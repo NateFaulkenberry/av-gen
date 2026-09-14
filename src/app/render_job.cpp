@@ -63,6 +63,24 @@ Result<void> RenderJob::start() {
     end_ = settings_.resolvedEnd(engine_->durationSeconds(), engine_->timeline().durationSeconds());
     total_ = settings_.frameCount(end_);
 
+    // ADR-186: the distance reductions this render is under. Told to the *engine*, not the
+    // renderer, because two of the three live in the simulation rather than in a pass -- the rig
+    // pose rate and the entity world's behaviour bands -- and the third reads the scene the engine
+    // hands over. This is the same lesson ADR-147 taught about the tier: a policy set on the
+    // interactive side only is a policy the deliverable never gets.
+    {
+        const scene::DetailLimits resolved = settings_.resolvedLimits();
+        engine_->setDetailLimits(resolved);
+        if (resolved.anyLifted()) {
+            log::info("render: lifting live detail limits -- procedural distance cull {}, LOD rungs "
+                      "{}, rig pose rate {}, entity behaviour bands {}",
+                      resolved.proceduralDistanceCull ? "kept" : "off",
+                      resolved.proceduralLodRungs ? "kept" : "off",
+                      resolved.rigDistanceRate ? "kept" : "off",
+                      resolved.entityDistanceCull ? "kept" : "off");
+        }
+    }
+
     // Warm-up: the first frames drawn with freshly compiled pipelines in a process differ by 1 LSB
     // in a few scattered pixels from every later render (Metal replaces the pipelines' GPU
     // binaries shortly after creation; Dawn caches pipeline objects device-wide, so a throwaway

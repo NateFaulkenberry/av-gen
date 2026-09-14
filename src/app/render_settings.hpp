@@ -5,6 +5,7 @@
 // overridable from the CLI. GPU-free; the RenderJob executes it.
 
 #include "core/error.hpp"
+#include "scene/detail_limits.hpp"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -55,6 +56,16 @@ struct RenderSettings {
     // reason and same defect as `disablePasses`: it was applied to the interactive renderer only,
     // so a quality arm on a `--render` was a third flag that validated and then did nothing.
     std::string qualityArms;
+    // ADR-186: which distance-based detail reductions this render is under. "tier" (the default)
+    // takes the tier's answer -- offline lifts them all, every other tier keeps live playback's;
+    // "live" keeps them whatever the tier, which is what a quick proof render wants; "unlimited"
+    // lifts them at any tier.
+    //
+    // Not a diagnostic like the two fields above it: this is a property of the deliverable, and a
+    // render with it lifted is the *better* picture rather than a broken one. The far field draws
+    // real geometry instead of billboards, distant characters are posed every frame instead of at
+    // 20 Hz, and nothing past 120 m stands frozen.
+    std::string limits = "tier";
 
     // Frame count for a resolved end time (endSeconds >= startSeconds); the last frame is the one
     // whose time is < end (end exclusive), at least 1.
@@ -79,6 +90,11 @@ struct RenderSettings {
     // Swaps a pattern that is still the other sequence kind's default for this kind's default, so
     // switching PNG <-> EXR does not leave ".png" names on EXR files.
     void normalisePattern();
+
+    // The detail limits this render runs under, resolved against its own tier. The one place the
+    // three words mean anything, so the job, the UI and a test cannot disagree about what "tier"
+    // resolves to.
+    [[nodiscard]] scene::DetailLimits resolvedLimits() const;
 
     [[nodiscard]] Result<void> validate() const; // sizes > 0 and even for video, fps > 0, quality range, pattern has {}
     [[nodiscard]] nlohmann::json toJson() const;

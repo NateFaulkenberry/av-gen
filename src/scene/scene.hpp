@@ -3,6 +3,7 @@
 // The scene data model (ADR-004): value types in scene_types.hpp; this header adds the
 // particle, post and procedural components and the Scene container.
 
+#include "scene/detail_limits.hpp"
 #include "scene/animation.hpp"
 #include "scene/particles.hpp"
 #include "scene/post_settings.hpp"
@@ -85,6 +86,9 @@ struct Scene {
     // ADR-086: the skinned characters. An Entity names one through Entity::rig; scene::updateRigs
     // advances them from the controller's update, never from the renderer.
     std::vector<SkinnedRig> rigs;
+    // ADR-186: the distance-based reductions in force for this frame. All on is live playback and
+    // is the default; an offline render lifts them. Not serialised -- policy, not content.
+    DetailLimits detailLimits{};
     PostSettings post;                // built-in post-processing (copied in by the Engine)
     std::uint64_t meshVersion = 0;    // incremented when meshes change (renderer re-uploads)
     std::uint64_t textureVersion = 0; // incremented when textures change

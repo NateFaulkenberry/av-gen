@@ -180,3 +180,5 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [182](ADR-182-a-diagnostic-arm-that-cannot-fail.md) | A diagnostic arm that cannot fail is worse than no arm | Accepted |
 | [183](ADR-183-the-waterline-work-is-reverted-pending-a-different-approach.md) | The waterline work is reverted, pending a different approach | Accepted |
 | [184](ADR-184-the-riverbank-work-is-carried-forward.md) | The riverbank work is carried forward; only the shimmer chase was reverted | Accepted |
+| [185](ADR-185-a-continuous-shot-carries-its-aim-across-the-cut.md) | A continuous shot carries its aim across the cut, not just its eye | Accepted |
+| [186](ADR-186-an-offline-render-lifts-the-limits-playback-needs.md) | An offline render lifts the distance limits playback needs | Accepted |

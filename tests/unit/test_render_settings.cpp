@@ -208,3 +208,64 @@ TEST_CASE("a render carries its quality tier", "[render][settings][tier]") {
         CHECK(legacy->tier == "offline");
     }
 }
+
+// ADR-186: which distance-based detail reductions a render runs under. The word resolves in one
+// place so the job, the panel and a test cannot each have their own idea of what "tier" means.
+TEST_CASE("Render limits resolve against the render's own tier", "[render][settings][limits]") {
+    RenderSettings s;
+    CHECK(s.limits == "tier");
+    CHECK(s.tier == "offline");
+
+    // The default deliverable: offline, so everything is lifted.
+    SECTION("tier, at the offline tier, lifts them all") {
+        const avgen::scene::DetailLimits r = s.resolvedLimits();
+        CHECK(r.anyLifted());
+        CHECK_FALSE(r.proceduralDistanceCull);
+        CHECK_FALSE(r.proceduralLodRungs);
+        CHECK_FALSE(r.rigDistanceRate);
+        CHECK_FALSE(r.entityDistanceCull);
+    }
+
+    // A fast proof render is a preview of the live picture, and a preview that quietly drew the
+    // far field at full detail would not be previewing what the viewport shows.
+    SECTION("tier, below offline, keeps the live picture") {
+        s.tier = "realtime";
+        CHECK_FALSE(s.resolvedLimits().anyLifted());
+        s.tier = "high";
+        CHECK_FALSE(s.resolvedLimits().anyLifted());
+        s.tier = "preview";
+        CHECK_FALSE(s.resolvedLimits().anyLifted());
+    }
+
+    SECTION("the two explicit words override the tier in both directions") {
+        s.limits = "live"; // offline tier, live limits
+        CHECK_FALSE(s.resolvedLimits().anyLifted());
+        s.tier = "realtime";
+        s.limits = "unlimited"; // realtime tier, lifted anyway
+        CHECK(s.resolvedLimits().anyLifted());
+    }
+
+    SECTION("a word nobody understands fails validation rather than the render") {
+        s.limits = "infinite";
+        CHECK_FALSE(s.validate().has_value());
+        s.limits = "unlimited";
+        CHECK(s.validate().has_value());
+    }
+
+    SECTION("it survives the project file") {
+        s.limits = "unlimited";
+        const auto back = RenderSettings::fromJson(s.toJson());
+        REQUIRE(back.has_value());
+        CHECK(back->limits == "unlimited");
+        CHECK(back->resolvedLimits().anyLifted());
+    }
+
+    // An older project has no "limits" key at all, and must keep meaning what it meant.
+    SECTION("a project written before this existed still renders") {
+        nlohmann::json j = s.toJson();
+        j.erase("limits");
+        const auto back = RenderSettings::fromJson(j);
+        REQUIRE(back.has_value());
+        CHECK(back->limits == "tier");
+    }
+}

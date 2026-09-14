@@ -455,7 +455,10 @@ RigStats updateRigs(Scene& scene, const FrameTime& time) {
             ++stats.culled;
             continue;
         }
-        const float hz = rig.rateFor(nearest[i]);
+        // ADR-186: with the distance rate lifted, every rig is posed at its authored `updateHz`
+        // however far away it is. `rateFor(0)` rather than a bare `updateHz` so the one rule that
+        // decides a rate stays in one place -- at zero distance it is the near band by definition.
+        const float hz = scene.detailLimits.rigDistanceRate ? rig.rateFor(nearest[i]) : rig.rateFor(0.0f);
         if (hz < 0.0f) {
             rig.hold();
             ++stats.culled;

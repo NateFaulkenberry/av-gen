@@ -99,6 +99,7 @@ std::string usageText() {
            "                      emission|ids|occlusion|depth|linear depth|depth edges|\n"
            "                      object depth|overdraw|fragment density\n"
            "  --tier <t>          quality tier: preview|realtime|high|offline\n"
+           "  --render-limits <m> distance detail in a render: tier|live|unlimited\n"
            "  --disable <list>    switch phases off for cost attribution, or subsystems off for\n"
            "                      forensic isolation:\n"
            "                      shadows,ao,volume,post,shadowmask,\n"
@@ -287,6 +288,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--tier");
             if (!v) return std::unexpected(v.error());
             options.qualityTier = *v;
+            ++i;
+        } else if (arg == "--render-limits") {
+            auto v = need(i, "--render-limits");
+            if (!v) return std::unexpected(v.error());
+            options.renderLimits = *v;
             ++i;
         } else if (arg == "--disable") {
             auto v = need(i, "--disable");
@@ -2813,6 +2819,15 @@ RenderSettings Application::renderSettingsFromOptions() const {
     // on a `--render` produced a byte-identical sequence -- an attribution arm that cannot fail.
     s.disablePasses = options_.disablePasses;
     s.qualityArms = options_.qualityArms;
+    // `--tier` used to reach the interactive renderer and stop there, so `--render out --tier
+    // realtime` -- the fast proof everyone wants before committing an hour to a sequence -- still
+    // rendered at the offline tier. Exactly ADR-147's defect one flag over.
+    if (!options_.qualityTier.empty()) {
+        s.tier = options_.qualityTier;
+    }
+    if (!options_.renderLimits.empty()) {
+        s.limits = options_.renderLimits; // ADR-186; validated with the rest of the settings
+    }
     if (options_.renderWidth) s.width = *options_.renderWidth;
     if (options_.renderHeight) s.height = *options_.renderHeight;
     if (options_.offlineFps > 0.0 && options_.fpsGiven) s.fps = options_.offlineFps;

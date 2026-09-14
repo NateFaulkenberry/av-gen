@@ -683,11 +683,11 @@ int survivorCount(const scene::Scene& s) {
     return static_cast<int>(std::count_if(levels.begin(), levels.end(), [](int l) { return l >= 0; }));
 }
 
-bool fullyCulledFor(const scene::Scene& s) {
+bool fullyCulledFor(const scene::Scene& s, bool limitDistance = true) {
     const auto& object = s.procedurals[0];
     return rendering::objectFullyCulled(object.lod, planesOf(s), cullCameraOf(s), glm::mat4(1.0f),
                                         rendering::instanceBounds(object.instances),
-                                        scene::sourceBoundingRadius(object.source));
+                                        scene::sourceBoundingRadius(object.source), limitDistance);
 }
 
 } // namespace
@@ -745,6 +745,27 @@ TEST_CASE("An object is rejected whole only when every instance would be culled"
         s.procedurals[0].lod.minScreenRadius = 20.0f;
         REQUIRE(survivorCount(s) == 0);
         CHECK(fullyCulledFor(s));
+    }
+
+    // ADR-186: an offline render lifts the distance limits, and the whole-object early-out is the
+    // first place that has to hear about it -- it rejects the object before the cull pass is ever
+    // encoded, so a policy that reached only the shader uniform would change nothing at all.
+    SECTION("with the distance limits lifted, only the frustum still rejects") {
+        // Inside the camera's far plane and well past both authored limits: the difference between
+        // the two arms is the policy and nothing else. (Further out than the far plane the frustum
+        // rejects it on its own, which is the camera's decision rather than the ladder's.)
+        s.camera.position = {0.0f, 6.0f, 150.0f};
+        s.camera.target = {0.0f, 0.0f, 0.0f};
+        s.procedurals[0].lod.maxDistance = 50.0f;
+        s.procedurals[0].lod.minScreenRadius = 20.0f;
+        REQUIRE(fullyCulledFor(s));            // live: past both limits
+        CHECK_FALSE(fullyCulledFor(s, false)); // lifted: still on screen, so still drawn
+
+        // And the frustum is not lifted with them: an object behind the camera contributes nothing
+        // to an offline frame either.
+        s.camera.position = {0.0f, 6.0f, 40.0f};
+        s.camera.target = {0.0f, 6.0f, 80.0f};
+        CHECK(fullyCulledFor(s, false));
     }
 
     SECTION("culling off: the shader rejects nothing, so neither may this") {

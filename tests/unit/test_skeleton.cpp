@@ -688,3 +688,57 @@ TEST_CASE("an unskinned entity uses its mesh bounds and says so", "[scene][skele
     CHECK(bounds.min.x > 3.0f);
     CHECK(bounds.max.x > 5.0f);
 }
+
+// ADR-186: a render that lifts the distance rate poses every rig at its authored rate, however far
+// away it is. The live path is unchanged, which is the half of this that a regression would break
+// quietly -- a policy that leaked into playback would cost CPU on every frame of every session.
+TEST_CASE("lifting the distance rate poses a rig the live path would freeze",
+          "[scene][animation][limits]") {
+    scene::Scene s;
+    s.camera.position = glm::vec3(0.0f, 0.0f, 5.0f);
+    s.rigs.push_back(twoStateRig());
+    s.rigs[0].cullDistance = 120.0f;
+    s.rigs[0].nearDistance = 15.0f;
+    s.rigs[0].farHz = 20.0f;
+    const scene::MeshId mesh = s.addMesh([] {
+        scene::MeshData m;
+        m.vertices = {{{0, 0, 0}, {0, 0, 1}, {0, 0}},
+                      {{1, 0, 0}, {0, 0, 1}, {1, 0}},
+                      {{0, 1, 0}, {0, 0, 1}, {0, 1}}};
+        m.indices = {0, 1, 2};
+        return m;
+    }());
+    scene::Entity& e = s.addEntity("alien", mesh);
+    e.rig = 0;
+    e.transform.position = glm::vec3(0.0f, 0.0f, -1000.0f); // a kilometre out: past cullDistance
+
+    FrameTime time;
+    time.renderTime = 1.0;
+
+    // Live playback: not posed at all. This is the frozen far herd the setting exists to remove.
+    auto stats = scene::updateRigs(s, time);
+    CHECK(stats.posed == 0);
+    CHECK(stats.culled == 1);
+
+    // Lifted: posed, at the near band's rate. Two different render times so the second call cannot
+    // pass by returning the palette the first one cached.
+    s.detailLimits = scene::DetailLimits::unlimited();
+    time.renderTime = 1.25;
+    stats = scene::updateRigs(s, time);
+    CHECK(stats.posed == 1);
+    CHECK(stats.culled == 0);
+    const std::uint64_t first = s.rigs[0].paletteVersion;
+
+    // And every frame, not at the 20 Hz far rate: a sixtieth of a second later it moves again.
+    time.renderTime = 1.25 + 1.0 / 60.0;
+    stats = scene::updateRigs(s, time);
+    CHECK(stats.posed == 1);
+    CHECK(s.rigs[0].paletteVersion > first);
+
+    // Put back, and it freezes again. The policy is the only thing that changed.
+    s.detailLimits = scene::DetailLimits{};
+    time.renderTime = 2.0;
+    stats = scene::updateRigs(s, time);
+    CHECK(stats.posed == 0);
+    CHECK(stats.culled == 1);
+}

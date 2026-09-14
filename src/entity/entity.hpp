@@ -188,6 +188,11 @@ struct EntityUpdate {
     std::uint64_t frameIndex = 0;
     const signals::SignalBus* bus = nullptr;
     glm::vec3 viewPosition{0.0f}; // where the camera is, for behaviour level of detail
+    // ADR-186: false lifts `EntityDesc::cullDistance` and `fullDetailDistance` -- every entity is
+    // updated every frame at full detail however far from the view it is. Set by an offline render,
+    // where the budget that made the bands worth having does not apply, and where a motionless far
+    // herd is a visible defect rather than a saving.
+    bool distanceDetail = true;
 };
 
 // What the field pass needs. The bus is not const here because a field *publishes*: occupancy and
@@ -198,6 +203,7 @@ struct FieldUpdate {
     double dt = 0.0;
     signals::SignalBus* bus = nullptr;
     glm::vec3 viewPosition{0.0f}; // the same three-band behaviour LOD the behaviour pass uses
+    bool distanceDetail = true;   // ADR-186; see EntityUpdate
 };
 
 class Entity {
@@ -549,7 +555,7 @@ public:
     // ordinary frame recomputes them.
     void seek(double time, params::ParameterSet* params = nullptr,
               const signals::SignalBus* bus = nullptr, glm::vec3 viewPosition = {},
-              double step = 1.0 / 60.0, double maxSeconds = 90.0);
+              double step = 1.0 / 60.0, double maxSeconds = 90.0, bool distanceDetail = true);
 
     // Everything that could not be resolved, for the editor and the log. Never silently empty
     // because a problem was swallowed.

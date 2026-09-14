@@ -105,6 +105,21 @@ normal|roughness|velocity|emission|ids|occlusion|depth` does the same from the c
 history lengths only - never the scene, its parameters or its determinism. `avgen --tier <name>`
 selects one; `rendering/render_quality.hpp` lists what each scales.
 
+### Distance detail limits (ADR-186)
+
+Three subsystems drop detail for things that are far away so a real-time frame fits in its budget:
+the procedural cull ladder stops drawing distant instances and demotes the ones it keeps to coarser
+meshes or billboards, `scene::updateRigs` poses distant characters at `farHz` or not at all past
+`cullDistance`, and the entity world stops running behaviours past its own radius. `scene::DetailLimits`
+(on `Scene`, never serialised) says which of the four are in force; all four on is playback.
+
+An offline render lifts them. `RenderSettings::limits` takes `tier` (the default -- offline lifts
+them, every other tier keeps them), `live` or `unlimited`; `avgen --render-limits <m>` and the Render
+panel's **draw distance** combo set it. Frustum culling and the camera's far plane are not affected
+at any setting: what is off screen is off screen, and how far the camera sees is composition.
+
+`--render-limits live` restores exactly what a render did before this existed.
+
 Bind groups: 0 the frame group - 0 `FrameUniforms` (976 B: viewProj, invViewProj, prevViewProj,
 camera basis, params, envParams, skyParams, fogParams, audio, cluster and shadow parameters, AO
 parameters, target size, and 8 `LightUniform`s for the fallback tier), 1 the packed scene lights

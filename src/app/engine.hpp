@@ -420,6 +420,15 @@ public:
 
     // ---- accessors for UI / renderer / tests ----
     [[nodiscard]] const scene::Scene& scene() const { return controller_->scene(); }
+
+    // ---- distance detail policy (ADR-186) ------------------------------------------------------
+    //
+    // What the procedural cull ladder, the rig pose rate and the entity world are allowed to drop
+    // because it is far away. The default honours everything the scene authored, which is live
+    // playback; an offline render lifts some or all of it. Written into the controller's scene at
+    // the top of every `update`, so it survives a scene the controller rebuilds under it.
+    void setDetailLimits(const scene::DetailLimits& limits) { detailLimits_ = limits; }
+    [[nodiscard]] const scene::DetailLimits& detailLimits() const { return detailLimits_; }
     [[nodiscard]] scene::SceneController& controller() { return *controller_; }
     // The orb preset when it is the active controller (nullptr otherwise).
     [[nodiscard]] scene::OrbScene* orbScene() { return dynamic_cast<scene::OrbScene*>(controller_.get()); }
@@ -465,6 +474,7 @@ private:
     void ensureControlSource();   // the "control" source exists in the rack and its channels are declared
 
     EngineMode mode_;
+    scene::DetailLimits detailLimits_{}; // ADR-186; all limits honoured == live playback
     params::ParameterSet params_;
     signals::SignalBus bus_;
     signals::AudioSignals audioSignals_;

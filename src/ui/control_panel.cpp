@@ -1867,6 +1867,32 @@ void ControlPanel::drawRender(app::Engine& engine) {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(0.90f, 0.72f, 0.25f, 1.0f), "(not final quality)");
         }
+        // ADR-186: the distance reductions the live path applies. Next to the tier because it is
+        // the same kind of decision -- how much work a frame is allowed to skip -- and because the
+        // default answer *is* the tier's.
+        static const char* kLimitNames[] = {"tier", "live", "unlimited"};
+        int limits = s.limits == "live" ? 1 : (s.limits == "unlimited" ? 2 : 0);
+        ImGui::SetNextItemWidth(140);
+        if (ImGui::Combo("draw distance", &limits, kLimitNames, 3)) {
+            s.limits = kLimitNames[limits];
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "Distance limits the live path applies so a frame fits in a frame.\n\n"
+                "tier      the tier decides: offline lifts them, anything else keeps them.\n"
+                "live      keep them -- a fast proof that matches the viewport.\n"
+                "unlimited lift them at any tier.\n\n"
+                "Lifted, nothing is dropped for being far away: scatter draws its real\n"
+                "mesh instead of a billboard however distant, every character is posed\n"
+                "every frame, and nothing past its cull radius stands frozen. Only\n"
+                "frustum culling stays -- what is off screen is still off screen.\n\n"
+                "Slower, sometimes much slower on a world with heavy scatter.");
+        }
+        const scene::DetailLimits resolved = s.resolvedLimits();
+        if (resolved.anyLifted()) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.45f, 0.80f, 0.55f, 1.0f), "(no distance cull)");
+        }
     }
     float range[2] = {static_cast<float>(s.startSeconds), static_cast<float>(s.endSeconds)};
     if (ImGui::InputFloat2("range (s, end<0 = auto)", range, "%.2f")) {

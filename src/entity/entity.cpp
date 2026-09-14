@@ -680,7 +680,7 @@ void EntityWorld::reset() {
 }
 
 void EntityWorld::seek(double time, params::ParameterSet* params, const signals::SignalBus* bus,
-                       glm::vec3 viewPosition, double step, double maxSeconds) {
+                       glm::vec3 viewPosition, double step, double maxSeconds, bool distanceDetail) {
     if (params != nullptr) {
         params->resetFinals();
     }
@@ -697,8 +697,8 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         for (auto& entityPtr : entities_) {
             Entity& entity = *entityPtr;
             const float distance = glm::length(entity.state_.position() - viewPosition);
-            if (entity.desc_.cullDistance > 0.0f && distance > entity.desc_.cullDistance &&
-                entity.everUpdated_) {
+            if (distanceDetail && entity.desc_.cullDistance > 0.0f &&
+                distance > entity.desc_.cullDistance && entity.everUpdated_) {
                 continue;
             }
             entity.motion_ = MotionOffset{};
@@ -906,7 +906,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // reproduce. The coarse stage below still applies, so the cost stays bounded -- what is
         // refused here is only the "do not update at all" band.
         const bool underOrders = entity.actions_.pending() > 0 || entity.schedule_.running();
-        if (!first && !underOrders && entity.desc_.cullDistance > 0.0f &&
+        if (!first && !underOrders && ctx.distanceDetail && entity.desc_.cullDistance > 0.0f &&
             distance > entity.desc_.cullDistance) {
             // Far enough away that nothing it could do would be visible. Not merely a cheaper
             // update: no update, and no parameter write either, so the node stays exactly where
@@ -917,7 +917,8 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         }
 
         double dt = ctx.dt;
-        if (!first && entity.desc_.fullDetailDistance > 0.0f && distance > entity.desc_.fullDetailDistance) {
+        if (!first && ctx.distanceDetail && entity.desc_.fullDetailDistance > 0.0f &&
+            distance > entity.desc_.fullDetailDistance) {
             entity.coarseAccum_ += ctx.dt;
             if (entity.coarseAccum_ < static_cast<double>(entity.desc_.coarseInterval)) {
                 ++counts_.skipped;
@@ -1486,10 +1487,11 @@ void EntityWorld::updateFields(const FieldUpdate& ctx, params::ParameterSet& par
         ++fieldCounts_.governed;
         const glm::vec3 here = e.fieldPosition();
         const float distance = glm::length(here - ctx.viewPosition);
-        if (e.desc().cullDistance > 0.0f && distance > e.desc().cullDistance) {
+        if (ctx.distanceDetail && e.desc().cullDistance > 0.0f && distance > e.desc().cullDistance) {
             continue;
         }
-        if (e.desc().fullDetailDistance > 0.0f && distance > e.desc().fullDetailDistance) {
+        if (ctx.distanceDetail && e.desc().fullDetailDistance > 0.0f &&
+            distance > e.desc().fullDetailDistance) {
             e.fieldAccum_ += ctx.dt;
             if (e.fieldAccum_ < static_cast<double>(e.desc().coarseInterval)) {
                 continue;

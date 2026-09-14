@@ -1709,6 +1709,7 @@ void Composition::updateFields(const FrameTime& time, signals::SignalBus& bus,
     update.dt = time.deltaTime;
     update.bus = &bus;
     update.viewPosition = scene_.camera.position;
+    update.distanceDetail = scene_.detailLimits.entityDistanceCull; // ADR-186
     const std::size_t signalsBefore = bus.size();
     entityWorld_.updateFields(update, *params_);
     if (!fieldRoutesChecked_) {
@@ -1756,6 +1757,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
     update.frameIndex = time.frameIndex;
     update.bus = &bus;
     update.viewPosition = scene_.camera.position;
+    update.distanceDetail = scene_.detailLimits.entityDistanceCull; // ADR-186
     entityWorld_.update(update, *params_);
 }
 

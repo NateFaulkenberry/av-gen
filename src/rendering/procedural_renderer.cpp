@@ -213,8 +213,12 @@ InstanceBounds instanceBounds(const std::vector<scene::InstanceRecord>& records)
     return bounds;
 }
 
+// `limitDistance` is `DetailLimits::proceduralDistanceCull` (ADR-186). It gates only the two
+// distance tests: the frustum rejection below stays whatever the policy is, because an object
+// entirely behind the camera contributes nothing to any render, offline or not.
 bool objectFullyCulled(const scene::LodSettings& lod, const FrustumPlanes& planes, const CullCamera& camera,
-                       const glm::mat4& objectToWorld, const InstanceBounds& bounds, float sourceRadius) {
+                       const glm::mat4& objectToWorld, const InstanceBounds& bounds, float sourceRadius,
+                       bool limitDistance) {
     if (!bounds.valid || !lod.cull) {
         return false;
     }
@@ -252,10 +256,10 @@ bool objectFullyCulled(const scene::LodSettings& lod, const FrustumPlanes& plane
     // and when radius / dist * projScale >= minScreenRadius.
     const glm::vec3 nearest = glm::clamp(camera.position, lo, hi);
     const float nearDistance = glm::length(nearest - camera.position);
-    if (lod.maxDistance > 0.0f && nearDistance - radius > lod.maxDistance) {
+    if (limitDistance && lod.maxDistance > 0.0f && nearDistance - radius > lod.maxDistance) {
         return true;
     }
-    if (lod.minScreenRadius > 0.0f &&
+    if (limitDistance && lod.minScreenRadius > 0.0f &&
         radius / std::max(nearDistance, 1e-4f) * camera.projScale < lod.minScreenRadius) {
         return true;
     }
@@ -1513,7 +1517,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         const bool fullyCulled = isPart ? fullyCulledOf[leadIndex] != 0
                                         : (cullActive && !usesLive &&
                                            objectFullyCulled(lodSettings, planes, cullCamera, model,
-                                                             state.bounds, cullRadius));
+                                                             state.bounds, cullRadius,
+                                                             scene.detailLimits.proceduralDistanceCull));
         if (fullyCulled) {
             ++stats_.culledObjects;
         }
@@ -1725,11 +1730,21 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             for (int c = 0; c < 3; ++c) {
                 objectScale = std::max(objectScale, glm::length(glm::vec3(model[c])));
             }
-            cull.limits = glm::vec4(std::max(lodSettings.maxDistance, 0.0f),
-                                    std::max(lodSettings.minScreenRadius, 0.0f), cullRadius,
-                                    std::max(objectScale, 1e-6f));
-            cull.thresholds = glm::vec4(lodSettings.lodDistances[0], lodSettings.lodDistances[1],
-                                        lodSettings.lodDistances[2], 0.0f);
+            // ADR-186: an offline render lifts the distance limits. Zero is already this pass's
+            // "no limit" for both, and a zero first threshold already ends the ladder at rung 0
+            // (see LodSettings), so lifting them needs no shader change and no second code path --
+            // the uniform is simply filled with the values that mean "everything, at full detail".
+            //
+            // Frustum culling is untouched either way. It removes only what is off screen, which is
+            // not a reduction in what the frame shows.
+            const bool limitDistance = scene.detailLimits.proceduralDistanceCull;
+            const bool limitRungs = scene.detailLimits.proceduralLodRungs;
+            cull.limits = glm::vec4(limitDistance ? std::max(lodSettings.maxDistance, 0.0f) : 0.0f,
+                                    limitDistance ? std::max(lodSettings.minScreenRadius, 0.0f) : 0.0f,
+                                    cullRadius, std::max(objectScale, 1e-6f));
+            cull.thresholds = limitRungs ? glm::vec4(lodSettings.lodDistances[0], lodSettings.lodDistances[1],
+                                                     lodSettings.lodDistances[2], 0.0f)
+                                         : glm::vec4(0.0f);
             cull.stability = glm::vec4(std::clamp(lodSettings.lodSpread, 0.0f, 0.5f),
                                        lodHysteresisAllowed_
                                            ? std::clamp(lodSettings.lodHysteresis, 0.0f, 0.5f)

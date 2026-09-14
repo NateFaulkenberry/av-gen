@@ -1928,7 +1928,8 @@ void Engine::seekSeconds(double seconds) {
     // pose, which is a different frame from the one the seeked second actually has.
     if (scene::Composition* composition = this->composition()) {
         composition->entityWorld().seek(seconds, &params_, nullptr,
-                                        composition->scene().camera.position);
+                                        composition->scene().camera.position, 1.0 / 60.0, 90.0,
+                                        composition->scene().detailLimits.entityDistanceCull);
         // Skinning has its own "a frame ago", and a seek makes that sentence false: the joints were
         // not anywhere a frame ago. Left alone, the first frame after every scrub carries joint
         // motion vectors for a jump nobody made and the character smears. Told here rather than
@@ -2381,6 +2382,14 @@ void Engine::applyCues() {
 void Engine::update(const FrameTime& time) {
     const auto start = std::chrono::steady_clock::now();
     bool newFrame = false;
+
+    // ADR-186: the frame's detail policy, written before anything reads it. Applied every frame
+    // rather than once at the setter, because a controller may replace its scene (a project load,
+    // a reimport) and the policy is the engine's, not that scene's -- the same reason the quality
+    // tier is pushed to the renderer per frame.
+    if (controller_) {
+        controller_->scene().detailLimits = detailLimits_;
+    }
 
     if (mode_ == EngineMode::Offline) {
         // The offline position, taken from whatever clock produced this frame. No clamp, no loop and

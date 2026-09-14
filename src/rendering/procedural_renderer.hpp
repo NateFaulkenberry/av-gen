@@ -165,7 +165,8 @@ struct InstanceBounds {
 // with effectors moves its records on the GPU, so the caller must not use this for those.
 [[nodiscard]] bool objectFullyCulled(const scene::LodSettings& lod, const FrustumPlanes& planes,
                                      const CullCamera& camera, const glm::mat4& objectToWorld,
-                                     const InstanceBounds& bounds, float sourceRadius);
+                                     const InstanceBounds& bounds, float sourceRadius,
+                                     bool limitDistance = true);
 
 // Per-object result of the cull pass (blocking readback; tests and tools).
 struct CullCounts {

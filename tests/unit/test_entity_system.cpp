@@ -629,3 +629,50 @@ TEST_CASE("A coarse entity holds its pose on the frames it skips", "[entity][per
     INFO(reversals << " frame(s) returned to the value from two frames earlier");
     CHECK(reversals == 0);
 }
+
+// ADR-186: an offline render lifts the distance bands, so the far herd goes on living rather than
+// standing where the budget left it. The pair matters more than either half: the live path must
+// still skip -- these bands are why a world of characters fits in a frame -- and the lifted path
+// must actually reach the entity, not merely be passed a flag nothing reads.
+TEST_CASE("lifting the distance bands keeps a distant entity alive", "[entity][performance][limits]") {
+    entity::EntityDesc d = craftDesc();
+    d.fullDetailDistance = 50.0f;
+    d.coarseInterval = 0.25f;
+    d.cullDistance = 200.0f;
+
+    const glm::vec3 faraway(0.0f, 10.0f, 900.0f); // well past the cull distance
+
+    // What playback does: nothing runs, and the node stays where the author placed it.
+    Fixture live(d);
+    auto* livePosition = live.params.findAs<glm::vec3>("nodes/craft/position");
+    run(live.world, live.params, live.bus, 2.0, faraway);
+    CHECK(live.world.counts().full == 0);
+    CHECK(live.world.counts().coarse == 0);
+    CHECK(livePosition->value().y == 10.0f);
+
+    // The same seed, the same two seconds, the same distance -- with the bands lifted. Every frame
+    // is a full update and the character has moved.
+    Fixture lifted(d);
+    auto* position = lifted.params.findAs<glm::vec3>("nodes/craft/position");
+    std::size_t skipped = 0;
+    std::size_t coarse = 0;
+    for (int i = 0; i <= 120; ++i) {
+        lifted.params.resetFinals();
+        entity::EntityUpdate u;
+        u.time = static_cast<double>(i) / 60.0;
+        u.dt = i == 0 ? 0.0 : 1.0 / 60.0;
+        u.frameIndex = static_cast<std::uint64_t>(i);
+        u.bus = &lifted.bus;
+        u.viewPosition = faraway;
+        u.distanceDetail = false; // ADR-186
+        lifted.world.update(u, lifted.params);
+        skipped += lifted.world.counts().skipped;
+        coarse += lifted.world.counts().coarse;
+    }
+    CHECK(skipped == 0);
+    CHECK(coarse == 0);
+    CHECK(lifted.world.counts().full == 1);
+    // It went somewhere. The live arm above proves the same two seconds at the same distance do
+    // not, so this cannot pass by the behaviour being a no-op.
+    CHECK(position->value().y != 10.0f);
+}

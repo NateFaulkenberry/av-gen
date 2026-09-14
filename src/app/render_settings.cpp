@@ -1,5 +1,7 @@
 #include "app/render_settings.hpp"
 
+#include "rendering/render_quality.hpp"
+
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
@@ -102,6 +104,30 @@ std::filesystem::path RenderSettings::withVideoExtension(const std::filesystem::
     return out;
 }
 
+scene::DetailLimits RenderSettings::resolvedLimits() const {
+    scene::DetailLimitMode mode = scene::DetailLimitMode::Tier;
+    if (!limits.empty()) {
+        // An unparseable value cannot reach here through `validate`, and if one does the answer is
+        // the live picture: the conservative reading of a setting nobody understood.
+        static_cast<void>(scene::detailLimitModeFromName(limits, mode));
+    }
+    if (mode == scene::DetailLimitMode::Live) {
+        return scene::DetailLimits{};
+    }
+    if (mode == scene::DetailLimitMode::Unlimited) {
+        return scene::DetailLimits::unlimited();
+    }
+    // "tier": the Offline tier is the one that promises no representation shortcut (§5.9), so it
+    // is the one that lifts these. Every other tier is a preview of the live picture and keeps
+    // them -- including a `--render` at `--tier realtime`, which exists precisely to be fast.
+    rendering::QualityTier resolved = rendering::QualityTier::Offline;
+    if (!rendering::qualityTierFromName(tier, resolved)) {
+        resolved = rendering::QualityTier::Offline; // the default the job also falls back to
+    }
+    return resolved == rendering::QualityTier::Offline ? scene::DetailLimits::unlimited()
+                                                       : scene::DetailLimits{};
+}
+
 Result<void> RenderSettings::validate() const {
     if (width == 0 || height == 0 || width > 16384 || height > 16384) {
         return fail("render size {}x{} is out of range", width, height);
@@ -120,6 +146,11 @@ Result<void> RenderSettings::validate() const {
     }
     if (quality < 0 || quality > 100) {
         return fail("render quality {} must be 0..100", quality);
+    }
+    // Validated here rather than discovered in the job, so a project file with a typo in it fails
+    // when it is loaded and not two hours into a sequence.
+    if (scene::DetailLimitMode mode{}; !limits.empty() && !scene::detailLimitModeFromName(limits, mode)) {
+        return fail("render limits '{}' is not 'tier', 'live' or 'unlimited'", limits);
     }
     if (isSequence(output)) {
         if (pattern.find('{') == std::string::npos || pattern.find('}') == std::string::npos) {
@@ -147,6 +178,7 @@ nlohmann::json RenderSettings::toJson() const {
                           {"backend", backend},
                           {"quality", quality},
                           {"tier", tier},
+                          {"limits", limits},
                           {"muxAudio", muxAudio},
                           {"encoderThreads", encoderThreads}};
 }
@@ -201,6 +233,7 @@ Result<RenderSettings> RenderSettings::fromJson(const nlohmann::json& j) {
     s.normalisePattern(); // a missing pattern follows the output kind
     if (auto r = text("codec", s.codec); !r) return std::unexpected(r.error());
     if (auto r = text("tier", s.tier); !r) return std::unexpected(r.error());
+    if (auto r = text("limits", s.limits); !r) return std::unexpected(r.error());
     if (auto r = text("backend", s.backend); !r) return std::unexpected(r.error());
     if (const auto it = j.find("muxAudio"); it != j.end()) {
         if (!it->is_boolean()) {

@@ -101,6 +101,9 @@ struct AppOptions {
     // tier that scales shadow, occlusion and cluster sample counts.
     std::string debugTarget;
     std::string qualityTier;
+    // ADR-186: "tier" | "live" | "unlimited" -- which distance-based detail reductions a `--render`
+    // runs under. Empty leaves whatever the project asked for.
+    std::string renderLimits;
     // A/B attribution: comma-separated phases to switch off for this run
     // (shadows, ao, volume, post). Logged at start-up so a run's own output proves which arm it is.
     std::string disablePasses;
