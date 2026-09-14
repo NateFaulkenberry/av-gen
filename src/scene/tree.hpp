@@ -76,10 +76,10 @@ inline constexpr std::uint32_t kNoNode = 0xFFFFFFFFu;
 // The shape of the volume the crown colonises. The attraction cloud *is* the silhouette, so this is
 // the most direct control over the tree's outline that the system has.
 struct CrownEnvelope {
-    float baseHeight = 7.0f;   // the crown ellipsoid does not reach below this
-    float centreHeight = 13.5f; // centre of the ellipsoid
-    float radius = 9.0f;       // horizontal semi-axis
-    float halfHeight = 6.0f;   // vertical semi-axis
+    float baseHeight = 11.5f;   // the crown ellipsoid does not reach below this
+    float centreHeight = 21.5f; // centre of the ellipsoid
+    float radius = 10.5f;       // horizontal semi-axis
+    float halfHeight = 10.0f;   // vertical semi-axis
     // Vertical profile: the horizontal extent is scaled by a function of the normalised height in
     // the ellipsoid. 0 = a plain ellipsoid; positive values pull the underside in and push the
     // shoulders out, which is the broad-shouldered monumental outline rather than a ball.
@@ -98,7 +98,7 @@ struct CrownEnvelope {
     // first time this ran. Narrow enough that a lateral bud on the bole finds almost no space and
     // is shed, wide enough that the terminal bud always has somewhere to go. The trunk's height,
     // taper and slight lean are then all outputs of the same competition as everything else.
-    float trunkCorridorRadius = 1.15f;
+    float trunkCorridorRadius = 1.35f;
     float trunkCorridorBottom = 0.4f;
 };
 
@@ -107,7 +107,7 @@ struct TreeParams {
 
     // --- Envelope and marker cloud -------------------------------------------------------------
     CrownEnvelope crown{};
-    int markerCount = 26000;
+    int markerCount = 52000;
 
     // --- Simulation ----------------------------------------------------------------------------
     int iterations = 32;
@@ -116,7 +116,7 @@ struct TreeParams {
     // internode length multiplies the achievable branch count by about eight. 0.38 against a 9 m
     // crown radius is the point where the twig count is in the thousands and generation is still
     // well under a second.
-    float internodeLength = 0.38f;
+    float internodeLength = 0.46f;
     float occupancyRadius = 1.6f;       // rho, in internode lengths (paper: 2)
     float perceptionDistance = 5.0f;    // r, in internode lengths (paper: 4 to 6)
     float perceptionAngle = 1.4f;       // theta, radians half-angle (paper: ~90 degrees)
@@ -163,16 +163,27 @@ struct TreeParams {
     float tipRadius = 0.028f;
     float radiusScale = 1.0f;
     float trunkFlare = 0.85f;           // extra radius at the very base, as a fraction
-    float flareHeight = 2.2f;           // the height it decays over
+    float flareHeight = 3.0f;           // the height it decays over
 
     // --- Foliage attachment --------------------------------------------------------------------
-    int foliageMinOrder = 2;
+    int foliageMinOrder = 3;
     float foliageMaxRadius = 0.10f;     // a tip thicker than this is structure, not a leaf holder
+    // The fraction of eligible tips that actually carry a cluster. THIS IS THE OPENNESS CONTROL.
+    // Every tip carrying foliage closes the canopy into one mass, and a canopy the limbs cannot be
+    // seen through fails the readability gate however good the branching underneath it is. Thinning
+    // deterministically by a hash of the tip -- rather than by raising the order threshold -- keeps
+    // the clusters spread through the crown instead of retreating to its surface.
+    float foliageFraction = 0.70f;
+    // Cluster size. Separate from `foliageFraction` because they are different failures: thinning
+    // opens holes in the canopy, enlarging closes it up without moving the clusters. A canopy needs
+    // both knobs to reach "limbs readable through leaves" rather than either "solid mass" or
+    // "branches with a few tufts on them".
+    float foliageClusterScale = 1.0f;
 
     // --- Roots ---------------------------------------------------------------------------------
     int rootCount = 9;
-    float rootSpread = 7.5f;
-    float rootDepth = 1.5f;
+    float rootSpread = 9.5f;
+    float rootDepth = 1.9f;
     float rootCurvature = 0.55f;
     float rootRadiusScale = 0.55f;      // fraction of the trunk base radius the largest root starts at
     int rootSegments = 9;

@@ -27,6 +27,7 @@ enum Channel : std::uint32_t {
     kNodePhase = 310,
     kFoliageRadius = 311,
     kFoliagePhase = 312,
+    kFoliageKeep = 313,
     kRootAngle = 320,
     kRootLength = 321,
     kRootWander = 322,
@@ -913,12 +914,18 @@ Result<TreeGraph> generateTree(const TreeParams& params) {
             node.radius > params.foliageMaxRadius) {
             continue;
         }
+        // Deterministic thinning. Keyed on the node so it is reproducible, and applied per tip so
+        // the surviving clusters stay spread through the crown's depth rather than forming a shell.
+        if (noise::hashIndex(params.seed, node.id, kFoliageKeep) > params.foliageFraction) {
+            continue;
+        }
         FoliageSite site;
         site.node = node.id;
         site.axis = node.axis;
         site.position = node.position;
         site.direction = node.direction;
-        site.radius = 0.6f + 0.8f * noise::hashIndex(params.seed, node.id, kFoliageRadius);
+        site.radius = (0.6f + 0.8f * noise::hashIndex(params.seed, node.id, kFoliageRadius)) *
+                      params.foliageClusterScale;
         site.phase = noise::hashIndex(params.seed, node.id, kFoliagePhase) * glm::two_pi<float>();
         const glm::vec3 toCentre = node.position - glm::vec3(0.0f, params.crown.centreHeight, 0.0f);
         const float extent = std::max(params.crown.radius, params.crown.halfHeight);
@@ -1046,6 +1053,8 @@ nlohmann::json TreeParams::toJson() const {
     j["flareHeight"] = flareHeight;
     j["foliageMinOrder"] = foliageMinOrder;
     j["foliageMaxRadius"] = foliageMaxRadius;
+    j["foliageFraction"] = foliageFraction;
+    j["foliageClusterScale"] = foliageClusterScale;
     j["rootCount"] = rootCount;
     j["rootSpread"] = rootSpread;
     j["rootDepth"] = rootDepth;
@@ -1114,6 +1123,8 @@ Result<TreeParams> TreeParams::fromJson(const nlohmann::json& j) {
     p.flareHeight = j.value("flareHeight", p.flareHeight);
     p.foliageMinOrder = j.value("foliageMinOrder", p.foliageMinOrder);
     p.foliageMaxRadius = j.value("foliageMaxRadius", p.foliageMaxRadius);
+    p.foliageFraction = j.value("foliageFraction", p.foliageFraction);
+    p.foliageClusterScale = j.value("foliageClusterScale", p.foliageClusterScale);
     p.rootCount = j.value("rootCount", p.rootCount);
     p.rootSpread = j.value("rootSpread", p.rootSpread);
     p.rootDepth = j.value("rootDepth", p.rootDepth);
