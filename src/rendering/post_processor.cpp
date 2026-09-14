@@ -371,9 +371,43 @@ void PostProcessor::encodeMetering(wgpu::CommandEncoder& encoder, const PostFram
     meterPending_ = true;
 }
 
+const gpu::TransientTexture* PostCapture::find(std::string_view name) const {
+    for (const PostCaptureStage& stage : stages) {
+        if (stage.name == name) {
+            return &stage.texture;
+        }
+    }
+    return nullptr;
+}
+
+void PostProcessor::armCapture() {
+    capturing_ = true;
+    capture_ = PostCapture{};
+}
+
+PostCapture PostProcessor::takeCapture() {
+    capturing_ = false;
+    return std::move(capture_);
+}
+
+void PostProcessor::captureStage(std::string name, const gpu::TransientTexture& texture) {
+    if (!capturing_ || !texture.valid()) {
+        return;
+    }
+    capture_.stages.push_back(PostCaptureStage{std::move(name), texture});
+}
+
+// The pyramid and the wide tier are the only targets the chain allocates without CopySrc -- the
+// default the pool hands everything else already has it. Widening them only while a capture is
+// armed keeps the production allocation exactly as it was.
+wgpu::TextureUsage PostProcessor::pyramidUsage() const {
+    const auto base = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
+    return capturing_ ? (base | wgpu::TextureUsage::CopySrc) : base;
+}
+
 wgpu::TextureView PostProcessor::buildPyramid(wgpu::CommandEncoder& encoder, gpu::TransientPool& pool,
                                               const Uniforms& base, std::vector<gpu::TransientTexture>& down,
-                                              float spread, float blend) {
+                                              float spread, float blend, const char* tier) {
     if (down.empty()) {
         return {};
     }
@@ -381,14 +415,14 @@ wgpu::TextureView PostProcessor::buildPyramid(wgpu::CommandEncoder& encoder, gpu
     for (int level = static_cast<int>(down.size()) - 2; level >= 0; --level) {
         const auto& fine = down[static_cast<std::size_t>(level)];
         const auto& coarse = down[static_cast<std::size_t>(level) + 1];
-        auto target = pool.acquire(fine.width, fine.height, kHdrFormat,
-                                   wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding, "bloom-up");
+        auto target = pool.acquire(fine.width, fine.height, kHdrFormat, pyramidUsage(), "bloom-up");
         Uniforms u = base;
         u.texelSize = 1.0f / glm::vec2(static_cast<float>(coarse.width), static_cast<float>(coarse.height));
         u.params0 = glm::vec4(spread, blend, 0.0f, 0.0f);
         // No stage of its own: the pyramid is shared by bloom and halation, and the caller has
         // already said which one this is.
         runPass(encoder, upsample_, target.view, acc, fine.view, nullptr, u);
+        captureStage(std::string(tier) + "/up" + std::to_string(level), target);
         acc = target.view;
     }
     return acc;
@@ -441,6 +475,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         u.params0 = glm::vec4(exposure, 0.0f, 0.0f, 0.0f);
         stage_ = "post/exposure";
         runPass(encoder, exposure_, target.view, current, nullptr, nullptr, u);
+        captureStage("exposure", target);
         current = target.view;
     }
 
@@ -467,6 +502,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         // The depth view is still bound when only the band is running: binding the placeholder
         // instead would cost a bind group rebuild for a texture the shader never reads.
         runPass(encoder, dof_, target.view, current, nullptr, in.depth, u);
+        captureStage("dof", target);
         current = target.view;
     }
     // ---- 3. motion blur: tile-based reconstruction over the velocity target (ADR-035/040) -------
@@ -501,6 +537,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         textures.third = in.velocity;
         textures.depth = in.depth;
         runPass(encoder, motionBlur_, target.view, textures, b);
+        captureStage("motionblur", target);
         current = target.view;
         pool.release(tiles);
         pool.release(neighbours);
@@ -512,6 +549,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         u.params0 = glm::vec4(s.chromaticAberration, s.distortion, 0.0f, 0.0f);
         stage_ = "post/lens";
         runPass(encoder, lens_, target.view, current, nullptr, nullptr, u);
+        captureStage("lens", target);
         current = target.view;
     }
 
@@ -520,7 +558,6 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
     const bool anamorphicOn = s.anamorphicEnabled && s.anamorphicIntensity > 0.0f;
     const bool halationOn = s.halationEnabled && s.halationIntensity > 0.0f;
     const bool pyramidOn = bloomOn || anamorphicOn;
-    const auto pyramidUsage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
     // The tent's blend weight: 0.5 halves each coarser level's share, so the pyramid's mean equals
     // the prefiltered image's mean whatever the level count (energy-conserving upsample, ADR-039).
     const float blend = std::clamp(s.bloomRadius * 0.5f, 0.05f, 0.95f);
@@ -532,7 +569,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         std::uint32_t w = std::max(1u, in.width / 2);
         std::uint32_t h = std::max(1u, in.height / 2);
         for (std::uint32_t level = 0; level < levels && w >= 2 && h >= 2; ++level) {
-            auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage, "bloom-down");
+            auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage(), "bloom-down");
             Uniforms u = base;
             if (level == 0) {
                 u.texelSize = 1.0f / base.outputSize;
@@ -553,12 +590,13 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
                     1.0f / glm::vec2(static_cast<float>(down.back().width), static_cast<float>(down.back().height));
                 runPass(encoder, downsample_, target.view, down.back().view, nullptr, nullptr, u);
             }
+            captureStage(level == 0 ? std::string("bloom/prefilter") : "bloom/down" + std::to_string(level), target);
             down.push_back(target);
             w = std::max(1u, w / 2);
             h = std::max(1u, h / 2);
         }
         stats_.bloomLevels = static_cast<std::uint32_t>(down.size());
-        bloom = buildPyramid(encoder, pool, base, down, s.bloomRadius, blend);
+        bloom = buildPyramid(encoder, pool, base, down, s.bloomRadius, blend, "bloom");
     }
 
     // Halation: its own, coarser pyramid over a warm-weighted threshold (ADR-039).
@@ -569,7 +607,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         std::uint32_t w = std::max(1u, in.width / 4);
         std::uint32_t h = std::max(1u, in.height / 4);
         for (std::uint32_t level = 0; level < levels && w >= 2 && h >= 2; ++level) {
-            auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage, "halation-down");
+            auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage(), "halation-down");
             Uniforms u = base;
             if (level == 0) {
                 u.texelSize = 1.0f / base.outputSize;
@@ -581,12 +619,14 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
                     1.0f / glm::vec2(static_cast<float>(hdown.back().width), static_cast<float>(hdown.back().height));
                 runPass(encoder, downsample_, target.view, hdown.back().view, nullptr, nullptr, u);
             }
+            captureStage(level == 0 ? std::string("halation/prefilter") : "halation/down" + std::to_string(level),
+                         target);
             hdown.push_back(target);
             w = std::max(1u, w / 2);
             h = std::max(1u, h / 2);
         }
         stats_.halationLevels = static_cast<std::uint32_t>(hdown.size());
-        halation = buildPyramid(encoder, pool, base, hdown, s.bloomRadius * s.halationRadius, blend);
+        halation = buildPyramid(encoder, pool, base, hdown, s.bloomRadius * s.halationRadius, blend, "halation");
     }
 
     // The wide tier: halation tinted and the anamorphic streak, in one texture the composite adds.
@@ -595,7 +635,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         // Quarter resolution: both tiers are low-frequency by construction.
         const std::uint32_t w = std::max(1u, in.width / 4);
         const std::uint32_t h = std::max(1u, in.height / 4);
-        auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage, "wide");
+        auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage(), "wide");
         Uniforms u = base;
         u.texelSize = 1.0f / glm::vec2(static_cast<float>(w), static_cast<float>(h));
         u.params0 = glm::vec4(s.anamorphicStretch, std::clamp(s.anamorphicGhosts, 0.0f, 1.0f),
@@ -607,6 +647,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         textures.second = halation;
         stage_ = "post/anamorphic";
         runPass(encoder, wide_, target.view, textures, u);
+        captureStage("wide", target);
         wide = target.view;
     }
 
@@ -635,6 +676,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         textures.depth = in.depth; // the depth grade needs the real depth, not the placeholder
         stage_ = "post/composite";
         runPass(encoder, composite_, target.view, textures, u);
+        captureStage("composite", target);
         current = target.view;
         output_ = target.texture;
     }
@@ -650,6 +692,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         textures.source = current;
         stage_ = "post/fxaa";
         runPass(encoder, fxaa_, target.view, textures, u);
+        captureStage("fxaa", target);
         current = target.view;
         output_ = target.texture;
     }
@@ -664,6 +707,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         textures.identifier = in.identifier;
         stage_ = "post/sharpen";
         runPass(encoder, sharpen_, target.view, textures, u);
+        captureStage("sharpen", target);
         current = target.view;
         output_ = target.texture;
     }
