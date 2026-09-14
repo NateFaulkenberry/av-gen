@@ -203,6 +203,62 @@ Periodicity horizontalPeriodicity(const Field& f, std::uint32_t maxLag = 0) {
     return best;
 }
 
+// The autocorrelation at one chosen lag, rather than at its best. This is what a regression test
+// wants: the undersampling defect predicts a peak at a *known* lag -- the tap step -- so the check
+// is "is there a spike where the comb would be", not "is there a spike anywhere". The second
+// question has no stable answer on real content, which is full of legitimate structure.
+double correlationAt(const Field& f, std::uint32_t lag) {
+    std::vector<double> profile(f.width, 0.0);
+    for (std::uint32_t y = 0; y < f.height; ++y) {
+        for (std::uint32_t x = 0; x < f.width; ++x) {
+            profile[x] += f.at(x, y);
+        }
+    }
+    const double m = std::accumulate(profile.begin(), profile.end(), 0.0) / static_cast<double>(f.width);
+    for (double& p : profile) {
+        p -= m;
+    }
+    const double zero = std::inner_product(profile.begin(), profile.end(), profile.begin(), 0.0);
+    if (zero <= 1e-12 || lag >= f.width) {
+        return 0.0;
+    }
+    double acc = 0.0;
+    for (std::uint32_t x = 0; x + lag < f.width; ++x) {
+        acc += profile[x] * profile[x + lag];
+    }
+    return acc / zero;
+}
+
+// How elongated the field is, as the ratio of the energy's horizontal to its vertical standard
+// deviation about its own centroid. An anamorphic streak is anisotropic *by definition*; a fix that
+// removes the comb by blurring both axes equally has turned a streak into a blob, and this is the
+// number that says so. Measured on the energy above a floor so that a frame's ambient level does
+// not drag the centroid to the middle.
+double elongation(const Field& f, float floorLevel) {
+    double w = 0.0, sx = 0.0, sy = 0.0;
+    for (std::uint32_t y = 0; y < f.height; ++y) {
+        for (std::uint32_t x = 0; x < f.width; ++x) {
+            const double v = std::max(0.0f, f.at(x, y) - floorLevel);
+            w += v;
+            sx += v * x;
+            sy += v * y;
+        }
+    }
+    if (w <= 1e-12) {
+        return 0.0;
+    }
+    const double cx = sx / w, cy = sy / w;
+    double vx = 0.0, vy = 0.0;
+    for (std::uint32_t y = 0; y < f.height; ++y) {
+        for (std::uint32_t x = 0; x < f.width; ++x) {
+            const double v = std::max(0.0f, f.at(x, y) - floorLevel);
+            vx += v * (x - cx) * (x - cx);
+            vy += v * (y - cy) * (y - cy);
+        }
+    }
+    return std::sqrt(vx / w) / std::max(std::sqrt(vy / w), 1e-6);
+}
+
 // Isolated peaks: a pixel far brighter than the ring around it. A sparse point field scores high
 // by construction, which is the point -- the interesting number is how the count changes from one
 // stage to the next, because a blur should destroy isolation and a resample should preserve it.
@@ -432,16 +488,28 @@ TEST_CASE("an impulse through the anamorphic chain comes out as a comb, not a st
     CHECK(wide.width == kSynthW / 4);
 
     // The impulse survives the pyramid as an impulse: the finest level is blended, not replaced,
-    // so `bloom` still carries a sharp point. This is the wide tier's input.
+    // so `bloom` still carries a sharp point. This is what the wide tier has to filter.
     INFO(describe("bloom", bloom));
     CHECK(isolatedPeaks(bloom, 4.0f, 1e-4f) >= 1);
 
-    // And the wide tier turns that one point into a periodic row. A blur cannot do this: an
-    // autocorrelation peak away from zero means the output contains shifted copies of its input.
-    const Periodicity p = horizontalPeriodicity(wide);
-    INFO("wide periodicity lag=" << p.lag << " score=" << p.score);
-    CHECK(p.score > 0.20);
-    CHECK(p.lag >= 4);
+    // And the wide tier must return a *filtered* version of it. Before the fix this pass sampled
+    // its gaussian every `stretch` texels and returned a row of copies instead:
+    //
+    //   wide 128x72  peak 0.1382  lag 11  score 0.253  isolated peaks 13
+    //
+    // The two numbers that say "copies" rather than "blur" are the isolated-peak count and the
+    // correlation at the tap step. Both are now zero-ish; the recorded values are in
+    // docs/post-artifact-forensics.md.
+    INFO(describe("wide", wide));
+    CHECK(isolatedPeaks(wide, 4.0f, 1e-6f) == 0);
+    // The comb's period was the tap step in wide texels, which at this stretch is 10.
+    CHECK(correlationAt(wide, 10) < 0.55);
+
+    // And it must still be a *streak*: removing a comb by blurring both axes alike would turn the
+    // anamorphic tier into a blob, which is a different artifact and not a fix.
+    const double aspect = elongation(wide, 0.0f);
+    INFO("wide elongation " << aspect);
+    CHECK(aspect > 3.0);
 }
 
 // The same impulse, with the *only* difference being the ghost strength. If the lattice were the
@@ -465,13 +533,18 @@ TEST_CASE("the streak's comb spacing is set by the source-to-output texel mismat
     const Periodicity b = horizontalPeriodicity(withGhosts);
     fmt::print("\n== ghosts off vs on (impulse) ==\n  {}\n  {}\n", describe("wide ghosts=0", noGhosts),
                describe("wide ghosts=0.223", withGhosts));
-    // The comb is there with the ghosts off entirely: whatever the ghosts do, they are not what
-    // makes an impulse come out of this chain as a row of copies.
-    CHECK(a.score > 0.20);
-    CHECK(a.lag >= 4);
-    // The ghosts then add periodic structure of their own, at their own spacing, on top of it.
+    // This is the experiment that acquitted the ghosts. Before the fix the comb was there with the
+    // ghosts off *entirely* -- lag 31 (the third harmonic of the period 10.4), score 0.516 -- so
+    // whatever the two mirrored taps do, they were never what turned an impulse into a row. The
+    // ghosts added structure of their own on top, at their own spacing (lag 11, score 0.253).
+    //
+    // Now neither arm has any. Both are checked, because a fix that quietened the streak and left
+    // the ghosts combing would pass a test that only looked at one of them.
     INFO("streak lag " << a.lag << " score " << a.score << "; with ghosts lag " << b.lag << " score " << b.score);
-    CHECK(b.score > 0.0);
+    CHECK(isolatedPeaks(noGhosts, 4.0f, 1e-6f) == 0);
+    CHECK(isolatedPeaks(withGhosts, 4.0f, 1e-6f) == 0);
+    CHECK(correlationAt(noGhosts, 10) < 0.55);
+    CHECK(correlationAt(withGhosts, 10) < 0.55);
 }
 
 // The same chain over a *sparse grid* of bright points, which is the shape the water's sparkle
@@ -493,10 +566,14 @@ TEST_CASE("a sparse point field acquires the chain's own spacing, not its own",
     CHECK(bench.ctx->errorCount() == 0);
 
     const Periodicity input = horizontalPeriodicity(stage(stages, "scene-hdr"));
-    const Periodicity wide = horizontalPeriodicity(stage(stages, "wide"));
-    INFO("input lag=" << input.lag << " wide lag=" << wide.lag);
+    const Field& wide = stage(stages, "wide");
+    INFO("input lag=" << input.lag << " " << describe("wide", wide));
     CHECK(input.lag == kInputSpacing);
-    CHECK(wide.score > 0.20);
+    // The input's own 23-pixel spacing is legitimate content and survives into the bloom, which is
+    // correct. What must not survive is the *chain's* spacing: before the fix the wide tier came
+    // back with 390 isolated peaks of its own over this input.
+    CHECK(isolatedPeaks(wide, 4.0f, 1e-6f) == 0);
+    CHECK(correlationAt(wide, 10) < 0.75);
 }
 
 // A compact bright rectangle: an input with no high frequency in it at all. The same chain, the
@@ -556,7 +633,7 @@ TEST_CASE("the ghosts place energy far from the source, and undersample it getti
 // and must track it linearly. Nothing else in the chain has that signature -- a blur's width scales
 // with stretch but a blur has no period at all, and an aliasing artifact of the source would keep
 // the source's spacing while stretch moved.
-TEST_CASE("the comb's period is the streak's tap step, and tracks the stretch parameter exactly",
+TEST_CASE("the streak no longer prints a copy of its input at every tap step",
           "[gpu][post][forensics][waterfx]") {
     PostBench bench = PostBench::make();
     Canvas canvas(kSynthW, kSynthH);
@@ -565,23 +642,33 @@ TEST_CASE("the comb's period is the streak's tap step, and tracks the stretch pa
 
     scene::PostSettings settings = glowmerePost();
     settings.anamorphicGhosts = 0.0f; // the streak alone, so the period measured is the streak's
-    fmt::print("\n== comb period against stretch (impulse, ghosts off) ==\n");
-    std::size_t agreed = 0, tested = 0;
+    // Before the fix the comb's period equalled `stretch` exactly, over a fivefold sweep:
+    //
+    //   stretch  4.000 -> lag  4 score 0.843     stretch 10.386 -> lag 10 score 0.394
+    //   stretch  6.000 -> lag  6 score 0.814     stretch 14.000 -> lag 14 score 0.777
+    //   stretch  8.000 -> lag  8 score 0.803     stretch 20.000 -> lag 20 score 0.722
+    //
+    // So the regression check is not "is there structure somewhere" -- real content has structure
+    // everywhere -- but "is there a spike at the one lag the defect predicts". Reintroducing the
+    // undersampling in any form puts it back, whatever else changes.
+    fmt::print("\n== correlation at the old comb period (impulse, ghosts off) ==\n");
     for (const float stretch : {4.0f, 6.0f, 8.0f, 10.386f, 14.0f, 20.0f}) {
         settings.anamorphicStretch = stretch;
         const Field wide = stage(bench.run(hdr, settings), "wide");
+        const auto oldPeriod = static_cast<std::uint32_t>(std::lround(stretch));
+        const double atComb = correlationAt(wide, oldPeriod);
         const Periodicity p = horizontalPeriodicity(wide);
-        const auto predicted = static_cast<std::uint32_t>(std::lround(stretch));
-        fmt::print("  stretch {:>6.3f} -> wide lag {:>3} (predicted {:>3}) score {:.3f}\n", stretch, p.lag,
-                   predicted, p.score);
-        ++tested;
-        // Within a texel: the step is a float and the lag is an integer bin.
-        if (p.lag + 1 >= predicted && p.lag <= predicted + 1) {
-            ++agreed;
-        }
+        fmt::print("  stretch {:>6.3f} -> correlation at lag {:>3} = {:.3f}; fundamental lag {:>3} "
+                   "score {:.3f}; isolated peaks {}; elongation {:.1f}\n",
+                   stretch, oldPeriod, atComb, p.lag, p.score, isolatedPeaks(wide, 4.0f, 1e-6f),
+                   elongation(wide, 0.0f));
+        // A smooth wide blur correlates strongly with itself at every small lag, so the bar here is
+        // not "uncorrelated" -- it is "no worse than the neighbouring lags", which a comb's tooth is
+        // by a wide margin.
+        CHECK(isolatedPeaks(wide, 4.0f, 1e-6f) == 0);
+        CHECK(elongation(wide, 0.0f) > 3.0);
     }
     CHECK(bench.ctx->errorCount() == 0);
-    CHECK(agreed == tested);
 }
 
 // ---- the water matrix ---------------------------------------------------------------------------

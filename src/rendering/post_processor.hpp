@@ -68,6 +68,7 @@ struct PostStats {
     double postMs = -1.0;            // GPU time of the whole chain (the "post/" prefix on the timeline)
     std::uint32_t bloomLevels = 0;
     std::uint32_t halationLevels = 0;
+    std::uint32_t anamorphicTaps = 0; // taps a side the streak spent; 0 when it did not run
     float exposureScale = 1.0f;      // the linear scale applied before bloom
     float exposureEv100 = 0.0f;      // the EV in force (scene-referred; see scene/camera.hpp)
     float meteredLuminance = -1.0f;  // the previous frame's centre-weighted luminance (-1 = none)

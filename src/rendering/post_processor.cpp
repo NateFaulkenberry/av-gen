@@ -46,6 +46,12 @@ float halfToFloat(std::uint16_t h) {
 
 constexpr std::uint32_t kMeterFirstDivisor = 4;  // the prefilter drops straight to quarter size
 constexpr std::uint32_t kMeterReduceFactor = 4;  // then quarters again per pass
+// The most taps a side the anamorphic streak will spend. Beyond this the pass stops sampling more
+// finely and reaches for a coarser pyramid level instead, so a long streak costs samples linearly
+// rather than without bound. Forty-eight is the smallest budget measured to leave no comb at
+// Glowmere's authored stretch (docs/post-artifact-forensics.md); the sweep is in
+// tests/rendering/test_post_artifact_forensics_gpu.cpp.
+constexpr std::uint32_t kAnamorphicTapBudget = 48;
 
 } // namespace
 
@@ -638,12 +644,70 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage(), "wide");
         Uniforms u = base;
         u.texelSize = 1.0f / glm::vec2(static_cast<float>(w), static_cast<float>(h));
-        u.params0 = glm::vec4(s.anamorphicStretch, std::clamp(s.anamorphicGhosts, 0.0f, 1.0f),
+
+        // ---- the streak's sampling rate and its source (docs/post-artifact-forensics.md) --------
+        //
+        // The streak is a gaussian reaching `8 * stretch` texels of *this* target. Which tells you
+        // nothing about how often to sample it, and the pass used to sample it eight times a side
+        // whatever the reach -- one tap every `stretch` texels. At Glowmere's authored stretch of
+        // 10.386 that is a sigma-33 gaussian sampled every ten texels, undersampled twentyfold, and
+        // an undersampled filter is not a blur: it is a comb. Measured on an impulse, the pass
+        // returned a row of copies whose period equalled `stretch` exactly across a fivefold sweep,
+        // and that comb over the water's field of discrete sparkles is the reported lattice.
+        //
+        // Two numbers fix it, and both follow from one rule -- *no tap may step further than the
+        // texel of the texture it reads*:
+        //
+        //   taps    enough of them that the spacing is a texel of the level below, bounded by a
+        //           budget so a large stretch costs samples linearly rather than quadratically;
+        //   source  the finest pyramid level whose texel is at least the tap spacing, so whatever
+        //           the budget leaves unresolved has already been filtered away rather than
+        //           aliased. The level is chosen from the reach, not fixed, so a short streak reads
+        //           a fine level and only a long one reaches for a coarse one -- which is the real
+        //           trade here: the coarser the level, the softer the streak is *vertically*, and
+        //           an anamorphic streak that has gone soft in both axes is a blob. The budget is
+        //           what buys the anisotropy back, and it is why it is as high as it is.
+        //
+        // Nothing about the streak's *shape* changes: the reach stays `8 * stretch` texels and the
+        // gaussian's sigma stays `3.2 * stretch` texels, expressed below in the new tap units.
+        const float stretch = std::max(s.anamorphicStretch, 1e-3f);
+        const float reach = 8.0f * stretch; // in this target's texels, as before
+        const auto taps = static_cast<std::uint32_t>(
+            std::clamp(std::ceil(reach), 1.0f, static_cast<float>(kAnamorphicTapBudget)));
+        const float spacing = reach / static_cast<float>(taps); // texels of this target
+        // The finest level whose texel is at least `spacing`. `down` runs fine to coarse and its
+        // level 0 is half the frame, so that level's texel is half a texel of this quarter-
+        // resolution target. `bloom` -- the assembled pyramid, which is what this pass has always
+        // read -- sits at that same finest resolution, so it is tried first and kept whenever the
+        // sampling can support it. In practice a streak long enough to be worth switching on always
+        // moves off it: spacing lands near one texel of this target and `bloom`'s is half that.
+        // The margin is Nyquist's, stated plainly: reconstructing a texel needs two samples across
+        // it, so the tap spacing has to be *half* a source texel and not a whole one. Sampling at
+        // exactly one tap per texel still aliases, and measurably so -- at stretch 4 and 6 the
+        // one-texel rule left 28 and 43 isolated peaks in the streak where the half-texel rule
+        // leaves none.
+        const float required = 2.0f * spacing;
+        wgpu::TextureView streakSource = bloom;
+        if (!down.empty() && static_cast<float>(w) / static_cast<float>(down.front().width) < required) {
+            streakSource = down.back().view; // nothing coarse enough: the coarsest is the best there is
+            for (const gpu::TransientTexture& level : down) {
+                if (static_cast<float>(w) / static_cast<float>(level.width) >= required) {
+                    streakSource = level.view;
+                    break;
+                }
+            }
+        }
+        stats_.anamorphicTaps = taps;
+
+        u.params0 = glm::vec4(spacing, std::clamp(s.anamorphicGhosts, 0.0f, 1.0f),
                               (anamorphicOn && bloom) ? 1.0f : 0.0f, halationOn ? 1.0f : 0.0f);
+        // Tap count, and the gaussian's sigma expressed in taps: `3.2 * stretch` texels over
+        // `spacing` texels per tap, which is 0.4 * taps and so is exactly 3.2 at the old eight.
+        u.params1 = glm::vec4(static_cast<float>(taps), 0.4f * static_cast<float>(taps), 0.0f, 0.0f);
         u.tintA = glm::vec4(s.halationTint * s.halationIntensity, 0.0f);
         u.tintB = glm::vec4(s.anamorphicTint * s.anamorphicIntensity, 0.0f);
         PassTextures textures;
-        textures.source = bloom;
+        textures.source = streakSource;
         textures.second = halation;
         stage_ = "post/anamorphic";
         runPass(encoder, wide_, target.view, textures, u);
