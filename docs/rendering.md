@@ -113,9 +113,11 @@ meshes or billboards, `scene::updateRigs` poses distant characters at `farHz` or
 `cullDistance`, and the entity world stops running behaviours past its own radius. `scene::DetailLimits`
 (on `Scene`, never serialised) says which of the four are in force; all four on is playback.
 
-An offline render lifts them. `RenderSettings::limits` takes `tier` (the default -- offline lifts
-them, every other tier keeps them), `live` or `unlimited`; `avgen --render-limits <m>` and the Render
-panel's **draw distance** combo set it. Frustum culling and the camera's far plane are not affected
+An offline render lifts them -- all except the LOD ladder, which it keeps (ADR-191: the ladder is
+keyed to projected screen size and is this renderer's only prefilter for geometry smaller than the
+sampling grid, so removing it does not sharpen the far field, it aliases it). `RenderSettings::limits`
+takes `tier` (the default), `live` or `unlimited` (which does lift the ladder too);
+`avgen --render-limits <m>` and the Render panel's **draw distance** combo set it. Frustum culling and the camera's far plane are not affected
 at any setting: what is off screen is off screen, and how far the camera sees is composition.
 
 `--render-limits live` restores exactly what a render did before this existed.

@@ -50,7 +50,36 @@ struct DetailLimits {
     // this lifted is not frame-identical to a preview with it in force.
     bool entityDistanceCull = true;
 
+    // Everything lifted. What `--render-limits unlimited` means, and not what the offline tier
+    // takes -- see `offlineDefault` for why.
     [[nodiscard]] static DetailLimits unlimited() { return DetailLimits{false, false, false, false}; }
+
+    // What an offline render takes by default (ADR-191): everything lifted **except the LOD ladder**.
+    //
+    // ADR-186 lifted all four, and that was one too many. The distance cull, the rig rate and the
+    // entity bands all remove something a viewer would otherwise see -- scatter that vanishes, a
+    // character stepping at 20 Hz, a herd frozen where it stood. The LOD ladder does not. It chooses
+    // a *representation* by projected screen size, and at the sizes it acts on, the simpler mesh is
+    // not a worse picture: it is the renderer's only prefilter for geometry smaller than the
+    // sampling grid.
+    //
+    // Take it away and sub-pixel geometry is drawn at full frequency with one sample per pixel,
+    // which is the definition of aliasing. Measured at a fixed view: lifting the rungs raised
+    // flickering area from 2.842% to 4.453%, a 57% increase, and the report that followed the first
+    // offline render under it was "small/distant objects look particularly aliased".
+    //
+    // Keeping it costs nothing a viewer can see, because the ladder is keyed to *projected size* --
+    // so it is resolution-aware by construction. Render at 1920x1080 instead of 1280x720 and every
+    // instance demotes later, in pixels, automatically. A billboard only appears once the object is
+    // small enough on screen that a billboard is an honest description of it.
+    //
+    // `--render-limits unlimited` still lifts all four, for anyone who wants to see what the far
+    // field looks like without the ladder at all.
+    [[nodiscard]] static DetailLimits offlineDefault() {
+        DetailLimits limits = unlimited();
+        limits.proceduralLodRungs = true;
+        return limits;
+    }
     // True when anything is lifted, which is what a log line and a "this is not the live picture"
     // notice test.
     [[nodiscard]] bool anyLifted() const {

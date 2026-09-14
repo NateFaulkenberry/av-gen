@@ -412,8 +412,16 @@ substitute something smoother, and high-frequency geometry aliases. The offline 
 adds a further 17% over realtime (2.420 → 2.842) for the same reason — auxiliary passes at full
 resolution resolve more detail to alias.
 
-Neither is an argument for putting the limits back; both are an argument that **the far field needs
-to be resolved, not simplified**, and they move a temporal-AA or supersampling question from "refused
+**Acted on** (ADR-191): the LOD half of that was a mistake and is reverted. Three of ADR-186's four
+reductions hide something a viewer would otherwise see -- scatter that vanishes, a character stepping
+at 20 Hz, a frozen herd -- and lifting those is right. The ladder is not one of those: it picks a
+representation by projected screen size and is this renderer's only prefilter for geometry smaller
+than the sampling grid. The offline default now keeps it, which puts the flickering area at 2.761%
+against live playback's 2.691% -- **+2.6% instead of +57%** -- with the other three still lifted.
+`--render-limits unlimited` still lifts all four.
+
+The remaining figure below is still the argument that **the far field needs to be resolved, not
+simplified**, and they move a temporal-AA or supersampling question from "refused
 on measurement" (ADR-132, which refused TAA as a *prerequisite for LOD stability*) to a different
 question it was never asked: what resolves an offline far field that is now drawing its real
 geometry. Worth noting the earlier refutation still stands on its own terms — supersampling made

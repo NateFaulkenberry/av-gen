@@ -216,12 +216,18 @@ TEST_CASE("Render limits resolve against the render's own tier", "[render][setti
     CHECK(s.limits == "tier");
     CHECK(s.tier == "offline");
 
-    // The default deliverable: offline, so everything is lifted.
-    SECTION("tier, at the offline tier, lifts them all") {
+    // The default deliverable: offline, so the reductions that hide something a viewer would
+    // otherwise see are lifted -- and the LOD ladder, which is not one of those, is kept.
+    //
+    // ADR-191. The ladder chooses a representation by projected screen size, and at the sizes it
+    // acts on the simpler mesh is the renderer's only prefilter for geometry smaller than the
+    // sampling grid. Lifting it drew sub-pixel foliage at full frequency with one sample per pixel
+    // and raised flickering area 57%.
+    SECTION("tier, at the offline tier, lifts everything except the LOD ladder") {
         const avgen::scene::DetailLimits r = s.resolvedLimits();
         CHECK(r.anyLifted());
-        CHECK_FALSE(r.proceduralDistanceCull);
-        CHECK_FALSE(r.proceduralLodRungs);
+        CHECK_FALSE(r.proceduralDistanceCull); // nothing vanishes for being far away
+        CHECK(r.proceduralLodRungs);           // but it is still allowed to be simpler out there
         CHECK_FALSE(r.rigDistanceRate);
         CHECK_FALSE(r.entityDistanceCull);
     }
@@ -243,6 +249,9 @@ TEST_CASE("Render limits resolve against the render's own tier", "[render][setti
         s.tier = "realtime";
         s.limits = "unlimited"; // realtime tier, lifted anyway
         CHECK(s.resolvedLimits().anyLifted());
+        // And "unlimited" still means all four, including the ladder the tier default keeps --
+        // otherwise there would be no way to ask for the far field without it at all.
+        CHECK_FALSE(s.resolvedLimits().proceduralLodRungs);
     }
 
     SECTION("a word nobody understands fails validation rather than the render") {

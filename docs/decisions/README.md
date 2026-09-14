@@ -186,3 +186,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [188](ADR-188-parenting-gets-an-appearance.md) | Parenting gets an appearance, and an offset you can type | Accepted |
 | [189](ADR-189-fxaa-fades-in-rather-than-switching-on.md) | FXAA fades in rather than switching on | Accepted |
 | [190](ADR-190-a-transition-comes-from-where-the-last-one-arrived.md) | A transition comes from where the last one arrived | Accepted |
+| [191](ADR-191-the-lod-ladder-is-a-prefilter-not-a-saving.md) | The LOD ladder is a prefilter, not a saving | Accepted |

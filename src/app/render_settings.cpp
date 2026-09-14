@@ -124,7 +124,7 @@ scene::DetailLimits RenderSettings::resolvedLimits() const {
     if (!rendering::qualityTierFromName(tier, resolved)) {
         resolved = rendering::QualityTier::Offline; // the default the job also falls back to
     }
-    return resolved == rendering::QualityTier::Offline ? scene::DetailLimits::unlimited()
+    return resolved == rendering::QualityTier::Offline ? scene::DetailLimits::offlineDefault()
                                                        : scene::DetailLimits{};
 }
 
