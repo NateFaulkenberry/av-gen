@@ -99,3 +99,47 @@ What can and cannot be said:
 
 **Re-run required on an idle machine before this number is quoted or acted on.** Until then
 `MaterialTierSelector` stays unwired, which is the same position this ADR already took.
+
+## Re-run on an idle machine: the estimate in this ADR is wrong by 4x
+
+The load-contended run above was discarded and the arm re-run with the machine settled (baseline
+blocks varied 0.45% GPU, the tightest this scene has measured all day):
+
+```
+baseline 14.55 ms GPU, arm 9.04 ms, delta +5.64 ms (+38.74%)
+floor 2.00%; components: calibrated 2.00, baseline 0.45, arm 1.45, per-pair 1.35
+```
+
+**The assignable share is 5.64 ms, not the ~1.4 ms this ADR estimated.** Against ADR-136's
+frame-global `matflat` at +5.77 ms, procedural draws account for **98%** of the entire flat-tier
+saving.
+
+**Why the estimate missed, and it is not arithmetic.** This ADR derived its bound from the coverage
+table: authored entities are 77% of Glowmere's coverage, so the assignable remainder looked like
+~23% of the saving. That inference assumes **shading cost follows screen coverage**, and it does
+not. The terrain covers most of the frame and is cheap per fragment; the ecology covers less and
+every instance pays the full clustered-light and contact-march path. Coverage and cost are different
+quantities and only a direct arm could tell them apart — which is what this ADR asked for, and why.
+
+## §50: the arm is rejected, and that makes assignment *more* justified, not less
+
+Captured and inspected against the baseline. 18.58% of pixels differ, max 182. The violet glow pools
+on the mid-ground bushes are gone, the purple shrub right of centre is desaturated, the hillside
+trees lose their colour variation, the ground wash under the foreground foliage dims. It removes
+Glowmere's bioluminescence, which is what the scene is *for*. Frame-global flat-on-procedurals is
+not shippable, exactly as frame-global flat was not.
+
+The conclusion reverses this ADR's position:
+
+- **Before:** assignment waits, because the realizable share looked like ~1.4 ms — marginal against
+  the cost of building it.
+- **Now:** the ceiling is **5.64 ms of a 14.55 ms frame**, and the reason the arm fails is that it
+  demotes the *foreground*. That is precisely what importance-driven assignment exists to avoid: the
+  near ferns stay Full and the distant scatter does not.
+
+**Assignment is now justified and should be wired.** `MaterialTierSelector` and `QualityPolicy` are
+built and tested; `ImportanceEvaluator` and `RepresentationSelector` are built, tested, and wired to
+nothing. The ceiling is real, measured, and four times what this document assumed.
+
+What is still unknown: how much of the 5.64 ms survives sparing the foreground. That is the next
+measurement, and it is a *sweep* over the importance threshold rather than a single arm.
