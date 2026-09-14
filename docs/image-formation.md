@@ -213,10 +213,16 @@ also restricted to highlights that are *already warm*: `warmth` blends between "
 "only highlights whose red exceeds the mean of green and blue". The result is multiplied by
 `halationTint` (a warm red-orange by default) and `halationIntensity`.
 
-**Anamorphic** (`post/anamorphic/*`) is a horizontally stretched bloom tier: a 17-tap gaussian over a
-coarse bloom level whose reach is `stretch` texels, plus optional flare `ghosts` mirrored through
-the frame centre, tinted by `anamorphicTint` (a cool blue by default). It needs the bloom pyramid,
-so it is computed whenever bloom or anamorphic is on.
+**Anamorphic** (`post/anamorphic/*`) is a horizontally stretched bloom tier: a gaussian whose reach
+is `8 * stretch` texels of the quarter-resolution wide target, plus optional flare `ghosts` mirrored
+through the frame centre, tinted by `anamorphicTint` (a cool blue by default). It needs the bloom
+pyramid, so it is computed whenever bloom or anamorphic is on.
+
+The tap count and the pyramid level it reads are **not** free choices: a Gaussian sampled more
+coarsely than its source's texel is a comb, and it prints one copy of every isolated highlight per
+tap. That is what produced the Glowmere water lattice, and both numbers are now derived from the
+reach rather than fixed — see `docs/post-artifact-forensics.md`, which has the measurement, the
+impulse response and the arithmetic that ties the comb's period to `stretch`.
 
 Both land in one "wide tier" texture that the composite adds, so enabling the second one costs
 almost nothing beyond the first.

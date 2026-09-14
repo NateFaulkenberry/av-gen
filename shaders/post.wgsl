@@ -212,26 +212,40 @@ fn fs_upsample(in: FsIn) -> @location(0) vec4<f32> {
 }
 
 // ---- the wide tier: halation and anamorphic streaks, combined into one texture ------------------
-// source = a coarse bloom level (the streak's input), second = the halation pyramid's result.
+// source = the bloom pyramid level the streak's sampling rate can support (chosen on the CPU; see
+// post_processor.cpp), second = the halation pyramid's result.
 // tintA = the halation tint * intensity, tintB = the anamorphic tint * intensity.
+//
+// params0 = (tap spacing in *this target's* texels, ghosts, anamorphicOn, halationOn)
+// params1 = (taps a side, the gaussian's sigma in taps)
+//
+// The spacing and the tap count arrive already reconciled with the source's resolution rather than
+// being fixed here, because the pass used to take eight taps a side whatever the reach -- which at
+// Glowmere's authored stretch put one tap every ten texels through a sigma-33 gaussian. An
+// undersampled filter is not a blur; it is a comb, and it prints one copy of every isolated
+// highlight per tap. See docs/post-artifact-forensics.md for the impulse response that measured it.
 
 @fragment
 fn fs_wide(in: FsIn) -> @location(0) vec4<f32> {
-    let stretch = post.params0.x;
+    let spacing = post.params0.x;
     let ghosts = post.params0.y;
     let anamorphicOn = post.params0.z;
     let halationOn = post.params0.w;
+    let taps = i32(post.params1.x);
+    let sigma = max(post.params1.y, 1e-3);
     var out = vec3<f32>(0.0);
     if (halationOn > 0.5) {
         out += textureSampleLevel(second, linearSampler, in.uv, 0.0).rgb * post.tintA.rgb;
     }
     if (anamorphicOn > 0.5) {
-        // A horizontal gaussian whose reach is `stretch` times the source texel size.
-        let step = post.texelSize.x * stretch;
+        // A horizontal gaussian, sampled every `spacing` texels of this target out to `taps` of
+        // them a side. The reach and the sigma are the same lengths they always were; only the rate
+        // they are sampled at has changed.
+        let step = post.texelSize.x * spacing;
         var streak = textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb * 0.20;
         var weightSum = 0.20;
-        for (var i = 1; i <= 8; i = i + 1) {
-            let w = exp(-0.5 * pow(f32(i) / 3.2, 2.0));
+        for (var i = 1; i <= taps; i = i + 1) {
+            let w = exp(-0.5 * pow(f32(i) / sigma, 2.0));
             let o = vec2<f32>(step * f32(i), 0.0);
             streak += textureSampleLevel(source, linearSampler, clamp(in.uv + o, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).rgb * w;
             streak += textureSampleLevel(source, linearSampler, clamp(in.uv - o, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).rgb * w;

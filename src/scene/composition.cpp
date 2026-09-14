@@ -1912,6 +1912,16 @@ CompositionNode cloneNodeSpec(const CompositionNode& node) {
     copy.terrainMaterial = node.terrainMaterial;
     copy.ecology = node.ecology;
     copy.animation = node.animation;
+    // Added after a duplicate came back missing them. The header above says this list is the list a
+    // new authored field has to be added to, and five had not been: a duplicated City node lost its
+    // settings and its tiling manifest and silently rebuilt itself from defaults, a duplicated
+    // terrain lost how fast its water ran, a duplicated floating layer stopped floating, and a node
+    // whose scene file wrote a `material` block came back claiming it had not.
+    copy.waterFlow = node.waterFlow;
+    copy.materialAuthored = node.materialAuthored;
+    copy.city = node.city;
+    copy.cityLibrary = node.cityLibrary;
+    copy.floats = node.floats;
     // The live transform, not the one the node was born with: duplicating something you have just
     // moved has to duplicate it where it is now. The parameter is the value the flattened scene
     // uses, so it is the one that is true.
