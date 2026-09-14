@@ -230,9 +230,24 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // Thickness along the ray, floored at zero: where the bed is nearer than the surface the water
     // is behind something and contributes nothing, which the depth test has already handled.
     var thickness = max(bed - viewDepth, 0.0);
-    let vertical = max(in.uv.x, 0.0);
+    // The vertical depth of the water under this pixel, which is what the shoreline, the foam and
+    // the depth colour are all made of.
+    //
+    // It comes from the scene's depth, not from the vertex. The thickness above already did; this
+    // did not, and that was the whole of the jagged waterline: `in.uv.x` is a per-vertex baked
+    // depth, so every shoreline effect was quantised to the water mesh's own tessellation and a
+    // river drawn on a coarse grid got a stair-stepped bank. The comment further down this file
+    // says all three read the scene's depth "so they are smooth across a quad boundary the geometry
+    // is not" -- it describes the intent, and until now only one of the three did it.
+    //
+    // The conversion is the inverse of the fallback's: thickness is measured along the view ray, so
+    // the vertical drop is that times the ray's vertical component, with the same 0.15 floor the
+    // fallback uses so a grazing view does not divide the bank away.
+    var vertical = thickness * max(abs(v.y), 0.15);
     if (water.params.z < 0.5) {
-        // No prepass: the best available thickness is the vertical depth along the view ray.
+        // No prepass: the vertex depth is the only thickness available, and the surface degrades to
+        // what it was before ADR-099 -- a waterline on the mesh's edge -- rather than to garbage.
+        vertical = max(in.uv.x, 0.0);
         thickness = vertical / max(abs(v.y), 0.15);
     }
     // A surface seen from a very grazing angle over a shallow bed reports a long thickness and goes
@@ -343,7 +358,8 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // ---- the shoreline (§10) -------------------------------------------------------------------
     // Three things happen at the bank, and the reason it works is that all three read the *scene's*
     // depth rather than the mesh's edge, so they are smooth across a quad boundary the geometry
-    // is not.
+    // is not. (They read it through `vertical`, which is derived from the depth buffer above. It
+    // was a vertex attribute until the bank turned out to be stair-stepped on a coarse channel.)
     //   1. the surface fades out as the water thins, over `edgeFade` metres of vertical depth
     //   2. a foam band sits on the waterline, broken up by the ripple field so it is a line of
     //      surf and not a contour
