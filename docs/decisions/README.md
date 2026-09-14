@@ -163,3 +163,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [158](ADR-158-a-directed-shot-aims-at-its-hero-and-nothing-else-follows.md) | A directed shot's aim follows its hero, and nothing else follows | Accepted |
 | [159](ADR-159-no-tap-may-step-further-than-the-texel-it-reads.md) | No tap may step further than the texel of the texture it reads | Accepted |
 | [160](ADR-160-the-distance-ladder-is-authored-and-there-are-two-of-them.md) | The distance ladder is authored, all four rungs of it — and there are two ladders | Accepted |
+| [161](ADR-161-root-motion-is-not-in-this-content-and-foot-slip-is-what-was-missing.md) | Root motion is not in this content, and foot slip is the thing that was missing | Accepted |

@@ -1030,6 +1030,25 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
                                 entity.state_.turnRate, dt);
         entity.locomotion_.activity = gait;
         entity.locomotion_.playbackRate = Gait::playbackRate(entity.desc_.gait, gait, entity.state_.speed);
+        // The feet against the ground they are crossing. Two numbers authored by different people
+        // in different files -- a behaviour's travel speed and a gait's stride speed -- with
+        // nothing comparing them until now; the only symptom is an animation that looks wrong in a
+        // way nobody can name. 1.5x is the threshold because a quarter of a stride either way is
+        // inside what a viewer reads as a character adjusting its pace.
+        if (!entity.warnedFootSlip_) {
+            const float slip = Gait::footSlip(entity.desc_.gait, gait, entity.state_.speed);
+            if (slip > 1.5f || slip < 1.0f / 1.5f) {
+                entity.warnedFootSlip_ = true;
+                const float authored =
+                    gait == Activity::Run ? entity.desc_.gait.runSpeed : entity.desc_.gait.walkSpeed;
+                log::warn("entity '{}': travelling at {:.2f} m/s against a {} clip authored for "
+                          "{:.2f} m/s ({:.1f}x foot slip){}",
+                          entity.desc_.name, entity.state_.speed,
+                          gait == Activity::Run ? "run" : "walk", authored, slip,
+                          entity.desc_.gait.matchRate ? "; rate matching is on and saturated"
+                                                      : "; rate matching is off");
+            }
+        }
         entity.locomotion_.blend = entity.desc_.gait.blend;
         // What an action asked to be played, if it asked for anything. Assigned rather than
         // rebuilt so a steady state reuses the string's capacity.

@@ -302,6 +302,10 @@ private:
 
     double coarseAccum_ = 0.0;
     bool active_ = true;
+    // Said once per entity per session, never per frame. A body whose travel speed the gait cannot
+    // represent is a persistent authoring fault, not an event, and printing it sixty times a second
+    // would make it something people filter out rather than fix.
+    bool warnedFootSlip_ = false;
     // Whether this entity has ever been ticked. Behaviour level of detail may not suppress the
     // *first* update: an entity that has never run has never published a LocomotionState, so
     // skipping it hands the animation layer a position of (0,0,0) and a character pops in from the

@@ -1133,3 +1133,36 @@ TEST_CASE("an interaction with no verb name is refused", "[entity][diagnostics]"
     REQUIRE_FALSE(badTarget.has_value());
     CHECK_THAT(badTarget.error().message, ContainsSubstring("interaction"));
 }
+
+// ADR-161. Foot slip is the ratio between the ground a body covers and the stride its clip was
+// authored for. It exists because the two numbers live in different files, are set by different
+// people, and were never compared: Glowmere's wanderer ran at 2.5 m/s against a run clip authored
+// for 4.0 with rate matching switched off, and the only symptom was an animation that looked wrong
+// in a way nobody could name.
+TEST_CASE("foot slip measures the clip against the ground it crosses", "[entity][gait]") {
+    entity::GaitSettings settings; // walkSpeed 1.6, runSpeed 4.0, matchRate off
+
+    // Matching off: the clip plays at 1x whatever the body does, so slip is the raw ratio.
+    CHECK(entity::Gait::footSlip(settings, entity::Activity::Walk, 1.6f) == 1.0f);
+    CHECK(entity::Gait::footSlip(settings, entity::Activity::Walk, 4.8f) == 3.0f);
+    CHECK(entity::Gait::footSlip(settings, entity::Activity::Run, 2.0f) == 0.5f);
+
+    // Nothing to be out of step with when there is no stride. A silent answer has to mean "no
+    // opinion" rather than "fine", or the check becomes a source of false confidence.
+    CHECK(entity::Gait::footSlip(settings, entity::Activity::Idle, 9.0f) == 1.0f);
+    CHECK(entity::Gait::footSlip(settings, entity::Activity::Turn, 9.0f) == 1.0f);
+
+    // Matching on and inside the clamp: the rate absorbs the difference and the feet keep up.
+    settings.matchRate = true;
+    settings.rateMin = 0.5f;
+    settings.rateMax = 2.0f;
+    CHECK(entity::Gait::footSlip(settings, entity::Activity::Walk, 2.4f) == 1.0f);
+    CHECK(entity::Gait::footSlip(settings, entity::Activity::Run, 2.0f) == 1.0f);
+
+    // ...and a rate matcher that saturates is still slipping, which is the case worth catching:
+    // the setting is on, it looks handled, and the feet are still wrong. 1.6 / (1.6 * 2.0 clamp).
+    const float saturated = entity::Gait::footSlip(settings, entity::Activity::Walk, 6.4f);
+    INFO("saturated slip " << saturated);
+    CHECK(saturated > 1.9f);
+    CHECK(saturated < 2.1f);
+}

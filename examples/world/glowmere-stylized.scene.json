@@ -2154,6 +2154,11 @@
   {
    "name": "wanderer",
    "node": "wanderer",
+   "gait": {
+    "matchRate": true,
+    "rateMin": 0.55,
+    "rateMax": 1.9
+   },
    "seed": 11235813,
    "fullDetailDistance": 90.0,
    "coarseInterval": 0.1,

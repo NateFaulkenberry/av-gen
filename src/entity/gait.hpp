@@ -76,6 +76,23 @@ public:
     // for rate matching, or when the gait has no authored speed to match against.
     [[nodiscard]] static float playbackRate(const GaitSettings& settings, Activity activity, float speed);
 
+    // How far the feet are from the ground they are crossing, as a ratio: 1 means the clip is being
+    // played at exactly the speed it was authored for, 3 means the body is covering three metres for
+    // every metre of stride and the character is moonwalking.
+    //
+    // This exists because the mismatch is invisible in every number the engine already prints. A
+    // scene authors a travel speed on a *behaviour* and a stride speed on a *gait*, they are set by
+    // different people at different times, and nothing compares them -- Glowmere's wanderer explores
+    // at 5 m/s against a walk clip authored for 1.6, and the only symptom is that the animation
+    // looks wrong in a way nobody can name. Returns 1 when there is nothing to compare, so a silent
+    // answer means "no opinion" rather than "fine".
+    //
+    // Note that this cannot be derived from the clip. The three clips this engine ships with are
+    // Mixamo in-place takes whose root returns exactly where it started -- net xz displacement
+    // measured at 0.0000 over all three -- so the speed a walk cycle *means* is not in the file and
+    // has to be authored. That is why `GaitSettings` carries it, and why it has to be checked.
+    [[nodiscard]] static float footSlip(const GaitSettings& settings, Activity activity, float speed);
+
     // The speed the body is allowed to have after `dt` seconds of wanting `desired`. Separate
     // limits up and down because stopping is not the reverse of starting.
     [[nodiscard]] static float approach(float current, float desired, float accel, float decel, double dt);

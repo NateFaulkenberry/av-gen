@@ -88,6 +88,24 @@ float Gait::playbackRate(const GaitSettings& settings, Activity activity, float 
     return std::clamp(speed / authored, settings.rateMin, settings.rateMax);
 }
 
+float Gait::footSlip(const GaitSettings& settings, Activity activity, float speed) {
+    float authored = 0.0f;
+    if (activity == Activity::Walk) {
+        authored = settings.walkSpeed;
+    } else if (activity == Activity::Run) {
+        authored = settings.runSpeed;
+    } else {
+        return 1.0f; // standing, turning, observing: no stride to be out of step with
+    }
+    if (authored <= 1e-4f || speed <= 1e-4f) {
+        return 1.0f;
+    }
+    // What the clip is actually being played at, which is the authored rate only when matching is
+    // on *and* the ratio is inside the clamp. A rate matcher that saturates is still slipping.
+    const float rate = playbackRate(settings, activity, speed);
+    return speed / (authored * std::max(rate, 1e-4f));
+}
+
 float Gait::approach(float current, float desired, float accel, float decel, double dt) {
     const auto step = static_cast<float>(dt);
     if (step <= 0.0f) {
