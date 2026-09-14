@@ -1,6 +1,7 @@
 # Level 3 gap closure — Phase 1 assessment
 
-**Status:** in progress. Assessment only; no rendering behaviour changed.
+**Status:** in progress. Assessment, plus the parity fixes it turned up (ADR-186).
+**Updated:** 2026-09-14, after the offline detail-limits work.
 **Date:** 2026-09-14
 
 ## The start condition
@@ -349,10 +350,56 @@ One caveat carried from the scene work: Glowmere Valley 2 recorded that mask-mod
 its hero mushrooms reads *less punchy* than the flat version it replaced, even at intensity 6.0. That
 is a material-authoring trade rather than a path defect, and it is the kind of thing §7 is for.
 
+## Realtime/offline parity (§15): three defects, and what the third says about the other two
+
+ADR-146 (hysteresis in the GPU cull ladder read the authored value at every tier) and ADR-147 (the
+render job never called `setQuality`, so a batch frame was byte-identical to an interactive one) were
+found before this document. A third arrived with ADR-186 and it is the same shape a third time:
+
+**The Offline tier's promise of "no representation shortcut" was only ever about shading.** Every
+field `forTier` sets for Offline — `materialTiers`, `forcedMaterialTier`, `renderScale`,
+`volumeResolutionScale`, `lodHysteresisAllowed` — is about how a pixel is shaded or how finely a
+shared pass is sampled. Four *geometric and temporal* reductions were never covered, because each
+lives in a subsystem that decides for itself: the procedural cull ladder's distance and screen-radius
+tests, its LOD rungs, `updateRigs`' pose rate, and the entity world's behaviour bands. A finished
+render still had billboards in its far field and a motionless herd on the far hillside.
+
+Fixed as `scene::DetailLimits` plus one render setting (`tier` | `live` | `unlimited`). Shown to
+change the output per ADR-182 — 0.59% of pixels, max delta 137, in a box over the distant scatter.
+
+Two things this says about the audit that remains:
+
+* **A tier field is not a parity guarantee; it is a guarantee about the subsystem that reads it.**
+  The audit should enumerate every subsystem that reduces work and ask which policy object it reads,
+  rather than reading the tier table and assuming coverage.
+* **The same pass found `--tier` never reaching `RenderSettings::tier`**, so `--render --tier realtime`
+  rendered at offline. Three of the four parity defects found so far are "a policy set on the
+  interactive side only". That is now a search pattern, not an anecdote.
+
 ## What Phase 1 still owes
 
-- The temporal artifact inventory (§4), which needs the representative suite rendered and looked at.
-- The variance protocol above, which needs a quiet machine.
-- The realtime/offline parity audit (§15), beyond the two parity defects already fixed (ADR-146,
-  ADR-147).
-- Scene authoring ergonomics (§17, §G).
+Ordered by what blocks the most.
+
+1. **Re-measure the Priority 1 attribution.** Every number in it was taken on frames with no
+   particles, because particles never simulated (three harness bugs, corrected above). The flicker
+   baseline moves **27x** at a hero camera once they do. The ranking may survive; the percentages are
+   not comparable with anything measured after the fix. Owed, not optional.
+2. **The ~34 unattributed points of water flicker.** No authored parameter reaches them; the
+   candidates are the moon glint, the sky reflection and the depth-derived shoreline, and separating
+   them needs arms inside `water.wgsl`. Deliberately not started: editing that shader on a hypothesis
+   is what cost three rounds on the anamorphic comb.
+3. **The variance protocol**, which needs a quiet machine.
+4. **The temporal artifact inventory (§4)**, which needs the representative suite rendered and
+   *looked at*.
+5. **§7's cinematic lighting evaluation** — depth, separation, focal hierarchy. This is what remains
+   of Priority 2 now that the HDR/emissive plumbing has been verified sound, and it requires looking.
+6. **The performance dashboard (§13)** — the one item that genuinely needs a human to certify.
+7. **AOV export (§B)**, and the debug views the mandate lists that do not exist — neither should be
+   built without saying what question each answers.
+8. **The rest of the realtime/offline parity audit (§15)**, per the search pattern above.
+9. **Scene authoring ergonomics (§17, §G).**
+10. **Maintainability (§18)** — flagged, still not a recommendation; the thing to look for when the
+    C/D/F measurements start touching `SceneRenderer::render`.
+
+Also outstanding and not blocked by any of the above: the counterbalanced A/B for ten heroes and ten
+emitters, designed and never run because the GPU was contended.
