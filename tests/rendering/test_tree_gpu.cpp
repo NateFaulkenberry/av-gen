@@ -26,6 +26,7 @@
 
 #include <array>
 #include <filesystem>
+#include <chrono>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -343,4 +344,74 @@ TEST_CASE("The tree moves, and stays in one piece while it does", "[gpu][tree][a
     // whose geometry is coming apart, not one that is swaying.
     CHECK(std::abs(luma[0] - luma[1]) < 4.0);
     WARN("motion frames written to " << outputDir().string());
+}
+
+// Hidden by the leading dot, following this repository's convention for anything whose assertion is
+// a wall-clock magnitude: `[.perf]` tests are absent from ctest entirely rather than present and
+// flaky. Run deliberately and alone, under tools/gpu-lock.sh.
+TEST_CASE("tree probe: what the atmosphere costs", "[.perf][tree]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    const scene::TreeGenerator generator;
+    const auto treeParams = scene::treeParamsFrom(search::sampleAt(generator.schema().parameters, 11));
+    REQUIRE(treeParams.has_value());
+
+    scene::TreeLook lit = scene::TreeLook{};
+    scene::TreeLook bare = lit;
+    bare.volumeDensity = 0.0f;   // turns the volumetric pass off entirely: no allocation, no passes
+    bare.distantTrees = 0;
+
+    auto withAtmosphere = scene::buildTreeScene(*treeParams, generator.camera(), lit);
+    auto without = scene::buildTreeScene(*treeParams, generator.camera(), bare);
+    REQUIRE(withAtmosphere.has_value());
+    REQUIRE(without.has_value());
+
+    // INTERLEAVED AND COUNTERBALANCED, INSIDE ONE PROCESS. Two invocations of a byte-identical
+    // scene on this machine differ by about 3 ms, so a between-process comparison of anything
+    // smaller is unreadable. Fixed-order interleaving is not enough either: whichever arm always
+    // runs second pays for the run's own drift, so the order alternates ABBA and each arm sees both
+    // positions equally.
+    //
+    // The statistic is the MINIMUM, not the median. Contention is never negative, so the fastest
+    // observation is the one least polluted by everything else on the machine.
+    constexpr int kPairs = 24;
+    constexpr std::uint32_t kW = 960;
+    constexpr std::uint32_t kH = 540;
+    double bestWith = 1e30;
+    double bestWithout = 1e30;
+
+    const auto timeOne = [&](const scene::Scene& s) {
+        const auto start = std::chrono::steady_clock::now();
+        const auto image = renderer.renderToImage(s, FrameTime{0.0, 1.0 / 60.0, 0}, kW, kH);
+        const double ms =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+        REQUIRE(image.has_value());
+        return ms;
+    };
+    // Warm-up, discarded: a batch run right after a build treats its first run as warm-up, and
+    // pipeline creation and the first upload of every buffer land on whichever arm goes first.
+    for (int i = 0; i < 4; ++i) {
+        timeOne(*withAtmosphere);
+        timeOne(*without);
+    }
+    for (int pair = 0; pair < kPairs; ++pair) {
+        if ((pair & 1) == 0) {
+            bestWith = std::min(bestWith, timeOne(*withAtmosphere));
+            bestWithout = std::min(bestWithout, timeOne(*without));
+        } else {
+            bestWithout = std::min(bestWithout, timeOne(*without));
+            bestWith = std::min(bestWith, timeOne(*withAtmosphere));
+        }
+    }
+    WARN(fmt::format("{}x{}, minimum of {} per arm, ABBA interleaved in one process:\n"
+                     "  with atmosphere    {:7.2f} ms\n"
+                     "  without            {:7.2f} ms\n"
+                     "  difference         {:7.2f} ms",
+                     kW, kH, kPairs, bestWith, bestWithout, bestWith - bestWithout));
+    // No assertion on the magnitude. This reports; it does not gate. A wall-clock threshold in a
+    // test is a cross-session comparison with the other session hidden inside a constant.
+    CHECK(bestWith > 0.0);
 }

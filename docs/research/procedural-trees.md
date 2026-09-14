@@ -1,8 +1,13 @@
 # Procedural trees: audit, research and architecture proposal
 
-Status: proposal for the Tree of Life phase (2026-09-14), covering brief phases 1 to 3. Phase 4's
-prototype is built and measured; sections 5 onward are proposals, not findings. Decision ADRs are
-numbered from 170 to stay clear of two concurrent agents; expect to renumber on merge.
+Status: **sections 1 to 3 are the original proposal, kept as written.** Phases 4 to 10 are built;
+§7 below records where the proposal was right, where it was wrong, and what the build found that no
+amount of proposing would have. Decision ADRs are 170, 174, 175, 176 and 177 — numbered clear of two
+concurrent agents, and 174 is known to collide with a different ADR-174 on the Glowmere branch.
+
+The proposal is deliberately not edited to match the outcome. A design document rewritten after the
+fact to look prescient is worth nothing to the next person, and three of the most useful findings
+here are places it was confidently wrong.
 
 ## 1. Repository audit: what exists, and what each part of this design sits on
 
@@ -422,3 +427,84 @@ Not known, and not roundable:
   (accessed 2026-09-14). *Learned:* practitioner tuning advice (segment size controls intricacy
   versus straight trunks) and the observation that repeated runs tend to look alike. *Confidence:*
   low to medium; a blog post.
+
+## 7. What the build found (phases 4 to 10)
+
+### 7.1 Where the proposal held
+
+- **The algorithm choice.** Space colonization for *where*, Borchert–Honda apical control for *how
+  much*. Nothing in ten phases argued against it, and the excurrent→decurrent λ decay does produce
+  the bole-under-spreading-crown outline it was chosen for.
+- **`spatial::Spline`'s rotation-minimising frames and `makeTube`.** Reused unchanged. The largest
+  planned item in the geometry phase was already done.
+- **One `CompositionNode` per tier**, forced by picking resolving an object index and never an
+  instance index. Confirmed against the code and unchanged since.
+- **Audio drives the wind, not the tree.** Held, and it is now testable: a full-scale step on the bus
+  moves the geometry by less than 0.002 rad of mean bend in the first frame.
+
+### 7.2 Where it was wrong
+
+- **`wind::VegetationMotion` was named as the animation system and cannot be used.** Six meshes each
+  bent about their own base separate at every joint between them. The tree is skinned to a 239-joint
+  branch skeleton instead. ADR-174.
+- **Axis order was assumed to be the semantic tier.** It is not: a tree whose trunk forks early
+  reported `primaryCount = 2` for a crown showing a dozen radial limbs, and the evaluator ranked the
+  best-looking tree in the population eleventh of twelve. Tier is now substance relative to the
+  trunk. ADR-175.
+- **The crown envelope was a surface of revolution**, so no search inside it could produce an
+  asymmetric crown at any population size. ADR-177, and the most generalisable finding here.
+- **"Foliage clusters at terminal branch tips"** (§2.7) makes a shell with limbs poking through it.
+  Clumps hang at the ends of *axes*, with a Poisson-disc spacing rule.
+
+### 7.3 What only rendering found
+
+Five times, a structural measurement was internally consistent and describing something other than
+the picture. The standing conclusion is that the rendered loop belongs **in front of** the structural
+one, not beside it.
+
+| Symptom | What it actually was |
+|---|---|
+| Evaluator scored 0.951 on an unusable frame | Every structural metric in band; the image a blown-out white lollipop |
+| `depthSpread` at its floor for all 72 candidates | r² weighting made it measure trunk thickness, and a trunk is a vertical line with no depth extent |
+| `structureVisible` 0.53–0.71 against a band topping at 0.48, unreachable by any parameter | The raster clamps a disc to half a pixel, so 1,300 sub-pixel twigs claimed 1,300 whole pixels |
+| Every candidate a rounded ball | The envelope could not express asymmetry (§7.2) |
+| One tuned hero looked right; 8 of 12 candidates had limbs as bright wires | Veins in uv space do not scale with the branch |
+
+And one suspicion that was **tested and refuted**: `silhouetteComplexity` was not blind to limb
+structure. Measured over 24 candidates, the full silhouette's quotient varies *more* relatively
+(sd/mean 0.651) than the branch-only one (0.342). Recorded in ADR-175 as a worked negative, because a
+pattern with a name gets over-applied.
+
+### 7.4 Measured, as built
+
+Showcase parameters, one machine, no cross-session comparison:
+
+- Generation ~140 ms per tree at ~5,800 nodes; mesh build on top; 100k–174k triangles per tree.
+- A 48-candidate search with geometry and evaluation: ~13 s, nothing rejected.
+- 239 joints, inside the 256-joint palette ceiling.
+- **What the atmosphere costs: 0.64 ms and 0.57 ms**, at 960x540, minimum of 24 per arm, ABBA
+  interleaved inside one process under the GPU lock. The arms are the volumetric pass plus the
+  fourteen distant trees, against neither.
+
+  The two invocations are the argument for the method as much as the result. The *absolute* numbers
+  moved 1.8 ms between them (6.94 -> 5.10 ms with atmosphere) — the cross-invocation noise floor,
+  and far larger than the effect. The *difference* moved 0.07 ms. An arm that always ran second
+  would have paid for that drift, which is why the order alternates and each arm sees both
+  positions equally.
+
+  Wall clock around `renderToImage` includes its blocking readback, which is a constant in both arms
+  and cancels in the difference. It is not a frame time and is not quoted as one.
+- Total frame cost: **not quoted.** The absolute above is unreadable across sessions by its own
+  evidence, and this scene has never been run through the real headless path with `--bench-json`.
+
+### 7.5 Still open
+
+- The tree is a good stylised fantasy tree with architectural variety, a readable hierarchy, luminous
+  veins and legible scale. It is not yet *awe-inspiring*, and the brief's §51 says not to rationalise
+  that away.
+- The evaluator has never been validated against a person's ranking. It agrees with one reader on one
+  contact sheet, which is a sanity check.
+- The editor path is unbuilt: the tree emits `scene::Scene` entities, not `CompositionNode`s, so it
+  is not yet selectable or editable. `PrimitiveKind::Generated` exists on the Glowmere branch and is
+  the intended route.
+- Runtime cost is unmeasured (§7.4).
