@@ -66,6 +66,10 @@ struct PostStats {
     double postMs = -1.0;            // GPU time of the whole chain (the "post/" prefix on the timeline)
     std::uint32_t bloomLevels = 0;
     std::uint32_t halationLevels = 0;
+    // Which bloom level the anamorphic streak read. Recorded because it is chosen from the
+    // authored stretch rather than fixed, and a streak sampling level 0 is the comb this
+    // number exists to make visible without a screenshot.
+    std::uint32_t anamorphicLevel = 0;
     float exposureScale = 1.0f;      // the linear scale applied before bloom
     float exposureEv100 = 0.0f;      // the EV in force (scene-referred; see scene/camera.hpp)
     float meteredLuminance = -1.0f;  // the previous frame's centre-weighted luminance (-1 = none)

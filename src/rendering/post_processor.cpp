@@ -604,6 +604,37 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         u.tintB = glm::vec4(s.anamorphicTint * s.anamorphicIntensity, 0.0f);
         PassTextures textures;
         textures.source = bloom;
+        // The streak reads a bloom level coarse enough that its taps overlap in it.
+        //
+        // An anamorphic streak reaches `stretch * 8` output texels -- at the authored stretch of
+        // 10 that is a seventh of the frame's width -- and a gaussian over it has a bounded number
+        // of taps. Sampling the *finest* bloom level across that reach leaves the taps several
+        // source texels apart, which is a comb rather than a blur: a river of thresholded sparkle
+        // was copied once per tap and printed dotted horizontal bands across the whole frame.
+        // Raising the tap count enough to close the gap at full resolution costs hundreds of taps
+        // per pixel and buys detail a seventh-of-a-frame blur throws away again.
+        //
+        // So lower the source's frequency instead of raising the sampling rate: walk down the
+        // pyramid until one texel is at least as wide as the step the shader will take. The streak
+        // keeps its width and its energy -- only the detail it never kept goes.
+        //
+        // The ghosts read the same level, and want it for their own reason: each is a *magnified*
+        // read (1.33x and 2.5x), and magnifying a level that still holds a lattice of sparkle
+        // prints that lattice, enlarged, on an unrelated part of the frame. A defocused copy is
+        // what a lens ghost is.
+        if (anamorphicOn && bloom && !down.empty()) {
+            // 48 a side is where `fs_wide` clamps; the two have to agree or the walk below stops
+            // one level short of overlapping.
+            constexpr float kMaxTapsPerSide = 48.0f;
+            const float reach = (1.0f / static_cast<float>(w)) * s.anamorphicStretch * 8.0f;
+            const float step = reach / kMaxTapsPerSide;
+            std::size_t level = 0;
+            while (level + 1 < down.size() && 1.0f / static_cast<float>(down[level].width) < step) {
+                ++level;
+            }
+            textures.source = down[level].view;
+            stats_.anamorphicLevel = static_cast<std::uint32_t>(level);
+        }
         textures.second = halation;
         stage_ = "post/anamorphic";
         runPass(encoder, wide_, target.view, textures, u);

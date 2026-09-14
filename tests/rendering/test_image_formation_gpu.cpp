@@ -434,6 +434,56 @@ TEST_CASE("Halation is a wide, red-weighted tier and anamorphic streaks are hori
     CHECK(ctx->errorCount() == 0);
 }
 
+TEST_CASE("The anamorphic streak falls off smoothly rather than in a comb", "[gpu][post][anamorphic]") {
+    // ADR-156. A gaussian whose taps do not overlap in its source does not blur -- it *copies*, once
+    // per tap, so a compact bright thing prints a row of evenly spaced dots. That is a ripple in the
+    // streak's profile, and a ripple is what this measures: walking outward from the highlight, the
+    // streak may only get dimmer.
+    //
+    // Deliberately not a comparison of two renders of the streak: both paths would carry the same
+    // defect and agree with each other. The reference is the shape a blur has.
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FrameTime time{};
+
+    auto scene = brightCubeScene();
+    scene.post.tonemap = scene::TonemapOperator::Clamp;
+    scene.post.bloomEnabled = true;
+    scene.post.bloomIntensity = 0.2f;
+    scene.post.bloomThreshold = 1.0f;
+    auto off = renderer.renderToImage(scene, time, 256, 256);
+    REQUIRE(off.has_value());
+    scene.post.anamorphicEnabled = true;
+    scene.post.anamorphicIntensity = 2.0f;
+    scene.post.anamorphicStretch = 8.0f;
+    auto on = renderer.renderToImage(scene, time, 256, 256);
+    REQUIRE(on.has_value());
+
+    // The streak alone: everything else in the row is identical between the two renders.
+    std::vector<int> profile;
+    for (std::uint32_t x = 160; x < 254; ++x) {
+        profile.push_back(sum3(on->pixel(x, 128)) - sum3(off->pixel(x, 128)));
+    }
+    REQUIRE(profile.size() > 20);
+    REQUIRE(profile.front() > 6); // there is a streak here at all to have a shape
+
+    // A local maximum away from the highlight is a copy of it. The margin is above 8-bit noise on a
+    // sum of three channels; the comb this was written against rippled by tens of levels.
+    int bumps = 0;
+    std::size_t worst = 0;
+    for (std::size_t i = 1; i + 1 < profile.size(); ++i) {
+        if (profile[i] > profile[i - 1] + 3 && profile[i] > profile[i + 1] + 3) {
+            ++bumps;
+            worst = i;
+        }
+    }
+    INFO("streak profile bumps " << bumps << " first at x=" << (160 + worst));
+    CHECK(bumps == 0);
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("Depth of field takes its radius from the lens's circle of confusion", "[gpu][post][lens]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);
