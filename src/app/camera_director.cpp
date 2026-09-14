@@ -312,7 +312,7 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
     // way, so a directed camera will fly through a hillside or a canopy as readily as through open
     // air. Glowmere's first directed pass went through the trees.
     nlohmann::json cleared = baked;
-    std::size_t liftedKeys = 0;
+    std::size_t movedKeys = 0;
     if (const scene::CompositionNode* terrain = terrainNodeOf(engine)) {
         world::ClearanceField field;
         field.map = &terrain->worldMap;
@@ -330,15 +330,17 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
                 const auto& v = key.at("value");
                 path.emplace_back(v[0].get<float>(), v[1].get<float>(), v[2].get<float>());
             }
-            liftedKeys = world::clearPath(field, path);
+            // Heroes are pushed out sideways and terrain lifts, so this is no longer only a lift.
+            movedKeys = world::clearPath(field, path);
             for (std::size_t i = 0; i < keys.size() && i < path.size(); ++i) {
                 keys[i]["value"] = {path[i].x, path[i].y, path[i].z};
             }
         }
     }
-    if (liftedKeys > 0) {
-        log::info("auto-director: lifted {} camera key(s) clear of the terrain, canopy or a hero",
-                  liftedKeys);
+    if (movedKeys > 0) {
+        log::info("auto-director: moved {} camera key(s) clear of the terrain, the canopy or a hero "
+                  "-- up out of the ground, and sideways out of a subject",
+                  movedKeys);
     }
 
     std::size_t added = 0;

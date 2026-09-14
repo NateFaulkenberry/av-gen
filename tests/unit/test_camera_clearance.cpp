@@ -137,7 +137,7 @@ TEST_CASE("Cleared ground grows nothing, so a corridor stays flyable", "[world][
     CHECK(field.canopyHeight(wooded) < 1.0f);
 }
 
-TEST_CASE("A camera inside a hero is lifted over it", "[world][clearance]") {
+TEST_CASE("A camera inside a hero is pushed out of it, not over it", "[world][clearance]") {
     const world::WorldMap map = flatMap();
     world::HeroPoint hero;
     hero.name = "elder";
@@ -152,11 +152,21 @@ TEST_CASE("A camera inside a hero is lifted over it", "[world][clearance]") {
     field.heroes = heroes;
 
     // Dead centre, halfway up: inside the trunk.
+    //
+    // This test asserted the opposite until the Auto-director gained a continuous-shot mode. Lifting
+    // is right for a cut-based film -- being inside a hero means the camera came too close on its way
+    // past -- and exactly wrong for a take that dollies toward a subject and orbits it, where it
+    // carries the camera *over* the thing it is circling. The contract changed deliberately and this
+    // is the assertion that changed with it.
     const glm::vec3 inside(0.0f, hero.position.y + 8.0f, 0.0f);
     CHECK(field.heroPenetration(inside) > 8.0f);
     const world::ClearanceAdjustment out = world::clearPoint(field, inside);
     CHECK(out.insideHero);
-    CHECK(out.position.y > inside.y);
+    CHECK(out.pushed > 8.0f);
+    // Out, not up: the height is unchanged and the planar distance now clears the capsule.
+    CHECK_THAT(out.position.y, Catch::Matchers::WithinAbs(inside.y, 1e-4));
+    CHECK(glm::length(glm::vec2(out.position.x, out.position.z)) >= hero.radius + field.cameraRadius - 1e-3f);
+    CHECK_THAT(field.heroPenetration(out.position), Catch::Matchers::WithinAbs(0.0, 1e-3));
 
     // Well outside its radius at the same height: untouched by the hero.
     const glm::vec3 beside(40.0f, hero.position.y + 8.0f, 0.0f);
@@ -217,4 +227,136 @@ TEST_CASE("A path that is already clear is returned untouched", "[world][clearan
     for (std::size_t i = 0; i < path.size(); ++i) {
         CHECK_THAT(glm::length(path[i] - before[i]), Catch::Matchers::WithinAbs(0.0, 1e-6));
     }
+}
+
+// ---- lateral clearance: an orbit that stays an orbit (section 9) --------------------------------
+
+TEST_CASE("A path through a hero goes around it rather than over it", "[world][clearance][lateral]") {
+    const world::WorldMap map = flatMap();
+    // `flatMap()` is a *generated* terrain, not a plane -- the name is older than the fixture. So the
+    // path is flown above the highest ground along its own length, which makes the hero the only
+    // thing in the way. The first version of this test put the path at a constant height above the
+    // ground at the origin, and its endpoints were underground: the 3.3 m "rise" it reported was the
+    // terrain lift working correctly on a path that was inside a hill.
+    float ceiling = -1.0e9f;
+    for (int i = 0; i <= 40; ++i) {
+        const float x = glm::mix(-40.0f, 40.0f, static_cast<float>(i) / 40.0f);
+        ceiling = std::max(ceiling, map.sample(glm::vec2(x, 0.0f), 0.5f).height);
+    }
+    const float ground = map.sample(glm::vec2(0.0f), 0.5f).height;
+    const float flyY = ceiling + 6.0f;
+
+    world::HeroPoint hero;
+    hero.name = "elder-2";
+    hero.assetId = "a";
+    hero.position = glm::vec3(0.0f, ground, 0.0f);
+    hero.radius = 8.0f;
+    hero.height = (flyY - ground) + 8.0f; // tall enough that its capsule reaches the dolly
+    const std::vector<world::HeroPoint> heroes{hero};
+
+    world::ClearanceField field;
+    field.map = &map;
+    field.heroes = heroes;
+
+    // A dolly straight at the subject and out the other side -- the move the continuous shot is for,
+    // and the one the old vertical-only correction turned into a fly-over.
+    std::vector<glm::vec3> path;
+    for (int i = 0; i <= 40; ++i) {
+        const float t = static_cast<float>(i) / 40.0f;
+        path.push_back(glm::vec3(glm::mix(-40.0f, 40.0f, t), flyY, 0.0f));
+    }
+    const std::vector<glm::vec3> authored = path;
+    const std::size_t moved = world::clearPath(field, path, 2);
+    REQUIRE(moved > 0);
+    REQUIRE(path.size() == authored.size());
+
+    SECTION("every point ends up outside the hero") {
+        for (const glm::vec3& p : path) {
+            INFO("point (" << p.x << ", " << p.y << ", " << p.z << ")");
+            REQUIRE(field.heroPenetration(p) < 0.05f);
+        }
+    }
+
+    SECTION("it went around: the path deviates sideways and barely rises") {
+        float maxSide = 0.0f;
+        float maxRise = 0.0f;
+        for (std::size_t i = 0; i < path.size(); ++i) {
+            maxSide = std::max(maxSide, std::fabs(path[i].z - authored[i].z) +
+                                            std::fabs(path[i].x - authored[i].x));
+            maxRise = std::max(maxRise, path[i].y - authored[i].y);
+        }
+        INFO("max lateral " << maxSide << " m, max rise " << maxRise << " m");
+        REQUIRE(maxSide > 4.0f);
+        // The whole point. Under the old correction this was the penetration depth, about 9 m.
+        REQUIRE(maxRise < 0.5f);
+    }
+
+    SECTION("the ends are untouched, because they were always clear") {
+        REQUIRE(glm::distance(path.front(), authored.front()) < 1e-3f);
+        REQUIRE(glm::distance(path.back(), authored.back()) < 1e-3f);
+    }
+
+    SECTION("it is deterministic") {
+        std::vector<glm::vec3> again = authored;
+        REQUIRE(world::clearPath(field, again, 2) == moved);
+        for (std::size_t i = 0; i < path.size(); ++i) {
+            REQUIRE(glm::distance(again[i], path[i]) < 1e-5f);
+        }
+    }
+}
+
+TEST_CASE("terrain still lifts, and a clear path is still untouched", "[world][clearance][lateral]") {
+    const world::WorldMap map = flatMap();
+    const float ground = map.sample(glm::vec2(0.0f), 0.5f).height;
+    world::ClearanceField field;
+    field.map = &map;
+
+    SECTION("a path underground is raised, not shoved sideways") {
+        // The negative control for the change: with no heroes in the field, nothing is pushed and the
+        // correction is exactly what it was before lateral clearance existed.
+        std::vector<glm::vec3> path;
+        for (int i = 0; i <= 10; ++i) {
+            path.push_back(glm::vec3(static_cast<float>(i) * 4.0f, ground - 3.0f, 0.0f));
+        }
+        const std::vector<glm::vec3> authored = path;
+        REQUIRE(world::clearPath(field, path, 2) == path.size());
+        for (std::size_t i = 0; i < path.size(); ++i) {
+            REQUIRE(path[i].y > authored[i].y);
+            REQUIRE_THAT(path[i].x, Catch::Matchers::WithinAbs(authored[i].x, 1e-5));
+            REQUIRE_THAT(path[i].z, Catch::Matchers::WithinAbs(authored[i].z, 1e-5));
+        }
+    }
+
+    SECTION("a path with nothing in the way is returned byte for byte") {
+        std::vector<glm::vec3> path{{-20.0f, ground + 60.0f, 0.0f}, {0.0f, ground + 60.0f, 0.0f}};
+        const std::vector<glm::vec3> authored = path;
+        REQUIRE(world::clearPath(field, path, 2) == 0);
+        REQUIRE(path == authored);
+    }
+}
+
+TEST_CASE("a camera on a hero's axis is pushed somewhere deterministic", "[world][clearance][lateral]") {
+    // No direction exists there, so the answer is a convention rather than a truth. What matters is
+    // that it is finite, reproducible, and actually clear -- an unseeded or NaN direction would make
+    // a bake non-reproducible, which is the one thing a baked camera may not be.
+    const world::WorldMap map = flatMap();
+    const float ground = map.sample(glm::vec2(0.0f), 0.5f).height;
+    world::HeroPoint hero;
+    hero.name = "h";
+    hero.assetId = "a";
+    hero.position = glm::vec3(0.0f, ground, 0.0f);
+    hero.radius = 5.0f;
+    hero.height = 10.0f;
+    const std::vector<world::HeroPoint> heroes{hero};
+    world::ClearanceField field;
+    field.map = &map;
+    field.heroes = heroes;
+
+    const glm::vec3 onAxis(0.0f, ground + 5.0f, 0.0f);
+    const world::ClearanceAdjustment a = world::clearPoint(field, onAxis);
+    const world::ClearanceAdjustment b = world::clearPoint(field, onAxis);
+    REQUIRE(std::isfinite(a.position.x));
+    REQUIRE(std::isfinite(a.position.z));
+    REQUIRE(glm::distance(a.position, b.position) < 1e-6f);
+    REQUIRE(field.heroPenetration(a.position) < 0.05f);
 }

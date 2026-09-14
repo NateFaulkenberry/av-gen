@@ -22,10 +22,20 @@
 //   * **Clearances** (ADR-067) are where the composer decided nothing grows. A camera in one is in
 //     a glade or a corridor and may fly low, which is the whole reason the corridor exists.
 //
-// The correction is deliberately minimal and vertical. Pushing a camera sideways changes which way
-// the shot faces and what is in frame; lifting it changes the shot least, and a camera that rises
-// slightly to clear a canopy reads as a camera choosing its altitude rather than as a camera being
-// shoved. Nothing here moves a camera that is already clear.
+// The correction is minimal, and **which way it goes depends on what is in the way**.
+//
+// *Ground and canopy lift.* A camera that rises slightly to clear a hillside or a treeline reads as
+// a camera choosing its altitude rather than as a camera being shoved, and there is nowhere sideways
+// to go from inside a hill anyway.
+//
+// *Heroes push out sideways.* This is the opposite of what it was, and the reason is the Auto-director
+// gaining a continuous-shot mode. Lifting worked for a cut-based film, where being inside a hero meant
+// the camera had come too close on the way past. It is exactly wrong for a take that dollies toward a
+// subject and orbits it: the camera is lifted **over** the thing it is supposed to be circling, and
+// that is a worse failure than clipping because it looks deliberate. Pushing the eye out to the
+// nearest point outside the hero's capsule keeps the orbit an orbit.
+//
+// Nothing here moves a camera that is already clear.
 
 #include "world/ecology.hpp"
 #include "world/hero.hpp"
@@ -59,27 +69,47 @@ struct ClearanceField {
     [[nodiscard]] float minimumHeight(glm::vec2 p) const;
     // How far inside a hero `p` is, in metres. Zero when it is outside all of them.
     [[nodiscard]] float heroPenetration(glm::vec3 p) const;
+    // The horizontal push that takes `p` out of the deepest hero it is inside: a planar vector whose
+    // length is the penetration. Zero when it is outside all of them.
+    //
+    // A camera exactly on a hero's axis has no direction to be pushed in, and the fallback is +X --
+    // deterministic rather than correct, because "correct" does not exist there and a random or
+    // uninitialised direction would make a bake non-reproducible. It is vanishingly rare: the axis of
+    // a hero is where the shot is looking *from* only if something has gone wrong already.
+    [[nodiscard]] glm::vec2 heroPushOut(glm::vec3 p) const;
 };
 
 // One adjusted camera position, and why.
 struct ClearanceAdjustment {
     glm::vec3 position{0.0f};
-    float lifted = 0.0f;      // metres the point was raised
+    float lifted = 0.0f;      // metres the point was raised (ground and canopy)
+    float pushed = 0.0f;      // metres the point was moved sideways (heroes)
     bool insideHero = false;
 };
 
-// Lifts `p` clear of the ground, the canopy and any hero it is inside. Returns the point unchanged
-// when it is already clear.
+// Clears `p`: sideways out of any hero it is inside, then up out of the ground and the canopy.
+//
+// Heroes first, because the push can land the camera somewhere lower and the floor has to be applied
+// to where it ends up; then one more hero check, because a push out of one hero can land inside
+// another. One extra iteration rather than a loop -- two heroes overlapping enough to trap a camera
+// between them is a staging problem, and a solver that hides it is worse than a bake that shows it.
+//
+// Returns the point unchanged when it is already clear.
 [[nodiscard]] ClearanceAdjustment clearPoint(const ClearanceField& field, glm::vec3 p);
 
 // Applies `clearPoint` along a whole path, then smooths the corrections.
 //
 // Smoothed because correcting keys independently produces a kink at every corrected one: a camera
 // that steps up for one key and back down for the next reads far worse than one that never dipped.
-// The smoothing only ever raises -- a pass that could lower a point would undo the clearance it was
-// run to create.
+// The vertical smoothing only ever raises -- a pass that could lower a point would undo the clearance
+// it was run to create.
 //
-// Returns how many points were raised.
+// The lateral correction is smoothed too, and cannot use that trick: "only ever push further out" has
+// no meaning when the push directions differ between neighbours. So the lateral pass smooths freely
+// and then **re-asserts** clearance on the result, which is the only way to be sure the smoothing did
+// not put a point back inside the hero it was moved out of.
+//
+// Returns how many points were moved, by either mechanism.
 [[nodiscard]] std::size_t clearPath(const ClearanceField& field, std::vector<glm::vec3>& path,
                                     int smoothingPasses = 2);
 
