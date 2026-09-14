@@ -541,3 +541,87 @@ TEST_CASE("navigation costs what it claims to", "[integration][glowmere][navigat
         CHECK(routed >= 90);
     }
 }
+
+// ADR-193. `Composition::rebuild()` discards the obstacle field and builds a fresh one -- "a stale
+// solid is a character walking round nothing, and a missing one is a character walking through a
+// tree", as its own comment puts it. The entity layer never heard about it.
+//
+// `EntityWorld::setNavigator` takes a `Navigator` **by value**, and a `Navigator` holds
+// `shared_ptr`s to the obstacle field and to the baked `NavGrid`. It is installed once, from
+// `installEntities()`, which `rebuild()` does not call. So after a terrain edit or a hero moving,
+// the walkers are pathing against the previous world while `TerrainQuery` -- rebuilt per call --
+// sees the new one. The bridge was kept in step; the characters were not.
+//
+// The probe is a hero appearing where a walker could previously stand.
+TEST_CASE("the navigator follows the world when it is rebuilt",
+          "[integration][navigation][obstacles]") {
+    const fs::path root = AVGEN_SOURCE_DIR;
+    if (!glowmereAvailable(root)) {
+        SKIP("Glowmere's assets are not installed");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadFile(root / "examples/world/glowmere-stylized.json").has_value());
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition != nullptr);
+
+    FrameTime time;
+    time.renderTime = 0.0;
+    engine.update(time);
+
+    // Somewhere the world says a body can stand. Chosen from the navigator rather than assumed,
+    // so the test does not depend on Glowmere's layout.
+    const entity::Navigator& nav = composition->entityWorld().navigator();
+    REQUIRE(nav.grid() != nullptr);
+    const std::uint32_t blockedBefore = nav.grid()->stats().blocked;
+    glm::vec2 spot{0.0f, 0.0f};
+    bool found = false;
+    for (int i = 0; i < 400 && !found; ++i) {
+        const float a = static_cast<float>(i) * 0.61f;
+        const float r = 20.0f + static_cast<float>(i) * 0.6f;
+        const glm::vec2 candidate{std::cos(a) * r, std::sin(a) * r};
+        if (nav.sample(candidate).navigable) {
+            spot = candidate;
+            found = true;
+        }
+    }
+    REQUIRE(found);
+
+    // A big authored solid, exactly there. Heroes are the obstacles a composition contributes for
+    // "the large authored solids -- the elder, the monument, the arch".
+    std::vector<world::HeroPoint> heroes = composition->heroes();
+    world::HeroPoint blocker;
+    blocker.name = "test-blocker";
+    blocker.position = glm::vec3(spot.x, nav.groundHeight(spot) + 6.0f, spot.y);
+    blocker.radius = 12.0f;
+    blocker.height = 12.0f;
+    blocker.importance = 0.5f;
+    blocker.preferredCameraDistance = 30.0f;
+    blocker.activationRadius = 120.0f;
+    heroes.push_back(blocker);
+    REQUIRE(composition->setHeroes(std::move(heroes)).has_value());
+
+    time.renderTime = 1.0 / 60.0;
+    time.deltaTime = 1.0 / 60.0;
+    time.frameIndex = 1;
+    engine.update(time);
+
+    // `TerrainQuery` agreeing proves nothing here, and an earlier version of this test used it as
+    // a control and was wrong to: it is rebuilt on every call and reads `heroes_` directly, so it
+    // sees a hero whether or not anything rebuilt. The control has to be something only a *rebuild*
+    // can produce.
+
+    // And so must the navigator the walkers actually use. Before ADR-193 this failed: the entity
+    // world was still holding the obstacle field from load.
+    const entity::Navigator& after = composition->entityWorld().navigator();
+    INFO("spot " << spot.x << ", " << spot.y);
+
+    // The grid was re-baked, not merely the clearance field re-read. A twelve-metre solid takes
+    // cells out of the walkable set, and the count is the one number that can only move if the
+    // *grid* -- the thing `EntityWorld` was holding a stale shared_ptr to -- was built again.
+    REQUIRE(after.grid() != nullptr);
+    INFO("blocked cells " << blockedBefore << " -> " << after.grid()->stats().blocked);
+    CHECK(after.grid()->stats().blocked > blockedBefore);
+
+    // And the walker's own question answers correctly.
+    CHECK_FALSE(after.sample(spot).navigable);
+}

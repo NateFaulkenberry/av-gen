@@ -1259,6 +1259,12 @@ Result<void> Composition::setHeroes(std::vector<world::HeroPoint> heroes) {
     }
     heroMotionPending_ = false;
     ++heroRevision_;
+    // ADR-193: a hero is an obstacle. `rebuild()` is the only thing that calls
+    // `obstaclesFromHeroes`, so a hero declared without one is a solid the navigation layer never
+    // hears about -- the director frames it, the editor draws its ring, and walkers stroll through
+    // it. Heroes are declared rarely and a flatten is expensive, but a flatten that does not happen
+    // is a world that disagrees with itself.
+    dirty_ = true;
     return {};
 }
 
@@ -3840,6 +3846,21 @@ void Composition::rebuild() {
     // The procedural vector has just been rebuilt from the node list, so every index into it is
     // new. Costs measured against the old one describe objects that no longer exist.
     proceduralRebuild_.clear();
+    // ADR-193: the walkers' navigator is made of the obstacle field this rebuild just replaced and
+    // of a NavGrid baked from it, and `EntityWorld` holds it **by value**. It was installed once,
+    // from `installEntities()`, which this function does not call -- so every rebuild left the
+    // characters pathing against the previous world while `TerrainQuery`, rebuilt on every call,
+    // saw the new one. The bridge above was kept in step; the characters were not.
+    //
+    // The same sentence this function opens with, applied one layer further out: "a stale solid is
+    // a character walking round nothing, and a missing one is a character walking through a tree."
+    //
+    // Only when there is somebody to walk. Measured on Glowmere at 170 ms against a 1676 ms
+    // flatten -- 10% of an operation that is already the expensive one, which is the right price
+    // for the entity layer agreeing with the world it is standing in.
+    if (!entityWorld_.empty()) {
+        entityWorld_.setNavigator(buildNavigator());
+    }
     log::info("composition '{}': flattened {} node(s) -> {} entities, {} meshes, {} procedurals in {:.1f} ms",
               name_, nodes_.size(), scene_.entities.size(), scene_.meshes.size(),
               scene_.procedurals.size(),
@@ -5100,6 +5121,11 @@ nlohmann::json Composition::toJson() const {
     if (!postJson_.is_null() && !postJson_.empty()) {
         j["post"] = postJson_;
     }
+    // ADR-193. Emitted only when it is not the default, so an untouched scene is byte-identical to
+    // one written before this key existed.
+    if (navCellSize_ != 4.0f) {
+        j["navCellSize"] = navCellSize_;
+    }
     if (windSetting_.enabled) {
         json w = wind::windToJson(windSetting_);
         w["speed"] = windSpeed_ != nullptr ? windSpeed_->base() : windSetting_.speed;
@@ -5433,6 +5459,20 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
     // ADR-055: the wind is a top-level block, a sibling of `environment` rather than a member of
     // it, because it is the weather rather than the sky: it moves geometry, and a later tier will
     // move cloth and particles with the same numbers.
+    // ADR-193: how coarse the navigation graph is, in metres. 0 disables pathfinding and leaves the
+    // straight-line steering, which is correct and cannot route. Validated here rather than clamped
+    // silently: a scene asking for a 0.1 m grid over a kilometre of world is asking for a hundred
+    // million cells, and finding that out as a warning beats finding it as a stall.
+    if (j.contains("navCellSize")) {
+        if (!j.at("navCellSize").is_number()) {
+            return fail("'navCellSize' must be a number of metres (0 disables pathfinding)");
+        }
+        const auto metres = j.at("navCellSize").get<float>();
+        if (metres < 0.0f || metres > 64.0f) {
+            return fail("'navCellSize' {} is out of range; use 0 to disable or 0.5..64 metres", metres);
+        }
+        comp->setNavCellSize(metres);
+    }
     if (j.contains("wind")) {
         if (!j.at("wind").is_object()) {
             return fail("'wind' must be an object");

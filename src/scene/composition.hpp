@@ -402,6 +402,23 @@ public:
         dirty_ = true;
     }
 
+    // How coarse the navigation graph is, in metres (ADR-193). The default of 4 m is a judgement
+    // about Glowmere-sized worlds; a tighter world wants a finer grid and a vast one cannot afford
+    // it, and until now neither could say so -- the field existed with no setter and no scene key,
+    // so its documented "0 disables pathfinding" escape hatch was unreachable.
+    //
+    // Marks the composition dirty, because the grid is baked during a rebuild and a cell size that
+    // takes effect at some unrelated later flatten is worse than one that cannot be set.
+    void setNavCellSize(float metres) {
+        const float clamped = metres <= 0.0f ? 0.0f : std::clamp(metres, 0.5f, 64.0f);
+        if (clamped == navCellSize_) {
+            return;
+        }
+        navCellSize_ = clamped;
+        dirty_ = true;
+    }
+    [[nodiscard]] float navCellSize() const { return navCellSize_; }
+
     // ---- heroes (ADR-072, authored in ADR-074) ----
     // What in this scene is worth travelling towards. A peer of CompositionData rather than a part
     // of it: focal points say where the frame should point, and a hero says what the thing there

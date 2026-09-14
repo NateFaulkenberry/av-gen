@@ -2771,3 +2771,46 @@ TEST_CASE("A terrain that authors a program is told its ground glow does nothing
         CHECK(chunks > 0);
     }
 }
+
+// ADR-193: the navigation grid's cell size had a field, a documented "0 disables pathfinding"
+// escape hatch, and no way at all to reach either -- no setter, no scene key. A knob nobody can
+// turn is the same defect as a knob wired to nothing.
+TEST_CASE("the navigation cell size is authorable and takes effect", "[scene][composition][nav]") {
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(tempDir());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "nav");
+    comp.attach(params, modulator);
+
+    CHECK(comp.navCellSize() == 4.0f);
+
+    // Clamped, not rejected, for a value inside the plausible band.
+    comp.setNavCellSize(1.5f);
+    CHECK(comp.navCellSize() == 1.5f);
+    comp.setNavCellSize(0.01f);
+    CHECK(comp.navCellSize() == 0.5f); // the floor `NavGrid::build` applies anyway
+    comp.setNavCellSize(1000.0f);
+    CHECK(comp.navCellSize() == 64.0f);
+
+    // Zero is the documented escape hatch and must survive the clamp that guards the rest.
+    comp.setNavCellSize(0.0f);
+    CHECK(comp.navCellSize() == 0.0f);
+
+    // It survives a save and a load, and an untouched scene does not grow the key -- so a scene
+    // written before this existed reloads byte-identical.
+    comp.setNavCellSize(2.5f);
+    const nlohmann::json saved = comp.toJson();
+    REQUIRE(saved.contains("navCellSize"));
+    CHECK(saved.at("navCellSize").get<float>() == 2.5f);
+
+    scene::Composition plain(registry, "plain");
+    plain.attach(params, modulator);
+    CHECK_FALSE(plain.toJson().contains("navCellSize"));
+
+    // And a value nobody could afford is refused with a reason rather than clamped into a stall.
+    nlohmann::json bad = saved;
+    bad["navCellSize"] = 500.0;
+    const auto refused = scene::Composition::fromJson(bad, registry);
+    CHECK_FALSE(refused.has_value());
+}
