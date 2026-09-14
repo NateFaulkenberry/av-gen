@@ -2178,7 +2178,12 @@ Result<void> Application::directCameraFromTrack() {
                     "in its Objects list to make it a hero, declare them in the scene's \"heroes\" "
                     "block, or generate a world");
     }
-    auto installed = directEngine(*engine_, heroes);
+    // The panel's settings, not the defaults. Omitting this argument is how "select Continuous shot
+    // and nothing changes" happened: `refreshDirection` passed `state.settings` on an automatic
+    // re-cut, and the *first* cut -- the one the Enable button makes, and the one a settings change
+    // re-triggers -- silently took `AutoDirectorSettings{}`. Every control in the panel was bound to
+    // a struct nothing on this path read.
+    auto installed = directEngine(*engine_, heroes, cameraDirection_.settings);
     if (!installed) {
         return std::unexpected(installed.error());
     }
@@ -2804,6 +2809,10 @@ RenderSettings Application::renderSettingsFromOptions() const {
         s.output = *options_.renderOutput;
     }
     s.normalisePattern();
+    // ADR-182: the diagnostic arms reach the offline renderer too. Without this `--disable water`
+    // on a `--render` produced a byte-identical sequence -- an attribution arm that cannot fail.
+    s.disablePasses = options_.disablePasses;
+    s.qualityArms = options_.qualityArms;
     if (options_.renderWidth) s.width = *options_.renderWidth;
     if (options_.renderHeight) s.height = *options_.renderHeight;
     if (options_.offlineFps > 0.0 && options_.fpsGiven) s.fps = options_.offlineFps;
@@ -3019,9 +3028,28 @@ int Application::runHeadless() {
             return 2;
         }
         const std::string armLabel = isQualityArm ? options_.abArm : "no-" + options_.abArm;
+        // Counterbalanced: the arm order alternates between blocks (ADR-181).
+        //
+        // Interleaving alone is not enough, and this harness had the defect it exists to prevent.
+        // Running baseline-then-arm in every block means the arm *always* pays for whatever the
+        // machine did during that block -- thermal drift, a background process waking, the GPU
+        // clocking down -- so drift enters the delta as a **bias** rather than as noise, and
+        // averaging more blocks converges on the wrong answer instead of the right one. It is not
+        // hypothetical: a fixed-order interleaved measurement of six mushrooms reported that
+        // *hiding* them made the frame 2.3 ms slower.
+        //
+        // Alternating means each arm runs first as often as it runs second, so first-position and
+        // second-position effects cancel in the mean instead of accumulating in one arm.
         for (int b = 0; b < options_.abBlocks; ++b) {
-            schedule.push_back({"baseline", baseToggles, baseQuality, true});
-            schedule.push_back({armLabel, armToggles, armQuality, false});
+            const BenchBlock base{"baseline", baseToggles, baseQuality, true};
+            const BenchBlock armed{armLabel, armToggles, armQuality, false};
+            if ((b % 2) == 0) {
+                schedule.push_back(base);
+                schedule.push_back(armed);
+            } else {
+                schedule.push_back(armed);
+                schedule.push_back(base);
+            }
         }
         if (isQualityArm) {
             log::info("A/B: {} pair(s) of baseline vs quality arm '{}' -- {} -- interleaved, {} frames "
@@ -3472,13 +3500,31 @@ int Application::runHeadless() {
         // that calls `shadowrange` "no-shadowrange" reads as the opposite of what was measured.
         ab = rendering::compareArms(schedule.size() > 1 ? schedule[1].arm : options_.abArm, baselineBlocks,
                                     armBlocks);
-        const auto report = [&](const char* clock_, const rendering::PairedDelta& d) {
+        const auto report = [&](const char* clock_, const rendering::PairedDelta& d,
+                                const rendering::DriftCheck& drift) {
+            // The drift check runs before the verdict, because a voided run has no verdict to
+            // report (ADR-181). Counterbalancing removes drift's bias; only this detects its size.
+            const bool voided = drift.voids(d.deltaMs);
             log::info("A/B {} : baseline {:.2f} ms, arm {:.2f} ms, delta {:+.2f} ms ({:+.2f}%); "
                       "noise floor {:.2f}% -> {}",
                       clock_, d.baselineMs, d.armMs, d.deltaMs, d.deltaPercent, d.noiseFloorPercent,
-                      d.isResult() ? (d.deltaMs > 0.0 ? "A RESULT: the arm is faster"
-                                                      : "A RESULT: the arm is slower")
-                                   : "NOT A RESULT: inside the noise");
+                      voided ? "VOID: the machine drifted further than the effect"
+                      : d.isResult() ? (d.deltaMs > 0.0 ? "A RESULT: the arm is faster"
+                                                        : "A RESULT: the arm is slower")
+                                     : "NOT A RESULT: inside the noise");
+            if (!drift.measurable()) {
+                log::info("A/B {} drift: not checked -- {} baseline block(s); --ab-blocks 2 or more "
+                          "is what makes the check possible",
+                          clock_, drift.samples);
+            } else {
+                log::info("A/B {} drift: baseline {:.2f} ms in the first half of the run, {:.2f} ms "
+                          "in the second ({:+.2f} ms, {:+.2f}%){}",
+                          clock_, drift.firstHalfMs, drift.secondHalfMs, drift.driftMs,
+                          drift.driftPercent,
+                          voided ? " -- larger than the effect, so this run measured two machines "
+                                   "rather than two arms"
+                                 : " -- the machine held still");
+            }
             // Which component set the floor, on the line where the verdict is read (ADR-148). A
             // difference rejected by the calibrated constant and one rejected because this
             // session's *arm* wobbled are different findings with different next steps, and the
@@ -3493,8 +3539,8 @@ int Application::runHeadless() {
         } else {
             log::info("A/B over {} pair(s) of '{}': baseline blocks varied by {:.2f}% GPU / {:.2f}% wall",
                       ab.blocks, ab.arm, ab.gpuSpreadPercent, ab.wallSpreadPercent);
-            report("gpu ", ab.gpu);
-            report("wall", ab.wall);
+            report("gpu ", ab.gpu, ab.gpuDrift);
+            report("wall", ab.wall, ab.wallDrift);
             std::string perBlock;
             for (std::size_t b = 0; b < ab.gpuBlockDeltaMs.size(); ++b) {
                 perBlock += fmt::format(" pair{}={:+.2f}", b + 1, ab.gpuBlockDeltaMs[b]);

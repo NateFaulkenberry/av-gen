@@ -120,6 +120,12 @@ struct FocalTarget {
     // the angle the subject asked for. 0 means the subject has no opinion, which is the same
     // convention `preferredDistance` uses.
     float preferredElevationDegrees = 0.0f;
+    // The bearing this subject is best approached from, in radians, derived from the ground it stands
+    // on (`world::preferredApproachAzimuth`). The golden-angle spread that stops a film being nine
+    // views down one axis is applied *around* this rather than around zero -- a global zero suits
+    // whichever hero happens to have open ground to its north and puts every other one's establishing
+    // shot into a hillside.
+    float preferredAzimuth = 0.0f;
 };
 
 // Where the subject sits in the frame and how the lens treats it. Thirds are the default because

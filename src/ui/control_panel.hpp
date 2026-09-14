@@ -203,6 +203,7 @@ private:
     void drawSceneTab(app::Engine& engine);
     void drawTimelineTab(app::Engine& engine);
     void drawRender(app::Engine& engine);
+    void drawAutoDirector(app::Engine& engine);
     void drawControlTab(app::Engine& engine);
     void drawOutputsTab(app::Engine& engine);
     void drawWorldWindow(app::Engine& engine);

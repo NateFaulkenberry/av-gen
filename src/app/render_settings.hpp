@@ -39,6 +39,22 @@ struct RenderSettings {
     // frame came out byte-identical to an interactive Realtime one -- the offline promise was
     // stated in the tier table and not kept by the path that produces the actual output.
     std::string tier = "offline";      // preview | realtime | high | offline
+    // Phases switched off for this render, comma-separated, in `--disable`'s vocabulary. Empty is
+    // the ordinary deliverable and is what every real render uses.
+    //
+    // It is here for the same reason `tier` is (ADR-147): the offline engine builds its own
+    // renderer, so a toggle set on the interactive one never reached the path that produces the
+    // output. `--disable water` on a `--render` came out byte-for-byte identical to the baseline --
+    // an attribution arm that cannot fail, which is worse than no arm at all, because a null result
+    // from it reads as "this subsystem is innocent".
+    //
+    // Not a deliverable feature: a render with a pass switched off is a diagnostic, and the job
+    // says so in the log rather than letting a disabled frame be mistaken for a finished one.
+    std::string disablePasses;
+    // Quality arms applied to this render, comma-separated, in `--quality-arm`'s vocabulary. Same
+    // reason and same defect as `disablePasses`: it was applied to the interactive renderer only,
+    // so a quality arm on a `--render` was a third flag that validated and then did nothing.
+    std::string qualityArms;
 
     // Frame count for a resolved end time (endSeconds >= startSeconds); the last frame is the one
     // whose time is < end (end exclusive), at least 1.

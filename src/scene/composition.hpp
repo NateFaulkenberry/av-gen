@@ -854,6 +854,13 @@ private:
         int particleIndex = -1;                      // index into scene_.particles (Particles kind)
         int proceduralIndex = -1;                    // index into scene_.procedurals (Procedural kind)
         std::size_t proceduralSubCount = 0;          // the asset's other materials, immediately after it
+        // A terrain's ecology scatter: one procedural per layer, plus each layer's material subs,
+        // emitted in one run. Recorded because otherwise nothing maps them back to the node that
+        // owns them -- `nodeForProcedural` resolved 29 of Glowmere Valley 2's 42 procedurals and
+        // returned nothing for the other 13, which are every fern, bush, boulder and scattered
+        // fungus in the world. A click on one selected nothing at all.
+        std::size_t ecologyFirst = 0;
+        std::size_t ecologyCount = 0;
         int fieldIndex = -1;                         // index into scene_.fields.fields (Field kind)
         std::size_t firstField = 0;                  // Scene kind: the child's fields copied in
         std::size_t fieldCount = 0;

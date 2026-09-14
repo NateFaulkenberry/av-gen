@@ -329,7 +329,7 @@ TEST_CASE("Glowmere's own heroes and score direct a camera that travels between 
     if (engine.track() == nullptr) {
         SKIP("glowmere-valley.wav is generated, not committed: run tools/make_glowmere_score.py");
     }
-    auto installed = app::directEngine(engine, heroes);
+    auto installed = app::directEngine(engine, heroes, {});
     INFO((installed ? std::string() : installed.error().message));
     REQUIRE(installed.has_value());
     CHECK(*installed > 0);
@@ -423,7 +423,7 @@ TEST_CASE("A directed shot re-cuts itself when the heroes change", "[director][c
 
     // Cut the shot, the way the menu item does.
     REQUIRE(composition->setHeroes(threeHeroes()).has_value());
-    REQUIRE(app::directEngine(engine, composition->heroes()).has_value());
+    REQUIRE(app::directEngine(engine, composition->heroes(), {}).has_value());
     app::noteDirected(engine, state);
     const std::vector<float> first = cameraKeys();
     REQUIRE(!first.empty());
@@ -585,7 +585,7 @@ TEST_CASE("Directing places the camera even when the scene was left in orbit mod
         engine.update(time);
         return engine.scene().camera.position;
     };
-    REQUIRE(app::directEngine(engine, composition->heroes()).has_value());
+    REQUIRE(app::directEngine(engine, composition->heroes(), {}).has_value());
 
     // The camera is where the shot says, and it travels the world rather than circling the origin
     // at the fitted distance.
@@ -717,7 +717,7 @@ TEST_CASE("A hero walking about during playback does not re-cut the film", "[dir
     scene::Composition* composition = engine.composition();
     composition->setHeroSettleSeconds(0.0);   // settle at once; the debounce has its own test
     REQUIRE(composition->setHeroes(threeHeroes()).has_value());
-    REQUIRE(app::directEngine(engine, composition->heroes()).has_value());
+    REQUIRE(app::directEngine(engine, composition->heroes(), {}).has_value());
 
     app::DirectorState state;
     app::noteDirected(engine, state);
@@ -798,7 +798,7 @@ TEST_CASE("Taking the camera by hand ends the director's claim", "[director][cam
     engine.timeline().addTrack(std::move(other));
 
     app::DirectorState state;
-    REQUIRE(app::directEngine(engine, engine.composition()->heroes()).has_value());
+    REQUIRE(app::directEngine(engine, engine.composition()->heroes(), {}).has_value());
     app::noteDirected(engine, state);
     REQUIRE(engine.timeline().isAutomated("camera/position"));
 
@@ -851,7 +851,7 @@ TEST_CASE("a project that arrives with a directed camera is recognised as direct
     engine.newComposition();
     REQUIRE(engine.loadAudio(wav).has_value());
     REQUIRE(engine.composition()->setHeroes(threeHeroes()).has_value());
-    REQUIRE(app::directEngine(engine, engine.composition()->heroes()).has_value());
+    REQUIRE(app::directEngine(engine, engine.composition()->heroes(), {}).has_value());
 
     // What a saved project holds: the tracks, and nothing that says who wrote them.
     const nlohmann::json saved = engine.timeline().toJson();
@@ -921,7 +921,7 @@ TEST_CASE("A directed shot's aim follows the hero it was cut for", "[director][c
     scene::Composition* composition = engine.composition();
     REQUIRE(composition != nullptr);
     REQUIRE(composition->setHeroes(threeHeroes()).has_value());
-    REQUIRE(app::directEngine(engine, composition->heroes()).has_value());
+    REQUIRE(app::directEngine(engine, composition->heroes(), {}).has_value());
 
     const std::vector<scene::AimFollow> follow = composition->aimFollow();
     INFO("shots that hold a subject: " << follow.size());
@@ -1134,6 +1134,52 @@ TEST_CASE("Auto-director settings reach the film, and refuse what they cannot me
             }
         }
         REQUIRE(castDiffers);
+    }
+
+    SECTION("the mode reaches the baked timeline through directEngine, not just directHeroes") {
+        // The layer the panel actually drives. `directHeroes` honouring the mode was already
+        // covered, and the defect was one level up: `directCameraFromTrack` called `directEngine`
+        // and omitted the settings, so every control was bound to a struct the cut never read.
+        // A test at the `directHeroes` level cannot see that, which is why this one exists here.
+        app::AutoDirectorSettings take;
+        take.mode = app::DirectorMode::ContinuousShot;
+        app::AutoDirectorSettings cut = take;
+        cut.mode = app::DirectorMode::EditedSequence;
+
+#ifndef AVGEN_SOURCE_DIR
+        SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+        const std::filesystem::path wav =
+            std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "audio" / "glowmere-valley.wav";
+        if (!std::filesystem::exists(wav)) {
+            SKIP("glowmere-valley.wav is generated, not committed");
+        }
+        app::Engine engine(app::EngineMode::Offline);
+        engine.newComposition();
+        REQUIRE(engine.loadAudio(wav).has_value());
+        REQUIRE(engine.composition()->setHeroes(heroes).has_value());
+
+        const auto keysFor = [&](const app::AutoDirectorSettings& settings) {
+            REQUIRE(app::directEngine(engine, heroes, settings).has_value());
+            std::vector<float> out;
+            for (const params::Track& t : engine.timeline().tracks()) {
+                if (t.target != "camera/position") {
+                    continue;
+                }
+                for (const params::Key& key : t.keys) {
+                    out.insert(out.end(), key.value.begin(), key.value.end());
+                }
+            }
+            return out;
+        };
+        const std::vector<float> continuousKeys = keysFor(take);
+        const std::vector<float> editedKeys = keysFor(cut);
+        REQUIRE_FALSE(continuousKeys.empty());
+        REQUIRE_FALSE(editedKeys.empty());
+        // Two different films. A continuous take pins each shot's start to the last one's end, so
+        // the camera path is not the one an edited sequence bakes.
+        CHECK(continuousKeys != editedKeys);
+#endif
     }
 
     SECTION("the wide lens reaches the baked keys") {

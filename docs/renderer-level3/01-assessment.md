@@ -218,6 +218,137 @@ the repo already tags `[.perf]`, and neither is a defect in the code under test.
 identifies them and either tags them or makes them robust, because a suite that occasionally fails
 for environmental reasons trains people to re-run rather than read.
 
+## Priority 1: the temporal inventory, first measurements
+
+The detector is `tools/temporal_stats.py`, and its whole design is one choice. A sequence taken from
+a **static camera** needs no motion vectors and no reprojection: with the view held still, every
+frame-to-frame difference is the scene. What remains is separating animation from instability, and
+that is the **second difference in time**, `|x(t+1) - 2x(t) + x(t-1)|`. A pixel that animates moves
+smoothly and has a near-zero second difference however *fast* it moves; a pixel that shimmers
+alternates, and alternation is exactly what a second difference is large for. First differences
+cannot tell them apart — which is why "the frame changed" has never been evidence of instability.
+
+Glowmere, static camera over the river bank, 24 frames at 960x540, flicker threshold 6/255:
+
+| arm | pixels that ever flicker | share of baseline |
+|---|---:|---:|
+| everything on | 3.116% | — |
+| bloom off | 2.595% | −17% |
+| **water off** | **1.332%** | **−57%** |
+| volumetrics off | 3.218% | +3% |
+
+**Water is the dominant source of temporal instability in this view**, by a wide margin. Bloom
+amplifies rather than originates — it spreads flicker across more pixels while capping the peak.
+Volumetrics contribute nothing measurable, which is a useful negative given how often fog is blamed.
+
+Peak second difference is **315 of 255** — a pixel swinging past the full display range and back
+between adjacent frames. That is not a subtle artifact.
+
+Three caveats that the numbers do not carry. This is one camera on one scene, and the water's own
+sparkle is *band-passed in screen space*, so its contribution is a function of camera distance and
+resolution together — a different view is a different experiment. The arms became trustworthy only
+after ADR-182, and every number above was re-measured afterwards. And the flicker threshold of 6/255
+is a choice, not a constant; the ranking is stable across plausible thresholds but the percentages
+are not.
+
+### Correction: the particle arm was measuring their absence
+
+The attribution table above says volumetrics contribute nothing and does not list particles, because
+the particles arm produced a byte-identical frame and was recorded as "a content fact rather than a
+harness fact" — this camera simply had none in view.
+
+**That reading was wrong, and for a reason no camera choice could have fixed.** Three harness bugs
+stood between a working emitter and a single rendered particle: a clock constructed inside the render
+loop makes every frame the first frame, so `dt` is always zero; resizing the target resets the
+particle pools; and seeking backwards resets them again. While any of the three held, an emitter at
+4,000 particles a second changed not one pixel.
+
+So **every capture this project has ever written contained no particles at all** — Glowmere's river
+motes and the visitor's beam included — and every frame looked plausible without them. Once they
+simulate, the flicker baseline at a hero camera moves **27x**, 0.347% to 9.363%.
+
+The consequence for this document is specific and worth stating rather than quietly re-running: the
+water/bloom/volumetrics attribution was taken on frames with no particles in them. Water being 57% of
+the flicker is a statement about a scene that was missing a subsystem. The *ranking* may well survive
+— water is a large continuous surface and particles are sparse — but the percentages are not
+comparable with anything measured afterwards, and re-measuring is owed.
+
+It is the same failure as ADR-182's, one layer further down: an arm whose null result was
+indistinguishable from a broken instrument. The identity check caught the *arm*; it could not catch a
+subsystem that was inert in every arm, including the baseline.
+
+### Inside the water: what is and is not the cause
+
+Arms on the water's own authored parameters, same camera and sequence, each checked for
+non-vacuity first:
+
+| arm | flickering pixels | attributable |
+|---|---:|---:|
+| baseline | 3.116% | — |
+| ripple normals off | 2.429% | **22 points of the 57** |
+| foam off | 3.081% | ~1 point |
+| glow off | 3.115% | **none** |
+| sparkle off | 3.116% | **none — the arm is vacuous here** |
+
+The tile map localises it beyond doubt. The tiles peaking near **300** are the river; with water off
+they fall to 50-130, while tiles containing no water are unchanged to the decimal — which is also the
+cleanest evidence that the arm perturbs only what it claims to.
+
+Three things this refutes, each on the mandate's own candidate list for water shimmer:
+
+* **Insufficient resolution is not the cause and supersampling is not the fix.** Rendering the same
+  sequence at 1920x1080 instead of 960x540 *raised* the flickering fraction from 3.116% to **4.274%**
+  — four times the pixels produced 5.5 times the flickering area. Whatever this is, more samples do
+  not average it away.
+* **The sparkle is innocent here.** Zeroing it produces a byte-identical frame at *both* resolutions,
+  because it is band-passed in screen space and contributes nothing at this camera distance. Worth
+  stating loudly, because it is the term whose name most invites the blame — and the term a previous
+  investigation spent three attempts on.
+* **The subsurface glow contributes nothing**, despite changing the image.
+
+**Ripple normals are the largest identified single cause at about 22 of the 57 points**, which is the
+classic specular-aliasing story: high-frequency procedural normals under a tight specular lobe. It is
+also only a third of water's share.
+
+**About 34 points remain unattributed**, and no authored parameter reaches them. The candidates are
+the moon glint, the sky reflection, and the depth-derived shoreline — and separating those needs arms
+inside `water.wgsl` rather than in the scene file. That is the next experiment and it is deliberately
+not being run yet: editing that shader on a hypothesis is exactly what cost three rounds on the
+anamorphic comb, and the discipline that eventually worked there was an impulse through the
+production chain rather than a plausible change.
+
+## Priority 2: the emissive path is not the gap the mandate expects
+
+The mandate's worry is that *"a glowing mushroom should actually look luminous, not merely have a
+bright-coloured surface"*, and asks for the whole HDR path to be verified rather than assumed. It
+was, and it holds:
+
+* **Float targets throughout.** Scene colour, normal+roughness and every post target are
+  `RGBA16Float`. There is **no clamp on emission anywhere in the shaders** — grepped, not assumed.
+* **The ladder is authored as absolute rungs, not fractions**, precisely so a later "brightness"
+  control cannot flatten it: `inert` 0, `silhouette` 0.035, `groundCover` 0.0615, `noticeable` 0.295,
+  then a deliberate gap to `special` 3.94 and up to `brightest` 6.89. The 13x gap between the
+  brightest ordinary vegetation and the first rung across the gap is **validated in code**, because a
+  profile edited toward "a bit more glow everywhere" closes it without anybody noticing the effect
+  has been removed.
+* **Emissive content becomes actual illumination.** Glowmere's ecology light field turns emissive
+  scatter into local lights, and the visual contribution is large: shading the same frame with the
+  local-light count forced to zero changes **28.96% of pixels**, mean delta 7.62/255, peak 233.
+
+Set against the renderer upgrade's measurement that removing *every* local light is worth 1.4 ms of
+an 11.4 ms scene pass, the emissive strategy costs about **12% of the scene pass and pays for 29% of
+the frame**. That is a good trade by any standard, and it is the mandate's own proposed hierarchy —
+hero emissives to local lighting, distant ones to emission and bloom — already implemented via a
+field rather than per-object lights.
+
+**So this is an "already production-grade" answer, not a gap.** The remaining Priority 2 work is
+lighting *quality* — §7's cinematic evaluation of depth, separation and focal hierarchy — rather than
+the HDR/emissive plumbing, which is sound.
+
+One caveat carried from the scene work: Glowmere Valley 2 recorded that mask-modulated emission on
+its hero mushrooms reads *less punchy* than the flat version it replaced, even at intensity 6.0. That
+is a material-authoring trade rather than a path defect, and it is the kind of thing §7 is for.
+
 ## What Phase 1 still owes
 
 - The temporal artifact inventory (§4), which needs the representative suite rendered and looked at.

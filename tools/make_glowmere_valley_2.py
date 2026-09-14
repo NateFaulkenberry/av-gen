@@ -20,7 +20,9 @@ reported at that XZ (`avgen_tests "[.probe][glowmere2]"`). Re-run the probe afte
 world, because moving the ground moves everything standing on it.
 """
 import collections
+import hashlib
 import json
+import math
 import os
 import sys
 
@@ -295,6 +297,7 @@ progs = [p for p in progs
                                            "bush-glow"))]
 for extra in ("../materials/glowmere2-painted-ground.material.json",
               "../materials/glowmere2-tissue.material.json",
+              "../materials/glowmere2-tissue-cool.material.json",
               "../materials/glowmere2-cap.material.json"):
     if extra not in progs:
         progs.append(extra)
@@ -481,18 +484,31 @@ PALETTE = {
 def mul(c, k):
     return [round(v * k, 5) for v in c]
 
-# (name, x, ground y, z, height in metres, yaw). Heights probed with
-# `avgen_tests "[.probe][glowmere2]"`; every one sits in the mesic riverbank band, HAR 2.5-6.3 m,
-# on near-flat ground. They are spread down the whole course rather than clustered, so the river is
-# a route past a series of them rather than a single set piece -- the brief's 7 asks for habitat
-# pockets, not a mushroom field.
+# (name, x, ground y, z, height in metres, yaw, unit gillLow, unit total height).
+#
+# Heights and bearings are probed, not guessed: `avgen_tests "[.probe][glowmere2]"` reports the ground
+# at each site and `world::preferredApproachAzimuth` reports the bearing the terrain falls away in.
+# The unit anchor and total height come from `avgen_tests "[.probe][mushroom]"`, which reads them back
+# off the generated meshes -- the same quantity the alignment invariant checks, so the spore emitter
+# is correct by construction rather than authored per hero.
+#
+# **The first six sit in the mesic riverbank band (HAR 2.5-6.3 m). The last four sit in the
+# transitional and xeric bands (HAR 12.8-28.7 m)** -- up the valley walls, out of the riparian
+# corridor entirely. That is the ladder being used as a placement argument rather than as a
+# description: these four are where they are *because the ladder says a drier band exists*.
 HERO_SITES = [
-    ("elder-2", -12.0,  3.66,  52.0, 16.0,  0.35),   # the pool's east bank: the dominant hero
-    ("lantern", -46.0,  7.93, -28.0,  6.5,  1.90),
-    ("spire",    68.0, 12.09,-104.0,  4.2, -0.80),
-    ("bloom",   -62.0,  4.30, 118.0,  9.0,  2.60),
-    ("veil",     78.0,  0.16, 198.0,  3.4,  0.95),
-    ("umbra",   -66.0,  4.25, 166.0,  5.5, -2.10),
+    # name        x       y       z    height   yaw     gillLow (unit)              unitH   gillR   HAR
+    ("elder-2", -12.0,   3.66,   52.0, 16.0,  2.356, (0.2019, 0.9891, 0.1123), 1.4373, 0.6729),  #  2.5
+    ("lantern", -46.0,   7.93,  -28.0,  6.5,  0.785, (0.4208, 0.8224, 0.1408), 1.0852, 0.6741),  #  4.7
+    ("spire",    68.0,  12.09, -104.0,  4.2,  2.356, (0.1253, 0.8083, 0.0046), 1.1039, 0.4465),  #  5.4
+    ("bloom",   -62.0,   4.30,  118.0,  9.0,  6.021, (0.3184, 0.7747, 0.0546), 1.0698, 0.4546),  #  5.2
+    ("veil",     78.0,   0.16,  198.0,  3.4,  1.833, (0.2599, 0.8306, 0.0781), 1.0703, 0.5267),  #  5.3
+    ("umbra",   -66.0,   4.25,  166.0,  5.5,  0.000, (0.4566, 1.0017, 0.1900), 1.4049, 0.6598),  #  6.3
+    # ---- the drier four -------------------------------------------------------------------------
+    ("cairn",  -150.0,  31.33,  -60.0,  7.5,  1.309, (0.1282, 0.9913, 0.0749), 1.3540, 0.7018),  # 28.7 xeric
+    ("ridge",   132.0,  20.93, -190.0,  5.0,  2.356, (0.3947, 1.0233, 0.1831), 1.3362, 0.6384),  # 12.8 upper
+    ("scree",  -178.0,  21.24,   96.0,  6.2,  5.760, (0.3816, 0.8732, 0.1265), 1.1276, 0.7144),  # 21.0 xeric
+    ("ember",   176.0,  11.97,  150.0,  4.0,  3.403, (0.1069, 0.8906, 0.0444), 1.1588, 0.5915),  # 16.9 upper
 ]
 
 # One warm hero, and it is the elder. Glowmere's reserve-accent rule -- "the hero is the only warm
@@ -513,7 +529,7 @@ def hero_materials(index, structure, emission):
     # broken by a material, and the first render of the placed elder showed it. The program's fresnel
     # translucency is a real loss and is noted as one; colour control is worth more, because "one warm
     # light in a cool world" is the reason the eye finds the hero at all.
-    tissue = "glowmere2TissueWarm" if warm else "glowmereTissue"
+    tissue = "glowmere2TissueWarm" if warm else "glowmere2TissueCool"
     under = {"program": tissue, "baseColor": mul(PALETTE["secondary"], 0.18),
              "roughness": 0.52, "emissiveColor": glow, "emissiveIntensity": 0.18}
     stem = {"baseColor": [0.24, 0.12, 0.25], "roughness": 0.62,
@@ -534,12 +550,11 @@ def hero_materials(index, structure, emission):
 PART_ROLES = ["cap", "under", "stem", "gills"]
 hero_nodes = []
 hero_points = []
-for hi, (hname, hx, hy, hz, hheight, hyaw) in enumerate(HERO_SITES):
+spore_nodes = []
+SPORE_BUDGET = []
+
+for hi, (hname, hx, hy, hz, hheight, hyaw, hanchor, hunit, hgillr) in enumerate(HERO_SITES):
     rec = heroes_doc["heroes"][hi]
-    values = [rec["parameters"][spec] for spec in
-              [k for k in rec["parameters"]]]  # placeholder, replaced below
-    # The schema's order is load-bearing (ADR-173), and a JSON object does not preserve it. The order
-    # is taken from the record's own index into the sampler rather than from dict iteration.
     order = ["aspect", "rimTangentDeg", "centreTangentDeg", "capThickness", "stemCurvature",
              "stemTaper", "stemBulgePosition", "stemBulgeWidth", "lobeCount", "lobeDepth",
              "capTiltDeg", "edgeWaviness", "surfaceNoiseAmp", "surfaceNoiseScale", "gillCount",
@@ -548,14 +563,16 @@ for hi, (hname, hx, hy, hz, hheight, hyaw) in enumerate(HERO_SITES):
     structure = int(round(values[16]))
     emission = float(values[17])
     mats = hero_materials(hi, structure, emission)
-    # Unit height of the generated organism is about 1.2 (stem 1 plus cap thickness and rim), so the
-    # scale that reaches a target height in metres is that ratio.
-    scale = round(hheight / 1.2, 4)
+    # Scaled by the organism's *own* unit height rather than a nominal 1.2, so a hero asked for 16 m
+    # is 16 m. The old constant was up to 20% out, because the generator's total height varies with
+    # cap thickness and rim droop.
+    scale = round(hheight / hunit, 4)
+    base_y = round(hy - 0.12, 3)
     for part in range(4):
         hero_nodes.append(collections.OrderedDict([
             ("name", "%s-%s" % (hname, PART_ROLES[part])),
             ("kind", "procedural"),
-            ("position", [hx, round(hy - 0.12, 3), hz]),
+            ("position", [hx, base_y, hz]),
             ("rotation", [0.0, round(hyaw * 57.29578, 2), 0.0]),
             ("procedural", collections.OrderedDict([
                 ("source", collections.OrderedDict([
@@ -572,8 +589,6 @@ for hi, (hname, hx, hy, hz, hheight, hyaw) in enumerate(HERO_SITES):
                 ("sourceTransform", {"scale": [scale, scale, scale]}),
                 ("distribution", {"kind": "single"}),
                 ("material", mats[part]),
-                # The gills are light and floppy, the cap is heavy and barely moves -- the same split
-                # the original elder used, and the reason its filaments read as alive.
                 ("motion", {"stiffness": 18.0 if part != 3 else 0.8,
                             "mass": 120.0 if part != 3 else 0.5,
                             "damping": 0.95,
@@ -582,15 +597,121 @@ for hi, (hname, hx, hy, hz, hheight, hyaw) in enumerate(HERO_SITES):
                             "tipAmplitude": 0.01 if part != 3 else 0.06}),
             ])),
         ]))
+
+    # The spore anchor in world space: the mesh-derived `gillLow`, scaled, then turned by the node's
+    # own yaw. One geometric quantity serves the alignment invariant and the particle emitter, so a
+    # cap that is on its stem also drops its spores from under itself.
+    ax, ay, az = hanchor
+    ca, sa = math.cos(hyaw), math.sin(hyaw)
+    # **Sized by the gills, and bounded by a density rather than by a count.**
+    #
+    # `gillRadius` is measured off the generated gill mesh by `mushroomAnchors` -- the same call that
+    # gives the emitter its position -- so one measurement serves both, which is what was asked for.
+    # Sizing it by the organism's *height* instead, which is what the first attempt did, put a 0.88 m
+    # disc under a six-metre cap: the fall read as a dribble down the stem rather than as snow off a
+    # canopy, and the render is what showed it.
+    #
+    # The bound is a **density**, 0.3 spores per square metre of gill area per second, so the count
+    # follows from how big the mushroom actually is instead of from a number chosen per hero. Rate is
+    # clamped to [3, 24]/s and capacity to 1024, so no single hero exceeds 1024 live particles
+    # whatever the search returns later.
+    spore_radius = round(hgillr * scale, 3)
+    spore_rate = round(min(24.0, max(3.0, 3.14159 * spore_radius * spore_radius * 0.3)), 1)
+    spore_capacity = min(1024, 1 << int(math.ceil(math.log2(max(64.0, spore_rate * 22.0 * 1.35)))))
+    SPORE_BUDGET.append((hname, spore_radius, spore_rate, spore_capacity))
+    spore = collections.OrderedDict([
+        ("name", "%s-spores" % hname),
+        ("kind", "particles"),
+        # The node carries the world position and the particles block carries a zero offset, which is
+        # the shape `visitor-beam` uses. Putting the world position in the particles block alone --
+        # which is what `spores` appears to do -- emitted nothing: ten systems flattened into the scene
+        # and rendered no pixels, and an emitter cranked to 4,000/s at 0.9 m still changed no frame,
+        # which is what said the emitter was broken rather than merely sparse.
+        ("position", [round(hx + (ax * ca - az * sa) * scale, 3),
+                      round(base_y + ay * scale, 3),
+                      round(hz + (ax * sa + az * ca) * scale, 3)]),
+        ("visible", True),
+        ("particles", collections.OrderedDict([
+            ("position", [0.0, 0.0, 0.0]),
+            ("shape", "disc"),
+            ("seed", 4100 + hi * 17),
+            # The fall is from under the whole cap, so the disc is the gills' own measured reach.
+            ("extent", [spore_radius, 0.15, spore_radius]),
+            ("capacity", spore_capacity),
+            # Glowing snow: slow, sparse, and small. The rate is the density above; against the
+            # 16,384 the scene's existing spores and river motes already carry, the ten spore-falls
+            # together are the total the generator prints below. A spore-fall that becomes the thing
+            # you look at has stopped being weather.
+            ("spawnRate", spore_rate),
+            ("lifetimeMin", 16.0),
+            ("lifetimeMax", 22.0),
+            # **Slow, but actually falling.** The first values -- 0.05-0.16 m/s against `drag` 0.45 --
+            # damped to a stop inside a second: measured against a spawn-rate-zero arm, the whole
+            # spore-fall occupied a band 33 px tall, about 0.25 m, after a full 24 s of simulated
+            # time. A fall that does not descend past the cap's own rim is not a fall. Light drag
+            # keeps the drift soft without arresting it; 0.10-0.20 m/s over a 16-22 s life is a
+            # descent of roughly two to three metres, which clears the cap and is still slow enough
+            # to read as snow rather than as rain.
+            ("speedMin", 0.10),
+            ("speedMax", 0.20),
+            ("direction", [0.0, -1.0, 0.0]),
+            ("spread", 0.22),
+            ("drag", 0.08),
+            ("gravity", [0.0, -0.05, 0.0]),
+            # Flake size is in **world metres and does not scale with the hero**, because snow is the
+            # same size wherever it falls; a spore sized as a fraction of a 16 m elder and of a 4 m
+            # ember would read as two different substances.
+            #
+            # This number was got wrong twice in the same way, and the way is worth recording. At
+            # 0.055 m nothing was visible, so it went to 0.16 m -- but the simulation was resetting
+            # every frame at the time, so what was being judged was a handful of newborn particles
+            # sitting on the emitter disc, not a fall. Sized against that, 0.16 m looked modest. With
+            # the simulation actually running, 0.16 m reads as a cloud of glowing bubbles the size of
+            # the cap. **A parameter tuned against a broken pipeline is tuned to the breakage.**
+            ("sizeStart", 0.07),
+            ("sizeEnd", 0.025),
+            ("blend", "additive"),
+            ("colorStart", mats[3]["emissiveColor"] + [0.0]),
+            ("colorEnd", mats[3]["emissiveColor"] + [0.0]),
+            # A rung of the emission ladder, not a free number (ADR-179): `special` at 3.936, one
+            # rung below the `beacon` 6.15 the gills sit on. Spores are lit *by* the gills they fall
+            # from, so they must not out-glow them, and the ladder's 4x minimum gap is what keeps
+            # that ordering true rather than a pair of numbers that happen to differ today.
+            ("emissive", 3.936),
+            ("opacityCurve", [{"t": 0.0, "value": 0.0}, {"t": 0.18, "value": 0.75},
+                              {"t": 0.7, "value": 0.55}, {"t": 1.0, "value": 0.0}]),
+            ("turbulence", 0.09),
+            ("turbulenceScale", 0.6),
+            ("turbulenceSpeed", 0.1),
+            # Crisp, not soft. At 0.6 the billboards blur into one another and the fall reads as a
+            # cloud hanging under the cap -- which is exactly what the shout arm rendered. Snow is
+            # made of separable flakes, so the edge has to survive.
+            ("softness", 0.18),
+            ("fogCoupling", 1.0),
+        ])),
+    ])
+    spore_nodes.append(spore)
+
+    # The hero declaration points at the **crown**, and its position is the crown's, not the base.
+    # The Auto-director aims at `HeroPoint::position`, so a hero anchored at the ground is a hero the
+    # camera frames the stem of.
+    crown_y = round(base_y + hanchor[1] * scale + hheight * 0.06, 3)
     hero_points.append(collections.OrderedDict([
         ("name", "%s-cap" % hname),
-        ("position", [hx, round(hy, 3), hz]),
+        ("position", [round(hx + (ax * ca - az * sa) * scale, 3), crown_y,
+                      round(hz + (ax * sa + az * ca) * scale, 3)]),
+        # The bearing the terrain says this hero is approached from, not a global default. The
+        # Auto-director spreads consecutive shots by the golden angle *around* this.
         ("yaw", round(hyaw, 3)), ("scale", 1.0),
         ("radius", round(hheight * 0.42, 2)), ("height", round(hheight, 2)),
-        ("importance", round(0.95 - hi * 0.07, 3)),
-        ("focalWeight", round(0.9 - hi * 0.08, 3)),
+        # Stepped so that no hero's importance collides with the Visitor's authored 0.68. ADR-072's
+        # contract is *strictly* descending, and a tie is not an ordering -- the ten-hero cast hit it
+        # on the first regeneration, which is the second time this test has caught the cast being
+        # wrong after the roster changed.
+        ("importance", round(0.95 - hi * 0.041, 3)),
+        ("focalWeight", round(0.9 - hi * 0.05, 3)),
         ("preferredCameraDistance", round(hheight * 3.1, 1)),
-        ("preferredCameraElevation", 5.0),
+        ("preferredCameraElevation", 4.0 if hi == 0 else 8.0),
         ("activationRadius", round(hheight * 9.0, 1)),
         ("colorAccent", PALETTE["accent"] if hi == 0 else PALETTE["primary"]),
         ("reactionProfile", "organism"),
@@ -602,6 +723,7 @@ for hi, (hname, hx, hy, hz, hheight, hyaw) in enumerate(HERO_SITES):
 ELDER = {"elder-crown", "elder-stem", "elder-filaments"}
 d["nodes"] = [n for n in d["nodes"] if n.get("name") not in ELDER]
 d["nodes"].extend(hero_nodes)
+d["nodes"].extend(spore_nodes)
 # Sorted by importance, descending. ADR-072's contract is that heroes arrive pre-ranked and
 # `briefFromHeroes` takes the first as the film's *subject* -- the one that gets the builds and the
 # drops. Appending the new heroes after the survivors left the UFO (0.68) ahead of the elder (0.95),
@@ -616,16 +738,34 @@ for e in d.get("entities", []):
             b["subjects"] = ["visitor", "elder-2-cap", "bloom-cap"]
 
 json.dump(d, open(DST, 'w'), indent=1)
-print("heroes placed: %d nodes, %d hero points" % (len(hero_nodes), len(hero_points)))
+print("heroes placed: %d nodes, %d spore emitters, %d hero points"
+      % (len(hero_nodes), len(spore_nodes), len(hero_points)))
 
 # ---- the project ------------------------------------------------------------------------------
 PSRC = 'examples/world/glowmere-stylized.json'
 PDST = 'examples/world/glowmere-valley-2.json'
-proj = json.load(open(PSRC), object_pairs_hook=collections.OrderedDict)
-proj["assets"]["scene"]["path"] = "glowmere-valley-2.scene.json"
-# The recorded hash and size described the *other* scene file. Leaving them would be carrying a
-# stale fingerprint; they are only consulted when the file is missing, but a wrong one is worse than
-# none because it would relink to something else.
+
+# **Rebase on the project if there is one; only build it from the stylized world the first time.**
+#
+# This script used to derive the project from `glowmere-stylized.json` on every run, which was right
+# exactly once. The project is now *edited state*: the user opened the scene, fixed the mushrooms by
+# hand and saved, and that save wrote 3,063 parameters where the generated file had 585. Re-deriving
+# would have thrown all of it away -- the rotations, the bloom and ghosting tune, the camera -- and
+# it would have looked like the generator working correctly. A tool that regenerates a file a person
+# edits has to be able to tell which half is its own.
+REBASE = os.path.exists(PDST)
+proj = json.load(open(PDST if REBASE else PSRC), object_pairs_hook=collections.OrderedDict)
+# The project fingerprints the scene it links, and this script has just rewritten that scene, so the
+# recorded hash is stale the moment it runs. It used to be dropped -- a missing fingerprint is
+# honest where a wrong one relinks to something else -- but the editor's own save writes it back in
+# a nested shape, so the hash is now *recomputed* instead. Dropping it on every run would have meant
+# the user's next save silently reintroducing a fingerprint for a file that had moved on again.
+_scene_bytes = open(DST, 'rb').read()
+proj["assets"]["scene"]["path"] = collections.OrderedDict([
+    ("path", "glowmere-valley-2.scene.json"),
+    ("sha256", hashlib.sha256(_scene_bytes).hexdigest()),
+    ("size", len(_scene_bytes)),
+])
 for k in ("sha256", "size"):
     proj["assets"]["scene"].pop(k, None)
 
@@ -639,11 +779,49 @@ for name in DROP:
 # The project's parameter block is authoritative over the scene's transforms -- `applyParameters`
 # rewrites them every frame -- so a staged scene whose project still carried the old positions would
 # put every hero back where it was. This is the half of staging that is easy to forget.
-params["nodes/foreground-leaves/position"] = list(FGLEAF)
-params["nodes/spores/position"] = [-20.0, 8.0, 20.0]
-params["camera/position"] = list(CAM_EYE)
-params["camera/target"] = list(CAM_TGT)
-params["camera/mode"] = 1
+if not REBASE:
+    params["nodes/foreground-leaves/position"] = list(FGLEAF)
+    params["nodes/spores/position"] = [-20.0, 8.0, 20.0]
+    params["camera/position"] = list(CAM_EYE)
+    params["camera/target"] = list(CAM_TGT)
+    params["camera/mode"] = 1
+
+# ---- unwinding the hand-fix ---------------------------------------------------------------------
+#
+# The user fixed the stem/crown joint in the editor by dragging the **stem** across to meet the cap,
+# and those nudges are project parameters. The generator now fixes the same joint at the other end,
+# by lathing the cap about the stem's own leaning top, so both corrections apply and the organism
+# comes apart again by the size of the nudge. One of them has to go, and it is the nudge: a fix in
+# the generator is a fix for all 800 candidates and for every mushroom anybody generates later,
+# where a fix in the project is a fix for six.
+#
+# **Telling a workaround from art direction, without guessing.** A mushroom is four nodes -- cap,
+# under, gills, stem -- and they are parts of one organism, so a transform that is not shared by all
+# four is not a placement, it is a patch. Every hero's cap, gills and under are byte-identical to
+# each other; only the stem differs, by 0.63 m to 2.01 m. That is the whole of the compensation and
+# it is exactly what the generator bug would produce. Everything the user changed *uniformly* across
+# all four nodes is left alone, because that is a decision about the organism rather than about its
+# seams:
+#
+#   * the rotations (elder 20.05 deg where the script authored 135 deg) -- they turned them;
+#   * the 0.12 m the whole organism sank into the ground, identical for all six heroes.
+#
+# The `procedural/<hero>-*/source/scale` overrides are dropped too, on a different test: each is
+# exactly `height / 1.2`, the nominal unit height this script used before it measured the real one.
+# A value that still matches the old formula to the digit was written by the old generator, not by a
+# person, so nothing is being second-guessed.
+STEM_PATCH_REMOVED = []
+for hname, _x, _y, _z, hh, _yaw, _anchor, _unit, _gr in HERO_SITES:
+    stemk = "nodes/%s-stem/position" % hname
+    capk = "nodes/%s-cap/position" % hname
+    if stemk in params and capk in params and params[stemk] != params[capk]:
+        d = [params[stemk][i] - params[capk][i] for i in range(3)]
+        STEM_PATCH_REMOVED.append((hname, math.sqrt(sum(v * v for v in d))))
+        params.pop(stemk)
+    for part in ("cap", "under", "gills", "stem"):
+        k = "procedural/%s-%s/source/scale" % (hname, part)
+        if k in params and abs(params[k][0] - hh / 1.2) < 1e-3:
+            params.pop(k)
 
 # The music reached the old elder through four routes. Repointed rather than dropped: the cap is what
 # the section-scale swell belongs on and the gills are what a downbeat should answer, which is the same
@@ -658,7 +836,7 @@ REPOINT = {
     "material/paintedCrown/emissionIntensity": "material/glowmere2Cap/emissionIntensity",
 }
 kept = []
-for r in proj["routes"]:
+for r in (proj["routes"] if not REBASE else []):
     t = r.get("target", "")
     if t in REPOINT:
         r["target"] = REPOINT[t]
@@ -668,18 +846,31 @@ for r in proj["routes"]:
         # would be a control with no effect.
         continue
     kept.append(r)
-proj["routes"] = kept
-for k in [k for k in params if k.startswith("nodes/elder-crown/") or k.startswith("nodes/elder-stem/")
-          or k.startswith("nodes/elder-filaments/") or k.startswith("procedural/elder-")]:
-    params.pop(k)
+if not REBASE:
+    proj["routes"] = kept
+    for k in [k for k in params if k.startswith("nodes/elder-crown/") or k.startswith("nodes/elder-stem/")
+              or k.startswith("nodes/elder-filaments/") or k.startswith("procedural/elder-")]:
+        params.pop(k)
 
 # Routes that named a removed node would bind to nothing. Unresolved routes stay enabled but inert
 # by design, so this is tidiness rather than a fix -- but an inert route is a lie in the UI.
 before = len(proj["routes"])
 proj["routes"] = [r for r in proj["routes"]
                   if not any(("/%s/" % n) in r.get("target", "") for n in DROP)]
-print("routes", before, "->", len(proj["routes"]), "; params", len(params))
+print("routes", before, "->", len(proj["routes"]), "; params", len(params),
+      "; rebased" if REBASE else "; built from stylized")
+if STEM_PATCH_REMOVED:
+    print("hand-fix unwound (stem nudges now done in the generator):")
+    for _n, _d in STEM_PATCH_REMOVED:
+        print("  %-9s stem was patched %.3f m off its cap" % (_n, _d))
 json.dump(proj, open(PDST, 'w'), indent=1)
 print("wrote", PDST)
+
+print("\nspore-fall budget (density 0.3 /m2/s, cap 1024 each)")
+for _n, _r, _rate, _cap in SPORE_BUDGET:
+    print("  %-9s radius %6.2f m  rate %5.1f /s  steady ~%5.0f  capacity %5d"
+          % (_n, _r, _rate, _rate * 19.0, _cap))
+print("  ten heroes: %d live at steady state, %d allocated"
+      % (sum(r * 19.0 for _n, _x, r, _c in SPORE_BUDGET), sum(c for _n, _x, _r, c in SPORE_BUDGET)))
 
 print('done.')

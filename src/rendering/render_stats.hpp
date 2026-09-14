@@ -20,6 +20,7 @@
 
 #include "gpu/timeline_math.hpp"
 
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -287,11 +288,40 @@ struct AbBlock {
 // Cross-session comparison is not offered at all, deliberately. The audit found a 28% gap between
 // two recorded Glowmere figures that run-to-run variance cannot explain, so a number from a
 // document is not a baseline. Both arms live in one process, or there is no comparison.
+// Whether the machine held still for long enough that the run means anything (ADR-181).
+//
+// Counterbalancing the arm order removes the *bias* from drift -- an arm that always runs second
+// always pays for whatever the machine did during the run -- but it averages drift rather than
+// detecting it, so a counterbalanced run can still return an impossible sign and say nothing about
+// why. This is the detector: the baseline arm is measured throughout the run, so its own first half
+// against its own second half is a direct reading of how far the machine moved while the experiment
+// was happening. It costs nothing extra, because those measurements were taken anyway.
+//
+// A run whose drift is larger than the effect it claims is void. Not "noisy" -- void: the thing it
+// measured changed underneath it, and the delta is a difference between two machines.
+struct DriftCheck {
+    double firstHalfMs = 0.0;  // the baseline arm's median over the first half of the run
+    double secondHalfMs = 0.0; // ...and over the second half
+    double driftMs = 0.0;      // second - first; signed, because which way it moved is diagnostic
+    double driftPercent = 0.0; // of the first half
+    int samples = 0;           // baseline blocks the check had to work with; < 2 means no check
+    [[nodiscard]] bool measurable() const { return samples >= 2; }
+    // The claimed effect has to stand clear of how far the machine moved. Equality voids: an effect
+    // exactly the size of the drift is indistinguishable from the drift.
+    [[nodiscard]] bool voids(double effectMs) const {
+        return measurable() && std::abs(driftMs) >= std::abs(effectMs);
+    }
+};
+
+[[nodiscard]] DriftCheck driftOf(const std::vector<AbBlock>& baselineBlocks, bool gpuClock);
+
 struct AbSummary {
     std::string arm;
     int blocks = 0; // A/B pairs that produced a delta
     PairedDelta gpu;
     PairedDelta wall;
+    DriftCheck gpuDrift;
+    DriftCheck wallDrift;
     std::vector<double> gpuBlockDeltaMs;  // per pair, in the order they ran
     std::vector<double> wallBlockDeltaMs;
     // What the baseline arm's own median did across the session, as a percentage of its median:

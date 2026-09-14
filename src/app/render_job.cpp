@@ -1,5 +1,7 @@
 #include "app/render_job.hpp"
 
+#include <sstream>
+
 #include "assets/exr.hpp"
 #include "assets/image.hpp"
 #include "core/log.hpp"
@@ -109,6 +111,60 @@ Result<void> RenderJob::start() {
                 "render: unknown tier '{}' (preview|realtime|high|offline)", settings_.tier)});
         }
         renderer_->setQuality(tier);
+    }
+    // Quality arms, applied before the pass toggles because an arm sets a policy field and a
+    // toggle removes a pass from whatever policy chose.
+    if (!settings_.qualityArms.empty()) {
+        rendering::QualitySettings quality = renderer_->qualitySettings();
+        std::istringstream stream(settings_.qualityArms);
+        std::string name;
+        std::string applied;
+        while (std::getline(stream, name, ',')) {
+            const auto begin = name.find_first_not_of(" \t");
+            const auto end = name.find_last_not_of(" \t");
+            if (begin == std::string::npos) {
+                continue;
+            }
+            name = name.substr(begin, end - begin + 1);
+            if (!rendering::SceneRenderer::setQualityArm(quality, name)) {
+                return std::unexpected(Error{fmt::format(
+                    "render: unknown quality arm '{}' (one of: {})", name,
+                    rendering::SceneRenderer::qualityArmNames())});
+            }
+            applied += applied.empty() ? name : ", " + name;
+        }
+        renderer_->setQualitySettings(quality);
+        log::warn("render: this is a DIAGNOSTIC render -- quality arm(s): {}", applied);
+    }
+    // The diagnostic arms, which used to stop at the interactive renderer (ADR-182). Applied after
+    // the tier, because a tier is a policy and this is a removal from whatever policy chose.
+    if (!settings_.disablePasses.empty()) {
+        rendering::SceneRenderer::PassToggles toggles = renderer_->passToggles();
+        std::istringstream stream(settings_.disablePasses);
+        std::string name;
+        std::vector<std::string> applied;
+        while (std::getline(stream, name, ',')) {
+            const auto begin = name.find_first_not_of(" \t");
+            const auto end = name.find_last_not_of(" \t");
+            if (begin == std::string::npos) {
+                continue;
+            }
+            name = name.substr(begin, end - begin + 1);
+            if (!rendering::SceneRenderer::setPassArm(toggles, name, false)) {
+                return std::unexpected(Error{fmt::format(
+                    "render: unknown phase '{}' to disable (one of: {})", name,
+                    rendering::SceneRenderer::passArmNames())});
+            }
+            applied.push_back(name);
+        }
+        renderer_->setPassToggles(toggles);
+        std::string list;
+        for (const std::string& a : applied) {
+            list += list.empty() ? a : ", " + a;
+        }
+        // Loud, because this frame is not the deliverable and a sequence that quietly came out
+        // without its water is the kind of file somebody ships.
+        log::warn("render: this is a DIAGNOSTIC render -- phase(s) disabled: {}", list);
     }
     compositor_ = std::make_unique<rendering::CompositionRenderer>(context_, shaders_);
     if (auto r = compositor_->init(); !r) {

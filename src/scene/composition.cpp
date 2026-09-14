@@ -1856,6 +1856,19 @@ const CompositionNode* Composition::nodeForProcedural(std::size_t proceduralInde
             return nodes_[i].get();
         }
     }
+    // A terrain's scatter layers, which carry no `proceduralIndex` of their own because they are
+    // emitted in a run rather than one per node. Checked second so an authored procedural that
+    // happens to share an index range with nothing still wins on the first pass.
+    for (std::size_t i = 0; i < ranges_.size() && i < nodes_.size(); ++i) {
+        const NodeRange& range = ranges_[i];
+        if (range.ecologyCount == 0) {
+            continue;
+        }
+        if (proceduralIndex >= range.ecologyFirst &&
+            proceduralIndex < range.ecologyFirst + range.ecologyCount) {
+            return nodes_[i].get();
+        }
+    }
     return nullptr;
 }
 
@@ -3075,6 +3088,7 @@ void Composition::rebuild() {
             fresh.hash = terrainKey;
             bool reusedProducts = false;
             std::size_t layerIndex = 0;
+            range.ecologyFirst = scene_.procedurals.size();
             for (const world::ScatterLayer& layer : node.ecology.layers) {
                 std::span<const glm::vec3> anchors;
                 if (layer.proximity) {
@@ -3251,6 +3265,7 @@ void Composition::rebuild() {
                     scene_.procedurals.push_back(std::move(sub));
                 }
             }
+            range.ecologyCount = scene_.procedurals.size() - range.ecologyFirst;
             // Heroes are the large authored solids -- the elder, the monument, the arch -- and the
             // only things in this world that already carry a volume worth colliding with.
             entity::obstaclesFromHeroes(heroes_, *obstacles_);

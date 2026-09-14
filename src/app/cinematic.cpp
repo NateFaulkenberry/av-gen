@@ -1204,7 +1204,10 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
         // The golden angle, so consecutive shots approach from unrelated directions and the film is
         // not nine views down the same axis. A multiple of a right angle would have every third
         // shot repeat the first one's geometry, which reads as the camera going back on itself.
-        shot.startAzimuth = static_cast<float>(i) * 2.39996f;
+        // Around the subject's own preferred bearing, not around zero. The golden angle is still what
+        // separates consecutive shots; what it separates them *from* is now a property of where the
+        // subject stands.
+        shot.startAzimuth = shot.subject.preferredAzimuth + static_cast<float>(i) * 2.39996f;
         shot.endAzimuth = shot.startAzimuth + d.azimuthSweep;
 
         switch (shot.kind) {
