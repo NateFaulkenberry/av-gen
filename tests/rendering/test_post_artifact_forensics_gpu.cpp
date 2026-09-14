@@ -229,6 +229,25 @@ double correlationAt(const Field& f, std::uint32_t lag) {
     return acc / zero;
 }
 
+// Whether the autocorrelation has a *tooth* at a given period, rather than merely a high value
+// there. This distinction is the whole detector: a wide smooth blur correlates strongly with itself
+// at every small lag -- 0.69 at lag 10, for the streak as it stands -- so "correlation at the comb's
+// period" cannot tell a comb from a blur, and a threshold on it fails in both directions. A comb
+// can, though: a periodic signal's autocorrelation has a maximum at its period and a minimum half a
+// period either side of it, while a blur's decays monotonically and is very nearly straight over
+// three consecutive samples. So the statistic is the prominence -- how far the correlation at the
+// period stands above the line through its anti-phase neighbours. Zero or below for any blur;
+// strongly positive only for repeated copies.
+double combProminence(const Field& f, std::uint32_t period) {
+    if (period < 2 || period * 3 / 2 >= f.width / 2) {
+        return 0.0;
+    }
+    const double here = correlationAt(f, period);
+    const double before = correlationAt(f, period / 2);
+    const double after = correlationAt(f, period * 3 / 2);
+    return here - 0.5 * (before + after);
+}
+
 // How elongated the field is, as the ratio of the energy's horizontal to its vertical standard
 // deviation about its own centroid. An anamorphic streak is anisotropic *by definition*; a fix that
 // removes the comb by blurring both axes equally has turned a streak into a blob, and this is the
@@ -501,9 +520,10 @@ TEST_CASE("an impulse through the anamorphic chain comes out as a comb, not a st
     // correlation at the tap step. Both are now zero-ish; the recorded values are in
     // docs/post-artifact-forensics.md.
     INFO(describe("wide", wide));
+    INFO("comb prominence at lag 10: " << combProminence(wide, 10));
     CHECK(isolatedPeaks(wide, 4.0f, 1e-6f) == 0);
     // The comb's period was the tap step in wide texels, which at this stretch is 10.
-    CHECK(correlationAt(wide, 10) < 0.55);
+    CHECK(combProminence(wide, 10) < 0.02);
 
     // And it must still be a *streak*: removing a comb by blurring both axes alike would turn the
     // anamorphic tier into a blob, which is a different artifact and not a fix.
@@ -543,8 +563,8 @@ TEST_CASE("the streak's comb spacing is set by the source-to-output texel mismat
     INFO("streak lag " << a.lag << " score " << a.score << "; with ghosts lag " << b.lag << " score " << b.score);
     CHECK(isolatedPeaks(noGhosts, 4.0f, 1e-6f) == 0);
     CHECK(isolatedPeaks(withGhosts, 4.0f, 1e-6f) == 0);
-    CHECK(correlationAt(noGhosts, 10) < 0.55);
-    CHECK(correlationAt(withGhosts, 10) < 0.55);
+    CHECK(combProminence(noGhosts, 10) < 0.02);
+    CHECK(combProminence(withGhosts, 10) < 0.02);
 }
 
 // The same chain over a *sparse grid* of bright points, which is the shape the water's sparkle
@@ -573,7 +593,7 @@ TEST_CASE("a sparse point field acquires the chain's own spacing, not its own",
     // correct. What must not survive is the *chain's* spacing: before the fix the wide tier came
     // back with 390 isolated peaks of its own over this input.
     CHECK(isolatedPeaks(wide, 4.0f, 1e-6f) == 0);
-    CHECK(correlationAt(wide, 10) < 0.75);
+    CHECK(combProminence(wide, 10) < 0.02);
 }
 
 // A compact bright rectangle: an input with no high frequency in it at all. The same chain, the
@@ -656,16 +676,13 @@ TEST_CASE("the streak no longer prints a copy of its input at every tap step",
         settings.anamorphicStretch = stretch;
         const Field wide = stage(bench.run(hdr, settings), "wide");
         const auto oldPeriod = static_cast<std::uint32_t>(std::lround(stretch));
-        const double atComb = correlationAt(wide, oldPeriod);
-        const Periodicity p = horizontalPeriodicity(wide);
-        fmt::print("  stretch {:>6.3f} -> correlation at lag {:>3} = {:.3f}; fundamental lag {:>3} "
-                   "score {:.3f}; isolated peaks {}; elongation {:.1f}\n",
-                   stretch, oldPeriod, atComb, p.lag, p.score, isolatedPeaks(wide, 4.0f, 1e-6f),
-                   elongation(wide, 0.0f));
-        // A smooth wide blur correlates strongly with itself at every small lag, so the bar here is
-        // not "uncorrelated" -- it is "no worse than the neighbouring lags", which a comb's tooth is
-        // by a wide margin.
+        const double prominence = combProminence(wide, oldPeriod);
+        fmt::print("  stretch {:>6.3f} -> prominence at lag {:>3} = {:+.4f}; correlation {:.3f}; "
+                   "isolated peaks {}; elongation {:.1f}\n",
+                   stretch, oldPeriod, prominence, correlationAt(wide, oldPeriod),
+                   isolatedPeaks(wide, 4.0f, 1e-6f), elongation(wide, 0.0f));
         CHECK(isolatedPeaks(wide, 4.0f, 1e-6f) == 0);
+        CHECK(prominence < 0.02);
         CHECK(elongation(wide, 0.0f) > 3.0);
     }
     CHECK(bench.ctx->errorCount() == 0);

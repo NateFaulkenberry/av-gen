@@ -153,3 +153,89 @@ Three measurements, none of which compares a render against a second render of t
 - **Isolated peaks**, a count of pixels far brighter than the ring around them. A blur destroys
   isolation and a resample preserves it, so the interesting number is how the count moves from one
   stage to the next.
+
+## 6. Every hypothesis, and what the measurement did to it
+
+| Hypothesis | Verdict | Evidence |
+|---|---|---|
+| High-frequency shimmer aliasing into the bright pass | **Rejected as the cause** | `bloom/prefilter` over the impulse and over the water both come back with no periodic structure (lag 0–2). The prefilter faithfully reproduces a sparse point field, which is what it is given. |
+| Isolated high-luminance pixels surviving the bloom prefilter | **True but not the defect** | They do survive — `bloom/up0` keeps 55 isolated peaks over the water frame, because the upsample *blends* the finest level rather than replacing it. That is correct behaviour for a bloom and produces no pattern on its own. |
+| Karis-style weighted averaging changes the shimmer's appearance | **Not tested as a fix; unnecessary** | It addresses the prefilter, and the prefilter was measured innocent. It would also change the bloom over everything in the frame to treat one stage's sampling bug. |
+| Anamorphic streak taps sampling a sparse sparkle field | **Confirmed, and it is the mechanism** | The period equals `stretch` in wide texels, exactly, over a fivefold sweep. §3. |
+| Ghost UV transforms magnifying or mirroring the pattern | **Rejected as the cause; real but secondary** | With `ghosts` at 0 the comb is still there (score 0.516). The ghosts add structure of their own on top, and out-of-region energy does scale with ghost strength (0.231 → 0.301 over the sweep), but they create no comb. |
+| Insufficient source resolution for the sampling footprint | **Confirmed, as the other half of the same defect** | Not "too little resolution" but too *much*: the source carried detail at half a texel that the taps sampled every ten. |
+| The ghost supersampling kernel creates square artifacts | **Not reached** | The 3×3 tent was one of the reverted attempts. It is a remedy for the ghosts' own undersampling, which remains unfixed; see §9. |
+
+The reverted "48 taps a side" and "coarser pyramid level" attempts were each half of the right
+answer, which is why neither worked alone: more taps without a band-limited source still combs at
+the residual spacing, and a coarser source without more taps trades the comb for a blob.
+
+## 7. The fix
+
+`shaders/post.wgsl` `fs_wide` and `src/rendering/post_processor.cpp`, under one rule — **no tap may
+step further than the texel of the texture it reads**, with a Nyquist margin, so "not further" means
+half a texel. ADR-159 has the decision; the two numbers it produces are the tap count (bounded by a
+48-a-side budget) and the pyramid level the streak reads (the finest whose texel is at least twice
+the tap spacing). The reach and the gaussian's sigma are unchanged, so the streak's *shape* is the
+authored one.
+
+## 8. Metrics, before and after
+
+Impulse, `wide` target, across the stretch sweep — comb prominence at the lag the defect predicts:
+
+```
+  stretch      4.000   6.000   8.000  10.386  14.000  20.000
+  before      +0.617  +0.826  +0.928  +0.520  +0.935  +0.819
+  after       +0.007  +0.010  +0.012  +0.008  -0.002  -0.090
+  isolated peaks  before 17, 17, 15, 11, 9, 7        after 0 everywhere
+  elongation      before 2.6 .. 7.6                  after 4.7 .. 10.9
+```
+
+QA river, Glowmere's water and post, the `wide` target:
+
+| | before | after |
+|---|---|---|
+| peak | 0.3943 | 0.0235 |
+| mean | 0.001595 | 0.001588 |
+| isolated peaks | 420 | 0 |
+
+The user's own project at 1920×1080, measuring the effect's contribution with
+`tools/post_artifact_stats.py ON.png OFF.png`:
+
+| | before | after |
+|---|---|---|
+| comb prominence at 42 px | +0.2218 | +0.0056 |
+| prominence at 126 px | +0.1711 | −0.0419 |
+| contribution max | 142.7 | 52.7 |
+| contribution mean | 1.7477 | 1.9395 |
+| isolated peaks (whole frame) | 650 | 539 |
+
+Two readings worth stating plainly. The contribution's **mean rose 11 %** — the effect is not weaker,
+the peaks fell because the teeth were the peaks. And the whole-frame isolated-peak count barely
+moved, because at full frame that statistic is dominated by the scene's own isolated bright things —
+the sparkle, the glowing flora — and not by the streak. It is the right statistic on the `wide`
+target and a weak one on a finished frame; the prominence is the discriminating one there.
+
+Cost, same protocol both sides with the first run discarded as warm-up: the anamorphic tier goes
+from 0.107 to 0.116 ms at 1080p and from 0.214 to 0.502 ms at 4K.
+
+## 9. What is not fixed, and what stayed inconclusive
+
+- **The ghosts still undersample.** `fs_wide`'s two flare taps minify the half-resolution source into
+  the quarter-resolution target by a further 0.75× and 0.40× — an effective 2.7× and 5× minification
+  — with a single bilinear tap and no prefilter. The comb fix moves them onto a band-limited level
+  as a side effect, which is why their isolated-peak count also went to zero, but that is a
+  consequence of the streak's source choice and not a decision taken about the ghosts. Out-of-region
+  energy still scales with ghost strength. If the ghosts are ever given their own source, they need
+  their own rule.
+- **`fs_wide`'s `post.texelSize` is still the output's texel.** That is now harmless, because the tap
+  spacing is reconciled with the source explicitly, but the confusion the shader comment encodes
+  ("a coarse bloom level") has been corrected in the comment rather than in the uniform.
+- **The whole-frame isolated-peak count is not a good artifact statistic**, as §8 notes. The
+  regression tests use it only on the `wide` target, where the streak is the only thing in the
+  picture.
+- **The water matrix's out-of-region energy never found a bright pixel outside the sparkle's
+  support** (0 pixels above 1e-3 in every arm, before and after). The post chain does spread energy
+  outside the region — measurably, and more with each stage enabled — but at this scene's brightness
+  it is diffuse rather than structured. Whether a darker scene would put *visible* structure outside
+  the water is untested.
