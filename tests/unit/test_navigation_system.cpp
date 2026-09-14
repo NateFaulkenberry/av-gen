@@ -725,3 +725,395 @@ TEST_CASE("characters make room for each other rather than standing in each othe
         }
     }
 }
+
+// ---- water as a depth rather than a wall --------------------------------------------------------
+
+namespace {
+
+// A flat, noiseless world with two watercourses across it: a ford half a metre deep at x = -30 and
+// a channel two and a half metres deep at x = +30. Flat on purpose -- what is being measured is the
+// water rule, and terrain noise would put a slope rejection in front of it. A `River` feature's
+// path level *is* its water surface and `amplitude` is how far the bed sits below it, so the depth
+// at the centre of each course is exactly the amplitude.
+world::WorldMap twoCrossings() {
+    world::WorldMap map;
+    map.name = "two crossings";
+    map.size = glm::vec2(240.0f, 240.0f);
+    map.baseHeight = 0.0f;
+    world::Feature ford;
+    ford.name = "ford";
+    ford.kind = world::FeatureKind::River;
+    ford.path = {{-30.0f, 0.0f, -110.0f}, {-30.0f, 0.0f, 110.0f}};
+    ford.width = 12.0f;
+    ford.amplitude = 0.5f;
+    ford.water = true;
+    map.features.push_back(ford);
+    world::Feature channel = ford;
+    channel.name = "channel";
+    channel.path = {{30.0f, 0.0f, -110.0f}, {30.0f, 0.0f, 110.0f}};
+    channel.amplitude = 2.5f;
+    map.features.push_back(channel);
+    map.prepare();
+    return map;
+}
+
+entity::Navigator walkerOn(const world::WorldMap& map, world::Ecology& ecology, float wadeDepth) {
+    world::ClearanceField clearance;
+    clearance.map = &map;
+    clearance.ecology = &ecology;
+    clearance.cameraRadius = 0.6f;
+    clearance.groundClearance = 0.0f;
+    entity::NavSettings settings;
+    settings.wadeDepth = wadeDepth;
+    return entity::Navigator(&map, clearance, settings);
+}
+
+} // namespace
+
+TEST_CASE("a walker meets water as a depth, not as a wall", "[navigation][water]") {
+    const world::WorldMap map = twoCrossings();
+    world::Ecology ecology;
+    const glm::vec2 dry(0.0f, 0.0f);
+    const glm::vec2 ford(-30.0f, 0.0f);
+    const glm::vec2 channel(30.0f, 0.0f);
+
+    // The world is what the test says it is. Without this the two rejections below could both be
+    // "there is no water anywhere" and the test would pass on a map with no river in it.
+    const entity::Navigator dryWalker = walkerOn(map, ecology, 0.0f);
+    REQUIRE_THAT(dryWalker.terrain().waterDepthAt(ford),
+                 Catch::Matchers::WithinAbs(0.5f, 0.02f));
+    REQUIRE_THAT(dryWalker.terrain().waterDepthAt(channel),
+                 Catch::Matchers::WithinAbs(2.5f, 0.02f));
+    REQUIRE(dryWalker.terrain().waterDepthAt(dry) == 0.0f);
+
+    SECTION("the sample carries the depth, and it is the world's own number") {
+        // Carried rather than re-derived: `NavSample` used to stop at the water *surface*, so
+        // every caller that wanted the depth took a second sample of the world to get it.
+        CHECK(dryWalker.sample(dry).waterDepth == 0.0f);
+        CHECK(dryWalker.sample(ford).waterDepth == dryWalker.terrain().waterDepthAt(ford));
+        CHECK(dryWalker.sample(channel).waterDepth == dryWalker.terrain().waterDepthAt(channel));
+        // And it is filled in on a rejected sample too. A walker that is told only "submerged"
+        // cannot tell a puddle it should have crossed from a lake it must go round.
+        CHECK(dryWalker.sample(ford).reject == entity::NavReject::Submerged);
+        CHECK(dryWalker.sample(ford).waterDepth > 0.4f);
+    }
+
+    SECTION("with no wade band declared, all water is a wall -- exactly as before") {
+        CHECK(dryWalker.sample(dry).navigable);
+        CHECK_FALSE(dryWalker.sample(ford).navigable);
+        CHECK(dryWalker.sample(ford).reject == entity::NavReject::Submerged);
+        CHECK_FALSE(dryWalker.sample(channel).navigable);
+        CHECK(dryWalker.sample(channel).reject == entity::NavReject::Submerged);
+    }
+
+    SECTION("the freeboard margin is what a wade band replaces, not what it adds to") {
+        // Dry ground standing 0.2 m above a water surface: no depth at all, and refused by the
+        // 0.35 m margin that has always been the rule. A body that will cross a half-metre ford and
+        // still refuses to stand on a bank two handspans above the water is not describing
+        // anything, so declaring a wade band retires the margin rather than stacking on it.
+        world::WorldMap shelf;
+        shelf.name = "a shelf above the sea";
+        shelf.size = glm::vec2(200.0f, 200.0f);
+        shelf.baseHeight = 0.2f;
+        shelf.seaLevel = 0.0f;
+        shelf.prepare();
+        world::Ecology bare;
+        const entity::NavSample dryRule = walkerOn(shelf, bare, 0.0f).sample(glm::vec2(0.0f));
+        REQUIRE(dryRule.waterDepth == 0.0f);
+        REQUIRE(std::isfinite(dryRule.waterSurface));
+        CHECK_FALSE(dryRule.navigable);
+        CHECK(dryRule.reject == entity::NavReject::Submerged);
+        CHECK(walkerOn(shelf, bare, 0.4f).sample(glm::vec2(0.0f)).navigable);
+    }
+
+    SECTION("with a wade band, the shallow crossing opens and the deep one does not") {
+        const entity::Navigator wader = walkerOn(map, ecology, 0.8f);
+        CHECK(wader.sample(dry).navigable);
+        CHECK(wader.sample(ford).navigable);
+        CHECK(wader.sample(ford).waterDepth > 0.4f); // and it is genuinely wet
+        CHECK_FALSE(wader.sample(channel).navigable);
+        CHECK(wader.sample(channel).reject == entity::NavReject::Submerged);
+        // The band is a band. Raise it past the channel and the channel opens too, which is what
+        // makes this a depth rather than a second hard-coded waterline.
+        const entity::Navigator diver = walkerOn(map, ecology, 3.0f);
+        CHECK(diver.sample(channel).navigable);
+    }
+
+    SECTION("the shared terrain query and the navigator answer the same question") {
+        // §3's whole reason for existing. These are one set of rules, and a wade band that only
+        // one of them knew about would be the duplication ADR-090 removed, growing back.
+        const entity::Navigator wader = walkerOn(map, ecology, 0.8f);
+        CHECK(wader.terrain().isWalkable(ford));
+        CHECK_FALSE(dryWalker.terrain().isWalkable(ford));
+        CHECK(wader.terrain().rejectAt(channel) == world::TerrainReject::Submerged);
+    }
+}
+
+TEST_CASE("the navigation graph agrees with the walker about water", "[navigation][water][grid]") {
+    const world::WorldMap map = twoCrossings();
+    world::Ecology ecology;
+    const glm::vec2 ford(-30.0f, 0.0f);
+    const glm::vec2 channel(30.0f, 0.0f);
+
+    entity::Navigator dryWalker = walkerOn(map, ecology, 0.0f);
+    dryWalker.buildGrid(2.0f);
+    entity::Navigator wader = walkerOn(map, ecology, 0.8f);
+    wader.buildGrid(2.0f);
+    REQUIRE(dryWalker.grid() != nullptr);
+    REQUIRE(wader.grid() != nullptr);
+
+    INFO("dry walkable " << dryWalker.grid()->stats().walkable << ", wading walkable "
+                         << wader.grid()->stats().walkable << " of "
+                         << wader.grid()->stats().cells);
+
+    SECTION("a ford is out of the graph until the walker will cross it, and never the channel") {
+        CHECK_FALSE(dryWalker.grid()->walkable(ford));
+        CHECK(wader.grid()->walkable(ford));
+        CHECK_FALSE(dryWalker.grid()->walkable(channel));
+        CHECK_FALSE(wader.grid()->walkable(channel));
+        // The ford is a strip through the whole world, so opening it is a big change to the
+        // walkable set rather than a cell here and there.
+        CHECK(wader.grid()->stats().walkable > dryWalker.grid()->stats().walkable + 500);
+    }
+
+    SECTION("a dry world's cells record no depth at all") {
+        // The cost term below multiplies this byte, so "zero everywhere" is what makes the claim
+        // that nothing changes for a world that does not wade a fact rather than an intention.
+        std::size_t wet = 0;
+        for (const entity::NavCell& c : dryWalker.grid()->cells()) {
+            wet += c.wade > 0 ? 1u : 0u;
+        }
+        CHECK(wet == 0);
+    }
+
+    SECTION("a wading world's cells record how deep the water is") {
+        const entity::NavCell& shallow = wader.grid()->at(wader.grid()->cellOf(ford));
+        CHECK(shallow.wade > 0);
+        // 0.5 m of a 0.8 m band, quantised over 0..255.
+        CHECK(shallow.wade > 140);
+        CHECK(shallow.wade < 190);
+        // Dry ground is dry: a cell well away from either course carries nothing.
+        CHECK(wader.grid()->at(wader.grid()->cellOf(glm::vec2(0.0f, 0.0f))).wade == 0);
+    }
+
+    SECTION("the two banks of the ford are one region only for the walker that can cross it") {
+        // The point of all of it. A ford splits a world in two for a body that stops at the water,
+        // and does not for one that does not, and that is a fact about reachability rather than
+        // about the look of a cell.
+        const glm::vec2 west(-60.0f, 0.0f);
+        const glm::vec2 east(-6.0f, 0.0f);
+        REQUIRE(dryWalker.grid()->walkable(west));
+        REQUIRE(dryWalker.grid()->walkable(east));
+        CHECK_FALSE(dryWalker.grid()->connected(west, east));
+        CHECK(wader.grid()->connected(west, east));
+    }
+}
+
+namespace {
+
+// The deepest water a route passes through, sampled every half metre along the polyline. A route is
+// a handful of waypoints and the water between two of them is invisible to a test that only looks
+// at the ends -- which is the same mistake `pathClear` used to make about tree trunks.
+float deepestAlong(const entity::Navigator& nav, glm::vec2 from,
+                   const std::vector<glm::vec2>& route) {
+    float deepest = 0.0f;
+    glm::vec2 previous = from;
+    for (const glm::vec2& leg : route) {
+        const float span = glm::length(leg - previous);
+        const int steps = std::max(1, static_cast<int>(std::ceil(span / 0.5f)));
+        for (int i = 0; i <= steps; ++i) {
+            const glm::vec2 at = previous + (leg - previous) * (static_cast<float>(i) /
+                                                                static_cast<float>(steps));
+            deepest = std::max(deepest, nav.terrain().waterDepthAt(at));
+        }
+        previous = leg;
+    }
+    return deepest;
+}
+
+float lengthOf(glm::vec2 from, const std::vector<glm::vec2>& route) {
+    float total = 0.0f;
+    glm::vec2 previous = from;
+    for (const glm::vec2& leg : route) {
+        total += glm::length(leg - previous);
+        previous = leg;
+    }
+    return total;
+}
+
+} // namespace
+
+TEST_CASE("a ford costs more to cross than dry ground of the same length", "[navigation][water][grid]") {
+    // A channel that stops halfway across the world, so there is a way round it as well as a way
+    // through it, and the planner has an actual choice to make.
+    world::WorldMap map;
+    map.name = "a channel with an end";
+    map.size = glm::vec2(240.0f, 240.0f);
+    map.baseHeight = 0.0f;
+    world::Feature channel;
+    channel.name = "channel";
+    channel.kind = world::FeatureKind::River;
+    channel.path = {{0.0f, 0.0f, -110.0f}, {0.0f, 0.0f, 0.0f}};
+    channel.width = 10.0f;
+    channel.amplitude = 0.5f;
+    channel.water = true;
+    map.features.push_back(channel);
+    map.prepare();
+
+    world::Ecology ecology;
+    entity::Navigator nav = walkerOn(map, ecology, 0.8f);
+    nav.buildGrid(2.0f);
+    REQUIRE(nav.grid() != nullptr);
+
+    const glm::vec2 from(-20.0f, -6.0f);
+    const glm::vec2 to(20.0f, -6.0f);
+    // The straight line is genuinely wet, or nothing below measures anything.
+    REQUIRE(nav.terrain().waterDepthAt(glm::vec2(0.0f, -6.0f)) > 0.4f);
+    REQUIRE(nav.grid()->walkable(from));
+    REQUIRE(nav.grid()->walkable(to));
+
+    std::vector<glm::vec2> route;
+
+    SECTION("priced at nothing, the planner walks through the river") {
+        entity::NavPathCost free;
+        free.wadePenalty = 0.0f;
+        REQUIRE(nav.grid()->findPath(from, to, route, free));
+        const float wet = deepestAlong(nav, from, route);
+        INFO("unpriced route " << lengthOf(from, route) << " m, deepest " << wet << " m");
+        CHECK(wet > 0.3f);
+    }
+
+    SECTION("priced steeply, it goes round the end of it -- and stays round it") {
+        entity::NavPathCost dear;
+        dear.wadePenalty = 40.0f;
+        REQUIRE(nav.grid()->findPath(from, to, route, dear));
+        const float wet = deepestAlong(nav, from, route);
+        const float length = lengthOf(from, route);
+        INFO("priced route " << length << " m, deepest " << wet << " m");
+        CHECK(wet < 0.05f);
+        // Going round costs metres, which is the point: the route is longer than the straight line
+        // it refused, so this is a decision the cost model made rather than a coincidence.
+        CHECK(length > 45.0f);
+        // And the string pull left it alone. The pull knows only walkability, a wadeable cell is
+        // walkable, and the straight line from one bank to the other is clear -- so without the
+        // guard on it the smoother would put this route straight back through the water it was just
+        // paid to avoid, and `wet` above would be half a metre.
+    }
+
+    SECTION("at the default price a short ford still beats a long detour") {
+        // The ford is ten metres wide and going round it costs about fourteen. Wading is supposed
+        // to be *dearer*, not forbidden: a price that refused every crossing would be the old
+        // binary rule with extra steps.
+        REQUIRE(nav.grid()->findPath(from, to, route, entity::NavPathCost{}));
+        INFO("default route " << lengthOf(from, route) << " m, deepest "
+                              << deepestAlong(nav, from, route) << " m");
+        CHECK(deepestAlong(nav, from, route) > 0.3f);
+    }
+}
+
+namespace {
+
+// How far one `explore` character actually travels in a minute. Distance along the ground
+// rather than displacement, because a wanderer that walked in a circle would show a displacement of
+// nothing and a speed that was fine.
+float walkedDistance(const world::WorldMap& map, world::Ecology& ecology, float wadeDepth,
+                     float wadeDrag) {
+    const entity::Navigator nav = walkerOn(map, ecology, wadeDepth);
+    params::ParameterSet params;
+    entity::EntityWorld world;
+    entity::EntityDesc desc;
+    desc.name = "walker";
+    desc.seed = 9001u;
+    entity::BehaviorDesc walk;
+    walk.kind = "explore";
+    // Every branch that could differ between the two runs is pinned: no running, no observing, no
+    // idling, and a stroll every time rather than a choice from an interest registry. What is left
+    // is a body walking, which is the thing being timed.
+    walk.settings = nlohmann::json{{"speed", 3.0f},      {"runSpeed", 3.0f},  {"runChance", 0.0f},
+                                   {"minRange", 20.0f},  {"maxRange", 60.0f}, {"strollChance", 1.0f},
+                                   {"idleMin", 0.0f},    {"idleMax", 0.0f},   {"observeChance", 0.0f},
+                                   {"wadeDrag", wadeDrag}};
+    desc.behaviors.push_back(walk);
+    std::vector<entity::EntityDesc> descs;
+    descs.push_back(std::move(desc));
+    world.setEntities(std::move(descs), 4242u);
+    entity::NodeBinding binding;
+    binding.node = "walker";
+    binding.exists = true;
+    binding.transformPrefix = "nodes/walker/";
+    binding.anchor = glm::vec3(0.0f);
+    std::vector<entity::NodeBinding> bindings;
+    bindings.push_back(std::move(binding));
+    world.setBindings(std::move(bindings));
+    world.setNavigator(nav);
+    world.registerParameters(params, "entity/");
+    world.bind(params, "entity/");
+
+    float travelled = 0.0f;
+    glm::vec3 previous = world.find("walker")->locomotion().position;
+    // A minute, so the character completes several strolls rather than one. A single leg would
+    // measure the arrival taper as much as the walking.
+    for (std::uint64_t frame = 0; frame < 3600; ++frame) {
+        entity::EntityUpdate tick;
+        tick.time = static_cast<double>(frame) / 60.0;
+        tick.dt = 1.0 / 60.0;
+        tick.frameIndex = frame;
+        world.update(tick, params);
+        const glm::vec3 now = world.find("walker")->locomotion().position;
+        travelled += glm::length(glm::vec2(now.x - previous.x, now.z - previous.z));
+        previous = now;
+    }
+    return travelled;
+}
+
+world::WorldMap flatWorld(float seaLevel) {
+    world::WorldMap map;
+    map.name = "flat";
+    map.size = glm::vec2(200.0f, 200.0f);
+    map.baseHeight = 0.0f;
+    map.seaLevel = seaLevel;
+    map.prepare();
+    return map;
+}
+
+} // namespace
+
+TEST_CASE("a wading walker is slower than a dry one", "[navigation][water][behavior]") {
+    // Two runs of the same character, from the same seed, in two worlds that differ in exactly one
+    // thing: forty centimetres of water over the whole of one of them. Every roll it makes is
+    // identical, every destination it picks is identical -- so any difference in how far it gets is
+    // the water and nothing else.
+    world::WorldMap dry = flatWorld(-1000.0f);
+    world::WorldMap flooded = flatWorld(0.4f);
+    world::Ecology ecology;
+
+    // The flood is real and it is crossable: the whole world is half the wade band deep.
+    const entity::Navigator wader = walkerOn(flooded, ecology, 0.8f);
+    REQUIRE_THAT(wader.terrain().waterDepthAt(glm::vec2(12.0f, -7.0f)),
+                 Catch::Matchers::WithinAbs(0.4f, 0.001f));
+    REQUIRE(wader.sample(glm::vec2(12.0f, -7.0f)).navigable);
+
+    const float onLand = walkedDistance(dry, ecology, 0.8f, 0.55f);
+    const float inWater = walkedDistance(flooded, ecology, 0.8f, 0.55f);
+    REQUIRE(onLand > 100.0f); // it walked at all, or the comparison below is two zeroes
+    const float ratio = inWater / onLand;
+    INFO("dry " << onLand << " m, wading " << inWater << " m over 3600 frames; ratio " << ratio);
+    // Half the wade band deep at a drag of 0.55 is 0.725 of full speed. Bounded either side rather
+    // than asserted to a tolerance, because the two runs drift apart in phase once one of them is
+    // behind -- what is being pinned is that the water cost it most of a quarter of its travel.
+    CHECK(ratio > 0.55f);
+    CHECK(ratio < 0.92f);
+    // And it kept walking. A character that stopped dead in the water would also be "slower", and
+    // would be a bug.
+    CHECK(inWater > 100.0f);
+
+    SECTION("and the drag is what does it") {
+        // The control that makes the measurement above attributable. Same flooded world, same
+        // seed, drag turned off: the trajectory is the dry one exactly, so what the first
+        // measurement found was the knob and not some other consequence of standing in water --
+        // a different ground height, a different walkable set, a different destination roll.
+        const float undragged = walkedDistance(flooded, ecology, 0.8f, 0.0f);
+        INFO("undragged " << undragged << " m against dry " << onLand << " m");
+        CHECK_THAT(undragged, Catch::Matchers::WithinAbs(onLand, 0.001f));
+    }
+}

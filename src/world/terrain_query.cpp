@@ -99,11 +99,24 @@ TerrainPoint TerrainQuery::at(glm::vec2 p) const {
         out.reject = TerrainReject::TooSteep;
         return out;
     }
-    // `waterSurface` is -infinity on dry ground, so this is a no-op there. The margin is the
-    // difference between standing on a bank and standing ankle-deep in the river.
-    if (std::isfinite(s.waterSurface) && s.height < s.waterSurface + rules.waterMargin) {
-        out.reject = TerrainReject::Submerged;
-        return out;
+    // `waterSurface` is -infinity on dry ground, so this whole block is a no-op there.
+    //
+    // Two rules, and which one applies is decided by the body rather than by the water. With
+    // `wadeDepth` at its default of 0 this is the rule that was always here: the margin is the
+    // difference between standing on a bank and standing ankle-deep in the river, and anything
+    // inside it is refused. With a wade band declared, the margin is *replaced* rather than added
+    // to -- a body that will cross a half-metre ford and still refuses to stand on a bank 0.3 m
+    // above the water is describing nothing -- and what is refused is water deeper than the band.
+    //
+    // `out.waterDepth` above is the same number, from the same sample: 0 on the dry side of the
+    // margin, so the freeboard shelf is walkable the moment wading is on at all.
+    if (std::isfinite(s.waterSurface)) {
+        const bool refused = rules.wadeDepth > 0.0f ? out.waterDepth > rules.wadeDepth
+                                                    : s.height < s.waterSurface + rules.waterMargin;
+        if (refused) {
+            out.reject = TerrainReject::Submerged;
+            return out;
+        }
     }
     if (out.canopy > rules.walkableVegetation && out.canopy < rules.headroom) {
         // Tall enough to stop a mover and too low to duck under: a thicket. Either side of that

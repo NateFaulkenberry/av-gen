@@ -43,6 +43,14 @@ namespace avgen::entity {
 struct NavSettings {
     float maxSlope = 0.55f;         // 0 flat .. 1 vertical (1 - normal.y); above this it is a cliff
     float waterMargin = 0.35f;      // metres of dry land required above any water surface
+    // The deepest water this walker will enter. 0 -- the default -- is a body that stops at the
+    // waterline, which is every walker this engine has ever had; see `world::WalkRules::wadeDepth`
+    // for why the default is 0 and not a plausible ankle depth. A scene opts in through the
+    // top-level `navWadeDepth` key, and it is a property of the *world's* navigator rather than of
+    // a character because the navigation graph is baked once and shared: a walker that wades
+    // deeper than the grid was built for would be planning against a walkable set it does not
+    // agree with.
+    float wadeDepth = 0.0f;
     float headroom = 2.2f;          // metres a walker needs under whatever grows here
     // Vegetation up to this height is walked *through*, not around. Without it, the undergrowth
     // test below rejects anywhere anything short grows -- and because the canopy model is
@@ -65,6 +73,7 @@ struct NavSettings {
     [[nodiscard]] world::WalkRules walkRules() const {
         return world::WalkRules{.maxSlope = maxSlope,
                                 .waterMargin = waterMargin,
+                                .wadeDepth = wadeDepth,
                                 .headroom = headroom,
                                 .walkableVegetation = walkableVegetation,
                                 .heroMargin = heroMargin,
@@ -87,6 +96,12 @@ struct NavSample {
     // than reduced to a boolean because "how far above the water am I" is what tells a shoreline
     // from a hilltop, and the navigation grid uses it to find the places worth walking to.
     float waterSurface = 0.0f;
+    // Metres of water over the bed here; 0 on dry land. The same number `world::TerrainPoint`
+    // already carries, from the same `WorldMap::sample` -- carrying it costs no extra evaluation
+    // of the world, and not carrying it meant every caller that wanted depth paid for a second
+    // one. A walker needs it to know how hard the water it is standing in is to walk through, and
+    // `NavGrid` needs it to price a ford.
+    float waterDepth = 0.0f;
     NavReject reject = NavReject::None;
 };
 

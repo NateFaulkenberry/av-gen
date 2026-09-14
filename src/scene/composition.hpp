@@ -419,6 +419,29 @@ public:
     }
     [[nodiscard]] float navCellSize() const { return navCellSize_; }
 
+    // How deep a walker will wade, in metres. 0 -- the default -- is a walkable set that stops at
+    // the waterline, which is what every scene written before this key existed was authored
+    // against; see `world::WalkRules::wadeDepth` for why the default is not a plausible ankle
+    // depth. Above 0, shallow water joins the walkable set, the navigation graph prices it, and
+    // `explore` slows down in it.
+    //
+    // Scene-wide rather than per-character, and deliberately: the graph is baked once and every
+    // walker shares it, so a character that waded deeper than the grid was built for would plan
+    // against a walkable set it does not agree with.
+    //
+    // Marks the composition dirty for the same reason the cell size does -- the grid is baked
+    // during a rebuild, and a wade band that takes effect at some unrelated later flatten is worse
+    // than one that cannot be set.
+    void setNavWadeDepth(float metres) {
+        const float clamped = std::clamp(metres, 0.0f, 8.0f);
+        if (clamped == navWadeDepth_) {
+            return;
+        }
+        navWadeDepth_ = clamped;
+        dirty_ = true;
+    }
+    [[nodiscard]] float navWadeDepth() const { return navWadeDepth_; }
+
     // ---- heroes (ADR-072, authored in ADR-074) ----
     // What in this scene is worth travelling towards. A peer of CompositionData rather than a part
     // of it: focal points say where the frame should point, and a hero says what the thing there
@@ -852,6 +875,7 @@ private:
     // How coarse the navigation graph is, in metres. 0 disables pathfinding, which leaves the
     // straight-line steering that was here before ADR-093 -- correct, and unable to route.
     float navCellSize_ = 4.0f;
+    float navWadeDepth_ = 0.0f;
     std::optional<graph::Graph> graph_;
     bool graphDirty_ = false;
     double interactiveRebuildBudgetMs_ = 0.0;

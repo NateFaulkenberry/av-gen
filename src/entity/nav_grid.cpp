@@ -105,6 +105,7 @@ void NavGrid::build(const Navigator& nav, float cellSize) {
     cells_.assign(total, NavCell{});
 
     const float maxSlope = std::max(nav.settings().maxSlope, 1e-3f);
+    const float wadeDepth = nav.settings().wadeDepth;
     // How much of a cell a solid covers, as the fraction of the cell's area its footprint claims.
     // Sampled from the obstacle field rather than from the point test, because a trunk half a metre
     // off the cell centre obstructs the cell and a point test at the centre says it does not.
@@ -119,6 +120,12 @@ void NavGrid::build(const Navigator& nav, float cellSize) {
             NavCell& c = cells_[index(glm::ivec2(x, y))];
             c.ground = s.ground;
             c.slope = quantise(s.slope / maxSlope);
+            // How deep the water over this cell is, as a fraction of the deepest this walker will
+            // enter. The grid has to agree with `Navigator::sample` about the walkable set or the
+            // planner routes round a ford the mover would have crossed -- and it has to agree
+            // about *how deep* it is, or it prices every ford the same. Both come off the sample
+            // already taken above. Exactly 0 for every cell when the walker does not wade.
+            c.wade = wadeDepth > 0.0f ? quantise(s.waterDepth / wadeDepth) : 0;
             if (std::isfinite(s.waterSurface) && s.ground < s.waterSurface) {
                 c.flags |= NavWater;
                 ++stats_.water;
@@ -264,7 +271,10 @@ bool NavGrid::nearestWalkable(glm::vec2 p, float maxRange, glm::vec2& out) const
     return false;
 }
 
-bool NavGrid::lineOfSight(glm::ivec2 a, glm::ivec2 b) const {
+bool NavGrid::lineOfSight(glm::ivec2 a, glm::ivec2 b, std::uint8_t* deepestWade) const {
+    if (deepestWade != nullptr) {
+        *deepestWade = 0;
+    }
     // A supercover walk: every cell the segment touches, not merely the ones a Bresenham line
     // lands on. The difference matters exactly where it always does -- a diagonal squeeze between
     // two blocked cells looks clear to a thin line and is not a gap anything can walk through.
@@ -278,6 +288,9 @@ bool NavGrid::lineOfSight(glm::ivec2 a, glm::ivec2 b) const {
     for (int guard = 0; guard <= dx + dy + 2; ++guard) {
         if (!walkable(glm::ivec2(x, y))) {
             return false;
+        }
+        if (deepestWade != nullptr) {
+            *deepestWade = std::max(*deepestWade, at(glm::ivec2(x, y)).wade);
         }
         if (x == b.x && y == b.y) {
             return true;
@@ -402,9 +415,15 @@ bool NavGrid::findPath(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out
                 // Distance is not the only cost. A character that minimised it alone would cross
                 // every scree slope and thread every thicket on the way, which is efficient and
                 // reads as a machine looking for the shortest line.
+                // ... and neither is water. A wadeable cell is in the walkable set, so without a
+                // price on it A* would put a route through a river whenever the river was one
+                // centimetre shorter -- which is not shorter, because the mover crosses it at half
+                // speed. `wade` is 0 on dry ground and in every world nobody wades in, so this
+                // term is exactly zero unless a scene asked for it.
                 const float penalty = 1.0f +
                                       cost.obstructionPenalty * (static_cast<float>(target.obstruction) / 255.0f) +
-                                      cost.slopePenalty * (static_cast<float>(target.slope) / 255.0f);
+                                      cost.slopePenalty * (static_cast<float>(target.slope) / 255.0f) +
+                                      cost.wadePenalty * (static_cast<float>(target.wade) / 255.0f);
                 const float tentative = gScore_[ci] + step * penalty;
                 const std::size_t ni = index(n);
                 if (visitStamp_[ni] == stamp_ && tentative >= gScore_[ni]) {
@@ -442,10 +461,32 @@ bool NavGrid::findPath(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out
     while (anchor + 1 < cellPath_.size()) {
         std::size_t furthest = anchor + 1;
         for (std::size_t probe = cellPath_.size() - 1; probe > anchor + 1; --probe) {
-            if (lineOfSight(cellPath_[anchor], cellPath_[probe])) {
-                furthest = probe;
-                break;
+            std::uint8_t lineWade = 0;
+            if (!lineOfSight(cellPath_[anchor], cellPath_[probe], &lineWade)) {
+                continue;
             }
+            // A shortcut may shorten the route. It may not wade on the route's behalf.
+            //
+            // The pull is a straightener that knows only walkability, and a wadeable cell is
+            // walkable -- so a route A* deliberately took round the end of a channel has a clear
+            // straight line across the channel, and the pull would take it. The planner's price on
+            // water would then be a cost paid during the search and thrown away immediately after
+            // it, which is worse than never charging it: the route would look considered and be
+            // the straight line anyway.
+            //
+            // Exactly zero cost where nobody wades: `wade` is 0 in every cell of every world with
+            // the default wade band, so `lineWade` is 0 and the scan below is never reached.
+            if (lineWade > 0) {
+                std::uint8_t routeWade = 0;
+                for (std::size_t i = anchor; i <= probe; ++i) {
+                    routeWade = std::max(routeWade, at(cellPath_[i]).wade);
+                }
+                if (lineWade > routeWade) {
+                    continue; // try a shorter shortcut instead
+                }
+            }
+            furthest = probe;
+            break;
         }
         out.push_back(centerOf(cellPath_[furthest]));
         anchor = furthest;
@@ -602,6 +643,13 @@ void NavGrid::extractInterestPoints() {
         for (int x = 0; x < stats_.width; ++x) {
             const glm::ivec2 c(x, y);
             if (!walkable(c)) {
+                continue;
+            }
+            // Dry, and next to wet. The second half used to be implied: before wading existed no
+            // walkable cell could carry `NavWater`, so the two were mutually exclusive and there
+            // was nothing to say. They are not any more, and without this a ford's own cells are
+            // all "shore" -- a character sent to look at the water would be sent to stand in it.
+            if ((at(c).flags & NavWater) != 0) {
                 continue;
             }
             const bool wet = (at(glm::ivec2(x - 1, y)).flags & NavWater) != 0 ||

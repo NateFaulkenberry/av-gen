@@ -735,6 +735,7 @@ public:
           homeDefault_(readFloat(s, "homeRadius", 0.0f)),
           runChanceDefault_(readFloat(s, "runChance", 0.18f)),
           slopeAlignDefault_(readFloat(s, "slopeAlign", 0.55f)),
+          wadeDragDefault_(readFloat(s, "wadeDrag", 0.55f)),
           bodyRadiusDefault_(readFloat(s, "bodyRadius", 0.0f)),
           headroomDefault_(readFloat(s, "headroom", 0.0f)),
           footprintDefault_(readFloat(s, "footprint", 0.55f)),
@@ -789,6 +790,18 @@ public:
         home_ = &params.add(floatDesc(prefix + "homeRadius", homeDefault_, 0.0f, 4000.0f));
         runChance_ = &params.add(floatDesc(prefix + "runChance", runChanceDefault_, 0.0f, 1.0f));
         slopeAlign_ = &params.add(floatDesc(prefix + "slopeAlign", slopeAlignDefault_, 0.0f, 1.0f));
+        // How much the water slows this character down, at the deepest water it will enter. A
+        // parameter rather than a constant for the same reason `speed` is one: it is the kind of
+        // thing a scene modulates -- something heavy fords a river at a crawl and something
+        // long-legged hardly notices -- and the whole point of ADR-011 is that anything a shot
+        // wants to shape over time can be keyframed rather than re-authored.
+        //
+        // Unlike `bodyRadius`, 0 here does not mean "take the world's number": it means water does
+        // not slow this character at all. The default of 0.55 is deliberately non-zero, because a
+        // scene that turned wading on and got a character skimming across a river at running speed
+        // would have had to find and set a second knob to get the behaviour it asked for. It costs
+        // nothing where nobody wades: depth is 0 on dry land, so the scale is exactly 1.
+        wadeDrag_ = &params.add(floatDesc(prefix + "wadeDrag", wadeDragDefault_, 0.0f, 1.0f));
         // How big this character is. A world's navigator carries defaults for a person-sized
         // walker, and Glowmere's is nearly ten metres tall: it has to keep further from a trunk
         // than a person does, and it does not duck under anything. 0 keeps the world's own number,
@@ -801,7 +814,7 @@ public:
                   prefix + "observeChance", prefix + "observeMin", prefix + "observeMax",
                   prefix + "minRange",      prefix + "maxRange",   prefix + "homeRadius",
                   prefix + "runChance",     prefix + "slopeAlign",  prefix + "bodyRadius",
-                  prefix + "headroom",      prefix + "footprint"};
+                  prefix + "headroom",      prefix + "footprint",  prefix + "wadeDrag"};
     }
     void collectParameterPaths(std::vector<std::string>& out) const override {
         out.insert(out.end(), paths_.begin(), paths_.end());
@@ -890,6 +903,37 @@ private:
     }
     [[nodiscard]] const Navigator* nav(const BehaviorContext& ctx) const {
         return walkerSource_ != nullptr ? &walker_ : ctx.nav;
+    }
+
+    // How much of its speed this character keeps at `p`. 1 on dry land, and 1 everywhere in a
+    // world whose walker does not wade -- that early-out is also what keeps this free: without it
+    // every walking frame of every existing scene would pay a water query to be told the answer is
+    // zero.
+    //
+    // Linear in depth over the wade band, which is the honest shape: the resistance a body pushes
+    // through is its submerged cross-section, and over ankle-to-thigh that is very close to linear
+    // in depth. It is also the shape `NavPathCost::wadePenalty` was priced against, and the two
+    // have to describe the same water or the planner and the mover disagree about which way is
+    // quicker.
+    //
+    // Floored rather than allowed to reach zero. A drag of 1.0 at full depth would stop the
+    // character dead in the middle of the ford, the stuck watchdog would fire, it would replan,
+    // and it would walk back into the same water -- a knob at its documented maximum producing a
+    // character that cannot move is a knob that is wrong at the end of its range.
+    [[nodiscard]] float wadeScale(const Navigator* navigator, glm::vec2 p) const {
+        if (navigator == nullptr || !navigator->valid()) {
+            return 1.0f;
+        }
+        const float band = navigator->settings().wadeDepth;
+        const float drag = param(wadeDrag_, wadeDragDefault_);
+        if (band <= 0.0f || drag <= 0.0f) {
+            return 1.0f;
+        }
+        const float depth = navigator->terrain().waterDepthAt(p);
+        if (depth <= 0.0f) {
+            return 1.0f;
+        }
+        return std::max(1.0f - drag * std::clamp(depth / band, 0.0f, 1.0f), 0.15f);
     }
 
     [[nodiscard]] float param(const params::Parameter<float>* p, float fallback) const {
@@ -1132,6 +1176,7 @@ private:
         if (finalLeg) {
             travelSpeed *= std::clamp(toWaypoint / std::max(arrive * 2.5f, 0.5f), 0.25f, 1.0f);
         }
+        travelSpeed *= wadeScale(navigator, flat);
         travelSpeed = std::min(travelSpeed, toWaypoint / std::max(dt, 1e-4f));
         const glm::vec2 heading(std::sin(state.yaw), std::cos(state.yaw));
         const glm::vec2 move = heading * travelSpeed * dt;
@@ -1400,7 +1445,7 @@ private:
     float speedDefault_, runSpeedDefault_, turnDefault_, arriveDefault_;
     float idleMinDefault_, idleMaxDefault_, observeDefault_, observeMinDefault_, observeMaxDefault_;
     float minRangeDefault_, maxRangeDefault_, homeDefault_, runChanceDefault_, slopeAlignDefault_;
-    float bodyRadiusDefault_, headroomDefault_, footprintDefault_;
+    float bodyRadiusDefault_, headroomDefault_, footprintDefault_, wadeDragDefault_;
     float landmarkAffinity_, characterAffinity_, glowAffinity_, waterAffinity_, vistaAffinity_;
     float strollChance_, waypointRadius_, repathSeconds_, stuckSeconds_, noveltyRadius_;
 
@@ -1421,6 +1466,7 @@ private:
     params::Parameter<float>* bodyRadius_ = nullptr;
     params::Parameter<float>* headroom_ = nullptr;
     params::Parameter<float>* footprint_ = nullptr;
+    params::Parameter<float>* wadeDrag_ = nullptr;
     std::vector<std::string> paths_;
     // This character's own view of the world: the host's navigator with its own size written onto
     // it. A copy is cheap -- the map, the obstacle field and the graph are all shared -- and it is

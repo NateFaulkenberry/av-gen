@@ -1585,6 +1585,14 @@ entity::Navigator Composition::buildNavigator() const {
         field.cameraRadius = 0.6f;
         field.groundClearance = 0.0f;
         entity::Navigator nav(&nodePtr->worldMap, field);
+        // Before the grid is built, because the wade band decides what the grid calls walkable.
+        // Setting it afterwards would bake a graph that stops at the waterline and then hand it to
+        // a walker that does not, which is the two halves of the same question disagreeing.
+        if (navWadeDepth_ > 0.0f) {
+            entity::NavSettings settings = nav.settings();
+            settings.wadeDepth = navWadeDepth_;
+            nav.setSettings(settings);
+        }
         nav.setObstacles(obstacles_, obstacles_ != nullptr ? &obstacleBridge_ : nullptr);
         // The navigation graph (ADR-093, §2). Built here rather than lazily, so its cost lands at
         // scene load where it can be seen and measured, and every walker in the world shares one.
@@ -5126,6 +5134,9 @@ nlohmann::json Composition::toJson() const {
     if (navCellSize_ != 4.0f) {
         j["navCellSize"] = navCellSize_;
     }
+    if (navWadeDepth_ != 0.0f) {
+        j["navWadeDepth"] = navWadeDepth_;
+    }
     if (windSetting_.enabled) {
         json w = wind::windToJson(windSetting_);
         w["speed"] = windSpeed_ != nullptr ? windSpeed_->base() : windSetting_.speed;
@@ -5472,6 +5483,21 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return fail("'navCellSize' {} is out of range; use 0 to disable or 0.5..64 metres", metres);
         }
         comp->setNavCellSize(metres);
+    }
+    // How deep a walker wades. 0 keeps water binary, which is what it has always been. Validated
+    // rather than clamped for the same reason as the cell size: a scene asking for a four-metre
+    // wade band is asking for its characters to walk along the bed of the river, and a number
+    // silently pulled back to something sensible is a scene that does not do what it says.
+    if (j.contains("navWadeDepth")) {
+        if (!j.at("navWadeDepth").is_number()) {
+            return fail("'navWadeDepth' must be a number of metres (0 stops walkers at the water)");
+        }
+        const auto metres = j.at("navWadeDepth").get<float>();
+        if (metres < 0.0f || metres > 8.0f) {
+            return fail("'navWadeDepth' {} is out of range; use 0 to stop at the water or 0..8 metres",
+                        metres);
+        }
+        comp->setNavWadeDepth(metres);
     }
     if (j.contains("wind")) {
         if (!j.at("wind").is_object()) {

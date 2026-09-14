@@ -60,7 +60,10 @@ struct NavCell {
     std::uint8_t flags = 0;
     std::uint8_t slope = 0;       // 0..255 over the navigator's 0..1 slope range
     std::uint8_t obstruction = 0; // 0..255: how much of the cell blocking solids cover
-    std::uint8_t pad = 0;
+    // 0..255 over the navigator's wade band: 0 is dry ground (and every cell of every world whose
+    // walker does not wade), 255 is water at the deepest this body will enter. This was the pad
+    // byte, so the cell is still eight bytes and A* still walks two of them per cache line.
+    std::uint8_t wade = 0;
 };
 
 struct NavGridStats {
@@ -126,6 +129,19 @@ struct PathResult {
 struct NavPathCost {
     float obstructionPenalty = 3.0f; // multiplies distance through a fully obstructed cell
     float slopePenalty = 1.6f;       // multiplies distance up a maximally steep walkable cell
+    // Multiplies distance through water at the full wade depth. Wading is navigable, not free: a
+    // ford is worth crossing when it is genuinely shorter and not when it merely cuts a corner.
+    //
+    // 1.2 is not a taste number. `explore` walks through water at `1 - wadeDrag * depth/wadeDepth`
+    // of its speed, and at that behaviour's default drag of 0.55 a cell at full depth takes
+    // 1/0.45 = 2.22 times as long to cross as a dry one. A penalty of 1.2 makes the planner's cost
+    // for that cell 1 + 1.2 = 2.2, so **A* is minimising roughly the time the mover will actually
+    // take** rather than a distance the mover does not experience. The two numbers move together:
+    // change one and the planner and the walker start disagreeing about what the short way is.
+    //
+    // Costs nothing where nothing wades -- `wade` is 0 in every cell of a world whose navigator
+    // has the default wade depth of 0, so the term is exactly zero and the search is unchanged.
+    float wadePenalty = 1.2f;
     int maxExpansions = 24000;       // give up rather than search a whole world for an island
 };
 
@@ -187,7 +203,14 @@ private:
     // Whether the straight line between two cells stays walkable, walked over the grid rather than
     // over the world. Cheap by design: it is the inner loop of the string pull, and the continuous
     // layer re-checks whatever survives.
-    [[nodiscard]] bool lineOfSight(glm::ivec2 a, glm::ivec2 b) const;
+    //
+    // `deepestWade`, when given, receives the deepest water the line crosses. The string pull needs
+    // it because a shortcut is only allowed to make a route shorter, never wetter: without it the
+    // pull would straighten a route that A* had just paid to keep out of the river back through
+    // the middle of it, and the whole price on wading would be spent for nothing. Zero in any
+    // world whose walker does not wade, so the check below it never fires there.
+    [[nodiscard]] bool lineOfSight(glm::ivec2 a, glm::ivec2 b,
+                                   std::uint8_t* deepestWade = nullptr) const;
     void extractInterestPoints();
     void buildRegions();
 

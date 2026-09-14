@@ -625,3 +625,67 @@ TEST_CASE("the navigator follows the world when it is rebuilt",
     // And the walker's own question answers correctly.
     CHECK_FALSE(after.sample(spot).navigable);
 }
+
+// ADR-194. The wade band is a scene key, a field on `NavSettings` and a term in the grid's cost --
+// three things that are only worth anything if the one a scene can set reaches the other two. The
+// unit tests pin the rule on a world built to have a ford in it; this pins the *wiring*, on the
+// world that actually has a river through it.
+TEST_CASE("a scene that declares a wade band gets a walkable ford out of it",
+          "[integration][glowmere][navigation][water]") {
+    const fs::path root = AVGEN_SOURCE_DIR;
+    if (!glowmereAvailable(root)) {
+        SKIP("Glowmere's assets are not installed");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadFile(root / "examples/world/glowmere-stylized.json").has_value());
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition != nullptr);
+
+    FrameTime time;
+    time.renderTime = 0.0;
+    engine.update(time);
+
+    // The world as it was authored: nobody wades, and the river is a wall.
+    REQUIRE(composition->navWadeDepth() == 0.0f);
+    const entity::Navigator& dry = composition->entityWorld().navigator();
+    REQUIRE(dry.grid() != nullptr);
+    REQUIRE(dry.settings().wadeDepth == 0.0f);
+    const std::size_t walkableBefore = dry.grid()->stats().walkable;
+    const std::size_t waterCells = dry.grid()->stats().water;
+    // Glowmere has water in it, or nothing below is being measured.
+    REQUIRE(waterCells > 0);
+    // And not one cell of it records a depth, because this walker has no band to record it against.
+    std::size_t recordedBefore = 0;
+    for (const entity::NavCell& c : dry.grid()->cells()) {
+        recordedBefore += c.wade > 0 ? 1u : 0u;
+    }
+    CHECK(recordedBefore == 0);
+
+    composition->setNavWadeDepth(0.9f);
+    time.renderTime = 1.0 / 60.0;
+    time.deltaTime = 1.0 / 60.0;
+    time.frameIndex = 1;
+    engine.update(time);
+
+    const entity::Navigator& wading = composition->entityWorld().navigator();
+    REQUIRE(wading.grid() != nullptr);
+    // The key reached the walker.
+    CHECK(wading.settings().wadeDepth == 0.9f);
+    // The key reached the graph, and the graph was re-baked rather than re-read: a cell that is
+    // both walkable and wet is a thing the old rule could not produce.
+    std::size_t wadeable = 0;
+    std::size_t recorded = 0;
+    for (std::size_t i = 0; i < wading.grid()->cells().size(); ++i) {
+        const entity::NavCell& c = wading.grid()->cells()[i];
+        recorded += c.wade > 0 ? 1u : 0u;
+        if ((c.flags & entity::NavWalkable) != 0 && (c.flags & entity::NavWater) != 0) {
+            ++wadeable;
+        }
+    }
+    INFO("walkable " << walkableBefore << " -> " << wading.grid()->stats().walkable << ", "
+                     << waterCells << " water cells, " << wadeable << " of them now walkable, "
+                     << recorded << " carrying a depth");
+    CHECK(wading.grid()->stats().walkable > walkableBefore);
+    CHECK(wadeable > 0);
+    CHECK(recorded > 0);
+}
