@@ -89,6 +89,25 @@ struct CrownEnvelope {
     float lumpiness = 0.55f;
     float lumpScale = 0.13f;
     // A hollow at the centre of the crown keeps the interior readable instead of a solid mass.
+    // THE ENVELOPE IS NOT A SURFACE OF REVOLUTION, AND THAT IS THE WHOLE POINT OF THESE THREE.
+    //
+    // It was one, and that turned out to be why every candidate in every search came out a rounded
+    // ball on a straight trunk. Space colonization fills the envelope it is given, so the crown's
+    // outline is the envelope's outline; an envelope whose radius is the same in every compass
+    // direction cannot produce an asymmetric crown, and no search inside it can find one, because
+    // asymmetry is not in the parameterisation at all. Widening the three bands that were suspected
+    // of preferring balls reordered the ranking and surfaced nothing new -- which is what says the
+    // problem was the space and not the scoring.
+    //
+    // `lumpiness` was supposed to supply this and does not: it thins marker density in regions, at
+    // an amplitude and scale that never breaks the outline.
+    //
+    // Two angular harmonics with seeded phases give lobes that do not repeat, and a lateral offset
+    // lets the crown sit off the trunk's axis the way an old tree's does.
+    int crownLobes = 3;
+    float crownLobeAmount = 0.26f;
+    float crownOffset = 0.12f;      // as a fraction of the crown radius
+
     // A hollow at the centre of the crown. Not cosmetic: without it the foliage fills the volume the
     // primary limbs occupy and buries them, and the readable branching the reference is chosen for
     // is invisible however good the skeleton underneath is.

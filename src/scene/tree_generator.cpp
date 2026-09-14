@@ -228,24 +228,37 @@ TreeMeasurements measureTree(const TreeGraph& graph, const TreeSilhouette& s, co
     // tends toward 1; spaghetti runs to hundreds. This is the single number that separates the two
     // failure modes at either end of the brief's section 5 list, which is why it is banded on both
     // sides rather than maximised.
-    double perimeter = 0.0;
-    for (int y = s.minY; y <= s.maxY; ++y) {
-        for (int x = s.minX; x <= s.maxX; ++x) {
-            if (s.mask[static_cast<std::size_t>(y) * s.width + x] == 0) {
-                continue;
-            }
-            const bool edge = x == 0 || x == s.width - 1 || y == 0 || y == s.height - 1 ||
-                              s.mask[static_cast<std::size_t>(y) * s.width + (x - 1)] == 0 ||
-                              s.mask[static_cast<std::size_t>(y) * s.width + (x + 1)] == 0 ||
-                              s.mask[static_cast<std::size_t>(y - 1) * s.width + x] == 0 ||
-                              s.mask[static_cast<std::size_t>(y + 1) * s.width + x] == 0;
-            if (edge) {
-                perimeter += 1.0;
+    // Computed twice: once over everything, once over the BRANCH pixels only. The suspicion under
+    // test is that the full-silhouette quotient is a correct measure of outline complexity applied
+    // to the wrong subject -- a canopy of thousands of small cards has an enormous perimeter
+    // whatever the limbs beneath it are doing, so the number would be dominated by foliage edge and
+    // blind to the branch structure it is supposed to be scoring.
+    const auto quotient = [&s](std::uint8_t want) {
+        double perimeter = 0.0;
+        std::size_t area = 0;
+        const auto solid = [&s, want](int x, int y) {
+            const std::uint8_t v = s.mask[static_cast<std::size_t>(y) * s.width + x];
+            return want == 0 ? v != 0 : v == want;
+        };
+        for (int y = s.minY; y <= s.maxY; ++y) {
+            for (int x = s.minX; x <= s.maxX; ++x) {
+                if (!solid(x, y)) {
+                    continue;
+                }
+                ++area;
+                const bool edge = x == 0 || x == s.width - 1 || y == 0 || y == s.height - 1 ||
+                                  !solid(x - 1, y) || !solid(x + 1, y) || !solid(x, y - 1) || !solid(x, y + 1);
+                if (edge) {
+                    perimeter += 1.0;
+                }
             }
         }
-    }
-    m.silhouetteComplexity =
-        s.filled > 0 ? static_cast<float>(perimeter * perimeter / (4.0 * glm::pi<double>() * s.filled)) : 0.0f;
+        return area > 0 ? static_cast<float>(perimeter * perimeter /
+                                             (4.0 * glm::pi<double>() * static_cast<double>(area)))
+                        : 0.0f;
+    };
+    m.silhouetteComplexity = quotient(0);
+    m.branchComplexity = quotient(1);
 
     // Depth: how far the CANOPY spreads along the camera's forward axis, relative to how far it
     // spreads across the frame. This is the number that says the scene is genuinely 3D rather than
@@ -470,6 +483,11 @@ search::GeneratorSchema treeSchema() {
          "Clump radius as a fraction of half the spacing. Above 1 the clumps overlap their "
          "neighbours and merge into irregular masses, which is what the reference shows; below it "
          "they stand apart as discrete balls."},
+        {"crownLobeAmount", 0.05f, 0.42f, false,
+         "Depth of the crown envelope's angular lobes. The asymmetry axis: without it the envelope "
+         "is a surface of revolution and no search inside it can produce a crown that is not round."},
+        {"crownOffset", 0.0f, 0.24f, false,
+         "How far the crown's centre sits off the trunk's axis, as a fraction of its radius."},
         {"outwardBias", 0.30f, 0.75f, false, "How hard limbs are pushed away from the trunk axis."},
         {"lambdaYoung", 0.56f, 0.70f, false, "Apical control early: how hard the bole is driven."},
         {"lambdaOld", 0.34f, 0.48f, false, "Apical control late: how far the crown spreads."},
@@ -498,8 +516,8 @@ TreeParams treeFixedParams() {
 }
 
 Result<TreeParams> treeParamsFrom(std::span<const float> v) {
-    if (v.size() < 17) {
-        return fail("tree: expected 17 parameters, got {}", v.size());
+    if (v.size() < 19) {
+        return fail("tree: expected 19 parameters, got {}", v.size());
     }
     TreeParams p = treeFixedParams();
     const float height = v[0];
@@ -508,17 +526,23 @@ Result<TreeParams> treeParamsFrom(std::span<const float> v) {
     p.foliageSpacing = v[3];
     p.foliageLowerClear = v[4];
     p.foliageClusterScale = v[5];
-    p.outwardBias = v[6];
-    p.lambdaYoung = v[7];
-    p.lambdaOld = v[8];
-    p.branchTropism = glm::vec3(0.0f, v[9], 0.0f);
-    p.branchAngle = v[10];
-    p.crown.shoulder = v[11];
-    p.crown.lumpiness = v[12];
-    p.shedThreshold = v[13];
-    p.alpha = v[14];
-    p.rootCanopyCoupling = v[15];
-    p.seed = 1u + static_cast<std::uint32_t>(std::lround(v[16]));
+    p.crown.crownLobeAmount = v[6];
+    p.crown.crownOffset = v[7];
+    p.outwardBias = v[8];
+    p.lambdaYoung = v[9];
+    p.lambdaOld = v[10];
+    p.branchTropism = glm::vec3(0.0f, v[11], 0.0f);
+    p.branchAngle = v[12];
+    p.crown.shoulder = v[13];
+    p.crown.lumpiness = v[14];
+    p.shedThreshold = v[15];
+    p.alpha = v[16];
+    p.rootCanopyCoupling = v[17];
+    p.seed = 1u + static_cast<std::uint32_t>(std::lround(v[18]));
+    // Lobe count follows the seed rather than being its own axis: three lobes and four lobes are
+    // not a continuum, and giving a discrete choice its own Sobol dimension wastes one of the good
+    // ones on a coin toss.
+    p.crown.crownLobes = 2 + static_cast<int>(noise::hashIndex(p.seed, 0u, 909u) * 3.0f);
 
     // Height and bole are authored as a total and a fraction, then converted into the envelope the
     // generator wants. Sampling the envelope's own fields directly lets the search produce a crown
@@ -664,6 +688,7 @@ std::vector<search::ScoreComponent> TreeGenerator::domainScores(const search::Su
         if (name == "boleFraction") return m->boleFraction;
         if (name == "trunkDominance") return m->trunkDominance;
         if (name == "silhouetteComplexity") return m->silhouetteComplexity;
+        if (name == "branchComplexity") return m->branchComplexity;
         if (name == "rootSpreadRatio") return m->rootSpreadRatio;
         return 0.0f;
     };

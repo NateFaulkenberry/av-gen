@@ -91,6 +91,9 @@ struct TreeMeasurements {
     float boleFraction = 0.0f;
     float trunkDominance = 0.0f;
     float silhouetteComplexity = 0.0f;
+    // The same quotient over the BRANCH pixels only, with foliage suppressed. Carried beside the
+    // full-silhouette number so the two can be compared directly: see the note in measureTree.
+    float branchComplexity = 0.0f;
     float rootSpreadRatio = 0.0f;
 };
 

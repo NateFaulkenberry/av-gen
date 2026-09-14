@@ -114,7 +114,7 @@ TEST_CASE("the tree generator satisfies the shared contract", "[tree][search]") 
     const TreeGenerator generator;
     REQUIRE(generator.schema().validate().has_value());
     CHECK(generator.schema().generatorName == "tree");
-    CHECK(generator.schema().parameters.size() == 17);
+    CHECK(generator.schema().parameters.size() == 19);
 
     const search::Parameters params = search::sampleAt(generator.schema().parameters, 0);
     REQUIRE(params.size() == generator.schema().parameters.size());
@@ -327,4 +327,53 @@ TEST_CASE("tree probe: which bands actually discriminate", "[.tree-probe]") {
                          population.front()[c].name, rawMin, rawMax, scoreMin, scoreMax, mean, sd,
                          sd < 0.05 ? "   <-- CONSTANT, not a criterion" : ""));
     }
+}
+
+TEST_CASE("tree probe: is silhouetteComplexity measuring foliage or limbs", "[.tree-probe]") {
+    // A ONE-VARIABLE TEST, run before any band is touched so the two changes cannot confound each
+    // other. The isoperimetric quotient is a correct measure of outline complexity. The question is
+    // whether it is being applied to the right subject: a canopy of thousands of small cards has an
+    // enormous perimeter however dull the limbs beneath it are, so the full-silhouette number may be
+    // dominated by foliage edge and blind to branch structure entirely.
+    //
+    // If the full number sits in a narrow band across the population while the branch-only number
+    // varies widely, the metric is measuring the canopy and must change subject rather than range.
+    const TreeGenerator generator;
+    std::vector<std::pair<float, float>> pairs;
+    for (int i = 0; i < 24; ++i) {
+        const search::Parameters params = search::sampleAt(generator.schema().parameters, static_cast<std::uint32_t>(i));
+        const auto treeParams = treeParamsFrom(params);
+        if (!treeParams) {
+            continue;
+        }
+        const auto graph = generateTree(*treeParams);
+        if (!graph) {
+            continue;
+        }
+        const TreeSilhouette mask = rasteriseTree(*graph, generator.camera());
+        if (mask.empty()) {
+            continue;
+        }
+        const TreeMeasurements m = measureTree(*graph, mask, generator.camera());
+        pairs.emplace_back(m.silhouetteComplexity, m.branchComplexity);
+    }
+    REQUIRE(pairs.size() > 8);
+
+    const auto report = [&pairs](const char* label, bool branch) {
+        double lo = 1e30, hi = -1e30, sum = 0.0, sq = 0.0;
+        for (const auto& [full, only] : pairs) {
+            const double v = branch ? only : full;
+            lo = std::min(lo, v);
+            hi = std::max(hi, v);
+            sum += v;
+            sq += v * v;
+        }
+        const auto n = static_cast<double>(pairs.size());
+        const double mean = sum / n;
+        const double sd = std::sqrt(std::max(sq / n - mean * mean, 0.0));
+        WARN(fmt::format("{:<18} range [{:7.2f} .. {:7.2f}] mean {:7.2f} sd {:6.2f} relative-sd {:.3f}", label, lo,
+                         hi, mean, sd, sd / std::max(mean, 1e-6)));
+    };
+    report("full silhouette", false);
+    report("branches only", true);
 }

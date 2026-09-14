@@ -24,6 +24,9 @@ enum Channel : std::uint32_t {
     kMarkerY = 301,
     kMarkerZ = 302,
     kMarkerAccept = 303,
+    kCrownPhaseA = 304,
+    kCrownPhaseB = 305,
+    kCrownOffset = 306,
     kNodePhase = 310,
     kFoliageRadius = 311,
     kFoliagePhase = 312,
@@ -147,6 +150,11 @@ std::vector<glm::vec3> generateMarkers(const TreeParams& params) {
         return markers;
     }
     const float corridor = std::max(crown.trunkCorridorRadius, 0.0f);
+    const float phaseA = noise::hashIndex(params.seed, 0u, kCrownPhaseA) * glm::two_pi<float>();
+    const float phaseB = noise::hashIndex(params.seed, 1u, kCrownPhaseB) * glm::two_pi<float>();
+    const float offsetAngle = noise::hashIndex(params.seed, 2u, kCrownOffset) * glm::two_pi<float>();
+    const glm::vec2 crownCentre = glm::vec2(std::cos(offsetAngle), std::sin(offsetAngle)) *
+                                  (crown.crownOffset * crown.radius);
     for (int attempt = 0; attempt < maxAttempts && static_cast<int>(markers.size()) < params.markerCount;
          ++attempt) {
         const auto index = static_cast<std::uint32_t>(attempt);
@@ -156,11 +164,14 @@ std::vector<glm::vec3> generateMarkers(const TreeParams& params) {
 
         const float y = bottom + ry * (top - bottom);
         const glm::vec2 disc(rx * crown.radius, rz * crown.radius);
-        const float dist = glm::length(disc);
+        // Measured from the crown's own centre, which is not the trunk's.
+        const glm::vec2 rel = disc - crownCentre;
+        const float dist = glm::length(rel);
 
-        // Below the crown, the only colonisable space is the trunk corridor.
+        // Below the crown, the only colonisable space is the trunk corridor -- which is around the
+        // TRUNK, at the origin, not around the crown's displaced centre.
         if (y < crownBottom) {
-            if (corridor <= 0.0f || dist > corridor || y < crown.trunkCorridorBottom) {
+            if (corridor <= 0.0f || glm::length(disc) > corridor || y < crown.trunkCorridorBottom) {
                 continue;
             }
             markers.emplace_back(disc.x, y, disc.y);
@@ -176,7 +187,16 @@ std::vector<glm::vec3> generateMarkers(const TreeParams& params) {
         // narrows the underside, which is the difference between a ball and a canopy.
         float profile = std::sqrt(std::max(0.0f, 1.0f - h * h));
         profile *= 1.0f + crown.shoulder * (0.5f - 0.5f * h * h * h - 0.25f * h);
-        const float maxR = crown.radius * std::max(profile, 0.0f);
+        // The lobes. Two harmonics at seeded phases, so the outline is irregular rather than a
+        // rosette, and the deeper harmonic leans the crown as well as scalloping it.
+        float lobe = 1.0f;
+        if (crown.crownLobeAmount > 0.0f && dist > kEpsilon) {
+            const float angle = std::atan2(rel.y, rel.x);
+            const auto n = static_cast<float>(std::max(crown.crownLobes, 1));
+            lobe += crown.crownLobeAmount *
+                    (std::cos(n * angle + phaseA) * 0.62f + std::cos((n + 1.0f) * angle + phaseB) * 0.38f);
+        }
+        const float maxR = crown.radius * std::max(profile * lobe, 0.0f);
         if (maxR <= 0.0f) {
             continue;
         }
@@ -1110,7 +1130,10 @@ nlohmann::json TreeParams::toJson() const {
                   {"shoulder", crown.shoulder},       {"lumpiness", crown.lumpiness},
                   {"lumpScale", crown.lumpScale},     {"coreHollow", crown.coreHollow},
                   {"trunkCorridorRadius", crown.trunkCorridorRadius},
-                  {"trunkCorridorBottom", crown.trunkCorridorBottom}};
+                  {"trunkCorridorBottom", crown.trunkCorridorBottom},
+                  {"crownLobes", crown.crownLobes},
+                  {"crownLobeAmount", crown.crownLobeAmount},
+                  {"crownOffset", crown.crownOffset}};
     j["markerCount"] = markerCount;
     j["iterations"] = iterations;
     j["internodeLength"] = internodeLength;
@@ -1181,6 +1204,9 @@ Result<TreeParams> TreeParams::fromJson(const nlohmann::json& j) {
         p.crown.coreHollow = c.value("coreHollow", p.crown.coreHollow);
         p.crown.trunkCorridorRadius = c.value("trunkCorridorRadius", p.crown.trunkCorridorRadius);
         p.crown.trunkCorridorBottom = c.value("trunkCorridorBottom", p.crown.trunkCorridorBottom);
+        p.crown.crownLobes = c.value("crownLobes", p.crown.crownLobes);
+        p.crown.crownLobeAmount = c.value("crownLobeAmount", p.crown.crownLobeAmount);
+        p.crown.crownOffset = c.value("crownOffset", p.crown.crownOffset);
     }
     p.markerCount = j.value("markerCount", p.markerCount);
     p.iterations = j.value("iterations", p.iterations);

@@ -74,6 +74,34 @@ thickness, `structureVisible`'s pixel count measuring the rasteriser's minimum-d
 standing conclusion is that **the rendered loop belongs in front of the structural one**, not beside
 it.
 
+## A worked negative, and why it belongs here
+
+The pattern is easy to over-apply once it is named, so the instance that did **not** hold is recorded
+beside the ones that did.
+
+`silhouetteComplexity` — the isoperimetric quotient of the rendered silhouette — was suspected of
+exactly this failure. A canopy of thousands of small foliage cards has an enormous perimeter however
+dull the limbs beneath it are, so the number looked like it must be dominated by foliage edge and
+blind to branch structure: a correct measure applied to the wrong subject.
+
+It was tested directly, and before anything else was changed, by computing the quotient twice on the
+same silhouette — once over everything, once over the branch pixels alone — across a population of
+twenty-four:
+
+| subject | range | mean | sd / mean |
+|---|---|---|---|
+| full silhouette | 2.76 .. 30.82 | 11.54 | **0.651** |
+| branches only | 9.56 .. 513.32 | 345.49 | 0.342 |
+
+**The suspicion was wrong.** The full-silhouette number has the *higher* relative variance of the
+two and its range sits squarely across the authored band; it discriminates. The branch-only number
+is dominated by twig count — thousands of thin filaments have vast perimeter for tiny area — so it
+measures density rather than limb architecture, and changing the metric's subject would have
+replaced one proxy with a worse one.
+
+The general lesson is unchanged, and the guard on it is this: *suspecting* a metric of measuring the
+wrong thing is not evidence, and the test is cheap. One render answered it.
+
 ## Verified vs assumed
 
 **Verified:** the reclassification, on a rendered contact sheet where the reordering is visible; that
