@@ -2579,6 +2579,13 @@ json ProceduralGeometry::toJson() const {
         s["metallic"] = material.metallic;
         s["doubleSided"] = material.doubleSided;
         s["unlit"] = material.unlit;
+        if (material.alphaMode != AlphaMode::Opaque) {
+            s["alphaMode"] = material.alphaMode == AlphaMode::Mask ? "mask" : "blend";
+            s["alphaCutoff"] = material.alphaCutoff;
+        }
+        if (!baseColorTexturePath.empty()) {
+            s["baseColorTexture"] = baseColorTexturePath;
+        }
         if (!material.program.empty()) {
             s["program"] = material.program; // ADR-030 material program name
         }
@@ -2872,6 +2879,23 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(m.doubleSided, "doubleSided", readBool);
         AVGEN_PROC_READ(m.unlit, "unlit", readBool);
         AVGEN_PROC_READ(m.program, "program", readString);
+        AVGEN_PROC_READ(m.alphaCutoff, "alphaCutoff", readFloat);
+        AVGEN_PROC_READ(g.baseColorTexturePath, "baseColorTexture", readString);
+        if (j.contains("alphaMode")) {
+            if (!j.at("alphaMode").is_string()) {
+                return fail("material 'alphaMode' must be a string");
+            }
+            const std::string mode = j.at("alphaMode").get<std::string>();
+            if (mode == "opaque") {
+                m.alphaMode = AlphaMode::Opaque;
+            } else if (mode == "mask") {
+                m.alphaMode = AlphaMode::Mask;
+            } else if (mode == "blend") {
+                m.alphaMode = AlphaMode::Blend;
+            } else {
+                return fail("material alphaMode '{}' is not opaque, mask or blend", mode);
+            }
+        }
     }
     if (root.contains("materialVariation")) {
         const json& j = root.at("materialVariation");

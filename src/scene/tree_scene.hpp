@@ -156,6 +156,11 @@ struct TreeSceneBuild {
     std::uint32_t triangles = 0;
 };
 
+// The environment pieces, exposed so the generated-source builder can emit them as scene nodes
+// rather than the scene assembler being the only thing that can make them.
+[[nodiscard]] MeshData makeTreeGround(const TreeLook& look);
+[[nodiscard]] MeshData makeTreeDistantTrees(const TreeLook& look, std::uint32_t seed);
+
 // The scene, ready to render. `camera` decides the framing; pass the same `TreeCameraView` the
 // candidate search evaluated with, or the tree will have been chosen for a shot nobody takes.
 [[nodiscard]] Result<Scene> buildTreeScene(const TreeGraph& graph, const TreeMeshes& meshes,

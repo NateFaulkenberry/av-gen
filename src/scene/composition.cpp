@@ -3475,6 +3475,23 @@ void Composition::rebuild() {
             // material written only here is overwritten before it ever reaches the GPU.
             CompositionNode& mutableNode = *nodePtr;
             mutableNode.proceduralSubRest.clear();
+            // Cutout foliage: the base-colour texture whose alpha is the mask. Loaded here for the
+            // same reason the mesh is, and written into the node's rest copy as well as this
+            // frame's -- `applyProceduralParameters` rebuilds `live` from `rest` every frame, so a
+            // texture set only on `pg` is gone before it reaches the GPU.
+            if (!pg.baseColorTexturePath.empty() && !pg.material.baseColorTexture.valid()) {
+                auto image = registry_.loadImage(pg.baseColorTexturePath, true);
+                if (!image) {
+                    log::warn("composition '{}': node '{}': base colour texture: {}", name_, node.name,
+                              image.error().message);
+                } else {
+                    const TextureId id = scene_.addTexture((*image)->image);
+                    pg.material.baseColorTexture.texture = id;
+                    pg.material.baseColorTexture.wrapU = WrapMode::Clamp;
+                    pg.material.baseColorTexture.wrapV = WrapMode::Clamp;
+                    mutableNode.proceduralRest.material.baseColorTexture = pg.material.baseColorTexture;
+                }
+            }
             std::vector<ProceduralGeometry> subs;
             if (pg.source.kind == PrimitiveKind::Mesh && !pg.source.asset.empty()) {
                 const std::vector<AssetPart> parts =

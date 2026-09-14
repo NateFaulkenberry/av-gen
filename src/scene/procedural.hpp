@@ -530,7 +530,16 @@ struct ProceduralGeometry {
     std::vector<spatial::Effector> effectors;
     std::string emissiveField;
     float emissiveFieldAmount = 0.0f;
-    std::string extraLane;               // attribute projected into InstanceRecord::emissive.a
+    std::string extraLane;
+    // Cutout foliage. The path of a base-colour texture whose alpha is the mask, resolved by the
+    // Composition against the scene file's folder and loaded once per rebuild.
+    //
+    // This exists because a procedural node's material could not express alpha cutout at all, and a
+    // canopy of leaves is opaque rectangles without it. The gap only became visible when a hero that
+    // had been assembled in C++ -- where `Material` is built directly and can say anything -- was
+    // moved into a scene file, which is exactly the kind of thing that stays hidden until something
+    // crosses the boundary.
+    std::string baseColorTexturePath;               // attribute projected into InstanceRecord::emissive.a
     HierarchySpec hierarchy;             // self-recursion (structural)
     LodSettings lod;                     // GPU culling / LOD (only lodCount is structural)
     // Whether this object is drawn into the shadow maps. Ground cover is the case this exists for:

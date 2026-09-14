@@ -1,6 +1,7 @@
 #include "app/engine.hpp"
 
 #include "organism/mushroom.hpp"
+#include "scene/tree_generated.hpp"
 
 #include "seq/layer_sink.hpp"
 
@@ -46,6 +47,7 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     // mushroom is; re-registering a name is defined to replace it, so calling this per Engine is
     // harmless.
     organism::registerMushroomGenerator();
+    scene::registerTreeGenerator();
     ensureControlSource();
     audioSignals_ = signals::AudioSignals::declare(bus_);
     timeSignals_.seconds = bus_.declare("time.seconds", 0.0f, 3600.0f);
