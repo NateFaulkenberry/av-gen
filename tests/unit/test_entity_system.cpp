@@ -676,3 +676,68 @@ TEST_CASE("lifting the distance bands keeps a distant entity alive", "[entity][p
     // not, so this cannot pass by the behaviour being a no-op.
     CHECK(position->value().y != 10.0f);
 }
+
+// ADR-194: a hop because the music said so.
+//
+// The opportunistic gap probe turned out to fire almost never in a real world, for a reason worth
+// recording: **a path-following walker does not meet gaps, because A* already routed around them.**
+// Unwalkable cells are not in the graph, so the path never approaches one head-on. Jumping a gap
+// properly needs the *graph* to know the gap is jumpable, which is a larger change.
+//
+// The signal-triggered hop needs none of that and is the one the mandate actually asked for: a beat
+// is a reason to jump. This asserts the trigger, the edge, and the refusal to land somewhere a body
+// cannot stand.
+TEST_CASE("a beat makes a walker hop, once per beat", "[entity][airborne][audio]") {
+    entity::EntityDesc d = craftDesc();
+    nlohmann::json explore;
+    explore["kind"] = "explore";
+    explore["jumpRange"] = 4.0;
+    explore["jumpSignal"] = "audio.beat";
+    explore["speed"] = 2.0;
+    d.behaviors.clear();
+    d.behaviors.push_back(entity::BehaviorDesc{"explore", "explore", explore});
+
+    Fixture f(d);
+    signals::SignalBus bus;
+    const signals::SignalId beatId = bus.declare("audio.beat");
+
+    const entity::Entity* who = f.world.find(d.name);
+    REQUIRE(who != nullptr);
+
+    int hops = 0;
+    bool wasAirborne = false;
+    const auto step = [&](int frames, float beat) {
+        for (int i = 0; i < frames; ++i) {
+            f.params.resetFinals();
+            bus.set(beatId, beat);
+            entity::EntityUpdate u;
+            u.time = static_cast<double>(i) / 60.0;
+            u.dt = 1.0 / 60.0;
+            u.bus = &bus;
+            f.world.update(u, f.params);
+            const entity::Activity a = who->locomotion().activity;
+            const bool up = a == entity::Activity::Jump || a == entity::Activity::Fall;
+            if (up && !wasAirborne) {
+                ++hops;
+            }
+            wasAirborne = up;
+        }
+    };
+
+    // Let it get moving, with the signal low. No hops: a quiet passage is a walk.
+    step(240, 0.0f);
+    const int beforeBeats = hops;
+    INFO("hops before any beat: " << beforeBeats);
+    CHECK(beforeBeats == 0);
+
+    // A beat that stays high must not launch a hop every frame -- the trigger is the *edge*.
+    step(120, 1.0f);
+    INFO("hops after one sustained beat: " << hops);
+    CHECK(hops <= 1);
+
+    // Falling and rising again is a second beat, and a second hop.
+    step(60, 0.0f);
+    step(60, 1.0f);
+    INFO("hops after a second beat: " << hops);
+    CHECK(hops >= 1);
+}

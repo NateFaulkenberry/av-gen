@@ -3,6 +3,7 @@
 #include "core/log.hpp"
 #include "core/noise.hpp"
 #include "entity/entity.hpp"
+#include "entity/airborne.hpp"
 #include "entity/grounding.hpp"
 #include "entity/nav_grid.hpp"
 
@@ -750,7 +751,17 @@ public:
           waypointRadius_(readFloat(s, "waypointRadius", 2.2f)),
           repathSeconds_(readFloat(s, "repathSeconds", 6.0f)),
           stuckSeconds_(readFloat(s, "stuckSeconds", 2.5f)),
-          noveltyRadius_(readFloat(s, "noveltyRadius", 22.0f)) {}
+          noveltyRadius_(readFloat(s, "noveltyRadius", 22.0f)),
+          // ADR-194. Read here and held, like the affinities: the *shape* of a hop is a property of
+          // the body -- how a particular creature moves -- while how far it will leap is the knob
+          // registered above, because that is the one an author might put under a signal.
+          jumpRangeDefault_(readFloat(s, "jumpRange", 0.0f)),
+          jumpSignal_(readString(s, "jumpSignal", "")) {
+        jump_.gravity = readFloat(s, "jumpGravity", 18.0f);
+        jump_.apex = readFloat(s, "jumpApex", 1.1f);
+        jump_.landSeconds = readFloat(s, "landSeconds", 0.3f);
+        jump_.maxDistance = jumpRangeDefault_;
+    }
 
     [[nodiscard]] std::string_view kind() const override { return "explore"; }
 
@@ -796,12 +807,16 @@ public:
         bodyRadius_ = &params.add(floatDesc(prefix + "bodyRadius", bodyRadiusDefault_, 0.0f, 40.0f));
         headroom_ = &params.add(floatDesc(prefix + "headroom", headroomDefault_, 0.0f, 60.0f));
         footprint_ = &params.add(floatDesc(prefix + "footprint", footprintDefault_, 0.0f, 20.0f));
+        // ADR-194: how far this body will leap. 0 -- the default -- is a body that does not jump,
+        // so every scene written before this behaves exactly as it did, and a hop is something an
+        // author turns on for a character they meant to be able to.
+        jumpRange_ = &params.add(floatDesc(prefix + "jumpRange", jumpRangeDefault_, 0.0f, 40.0f));
         paths_ = {prefix + "speed",         prefix + "runSpeed",   prefix + "turnRate",
                   prefix + "arrive",        prefix + "idleMin",    prefix + "idleMax",
                   prefix + "observeChance", prefix + "observeMin", prefix + "observeMax",
                   prefix + "minRange",      prefix + "maxRange",   prefix + "homeRadius",
                   prefix + "runChance",     prefix + "slopeAlign",  prefix + "bodyRadius",
-                  prefix + "headroom",      prefix + "footprint"};
+                  prefix + "headroom",      prefix + "footprint",  prefix + "jumpRange"};
     }
     void collectParameterPaths(std::vector<std::string>& out) const override {
         out.insert(out.end(), paths_.begin(), paths_.end());
@@ -823,6 +838,8 @@ public:
         lastStatus_ = PathStatus::Ok;
         recent_.clear();
         ground_.reset();
+        air_.reset(); // a seek must not carry an arc into a second the body never jumped in
+        jumpArmed_ = 0.0f;
     }
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
@@ -1003,6 +1020,24 @@ private:
         const glm::vec3 here = state.position();
         const glm::vec2 flat(here.x, here.z);
 
+        // ADR-194. A hop in progress owns the body: the arc is the movement, so nothing below --
+        // steering, separation, the penetration resolve, the ground follower -- may touch it until
+        // the feet are down. Committed rather than interruptible, which is what a jump is.
+        if (const Navigator* airNav = nav(ctx); air_.active() && airNav != nullptr) {
+            glm::vec3 at = here;
+            if (air_.update(*airNav, ctx.dt, at, jump_)) {
+                state.travel = at - state.anchor;
+                state.speed = glm::length(glm::vec2(air_.position().x - here.x, air_.position().z - here.z)) /
+                              std::max(dt, 1e-4f);
+                state.activity = air_.activity();
+                return false;
+            }
+            // Down. The ground follower has been ignored for the whole arc and still holds the
+            // height the body left from, so it has to be re-primed or it glides down to the
+            // surface from take-off height -- which its own header warns about in as many words.
+            ground_.reset();
+        }
+
         // A goal that moves. The craft drifts and hovers, and a character walking to where it was
         // a minute ago is a character walking to nothing.
         if (goalKind_ == InterestKind::Character && !goalName_.empty() && ctx.world != nullptr) {
@@ -1135,6 +1170,73 @@ private:
         travelSpeed = std::min(travelSpeed, toWaypoint / std::max(dt, 1e-4f));
         const glm::vec2 heading(std::sin(state.yaw), std::cos(state.yaw));
         const glm::vec2 move = heading * travelSpeed * dt;
+
+        // ADR-194: a gap the body could clear. Probed only when actually travelling and roughly
+        // facing the way it is going -- a character does not leap sideways out of a turn -- and only
+        // forwards along its own heading, so this cannot fire on the separation push or on the
+        // penetration resolve below.
+        //
+        // The probe is two questions of the navigator the walk already asks every frame: is the
+        // ground just ahead unwalkable, and is there walkable ground beyond it inside the body's
+        // reach? That is a gap by definition, and it needs no gap-detection machinery of its own.
+        const float jumpReach = param(jumpRange_, jumpRangeDefault_);
+
+        // ADR-194: a hop because the music said so. Edge-triggered on the signal rising past a
+        // half, with the previous value remembered, so a signal that sits high does not launch a
+        // hop every frame -- the same shape `spin` uses for an impulse.
+        //
+        // Deliberately *not* conditional on there being a gap: this is the author's jump, and the
+        // body hops forward along the way it is already going. A character that only ever jumped
+        // when the terrain demanded it would be an obstacle-avoider rather than a performer.
+        if (!jumpSignal_.empty() && jumpReach > 0.0f && navigator != nullptr && !air_.active()) {
+            const float now = ctx.signal(jumpSignal_);
+            const bool rising = now > 0.5f && jumpArmed_ <= 0.5f;
+            jumpArmed_ = now;
+            if (rising) {
+                const float distance = std::min(jumpReach, std::max(travelSpeed, speed) * 0.55f);
+                const glm::vec2 landing = flat + heading * distance;
+                const NavSample beyond = navigator->sample(landing);
+                // Only onto ground it can stand on. A hop that lands in a lake is worse than no
+                // hop, and the navigator already knows the difference.
+                if (beyond.navigable) {
+                    jump_.maxDistance = jumpReach;
+                    const glm::vec3 target(landing.x, beyond.ground, landing.y);
+                    if (air_.launch(here, target, jump_)) {
+                        state.speed = travelSpeed;
+                        state.activity = air_.activity();
+                        return false;
+                    }
+                }
+            }
+        }
+
+        if (jumpReach > 0.0f && navigator != nullptr && travelSpeed > speed * 0.5f &&
+            alignment > 0.8f && !air_.active()) {
+            // The arc's reach follows the live parameter, so a signal raising `jumpRange` mid-scene
+            // raises how far the body will actually commit to rather than only how far it looks.
+            jump_.maxDistance = jumpReach;
+            const float probe = std::max(state.radius, 0.5f) + travelSpeed * 0.25f;
+            const glm::vec2 ahead = flat + heading * probe;
+            if (!navigator->sample(ahead).navigable) {
+                // Step out along the heading until the far side appears. Coarse on purpose: the
+                // arc lands where the ground is, and a metre of resolution is finer than the body.
+                const float reach = param(jumpRange_, jumpRangeDefault_);
+                for (float d = probe + 1.0f; d <= reach; d += 1.0f) {
+                    const glm::vec2 landing = flat + heading * d;
+                    if (!navigator->sample(landing).navigable) {
+                        continue;
+                    }
+                    const glm::vec3 target(landing.x, navigator->groundHeight(landing), landing.y);
+                    if (air_.launch(here, target, jump_)) {
+                        state.speed = travelSpeed;
+                        state.activity = air_.activity();
+                        return false;
+                    }
+                    break; // the near side of the far bank; nothing beyond it is a better landing
+                }
+            }
+        }
+
         state.travel.x += move.x;
         state.travel.z += move.y;
 
@@ -1447,6 +1549,18 @@ private:
     PathStatus lastStatus_ = PathStatus::Ok;
     std::vector<glm::vec3> recent_;
     GroundFollower ground_;
+    // ADR-194: the hop. `jumpRange_` is registered because "how far will it leap" is a creative
+    // control an author may want on a timeline or under a signal; `jump_` holds the arc's shape,
+    // which is a property of the body rather than of the moment.
+    Airborne air_;
+    JumpSettings jump_;
+    // ADR-194: the signal that makes this body hop, or empty for one that only jumps at gaps. This
+    // is what makes a character a modulation target rather than only an obstacle-avoider -- a beat
+    // is a reason to jump, and the engine already delivers beats to behaviours.
+    std::string jumpSignal_;
+    float jumpArmed_ = 0.0f;
+    params::Parameter<float>* jumpRange_ = nullptr;
+    float jumpRangeDefault_ = 0.0f;
     // Scratch for the weighted pick, kept so a selection every few seconds does not allocate.
     std::vector<const InterestPoint*> candidates_;
     std::vector<float> weights_;
@@ -1624,13 +1738,17 @@ const char* activityName(Activity activity) {
     case Activity::Turn: return "turn";
     case Activity::Observe: return "observe";
     case Activity::React: return "react";
+    case Activity::Jump: return "jump";
+    case Activity::Fall: return "fall";
+    case Activity::Land: return "land";
     }
     return "idle";
 }
 
 bool activityFromName(std::string_view name, Activity& out) {
     constexpr Activity kAll[] = {Activity::Idle,  Activity::Walk,    Activity::Run,
-                                 Activity::Turn,  Activity::Observe, Activity::React};
+                                 Activity::Turn,  Activity::Observe, Activity::React,
+                                 Activity::Jump,  Activity::Fall,    Activity::Land};
     for (const Activity a : kAll) {
         if (name == activityName(a)) {
             out = a;

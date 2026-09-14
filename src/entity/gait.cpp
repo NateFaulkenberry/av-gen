@@ -14,6 +14,11 @@ bool gaitLocomotor(Activity activity) {
         return true;
     case Activity::Observe:
     case Activity::React:
+    // ADR-194: airborne. Passed through for the same reason `React` is -- the gait underneath is
+    // remembered, so a body that jumps mid-run comes back to a run.
+    case Activity::Jump:
+    case Activity::Fall:
+    case Activity::Land:
         return false;
     }
     return false;

@@ -625,3 +625,56 @@ TEST_CASE("the navigator follows the world when it is rebuilt",
     // And the walker's own question answers correctly.
     CHECK_FALSE(after.sample(spot).navigable);
 }
+
+// ADR-194. Does the gap probe ever actually fire in a real world? A probe rather than an assertion
+// until that question has an answer: a test that waits for a wandering character to meet a gap is a
+// test whose outcome depends on where it chose to wander.
+TEST_CASE("a walker given a jump finds something to jump over",
+          "[.probe][integration][navigation][airborne]") {
+    const fs::path root = AVGEN_SOURCE_DIR;
+    if (!glowmereAvailable(root)) {
+        SKIP("Glowmere's assets are not installed");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadFile(root / "examples/world/glowmere-stylized.json").has_value());
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition != nullptr);
+
+    // Reachable as an ordinary parameter, which is the point of registering it: a jump is something
+    // an author turns on, and could put under a signal.
+    auto* range = engine.params().findAs<float>("entity/wanderer/explore/jumpRange");
+    REQUIRE(range != nullptr);
+    range->setBase(9.0f);
+    INFO("opportunistic gap probe only -- no jumpSignal on this scene's walker");
+
+    const entity::Entity* who = composition->entityWorld().find("wanderer");
+    REQUIRE(who != nullptr);
+
+    int airborne = 0;
+    int landings = 0;
+    int hops = 0;
+    bool wasAirborne = false;
+    constexpr double kStepSeconds = 1.0 / 60.0;
+    const auto frames = static_cast<std::uint64_t>(240.0 / kStepSeconds); // four simulated minutes
+    for (std::uint64_t i = 0; i <= frames; ++i) {
+        FrameTime time;
+        time.renderTime = static_cast<double>(i) * kStepSeconds;
+        time.deltaTime = i == 0 ? 0.0 : kStepSeconds;
+        time.frameIndex = i;
+        engine.update(time);
+        const entity::Activity a = who->locomotion().activity;
+        const bool up = a == entity::Activity::Jump || a == entity::Activity::Fall;
+        if (up) {
+            ++airborne;
+        }
+        if (up && !wasAirborne) {
+            ++hops;
+        }
+        wasAirborne = up;
+        if (a == entity::Activity::Land) {
+            ++landings;
+        }
+    }
+    INFO("hops " << hops << ", airborne frames " << airborne << ", landing frames " << landings);
+    CHECK(frames > 0);
+}

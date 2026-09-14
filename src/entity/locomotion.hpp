@@ -34,6 +34,13 @@ enum class Activity : std::uint8_t {
     Turn,     // turning on the spot
     Observe,  // stopped and looking at something
     React,    // a one-shot response to an event
+    // ADR-194: off the ground. Not speed-derived like the three above them -- a body in the air is
+    // airborne whatever its horizontal speed -- so the gait machine passes them through untouched
+    // and remembers the gait underneath, which is what makes `Run -> Jump -> Fall -> Land -> Run`
+    // come back as a run rather than as an idle.
+    Jump,     // rising
+    Fall,     // descending, and also the state of a body that walked off something
+    Land,     // touched down, recovering; standing, but not yet walking
 };
 [[nodiscard]] const char* activityName(Activity activity);
 // The inverse, for the one place an activity is named in data: a field's reaction arc says which
