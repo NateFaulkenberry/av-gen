@@ -742,3 +742,76 @@ TEST_CASE("lifting the distance rate poses a rig the live path would freeze",
     CHECK(stats.posed == 0);
     CHECK(stats.culled == 1);
 }
+
+// ADR-192: the modular alien pack. Six variants from one source, and the properties that matter are
+// not "a file exists" -- they are that the engine gets a rig it can drive, that the clip names are
+// the ones a scene author will type, and that six of them in one scene are six independent
+// characters rather than six views of one.
+TEST_CASE("the modular aliens import as drivable rigs", "[assets][gltf][skeleton][aliens]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path dir = std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "aliens";
+    const std::array<const char*, 6> variants{{"alien-scout", "alien-diver", "alien-elder",
+                                               "alien-pilot", "alien-trooper", "alien-ranger"}};
+    if (!std::filesystem::exists(dir / "alien-scout.glb")) {
+        SKIP("assets/aliens is not present");
+    }
+
+    // The clips a scene author is told they can ask for. Asserted by name because a rename in the
+    // exporter that nobody notices is exactly the kind of change that leaves a scene file playing a
+    // bind pose and saying nothing.
+    const std::array<const char*, 8> expected{{"Idle", "Walking", "Running", "Jumping", "Landing",
+                                               "Crazy", "Fight_idle", "Flying_jet"}};
+
+    for (const char* variant : variants) {
+        INFO(variant);
+        assets::AssetRegistry registry;
+        registry.setBaseDirectory(dir);
+        scene::Scene s;
+        const auto summary = assets::loadGltf(dir / (std::string(variant) + ".glb"), s, {});
+        REQUIRE(summary.has_value());
+        // No warnings at all. The morph targets were stripped at export precisely so that loading a
+        // character is silent; a warning here means the export settings drifted.
+        INFO("warnings: " << summary->warnings.size());
+        CHECK(summary->warnings.empty());
+
+        REQUIRE(summary->rigs == 1);
+        REQUIRE(s.rigs.size() == 1);
+        const scene::SkinnedRig& rig = s.rigs.front();
+        CHECK(rig.skeleton.paletteSize() == 89);
+        CHECK(rig.skeleton.jointCount() >= rig.skeleton.paletteSize());
+        CHECK(rig.skeleton.paletteSize() <= scene::kMaxPaletteJoints);
+        CHECK(rig.clips.size() == 26);
+
+        for (const char* want : expected) {
+            INFO("clip " << want);
+            const int index = rig.findClip(want);
+            REQUIRE(index >= 0);
+            CHECK(rig.clips[static_cast<std::size_t>(index)].valid());
+            CHECK(rig.clips[static_cast<std::size_t>(index)].duration > 0.0);
+        }
+        // `addDefaultStates` named a state per clip on import, so a scene file's
+        // `"animation": {"state": "Running"}` resolves.
+        CHECK(rig.player.findState("Running") != nullptr);
+
+        // Skinning is sound: every influence sums to one and names a joint inside the palette.
+        std::size_t skinnedMeshes = 0;
+        for (const scene::MeshData& mesh : s.meshes) {
+            if (!mesh.skinned()) {
+                continue;
+            }
+            ++skinnedMeshes;
+            for (const scene::SkinInfluence& influence : mesh.skin) {
+                const float sum = influence.weights.x + influence.weights.y + influence.weights.z +
+                                  influence.weights.w;
+                REQUIRE(sum == Approx(1.0f).margin(1e-4));
+                for (const std::uint16_t joint : influence.joints) {
+                    REQUIRE(joint < rig.skeleton.paletteSize());
+                }
+            }
+        }
+        CHECK(skinnedMeshes >= 2); // a head and a body at least; the packs add a third
+    }
+#endif
+}

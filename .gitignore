@@ -34,3 +34,11 @@ cmake-build-*/
 /assets/imported/concert/
 /assets/imported/instruments/
 /examples/world/_flicker_*.scene.json
+
+# The modular aliens (ADR-192): six variants exported from a source .blend that is not in this
+# repository. 27 MB, and -- unlike every other pack here -- with **no recorded licence**, which is
+# the second reason they stay out. assets/aliens/ATTRIBUTION.md is the part the repository keeps:
+# what was dropped and why, the variant table, the two engine limitations the export works within,
+# and the one command that regenerates all six (tools/make_aliens.sh). The scenes name the files;
+# a worktree without them loads the squad as a bare plinth and says so per missing asset.
+/assets/aliens/*.glb

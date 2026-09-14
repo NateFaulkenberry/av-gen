@@ -1,0 +1,269 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "alien-squad",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   2.2,
+   9.6
+  ],
+  "target": [
+   0.0,
+   0.95,
+   0.0
+  ],
+  "fov": 38.0,
+  "orbitSpeed": 0.0
+ },
+ "lightRig": "../lightrigs/studio-softbox.rig.json",
+ "environment": {
+  "intensity": 0.45,
+  "background": [
+   0.016,
+   0.018,
+   0.024
+  ],
+  "fogColor": [
+   0.02,
+   0.022,
+   0.03
+  ],
+  "fogDensity": 0.008,
+  "volumeDensity": 0.0,
+  "sky": {
+   "zenithColor": [
+    0.3,
+    0.35,
+    0.46
+   ],
+   "horizonColor": [
+    0.32,
+    0.33,
+    0.36
+   ],
+   "groundColor": [
+    0.02,
+    0.021,
+    0.024
+   ],
+   "haze": 0.2,
+   "sunColor": [
+    1.0,
+    0.95,
+    0.88
+   ],
+   "sunIntensity": 18.0,
+   "sunSize": 0.35,
+   "sunGlow": 0.6,
+   "intensity": 0.5
+  }
+ },
+ "nodes": [
+  {
+   "name": "floor",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    -0.06,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      16.0,
+      0.12,
+      6.0
+     ],
+     "subdivisions": 2,
+     "bevel": 0.02,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.1,
+      0.105,
+      0.115
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.55,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "scout",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-scout.glb",
+   "position": [
+    -5.875,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0,
+    17.6,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.35
+   }
+  },
+  {
+   "name": "diver",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-diver.glb",
+   "position": [
+    -3.525,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0,
+    10.6,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Walking",
+    "blend": 0.35
+   }
+  },
+  {
+   "name": "elder",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-elder.glb",
+   "position": [
+    -1.175,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0,
+    3.5,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Crazy",
+    "blend": 0.35
+   }
+  },
+  {
+   "name": "pilot",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-pilot.glb",
+   "position": [
+    1.175,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0,
+    -3.5,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Flying_jet",
+    "blend": 0.35
+   }
+  },
+  {
+   "name": "trooper",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-trooper.glb",
+   "position": [
+    3.525,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0,
+    -10.6,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Fight_idle",
+    "blend": 0.35
+   }
+  },
+  {
+   "name": "ranger",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-ranger.glb",
+   "position": [
+    5.875,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0,
+    -17.6,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Running",
+    "blend": 0.35
+   }
+  }
+ ],
+ "composition": {
+  "focalPoints": [
+   {
+    "name": "squad",
+    "position": [
+     0.0,
+     0.9,
+     0.0
+    ],
+    "radius": 7.5,
+    "weight": 2.0
+   }
+  ],
+  "cameraTarget": "squad",
+  "targetScreenPosition": [
+   0.5,
+   0.52
+  ],
+  "framingStrength": 0.0
+ }
+}
