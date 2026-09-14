@@ -192,3 +192,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [194](ADR-194-a-body-off-the-ground.md) | A body off the ground | Accepted |
 | [195](ADR-195-water-is-a-depth-a-body-is-in.md) | Water is a depth a body is in, not a line it stops at | Accepted |
 | [196](ADR-196-a-solid-says-what-getting-past-it-takes.md) | A solid says what getting past it takes; the body says what it can do about that | Accepted |
+| [197](ADR-197-the-navigation-layer-gets-an-appearance.md) | The navigation layer gets an appearance, and the overlay gets a camera pointed at it | Accepted |

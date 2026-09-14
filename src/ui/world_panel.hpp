@@ -14,6 +14,8 @@
 
 namespace avgen::ui {
 
+class WorldEditor;
+
 // Which parameters a layer shows. Beginner: world macros, atmosphere, camera, post. Intermediate:
 // + generators (procedural/*), fields, materials, deformers, particles, splines, sdf. Advanced:
 // everything (graph, attributes, GPU, simulation).
@@ -52,7 +54,12 @@ public:
     void drawInspector(app::Engine& engine);
     void drawStates(app::Engine& engine);
     void drawMacros(app::Engine& engine);
-    void drawDebugOptions(app::Engine& engine);
+    // The debug tab. `editor` is where the navigation overlay's toggles live (ADR-197) -- the
+    // overlay is drawn by the viewport from `EditorVisuals`, not by the debug line layer, so its
+    // switches belong to the editor rather than to `DebugViewOptions`. Passed rather than held,
+    // because this panel owns no editor and a second one would be a second answer to "what is
+    // selected". May be null in a session with no world editor; the tab then says so.
+    void drawDebugOptions(app::Engine& engine, WorldEditor* editor = nullptr);
     // Art direction (ADR-041): the director's knobs and the shipped looks.
     void drawDirector(app::Engine& engine);
     // The layer selector plus the filtered parameter list (used by the Parameters window).
@@ -60,6 +67,8 @@ public:
     [[nodiscard]] bool shows(const std::string& path) const { return layerShowsPath(layer, path); }
 
 private:
+    void drawNavigationOptions(WorldEditor* editor);
+
     char macroName_[64] = "energy";
     char lookName_[64] = "My Look";
     int selectedLook_ = 0;

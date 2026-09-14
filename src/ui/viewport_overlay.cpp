@@ -2,6 +2,7 @@
 
 #include "ui/ui_logic.hpp"
 
+#include "entity/nav_grid.hpp"
 #include "ui/brush.hpp"
 #include "ui/gizmo.hpp"
 #include "ui/world_probe.hpp"
@@ -32,6 +33,68 @@ constexpr ImU32 kHeroSubject = IM_COL32(190, 216, 255, 210);
 // answers is a third one: not "what is selected" or "what is the camera about", but "what does this
 // thing move with".
 constexpr ImU32 kParentLink = IM_COL32(190, 130, 235, 200);
+
+// ---- navigation (ADR-197) -----------------------------------------------------------------------
+//
+// A fourth hue, for the fourth question: not "what is selected", not "what is the camera about",
+// not "what does this move with", but "where is this going and may it get there". Teal, because it
+// is the one part of the overlay that is about the *ground* rather than about an object, and it has
+// to stay legible over the amber selection box that is usually on the same character.
+constexpr ImU32 kRoute = IM_COL32(90, 210, 200, 170);      // the plan beyond the next waypoint
+constexpr ImU32 kRouteLeg = IM_COL32(150, 255, 235, 240);  // the leg being walked right now
+constexpr ImU32 kRouteGoal = IM_COL32(120, 245, 185, 230);
+// A route that failed. The same refusal red as a placement that would not take, deliberately: the
+// two mean the same thing to a person -- "this will not work" -- and giving them two colours would
+// be two things to learn for one fact.
+constexpr ImU32 kRouteFailed = IM_COL32(240, 96, 88, 230);
+
+// The grid. Low alpha throughout: it is a carpet under everything else, and at four-metre cells a
+// screenful of it is a thousand quads that must not drown the scene they are explaining.
+constexpr ImU32 kCellWalkable = IM_COL32(80, 190, 150, 30);
+constexpr ImU32 kCellEdge = IM_COL32(150, 230, 190, 80);   // walkable, and up against something
+constexpr ImU32 kCellWater = IM_COL32(70, 140, 235, 60);
+constexpr ImU32 kCellSteep = IM_COL32(235, 165, 70, 60);
+constexpr ImU32 kCellBlocked = IM_COL32(235, 80, 80, 70);
+constexpr ImU32 kCellUnknown = IM_COL32(150, 150, 150, 34); // not walkable, and no reason recorded
+constexpr ImU32 kShore = IM_COL32(120, 200, 255, 200);
+constexpr ImU32 kVista = IM_COL32(255, 220, 130, 200);
+
+// A stable colour per connected region. The number itself is meaningless -- what matters is that
+// two cells the same colour are reachable from each other and two cells different colours are not,
+// which is the one fact "my character will not go there" usually turns out to be.
+ImU32 regionColour(std::uint16_t region) {
+    if (region == 0) {
+        return kCellUnknown;
+    }
+    // A golden-ratio walk over hue, so consecutive region ids are far apart rather than adjacent.
+    const float hue = std::fmod(static_cast<float>(region) * 0.61803398875f, 1.0f);
+    float r = 0.0f;
+    float g = 0.0f;
+    float b = 0.0f;
+    ImGui::ColorConvertHSVtoRGB(hue, 0.65f, 1.0f, r, g, b);
+    return IM_COL32(static_cast<int>(r * 255.0f), static_cast<int>(g * 255.0f),
+                    static_cast<int>(b * 255.0f), 66);
+}
+
+ImU32 cellColour(const EditorVisuals::NavCellMark& cell, bool regions) {
+    using namespace avgen::entity;
+    if ((cell.flags & NavWalkable) != 0) {
+        if (regions) {
+            return regionColour(cell.region);
+        }
+        return (cell.flags & NavEdge) != 0 ? kCellEdge : kCellWalkable;
+    }
+    if ((cell.flags & NavBlocked) != 0) {
+        return kCellBlocked;
+    }
+    if ((cell.flags & NavWater) != 0) {
+        return kCellWater;
+    }
+    if ((cell.flags & NavSteep) != 0) {
+        return kCellSteep;
+    }
+    return kCellUnknown;
+}
 
 // NDC -> the canvas's own pixels, in ImGui's screen space. The one conversion in the file; every
 // world point goes through here and nowhere else.
@@ -109,6 +172,19 @@ struct Painter {
                  colour, thickness);
         }
     }
+    // A cell-sized square lying flat at `centre`'s own height. Four projections and one filled
+    // quad; this is the unit the navigation grid's cost is counted in.
+    void flatQuad(glm::vec3 centre, float half, ImU32 colour) const {
+        ImVec2 corner[4];
+        static constexpr float kSx[4] = {-1.0f, 1.0f, 1.0f, -1.0f};
+        static constexpr float kSz[4] = {-1.0f, -1.0f, 1.0f, 1.0f};
+        for (int i = 0; i < 4; ++i) {
+            if (!point(centre + glm::vec3(kSx[i] * half, 0.0f, kSz[i] * half), corner[i])) {
+                return; // behind the eye: refused whole, as every other shape here is
+            }
+        }
+        list->AddQuadFilled(corner[0], corner[1], corner[2], corner[3], colour);
+    }
     void label(glm::vec3 world, const char* text, ImU32 colour, ImVec2 offset = ImVec2(8.0f, -8.0f)) const {
         ImVec2 at;
         if (!point(world, at)) {
@@ -116,6 +192,25 @@ struct Painter {
         }
         at.x += offset.x;
         at.y += offset.y;
+        // Held inside the canvas. A label is drawn at its object, and an object near the right edge
+        // put its text off the side of the viewport where the clip rect cut it in half -- which was
+        // found by looking at a rasterised overlay rather than reasoned about (ADR-197). Sliding it
+        // rather than dropping it: a label that moved a little still says which object it is over,
+        // and a label that is not there says nothing at all.
+        const ImVec2 size = ImGui::CalcTextSize(text);
+        const ImVec2 want = at;
+        at.x = std::clamp(at.x, canvas->x + 2.0f, canvas->x + canvas->width - size.x - 2.0f);
+        at.y = std::clamp(at.y, canvas->y + 2.0f, canvas->y + canvas->height - size.y - 2.0f);
+        // ...but only a slide, not a pin. Clamping unconditionally puts a label for something well
+        // off the side of the view hard against the border, where it says nothing about where its
+        // object is and lands on top of every other off-screen label doing the same thing -- two of
+        // them overlapping in the top-right corner is what this looked like. Past a slide of about
+        // a label's own width the object is simply not on screen, and no label is the honest
+        // answer. Found the same way the clamp itself was: by looking at a rasterised overlay.
+        const float slack = 24.0f;
+        if (std::abs(at.x - want.x) > size.x + slack || std::abs(at.y - want.y) > size.y + slack) {
+            return;
+        }
         // A shadow, because the world behind the text is any colour it likes.
         list->AddText(ImVec2(at.x + 1.0f, at.y + 1.0f), IM_COL32(0, 0, 0, 190), text);
         list->AddText(at, colour, text);
@@ -195,6 +290,57 @@ void drawViewportOverlay(const WorldEditor& editor, const scene::Camera& camera,
                                ImVec2(canvas.x + canvas.width, canvas.y + canvas.height), true);
 
     const EditorVisuals& visuals = editor.visuals();
+
+    // ---- the navigation grid (ADR-197) ----
+    //
+    // First, so everything else reads over it. This is the carpet: what a walker may stand on, what
+    // it is refused by, and -- with regions on -- which parts of the world are reachable from which
+    // other parts. It is the answer to "my character will not cross the valley", which until now
+    // had to be guessed at from the character's behaviour.
+    if (!visuals.navCells.empty() && visuals.navCellSize > 0.0f) {
+        const float half = visuals.navCellSize * 0.5f * 0.9f; // a hair of gap, so cells read as cells
+        for (const EditorVisuals::NavCellMark& cell : visuals.navCells) {
+            painter.flatQuad(cell.centre, half, cellColour(cell, visuals.navRegionColours));
+        }
+    }
+    // The places the grid found while it was being built and nothing has ever looked at: where
+    // walkable ground meets water, and the walkable local maxima. They are what `explore` picks
+    // destinations from, so an author asking "why does it keep going *there*" is asking about these.
+    for (const glm::vec3& point : visuals.navShore) {
+        painter.ring(point, glm::vec3(0.0f, 1.0f, 0.0f), 1.1f, kShore, 10, 1.2f);
+    }
+    for (const glm::vec3& point : visuals.navVistas) {
+        painter.line(point, point + glm::vec3(0.0f, 2.2f, 0.0f), kVista, 1.4f);
+        painter.ring(point, glm::vec3(0.0f, 1.0f, 0.0f), 1.4f, kVista, 12, 1.2f);
+    }
+
+    // ---- the selected walker's route ----
+    //
+    // The polyline the behaviour planned, the leg it is on picked out brighter, and a ring at the
+    // destination. The label is the part that does not exist anywhere else: a phase and a
+    // `PathStatus`, so "standing still because the goal is unreachable" stops looking exactly like
+    // "standing still because it is idling".
+    for (const EditorVisuals::NavRoute& route : visuals.navRoutes) {
+        const ImU32 colour = route.failed ? kRouteFailed : kRoute;
+        glm::vec3 from = route.position;
+        for (std::size_t i = 0; i < route.waypoints.size(); ++i) {
+            const bool walking = i == route.leg;
+            painter.line(from, route.waypoints[i], walking ? kRouteLeg : colour, walking ? 2.6f : 1.5f);
+            // A tick at each waypoint, so a route with two legs in nearly the same direction is
+            // still visibly two legs -- which is what a string-pulled path usually looks like.
+            painter.ring(route.waypoints[i], glm::vec3(0.0f, 1.0f, 0.0f), 0.45f, colour, 8, 1.2f);
+            from = route.waypoints[i];
+        }
+        if (route.hasDestination) {
+            painter.ring(route.destination, glm::vec3(0.0f, 1.0f, 0.0f), 1.6f, kRouteGoal, 20, 1.6f);
+            painter.line(route.destination, route.destination + glm::vec3(0.0f, 2.0f, 0.0f), kRouteGoal,
+                         1.4f);
+        }
+        // Over the walker's head rather than at its feet, where the selection box's own name is,
+        // and offset up so the two lines do not sit on each other.
+        painter.label(route.position + glm::vec3(0.0f, 0.4f, 0.0f), route.label.c_str(),
+                      route.failed ? kRouteFailed : kRouteLeg, ImVec2(10.0f, 6.0f));
+    }
 
     // ---- what is selected ----
     for (const EditorVisuals::SelectedBox& selected : visuals.selectionBoxes) {

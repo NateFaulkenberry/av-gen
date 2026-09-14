@@ -52,6 +52,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -304,6 +305,16 @@ public:
     // held, which is what makes a resume a resume.
     [[nodiscard]] double elapsed() const;
     [[nodiscard]] double elapsed(Authority authority) const;
+    // The route the driving tier's `move` is walking, and which leg of it (ADR-197). Empty when
+    // nothing is running, when what is running is not a move, or before the planner has answered.
+    // A move with no planner installed routes straight at the goal and is reported as the one
+    // waypoint it actually holds -- the overlay draws that line, because it is the line the body
+    // is walking, and a straight line through a lake is exactly the thing worth seeing.
+    //
+    // The span points into the queue and lives until its next update, like `current()`.
+    [[nodiscard]] std::span<const glm::vec2> route() const;
+    [[nodiscard]] std::size_t routeLeg() const;
+
     // Actions not yet finished, across every tier.
     [[nodiscard]] std::size_t pending() const;
     [[nodiscard]] std::size_t pending(Authority authority) const;

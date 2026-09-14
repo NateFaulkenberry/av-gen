@@ -333,6 +333,24 @@ const ActionDesc* ActionQueue::current(Authority authority) const {
     return layer.index < layer.actions.size() ? &layer.actions[layer.index] : nullptr;
 }
 
+std::span<const glm::vec2> ActionQueue::route() const {
+    const int top = topLayer();
+    if (top < 0) {
+        return {};
+    }
+    const Layer& layer = layers_[static_cast<std::size_t>(top)];
+    const ActionDesc* action = current(static_cast<Authority>(top));
+    if (action == nullptr || action->kind != ActionKind::Move || !layer.progress.routed) {
+        return {};
+    }
+    return layer.progress.waypoints;
+}
+
+std::size_t ActionQueue::routeLeg() const {
+    const int top = topLayer();
+    return top < 0 ? 0 : layers_[static_cast<std::size_t>(top)].progress.waypoint;
+}
+
 double ActionQueue::elapsed() const {
     const int top = topLayer();
     return top < 0 ? 0.0 : layers_[static_cast<std::size_t>(top)].elapsed;
