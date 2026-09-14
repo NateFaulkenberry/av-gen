@@ -82,6 +82,23 @@ struct ScatterClearance {
                                     float layerHeight = 0.0f,
                                     std::string_view layerCategory = {});
 
+// What a layer is for navigation, when the layer knows something the heuristic cannot (ADR-194).
+//
+// `entity::classifyScatterLayer` reads the composer's category, then the asset's *filename*, then
+// the layer's own name. That is honest and inspectable and it is still keywords: an author whose
+// tree asset is called `Plant_7` has no way to say "this one blocks", and one whose monument is
+// scenery a character walks through has no way to say so either. This is that way.
+//
+// `Auto` is the heuristic and is the default, so a scene that says nothing classifies exactly as it
+// did and is written back out without the key.
+enum class ScatterNavigation : std::uint8_t {
+    Auto,     // the heuristic decides: category, then asset path, then layer name, then height
+    Blocks,   // every instance is a solid, whatever its height and whatever the asset is called
+    Passable, // no instance is a solid, however tall
+};
+[[nodiscard]] const char* scatterNavigationName(ScatterNavigation navigation);
+[[nodiscard]] std::optional<ScatterNavigation> scatterNavigationFromName(std::string_view name);
+
 struct ScatterLayer {
     std::string name;
     std::string asset;
@@ -184,6 +201,12 @@ struct ScatterLayer {
     // cannot say both. Deliberately absent from `structuralHash`: motion is a per-frame uniform,
     // so retuning how a fern moves does not replant the forest.
     wind::VegetationMotion motion;
+
+    // Whether this layer's instances are solids a character has to go round (ADR-194). Deliberately
+    // an override rather than a replacement: `Auto` leaves the height thresholds in
+    // `entity::ObstaclePolicy` in charge, and the other two settle only the question the heuristic
+    // cannot answer -- *whether* -- while the per-instance height still decides the traversal class.
+    ScatterNavigation navigation = ScatterNavigation::Auto;
 
     std::uint32_t seed = 1;
     int maxInstances = 60000;             // a hard ceiling per layer, whatever the density says

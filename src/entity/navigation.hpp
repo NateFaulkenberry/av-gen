@@ -60,6 +60,17 @@ struct NavSettings {
     // and a step-over height turn a set of cylinders into "may I stand here".
     float bodyRadius = 0.45f;
     float stepOver = 0.4f;          // solids shorter than this are stepped over, not avoided
+    // Metres of solid this body can clear by vaulting (ADR-194). Only `spatial::Traversal::Jumpable`
+    // solids are eligible -- a boulder it could clear is not a tree it could not -- and only up to
+    // this height.
+    //
+    // **0, the default, is a body that cannot jump**, and that is what keeps this inert: every
+    // walker in this project answers every query exactly as it did before the class existed. There
+    // is deliberately no scene key for it yet. A body's abilities belong with `bodyRadius` and
+    // `headroom` on the walk behaviour, which is where a character already declares its
+    // proportions, and putting one there adds a parameter to every project in the repository --
+    // a change that wants its own proof, not a free ride on this one.
+    float jumpOver = 0.0f;
 
     // The six shared rules, as the terrain query surface wants them.
     [[nodiscard]] world::WalkRules walkRules() const {

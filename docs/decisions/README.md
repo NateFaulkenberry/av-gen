@@ -189,3 +189,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [191](ADR-191-the-lod-ladder-is-a-prefilter-not-a-saving.md) | The LOD ladder is a prefilter, not a saving | Accepted |
 | [192](ADR-192-six-aliens-from-one-modular-source.md) | Six aliens from one modular source | Accepted |
 | [193](ADR-193-the-entity-layer-hears-when-the-world-changes.md) | The entity layer hears when the world changes | Accepted |
+| [194](ADR-194-a-solid-says-what-getting-past-it-takes.md) | A solid says what getting past it takes; the body says what it can do about that | Accepted |

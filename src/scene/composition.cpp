@@ -3195,6 +3195,17 @@ void Composition::rebuild() {
                         log::info("terrain '{}': scatter '{}' contributed {} navigation obstacles ({})",
                                   node.name, layer.name, added,
                                   spatial::obstacleTypeName(entity::classifyScatterLayer(layer)));
+                    } else if (layer.navigation != world::ScatterNavigation::Auto) {
+                        // A declaration that produced nothing is a thing an author asked for and
+                        // did not get, and this project has found too many of those by accident
+                        // (ADR-194). `passable` producing nothing is the point; `blocks` producing
+                        // nothing means the layer placed nothing, and either way it is said out
+                        // loud. Only ever reached by a scene that set the key, so every log a
+                        // scene written before it existed prints is byte-identical.
+                        log::info("terrain '{}': scatter '{}' declared navigation '{}': "
+                                  "contributed no navigation obstacles",
+                                  node.name, layer.name,
+                                  world::scatterNavigationName(layer.navigation));
                     }
                 }
                 ProceduralGeometry pg;

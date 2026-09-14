@@ -134,13 +134,25 @@ void NavGrid::build(const Navigator& nav, float cellSize) {
                 // Area-weighted rather than counted: three saplings and one boulder should not
                 // score the same, and a cell a walker can still thread should not score as full.
                 float covered = 0.0f;
+                float vaulted = 0.0f;
+                const spatial::ObstacleFilter body = nav.filter(s.ground);
                 obstacles->query(p, cell * 0.7071f, hits);
                 for (const std::uint32_t i : hits) {
                     const spatial::NavigationObstacle& o = obstacles->obstacles()[i];
                     const float r = o.radius + nav.settings().bodyRadius;
-                    covered += 3.14159265f * r * r;
+                    const float area = 3.14159265f * r * r;
+                    // Only what this body actually gets past by jumping leaves the obstruction
+                    // total (ADR-194). Everything else -- including a solid it merely steps over,
+                    // which this sum has always counted -- stays where it was, so a body that
+                    // cannot jump scores every cell exactly as it did.
+                    if (spatial::traversalFor(o, body) == spatial::Traversal::Jumpable) {
+                        vaulted += area;
+                    } else {
+                        covered += area;
+                    }
                 }
                 c.obstruction = quantise(covered / cellArea);
+                c.vault = quantise(vaulted / cellArea);
                 if (c.obstruction > 200) {
                     c.flags |= NavBlocked;
                 }
@@ -404,6 +416,7 @@ bool NavGrid::findPath(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out
                 // reads as a machine looking for the shortest line.
                 const float penalty = 1.0f +
                                       cost.obstructionPenalty * (static_cast<float>(target.obstruction) / 255.0f) +
+                                      cost.vaultPenalty * (static_cast<float>(target.vault) / 255.0f) +
                                       cost.slopePenalty * (static_cast<float>(target.slope) / 255.0f);
                 const float tentative = gScore_[ci] + step * penalty;
                 const std::size_t ni = index(n);

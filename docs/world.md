@@ -206,6 +206,12 @@ Three things worth knowing before authoring one:
   *same* places. That is what makes a fern and a mushroom look like they are growing together.
 - **`tint` and `emissiveColor` are how a library becomes this world.** The asset's textures stay;
   these multiply and add. Bioluminescence is a layer saying its fungi are emissive.
+- **`navigation` is how a layer overrules the obstacle heuristic** (ADR-194): `"auto"` (the
+  default), `"blocks"` or `"passable"`. Which layers become solids is otherwise decided by keywords
+  in the category, the asset's filename and the layer's name, and an author with a tree in a file
+  called `Plant_7.gltf` has no other way to say "this one blocks". `"passable"` contributes nothing
+  however tall the layer grew; `"blocks"` contributes every instance however short. It is written
+  back out only when it is not `"auto"`, and an unrecognised word is an error at load.
 
 Each layer becomes one ordinary procedural object with `distribution.kind = "scatter"` -- placements
 supplied from outside, the way an imported mesh is a source supplied from outside. Everything
@@ -329,7 +335,15 @@ allocation-free, thread-safe for reads, and the only place the walkability rules
 **"Is anything solid at this spot?"** — `spatial::ObstacleField`: vertical cylinders in a uniform
 grid, built once per world from the scatter clouds and the heroes. The height recorded is the height
 of the *solid*, so a fourteen-metre tree contributes a half-metre trunk rather than a five-metre
-bounding disc. Reachable as `composition.entityWorld().navigator().obstacles()`, and published
+bounding disc.
+
+Each cylinder carries two facts about itself. `ObstacleType` is **identity** — "it is a rock" — and
+`Traversal` is **what getting past it takes**: `Passable`, `StepOver`, `Jumpable`, `Blocking`,
+derived from its own height and type by `entity::traversalClass` (ADR-194). What a particular body
+can *do* about a class is the other half and lives on the query: `ObstacleFilter::bodyRadius`,
+`stepOver`, `headHeight` and `jumpOver`. `jumpOver` defaults to 0 — a body that cannot jump — and a
+`Jumpable` solid is a wall to one that cannot. `field.traversalAt(p, filter, hit)` answers "what
+would I have to do here" with the hardest thing in the way rather than with a boolean. Reachable as `composition.entityWorld().navigator().obstacles()`, and published
 through §3's one-method seam by `entity::NavigationObstacles`, so `TerrainQuery::isOccupied` answers
 truthfully wherever a query object has been handed one. `hasObstacles()` distinguishes "nothing is
 there" from "nobody asked".
@@ -364,7 +378,12 @@ waypoints, which is what ADR-091 needs for a baked actor's route to survive a re
 `crowdSeparation` pushes a body out of the ones it overlaps. It is not part of the navigator's
 obstacle set — a route is planned over a world that is not moving.
 
-**For a debug overlay**: `NavGrid::cells()` carries walkability, slope, water and obstruction per
-cell; `stats()` carries the region count and the largest region; `shorePoints()` and `vistaPoints()`
+A* prices a vault. `NavCell` carries `vault` beside `obstruction` — how much of the cell is covered
+by solids this body clears only by jumping — and `NavPathCost::vaultPenalty` (1.5, against
+`obstructionPenalty`'s 3.0) makes crossing one cost more than open ground and less than a detour.
+Nothing in this project can jump yet, so `vault` is zero in every cell of every world it ships.
+
+**For a debug overlay**: `NavGrid::cells()` carries walkability, slope, water, obstruction and vault
+per cell; `stats()` carries the region count and the largest region; `shorePoints()` and `vistaPoints()`
 are what the grid noticed about the terrain. The `explore` behaviour exposes `route()`, `routeLeg()`,
 `destination()`, `phaseName()` and `lastPathStatus()`.

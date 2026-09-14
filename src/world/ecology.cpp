@@ -176,6 +176,22 @@ Result<void> ScatterLayer::validate() const {
     return {};
 }
 
+const char* scatterNavigationName(ScatterNavigation navigation) {
+    switch (navigation) {
+    case ScatterNavigation::Auto: return "auto";
+    case ScatterNavigation::Blocks: return "blocks";
+    case ScatterNavigation::Passable: return "passable";
+    }
+    return "auto";
+}
+
+std::optional<ScatterNavigation> scatterNavigationFromName(std::string_view name) {
+    if (name == "auto") return ScatterNavigation::Auto;
+    if (name == "blocks") return ScatterNavigation::Blocks;
+    if (name == "passable") return ScatterNavigation::Passable;
+    return std::nullopt;
+}
+
 std::uint64_t ScatterLayer::structuralHash() const {
     StructHash h;
     h.str(name);
@@ -215,6 +231,13 @@ std::uint64_t ScatterLayer::structuralHash() const {
     h.str(materialProgram);
     h.boolean(avoidWater);
     h.boolean(castsShadow);
+    // `navigation` is deliberately absent, for the same reason `motion` is and one more. It does
+    // not change where a single instance is placed -- and this hash is xored into the layer's
+    // `scatterHash`, so putting it in would re-randomise every instance's variation in the whole
+    // world the first time an author marked one layer `blocks`. The obstacle field is rebuilt from
+    // the (reused) point clouds on every `Composition::rebuild`, so leaving it out is not staleness:
+    // the placements survive the edit and the solids are recomputed from them.
+
     h.u32(seed);
     h.i32(maxInstances);
     h.i32(meshBudget);
@@ -633,6 +656,21 @@ Result<Ecology> ecologyFromJson(const json& j) {
         if (e.contains("category") && e.at("category").is_string()) {
             l.category = e.at("category").get<std::string>();
         }
+        if (e.contains("navigation")) {
+            if (!e.at("navigation").is_string()) {
+                return fail("scatter '{}': 'navigation' must be a string", l.name);
+            }
+            const std::string nav = e.at("navigation").get<std::string>();
+            // Named rather than silently defaulted. A typo here is an author asking for something
+            // the world then quietly does not do, which is the failure this project keeps finding
+            // in its own policy fields.
+            const std::optional<ScatterNavigation> parsed = scatterNavigationFromName(nav);
+            if (!parsed) {
+                return fail("scatter '{}': 'navigation' must be auto, blocks or passable, not '{}'",
+                            l.name, nav);
+            }
+            l.navigation = *parsed;
+        }
         if (e.contains("materialProgram")) {
             if (!e.at("materialProgram").is_string()) {
                 return fail("scatter '{}': 'materialProgram' must be a string", l.name);
@@ -733,6 +771,11 @@ json ecologyToJson(const Ecology& ecology) {
                            {"seed", l.seed},
                            {"maxInstances", l.maxInstances},
                            {"meshBudget", l.meshBudget}});
+        // Same rule as the habitat band below: written only when the author said something, so a
+        // scene that never heard of the key round-trips byte-identically.
+        if (l.navigation != ScatterNavigation::Auto) {
+            out.back()["navigation"] = scatterNavigationName(l.navigation);
+        }
         // Written only when the layer actually constrains it, so every scene authored before this
         // field existed round-trips byte-identically rather than growing three defaults per layer.
         if (l.constrainsHeightAboveWater()) {

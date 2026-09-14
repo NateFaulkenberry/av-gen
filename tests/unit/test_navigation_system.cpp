@@ -117,7 +117,7 @@ TEST_CASE("an obstacle field answers where the solids are", "[navigation][obstac
     SECTION("a non-blocking obstacle is invisible unless asked for") {
         spatial::ObstacleField soft;
         spatial::NavigationObstacle plant = solid(0.0f, 0.0f, 2.0f, 1.0f, spatial::ObstacleType::Vegetation);
-        plant.blocking = false;
+        plant.traversal = spatial::Traversal::Passable;
         soft.add(plant);
         soft.build();
         CHECK(soft.blockingCount() == 0);
@@ -234,6 +234,214 @@ TEST_CASE("the obstacle policy tells scenery from a solid", "[navigation][obstac
         // exclusion zone around a tree a character is meant to be able to walk up to.
         CHECK(hero.radius < 8.2f);
         CHECK(hero.radius > 3.0f);
+    }
+}
+
+// ---- traversal: what it takes to get past a thing ------------------------------------------------
+
+TEST_CASE("a solid says what getting past it takes, and the body says what it can do about that",
+          "[navigation][obstacles][traversal]") {
+    // ADR-194. The old arrangement had exactly one notion of traversal and it was a float on the
+    // *query* -- so the field could say how tall a solid was and nothing about what kind of effort
+    // it took, and every solid a body could not step over was the same solid.
+    const entity::ObstaclePolicy policy;
+
+    SECTION("a short rock is stepped over and a tall one is walked round") {
+        CHECK(entity::traversalClass(spatial::ObstacleType::Rock, 0.3f, policy) ==
+              spatial::Traversal::StepOver);
+        CHECK(entity::traversalClass(spatial::ObstacleType::Rock, 3.0f, policy) ==
+              spatial::Traversal::Blocking);
+        // And the band between them is the one the class exists for.
+        CHECK(entity::traversalClass(spatial::ObstacleType::Rock, 1.0f, policy) ==
+              spatial::Traversal::Jumpable);
+    }
+
+    SECTION("every class has a name a diagnostic can print") {
+        // The same reason `navRejectName` and `pathStatusName` exist: a class nobody can read is a
+        // class nobody acts on, and this one is the answer to "why did it go round that".
+        CHECK(std::string(spatial::traversalName(spatial::Traversal::Passable)) == "passable");
+        CHECK(std::string(spatial::traversalName(spatial::Traversal::StepOver)) == "step-over");
+        CHECK(std::string(spatial::traversalName(spatial::Traversal::Jumpable)) == "jumpable");
+        CHECK(std::string(spatial::traversalName(spatial::Traversal::Blocking)) == "blocking");
+    }
+
+    SECTION("a creature is never vaulted, whatever size it is") {
+        // The one thing identity decides here: a solid that walks away mid-jump is not one to
+        // commit to. A rock of the same height is.
+        CHECK(entity::traversalClass(spatial::ObstacleType::Creature, 1.0f, policy) ==
+              spatial::Traversal::Blocking);
+        CHECK(entity::traversalClass(spatial::ObstacleType::Rock, 1.0f, policy) ==
+              spatial::Traversal::Jumpable);
+    }
+
+    SECTION("a body that cannot jump treats a jumpable solid exactly as a blocking one") {
+        spatial::ObstacleField field;
+        spatial::NavigationObstacle boulder = solid(0.0f, 0.0f, 1.0f, 1.0f);
+        boulder.traversal = spatial::Traversal::Jumpable;
+        field.add(boulder);
+        field.build();
+
+        spatial::ObstacleFilter walker; // jumpOver defaults to 0: it cannot
+        walker.bodyRadius = 0.45f;
+        walker.stepOver = 0.4f;
+        REQUIRE(walker.jumpOver == 0.0f);
+        spatial::ObstacleHit hit;
+        CHECK(field.blocker(glm::vec2(0.5f, 0.0f), walker, hit));
+        CHECK(field.segmentBlocked(glm::vec2(-6.0f, 0.0f), glm::vec2(6.0f, 0.0f), walker));
+        CHECK(field.traversalAt(glm::vec2(0.5f, 0.0f), walker, hit) ==
+              spatial::Traversal::Blocking);
+
+        // The counter-arm, so the one above is not passing because nothing can ever pass: a body
+        // that *can* clear a metre walks the same line.
+        spatial::ObstacleFilter deer = walker;
+        deer.jumpOver = 1.2f;
+        CHECK_FALSE(field.blocker(glm::vec2(0.5f, 0.0f), deer, hit));
+        CHECK_FALSE(field.segmentBlocked(glm::vec2(-6.0f, 0.0f), glm::vec2(6.0f, 0.0f), deer));
+        CHECK(field.traversalAt(glm::vec2(0.5f, 0.0f), deer, hit) == spatial::Traversal::Jumpable);
+        CHECK(hit.index == 0);
+
+        // And a jump is an ability, not a licence: a solid taller than the body can clear is a
+        // wall to it too.
+        spatial::ObstacleField wall;
+        spatial::NavigationObstacle tall = solid(0.0f, 0.0f, 1.0f, 2.5f);
+        tall.traversal = spatial::Traversal::Jumpable;
+        wall.add(tall);
+        wall.build();
+        CHECK(wall.blocker(glm::vec2(0.5f, 0.0f), deer, hit));
+    }
+
+    SECTION("traversalAt answers with the hardest thing in the way") {
+        spatial::ObstacleField field;
+        spatial::NavigationObstacle kerb = solid(0.0f, 0.0f, 1.0f, 0.2f);
+        kerb.traversal = spatial::Traversal::StepOver;
+        field.add(kerb);
+        spatial::NavigationObstacle boulder = solid(6.0f, 0.0f, 1.0f, 1.0f);
+        boulder.traversal = spatial::Traversal::Jumpable;
+        field.add(boulder);
+        spatial::NavigationObstacle trunk = solid(6.0f, 1.0f, 1.0f, 9.0f, spatial::ObstacleType::Trunk);
+        field.add(trunk);
+        field.build();
+
+        spatial::ObstacleFilter deer;
+        deer.bodyRadius = 0.45f;
+        deer.stepOver = 0.4f;
+        deer.jumpOver = 1.2f;
+        spatial::ObstacleHit hit;
+        CHECK(field.traversalAt(glm::vec2(0.0f, 0.0f), deer, hit) == spatial::Traversal::StepOver);
+        CHECK(hit.index == 0);
+        // Standing where the boulder and the trunk both reach: the trunk is the answer, because
+        // the question is what it takes to get past, and the hardest thing decides.
+        CHECK(field.traversalAt(glm::vec2(6.0f, 0.5f), deer, hit) == spatial::Traversal::Blocking);
+        CHECK(hit.index == 2);
+        CHECK(field.traversalAt(glm::vec2(60.0f, 60.0f), deer, hit) == spatial::Traversal::Passable);
+    }
+
+    SECTION("the class a solid is born with does not promise anything to a body") {
+        // A nominal step-over is still a wall to something whose own step is lower, which is why
+        // the class lives on the obstacle and the ability lives on the filter.
+        spatial::ObstacleField field;
+        spatial::NavigationObstacle kerb = solid(0.0f, 0.0f, 1.0f, 0.35f);
+        kerb.traversal = spatial::Traversal::StepOver;
+        field.add(kerb);
+        field.build();
+        spatial::ObstacleFilter cart;
+        cart.bodyRadius = 0.6f;
+        cart.stepOver = 0.05f; // a wheel
+        spatial::ObstacleHit hit;
+        CHECK(field.blocker(glm::vec2(0.0f), cart, hit));
+    }
+
+    SECTION("the traversal class is part of what makes two worlds the same world") {
+        spatial::ObstacleField a;
+        a.add(solid(3.0f, 4.0f, 1.0f, 1.0f));
+        spatial::ObstacleField b;
+        spatial::NavigationObstacle jumpable = solid(3.0f, 4.0f, 1.0f, 1.0f);
+        jumpable.traversal = spatial::Traversal::Jumpable;
+        b.add(jumpable);
+        CHECK(a.contentHash() != b.contentHash());
+    }
+}
+
+// ---- a layer that says what it is ----------------------------------------------------------------
+
+TEST_CASE("a scatter layer can overrule the filename heuristic", "[navigation][obstacles][traversal]") {
+    // ADR-194. `classifyScatterLayer` is keywords over an asset path, and it is wrong in ways an
+    // author can see and, until now, could not fix.
+    spatial::PointCloud cloud;
+    cloud.resize(3);
+    for (std::size_t i = 0; i < 3; ++i) {
+        cloud.positions()[i] = glm::vec3(static_cast<float>(i) * 12.0f, 0.0f, 0.0f);
+        cloud.scales()[i] = glm::vec3(1.0f);
+    }
+
+    SECTION("a layer marked passable contributes nothing however tall it is") {
+        world::ScatterLayer grove;
+        grove.name = "canopy";              // every heuristic in the file says trunk
+        grove.asset = "CommonTree_1.gltf";
+        grove.height = 14.0f;               // and it is four times the blocking threshold
+        grove.minScale = 1.0f;
+        grove.maxScale = 1.0f;
+        spatial::ObstacleField out;
+        REQUIRE(entity::obstaclesFromScatter(grove, cloud, 0.36f, 7.0f, {}, out) == 3);
+        out.clear();
+        grove.navigation = world::ScatterNavigation::Passable;
+        CHECK(entity::obstaclesFromScatter(grove, cloud, 0.36f, 7.0f, {}, out) == 0);
+        CHECK(out.empty());
+    }
+
+    SECTION("a layer marked blocks contributes below the height threshold its class would impose") {
+        // A 1.2 m plant: vegetation by every keyword, and `vegetationMinHeight` is 4 m, so the
+        // whole layer is rejected by one comparison. The author says otherwise.
+        world::ScatterLayer thicket;
+        thicket.name = "thicket";
+        thicket.asset = "Plant_7.gltf";
+        thicket.height = 1.2f;
+        thicket.minScale = 1.0f;
+        thicket.maxScale = 1.0f;
+        spatial::ObstacleField control;
+        REQUIRE(entity::obstaclesFromScatter(thicket, cloud, 0.4f, 1.0f, {}, control) == 0);
+
+        thicket.navigation = world::ScatterNavigation::Blocks;
+        spatial::ObstacleField out;
+        REQUIRE(entity::obstaclesFromScatter(thicket, cloud, 0.4f, 1.0f, {}, out) == 3);
+        // Declared solid means `Blocking`, not "jumpable because it happens to be 1.2 m": the
+        // author overruled the heuristic once and it does not get a second say.
+        CHECK(out.obstacles()[0].traversal == spatial::Traversal::Blocking);
+        CHECK(out.obstacles()[0].type == spatial::ObstacleType::Vegetation); // identity is untouched
+        out.build();
+        spatial::ObstacleFilter walker;
+        spatial::ObstacleHit hit;
+        CHECK(out.blocker(glm::vec2(12.0f, 0.0f), walker, hit));
+    }
+
+    SECTION("auto is the heuristic, and it classes by height as it always did") {
+        world::ScatterLayer boulders;
+        boulders.name = "boulders";
+        boulders.asset = "Rock_Medium_1.gltf";
+        boulders.height = 1.0f;   // over rockMinHeight (0.9), under jumpOverHeight (1.2)
+        boulders.minScale = 1.0f;
+        boulders.maxScale = 1.0f;
+        spatial::ObstacleField out;
+        REQUIRE(entity::obstaclesFromScatter(boulders, cloud, 0.45f, 1.0f, {}, out) == 3);
+        CHECK(out.obstacles()[0].type == spatial::ObstacleType::Rock);
+        CHECK(out.obstacles()[0].traversal == spatial::Traversal::Jumpable);
+
+        world::ScatterLayer cliffs = boulders;
+        cliffs.height = 6.0f;
+        spatial::ObstacleField tall;
+        REQUIRE(entity::obstaclesFromScatter(cliffs, cloud, 0.45f, 1.0f, {}, tall) == 3);
+        CHECK(tall.obstacles()[0].traversal == spatial::Traversal::Blocking);
+    }
+
+    SECTION("a hero is blocking whatever its proportions") {
+        std::vector<world::HeroPoint> heroes(1);
+        heroes[0].name = "marker";
+        heroes[0].position = glm::vec3(0.0f);
+        heroes[0].radius = 2.0f;
+        heroes[0].height = 0.9f; // inside the vault band, and not a thing anybody vaults
+        spatial::ObstacleField out;
+        REQUIRE(entity::obstaclesFromHeroes(heroes, out) == 1);
+        CHECK(out.obstacles()[0].traversal == spatial::Traversal::Blocking);
     }
 }
 

@@ -44,6 +44,16 @@ void hashFloat(std::uint64_t& h, float v) {
 
 } // namespace
 
+const char* traversalName(Traversal traversal) {
+    switch (traversal) {
+    case Traversal::Passable: return "passable";
+    case Traversal::StepOver: return "step-over";
+    case Traversal::Jumpable: return "jumpable";
+    case Traversal::Blocking: return "blocking";
+    }
+    return "unknown";
+}
+
 const char* obstacleTypeName(ObstacleType type) {
     switch (type) {
     case ObstacleType::Vegetation: return "vegetation";
@@ -72,7 +82,7 @@ void ObstacleField::reserve(std::size_t count) { obstacles_.reserve(count); }
 
 void ObstacleField::add(const NavigationObstacle& obstacle) {
     obstacles_.push_back(obstacle);
-    if (obstacle.blocking) {
+    if (obstacle.blocking()) {
         ++blocking_;
     }
     maxRadius_ = std::max(maxRadius_, obstacle.radius);
@@ -149,24 +159,45 @@ glm::ivec2 ObstacleField::cellOf(glm::vec2 p) const {
 
 namespace {
 
+// The one ladder. `traversalFor` and `relevant` are both this function, which is why it takes the
+// class as an argument rather than reading it off the obstacle: `relevant` has to be able to ask
+// "and what would this take if it *were* solid", which is what `includeNonBlocking` means.
+Traversal traversalOf(Traversal cls, float base, float height, const ObstacleFilter& filter) {
+    const float top = base + height;
+    if (top < filter.footY + filter.stepOver) {
+        return Traversal::StepOver; // short enough to step over, whatever it is
+    }
+    if (filter.headHeight > 0.0f && base > filter.footY + filter.headHeight) {
+        return Traversal::Passable; // its foot is above the body's head: it ducks under
+    }
+    if (cls == Traversal::Jumpable && height <= filter.jumpOver) {
+        return Traversal::Jumpable; // this body can clear one this tall
+    }
+    if (cls == Traversal::Passable) {
+        return Traversal::Passable;
+    }
+    return Traversal::Blocking;
+}
+
 // Whether this obstacle is in the way of a walker described by `filter`. Separated out because
 // every query below asks exactly this question and getting it subtly different in one of them is
 // how "it avoids trees except when pathfinding" happens.
 bool relevant(const NavigationObstacle& o, const ObstacleFilter& filter) {
-    if (!o.blocking && !filter.includeNonBlocking) {
+    if (!o.blocking() && !filter.includeNonBlocking) {
         return false;
     }
-    const float top = o.base + o.height;
-    if (top < filter.footY + filter.stepOver) {
-        return false; // short enough to step over
-    }
-    if (filter.headHeight > 0.0f && o.base > filter.footY + filter.headHeight) {
-        return false; // its foot is above the walker's head: it ducks under
-    }
-    return true;
+    // A caller that asked for the non-solids wants the ones that are actually in its way, so they
+    // are put through the ladder as though they were solid. Their own class already answered "no"
+    // once; asking it twice would make `includeNonBlocking` return nothing.
+    const Traversal cls = o.blocking() ? o.traversal : Traversal::Blocking;
+    return traversalOf(cls, o.base, o.height, filter) == Traversal::Blocking;
 }
 
 } // namespace
+
+Traversal traversalFor(const NavigationObstacle& o, const ObstacleFilter& filter) {
+    return traversalOf(o.traversal, o.base, o.height, filter);
+}
 
 bool ObstacleField::isOccupied(float x, float z, float radius) const {
     const glm::vec2 p(x, z);
@@ -177,7 +208,7 @@ bool ObstacleField::isOccupied(float x, float z, float radius) const {
             return;
         }
         const NavigationObstacle& o = obstacles_[i];
-        if (!o.blocking) {
+        if (!o.blocking()) {
             return;
         }
         const glm::vec2 d = o.center - p;
@@ -215,6 +246,38 @@ bool ObstacleField::blocker(glm::vec2 p, const ObstacleFilter& filter, ObstacleH
         }
     });
     return found;
+}
+
+Traversal ObstacleField::traversalAt(glm::vec2 p, const ObstacleFilter& filter,
+                                     ObstacleHit& out) const {
+    const float pad = filter.bodyRadius + maxRadius_;
+    Traversal worst = Traversal::Passable;
+    float deepest = 0.0f;
+    out.index = static_cast<std::uint32_t>(obstacles_.size());
+    out.penetration = 0.0f;
+    forEachNear(p - pad, p + pad, [&](std::uint32_t i) {
+        const NavigationObstacle& o = obstacles_[i];
+        const float reach = o.radius + filter.bodyRadius;
+        const glm::vec2 d = o.center - p;
+        const float distSq = glm::dot(d, d);
+        if (distSq >= reach * reach) {
+            return;
+        }
+        const Traversal t = traversalFor(o, filter);
+        if (t == Traversal::Passable) {
+            return; // nothing to do about it, so it is not the answer
+        }
+        const float penetration = reach - std::sqrt(distSq);
+        // Harder wins; within a class the deeper overlap wins; strictly greater, so a tie goes to
+        // the lowest index and never to the order the grid visited the cells in.
+        if (t > worst || (t == worst && penetration > deepest)) {
+            worst = t;
+            deepest = penetration;
+            out.index = i;
+            out.penetration = penetration;
+        }
+    });
+    return worst;
 }
 
 float ObstacleField::clearance(glm::vec2 p, const ObstacleFilter& filter, float maxRange) const {
@@ -305,7 +368,7 @@ void ObstacleField::query(glm::vec2 p, float radius, std::vector<std::uint32_t>&
     const float pad = std::max(radius, 0.0f) + maxRadius_;
     forEachNear(p - pad, p + pad, [&](std::uint32_t i) {
         const NavigationObstacle& o = obstacles_[i];
-        if (!o.blocking && !includeNonBlocking) {
+        if (!o.blocking() && !includeNonBlocking) {
             return;
         }
         const glm::vec2 d = o.center - p;
@@ -329,7 +392,11 @@ std::uint64_t ObstacleField::contentHash() const {
         hashFloat(h, o.base);
         hashFloat(h, o.height);
         h = (h ^ static_cast<std::uint8_t>(o.type)) * 0x100000001b3ULL;
-        h = (h ^ static_cast<std::uint8_t>(o.blocking ? 1u : 0u)) * 0x100000001b3ULL;
+        // The traversal class, not merely whether it is solid: two worlds that agree on every
+        // cylinder and disagree on which of them can be vaulted answer a jumper's queries
+        // differently, and a hash that said they were the same world would be wrong for the one
+        // caller -- a cache -- that this exists for.
+        h = (h ^ static_cast<std::uint8_t>(o.traversal)) * 0x100000001b3ULL;
     }
     return h;
 }

@@ -46,6 +46,28 @@ enum class ObstacleType : std::uint8_t {
 };
 [[nodiscard]] const char* obstacleTypeName(ObstacleType type);
 
+// What getting past a solid takes, decided by the solid rather than by whoever is looking at it.
+//
+// `ObstacleType` above is *identity* and stays that way -- it is what lets a diagnostic say "a
+// rock". This is *policy about the thing*: a 0.3 m rock is stepped over and a 3 m rock is walked
+// round, and that is true of the rock however it is being asked. What is deliberately **not**
+// decided here is what a particular body can do about the class -- a walker with no jump clears
+// nothing, a deer clears a metre -- because that is a property of the body and it lives in
+// `ObstacleFilter`.
+//
+// The split is the whole point of the class existing. Before it, the only thing resembling
+// traversal was `ObstacleFilter::stepOver`, a float on the *query*: the field could say how tall a
+// solid was and nothing at all about what kind of effort it took, so every obstacle a body could
+// not step over was the same obstacle. One field now serves a walker and a jumper because the
+// obstacle carries half the answer and the filter carries the other half.
+enum class Traversal : std::uint8_t {
+    Passable, // never in the way: recorded because it is navigation-relevant, not because it blocks
+    StepOver, // low enough that a body of ordinary proportions steps onto or over it
+    Jumpable, // clearable by a body that can jump, and a wall to one that cannot
+    Blocking, // go round
+};
+[[nodiscard]] const char* traversalName(Traversal traversal);
+
 // One solid. Positions are world space; `center` is XZ and `base` the world y of its foot, so an
 // obstacle on a hillside is at the height of the hillside rather than at zero.
 struct NavigationObstacle {
@@ -54,10 +76,17 @@ struct NavigationObstacle {
     float base = 0.0f;    // world y of the foot
     float height = 1.0f;  // metres of solid above `base`
     ObstacleType type = ObstacleType::Custom;
-    // False for things recorded because they are navigation-relevant but not in the way: a glowing
-    // plant a character walks to and through. A non-blocking obstacle is invisible to every query
-    // unless the filter asks for it.
-    bool blocking = true;
+    // What it takes to get past this one. `Passable` is the old `blocking = false`: something
+    // recorded because it is navigation-relevant and not because it is in the way -- a glowing
+    // plant a character walks to and through -- and it is invisible to every query unless the
+    // filter asks for it. `Blocking` is the default because a solid nobody classified is a solid,
+    // which is the safe end of the mistake.
+    Traversal traversal = Traversal::Blocking;
+
+    // Whether this is a solid at all, which is the only thing the plan-view queries can ask: they
+    // take a radius and nothing else, so they cannot know a body's legs. Kept as a name rather
+    // than open-coding the comparison in five places.
+    [[nodiscard]] bool blocking() const { return traversal != Traversal::Passable; }
 };
 
 // What a particular walker counts as in its way. The field stores facts; the filter is policy, and
@@ -70,8 +99,25 @@ struct ObstacleFilter {
     // at 0 to ignore the vertical extent entirely, which is what a plan-view query wants.
     float footY = 0.0f;
     float headHeight = 0.0f;
+    // Metres of solid this body can clear by jumping or vaulting. Only `Traversal::Jumpable`
+    // solids are eligible, and only up to this height.
+    //
+    // **0 -- the default -- is a body that cannot jump**, and it is what makes this addition inert
+    // for everything that existed before it: `height <= 0` is false for every real obstacle, so a
+    // walker sees a jumpable solid exactly as it saw it when there was no such class.
+    float jumpOver = 0.0f;
     bool includeNonBlocking = false;
 };
+
+// What `filter`'s body must do about `o`. `Passable` means nothing at all: it is not in the way.
+//
+// The order of the tests is the physical one, and it is deliberate. A thing low enough to stand on
+// is stepped on whatever it is made of, and a thing whose foot is above a body's head is ducked
+// under whatever it is made of; the obstacle's own class only gets a say after those, and only to
+// decide whether a jump is an option. That is why a nominal `StepOver` still blocks a body whose
+// own step is lower than the thing is tall -- the class is what the solid is, not a promise to
+// every body that asks.
+[[nodiscard]] Traversal traversalFor(const NavigationObstacle& o, const ObstacleFilter& filter);
 
 // One obstacle in the way, and how far in.
 struct ObstacleHit {
@@ -110,6 +156,16 @@ public:
     // The same test under a walker's own policy. Returns the deepest overlap, or an index past the
     // end when nothing is in the way.
     [[nodiscard]] bool blocker(glm::vec2 p, const ObstacleFilter& filter, ObstacleHit& out) const;
+
+    // "What can this body get past here", answered with what it would have to *do* rather than
+    // with a boolean. The hardest thing the disc at `p` overlaps: `Blocking` if anything must be
+    // walked round, else `Jumpable` if anything must be vaulted, else `StepOver` if anything must
+    // be stepped on, else `Passable` -- which is also the answer when the disc overlaps nothing.
+    //
+    // `out` describes whichever obstacle produced the answer, so a caller told `Jumpable` knows
+    // what it is jumping. Ties within a class go to the deepest overlap and then to the lowest
+    // index, the same rule `blocker` uses, so the grid never decides the answer.
+    Traversal traversalAt(glm::vec2 p, const ObstacleFilter& filter, ObstacleHit& out) const;
 
     // Metres of open ground between the walker's rim and the nearest blocking solid, clamped to
     // `maxRange`. Negative when the walker is already inside one. This is what steering wants: a

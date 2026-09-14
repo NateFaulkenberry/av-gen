@@ -123,6 +123,23 @@ spatial::ObstacleType classifyScatterLayer(const world::ScatterLayer& layer) {
     return spatial::ObstacleType::Vegetation;
 }
 
+spatial::Traversal traversalClass(spatial::ObstacleType type, float height,
+                                  const ObstaclePolicy& policy) {
+    // A creature is the one identity that changes the answer. Everything else is decided by how
+    // tall the solid is, because that is what getting past it actually depends on -- a
+    // one-metre stump and a one-metre boulder take the same vault.
+    if (type == spatial::ObstacleType::Creature) {
+        return spatial::Traversal::Blocking;
+    }
+    if (height <= policy.stepOverHeight) {
+        return spatial::Traversal::StepOver;
+    }
+    if (height <= policy.jumpOverHeight) {
+        return spatial::Traversal::Jumpable;
+    }
+    return spatial::Traversal::Blocking;
+}
+
 float instanceHeight(const world::ScatterLayer& layer, float instanceScale, float assetHeight) {
     // `layer.height` is what the world wants the thing to be; the asset's own height is what it is.
     // The composition normalises the mesh by the ratio, so the world height of an instance is the
@@ -174,12 +191,19 @@ std::size_t obstaclesFromScatter(const world::ScatterLayer& layer, const spatial
     if (count == 0) {
         return 0;
     }
+    // The author's word, where there is one (ADR-194). A layer declared `passable` is scenery
+    // whatever it is called and however tall it grew, and saying so costs the same one comparison
+    // the height early-out costs.
+    if (layer.navigation == world::ScatterNavigation::Passable) {
+        return 0;
+    }
+    const bool declaredSolid = layer.navigation == world::ScatterNavigation::Blocks;
     const spatial::ObstacleType type = classifyScatterLayer(layer);
     // Cheapest possible rejection of the layers that produce nothing: 120,000 grass instances must
     // not cost 120,000 iterations to decide they are grass. The tallest instance a layer can grow
     // is its authored height at its largest scale, so one comparison settles the whole layer.
     const float tallest = instanceHeight(layer, std::max(layer.maxScale, layer.minScale), assetHeight);
-    if (!blocksAt(type, tallest, policy)) {
+    if (!declaredSolid && !blocksAt(type, tallest, policy)) {
         return 0;
     }
     const std::span<const glm::vec3> positions = cloud.positions();
@@ -193,7 +217,7 @@ std::size_t obstaclesFromScatter(const world::ScatterLayer& layer, const spatial
         const float scaleY = i < scales.size() ? scales[i].y : 1.0f;
         const float scaleXZ = i < scales.size() ? scales[i].x : 1.0f;
         const float height = instanceHeight(layer, scaleY, assetHeight);
-        if (!blocksAt(type, height, policy)) {
+        if (!declaredSolid && !blocksAt(type, height, policy)) {
             continue; // this specimen is small enough to walk through even though its species is not
         }
         spatial::NavigationObstacle o;
@@ -205,7 +229,11 @@ std::size_t obstaclesFromScatter(const world::ScatterLayer& layer, const spatial
         o.base = p.y + layer.sink;
         o.height = height;
         o.type = type;
-        o.blocking = true;
+        // A declared solid is `Blocking` and nothing derives its way out of that: the author has
+        // said the thing is in the way, and the heuristic that classified it has already been
+        // overruled once. Everything else is classed by what it is and how tall it grew.
+        o.traversal = declaredSolid ? spatial::Traversal::Blocking
+                                    : traversalClass(type, height, policy);
         out.add(o);
         ++added;
     }
@@ -227,7 +255,9 @@ std::size_t obstaclesFromHeroes(std::span<const world::HeroPoint> heroes, spatia
         o.base = hero.position.y;
         o.height = hero.height;
         o.type = spatial::ObstacleType::Structure;
-        o.blocking = true;
+        // A hero is a monument, an elder tree or an arch, and none of them is vaulted. Blocking
+        // outright rather than through `traversalClass`, which would call a half-metre hero a kerb.
+        o.traversal = spatial::Traversal::Blocking;
         out.add(o);
         ++added;
     }
