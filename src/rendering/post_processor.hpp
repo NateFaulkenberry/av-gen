@@ -29,6 +29,8 @@
 #include <webgpu/webgpu_cpp.h>
 
 #include <cstdint>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace avgen::gpu {
@@ -66,9 +68,33 @@ struct PostStats {
     double postMs = -1.0;            // GPU time of the whole chain (the "post/" prefix on the timeline)
     std::uint32_t bloomLevels = 0;
     std::uint32_t halationLevels = 0;
+    std::uint32_t anamorphicTaps = 0; // taps a side the streak spent; 0 when it did not run
     float exposureScale = 1.0f;      // the linear scale applied before bloom
     float exposureEv100 = 0.0f;      // the EV in force (scene-referred; see scene/camera.hpp)
     float meteredLuminance = -1.0f;  // the previous frame's centre-weighted luminance (-1 = none)
+};
+
+// ---- diagnostic capture (docs/post-artifact-forensics.md) --------------------------------------
+//
+// A post chain can only be judged on its final frame, which is how three plausible fixes for the
+// water artifact were shipped without anyone knowing which stage produced it. Arming a capture
+// makes run() keep a handle on every intermediate it renders, so the question "which target does
+// the pattern first exist in" is a readback rather than an opinion.
+//
+// Arming changes exactly one thing about what the chain does: the pyramid and wide textures are
+// allocated with CopySrc, which they otherwise lack and which nothing samples. Every pass, every
+// uniform and every resolution is the production one.
+//
+// The handles alias transient-pool entries, which the pool reclaims at the end of the frame. Read
+// them back before rendering anything else.
+struct PostCaptureStage {
+    std::string name;
+    gpu::TransientTexture texture;
+};
+
+struct PostCapture {
+    std::vector<PostCaptureStage> stages;
+    [[nodiscard]] const gpu::TransientTexture* find(std::string_view name) const;
 };
 
 class PostProcessor {
@@ -82,6 +108,13 @@ public:
     // The texture behind the view run() returned this frame; null when the input passed through.
     [[nodiscard]] const wgpu::Texture& outputTexture() const { return output_; }
     [[nodiscard]] const PostStats& stats() const { return stats_; }
+
+    // Diagnostic capture, off unless a caller arms it (see PostCapture above). `armCapture` clears
+    // anything held from a previous frame; `takeCapture` hands over what the last run() recorded
+    // and disarms, so a capture is never silently left running.
+    void armCapture();
+    [[nodiscard]] PostCapture takeCapture();
+    [[nodiscard]] bool capturing() const { return capturing_; }
 
     // Auto-exposure state (ADR-037). It is part of render state: reset it when a render job seeks
     // or a scene is swapped so an offline render reproduces a live one exactly.
@@ -148,8 +181,15 @@ private:
     void encodeMetering(wgpu::CommandEncoder& encoder, const PostFrameInputs& in, gpu::TransientPool& pool,
                         const Uniforms& base);
     // Downsample/upsample pyramid over an already-prefiltered base; returns its finest level.
+    // `tier` names the pyramid for a diagnostic capture ("bloom" / "halation") and is unused
+    // otherwise.
     wgpu::TextureView buildPyramid(wgpu::CommandEncoder& encoder, gpu::TransientPool& pool, const Uniforms& base,
-                                   std::vector<gpu::TransientTexture>& down, float spread, float blend);
+                                   std::vector<gpu::TransientTexture>& down, float spread, float blend,
+                                   const char* tier);
+    // Records one intermediate when a capture is armed; a no-op otherwise.
+    void captureStage(std::string name, const gpu::TransientTexture& texture);
+    // The usage the pyramid and wide textures are allocated with: CopySrc only while capturing.
+    [[nodiscard]] wgpu::TextureUsage pyramidUsage() const;
 
     gpu::Context& context_;
     gpu::ShaderLibrary& shaders_;
@@ -190,6 +230,8 @@ private:
     scene::ExposureState exposureState_;
     PostStats stats_;
     wgpu::Texture output_;
+    bool capturing_ = false;
+    PostCapture capture_;
 };
 
 } // namespace avgen::rendering
