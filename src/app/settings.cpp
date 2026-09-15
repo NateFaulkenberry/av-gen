@@ -30,66 +30,12 @@ bool appearanceThemeFromName(const std::string& name, AppearanceTheme& out) {
     return false;
 }
 
-namespace {
-
-// The Auto-director's controls, by the names the `--director` flag already uses for the same
-// fields. One spelling for a setting whether it arrives from a command line or a preferences file
-// is worth more than a prettier key.
-json directorToJson(const AutoDirectorSettings& s) {
-    return json{{"mode", directorModeName(s.mode)},
-                {"minShot", s.minShotSeconds},
-                {"minBuildShot", s.minBuildShotSeconds},
-                {"maxShot", s.maxShotSeconds},
-                {"wide", s.wideFocalLength},
-                {"hero", s.heroFocalLength},
-                {"maxSpeed", s.maxCameraSpeed},
-                {"maxSwing", s.maxViewRate},
-                {"dwell", s.dwellShots},
-                {"seed", s.seed}};
-}
-
-// Refused rather than silently reset, the way the AI section is. This file is machine-written, so
-// the only way to a value outside `validate()`'s range is somebody editing it by hand -- and being
-// told which field is wrong beats launching with defaults and wondering where the settings went.
-Result<AutoDirectorSettings> directorFromJson(const json& doc) {
-    if (!doc.is_object()) {
-        return fail("director settings must be a JSON object");
-    }
-    AutoDirectorSettings out;
-    if (const auto mode = doc.find("mode"); mode != doc.end()) {
-        if (!mode->is_string()) {
-            return fail("director.mode must be a string");
-        }
-        const auto parsed = directorModeFromName(mode->get<std::string>());
-        if (!parsed) {
-            return fail("director.mode '{}' is not a shot mode", mode->get<std::string>());
-        }
-        out.mode = *parsed;
-    }
-    out.minShotSeconds = doc.value("minShot", out.minShotSeconds);
-    out.minBuildShotSeconds = doc.value("minBuildShot", out.minBuildShotSeconds);
-    out.maxShotSeconds = doc.value("maxShot", out.maxShotSeconds);
-    out.wideFocalLength = doc.value("wide", out.wideFocalLength);
-    out.heroFocalLength = doc.value("hero", out.heroFocalLength);
-    out.maxCameraSpeed = doc.value("maxSpeed", out.maxCameraSpeed);
-    out.maxViewRate = doc.value("maxSwing", out.maxViewRate);
-    out.dwellShots = doc.value("dwell", out.dwellShots);
-    out.seed = doc.value("seed", out.seed);
-    if (auto ok = out.validate(); !ok) {
-        return std::unexpected(ok.error());
-    }
-    return out;
-}
-
-} // namespace
-
 json AppSettings::toJson() const {
     json doc;
     doc["format"] = kFormatName;
     doc["version"] = kFormatVersion;
     doc["general"] = json{{"canvasRenderScale", canvasRenderScale}, {"appearance", appearanceThemeName(appearance)}};
     doc["ai"] = ai.toJson();
-    doc["director"] = directorToJson(director);
     return doc;
 }
 
@@ -123,18 +69,6 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
             return std::unexpected(parsed.error());
         }
         out.ai = std::move(*parsed);
-    }
-    // No version bump for this section, deliberately. `version` guards the *format*, and a build
-    // that predates this key ignores it and rewrites the file without it -- which loses the
-    // director settings and nothing else. Writing version 2 would instead make that build refuse
-    // the whole document and lose the provider configuration too, which is a worse trade for a
-    // section that is additive in both directions.
-    if (const auto d = doc.find("director"); d != doc.end()) {
-        auto parsed = directorFromJson(*d);
-        if (!parsed) {
-            return std::unexpected(parsed.error());
-        }
-        out.director = *parsed;
     }
     return out;
 }

@@ -24,6 +24,8 @@
 #include "signals/musical_events.hpp"
 #include "world/hero.hpp"
 
+#include <nlohmann/json_fwd.hpp>
+
 #include <span>
 #include <vector>
 
@@ -96,6 +98,12 @@ struct AutoDirectorSettings {
 
     [[nodiscard]] Result<void> validate() const;
     void applyTo(DirectionBrief& brief) const;
+
+    // ADR-225: the project's `autoDirector` block (`director` is the World Director's, ADR-088). Keyed by the names `--director` already uses for the
+    // same fields, so one setting has one spelling whether it arrives from a command line or a
+    // file. `fromJson` refuses a document `validate()` would refuse rather than clamping into one.
+    [[nodiscard]] nlohmann::json toJson() const;
+    [[nodiscard]] static Result<AutoDirectorSettings> fromJson(const nlohmann::json& doc);
 
     // So a host can tell "the user moved something" from "nothing happened" without a memcmp over
     // a struct with padding in it, which is what the panel used to do.

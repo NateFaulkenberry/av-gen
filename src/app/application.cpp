@@ -419,17 +419,6 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
 
 Application::Application() = default;
 Application::~Application() {
-    // A change still inside its settle window is a change: quitting straight after moving a slider
-    // must not be the one path that loses it. Before anything is torn down, because `saveSettings`
-    // reads the panel and the control plane.
-    if (directorDirty_ && cameraDirection_.settings.validate()) {
-        settings_.director = cameraDirection_.settings;
-        if (settings_.director != savedDirector_ && options_.directorSettings.empty()) {
-            savedDirector_ = settings_.director;
-            saveSettings();
-        }
-        directorDirty_ = false;
-    }
     // Destruction order matters: UI before GPU context, renderer before context, window last.
     // The control plane goes first of all: it cancels the running task and waits for it, and both
     // the panel (a raw pointer) and the engine (a reference) outlive it only if it goes now.
@@ -451,10 +440,6 @@ void Application::initControlPlane() {
     } else {
         settings_ = std::move(*loaded);
     }
-    // The panel edits `cameraDirection_.settings` in place, so this is where a saved preference
-    // becomes the thing the first cut reads.
-    cameraDirection_.settings = settings_.director;
-    savedDirector_ = settings_.director;
     ai_ = std::make_unique<ai::ControlPlane>(*engine_, jobs_.get());
     // ADR-101: an assistant's edit lands in the same history as a person's, so Cmd+Z takes back
     // "the last thing that happened" rather than "the last thing *I* did". The snapshot sink stays
@@ -538,38 +523,25 @@ int Application::runAiTask() {
     return 0;
 }
 
-void Application::persistDirectorSettings() {
-    // `--director` exists to make a measurement reproducible (see `applyDirectorArgs`), and a flag
-    // that quietly rewrote the user's preferences would make the next *unflagged* run a different
-    // measurement. A session that carries it reads the file and never writes it.
-    if (settingsPath_.empty() || !options_.directorSettings.empty()) {
+void Application::syncDirectorSettings() {
+    if (engine_ == nullptr) {
         return;
     }
-    const auto now = std::chrono::steady_clock::now();
-    if (cameraDirection_.settings != settings_.director) {
-        // Still moving. Take the value and restart the settle rather than writing: a slider drag
-        // reports a change on every frame of the drag, and `save` renames a file each time.
-        settings_.director = cameraDirection_.settings;
-        directorChangedAt_ = now;
-        directorDirty_ = true;
+    AutoDirectorSettings& saved = engine_->autoDirector();
+    // The engine's copy moved without the panel touching it, which means a project was loaded.
+    // Checked first, because a load that lands on the same frame as a slider drag is the load
+    // winning: the file is what the author saved and the drag is on a shot that no longer exists.
+    if (saved != lastDirectorSync_) {
+        cameraDirection_.settings = saved;
+        lastDirectorSync_ = saved;
         return;
     }
-    if (!directorDirty_ || now - directorChangedAt_ < std::chrono::milliseconds(400)) {
-        return;
+    // Otherwise the panel moved it, and the project's copy follows. In memory, not to a file: a
+    // project is written when somebody asks for it, so there is nothing here to debounce.
+    if (cameraDirection_.settings != lastDirectorSync_) {
+        saved = cameraDirection_.settings;
+        lastDirectorSync_ = cameraDirection_.settings;
     }
-    directorDirty_ = false;
-    // Refused rather than written. The panel lets a value sit in an invalid combination while it
-    // says so -- a wide lens longer than the hero lens, on the way to a valid pair -- and a
-    // settings file carrying one is refused wholesale on the next launch, taking the provider
-    // configuration with it. An invalid intermediate is not a preference.
-    if (!cameraDirection_.settings.validate()) {
-        return;
-    }
-    if (settings_.director == savedDirector_) {
-        return;
-    }
-    savedDirector_ = settings_.director;
-    saveSettings();
 }
 
 void Application::saveSettings() {
@@ -1342,7 +1314,13 @@ void Application::applyOutputsFromProject() {
     }
 }
 
-void Application::storeOutputsToProject() { engine_->setOutputsJson(outputs_.toJson()); }
+void Application::storeOutputsToProject() {
+    engine_->setOutputsJson(outputs_.toJson());
+    // The last thing before a save, so a headless run that never reaches the frame loop's
+    // `syncDirectorSettings` -- `--direct --director=... --save-project` -- still records the
+    // direction it was given rather than the defaults it never used.
+    syncDirectorSettings();
+}
 
 void Application::startRenderFromUi() {
     if (job_) {
@@ -2584,9 +2562,9 @@ int Application::runLive() {
             }
         }
 
-        // The panel edited these in place during the last frame's UI; write them out once they
-        // stop moving (ADR-225).
-        persistDirectorSettings();
+        // The panel edited these in place during the last frame's UI; carry them to the copy the
+        // project file is written from, and take a loaded project's copy back (ADR-225).
+        syncDirectorSettings();
 
         // Before the clock, so a shot re-cut this frame is the shot this frame renders.
         if (auto redirected = refreshDirection(*engine_, cameraDirection_); !redirected) {

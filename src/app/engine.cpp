@@ -761,6 +761,18 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
             doc["timeline"] = std::move(timeline);
         }
     }
+    // ADR-225: the Auto-director's controls, beside the cut they produced.
+    //
+    // Written only when the author has moved something, so a project nobody directed keeps the file
+    // it had -- the same rule `cameraAimFollow` and `cameraShotSpans` below follow, and the reason a
+    // round trip on an untouched project is byte-stable.
+    if (!(autoDirector_ == AutoDirectorSettings{})) {
+        // `autoDirector`, not `director`: `director` is already the World Director's knob mappings
+        // (ADR-088), written a few lines below. Two blocks under one key is one block, and the
+        // second one written wins -- which is how this was caught: the load refused a document
+        // whose `director` block was the other subsystem's.
+        doc["autoDirector"] = autoDirector_.toJson();
+    }
     // ADR-158: which hero each directed shot was cut for, beside the tracks it accompanies.
     //
     // A sibling of `timeline` rather than part of the scene, because that is what it belongs to: the
@@ -1194,6 +1206,17 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         }
     } else {
         timeline_.clear();
+    }
+    // ADR-225. Reset when absent rather than inherited, like everything else on this path: a
+    // project written before this block existed, or one nobody directed, opens with the defaults
+    // and no message -- its absence is the ordinary state, not a fault.
+    autoDirector_ = AutoDirectorSettings{};
+    if (const auto director = doc.find("autoDirector"); director != doc.end()) {
+        auto parsed = AutoDirectorSettings::fromJson(*director);
+        if (!parsed) {
+            return std::unexpected(parsed.error());
+        }
+        autoDirector_ = *parsed;
     }
     // ADR-158. Cleared when absent, like the timeline above: a project without a cut must not
     // inherit the last one's, or the camera would chase a hero this scene has never heard of.

@@ -6,6 +6,7 @@
 // runs on a thread) and Offline (fixed-step clock, analysis precomputed and indexed by time).
 
 #include "analysis/analysis_runner.hpp"
+#include "app/camera_director.hpp"
 #include "app/control_hub.hpp"
 #include "app/music_runtime.hpp"
 #include "app/render_settings.hpp"
@@ -308,6 +309,16 @@ public:
     void setShotSpans(std::vector<world::ShotSpan> spans) { shotSpans_ = std::move(spans); }
     [[nodiscard]] std::span<const world::ShotSpan> shotSpans() const { return shotSpans_; }
 
+    // ADR-225: the Auto-director's controls, saved with the project.
+    //
+    // Here rather than in `DirectorState` -- which is a member of the running `Application` and of
+    // nothing that is written anywhere -- because the project file is what `saveProject` writes and
+    // what an offline render loads. `Application` mirrors the panel's live copy into this one, and
+    // takes it back after a load; nothing in the engine reads it, exactly as nothing in the engine
+    // reads `shotSpans_` except to hand it on.
+    [[nodiscard]] AutoDirectorSettings& autoDirector() { return autoDirector_; }
+    [[nodiscard]] const AutoDirectorSettings& autoDirector() const { return autoDirector_; }
+
     [[nodiscard]] params::Timeline& timeline() { return timeline_; }
     [[nodiscard]] const params::Timeline& timeline() const { return timeline_; }
     // The clock the timeline is evaluated against this frame: audio time (render time without
@@ -538,6 +549,7 @@ private:
     std::vector<world::WorldEffect> worldEffects_;
     world::WorldEffectParameters worldEffectParams_;
     std::vector<world::ShotSpan> shotSpans_;
+    AutoDirectorSettings autoDirector_; // ADR-225: saved with the project, read by the host
     std::uint32_t lastWorldEffectCount_ = 0;
     void updateWorldEffects();
     [[nodiscard]] glm::vec3 cameraVelocityOnTimeline() const;
