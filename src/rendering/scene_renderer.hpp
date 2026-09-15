@@ -270,7 +270,7 @@ struct FrameUniforms {
 // the same field in the same place, which is the whole reason it is written as a sum rather than a
 // number.
 static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::kMaxGpuWorldEffects +
-                                       16 + 144 * world::kMaxGpuComets + 224 * world::kMaxGpuAuroras + 48);
+                                       16 + 160 * world::kMaxGpuComets + 224 * world::kMaxGpuAuroras + 48);
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);
@@ -284,8 +284,8 @@ static_assert(offsetof(FrameUniforms, worldEffectCount) == 1152);
 static_assert(offsetof(FrameUniforms, worldEffects) == 1168);
 static_assert(offsetof(FrameUniforms, atmosCount) == 2320);
 static_assert(offsetof(FrameUniforms, comets) == 2336);
-static_assert(offsetof(FrameUniforms, auroras) == 3200);
-static_assert(offsetof(FrameUniforms, skyGround) == 3648);
+static_assert(offsetof(FrameUniforms, auroras) == 3296);
+static_assert(offsetof(FrameUniforms, skyGround) == 3744);
 
 struct ObjectUniforms {
     glm::mat4 model;

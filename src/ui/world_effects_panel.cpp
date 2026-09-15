@@ -5,6 +5,8 @@
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
 #include "ui/help_panel.hpp"
+#include "world/atmospheric_params.hpp"
+#include "world/atmospherics.hpp"
 #include "world/effect_params.hpp"
 #include "world/effects.hpp"
 
@@ -187,12 +189,13 @@ void WorldEffectsPanel::draw(app::Engine& engine) {
         ImGui::TextColored(kWarning, "%s", status_.c_str());
     }
     if (authored.empty()) {
-        ImGui::TextDisabled("No world effects in this scene.");
-        return;
+        // Not a `return`: ADR-230's section lives below, and a scene with an aurora and no
+        // propagation effects is an ordinary scene rather than an empty panel.
+        ImGui::TextDisabled("No propagation effects in this scene.");
     }
     // A cut is what a camera-gated effect activates against, and a scene with none will simply never
     // fire one. Said here rather than left to be discovered as "my effect does nothing".
-    if (engine.shotSpans().empty()) {
+    if (!authored.empty() && engine.shotSpans().empty()) {
         const bool gated = std::any_of(authored.begin(), authored.end(), [](const world::WorldEffect& e) {
             return e.activation == world::Activation::CameraTravel ||
                    e.activation == world::Activation::HeroFocus;
@@ -220,6 +223,7 @@ void WorldEffectsPanel::draw(app::Engine& engine) {
         }
         pendingRemove_ = -1;
     }
+    drawAtmosphericSection(engine);
 }
 
 void WorldEffectsPanel::drawEffect(app::Engine& engine, const world::WorldEffect& authored, std::size_t index) {
@@ -465,6 +469,358 @@ void WorldEffectsPanel::drawAdvanced(app::Engine& engine, const world::WorldEffe
     }
 
     ImGui::TextColored(kMuted, "Every control here is the parameter worldfx/%s/...", authored.name.c_str());
+}
+
+// ---- ADR-230: the Atmospheric section --------------------------------------------------------------
+//
+// The same split the propagation section uses, for the same reason: on/off, preset, the two or three
+// colours, and the handful of numbers somebody reaches for, with everything else behind Advanced.
+// Every slider writes the *base* of an ordinary `atmos/...` parameter, so a keyframe, a cue, a
+// sequencer event and a route all keep working and the Parameters panel shows the same numbers.
+
+namespace {
+
+const char* const kGroundGlowNames[] = {"off", "subtle", "strong"};
+const char* const kSkyAnchorNames[] = {"a fixed world point", "the camera"};
+
+} // namespace
+
+void WorldEffectsPanel::commitAtmospheric(app::Engine& engine, std::size_t index,
+                                          const std::function<void(world::AtmosphericEffect&)>& edit) {
+    const scene::Composition* comp = engine.composition();
+    if (comp == nullptr) {
+        return;
+    }
+    std::vector<world::AtmosphericEffect> effects = comp->atmosphericEffects();
+    if (index >= effects.size()) {
+        return;
+    }
+    // As `commit` above: every slider anybody has moved, carried onto the authored set before the
+    // structural change, because re-registration takes its defaults from these.
+    world::captureAtmosphericParameters(engine.atmosphericParameters(), effects);
+    edit(effects[index]);
+    if (auto ok = engine.setAtmosphericEffects(std::move(effects)); !ok) {
+        status_ = ok.error().message;
+    } else {
+        status_.clear();
+    }
+}
+
+void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
+    const scene::Composition* comp = engine.composition();
+    if (comp == nullptr) {
+        return;
+    }
+    ImGui::Dummy(ImVec2(0.0f, 6.0f));
+    ImGui::SeparatorText("Atmospheric");
+
+    const std::vector<world::AtmosphericEffect>& authored = comp->atmosphericEffects();
+
+    // A unique name, because a name is half of a parameter path and two effects sharing one is two
+    // things writing the same path.
+    const auto unique = [&](std::string base) {
+        std::string name = base;
+        for (int n = 2; std::any_of(authored.begin(), authored.end(),
+                                    [&](const world::AtmosphericEffect& e) { return e.name == name; });
+             ++n) {
+            name = base + " " + std::to_string(n);
+        }
+        return name;
+    };
+    const auto append = [&](world::AtmosphericEffect effect) {
+        std::vector<world::AtmosphericEffect> next = authored;
+        next.push_back(std::move(effect));
+        if (auto ok = engine.setAtmosphericEffects(std::move(next)); !ok) {
+            status_ = ok.error().message;
+        }
+    };
+
+    if (ImGui::Button("Add comet")) {
+        append(world::bioluminescentComet(unique("Bioluminescent Comet")));
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("A celestial object on a great-circle arc across the sky.\n"
+                          "It arrives as an event with an authored window, so it launches once;\n"
+                          "give it a repeat interval to make it a shower.");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Add aurora")) {
+        append(world::glowmereAurora(unique("Aurora")));
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Curtains rising from the horizon, shaped by the audio spectrum.\n"
+                          "Always on and fading up: an aurora is scenery that breathes.");
+    }
+
+    if (authored.empty()) {
+        ImGui::TextDisabled("No atmospheric effects in this scene.");
+        return;
+    }
+
+    pendingAtmosphericRemove_ = -1;
+    for (std::size_t i = 0; i < authored.size(); ++i) {
+        ImGui::PushID(static_cast<int>(10000 + i)); // clear of the propagation list's ids above
+        drawAtmospheric(engine, authored[i], i);
+        ImGui::PopID();
+    }
+    if (pendingAtmosphericRemove_ >= 0 &&
+        static_cast<std::size_t>(pendingAtmosphericRemove_) < authored.size()) {
+        std::vector<world::AtmosphericEffect> next = authored;
+        next.erase(next.begin() + pendingAtmosphericRemove_);
+        if (auto ok = engine.setAtmosphericEffects(std::move(next)); !ok) {
+            status_ = ok.error().message;
+        }
+        pendingAtmosphericRemove_ = -1;
+    }
+}
+
+void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::AtmosphericEffect& authored,
+                                        std::size_t index) {
+    const std::string prefix = world::atmosphericParameterPrefix(authored.name);
+    const bool isComet = authored.kind == world::AtmosphereKind::Comet;
+    const bool open = ImGui::CollapsingHeader(authored.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen |
+                                                                        ImGuiTreeNodeFlags_AllowOverlap);
+    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 74.0f);
+    paramCheckbox(engine, prefix, "enabled", "##on");
+    ImGui::SameLine();
+    if (ImGui::SmallButton("x")) {
+        pendingAtmosphericRemove_ = static_cast<int>(index);
+    }
+    if (!open) {
+        return;
+    }
+    ImGui::Indent();
+
+    // ---- preset ----
+    const auto styles = isComet ? world::cometStyleNames() : world::auroraStyleNames();
+    std::vector<const char*> styleNames;
+    int current = -1;
+    for (std::size_t s = 0; s < styles.size(); ++s) {
+        styleNames.push_back(styles[s].data());
+        if (authored.style == styles[s]) {
+            current = static_cast<int>(s);
+        }
+    }
+    rowLabel("Preset");
+    if (ImGui::Combo("##preset", &current, styleNames.data(), static_cast<int>(styleNames.size())) &&
+        current >= 0) {
+        // A preset is a shortcut through the same parameters, never a second way to control the
+        // effect: it rewrites the authored values and the parameters take their defaults from those.
+        const std::string_view style = styles[static_cast<std::size_t>(current)];
+        commitAtmospheric(engine, index, [isComet, style](world::AtmosphericEffect& e) {
+            if (isComet) {
+                world::applyCometStyle(e, style);
+            } else {
+                world::applyAuroraStyle(e, style);
+            }
+        });
+        ImGui::Unindent();
+        return; // the parameters below have just been re-registered; draw them next frame
+    }
+
+    if (isComet) {
+        paramColor(engine, prefix, "coreColor", "Core colour");
+        paramColor(engine, prefix, "tailColor", "Tail colour");
+        paramSlider(engine, prefix, "coreIntensity", "Core brightness");
+        paramSlider(engine, prefix, "headSize", "Head size", "%.0f m");
+        paramSlider(engine, prefix, "tailLength", "Tail length", "%.0f m");
+        paramSlider(engine, prefix, "tailWidth", "Tail width", "%.0f m");
+        paramCheckbox(engine, prefix, "sparkle", "Sparkling fragments");
+        paramCheckbox(engine, prefix, "rainbow", "Rainbow");
+        paramSlider(engine, prefix, "travelSeconds", "Crossing", "%.1f s");
+    } else {
+        paramColor(engine, prefix, "lowColor", "Base colour");
+        paramColor(engine, prefix, "midColor", "Middle colour");
+        paramColor(engine, prefix, "topColor", "Top colour");
+        paramSlider(engine, prefix, "intensity", "Brightness");
+        paramSlider(engine, prefix, "curtainHeight", "Height", "%.0f m");
+        paramSlider(engine, prefix, "curtains", "Curtains", "%.0f");
+        paramSlider(engine, prefix, "flowSpeed", "Flow");
+        paramSlider(engine, prefix, "audioSensitivity", "Audio response");
+        paramSlider(engine, prefix, "spectrumShape", "Spectrum shape");
+        paramCheckbox(engine, prefix, "rainbow", "Colour cycle");
+    }
+
+    // ---- ground illumination (section 6) ----
+    // The mode is a structural choice rather than a parameter: automating "should this light the
+    // valley" is not a thing anybody wants, while automating *how much* is -- so the three words are
+    // a combo and the intensity below is an ordinary modulatable parameter.
+    int ground = static_cast<int>(authored.ground.mode);
+    rowLabel("Ground glow");
+    if (ImGui::Combo("##ground", &ground, kGroundGlowNames, 3)) {
+        commitAtmospheric(engine, index, [ground](world::AtmosphericEffect& e) {
+            e.ground.mode = static_cast<world::GroundGlow>(std::clamp(ground, 0, 2));
+        });
+        ImGui::Unindent();
+        return;
+    }
+    if (authored.ground.mode != world::GroundGlow::Off) {
+        paramColor(engine, prefix, "groundColor", "Glow colour");
+        paramSlider(engine, prefix, "groundIntensity", "Glow amount");
+    }
+
+    // ---- beat response ----
+    // The same construction the propagation section uses, and for the same reason: this writes an
+    // ordinary modulation route, visible and editable in the Modulation panel, rather than a hidden
+    // audio hook inside the effect.
+    {
+        const char* leaf = isComet ? "coreIntensity" : "edgeBrightness";
+        params::IParameter* target = find(engine, prefix, leaf);
+        const std::string path = atmosphericBeatTarget(authored.name, authored.kind);
+        params::Modulator& modulator = engine.modulator();
+        params::ModRoute* route = findRoute(modulator, beatResponseSource(), path);
+        const float softRange =
+            target != nullptr ? std::max(target->softMax(0) - target->softMin(0), 1e-3f) : 1.0f;
+        float amount = route != nullptr ? std::clamp(route->amount / softRange, 0.0f, 1.0f) : 0.0f;
+        rowLabel("Beat response");
+        if (ImGui::SliderFloat("##beat", &amount, 0.0f, 1.0f, amount > 0.0f ? "%.2f" : "off")) {
+            if (amount <= 0.0f) {
+                auto& routes = modulator.routes();
+                std::erase_if(routes, [&](const params::ModRoute& r) {
+                    return r.source == beatResponseSource() && r.target == path;
+                });
+                engine.rebind();
+            } else if (route != nullptr) {
+                route->amount = beatResponseDepth(amount, softRange);
+            } else {
+                params::ModRoute r;
+                r.source = beatResponseSource();
+                r.target = path;
+                r.amount = beatResponseDepth(amount, softRange);
+                // A pulse with no decay is a step; these are the shape of a beat, not a gate.
+                r.chain.attackMs = 10.0f;
+                r.chain.decayMs = 260.0f;
+                modulator.addRoute(r);
+                engine.rebind();
+            }
+        }
+    }
+
+    if (ImGui::TreeNode("Advanced")) {
+        drawAtmosphericAdvanced(engine, authored, index);
+        ImGui::TreePop();
+    }
+    ImGui::Unindent();
+}
+
+void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
+                                                const world::AtmosphericEffect& authored,
+                                                std::size_t index) {
+    const std::string prefix = world::atmosphericParameterPrefix(authored.name);
+    const bool isComet = authored.kind == world::AtmosphereKind::Comet;
+
+    ImGui::SeparatorText("Lifetime");
+    int activation = static_cast<int>(authored.activation);
+    rowLabel("Activation");
+    if (ImGui::Combo("##act", &activation, kActivationNames, 4)) {
+        commitAtmospheric(engine, index, [activation](world::AtmosphericEffect& e) {
+            e.activation = static_cast<world::Activation>(std::clamp(activation, 0, 3));
+        });
+        return;
+    }
+    if (authored.activation == world::Activation::Window) {
+        paramSlider(engine, prefix, "windowStart", "Window start", "%.2f s");
+        paramSlider(engine, prefix, "windowSeconds", "Window length", "%.2f s");
+    }
+    paramSlider(engine, prefix, "delay", "Delay", "%.2f s");
+    paramSlider(engine, prefix, "fadeIn", "Fade in", "%.2f s");
+    paramSlider(engine, prefix, "fadeOut", "Fade out", "%.2f s");
+    paramSlider(engine, prefix, "lifetime", "Lifetime", "%.2f s");
+    paramSlider(engine, prefix, "repeat", "Repeat every", "%.2f s");
+
+    if (isComet) {
+        ImGui::SeparatorText("Trajectory");
+        int anchor = static_cast<int>(authored.comet.path.anchor);
+        rowLabel("Anchored to");
+        if (ImGui::Combo("##anchor", &anchor, kSkyAnchorNames, 2)) {
+            commitAtmospheric(engine, index, [anchor](world::AtmosphericEffect& e) {
+                e.comet.path.anchor = static_cast<world::SkyAnchor>(std::clamp(anchor, 0, 1));
+            });
+            return;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("A world anchor gives the comet real parallax: it slides against the\n"
+                              "stars as the camera travels, and it can leave frame. A camera anchor\n"
+                              "keeps its bearing however far the camera goes.");
+        }
+        paramSlider(engine, prefix, "startAzimuth", "Start bearing", "%.0f deg");
+        paramSlider(engine, prefix, "startElevation", "Start height", "%.0f deg");
+        paramSlider(engine, prefix, "endAzimuth", "End bearing", "%.0f deg");
+        paramSlider(engine, prefix, "endElevation", "End height", "%.0f deg");
+        paramSlider(engine, prefix, "distance", "Distance", "%.0f m", true);
+        paramSlider(engine, prefix, "speed", "Speed");
+        paramSlider(engine, prefix, "acceleration", "Acceleration");
+        paramSlider(engine, prefix, "arcLift", "Arc lift", "%.0f m");
+        paramSlider(engine, prefix, "curvature", "Curvature", "%.0f m");
+
+        ImGui::SeparatorText("Appearance");
+        paramColor(engine, prefix, "haloColor", "Halo colour");
+        paramSlider(engine, prefix, "haloIntensity", "Halo brightness");
+        paramSlider(engine, prefix, "haloSize", "Halo size", "%.0f m");
+        paramSlider(engine, prefix, "tailIntensity", "Tail brightness");
+        paramSlider(engine, prefix, "tailFalloff", "Tail falloff");
+        paramSlider(engine, prefix, "wispAmount", "Wisp amount", "%.0f m");
+        paramSlider(engine, prefix, "wispScale", "Wisp scale", "%.4f");
+        paramSlider(engine, prefix, "flowSpeed", "Wisp flow");
+
+        ImGui::SeparatorText("Fragments");
+        paramSlider(engine, prefix, "sparkleDensity", "Density", "%.3f /m");
+        paramSlider(engine, prefix, "sparkleSize", "Size");
+        paramSlider(engine, prefix, "sparkleIntensity", "Brightness");
+        paramSlider(engine, prefix, "sparkleSpeed", "Twinkle");
+    } else {
+        ImGui::SeparatorText("Shape");
+        int anchor = static_cast<int>(authored.aurora.shape.anchor);
+        rowLabel("Anchored to");
+        if (ImGui::Combo("##anchor", &anchor, kSkyAnchorNames, 2)) {
+            commitAtmospheric(engine, index, [anchor](world::AtmosphericEffect& e) {
+                e.aurora.shape.anchor = static_cast<world::SkyAnchor>(std::clamp(anchor, 0, 1));
+            });
+            return;
+        }
+        paramSlider(engine, prefix, "radius", "Distance", "%.0f m", true);
+        paramSlider(engine, prefix, "layerSpacing", "Layer spacing");
+        paramSlider(engine, prefix, "baseHeight", "Base height", "%.0f m");
+        paramSlider(engine, prefix, "waveAmplitude", "Wave amount");
+        paramSlider(engine, prefix, "waveScale", "Wave scale");
+        paramSlider(engine, prefix, "turbulence", "Turbulence");
+        paramSlider(engine, prefix, "complexity", "Ray structure", "%.0f");
+        paramSlider(engine, prefix, "driftSpeed", "Fold drift");
+        paramSlider(engine, prefix, "verticalSpeed", "Vertical drift");
+
+        ImGui::SeparatorText("Appearance");
+        paramSlider(engine, prefix, "emission", "Bloom weight");
+        paramSlider(engine, prefix, "opacity", "Curtain opacity");
+        paramSlider(engine, prefix, "edgeBrightness", "Edge brightness");
+        paramSlider(engine, prefix, "filaments", "Filaments");
+        paramSlider(engine, prefix, "sparkle", "Sparkle");
+        paramSlider(engine, prefix, "horizonGlow", "Horizon glow");
+
+        // Section 4.2's per-band depths. These scale the bands already in the frame block; they are
+        // not a second analyser, and every one of them is itself an ordinary parameter a route can
+        // drive.
+        ImGui::SeparatorText("Audio response");
+        paramSlider(engine, prefix, "audioBass", "Bass -> height");
+        paramSlider(engine, prefix, "audioLowMid", "Low-mid -> waves");
+        paramSlider(engine, prefix, "audioMid", "Mid -> folds");
+        paramSlider(engine, prefix, "audioHigh", "High -> filaments");
+        paramSlider(engine, prefix, "audioBeat", "Beat -> pulse");
+    }
+
+    ImGui::SeparatorText("Rainbow");
+    paramSlider(engine, prefix, "rainbowSpeed", "Speed");
+    paramSlider(engine, prefix, "rainbowScale", "Scale");
+    paramSlider(engine, prefix, "rainbowHue", "Hue offset");
+    paramSlider(engine, prefix, "rainbowSaturation", "Saturation");
+    paramSlider(engine, prefix, "rainbowBrightness", "Brightness");
+
+    if (authored.ground.mode != world::GroundGlow::Off) {
+        ImGui::SeparatorText("Ground illumination");
+        paramSlider(engine, prefix, "groundRadius", "Radius", "%.0f m", true);
+        paramSlider(engine, prefix, "groundFalloff", "Falloff");
+    }
+
+    ImGui::TextColored(kMuted, "Every control here is the parameter atmos/%s/...", authored.name.c_str());
 }
 
 } // namespace avgen::ui

@@ -109,18 +109,34 @@ struct AtmosResult {
 
 // ---- comets ------------------------------------------------------------------------------------
 
-// Where the comet is at chord distance `s` from its launch point. The same curve the CPU evaluates
-// in `world::cometPositionAt`, so the ground track and the visible head cannot disagree.
+// Where the comet is at arc length `s` from its launch point. The same curve the CPU evaluates in
+// `world::cometPositionAt`, so the ground track and the visible head cannot disagree.
 //
-// The bow is zero outside [0, pathLength], so a comet that outlives its authored crossing flies
-// straight on rather than bending back through it.
+// A **great-circle arc at constant distance**, not a chord. A chord between two points on a sphere
+// passes through the interior, so a comet on one dives towards the anchor and its apparent elevation
+// swings far outside the two numbers that were authored -- the first implementation launched at 31
+// degrees, aimed at 5, and passed overhead at 49. Slerp keeps the distance fixed, so what an artist
+// types is what the sky shows.
+//
+// It extrapolates correctly past either end: the sines carry on round the circle, which is what a
+// comet outliving its crossing should do. The bow is clamped to the crossing so it does not bend the
+// comet back through its own path afterwards.
 fn atmosCometCurve(c: AtmosComet, s: f32) -> vec3<f32> {
-    let t = s / max(c.bendPath.w, 1.0);
-    var bow = 0.0;
-    if (t > 0.0 && t < 1.0) {
-        bow = sin(kAtmosPi * t);
+    let pathLength = max(c.dir1Path.w, 1.0);
+    let u = s / pathLength;
+    let omega = c.arc.y;
+    var d = c.dir0Tail.xyz;
+    let sinOmega = sin(omega);
+    if (omega > 1.0e-4 && abs(sinOmega) > 1.0e-6) {
+        d = (sin((1.0 - u) * omega) * c.dir0Tail.xyz + sin(u * omega) * c.dir1Path.xyz) / sinOmega;
     }
-    return c.originTravel.xyz + c.axisTail.xyz * s + c.bendPath.xyz * bow;
+    if (u > 0.0 && u < 1.0) {
+        let bow = sin(kAtmosPi * u);
+        // Perpendicular to the arc's plane, for the sideways bow; the zenith for the lift.
+        let normal = normalize(cross(c.dir0Tail.xyz, c.dir1Path.xyz) + vec3<f32>(0.0, 1.0e-5, 0.0));
+        d = d + vec3<f32>(0.0, 1.0, 0.0) * (c.arc.z * bow) + normal * (c.arc.w * bow);
+    }
+    return c.anchorTravel.xyz + normalize(d) * c.arc.x;
 }
 
 fn atmosphereCometsAt(ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f32) -> AtmosResult {
@@ -137,8 +153,8 @@ fn atmosphereCometsAt(ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f32) -> AtmosRes
 
     for (var i: u32 = 0u; i < count; i = i + 1u) {
         let c = frame.comets[i];
-        let travelled = c.originTravel.w;
-        let tailLen = max(c.axisTail.w, 1.0);
+        let travelled = c.anchorTravel.w;
+        let tailLen = max(c.dir0Tail.w, 1.0);
         let headR = max(c.core.w, 0.5);
         let tailW = max(c.shape.x, 0.5);
 
@@ -150,7 +166,7 @@ fn atmosphereCometsAt(ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f32) -> AtmosRes
         // any comet, and without this every one of them would march every tail: this is the
         // difference between the effect costing something where it is and costing it everywhere.
         let centre = (head + back) * 0.5;
-        let bound = length(head - back) * 0.5 + tailW * 3.0 + c.halo.w * 2.0 + length(c.bendPath.xyz);
+        let bound = length(head - back) * 0.5 + tailW * 3.0 + c.halo.w * 2.0 + c.arc.x * (abs(c.arc.z) + abs(c.arc.w));
         let toC = centre - ro;
         let tc = dot(toC, rd);
         if (tc < -bound) {
@@ -161,15 +177,26 @@ fn atmosphereCometsAt(ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f32) -> AtmosRes
         }
 
         // A frame across the trail, for the shed fragments below. Once per comet rather than once
-        // per fragment: it is the same basis for all of them.
-        var side = cross(c.axisTail.xyz, vec3<f32>(0.0, 1.0, 0.0));
+        // per fragment: it is the same basis for all of them. Taken from the head's own direction of
+        // travel -- a finite difference along the arc -- because the arc has no single axis.
+        let tangent = normalize(head - back + vec3<f32>(1.0e-4, 0.0, 0.0));
+        var side = cross(tangent, vec3<f32>(0.0, 1.0, 0.0));
         if (length(side) < 1.0e-4) {
             side = vec3<f32>(1.0, 0.0, 0.0);
         }
         side = normalize(side);
-        let lift = normalize(cross(side, c.axisTail.xyz));
+        let lift = normalize(cross(side, tangent));
 
         var radiance = vec3<f32>(0.0);
+
+        // The head's own place in the hue ramp. Rainbow mode used to tint only the tail, which left
+        // a white-hot core dragging a coloured streak -- the one part of the effect an eye goes
+        // straight to was the one part with no colour in it. The head takes the ramp at its own arc
+        // position, so the whole comet is one hue that travels with it.
+        var rainbowHead = vec3<f32>(1.0);
+        if (c.rainbow.w > 0.0) {
+            rainbowHead = atmosRainbow(travelled * c.rainbow.x + c.rainbow.y, c.rainbow.z, c.rainbow.w);
+        }
 
         // ---- the head ----
         let toH = head - ro;
@@ -185,7 +212,7 @@ fn atmosphereCometsAt(ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f32) -> AtmosRes
             // light source rather than as a bright dot.
             let hr = max(c.halo.w, 1.0);
             let halo = (hr * hr) / (perp * perp + hr * hr);
-            radiance = radiance + c.core.rgb * core + c.halo.rgb * halo * halo;
+            radiance = radiance + (c.core.rgb * core + c.halo.rgb * halo * halo) * rainbowHead;
         }
 
         // ---- the tail ----
@@ -246,10 +273,15 @@ fn atmosphereCometsAt(ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f32) -> AtmosRes
                 // from the head instead would slide every fragment along with the comet, which is
                 // exactly the crawl §3.4 forbids.
                 let k = k0 + m;
-                let arc = (k + 0.5) / density;
                 let r = atmosHash3(vec3<f32>(k, k * 1.37 + 5.1, k * 2.71 + 9.3));
+                let r2 = atmosHash3(vec3<f32>(k * 0.73 + 2.9, k * 1.91 + 7.7, k * 3.17 + 1.3));
+                // The cell's own position is jittered *along* the arc as well as across it. Evenly
+                // spaced fragments on a straight tail read as a string of pearls -- a runway, not a
+                // comet -- and no amount of lateral scatter fixes a regular rhythm. Still a pure
+                // function of the cell index, so the fragment is still nailed to its world position.
+                let arc = (k + 0.5 + (r2.x - 0.5) * 0.85) / density;
                 let f = clamp((travelled - arc) / tailLen, 0.0, 1.0);
-                let spread = (headR + tailW * pow(f, 0.7)) * 1.35;
+                let spread = (headR + tailW * pow(f, 0.7)) * 1.5;
                 let q = atmosCometCurve(c, arc) + side * ((r.x - 0.5) * 2.0 * spread) +
                         lift * ((r.y - 0.5) * 2.0 * spread);
                 let toQ = q - ro;
@@ -258,17 +290,19 @@ fn atmosphereCometsAt(ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f32) -> AtmosRes
                     continue;
                 }
                 let perp = length(toQ - rd * tq);
-                let blob = exp(-(perp * perp) / (fragR * fragR));
+                // Fragments are not all the same size either, for the same reason.
+                let rr = fragR * (0.45 + 1.1 * r2.y);
+                let blob = exp(-(perp * perp) / (rr * rr));
                 // The angular-size fade is the whole anti-aliasing: a fragment smaller than a pixel
                 // is removed rather than sampled, because sampling it is how a sparkle becomes a
                 // shimmer.
-                let aa = smoothstep(0.5, 1.5, (fragR / tq) / pixelAngle);
+                let aa = smoothstep(0.5, 1.5, (rr / tq) / pixelAngle);
                 let twinkle = 0.35 + 0.65 * sin(kAtmosTau * (r.z + c.sparkle.w));
                 spark = spark + vec3<f32>(blob * max(twinkle, 0.0) * aa * pow(1.0 - f, 1.5));
             }
             // Fragments take the core's colour: they are pieces of the comet, and giving them a
             // colour of their own is a control that only ever gets set back to this.
-            radiance = radiance + c.core.rgb * spark * (c.sparkle.z / max(c.core.w, 1.0));
+            radiance = radiance + c.core.rgb * rainbowHead * spark * (c.sparkle.z / max(c.core.w, 1.0));
         }
 
         out.radiance = out.radiance + radiance;
@@ -389,16 +423,32 @@ fn atmosphereAuroraAt(ro: vec3<f32>, rd: vec3<f32>) -> AtmosResult {
             // The curtain's top. `detail.z` blends between a flat curtain and a full visualiser;
             // 0.5 is the neutral spectrum value the CPU fills in when there is no music, so silence
             // gives an ordinary aurora rather than a collapsed one.
-            let shaped = mix(1.0, 0.35 + 1.3 * spec, a.detail.z);
-            let lift = 1.0 + a.audio.x * bass * 0.8;
+            //
+            // The ranges are deliberately narrow. An earlier pass let the spectrum and the bass
+            // between them push the top to 2.2 curtain-heights, and on a loud passage every bearing
+            // saturated at once: the curtains stopped being curtains and became a ceiling. A
+            // spectrum that moves the top between about a third and a full height is legible as a
+            // spectrum; one that moves it past the top of frame is just brightness.
+            let shaped = mix(1.0, 0.30 + 0.95 * spec, a.detail.z);
+            let lift = 1.0 + a.audio.x * bass * 0.5;
             let wave = a.shape.x * (atmosFbm2(flowed * a.shape.y, 3) - 0.5) * 2.0 *
                        (1.0 + a.audio.y * lowMid);
-            let top = clamp(shaped * lift + wave, 0.08, 2.2);
+            let top = clamp(shaped * lift + wave, 0.08, 1.5);
+
+            // **Where there is a curtain at all.** Without this the azimuthal noise never reaches
+            // zero, every bearing is lit, and the result is a fog bank filling the lower sky rather
+            // than an aurora -- which is exactly what the first render produced. The dark gaps
+            // between curtains are the silhouette, and the silhouette is the effect.
+            let presence = smoothstep(0.30, 0.72,
+                                      atmosFbm2(flowed * (a.shape.y * 0.85) + vec2<f32>(3.1, 1.7), 3));
+            if (presence <= 1.0e-3) {
+                continue;
+            }
 
             let hn = h / top;
             // A crisp lower edge and a diffuse top. That asymmetry is the entire silhouette of an
             // aurora; symmetrical falloff reads as a fog band.
-            let body = smoothstep(0.0, 0.035, h) * (1.0 - smoothstep(0.35, 1.0, hn));
+            let body = smoothstep(0.0, 0.03, h) * (1.0 - smoothstep(0.25, 0.95, hn)) * presence;
             if (body <= 1.0e-3) {
                 continue;
             }
@@ -423,8 +473,10 @@ fn atmosphereAuroraAt(ro: vec3<f32>, rd: vec3<f32>) -> AtmosResult {
                 col = col * atmosRainbow(m * a.audio2.z + a.audio2.w, a.anchor.w, a.audio2.y);
             }
 
-            // The bright lower rim.
-            let edge = exp(-hn * hn * 34.0) * a.top.w;
+            // The bright lower rim. Scaled well down from the authored number because it is
+            // multiplied by an already-HDR colour: at 1:1 an edge brightness of 3 put a radiance of
+            // 9 along the whole base of every curtain, which is a bar of light and not a rim.
+            let edge = exp(-hn * hn * 34.0) * a.top.w * 0.28;
             // Filaments: fine luminous threads, which is what the high band actually drives.
             let filament = pow(rays, 5.0) * a.detail.x * (0.4 + 1.6 * a.audio.w * high);
             var glint = 0.0;
@@ -438,11 +490,18 @@ fn atmosphereAuroraAt(ro: vec3<f32>, rd: vec3<f32>) -> AtmosResult {
             let layer = body * rays * foldGain * a.low.w * depth;
             radiance = radiance + col * (layer + (edge + filament + glint) * body * depth) * beatGain;
         }
+        // **More shells are more detail, not more light.** Four curtains summing un-normalised is
+        // four times the radiance of one, so raising the layer count -- an artistic choice about
+        // depth -- silently became an exposure change, and the aurora blew out. Normalising here
+        // means `curtains` does what its name says and nothing else.
+        radiance = radiance / (0.6 * f32(shells) + 0.4);
 
         // The broad wash the curtains stand in. Once per aurora rather than per shell, because it is
         // light the atmosphere itself scatters and it has no surface to be on.
-        let glow = exp(-max(rd.y, 0.0) * 9.0) * a.detail.w;
-        radiance = radiance + mix(a.low.rgb, a.mid.rgb, 0.4) * (glow * 0.35 * beatGain);
+        // Steep and faint: this is scattered light close to the horizon, and a shallow falloff put
+        // a solid colour across the bottom third of the sky that read as coloured fog.
+        let glow = exp(-max(rd.y, 0.0) * 16.0) * a.detail.w;
+        radiance = radiance + mix(a.low.rgb, a.mid.rgb, 0.4) * (glow * 0.16 * beatGain);
 
         out.radiance = out.radiance + radiance;
         emission = max(emission, a.mid.w);

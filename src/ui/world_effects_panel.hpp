@@ -10,6 +10,11 @@
 //   * **Advanced**, collapsed: everything else, which is still every parameter, because a control
 //     that only a preset can reach is a control the user does not own.
 //
+// ADR-230 adds a second section to the same panel, **Atmospheric**, on the same split. One panel
+// rather than a second one because the brief's own organisation puts atmospheric effects *under*
+// World Effects -- they are one family of thing with two propagation geometries -- and because two
+// panels would mean two places to look for "what is in this sky".
+//
 // Two things it deliberately does not do. It does not invent a second way to edit a parameter: every
 // slider here writes the *base* value of an ordinary `worldfx/...` parameter, so a keyframe, a
 // preset, a cue and a route all keep working and the Parameters panel shows the same numbers. And it
@@ -17,6 +22,7 @@
 // ordinary `beat.pulse -> worldfx/<name>/intensity` modulation route, visible and editable in the
 // Modulation panel like any other, rather than a hidden audio hook inside the effect.
 
+#include "world/atmospheric_params.hpp"
 #include "world/effect_params.hpp"
 
 #include <algorithm>
@@ -46,8 +52,17 @@ private:
     // structural change does not quietly discard every slider somebody has moved.
     void commit(app::Engine& engine, std::size_t index, const std::function<void(world::WorldEffect&)>& edit);
 
+    // ---- ADR-230, the same three in the same shapes ------------------------------------------------
+    void drawAtmosphericSection(app::Engine& engine);
+    void drawAtmospheric(app::Engine& engine, const world::AtmosphericEffect& authored, std::size_t index);
+    void drawAtmosphericAdvanced(app::Engine& engine, const world::AtmosphericEffect& authored,
+                                 std::size_t index);
+    void commitAtmospheric(app::Engine& engine, std::size_t index,
+                           const std::function<void(world::AtmosphericEffect&)>& edit);
+
     std::string status_;
     int pendingRemove_ = -1;
+    int pendingAtmosphericRemove_ = -1;
 };
 
 // ---- the pieces worth testing without Dear ImGui -------------------------------------------------
@@ -66,6 +81,16 @@ private:
 // answer that makes 1.0 read as "as much as this knob goes".
 [[nodiscard]] inline float beatResponseDepth(float amount, float softRange) {
     return std::clamp(amount, 0.0f, 1.0f) * std::max(softRange, 0.0f);
+}
+
+// ADR-230's equivalent. An atmospheric effect's beat route lands on the property that *reads* as
+// brightness for its kind -- a comet's core and an aurora's edge -- rather than on one name that
+// happens to exist on both, because "intensity" on an aurora is its overall level and pulsing that
+// makes the whole sky flash rather than making its curtain edges answer the beat.
+[[nodiscard]] inline std::string atmosphericBeatTarget(const std::string& effectName,
+                                                       world::AtmosphereKind kind) {
+    return world::atmosphericParameterPrefix(effectName) +
+           (kind == world::AtmosphereKind::Comet ? "coreIntensity" : "edgeBrightness");
 }
 
 } // namespace avgen::ui

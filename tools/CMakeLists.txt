@@ -60,3 +60,10 @@ endif()
 # hold a second copy of the terrain noise and the two would drift apart silently.
 add_executable(avgen_place_farm_animals place_farm_animals.cpp)
 target_link_libraries(avgen_place_farm_animals PRIVATE avgen_core)
+
+# The atmospheric preset dumper (ADR-230, §10). A build target rather than a table in the scene
+# emitter for the reason the Tree of Life emitter gives: a Python copy of every tuned radiance would
+# drift from applyCometStyle/applyAuroraStyle silently, and the first symptom would be a shipped
+# example that no longer matches the preset the UI offers under the same name.
+add_executable(avgen_atmos_presets atmos_presets.cpp)
+target_link_libraries(avgen_atmos_presets PRIVATE avgen_core)

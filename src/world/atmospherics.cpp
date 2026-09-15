@@ -566,42 +566,45 @@ bool applyCometStyle(AtmosphericEffect& e, std::string_view style) {
     if (style == kCometStyles[0]) { // Bioluminescent Cyan
         a.coreColor = {0.55f, 1.0f, 1.0f};
         a.coreIntensity = 20.0f;
-        a.headSize = 28.0f;
+        a.headSize = 19.0f;
         a.haloColor = {0.16f, 0.78f, 1.0f};
-        a.haloIntensity = 2.6f;
-        a.haloSize = 165.0f;
+        a.haloIntensity = 2.1f;
+        a.haloSize = 95.0f;
         a.tailColor = {0.42f, 0.34f, 1.0f};
         a.tailIntensity = 5.0f;
-        a.tailLength = 950.0f;
-        a.tailWidth = 72.0f;
+        a.tailLength = 2000.0f;
+        a.tailWidth = 38.0f;
         a.tailFalloff = 1.85f;
-        a.wispAmount = 58.0f;
-        a.wispScale = 0.0024f;
+        a.wispAmount = 62.0f;
+        a.wispScale = 0.0022f;
         a.flowSpeed = 0.35f;
-        s.density = 0.016f;
-        s.size = 0.30f;
-        s.intensity = 9.0f;
+        s.density = 0.011f;
+        s.size = 0.13f;
+        s.intensity = 7.0f;
         s.speed = 1.3f;
     } else if (style == kCometStyles[1]) { // Rainbow Cosmic
         // The colours are left near-white on purpose: rainbow replaces the *hue* and keeps the
         // magnitude, exactly as ADR-207's Rainbow style does, so a tinted base would fight it.
         a.coreColor = {1.0f, 1.0f, 1.0f};
-        a.coreIntensity = 22.0f;
-        a.headSize = 30.0f;
+        // Lower than the explicit-colour presets on purpose. Rainbow multiplies a hue into a white
+        // base, so at 22 the core clipped to white and the one part of the comet an eye goes
+        // straight to was the one part with no colour left in it.
+        a.coreIntensity = 13.0f;
+        a.headSize = 21.0f;
         a.haloColor = {0.9f, 0.9f, 1.0f};
-        a.haloIntensity = 2.8f;
-        a.haloSize = 185.0f;
+        a.haloIntensity = 2.2f;
+        a.haloSize = 105.0f;
         a.tailColor = {1.0f, 1.0f, 1.0f};
         a.tailIntensity = 5.5f;
-        a.tailLength = 1150.0f;
-        a.tailWidth = 84.0f;
+        a.tailLength = 2400.0f;
+        a.tailWidth = 44.0f;
         a.tailFalloff = 1.65f;
-        a.wispAmount = 70.0f;
-        a.wispScale = 0.0021f;
+        a.wispAmount = 78.0f;
+        a.wispScale = 0.0019f;
         a.flowSpeed = 0.42f;
-        s.density = 0.020f;
-        s.size = 0.34f;
-        s.intensity = 11.0f;
+        s.density = 0.013f;
+        s.size = 0.15f;
+        s.intensity = 8.5f;
         s.speed = 1.6f;
         r.enabled = true;
         // Just over one turn across the tail: less and it is a single hue, much more and it stripes
@@ -613,52 +616,52 @@ bool applyCometStyle(AtmosphericEffect& e, std::string_view style) {
     } else if (style == kCometStyles[2]) { // Emerald Teal
         a.coreColor = {0.55f, 1.0f, 0.78f};
         a.coreIntensity = 17.0f;
-        a.headSize = 25.0f;
+        a.headSize = 17.0f;
         a.haloColor = {0.10f, 0.85f, 0.62f};
-        a.haloIntensity = 2.3f;
-        a.haloSize = 150.0f;
+        a.haloIntensity = 1.9f;
+        a.haloSize = 88.0f;
         a.tailColor = {0.13f, 0.92f, 0.72f};
         a.tailIntensity = 4.6f;
-        a.tailLength = 880.0f;
-        a.tailWidth = 66.0f;
+        a.tailLength = 1750.0f;
+        a.tailWidth = 34.0f;
         a.tailFalloff = 2.0f;
-        a.wispAmount = 50.0f;
-        a.wispScale = 0.0026f;
+        a.wispAmount = 54.0f;
+        a.wispScale = 0.0024f;
         a.flowSpeed = 0.31f;
-        s.density = 0.015f;
-        s.size = 0.28f;
-        s.intensity = 8.0f;
+        s.density = 0.010f;
+        s.size = 0.12f;
+        s.intensity = 6.5f;
         s.speed = 1.2f;
     } else if (style == kCometStyles[3]) { // Magenta Blue
         a.coreColor = {1.0f, 0.68f, 1.0f};
         a.coreIntensity = 19.0f;
-        a.headSize = 27.0f;
+        a.headSize = 19.0f;
         a.haloColor = {0.85f, 0.22f, 0.95f};
-        a.haloIntensity = 2.5f;
-        a.haloSize = 170.0f;
+        a.haloIntensity = 2.0f;
+        a.haloSize = 98.0f;
         a.tailColor = {0.30f, 0.32f, 1.0f};
         a.tailIntensity = 5.2f;
-        a.tailLength = 1000.0f;
-        a.tailWidth = 78.0f;
+        a.tailLength = 1900.0f;
+        a.tailWidth = 40.0f;
         a.tailFalloff = 1.75f;
-        a.wispAmount = 62.0f;
-        a.wispScale = 0.0023f;
+        a.wispAmount = 66.0f;
+        a.wispScale = 0.0021f;
         a.flowSpeed = 0.38f;
-        s.density = 0.017f;
-        s.size = 0.31f;
-        s.intensity = 9.5f;
+        s.density = 0.012f;
+        s.size = 0.14f;
+        s.intensity = 7.5f;
         s.speed = 1.4f;
     } else if (style == kCometStyles[4]) { // Subtle Shooting Star
         a.coreColor = {0.92f, 0.97f, 1.0f};
         a.coreIntensity = 7.0f;
-        a.headSize = 8.0f;
+        a.headSize = 6.0f;
         a.haloColor = {0.55f, 0.72f, 1.0f};
         a.haloIntensity = 0.7f;
-        a.haloSize = 48.0f;
+        a.haloSize = 34.0f;
         a.tailColor = {0.60f, 0.75f, 1.0f};
         a.tailIntensity = 1.5f;
-        a.tailLength = 420.0f;
-        a.tailWidth = 16.0f;
+        a.tailLength = 700.0f;
+        a.tailWidth = 11.0f;
         a.tailFalloff = 2.6f;
         a.wispAmount = 6.0f;
         a.wispScale = 0.0040f;
@@ -823,12 +826,33 @@ glm::vec3 anchorOf(SkyAnchor anchor, const glm::vec3& authored, const glm::vec3&
 
 } // namespace
 
+// The great-circle arc, evaluated at an arc length from the launch point. The same function the
+// shader runs (`atmosCometCurve`), so the ground track and the visible head cannot disagree.
+//
+// Slerp rather than a chord: the distance stays constant, so the apparent azimuth and elevation
+// interpolate between the two the artist typed. It extrapolates correctly past either end -- the
+// sines simply carry on round the circle -- which is what a comet outliving its authored crossing
+// should do, while the bow is clamped to the crossing so it does not bend the comet back through
+// its own path afterwards.
 glm::vec3 cometPositionAt(const ResolvedAtmospheric& r, float arcLength) {
-    if (r.effect == nullptr || r.pathLength <= kEps) {
+    if (r.effect == nullptr) {
         return r.launch;
     }
-    const glm::vec3 axis = safeNormalize(r.destination - r.launch, glm::vec3(0.0f, 0.0f, -1.0f));
-    return r.launch + axis * arcLength + r.bow * bowShape(arcLength / r.pathLength);
+    const float u = r.pathLength > kEps ? arcLength / r.pathLength : 0.0f;
+    glm::vec3 d = r.dir0;
+    const float sinOmega = std::sin(r.omega);
+    if (r.omega > 1e-4f && std::abs(sinOmega) > 1e-6f) {
+        d = (std::sin((1.0f - u) * r.omega) * r.dir0 + std::sin(u * r.omega) * r.dir1) / sinOmega;
+    }
+    const float bow = bowShape(u);
+    if (bow > 0.0f) {
+        // Perpendicular to the arc's plane, for the sideways bow. Degenerate when the two
+        // directions are parallel, which `validate` already refuses.
+        const glm::vec3 normal = safeNormalize(glm::cross(r.dir0, r.dir1), glm::vec3(0.0f, 1.0f, 0.0f));
+        d += glm::vec3(0.0f, 1.0f, 0.0f) * (r.liftAmount * bow) + normal * (r.curveAmount * bow);
+    }
+    d = safeNormalize(d, r.dir0);
+    return r.anchor + d * r.distance;
 }
 
 AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> effects,
@@ -874,25 +898,26 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
             }
             const CometPath& p = e.comet.path;
             r.anchor = anchorOf(p.anchor, p.anchorPosition, ctx.cameraPosition);
-            r.launch = r.anchor + directionFromSky(p.startAzimuth, p.startElevation) * p.distance;
-            r.destination = r.anchor + directionFromSky(p.endAzimuth, p.endElevation) * p.distance;
-            const glm::vec3 chord = r.destination - r.launch;
-            r.pathLength = glm::length(chord);
-            if (r.pathLength <= kEps) {
-                continue; // validate() refuses this, but a modulated azimuth could still collapse it
+            r.dir0 = directionFromSky(p.startAzimuth, p.startElevation);
+            r.dir1 = directionFromSky(p.endAzimuth, p.endElevation);
+            r.distance = std::max(p.distance, 1.0f);
+            // The angle between the two bearings, which with the distance is the arc's length. A
+            // comet whose ends have collapsed onto each other has nowhere to fly; `validate` refuses
+            // that, but a modulated azimuth can still reach it, so it is checked here too.
+            const float cosOmega = std::clamp(glm::dot(r.dir0, r.dir1), -1.0f, 1.0f);
+            r.omega = std::acos(cosOmega);
+            if (r.omega <= 1e-4f) {
+                continue;
             }
-            const glm::vec3 axis = chord / r.pathLength;
-            // A frame on the chord: `side` is horizontal, `lift` is the remaining perpendicular. The
-            // fallback matters for a comet flying almost straight up, where the cross product with
-            // world up collapses.
-            glm::vec3 side = glm::cross(axis, glm::vec3(0.0f, 1.0f, 0.0f));
-            side = safeNormalize(side, glm::vec3(1.0f, 0.0f, 0.0f));
-            const glm::vec3 lift = safeNormalize(glm::cross(side, axis), glm::vec3(0.0f, 1.0f, 0.0f));
-            r.bow = side * p.curvature + lift * p.arcLift;
+            r.pathLength = r.omega * r.distance;
+            r.liftAmount = p.arcLift / r.distance;
+            r.curveAmount = p.curvature / r.distance;
 
             const float progress =
                 static_cast<float>(pass) * std::max(p.speedScale, kEps) / std::max(p.travelSeconds, kEps);
             r.travelled = reparameterise(progress, p.acceleration) * r.pathLength;
+            r.launch = r.anchor + r.dir0 * r.distance;
+            r.destination = r.anchor + r.dir1 * r.distance;
             comets[counts.comets++] = r;
         } else {
             if (counts.auroras >= auroras.size()) {
@@ -914,11 +939,11 @@ CometGpu packComet(const ResolvedAtmospheric& r) {
     }
     const Comet& c = r.effect->comet;
     const CometAppearance& a = c.appearance;
-    const glm::vec3 axis = safeNormalize(r.destination - r.launch, glm::vec3(0.0f, 0.0f, -1.0f));
 
-    g.originTravel = glm::vec4(r.launch, r.travelled);
-    g.axisTail = glm::vec4(axis, a.tailLength);
-    g.bendPath = glm::vec4(r.bow, r.pathLength);
+    g.anchorTravel = glm::vec4(r.anchor, r.travelled);
+    g.dir0Tail = glm::vec4(r.dir0, a.tailLength);
+    g.dir1Path = glm::vec4(r.dir1, r.pathLength);
+    g.arc = glm::vec4(r.distance, r.omega, r.liftAmount, r.curveAmount);
     // The envelope is folded into every radiance rather than carried as a lane the shader would
     // multiply into three terms. A fade is a fade -- the same argument ADR-207 made.
     g.core = glm::vec4(a.coreColor * a.coreIntensity * r.envelope, a.headSize);

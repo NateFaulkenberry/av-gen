@@ -148,12 +148,18 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
     // registrar that only ever adds leaves the previous scene's paths behind for a route to bind to.
     timeline_.unbind();
     world::unregisterWorldEffectParameters(params_, worldEffectParams_);
+    world::unregisterAtmosphericParameters(params_, atmosphericParams_);
     worldEffects_.clear();
+    atmosphericEffects_.clear();
     if (const auto* comp = composition()) {
         worldEffects_ = comp->worldEffects();
+        atmosphericEffects_ = comp->atmosphericEffects();
     }
     if (!worldEffects_.empty()) {
         worldEffectParams_ = world::registerWorldEffectParameters(params_, worldEffects_);
+    }
+    if (!atmosphericEffects_.empty()) {
+        atmosphericParams_ = world::registerAtmosphericParameters(params_, atmosphericEffects_);
     }
     resetCameraState();
     shaderLayers_.reattach();
@@ -366,6 +372,26 @@ Result<void> Engine::setWorldEffects(std::vector<world::WorldEffect> effects) {
     return {};
 }
 
+// ADR-230, on exactly the terms `setWorldEffects` states above.
+Result<void> Engine::setAtmosphericEffects(std::vector<world::AtmosphericEffect> effects) {
+    if (auto ok = world::validateAtmosphericEffects(effects); !ok) {
+        return ok;
+    }
+    if (auto* comp = composition()) {
+        if (auto ok = comp->setAtmosphericEffects(effects); !ok) {
+            return ok;
+        }
+    }
+    timeline_.unbind();
+    world::unregisterAtmosphericParameters(params_, atmosphericParams_);
+    atmosphericEffects_ = std::move(effects);
+    if (!atmosphericEffects_.empty()) {
+        atmosphericParams_ = world::registerAtmosphericParameters(params_, atmosphericEffects_);
+    }
+    rebind();
+    return {};
+}
+
 void Engine::detachSceneParameters() {
     if (auto* comp = composition()) {
         comp->detach();
@@ -376,6 +402,7 @@ void Engine::detachSceneParameters() {
     // ADR-207. After `timeline_.unbind()`, because a track aimed at a `worldfx/...` path holds a
     // pointer into the parameter that is about to go.
     world::unregisterWorldEffectParameters(params_, worldEffectParams_);
+    world::unregisterAtmosphericParameters(params_, atmosphericParams_);
 }
 
 params::Track* Engine::recordKey(const std::string& path, int component, params::KeyInterp interp,
@@ -2618,6 +2645,95 @@ void Engine::updateWorldEffects() {
     }
 }
 
+// The aurora's spectrum, folded from the analysis frame into `kAuroraBands` log-spaced bins.
+//
+// **This is the one place an effect reads audio directly, and it is deliberate.** The rule
+// `world/effect_params.hpp` states -- audio reaches an effect as a modulation route, never as a hook
+// -- holds for every scalar an aurora has, and `defaultAtmosphericRoutes` is what implements it. It
+// cannot hold for the curtain's *shape*, because that is sixteen numbers across the sky and a route
+// carries one. So the vector rides in the resolution context instead, and it is read from
+// `latestFrame()` -- the same frame the signal bus, the material inputs and the camera director all
+// read, published by the same code in both modes.
+//
+// That is what keeps it deterministic. Offline, `latest_` is `frames[cursor - 1]` of a precomputed
+// `AnalysisTrack`, a pure function of the render time; live, it is the runner's newest. Neither
+// integrates state here, and nothing below reads a frame counter.
+//
+// Log-spaced because hearing is: sixteen linear slices of a 1025-bin spectrum would put thirteen of
+// them above 6 kHz, where a curtain has nothing to show.
+void Engine::updateAuroraSpectrum() {
+    auroraSpectrum_.fill(0.5f); // the neutral value: an ordinary curtain when there is no music
+    const analysis::AnalysisFrame& f = latest_;
+    if (f.magnitude.empty()) {
+        return;
+    }
+    const float nyquist = static_cast<float>(analyzerConfig_.sampleRate) * 0.5f;
+    if (!(nyquist > 0.0f)) {
+        return;
+    }
+    constexpr float kLowHz = 40.0f;
+    constexpr float kHighHz = 12000.0f;
+    const float bins = static_cast<float>(f.magnitude.size());
+    const float logLow = std::log(kLowHz);
+    const float logSpan = std::log(std::min(kHighHz, nyquist)) - logLow;
+    for (std::size_t i = 0; i < world::kAuroraBands; ++i) {
+        const float t0 = static_cast<float>(i) / static_cast<float>(world::kAuroraBands);
+        const float t1 = static_cast<float>(i + 1) / static_cast<float>(world::kAuroraBands);
+        const float hz0 = std::exp(logLow + logSpan * t0);
+        const float hz1 = std::exp(logLow + logSpan * t1);
+        const auto binOf = [&](float hz) {
+            return std::clamp(static_cast<std::size_t>(hz / nyquist * bins), std::size_t{0},
+                              f.magnitude.size() - 1);
+        };
+        const std::size_t b0 = binOf(hz0);
+        const std::size_t b1 = std::max(binOf(hz1), b0 + 1);
+        float sum = 0.0f;
+        std::size_t n = 0;
+        for (std::size_t b = b0; b < b1 && b < f.magnitude.size(); ++b) {
+            sum += f.magnitude[b] * f.magnitude[b];
+            ++n;
+        }
+        // Root-mean-square over the slice, then a fixed compression. A *fixed* curve rather than a
+        // running normaliser on purpose: `AnalysisFrame::bands` is already auto-gained with a 4 s
+        // decay, and an aurora whose sixteen bins each had their own AGC would breathe in sixteen
+        // directions and read as noise rather than as a spectrum.
+        const float rms = n > 0 ? std::sqrt(sum / static_cast<float>(n)) : 0.0f;
+        auroraSpectrum_[i] = std::clamp(std::sqrt(rms) * 1.9f, 0.0f, 1.0f);
+    }
+}
+
+// Resolves this frame's atmospheric effects into the scene (ADR-230).
+//
+// Called from `update()` beside `updateWorldEffects`, for the same reasons: after the camera has
+// been placed and after the modulation routes have run, so the numbers it reads are this frame's
+// finals. Everything it does is a pure function of the transport second.
+void Engine::updateAtmosphericEffects() {
+    scene::Scene& live = controller_->scene();
+    if (atmosphericEffects_.empty()) {
+        live.atmospherics = world::AtmosphericFrame{};
+        return;
+    }
+    world::applyAtmosphericParameters(atmosphericParams_, atmosphericEffects_);
+    updateAuroraSpectrum();
+
+    world::AtmosphericContext ctx;
+    ctx.seconds = timelineClock_.seconds;
+    ctx.cameraPosition = live.camera.position;
+    ctx.shots = shotSpans_;
+    ctx.spectrum = auroraSpectrum_;
+    world::buildAtmosphericFrame(atmosphericEffects_, ctx, live.atmospherics);
+    // The §12 quality control. Offline renders get the full march; live playback takes two thirds of
+    // it, which is a difference nobody sees on a moving comet and a third of the tail's cost.
+    live.atmospherics.cometSteps = mode_ == EngineMode::Offline ? 28u : 18u;
+
+    const std::uint32_t total = live.atmospherics.cometCount + live.atmospherics.auroraCount;
+    if (total != lastAtmosphericCount_) {
+        lastAtmosphericCount_ = total;
+        log::debug("atmospheric effects: {} comet(s), {} aurora(s) live at {:.2f}s",
+                   live.atmospherics.cometCount, live.atmospherics.auroraCount, ctx.seconds);
+    }
+}
+
 void Engine::update(const FrameTime& time) {
     const auto start = std::chrono::steady_clock::now();
     bool newFrame = false;
@@ -2790,6 +2906,7 @@ void Engine::update(const FrameTime& time) {
     }
     controller_->scene().post = post_;
     updateWorldEffects();
+    updateAtmosphericEffects();
     {
         shaders::StdUniforms base;
         const auto& f = latest_;

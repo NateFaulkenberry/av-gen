@@ -32,9 +32,11 @@ struct WorldEffect {
 // both sizes, and the sum assert on FrameUniforms is what makes a lane added on one side a compile
 // error on the other rather than a silent misread.
 struct AtmosComet {
-    originTravel: vec4<f32>, // xyz = launch point (world), w = chord distance flown (m)
-    axisTail: vec4<f32>,     // xyz = unit chord direction, w = tail length (m)
-    bendPath: vec4<f32>,     // xyz = midpoint bow (m), w = chord length (m)
+    anchorTravel: vec4<f32>, // xyz = anchor (world), w = arc length flown (m)
+    dir0Tail: vec4<f32>,     // xyz = unit direction to the launch point, w = tail length (m)
+    dir1Path: vec4<f32>,     // xyz = unit direction to the destination, w = arc length (m)
+    arc: vec4<f32>,          // x = distance (m), y = omega (rad), z = lift, w = curvature
+                             // (both bows as fractions of the distance)
     core: vec4<f32>,         // rgb = core radiance (envelope folded in), w = head radius (m)
     halo: vec4<f32>,         // rgb = halo radiance, w = halo radius (m)
     tail: vec4<f32>,         // rgb = tail radiance, w = tail falloff exponent

@@ -26,9 +26,19 @@
 //
 // **A comet is a curve in the world, not a streak on the screen.** Its trajectory is authored in
 // sky coordinates -- an azimuth and elevation to launch from, one to fly to, and a distance -- and
-// resolved to two world points with a bow between them. The shader integrates the view ray against
-// that curve, so the comet has real parallax: crossing Glowmere's valley moves it against the
-// stars, which is the difference between a celestial object and a texture sliding across the sky.
+// flown as a **great-circle arc at that distance**, bowed by an optional lift and curvature.
+//
+// The arc matters, and a straight chord between the two points does not work. A chord between two
+// points on a sphere passes through the interior, so a comet on one dives towards the anchor and
+// its *apparent* elevation swings far outside the two numbers that were authored: the first
+// implementation launched at 31 degrees, aimed at 5, and passed overhead at 49, which put it out of
+// frame. On an arc the distance is constant, so a camera near the anchor sees the azimuth and
+// elevation interpolate between exactly what was typed -- which is the difference between a control
+// and a suggestion.
+//
+// The shader integrates the view ray against that curve, so the comet has real parallax: crossing
+// Glowmere's valley moves it against the stars, which is the difference between a celestial object
+// and a texture sliding across the sky.
 //
 // **An aurora is a set of vertical cylinders, not a plane.** The ray is intersected with K shells
 // at stepped radii; the hit's azimuth and height index a curtain whose top is driven by the audio
@@ -157,9 +167,11 @@ struct CometPath {
     // start and end points do not move.
     float acceleration = 0.0f;
 
-    float curvature = 0.0f;     // metres the path bows sideways at its midpoint
-    float arcLift = 180.0f;     // metres the path rises at its midpoint, so it arcs rather than
-                                // running dead straight across the sky
+    // Both bows are metres at the midpoint, perpendicular to the great circle: `curvature` out of
+    // its plane, `arcLift` towards the zenith. They are applied to the *direction* and renormalised,
+    // so a bowed comet is still at `distance` and still behaves like a thing in the sky.
+    float curvature = 0.0f;
+    float arcLift = 180.0f;
     [[nodiscard]] Result<void> validate() const;
 };
 
@@ -336,20 +348,28 @@ struct ResolvedAtmospheric {
     float envelope = 0.0f;     // 0..1: delay, fade in, lifetime and fade out, multiplied together
     double elapsed = 0.0;      // seconds since this pass started, for the phase lanes
 
-    // Comet only.
-    glm::vec3 launch{0.0f};    // where the crossing starts, in world space
+    // Comet only. The arc is `dir0 -> dir1` through `omega` radians at `distance` metres, so
+    // `pathLength` is a true arc length and speeds and tail lengths in metres mean what they say.
+    glm::vec3 dir0{0.0f, 0.0f, 1.0f}; // unit direction from the anchor to the launch point
+    glm::vec3 dir1{0.0f, 0.0f, 1.0f}; // ...and to the destination
+    float omega = 0.0f;               // radians between them
+    float distance = 0.0f;            // metres from the anchor the comet flies at
+    float liftAmount = 0.0f;          // midpoint bow towards the zenith, as a fraction of `distance`
+    float curveAmount = 0.0f;         // midpoint bow out of the arc's plane, likewise
+    glm::vec3 launch{0.0f};           // the crossing's start, in world space (for tests and the ground track)
     glm::vec3 destination{0.0f};
-    glm::vec3 bow{0.0f};       // the midpoint displacement, lift folded in
-    float pathLength = 0.0f;   // metres of the chord
-    float travelled = 0.0f;    // metres flown so far, after the acceleration reparameterisation
+    float pathLength = 0.0f;          // metres of arc
+    float travelled = 0.0f;           // metres flown so far, after the acceleration reparameterisation
 };
 
 // Mirrors `Comet` in shaders/atmosphere_fx.wgsl. 144 bytes, the same size ADR-207 chose, for the
 // same reason: it is what nine vec4s cost and nine is what the lanes need.
 struct CometGpu {
-    glm::vec4 originTravel{0.0f}; // xyz = launch point (world), w = arc length travelled (m)
-    glm::vec4 axisTail{0.0f};     // xyz = unit chord direction, w = tail length (m)
-    glm::vec4 bendPath{0.0f};     // xyz = midpoint bow (m), w = chord length (m)
+    glm::vec4 anchorTravel{0.0f}; // xyz = anchor (world), w = arc length travelled (m)
+    glm::vec4 dir0Tail{0.0f};     // xyz = unit direction to the launch point, w = tail length (m)
+    glm::vec4 dir1Path{0.0f};     // xyz = unit direction to the destination, w = arc length (m)
+    glm::vec4 arc{0.0f};          // x = distance (m), y = omega (rad), z = lift, w = curvature
+                                  // (both bows as fractions of the distance)
     glm::vec4 core{0.0f};         // rgb = core radiance (envelope folded in), w = head radius (m)
     glm::vec4 halo{0.0f};         // rgb = halo radiance, w = halo radius (m)
     glm::vec4 tail{0.0f};         // rgb = tail radiance, w = tail falloff exponent
@@ -360,7 +380,7 @@ struct CometGpu {
     glm::vec4 rainbow{0.0f};      // x = cycles per metre, y = phase, z = saturation,
                                   // w = brightness (0 = rainbow off)
 };
-static_assert(sizeof(CometGpu) == 144);
+static_assert(sizeof(CometGpu) == 160);
 
 // Mirrors `Aurora` in shaders/atmosphere_fx.wgsl. The four band vectors are spelled out rather than
 // declared as an array because an array inside a struct inside an array is the one uniform layout
