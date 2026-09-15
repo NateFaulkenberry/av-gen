@@ -122,14 +122,25 @@ view ray against a bounding sphere around its whole trail in three instructions,
 on most frames stop there; only rays that could plausibly hit march the tail. That is why the cap can
 be six comets with a 24-sample march rather than one comet with four.
 
-Audio reaches the effects the way audio reaches everything else in this engine: as `ModRoute`s onto
-`atmos/<name>/<property>`, because that is the rule `world/effect_params.hpp` states and a second
-reaction system would be a second thing to debug. **There is exactly one exception, and it is
-recorded rather than smuggled**: a curtain whose shape is a frequency spectrum needs sixteen numbers
-across the sky, and a scalar route carries one. Those bins ride in `AtmosphericContext::spectrum`,
-folded by the engine from the same `analysis::AnalysisFrame` every other consumer reads -- which is
-also what keeps them deterministic, because offline that frame is a precomputed track indexed by the
-render time.
+Audio reaches the effects on two established paths, and no third one is invented.
+
+**Scalars go through the modulator.** Every number an aurora or a comet has is an ordinary parameter
+under `atmos/<name>/<property>`, and `defaultAtmosphericRoutes` returns the depths and envelopes that
+make one answer the music. That is the rule `world/effect_params.hpp` states, and it is what makes
+the response editable, curvable and visible in the Modulation panel rather than buried in a shader.
+
+**Vectors come from the frame block, where the engine already publishes them.** The aurora's shader
+reads `frame.audio`, `frame.audioBands` and `frame.beat` directly -- which is not a special case but
+exactly what ADR-030 put those lanes there for, and the same thing a material program does. What is
+authored per effect is the *depth* on each band, and every one of those depths is itself a parameter
+a route can drive. The sixteen spectrum bins are the one genuinely new lane, and they are new because
+a curtain whose shape is a frequency spectrum needs sixteen numbers across the sky and a scalar route
+carries one. They ride in `AtmosphericContext::spectrum`, folded by the engine from the same
+`analysis::AnalysisFrame` every other consumer reads -- which is also what keeps them deterministic,
+because offline that frame is a precomputed track indexed by the render time.
+
+The distinction that matters is that **no audio is read inside `world::atmospherics`**. Resolution
+takes numbers it is handed; it never asks an analyser anything.
 
 ## Consequences
 
@@ -156,6 +167,16 @@ render time.
   trajectory, which is state this system deliberately does not keep. Recorded as a limitation: a
   comet does not motion-blur, and at the speeds these cross the sky nothing in the renders suggested
   it should.
+* **The aurora is the most temporally active thing in Glowmere's frame, by a wide margin.**
+  `tools/temporal_stats.py` over a 180-frame static-camera sequence: 1.4% of pixels ever cross the
+  flicker threshold with the effects off, 7.4% with six comets, 59% with the aurora. Attributed
+  rather than guessed -- it is not the audio (removing every band and the spectrum leaves 61%), not
+  FXAA (58.9% with it off) and not the post chain (62.7% with it off). What it is, is a large soft
+  element animating: the flicker map shows broad curtain shapes rather than per-pixel noise, a 1:1
+  crop is clean, and `tools/chroma_speckle.py` reads 0.55% against a 0.26% baseline, which is no
+  fringing at all. The second difference cannot tell fast smooth motion from alternation, and an
+  aurora is fast smooth motion over most of the sky. Recorded because the number looks alarming and
+  the next person to measure it deserves the attribution rather than the fright.
 * **Ground illumination is not lighting.** There is no shadow, no occlusion and no falloff with
   surface orientation beyond a hemispheric weight. §6 asks for cinematic atmospheric illumination
   rather than physical accuracy, and a high comet's pool of light lands kilometres away and is
