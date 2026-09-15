@@ -126,6 +126,29 @@ with `loopLength` for repeating patterns. Interpolations: `step`, `linear`, `smo
 from the project's bank at their time, morphing over `morphSeconds` (beats for beat-based cues);
 an empty `preset` is a marker.
 
+## The Auto-director (ADR-225)
+
+```json
+"autoDirector": {
+  "mode": "edited", "minShot": 5.0, "minBuildShot": 2.0, "maxShot": 12.0,
+  "wide": 24.0, "hero": 50.0, "maxSpeed": 0.4, "maxSwing": 8.0, "dwell": 6, "seed": 1
+}
+```
+
+The controls the Auto-director cuts from, saved with the project because they are part of the work
+rather than a preference about this machine — and because an offline render sees only this document,
+so a setting that lived in the panel was one no exported frame ever saw.
+
+`autoDirector`, not `director`: `director` is the World Director's knob mappings (ADR-088), which is
+a different block entirely. The keys inside are the ones `--director` uses on the command line.
+
+Written only when something has been moved off its default, so a project nobody directed carries no
+block and a save/load/save leaves the file as it was. An absent block loads the defaults silently.
+Values are refused rather than clamped when they fall outside what `AutoDirectorSettings::validate`
+accepts: shot lengths in (0, 120] s with the build's minimum no longer than the ordinary one, focal
+lengths in [8, 400] mm with the wide no longer than the hero, `maxSpeed` 0 (off) or 0.1–2000 m/s,
+`maxSwing` 0 (off) or 1–720 deg/s, and `dwell` 1–12 shots.
+
 ## Scene composition files (milestone 0.7, ADR-017)
 
 A scene file is a separate document (`"format": "avgen-scene"`, version 1) describing a
