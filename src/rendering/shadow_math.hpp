@@ -42,13 +42,19 @@ struct ShadowViewGpu {
 };
 static_assert(sizeof(ShadowViewGpu) == 80);
 
-// Group 0 binding 3 of every scene pass (672 bytes).
+// Group 0 binding 3 of every scene pass (688 bytes).
 struct ShadowUniforms {
     ShadowViewGpu views[kMaxShadowViews];
     glm::vec4 info;   // x = atlas resolution, y = cascade count, z = PCF taps, w = 1 when PCSS is on
     glm::vec4 splits; // the cascade far distances in view depth (unused entries hold the last one)
+    // ADR-227. x = PCSS blocker-search taps. `info` and `splits` were both full, which is why
+    // `QualitySettings::pcssBlockerTaps` sat unread for as long as it did -- wiring it was a
+    // uniform-layout change rather than a line. yzw are free and deliberately named nothing:
+    // the next field to want a lane takes one rather than overloading a meaning onto an existing
+    // one, which is the mistake `info.z` serving two tap counts already was.
+    glm::vec4 info2;
 };
-static_assert(sizeof(ShadowUniforms) == 672);
+static_assert(sizeof(ShadowUniforms) == 688);
 
 // ADR-112: the shadow-map resolution the shadowed range is sized against, whatever resolution the
 // tier actually renders it at.

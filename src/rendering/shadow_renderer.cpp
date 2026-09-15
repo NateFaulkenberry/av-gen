@@ -252,6 +252,11 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
     }
     im.block.info = glm::vec4(static_cast<float>(im.resolution), static_cast<float>(cascades),
                               static_cast<float>(quality.shadowPcfTaps), quality.softShadows ? 1.0f : 0.0f);
+    // ADR-227: the blocker search's own budget. Clamped here rather than in the shader so the
+    // number the tier asked for is the number the frame used, and 0 is not a legal request -- the
+    // shader reads 0 as "the lane was never written" and falls back to the filter's count.
+    im.block.info2 = glm::vec4(static_cast<float>(std::clamp(quality.pcssBlockerTaps, 1u, 32u)), 0.0f,
+                               0.0f, 0.0f);
     im.block.splits = glm::vec4(splits.empty() ? shadowFar : splits[0],
                                 splits.size() > 1 ? splits[1] : shadowFar,
                                 splits.size() > 2 ? splits[2] : shadowFar,

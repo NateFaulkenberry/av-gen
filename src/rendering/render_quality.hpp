@@ -97,15 +97,14 @@ struct QualitySettings {
 
     std::uint32_t shadowPcfTaps = 12;
     // NOT READ. The §15 parity audit grepped every field here for a reader and found none: the
-    // PCSS blocker search in shaders/shadows.wgsl takes the same tap count as the PCF filter, which
-    // is `shadowPcfTaps` through `ShadowUniforms::info.z`. Wiring it needs a lane in that block and
-    // every lane of `info` and `splits` is taken, so it is a uniform-layout change rather than a
-    // line. Left in place with the truth attached rather than deleted, because the tiers do want a
-    // separate budget for it: the search is uninterpolated `textureLoad`s on top of the filter and
-    // ADR-111 measured it as the largest single contributor to the shadow mask's residual.
+    // How many taps the PCSS blocker search takes, through `ShadowUniforms::info2.x` (ADR-227).
+    // Its own budget rather than the filter's, because they are two costs: the search is
+    // uninterpolated `textureLoad`s over a fixed radius and ADR-111 measured it as the largest
+    // single contributor to the shadow mask's residual, while the filter is hardware comparison
+    // samples over a radius the search chose. Clamped to 1..32 where it is written.
     //
-    // Only the High tier sets the two differently today (20 PCF, 16 blocker), so wiring it changes
-    // one tier's picture and no other.
+    // Only the High tier sets the two differently today (20 PCF, 16 blocker), so this moves one
+    // tier's picture and no other.
     std::uint32_t pcssBlockerTaps = 12;
     bool softShadows = true;               // percentage-closer soft shadows for the key light
     std::uint32_t contactSteps = 12;       // screen-space contact-shadow march
