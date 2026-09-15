@@ -15,6 +15,7 @@
 #include "scene/water_surface.hpp"
 #include "spatial/field.hpp"
 #include "spatial/spline.hpp"
+#include "world/atmospherics.hpp"
 #include "world/effects.hpp"
 #include "scene/scene_types.hpp"
 
@@ -96,6 +97,10 @@ struct Scene {
     // needs the hero table and the director's cut, neither of which a renderer has any business
     // knowing about. Not serialised -- the authored effects live on the Composition.
     world::WorldEffectFrame worldEffects;
+    // ADR-230: the atmospheric effects live *this frame*, resolved and packed the same way and by
+    // the same owner, for the same reason -- a comet's launch window is gated on the director's cut
+    // and its spectrum comes from the analysis track, neither of which a renderer should know.
+    world::AtmosphericFrame atmospherics;
     std::uint64_t meshVersion = 0;    // incremented when meshes change (renderer re-uploads)
     std::uint64_t textureVersion = 0; // incremented when textures change
     // Who this scene is, as distinct from where it lives (see mintSceneIdentity above). Never 0:

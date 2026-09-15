@@ -1246,6 +1246,17 @@ Result<void> Composition::setWorldEffects(std::vector<world::WorldEffect> effect
     return {};
 }
 
+// ADR-230, on exactly the terms `setWorldEffects` states above: the whole set or none of it, and a
+// duplicate name refused because a name is half of a parameter path. No `dirty_` for the same reason
+// again -- an aurora places nothing and occludes nothing.
+Result<void> Composition::setAtmosphericEffects(std::vector<world::AtmosphericEffect> effects) {
+    if (auto ok = world::validateAtmosphericEffects(effects); !ok) {
+        return ok;
+    }
+    atmosphericEffects_ = std::move(effects);
+    return {};
+}
+
 Result<void> Composition::setHeroes(std::vector<world::HeroPoint> heroes) {
     for (std::size_t i = 0; i < heroes.size(); ++i) {
         if (auto ok = heroes[i].validate(); !ok) {
@@ -5411,6 +5422,15 @@ nlohmann::json Composition::toJson() const {
         }
         j["worldEffects"] = std::move(effects);
     }
+    // ADR-230. Written only when there are effects, so every scene that never declared one writes
+    // back exactly the file it had.
+    if (!atmosphericEffects_.empty()) {
+        json atmospherics = json::array();
+        for (const world::AtmosphericEffect& effect : atmosphericEffects_) {
+            atmospherics.push_back(effect.toJson());
+        }
+        j["atmosphericEffects"] = std::move(atmospherics);
+    }
     if (!profileLibraryPath_.empty()) {
         j["entityProfiles"] = profileLibraryPath_;
     }
@@ -5872,6 +5892,28 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             effects.push_back(std::move(*effect));
         }
         if (auto ok = comp->setWorldEffects(std::move(effects)); !ok) {
+            return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
+        }
+    }
+    // ADR-230: the atmospheric effects. Read beside the world effects and on the same terms -- a
+    // malformed one is an error rather than a silent omission, because an effect that does not load
+    // is an effect that never fires with nothing saying why.
+    if (j.contains("atmosphericEffects")) {
+        const json& atmosJson = j.at("atmosphericEffects");
+        if (!atmosJson.is_array()) {
+            return fail("scene file '{}': 'atmosphericEffects' must be an array", scenePath.string());
+        }
+        std::vector<world::AtmosphericEffect> atmospherics;
+        atmospherics.reserve(atmosJson.size());
+        for (std::size_t i = 0; i < atmosJson.size(); ++i) {
+            auto effect = world::AtmosphericEffect::fromJson(atmosJson[i]);
+            if (!effect) {
+                return fail("scene file '{}': atmosphericEffects[{}]: {}", scenePath.string(), i,
+                            effect.error().message);
+            }
+            atmospherics.push_back(std::move(*effect));
+        }
+        if (auto ok = comp->setAtmosphericEffects(std::move(atmospherics)); !ok) {
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
     }

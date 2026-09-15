@@ -25,6 +25,9 @@
 // raymarched SDF surfaces all receive a wave with no per-asset code. It reads `kProceduralDraw`,
 // which every includer of this file already defines.
 #include "world_effects.wgsl"
+// ADR-230 §6. Only the ground half: the comet marching and the aurora shells belong to the sky
+// draw, and a surface fragment has no use for them.
+#include "atmosphere_ground.wgsl"
 
 // applyFog / fogHeightIntegral moved to common.wgsl in ADR-099: water.wgsl needs the same fog and
 // does not include this file, and two copies of a fog curve is how two surfaces end up in
@@ -374,8 +377,14 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         // down a valley is seen through the air that is between it and the eye, and added to the
         // emission target so the bloom chain sees it too.
         let fx = worldEffectsAt(worldPos, n, emissive);
+        // ADR-230 §6: the sky's light on the ground. Multiplied by the albedo because it is
+        // *incoming light* and not paint -- adding it flat would lift every black surface in the
+        // valley to the aurora's colour, which is the "flattens the scene" failure §6 warns about.
+        // It is deliberately absent from `result.emission`: illumination is not emission, and a
+        // ground wash that blooms is a ground wash nobody can control.
+        let skyLit = atmosphereGroundAt(worldPos, n) * baseColor.rgb;
         result.color = vec4<f32>(applyFog(lighting.diffuse + lighting.specular + ambient + emissive + rim
-                                          + fx.radiance,
+                                          + fx.radiance + skyLit,
                                          worldPos), alpha);
         result.normal = n;
         result.roughness = roughness;
@@ -485,7 +494,9 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
 
     // ADR-207, as on the styled path above: additive, pre-fog, and into the emission target.
     let fx = worldEffectsAt(worldPos, n, emissive);
-    result.color = vec4<f32>(applyFog(direct + ambient + emissive + rim + fx.radiance, worldPos), alpha);
+    // ADR-230 §6, as on the styled path above: albedo-multiplied, and not into the emission target.
+    let skyLit = atmosphereGroundAt(worldPos, n) * baseColor.rgb;
+    result.color = vec4<f32>(applyFog(direct + ambient + emissive + rim + fx.radiance + skyLit, worldPos), alpha);
     result.normal = n;
     result.roughness = roughness;
     result.emission = emissive + rim + fx.radiance;

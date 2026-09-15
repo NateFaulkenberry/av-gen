@@ -736,13 +736,21 @@ const std::vector<Pairing>& pairings() {
          {"common.wgsl"},
          "FrameUniforms",
          // ADR-207 appended a count vector and an array of `world::WorldEffectGpu` after `lights`;
-         // the bundle has to carry that header or the audit cannot resolve the element type.
-         {"rendering/scene_renderer.hpp", "core/wind.hpp", "world/effects.hpp"},
+         // ADR-230 appended the atmospheric block after that. The bundle has to carry both headers
+         // or the audit cannot resolve the element types -- and an unresolved type stops the audit
+         // rather than being skipped, which is how this test caught ADR-230 adding three.
+         {"rendering/scene_renderer.hpp", "core/wind.hpp", "world/effects.hpp",
+          "world/atmospherics.hpp"},
          "FrameUniforms",
          // The wind field is one nested struct on the C++ side and four loose vec4s in the shader.
          // That is deliberate: `wind::packWind` builds the block once and the shaders read it
          // through `shaders/wind.wgsl`, which wants the four names.
-         {{"wind", {"windDir", "windRegion", "windGust", "windTurb"}}}},
+         //
+         // ADR-230's ground illumination is the same shape for the same reason: `world::SkyGroundGpu`
+         // is one struct the CPU fills in one place, and three separate vec4s in the shader because
+         // `atmosphere_ground.wgsl` reads them by name.
+         {{"wind", {"windDir", "windRegion", "windGust", "windTurb"}},
+          {"skyGround", {"skyGroundAmbient", "skyGroundPoint", "skyGroundPointColor"}}}},
         {"ObjectUniforms", {"common.wgsl"}, "ObjectUniforms", {"rendering/scene_renderer.hpp"}, "ObjectUniforms", {}},
         {"LightUniform", {"common.wgsl"}, "Light", {"rendering/scene_renderer.hpp"}, "LightUniform", {}},
         {"TonemapUniforms", {"tonemap.wgsl"}, "TonemapUniforms", {"rendering/scene_renderer.hpp"},

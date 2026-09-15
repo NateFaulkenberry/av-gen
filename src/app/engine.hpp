@@ -32,6 +32,7 @@
 #include "scene/orb_scene.hpp"
 #include "scene/camera.hpp"
 #include "scene/post_settings.hpp"
+#include "world/atmospheric_params.hpp"
 #include "world/effect_params.hpp"
 #include "scene/scene_controller.hpp"
 #include "seq/director.hpp"
@@ -46,6 +47,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <array>
 #include <cstdint>
 #include <span>
 #include <string>
@@ -303,6 +305,18 @@ public:
     // does, and leaves everything as it was on a refusal.
     [[nodiscard]] Result<void> setWorldEffects(std::vector<world::WorldEffect> effects);
 
+    // ---- atmospheric effects (ADR-230) -----------------------------------------------------------
+    //
+    // The same three accessors on the same terms, for the sky family. Separate from the world
+    // effects all the way down -- separate list, separate parameter group, separate GPU block,
+    // separate draw -- because the only thing the two share is a lifecycle.
+    [[nodiscard]] std::vector<world::AtmosphericEffect>& atmosphericEffects() { return atmosphericEffects_; }
+    [[nodiscard]] const std::vector<world::AtmosphericEffect>& atmosphericEffects() const {
+        return atmosphericEffects_;
+    }
+    [[nodiscard]] const world::AtmosphericParameters& atmosphericParameters() const { return atmosphericParams_; }
+    [[nodiscard]] Result<void> setAtmosphericEffects(std::vector<world::AtmosphericEffect> effects);
+
     // The director's cut, flattened to what an effect needs for time gating (ADR-207). Installed by
     // `app::installSequence` and cleared by `releaseDirectedCamera`; empty means nothing is directing
     // the camera, in which case `CameraTravel` and `HeroFocus` effects simply never activate.
@@ -554,10 +568,20 @@ private:
     // `worldfx/...` parameters; `shotSpans_` is the director's cut, for time gating.
     std::vector<world::WorldEffect> worldEffects_;
     world::WorldEffectParameters worldEffectParams_;
+    // ADR-230, on the same terms: the live set and the `atmos/...` parameters that own it.
+    std::vector<world::AtmosphericEffect> atmosphericEffects_;
+    world::AtmosphericParameters atmosphericParams_;
+    // The aurora's spectrum, resolved each frame from the analysis frame every other consumer
+    // reads. `kAuroraBands` entries; see `world/atmospherics.hpp` for why this one vector is not a
+    // modulation route.
+    std::array<float, world::kAuroraBands> auroraSpectrum_{};
     std::vector<world::ShotSpan> shotSpans_;
     AutoDirectorSettings autoDirector_; // ADR-225: saved with the project, read by the host
     std::uint32_t lastWorldEffectCount_ = 0;
+    std::uint32_t lastAtmosphericCount_ = 0;
     void updateWorldEffects();
+    void updateAtmosphericEffects();
+    void updateAuroraSpectrum();
     [[nodiscard]] glm::vec3 cameraVelocityOnTimeline() const;
     scene::PostParameters postParams_;
     scene::LensSettings lens_;

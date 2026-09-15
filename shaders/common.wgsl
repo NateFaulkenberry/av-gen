@@ -28,6 +28,41 @@ struct WorldEffect {
     response: vec4<f32>,   // x = ground, y = foliage (the scatter), z = surface, w = emissive gain
 };
 
+// ADR-230 atmospheric effects. Mirrors world::CometGpu / world::AuroraGpu; the C++ side asserts
+// both sizes, and the sum assert on FrameUniforms is what makes a lane added on one side a compile
+// error on the other rather than a silent misread.
+struct AtmosComet {
+    anchorTravel: vec4<f32>, // xyz = anchor (world), w = arc length flown (m)
+    dir0Tail: vec4<f32>,     // xyz = unit direction to the launch point, w = tail length (m)
+    dir1Path: vec4<f32>,     // xyz = unit direction to the destination, w = arc length (m)
+    arc: vec4<f32>,          // x = distance (m), y = omega (rad), z = lift, w = curvature
+                             // (both bows as fractions of the distance)
+    core: vec4<f32>,         // rgb = core radiance (envelope folded in), w = head radius (m)
+    halo: vec4<f32>,         // rgb = halo radiance, w = halo radius (m)
+    tail: vec4<f32>,         // rgb = tail radiance, w = tail falloff exponent
+    shape: vec4<f32>,        // x = tail width (m), y = wisp amount (m), z = wisp scale (1/m), w = flow phase
+    sparkle: vec4<f32>,      // x = fragments per metre (0 = off), y = fragment radius (m),
+                             // z = intensity, w = twinkle phase
+    rainbow: vec4<f32>,      // x = cycles per metre, y = phase, z = saturation, w = brightness (0 = off)
+};
+
+struct AtmosAurora {
+    config: vec4<f32>,  // x = curtain shells, y = nearest radius (m), z = base height (world Y), w = curtain height (m)
+    shape: vec4<f32>,   // x = wave amplitude, y = wave scale, z = turbulence, w = complexity
+    flow: vec4<f32>,    // x = flow phase, y = drift phase, z = vertical phase, w = layer spacing
+    low: vec4<f32>,     // rgb = base radiance (intensity and envelope folded in), w = opacity
+    mid: vec4<f32>,     // rgb = mid radiance, w = bloom weight
+    top: vec4<f32>,     // rgb = top radiance, w = edge brightness
+    detail: vec4<f32>,  // x = filaments, y = sparkle, z = spectrum shape amount, w = horizon glow
+    audio: vec4<f32>,   // x = bass, y = lowMid, z = mid, w = high -- depths, already sensitised
+    audio2: vec4<f32>,  // x = beat depth, y = rainbow amount, z = rainbow scale, w = rainbow phase
+    anchor: vec4<f32>,  // xyz = shell centre (world), w = rainbow saturation
+    band0: vec4<f32>,   // the spectrum, low to high: bins 0..3
+    band1: vec4<f32>,   // bins 4..7
+    band2: vec4<f32>,   // bins 8..11
+    band3: vec4<f32>,   // bins 12..15
+};
+
 struct FrameUniforms {
     viewProj: mat4x4<f32>,
     invViewProj: mat4x4<f32>,
@@ -81,6 +116,18 @@ struct FrameUniforms {
     // x = how many of the array below are live; the rest of the vector is spare.
     worldEffectCount: vec4<f32>,
     worldEffects: array<WorldEffect, 8>,
+    // ADR-230 atmospheric effects. Appended after the world effects for the same reason those were
+    // appended after `lights`: no offset above it moves, so nothing already reading this block can
+    // be broken by adding to the end of it.
+    // x = live comets, y = live auroras, z = how many samples the tail march takes, w = 0.
+    atmosCount: vec4<f32>,
+    comets: array<AtmosComet, 6>,
+    auroras: array<AtmosAurora, 2>,
+    // §6 ground illumination, already summed and already scaled by each effect's Off/Subtle/Strong
+    // setting and lifetime envelope, so the surface shader adds rather than loops.
+    skyGroundAmbient: vec4<f32>,    // rgb = hemispheric radiance, w = 0
+    skyGroundPoint: vec4<f32>,      // xyz = the brightest comet's ground track point, w = radius (m)
+    skyGroundPointColor: vec4<f32>, // rgb = its radiance, w = falloff exponent
 };
 
 struct ObjectUniforms {

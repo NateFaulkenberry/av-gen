@@ -32,6 +32,7 @@
 #include "scene/scene_controller.hpp"
 #include "world/city.hpp"
 #include "world/ecology.hpp"
+#include "world/atmospherics.hpp"
 #include "world/effects.hpp"
 #include "world/hero.hpp"
 #include "world/terrain.hpp"
@@ -493,6 +494,17 @@ public:
     // silently dropped is an effect that never fires with nothing saying why. Duplicates matter more
     // here than they would elsewhere: a name is half of a parameter path.
     Result<void> setWorldEffects(std::vector<world::WorldEffect> effects);
+
+    // ---- atmospheric effects (ADR-230) -----------------------------------------------------------
+    //
+    // A separate list from the world effects, round-tripped as `"atmosphericEffects"`, for the same
+    // reason ADR-230 gives a comet its own rendering path: the two families share a lifecycle and
+    // nothing else. Folding them into one array would mean one `kind` field deciding which half of a
+    // much larger struct is meaningful, and a file in which most of every record is ignored.
+    [[nodiscard]] const std::vector<world::AtmosphericEffect>& atmosphericEffects() const {
+        return atmosphericEffects_;
+    }
+    Result<void> setAtmosphericEffects(std::vector<world::AtmosphericEffect> effects);
     // Bumped by every accepted `setHeroes`. A counter rather than a comparison of the lists,
     // because what reads it is asking "is the shot I cut still the shot these heroes describe" --
     // a question about *when*, not about which fields differ -- and because comparing two vectors
@@ -886,6 +898,8 @@ private:
     std::vector<std::unique_ptr<AnimationSink>> animationSinks_;
 
     std::vector<world::WorldEffect> worldEffects_; // ADR-207: authored, round-tripped as "worldEffects"
+    // ADR-230: authored, round-tripped as "atmosphericEffects"
+    std::vector<world::AtmosphericEffect> atmosphericEffects_;
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
     std::uint64_t heroRevision_ = 1;
     std::uint64_t heroPlacementRevision_ = 1;
