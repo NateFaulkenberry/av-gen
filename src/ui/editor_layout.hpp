@@ -89,7 +89,19 @@ struct EditorPanel {
 struct LayoutRatios {
     float left = 0.19f;
     float right = 0.21f;
-    float bottom = 0.26f;
+    // The bottom region has to hold the Sequence panel, and that is what sizes it: a transport bar,
+    // a two-row toolbar, the strip, and an inspector under it.
+    //
+    // At 0.26 it did not. Measured with `--ui-script strip` on a 1440x900-point window, the strip
+    // laid out at y = 890 in a 900-point window -- ten points of a 170-point strip on screen, and
+    // the rest below the fold. The sequencer was unusable at the size the editor opens at until
+    // somebody dragged the divider, and nothing said so; the scripted arm found it on its first
+    // run by reporting a scrub that had gone to 0.00 s because the click landed outside the window.
+    //
+    // 0.32 fits the strip for a piece with audio, sections, shots and two actors, which is the
+    // shape of an actual project rather than an empty one. The canvas keeps 68% of the height and
+    // remains much the largest thing on screen, which is the rule the comment above states.
+    float bottom = 0.32f;
 
     [[nodiscard]] float centreWidth() const { return 1.0f - left - right; }
     [[nodiscard]] float centreHeight() const { return 1.0f - bottom; }

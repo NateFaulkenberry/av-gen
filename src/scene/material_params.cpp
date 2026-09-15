@@ -21,6 +21,12 @@ void copyValue(const MaterialProgramParameters& p, const std::string& rel, T& ta
         target = param->value();
     }
 }
+// The path of one op's parameters, relative to the program's prefix: index *and* kind, so that a
+// value saved against a different op list cannot land on this one (ADR-232). Registration and
+// application both go through here, so the two can never drift apart.
+[[nodiscard]] std::string opPath(std::size_t index, MaterialOpKind kind) {
+    return "op/" + std::to_string(index + 1) + "/" + materialOpKindName(kind) + "/";
+}
 } // namespace
 
 MaterialProgramParameters registerMaterialProgramParameters(params::ParameterSet& params, const MaterialProgram& rest,
@@ -73,7 +79,7 @@ MaterialProgramParameters registerMaterialProgramParameters(params::ParameterSet
     p.emissionIntensity = addF("emissionIntensity", "emissionIntensity", rest.emissionIntensity, 0.0f, 100.0f, 0.0f, 8.0f);
     for (std::size_t i = 0; i < rest.ops.size(); ++i) {
         const MaterialOp& op = rest.ops[i];
-        const std::string base = "op/" + std::to_string(i + 1) + "/";
+        const std::string base = opPath(i, op.kind);
         const std::string kind = materialOpKindName(op.kind);
         p.opValue.push_back(addF(base + "value", kind + "/value", op.value, -1000.0f, 1000.0f, -4.0f, 4.0f));
         addV4(base + "constant", kind + "/constant", op.constant);
@@ -90,7 +96,7 @@ void applyMaterialProgramParameters(const MaterialProgramParameters& p, const Ma
     live = rest;
     copyValue(p, "emissionIntensity", live.emissionIntensity);
     for (std::size_t i = 0; i < live.ops.size(); ++i) {
-        const std::string base = "op/" + std::to_string(i + 1) + "/";
+        const std::string base = opPath(i, live.ops[i].kind);
         copyValue(p, base + "value", live.ops[i].value);
         copyValue(p, base + "constant", live.ops[i].constant);
         copyValue(p, base + "constant2", live.ops[i].constant2);

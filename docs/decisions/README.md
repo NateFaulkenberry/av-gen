@@ -217,4 +217,6 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [226](ADR-226-the-second-scene-with-the-same-stride-defect.md) | The second scene with the same stride defect, and the bands nobody scaled | Accepted |
 | [227](ADR-227-the-blocker-search-gets-its-own-budget.md) | The blocker search gets its own budget, and the lane it needed | Accepted |
 | [230](ADR-230-atmospheric-effects.md) | An atmospheric effect is a view ray, not a surface term (comets and aurora) | Accepted |
+| [231](ADR-231-the-interface-says-what-it-can-do-and-what-it-is-doing.md) | The interface says what it can do, and what it is doing (cursors, context menus, the processing indicator, a threaded scatter) | Accepted |
+| [232](ADR-232-a-parameter-path-carries-the-structure-it-was-saved-against.md) | A parameter path carries the structure it was saved against (the material op table that black-holed an elder) | Accepted |
 | [240](ADR-240-a-placement-is-not-an-offset.md) | A placement is not an offset, a euler triple is not an orientation, a push is not a walk, and a stride speed is still a claim about a clip | Accepted |

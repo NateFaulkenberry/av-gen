@@ -172,7 +172,13 @@ private:
     int runLive();
     int runHeadless();
     void loadAudio(const std::filesystem::path& path);
+    // Asks for `path` to be opened at the top of the next frame, so the canvas can say so first.
+    // See the note at the definition for why the load itself stays on the main thread.
     void loadAny(const std::filesystem::path& path);
+    void servicePendingOpen();
+    // The blocking half of `loadAny`.
+    void performOpen(const std::filesystem::path& path);
+    std::optional<std::filesystem::path> pendingOpen_;
     void rememberProject(const std::filesystem::path& path); // recent list + window title
     // Input diagnostics (AVGEN_UI_SELFTEST=1): raw SDL mouse events seen this run.
     std::uint64_t uiMotionEvents_ = 0;

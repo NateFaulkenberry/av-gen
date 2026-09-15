@@ -1,5 +1,8 @@
 #include "ui/world_edit_panel.hpp"
 
+#include "ui/style.hpp"
+#include "ui/world_context_menu.hpp"
+
 #include "core/log.hpp"
 
 #include "scene/composition.hpp"
@@ -612,6 +615,10 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
         }
     }
 
+    const std::string primary = editor.selection.primary();
+    if (primary.empty()) {
+        scrolledTo_.clear();
+    }
     const std::string filter = objectFilter_;
     const auto matches = [&](const std::string& name) {
         if (filter.empty()) {
@@ -639,7 +646,11 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
                                                                            int depth) {
         const auto kids = children.find(node.name);
         const bool hasKids = kids != children.end() && !kids->second.empty();
-        const bool showSelf = matches(node.name);
+        // A filter narrows what you are *looking* for; it should not hide what you have *got*.
+        // Selecting something in the viewport while a filter is applied used to leave the list
+        // showing no selected row at all, which reads as the click having failed.
+        const bool isSelected = editor.selection.contains(node.name);
+        const bool showSelf = matches(node.name) || isSelected;
         ImGui::PushID(node.name.c_str());
 
         if (showSelf) {
@@ -712,6 +723,29 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
                 } else {
                     editor.selection.set(node.name);
                 }
+            }
+            // Bring a selection made elsewhere into view. After the row, so the scroll target is
+            // the row that was just laid out; only for the primary, so a box-select of forty
+            // objects does not fight itself for the viewport.
+            if (isSelected && !primary.empty() && node.name == primary && scrolledTo_ != primary) {
+                ImGui::SetScrollHereY(0.5f);
+                scrolledTo_ = primary;
+            }
+            if (ImGui::IsItemHovered()) {
+                // A locked row is inert to a click, and the cursor says which of the two it is
+                // rather than promising a selection the row will refuse.
+                setHoverCursor(node.locked ? ImGuiMouseCursor_NotAllowed : ImGuiMouseCursor_Hand);
+            }
+            // The row's context menu. Attached to the `Selectable` above and inside this row's
+            // `PushID`, so an unnamed popup gets a unique id per node without one being invented.
+            //
+            // It is offered on a locked row too, which the left click is not: a lock means "this
+            // does not get selected", and the one thing you most need to do to a locked object is
+            // unlock it. A menu that refused to open on exactly the rows you cannot otherwise
+            // reach would be a trap.
+            if (ContextMenu menu("##rowmenu"); menu) {
+                static_cast<void>(worldObjectMenuBody(engine, editor, node.name,
+                                                      WorldMenuHost{.frameSelection = &frameSelectionRequested}));
             }
             if (node.locked) {
                 ImGui::PopStyleColor();

@@ -4,8 +4,10 @@
 
 #include "params/modulation.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <iterator>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -250,6 +252,21 @@ struct StripLanes {
     float audioLaneHeight = 36.0f;
     float sectionLaneHeight = 22.0f;
     float gap = 3.0f;
+    // The header column down the left of the strip, in points. Zero is a strip with no headers,
+    // which is what it was before this pass and what the existing lane tests still describe.
+    //
+    // It lives here, with the lane heights, for exactly the reason the lane heights do: the
+    // drawing and the hit testing both need to know where the time axis begins, and ADR-103 is the
+    // record of what happens when two places calculate the strip's geometry separately. A click
+    // left of `timeLeft()` is a click on a header and never a scrub, and that is one comparison
+    // against one number that both sides read.
+    float gutter = 0.0f;
+
+    // Where the time axis begins, measured from the left of the strip.
+    [[nodiscard]] float timeLeft() const { return gutter; }
+    // True when `x`, relative to the left of the strip, is on a lane's header rather than on the
+    // time axis.
+    [[nodiscard]] bool inGutter(float x) const { return gutter > 0.0f && x < gutter; }
 
     // Where the lanes start, measured from the top of the strip.
     [[nodiscard]] float lanesTop() const { return rulerHeight + markerHeight + gap; }
@@ -296,6 +313,199 @@ struct StripLanes {
         return StripLane::None;
     }
 };
+
+// ---- blocks in a lane: where the body ends and the grip begins -------------------------------
+//
+// A clip, a shot and an overlay are all the same shape -- a box on a time axis with a draggable
+// body and two edges that resize it -- so which part of one the pointer is over is answered once,
+// here, without a window. The cursor, the hover highlight and the drag all read the same answer,
+// which is the property that stopped the lanes and the hit test drifting apart in ADR-103.
+enum class BlockZone : std::uint8_t {
+    None,      // not over the block at all
+    Body,      // moves it
+    LeftEdge,  // trims the start
+    RightEdge, // trims the end
+};
+
+// A block narrower than this offers no edge grips at all. Two of them would leave a body of a few
+// points, and a move gesture that can only be started by hitting a three-pixel target is not a
+// gesture, it is a lottery -- zooming in is the honest answer, and the ruler makes that easy.
+inline constexpr float kMinGrippableBlockWidth = 18.0f;
+
+// `x` is the pointer, `a` and `b` the block's left and right edges, all in one space (screen
+// points). `grab` is how far inside an edge still counts as that edge.
+//
+// The grips are strictly *inside* the block. A grip that reached past the edge would swallow the
+// first few points of the neighbouring block, and in a lane packed edge to edge that is every
+// click. It also shrinks on a narrow block -- a third of the width at most -- so that the body
+// never disappears behind its own handles.
+[[nodiscard]] inline BlockZone blockZoneAt(float x, float a, float b, float grab) {
+    if (b < a) {
+        std::swap(a, b);
+    }
+    if (x < a || x > b) {
+        return BlockZone::None;
+    }
+    const float width = b - a;
+    if (width < kMinGrippableBlockWidth) {
+        return BlockZone::Body;
+    }
+    const float grip = std::min(std::max(grab, 0.0f), width / 3.0f);
+    if (grip <= 0.0f) {
+        return BlockZone::Body;
+    }
+    // The right edge wins a tie on a block so narrow that the two grips meet, because extending the
+    // end is the commoner gesture and because `a + grip <= b - grip` is guaranteed by the third
+    // above -- the tie is only reachable at exactly a third.
+    if (x >= b - grip) {
+        return BlockZone::RightEdge;
+    }
+    if (x <= a + grip) {
+        return BlockZone::LeftEdge;
+    }
+    return BlockZone::Body;
+}
+
+// ---- a right-click that is not the end of a right-drag ----------------------------------------
+//
+// Dear ImGui opens a context menu on the *release* of the right button and makes no test of how far
+// it travelled (`IsPopupOpenRequestForItem` in imgui.cpp: `IsMouseReleased(button) &&
+// IsItemHovered(...)`, and nothing else). On a list row that is exactly right. On the sequencer
+// strip it is wrong, because a right-drag is how the view pans -- so every pan would finish by
+// opening a menu over wherever it happened to stop.
+//
+// The strip therefore decides for itself: a right press that stays put is a menu, a right press
+// that moves is a pan, and once it has moved it cannot become a menu again however far it comes
+// back. Latching `travelled` is what makes that last part true; testing the distance only at the
+// release would call a there-and-back drag a click.
+struct ContextClickTracker {
+    bool down = false;
+    bool travelled = false;
+    float pressX = 0.0f;
+    float pressY = 0.0f;
+};
+
+// Four points of slop: enough that a hand resting on a trackpad does not lose its menu, small
+// enough that a deliberate pan never opens one.
+inline constexpr float kContextClickSlop = 4.0f;
+
+// Feed the button's state every frame. Returns true on the single frame a context menu should open.
+[[nodiscard]] inline bool updateContextClick(ContextClickTracker& t, bool pressed, bool released,
+                                             float x, float y, float slop = kContextClickSlop) {
+    if (pressed) {
+        t.down = true;
+        t.travelled = false;
+        t.pressX = x;
+        t.pressY = y;
+    }
+    if (t.down && !t.travelled) {
+        const float dx = x - t.pressX;
+        const float dy = y - t.pressY;
+        if (dx * dx + dy * dy > slop * slop) {
+            t.travelled = true;
+        }
+    }
+    if (released) {
+        const bool menu = t.down && !t.travelled;
+        t.down = false;
+        t.travelled = false;
+        return menu;
+    }
+    return false;
+}
+
+// ---- when the canvas admits it is working ------------------------------------------------------
+//
+// The rule the brief asks for, as arithmetic: nothing at all under the threshold, then a fade in.
+//
+// A threshold is the whole point. Procedural regeneration defers for 90 ms by design (ADR-084), and
+// an indicator that appeared for every one of those would blink on every frame of every slider
+// drag -- which does not communicate "working", it teaches the eye to ignore the one place the
+// application has to say so. And it must fade rather than appear: something that blinks on at full
+// strength reads as an error, and this is not one.
+//
+// This reads a wall clock, and a wall clock may not decide what a render contains. It does not: the
+// hint is drawn by Dear ImGui into the window's swapchain image, after the world has been rendered
+// into its own target and never into it. `--headless` builds no window and draws no ImGui at all.
+struct ProcessingHint {
+    bool visible = false;
+    float opacity = 0.0f; // 0..1
+};
+
+// How long the work must have been going before the canvas says anything.
+inline constexpr double kProcessingAppearMs = 180.0;
+// And how long it then takes to reach full strength.
+inline constexpr double kProcessingFadeMs = 140.0;
+
+[[nodiscard]] inline ProcessingHint processingHint(bool busy, double busyForMs) {
+    ProcessingHint out;
+    if (!busy || busyForMs < kProcessingAppearMs) {
+        return out;
+    }
+    const double into = busyForMs - kProcessingAppearMs;
+    out.visible = true;
+    out.opacity = static_cast<float>(std::clamp(into / kProcessingFadeMs, 0.0, 1.0));
+    return out;
+}
+
+// Accumulates how long the world has been busy, so `processingHint` has something to ask about.
+// Fed the frame's own delta rather than reading a clock, which is what makes it testable and what
+// keeps the one wall clock involved at the call site where it can be seen.
+struct ProcessingTracker {
+    double busyForMs = 0.0;
+
+    ProcessingHint advance(bool busy, double deltaMs) {
+        // The timer resets the moment the work finishes, so a second burst starts from zero and
+        // has to earn the indicator again. Carrying it over would make the indicator appear
+        // instantly on every subsequent slider nudge, which is the flashing the threshold exists
+        // to prevent.
+        busyForMs = busy ? busyForMs + std::max(deltaMs, 0.0) : 0.0;
+        return processingHint(busy, busyForMs);
+    }
+};
+
+// ---- the timeline ruler's divisions ------------------------------------------------------------
+//
+// A ruler with one tick size is a row of scratches; a ruler with two is readable at a glance,
+// because the minor ticks give the eye something to count between the labels. Which two depends on
+// the zoom, and picking them is arithmetic over a 1-2-5 ladder rather than a guess.
+struct RulerTicks {
+    double major = 1.0; // labelled
+    double minor = 0.0; // unlabelled; zero means there is no room for them
+};
+
+// `span` is how many seconds are on screen, `width` how many points wide that is.
+// `minLabelSpacing` keeps the labels from colliding; `minMinorSpacing` stops the minor ticks
+// closing up into a grey band, which is worse than no minor ticks at all.
+[[nodiscard]] inline RulerTicks rulerTicks(double span, float width, float minLabelSpacing = 68.0f,
+                                           float minMinorSpacing = 7.0f) {
+    RulerTicks out;
+    if (!(span > 0.0) || !(width > 0.0f)) {
+        return out;
+    }
+    // Seconds, on the ladder a person reads time in. 1-2-5 up to a minute and then the minute
+    // multiples, because 100 seconds is not a unit anybody thinks in.
+    static constexpr double kLadder[] = {0.01, 0.025, 0.05, 0.1, 0.25, 0.5,  1.0,   2.0,
+                                         5.0,  10.0,  15.0, 30.0, 60.0, 120.0, 300.0, 600.0};
+    const double perPoint = span / static_cast<double>(width);
+    out.major = kLadder[std::size(kLadder) - 1];
+    for (const double step : kLadder) {
+        if (step / perPoint >= static_cast<double>(minLabelSpacing)) {
+            out.major = step;
+            break;
+        }
+    }
+    // The finest subdivision of the major that still reads as separate ticks. Halves, quarters and
+    // fifths only: a major divided by three is not something the eye counts.
+    for (const int divisor : {5, 4, 2}) {
+        const double candidate = out.major / static_cast<double>(divisor);
+        if (candidate / perPoint >= static_cast<double>(minMinorSpacing)) {
+            out.minor = candidate;
+            break;
+        }
+    }
+    return out;
+}
 
 // ---- parameters the current state ignores ------------------------------------------------------
 //

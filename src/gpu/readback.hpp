@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <span>
 #include <vector>
 
 namespace avgen::gpu {
@@ -48,10 +49,39 @@ Result<std::vector<std::uint32_t>> readTextureR32Uint(Context& context, const wg
 
 // Reads a single texel of an R32Uint or R32Float texture. This is what picking uses: a click needs
 // four bytes, and reading the whole identifier target to get them is five megabytes and a stall.
+//
+// Each of these is a whole GPU round trip -- a copy, a submit, a `MapAsync` and a blocking wait --
+// so two of them cost twice what one does however few bytes each moves. Prefer `readTexelsR32`
+// wherever more than one texel is wanted at the same moment.
 Result<std::uint32_t> readTexelR32Uint(Context& context, const wgpu::Texture& texture,
                                        std::uint32_t x, std::uint32_t y);
 Result<float> readTexelR32Float(Context& context, const wgpu::Texture& texture, std::uint32_t x,
                                 std::uint32_t y);
+
+// One texel of one texture, for `readTexelsR32`. The texture is held by pointer because the batch
+// deliberately spans *several* textures -- picking wants the identifier target and the linear-depth
+// target at the same pixel, which is the whole reason this exists.
+struct TexelRequest {
+    const wgpu::Texture* texture = nullptr;
+    std::uint32_t x = 0;
+    std::uint32_t y = 0;
+};
+
+// Reads every requested texel in **one** submission and **one** map, returning their raw 32 bits in
+// request order (`std::bit_cast` or memcpy to float where the texture is R32Float).
+//
+// Why this is worth having rather than a loop over the singular versions: the cost of a readback on
+// this backend is almost entirely the round trip, not the bytes. `viewport_pick` read the depth,
+// waited for the GPU, then read the identifier and waited again -- so every click on the viewport
+// paid two full CPU-blocking stalls on the main thread to move eight bytes. It is item 4 of
+// docs/application-performance.md section 14 ("coalesce the viewport pick's readbacks into one
+// submission"), and it is on the interaction a person performs most often.
+//
+// Each texel gets its own 256-byte-aligned slice of one staging buffer, because that is WebGPU's
+// minimum offset for a texture-to-buffer copy. Eight bytes of payload in two kilobytes of buffer is
+// not a saving worth making; one wait instead of two is.
+Result<std::vector<std::uint32_t>> readTexelsR32(Context& context,
+                                                 std::span<const TexelRequest> requests);
 
 // Reads `size` bytes of a buffer created with CopySrc usage (blocking). For tests and tools.
 Result<std::vector<std::uint8_t>> readBuffer(Context& context, const wgpu::Buffer& buffer, std::uint64_t offset,

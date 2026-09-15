@@ -26,7 +26,7 @@ struct ArmName {
     std::string_view name;
     UiScriptArm arm;
 };
-constexpr std::array<ArmName, 8> kArms{{
+constexpr std::array<ArmName, 9> kArms{{
     {"hover", UiScriptArm::Hover},
     {"sliders", UiScriptArm::Sliders},
     {"panels", UiScriptArm::Panels},
@@ -35,6 +35,7 @@ constexpr std::array<ArmName, 8> kArms{{
     {"camera", UiScriptArm::Camera},
     {"tabs", UiScriptArm::Tabs},
     {"edit", UiScriptArm::Edit},
+    {"strip", UiScriptArm::Strip},
 }};
 
 // Pushes a motion event as though the device had produced it. SDL routes it to the window under
@@ -50,6 +51,27 @@ void pushMotion(platform::Window& window, float x, float y) {
     e.motion.x = x;
     e.motion.y = y;
     SDL_PushEvent(&e);
+}
+
+// Moves the *real* pointer, and therefore the one Dear ImGui will believe.
+//
+// `pushMotion` alone is not enough for an arm that has to press an exact spot. The SDL3 backend
+// rewrites `io.MousePos` from the operating system's cursor at the top of every frame in which the
+// window is focused and no button is held, and it queues that write *after* the synthetic motion
+// the poll just delivered -- so on the one frame that matters, the frame of the press, the OS wins
+// and the click lands wherever the physical mouse happens to be sitting.
+//
+// The Edit arm lives with that because a paint stroke only needs the *drag* to be in the right
+// place. A scrub does not: the press is the gesture. And the failure is silent and total, because
+// a click that lands on some other widget takes `ActiveId` with it, and ImGui then reports the
+// strip as not hovered for the whole of the drag that follows -- so even the drag-to-scrub
+// fallback never fires. The first run of the strip arm reported a scrub to 0.00 s for exactly this
+// reason, which is what a probe is for (ADR-182).
+//
+// Warping makes the operating system agree with the script, so there is nothing left to overwrite.
+void warpAndMove(platform::Window& window, float x, float y) {
+    SDL_WarpMouseInWindow(window.handle(), x, y);
+    pushMotion(window, x, y);
 }
 
 void pushButton(platform::Window& window, float x, float y, bool down) {
@@ -211,6 +233,10 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
 
     if (has(arms_, UiScriptArm::Edit)) {
         stepEdit(engine, *panel, window, frame);
+    }
+
+    if (has(arms_, UiScriptArm::Strip)) {
+        stepStrip(engine, *panel, window, frame);
     }
 
     if (has(arms_, UiScriptArm::Panels)) {
@@ -455,6 +481,151 @@ void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Windo
         const float t = static_cast<float>(frame - 190) / 15.0f;
         const auto [x, y] = at(0.06f + 0.88f * t, 0.10f + 0.84f * t);
         pushMotion(window, x, y);
+    }
+}
+
+
+
+
+// The sequencer strip, driven the way a person drives it (the brief's scenario C).
+//
+// The same rules as the Edit arm, and the same reason for them: the events go onto the SDL queue
+// and travel the whole path, and a press is issued with a motion in the same frame because Dear
+// ImGui's SDL3 backend overwrites the pointer position from the operating system's cursor on any
+// frame where the window is focused and no button is held. A synthetic motion on its own never
+// survives to the frame that would have used it.
+//
+// The script, in frames:
+//
+//     2  restore the default layout, so the Sequence panel is where it ships
+//     4  open it, in case a saved layout had it closed
+//    20  report where the strip ended up
+//    30  press on the ruler and scrub along it to 80 -- the scrub half of scenario C
+//    82  release
+//    90  press on the shots lane and drag a shot to 140 -- the drag half
+//   142  release, which is the frame the bake happens on
+//   150  report what moved
+void UiScript::stepStrip(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                         std::uint64_t frame) {
+    const auto say = [&](std::string line) { editLog_.push_back(std::move(line)); };
+    const ui::SequencePanel::StripRect& strip = panel.sequence.stripRect();
+
+    if (frame == 2) {
+        panel.restoreDefaultLayout();
+        return;
+    }
+    if (frame == 4 || frame == 5) {
+        // Open *and* bring to the front. The bottom dock holds Sequence, Control, Analysis,
+        // Modulation and Graph as tabs, and opening a panel does not make it the active one -- a
+        // background tab's `Begin` returns false and its body never runs at all.
+        //
+        // That was the whole of the first failure, and it was invisible because `stripRect_` keeps
+        // its last value: the panel laid out once while the default layout was being rebuilt, and
+        // every later report was that stale frame's rectangle. The pointer really was on the
+        // strip's remembered coordinates; the strip simply was not being drawn there any more.
+        if (bool* slot = panel.layout().slot("Sequence"); slot != nullptr) {
+            *slot = true;
+        }
+        ImGui::SetWindowFocus("Sequence");
+        return;
+    }
+    if (!strip.valid()) {
+        if (frame == 20) {
+            say("strip: the Sequence panel never laid out; nothing to drive");
+        }
+        return;
+    }
+    // A point on the strip's time axis, `u` of the way across it. Never in the gutter: a click
+    // there is a header and means something else entirely.
+    const auto at = [&](float u, float localY) {
+        return std::pair<float, float>(strip.x + strip.gutter + (strip.width - strip.gutter) * u,
+                                       strip.y + localY);
+    };
+
+    switch (frame) {
+    case 20:
+        say(fmt::format("strip: at ({:.0f},{:.0f}) {:.0f}x{:.0f} points, gutter {:.0f}, {:.0f} points of "
+                        "toolbar above it, {:.0f} visible", strip.x, strip.y, strip.width, strip.height,
+                        strip.gutter, strip.toolbarHeight, strip.visibleHeight));
+        break;
+    case 26:
+    case 27:
+    case 28:
+    case 29: {
+        // Park the pointer on the target for a few frames *before* pressing. The backend rewrites
+        // `io.MousePos` from the OS cursor on every frame with no button held, so the only way the
+        // press frame sees the right position is for the OS cursor to already be there -- and
+        // ImGui's `HoveredWindow` is computed from that position, so it also needs a frame to
+        // become the Sequence panel. Pressing on the first frame of a move satisfies neither.
+        const auto [x, y] = at(0.15f, strip.rulerHeight * 0.5f);
+        warpAndMove(window, x, y);
+        break;
+    }
+    case 30: {
+        const auto [x, y] = at(0.15f, strip.rulerHeight * 0.5f);
+        warpAndMove(window, x, y);
+        pushButton(window, x, y, true);
+        break;
+    }
+    case 82: {
+        const auto [x, y] = at(0.70f, strip.rulerHeight * 0.5f);
+        warpAndMove(window, x, y);
+        pushButton(window, x, y, false);
+        break;
+    }
+    case 50: {
+        // Mid-stroke, like the Edit arm's report: what the pointer actually is, and whether the
+        // press reached the panel at all. A probe that cannot show it established the state it
+        // measures is worth nothing (ADR-182), and the first run of this arm reported a scrub to
+        // 0.00 s -- which is exactly what "the click never landed" looks like.
+        const ImGuiIO& io = ImGui::GetIO();
+        say(fmt::format("strip: mid-scrub mouse=({:.0f},{:.0f}) down={} hovered={} visible={:.0f}/{:.0f} clock={:.2f} s",
+                        io.MousePos.x, io.MousePos.y, io.MouseDown[0], strip.hovered,
+                        strip.visibleHeight, strip.height, engine.timelineClock().seconds));
+        break;
+    }
+    case 84:
+        say(fmt::format("strip: scrubbed to {:.2f} s", engine.timelineClock().seconds));
+        break;
+    case 86:
+    case 87:
+    case 88:
+    case 89: {
+        const auto [x, y] = at(0.10f, strip.shotsTop + 10.0f);
+        warpAndMove(window, x, y);
+        break;
+    }
+    case 90: {
+        const auto [x, y] = at(0.10f, strip.shotsTop + 10.0f);
+        warpAndMove(window, x, y);
+        pushButton(window, x, y, true);
+        break;
+    }
+    case 142: {
+        const auto [x, y] = at(0.45f, strip.shotsTop + 10.0f);
+        warpAndMove(window, x, y);
+        pushButton(window, x, y, false);
+        break;
+    }
+    case 150: {
+        const seq::Sequence& piece = engine.sequence();
+        say(fmt::format("strip: {} shot(s); first starts at {:.2f} s", piece.shots.size(),
+                        piece.shots.empty() ? -1.0 : piece.shots.front().startSeconds));
+        break;
+    }
+    default:
+        // Between the presses: keep the pointer where it is travelling to, every frame, which is
+        // what makes it a drag rather than a teleport.
+        if (frame > 30 && frame < 82) {
+            const float u = 0.15f + 0.55f * static_cast<float>(frame - 30) / 52.0f;
+            const auto [x, y] = at(u, strip.rulerHeight * 0.5f);
+            warpAndMove(window, x, y);
+        } else if (frame > 90 && frame < 142) {
+            const float u = 0.10f + 0.35f * static_cast<float>(frame - 90) / 52.0f;
+            const auto [x, y] = at(u, strip.shotsTop + 10.0f);
+            warpAndMove(window, x, y);
+        }
+        break;
     }
 }
 

@@ -78,6 +78,29 @@ std::vector<AudioDeviceInfo> listCaptureDevices() {
         d.isDefault = info.isDefault != MA_FALSE;
         devices.push_back(std::move(d));
     });
+    // At most one capture device is the default, and the backend does not always agree. Observed on
+    // a machine with a USB interface attached: CoreAudio reported **both** "Volt 876" and "MacBook
+    // Pro Microphone" as default, from a capture-only enumeration where two defaults cannot be
+    // meaningful.
+    //
+    // This matters beyond tidiness, because "open the default device" resolves by scanning this list
+    // for the flag: with two set, which microphone the engine opens depends on enumeration order,
+    // which is not a decision anybody made. The first is kept -- it is the one the backend offers
+    // first and, on the machine above, the one the system actually defaults to -- and the rest are
+    // cleared, so the list means what the rest of the engine assumes it means.
+    bool seen = false;
+    for (AudioDeviceInfo& d : devices) {
+        if (!d.isDefault) {
+            continue;
+        }
+        if (seen) {
+            log::warn("audio input: '{}' also claims to be the default capture device; keeping the "
+                      "first one the backend offered",
+                      d.name);
+            d.isDefault = false;
+        }
+        seen = true;
+    }
     return devices;
 }
 

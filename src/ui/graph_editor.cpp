@@ -1,5 +1,7 @@
 #include "ui/graph_editor.hpp"
 
+#include "ui/style.hpp"
+
 #include "core/log.hpp"
 
 #include <imgui.h>
@@ -107,6 +109,12 @@ void GraphEditor::drawCanvas(graph::Graph& graph) {
 
     // Pan with the middle mouse button or a drag on empty canvas.
     ImGui::InvisibleButton("canvas-bg", size, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonMiddle);
+    // The graph's background pans on a middle-drag, so it says so while one is happening. Not on
+    // hover: a plain arrow over empty canvas is correct, and a permanent move cursor there would
+    // claim the background is draggable with any button, which it is not.
+    if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
+        setHoverCursor(ImGuiMouseCursor_ResizeAll);
+    }
     const bool canvasHovered = ImGui::IsItemHovered();
     if (canvasHovered && ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
         const ImVec2 delta = ImGui::GetIO().MouseDelta;
@@ -143,6 +151,11 @@ void GraphEditor::drawCanvas(graph::Graph& graph) {
         ImGui::SetCursorScreenPos(a);
         ImGui::PushID(node.name.c_str());
         ImGui::InvisibleButton("node", ImVec2(b.x - a.x, kHeaderHeight * zoom_));
+        // A node's header is what moves it, and nothing said so: the pointer showed an arrow over
+        // the one strip of a node that is draggable and an arrow over the rest of it too.
+        if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+            setHoverCursor(ImGuiMouseCursor_ResizeAll);
+        }
         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
             const ImVec2 delta = ImGui::GetIO().MouseDelta;
             node.position += glm::vec2(delta.x, delta.y) / zoom_;

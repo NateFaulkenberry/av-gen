@@ -1,5 +1,8 @@
 #include "ui/transport_bar.hpp"
 
+#include "ui/style.hpp"
+#include "ui/theme.hpp"
+
 #include "app/transport.hpp"
 #include "core/log.hpp"
 
@@ -17,10 +20,14 @@ namespace {
 // the shapes.
 enum class Glyph { Play, Pause, Stop, Start, End, StepBack, StepForward, Rewind, Forward, Loop };
 
-constexpr ImU32 kOn = IM_COL32(232, 238, 248, 255);
-constexpr ImU32 kOff = IM_COL32(168, 174, 186, 255);
-constexpr ImU32 kLit = IM_COL32(120, 200, 255, 255);
-constexpr ImU32 kPlaying = IM_COL32(130, 225, 150, 255);
+// The glyph's ink, by what it means. Taken from the application's palette rather than written as
+// literals here, so the transport answers a theme change like every other panel: these were four
+// fixed colours and they stayed the same in light mode, where `kOn` is nearly white on nearly
+// white.
+ImU32 inkOn() { return palette().text; }
+ImU32 inkOff() { return palette().textMuted; }
+ImU32 inkLit() { return palette().accent; }
+ImU32 inkPlaying() { return palette().success; }
 
 void triangle(ImDrawList* list, ImVec2 c, float r, ImU32 colour, bool pointRight) {
     const float d = pointRight ? 1.0f : -1.0f;
@@ -85,7 +92,10 @@ void drawGlyph(ImDrawList* list, Glyph glyph, ImVec2 c, float r, ImU32 colour) {
 
 // Returns true when clicked. `lit` colours it as an active state rather than a press.
 bool glyphButton(const char* id, Glyph glyph, const char* tooltip, bool enabled = true,
-                 ImU32 colour = kOff) {
+                 ImU32 colour = 0) {
+    if (colour == 0) {
+        colour = inkOff();
+    }
     const float height = ImGui::GetFrameHeight();
     const ImVec2 size(height * 1.25f, height);
     const ImVec2 lo = ImGui::GetCursorScreenPos();
@@ -96,11 +106,16 @@ bool glyphButton(const char* id, Glyph glyph, const char* tooltip, bool enabled 
     if (hovered && tooltip != nullptr) {
         ImGui::SetTooltip("%s", tooltip);
     }
+    // A button says it is a button. These are the controls a person reaches for most often in the
+    // application and the pointer was an arrow over every one of them.
+    if (hovered && enabled) {
+        setHoverCursor(ImGuiMouseCursor_Hand);
+    }
     ImU32 shade = colour;
     if (!enabled) {
-        shade = IM_COL32(96, 100, 108, 255);
-    } else if (hovered && colour == kOff) {
-        shade = kOn;
+        shade = palette().textDisabled;
+    } else if (hovered && colour == inkOff()) {
+        shade = inkOn();
     }
     drawGlyph(ImGui::GetWindowDrawList(), glyph, ImVec2(lo.x + size.x * 0.5f, lo.y + size.y * 0.5f),
               height * 0.26f, shade);
@@ -164,7 +179,7 @@ void TransportBar::drawTransportButtons(app::Engine& engine, const app::Transpor
     }
     ImGui::SameLine(0.0f, 2.0f);
     if (glyphButton("play", playing ? Glyph::Pause : Glyph::Play,
-                    playing ? "Pause (Space)" : "Play (Space)", true, playing ? kPlaying : kOff)) {
+                    playing ? "Pause (Space)" : "Play (Space)", true, playing ? inkPlaying() : inkOff())) {
         engine.togglePlay();
     }
     ImGui::SameLine(0.0f, 2.0f);
@@ -210,7 +225,7 @@ void TransportBar::drawLoopControls(app::Engine& engine, const app::TransportSna
     if (glyphButton("loop", Glyph::Loop,
                     snapshot.loop.enabled ? "Looping -- play the range over and over (L)"
                                           : "Loop the range over and over (L)",
-                    true, snapshot.loop.enabled ? kLit : kOff)) {
+                    true, snapshot.loop.enabled ? inkLit() : inkOff())) {
         transport.setLoopEnabled(!snapshot.loop.enabled);
         if (transport.loop().enabled && !transport.loop().usable() && snapshot.durationSeconds > 0.0) {
             // Turning the loop on with no range set would light a button that does nothing. A first

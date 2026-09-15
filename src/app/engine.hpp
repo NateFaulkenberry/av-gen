@@ -45,6 +45,8 @@
 #include <nlohmann/json.hpp>
 
 #include <filesystem>
+#include <functional>
+#include <utility>
 #include <memory>
 #include <optional>
 #include <array>
@@ -129,6 +131,39 @@ public:
     [[nodiscard]] Result<void> loadProject(const std::filesystem::path& path);
     [[nodiscard]] const std::filesystem::path& projectPath() const { return projectPath_; }
     [[nodiscard]] const std::vector<std::string>& projectWarnings() const { return projectWarnings_; }
+
+    // ---- what a load is doing while it does it (the brief's section 5) -------------------------
+    //
+    // Opening a project is one synchronous call that can hold the main thread for seconds: the
+    // scene's first flatten alone is about 620 ms on a real world (docs/application-performance.md
+    // section 14), and the audio is decoded and mixed on the same thread before it. During that the
+    // window does not redraw, which is indistinguishable from a crash.
+    //
+    // It is not moved to a worker, and that is deliberate rather than unfinished. The composition
+    // is not thread-safe, the environment map's prefilter is GPU work and all GPU work in this
+    // application is the main thread's, and the parameter set is being torn down and rebuilt
+    // underneath everything that reads it. ADR-084 already rejected threading a much smaller piece
+    // of this for the same reasons.
+    //
+    // What can be fixed without any of that risk is the *silence*. The loader says which stage it
+    // is in as it enters it, and the editor shows that; the freeze is the same length and it stops
+    // being a mystery. `index`/`count` are a position in a list of stages that is known up front --
+    // a countable fact, not an estimate of time remaining, which ADR-064 is clear nobody should
+    // invent.
+    struct LoadStage {
+        std::string_view name;
+        int index = 0;
+        int count = 1;
+    };
+    using LoadReporter = std::function<void(const LoadStage&)>;
+    // Set by the live editor. Never set offline: `runHeadless` has no window to report to, and a
+    // reporter that logged would put a wall clock into a deterministic path's output.
+    void setLoadReporter(LoadReporter reporter) { loadReporter_ = std::move(reporter); }
+    // Per-stage wall-clock of the last `loadProject`, in the order the stages ran. For the
+    // measurement in docs/application-performance.md; empty until a project has been opened.
+    [[nodiscard]] const std::vector<std::pair<std::string, double>>& lastLoadTimings() const {
+        return loadTimings_;
+    }
     // Parameter paths that a timeline cue's preset will overwrite, measured at load against the
     // values the scene file and the project put in effect (ADR-018). Sorted, deduplicated across
     // cues, empty when nothing is contested. Not a load fault -- a cue is *meant* to take a value
@@ -605,6 +640,8 @@ private:
     // read.
     void noteBindingProblem(std::string message);
     std::vector<std::string> projectWarnings_;
+    LoadReporter loadReporter_;
+    std::vector<std::pair<std::string, double>> loadTimings_;
     // Beat clock extrapolated per render frame from the analysis tempo (ADR-012).
     double beatClockPhase_ = 0.0;
     std::uint32_t beatClockCount_ = 0;

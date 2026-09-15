@@ -2,6 +2,9 @@
 
 #include "core/color.hpp"
 #include "core/noise.hpp"
+#include "params/parameter_set.hpp"
+#include "params/serialization.hpp"
+#include "scene/material_params.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -1648,5 +1651,160 @@ TEST_CASE("examples/reassembly and examples/infinite wire the library in", "[mat
             INFO("node " << node);
             CHECK(found);
         }
+    }
+}
+
+// ADR-232. A material program is a file (structure) and a project is a table of values for it, and
+// the two are edited apart. When the file gains an op, every op after it shifts by one; while the
+// parameter paths were purely positional ("op/5/constant") a project saved before that edit wrote
+// its old values silently onto the wrong ops, and there was no way to tell from either file that it
+// had happened. This is what black-holed `elder-2-under` in Glowmere Valley 2: the warm tissue
+// program gained a `remap` at position 5 and the project, saved against the fourteen-op version,
+// then zeroed the emission constant, the grazing mask and the emission ramp -- so the emission was
+// exactly zero and `emissionIntensity` could not move it, because 30 times nothing is nothing.
+namespace {
+
+// The parameter table a project holds: every registered parameter, by path.
+nlohmann::json saveParameterTable(const MaterialProgramParameters& p) {
+    nlohmann::json doc = nlohmann::json::object();
+    for (params::IParameter* ip : p.all) {
+        doc[ip->path()] = params::parameterToJson(*ip);
+    }
+    return doc;
+}
+
+// Loads one the way the project loader does: a path the set does not know is dropped, not applied.
+struct TableLoad {
+    int applied = 0;
+    int dropped = 0;
+};
+TableLoad loadParameterTable(params::ParameterSet& set, const nlohmann::json& doc) {
+    TableLoad result;
+    for (const auto& [path, value] : doc.items()) {
+        params::IParameter* param = set.find(path);
+        if (param == nullptr) {
+            ++result.dropped;
+            continue;
+        }
+        REQUIRE(params::parameterFromJson(*param, value).has_value());
+        ++result.applied;
+    }
+    set.resetFinals(); // a loaded value is a *base*; scene code reads the modulated one
+    return result;
+}
+
+// instanceEmissive -> multiply by a constant -> emission, the shape both Glowmere tissue programs
+// have. `hue` is the constant the program asserts.
+MaterialProgram tissueLike(const glm::vec4& hue) {
+    MaterialProgram program;
+    program.name = "tissue";
+    program.ops = {inputOp(0, MaterialInput::InstanceEmissive), constantOp(1, hue),
+                   makeOp(MaterialOpKind::Multiply, 0, 0, 1)};
+    program.emissionRegister = 0;
+    program.emissionIntensity = 4.0f;
+    return program;
+}
+
+} // namespace
+
+TEST_CASE("A material op parameter is addressed by kind, so a shifted op list cannot rewrite it",
+          "[material][params]") {
+    const glm::vec4 hue{1.0f, 0.5f, 0.25f, 1.0f};
+    const MaterialProgram before = tissueLike(hue);
+
+    // A project saved against `before`.
+    params::ParameterSet saved;
+    const nlohmann::json table = saveParameterTable(registerMaterialProgramParameters(saved, before, "material/tissue/"));
+
+    // The material file then gains a mask in front of the multiply, so ops 2 and 3 become 3 and 4.
+    MaterialProgram after = before;
+    MaterialOp mask = makeOp(MaterialOpKind::Remap, 2, 0);
+    mask.constant = {0.0f, 1.0f, 0.45f, 1.0f};
+    after.ops.insert(after.ops.begin() + 1, mask);
+    REQUIRE(after.ops.size() == 4); // input, remap, constant, multiply
+
+    params::ParameterSet live;
+    const MaterialProgramParameters params = registerMaterialProgramParameters(live, after, "material/tissue/");
+    const TableLoad load = loadParameterTable(live, table);
+    // The probe can detect what it is looking for: the old table did reach some of the new
+    // parameters (the ops in front of the insertion still line up) and was refused by the rest.
+    CHECK(load.applied > 0);
+    CHECK(load.dropped > 0);
+
+    MaterialProgram applied;
+    applyMaterialProgramParameters(params, after, applied);
+    // Nothing the stale table said reached an op it did not name: the file's own program stands.
+    CHECK(applied.structuralHash() == after.structuralHash());
+    // Which is the point: the constant the program asserts is still the hue, not zero.
+    checkVec4(applied.ops[2].constant, hue);
+    // And the mask the file added still has its remap range, so emission survives evaluation.
+    MaterialContext ctx = richContext();
+    ctx.instanceEmissive = {1.0f, 1.0f, 1.0f, 1.0f};
+    CHECK(color::luminance(run(applied, ctx).emission) > 0.0f);
+}
+
+TEST_CASE("The Glowmere projects leave both tissue programs their own emission",
+          "[material][glowmere][params]") {
+    const auto materials = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "materials";
+    const auto warm = MaterialProgram::loadFile(materials / "glowmere2-tissue.material.json");
+    const auto cool = MaterialProgram::loadFile(materials / "glowmere2-tissue-cool.material.json");
+    REQUIRE(warm.has_value());
+    REQUIRE(cool.has_value());
+
+    for (const auto* projectName : {"glowmere-valley-2.json", "glowmere-atmospherics.json"}) {
+        INFO(projectName);
+        std::ifstream in(std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "world" / projectName);
+        REQUIRE(in.good());
+        nlohmann::json project;
+        in >> project;
+        REQUIRE(project.contains("parameters"));
+
+        params::ParameterSet set;
+        const auto warmParams = registerMaterialProgramParameters(set, *warm, "material/glowmere2TissueWarm/");
+        const auto coolParams = registerMaterialProgramParameters(set, *cool, "material/glowmere2TissueCool/");
+        // Every material parameter the project names for these two programs must be one they
+        // actually register. A path the set does not know is a value saved against a program that
+        // no longer exists -- the state that turned the elder's underside black.
+        int named = 0;
+        for (const auto& [path, value] : project.at("parameters").items()) {
+            if (!path.starts_with("material/glowmere2Tissue")) {
+                continue;
+            }
+            params::IParameter* param = set.find(path);
+            INFO(path);
+            REQUIRE(param != nullptr);
+            REQUIRE(params::parameterFromJson(*param, value).has_value());
+            ++named;
+        }
+        CHECK(named > 0); // the loop above is only evidence if it looked at something
+        set.resetFinals(); // as the engine does before every frame's modulation pass
+
+        MaterialProgram liveWarm;
+        MaterialProgram liveCool;
+        applyMaterialProgramParameters(warmParams, *warm, liveWarm);
+        applyMaterialProgramParameters(coolParams, *cool, liveCool);
+        // The project may tune these programs; it may not silently rebuild them.
+        CHECK(liveWarm.structuralHash() == warm->structuralHash());
+        CHECK(liveCool.structuralHash() == cool->structuralHash());
+
+        // An underside, lit from within: the surface faces down and the view grazes it.
+        double warmBest = 0.0;
+        double coolBest = 0.0;
+        for (int sample = 0; sample < 64; ++sample) {
+            const float fraction = static_cast<float>(sample) / 63.0f;
+            MaterialContext ctx;
+            ctx.normal = {0.0f, -1.0f, 0.0f};
+            ctx.viewDirection = {0.0f, 1.0f, 0.0f};
+            ctx.localPosition = {fraction * 8.0f - 4.0f, -0.5f, fraction * 3.0f};
+            ctx.worldPosition = ctx.localPosition + glm::vec3(-12.0f, 3.5f, 52.0f);
+            ctx.instanceEmissive = {1.0f, 1.0f, 1.0f, 1.0f}; // the program's own colour, isolated
+            warmBest = std::max(warmBest, d(color::luminance(run(liveWarm, ctx).emission)));
+            coolBest = std::max(coolBest, d(color::luminance(run(liveCool, ctx).emission)));
+        }
+        INFO("warm " << warmBest << " cool " << coolBest);
+        // Both undersides glow, and the warm one is within a stop of the cool ones it stands among.
+        CHECK(coolBest > 1.0);
+        CHECK(warmBest > 1.0);
+        CHECK(warmBest > 0.5 * coolBest);
     }
 }
