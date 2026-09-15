@@ -604,23 +604,30 @@ Ordered by what blocks the most.
 1. ~~Re-measure the Priority 1 attribution.~~ **Done** — see above. The harness is
    `tools/flicker_bench.py` and the answer changed: FXAA is the largest identified source at 19-21%,
    water's ripple normals second at 14-19%, bloom zero, and the old 57% came from a confounded arm.
-2. **What FXAA's 20% should be done about.** It is not a strength-tuning problem — the dose-response
-   says most of the cost arrives when the pass is switched on at all. The options are a temporal
-   term, a threshold hysteresis, or not running FXAA at the offline tier at all and resolving the
-   edge some other way. None of them should be chosen before §4's inventory says whether the
-   *artifact* a viewer sees is edge crawl; a 20% share of a detector's metric is not by itself a
-   reason to change a shipping picture.
-3. **The remaining unattributed flicker.** The identified terms sum to roughly 40% at the river view;
-   the rest is not reached by any authored parameter. The candidates are the moon glint, the sky
-   reflection and the depth-derived shoreline, and separating them needs arms inside `water.wgsl`.
-   Still deliberately not started: editing that shader on a hypothesis is what cost three rounds on
-   the anamorphic comb, and the per-term scene arms are not exhausted yet.
+2. ~~**What FXAA's 20% should be done about.**~~ **Answered, and the answer was to do nothing to it**
+   — ADR-243. §4 was reviewed by a human and FXAA is *suppressing* the artifact they object to:
+   removing it makes the reported jaggedness 31% worse on the region they named, and they called the
+   no-FXAA arm the more distracting of the two unblinded. "Not running FXAA at the offline tier" is
+   refused. The last sentence of the original entry turned out to be the important one: a 20% share
+   of a detector's metric was not a reason to change a shipping picture, and in this case the metric
+   ranked the remedies **backwards**.
+3. ~~**The remaining unattributed flicker.**~~ **Retired** — ADR-243. Asked to compare the river
+   against its ripple term switched off, the reviewer reported it calmer and **no longer sparkling**,
+   while the detector says 41% of the river's flicker survives that arm. The residue is real and it
+   is not visible. `water.wgsl` stays closed, which is the outcome the three wasted rounds on the
+   anamorphic comb were the argument for.
 4. ~~Re-run the supersampling refutation on this harness.~~ **Done** — the direction holds (4.453% →
    4.717% for four times the pixels), the magnitude was much smaller than recorded. The refusal
    stands and now rests on something re-runnable.
 5. **The variance protocol**, which needs a quiet machine.
-6. **The temporal artifact inventory (§4)**, which needs the representative suite rendered and
-   *looked at*.
+6. **The temporal artifact inventory (§4)** — rendered, looked at, and **the question changed**
+   (ADR-243). The artifact a viewer objects to in Glowmere is *spatial*: grass blades and the hero
+   mushroom's gill filaments are thinner than a pixel, so they stair-step and drop out. The temporal
+   detector is anti-correlated with viewer preference on that region — it scores removing FXAA as
+   −42% and supersampling as +9%, and the reviewer says the opposite of both. `tools/spatial_stats.py`
+   is the second measure. Still open: whether supersampling is *enough*, which needs the same person
+   to look at a supersampled deliverable, and the whole of the moving-camera case, which has never
+   been reviewed and is where crawl on static geometry would actually live.
 7. **§7's cinematic lighting evaluation** — depth, separation, focal hierarchy. This is what remains
    of Priority 2 now that the HDR/emissive plumbing has been verified sound, and it requires looking.
 8. **The performance dashboard (§13)** — the one item that genuinely needs a human to certify.

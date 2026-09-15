@@ -2697,6 +2697,7 @@
     "pattern": "frame_{:06d}.png",
     "quality": 80,
     "start": 0.0,
+    "supersample": 2.0,
     "tier": "offline",
     "width": 1920
   },
