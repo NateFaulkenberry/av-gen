@@ -88,7 +88,10 @@ float Gait::playbackRate(const GaitSettings& settings, Activity activity, float 
         authored = settings.runSpeed;
     }
     if (authored <= 1e-4f) {
-        return 1.0f;
+        // Not walking and not running: an idle, a turn, an observe. `idleRate` decides, because
+        // whether that clip should be moving is a property of the *asset* -- an alien has an Idle
+        // to play, a farm animal has only its Walk -- and this function cannot see clip names.
+        return settings.idleRate;
     }
     return std::clamp(speed / authored, settings.rateMin, settings.rateMax);
 }

@@ -1318,6 +1318,7 @@ Result<GaitSettings> gaitFromJson(const nlohmann::json& j) {
     gait.matchRate = readBool(j, "matchRate", gait.matchRate);
     gait.rateMin = readFloat(j, "rateMin", gait.rateMin);
     gait.rateMax = readFloat(j, "rateMax", gait.rateMax);
+    gait.idleRate = readFloat(j, "idleRate", gait.idleRate);
     // An exit above an enter is not hysteresis, it is a latch that never releases. Caught here
     // rather than discovered as a character that never stops running.
     if (gait.moveExit > gait.moveEnter) {
@@ -1347,6 +1348,10 @@ nlohmann::json gaitToJson(const GaitSettings& gait) {
         j["matchRate"] = true;
         j["rateMin"] = gait.rateMin;
         j["rateMax"] = gait.rateMax;
+        // Written only when it is not the default, so every existing scene round-trips unchanged.
+        if (gait.idleRate != GaitSettings{}.idleRate) {
+            j["idleRate"] = gait.idleRate;
+        }
     }
     return j;
 }

@@ -54,6 +54,18 @@ struct GaitSettings {
     bool matchRate = false;
     float rateMin = 0.6f;
     float rateMax = 1.6f;
+    // What a non-locomotion activity plays at, when `matchRate` is on (ADR-213).
+    //
+    // 1 is right for an asset with a real idle: the clip is already the pose of a standing body and
+    // it should run at its authored speed. It is wrong for an asset that has *only* a walk cycle,
+    // where `clips` necessarily maps idle onto it -- the body then stands still playing a walk at
+    // full rate, which is the whole of what "the animals are sliding" turned out to mean. The nine
+    // farm animals ship exactly one clip, called `Walk`, and every activity resolves to it.
+    //
+    // 0 freezes the clip while the body is not travelling. A statue caught mid-stride is not a good
+    // idle, and it is enormously better than feet running on the spot; an asset that wants better
+    // needs an idle clip, which is an asset question rather than an engine one.
+    float idleRate = 1.0f;
 
     // So a writer can tell "the author set nothing" from "the author set the defaults" and emit
     // nothing in the first case.
