@@ -42,3 +42,12 @@ cmake-build-*/
 # and the one command that regenerates all six (tools/make_aliens.sh). The scenes name the files;
 # a worktree without them loads the squad as a bare plinth and says so per missing asset.
 /assets/aliens/*.glb
+
+# The farm animals (ADR-205): nine animals exported from a source .blend that is not in this
+# repository. 2.5 MB, and -- like the aliens and unlike every other pack here -- with **no recorded
+# licence**, which is the reason they stay out rather than the size. assets/farm/ATTRIBUTION.md is
+# the part the repository keeps: the inventory, the three animals that needed handling, the two
+# warnings that are harmless and why, and the one command that regenerates all nine
+# (tools/make_farm_animals.sh). assets/farm.manifest.json is the other part: it names all nine with
+# their real metre sizes, and it resolves whether or not the meshes are on disk.
+/assets/farm/*.glb

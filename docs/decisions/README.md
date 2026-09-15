@@ -200,4 +200,5 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [202](ADR-202-importance-is-the-whole-of-casting.md) | Importance is the whole of casting | Accepted |
 | [203](ADR-203-a-cap-that-broke-the-film.md) | A cap that broke the film, and the control that was missing | Accepted |
 | [204](ADR-204-a-clip-starts-where-its-keys-start.md) | A clip starts where its keys start, a facing is not an odometer, and a stride speed is a claim about a clip | Accepted |
+| [205](ADR-205-nine-farm-animals-from-one-turntable.md) | Nine farm animals from one turntable scene | Accepted |
 | [206](ADR-206-structure-from-repetition-not-from-energy.md) | Structure from repetition, not from energy | Accepted |
