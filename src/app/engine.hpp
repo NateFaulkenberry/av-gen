@@ -31,6 +31,7 @@
 #include "scene/orb_scene.hpp"
 #include "scene/camera.hpp"
 #include "scene/post_settings.hpp"
+#include "world/effect_params.hpp"
 #include "scene/scene_controller.hpp"
 #include "seq/director.hpp"
 #include "seq/sequence.hpp"
@@ -289,6 +290,24 @@ public:
     [[nodiscard]] const RenderSettings& renderSettings() const { return render_; }
 
     // ---- timeline (milestone 0.8) ----
+    // ---- world effects (ADR-204) ----------------------------------------------------------------
+    //
+    // The *live* set: the composition's authored effects with this frame's modulation applied. The
+    // panel edits these; `Composition::worldEffects()` is what a save writes.
+    [[nodiscard]] std::vector<world::WorldEffect>& worldEffects() { return worldEffects_; }
+    [[nodiscard]] const std::vector<world::WorldEffect>& worldEffects() const { return worldEffects_; }
+    [[nodiscard]] const world::WorldEffectParameters& worldEffectParameters() const { return worldEffectParams_; }
+    // Replaces the effect set: re-registers `worldfx/...` parameters and writes the set back to the
+    // composition so a save carries it. Refuses the whole set the way `Composition::setWorldEffects`
+    // does, and leaves everything as it was on a refusal.
+    [[nodiscard]] Result<void> setWorldEffects(std::vector<world::WorldEffect> effects);
+
+    // The director's cut, flattened to what an effect needs for time gating (ADR-204). Installed by
+    // `app::installSequence` and cleared by `releaseDirectedCamera`; empty means nothing is directing
+    // the camera, in which case `CameraTravel` and `HeroFocus` effects simply never activate.
+    void setShotSpans(std::vector<world::ShotSpan> spans) { shotSpans_ = std::move(spans); }
+    [[nodiscard]] std::span<const world::ShotSpan> shotSpans() const { return shotSpans_; }
+
     [[nodiscard]] params::Timeline& timeline() { return timeline_; }
     [[nodiscard]] const params::Timeline& timeline() const { return timeline_; }
     // The clock the timeline is evaluated against this frame: audio time (render time without
@@ -514,6 +533,13 @@ private:
     std::vector<seq::FiredEvent> firedEvents_;
     void removeLayerParameters(); // drops "layers/*" from params_ (before a reload or a delete)
     scene::PostSettings post_;
+    // ADR-204. `worldEffects_` is the live set (authored + modulated); `worldEffectParams_` owns the
+    // `worldfx/...` parameters; `shotSpans_` is the director's cut, for time gating.
+    std::vector<world::WorldEffect> worldEffects_;
+    world::WorldEffectParameters worldEffectParams_;
+    std::vector<world::ShotSpan> shotSpans_;
+    void updateWorldEffects();
+    [[nodiscard]] glm::vec3 cameraVelocityOnTimeline() const;
     scene::PostParameters postParams_;
     scene::LensSettings lens_;
     scene::ExposureSettings exposure_;

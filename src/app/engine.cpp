@@ -139,6 +139,22 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         const scene::FocusSettings keepFocus = focus_;
         cameraParams_ = scene::registerCameraParameters(params_, keepLens, keepExposure, keepFocus);
     }
+    // ADR-204: the scene's world effects, and the `worldfx/<name>/...` parameters that make every
+    // number on them automatable, keyable and modulatable. The authored set is copied off the
+    // composition rather than read through it per frame, because the live set is what modulation
+    // writes to and a composition's authored values must survive being modulated.
+    //
+    // Unregistered first and unconditionally: a scene swap replaces the cast of effects, and a
+    // registrar that only ever adds leaves the previous scene's paths behind for a route to bind to.
+    timeline_.unbind();
+    world::unregisterWorldEffectParameters(params_, worldEffectParams_);
+    worldEffects_.clear();
+    if (const auto* comp = composition()) {
+        worldEffects_ = comp->worldEffects();
+    }
+    if (!worldEffects_.empty()) {
+        worldEffectParams_ = world::registerWorldEffectParameters(params_, worldEffects_);
+    }
     resetCameraState();
     shaderLayers_.reattach();
     // The composition's layer parameters (ADR-083), with everything else that has to survive a
@@ -326,6 +342,30 @@ void Engine::noteBindingProblem(std::string message) {
     projectWarnings_.push_back(std::move(message));
 }
 
+Result<void> Engine::setWorldEffects(std::vector<world::WorldEffect> effects) {
+    // Validated before anything is touched, so a refusal leaves the engine exactly as it was.
+    if (auto ok = world::validateWorldEffects(effects); !ok) {
+        return ok;
+    }
+    // The composition owns the authored set (it is what a save writes); the engine owns the live
+    // one. Writing both here is what stops the panel and the file drifting apart.
+    if (auto* comp = composition()) {
+        if (auto ok = comp->setWorldEffects(effects); !ok) {
+            return ok;
+        }
+    }
+    // The parameter set changes shape -- effects appear and disappear -- so the timeline has to let
+    // go of its pointers before the old paths are removed, and rebind afterwards.
+    timeline_.unbind();
+    world::unregisterWorldEffectParameters(params_, worldEffectParams_);
+    worldEffects_ = std::move(effects);
+    if (!worldEffects_.empty()) {
+        worldEffectParams_ = world::registerWorldEffectParameters(params_, worldEffects_);
+    }
+    rebind();
+    return {};
+}
+
 void Engine::detachSceneParameters() {
     if (auto* comp = composition()) {
         comp->detach();
@@ -333,6 +373,9 @@ void Engine::detachSceneParameters() {
     shaderLayers_.detach();
     layers_.detach();
     timeline_.unbind();
+    // ADR-204. After `timeline_.unbind()`, because a track aimed at a `worldfx/...` path holds a
+    // pointer into the parameter that is about to go.
+    world::unregisterWorldEffectParameters(params_, worldEffectParams_);
 }
 
 params::Track* Engine::recordKey(const std::string& path, int component, params::KeyInterp interp,
@@ -2379,6 +2422,103 @@ void Engine::applyCues() {
     }
 }
 
+namespace {
+
+// Where the world's nodes are, for a world effect resolving a `node:` source (ADR-204). An interface
+// rather than a lambda so resolution allocates nothing: the engine counts allocations per frame.
+class CompositionEffectScene final : public world::WorldEffectScene {
+public:
+    explicit CompositionEffectScene(const scene::Composition* comp) : comp_(comp) {}
+
+    [[nodiscard]] bool nodePosition(std::string_view name, glm::vec3& out) const override {
+        if (comp_ == nullptr) {
+            return false;
+        }
+        const scene::CompositionNode* node = comp_->findNode(std::string(name));
+        if (node == nullptr) {
+            return false;
+        }
+        out = comp_->nodeWorldTransform(*node).position;
+        return true;
+    }
+
+    [[nodiscard]] bool nodeForward(std::string_view name, glm::vec3& out) const override {
+        if (comp_ == nullptr) {
+            return false;
+        }
+        const scene::CompositionNode* node = comp_->findNode(std::string(name));
+        if (node == nullptr) {
+            return false;
+        }
+        // The node's -Z axis, which is the convention the rest of the engine uses for "forward".
+        out = comp_->nodeWorldTransform(*node).rotation * glm::vec3(0.0f, 0.0f, -1.0f);
+        return true;
+    }
+
+private:
+    const scene::Composition* comp_;
+};
+
+} // namespace
+
+// The camera's velocity, in metres per timeline second.
+//
+// **A finite difference in timeline seconds, never in frame deltas.** A beam pointed where the
+// camera is going has to point the same way in a 30 fps offline render and in a 144 Hz window, and a
+// frame-to-frame difference does not: it is `speed * deltaTime`, and deltaTime is whatever the
+// machine managed. The camera is a baked `camera/position` track (ADR-075), which is a pure function
+// of time, so the honest answer is to evaluate it twice a fixed step apart.
+//
+// Zero when the camera is not automated, which is the truthful answer for a camera that is wherever
+// somebody last dragged it: there is no trajectory to read.
+glm::vec3 Engine::cameraVelocityOnTimeline() const {
+    constexpr double kStep = 1.0 / 60.0; // one 60 Hz frame: short enough to be local, long enough to
+                                         // survive the float precision of a key value
+    const params::Track* track = timeline_.findTrack("camera/position", -1);
+    if (track == nullptr || !track->enabled || track->keys.size() < 2) {
+        return glm::vec3(0.0f);
+    }
+    const double now = timelineClock_.at(track->timeBase);
+    // Beats per second when the track is keyed in beats, so the result is still metres per *second*.
+    const double scale = track->timeBase == params::TimeBase::Beats
+                             ? (sourceContext_.tempoBpm > 1.0f ? sourceContext_.tempoBpm / 60.0 : 2.0)
+                             : 1.0;
+    const params::KeyValue a = track->evaluate(now - kStep * scale);
+    const params::KeyValue b = track->evaluate(now);
+    const glm::vec3 delta(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    return delta / static_cast<float>(kStep);
+}
+
+// Resolves this frame's world effects into the scene (ADR-204).
+//
+// Called from `update()` after the camera has been placed and after the modulation routes have run,
+// so the numbers it reads are this frame's finals and the camera it reads is this frame's camera.
+// Everything it does is a pure function of the transport second, which is what keeps an offline
+// render of second N identical to a playthrough of second N.
+void Engine::updateWorldEffects() {
+    scene::Scene& live = controller_->scene();
+    if (worldEffects_.empty()) {
+        live.worldEffects = world::WorldEffectFrame{};
+        return;
+    }
+    world::applyWorldEffectParameters(worldEffectParams_, worldEffects_);
+
+    const CompositionEffectScene sceneAdapter(composition());
+    world::WorldEffectContext ctx;
+    ctx.seconds = timelineClock_.seconds;
+    ctx.cameraPosition = live.camera.position;
+    ctx.cameraTarget = live.camera.target;
+    const glm::vec3 aim = live.camera.target - live.camera.position;
+    ctx.cameraForward = glm::length(aim) > 1e-5f ? glm::normalize(aim) : glm::vec3(0.0f, 0.0f, -1.0f);
+    ctx.cameraVelocity = cameraVelocityOnTimeline();
+    ctx.shots = shotSpans_;
+    ctx.scene = &sceneAdapter;
+    if (const auto* comp = composition()) {
+        ctx.heroes = comp->heroes();
+    }
+    world::buildWorldEffectFrame(worldEffects_, ctx, live.worldEffects);
+}
+
 void Engine::update(const FrameTime& time) {
     const auto start = std::chrono::steady_clock::now();
     bool newFrame = false;
@@ -2550,6 +2690,7 @@ void Engine::update(const FrameTime& time) {
         // post/motionBlur/amount stays exactly as authored.
     }
     controller_->scene().post = post_;
+    updateWorldEffects();
     {
         shaders::StdUniforms base;
         const auto& f = latest_;

@@ -1359,6 +1359,11 @@ std::span<const SceneRenderer::PassArm> SceneRenderer::passArms() {
         {"particles", &T::particles},       {"animation", &T::animation},
         {"cameramotion", &T::cameraMotion},  {"animationmotion", &T::animationMotion},
         {"auxstore", &T::auxTargetStores},   {"fxaa", &T::antialias},
+        // ADR-204. Off: the frame block reports zero effects, so the per-fragment loop in
+        // world_effects.wgsl executes one uniform compare and returns. This is the arm that answers
+        // "what does World Effects cost when nothing is running", which §22 of the brief asks for
+        // separately from "what does one cost when it is".
+        {"worldeffects", &T::worldEffects},
     };
     return kArms;
 }
@@ -2367,6 +2372,21 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                            on ? static_cast<float>(stats_.shadowMask.lights) : 0.0f,
                                            static_cast<float>(std::max(stats_.shadowMask.width, 1u)),
                                            static_cast<float>(std::max(stats_.shadowMask.height, 1u)));
+    }
+    // ADR-204: the world effects, already resolved and packed by whoever owns the scene. The
+    // renderer copies them and never resolves them -- a source is a hero name or the camera's
+    // trajectory, and a renderer that knew about either would be a renderer that has to be given
+    // the director.
+    if (toggles_.worldEffects) {
+        const std::uint32_t effects =
+            std::min<std::uint32_t>(scene.worldEffects.count, world::kMaxGpuWorldEffects);
+        frame.worldEffectCount = glm::vec4(static_cast<float>(effects), 0.0f, 0.0f, 0.0f);
+        for (std::uint32_t i = 0; i < effects; ++i) {
+            frame.worldEffects[i] = scene.worldEffects.effects[i];
+        }
+        stats_.worldEffects = effects;
+    } else {
+        stats_.worldEffects = 0;
     }
     queue.WriteBuffer(frameUniforms_, 0, &frame, sizeof(frame));
     // Each shadow view is the same block with its own light-space matrix, so the depth-only passes
