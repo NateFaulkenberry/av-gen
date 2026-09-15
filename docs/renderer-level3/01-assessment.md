@@ -637,8 +637,16 @@ Ordered by what blocks the most.
    is the second measure. Still open: whether supersampling is *enough*, which needs the same person
    to look at a supersampled deliverable, and the whole of the moving-camera case, which has never
    been reviewed and is where crawl on static geometry would actually live.
-7. **§7's cinematic lighting evaluation** — depth, separation, focal hierarchy. This is what remains
-   of Priority 2 now that the HDR/emissive plumbing has been verified sound, and it requires looking.
+7. ~~**§7's cinematic lighting evaluation**~~ **Done, and it found nothing** — ADR-244. Six
+   diagnostics, each chosen to map onto a knob rather than to produce a score, all six clean on
+   Glowmere: layers separate under a squint, the eye lands on the subject, the light has a readable
+   direction, nothing reads as pasted on, and the air has presence without smothering the contrast.
+   Scored 7–8, with the limiting factor named by the author as **their own remaining authoring
+   time**, not the engine. Nothing at or below the rubric's own defect line of 5.
+
+   Scope, stated: one scene, three moments. The other four master scenes were not reviewed — the
+   owner is discarding them — and Glowmere is an emissive night world, which is the easiest lighting
+   case this engine has.
 8. **The performance dashboard (§13)** — the one item that genuinely needs a human to certify.
 9. ~~**AOV export (§B)**~~ **Done** — ADR-242, five passes, each with its consumer named. The debug
    views the mandate lists are still **not** built, and deliberately: none of them has been asked for
@@ -650,7 +658,11 @@ Ordered by what blocks the most.
 11. **The rest of the realtime/offline parity audit (§15)** beyond `QualitySettings` — the same
     enumeration against the scene's own reduction policies, the particle budgets and the terrain's
     view distances.
-12. **Scene authoring ergonomics (§17, §G).**
+12. **Scene authoring ergonomics (§17, §G)** — **now the highest-value item in this list**, promoted
+    by evidence rather than by preference (ADR-244). §7 came back with no renderer defect and the
+    author attributing the gap between a 7 and a 10 to time spent tweaking by hand. Tools are what
+    buy that back. This entry has been a one-line placeholder with nothing behind it; it needs a
+    specification before it needs an implementation.
 13. **Maintainability (§18)** — flagged, still not a recommendation; the thing to look for when the
     C/D/F measurements start touching `SceneRenderer::render`.
 

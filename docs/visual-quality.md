@@ -17,6 +17,11 @@ Each must eventually work as a still (a single frame worth showing), as a thirty
 sequence with a beginning, development, climax and resolution, live, and offline with identical
 results.
 
+> **Status, 15 September 2026 (ADR-244).** These four remain the spec's statement of the bar and are
+> kept here as written. They are **not** the current quality target: the owner has described them as
+> tests likely to be discarded, and only Glowmere was reviewed for §7. Do not score the engine
+> against these four, and do not read work into them that nobody has asked for.
+
 ## 2. The rubric
 
 Score each scene one to ten. Anything at five or below is a defect to fix, not a taste question.
