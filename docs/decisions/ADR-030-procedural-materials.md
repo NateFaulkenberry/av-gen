@@ -5,7 +5,7 @@
 
 ## Decision
 - `scene::MaterialProgram` (data): ≤ 16 ops over a register file of 8 vec4 registers; inputs (world/local position, normal, uv, object id, instance index/id, instance attributes, time, audio vector, field slots, noise); ops (gradient, noise, voronoi, fresnel, ramp, remap, multiply, add, mix, power, smoothstep, threshold, hueShift, saturate, palette); outputs (baseColor, metallic, roughness, emission, opacity). Evaluated by `material.wgsl` (included by `pbr_shade.wgsl`) from a uniform op array; also evaluated on the CPU for tests (`evaluateMaterialProgram`).
-- `Material` gains an optional program name; programs live in `Scene::materialPrograms`; parameters `material/<name>/op/<i>/…`.
+- `Material` gains an optional program name; programs live in `Scene::materialPrograms`; parameters `material/<name>/op/<i>/<kind>/…` (positional until ADR-232, which put the op's kind in the path).
 - `core/color.hpp` + `color.wgsl`: RGB↔HSV/HSL/OKLab/OKLCH, hue shift, saturation, value, contrast, cosine palettes, gradient ramps; used by ops, by material variation and by the UI.
 
 ## Consequences
