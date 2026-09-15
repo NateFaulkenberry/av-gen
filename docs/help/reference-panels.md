@@ -54,6 +54,37 @@ Parameters panel shows the same numbers, the timeline can key them and a preset 
 Effects gated on the camera need a directed camera to gate against. With none, the panel says so
 rather than leaving you to discover it as an effect that does nothing.
 
+### Atmospheric
+
+Below the propagation effects, the same panel holds the sky ones (ADR-230): **comets** that cross it
+on a great-circle arc, and an **aurora** whose curtains rise from the horizon and take their shape
+from the audio spectrum. They are here rather than in a panel of their own because they are the same
+kind of thing with a different geometry — a source, a lifetime, an appearance and a wish to be
+modulated — and they share every control that describes one.
+
+**Add comet** makes an event: a window a sequencer can move, so it launches once. Give it a repeat
+interval to make it a shower. **Add aurora** makes scenery that breathes: always on, fading up.
+**Preset** sets the colours, the shape and the sparkle in one go and leaves every one of them
+editable underneath.
+
+A comet's trajectory is authored in sky coordinates — a bearing and a height to launch from, one to
+fly to, and a distance — and the two bearings mean what they say, because it flies an arc at that
+distance rather than a straight line through the sky. **Anchored to** decides whether it hangs in the
+world, where it has real parallax and can leave frame, or on the camera, where it keeps its bearing
+however far the camera travels.
+
+**Ground glow** is off, subtle or strong: how much of the phenomenon lands on the valley below it.
+It is cinematic illumination rather than lighting — a wash weighted by which way a surface faces,
+plus a pool under a low comet — and it casts no shadows.
+
+An aurora's **Audio response** controls are depths on the bands the engine already publishes, not a
+second analyser: bass raises the curtain, low-mid drives the waves, mid the folds, highs the
+filaments. Its overall shape can also be driven by ordinary modulation routes, and **Beat response**
+writes one, exactly as it does above.
+
+Every control here is an ordinary parameter under `atmos/<name>/`, so the Parameters panel shows the
+same numbers, the timeline can key them, a sequencer event can set them and a preset can recall them.
+
 ## Parameters — right
 
 Every exposed parameter, grouped. Right-click for **Reset to default** and **Key at current time**.
