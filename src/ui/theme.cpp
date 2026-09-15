@@ -49,6 +49,7 @@ Palette darkPalette() {
     p.panel         = rgba(19, 22, 27);
     p.lane          = rgba(24, 28, 35);
     p.raised        = rgba(38, 44, 55);
+    p.control       = rgba(46, 53, 66);
 
     p.border        = rgba(56, 63, 76, 200);
     p.borderStrong  = rgba(120, 132, 152, 235);
@@ -82,6 +83,7 @@ Palette lightPalette() {
     p.panel         = rgba(240, 242, 245);
     p.lane          = rgba(231, 234, 239);
     p.raised        = rgba(250, 251, 253);
+    p.control       = rgba(255, 255, 255);
 
     p.border        = rgba(178, 185, 196, 220);
     p.borderStrong  = rgba(92, 102, 118, 235);
@@ -134,7 +136,7 @@ void applyTheme(app::AppearanceTheme preference) {
     style.TabRounding = 4.0f;
     style.WindowBorderSize = 1.0f;
     style.ChildBorderSize = 1.0f;
-    style.FrameBorderSize = 0.0f;
+    style.FrameBorderSize = 1.0f;
     style.PopupBorderSize = 1.0f;
     style.ScrollbarSize = 13.0f;
     style.GrabMinSize = 10.0f;
@@ -192,12 +194,12 @@ void applyTheme(app::AppearanceTheme preference) {
     c[ImGuiCol_Text] = solid(p.text);
     c[ImGuiCol_TextDisabled] = solid(p.textDisabled);
 
-    c[ImGuiCol_FrameBg] = solid(p.lane);
+    c[ImGuiCol_FrameBg] = solid(p.control);
     c[ImGuiCol_FrameBgHovered] = solid(p.hover);
     c[ImGuiCol_FrameBgActive] = solid(p.selected);
 
     c[ImGuiCol_TitleBg] = solid(p.ground);
-    c[ImGuiCol_TitleBgActive] = solid(p.lane);
+    c[ImGuiCol_TitleBgActive] = solid(p.raised);
     c[ImGuiCol_TitleBgCollapsed] = solid(p.ground);
     c[ImGuiCol_MenuBarBg] = solid(p.ground);
     c[ImGuiCol_ScrollbarBg] = solid(p.ground);

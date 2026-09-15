@@ -35,6 +35,12 @@ struct Palette {
     ImU32 panel = 0;     // a panel's own background
     ImU32 lane = 0;      // a timeline lane, a list's alternate row: inset from the panel
     ImU32 raised = 0;    // a block sitting on a lane, a button
+    // The inside of a control -- a checkbox's box, a slider's trough, a text field. A separate role
+    // from `lane` because the two have different jobs: a lane recedes behind what sits on it, and a
+    // control has to be *findable* against the panel it sits on. They were the same colour once and
+    // a rasterised shot of the World panel settled it -- a column of unchecked checkboxes was five
+    // levels of grey away from its background and read as empty space.
+    ImU32 control = 0;
 
     ImU32 border = 0;    // a divider that must be found rather than seen
     ImU32 borderStrong = 0; // the outline of something selected or being dragged

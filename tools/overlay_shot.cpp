@@ -28,6 +28,7 @@
 #include "ui/editor_layout.hpp"
 #include "ui/viewport_overlay.hpp"
 #include "ui/world_editor.hpp"
+#include "ui/theme.hpp"
 #include "ui/world_panel.hpp"
 
 #include <imgui.h>
@@ -402,6 +403,18 @@ int main(int argc, char** argv) {
     // and read straight out of `ImTextureData`, so there is no upload and no backend.
     io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset | ImGuiBackendFlags_RendererHasTextures;
     io.Fonts->AddFontDefault();
+    // The application's own palette and metrics, not Dear ImGui's stock dark theme.
+    //
+    // This tool is the one instrument in the repository that can show what ImGui actually draws --
+    // the standing rule here is that a UI cannot be certified by reading its source -- and until
+    // now it rasterised in `StyleColorsDark` while the editor ran in something else entirely. A
+    // picture of a panel in the wrong colours cannot answer a question about contrast, about a
+    // selected row, or about whether a disabled item reads as disabled, which are most of the
+    // questions worth taking a picture to answer.
+    //
+    // `Dark` rather than `System`: a screenshot has to be the same screenshot on a machine whose
+    // appearance is set the other way.
+    ui::applyTheme(app::AppearanceTheme::Dark);
 
     ui::WorldPanel panel;
 
