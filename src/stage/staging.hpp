@@ -202,6 +202,27 @@ enum class Travel : std::uint8_t {
 [[nodiscard]] const char* travelName(Travel travel);
 [[nodiscard]] std::optional<Travel> travelFromName(std::string_view name);
 
+// Which of a body's two positions a step measures a destination from.
+//
+// They are not the same place, and the difference is not small. `Entity::state().position()` is the
+// anchor plus `travel` -- what navigation and this director wrote. The behaviours' offsets are
+// folded onto the node's transform *afterwards*, on purpose (ADR-210: "a craft keeps hovering,
+// drifting and banking while it is being flown somewhere"), so what is *drawn* is
+// `Entity::visualPosition()`. Glowmere's saucer carries `drift` with a radius of 2.4 m, and its
+// tractor beam is a particle node parented to its transform -- so the beam column stands up to
+// 2.4 m from where the director thinks the craft is, and an animal lifted to the director's number
+// rises beside the beam rather than up it.
+//
+// `Travel` is the default because it is what every step did before this existed, and because it is
+// the right answer for a query: "how far is the nearest cow" is a fact about the simulation. `Visual`
+// is the right answer for anything that has to line up with a picture.
+enum class Anchor : std::uint8_t {
+    Travel, // state().position(): the simulation's number. The default.
+    Visual, // visualPosition(): the simulation's number plus the behaviours' offsets. What is drawn.
+};
+[[nodiscard]] const char* anchorName(Anchor anchor);
+[[nodiscard]] std::optional<Anchor> anchorFromName(std::string_view name);
+
 struct StepDesc {
     StepKind kind = StepKind::Wait;
     std::string name; // a label, for the report and for a test to assert on
@@ -217,6 +238,18 @@ struct StepDesc {
     Value height;             // metres added to the destination's y
     bool aboveGround = false; // measure `height` from the terrain under the destination instead
     bool relative = false;    // MoveBy: `point` is an offset from where the body is *now*
+    // Which of the destination role's two positions the point is measured from. Default `Travel`,
+    // which is what every step did before this field existed.
+    Anchor anchor = Anchor::Travel;
+    // `Follow` only: resolve the destination **once**, on the step's first frame, and hold it.
+    //
+    // The brief's Hover, as distinct from its Follow, and the difference is load-bearing rather than
+    // cosmetic. A craft that keeps taking its station from a body which is simultaneously taking its
+    // own from the craft is a loop, and ADR-210 already paid for the vertical half of one (488 m of
+    // "lift" in four and a half seconds). The horizontal half is benign only while whatever is added
+    // on the way round has a small time integral; a `drift` of 2.4 m at 0.031 Hz integrates to about
+    // twelve metres, which is not benign. A held point has nothing going round it.
+    bool hold = false;
     Travel travel = Travel::Fly;
     Value speed;              // m/s; ignored when `duration` is set
     Value tolerance;          // metres that count as arrived (Walk only; Fly arrives exactly)

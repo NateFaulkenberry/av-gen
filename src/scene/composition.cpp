@@ -2028,6 +2028,42 @@ CompositionNode cloneNodeSpec(const CompositionNode& node) {
     return copy;
 }
 
+// The corners themselves, rather than the axis-aligned box `nodeBounds` folds them into.
+//
+// Two different questions, and the difference is a metre on a cow. "Does this fit inside a circle of
+// radius R" asked of the box is asked of something up to its own diagonal larger than the body: a
+// 3.6x farm animal is long and thin, and a yaw that is not a multiple of ninety degrees makes its
+// box very much wider than it is. The corners are the same eight points `nodeBounds` transforms --
+// this is that loop, stopping one step earlier.
+std::vector<glm::vec3> Composition::nodeCorners(const std::string& name) {
+    std::vector<glm::vec3> out;
+    const auto it = std::find_if(nodes_.begin(), nodes_.end(),
+                                 [&](const std::unique_ptr<CompositionNode>& n) { return n->name == name; });
+    if (it == nodes_.end()) {
+        return out;
+    }
+    ensureBuilt();
+    const auto index = static_cast<std::size_t>(std::distance(nodes_.begin(), it));
+    if (index >= ranges_.size()) {
+        return out;
+    }
+    const NodeRange& range = ranges_[index];
+    for (std::size_t e = range.firstEntity;
+         e < range.firstEntity + range.entityCount && e < scene_.entities.size(); ++e) {
+        const Entity& entity = scene_.entities[e];
+        if (entity.mesh >= scene_.meshes.size()) {
+            continue;
+        }
+        const auto& [lo, hi] = scene_.meshBounds(entity.mesh);
+        for (int corner = 0; corner < 8; ++corner) {
+            const glm::vec3 p((corner & 1) ? hi.x : lo.x, (corner & 2) ? hi.y : lo.y,
+                              (corner & 4) ? hi.z : lo.z);
+            out.push_back(transformPoint(entity.transform, p));
+        }
+    }
+    return out;
+}
+
 WorldBounds Composition::nodeBounds(const std::string& name) {
     WorldBounds out;
     const auto it = std::find_if(nodes_.begin(), nodes_.end(),

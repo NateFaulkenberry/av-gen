@@ -208,6 +208,15 @@ namespace {
     }
     s.aboveGround = readBool(j, "aboveGround", false);
     s.relative = readBool(j, "relative", s.relative);
+    s.hold = readBool(j, "hold", false);
+    if (j.contains("anchor")) {
+        const std::string name = readString(j, "anchor");
+        const auto anchor = anchorFromName(name);
+        if (!anchor) {
+            return fail("a step's `anchor` is '{}', which is not travel/visual", name);
+        }
+        s.anchor = *anchor;
+    }
     if (j.contains("travel")) {
         const std::string name = readString(j, "travel");
         const auto travel = travelFromName(name);
@@ -259,6 +268,8 @@ namespace {
     if (s.point != glm::vec3(0.0f)) j["point"] = vec3ToJson(s.point);
     if (s.aboveGround) j["aboveGround"] = true;
     if (s.relative) j["relative"] = true;
+    if (s.hold) j["hold"] = true;
+    if (s.anchor != Anchor::Travel) j["anchor"] = anchorName(s.anchor);
     if (s.travel != Travel::Fly) j["travel"] = travelName(s.travel);
     writeValue(j, "duration", s.duration, 0.0f);
     writeValue(j, "height", s.height, 0.0f);

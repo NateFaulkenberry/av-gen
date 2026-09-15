@@ -394,6 +394,10 @@ public:
     // to grab. Rebuilds the scene first when it is dirty, because bounds read from a stale
     // flattening are bounds of the world as it was before the last edit.
     [[nodiscard]] WorldBounds nodeBounds(const std::string& name);
+    // The eight world-space corners of every mesh the node draws, un-boxed. What a "does it fit
+    // inside a cylinder" question needs: the axis-aligned box of a rotated body is larger than the
+    // body by up to its own diagonal, which on a 3.6x farm animal is a metre of beam.
+    [[nodiscard]] std::vector<glm::vec3> nodeCorners(const std::string& name);
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
     // ---- composition (ADR-038) ----
     // What the frame is about: focal points, depth layers and exclusion regions. Its fields are

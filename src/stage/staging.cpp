@@ -140,6 +140,19 @@ std::optional<Travel> travelFromName(std::string_view name) {
     return std::nullopt;
 }
 
+const char* anchorName(Anchor anchor) {
+    switch (anchor) {
+    case Anchor::Travel: return "travel";
+    case Anchor::Visual: return "visual";
+    }
+    return "?";
+}
+std::optional<Anchor> anchorFromName(std::string_view name) {
+    if (name == "travel" || name == "simulated") return Anchor::Travel;
+    if (name == "visual" || name == "drawn" || name == "rendered") return Anchor::Visual;
+    return std::nullopt;
+}
+
 const char* stageEventKindName(StageEventKind kind) {
     switch (kind) {
     case StageEventKind::Started: return "started";
@@ -205,8 +218,9 @@ namespace {
             if (step.kind != StepKind::MoveTo && step.kind != StepKind::Follow) {
                 continue;
             }
-            // Anchored to the ground, or asking for no height at all: not a vertical reference.
-            if (step.aboveGround || step.toRole.empty()) {
+            // Anchored to the ground, asking for no height at all, or resolved once and held:
+            // not a live vertical reference.
+            if (step.aboveGround || step.toRole.empty() || step.hold) {
                 continue;
             }
             if (!step.height.bound() && step.height.literal == 0.0f && step.point.y == 0.0f) {
@@ -219,6 +233,52 @@ namespace {
     for (const Link& x : links) {
         for (const Link& y : links) {
             if (x.from == y.to && x.to == y.from && x.from != x.to) {
+                a = x.from;
+                b = x.to;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// The same shape of runaway, horizontally, and it only exists once a step can measure from where a
+// body is *drawn* rather than from where the simulation put it.
+//
+// Two cues taking their horizontal station from each other is the thing ADR-210 called fine and is
+// fine, because what goes round the loop each frame is the pair's own wobble -- a sinusoid whose
+// time integral is bounded by amplitude/(2*pi*rate), and the shipped craft's is 0.3 m at 0.45 Hz,
+// or eleven centimetres. `Anchor::Visual` puts the *behaviours'* offsets into the loop instead, and
+// Glowmere's saucer drifts 2.4 m at 0.031 Hz -- an integral of about twelve metres. The same
+// structure, three orders of magnitude apart, so the loop stops being benign exactly when a step
+// asks for the drawn position.
+//
+// `hold` is the anchor here, the way `aboveGround` is the anchor for the vertical one: a station
+// resolved once has nothing going round it.
+[[nodiscard]] bool visualCycle(const BeatDesc& beat, std::string& a, std::string& b) {
+    struct Link {
+        std::string from;
+        std::string to;
+        bool visual = false;
+    };
+    std::vector<Link> links;
+    for (const CueDesc& cue : beat.cues) {
+        for (const StepDesc& step : cue.steps) {
+            if (step.kind != StepKind::MoveTo && step.kind != StepKind::Follow) {
+                continue;
+            }
+            if (step.toRole.empty() || step.hold) {
+                continue;
+            }
+            const std::string& self = step.role.empty() ? cue.role : step.role;
+            links.push_back(Link{.from = self,
+                                 .to = step.toRole,
+                                 .visual = step.anchor == Anchor::Visual});
+        }
+    }
+    for (const Link& x : links) {
+        for (const Link& y : links) {
+            if (x.from == y.to && x.to == y.from && x.from != x.to && (x.visual || y.visual)) {
                 a = x.from;
                 b = x.to;
                 return true;
@@ -292,6 +352,13 @@ Result<void> Staging::setDesc(StagingDesc desc) {
                             "height and the pair climbs away. Anchor one of them with "
                             "`aboveGround`.",
                             scenario.name, beat.name, a, b, b, a);
+            }
+            if (visualCycle(beat, a, b)) {
+                return fail("scenario '{}', beat '{}': '{}' and '{}' each take their station from "
+                            "the other and one of them measures from the drawn position, so the "
+                            "behaviours' own offsets go round the loop every frame and the pair "
+                            "walks away. Hold one of the two stations with `hold`.",
+                            scenario.name, beat.name, a, b);
             }
             for (CueDesc& cue : beat.cues) {
                 for (StepDesc& step : cue.steps) {
@@ -817,19 +884,26 @@ bool Staging::runQuery(Run& run, const QueryDesc& query, const StageContext& ctx
 
 bool Staging::resolvePoint(const Run& run, const StepDesc& step, const StageContext& ctx,
                            glm::vec3& out) const {
+    // `Visual` is where the body is *drawn* -- the simulation's number plus the behaviours' offsets
+    // the entity layer folds onto the node afterwards. A step that has to line up with something
+    // parented to that node (a tractor beam) must measure from the drawn place, not the simulated
+    // one; see the note on `Anchor`.
+    const auto placeOf = [&](const entity::Entity& e) {
+        return step.anchor == Anchor::Visual ? e.visualPosition() : e.state().position();
+    };
     glm::vec3 base(0.0f);
     if (!step.toRole.empty()) {
         const entity::Entity* target = resolve(run, step.toRole, ctx);
         if (target == nullptr) {
             return false;
         }
-        base = target->state().position();
+        base = placeOf(*target);
     } else if (step.relative) {
         const entity::Entity* self = resolve(run, step.role, ctx);
         if (self == nullptr) {
             return false;
         }
-        base = self->state().position();
+        base = placeOf(*self);
     }
     out = base + step.point;
     const float height = value(run, step.height);
@@ -1127,8 +1201,19 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             return StepStatus::Failed;
         }
         glm::vec3 goal(0.0f);
-        if (!resolvePoint(run, step, ctx, goal)) {
-            return StepStatus::Failed;
+        // `hold` resolves the station once and keeps it. Re-reading it every frame is what makes a
+        // `follow` follow, and is exactly wrong when the thing being followed is itself taking its
+        // position from this body: see the note on `StepDesc::hold`.
+        if (step.hold && cue.started) {
+            goal = cue.from;
+        } else {
+            if (!resolvePoint(run, step, ctx, goal)) {
+                return StepStatus::Failed;
+            }
+            if (step.hold) {
+                cue.from = goal;
+                cue.started = true;
+            }
         }
         cue.phase += ctx.dt;
         glm::vec3 p = goal;
