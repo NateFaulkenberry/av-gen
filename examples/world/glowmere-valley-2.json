@@ -10087,6 +10087,7 @@
     "quality": 80,
     "start": 0.0,
     "tier": "offline",
+    "supersample": 2.0,
     "width": 1280
   },
   "routes": [
