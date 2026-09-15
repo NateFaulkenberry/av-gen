@@ -65,7 +65,10 @@ enum class PropagationKind : std::uint8_t {
 enum class SourceKind : std::uint8_t {
     World,      // an authored world position; `position` is the answer
     Node,       // a scene node, by name: the effect rides whatever that node's transform is
-    Hero,       // a hero, by name (ADR-072): its position and its accent colour are available
+    // A hero, by name (ADR-072). Resolves to the *node* of that name when the scene has one -- a
+    // hero is one object (ADR-107) and its transform is where that object stands -- and to
+    // `HeroPoint::position`, which is the centre of its bounds, when it does not.
+    Hero,
     Camera,     // the active camera's eye
     FocusHero,  // whichever hero the shot schedule is spotlighting *now* -- no name, no wiring
 };
@@ -157,7 +160,7 @@ struct Appearance {
     // construction -- it is a function of position and of the front's distance, not of noise.
     bool rainbow = false;
     float rainbowSpeed = 0.35f;    // cycles per second the ramp slides through the wave
-    float rainbowScale = 0.012f;   // cycles per metre
+    float rainbowScale = 0.025f;   // cycles per metre; under ~2 turns inside the band it is a stripe
     float rainbowSaturation = 0.85f;
     float rainbowBrightness = 1.0f;
 
@@ -170,8 +173,8 @@ struct Appearance {
 // smaller than a pixel is faded out rather than sampled.
 struct Sparkle {
     bool enabled = false;
-    float density = 0.55f;    // cells per metre
-    float size = 0.34f;       // 0..1 of a cell
+    float density = 1.1f;     // cells per metre; coarse cells read as blobs, not as sparkle
+    float size = 0.22f;       // 0..1 of a cell
     float intensity = 1.6f;
     float speed = 0.6f;       // twinkle rate, in cycles per second, off the effect's own clock
     float fadeDistance = 85.0f; // metres at which sparkle is gone, so it cannot alias at range
@@ -258,7 +261,12 @@ struct ShotSpan {
     double start = 0.0;
     double end = 0.0;
     bool travel = false;     // the camera is moving from one subject to another
-    bool spotlight = false;  // a subject is being held
+    // The camera has landed: this shot is not travelling and it is about something. Deliberately a
+    // geometric fact rather than the director's own `Spotlight::emphasis`, which is how much of the
+    // *film* a subject owns and is zero for a whole intro. An effect gated on "the camera is on this
+    // hero" wants the former; `emphasis` below is there for anything that wants the latter.
+    bool spotlight = false;
+    float emphasis = 0.0f;   // 0..1, the director's own weighting of this subject
     std::string subject;     // who the shot is about
     glm::vec3 subjectPosition{0.0f};
     float subjectRadius = 1.0f;

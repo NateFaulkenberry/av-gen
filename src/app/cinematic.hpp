@@ -297,10 +297,11 @@ struct Sequence {
     // The cut, flattened to what a world effect needs for time gating (ADR-204): when the camera is
     // travelling between subjects, when it is holding one, and who those subjects are.
     //
-    // A travel shot is **not** also a hold. The director gives every shot a spotlight emphasis from
-    // its section, so a transition arrives carrying one -- but a shot whose whole purpose is to
-    // leave one subject for another is not a shot holding either of them, and an effect gated on
-    // "the camera has landed" must not fire while it is still on its way.
+    // A travel shot is **not** also a hold: a shot whose whole purpose is to leave one subject for
+    // another is not a shot holding either of them, and an effect gated on "the camera has landed"
+    // must not fire while it is still on its way. A hold is any other shot with a subject --
+    // `Spotlight::emphasis` is carried alongside but does not decide it, because emphasis is how
+    // much of the *film* a subject owns and the director leaves it at zero for a whole intro.
     [[nodiscard]] std::vector<world::ShotSpan> shotSpans() const;
 
     [[nodiscard]] nlohmann::json toJson() const;

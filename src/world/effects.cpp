@@ -460,8 +460,12 @@ bool applyBeamStyle(WorldEffect& e, std::string_view style) {
         a.edgeIntensity = 3.4f;
         a.rainbow = false;
         s.enabled = true;
-        s.density = 0.5f;
-        s.intensity = 1.5f;
+        // Cells per metre. Coarse cells do not read as sparkle -- at 0.5 (two-metre cells) the
+        // leading edge grew soft discs the size of a bush. Finer cells alias sooner, which is what
+        // `fadeDistance` is for.
+        s.density = 1.1f;
+        s.size = 0.22f;
+        s.intensity = 1.9f;
         p.frontWidth = 16.0f;
         p.trailLength = 52.0f;
         p.falloff = 1.6f;
@@ -472,12 +476,16 @@ bool applyBeamStyle(WorldEffect& e, std::string_view style) {
         a.edgeIntensity = 2.6f;
         a.rainbow = true;
         a.rainbowSpeed = 0.3f;
-        a.rainbowScale = 0.010f;
+        // Cycles per metre. 0.010 was one full sweep per 100 m, which over a band 80 m long is less
+        // than one turn -- rendered, it read as a single tinted stripe rather than as a rainbow.
+        // 0.025 puts two turns inside the band, which is where the eye starts calling it one.
+        a.rainbowScale = 0.025f;
         a.rainbowSaturation = 0.9f;
         a.rainbowBrightness = 1.05f;
         s.enabled = true;
-        s.density = 0.6f;
-        s.intensity = 1.7f;
+        s.density = 1.1f;
+        s.size = 0.22f;
+        s.intensity = 2.1f;
         p.frontWidth = 18.0f;
         p.trailLength = 64.0f;
         p.falloff = 1.3f;
@@ -696,6 +704,21 @@ const HeroPoint* findHero(std::span<const HeroPoint> heroes, std::string_view na
     return nullptr;
 }
 
+// Where a hero *stands*, as distinct from where its bounds are centred.
+//
+// A hero is one object (ADR-107) and its name is that object's node, so when the scene has a node of
+// that name its transform is where the thing stands -- which for Glowmere's elder is the ground at
+// its stem, twelve metres below the `HeroPoint::position` that describes its cap. A ripple through
+// the ground wants the former; ADR-199 is the record of what assuming the two are the same costs.
+// Falls back to the hero's own position for a hero with no node of its name.
+glm::vec3 heroStandsAt(const HeroPoint& hero, const WorldEffectContext& ctx) {
+    glm::vec3 at{0.0f};
+    if (ctx.scene != nullptr && ctx.scene->nodePosition(hero.name, at)) {
+        return at;
+    }
+    return hero.position;
+}
+
 // Where an endpoint is. `accent` receives the hero's own colour when the endpoint resolved to one,
 // so an effect can be the colour of the thing it is about without anybody typing it twice.
 bool resolveEndpoint(const EffectEndpoint& e, const WorldEffectContext& ctx, const ShotSpan* span,
@@ -721,7 +744,7 @@ bool resolveEndpoint(const EffectEndpoint& e, const WorldEffectContext& ctx, con
             out = e.position;
             break;
         }
-        out = hero->position;
+        out = heroStandsAt(*hero, ctx);
         if (accent != nullptr) { *accent = &hero->colorAccent; }
         break;
     }
@@ -731,7 +754,7 @@ bool resolveEndpoint(const EffectEndpoint& e, const WorldEffectContext& ctx, con
         }
         const HeroPoint* hero = findHero(ctx.heroes, span->subject);
         if (hero != nullptr) {
-            out = hero->position;
+            out = heroStandsAt(*hero, ctx);
             if (accent != nullptr) { *accent = &hero->colorAccent; }
         } else {
             out = span->subjectPosition;

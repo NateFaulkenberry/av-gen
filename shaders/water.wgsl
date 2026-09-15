@@ -23,6 +23,13 @@
 //   uv        x = bed depth in metres, y = across the channel (1 centreline, 0 bank)
 #include "common.wgsl"
 #include "lighting.wgsl"
+// ADR-204. Water is not shaded through pbr_shade.wgsl (see the header above for why), so it has to
+// take the world-effect term itself. It does, and the reason is one frame: Glowmere's elder stands
+// in a pool, and a ground ripple that stopped at the shoreline drew a hard straight edge across the
+// exact shot the effect exists for. `kProceduralDraw` is what worldEffectGain switches on and is
+// declared by every module that includes the file.
+const kProceduralDraw: bool = false;
+#include "world_effects.wgsl"
 
 struct WaterUniforms {
     shallowColor: vec4<f32>,   // rgb, w = metres of depth over which the colour reaches deep
@@ -447,7 +454,11 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     let occlusion = sampleAmbientOcclusion(screenUv, viewDepth, vec3<f32>(0.0, 1.0, 0.0));
     let ao = mix(frame.styledSky.w, 1.0, clamp(occlusion.visibility, 0.0, 1.0));
     color = color * mix(ao, 1.0, fresnel);
-    color = applyFog(color, in.worldPos);
+    // ADR-204: additive and pre-fog, as on every other surface. The surface normal is the water's
+    // own, so a ripple crossing a pool reads as ground-facing and takes the same response weight the
+    // bank beside it does -- which is what makes the crossing invisible.
+    let fx = worldEffectsAt(in.worldPos, n, glint + sparkle);
+    color = applyFog(color + fx.radiance, in.worldPos);
 
     var out: SceneOut;
     // The pipeline uses the conventional non-premultiplied SrcAlpha blend state. Keep alpha in
@@ -458,7 +469,7 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     out.velocity = screenVelocityAt(in.clip, in.prevClip);
     // The glint and the sparkle are what should bloom; the body colour should not, or a wide river
     // washes the whole frame. The alpha lane is the bloom weight.
-    out.emission = vec4<f32>((glint + sparkle) * alpha, 1.0);
+    out.emission = vec4<f32>((glint + sparkle) * alpha + fx.radiance, 1.0);
     out.ids = packIds(object.ids.x, object.ids.y);
     return out;
 }

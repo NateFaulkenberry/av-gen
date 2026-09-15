@@ -538,6 +538,7 @@ private:
     std::vector<world::WorldEffect> worldEffects_;
     world::WorldEffectParameters worldEffectParams_;
     std::vector<world::ShotSpan> shotSpans_;
+    std::uint32_t lastWorldEffectCount_ = 0;
     void updateWorldEffects();
     [[nodiscard]] glm::vec3 cameraVelocityOnTimeline() const;
     scene::PostParameters postParams_;

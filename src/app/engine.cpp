@@ -777,6 +777,33 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
         }
         doc["cameraAimFollow"] = std::move(shots);
     }
+    // ADR-204: the other half of the same bake -- when the camera travels and when it holds, which
+    // is what a world effect time-gates on. A sibling of `cameraAimFollow` for the identical reason,
+    // and saved for a reason the aim-follow table taught the hard way: an offline render loads a
+    // *project document*, so anything the director left only in memory is a cut the render does not
+    // have. Without this the beam and the pulse were correct in the window and absent from every
+    // frame anybody exported.
+    if (!shotSpans_.empty()) {
+        nlohmann::json spans = nlohmann::json::array();
+        for (const world::ShotSpan& span : shotSpans_) {
+            nlohmann::json entry{{"start", span.start},
+                                 {"end", span.end},
+                                 {"travel", span.travel},
+                                 {"spotlight", span.spotlight},
+                                 {"emphasis", span.emphasis},
+                                 {"subject", span.subject},
+                                 {"subjectPosition",
+                                  {span.subjectPosition.x, span.subjectPosition.y, span.subjectPosition.z}},
+                                 {"subjectRadius", span.subjectRadius}};
+            if (!span.handoff.empty()) {
+                entry["handoff"] = span.handoff;
+                entry["handoffPosition"] = {span.handoffPosition.x, span.handoffPosition.y,
+                                            span.handoffPosition.z};
+            }
+            spans.push_back(std::move(entry));
+        }
+        doc["cameraShotSpans"] = std::move(spans);
+    }
     if (!states_.empty()) {
         doc["states"] = states_.toJson();
     }
@@ -1193,6 +1220,42 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             }
         }
         comp->setAimFollow(std::move(shots));
+    }
+    // ADR-204, and cleared when absent for the same reason the aim-follow table is: a project with
+    // no cut must not inherit the last one's, or a world effect would fire against a schedule for a
+    // film this scene has never been in.
+    {
+        std::vector<world::ShotSpan> spans;
+        if (doc.contains("cameraShotSpans") && doc["cameraShotSpans"].is_array()) {
+            for (const auto& entry : doc["cameraShotSpans"]) {
+                if (!entry.is_object()) {
+                    continue;
+                }
+                world::ShotSpan span;
+                span.start = entry.value("start", 0.0);
+                span.end = entry.value("end", 0.0);
+                span.travel = entry.value("travel", false);
+                span.spotlight = entry.value("spotlight", false);
+                span.emphasis = entry.value("emphasis", 0.0f);
+                span.subject = entry.value("subject", std::string{});
+                const auto readVec = [&entry](const char* key, glm::vec3& out) {
+                    if (entry.contains(key) && entry[key].is_array() && entry[key].size() == 3) {
+                        out = glm::vec3(entry[key][0].get<float>(), entry[key][1].get<float>(),
+                                        entry[key][2].get<float>());
+                    }
+                };
+                readVec("subjectPosition", span.subjectPosition);
+                span.subjectRadius = entry.value("subjectRadius", 1.0f);
+                span.handoff = entry.value("handoff", std::string{});
+                readVec("handoffPosition", span.handoffPosition);
+                if (!(span.end > span.start)) {
+                    warn("cameraShotSpans: a span with no duration was skipped");
+                    continue;
+                }
+                spans.push_back(std::move(span));
+            }
+        }
+        shotSpans_ = std::move(spans);
     }
     cueState_ = {};
     cueApplied_ = false;
@@ -2517,6 +2580,12 @@ void Engine::updateWorldEffects() {
         ctx.heroes = comp->heroes();
     }
     world::buildWorldEffectFrame(worldEffects_, ctx, live.worldEffects);
+    // Logged on the edge rather than per frame: "why is my effect not firing" is a question about
+    // when it started and stopped, and a line per frame would bury the answer.
+    if (live.worldEffects.count != lastWorldEffectCount_) {
+        lastWorldEffectCount_ = live.worldEffects.count;
+        log::debug("world effects: {} live at {:.2f}s", live.worldEffects.count, ctx.seconds);
+    }
 }
 
 void Engine::update(const FrameTime& time) {

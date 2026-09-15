@@ -468,7 +468,23 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
     // rather than derived per frame, for the same reason the keys exist at all -- a shot schedule is
     // a fold over a whole track and the frame you are on cannot know it. Nothing here runs per
     // frame; `resolveWorldEffects` does a linear scan of single digits of spans.
-    engine.setShotSpans(sequence.shotSpans());
+    {
+        std::vector<world::ShotSpan> spans = sequence.shotSpans();
+        // At debug level, because "why is my world effect not firing" is otherwise unanswerable
+        // without a debugger: an effect gated on the cut is gated on exactly these spans.
+        std::size_t travelling = 0;
+        std::size_t holding = 0;
+        for (const world::ShotSpan& span : spans) {
+            travelling += span.travel ? 1 : 0;
+            holding += span.spotlight ? 1 : 0;
+            log::debug("auto-director: span {:7.2f}s..{:7.2f}s {:<9} {}{}", span.start, span.end,
+                       span.travel ? "travelling" : (span.spotlight ? "holding" : "--"), span.subject,
+                       span.handoff.empty() ? "" : " -> " + span.handoff);
+        }
+        log::info("auto-director: {} span(s) for world effects: {} travelling, {} holding",
+                  spans.size(), travelling, holding);
+        engine.setShotSpans(std::move(spans));
+    }
     log::info("auto-director: {} shot(s), {} track(s) installed, {} replaced",
               sequence.shots.size(), added, removed);
     return added;

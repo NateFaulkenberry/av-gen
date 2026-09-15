@@ -1082,17 +1082,6 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             if (panel_) panel_->setStatus(r.error().message);
         }
     }
-    if (options.directCamera) {
-        // After the world exists, because the director shoots the world's heroes and a generated
-        // world has none until it is installed.
-        if (auto r = directCameraFromTrack(); !r) {
-            log::error("direct: {}", r.error().message);
-            if (options.headless) {
-                return std::unexpected(r.error());
-            }
-            if (panel_) panel_->setStatus(r.error().message);
-        }
-    }
     if (options.oscPort) {
         auto map = engine_->control().map();
         map.oscPort = static_cast<std::uint16_t>(std::clamp(*options.oscPort, 0, 65535));
@@ -1137,6 +1126,20 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         loadAudio(*options.audio);
         if (!engine_->hasAudio() && options.headless) {
             return fail("headless run requires a loadable audio file");
+        }
+    }
+    if (options.directCamera) {
+        // After **both** of the things the director needs: a world, because it shoots that world's
+        // heroes, and an analysed track, because a structure is a fold over a whole piece. It used
+        // to sit above `--composition` and `--audio` alike, so `--direct` worked only with
+        // `--project` and answered a scene file with "needs a scene" -- a message about the ordering
+        // of this function rather than about anything the user did.
+        if (auto r = directCameraFromTrack(); !r) {
+            log::error("direct: {}", r.error().message);
+            if (options.headless) {
+                return std::unexpected(r.error());
+            }
+            if (panel_) panel_->setStatus(r.error().message);
         }
     }
     for (const auto& [file, isPost] : options.shaders) {

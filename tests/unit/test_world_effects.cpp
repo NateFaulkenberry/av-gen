@@ -630,10 +630,22 @@ TEST_CASE("a directed sequence flattens to spans a world effect can gate on",
     // The director gives a transition an emphasis too; the span must still not call it a hold.
     move.spotlight.active = true;
     move.spotlight.emphasis = 0.6f;
+    // And a shot the director left at zero emphasis -- every intro shot is one -- is still a shot
+    // the camera has landed on, which is what a hero-focus effect is gated on.
+    app::Shot quiet;
+    quiet.name = "quiet";
+    quiet.kind = app::ShotKind::Establish;
+    quiet.startSeconds = 13.0;
+    quiet.durationSeconds = 4.0;
+    quiet.subject.name = "cairn";
+    quiet.subject.radius = 4.0f;
 
-    seq.shots = {hold, move};
+    seq.shots = {hold, move, quiet};
     const std::vector<world::ShotSpan> spans = seq.shotSpans();
-    REQUIRE(spans.size() == 2);
+    REQUIRE(spans.size() == 3);
+    CHECK(spans[2].spotlight);
+    CHECK_THAT(spans[2].emphasis, WithinAbs(0.0f, 1e-6f));
+    CHECK_THAT(spans[0].emphasis, WithinAbs(0.8f, 1e-6f));
     CHECK(spans[0].spotlight);
     CHECK_FALSE(spans[0].travel);
     CHECK(spans[0].subject == "elder");

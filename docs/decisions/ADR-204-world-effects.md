@@ -76,7 +76,8 @@ inherit it with the rest of the block so nothing can disagree with itself.
 reaches entities (`pbr.wgsl`), skinned characters (`pbr_skinned.wgsl`, which includes `pbr.wgsl`
 unchanged), the procedural scatter (`procedural.wgsl`) and raymarched SDF surfaces
 (`sdf_raymarch.wgsl`) -- so terrain, vegetation, rocks, mushrooms, props and characters all receive
-the effect without one line of per-asset code. The result is **added** to the shaded colour and to
+the effect without one line of per-asset code. Water includes it separately, because it shades
+through its own pipeline; see the consequences below. The result is **added** to the shaded colour and to
 the emission target, never substituted for the base colour: `finalSurface = normalSurface +
 propagationContribution`, which is what keeps a material looking like itself under a wave.
 
@@ -118,9 +119,13 @@ is one function in one WGSL file.
   category field on `scene::Entity` that nothing currently carries. Recorded as the extension point
   rather than approximated by a name prefix, which would be a control that lies at the first scene
   that names something `rock_platform`.
-* Water (`water.wgsl`) does not receive world effects. It has its own pipeline for the reasons
-  `water_renderer.hpp` gives, and ADR-183/184 are a record of what chasing the water surface costs.
-  Adding it is a separate change with its own before/after.
+* Water (`water.wgsl`) has its own pipeline and so takes the term itself, in three added lines.
+  This was going to be an exclusion -- water has its own shading for the reasons
+  `water_renderer.hpp` gives, and ADR-183/184 record what chasing the water surface costs -- and the
+  first render of the hero pulse overturned it in one frame: Glowmere's elder stands in a pool, so a
+  ripple that stopped at the shoreline drew a hard straight edge across the exact shot the effect
+  exists for. The addition is purely additive and touches none of water's normals, refraction or
+  foam, which is why it is three lines and not a negotiation.
 * The block is in `FrameUniforms`, so `sizeof(FrameUniforms)` moved and the WGSL mirror had to move
   with it. The `static_assert` written as a sum (ADR's own note in `scene_renderer.hpp`) is what
   makes that a compile error rather than a silent misread.
