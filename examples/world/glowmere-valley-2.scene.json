@@ -8790,6 +8790,7 @@
           "height": {
            "param": "hoverHeight"
           },
+          "aboveGround": true,
           "speed": {
            "param": "travelSpeed"
           },
@@ -8818,6 +8819,7 @@
           "height": {
            "param": "hoverHeight"
           },
+          "aboveGround": true,
           "duration": {
            "param": "hoverSeconds"
           },
@@ -8878,6 +8880,7 @@
           "height": {
            "param": "hoverHeight"
           },
+          "aboveGround": true,
           "duration": {
            "param": "abductSeconds"
           },

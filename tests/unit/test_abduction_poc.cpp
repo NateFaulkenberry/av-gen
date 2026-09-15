@@ -91,6 +91,12 @@ struct Run {
         comp = std::move(*loaded);
         comp->attach(params, modulator);
         comp->setViewport(1920, 1080);
+        // ADR-186's offline setting: every entity updated every frame, however far from the view.
+        // The measurements here are about the world, not about the camera, and with the cull on a
+        // far animal simply is not simulated -- so "it did not move this frame" would be measuring
+        // the level-of-detail band rather than anything about wandering. (Measured: with the cull
+        // on, the wander metric read 63.6% and a 75 s "stall" that was one culled chick.)
+        comp->scene().detailLimits.entityDistanceCull = false;
     }
 
     void play(double seconds, double hz = 60.0) {
@@ -377,6 +383,30 @@ TEST_CASE("the UFO abducts several animals, choosing each one from the scene",
                      run.reachedCraft));
     CHECK(run.highestLift > 10.0f);
     CHECK(run.reachedCraft < 5.0f);
+
+    // If it stopped early, say why rather than leaving it a mystery: for every animal still on the
+    // ground, the three things the query asks about it.
+    if (run.abducted.size() < static_cast<std::size_t>(wanted)) {
+        const world::TerrainQuery terrain = run.comp->terrainQuery();
+        const entity::Entity* craft = run.comp->entityWorld().find("visitor");
+        const glm::vec3 from = craft != nullptr ? craft->state().position() : glm::vec3(0.0f);
+        const float radius = director.parameter("abduction", "searchRadius");
+        const float ceiling = director.parameter("abduction", "targetClearance");
+        std::string why;
+        for (const auto& ePtr : run.comp->entityWorld().entities()) {
+            const entity::Entity& e = *ePtr;
+            if (!isAnimal(e) ||
+                std::find(run.abducted.begin(), run.abducted.end(), e.name()) != run.abducted.end()) {
+                continue;
+            }
+            const glm::vec3 p = e.state().position();
+            why += fmt::format("  {:<12} {:6.1f} m  canopy {:5.1f}  navigable {}\n", e.name(),
+                               glm::length(p - from), terrain.canopyHeightAt({p.x, p.z}),
+                               terrain.isWalkable({p.x, p.z}) ? "yes" : "NO");
+        }
+        INFO(fmt::format("search radius {:.0f}, canopy ceiling {:.1f}; left on the ground:\n{}",
+                         radius, ceiling, why));
+    }
 
     // And the director did not brute-force the scene to do it.
     const stage::StageReport& report = director.report();

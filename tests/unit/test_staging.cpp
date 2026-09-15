@@ -853,6 +853,62 @@ TEST_CASE("a value naming a parameter the scenario never declared is refused",
     CHECK_THAT(ok.error().message, ContainsSubstring("noSuchKnob"));
 }
 
+TEST_CASE("two cues that take their height from each other are refused",
+          "[stage][director][json]") {
+    // Not hypothetical: the shipped abduction was shaped exactly like this. The saucer hovered
+    // `hoverHeight` above the cow while the cow rose to `liftHeight` under the saucer, and each
+    // frame both read the other's new height -- measured, the pair climbed to 488 m in four and a
+    // half seconds. It had been invisible because `ground` was pinning the cow to the terrain, so
+    // fixing grounding is what exposed it.
+    stage::StepDesc up = step(stage::StepKind::MoveTo, "lift");
+    up.role = "target";
+    up.toRole = "actor";
+    up.height = lit(-3.0f);
+    up.duration = lit(2.0f);
+    stage::StepDesc over = step(stage::StepKind::Follow, "hold");
+    over.role = "actor";
+    over.toRole = "target";
+    over.height = lit(20.0f);
+    over.duration = lit(2.0f);
+
+    const auto build = [&](bool anchored) {
+        stage::StepDesc craft = over;
+        craft.aboveGround = anchored;
+        stage::CueDesc a;
+        a.role = "actor";
+        a.steps = {craft};
+        stage::CueDesc b;
+        b.role = "target";
+        b.steps = {up};
+        stage::BeatDesc beat;
+        beat.name = "abduct";
+        beat.cues = {a, b};
+        stage::ActorDesc actor;
+        actor.name = "star";
+        actor.body = "hero";
+        stage::ScenarioDesc sc;
+        sc.name = "test";
+        sc.actor = "star";
+        sc.maxCycles = 1;
+        sc.beats = {beat};
+        stage::StagingDesc d;
+        d.actors = {actor};
+        d.scenarios = {sc};
+        return d;
+    };
+
+    stage::Staging loop;
+    const auto refused = loop.setDesc(build(false));
+    REQUIRE_FALSE(refused.has_value());
+    CHECK_THAT(refused.error().message, ContainsSubstring("height"));
+    CHECK_THAT(refused.error().message, ContainsSubstring("aboveGround"));
+
+    // The negative control, and the fix: anchoring one end to the terrain breaks the cycle, and the
+    // *horizontal* half of the coupling -- a craft following a target that walks -- is untouched.
+    stage::Staging fixed;
+    CHECK(fixed.setDesc(build(true)).has_value());
+}
+
 TEST_CASE("a beat naming a beat that is not there is refused", "[stage][director][json]") {
     stage::StagingDesc d = finder(stage::Pick::Nearest, 10.0f);
     d.scenarios[0].beats[0].then = "nowhere";

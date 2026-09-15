@@ -191,7 +191,38 @@ than hoped for.
 
 ## What this cost, in defects found
 
-Two, both from the same source — a probe that could not fail (ADR-182).
+Four, and the interesting ones came from fixing the earlier ones.
+
+### Two cues that take their height from each other climb away
+
+The shipped abduction had the saucer hovering `hoverHeight` above the cow while the cow rose to
+`liftHeight` under the saucer. Each frame both read the other's *new* height. Measured: **488 metres
+of "lift" in four and a half seconds**, and the scenario starved after one abduction because the
+saucer was in the stratosphere and nothing was in range.
+
+It had been invisible, and the thing that made it visible was fixing something else. `ground` was
+pinning the cow to the terrain every frame, which broke the loop and also meant the cow never rose
+at all — the lift measured 1.2 m instead of 19.6 and the sequence "worked". So the grounding fix is
+what *exposed* this, which is the usual shape of these: a defect masked by a second defect, and the
+count of abductions went *down* (six to one) when the code got more correct. "Improved" is not
+"correct" (ADR-199), and neither is "it looked like it was working".
+
+The horizontal half of that coupling is fine and is the point — a craft should follow a target that
+walks. Only the vertical half is circular, and only when neither end is anchored to something that
+does not move. `aboveGround` is that anchor: a height measured from the terrain rather than from the
+other body. `setDesc` now **refuses** a beat where two roles take their height from each other and
+neither is anchored, and says which two and what to do about it.
+
+### The wander metric was measuring the level-of-detail band
+
+The first reading was 63.6% of commanded frames still and a **75-second** stall — worse than the
+`sage` precedent this was supposed to beat. The 75 seconds was one chick, culled by
+`EntityDesc::cullDistance` because the camera was 260 m away, holding its last `speed` and its last
+position for the rest of the run. "It did not move this frame" is not a fact about wandering when
+the entity was not updated at all. The measurement now runs with ADR-186's offline setting —
+`entityDistanceCull = false`, every entity every frame — which is the arm the question is about.
+
+### And two from probes that could not fail (ADR-182)
 
 `parameterPath` was reading `StepDesc::role` instead of the role the cue resolves when a step names
 none, so **every `show`, `hide` and `set` in the shipped scenario was failing silently**. The test

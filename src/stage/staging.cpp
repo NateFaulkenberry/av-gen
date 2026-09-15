@@ -182,6 +182,52 @@ namespace {
                 scenario.name, where, v.param);
 }
 
+// Two cues in one beat, each taking its *height* from the other, is a runaway.
+//
+// It is not a hypothetical. The shipped abduction had the saucer hovering `hoverHeight` above the
+// cow while the cow rose to `liftHeight` under the saucer, and each frame both read the other's new
+// y: measured, the pair climbed to 488 metres in four and a half seconds. It had been invisible
+// because `ground` was pinning the cow to the terrain and breaking the loop -- so fixing grounding
+// (ADR-209) is what *exposed* it, which is the usual shape of these.
+//
+// The horizontal half of that coupling is fine and is the point: a craft should follow a target
+// that walks. Only the vertical half is circular, and only when neither end is anchored to
+// something that does not move -- which is what `aboveGround` is: a height measured from the
+// terrain rather than from the other body.
+[[nodiscard]] bool verticalCycle(const BeatDesc& beat, std::string& a, std::string& b) {
+    struct Link {
+        std::string from;
+        std::string to;
+    };
+    std::vector<Link> links;
+    for (const CueDesc& cue : beat.cues) {
+        for (const StepDesc& step : cue.steps) {
+            if (step.kind != StepKind::MoveTo && step.kind != StepKind::Follow) {
+                continue;
+            }
+            // Anchored to the ground, or asking for no height at all: not a vertical reference.
+            if (step.aboveGround || step.toRole.empty()) {
+                continue;
+            }
+            if (!step.height.bound() && step.height.literal == 0.0f && step.point.y == 0.0f) {
+                continue;
+            }
+            const std::string& self = step.role.empty() ? cue.role : step.role;
+            links.push_back(Link{.from = self, .to = step.toRole});
+        }
+    }
+    for (const Link& x : links) {
+        for (const Link& y : links) {
+            if (x.from == y.to && x.to == y.from && x.from != x.to) {
+                a = x.from;
+                b = x.to;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 [[nodiscard]] bool hasBeat(const ScenarioDesc& scenario, const std::string& name) {
     if (name.empty()) {
         return true;
@@ -237,6 +283,15 @@ Result<void> Staging::setDesc(StagingDesc desc) {
                 if (auto r = resolveValue(q.radius, scenario, "a find's radius"); !r) return r;
                 if (auto r = resolveValue(q.minRadius, scenario, "a find's minRadius"); !r) return r;
                 if (auto r = resolveValue(q.clearance, scenario, "a find's clearance"); !r) return r;
+            }
+            std::string a;
+            std::string b;
+            if (verticalCycle(beat, a, b)) {
+                return fail("scenario '{}', beat '{}': '{}' takes its height from '{}' and '{}' "
+                            "takes its height from '{}' -- each frame both read the other's new "
+                            "height and the pair climbs away. Anchor one of them with "
+                            "`aboveGround`.",
+                            scenario.name, beat.name, a, b, b, a);
             }
             for (CueDesc& cue : beat.cues) {
                 for (StepDesc& step : cue.steps) {

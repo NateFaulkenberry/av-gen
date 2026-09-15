@@ -75,8 +75,14 @@ BEATS = [
             ("steps", [
                 od([("kind", "lookAt"), ("name", "aim"), ("to", "target"),
                     ("duration", ref("aimSeconds"))]),
+                # `aboveGround`: the hover height is measured from the terrain under the animal,
+                # not from the animal. Two cues that each take their height from the other diverge
+                # -- the saucer goes to cow + 23, the cow goes to saucer - 3.4, and next frame both
+                # read the other's new height. Measured, before this: 488 m of "lift" in four and a
+                # half seconds. `setDesc` now refuses a beat shaped like that, and this is the
+                # shape that is right.
                 od([("kind", "moveTo"), ("name", "approach"), ("to", "target"),
-                    ("height", ref("hoverHeight")),
+                    ("height", ref("hoverHeight")), ("aboveGround", True),
                     ("speed", ref("travelSpeed")),
                     ("duration", ref("approachSeconds")),
                     ("clearance", ref("cruiseClearance"))]),
@@ -90,7 +96,7 @@ BEATS = [
         ("cues", [
             od([("role", "actor"), ("steps", [
                 od([("kind", "follow"), ("name", "hover"), ("to", "target"),
-                    ("height", ref("hoverHeight")),
+                    ("height", ref("hoverHeight")), ("aboveGround", True),
                     ("duration", ref("hoverSeconds")),
                     ("clearance", ref("cruiseClearance")),
                     ("wobble", ref("craftWobble")),
@@ -110,8 +116,10 @@ BEATS = [
         ("name", "abduct"),
         ("cues", [
             od([("role", "actor"), ("steps", [
+                # And the same here, which is the beat the loop actually bit in: the saucer holds
+                # station over the *ground* the animal came off while the animal rises to meet it.
                 od([("kind", "follow"), ("name", "hold"), ("to", "target"),
-                    ("height", ref("hoverHeight")),
+                    ("height", ref("hoverHeight")), ("aboveGround", True),
                     ("duration", ref("abductSeconds")),
                     ("clearance", ref("cruiseClearance")),
                     ("wobble", ref("craftWobble")),

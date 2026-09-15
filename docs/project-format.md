@@ -513,7 +513,11 @@ many metres of canopy over it; `requireNavigable` rejects one off the map or in 
   with `aboveGround` measuring the height from the terrain. `speed` is how fast; `duration` is the
   *least* time the move may take, so both "travel speed" and "approach smoothing" are real knobs.
   `clearance` is a floor over the terrain. `spin`, `wobble` and `wobbleRate` are applied while the
-  step runs. `travel: "walk"` hands the move to `ActionKind::Move` instead — routed, steered and
+  step runs. **Two cues that take their height from each other climb away** -- a craft hovering
+  above a target while the target rises toward the craft reads the other's *new* height every frame
+  -- so a beat shaped like that is refused at load, and `aboveGround` on one of them is the fix: it
+  anchors that end to the terrain, which does not move. The horizontal half of the coupling is fine
+  and is the point. `travel: "walk"` hands the move to `ActionKind::Move` instead — routed, steered and
   gaited by the navigation layer, identical to a walk the entity chose for itself.
 - `play` names an **activity**, never a clip; `EntityDesc::clips` maps it per asset.
 - `set` / `show` / `hide` write a parameter. A bare `target` resolves against the role's node
