@@ -26,6 +26,7 @@
 // you use, and cannot carry a key.
 
 #include "ai/control_plane.hpp"
+#include "app/camera_director.hpp"
 #include "core/error.hpp"
 
 #include <nlohmann/json.hpp>
@@ -54,6 +55,17 @@ struct AppSettings {
 
     // ---- ai ----
     ai::AiSettings ai;
+
+    // ---- the auto-director ----
+    // Every control in the Auto-director panel. It lived only in `DirectorState`, which is a
+    // member of the running `Application` and nothing else, so a user who set a max swing of 8
+    // deg/s and a hold of six shots got the defaults back on the next launch -- and the defaults
+    // are "off" and "one shot", which is the setting those two controls exist to move away from.
+    //
+    // Per installation rather than per project, like the canvas scale above and for the same
+    // reason: it is a statement about how fast *this viewer* wants a camera to move, not about
+    // the piece. A project carries its cut as baked timeline tracks either way.
+    AutoDirectorSettings director;
 
     [[nodiscard]] nlohmann::json toJson() const;
     [[nodiscard]] static Result<AppSettings> fromJson(const nlohmann::json& doc);

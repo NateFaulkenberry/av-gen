@@ -96,6 +96,10 @@ struct AutoDirectorSettings {
 
     [[nodiscard]] Result<void> validate() const;
     void applyTo(DirectionBrief& brief) const;
+
+    // So a host can tell "the user moved something" from "nothing happened" without a memcmp over
+    // a struct with padding in it, which is what the panel used to do.
+    friend bool operator==(const AutoDirectorSettings&, const AutoDirectorSettings&) = default;
 };
 
 // A one-line account of what the last cut does, for the panel. Empty until something is directed.

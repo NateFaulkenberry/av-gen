@@ -31,6 +31,7 @@
 #include "core/file_watcher.hpp"
 #include "core/log.hpp"
 
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <deque>
@@ -356,6 +357,14 @@ private:
     std::uint64_t lastTransportDiscontinuity_ = 0;
     // The shot the director cut, so starring an object re-cuts it (see `refreshDirection`).
     DirectorState cameraDirection_;
+    // The Auto-director's controls are edited in place by the panel, which has no way to say "I am
+    // finished": a slider reports a change on every frame of a drag. So the host watches the struct
+    // and writes the settings file once the value has stopped moving, rather than sixty times a
+    // second while somebody drags a slider across its range.
+    void persistDirectorSettings();
+    AutoDirectorSettings savedDirector_;
+    std::chrono::steady_clock::time_point directorChangedAt_{};
+    bool directorDirty_ = false;
 };
 
 } // namespace avgen::app
