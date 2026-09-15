@@ -22,6 +22,7 @@
 #include "scene/field_params.hpp"
 #include "scene/light_rig.hpp"
 #include "scene/material_params.hpp"
+#include "stage/staging.hpp"
 #include "scene/sdf_object.hpp"
 #include "scene/spline_params.hpp"
 #include "scene/floaters.hpp"
@@ -560,6 +561,19 @@ public:
     // setHeroes does: an entity silently missing is a scene that does nothing with no explanation.
     Result<void> setEntities(std::vector<entity::EntityDesc> entities);
 
+    // ---- the director (ADR-209) ---------------------------------------------------------------
+    //
+    // The `staging` object of a scene file: the actors a shot moves as one thing, and the scenarios
+    // that decide what they do. A peer of `entities` for the same reason entities are a peer of
+    // heroes -- the entities already exist and already know how to act; this says who decides.
+    //
+    // It is ticked from `updateBehaviour`, immediately before the entity pass, so an override the
+    // director issues this frame is executed this frame.
+    [[nodiscard]] const stage::StagingDesc& staging() const { return stagingDesc_; }
+    [[nodiscard]] const stage::Staging& director() const { return staging_; }
+    [[nodiscard]] stage::Staging& director() { return staging_; }
+    Result<void> setStaging(stage::StagingDesc staging);
+
     // ---- trigger volumes and music influence fields (ADR-097) --------------------------------
     //
     // The `fields` array of a scene file, a sibling of `entities` for the same reason: the volumes
@@ -895,6 +909,8 @@ private:
     void markHeroesMoved();
     void settleHeroes();
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
+    stage::StagingDesc stagingDesc_;              // ADR-209: authored, round-tripped as "staging"
+    stage::Staging staging_;
     std::vector<entity::FieldDesc> fieldDescs_;   // ADR-097: authored, round-tripped as "fields"
     std::string profileLibraryPath_;              // ADR-097: "entityProfiles", relative to the scene
     bool fieldRoutesChecked_ = false;             // has the "a route cannot drive a field" scan run

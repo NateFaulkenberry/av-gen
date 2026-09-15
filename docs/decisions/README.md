@@ -204,3 +204,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [206](ADR-206-structure-from-repetition-not-from-energy.md) | Structure from repetition, not from energy | Accepted |
 | [207](ADR-207-world-effects.md) | World effects propagate through one frame-global block, not through per-object state | Accepted |
 | [208](ADR-208-what-world-effects-cost.md) | What world effects cost, and the cross-binary number that is not evidence | Accepted |
+| [209](ADR-209-the-director-is-a-decision-layer-not-a-behaviour-system.md) | The director is a decision layer, not a second behaviour system | Accepted |

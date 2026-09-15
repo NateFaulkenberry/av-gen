@@ -1425,6 +1425,20 @@ Result<void> Composition::setEntities(std::vector<entity::EntityDesc> entities) 
     return {};
 }
 
+Result<void> Composition::setStaging(stage::StagingDesc staging) {
+    stagingDesc_ = std::move(staging);
+    if (params_ != nullptr) {
+        staging_.unregisterParameters(*params_);
+    }
+    if (auto ok = staging_.setDesc(stagingDesc_); !ok) {
+        return ok;
+    }
+    if (params_ != nullptr) {
+        staging_.registerParameters(*params_, prefix_ + "staging/");
+    }
+    return {};
+}
+
 void Composition::installEntities() {
     if (params_ == nullptr) {
         return;
@@ -1485,6 +1499,16 @@ void Composition::installEntities() {
     entityWorld_.setFields(fieldDescs_);
     entityWorld_.registerParameters(*params_, prefix_ + "entity/");
     entityWorld_.bind(*params_, prefix_ + "entity/");
+
+    // The director's knobs, registered here for the same reason a field's are: a scene swap has
+    // just cleared them, and a track or a route bound before its target exists is a track that does
+    // nothing, silently, for ever (ADR-075).
+    staging_.unregisterParameters(*params_);
+    if (auto ok = staging_.setDesc(stagingDesc_); !ok) {
+        entityWorld_.recordProblems({ok.error().message});
+        log::warn("staging: {}", ok.error().message);
+    }
+    staging_.registerParameters(*params_, prefix_ + "staging/");
 
     // Hand every entity that declared clips a sink onto the node's rig. An entity that declared
     // none gets one too and it does nothing -- which is the point: a craft, a rock and a character
@@ -1788,6 +1812,18 @@ void Composition::updateFields(const FrameTime& time, signals::SignalBus& bus,
 void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBus& bus) {
     if (entityWorld_.empty() || params_ == nullptr) {
         return;
+    }
+    // The director decides first (ADR-209). It reads the action events the *previous* entity update
+    // produced and writes the overrides and the director motions this one will execute, so the
+    // whole thing is a pure function of the frame sequence and an order somebody chose rather than
+    // an order that fell out of where the call happened to be.
+    if (!stagingDesc_.empty()) {
+        stage::StageContext stageCtx;
+        stageCtx.time = time.renderTime;
+        stageCtx.dt = time.deltaTime;
+        stageCtx.world = &entityWorld_;
+        stageCtx.params = params_;
+        staging_.update(stageCtx);
     }
     entity::EntityUpdate update;
     update.time = time.renderTime;
@@ -5383,6 +5419,11 @@ nlohmann::json Composition::toJson() const {
     if (!fieldDescs_.empty()) {
         j["fields"] = entity::fieldsToJson(fieldDescs_);
     }
+    // ADR-209. Written only when there is one, so every scene that never declared a director keeps
+    // the file it had, byte for byte.
+    if (!stagingDesc_.empty() || !stagingDesc_.actors.empty()) {
+        j["staging"] = stage::stagingToJson(stagingDesc_);
+    }
     if (graph_) {
         j["graph"] = graph_->toJson();
     }
@@ -5871,6 +5912,19 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return fail("scene file '{}': {}", scenePath.string(), fields.error().message);
         }
         if (auto ok = comp->setFields(std::move(*fields)); !ok) {
+            return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
+        }
+    }
+    // ADR-209: the director, read after the entities it directs so `setStaging`'s validation has
+    // the actor list to check against. A malformed scenario fails the whole file rather than being
+    // dropped, for the same reason a malformed hero does: a director that silently is not there is
+    // a scene that does nothing with no explanation.
+    if (j.contains("staging")) {
+        auto staging = stage::stagingFromJson(j.at("staging"));
+        if (!staging) {
+            return fail("scene file '{}': {}", scenePath.string(), staging.error().message);
+        }
+        if (auto ok = comp->setStaging(std::move(*staging)); !ok) {
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
     }

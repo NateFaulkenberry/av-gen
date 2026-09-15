@@ -442,6 +442,101 @@ is NOT scrub-exact (ADR-091)` — and `requireScrubExact` turns it into a warnin
 field and the source.
 
 
+### `"staging"` — the director: who decides what the actors do (ADR-209)
+
+A sibling of `"entities"`, for the same reason entities are a sibling of `"heroes"`: the entities
+already exist and already know *how* to act (ADR-096's actions, targets, completions and schedules,
+whose top authority tier is already called `Director`). This says **who decides**, and it is the
+only thing in the pipeline that was missing.
+
+```json
+"staging": {
+ "actors": [
+  { "name": "saucer", "body": "visitor",
+    "parts": [ { "name": "beam", "entity": "visitor-beam" } ] }
+ ],
+ "scenarios": [
+  {
+   "name": "abduction", "actor": "saucer", "seed": 20260915,
+   "autoStart": true, "maxCycles": 6, "searchInterval": 0.5,
+   "params": [ { "name": "hoverHeight", "value": 23.0, "min": 5.0, "max": 80.0 } ],
+   "beats": [
+    { "name": "acquire",
+      "find": [ { "bind": "target", "tag": "animal", "from": "actor",
+                  "radius": { "param": "searchRadius" }, "pick": "nearest",
+                  "clearance": { "param": "targetClearance" }, "requireNavigable": true } ],
+      "cues": [], "then": "approach", "otherwise": "" },
+    { "name": "approach",
+      "cues": [ { "role": "actor", "steps": [
+        { "kind": "lookAt", "to": "target", "duration": { "param": "aimSeconds" } },
+        { "kind": "moveTo", "to": "target", "height": { "param": "hoverHeight" },
+          "speed": { "param": "travelSpeed" }, "duration": { "param": "approachSeconds" },
+          "clearance": { "param": "cruiseClearance" } } ] } ],
+      "then": "beam" }
+   ]
+  }
+ ]
+}
+```
+
+**An actor** is a logical group of existing entities: a `body` the director moves, and named
+`parts`. The transform relationship is the scene's own parenting and is *not* repeated here —
+`visitor-beam` already says `"parent": "visitor"`, so moving the body moves the beam. What an actor
+adds is the name, so a step can address `actor.beam` without knowing the entity is called
+`visitor-beam`.
+
+**A scenario** runs `beats` in order and then starts again, up to `maxCycles` (0 = for ever).
+`autoStart` starts it on load; otherwise the sequencer or the editor calls `start`.
+
+**A beat** runs its `find` queries, binds a role for each, then runs every cue in `cues` **at the
+same time**. So: a cue's `steps` are the *sequence*, a beat's `cues` are the *parallel* (across
+different entities, which is the case a per-entity action queue cannot express), and the scenario's
+cycle is the *repeat*. `then` names the beat to continue from (default: the next one); `otherwise`
+is where a failed `find` goes (default: end the cycle, drop every claim, go idle — restartable, not
+stuck); `release` drops the scenario's claims as the beat ends.
+
+**A find** is one query with different fields set: `name` (an exact entity), `tag`, `from` (the role
+the search centres on) plus `radius`/`minRadius`, `center` plus `radius` (a region), and `pick` of
+`nearest` / `farthest` / `random` / `first`. `clearance` rejects a candidate with more than that
+many metres of canopy over it; `requireNavigable` rejects one off the map or in the lake.
+`claim` (default true) holds the winner so no other cue can pick it; `excludeClaimed` and
+`excludeRetired` (both default true) are what keep two actors off the same animal.
+
+**A step** is one of `wait`, `moveTo` (`moveBy` = the relative spelling, `flyTo` = the same thing),
+`follow` (`hover`), `lookAt` (`rotateTo`, `face`), `play` (`playAnimation`, `setAnimationState`),
+`show`, `hide`, `set` (`fade`), `actions`, `attach`, `detach`, `release`, `retire`. It names a
+`role` (defaulting to the cue's), never an entity.
+
+- `moveTo` / `follow` take a destination as `to` (a role) plus `point` (an offset) plus `height`,
+  with `aboveGround` measuring the height from the terrain. `speed` is how fast; `duration` is the
+  *least* time the move may take, so both "travel speed" and "approach smoothing" are real knobs.
+  `clearance` is a floor over the terrain. `spin`, `wobble` and `wobbleRate` are applied while the
+  step runs. `travel: "walk"` hands the move to `ActionKind::Move` instead — routed, steered and
+  gaited by the navigation layer, identical to a walk the entity chose for itself.
+- `play` names an **activity**, never a clip; `EntityDesc::clips` maps it per asset.
+- `set` / `show` / `hide` write a parameter. A bare `target` resolves against the role's node
+  exactly as an entity reaction's does, so `"spawnRate"` on a particle node finds
+  `particles/<node>/spawnRate` and `"visible"` finds `nodes/<node>/visible`; a `target` containing a
+  `/` is an absolute path. `set` with a `duration` ramps.
+- `actions` hands a list of ordinary ADR-096 actions to the entity at `Authority::Director` and
+  waits for the queue to drain.
+- `retire` hides the role's node, drops its claim and removes it from every future query. What
+  "the animal disappears into the UFO" is.
+
+**Every number may be a parameter.** `{ "param": "hoverHeight" }` anywhere a number appears, naming
+one of the scenario's own `params`. Each becomes `staging/<scenario>/<name>` in the parameter set,
+so every director knob is keyframeable, presettable and modulatable. A `param` the scenario never
+declared is a **load error** — a knob that silently read zero would be a search radius of nothing.
+
+**Determinism.** A scenario's `seed` (or its name, hashed) seeds its draws; nothing reads a clock;
+the candidate index is rebuilt on a fixed `searchInterval` against the timeline and queried through
+a `spatial::PointGrid`, whose visit order is a pure function of the point set. The same seed and the
+same second choose the same target offline and in the editor.
+
+**Cost.** The candidate index holds only the entities whose tags some query mentions, and is rebuilt
+on the interval, not per frame. With no scenario running the per-frame cost is one branch.
+
+
 ## Assets and app blocks (milestone 0.9, ADR-019)
 
 ```json
