@@ -198,3 +198,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [200](ADR-200-the-camera-was-fast-in-a-way-the-cap-did-not-measure.md) | The camera was fast in a way the first cap did not measure | Accepted |
 | [201](ADR-201-there-is-no-primary-hero.md) | There is no primary hero, only importance | Accepted |
 | [204](ADR-204-world-effects.md) | World effects propagate through one frame-global block, not through per-object state | Accepted |
+| [205](ADR-205-what-world-effects-cost.md) | What world effects cost, and the cross-binary number that is not evidence | Accepted |
