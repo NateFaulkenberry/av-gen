@@ -14,8 +14,8 @@ player looped over `[0, duration]`. That is correct exactly when the first key i
 
 Every clip in the alien pack begins at **1/30 s**. All 26, on all four characters, to the last
 decimal: Blender's exporter wrote the frame range it was given and these takes are authored from
-frame 1. The Mixamo character this engine was built against begins at 0, which is why four years of
-this code never saw it.
+frame 1. The Mixamo character this engine was built against begins at 0, which is why nothing
+ever saw this.
 
 | clip | first key | last key | engine's cycle | the animation's cycle |
 |---|---:|---:|---:|---:|
@@ -70,6 +70,29 @@ And the composed euler is folded into (-180, 180] at the write site, so the clam
 construction rather than by everybody remembering. Euler degrees are 360-periodic: this is the same
 orientation and cannot be anything else. What it removes is a silent clamp, which is not a rotation
 at all.
+
+**31.77% to 0.00%** on the scene the report was filed against, over the same ten simulated minutes:
+31,761 moving frames, zero drawn travelling backwards, worst step 0 m.
+
+### What is left, and why it is not this
+
+Glowmere Valley 2's `rook` still shows backwards steps -- 74 in 11,835 moving frames over ten
+simulated minutes with the camera pinned to it, so nothing was culled and none of the 74 was a
+coarse update. They are a different mechanism, and the decomposition says so rather than the
+argument: the body's own `speed` along its own `yaw` accounts for **none** of them. Mean residual
+0.167 m against a mean step of 0.093 m -- **1.8x the whole step**, worst 0.093 m, every one of them
+in a walk or a turn and none in a run.
+
+That is a body being pushed: crowd separation, the penetration resolve, or ADR-162's walk back onto
+the navigable set. A body shoved sideways out of a rock moves without its facing following, and that
+is exactly the guarantee those mechanisms exist to make. Making the facing chase a push would mean a
+character snapping round every time it brushed a boulder, and it would be a navigation change, not
+an animation one.
+
+So the probe classifies rather than counts, and asserts the thing the fix establishes: **a step the
+body's own travel accounts for is never against the way the body is drawn** -- zero, not a fraction.
+The pushes are reported and bounded loosely, so a regression that made them dominate the walk would
+still be caught.
 
 ## 3. A stride speed is a claim about a clip, and nothing was checking it against the clip
 
@@ -170,7 +193,14 @@ frames drawn travelling backwards, **0** frozen poses while walking, **0** frame
 outside 1.1× -- and the drawn facing within each character's own authored `liveliness` sway of its
 heading, which is the only thing that is allowed to be between them.
 
-## What this does not fix
+## What this does not fix, beyond the pushes above
+
+**The gait's minimum dwell.** `GaitSettings::minDwell` holds a gait for a quarter of a second after
+the body has already stopped, so for up to 0.25 s the machine says Walk at a speed the rate matcher
+cannot represent -- measured on `rook` at 0.07 m/s against a 5.71 m/s clip, which is 0.2x slip and
+fires the ADR-161 warning once. It is bounded and small: under two centimetres of ground crossed in
+the whole window, at the end of an arrival. Removing it means either a gait that flickers or a
+minimum dwell that knows about clips, and neither is worth it for two centimetres.
 
 `Gait::footSlip` still cannot see a `walkSpeed` that does not describe its clip. Closing that in the
 engine means the gait layer measuring a clip, which means it learning which joints are feet -- asset

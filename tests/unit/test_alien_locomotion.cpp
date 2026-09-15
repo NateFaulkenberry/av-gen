@@ -370,7 +370,11 @@ TEST_CASE("every alien clip starts at the same key, and the loops close on it", 
         // frame 0, so the playable range does not begin at zero.
         CHECK(span.first == Approx(1.0f / 30.0f).margin(1e-5));
         CHECK(span.period() > 0.0f);
+        // And the clip has to *record* both ends, or the player has no way to know where the range
+        // begins. `duration` is the last key time, as it always was; `start` is the first.
         CHECK(clip.duration == Approx(span.last).margin(1e-5));
+        CHECK(clip.start == Approx(span.first).margin(1e-5));
+        CHECK(clip.length() == Approx(span.period()).margin(1e-5));
     }
 
     // The locomotion loops close: the last key is the first key, which is what makes
@@ -410,6 +414,16 @@ TEST_CASE("a looping alien clip repeats on its own period", "[aliens][animation]
             const std::vector<glm::mat4> c = playedPalette(rig, t + 3.0 * static_cast<double>(period));
             CHECK(paletteDelta(a, b) < 1e-4f);
             CHECK(paletteDelta(a, c) < 1e-4f);
+        }
+        // The local clip second the player asks for never falls outside the range the keys cover.
+        // Below `start` every channel clamps to its first value, which is a pose the file does not
+        // contain and the character stands in for a frame of its stride.
+        const scene::AnimationClip& c = clipNamed(rig, name);
+        for (int i = 0; i < 400; ++i) {
+            const double t = static_cast<double>(i) * 0.0117;
+            const float local = rig.player.stateTime(rig.clips, t);
+            CHECK(local >= c.start - 1e-5f);
+            CHECK(local <= c.duration + 1e-5f);
         }
         // And the cycle is not something else: half a period away the pose is genuinely different,
         // so the test above cannot pass on a rig that never moves.
@@ -1227,6 +1241,20 @@ TEST_CASE("the four aliens animate independently in the scene they ship in",
 }
 
 // The long-form version of the facing measurement, on the scene the report was filed against.
+//
+// A backwards step is classified rather than merely counted, because two different things can
+// produce one and only one of them is this defect. The body's own locomotion is `speed` along
+// `yaw` for the interval since it last moved; whatever the step is that that does not account for
+// came from somewhere else -- crowd separation, the penetration resolve, or ADR-162's walk back
+// onto the navigable set. A body shoved sideways out of a rock moves without its facing following,
+// and that is the guarantee those mechanisms make rather than an animation fault.
+//
+// Measured on `rook` with the camera pinned to it, over ten simulated minutes: 74 backwards steps
+// in 11,835 moving frames, mean residual 0.167 m against a mean step of 0.093 m. The residual is
+// **1.8x the whole step** -- every one of them is a push, none of them is the walk. What this
+// asserts is therefore the thing the fix establishes: a step the body's own travel accounts for is
+// never against the way the body is drawn.
+//
 // Tagged [.probe]: ten simulated minutes is seconds of wall clock but not something the default
 // suite should pay for. Run it with `avgen_tests "[facing]"`.
 TEST_CASE("probe: the four aliens travel the way they are drawn facing",
@@ -1249,9 +1277,12 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
         const entity::Entity* who = nullptr;
         const scene::CompositionNode* node = nullptr;
         glm::vec3 last{0.0f};
+        double lastMoved = 0.0;
         int moving = 0;
-        int backwards = 0;
+        int backwards = 0;      // travelled against the way it is drawn facing
+        int backwardsWalking = 0; // ...and its own locomotion accounts for the step
         float worst = 0.0f;
+        float worstWalking = 0.0f;
     };
     std::vector<Row> rows;
     for (const Cast& c : kCast) {
@@ -1279,7 +1310,8 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
         centre /= static_cast<float>(rows.size());
         cameraPos->setBase(centre + glm::vec3(0.0f, 45.0f, 90.0f));
         cameraTarget->setBase(centre);
-        engine.update(engine.tick(clock));
+        const FrameTime ft = engine.tick(clock);
+        engine.update(ft);
         for (Row& r : rows) {
             const scene::Transform t = comp->nodeWorldTransform(*r.node);
             const glm::vec2 step(t.position.x - r.last.x, t.position.z - r.last.z);
@@ -1288,21 +1320,43 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
             if (len < 1e-4f) {
                 continue;
             }
+            const auto since = static_cast<float>(ft.renderTime - r.lastMoved);
+            r.lastMoved = ft.renderTime;
             ++r.moving;
-            const glm::vec3 fwd = t.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
+            const scene::Transform& tr = t;
+            const glm::vec3 fwd = tr.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
             const float drawn = std::atan2(fwd.x, fwd.z);
             const glm::vec2 facing(std::sin(drawn), std::cos(drawn));
-            if (glm::dot(facing, step / len) < -0.2f) {
-                ++r.backwards;
-                r.worst = std::max(r.worst, len);
+            if (glm::dot(facing, step / len) >= -0.2f) {
+                continue;
+            }
+            ++r.backwards;
+            r.worst = std::max(r.worst, len);
+            // What the body says it did, over the interval it actually advanced across.
+            const entity::LocomotionState& loco = r.who->locomotion();
+            const glm::vec2 heading(std::sin(loco.yaw), std::cos(loco.yaw));
+            const float residual = glm::length(step - heading * loco.speed * since);
+            if (residual < len * 0.35f) {
+                ++r.backwardsWalking;
+                r.worstWalking = std::max(r.worstWalking, len);
             }
         }
     }
     for (const Row& r : rows) {
         const double rate = r.moving > 0 ? 100.0 * r.backwards / r.moving : 0.0;
         INFO(r.name << ": moving " << r.moving << ", backwards " << r.backwards << " (" << rate
-                    << "%), worst step " << r.worst << " m");
+                    << "%), of which its own travel explains " << r.backwardsWalking
+                    << "; worst step " << r.worst << " m, worst explained " << r.worstWalking
+                    << " m");
         REQUIRE(r.moving > 1000);
-        CHECK(r.backwards * 200 < r.moving);
+        // The defect: a body walking one way while drawn facing the other. Zero, not a fraction.
+        CHECK(r.backwardsWalking == 0);
+        // And the residue, which is a body being pushed out of a solid or out of a crowd and is a
+        // different mechanism's guarantee (ADR-162, ADR-196). Measured over these ten minutes at
+        // rook 5.62%, sage 0.16%, ember 0.15%, tide 0% -- rook is the fastest and widest body in a
+        // world with 1,238 obstacles, so it meets the most of them. Bounded at a fifth, which is
+        // not a tolerance anybody tuned: its only job is to catch a regression in which the pushes
+        // stopped being a residue and became the walk.
+        CHECK(r.backwards * 5 < r.moving);
     }
 }
