@@ -181,7 +181,6 @@ ReanalysisReport reanalyse(SongStructure& current, const SongStructure& fresh) {
     }
 
     std::vector<SongSection> merged = fresh.sections;
-    report.detectedReplaced = static_cast<int>(merged.size());
     for (const SongSection& protectedSection : kept) {
         std::vector<SongSection> next;
         next.reserve(merged.size() + 2);
@@ -210,7 +209,6 @@ ReanalysisReport reanalyse(SongStructure& current, const SongStructure& fresh) {
                 next.push_back(std::move(right));
                 report.detectedTrimmed += 1;
             }
-            report.detectedReplaced -= 1; // this one did not survive as itself
         }
         next.push_back(protectedSection);
         merged = std::move(next);
@@ -223,7 +221,14 @@ ReanalysisReport reanalyse(SongStructure& current, const SongStructure& fresh) {
     current.tempoConfidence = fresh.tempoConfidence;
     current.beatTimes = fresh.beatTimes;
     current.novelty = fresh.novelty;
-    report.detectedReplaced = std::max(report.detectedReplaced, 0);
+    // Counted off the result rather than accumulated along the way: a fresh section cut by two kept
+    // ones would otherwise be counted as lost twice, and a count that can be wrong is worse than no
+    // count at all in a report whose whole job is to be believed.
+    for (const SongSection& s : current.sections) {
+        if (s.origin == SectionOrigin::Detected) {
+            report.detectedReplaced += 1;
+        }
+    }
     return report;
 }
 

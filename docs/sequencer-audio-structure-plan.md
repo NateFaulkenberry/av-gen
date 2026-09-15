@@ -1,7 +1,9 @@
 # Sequencer-centred audio, song structure and Director integration — plan
 
-**Status:** planned, queued behind the Director POC (`docs/director-poc-plan.md`), which is itself
-queued behind three in-flight branches.
+**Status:** **A, B, C and D done** (ADR-215, ADR-216, 2026-09-15). Generation -- the second half of
+D -- is defined as a seam (`seq/section_direction.hpp`) and waits on the Director decision layer
+(`docs/director-poc-plan.md`) to supply a `SectionDirectionTable`. See "What was built" at the foot
+of this file.
 **Written:** 2026-09-14
 
 ## Again, most of the architecture already exists
@@ -179,3 +181,37 @@ Detection quality on real music is *reported*, not asserted.
 Analysis runs once, asynchronously, on import — never per frame. The result is cached in the project
 so reopening does not recompute. Determinism is required: the same audio must produce the same
 boundaries, which rules out anything seeded by wall-clock or thread scheduling.
+
+---
+
+# What was built, 2026-09-15
+
+Against the four gaps above.
+
+**A -- the editable model.** ADR-215. `seq::Sequence` carries an `analysis::SongStructure` and saves
+it in its own JSON, so it is part of the project. `seq::reanalyse` replaces `Detected` sections,
+keeps `Refined` and `Authored` ones exactly, cuts the fresh detection around them, and reports what
+it kept. Editing marks what it touched. The §17 test asserts both halves directly: a moved boundary
+survives a re-run that changed its mind about everything, and a boundary with detected material on
+both sides is replaced.
+
+One thing the tests found and the ADR records: provenance is per *section*, so dragging one boundary
+protects the two sections it separates and therefore three boundaries. Over-protective on purpose.
+
+**B -- the vocabulary.** `MusicalSection` gains PreChorus, Chorus, Break, Bridge, Instrumental and
+FinalChorus. All four downstream switches answer every one of them explicitly; two are now exhaustive
+switches with no `default` so `-Wswitch` catches the next addition, and the other two are pinned by a
+test because their fall-through values (`Establish`, emphasis `0`) are also legitimate answers. The
+relationship to `analysis::SectionFunction` is stated, one-way and total, with `Other -> Phrase`.
+
+**C -- the consolidation.** ADR-216. Import moved to the Sequencer toolbar; the File menu item and
+`O` stay and share the callback; the Control section's compact transport and Open Audio button are
+gone. Nothing that remains is gated on `hasAudio` except the volume.
+
+**D -- sections as regions.** A lane under the ruler, boundaries draggable, names and types editable,
+split and delete, with its own optional free/beat/bar snap that assigns a beat's own value rather
+than a rounded one. Detection runs on the `JobSystem`, once on import, cached in the project.
+
+**Not built:** generation. `seq/section_direction.hpp` defines the event shape and leaves the
+behaviour table as the hole, declines everything today, and names each section kind it had no
+direction for.

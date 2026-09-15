@@ -10,7 +10,6 @@
 #include "scene/composition.hpp"
 #include "seq/layer_sink.hpp"
 #include "seq/lyrics.hpp"
-#include "seq/section_direction.hpp"
 #include "seq/song_structure.hpp"
 
 #include <imgui.h>
@@ -1545,6 +1544,10 @@ void SequencePanel::startStructureAnalysis(app::Engine& engine, bool merge) {
             [[nodiscard]] bool waitWhilePaused() override { return true; }
         } context;
         (void)body(context);
+        // Applied here rather than left for the next frame's poll: a caller with no job system is
+        // almost always a test, and "it appears one frame later" is a difference between the two
+        // paths that a test would have to know about.
+        pollStructureAnalysis(engine);
         return;
     }
     workJob_ = jobs->submit(app::JobRequest{.type = "analysis.structure",
