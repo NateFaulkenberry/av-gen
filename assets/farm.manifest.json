@@ -1,0 +1,360 @@
+{
+ "source": "FarmAnimalsLowpoly.blend, a low-poly farm animal pack supplied by the project owner; converted by tools/make_farm_animals.sh (ADR-205)",
+ "license": "Not recorded. The source .blend carries no licence text and none was supplied with it. Fill this in before these assets are distributed outside the project. assets/farm/ATTRIBUTION.md carries the same warning beside the meshes.",
+ "note": "Nine animals, one per GLB, each a single skinned mesh on its own armature with one clip called `Walk`. Sizes are the metres the GLBs actually occupy at rest -- the source is authored in metres, so preferredScale is naturalSize.y and an instance is placed at scale 1.0.\n\n  Two things a recipe author should know before scattering these. First, a scattered instance is *static*: world::scatter merges an asset's primitives into one mesh per material and the merge does not carry skin influences, so a farm animal in a scatter layer draws in its bind pose, identically, forever. That is fine for a herd on a far hillside and wrong for anything the camera looks at. An animal that has to move must arrive as a `gltf` node with an `animation` state -- by hand in a scene file, or as a hero, which is a real Gltf node and does copy the rig. Second, `variation.lean` is 0 on every entry and should stay there: a bush may lean, but an animal standing on four legs that leans is an animal falling over.\n\n  preferredDensity is deliberately tiny. These are punctuation in a landscape, not groundcover: the densest entry here is the chicken at one per 300 square metres, and the horse is one per five thousand.",
+ "categories": {
+  "livestock": [
+   {
+    "name": "bull",
+    "file": "farm/bull.glb",
+    "category": "creature",
+    "archetype": "bull",
+    "triangles": 2788,
+    "naturalSize": [
+     0.7617,
+     1.771,
+     2.6498
+    ],
+    "naturalCentre": [
+     0.0,
+     0.8843,
+     0.2404
+    ],
+    "preferredScale": 1.771,
+    "visualImportance": 0.72,
+    "preferredDensity": 0.00012,
+    "material": {
+     "emissive": 0.0,
+     "translucency": 0.0,
+     "roughness": 0.86,
+     "metallic": 0.0
+    },
+    "variation": {
+     "scale": 0.08,
+     "hue": 0.015,
+     "emissive": 0.0,
+     "yaw": 1.0,
+     "lean": 0.0
+    },
+    "tags": [
+     "midground",
+     "animal",
+     "livestock",
+     "horned"
+    ]
+   },
+   {
+    "name": "cow",
+    "file": "farm/cow.glb",
+    "category": "creature",
+    "archetype": "cow",
+    "triangles": 2744,
+    "naturalSize": [
+     0.6942,
+     1.5739,
+     2.3575
+    ],
+    "naturalCentre": [
+     0.0,
+     0.7859,
+     0.2478
+    ],
+    "preferredScale": 1.5739,
+    "visualImportance": 0.68,
+    "preferredDensity": 0.00035,
+    "material": {
+     "emissive": 0.0,
+     "translucency": 0.0,
+     "roughness": 0.86,
+     "metallic": 0.0
+    },
+    "variation": {
+     "scale": 0.09,
+     "hue": 0.02,
+     "emissive": 0.0,
+     "yaw": 1.0,
+     "lean": 0.0
+    },
+    "tags": [
+     "midground",
+     "animal",
+     "livestock",
+     "herd"
+    ]
+   },
+   {
+    "name": "horse",
+    "file": "farm/horse.glb",
+    "category": "creature",
+    "archetype": "horse",
+    "triangles": 2504,
+    "naturalSize": [
+     0.5666,
+     1.7523,
+     2.3157
+    ],
+    "naturalCentre": [
+     0.0,
+     0.8754,
+     0.1757
+    ],
+    "preferredScale": 1.7523,
+    "visualImportance": 0.74,
+    "preferredDensity": 0.0002,
+    "material": {
+     "emissive": 0.0,
+     "translucency": 0.0,
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "variation": {
+     "scale": 0.08,
+     "hue": 0.02,
+     "emissive": 0.0,
+     "yaw": 1.0,
+     "lean": 0.0
+    },
+    "tags": [
+     "midground",
+     "animal",
+     "livestock"
+    ]
+   },
+   {
+    "name": "sheep",
+    "file": "farm/sheep.glb",
+    "category": "creature",
+    "archetype": "sheep",
+    "triangles": 2202,
+    "naturalSize": [
+     0.4958,
+     0.9412,
+     1.2516
+    ],
+    "naturalCentre": [
+     0.0,
+     0.4703,
+     0.1369
+    ],
+    "preferredScale": 0.9412,
+    "visualImportance": 0.5,
+    "preferredDensity": 0.0012,
+    "material": {
+     "emissive": 0.0,
+     "translucency": 0.0,
+     "roughness": 0.94,
+     "metallic": 0.0
+    },
+    "variation": {
+     "scale": 0.11,
+     "hue": 0.015,
+     "emissive": 0.0,
+     "yaw": 1.0,
+     "lean": 0.0
+    },
+    "tags": [
+     "midground",
+     "animal",
+     "livestock",
+     "herd"
+    ]
+   },
+   {
+    "name": "pig",
+    "file": "farm/pig.glb",
+    "category": "creature",
+    "archetype": "pig",
+    "triangles": 1424,
+    "naturalSize": [
+     0.4331,
+     0.69,
+     1.2598
+    ],
+    "naturalCentre": [
+     0.0,
+     0.3446,
+     -0.0158
+    ],
+    "preferredScale": 0.69,
+    "visualImportance": 0.48,
+    "preferredDensity": 0.0008,
+    "material": {
+     "emissive": 0.0,
+     "translucency": 0.0,
+     "roughness": 0.78,
+     "metallic": 0.0
+    },
+    "variation": {
+     "scale": 0.12,
+     "hue": 0.02,
+     "emissive": 0.0,
+     "yaw": 1.0,
+     "lean": 0.0
+    },
+    "tags": [
+     "foreground",
+     "animal",
+     "livestock"
+    ]
+   },
+   {
+    "name": "goat",
+    "file": "farm/goat.glb",
+    "category": "creature",
+    "archetype": "goat",
+    "triangles": 1924,
+    "naturalSize": [
+     0.2601,
+     0.7441,
+     0.9474
+    ],
+    "naturalCentre": [
+     0.0,
+     0.3716,
+     0.0691
+    ],
+    "preferredScale": 0.7441,
+    "visualImportance": 0.52,
+    "preferredDensity": 0.001,
+    "material": {
+     "emissive": 0.0,
+     "translucency": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "variation": {
+     "scale": 0.12,
+     "hue": 0.02,
+     "emissive": 0.0,
+     "yaw": 1.0,
+     "lean": 0.0
+    },
+    "tags": [
+     "foreground",
+     "animal",
+     "livestock",
+     "horned"
+    ]
+   }
+  ],
+  "poultry": [
+   {
+    "name": "rooster",
+    "file": "farm/rooster.glb",
+    "category": "creature",
+    "archetype": "rooster",
+    "triangles": 1923,
+    "naturalSize": [
+     0.1626,
+     0.4342,
+     0.3555
+    ],
+    "naturalCentre": [
+     0.0,
+     0.217,
+     -0.0182
+    ],
+    "preferredScale": 0.4342,
+    "visualImportance": 0.44,
+    "preferredDensity": 0.0009,
+    "material": {
+     "emissive": 0.0,
+     "translucency": 0.0,
+     "roughness": 0.72,
+     "metallic": 0.0
+    },
+    "variation": {
+     "scale": 0.1,
+     "hue": 0.03,
+     "emissive": 0.0,
+     "yaw": 1.0,
+     "lean": 0.0
+    },
+    "tags": [
+     "foreground",
+     "animal",
+     "poultry",
+     "accent"
+    ]
+   },
+   {
+    "name": "chicken",
+    "file": "farm/chicken.glb",
+    "category": "creature",
+    "archetype": "chicken",
+    "triangles": 1923,
+    "naturalSize": [
+     0.1502,
+     0.3368,
+     0.3113
+    ],
+    "naturalCentre": [
+     0.0,
+     0.1683,
+     0.0128
+    ],
+    "preferredScale": 0.3368,
+    "visualImportance": 0.3,
+    "preferredDensity": 0.0033,
+    "material": {
+     "emissive": 0.0,
+     "translucency": 0.0,
+     "roughness": 0.72,
+     "metallic": 0.0
+    },
+    "variation": {
+     "scale": 0.12,
+     "hue": 0.03,
+     "emissive": 0.0,
+     "yaw": 1.0,
+     "lean": 0.0
+    },
+    "tags": [
+     "foreground",
+     "animal",
+     "poultry",
+     "flock"
+    ]
+   },
+   {
+    "name": "chick",
+    "file": "farm/chick.glb",
+    "category": "creature",
+    "archetype": "chick",
+    "triangles": 1500,
+    "naturalSize": [
+     0.0548,
+     0.11,
+     0.1019
+    ],
+    "naturalCentre": [
+     0.0,
+     0.055,
+     0.0146
+    ],
+    "preferredScale": 0.11,
+    "visualImportance": 0.22,
+    "preferredDensity": 0.005,
+    "material": {
+     "emissive": 0.0,
+     "translucency": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0
+    },
+    "variation": {
+     "scale": 0.14,
+     "hue": 0.025,
+     "emissive": 0.0,
+     "yaw": 1.0,
+     "lean": 0.0
+    },
+    "tags": [
+     "foreground",
+     "animal",
+     "poultry",
+     "flock"
+    ]
+   }
+  ]
+ }
+}
