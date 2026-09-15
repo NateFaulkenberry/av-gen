@@ -12632,7 +12632,7 @@
     "limits": "unlimited",
     "muxAudio": true,
     "output": "video",
-    "path": "bad",
+    "path": "/Users/natefaulkenberry/Desktop/bad.mov",
     "pattern": "frame_{:06d}.png",
     "quality": 80,
     "start": 0.0,
