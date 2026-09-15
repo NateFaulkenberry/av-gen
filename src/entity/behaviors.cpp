@@ -1504,28 +1504,37 @@ private:
             if (distance > 1e-4f) {
                 // **A push may correct a walk; it may not replace one** (ADR-240).
                 //
-                // The clamp used to be the body's own full walking speed, which for a six-metre
-                // alien is 5.6 m/s -- so the separation could move the body exactly as far in a
-                // frame as its legs did, and whenever the walk itself was slow (a turn, an arrival)
-                // the push was the *whole* step. The body was then drawn walking forwards while
-                // travelling sideways or backwards, which is precisely the report this pass exists
-                // to answer. Measured over ten simulated minutes of the shipped scene with nothing
-                // culled: `rook` and `tide` travelled against their own facing on 25.6% and 20.6%
-                // of their moving frames, and **every one of those steps was a crowd overlap** --
-                // not one was a solid, and not one was the body's own travel.
+                // `crowdSeparation` returns half the overlap, and this used to move the body that
+                // whole distance in a single frame, capped only at the body's own full walking
+                // step. Two consequences, and the second is the visible one.
                 //
-                // A third of the ground the body covers under its own power is a derivation, not a
-                // taste: a perpendicular correction of a third turns the resultant step by
-                // atan(1/3) = 18.4 degrees at most, and a correction bounded by a third of the
-                // forward component can never reverse it. The floor keeps the guarantee that
-                // matters for two bodies that are both standing still -- they still separate, over
-                // a second or two, instead of resting inside each other.
+                // It is frame-rate dependent: half the overlap per frame is twice the separation
+                // speed at 120 Hz that it is at 60, which is exactly what ADR-161 says a
+                // behaviour's motion must never be.
+                //
+                // And it is enormous. A fifth of a metre of overlap between two six-metre aliens
+                // produces a tenth of a metre of push, which at 60 Hz is six metres a second --
+                // more than `rook` walks at. So whenever the walk itself was slow (a turn, an
+                // arrival) the push was the *whole* step, and the body was drawn walking forwards
+                // while travelling sideways. Measured over ten simulated minutes of the shipped
+                // scene with nothing culled: `rook` and `tide` travelled against their own facing
+                // on 25.6% and 20.6% of their moving frames, and **every one of those steps was a
+                // crowd overlap** -- not one was a solid, and not one was the body's own travel.
+                //
+                // So separation is a *speed* now, and the speed is the one that says what the
+                // mechanism is for: **each body walks out of its own half of the overlap over half
+                // a second**, integrated against the real dt, and never faster than it walks. Deep
+                // overlaps still resolve at a walk -- two bodies placed inside each other have to
+                // get out and be seen to -- and a brush in passing becomes a nudge of a few
+                // centimetres a second instead of a shove at cruising speed.
                 //
                 // Not applied to the penetration resolve below, which is a different kind of
                 // statement: a body may not end a frame inside a solid, and that is a guarantee
                 // rather than a preference.
-                const float budget = std::max(travelSpeed * 0.33f, 0.5f) * dt;
-                const float limit = std::min(distance, budget);
+                constexpr float kSeparationSeconds = 0.5f;
+                const float apartSpeed =
+                    std::min(distance / kSeparationSeconds, std::max(speed, 1.0f));
+                const float limit = std::min(distance, apartSpeed * dt);
                 state.travel.x += apart.x / distance * limit;
                 state.travel.z += apart.y / distance * limit;
             }

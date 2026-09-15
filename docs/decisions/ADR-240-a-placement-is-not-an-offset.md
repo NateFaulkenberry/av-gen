@@ -218,25 +218,40 @@ culled, and classified by mechanism rather than assumed:
 
 Every one a crowd overlap. Not one a solid, and not one the body's own travel.
 
-**The decision.** A push may correct a walk; it may not replace one. The crowd push is bounded at a
-third of the ground the body covers under its own power that frame, with a floor of 0.5 m/s. The
-third is a derivation rather than a taste: a perpendicular correction of a third turns the resultant
-step by `atan(1/3)` = 18.4 degrees at most, and one bounded by a third of the forward component can
-never reverse it. The floor is what keeps two bodies that are *both* standing still separating over a
-second or two instead of resting inside each other.
+The cause is the clamp, and there are two things wrong with it. `crowdSeparation` returns **half the
+overlap** and the caller moved the body that whole distance in one frame, capped only at
+`max(speed, 1.0) * dt`.
+
+That is frame-rate dependent — half the overlap per frame is twice the separation speed at 120 Hz
+that it is at 60 — which is exactly what ADR-161 says a behaviour's motion must never be. And it is
+enormous: a fifth of a metre of overlap between two six-metre aliens produces a tenth of a metre of
+push, which at 60 Hz is six metres a second, more than `rook` walks at. The cap was the only thing
+making it soft, and the cap is a *walking step*.
+
+**The decision.** Separation is a speed, and the speed says what the mechanism is for: **each body
+walks out of its own half of the overlap over half a second**, integrated against the real dt, and
+never faster than it walks. Deep overlaps still resolve at a walk — two bodies placed inside each
+other have to get out, and be seen to — and a brush in passing becomes a nudge of a few centimetres a
+second instead of a shove at cruising speed. The half-second is not free to choose: it is what
+`characters make room for each other rather than standing in each other` already requires, which
+starts two bodies three metres inside each other and gives them one second to get under half a metre.
 
 The penetration resolve is left exactly as it was. "A body may not end a frame inside a solid" is a
 guarantee rather than a preference, and it accounted for none of these steps anyway.
 
-| | before | after |
-|---|---|---|
-| rook | 25.64%, worst step 0.093 m | **4.31%**, worst 0.008 m |
-| tide | 20.64%, worst step 0.026 m | **0.00%** |
-| vane | 0.00% | 0.08%, worst 0.008 m |
-| ember | 0.01% | 0.01% |
-| sage | 0.00% | 0.00% |
+| | worst backwards step | mean | frames |
+|---|---|---|---|
+| rook | **0.0933 → 0.0317 m** | 0.0240 → 0.0284 | 25.6% → 28.9% |
+| tide | 0.0263 → 0.0231 m | 0.0075 → 0.0018 | 20.6% → 9.4% |
 
-0.008 m is the standing-body floor — eight millimetres in a frame, under an idle clip.
+`rook`'s authored walking step is 0.0933 m at 60 Hz. **The worst push was the walk, to four decimal
+places.**
+
+Only the worst separates the two builds, and that is why the assertion is stated on it. The mean
+barely moves, because the old clamp only ever bit on the deep overlaps — which are exactly the frames
+where a body got shoved a whole stride sideways. The *count* goes up, because a gentler push leaves
+the body moving on frames where it used to be pinned; a count of backwards frames has no magnitude in
+it and is not the statistic this was ever about.
 
 ### The fix that was measured and is not the fix
 
@@ -274,8 +289,8 @@ produced rather than writing a number down.
 
 The five animated aliens over ten simulated minutes, nothing culled: **0** backwards steps that the
 body's own travel accounts for, on every one of them, including `vane` — which was placed at 248
-degrees and which no previous pass measured — and the pushes down from 25.6% and 20.6% of moving
-frames to 4.3% and 0%.
+degrees and which no previous pass measured — and no push bigger than a third of the body's own
+walking step, where the worst of them used to be a whole one.
 
 **The probes themselves had to be fixed first, and that is a finding.** Both scene-running alien
 tests pin the camera to the group and both were reading the level-of-detail ladder: the group spreads

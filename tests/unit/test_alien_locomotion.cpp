@@ -1372,6 +1372,7 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
     if (!aliensPresent()) {
         SKIP("assets/aliens is not present");
     }
+    const nlohmann::json doc = sceneJson();
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadComposition(valleyScene()).has_value());
     scene::Composition* comp = engine.composition();
@@ -1403,6 +1404,8 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
         int backwardsSolid = 0;   // ...and it was inside a solid
         float worst = 0.0f;
         float worstWalking = 0.0f;
+        double sumBackwards = 0.0; // metres, over every step that went against the facing
+        float walkStep = 0.0f;     // the ground its authored cruise covers in one 60 Hz frame
     };
     std::vector<Row> rows;
     // The four, plus `vane` -- a fifth animated alien on `alien-pilot.glb` that the rest of this
@@ -1427,6 +1430,15 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
         REQUIRE(r.who != nullptr);
         REQUIRE(r.node != nullptr);
         r.last = comp->nodeWorldTransform(*r.node).position;
+        // The pace this body was authored to walk at, which is what a push has to stay under.
+        const nlohmann::json* ent = findNamed(doc.at("entities"), name.c_str());
+        REQUIRE(ent != nullptr);
+        for (const nlohmann::json& b : ent->at("behaviors")) {
+            if (b.value("kind", std::string()) == "explore") {
+                r.walkStep = b.at("speed").get<float>() / 60.0f;
+            }
+        }
+        REQUIRE(r.walkStep > 0.0f);
         rows.push_back(std::move(r));
     }
 
@@ -1462,6 +1474,7 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
             }
             ++r.backwards;
             r.worst = std::max(r.worst, len);
+            r.sumBackwards += len;
             // Which push. Crowd separation acts while another body's disc overlaps this one; the
             // penetration resolve acts while the body is inside a solid. Counted rather than
             // assumed, because "it is a push" is a claim about a mechanism and the two mechanisms
@@ -1497,10 +1510,11 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
         // WARN rather than INFO: the rates are the result, and a probe that only prints them when
         // it fails cannot be used to compare a before with an after.
         WARN(fmt::format("{:<6} moving {:6d}, backwards {:5d} ({:.2f}%): its own travel explains "
-                         "{:5d}, a crowd overlap {:5d}, a solid {:5d}; worst step {:.3f} m, worst "
-                         "explained {:.3f} m",
+                         "{:5d}, a crowd overlap {:5d}, a solid {:5d}; worst backwards step "
+                         "{:.4f} m and mean {:.4f} m, against an authored walking step of {:.4f} m",
                          r.name, r.moving, r.backwards, rate, r.backwardsWalking,
-                         r.backwardsCrowded, r.backwardsSolid, r.worst, r.worstWalking));
+                         r.backwardsCrowded, r.backwardsSolid, r.worst,
+                         r.backwards > 0 ? r.sumBackwards / r.backwards : 0.0, r.walkStep));
         REQUIRE(r.moving > 1000);
         // The defect: a body walking one way while drawn facing the other. Zero, not a fraction.
         CHECK(r.backwardsWalking == 0);
@@ -1510,6 +1524,35 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
         // world with 1,238 obstacles, so it meets the most of them. Bounded at a fifth, which is
         // not a tolerance anybody tuned: its only job is to catch a regression in which the pushes
         // stopped being a residue and became the walk.
-        CHECK(r.backwards * 5 < r.moving);
+        // The residue has to stay a residue, and that is a statement about **how far** rather than
+        // about how often (ADR-240). ADR-204 bounded the count of backwards frames, and a count has
+        // no magnitude in it: a body barely moving and nudged a centimetre reads exactly the same
+        // as one shoved half a metre at cruising speed. It also is not comparable across runs, now
+        // that the distance ladder is off here -- a body is simulated on every frame, so a gentle
+        // nudge during a turn counts where before the body was not being simulated at all.
+        //
+        // So the bound is the body's own stride, measured off the same run: **a push may correct a
+        // walk; it may not replace one.** The bound is the ground the body's own authored cruise
+        // covers in a frame, halved -- half being the point at which a correction stops being a
+        // correction rather than a number anybody tuned.
+        //
+        // Stated on the worst step rather than on the count or the mean, and that choice was
+        // measured rather than assumed. Putting the separation clamp back to the body's full
+        // walking step moves the three statistics like this:
+        //
+        //           worst          mean          count
+        //   rook   0.0933 -> 0.0317   0.0240 -> 0.0284   25.6% -> 28.9%
+        //   tide   0.0263 -> 0.0231   0.0075 -> 0.0018   20.6% ->  9.4%
+        //
+        // Only the worst separates them, and it separates them completely: `rook`'s was **0.0933 m
+        // against an authored walking step of 0.0933 m**, a push that was the walk to four decimal
+        // places, and this assertion fails on it. The mean barely moves because the old clamp only
+        // ever bit on the deep overlaps -- which are exactly the frames where a body got shoved a
+        // whole stride sideways -- and the count went *up* because a gentler push leaves the body
+        // moving on frames where it used to be pinned. A probe that can fail on the thing it is
+        // looking for is the whole requirement here (ADR-182).
+        INFO("worst backwards step " << r.worst << " m against an authored walking step of "
+                                     << r.walkStep << " m");
+        CHECK(r.worst < 0.5f * r.walkStep);
     }
 }
