@@ -423,6 +423,55 @@ TEST_CASE("show, hide and set write the parameters an author can see", "[stage][
     CHECK(rate->baseComponent(0) == Approx(10.0f));
 }
 
+// ADR-241. The Inspector's promise is "everything that writes this parameter", and a scenario writes
+// parameters no other layer can see -- a beam's visibility, a spawn rate, any absolute path a `set`
+// step names. ADR-211 recorded the hole and declined to fill it; this is the query that fills it.
+//
+// The negative controls are the test. A query that answered "the director" about every path would
+// pass the positive half while being useless, so: a parameter the scenario never touches must come
+// back empty, and a role-relative target must come back empty *before* the role binds, because the
+// path it resolves to does not exist until then.
+TEST_CASE("the director can say which scenario writes a parameter", "[stage][director][inspector]") {
+    stage::StepDesc hide = step(stage::StepKind::Hide, "off"); // role-relative: resolves to "visible"
+    stage::StepDesc set = step(stage::StepKind::Set, "ramp");
+    set.target = "particles/hero/spawnRate"; // absolute: knowable from the description alone
+    set.to = lit(500.0f);
+    Stage s({animal("hero", {})}, {{"hero", glm::vec3(0.0f)}}, oneCue({hide, set}));
+
+    SECTION("an absolute target is known before anything runs") {
+        const auto declared = s.staging.writersOf("particles/hero/spawnRate");
+        REQUIRE(declared.size() == 1);
+        CHECK(declared[0].scenario == "test");
+        CHECK(declared[0].role.empty());
+        CHECK_FALSE(declared[0].live);    // read off the description
+        CHECK_FALSE(declared[0].running); // and honest that nothing is happening yet
+        // The control: the role-relative step in the same cue is NOT reported yet, because its path
+        // is not decidable. Reporting it here would mean the declared branch was matching on the
+        // scenario rather than on the path.
+        CHECK(s.staging.writersOf("nodes/hero/visible").empty());
+    }
+
+    SECTION("a role-relative target is named once it has been written") {
+        s.staging.start("test", s.time);
+        s.tick(0.1);
+        const auto live = s.staging.writersOf("nodes/hero/visible");
+        REQUIRE(live.size() == 1);
+        CHECK(live[0].scenario == "test");
+        CHECK(live[0].role == "actor"); // the cue's role, which is what an author would look for
+        CHECK(live[0].live);
+        // And the absolute path is still one answer rather than two, now that it has been both
+        // declared and observed.
+        CHECK(s.staging.writersOf("particles/hero/spawnRate").size() == 1);
+    }
+
+    SECTION("a parameter no scenario writes has no director behind it") {
+        s.staging.start("test", s.time);
+        s.tick(0.1);
+        CHECK(s.staging.writersOf("nodes/hero/position").empty());
+        CHECK(s.staging.writersOf("nodes/hero/scale").empty());
+    }
+}
+
 // ---- target selection ---------------------------------------------------------------------------
 
 namespace {

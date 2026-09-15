@@ -424,6 +424,26 @@ public:
     void unregisterParameters(params::ParameterSet& params);
     [[nodiscard]] const std::string& prefix() const { return prefix_; }
 
+    // ---- "why is this parameter moving?" ---------------------------------------------------------
+    //
+    // A scenario reaches a parameter in two ways and the Inspector has to be able to name both
+    // (ADR-211 recorded this as not done; ADR-241 does it). `PathWriter` is one answer: the scenario,
+    // the role that resolved it when a role did, and whether the scenario is running right now.
+    //
+    // `live` distinguishes the two sources deliberately. A step whose target is an *absolute* path is
+    // known from the description alone, before anything runs -- that is the tractor beam's
+    // `nodes/<beam>/visible`, the case this exists for. A step whose target is a role-relative name
+    // cannot be resolved until the role binds, so it can only be reported once it has been written.
+    // Reporting the first as "not yet" would answer "what can move this" with "nothing".
+    struct PathWriter {
+        std::string path;
+        std::string scenario;
+        std::string role;   // empty when the step named an absolute path
+        bool running = false;
+        bool live = false;  // true: observed being written. false: read off the description.
+    };
+    [[nodiscard]] std::vector<PathWriter> writersOf(std::string_view path) const;
+
     // ---- the API the sequencer calls -------------------------------------------------------------
     //
     // A sequencer track is "start this scenario at 12.5 s", "stop it at 40 s", "jump it to the beat
@@ -512,6 +532,8 @@ private:
     struct Written {
         std::string path;
         std::vector<float> base; // what it held before this director first wrote it
+        std::string scenario;    // which scenario reached this path
+        std::string role;        // the role whose entity resolved it, empty for an absolute path
     };
 
     enum class StepStatus : std::uint8_t { Running, Done, Failed };
@@ -532,7 +554,8 @@ private:
                                     glm::vec3& out) const;
     [[nodiscard]] std::string parameterPath(const Run& run, std::string_view role,
                                             std::string_view target, const StageContext& ctx) const;
-    void writeParameter(const std::string& path, float value, const StageContext& ctx);
+    void writeParameter(const Run& run, std::string_view role, const std::string& path,
+                        float value, const StageContext& ctx);
     void bindRole(Run& run, const std::string& role, const std::string& entity,
                   const std::string& actor);
     void releaseClaims(const Run& run);

@@ -2241,8 +2241,8 @@
         0.0
       ],
       "particles": {
-        "capacity": 16384,
-        "spawnRate": 1050.0,
+        "capacity": 32768,
+        "spawnRate": 0.0,
         "shape": "disc",
         "position": [
           0.0,
@@ -2250,9 +2250,9 @@
           0.0
         ],
         "extent": [
-          3.6,
-          3.6,
-          3.6
+          7.8,
+          7.8,
+          7.8
         ],
         "direction": [
           0.0,
@@ -2273,8 +2273,8 @@
         "turbulence": 0.16,
         "turbulenceScale": 0.08,
         "turbulenceSpeed": 0.15,
-        "sizeStart": 0.44,
-        "sizeEnd": 0.05,
+        "sizeStart": 0.656,
+        "sizeEnd": 0.074,
         "blend": "additive",
         "emissive": 0.45,
         "colorStart": [
@@ -6653,8 +6653,8 @@
       "kind": "gltf",
       "asset": "../../assets/aliens/alien-ranger.glb",
       "position": [
-        -56.0,
-        7.62,
+        12.0,
+        7.66,
         34.0
       ],
       "scale": [
@@ -6672,6 +6672,36 @@
         "cullDistance": 360.0
       },
       "visible": true
+    },
+    {
+      "name": "vane",
+      "kind": "gltf",
+      "asset": "../../assets/aliens/alien-pilot.glb",
+      "position": [
+        20.0,
+        8.83,
+        -10.0
+      ],
+      "scale": [
+        3.344,
+        3.344,
+        3.344
+      ],
+      "animation": {
+        "state": "Idle",
+        "blend": 0.35,
+        "speed": 1.0,
+        "updateHz": 30,
+        "nearDistance": 25.0,
+        "farHz": 20.0,
+        "cullDistance": 360.0
+      },
+      "visible": true,
+      "rotation": [
+        0.0,
+        248.0,
+        0.0
+      ]
     },
     {
       "animation": {
@@ -6697,9 +6727,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -6727,9 +6757,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -6757,9 +6787,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -6787,9 +6817,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -6817,9 +6847,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -6847,9 +6877,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -6877,9 +6907,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -6907,39 +6937,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
-      ],
-      "visible": true
-    },
-    {
-      "animation": {
-        "blend": 0.3,
-        "cullDistance": 280.0,
-        "farHz": 15.0,
-        "nearDistance": 20.0,
-        "speed": 1.0,
-        "state": "Walk",
-        "updateHz": 30
-      },
-      "asset": "../../assets/farm/chick.glb",
-      "kind": "gltf",
-      "name": "chick-9",
-      "position": [
-        -200.9199981689453,
-        26.950000762939453,
-        40.470001220703125
-      ],
-      "rotation": [
-        0.0,
-        -93.75,
-        0.0
-      ],
-      "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -6967,9 +6967,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -6997,9 +6997,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -7027,9 +7027,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -7057,9 +7057,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -7087,9 +7087,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -7117,9 +7117,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -7147,9 +7147,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     },
@@ -7177,39 +7177,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
-      ],
-      "visible": true
-    },
-    {
-      "animation": {
-        "blend": 0.3,
-        "cullDistance": 280.0,
-        "farHz": 15.0,
-        "nearDistance": 20.0,
-        "speed": 1.0,
-        "state": "Walk",
-        "updateHz": 30
-      },
-      "asset": "../../assets/farm/chick.glb",
-      "kind": "gltf",
-      "name": "chick-18",
-      "position": [
-        -3.5,
-        0.7099999785423279,
-        206.75
-      ],
-      "rotation": [
-        0.0,
-        -165.4600067138672,
-        0.0
-      ],
-      "scale": [
-        1.0,
-        1.0,
-        1.0
+        3.6,
+        3.6,
+        3.6
       ],
       "visible": true
     }
@@ -7746,18 +7716,136 @@
       ]
     },
     {
+      "name": "vane",
+      "node": "vane",
+      "seed": 8814473,
+      "gait": {
+        "matchRate": true,
+        "walkSpeed": 5.29,
+        "runSpeed": 12.74,
+        "rateMin": 0.08,
+        "rateMax": 1.75,
+        "runEnter": 8.3,
+        "runExit": 5.29,
+        "moveEnter": 1.38,
+        "moveExit": 0.69,
+        "accel": 7.36,
+        "decel": 10.12
+      },
+      "fullDetailDistance": 120.0,
+      "coarseInterval": 0.1,
+      "cullDistance": 340.0,
+      "clips": {
+        "idle": "Idle",
+        "walk": "Walking",
+        "run": "Running",
+        "turn": "Idle_turn",
+        "observe": "Idle",
+        "react": "Crazy",
+        "jump": "Jumping",
+        "fall": "Fall_loop",
+        "land": "Landing"
+      },
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 11.0,
+          "kind": "explore",
+          "arrive": 3.0,
+          "bodyRadius": 2.4,
+          "headroom": 9.0,
+          "footprint": 2.6,
+          "slopeAlign": 0.5,
+          "waypointRadius": 3.5,
+          "repathSeconds": 7.0,
+          "noveltyRadius": 28.0,
+          "minRange": 18.0,
+          "maxRange": 220.0,
+          "speed": 4.6,
+          "runSpeed": 12.0,
+          "turnRate": 170.0,
+          "runChance": 0.28,
+          "strollChance": 0.2,
+          "idleMin": 0.5,
+          "idleMax": 2.0,
+          "observeChance": 0.3,
+          "observeMin": 1.2,
+          "observeMax": 3.5,
+          "landmarkAffinity": 1.0,
+          "characterAffinity": 1.5,
+          "glowAffinity": 1.4,
+          "waterAffinity": 0.9,
+          "vistaAffinity": 0.8,
+          "jumpRange": 7.0,
+          "jumpApex": 2.6,
+          "jumpSignal": "audio.beat",
+          "landSeconds": 0.35
+        },
+        {
+          "kind": "liveliness",
+          "bounce": 0.32,
+          "stride": 5.35,
+          "sway": 5.0,
+          "nod": 3.0
+        },
+        {
+          "kind": "lookAt",
+          "turnRate": 140.0,
+          "weight": 1.0
+        }
+      ],
+      "reactions": [
+        {
+          "signal": "audio.bass",
+          "target": "liveliness/bounce",
+          "depth": 0.45,
+          "chain": {
+            "attackMs": 60.0,
+            "curve": "power",
+            "curveAmount": 1.5,
+            "decayMs": 380.0
+          }
+        },
+        {
+          "signal": "audio.rms",
+          "target": "explore/speed",
+          "depth": 4.2,
+          "chain": {
+            "attackMs": 420.0,
+            "decayMs": 1500.0
+          }
+        },
+        {
+          "signal": "music.drop",
+          "target": "explore/runChance",
+          "depth": 0.5,
+          "chain": {
+            "envelope": "peakhold",
+            "envelopeFallPerSecond": 0.4,
+            "envelopeHoldMs": 1400.0
+          }
+        }
+      ]
+    },
+    {
+      "behaviors": [
+        {
+          "kind": "liveliness",
+          "bounce": 0.026,
+          "bounceRate": 0.84,
+          "sway": 2.08,
+          "swayRate": 0.218,
+          "nod": 1.15
+        },
+        {
+          "arrive": 0.88,
+          "homeRadius": 18.24,
           "kind": "wander",
-          "maxRange": 11.0,
-          "minRange": 2.75,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.6500000953674316,
-          "speed": 0.75,
-          "turnRate": 110.0
+          "maxRange": 14.31,
+          "minRange": 1.8,
+          "pauseMax": 5.34,
+          "pauseMin": 1.08,
+          "runSpeed": 5.736,
+          "speed": 3.585,
+          "turnRate": 76.3
         },
         {
           "kind": "ground",
@@ -7774,13 +7862,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 5.74,
+        "decel": 7.89,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 1.6500000953674316,
-        "walkSpeed": 0.75
+        "rateMax": 1.0,
+        "rateMin": 0.005,
+        "runEnter": 5.736,
+        "runExit": 4.123,
+        "runSpeed": 6.008,
+        "walkSpeed": 6.008
       },
       "name": "bull-1",
       "node": "bull-1",
@@ -7794,16 +7887,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 15.0,
+          "kind": "liveliness",
+          "bounce": 0.057,
+          "bounceRate": 1.04,
+          "sway": 2.8,
+          "swayRate": 0.102,
+          "nod": 1.39
+        },
+        {
+          "arrive": 0.79,
+          "homeRadius": 19.54,
           "kind": "wander",
-          "maxRange": 15.0,
-          "minRange": 3.75,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 2.9700000286102295,
-          "speed": 1.350000023841858,
-          "turnRate": 110.0
+          "maxRange": 10.66,
+          "minRange": 2.78,
+          "pauseMax": 5.03,
+          "pauseMin": 1.03,
+          "runSpeed": 4.12,
+          "speed": 2.575,
+          "turnRate": 94.4
         },
         {
           "kind": "ground",
@@ -7820,13 +7921,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 4.12,
+        "decel": 5.67,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 2.9700000286102295,
-        "walkSpeed": 1.350000023841858
+        "rateMax": 1.0,
+        "rateMin": 0.0051,
+        "runEnter": 4.12,
+        "runExit": 2.961,
+        "runSpeed": 5.86,
+        "walkSpeed": 5.86
       },
       "name": "horse-2",
       "node": "horse-2",
@@ -7840,15 +7946,23 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 11.0,
+          "kind": "liveliness",
+          "bounce": 0.024,
+          "bounceRate": 0.86,
+          "sway": 2.5,
+          "swayRate": 0.098,
+          "nod": 2.19
+        },
+        {
+          "arrive": 0.57,
+          "homeRadius": 15.5,
           "kind": "wander",
-          "maxRange": 11.0,
-          "minRange": 2.75,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.5399999618530273,
-          "speed": 0.699999988079071,
+          "maxRange": 13.02,
+          "minRange": 2.48,
+          "pauseMax": 3.45,
+          "pauseMin": 1.13,
+          "runSpeed": 4.742,
+          "speed": 2.964,
           "turnRate": 110.0
         },
         {
@@ -7866,13 +7980,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 4.74,
+        "decel": 6.52,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 1.5399999618530273,
-        "walkSpeed": 0.699999988079071
+        "rateMax": 1.0,
+        "rateMin": 0.0054,
+        "runEnter": 4.742,
+        "runExit": 3.409,
+        "runSpeed": 5.59,
+        "walkSpeed": 5.59
       },
       "name": "cow-3",
       "node": "cow-3",
@@ -7886,16 +8005,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 9.0,
+          "kind": "liveliness",
+          "bounce": 0.03,
+          "bounceRate": 1.01,
+          "sway": 2.37,
+          "swayRate": 0.111,
+          "nod": 2.19
+        },
+        {
+          "arrive": 0.53,
+          "homeRadius": 16.36,
           "kind": "wander",
-          "maxRange": 9.0,
-          "minRange": 2.25,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.8700001239776611,
-          "speed": 0.8500000238418579,
-          "turnRate": 110.0
+          "maxRange": 12.96,
+          "minRange": 2.14,
+          "pauseMax": 5.68,
+          "pauseMin": 1.16,
+          "runSpeed": 1.645,
+          "speed": 1.028,
+          "turnRate": 93.8
         },
         {
           "kind": "ground",
@@ -7912,13 +8039,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 1.64,
+        "decel": 2.26,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 1.8700001239776611,
-        "walkSpeed": 0.8500000238418579
+        "rateMax": 1.0,
+        "rateMin": 0.0121,
+        "runEnter": 1.645,
+        "runExit": 1.182,
+        "runSpeed": 2.482,
+        "walkSpeed": 2.482
       },
       "name": "sheep-4",
       "node": "sheep-4",
@@ -7932,16 +8064,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 10.0,
+          "kind": "liveliness",
+          "bounce": 0.06,
+          "bounceRate": 0.81,
+          "sway": 3.05,
+          "swayRate": 0.154,
+          "nod": 2.42
+        },
+        {
+          "arrive": 0.77,
+          "homeRadius": 15.23,
           "kind": "wander",
-          "maxRange": 10.0,
-          "minRange": 2.5,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 2.200000047683716,
-          "speed": 1.0,
-          "turnRate": 110.0
+          "maxRange": 10.18,
+          "minRange": 2.24,
+          "pauseMax": 4.62,
+          "pauseMin": 1.11,
+          "runSpeed": 1.741,
+          "speed": 1.088,
+          "turnRate": 85.6
         },
         {
           "kind": "ground",
@@ -7958,13 +8098,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 1.74,
+        "decel": 2.39,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 2.200000047683716,
-        "walkSpeed": 1.0
+        "rateMax": 1.0,
+        "rateMin": 0.0143,
+        "runEnter": 1.741,
+        "runExit": 1.251,
+        "runSpeed": 2.099,
+        "walkSpeed": 2.099
       },
       "name": "goat-5",
       "node": "goat-5",
@@ -7978,16 +8123,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 7.0,
+          "kind": "liveliness",
+          "bounce": 0.058,
+          "bounceRate": 0.75,
+          "sway": 1.51,
+          "swayRate": 0.14,
+          "nod": 1.73
+        },
+        {
+          "arrive": 0.74,
+          "homeRadius": 21.09,
           "kind": "wander",
-          "maxRange": 7.0,
-          "minRange": 1.75,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.4299999475479126,
-          "speed": 0.6499999761581421,
-          "turnRate": 110.0
+          "maxRange": 11.52,
+          "minRange": 2.93,
+          "pauseMax": 5.19,
+          "pauseMin": 1.06,
+          "runSpeed": 2.888,
+          "speed": 1.805,
+          "turnRate": 101.7
         },
         {
           "kind": "ground",
@@ -8004,13 +8157,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 2.89,
+        "decel": 3.97,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 1.4299999475479126,
-        "walkSpeed": 0.6499999761581421
+        "rateMax": 1.0,
+        "rateMin": 0.0105,
+        "runEnter": 2.888,
+        "runExit": 2.076,
+        "runSpeed": 2.845,
+        "walkSpeed": 2.845
       },
       "name": "pig-6",
       "node": "pig-6",
@@ -8024,16 +8182,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 6.0,
+          "kind": "liveliness",
+          "bounce": 0.022,
+          "bounceRate": 0.94,
+          "sway": 3.08,
+          "swayRate": 0.215,
+          "nod": 1.16
+        },
+        {
+          "arrive": 0.66,
+          "homeRadius": 16.56,
           "kind": "wander",
-          "maxRange": 6.0,
-          "minRange": 1.5,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.5399999618530273,
-          "speed": 0.699999988079071,
-          "turnRate": 110.0
+          "maxRange": 10.74,
+          "minRange": 2.32,
+          "pauseMax": 3.06,
+          "pauseMin": 1.3,
+          "runSpeed": 1.704,
+          "speed": 1.065,
+          "turnRate": 99.6
         },
         {
           "kind": "ground",
@@ -8050,13 +8216,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 1.7,
+        "decel": 2.34,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 1.5399999618530273,
-        "walkSpeed": 0.699999988079071
+        "rateMax": 1.0,
+        "rateMin": 0.0168,
+        "runEnter": 1.704,
+        "runExit": 1.225,
+        "runSpeed": 1.79,
+        "walkSpeed": 1.79
       },
       "name": "rooster-7",
       "node": "rooster-7",
@@ -8070,16 +8241,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 5.5,
+          "kind": "liveliness",
+          "bounce": 0.054,
+          "bounceRate": 0.79,
+          "sway": 1.56,
+          "swayRate": 0.143,
+          "nod": 1.8
+        },
+        {
+          "arrive": 0.58,
+          "homeRadius": 15.31,
           "kind": "wander",
-          "maxRange": 5.5,
-          "minRange": 1.375,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.4299999475479126,
-          "speed": 0.6499999761581421,
-          "turnRate": 110.0
+          "maxRange": 9.57,
+          "minRange": 2.53,
+          "pauseMax": 3.82,
+          "pauseMin": 1.65,
+          "runSpeed": 1.504,
+          "speed": 0.94,
+          "turnRate": 106.4
         },
         {
           "kind": "ground",
@@ -8096,13 +8275,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 1.5,
+        "decel": 2.07,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 1.4299999475479126,
-        "walkSpeed": 0.6499999761581421
+        "rateMax": 1.0,
+        "rateMin": 0.0147,
+        "runEnter": 1.504,
+        "runExit": 1.081,
+        "runSpeed": 2.035,
+        "walkSpeed": 2.035
       },
       "name": "chicken-8",
       "node": "chicken-8",
@@ -8116,16 +8300,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 4.0,
+          "kind": "liveliness",
+          "bounce": 0.033,
+          "bounceRate": 0.81,
+          "sway": 2.93,
+          "swayRate": 0.179,
+          "nod": 1.53
+        },
+        {
+          "arrive": 0.54,
+          "homeRadius": 16.96,
           "kind": "wander",
-          "maxRange": 4.0,
-          "minRange": 1.0,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.2100000381469727,
-          "speed": 0.550000011920929,
-          "turnRate": 110.0
+          "maxRange": 11.8,
+          "minRange": 2.38,
+          "pauseMax": 6.05,
+          "pauseMin": 0.9,
+          "runSpeed": 6.074,
+          "speed": 3.796,
+          "turnRate": 69.2
         },
         {
           "kind": "ground",
@@ -8142,59 +8334,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 6.07,
+        "decel": 8.35,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 1.2100000381469727,
-        "walkSpeed": 0.550000011920929
-      },
-      "name": "chick-9",
-      "node": "chick-9",
-      "seed": 20324280,
-      "tags": [
-        "animal",
-        "farm",
-        "chick"
-      ]
-    },
-    {
-      "behaviors": [
-        {
-          "arrive": 0.6,
-          "homeRadius": 11.0,
-          "kind": "wander",
-          "maxRange": 11.0,
-          "minRange": 2.75,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.6500000953674316,
-          "speed": 0.75,
-          "turnRate": 110.0
-        },
-        {
-          "kind": "ground",
-          "slopeAlign": 0.55
-        }
-      ],
-      "clips": {
-        "idle": "Walk",
-        "run": "Walk",
-        "turn": "Walk",
-        "walk": "Walk"
-      },
-      "coarseInterval": 0.1,
-      "cullDistance": 260.0,
-      "fullDetailDistance": 90.0,
-      "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
-        "matchRate": true,
-        "moveEnter": 0.06,
-        "moveExit": 0.03,
-        "runSpeed": 1.6500000953674316,
-        "walkSpeed": 0.75
+        "rateMax": 1.0,
+        "rateMin": 0.005,
+        "runEnter": 6.074,
+        "runExit": 4.365,
+        "runSpeed": 6.008,
+        "walkSpeed": 6.008
       },
       "name": "bull-10",
       "node": "bull-10",
@@ -8208,16 +8359,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 15.0,
+          "kind": "liveliness",
+          "bounce": 0.057,
+          "bounceRate": 1.03,
+          "sway": 1.91,
+          "swayRate": 0.152,
+          "nod": 2.12
+        },
+        {
+          "arrive": 0.65,
+          "homeRadius": 20.35,
           "kind": "wander",
-          "maxRange": 15.0,
-          "minRange": 3.75,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 2.9700000286102295,
-          "speed": 1.350000023841858,
-          "turnRate": 110.0
+          "maxRange": 14.0,
+          "minRange": 2.63,
+          "pauseMax": 6.24,
+          "pauseMin": 1.6,
+          "runSpeed": 4.837,
+          "speed": 3.023,
+          "turnRate": 81.5
         },
         {
           "kind": "ground",
@@ -8234,13 +8393,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 4.84,
+        "decel": 6.65,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 2.9700000286102295,
-        "walkSpeed": 1.350000023841858
+        "rateMax": 1.0,
+        "rateMin": 0.0051,
+        "runEnter": 4.837,
+        "runExit": 3.476,
+        "runSpeed": 5.86,
+        "walkSpeed": 5.86
       },
       "name": "horse-11",
       "node": "horse-11",
@@ -8254,16 +8418,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 11.0,
+          "kind": "liveliness",
+          "bounce": 0.056,
+          "bounceRate": 1.08,
+          "sway": 1.67,
+          "swayRate": 0.139,
+          "nod": 1.84
+        },
+        {
+          "arrive": 0.81,
+          "homeRadius": 15.49,
           "kind": "wander",
-          "maxRange": 11.0,
-          "minRange": 2.75,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.5399999618530273,
-          "speed": 0.699999988079071,
-          "turnRate": 110.0
+          "maxRange": 14.99,
+          "minRange": 2.34,
+          "pauseMax": 5.61,
+          "pauseMin": 1.0,
+          "runSpeed": 3.68,
+          "speed": 2.3,
+          "turnRate": 75.5
         },
         {
           "kind": "ground",
@@ -8280,13 +8452,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 3.68,
+        "decel": 5.06,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 1.5399999618530273,
-        "walkSpeed": 0.699999988079071
+        "rateMax": 1.0,
+        "rateMin": 0.0054,
+        "runEnter": 3.68,
+        "runExit": 2.645,
+        "runSpeed": 5.59,
+        "walkSpeed": 5.59
       },
       "name": "cow-12",
       "node": "cow-12",
@@ -8300,16 +8477,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 9.0,
+          "kind": "liveliness",
+          "bounce": 0.059,
+          "bounceRate": 0.88,
+          "sway": 2.24,
+          "swayRate": 0.209,
+          "nod": 2.26
+        },
+        {
+          "arrive": 0.88,
+          "homeRadius": 16.93,
           "kind": "wander",
-          "maxRange": 9.0,
-          "minRange": 2.25,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.8700001239776611,
-          "speed": 0.8500000238418579,
-          "turnRate": 110.0
+          "maxRange": 11.88,
+          "minRange": 2.89,
+          "pauseMax": 3.54,
+          "pauseMin": 1.43,
+          "runSpeed": 1.922,
+          "speed": 1.201,
+          "turnRate": 88.8
         },
         {
           "kind": "ground",
@@ -8326,13 +8511,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 1.92,
+        "decel": 2.64,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 1.8700001239776611,
-        "walkSpeed": 0.8500000238418579
+        "rateMax": 1.0,
+        "rateMin": 0.0121,
+        "runEnter": 1.922,
+        "runExit": 1.381,
+        "runSpeed": 2.482,
+        "walkSpeed": 2.482
       },
       "name": "sheep-13",
       "node": "sheep-13",
@@ -8346,16 +8536,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 10.0,
+          "kind": "liveliness",
+          "bounce": 0.05,
+          "bounceRate": 0.77,
+          "sway": 1.73,
+          "swayRate": 0.1,
+          "nod": 1.28
+        },
+        {
+          "arrive": 0.87,
+          "homeRadius": 21.34,
           "kind": "wander",
-          "maxRange": 10.0,
-          "minRange": 2.5,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 2.200000047683716,
-          "speed": 1.0,
-          "turnRate": 110.0
+          "maxRange": 12.76,
+          "minRange": 2.13,
+          "pauseMax": 4.29,
+          "pauseMin": 0.84,
+          "runSpeed": 1.854,
+          "speed": 1.159,
+          "turnRate": 107.1
         },
         {
           "kind": "ground",
@@ -8372,13 +8570,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 1.85,
+        "decel": 2.55,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 2.200000047683716,
-        "walkSpeed": 1.0
+        "rateMax": 1.0,
+        "rateMin": 0.0143,
+        "runEnter": 1.854,
+        "runExit": 1.333,
+        "runSpeed": 2.099,
+        "walkSpeed": 2.099
       },
       "name": "goat-14",
       "node": "goat-14",
@@ -8392,16 +8595,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 7.0,
+          "kind": "liveliness",
+          "bounce": 0.021,
+          "bounceRate": 0.9,
+          "sway": 2.64,
+          "swayRate": 0.137,
+          "nod": 1.39
+        },
+        {
+          "arrive": 0.69,
+          "homeRadius": 15.97,
           "kind": "wander",
-          "maxRange": 7.0,
-          "minRange": 1.75,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.4299999475479126,
-          "speed": 0.6499999761581421,
-          "turnRate": 110.0
+          "maxRange": 9.94,
+          "minRange": 2.61,
+          "pauseMax": 3.35,
+          "pauseMin": 1.28,
+          "runSpeed": 1.84,
+          "speed": 1.15,
+          "turnRate": 106.7
         },
         {
           "kind": "ground",
@@ -8418,13 +8629,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 1.84,
+        "decel": 2.53,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 1.4299999475479126,
-        "walkSpeed": 0.6499999761581421
+        "rateMax": 1.0,
+        "rateMin": 0.0105,
+        "runEnter": 1.84,
+        "runExit": 1.322,
+        "runSpeed": 2.845,
+        "walkSpeed": 2.845
       },
       "name": "pig-15",
       "node": "pig-15",
@@ -8438,16 +8654,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 6.0,
+          "kind": "liveliness",
+          "bounce": 0.056,
+          "bounceRate": 0.72,
+          "sway": 1.51,
+          "swayRate": 0.115,
+          "nod": 2.47
+        },
+        {
+          "arrive": 0.74,
+          "homeRadius": 20.26,
           "kind": "wander",
-          "maxRange": 6.0,
-          "minRange": 1.5,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.5399999618530273,
-          "speed": 0.699999988079071,
-          "turnRate": 110.0
+          "maxRange": 9.11,
+          "minRange": 2.98,
+          "pauseMax": 3.28,
+          "pauseMin": 1.35,
+          "runSpeed": 1.378,
+          "speed": 0.861,
+          "turnRate": 110.8
         },
         {
           "kind": "ground",
@@ -8464,13 +8688,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 1.38,
+        "decel": 1.89,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 1.5399999618530273,
-        "walkSpeed": 0.699999988079071
+        "rateMax": 1.0,
+        "rateMin": 0.0168,
+        "runEnter": 1.378,
+        "runExit": 0.99,
+        "runSpeed": 1.79,
+        "walkSpeed": 1.79
       },
       "name": "rooster-16",
       "node": "rooster-16",
@@ -8484,16 +8713,24 @@
     {
       "behaviors": [
         {
-          "arrive": 0.6,
-          "homeRadius": 5.5,
+          "kind": "liveliness",
+          "bounce": 0.028,
+          "bounceRate": 1.04,
+          "sway": 1.48,
+          "swayRate": 0.215,
+          "nod": 2.19
+        },
+        {
+          "arrive": 0.5,
+          "homeRadius": 19.6,
           "kind": "wander",
-          "maxRange": 5.5,
-          "minRange": 1.375,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.4299999475479126,
-          "speed": 0.6499999761581421,
-          "turnRate": 110.0
+          "maxRange": 13.29,
+          "minRange": 2.1,
+          "pauseMax": 4.72,
+          "pauseMin": 1.65,
+          "runSpeed": 2.003,
+          "speed": 1.252,
+          "turnRate": 78.4
         },
         {
           "kind": "ground",
@@ -8510,13 +8747,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
+        "accel": 2.0,
+        "decel": 2.75,
+        "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.06,
         "moveExit": 0.03,
-        "runSpeed": 1.4299999475479126,
-        "walkSpeed": 0.6499999761581421
+        "rateMax": 1.0,
+        "rateMin": 0.0147,
+        "runEnter": 2.003,
+        "runExit": 1.44,
+        "runSpeed": 2.035,
+        "walkSpeed": 2.035
       },
       "name": "chicken-17",
       "node": "chicken-17",
@@ -8525,52 +8767,6 @@
         "animal",
         "farm",
         "chicken"
-      ]
-    },
-    {
-      "behaviors": [
-        {
-          "arrive": 0.6,
-          "homeRadius": 4.0,
-          "kind": "wander",
-          "maxRange": 4.0,
-          "minRange": 1.0,
-          "pauseMax": 26.0,
-          "pauseMin": 3.0,
-          "runSpeed": 1.2100000381469727,
-          "speed": 0.550000011920929,
-          "turnRate": 110.0
-        },
-        {
-          "kind": "ground",
-          "slopeAlign": 0.55
-        }
-      ],
-      "clips": {
-        "idle": "Walk",
-        "run": "Walk",
-        "turn": "Walk",
-        "walk": "Walk"
-      },
-      "coarseInterval": 0.1,
-      "cullDistance": 260.0,
-      "fullDetailDistance": 90.0,
-      "gait": {
-        "accel": 1.6,
-        "decel": 2.4,
-        "matchRate": true,
-        "moveEnter": 0.06,
-        "moveExit": 0.03,
-        "runSpeed": 1.2100000381469727,
-        "walkSpeed": 0.550000011920929
-      },
-      "name": "chick-18",
-      "node": "chick-18",
-      "seed": 20395551,
-      "tags": [
-        "animal",
-        "farm",
-        "chick"
       ]
     }
   ],
@@ -8684,7 +8880,7 @@
           },
           {
             "name": "animalWobble",
-            "value": 0.85,
+            "value": 0.4,
             "min": 0.0,
             "max": 10.0
           },
@@ -8720,7 +8916,7 @@
           },
           {
             "name": "beamSpawnRate",
-            "value": 2900.0,
+            "value": 6100.0,
             "min": 0.0,
             "max": 20000.0
           },
@@ -8732,7 +8928,7 @@
           },
           {
             "name": "beamRestRate",
-            "value": 1050.0,
+            "value": 0.0,
             "min": 0.0,
             "max": 20000.0
           },
@@ -8741,6 +8937,12 @@
             "value": 0.45,
             "min": 0.0,
             "max": 10.0
+          },
+          {
+            "name": "beamDrainSeconds",
+            "value": 5.0,
+            "min": 0.0,
+            "max": 30.0
           }
         ],
         "beats": [
@@ -8772,6 +8974,22 @@
           {
             "name": "approach",
             "cues": [
+              {
+                "role": "actor.beam",
+                "steps": [
+                  {
+                    "kind": "wait",
+                    "name": "beamDrain",
+                    "duration": {
+                      "param": "beamDrainSeconds"
+                    }
+                  },
+                  {
+                    "kind": "hide",
+                    "name": "beamOff"
+                  }
+                ]
+              },
               {
                 "role": "actor",
                 "steps": [
@@ -8877,6 +9095,7 @@
                     "kind": "follow",
                     "name": "hold",
                     "to": "target",
+                    "hold": true,
                     "height": {
                       "param": "hoverHeight"
                     },
@@ -8903,6 +9122,7 @@
                     "kind": "moveTo",
                     "name": "lift",
                     "to": "actor",
+                    "anchor": "visual",
                     "height": {
                       "param": "liftHeight"
                     },
@@ -8957,10 +9177,6 @@
                       "param": "beamRestEmissive"
                     },
                     "duration": 0.3
-                  },
-                  {
-                    "kind": "hide",
-                    "name": "beamOff"
                   }
                 ]
               },

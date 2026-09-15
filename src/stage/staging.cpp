@@ -943,7 +943,8 @@ std::string Staging::parameterPath(const Run& run, std::string_view role, std::s
     return path;
 }
 
-void Staging::writeParameter(const std::string& path, float v, const StageContext& ctx) {
+void Staging::writeParameter(const Run& run, std::string_view role, const std::string& path,
+                             float v, const StageContext& ctx) {
     if (ctx.params == nullptr || path.empty()) {
         return;
     }
@@ -968,9 +969,77 @@ void Staging::writeParameter(const std::string& path, float v, const StageContex
         for (std::size_t c = 0; c < p->componentCount(); ++c) {
             w.base.push_back(p->baseComponent(c));
         }
+        // Who reached it, so the Inspector can say so (ADR-241). Recorded on the first write
+        // alongside the authored base, because that is the moment the fact is known and the two
+        // have exactly the same lifetime -- `reset` clears both.
+        w.scenario = desc_.scenarios[run.scenario].name;
+        w.role = std::string(role);
         written_.push_back(std::move(w));
     }
     p->setBaseComponent(0, v);
+}
+
+// ---- "why is this parameter moving?" --------------------------------------------------------------
+
+std::vector<Staging::PathWriter> Staging::writersOf(std::string_view path) const {
+    std::vector<PathWriter> out;
+    // One entry per scenario, because this answers "what can write this" and a scenario that both
+    // declares an absolute target and has since written it is one answer, not two. Deliberately not
+    // keyed on the role as well: a `set` step naming an absolute path still carries its cue's role,
+    // so keying on the pair would report the same scenario twice.
+    const auto already = [&out](std::string_view scenario) {
+        return std::any_of(out.begin(), out.end(),
+                           [&](const PathWriter& w) { return w.scenario == scenario; });
+    };
+    const auto isRunning = [this](std::string_view scenario) {
+        return std::any_of(runs_.begin(), runs_.end(), [&](const Run& r) {
+            return r.running && desc_.scenarios[r.scenario].name == scenario;
+        });
+    };
+
+    // Observed. A role-relative target can only be known this way: the path it resolves to does not
+    // exist until the role binds to a body.
+    for (const Written& w : written_) {
+        if (w.path != path) {
+            continue;
+        }
+        PathWriter pw;
+        pw.path = w.path;
+        pw.scenario = w.scenario;
+        pw.role = w.role;
+        pw.running = isRunning(w.scenario);
+        pw.live = true;
+        out.push_back(std::move(pw));
+    }
+
+    // Declared. A step that names an absolute path is answerable from the description alone, which
+    // is the whole point -- a beam nobody has fired yet still has a director that can hide it, and
+    // "nothing modulates this" would be the wrong answer to give about it.
+    for (const ScenarioDesc& sc : desc_.scenarios) {
+        for (const BeatDesc& beat : sc.beats) {
+            for (const CueDesc& cue : beat.cues) {
+                for (const StepDesc& step : cue.steps) {
+                    if (step.kind != StepKind::Show && step.kind != StepKind::Hide &&
+                        step.kind != StepKind::Set) {
+                        continue;
+                    }
+                    if (step.target.find('/') == std::string::npos || step.target != path) {
+                        continue;
+                    }
+                    if (already(sc.name)) {
+                        continue;
+                    }
+                    PathWriter pw;
+                    pw.path = std::string(path);
+                    pw.scenario = sc.name;
+                    pw.running = isRunning(sc.name);
+                    pw.live = false;
+                    out.push_back(std::move(pw));
+                }
+            }
+        }
+    }
+    return out;
 }
 
 // ---- the frame ------------------------------------------------------------------------------------
@@ -1305,7 +1374,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         if (path.empty()) {
             return StepStatus::Failed;
         }
-        writeParameter(path, step.kind == StepKind::Show ? 1.0f : 0.0f, ctx);
+        writeParameter(run, role, path, step.kind == StepKind::Show ? 1.0f : 0.0f, ctx);
         return StepStatus::Done;
     }
 
@@ -1316,7 +1385,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         }
         const float to = value(run, step.to);
         if (duration <= 0.0) {
-            writeParameter(path, to, ctx);
+            writeParameter(run, role, path, to, ctx);
             return StepStatus::Done;
         }
         if (!cue.started) {
@@ -1331,7 +1400,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             }
         }
         const auto u = static_cast<float>(std::clamp(elapsed / duration, 0.0, 1.0));
-        writeParameter(path, glm::mix(cue.span, to, u), ctx);
+        writeParameter(run, role, path, glm::mix(cue.span, to, u), ctx);
         return u >= 1.0f ? StepStatus::Done : StepStatus::Running;
     }
 
@@ -1402,7 +1471,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             // holding a director motion that will never be updated again.
             self->clearDirectorMotion();
             self->actions().cancel(entity::Authority::Director, ctx.time);
-            writeParameter(parameterPath(run, role, {}, ctx), 0.0f, ctx);
+            writeParameter(run, role, parameterPath(run, role, {}, ctx), 0.0f, ctx);
         }
         claims_.erase(std::remove_if(claims_.begin(), claims_.end(),
                                      [&](const Claim& c) { return c.entity == name; }),

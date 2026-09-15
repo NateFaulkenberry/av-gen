@@ -157,12 +157,13 @@ TEST_CASE("every writer of a parameter final is a kind the Inspector can name", 
     //   params/parameter_set.cpp -> resets finals; it establishes the base rather than modulating
     //   ui/edit_history.cpp    -> an undo. A user action, not an influence on a running scene.
     // World macros do not appear because a macro writes through routes.
-    //   stage/staging.cpp      -> Kind::Entity, and only PARTLY. A scenario (ADR-210) drives a body
-    //                             through `entity::DirectorMotion`, so a staged *entity* is named --
-    //                             but a scenario also writes nodes that are not entities, such as
-    //                             the tractor beam's visibility, and those still show nothing. The
-    //                             honest answer is a `Kind::Staging` that names the scenario and the
-    //                             role; ADR-211 records it as not done rather than claiming it.
+    //   stage/staging.cpp      -> Kind::Entity *and* Kind::Staging. A scenario (ADR-210) drives a
+    //                             body through `entity::DirectorMotion`, which the entity branch
+    //                             names; it also writes parameters directly -- a tractor beam's
+    //                             visibility, a spawn rate, any absolute path a `set` step gives --
+    //                             and `Staging::writersOf` names those (ADR-241). The one final it
+    //                             writes that is NOT an influence is a scenario's own knob in
+    //                             `setParameter`: that is an author moving a slider, like an undo.
     //
     // This test found `stage/staging.cpp` the day it landed, which is what it is for.
     const std::set<std::string> known{

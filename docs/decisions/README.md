@@ -221,3 +221,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [232](ADR-232-a-parameter-path-carries-the-structure-it-was-saved-against.md) | A parameter path carries the structure it was saved against (the material op table that black-holed an elder) | Accepted |
 | [233](ADR-233-two-things-rebuilt-that-nobody-changed.md) | Two things were rebuilt every frame that nobody had changed (the idle editor's 22 regenerations, and the sky rebuilt inside the drag) | Accepted |
 | [240](ADR-240-a-placement-is-not-an-offset.md) | A placement is not an offset, a euler triple is not an orientation, a push is not a walk, and a stride speed is still a claim about a clip | Accepted |
+| [241](ADR-241-the-director-says-what-it-writes.md) | The director says what it writes (the Inspector's `Kind::Staging`, declared and observed) | Accepted |
