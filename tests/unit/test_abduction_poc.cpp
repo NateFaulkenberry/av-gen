@@ -664,3 +664,149 @@ TEST_CASE("The squad stands three on one bank and two on the other", "[glowmere]
         CHECK(terrain.isWalkable(glm::vec2(p.x, p.z)));
     }
 }
+
+TEST_CASE("How much room each animal actually has", "[.report][glowmere][wander]") {
+    // Placement validated the *spot* -- walkable, not inside a solid -- and not the *territory*. An
+    // animal standing somewhere legal with nowhere legal to go is stuck, and it reads as the frozen
+    // pose the wander was blamed for. This asks the navigator the same question the wander asks, from
+    // each animal's own anchor, and counts how often it gets an answer.
+    if (!farmAssetsPresent()) {
+        SKIP("the farm GLBs are not on disk");
+    }
+    Run run(sceneFile());
+    entity::EntityWorld& world = run.comp->entityWorld();
+    const entity::Navigator& nav = world.navigator();
+
+    for (const auto& e : world.entities()) {
+        if (e == nullptr) {
+            continue;
+        }
+        const entity::EntityDesc& d = e->desc();
+        const bool farm = std::find(d.tags.begin(), d.tags.end(), "farm") != d.tags.end();
+        if (!farm) {
+            continue;
+        }
+        float home = 0.0f;
+        float lo = 0.0f;
+        float hi = 0.0f;
+        for (const entity::BehaviorDesc& b : d.behaviors) {
+            if (b.kind != "wander") {
+                continue;
+            }
+            home = b.settings.value("homeRadius", 0.0f);
+            lo = b.settings.value("minRange", 0.0f);
+            hi = b.settings.value("maxRange", 0.0f);
+        }
+        const glm::vec3 at = e->state().position();
+        const glm::vec2 from(at.x, at.z);
+        Rng rng(1234u);
+        int found = 0;
+        glm::vec2 dst{};
+        for (int i = 0; i < 200; ++i) {
+            if (nav.pickDestination(rng, from, lo, std::min(hi, home), dst)) {
+                ++found;
+            }
+        }
+        WARN(fmt::format("{:<11} at ({:7.1f},{:7.1f})  home {:5.1f}  destinations {:3d}/200", d.name,
+                         at.x, at.z, home, found));
+    }
+}
+
+TEST_CASE("Where the stall happens and what the navigator says there", "[.report][glowmere][wander]") {
+    // The previous report asked `pickDestination` and got 200/200, which refutes "boxed in" and
+    // nothing else: picking a destination is not the same question as being able to set off towards
+    // it. `wander` takes its give-up branch when `Navigator::steer` returns a vector shorter than
+    // 0.5 -- and `steer` is a *path* query from the body's own position, which `pickDestination`
+    // never asks. This replays the run, finds the worst motionless stretch, and at the position the
+    // body held during it asks both questions.
+    if (!farmAssetsPresent()) {
+        SKIP("the farm GLBs are not on disk");
+    }
+    Run run(sceneFile());
+    entity::EntityWorld& world = run.comp->entityWorld();
+
+    // Replay, remembering where each animal stood at the start of its worst stretch.
+    struct Worst { double seconds = 0.0; glm::vec3 at{0.0f}; };
+    std::map<std::string, Worst> worst;
+    std::map<std::string, std::pair<double, glm::vec3>> current;
+    std::map<std::string, glm::vec3> was;
+    for (const auto& e : world.entities()) {
+        was[e->name()] = e->state().position();
+    }
+    const double step = 1.0 / 60.0;
+    FrameTime time;
+    for (int i = 0; i < 5400; ++i) {
+        time.renderTime = static_cast<double>(i) * step;
+        time.deltaTime = i == 0 ? 0.0 : step;
+        time.frameIndex = static_cast<std::uint64_t>(i);
+        run.params.resetFinals();
+        run.comp->updateFields(time, run.bus, run.modulator);
+        run.modulator.applyRoutes(run.bus, run.params, time.deltaTime);
+        run.comp->updateBehaviour(time, run.bus);
+        for (const auto& ePtr : world.entities()) {
+            const entity::Entity& e = *ePtr;
+            if (!isAnimal(e) || e.directorMotion().active) {
+                continue;
+            }
+            const glm::vec3 now = e.state().position();
+            const glm::vec2 d(now.x - was[e.name()].x, now.z - was[e.name()].z);
+            if (glm::length(d) < 0.001f) {
+                auto& c = current[e.name()];
+                if (c.first == 0.0) {
+                    c.second = now;
+                }
+                c.first += step;
+                if (c.first > worst[e.name()].seconds) {
+                    worst[e.name()] = {c.first, c.second};
+                }
+            } else {
+                current[e.name()] = {0.0, now};
+            }
+            was[e.name()] = now;
+        }
+    }
+
+    const entity::Navigator& nav = world.navigator();
+    for (const auto& ePtr : world.entities()) {
+        const entity::Entity& e = *ePtr;
+        if (!isAnimal(e)) {
+            continue;
+        }
+        const entity::EntityDesc& d = e.desc();
+        float home = 0.0f, lo = 0.0f, hi = 0.0f, speed = 0.0f, arrive = 0.0f;
+        for (const entity::BehaviorDesc& b : d.behaviors) {
+            if (b.kind != "wander") {
+                continue;
+            }
+            home = b.settings.value("homeRadius", 0.0f);
+            lo = b.settings.value("minRange", 0.0f);
+            hi = b.settings.value("maxRange", 0.0f);
+            speed = b.settings.value("speed", 1.6f);
+            arrive = b.settings.value("arrive", 1.2f);
+        }
+        const glm::vec3 at = worst[d.name].at;
+        const glm::vec2 from(at.x, at.z);
+        Rng rng(99u);
+        int picked = 0;
+        int steerable = 0;
+        int tooClose = 0;
+        glm::vec2 dst{};
+        for (int i = 0; i < 200; ++i) {
+            if (!nav.pickDestination(rng, from, lo, std::min(hi, home > 0.0f ? home : hi), dst)) {
+                continue;
+            }
+            ++picked;
+            if (glm::length(dst - from) <= arrive) {
+                ++tooClose;
+            }
+            if (glm::length(nav.steer(from, dst, std::max(speed * 1.5f, 2.0f))) > 0.5f) {
+                ++steerable;
+            }
+        }
+        WARN(fmt::format("{:<11} worst still {:6.2f} s at ({:7.1f},{:7.1f})  navigable {}  "
+                         "picked {:3d}/200  steerable {:3d}  within-arrive {:3d}  radius {:.2f}",
+                         d.name, worst[d.name].seconds, at.x, at.z,
+                         nav.navigable(from) ? "yes" : "NO ", picked, steerable, tooClose,
+                         e.state().radius));
+    }
+}
