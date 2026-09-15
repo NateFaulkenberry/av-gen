@@ -2609,8 +2609,23 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                                   "a piece with distinct sections wants.");
             }
 
+            const bool continuous = s.mode == app::DirectorMode::ContinuousShot;
+
             ImGui::Separator();
-            ImGui::TextUnformatted("Shot timing");
+            // Named for what the controls do in the mode that is actually selected. All three are
+            // live in both modes -- they group the analyser's sections into shots before either
+            // mode sees them -- so none of them is disabled here (ADR-203). What changes is what a
+            // "shot" *is*: a cut in an edited sequence, and a change of subject and intent inside
+            // one unbroken move in a continuous take.
+            ImGui::TextUnformatted(continuous ? "Shot timing (moves, not cuts)" : "Shot timing");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    continuous
+                        ? "A continuous take does not cut, so these do not set cut lengths.\n"
+                          "They set how often the camera changes what it is doing and who it\n"
+                          "is looking at -- the boundaries between moves inside the one take."
+                        : "How long each cut runs before the next one.");
+            }
             auto seconds = [](const char* label, double& v, double lo, double hi, const char* tip) {
                 auto f = static_cast<float>(v);
                 if (ImGui::SliderFloat(label, &f, static_cast<float>(lo), static_cast<float>(hi),
@@ -2648,6 +2663,29 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
 
             ImGui::Separator();
             ImGui::TextUnformatted("Pace");
+            // First in this block, because it is the one that actually lowers the floor the two
+            // caps below run into. Measured on Glowmere with the caps at 0.4 m/s and 2 deg/s:
+            // holding each subject for one shot peaks at 42.3 m/s, and for six shots at 0.8 m/s.
+            int dwell = s.dwellShots;
+            if (ImGui::SliderInt("hold subject", &dwell, 1, 12,
+                                 dwell == 1 ? "1 shot" : "%d shots")) {
+                s.dwellShots = std::clamp(dwell, 1, 12);
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "How many shots in a row one subject keeps before the film moves on.\n\n"
+                    "Importance decides how often a subject's turn comes round; this decides\n"
+                    "how long a turn lasts. They are two questions, and with a cast of eleven\n"
+                    "no importance setting could answer the second one -- every turn was a\n"
+                    "single shot however high the slider went.\n\n"
+                    "It is also the control that makes a slow camera possible at all. In a\n"
+                    "continuous take the camera has to physically cross the ground between one\n"
+                    "subject and the next inside the time the music gave the shot, and that\n"
+                    "distance over that duration is a floor the two caps below cannot go under.\n"
+                    "Consecutive shots on the same subject have no ground to cross.\n\n"
+                    "Measured on Glowmere at 0.4 m/s and 2 deg/s: 1 shot per subject peaks at\n"
+                    "42.3 m/s, 6 shots per subject at 0.8 m/s.");
+            }
             // ADR-200. Off is a real value here, not a disabled control: 0 means the director's own
             // geometry stands, and that is the right default for a scene nobody has complained
             // about. The format says so rather than showing a bare 0.
@@ -2693,6 +2731,20 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                 ImGui::SetTooltip("Same seed, same heroes, same track, same film. Change it to "
                                   "ask for a different edit of the same piece -- it picks which "
                                   "supporting subject each section gets, and nothing else.");
+            }
+
+            if (!directorSummary.empty()) {
+                ImGui::Separator();
+                ImGui::TextWrapped("%s", directorSummary.c_str());
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip(
+                        "What the cut this panel produced actually does, rather than what was\n"
+                        "asked of it.\n\n"
+                        "The two caps are requests, and a continuous take can refuse them: the\n"
+                        "camera has to get from one subject's stand-off point to the next inside\n"
+                        "the time the music gave the shot. Hold each subject for more shots, or\n"
+                        "give the shots longer, to lower that floor.");
+                }
             }
 
             // Refuse rather than clamp, and say why in the panel rather than in a log.

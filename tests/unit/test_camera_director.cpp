@@ -1338,3 +1338,118 @@ TEST_CASE("Auto-director settings reach the film, and refuse what they cannot me
         REQUIRE_FALSE(zero.validate().has_value());
     }
 }
+
+// ---- ADR-203: a cap that breaks the film ---------------------------------------------------------
+
+TEST_CASE("A pace cap slows the cut instead of destroying it", "[director][camera][pace]") {
+    // The defect, in one sentence: `limitCameraSpeed` and `limitViewRate` shorten a shot by pulling
+    // its end back toward its start, and in a continuous take the start is wherever the *previous*
+    // shot left off -- so a hard cap stopped each shot travelling to its own subject at all and
+    // left the camera across the valley from it. `Sequence::validate()` then refused the whole
+    // sequence ("spotlights X but it never spans more than 0.024 of the frame"), `directHeroes`
+    // returned that error, and nothing was installed: the previously directed film kept playing.
+    //
+    // Which is exactly how it was reported -- "I dont know if max speed is working correctly - even
+    // at its smallest value its still moving blazing fast". The cap was not being ignored. It was
+    // working so well it invalidated the film, and the failure was a line in the status bar.
+    //
+    // Measured on Glowmere Valley 2 before the fix, with the panel's own settings: **every** cap
+    // from 0.4 m/s up to 20 m/s rejected the sequence. Not an extreme-value problem.
+    //
+    // The heroes here are spread over a valley-sized area and given real stand-off distances, so the
+    // travel between consecutive subjects is large enough for a cap to bite -- which is the
+    // condition the bug needs.
+    const std::vector<world::HeroPoint> heroes{
+        hero("north-elder", glm::vec3(0.0f, 0.0f, -120.0f), 22.0f, 5.0f, 0.95f),
+        hero("east-spire", glm::vec3(140.0f, 0.0f, 30.0f), 10.0f, 2.0f, 0.90f),
+        hero("south-bloom", glm::vec3(-20.0f, 0.0f, 160.0f), 8.0f, 3.0f, 0.85f),
+        hero("west-veil", glm::vec3(-150.0f, 0.0f, -10.0f), 5.0f, 1.4f, 0.80f)};
+    const auto structure = sevenSections();
+
+    app::AutoDirectorSettings settings;
+    settings.mode = app::DirectorMode::ContinuousShot;
+
+    SECTION("a hard cap still produces an installable sequence") {
+        settings.maxCameraSpeed = 0.4f;
+        settings.maxViewRate = 2.0f;
+        auto capped = app::directHeroes(heroes, structure, settings);
+        // This is the assertion that failed before the fix, and it failed with the coverage message
+        // rather than with anything about speed.
+        INFO((capped ? std::string() : capped.error().message));
+        REQUIRE(capped.has_value());
+        // And it has to survive the check `installSequence` makes, which is where it actually died.
+        REQUIRE(capped->validate().has_value());
+    }
+
+    SECTION("the cap is applied, not merely survived") {
+        // The other half of the same contract: a guard that gave up immediately would pass the
+        // section above while doing nothing at all. Both arms are the same cut, built in the same
+        // process, differing only in the caps -- so the comparison means something.
+        app::AutoDirectorSettings uncapped = settings;
+        auto loose = app::directHeroes(heroes, structure, uncapped);
+        REQUIRE(loose.has_value());
+
+        settings.maxCameraSpeed = 0.4f;
+        settings.maxViewRate = 2.0f;
+        auto tight = app::directHeroes(heroes, structure, settings);
+        REQUIRE(tight.has_value());
+
+        CHECK(tight->peakCameraSpeed() < loose->peakCameraSpeed());
+        CHECK(tight->peakViewSwing() < loose->peakViewSwing());
+    }
+
+    SECTION("holding a subject for several shots is what lets the cap be met") {
+        // The floor a continuous take runs into is the ground between consecutive subjects over the
+        // time the music gave the shot -- so the control that lowers it is not a smaller cap, it is
+        // fewer changes of subject. Consecutive shots on one subject have no ground to cross.
+        settings.maxCameraSpeed = 0.4f;
+        settings.maxViewRate = 2.0f;
+        settings.dwellShots = 1;
+        auto bouncing = app::directHeroes(heroes, structure, settings);
+        REQUIRE(bouncing.has_value());
+
+        settings.dwellShots = 6;
+        auto held = app::directHeroes(heroes, structure, settings);
+        REQUIRE(held.has_value());
+
+        CHECK(held->peakCameraSpeed() < bouncing->peakCameraSpeed() * 0.5f);
+        CHECK(held->peakViewSwing() < bouncing->peakViewSwing());
+    }
+
+    SECTION("dwell holds a subject for the number of shots it says") {
+        // Independently counted from the shot list rather than from anything the director reports:
+        // the longest run of consecutive shots naming the same subject must reach the dwell, and a
+        // dwell of 1 must not produce runs at all beyond what the rotation itself gives.
+        const auto longestRun = [](const app::Sequence& seq) {
+            std::size_t best = 0;
+            std::size_t run = 0;
+            std::string previous;
+            for (const app::Shot& s : seq.shots) {
+                // A transition names where it came *from*, so its handoff is the subject the film
+                // is moving to. Read that, or a dwell looks one shot shorter than it is.
+                const std::string who = s.handoff ? s.handoff->name : s.subject.name;
+                run = who == previous ? run + 1 : 1;
+                previous = who;
+                best = std::max(best, run);
+            }
+            return best;
+        };
+        settings.dwellShots = 1;
+        auto quick = app::directHeroes(heroes, structure, settings);
+        REQUIRE(quick.has_value());
+        settings.dwellShots = 4;
+        auto slow = app::directHeroes(heroes, structure, settings);
+        REQUIRE(slow.has_value());
+        CHECK(longestRun(*slow) > longestRun(*quick));
+    }
+
+    SECTION("a dwell nobody could mean is refused rather than clamped") {
+        app::AutoDirectorSettings bad = settings;
+        bad.dwellShots = 0;
+        CHECK_FALSE(bad.validate().has_value());
+        bad.dwellShots = 99;
+        CHECK_FALSE(bad.validate().has_value());
+        bad.dwellShots = 1;
+        CHECK(bad.validate().has_value());
+    }
+}

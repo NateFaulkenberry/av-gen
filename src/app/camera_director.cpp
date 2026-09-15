@@ -197,6 +197,16 @@ Result<DirectionBrief> briefFromHeroes(std::span<const world::HeroPoint> heroes)
     return brief;
 }
 
+namespace {
+// Not a member of anything, because the only consumer is a panel and the only producer is the
+// function below. A plain string rather than a struct: it is a sentence for a human to read, and
+// the numbers behind it are already in the log.
+std::string gLastSummary;
+void setDirectionSummary(std::string s) { gLastSummary = std::move(s); }
+} // namespace
+
+std::string lastDirectionSummary() { return gLastSummary; }
+
 Result<Sequence> directHeroes(std::span<const world::HeroPoint> heroes,
                               const signals::MusicalStructure& structure,
                               const AutoDirectorSettings& settings) {
@@ -227,6 +237,32 @@ Result<Sequence> directHeroes(std::span<const world::HeroPoint> heroes,
             log::info("auto-director: {} of {} shot(s) given a longer swing to hold {:.0f} deg/s",
                       widened, sequence->shots.size(), settings.maxViewRate);
         }
+    }
+    // What the cut *does*, not what was asked for (ADR-203). A cap is a request, and in a
+    // continuous take it is frequently one the geometry cannot grant: the camera has to cross the
+    // ground between one subject's stand-off point and the next inside the time the music gave the
+    // shot, and that is a floor. Saying so here is the difference between a control that looks
+    // broken and one whose limit is visible -- which is how this was reported.
+    const float peakSpeed = sequence->peakCameraSpeed();
+    const float peakSwing = sequence->peakViewSwing();
+    setDirectionSummary(fmt::format(
+        "{} shots peaking at {:.1f} m/s and {:.0f} deg/s{}", sequence->shots.size(), peakSpeed,
+        peakSwing,
+        (settings.maxCameraSpeed > 0.0f && peakSpeed > settings.maxCameraSpeed * 1.02f) ||
+                (settings.maxViewRate > 0.0f && peakSwing > settings.maxViewRate * 1.02f)
+            ? " -- the caps could not be met; see the tooltip"
+            : ""));
+    if ((settings.maxCameraSpeed > 0.0f && peakSpeed > settings.maxCameraSpeed * 1.02f) ||
+        (settings.maxViewRate > 0.0f && peakSwing > settings.maxViewRate * 1.02f)) {
+        log::info("auto-director: the cut peaks at {:.1f} m/s and {:.0f} deg/s; the caps asked for "
+                  "{:.1f} m/s and {:.0f} deg/s. A continuous take has to cross the ground between "
+                  "subjects in the time the music gives it -- hold each subject for more shots, or "
+                  "give the shots longer, to lower that floor",
+                  peakSpeed, peakSwing,
+                  settings.maxCameraSpeed > 0.0f ? settings.maxCameraSpeed : peakSpeed,
+                  settings.maxViewRate > 0.0f ? settings.maxViewRate : peakSwing);
+    } else {
+        log::info("auto-director: the cut peaks at {:.1f} m/s and {:.0f} deg/s", peakSpeed, peakSwing);
     }
     return sequence;
 }
@@ -294,6 +330,9 @@ Result<void> AutoDirectorSettings::validate() const {
         return fail("auto-director: maximum view rate {} must be 0 (off) or 1..720 deg/s",
                     maxViewRate);
     }
+    if (dwellShots < 1 || dwellShots > 12) {
+        return fail("auto-director: a subject must be held for 1..12 shots, not {}", dwellShots);
+    }
     return {};
 }
 
@@ -308,6 +347,7 @@ void AutoDirectorSettings::applyTo(DirectionBrief& brief) const {
     if (heroFocalLength != AutoDirectorSettings{}.heroFocalLength) {
         brief.heroFocalLength = heroFocalLength;
     }
+    brief.dwellShots = dwellShots;
     brief.seed = seed;
 }
 

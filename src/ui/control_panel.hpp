@@ -69,6 +69,11 @@ public:
     // owns them and a re-cut uses what the user last chose; the panel edits them in place and calls
     // `onDirectCamera` when one changes while the camera is already directed.
     app::AutoDirectorSettings* autoDirector = nullptr;
+    // What the last cut actually does, set by the host after each direct (ADR-203). A cap is a
+    // request the geometry can refuse -- the camera still has to cross the ground between subjects
+    // in the time the music gave the shot -- and a slider whose limit is invisible reads as a
+    // slider that does not work, which is how this one was reported.
+    std::string directorSummary;
     // The application's edit system (ADR-101). The menu is a consumer of it, never an owner: an
     // item asks `canExecute` to decide whether to grey itself and calls `execute` to act, so the
     // menu and the keyboard cannot come to disagree about what is available or what it does.

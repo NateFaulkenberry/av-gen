@@ -82,6 +82,9 @@ std::string usageText() {
            "  --generate <file>   compose a world from a recipe (see examples/recipes/) at start-up\n"
            "  --direct            cut the camera to the loaded track: folds the audio into\n"
            "                      musical sections and shoots the world's heroes\n"
+           "  --director <k=v,..> --direct with the Auto-director panel's settings: mode=continuous|edited,\n"
+           "                      minShot, minBuildShot, maxShot (s), wide, hero (mm), maxSpeed (m/s),\n"
+           "                      maxSwing (deg/s), dwell (shots), seed\n"
            "  --save-project <f>  write the project on exit\n"
            "  --play              start playback immediately\n"
            "  --frames <n>        exit after n frames\n"
@@ -264,6 +267,12 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             ++i;
         } else if (arg == "--direct") {
             options.directCamera = true;
+        } else if (arg == "--director") {
+            auto v = need(i, "--director");
+            if (!v) return std::unexpected(v.error());
+            options.directorSettings = *v;
+            options.directCamera = true;
+            ++i;
         } else if (arg == "--generate") {
             auto v = need(i, "--generate");
             if (!v) return std::unexpected(v.error());
@@ -1082,17 +1091,6 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             if (panel_) panel_->setStatus(r.error().message);
         }
     }
-    if (options.directCamera) {
-        // After the world exists, because the director shoots the world's heroes and a generated
-        // world has none until it is installed.
-        if (auto r = directCameraFromTrack(); !r) {
-            log::error("direct: {}", r.error().message);
-            if (options.headless) {
-                return std::unexpected(r.error());
-            }
-            if (panel_) panel_->setStatus(r.error().message);
-        }
-    }
     if (options.oscPort) {
         auto map = engine_->control().map();
         map.oscPort = static_cast<std::uint16_t>(std::clamp(*options.oscPort, 0, 65535));
@@ -1137,6 +1135,23 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         loadAudio(*options.audio);
         if (!engine_->hasAudio() && options.headless) {
             return fail("headless run requires a loadable audio file");
+        }
+    }
+    if (options.directCamera) {
+        // After the world *and* the track, because the director needs both: it shoots the world's
+        // heroes and it cuts to the music. This used to sit above, between `--generate` and
+        // `--scene`, on the reasoning that a generated world has no heroes until it is installed --
+        // which is true and insufficient. `--composition` loads thirty lines further down and
+        // `--audio` sixty, so `avgen --composition w.scene.json --audio t.wav --direct` reached the
+        // director with no scene at all and failed with "--direct needs a scene; load a project or
+        // generate a world first" every single time. The flag worked only for `--project` and
+        // `--generate`, which is not what its own usage line claims.
+        if (auto r = directCameraFromTrack(); !r) {
+            log::error("direct: {}", r.error().message);
+            if (options.headless) {
+                return std::unexpected(r.error());
+            }
+            if (panel_) panel_->setStatus(r.error().message);
         }
     }
     for (const auto& [file, isPost] : options.shaders) {
@@ -2168,9 +2183,87 @@ void Application::serviceViewportPick() {
 }
 
 
+namespace {
+
+// `--director mode=continuous,maxShot=6.8,maxSpeed=0.4`. Unknown keys are refused rather than
+// ignored: a typo in a measurement's arguments that silently measures the default is worse than no
+// flag at all, and this flag exists to make measurements reproducible.
+Result<void> applyDirectorArgs(AutoDirectorSettings& s, std::string_view spec) {
+    std::size_t at = 0;
+    while (at <= spec.size()) {
+        const std::size_t comma = spec.find(',', at);
+        std::string_view item = spec.substr(at, comma == std::string_view::npos ? comma : comma - at);
+        at = comma == std::string_view::npos ? spec.size() + 1 : comma + 1;
+        if (item.empty()) {
+            continue;
+        }
+        const std::size_t eq = item.find('=');
+        if (eq == std::string_view::npos) {
+            return fail("--director: '{}' is not key=value", item);
+        }
+        const std::string key(item.substr(0, eq));
+        const std::string value(item.substr(eq + 1));
+        const auto number = [&](double& out) -> Result<void> {
+            try {
+                std::size_t used = 0;
+                out = std::stod(value, &used);
+                if (used != value.size()) {
+                    return fail("--director: '{}' is not a number for '{}'", value, key);
+                }
+            } catch (const std::exception&) {
+                return fail("--director: '{}' is not a number for '{}'", value, key);
+            }
+            return {};
+        };
+        double v = 0.0;
+        if (key == "mode") {
+            if (value == "continuous") {
+                s.mode = DirectorMode::ContinuousShot;
+            } else if (value == "edited") {
+                s.mode = DirectorMode::EditedSequence;
+            } else {
+                return fail("--director: mode must be 'continuous' or 'edited', got '{}'", value);
+            }
+            continue;
+        }
+        if (auto ok = number(v); !ok) {
+            return std::unexpected(ok.error());
+        }
+        if (key == "minShot") {
+            s.minShotSeconds = v;
+        } else if (key == "minBuildShot") {
+            s.minBuildShotSeconds = v;
+        } else if (key == "maxShot") {
+            s.maxShotSeconds = v;
+        } else if (key == "wide") {
+            s.wideFocalLength = static_cast<float>(v);
+        } else if (key == "hero") {
+            s.heroFocalLength = static_cast<float>(v);
+        } else if (key == "maxSpeed") {
+            s.maxCameraSpeed = static_cast<float>(v);
+        } else if (key == "maxSwing") {
+            s.maxViewRate = static_cast<float>(v);
+        } else if (key == "dwell") {
+            s.dwellShots = static_cast<int>(v);
+        } else if (key == "seed") {
+            s.seed = static_cast<std::uint32_t>(std::max(0.0, v));
+        } else {
+            return fail("--director: unknown setting '{}'", key);
+        }
+    }
+    return s.validate();
+}
+
+} // namespace
+
 Result<void> Application::directCameraFromTrack() {
     if (engine_ == nullptr || engine_->composition() == nullptr) {
         return fail("--direct needs a scene; load a project or generate a world first");
+    }
+    if (!options_.directorSettings.empty()) {
+        if (auto ok = applyDirectorArgs(cameraDirection_.settings, options_.directorSettings); !ok) {
+            return std::unexpected(ok.error());
+        }
     }
     // Heroes come from whichever source the world has one. An authored scene declares them
     // (ADR-074); a generated world's composer places them (ADR-072). Preferring the scene's own is
@@ -2194,6 +2287,9 @@ Result<void> Application::directCameraFromTrack() {
         return std::unexpected(installed.error());
     }
     log::info("direct: {} camera track(s) from {} hero(es)", *installed, heroes.size());
+    if (panel_ != nullptr) {
+        panel_->directorSummary = lastDirectionSummary();
+    }
     // From now until the camera is handed back, the shot follows the heroes: starring an object
     // re-cuts it on the next frame rather than waiting to be asked (`refreshDirection`).
     noteDirected(*engine_, cameraDirection_);

@@ -74,6 +74,10 @@ struct AppOptions {
     // Direct the camera from the loaded track's musical structure and the world's heroes, replacing
     // whatever camera automation the project carries (ADR-075).
     bool directCamera = false;
+    // `--director k=v,...`: the Auto-director panel's settings, from the command line. The panel is
+    // the only other way to set these, so before this flag nothing about the director could be
+    // measured, reproduced or regression-tested without a human at a GUI.
+    std::string directorSettings;
     std::optional<std::filesystem::path> saveProject;  // write on exit
     bool autoplay = false;
     int frames = -1; // exit after this many frames (-1 = run until closed)

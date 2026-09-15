@@ -281,6 +281,13 @@ struct Sequence {
     // where it was going, at the same moment, having taken longer over the turn.
     std::size_t limitViewRate(float maxDegreesPerSecond);
 
+    // What the cut actually does, after any caps. Reported rather than assumed, because a cap is
+    // not always reachable: in a continuous take the camera has to physically get from one
+    // subject's stand-off point to the next inside the time the music gave the shot, and that
+    // distance over that duration is a floor no amount of shrinking goes under (ADR-203).
+    [[nodiscard]] float peakCameraSpeed() const;
+    [[nodiscard]] float peakViewSwing() const;
+
     // Who the film is about at this moment, or nullptr if nothing is spotlit.
     [[nodiscard]] const FocalTarget* spotlightAt(double seconds) const;
     // The spotlight as spans, for the systems that will frame, expose and rim-light the subject.
@@ -348,6 +355,12 @@ struct DirectionBrief {
     // each shot starts where the last one ended, and -- since this became a user-facing mode -- the
     // camera no longer decelerates to a stop at each of those boundaries either. See `DirectorMode`.
     DirectorMode mode = DirectorMode::ContinuousShot;
+    // Consecutive shots one subject keeps before the rotation moves on (ADR-203). 1 is the
+    // rotation turning every shot, which is what ADR-202 shipped; raising it holds each subject for
+    // that many shots in a row. Independent of importance by construction: importance decides how
+    // often a turn comes round, this decides how long a turn is.
+    int dwellShots = 1;
+
     [[nodiscard]] bool continuous() const { return mode == DirectorMode::ContinuousShot; }
     std::uint32_t seed = 1; // picks which supporting subject a section gets; nothing else is random
 };

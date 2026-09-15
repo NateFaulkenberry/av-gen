@@ -85,10 +85,21 @@ struct AutoDirectorSettings {
     // that moves less still has to sweep its aim the same distance in the same time. What a viewer
     // calls "moving too fast" is nearly always this one.
     float maxViewRate = 0.0f;
+    // Consecutive shots one subject keeps before the rotation moves on (ADR-203). 1 is a new
+    // subject every shot.
+    //
+    // A second control rather than more importance, because importance cannot express this: it sets
+    // how often a subject's turn comes round, and with a cast of eleven every turn was one shot long
+    // however high the slider went. "I'm not sure I can control that enough with just the importance
+    // param" -- correct, and this is the thing that was missing.
+    int dwellShots = 1;
 
     [[nodiscard]] Result<void> validate() const;
     void applyTo(DirectionBrief& brief) const;
 };
+
+// A one-line account of what the last cut does, for the panel. Empty until something is directed.
+[[nodiscard]] std::string lastDirectionSummary();
 
 [[nodiscard]] Result<Sequence> directHeroes(std::span<const world::HeroPoint> heroes,
                                             const signals::MusicalStructure& structure,

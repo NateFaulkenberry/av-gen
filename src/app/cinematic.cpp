@@ -1125,9 +1125,10 @@ std::vector<ShotSpan> groupSections(const signals::MusicalStructure& structure,
 } // namespace
 
 namespace {
-// Defined below, beside the view-rate helpers it shares. Declared here because the travel cap needs
-// it first and the two belong together rather than apart.
+// Defined below, beside the view-rate helpers they share. Declared here because the travel cap
+// needs them first and they belong together rather than apart.
 void shrinkShotMotion(Shot& shot, float f);
+bool stillShootable(const Shot& shot);
 } // namespace
 
 std::size_t Sequence::limitCameraSpeed(float maxMetresPerSecond) {
@@ -1167,16 +1168,56 @@ std::size_t Sequence::limitCameraSpeed(float maxMetresPerSecond) {
         // because `cameraAt` composes easing, an optional height range and two different
         // parameterisations, and a closed form for that is a worse thing to maintain than a few
         // iterations of the real function.
+        //
+        // The shot is kept as it was before each attempt, because an attempt may go too far
+        // (ADR-203). Shrinking a move pulls its *end* back toward its start, and in a continuous
+        // take the start is wherever the previous shot left off -- so past a certain point the
+        // camera stops travelling to its subject at all and sits across the valley from it. That
+        // is a shot `validate()` refuses, and a refused sequence is never installed: the cap then
+        // appears to do nothing whatever, which is exactly how it was reported ("even at its
+        // smallest value it's still moving blazing fast"). Measured on Glowmere: every cap from
+        // 0.4 m/s to 20 m/s rejected the whole film this way.
         for (int attempt = 0; attempt < 24 && peak > maxMetresPerSecond; ++attempt) {
+            const Shot before = shot;
             const float f = std::clamp(maxMetresPerSecond / std::max(peak, 1e-3f), 0.02f, 0.995f);
             shrinkShotMotion(shot, f);
+            if (!stillShootable(shot)) {
+                shot = before;
+                break;
+            }
             peak = shot.peakSpeed();
         }
     }
     return shortened;
 }
 
+float Sequence::peakCameraSpeed() const {
+    float peak = 0.0f;
+    for (const Shot& shot : shots) {
+        peak = std::max(peak, shot.peakSpeed());
+    }
+    return peak;
+}
+
 namespace {
+
+// The most of the frame a shot's subject ever fills, sampled the same way `validate()` samples it.
+// Shared with the cap loops rather than duplicated, so "still shootable" means exactly one thing.
+float bestSubjectCoverage(const Shot& shot) {
+    float best = 0.0f;
+    for (int i = 0; i <= 8; ++i) {
+        best = std::max(best, shot.subjectCoverageAt(static_cast<float>(i) / 8.0f));
+    }
+    return best;
+}
+
+// Whether a cap may keep shrinking this shot. A spotlit shot whose subject has become a speck is
+// one `validate()` will refuse -- and a refused sequence is not installed, so the whole cap silently
+// does nothing at all. See ADR-203: this is the guard that turns "the film is rejected" into "the
+// cap stops where the shot stops working".
+bool stillShootable(const Shot& shot) {
+    return !shot.spotlight.active || bestSubjectCoverage(shot) >= kMinHeroCoverage;
+}
 
 // Pulls a shot's end back toward its start by `f`, whichever way the shot is parameterised.
 // Branching on which path `cameraAt` actually takes, not on which fields happen to be set: a shot
@@ -1260,15 +1301,32 @@ std::size_t Sequence::limitViewRate(float maxDegreesPerSecond) {
         // and every degree of rotation comes from the camera swinging around it. Neither a swing
         // window nor a metres-per-second cap reaches that: a camera close to its subject rotates
         // fast while barely moving.
+        //
+        // Same guard as the travel cap, for the same reason and with the same evidence: a swing cap
+        // of 2 deg/s on Glowmere shrank a spotlit shot until its subject filled 0.024 of the frame,
+        // and the film was then refused rather than slowed (ADR-203).
         for (int attempt = 0; attempt < 24; ++attempt) {
             const float rate = peakViewRate(shot);
             if (rate <= maxDegreesPerSecond) {
                 break;
             }
+            const Shot before = shot;
             shrinkShotMotion(shot, std::clamp(maxDegreesPerSecond / std::max(rate, 1e-3f), 0.02f, 0.995f));
+            if (!stillShootable(shot)) {
+                shot = before;
+                break;
+            }
         }
     }
     return slowed;
+}
+
+float Sequence::peakViewSwing() const {
+    float peak = 0.0f;
+    for (const Shot& shot : shots) {
+        peak = std::max(peak, peakViewRate(shot));
+    }
+    return peak;
 }
 
 Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
@@ -1335,7 +1393,7 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
         k ^= k >> 15;
         credit[i] = totalWeight * (static_cast<double>(k & 0xFFFFu) / 65536.0);
     }
-    const auto castNext = [&]() -> const FocalTarget& {
+    const auto drawNext = [&]() -> std::size_t {
         std::size_t best = 0;
         for (std::size_t i = 0; i < cast.size(); ++i) {
             credit[i] += weight[i];
@@ -1346,7 +1404,34 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
             }
         }
         credit[best] -= totalWeight;
-        return cast[best];
+        return best;
+    };
+
+    // How long the film stays with one subject before the rotation moves on (ADR-203).
+    //
+    // ADR-202 replaced a hero who owned everything with a rotation, and the rotation turns once per
+    // shot -- so with a cast of eleven the camera left every subject the moment it arrived at it.
+    // Reported as "try to get it to sit longer on individual heroes before it bounces away", and
+    // correctly observed in the same breath that importance could not fix it: importance decides
+    // *how often* a subject's turn comes round, not *how long* a turn lasts. Those are two
+    // questions and they needed two controls.
+    //
+    // A dwell is charged once, not once per shot in it. So importance governs how many *turns* each
+    // subject gets and dwell governs how many shots a turn is worth, which keeps the two controls
+    // independent: raising dwell lengthens every subject's stay without redistributing the film.
+    const int dwell = std::max(brief.dwellShots, 1);
+    std::size_t heldIndex = 0;
+    int heldFor = 0;
+    bool holding = false;
+    const auto castNext = [&]() -> const FocalTarget& {
+        if (holding && heldFor < dwell) {
+            ++heldFor;
+            return cast[heldIndex];
+        }
+        heldIndex = drawNext();
+        heldFor = 1;
+        holding = true;
+        return cast[heldIndex];
     };
 
     // Where the camera actually *is*, as opposed to what the last shot was about.
