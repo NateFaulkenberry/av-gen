@@ -18,7 +18,7 @@ constexpr int kFormatVersion = 1;
 // The panels, grouped the way the View menu reads them: what you build with on the left, what you
 // inspect and tune on the right, what runs underneath along the bottom. Nothing is assigned to the
 // centre -- see DockRegion.
-constexpr std::array<EditorPanel, 18> kPanels{{
+constexpr std::array<EditorPanel, 19> kPanels{{
     {"World Builder", "World Builder", DockRegion::Left, true,
      "recipe, Generate World and the job monitor"},
     // ADR-092. One panel, not two: the brush and the selection are the same job seen from two
@@ -37,6 +37,10 @@ constexpr std::array<EditorPanel, 18> kPanels{{
     {"Render", "Render", DockRegion::Right, false, "offline render settings, progress and the queue"},
     {"Auto-director", "Auto-director", DockRegion::Right, false,
      "shot mode, timings, lenses and the seed for the camera that cuts to the music"},
+    // ADR-204. Beside the Auto-director, because the two shipped effects are gated on its cut and
+    // "why is my beam not firing" is nearly always "nothing is directing the camera".
+    {"World Effects", "World Effects", DockRegion::Right, false,
+     "waves propagating through the world: beams, ripples, their styles and what answers the beat"},
     {"Control", "Control", DockRegion::Bottom, true, "transport, audio response and performance"},
     // §13. The data has been machine-readable since ADR-148 and had no surface: the answer to "why
     // is this frame expensive" lived in `--bench-json` and in the log. Closed by its own panel

@@ -138,58 +138,82 @@ void unregisterWorldEffectParameters(params::ParameterSet& params, WorldEffectPa
     registered.effects.clear();
 }
 
-void applyWorldEffectParameters(const WorldEffectParameters& registered, std::span<WorldEffect> live) {
+namespace {
+
+// The whole copy-out, once, with a switch for which of a parameter's two values it reads.
+//
+// `final` is this frame's modulated value and is what the renderer wants; `base` is the authored
+// value a slider wrote and is what a *save* wants. The same list of fields serves both, because two
+// copies of that list is how the two drift.
+void copyParameters(const WorldEffectParameters& registered, std::span<WorldEffect> live, bool fromBase) {
     if (registered.effects.empty()) {
         return;
     }
+    const auto v1 = [fromBase](const params::IParameter* p) {
+        return fromBase ? p->baseComponent(0) : p->finalComponent(0);
+    };
+    const auto v3 = [fromBase](const params::IParameter* p) {
+        return fromBase ? glm::vec3(p->baseComponent(0), p->baseComponent(1), p->baseComponent(2))
+                        : glm::vec3(p->finalComponent(0), p->finalComponent(1), p->finalComponent(2));
+    };
     for (WorldEffect& e : live) {
         const WorldEffectParams* p = registered.find(e.name);
         if (p == nullptr || p->enabled == nullptr) {
             continue; // not registered: leave the authored values exactly as they are
         }
-        e.enabled = p->enabled->value();
+        e.enabled = v1(p->enabled) >= 0.5f;
 
-        e.appearance.color = p->color->value();
-        e.appearance.intensity = p->intensity->value();
-        e.appearance.edgeColor = p->edgeColor->value();
-        e.appearance.edgeIntensity = p->edgeIntensity->value();
-        e.appearance.width = std::max(p->width->value(), 1e-3f);
+        e.appearance.color = v3(p->color);
+        e.appearance.intensity = v1(p->intensity);
+        e.appearance.edgeColor = v3(p->edgeColor);
+        e.appearance.edgeIntensity = v1(p->edgeIntensity);
+        e.appearance.width = std::max(v1(p->width), 1e-3f);
 
-        e.appearance.rainbow = p->rainbow->value();
-        e.appearance.rainbowSpeed = p->rainbowSpeed->value();
-        e.appearance.rainbowScale = p->rainbowScale->value();
-        e.appearance.rainbowSaturation = p->rainbowSaturation->value();
-        e.appearance.rainbowBrightness = p->rainbowBrightness->value();
+        e.appearance.rainbow = v1(p->rainbow) >= 0.5f;
+        e.appearance.rainbowSpeed = v1(p->rainbowSpeed);
+        e.appearance.rainbowScale = v1(p->rainbowScale);
+        e.appearance.rainbowSaturation = v1(p->rainbowSaturation);
+        e.appearance.rainbowBrightness = v1(p->rainbowBrightness);
 
-        e.sparkle.enabled = p->sparkle->value();
-        e.sparkle.density = p->sparkleDensity->value();
-        e.sparkle.size = p->sparkleSize->value();
-        e.sparkle.intensity = p->sparkleIntensity->value();
-        e.sparkle.speed = p->sparkleSpeed->value();
+        e.sparkle.enabled = v1(p->sparkle) >= 0.5f;
+        e.sparkle.density = v1(p->sparkleDensity);
+        e.sparkle.size = v1(p->sparkleSize);
+        e.sparkle.intensity = v1(p->sparkleIntensity);
+        e.sparkle.speed = v1(p->sparkleSpeed);
 
-        // Clamped where zero would be a division rather than an "off". The hard ranges above already
-        // keep a route inside them; this is the belt for an authored value that predates a range.
-        e.propagation.speed = std::max(p->speed->value(), 1e-3f);
-        e.propagation.range = std::max(p->range->value(), 1e-2f);
-        e.propagation.frontWidth = std::max(p->frontWidth->value(), 1e-3f);
-        e.propagation.trailLength = std::max(p->trailLength->value(), 0.0f);
-        e.propagation.falloff = std::max(p->falloff->value(), 1e-2f);
-        e.propagation.startOffset = p->startOffset->value();
-        e.propagation.verticalExtent = std::max(p->verticalExtent->value(), 0.0f);
-        e.propagation.ringCount = std::max(p->ringCount->value(), 0.0f);
-        e.propagation.beamRadius = std::max(p->beamRadius->value(), 0.0f);
+        // Clamped where zero would be a division rather than an "off". The hard ranges keep a route
+        // inside them; this is the belt for an authored value that predates a range.
+        e.propagation.speed = std::max(v1(p->speed), 1e-3f);
+        e.propagation.range = std::max(v1(p->range), 1e-2f);
+        e.propagation.frontWidth = std::max(v1(p->frontWidth), 1e-3f);
+        e.propagation.trailLength = std::max(v1(p->trailLength), 0.0f);
+        e.propagation.falloff = std::max(v1(p->falloff), 1e-2f);
+        e.propagation.startOffset = v1(p->startOffset);
+        e.propagation.verticalExtent = std::max(v1(p->verticalExtent), 0.0f);
+        e.propagation.ringCount = std::max(v1(p->ringCount), 0.0f);
+        e.propagation.beamRadius = std::max(v1(p->beamRadius), 0.0f);
 
-        e.response.ground = p->responseGround->value();
-        e.response.foliage = p->responseFoliage->value();
-        e.response.surface = p->responseSurface->value();
-        e.response.emissive = p->responseEmissive->value();
+        e.response.ground = v1(p->responseGround);
+        e.response.foliage = v1(p->responseFoliage);
+        e.response.surface = v1(p->responseSurface);
+        e.response.emissive = v1(p->responseEmissive);
 
-        e.timing.delay = static_cast<double>(p->delay->value());
-        e.timing.lifetime = static_cast<double>(p->lifetime->value());
-        e.timing.fadeIn = static_cast<double>(p->fadeIn->value());
-        e.timing.fadeOut = static_cast<double>(p->fadeOut->value());
-        e.timing.repeatSeconds = static_cast<double>(p->repeat->value());
+        e.timing.delay = static_cast<double>(v1(p->delay));
+        e.timing.lifetime = static_cast<double>(v1(p->lifetime));
+        e.timing.fadeIn = static_cast<double>(v1(p->fadeIn));
+        e.timing.fadeOut = static_cast<double>(v1(p->fadeOut));
+        e.timing.repeatSeconds = static_cast<double>(v1(p->repeat));
     }
+}
+
+} // namespace
+
+void applyWorldEffectParameters(const WorldEffectParameters& registered, std::span<WorldEffect> live) {
+    copyParameters(registered, live, /*fromBase=*/false);
+}
+
+void captureWorldEffectParameters(const WorldEffectParameters& registered, std::span<WorldEffect> authored) {
+    copyParameters(registered, authored, /*fromBase=*/true);
 }
 
 } // namespace avgen::world

@@ -106,4 +106,9 @@ void unregisterWorldEffectParameters(params::ParameterSet& params, WorldEffectPa
 // effect the registrar never saw is left exactly as authored rather than silently zeroed.
 void applyWorldEffectParameters(const WorldEffectParameters& registered, std::span<WorldEffect> live);
 
+// The mirror: copies each parameter's **base** value onto `authored`. What a save and a structural
+// edit want, and the reason it is a separate call rather than the same one -- the finals carry this
+// frame's beat on them, and writing those back would bake the music into the file.
+void captureWorldEffectParameters(const WorldEffectParameters& registered, std::span<WorldEffect> authored);
+
 } // namespace avgen::world

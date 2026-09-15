@@ -6,10 +6,13 @@
 // has the front got, is it the same at 30 fps as at 120 -- are all answerable before a pixel exists.
 
 #include "app/cinematic.hpp"
+#include "assets/asset_registry.hpp"
 #include "params/parameter_set.hpp"
 #include "params/modulation.hpp"
 #include "signals/signal_bus.hpp"
 #include "world/effect_params.hpp"
+#include "scene/composition.hpp"
+#include "ui/world_effects_panel.hpp"
 #include "world/effects.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -17,6 +20,8 @@
 #include <nlohmann/json.hpp>
 
 #include <array>
+#include <filesystem>
+#include <fstream>
 
 using namespace avgen;
 using Catch::Matchers::WithinAbs;
@@ -653,4 +658,146 @@ TEST_CASE("a directed sequence flattens to spans a world effect can gate on",
     CHECK_FALSE(spans[1].spotlight);
     CHECK(spans[1].handoff == "lantern");
     CHECK_THAT(spans[1].handoffPosition.x, WithinAbs(40.0f, 1e-5f));
+}
+
+TEST_CASE("a hero source resolves to the object the hero is, not to the middle of its bounds",
+          "[world][effects][source]") {
+    // ADR-107: a hero is one object and its name is that object's node; ADR-199 is what assuming the
+    // node's origin and the hero's `position` are the same thing costs. Glowmere's elder is the case
+    // this exists for -- its `position` describes the cap, twelve metres above the ground its stem
+    // stands on -- and a ripple through the ground wants the ground.
+    class SceneWithHeroNode final : public world::WorldEffectScene {
+    public:
+        [[nodiscard]] bool nodePosition(std::string_view name, glm::vec3& out) const override {
+            if (name == "elder") {
+                out = glm::vec3(0.0f, 1.0f, 0.0f); // where it stands
+                return true;
+            }
+            return false;
+        }
+    };
+    const SceneWithHeroNode scene;
+    const auto heroes = twoHeroes(); // "elder" is at y = 5: the middle of its cap
+    const std::vector<world::ShotSpan> none;
+    std::array<world::ResolvedEffect, world::kMaxGpuWorldEffects> out{};
+
+    world::WorldEffect e;
+    e.name = "ripple";
+    e.source.kind = world::SourceKind::Hero;
+    e.source.name = "elder";
+    e.timing.fadeIn = 0.0;
+    world::WorldEffectContext ctx;
+    ctx.seconds = 0.5;
+    ctx.heroes = heroes;
+    ctx.scene = &scene;
+    REQUIRE(world::resolveWorldEffects(std::array{e}, ctx, out) == 1);
+    CHECK_THAT(out[0].origin.y, WithinAbs(1.0f, 1e-4f));
+
+    SECTION("and falls back to the hero's own position when the scene has no such node") {
+        world::WorldEffectContext bare = ctx;
+        bare.scene = nullptr;
+        REQUIRE(world::resolveWorldEffects(std::array{e}, bare, out) == 1);
+        CHECK_THAT(out[0].origin.y, WithinAbs(5.0f, 1e-4f));
+    }
+}
+
+TEST_CASE("world effects round-trip through a scene file", "[world][effects][json][composition]") {
+    // The `"worldEffects"` block is a sibling of `"heroes"`, and the properties that matter are the
+    // ones a hand-edited file depends on: a scene that never declared one is unchanged, a scene that
+    // did gets it back, and a malformed one is refused with the index in the message.
+    const std::string base = R"({"format": "avgen-scene", "version": 1, "name": "fx", "nodes": []})";
+    assets::AssetRegistry registry;
+
+    SECTION("a scene with no world effects has none, and writes none back") {
+        auto comp = scene::Composition::fromJson(nlohmann::json::parse(base), registry);
+        REQUIRE(comp);
+        CHECK((*comp)->worldEffects().empty());
+        CHECK_FALSE((*comp)->toJson().contains("worldEffects"));
+    }
+
+    SECTION("a declared effect survives the trip") {
+        nlohmann::json doc = nlohmann::json::parse(base);
+        doc["worldEffects"] = nlohmann::json::array({world::heroGroundPulse("Ripple").toJson(),
+                                                     world::cameraTravelBeam("Beam").toJson()});
+        auto comp = scene::Composition::fromJson(doc, registry);
+        REQUIRE(comp);
+        REQUIRE((*comp)->worldEffects().size() == 2);
+        CHECK((*comp)->worldEffects()[0].name == "Ripple");
+        CHECK((*comp)->worldEffects()[1].activation == world::Activation::CameraTravel);
+        const nlohmann::json written = (*comp)->toJson();
+        REQUIRE(written.contains("worldEffects"));
+        CHECK(written["worldEffects"] == doc["worldEffects"]);
+    }
+
+    SECTION("a malformed effect is refused, and the message says which one") {
+        nlohmann::json doc = nlohmann::json::parse(base);
+        doc["worldEffects"] = nlohmann::json::array(
+            {world::heroGroundPulse("Ripple").toJson(), nlohmann::json{{"name", "bad"}, {"propagation", {{"speed", -1.0}}}}});
+        auto comp = scene::Composition::fromJson(doc, registry);
+        REQUIRE_FALSE(comp);
+        CHECK(comp.error().message.find("worldEffects[1]") != std::string::npos);
+    }
+
+    SECTION("two effects of one name are refused, because a name is half a parameter path") {
+        nlohmann::json doc = nlohmann::json::parse(base);
+        doc["worldEffects"] = nlohmann::json::array(
+            {world::heroGroundPulse("Same").toJson(), world::cameraTravelBeam("Same").toJson()});
+        CHECK_FALSE(scene::Composition::fromJson(doc, registry));
+    }
+}
+
+TEST_CASE("the shipped Glowmere scene declares the two effects the brief is about",
+          "[world][effects][glowmere2]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR is not defined");
+#else
+    const std::filesystem::path path =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2.scene.json";
+    if (!std::filesystem::is_regular_file(path)) {
+        SKIP("the Glowmere Valley 2 example is not present in this checkout");
+    }
+    std::ifstream in(path);
+    REQUIRE(in);
+    const nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
+    REQUIRE_FALSE(doc.is_discarded());
+    REQUIRE(doc.contains("worldEffects"));
+    std::vector<world::WorldEffect> effects;
+    for (const nlohmann::json& entry : doc.at("worldEffects")) {
+        auto e = world::WorldEffect::fromJson(entry);
+        REQUIRE(e);
+        effects.push_back(std::move(*e));
+    }
+    REQUIRE(world::validateWorldEffects(effects));
+    REQUIRE(effects.size() == 2);
+
+    const world::WorldEffect& beam = effects[0];
+    CHECK(beam.propagation.kind == world::PropagationKind::DirectionalWave);
+    // The camera beam fires while the camera travels, and it is aimed at where it is going rather
+    // than along a world axis somebody typed.
+    CHECK(beam.activation == world::Activation::CameraTravel);
+    CHECK(beam.source.kind == world::SourceKind::Camera);
+    CHECK(beam.propagation.direction == world::DirectionMode::Blended);
+    CHECK(beam.hasTarget);
+    CHECK(beam.target.kind == world::SourceKind::FocusHero);
+
+    const world::WorldEffect& pulse = effects[1];
+    CHECK(pulse.propagation.kind == world::PropagationKind::RadialWave);
+    CHECK(pulse.activation == world::Activation::HeroFocus);
+    // No Glowmere coordinates anywhere: the pulse follows whichever hero the cut is holding.
+    CHECK(pulse.source.kind == world::SourceKind::FocusHero);
+    CHECK(pulse.source.name.empty());
+    // It repeats, or it is one ring at the start of a ten-second hold rather than a pulse.
+    CHECK(pulse.timing.repeatSeconds > 0.0);
+#endif
+}
+
+TEST_CASE("the Beat response slider owns an ordinary modulation route", "[world][effects][ui]") {
+    // §13 and §16: no special-case audio hook. What the panel's one musical control writes is a
+    // route the Modulation panel can see, curve, re-point and delete.
+    CHECK(ui::beatResponseSource() == "beat.pulse");
+    CHECK(ui::beatResponseTarget("Hero Mushroom Pulse") == "worldfx/Hero Mushroom Pulse/intensity");
+    // A 0..1 slider has to mean something in the target's units: the whole of what the knob offers.
+    CHECK_THAT(ui::beatResponseDepth(1.0f, 8.0f), WithinAbs(8.0f, 1e-6f));
+    CHECK_THAT(ui::beatResponseDepth(0.25f, 8.0f), WithinAbs(2.0f, 1e-6f));
+    CHECK_THAT(ui::beatResponseDepth(-3.0f, 8.0f), WithinAbs(0.0f, 1e-6f));
 }
