@@ -2033,6 +2033,13 @@ void Engine::seekSeconds(double seconds) {
     // the version that belongs here: `reset` alone would put every character back at its t = 0
     // pose, which is a different frame from the one the seeked second actually has.
     if (scene::Composition* composition = this->composition()) {
+        // The director first (ADR-209), because it is the tier above: it drops every claim, releases
+        // every body it was holding and puts back every parameter it wrote -- so the re-simulation
+        // below starts from the scene the file describes rather than from a beam left lit and a cow
+        // left invisible twenty metres in the air. A scenario that autostarts picks up again on the
+        // next frame, which is what makes the seeked second a function of the second rather than of
+        // how the playhead got there.
+        composition->director().reset(&composition->entityWorld(), &params_);
         composition->entityWorld().seek(seconds, &params_, nullptr,
                                         composition->scene().camera.position, 1.0 / 60.0, 90.0,
                                         composition->scene().detailLimits.entityDistanceCull);
