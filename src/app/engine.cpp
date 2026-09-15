@@ -979,6 +979,53 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
 }
 
 Result<void> Engine::loadProject(const std::filesystem::path& path) {
+    // ---- the stages, and what they cost -----------------------------------------------------
+    //
+    // The list is fixed and known before the first byte is read, which is what makes "stage 3 of 9"
+    // a countable fact rather than a guess (ADR-064: a fabricated bar is indistinguishable from a
+    // real one). Each stage's wall-clock is kept for `lastLoadTimings()`, because "opening a
+    // project freezes the application" is not a number and the first job was to make it one.
+    static constexpr std::array<std::string_view, 9> kStages{
+        "Reading the project",  "Clearing the last project", "Loading audio",
+        "Building the scene",   "Loading the environment",   "Layers and parameters",
+        "Shaders and control",  "Timeline and automation",   "Finishing"};
+    loadTimings_.clear();
+    loadTimings_.reserve(kStages.size());
+    auto stageStarted = std::chrono::steady_clock::now();
+    int stageIndex = -1;
+    const auto stage = [&](int index) {
+        if (stageIndex >= 0 && stageIndex < static_cast<int>(kStages.size())) {
+            const auto now = std::chrono::steady_clock::now();
+            loadTimings_.emplace_back(
+                std::string(kStages[static_cast<std::size_t>(stageIndex)]),
+                std::chrono::duration<double, std::milli>(now - stageStarted).count());
+            stageStarted = now;
+        }
+        stageIndex = index;
+        if (loadReporter_) {
+            loadReporter_(LoadStage{.name = kStages[static_cast<std::size_t>(index)],
+                                    .index = index,
+                                    .count = static_cast<int>(kStages.size())});
+        }
+    };
+    // Closes the final stage's timing and prints the breakdown. Called on every exit that reached
+    // a stage, including the failures -- a load that failed slowly is the one you most want the
+    // numbers for.
+    const auto finishTimings = [&] {
+        stage(static_cast<int>(kStages.size()) - 1);
+        stageIndex = -1;
+        double total = 0.0;
+        std::string line;
+        for (const auto& [name, ms] : loadTimings_) {
+            total += ms;
+            if (ms >= 1.0) {
+                line += fmt::format("{} {:.0f} ms; ", name, ms);
+            }
+        }
+        log::info("project load: {:.0f} ms total -- {}", total, line.empty() ? "all stages under 1 ms" : line);
+    };
+
+    stage(0);
     std::ifstream in(path);
     if (!in) {
         return fail("cannot open '{}'", path.string());
@@ -998,6 +1045,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     for (const auto& step : migrated->steps) {
         log::info("project '{}' migrated: {}", path.filename().string(), step);
     }
+    stage(1);
     const auto dir = std::filesystem::absolute(path).parent_path();
     projectWarnings_.clear();
     // Back to factory before anything of this project's is applied.
@@ -1049,6 +1097,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         return path; // still missing: the loader reports it
     };
 
+    stage(2);
     // The audio is the project's too. A document that names none means silence, not whatever was
     // playing before: opening a project with no `assets.audio` used to leave the previous piece
     // loaded, under a scene it was never written for, with a transport whose duration came from it.
@@ -1102,6 +1151,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                 }
             }
         }
+        stage(3);
         if (assets->contains("scene") && (*assets)["scene"].is_object()) {
             const auto& sceneRef = (*assets)["scene"];
             const std::string kind = sceneRef.value("kind", std::string("orb"));
@@ -1153,6 +1203,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                 warn("scene: unknown kind '" + kind + "'");
             }
         }
+        stage(4);
         std::optional<std::filesystem::path> env;
         if (assets->contains("environment")) {
             env = resolveAsset((*assets)["environment"], "environment");
@@ -1182,6 +1233,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         }
     }
 
+    stage(5);
     // ---- the 2D composition (ADR-083) ----
     // Here, and not later: the parameter block below carries "layers/<id>/..." values, and the
     // timeline below carries tracks aimed at them. Both need the parameters to exist first, and a
@@ -1217,6 +1269,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         controlHub_.setMap(control::ControlMap{});
         setTempoSource(TempoSource::Analysis);
     }
+    stage(6);
     outputs_ = doc.contains("outputs") && doc["outputs"].is_array() ? doc["outputs"] : nlohmann::json::array();
     ensureControlSource();
     sources_.attach(bus_, params_);
@@ -1227,6 +1280,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     } else {
         shaderLayers_.clear();
     }
+    stage(7);
     if (doc.contains("timeline")) {
         if (auto r = timeline_.fromJson(doc["timeline"]); !r) {
             return r;
@@ -1401,6 +1455,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             noteBindingProblem(fmt::format("sequence: {}", r.error().message));
         }
     }
+    finishTimings();
     projectPath_ = path;
     // A loaded project is a different piece. The transport stops and parks at its start rather than
     // carrying the previous project's playhead into it -- opening a project while another is playing

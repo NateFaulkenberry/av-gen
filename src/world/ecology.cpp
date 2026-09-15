@@ -11,6 +11,8 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
+#include <cstdlib>
+#include <thread>
 #include <cmath>
 #include <limits>
 #include <unordered_map>
@@ -371,10 +373,14 @@ spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
         return out;
     }
 
-    std::vector<glm::vec3> positions;
-    std::vector<glm::vec4> rotations;
-    std::vector<glm::vec3> scales;
-    positions.reserve(1024);
+    // One band of rows per worker (see the threading note below the loop). A band holds its own
+    // output and they are concatenated in band order afterwards, which is what keeps the result
+    // identical to the serial one rather than merely equivalent to it.
+    struct Band {
+        std::vector<glm::vec3> positions;
+        std::vector<glm::vec4> rotations;
+        std::vector<glm::vec3> scales;
+    };
 
     const float cellArea = cell * cell;
     // `maxInstances` used to be enforced with a `break` on the inner loop, which truncates the
@@ -388,11 +394,61 @@ spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
     // Two passes only ever happen to a layer that actually overflows, and the second is the same
     // pure function of the same inputs, so the result stays deterministic and order-independent.
     float keep = 1.0f;
+    // ---- threading -------------------------------------------------------------------------
+    //
+    // This function was the single most expensive thing in opening a project. Measured on
+    // `examples/world/glowmere-stylized.json` with `sample(1)`: 771 of the 1648 samples taken
+    // during start-up were inside it -- about 47% of a 2.14-second load, on one core, while the
+    // terrain build directly beside it had been threaded since ADR-090. It is item P1-3 of
+    // docs/application-performance.md section 14 and it has been recorded and unfixed since.
+    //
+    // It parallelises exactly, not approximately, and that distinction is the whole reason it is
+    // safe to do: **the output is byte-identical to the serial version, not statistically similar
+    // to it.** Three properties make that true, and breaking any one of them breaks determinism:
+    //
+    //   1. Every random number in the loop is `random01(layer.seed, cellId, channel)` -- a pure
+    //      hash of the cell's own index. There is no sequential generator whose state depends on
+    //      how many cells came before, so a cell's jitter, acceptance, yaw and scale do not depend
+    //      on which thread evaluated it or in what order.
+    //   2. Everything read is const and free of mutable caches: `WorldMap::sample`/`height`,
+    //      `BiomeSet::at`, `WorldMap::waterTable`, `HabitatIndex::nearest` and the noise functions
+    //      are all pure functions of their arguments. Checked, not assumed.
+    //   3. The bands are contiguous row ranges and are concatenated in ascending order, so the
+    //      emitted sequence is the same sequence -- `renumberIndices` and every downstream
+    //      consumer that keys on an instance's position in the cloud see no change at all.
+    //
+    // The same reasoning as `world::buildTerrain`'s pool, which this deliberately mirrors: a thread
+    // owns whole rows and writes only into its own slots, so there is no lock.
+    // `AVGEN_SCATTER_WORKERS=1` forces the serial walk. It exists so the claim above -- that the
+    // threaded result is byte-identical rather than merely similar -- stays checkable by anyone
+    // later, rather than being a historical assertion about two builds that no longer both exist.
+    // `AVGEN_NO_TERRAIN_CACHE` is in the codebase for the same reason.
+    static const unsigned forced = [] {
+        const char* env = std::getenv("AVGEN_SCATTER_WORKERS");
+        return env != nullptr ? static_cast<unsigned>(std::max(1, std::atoi(env))) : 0u;
+    }();
+    const unsigned hardware = forced != 0u ? forced : std::max(1u, std::thread::hardware_concurrency());
+    // A small layer stays on one thread. Spawning a pool to walk a few hundred cells costs more
+    // than the walk, and a sparse layer over a small map really is that small.
+    constexpr int kMinCellsToThread = 4096;
+    const std::size_t workers =
+        (nx * nz >= kMinCellsToThread)
+            ? std::min<std::size_t>(hardware, std::max<std::size_t>(static_cast<std::size_t>(nz) / 4, 1))
+            : 1;
+    std::vector<Band> bands(std::max<std::size_t>(workers, 1));
+
     for (int pass = 0; pass < 2; ++pass) {
-    positions.clear();
-    rotations.clear();
-    scales.clear();
-    for (int j = 0; j < nz; ++j) {
+    for (Band& band : bands) {
+        band.positions.clear();
+        band.rotations.clear();
+        band.scales.clear();
+    }
+    const auto runRows = [&](std::size_t bandIndex, int firstRow, int lastRow) {
+    Band& band = bands[bandIndex];
+    std::vector<glm::vec3>& positions = band.positions;
+    std::vector<glm::vec4>& rotations = band.rotations;
+    std::vector<glm::vec3>& scales = band.scales;
+    for (int j = firstRow; j < lastRow; ++j) {
         for (int i = 0; i < nx; ++i) {
             const auto cellId = static_cast<std::uint32_t>(j * nx + i);
             const glm::vec2 base = map.min() + glm::vec2(static_cast<float>(i), static_cast<float>(j)) * cell;
@@ -500,7 +556,34 @@ spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
             scales.emplace_back(scale);
         }
     }
-    const auto placed = static_cast<int>(positions.size());
+    };
+
+    if (workers <= 1) {
+        runRows(0, 0, nz);
+    } else {
+        std::vector<std::thread> pool;
+        pool.reserve(workers - 1);
+        const int span = (nz + static_cast<int>(workers) - 1) / static_cast<int>(workers);
+        for (std::size_t w = 1; w < workers; ++w) {
+            const int first = std::min(static_cast<int>(w) * span, nz);
+            const int last = std::min(first + span, nz);
+            if (first < last) {
+                pool.emplace_back(runRows, w, first, last);
+            }
+        }
+        // The calling thread takes the first band rather than waiting on all of them, which is one
+        // fewer thread and one fewer context switch on the common case of a short layer.
+        runRows(0, 0, std::min(span, nz));
+        for (std::thread& t : pool) {
+            t.join();
+        }
+    }
+
+    std::size_t placedTotal = 0;
+    for (const Band& band : bands) {
+        placedTotal += band.positions.size();
+    }
+    const auto placed = static_cast<int>(placedTotal);
     if (pass == 0 && layer.maxInstances > 0 && placed > layer.maxInstances) {
         keep = static_cast<float>(layer.maxInstances) / static_cast<float>(placed);
         continue; // run the thinned pass
@@ -508,13 +591,23 @@ spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
     break;
     }
 
-    out.resize(positions.size());
-    if (positions.empty()) {
+    std::size_t total = 0;
+    for (const Band& band : bands) {
+        total += band.positions.size();
+    }
+    out.resize(total);
+    if (total == 0) {
         return out;
     }
-    std::copy(positions.begin(), positions.end(), out.positions().begin());
-    std::copy(rotations.begin(), rotations.end(), out.rotations().begin());
-    std::copy(scales.begin(), scales.end(), out.scales().begin());
+    // In band order, which is row order, which is the order the serial loop emitted in.
+    auto* positionOut = out.positions().data();
+    auto* rotationOut = out.rotations().data();
+    auto* scaleOut = out.scales().data();
+    for (const Band& band : bands) {
+        positionOut = std::copy(band.positions.begin(), band.positions.end(), positionOut);
+        rotationOut = std::copy(band.rotations.begin(), band.rotations.end(), rotationOut);
+        scaleOut = std::copy(band.scales.begin(), band.scales.end(), scaleOut);
+    }
     out.renumberIndices();
     out.reseed(layer.seed);
     return out;
