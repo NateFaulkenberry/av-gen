@@ -1,6 +1,9 @@
 # The Director system and the UFO abduction POC — plan
 
-**Status:** planned, not started. Deferred behind three in-flight branches (see "Why this is batched").
+**Status:** **Done** (2026-09-15, ADR-209), except Part 6 -- the sequencer track -- which another
+branch owns. The headline below was checked rather than trusted and held: the four gaps it names
+were the whole job, and the only new C++ outside `src/stage/` is `entity::DirectorMotion` and one
+distinction (`EntityState::airborne`) that grounding needed.
 **Written:** 2026-09-14
 
 ## The headline: most of Parts 3–5 already exist
@@ -98,3 +101,24 @@ until `agent/farm-animals` lands. And `glowmere-valley-2.scene.json` is fingerpr
 - Failure cases from the brief's test list (no valid targets, target disappears, actor removed,
   sequence cancelled) — each must leave the director idle and restartable, asserted directly.
 - Performance: no per-frame scan over all entities. Search on an interval, against `PointGrid`.
+
+## What it turned out to cost, once it was done
+
+The plan's four gaps were right, and a fifth turned up on contact: `ActionKind::Move` snaps
+`travel.y` to the ground it is crossing, so nothing in ADR-096 could express a body that is not
+standing on anything. That is `entity::DirectorMotion`, twenty lines on `Entity` and three places
+in the update loop, plus `EntityState::airborne` so `ground` knows to yield -- `driven` alone is not
+enough, because an action's `move` walks across ground and *wants* grounding.
+
+Two defects, both from probes that could not fail (ADR-182):
+
+* `parameterPath` read `StepDesc::role` rather than the role a cue resolves, so every `show`, `hide`
+  and `set` in the shipped scenario failed silently. The test that should have caught it passed,
+  because its fixture registered `visible` as a `ParamDesc<bool>` left at its defaults -- hard range
+  `[false, false]` -- so the parameter was already 0 and "hidden it" and "did nothing" read the same.
+* `wander` returned from its two give-up paths without writing `state.speed`, which is not cleared
+  between frames. Last frame's number stood, the gait picked a walk clip from it, and 54% of the
+  frames an animal was "commanded to move" were frames it was standing still -- the `sage` defect
+  (ADR-199) in miniature and repeated across eighteen bodies.
+
+Both were found by the measurements this file asked for, not by looking at the scene.

@@ -52,3 +52,11 @@ if(TARGET avgen_platform)
     target_link_libraries(avgen_overlay_shot PRIVATE avgen_platform)
     avgen_set_warnings(avgen_overlay_shot)
 endif()
+
+# The farm-animal placer (ADR-209, Part 1). A build target rather than a script for the reason the
+# Tree of Life emitter gives: it asks the engine's own questions of the world -- walkable, wet,
+# steep, under canopy, inside a recorded solid -- against the real WorldMap, the real ecology
+# scatter and the real per-instance obstacle field the scene builds at load. A Python placer would
+# hold a second copy of the terrain noise and the two would drift apart silently.
+add_executable(avgen_place_farm_animals place_farm_animals.cpp)
+target_link_libraries(avgen_place_farm_animals PRIVATE avgen_core)

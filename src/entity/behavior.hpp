@@ -71,6 +71,13 @@ struct EntityState {
     // hover, drift, spin, bank -- are unaffected: a craft can hover while it is being told where
     // to go.
     bool driven = false;
+    // And it owns this body's *height* too: the body is not standing on anything. Raised by the
+    // Director tier (ADR-210) when a shot is flying something -- a craft between targets, an animal
+    // going up a tractor beam. `driven` alone is not enough: an action's `move` walks across ground
+    // and wants `ground` to keep it on the surface, and a cow twenty metres in the air does not.
+    // Without the distinction, `ground` writes `travel.y` back to the terrain every frame and the
+    // lift is a cow standing in a beam looking startled.
+    bool airborne = false;
     [[nodiscard]] glm::vec3 position() const { return anchor + travel; }
 };
 

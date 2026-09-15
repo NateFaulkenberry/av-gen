@@ -206,6 +206,38 @@ struct FieldUpdate {
     bool distanceDetail = true;   // ADR-186; see EntityUpdate
 };
 
+// ---- the Director tier's hold on a body (ADR-210) ----------------------------------------------
+//
+// ADR-091's hierarchy is Director -> Cinematic Action -> Behavior -> Navigation, and `ActionQueue`
+// already implements the top three for anything that *walks*: a `move` routes over the navigation
+// layer, snaps to the ground it is crossing and hands the gait a speed. A craft in the air and a
+// cow going up a tractor beam are neither walking nor standing on anything, and expressing them as
+// `move` would mean teaching the walker's path provider to lie about where the ground is.
+//
+// So this is the other half of the same tier, and deliberately the *smallest* half: a director says
+// where a body **is**, absolutely, and everything below composes around that. `position` becomes
+// `travel` (so `EntityState::position()`, the crowd field, the fields pass and every query that
+// reads an entity's place all agree), `driven` is raised (so `wander` and `explore` yield by
+// keeping their destination, exactly as they do under an action), and `rotation` is added to the
+// behaviours' own offsets *after* they run -- which is what lets the visitor keep hovering, drifting
+// and banking while it is being flown somewhere.
+//
+// Absolute rather than relative because a director's claim is "the saucer is here now", not "the
+// saucer has drifted nine metres from where the scene file put it": an offset would make the answer
+// depend on the anchor, and an anchor is an authoring decision that must be free to change.
+struct DirectorMotion {
+    bool active = false;
+    glm::vec3 position{0.0f}; // world
+    float yaw = 0.0f;         // radians about +Y
+    bool hasYaw = false;
+    glm::vec3 rotation{0.0f}; // extra Euler degrees, added after the behaviours have had their turn
+    // The horizontal speed the gait should read. What makes an animal being carried up a beam keep
+    // its legs going: the gait machine picks a clip from a speed, and it does not care whether the
+    // speed came from navigation or from a director.
+    float speed = 0.0f;
+    bool hasSpeed = false;
+};
+
 class Entity {
 public:
     Entity(EntityDesc desc, std::uint32_t sceneSeed);
@@ -240,6 +272,15 @@ public:
     [[nodiscard]] Schedule& schedule() { return schedule_; }
     [[nodiscard]] const Schedule& schedule() const { return schedule_; }
     [[nodiscard]] const Gait& gait() const { return gait_; }
+
+    // ---- the Director tier (ADR-210) ---------------------------------------------------------
+    //
+    // Set by `stage::Staging` and by nothing else in this layer. An entity under a director motion
+    // is never distance-culled, for the same reason an entity under orders is not: a body a shot is
+    // moving must not stop moving because the camera looked away.
+    void setDirectorMotion(const DirectorMotion& motion) { director_ = motion; }
+    void clearDirectorMotion() { director_ = DirectorMotion{}; }
+    [[nodiscard]] const DirectorMotion& directorMotion() const { return director_; }
 
     // A named number this entity declared. `setProperty` refuses a name the entity did not
     // declare rather than inventing one, because a property invented at runtime is a property no
@@ -298,6 +339,7 @@ private:
     Rng rng_;
     EntityState state_{};
     MotionOffset motion_{};
+    DirectorMotion director_{};
     LocomotionState locomotion_{};
     std::vector<std::unique_ptr<IBehavior>> behaviors_;
 

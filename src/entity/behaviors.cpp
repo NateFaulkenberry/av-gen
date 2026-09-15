@@ -506,7 +506,16 @@ public:
                 // Nowhere to go. Wait a beat and ask again rather than retrying every frame: a
                 // character boxed in by terrain should stand still, not burn the frame on
                 // rejection sampling.
+                //
+                // And *say* it is standing still. `EntityState::speed` is not cleared between
+                // frames -- whoever is driving owns it -- so returning without writing it leaves
+                // last frame's number standing, and the gait picks a walk clip from it. A body
+                // playing a walk cycle and going nowhere is the `sage` defect (ADR-199), in
+                // miniature and repeated: measured over the shipped farm it was 54% of the frames
+                // an animal was "commanded to move".
                 pause_ = 1.0f;
+                state.speed = 0.0f;
+                state.activity = Activity::Idle;
                 return;
             }
         }
@@ -530,9 +539,12 @@ public:
                 direction = steered;
             } else {
                 // Every way out is blocked. Drop the destination rather than grinding into a
-                // hillside; the next pick will be somewhere else.
+                // hillside; the next pick will be somewhere else -- and stop claiming to be moving,
+                // for the reason above.
                 hasDestination_ = false;
                 pause_ = 0.5f;
+                state.speed = 0.0f;
+                state.activity = Activity::Idle;
                 return;
             }
         }
@@ -1761,6 +1773,13 @@ public:
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
         if (ctx.nav == nullptr) {
+            return;
+        }
+        // The body is off the ground because a shot put it there (ADR-210). Pinning it back to the
+        // surface -- and tilting it to a slope it is nowhere near -- is the one thing grounding must
+        // not do to it. Yielding by *keeping* the follower's state, so a body set down again picks
+        // up its smoothed height rather than snapping to the terrain.
+        if (state.airborne) {
             return;
         }
         GroundSettings settings;

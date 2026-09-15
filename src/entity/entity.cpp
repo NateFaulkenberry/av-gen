@@ -653,6 +653,10 @@ void EntityWorld::reset() {
         entity->rng_ = Rng(entity->seed_);
         entity->state_ = EntityState{};
         entity->motion_ = MotionOffset{};
+        // The Director tier resets with everything else (ADR-210): a seek that left a cow half way
+        // up a beam would make a scrubbed frame depend on how the playhead got there. `stage::Staging`
+        // resets alongside this and re-issues whatever the scenario is doing at the new second.
+        entity->director_ = DirectorMotion{};
         entity->locomotion_ = LocomotionState{};
         entity->coarseAccum_ = 0.0;
         entity->everUpdated_ = false;
@@ -931,7 +935,8 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // walking to the nightstand because the camera looked away would be a bug nobody could
         // reproduce. The coarse stage below still applies, so the cost stays bounded -- what is
         // refused here is only the "do not update at all" band.
-        const bool underOrders = entity.actions_.pending() > 0 || entity.schedule_.running();
+        const bool underOrders = entity.actions_.pending() > 0 || entity.schedule_.running() ||
+                                 entity.director_.active;
         if (!first && !underOrders && ctx.distanceDetail && entity.desc_.cullDistance > 0.0f &&
             distance > entity.desc_.cullDistance) {
             // Far enough away that nothing it could do would be visible. Not merely a cheaper
@@ -972,6 +977,21 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         entity.state_.reaction = 0.0f;
         entity.state_.activity = Activity::Idle;
         entity.state_.driven = false;
+        entity.state_.airborne = false;
+
+        // ---- the Director tier, above everything (ADR-210) ----
+        // A director says where a body *is*. Written as `travel` rather than as an offset so that
+        // `position()`, the crowd field, the fields pass and every query that reads an entity's
+        // place see the same answer, and `driven` so the locomotor behaviours yield by keeping
+        // their state -- an animal put down after an abduction resumes the walk it was on.
+        if (entity.director_.active) {
+            entity.state_.travel = entity.director_.position - entity.state_.anchor;
+            if (entity.director_.hasYaw) {
+                entity.state_.yaw = entity.director_.yaw;
+            }
+            entity.state_.driven = true;
+            entity.state_.airborne = true;
+        }
 
         // ---- intent, before behaviour (ADR-091) ----
         // The hierarchy is read top-down, so the action tier gets its say first and the behaviours
@@ -1013,6 +1033,17 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         bc.rng = &entity.rng_;
         for (auto& behavior : entity.behaviors_) {
             behavior->update(bc, entity.state_, entity.motion_);
+        }
+        // The director's *additive* half, after the behaviours rather than before them: the point
+        // of the split is that a craft keeps hovering, drifting and banking while it is being flown
+        // somewhere, and a spin the director asked for is on top of the spin the scene authored.
+        // Speed is written last because the gait reads it, and a body carried by a beam should have
+        // its legs going even though nothing navigated it there.
+        if (entity.director_.active) {
+            entity.motion_.rotation += entity.director_.rotation;
+            if (entity.director_.hasSpeed) {
+                entity.state_.speed = entity.director_.speed;
+            }
         }
         // The body's facing, not the total it has turned. Canonicalised here, once, after everything
         // that steers has had its turn and before anything reads it -- the node's rotation, the
