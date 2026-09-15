@@ -1887,7 +1887,7 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
     // It costs one pass over the file at load -- about 130 ms for ninety seconds -- and both of the
     // places that read `track_` are already behind a mode or player check, so this is inert for
     // live rendering.
-    track_ = std::make_unique<analysis::AnalysisTrack>(
+    track_ = std::make_shared<analysis::AnalysisTrack>(
         analysis::AnalysisTrack::analyze(*file, analyzerConfig_));
     offlineFrameCursor_ = 0;
     log::info("analysed {:.2f} s of audio: {} frames", file->durationSeconds(), track_->frames().size());

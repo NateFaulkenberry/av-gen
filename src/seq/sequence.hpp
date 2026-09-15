@@ -43,6 +43,7 @@
 // is the real one, over `comp::LayerStack` (ADR-083), and `NullLayerSink` still exists so the
 // timing half can be tested without a font engine. Nothing in this file knows what a font is.
 
+#include "analysis/structure.hpp"
 #include "app/cinematic.hpp"
 #include "core/error.hpp"
 #include "params/timeline.hpp"
@@ -315,6 +316,12 @@ struct Sequence {
     std::vector<Actor> actors;
     std::vector<OverlayCue> overlays;
     std::vector<Marker> markers;
+    // The editable song structure (ADR-215). Saved with the piece, because it is authored data the
+    // moment anybody touches it: detected sections are the analyser's first pass, and a boundary a
+    // person dragged or a section they named is work that a re-analysis must not destroy. The
+    // markers above are still *derived* from this -- `setSectionMarkers` -- so the strip and the
+    // event triggers see one answer.
+    analysis::SongStructure structure;
     // spec 17 of the cinematic world brief: "when X happens, do Y". Most of these stop being
     // events at bake and become keys; the rest are dispatched. seq/events.hpp is the argument.
     std::vector<SequenceEvent> events;
@@ -332,7 +339,14 @@ struct Sequence {
 
     // Replaces the marker list's Section entries with the fold's sections (spec 19). Beat and Cue
     // markers are kept: a section label is derived and an author's cue is not.
-    void setSectionMarkers(const signals::MusicalStructure& structure);
+    void setSectionMarkers(const signals::MusicalStructure& folded);
+    // The same, from the editable structure (ADR-215). `TriggerKind::Section` matches on a marker's
+    // *name*, so the name written here is the section's display name -- the label a person gave it
+    // where there is one, and the function's name otherwise. That is the string an event names, and
+    // it is why renaming a section is an edit with consequences rather than a decoration.
+    void setSectionMarkers(const analysis::SongStructure& structure);
+    // Re-derives the Section markers from `this->structure`. Called after any structural edit.
+    void refreshSectionMarkers();
     // Adds `Beat` markers for every beat time (spec 20). Existing beat markers are replaced.
     void setBeatMarkers(std::span<const double> beatTimes);
     [[nodiscard]] std::vector<double> markerTimes(MarkerKind kind) const;

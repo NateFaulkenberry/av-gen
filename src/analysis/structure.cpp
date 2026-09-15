@@ -76,6 +76,18 @@ void rescale(std::vector<float>& v) {
 
 } // namespace
 
+std::span<const SectionFunction> allSectionFunctions() {
+    static constexpr std::array<SectionFunction, 13> kAll{
+        SectionFunction::Intro,       SectionFunction::Verse,       SectionFunction::PreChorus,
+        SectionFunction::Build,       SectionFunction::Chorus,      SectionFunction::Drop,
+        SectionFunction::Break,       SectionFunction::Bridge,      SectionFunction::Instrumental,
+        SectionFunction::Breakdown,   SectionFunction::FinalChorus, SectionFunction::Outro,
+        SectionFunction::Other};
+    // `Other` is the last enumerator, so this stops compiling if one is added without being listed.
+    static_assert(kAll.size() == static_cast<std::size_t>(SectionFunction::Other) + 1);
+    return kAll;
+}
+
 const char* sectionFunctionName(SectionFunction f) {
     switch (f) {
     case SectionFunction::Intro: return "intro";

@@ -1000,23 +1000,25 @@ void ControlPanel::drawTransport(app::Engine& engine) {
             }
         }
     }
-    if (ImGui::Button("Open Audio") && onOpenAudio) {
-        onOpenAudio();
-    }
-    ImGui::SameLine();
+    // The import button and the compact transport used to be here, and both are gone (ADR-216):
+    // audio belongs to the Sequencer, which is where the waveform, the sections and the timeline
+    // are. Three things remain, and each is here because it is *not* a duplicate of anything the
+    // Sequencer has: which file is loaded, where the playhead is as a draggable value, and how loud
+    // it is.
+    //
+    // What must not come back with the button is the assumption that went with it. The old Control
+    // transport was disabled whenever no audio was loaded, and ADR-102 removed exactly that: a
+    // project without audio has a transport like any other. Nothing below is gated on `hasAudio`
+    // except the volume, which genuinely has nothing to be the volume of.
     if (engine.hasAudio()) {
         ImGui::TextUnformatted(engine.audioPath().filename().string().c_str());
     } else {
-        ImGui::TextDisabled("no audio loaded (drop a file on the window)");
+        ImGui::TextDisabled("no audio loaded (Sequencer > Import Audio..., the File menu, O, or "
+                            "drop a file on the window)");
     }
     if (!status_.empty()) {
         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "%s", status_.c_str());
     }
-
-    // The same widget the Sequence panel draws, in its compact form. These used to be their own
-    // Play/Pause/Stop buttons, disabled whenever no audio was loaded -- which is exactly the
-    // assumption ADR-102 removed: a project without audio has a transport like any other.
-    transport.draw(engine, true);
 
     float position = static_cast<float>(engine.positionSeconds());
     const float duration = static_cast<float>(std::max(engine.durationSeconds(), 0.001));

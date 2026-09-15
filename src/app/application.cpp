@@ -813,6 +813,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->setLayoutStore(prefs.empty() ? std::filesystem::path{} : prefs / "editor-layout.json",
                                imgui_->hadSavedLayout());
         panel_->jobs = jobs_.get();
+        panel_->sequence.jobs = jobs_.get();
         panel_->builder = worldBuilder_.get();
         auto dialog = [this](platform::Window::DialogKind kind) {
             return [this, kind] {
@@ -843,7 +844,12 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             panel_->setStatus("camera handed back to the viewport (" + std::to_string(removed) +
                               " track(s) removed)");
         };
+        // One action, three routes (ADR-216): the File menu item, the O shortcut and the Sequencer's
+        // Import Audio... button. The menu item and the shortcut are *not* duplicates of each other
+        // -- one is discoverable and one is fast -- and the button is where a person looking at a
+        // timeline goes to put a song on it. All three are this callback.
         panel_->onOpenAudio = dialog(platform::Window::DialogKind::Audio);
+        panel_->sequence.onOpenAudio = panel_->onOpenAudio;
         panel_->onOpenScene = dialog(platform::Window::DialogKind::Scene);
         panel_->onOpenEnvironment = dialog(platform::Window::DialogKind::Environment);
         panel_->onOrbScene = [this] { engine_->loadOrbScene(); };

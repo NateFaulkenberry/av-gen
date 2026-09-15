@@ -233,18 +233,32 @@ TEST_CASE("Every lane is where the strip's own height says it is", "[ui][sequenc
     // The lanes tile the strip in order and none of them runs off the end of it: a lane drawn past
     // the strip's height is one the mouse can never reach.
     for (bool audio : {false, true}) {
+      for (bool sections : {false, true}) {
         for (std::size_t actors : {std::size_t{0}, std::size_t{1}, std::size_t{4}}) {
             for (bool overlays : {false, true}) {
-                ui::StripLanes lanes{.hasAudio = audio, .actorCount = actors, .hasOverlays = overlays};
-                INFO("audio=" << audio << " actors=" << actors << " overlays=" << overlays);
+                ui::StripLanes lanes{.hasAudio = audio,
+                                     .hasSections = sections,
+                                     .actorCount = actors,
+                                     .hasOverlays = overlays};
+                INFO("audio=" << audio << " sections=" << sections << " actors=" << actors
+                              << " overlays=" << overlays);
 
                 CHECK(lanes.at(0.0f) == ui::StripLane::Ruler);
                 CHECK(lanes.at(lanes.lanesTop() - 0.1f) == ui::StripLane::Ruler);
                 CHECK(lanes.at(lanes.shotsTop() + 1.0f) == ui::StripLane::Shots);
                 CHECK(lanes.shotsTop() + lanes.laneHeight <= lanes.height());
+                if (sections) {
+                    // Directly under the ruler: the song's shape is what everything below it is cut
+                    // to, and it is only readable against the waveform when the two are adjacent.
+                    CHECK(lanes.at(lanes.sectionsTop() + 1.0f) == ui::StripLane::Sections);
+                    CHECK(lanes.sectionsTop() == lanes.lanesTop());
+                    CHECK(lanes.sectionsTop() + lanes.sectionLaneHeight <= lanes.height());
+                } else {
+                    CHECK(lanes.audioTop() == lanes.lanesTop());
+                }
                 if (audio) {
                     CHECK(lanes.at(lanes.audioTop() + 1.0f) == ui::StripLane::Audio);
-                } else {
+                } else if (!sections) {
                     // With no audio the shots are the first lane, exactly where the audio would have
                     // been -- so a project without audio loses no space to a lane it has not got.
                     CHECK(lanes.shotsTop() == lanes.lanesTop());
@@ -261,7 +275,19 @@ TEST_CASE("Every lane is where the strip's own height says it is", "[ui][sequenc
                 CHECK(lanes.at(lanes.height() + 10.0f) == ui::StripLane::None);
             }
         }
+      }
     }
+}
+
+TEST_CASE("The section lane costs nothing when there is no structure", "[ui][sequencer][lanes]") {
+    const ui::StripLanes without{.hasAudio = true, .hasSections = false, .actorCount = 1};
+    const ui::StripLanes with{.hasAudio = true, .hasSections = true, .actorCount = 1};
+    CHECK(with.height() > without.height());
+    CHECK_THAT(static_cast<double>(with.height() - without.height()),
+               Catch::Matchers::WithinAbs(static_cast<double>(with.sectionLaneHeight + with.gap), 1e-4));
+    // And it does not take the audio lane's clicks with it: the audio lane simply moves down.
+    CHECK(with.audioTop() > without.audioTop());
+    CHECK(with.at(with.audioTop() + 1.0f) == ui::StripLane::Audio);
 }
 
 TEST_CASE("The audio lane costs nothing when there is no audio", "[ui][sequencer][lanes]") {

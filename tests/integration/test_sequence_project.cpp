@@ -7,11 +7,13 @@
 // by. Every check here goes through `app::Engine::update`, not through the model, so it is testing
 // the path a render actually takes.
 
+#include "analysis/structure.hpp"
 #include "app/camera_director.hpp"
 #include "app/engine.hpp"
 #include "core/time.hpp"
 #include "scene/composition.hpp"
 #include "seq/sequence.hpp"
+#include "seq/song_structure.hpp"
 #include "support/temp_dir.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -22,6 +24,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <tuple>
 #include <vector>
 
 using namespace avgen;
@@ -554,4 +557,82 @@ TEST_CASE("the proof-of-concept score folds into sections the editor can cut to"
     }
     // More than one section, or the fold has told the author nothing.
     CHECK(structure->sections.size() >= 3);
+}
+
+// ---- the song structure through a real project file (ADR-215) -----------------------------------
+//
+// `tests/unit/test_song_structure_edit.cpp` checks the model and its own JSON. This checks the claim
+// the model exists to make: that a boundary somebody dragged is still there after the project has
+// been through a file, and that a re-analysis after that reload still does not take it away. The
+// unit test could pass while the engine dropped the block on the way out, which is exactly the shape
+// of the bug worth an integration test.
+TEST_CASE("an edited song structure survives the project file, and a later re-analysis",
+          "[integration][sequence][project][structure]") {
+    Scratch scratch("sequence_structure");
+    const fs::path stage = writeStage(scratch.dir, "stage.json");
+    const fs::path file = "structure-session.json";
+
+    const auto detected = [] {
+        analysis::SongStructure s;
+        s.durationSeconds = 100.0;
+        for (const auto& [from, to, f] :
+             std::vector<std::tuple<double, double, analysis::SectionFunction>>{
+                 {0.0, 24.318274, analysis::SectionFunction::Intro},
+                 {24.318274, 51.772913, analysis::SectionFunction::Verse},
+                 {51.772913, 78.104558, analysis::SectionFunction::Chorus},
+                 {78.104558, 100.0, analysis::SectionFunction::Outro}}) {
+            analysis::SongSection section;
+            section.startSeconds = from;
+            section.endSeconds = to;
+            section.function = f;
+            section.startConfidence = 0.4f;
+            s.sections.push_back(section);
+        }
+        return s;
+    };
+
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadFile(stage).has_value());
+        seq::Sequence built = piece();
+        built.structure = detected();
+        // A person drags the chorus's closing boundary and renames it.
+        REQUIRE(seq::moveBoundary(built.structure, 3, 80.25).has_value());
+        REQUIRE(seq::setSectionLabel(built.structure, 2, "the big one"));
+        built.refreshSectionMarkers();
+        REQUIRE(engine.setSequence(std::move(built)).has_value());
+        REQUIRE(engine.saveProject(file).has_value());
+    }
+
+    app::Engine loaded(app::EngineMode::Offline);
+    REQUIRE(loaded.loadProject(file).has_value());
+    REQUIRE(loaded.sequence().structure.sections.size() == 4);
+    const analysis::SongSection& chorus = loaded.sequence().structure.sections[2];
+    CHECK(chorus.label == "the big one");
+    CHECK(chorus.origin == analysis::SectionOrigin::Refined);
+    CHECK(chorus.endSeconds == 80.25); // exactly, not nearly
+    // The markers came back with it, so an event that triggers on "the big one" still finds it.
+    const seq::TriggerContext ctx = loaded.sequence().triggerContext();
+    bool named = false;
+    for (const auto& span : ctx.sections) {
+        named = named || span.name == "the big one";
+    }
+    CHECK(named);
+
+    // ...and the detector, run again on the reloaded project, does not take the edit away.
+    analysis::SongStructure fresh = detected();
+    fresh.sections[0].endSeconds = 12.5;
+    fresh.sections[1].startSeconds = 12.5;
+    const seq::ReanalysisReport report = seq::reanalyse(loaded.sequence().structure, fresh);
+    CHECK(report.kept() == 2);
+    CHECK(loaded.sequence().structure.validate().has_value());
+    bool stillThere = false;
+    for (const analysis::SongSection& s : loaded.sequence().structure.sections) {
+        if (s.label != "the big one") {
+            continue;
+        }
+        stillThere = true;
+        CHECK(s.endSeconds == 80.25);
+    }
+    CHECK(stillThere);
 }

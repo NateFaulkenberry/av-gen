@@ -83,6 +83,9 @@ enum class SectionFunction : std::uint8_t {
 };
 [[nodiscard]] const char* sectionFunctionName(SectionFunction f);
 [[nodiscard]] std::optional<SectionFunction> sectionFunctionFromName(std::string_view name);
+// Every function, in declaration order. One list, so a UI offering the choices and a test checking
+// them all cannot come to disagree about how many there are.
+[[nodiscard]] std::span<const SectionFunction> allSectionFunctions();
 
 // Where a section's boundaries and label came from. The reason this exists is data loss: re-running
 // analysis must replace what the analyser guessed and leave alone what a person decided, and that is

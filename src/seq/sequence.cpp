@@ -1,5 +1,7 @@
 #include "seq/sequence.hpp"
 
+#include "seq/song_structure.hpp"
+
 
 #include <nlohmann/json.hpp>
 
@@ -816,15 +818,26 @@ const SceneSlot* Sequence::sceneAt(double seconds) const {
     return current;
 }
 
-void Sequence::setSectionMarkers(const signals::MusicalStructure& structure) {
+void Sequence::setSectionMarkers(const signals::MusicalStructure& folded) {
     std::erase_if(markers, [](const Marker& m) { return m.kind == MarkerKind::Section; });
-    for (const auto& s : structure.sections) {
+    for (const auto& s : folded.sections) {
         markers.push_back(
             Marker{s.startSeconds, signals::musicalSectionName(s.kind), MarkerKind::Section});
     }
     std::stable_sort(markers.begin(), markers.end(),
                      [](const Marker& a, const Marker& b) { return a.timeSeconds < b.timeSeconds; });
 }
+
+void Sequence::setSectionMarkers(const analysis::SongStructure& songStructure) {
+    std::erase_if(markers, [](const Marker& m) { return m.kind == MarkerKind::Section; });
+    for (const auto& s : songStructure.sections) {
+        markers.push_back(Marker{s.startSeconds, sectionDisplayName(s), MarkerKind::Section});
+    }
+    std::stable_sort(markers.begin(), markers.end(),
+                     [](const Marker& a, const Marker& b) { return a.timeSeconds < b.timeSeconds; });
+}
+
+void Sequence::refreshSectionMarkers() { setSectionMarkers(structure); }
 
 void Sequence::setBeatMarkers(std::span<const double> beatTimes) {
     std::erase_if(markers, [](const Marker& m) { return m.kind == MarkerKind::Beat; });
@@ -1590,6 +1603,12 @@ json Sequence::toJson() const {
            {"actors", std::move(actorsJson)},
            {"overlays", std::move(overlaysJson)},
            {"markers", std::move(markersJson)}};
+    // ADR-215. Written only when there is one, so a project that was never analysed keeps the file
+    // it had -- and, unlike the beat markers above, this is *not* derived: it is where a person's
+    // boundaries and names live, and dropping it would be the data loss the whole model prevents.
+    if (!structure.sections.empty()) {
+        j["structure"] = songStructureToJson(structure);
+    }
     if (!events.empty()) {
         json eventsJson = json::array();
         for (const auto& e : events) {
@@ -1722,6 +1741,13 @@ Result<Sequence> Sequence::fromJson(const json& j) {
             }
             seq.markers.push_back(std::move(m));
         }
+    }
+    if (const auto st = j.find("structure"); st != j.end()) {
+        auto parsed = songStructureFromJson(*st);
+        if (!parsed) {
+            return fail("sequence '{}': {}", seq.name, parsed.error().message);
+        }
+        seq.structure = std::move(*parsed);
     }
     if (const auto ev = j.find("events"); ev != j.end()) {
         if (!ev->is_array()) {

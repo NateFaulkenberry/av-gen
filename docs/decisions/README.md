@@ -205,3 +205,5 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [207](ADR-207-world-effects.md) | World effects propagate through one frame-global block, not through per-object state | Accepted |
 | [208](ADR-208-what-world-effects-cost.md) | What world effects cost, and the cross-binary number that is not evidence | Accepted |
 | [209](ADR-209-the-kind-the-box-fix-missed.md) | The kind the box fix missed | Accepted |
+| [215](ADR-215-a-section-someone-decided-outranks-a-section-someone-detected.md) | A section somebody decided outranks a section somebody detected | Accepted |
+| [216](ADR-216-the-sequencer-is-where-the-song-lives.md) | The Sequencer is where the song lives | Accepted |

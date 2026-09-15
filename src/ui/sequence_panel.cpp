@@ -5,11 +5,12 @@
 #include <chrono>
 
 #include "analysis/analysis_track.hpp"
-#include "app/camera_director.hpp"
+#include "analysis/structure.hpp"
 #include "core/log.hpp"
 #include "scene/composition.hpp"
 #include "seq/layer_sink.hpp"
 #include "seq/lyrics.hpp"
+#include "seq/song_structure.hpp"
 
 #include <imgui.h>
 
@@ -17,6 +18,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <utility>
 
 namespace avgen::ui {
 namespace {
@@ -57,10 +59,66 @@ ImU32 shotColour(int index, bool selected) {
 }
 
 const char* kSnapNames[] = {"Off", "Frames", "Beats", "Markers"};
+const char* kSectionSnapNames[] = {"free", "beat", "bar"};
+
+// One colour per section function, so the shape of a song is readable without reading any of it.
+// Warm for the payoffs, cool for the passages, grey for "the detector did not claim anything".
+ImU32 sectionColour(avgen::analysis::SectionFunction f, bool selected) {
+    using F = avgen::analysis::SectionFunction;
+    ImU32 base = IM_COL32(88, 96, 112, 220);
+    switch (f) {
+    case F::Intro:
+    case F::Outro:
+        base = IM_COL32(72, 92, 116, 220);
+        break;
+    case F::Verse:
+    case F::Instrumental:
+        base = IM_COL32(64, 108, 104, 220);
+        break;
+    case F::PreChorus:
+    case F::Build:
+        base = IM_COL32(150, 120, 60, 225);
+        break;
+    case F::Chorus:
+    case F::Drop:
+    case F::FinalChorus:
+        base = IM_COL32(176, 88, 86, 235);
+        break;
+    case F::Break:
+    case F::Breakdown:
+        base = IM_COL32(70, 74, 96, 220);
+        break;
+    case F::Bridge:
+        base = IM_COL32(112, 84, 140, 225);
+        break;
+    case F::Other:
+        base = IM_COL32(88, 96, 112, 220);
+        break;
+    }
+    if (!selected) {
+        return base;
+    }
+    // Lifted rather than outlined: the outline is what marks the boundary being dragged, and two
+    // outlines in one lane is two things saying "this one".
+    const ImVec4 c = ImGui::ColorConvertU32ToFloat4(base);
+    return ImGui::GetColorU32(ImVec4(std::min(c.x + 0.18f, 1.0f), std::min(c.y + 0.18f, 1.0f),
+                                     std::min(c.z + 0.18f, 1.0f), 1.0f));
+}
 
 } // namespace
 
 void SequencePanel::draw(app::Engine& engine) {
+    // Before anything is drawn, so a finished analysis is on screen in the frame it finished in
+    // rather than the one after.
+    pollStructureAnalysis(engine);
+    // The one automatic trigger: audio arrived, the option is on, and this piece has no structure
+    // of its own yet. A project that was saved with a structure is *not* re-analysed on open --
+    // that is the whole point of caching it -- and re-running is an explicit button.
+    if (analyseOnImport_ && work_ == nullptr && engine.track() != nullptr &&
+        engine.audioRevision() != structureRevision_ &&
+        engine.sequence().structure.sections.empty()) {
+        startStructureAnalysis(engine, false);
+    }
     drawToolbar(engine);
     ImGui::Separator();
     drawStrip(engine);
@@ -204,23 +262,27 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
         touch();
     }
     ImGui::SameLine();
-    ImGui::BeginDisabled(engine.track() == nullptr);
-    if (ImGui::Button("Sections")) {
-        // spec 19/20: the labels and the beat grid come from the music, not from typing.
-        auto structure = app::structureOfTrack(*engine.track(), engine.phraseBars(), engine.sectionPhrases());
-        if (structure) {
-            piece.setSectionMarkers(*structure);
-            piece.setBeatMarkers(engine.track()->beats().beatTimes);
-            status_ = fmt::format("{} section(s), {} beat(s) from the track",
-                                  structure->sections.size(), engine.track()->beats().beatTimes.size());
-        } else {
-            status_ = structure.error().message;
-        }
+    const bool busy = work_ != nullptr;
+    ImGui::BeginDisabled(engine.track() == nullptr || busy);
+    if (ImGui::Button(busy ? "Analysing..." : "Analyse Song")) {
+        // Re-running merges rather than replacing: `seq::reanalyse` puts back what a person moved
+        // or named and reports it (ADR-215). Pressing this twice is safe, which is the property
+        // that makes it worth having a button at all.
+        startStructureAnalysis(engine, !piece.structure.sections.empty());
     }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("Label the strip from the song's own structure, and draw its beats.\n"
-                          "Needs analysed audio.");
+        ImGui::SetTooltip("Find the song's sections and lay them on the timeline, and draw its beats.\n"
+                          "Runs in the background. Anything you have edited is kept.\n"
+                          "Needs audio.");
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Import Audio...")) {
+        ImGui::OpenPopup("import-audio");
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Bring a song in. Also on the File menu, and on O.");
     }
 
     ImGui::SameLine();
@@ -240,6 +302,10 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
         }
     }
     ImGui::PopStyleVar();
+    if (ImGui::BeginPopup("import-audio")) {
+        drawImportPopup(engine);
+        ImGui::EndPopup();
+    }
     if (ImGui::BeginPopup("audio-clips")) {
         ImGui::SetNextItemWidth(460.0f);
         drawAudioClips(engine);
@@ -263,6 +329,14 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
 
     ImGui::SetNextItemWidth(110);
     ImGui::Combo("snap", &snapMode_, kSnapNames, IM_ARRAYSIZE(kSnapNames));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(90);
+    ImGui::Combo("sections", &sectionSnap_, kSectionSnapNames, IM_ARRAYSIZE(kSectionSnapNames));
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("What a section boundary snaps to while you drag it.\n"
+                          "`free` keeps whatever you land on, to the millisecond.\n"
+                          "A snapped boundary takes the beat's own time, not a rounded one.");
+    }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(120);
     ImGui::SliderFloat("zoom", &zoom_, 0.25f, 8.0f, "%.2fx");
@@ -296,9 +370,54 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
             ImGui::SetTooltip("%s", all.c_str());
         }
     }
+    if (work_ != nullptr) {
+        // The honest progress report job_system.hpp asks for: the stage, because the detector does
+        // not report a fraction of itself and a bar invented here would be indistinguishable from
+        // a real one.
+        app::JobStatus job;
+        const bool known = jobs != nullptr && workJob_ != 0 && jobs->status(workJob_, job);
+        ImGui::TextColored(ImVec4(0.6f, 0.82f, 0.95f, 1.0f), "analysing the song%s%s",
+                           known && !job.stageName.empty() ? ": " : "...",
+                           known && !job.stageName.empty() ? job.stageName.c_str() : "");
+    }
     if (!status_.empty()) {
         ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.45f, 1.0f), "%s", status_.c_str());
     }
+}
+
+void SequencePanel::drawImportPopup(app::Engine& engine) {
+    ImGui::TextUnformatted("Import audio");
+    ImGui::Separator();
+    ImGui::Checkbox("Analyse song structure", &analyseOnImport_);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Find the sections -- intro, verse, chorus -- and lay them on the\n"
+                          "timeline, where you can move and rename them.");
+    }
+    // Present, and honest about being unavailable. Generation is a thin translation on top of the
+    // Director decision layer (seq/section_direction.hpp), and that layer does not exist yet; a
+    // checkbox that silently did nothing would be worse than one that says why.
+    const bool directorReady = false;
+    ImGui::BeginDisabled(!directorReady);
+    ImGui::Checkbox("Generate initial Director sequence", &generateOnImport_);
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip("Not yet: this turns each section into a Director event, and the\n"
+                          "Director decision layer it would call is still being built.\n"
+                          "The connection is seq/section_direction.hpp.");
+    }
+    ImGui::Separator();
+    if (ImGui::Button("Choose file...")) {
+        if (onOpenAudio) {
+            onOpenAudio();
+        } else {
+            status_ = "no file dialog available in this build";
+        }
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", engine.hasAudio()
+                                  ? engine.audioPath().filename().string().c_str()
+                                  : "nothing loaded (you can also drop a file on the window)");
 }
 
 // ---- the strip ---------------------------------------------------------------------------------
@@ -314,6 +433,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     // the music moved the music instead (ADR-103); the arithmetic is in `ui_logic.hpp` so it can be
     // checked without a window, and `tests/unit/test_ui_logic.cpp` checks it.
     const StripLanes lanes{.hasAudio = hasAudio,
+                           .hasSections = !piece.structure.sections.empty(),
                            .actorCount = piece.actors.size(),
                            .hasOverlays = !piece.overlays.empty(),
                            .rulerHeight = kRulerHeight,
@@ -386,6 +506,12 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         if (marker.kind != seq::MarkerKind::Section && marker.kind != seq::MarkerKind::Cue) {
             continue;
         }
+        // Section markers are derived from the structure, and when the structure has a lane of its
+        // own that lane already draws every one of them with a name and a boundary line. Drawing
+        // both is the same information twice, in two places, with the labels overlapping.
+        if (marker.kind == seq::MarkerKind::Section && lanes.hasSections) {
+            continue;
+        }
         const float x = toX(marker.timeSeconds);
         if (x < origin.x - 40.0f || x > origin.x + width) {
             continue;
@@ -394,6 +520,54 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                                                                     : IM_COL32(220, 190, 120, 220);
         draw->AddLine(ImVec2(x, markerTop), ImVec2(x, origin.y + height), colour);
         draw->AddText(ImVec2(x + 3.0f, markerTop), colour, marker.name.c_str());
+    }
+
+    // ---- the section lane (ADR-216) ----
+    //
+    // The song's own shape, directly under the ruler. Each section is a block; the line between two
+    // blocks is the boundary and is what a drag grabs. A boundary is drawn as a full-height line
+    // through the whole strip because that is what it is for: seeing whether a cut lands on one.
+    const auto& sections = piece.structure.sections;
+    if (!sections.empty()) {
+        const float top = origin.y + lanes.sectionsTop();
+        const float bottom = top + lanes.sectionLaneHeight;
+        for (std::size_t i = 0; i < sections.size(); ++i) {
+            const analysis::SongSection& section = sections[i];
+            ImVec2 a(toX(section.startSeconds), top);
+            ImVec2 b(toX(section.endSeconds), bottom);
+            if (b.x < origin.x || a.x > origin.x + width) {
+                continue;
+            }
+            a.x = std::max(a.x, origin.x);
+            b.x = std::min(b.x, origin.x + width);
+            const bool isSelected = selection_ == Selection::Section && selected_ == static_cast<int>(i);
+            draw->AddRectFilled(a, b, sectionColour(section.function, isSelected), 2.0f);
+            if (section.origin != analysis::SectionOrigin::Detected) {
+                // A person's section is marked, because whether the analyser or a person decided a
+                // boundary is the single most useful thing to know before pressing Analyse again.
+                draw->AddRect(ImVec2(a.x + 1.0f, a.y + 1.0f), ImVec2(b.x - 1.0f, b.y - 1.0f),
+                              IM_COL32(245, 225, 150, 190), 2.0f);
+            }
+            if (b.x - a.x > 26.0f) {
+                draw->PushClipRect(a, ImVec2(b.x - 3.0f, b.y), true);
+                draw->AddText(ImVec2(a.x + 5.0f, a.y + 3.0f), IM_COL32(244, 244, 248, 235),
+                              seq::sectionDisplayName(section).c_str());
+                draw->PopClipRect();
+            }
+        }
+        // The boundaries, over the blocks and down the whole strip.
+        for (std::size_t i = 1; i < sections.size(); ++i) {
+            const float x = toX(sections[i].startSeconds);
+            if (x < origin.x || x > origin.x + width) {
+                continue;
+            }
+            const bool dragging = dragKind_ == 5 && dragIndex_ == static_cast<int>(i);
+            draw->AddLine(ImVec2(x, top), ImVec2(x, origin.y + height),
+                          dragging ? IM_COL32(255, 235, 150, 255) : IM_COL32(230, 236, 246, 120),
+                          dragging ? 2.0f : 1.0f);
+        }
+        draw->AddRect(ImVec2(origin.x, top), ImVec2(origin.x + width, bottom),
+                      IM_COL32(0, 0, 0, 110), 2.0f);
     }
 
     // ---- lanes ----
@@ -584,7 +758,35 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         dragIndex_ = -1;
         bool hitBlock = false;
         const StripLane lane = lanes.at(mouse.y - origin.y);
-        if (lane == StripLane::Audio) {
+        if (lane == StripLane::Sections) {
+            // A boundary first, because it is a five-point target inside a block and the block is
+            // the thing you get when you miss it.
+            auto& structure = piece.structure;
+            for (std::size_t i = 1; i < structure.sections.size(); ++i) {
+                if (std::fabs(mouse.x - toX(structure.sections[i].startSeconds)) <= kEdgeGrab) {
+                    dragKind_ = 5;
+                    dragIndex_ = static_cast<int>(i);
+                    // The section the boundary opens, so grabbing an edge also shows you what you
+                    // are about to move the start of.
+                    selection_ = Selection::Section;
+                    selected_ = static_cast<int>(i);
+                    hitBlock = true;
+                    break;
+                }
+            }
+            if (!hitBlock) {
+                for (std::size_t i = 0; i < structure.sections.size(); ++i) {
+                    if (mouseTime < structure.sections[i].startSeconds ||
+                        mouseTime > structure.sections[i].endSeconds) {
+                        continue;
+                    }
+                    selection_ = Selection::Section;
+                    selected_ = static_cast<int>(i);
+                    hitBlock = true;
+                    break;
+                }
+            }
+        } else if (lane == StripLane::Audio) {
             // The clip under the pointer is highlighted, and the click still scrubs: `hitBlock` stays
             // false on purpose. Clips are not dragged here. Making them draggable is what stole the
             // click that moves the playhead, and this lane's promise -- clicking a moment in the
@@ -666,6 +868,13 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                    dragIndex_ < static_cast<int>(piece.overlays.size())) {
             seq::OverlayCue& cue = piece.overlays[static_cast<std::size_t>(dragIndex_)];
             cue.endSeconds = std::max(cue.startSeconds + 0.2, t);
+        } else if (dragKind_ == 5 && dragIndex_ > 0) {
+            // The section boundary has its *own* snap, not the strip's: `t` above has already been
+            // through the shot grid, so this starts again from the raw time. A snapped boundary
+            // takes the beat's own value, bit for bit; a free one takes the millisecond it landed
+            // on. Neither is rounded.
+            (void)seq::moveBoundary(piece.structure, static_cast<std::size_t>(dragIndex_),
+                                    snapSection(engine, mouseTime));
         }
     } else if (dragKind_ == 0 && hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
         engine.seekSeconds(std::clamp(snap(engine, mouseTime), 0.0, duration));
@@ -675,6 +884,12 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         // and layers; doing both together would make a smooth drag feel like a stutter. The
         // arrangement waits for the same reason and costs more: a re-mix is a pass over every
         // sample in the piece.
+        // The markers are derived from the structure, and re-deriving them means re-sorting a list
+        // that holds every beat in the song. Once, when the drag ends, rather than sixty times a
+        // second while it is moving.
+        if (dragKind_ == 5) {
+            piece.refreshSectionMarkers();
+        }
         dragKind_ = 0;
         dragIndex_ = -1;
         touch();
@@ -714,9 +929,105 @@ void SequencePanel::drawInspector(app::Engine& engine) {
             drawOverlayInspector(engine, piece.overlays[static_cast<std::size_t>(selected_)]);
         }
         break;
-    case Selection::None:
-        ImGui::TextDisabled("Click a shot, a character lane or a lyric to edit it.");
+    case Selection::Section:
+        if (selected_ >= 0 && selected_ < static_cast<int>(piece.structure.sections.size())) {
+            drawSectionInspector(engine, static_cast<std::size_t>(selected_));
+        }
         break;
+    case Selection::None:
+        ImGui::TextDisabled("Click a section, a shot, a character lane or a lyric to edit it.");
+        break;
+    }
+}
+
+void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index) {
+    seq::Sequence& piece = engine.sequence();
+    analysis::SongSection& section = piece.structure.sections[index];
+    ImGui::SeparatorText("Section");
+
+    std::strncpy(labelBuffer_, section.label.c_str(), sizeof(labelBuffer_) - 1);
+    labelBuffer_[sizeof(labelBuffer_) - 1] = '\0';
+    ImGui::SetNextItemWidth(200);
+    if (ImGui::InputText("name", labelBuffer_, sizeof(labelBuffer_))) {
+        if (seq::setSectionLabel(piece.structure, index, labelBuffer_)) {
+            piece.refreshSectionMarkers();
+            touch();
+        }
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("What events call this section. Leave it empty to use the type's name.");
+    }
+
+    // The type, from the one list `analysis::allSectionFunctions()` keeps, so this cannot come to
+    // offer eleven of thirteen.
+    const auto functions = analysis::allSectionFunctions();
+    int current = 0;
+    std::vector<const char*> names;
+    names.reserve(functions.size());
+    for (std::size_t i = 0; i < functions.size(); ++i) {
+        names.push_back(analysis::sectionFunctionName(functions[i]));
+        if (functions[i] == section.function) {
+            current = static_cast<int>(i);
+        }
+    }
+    ImGui::SetNextItemWidth(200);
+    if (ImGui::Combo("type", &current, names.data(), static_cast<int>(names.size()))) {
+        if (seq::setSectionFunction(piece.structure, index, functions[static_cast<std::size_t>(current)])) {
+            piece.refreshSectionMarkers();
+            touch();
+        }
+    }
+
+    // Times in full, because a boundary at 1:02.409117 is the thing this whole feature is about and
+    // a display rounded to two places would hide the precision it is claiming to keep.
+    ImGui::Text("%s -> %s   (%.3f s)", clock(section.startSeconds).c_str(),
+                clock(section.endSeconds).c_str(), section.durationSeconds());
+    ImGui::TextDisabled("%.6f -> %.6f s", section.startSeconds, section.endSeconds);
+
+    const char* originText = analysis::sectionOriginName(section.origin);
+    if (section.origin == analysis::SectionOrigin::Detected) {
+        ImGui::TextDisabled("%s", originText);
+    } else {
+        ImGui::TextColored(ImVec4(0.96f, 0.88f, 0.58f, 1.0f), "%s -- kept when you analyse again",
+                           originText);
+    }
+    if (seq::confidenceIsMeaningful(section)) {
+        // Only for a detected section. On one a person has touched the number is not a smaller
+        // claim, it is not a claim at all (ADR-215), so it is not shown rather than shown small.
+        ImGui::TextDisabled("label %.0f%%, boundary %.0f%%",
+                            static_cast<double>(section.labelConfidence) * 100.0,
+                            static_cast<double>(section.startConfidence) * 100.0);
+        if (section.repetitionGroup >= 0) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("| repeat %d, occurrence %d", section.repetitionGroup,
+                                section.occurrence + 1);
+        }
+    }
+
+    if (ImGui::Button("Split at playhead")) {
+        const double at = engine.timelineClock().seconds;
+        if (const auto made = seq::splitSection(piece.structure, snapSection(engine, at))) {
+            selected_ = static_cast<int>(*made);
+            piece.refreshSectionMarkers();
+            touch();
+            status_ = "split; the new section is yours, not the analyser's";
+        } else {
+            status_ = "the playhead is not far enough inside a section to split it";
+        }
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(piece.structure.sections.size() <= 1);
+    if (ImGui::Button("Delete")) {
+        if (seq::removeSection(piece.structure, index)) {
+            selection_ = Selection::None;
+            selected_ = -1;
+            piece.refreshSectionMarkers();
+            touch();
+        }
+    }
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip("Its time goes to the section before it, so the song stays covered.");
     }
 }
 
@@ -1187,6 +1498,128 @@ void SequencePanel::installIfDirty(app::Engine& engine) {
     for (const std::string& warning : report->warnings) {
         status_ = warning; // the most recent one; the rest are in the log and in projectWarnings
     }
+}
+
+// ---- song structure (ADR-215, ADR-216) ----------------------------------------------------------
+
+void SequencePanel::startStructureAnalysis(app::Engine& engine, bool merge) {
+    if (work_ != nullptr) {
+        return;
+    }
+    auto track = engine.trackShared();
+    if (track == nullptr || track->empty()) {
+        status_ = "no analysed audio to look at";
+        return;
+    }
+    // Claimed before the job starts, not after it finishes. Otherwise the auto-import trigger sees
+    // "revision changed, no structure yet" on the very next frame and queues a second analysis of
+    // the same audio.
+    structureRevision_ = engine.audioRevision();
+    auto work = std::make_shared<StructureWork>();
+    work->track = std::move(track);
+    work->revision = structureRevision_;
+    work->merge = merge;
+    work_ = work;
+    status_.clear();
+
+    const auto body = [work](app::JobContext& ctx) -> Result<void> {
+        ctx.setStages({"beats and features", "self-similarity", "sections"});
+        ctx.beginStage(0);
+        ctx.setOperation("reading the song");
+        // One call, and no progress fraction reported from inside it: `detectStructure` does not
+        // know how far through itself it is, and a number made up here would look exactly like a
+        // measured one (job_system.hpp's rule).
+        ctx.beginStage(2);
+        auto found = analysis::detectStructure(*work->track);
+        if (!found) {
+            work->error = found.error().message;
+            work->finished.store(true, std::memory_order_release);
+            return std::unexpected(found.error());
+        }
+        work->result = std::move(*found);
+        work->finished.store(true, std::memory_order_release);
+        return {};
+    };
+
+    if (jobs == nullptr) {
+        // No job system: a headless host or a test. Inline, and stated as such rather than silently
+        // skipped -- an editor never takes this path.
+        struct Inline final : app::JobContext {
+            void setStages(std::vector<std::string>) override {}
+            void beginStage(int) override {}
+            void setStageProgress(float) override {}
+            void setOperation(std::string) override {}
+            void log(std::string) override {}
+            [[nodiscard]] bool shouldCancel() const override { return false; }
+            [[nodiscard]] bool waitWhilePaused() override { return true; }
+        } context;
+        (void)body(context);
+        // Applied here rather than left for the next frame's poll: a caller with no job system is
+        // almost always a test, and "it appears one frame later" is a difference between the two
+        // paths that a test would have to know about.
+        pollStructureAnalysis(engine);
+        return;
+    }
+    workJob_ = jobs->submit(app::JobRequest{.type = "analysis.structure",
+                                            .name = "song structure",
+                                            .body = body,
+                                            .cancellable = true});
+}
+
+void SequencePanel::pollStructureAnalysis(app::Engine& engine) {
+    if (work_ == nullptr || !work_->finished.load(std::memory_order_acquire)) {
+        return;
+    }
+    const std::shared_ptr<StructureWork> work = std::exchange(work_, nullptr);
+    workJob_ = 0;
+    if (!work->error.empty()) {
+        status_ = work->error;
+        return;
+    }
+    if (work->revision != engine.audioRevision()) {
+        // The audio changed while this was running. Its answer is about a file that is no longer
+        // open, and merging it would put another song's sections on this one.
+        status_ = "the audio changed while the song was being analysed; nothing applied";
+        return;
+    }
+    seq::Sequence& piece = engine.sequence();
+    if (work->merge) {
+        const seq::ReanalysisReport report = seq::reanalyse(piece.structure, work->result);
+        status_ = report.summary();
+    } else {
+        piece.structure = std::move(work->result);
+        status_ = fmt::format("{} section(s) found", piece.structure.sections.size());
+    }
+    piece.refreshSectionMarkers();
+    if (engine.track() != nullptr) {
+        piece.setBeatMarkers(engine.track()->beats().beatTimes);
+    }
+    touch();
+}
+
+double SequencePanel::snapSection(const app::Engine& engine, double seconds) const {
+    if (sectionSnap_ == 0) {
+        return seconds;
+    }
+    const analysis::AnalysisTrack* track = engine.track();
+    if (track == nullptr) {
+        return seconds;
+    }
+    const std::vector<double>& beats = track->beats().beatTimes;
+    if (beats.empty()) {
+        return seconds;
+    }
+    if (sectionSnap_ == 1) {
+        return seq::snapTime(seconds, seq::SnapMode::Beats, beats);
+    }
+    // Bars: every fourth beat, which is the same assumption `seq::BakeOptions::beatsPerBar` makes
+    // and is stated in one place there. The returned value is still a beat's own time.
+    std::vector<double> bars;
+    bars.reserve(beats.size() / 4 + 1);
+    for (std::size_t i = 0; i < beats.size(); i += 4) {
+        bars.push_back(beats[i]);
+    }
+    return seq::snapTime(seconds, seq::SnapMode::Beats, bars);
 }
 
 double SequencePanel::snap(const app::Engine& engine, double seconds) const {

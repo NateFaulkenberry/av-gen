@@ -1024,15 +1024,59 @@ ShotKind shotKindForSection(signals::MusicalSection section) {
         return ShotKind::Reveal;      // the widest opening-out in the film, kept for the end
     case S::Outro:
         return ShotKind::Establish;
+    // ---- the pop/rock half of the vocabulary (ADR-215) ----
+    //
+    // Answered one at a time rather than folded onto the nearest existing kind, because the reason
+    // to have the kind at all is that the shot differs.
+    case S::PreChorus:
+        return ShotKind::Approach;    // the run-up to a chorus is shorter than a build: close the gap
+    case S::Chorus:
+        return ShotKind::HeroReveal;  // a chorus is the payoff, and the payoff is the reveal
+    case S::Break:
+        return ShotKind::Drift;       // the music stopped pushing; the camera keeps moving, laterally
+    case S::Bridge:
+        return ShotKind::Transition;  // the departure: leave what we were on and find something else
+    case S::Instrumental:
+        return ShotKind::Orbit;       // the voice is out; the silhouette is what there is to look at
+    case S::FinalChorus:
+        return ShotKind::Reveal;      // the last chorus gets the widest opening-out, like the last drop
     }
+    // No `default` above, on purpose: -Wswitch then makes a new MusicalSection a compile error here
+    // rather than a silently bland Establish. This line is only reachable from a cast.
     return ShotKind::Establish;
 }
 
-namespace {
 using signals::MusicalSection;
 
-bool isDropSection(MusicalSection s) {
-    return s == MusicalSection::Drop || s == MusicalSection::FinalDrop;
+// Which sections must open their own shot, exactly on their own first frame.
+//
+// A chorus is here beside the drop, and that is the deliberate answer rather than a convenience: in
+// a song with words the chorus *is* the payoff the pre-chorus built to, and the whole reason to read
+// the structure is that the cut lands on the beat the music lands on. The two do not co-occur in one
+// piece in any meaningful way -- a track has drops or it has choruses -- so they are one tier, not
+// two. The cost is visible and accepted: a pop track with four choruses gets four hard cuts, which
+// is what cutting to a pop track looks like.
+bool isDropSectionKind(MusicalSection s) {
+    switch (s) {
+    case MusicalSection::Drop:
+    case MusicalSection::FinalDrop:
+    case MusicalSection::Chorus:
+    case MusicalSection::FinalChorus:
+        return true;
+    case MusicalSection::Intro:
+    case MusicalSection::Build:
+    case MusicalSection::Phrase:
+    case MusicalSection::Verse:
+    case MusicalSection::Breakdown:
+    case MusicalSection::FinalBuild:
+    case MusicalSection::PreChorus:
+    case MusicalSection::Break:
+    case MusicalSection::Bridge:
+    case MusicalSection::Instrumental:
+    case MusicalSection::Outro:
+        return false;
+    }
+    return false;
 }
 
 // The hero owns the payoffs and the run-ups to them, and the wide shots that bracket the film.
@@ -1054,31 +1098,66 @@ bool isDropSection(MusicalSection s) {
 // phrase, a verse and an outro are passages -- the camera travelling through a world -- and a
 // thirty-second one of those is not restraint, it is the film being about whichever object the
 // longest section happened to land on.
-bool mayBeSplit(MusicalSection s) {
+//
+// The four added passages answer this way. `Instrumental` and `Bridge` are passages -- material the
+// camera travels through, and a thirty-second one held on a single object is the film being about
+// whichever object that section landed on. `PreChorus` is a run-up and is not cut into, for the same
+// reason a build is not. `Break` and `Chorus` are the two that must be held: a break is the quiet
+// hold a loud section could not carry, and a chorus has to land and stay landed.
+bool mayBeSplitSection(MusicalSection s) {
     switch (s) {
     case MusicalSection::Intro:
     case MusicalSection::Phrase:
     case MusicalSection::Verse:
     case MusicalSection::Outro:
+    case MusicalSection::Bridge:
+    case MusicalSection::Instrumental:
         return true;
-    default:
+    case MusicalSection::Build:
+    case MusicalSection::Drop:
+    case MusicalSection::Breakdown:
+    case MusicalSection::FinalBuild:
+    case MusicalSection::FinalDrop:
+    case MusicalSection::PreChorus:
+    case MusicalSection::Chorus:
+    case MusicalSection::Break:
+    case MusicalSection::FinalChorus:
         return false;
     }
+    return false;
 }
 
-float emphasisFor(MusicalSection s, float intensity) {
+// How much of the frame the hero is owed. Note that a plain `Build` is zero and only `FinalBuild`
+// carries a run-up's emphasis -- so `PreChorus`, which is a run-up, is zero for the same reason
+// rather than being given a tier of its own. `Chorus` and `FinalChorus` take the drop weights
+// exactly, because they are the same event in a different genre and a second, weaker tier would be
+// a claim that a chorus matters less than a drop in the piece it is actually in.
+float emphasisForSection(MusicalSection s, float intensity) {
     switch (s) {
     case MusicalSection::FinalDrop:
+    case MusicalSection::FinalChorus:
         return std::clamp(0.80f + 0.20f * intensity, 0.0f, 1.0f);
     case MusicalSection::Drop:
+    case MusicalSection::Chorus:
         return std::clamp(0.65f + 0.35f * intensity, 0.0f, 1.0f);
     case MusicalSection::FinalBuild:
         return std::clamp(0.35f + 0.30f * intensity, 0.0f, 1.0f);
-    default:
+    case MusicalSection::Intro:
+    case MusicalSection::Build:
+    case MusicalSection::Phrase:
+    case MusicalSection::Verse:
+    case MusicalSection::Breakdown:
+    case MusicalSection::PreChorus:
+    case MusicalSection::Break:
+    case MusicalSection::Bridge:
+    case MusicalSection::Instrumental:
+    case MusicalSection::Outro:
         return 0.0f;
     }
+    return 0.0f;
 }
 
+namespace {
 // One shot's worth of the structure. `opener` is the section that decided what the shot is; the
 // span may cover sections after it that were too short to be worth a cut of their own.
 struct ShotSpan {
@@ -1096,7 +1175,7 @@ std::vector<ShotSpan> groupSections(const signals::MusicalStructure& structure,
             continue;
         }
         const double runSoFar = section.startSeconds - spans.back().start;
-        if (isDropSection(section.kind)) {
+        if (isDropSectionKind(section.kind)) {
             // A drop always opens its own shot, exactly on the drop. That is the one hard rule
             // here: the whole point of reading the structure is that the reveal lands on the beat
             // the music lands on, and any smoothing that moves it is smoothing away the reason.
@@ -1139,7 +1218,7 @@ std::vector<ShotSpan> groupSections(const signals::MusicalStructure& structure,
         // that assert the present contract in as many words ("the drop is one shot from 41 s to the
         // end"), so it is a decision about what a drop *is* rather than a defect, and it is left to
         // be made rather than made here. See ADR-190.
-        if (!mayBeSplit(span.opener->kind) || length <= brief.maxShotSeconds) {
+        if (!mayBeSplitSection(span.opener->kind) || length <= brief.maxShotSeconds) {
             split.push_back(span);
             continue;
         }
@@ -1558,7 +1637,7 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
             shot.endAzimuth = shot.startAzimuth + 0.10f;
         }
 
-        shot.spotlight.emphasis = emphasisFor(sectionKind, span.opener->intensity);
+        shot.spotlight.emphasis = emphasisForSection(sectionKind, span.opener->intensity);
         shot.spotlight.active = shot.spotlight.emphasis > 0.0f;
 
         // A breakdown is the one place a cut belongs. The music has stopped, so the cut is invisible

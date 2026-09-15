@@ -202,15 +202,15 @@ TEST_CASE("An energy trend colours a section without dividing it",
 }
 
 TEST_CASE("Structure names round-trip", "[signals][musical][structure]") {
-    for (const auto s : {MusicalSection::Intro, MusicalSection::Build, MusicalSection::Phrase,
-                         MusicalSection::Drop, MusicalSection::Verse, MusicalSection::Breakdown,
-                         MusicalSection::FinalBuild, MusicalSection::FinalDrop,
-                         MusicalSection::Outro}) {
+    // Over `allMusicalSections()` rather than a list written out here: a hand-written list of nine
+    // is what this test used to be, and when the vocabulary grew to fifteen (ADR-215) it went on
+    // passing while testing nine of them.
+    for (const auto s : avgen::signals::allMusicalSections()) {
         const auto again = musicalSectionFromName(musicalSectionName(s));
         REQUIRE(again.has_value());
         CHECK(*again == s);
     }
-    CHECK(!musicalSectionFromName("chorus").has_value());
+    CHECK(!musicalSectionFromName("hook").has_value());
 }
 
 TEST_CASE("A structure with no length has no sections", "[signals][musical][structure]") {
