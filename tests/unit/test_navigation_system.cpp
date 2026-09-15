@@ -12,6 +12,8 @@
 #include "entity/obstacles.hpp"
 #include "spatial/obstacle_field.hpp"
 #include "params/parameter_set.hpp"
+
+#include <array>
 #include "world/world_map.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -829,6 +831,78 @@ TEST_CASE("a grounded body follows the surface without inheriting its noise", "[
             orphan.update(nowhere, glm::vec2(500.0f, 500.0f), 0.0f, 0.0f, kStep, settings);
         CHECK(result.height == 0.0f);
         CHECK(result.grounded);
+    }
+}
+
+// PROBE (temporary): the reported defect -- four-legged farm animals walking INTO a hill rather
+// than up it. A body of length L on a slope t, pitched by p, puts its nose (L/2)(tan t - tan p)
+// below the ground and floats its tail by the same. Swept across slope angle, because the severity
+// is a function of the grade and Glowmere has a range of them.
+TEST_CASE("PROBE quadruped nose penetration against slope angle", "[.probe][slope]") {
+    world::Ecology ecology;
+    struct Sample { float slopeDeg; glm::vec2 at; const world::WorldMap* map; };
+    std::vector<world::WorldMap> maps;
+    // Increasing amplitude at one low frequency: smooth hills of increasing steepness, so a search
+    // over them finds points at a range of real gradients.
+    for (float amp : {12.0f, 30.0f, 60.0f, 110.0f, 180.0f}) {
+        world::WorldMap m;
+        m.size = glm::vec2(600.0f, 600.0f);
+        m.layers.push_back({.frequency = 0.004f, .amplitude = amp});
+        m.prepare();
+        maps.push_back(std::move(m));
+    }
+
+    struct Animal { const char* name; float length; };
+    const Animal animals[] = {{"bull", 2.65f * 3.6f}, {"cow", 2.36f * 3.6f}, {"horse", 2.32f * 3.6f},
+                              {"pig", 1.26f * 3.6f},  {"sheep", 1.25f * 3.6f}, {"goat", 0.95f * 3.6f}};
+
+    const auto measure = [](const entity::Navigator& nav, glm::vec2 at,
+                            const entity::GroundSettings& settings, float length) {
+        entity::GroundFollower body;
+        const glm::vec2 heading(1.0f, 0.0f);
+        const float yaw = std::atan2(heading.x, heading.y);
+        entity::GroundResult r;
+        for (int i = 0; i < 400; ++i) {
+            r = body.update(nav, at, yaw, 0.0f, 1.0 / 60.0, settings);
+        }
+        const float half = length * 0.5f;
+        const float nose = nav.groundHeight(at + heading * half) -
+                           (r.height + half * std::sin(r.pitch / 57.2957795f));
+        return std::pair<float, float>{r.pitch, nose};
+    };
+
+    WARN("slope  animal   SHIPPING (fp 0.55 m, align 0.55)      PROPOSED (fp = L/2, align 0.92)");
+    for (const world::WorldMap& map : maps) {
+        world::ClearanceField clearance;
+        clearance.map = &map;
+        clearance.ecology = &ecology;
+        const entity::Navigator nav(&map, clearance);
+        glm::vec2 best(0.0f);
+        float bestGrad = 0.0f;
+        for (float x = -200.0f; x < 200.0f; x += 2.0f) {
+            for (float z = -200.0f; z < 200.0f; z += 2.0f) {
+                const glm::vec2 at(x, z);
+                const float d = (nav.groundHeight(at + glm::vec2(4.0f, 0.0f)) -
+                                 nav.groundHeight(at - glm::vec2(4.0f, 0.0f))) / 8.0f;
+                if (d > bestGrad) { bestGrad = d; best = at; }
+            }
+        }
+        const float slopeDeg = std::atan(bestGrad) * 57.2957795f;
+        // The two knobs separated, because changing both on one hunch is how a fix gets credited to
+        // the wrong half of itself.
+        if (slopeDeg > 20.0f && slopeDeg < 25.0f) {
+            const Animal& a = animals[0]; // the bull: the longest body and the worst case
+            for (float align : {0.55f, 0.80f, 0.92f, 1.00f}) {
+                for (float fp : {0.55f, a.length * 0.25f, a.length * 0.5f}) {
+                    entity::GroundSettings g;
+                    g.slopeAlign = align;
+                    g.footprint = fp;
+                    const auto m = measure(nav, best, g, a.length);
+                    WARN("MATRIX align " << align << " footprint " << fp << " -> pitch " << m.first
+                                         << " nose " << m.second);
+                }
+            }
+        }
     }
 }
 
