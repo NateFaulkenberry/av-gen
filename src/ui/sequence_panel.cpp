@@ -506,6 +506,12 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         if (marker.kind != seq::MarkerKind::Section && marker.kind != seq::MarkerKind::Cue) {
             continue;
         }
+        // Section markers are derived from the structure, and when the structure has a lane of its
+        // own that lane already draws every one of them with a name and a boundary line. Drawing
+        // both is the same information twice, in two places, with the labels overlapping.
+        if (marker.kind == seq::MarkerKind::Section && lanes.hasSections) {
+            continue;
+        }
         const float x = toX(marker.timeSeconds);
         if (x < origin.x - 40.0f || x > origin.x + width) {
             continue;
