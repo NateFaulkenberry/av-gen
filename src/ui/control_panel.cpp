@@ -699,6 +699,12 @@ void ControlPanel::drawCanvasActivity(app::Engine& engine, const CanvasRect& rec
             }
         }
     }
+    if (stage == nullptr && environmentBehind) {
+        // The same rule for the same reason, one subsystem along (ADR-233): the sky and everything
+        // it lights are a few frames behind the slider, and the alternative to saying so is a
+        // picture that quietly disagrees with the numbers in the panel.
+        stage = "Updating the sky";
+    }
 
     // A load is shown the instant it is known, with no threshold: the host only sets the flag on
     // the frame before it blocks, so a fade would mean showing nothing at all on the one frame

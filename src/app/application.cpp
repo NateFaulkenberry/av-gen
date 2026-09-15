@@ -16,11 +16,13 @@
 #include "assets/image.hpp"
 #include "rendering/shader_layer.hpp"
 #include "core/rng.hpp"
+#include "scene/procedural.hpp"
 #include "core/time.hpp"
 #include "gpu/context.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
 #include "platform/window.hpp"
+#include "rendering/environment.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "rendering/debug_visualizer.hpp"
 #include "app/world_builder.hpp"
@@ -53,6 +55,68 @@
 #include <vector>
 
 namespace avgen::app {
+
+namespace {
+// "a:b:c" -> {"a","b","c"}. Empty tokens are dropped so a trailing separator is not an arm.
+std::vector<std::string> splitList(std::string_view spec, char sep) {
+    std::vector<std::string> out;
+    std::size_t start = 0;
+    while (start <= spec.size()) {
+        const std::size_t at = spec.find(sep, start);
+        const std::string_view token =
+            spec.substr(start, at == std::string_view::npos ? std::string_view::npos : at - start);
+        if (!token.empty()) {
+            out.emplace_back(token);
+        }
+        if (at == std::string_view::npos) {
+            break;
+        }
+        start = at + 1;
+    }
+    return out;
+}
+
+// An arm's name may carry "+"-separated flags after the script, each meaning "run this block with
+// one of ADR-233's fixes put back". That is what makes a before/after a *difference* rather than a
+// comparison of two runs on a machine three agents share: the two arms are blocks of the same
+// process, seconds apart, under the same contention and the same thermal state.
+//
+//   idle+legacy     the procedural double generation, restored
+//   sliders+skynow  the sky IBL rebuilt inside the frame again, undeferred
+struct UiAbArm {
+    std::string script;
+    bool legacyProcGen = false;
+    bool eagerSky = false;
+};
+UiAbArm parseUiAbArm(std::string_view spec) {
+    UiAbArm out;
+    std::size_t start = 0;
+    bool first = true;
+    while (start <= spec.size()) {
+        const std::size_t at = spec.find('+', start);
+        const std::string_view token =
+            spec.substr(start, at == std::string_view::npos ? std::string_view::npos : at - start);
+        if (first) {
+            out.script = std::string(token);
+            first = false;
+        } else if (token == "legacy") {
+            out.legacyProcGen = true;
+        } else if (token == "skynow") {
+            out.eagerSky = true;
+        } else {
+            // An unknown flag must not read as "no flag": it would silently measure the arm twice
+            // and report the pair as a null result (ADR-182's vacuous arm, exactly).
+            out.script = "?" + std::string(token);
+        }
+        if (at == std::string_view::npos) {
+            break;
+        }
+        start = at + 1;
+    }
+    return out;
+}
+
+} // namespace
 
 std::string usageText() {
     return "usage: avgen [options]\n"
@@ -95,6 +159,16 @@ std::string usageText() {
            "                      'turns' array). Deterministic: no key, no network, real tools\n"
            "  --ui-script <arms>  drive the editor with a repeatable interaction: comma-separated from\n"
            "                      hover,sliders,panels,select,scrub,camera,tabs -- or idle, or all\n"
+           "  --ui-ab <a>:<b>..   interleave those --ui-script arms in blocks inside ONE process and\n"
+           "                      report each arm's frame distribution side by side. The only honest\n"
+           "                      way to compare two interactions on a machine other agents share\n"
+           "  --ui-ab-frames <n>  frames per block (default 120; keep it a multiple of 60, the\n"
+           "                      pointer arms' gesture cycle)\n"
+           "  --ui-ab-blocks <n>  passes over the arm list (default 4)\n"
+           "  --ui-ab-settle <n>  frames discarded after each switch (default 12)\n"
+           "                      an arm may be suffixed '+legacy' (procedural double-generation\n"
+           "                      restored) and/or '+skynow' (sky IBL rebuilt inside the frame),\n"
+           "                      so each fix has a before arm in the same process\n"
            "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
            "  --supersample <f>   offline render only: render the scene at this multiple of the output\n"
            "                      size and resolve down (1 = off, max 2). Buys back the sub-pixel\n"
@@ -360,6 +434,36 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
                 return fail("--ui-script '{}' is not an arm; expected some of {}", *v, uiScriptNames());
             }
             options.uiScript = *v;
+            ++i;
+        } else if (arg == "--ui-ab") {
+            auto v = need(i, "--ui-ab");
+            if (!v) return std::unexpected(v.error());
+            // Every arm is validated here rather than at the first switch: a typo in arm four of a
+            // six-arm run must not be discovered after four hundred frames of measuring.
+            for (const std::string& armSpec : splitList(*v, ':')) {
+                if (!parseUiScript(parseUiAbArm(armSpec).script)) {
+                    return fail("--ui-ab arm '{}' is not an arm; expected some of {}, optionally "
+                                "suffixed '+legacy' and/or '+skynow'",
+                                armSpec, uiScriptNames());
+                }
+            }
+            options.uiAb = *v;
+            ++i;
+        } else if (arg == "--ui-ab-frames" || arg == "--ui-ab-blocks" || arg == "--ui-ab-settle") {
+            auto v = need(i, arg.c_str());
+            if (!v) return std::unexpected(v.error());
+            int n = 0;
+            try {
+                n = std::stoi(*v);
+            } catch (const std::exception&) {
+                return fail("{} expects an integer", arg);
+            }
+            if (n < 0) {
+                return fail("{} expects a non-negative integer", arg);
+            }
+            if (arg == "--ui-ab-frames") options.uiAbFrames = std::max(1, n);
+            else if (arg == "--ui-ab-blocks") options.uiAbBlocks = std::max(1, n);
+            else options.uiAbSettle = n;
             ++i;
         } else if (arg == "--supersample") {
             auto v = need(i, "--supersample");
@@ -2482,16 +2586,91 @@ int Application::runLive() {
     const int kPhAllocEngine = prof.phase("# allocs engine.upd");
     const int kPhAllocRecord = prof.phase("# allocs render.rec");
     const int kPhAllocImgui = prof.phase("# allocs imgui.rec");
+    // Structural counters: what the frame *caused*, not how long the machine took to do it. ADR-170
+    // is the reason these are here -- a phantom 3.8x regression was nearly filed off timings while
+    // the structural counters moved 3.6%, and it was the counters that indicted the machine. A
+    // regeneration count cannot be inflated by somebody else's build.
+    const int kPhProcGen = prof.phase("# procedural regen");
+    const int kPhFlatten = prof.phase("# scene flattens");
+    const int kPhEnvBuild = prof.phase("# IBL builds");
+    std::uint64_t lastProcGen = scene::proceduralRebuildCount();
+    std::uint64_t lastEnvBuild = rendering::environmentBuildCount();
+    // Seeded from the composition as it stands *after* the load, so the first frame reports the
+    // flattens that frame caused rather than the ones opening the project did.
+    std::uint64_t lastFlatten =
+        engine_->composition() != nullptr ? engine_->composition()->flattenCount() : 0;
     if (auto arms = parseUiScript(options_.uiScript)) {
         uiScript_ = UiScript(*arms);
     }
     if (uiScript_.active()) {
         log::info("ui-script: '{}' driving the editor", options_.uiScript);
     }
+    // ADR-233, live only: above two milliseconds a sky rebuild waits for the drag to stop. The
+    // same number and the same reasoning as Engine::installController's procedural budget --
+    // comfortably below a frame's share, comfortably above anything worth deferring. `runHeadless`
+    // never calls this, so an offline render rebuilds whenever the hash moves, as it always did.
+    renderer_->setInteractiveEnvironmentBudget(2.0);
+    // ---- the interleaved arms (--ui-ab) ---------------------------------------------------------
+    //
+    // One process, several interactions, cycled in blocks. The first `uiAbSettle` frames of a block
+    // are labelled `kNoGroup` and excluded: an arm must not be charged for the deferral its
+    // predecessor left running, nor credited with a pipeline its predecessor already compiled.
+    const std::vector<std::string> abArms = splitList(options_.uiAb, ':');
+    std::vector<std::string> abEditLog;
+    const bool abRunning = !abArms.empty();
+    std::vector<int> abGroups;
+    if (abRunning) {
+        if (abArms.size() > core::PhaseProfiler::kMaxGroups) {
+            // Said, not swallowed. A run asked for nine arms and reported eight, and the missing
+            // one was the arm the question was about -- a truncation nobody is told about is a
+            // measurement of something other than what was asked for.
+            log::warn("ui-ab: {} arms asked for, {} is the maximum; the last {} will not run",
+                      abArms.size(), core::PhaseProfiler::kMaxGroups,
+                      abArms.size() - core::PhaseProfiler::kMaxGroups);
+        }
+        for (std::size_t a = 0; a < abArms.size() && a < core::PhaseProfiler::kMaxGroups; ++a) {
+            prof.nameGroup(static_cast<int>(a), abArms[a]);
+            abGroups.push_back(static_cast<int>(a));
+        }
+        log::info("ui-ab: {} arm(s) x {} block(s) of {} frames ({} settling), interleaved in this process",
+                  abGroups.size(), options_.uiAbBlocks, options_.uiAbFrames, options_.uiAbSettle);
+    }
 
     for (;;) {
         const auto frameStart = std::chrono::steady_clock::now();
         prof.beginFrame();
+        if (abRunning) {
+            const int perBlock = std::max(1, options_.uiAbFrames);
+            const auto arms = static_cast<int>(abGroups.size());
+            const int index = framesRendered / perBlock;
+            const int withinBlock = framesRendered % perBlock;
+            if (index >= arms * std::max(1, options_.uiAbBlocks)) {
+                break; // every arm has had every block; the report is written on the way out
+            }
+            const int arm = index % arms;
+            if (withinBlock == 0) {
+                // Whatever the outgoing arm was holding, it is not holding it now.
+                releaseScriptedPointer(*window_);
+                const UiAbArm spec = parseUiAbArm(abArms[static_cast<std::size_t>(arm)]);
+                // What the outgoing arm proved about itself, before the script that holds it is
+                // replaced. Without this the probes an arm prints -- "the box selected 9 of 16",
+                // "the handle under the pointer was AxisX" -- die at the first switch, and every
+                // `--ui-ab` column would be a frame time with nothing saying the arm did anything
+                // at all (ADR-182).
+                for (const std::string& line : uiScript_.editLog()) {
+                    abEditLog.push_back(line);
+                }
+                if (auto parsed = parseUiScript(spec.script)) {
+                    uiScript_ = UiScript(*parsed);
+                }
+                if (auto* comp = engine_->composition()) {
+                    comp->setLegacyProceduralGeneration(spec.legacyProcGen);
+                }
+                renderer_->setInteractiveEnvironmentBudget(spec.eagerSky ? 0.0 : 2.0);
+            }
+            prof.setFrameGroup(withinBlock < options_.uiAbSettle ? core::PhaseProfiler::kNoGroup
+                                                                 : abGroups[static_cast<std::size_t>(arm)]);
+        }
         const std::uint64_t allocsAtFrameStart = core::allocCounters().allocations;
         // Last frame's canvas. Events are read before this frame is laid out, so this is the most
         // recent answer there is; on a still window it is the current one.
@@ -2593,6 +2772,7 @@ int Application::runLive() {
         }
         if (panel_ != nullptr) {
             panel_->canvasTexture = reinterpret_cast<std::uint64_t>(finalView_.Get());
+            panel_->environmentBehind = renderer_->environmentAwaitingRebuild();
         }
         prof.add(kPhResize, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
                                                                       resizeStart).count());
@@ -2957,6 +3137,18 @@ int Application::runLive() {
         stats.frameIntervalMs = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();
         prof.count(kPhAllocK,
                    static_cast<double>(core::allocCounters().allocations - allocsAtFrameStart) / 1000.0);
+        {
+            const std::uint64_t procGen = scene::proceduralRebuildCount();
+            const std::uint64_t envBuild = rendering::environmentBuildCount();
+            const std::uint64_t flatten =
+                engine_->composition() != nullptr ? engine_->composition()->flattenCount() : lastFlatten;
+            prof.count(kPhProcGen, static_cast<double>(procGen - lastProcGen));
+            prof.count(kPhEnvBuild, static_cast<double>(envBuild - lastEnvBuild));
+            prof.count(kPhFlatten, static_cast<double>(flatten >= lastFlatten ? flatten - lastFlatten : 0));
+            lastProcGen = procGen;
+            lastEnvBuild = envBuild;
+            lastFlatten = flatten;
+        }
         prof.endFrame(stats.frameIntervalMs);
         ++fpsFrames;
         fpsAccum = std::chrono::duration<double>(frameEnd - fpsStart).count();
@@ -3015,6 +3207,19 @@ int Application::runLive() {
                        .c_str(),
                    stderr);
     }
+    if (!abGroups.empty()) {
+        // Always printed, with or without --profile-cpu: a `--ui-ab` run whose comparison has to be
+        // asked for separately is a run somebody will take without it and then quote anyway.
+        std::fputs(cpuProfile_
+                       .compare(fmt::format("interleaved arms, one process, {} block(s) of {} frames",
+                                            options_.uiAbBlocks, options_.uiAbFrames),
+                                abGroups)
+                       .c_str(),
+                   stderr);
+        for (const int g : abGroups) {
+            std::fputs(cpuProfile_.report(fmt::format("arm '{}'", cpuProfile_.groupName(g)), g).c_str(), stderr);
+        }
+    }
     if (options_.profileCsv) {
         std::ofstream out(*options_.profileCsv);
         out << cpuProfile_.csv();
@@ -3022,6 +3227,9 @@ int Application::runLive() {
     }
     // What the scripted editor run actually did, in order. This is the only record that survives a
     // run the machine cannot screenshot (ADR-092), so it is printed whether or not anything else is.
+    for (const std::string& line : abEditLog) {
+        log::info("{}", line);
+    }
     for (const std::string& line : uiScript_.editLog()) {
         log::info("{}", line);
     }
