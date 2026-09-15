@@ -138,6 +138,15 @@ is where you find and remove it.
 not collision avoidance: it does not know about buildings, water, moving entities, or anything that
 arrives after the shot is cut.
 
+**The cut cannot see the world's own events — except one, on request (ADR-217).** The whole sequence
+is folded from the music before a frame is drawn, so a shot can land in the middle of a staging
+scenario (ADR-210) and the next one can walk out of it. `holdScenario` names one scenario; while it
+holds `holdRole` bound and the playhead is in a shot cut for that scenario's actor, the camera keeps
+that shot's framing on the actor and rides along with it, rejoining the cut over `holdRelease`
+seconds afterwards. Off unless a scenario is named, and it does not change the cut itself: the keys,
+the timings and every other shot are the same film. On the command line:
+`--director holdScenario=abduction`; in the panel, *Stay with a scenario ▸ mid-event*.
+
 **No re-cut during an offline render.** `refreshDirection` runs in the interactive loop only; a
 render's heroes cannot change while it runs.
 
