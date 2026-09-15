@@ -199,3 +199,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [201](ADR-201-there-is-no-primary-hero.md) | There is no primary hero, only importance | Accepted |
 | [202](ADR-202-importance-is-the-whole-of-casting.md) | Importance is the whole of casting | Accepted |
 | [203](ADR-203-a-cap-that-broke-the-film.md) | A cap that broke the film, and the control that was missing | Accepted |
+| [206](ADR-206-structure-from-repetition-not-from-energy.md) | Structure from repetition, not from energy | Accepted |
