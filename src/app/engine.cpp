@@ -139,6 +139,22 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         const scene::FocusSettings keepFocus = focus_;
         cameraParams_ = scene::registerCameraParameters(params_, keepLens, keepExposure, keepFocus);
     }
+    // ADR-207: the scene's world effects, and the `worldfx/<name>/...` parameters that make every
+    // number on them automatable, keyable and modulatable. The authored set is copied off the
+    // composition rather than read through it per frame, because the live set is what modulation
+    // writes to and a composition's authored values must survive being modulated.
+    //
+    // Unregistered first and unconditionally: a scene swap replaces the cast of effects, and a
+    // registrar that only ever adds leaves the previous scene's paths behind for a route to bind to.
+    timeline_.unbind();
+    world::unregisterWorldEffectParameters(params_, worldEffectParams_);
+    worldEffects_.clear();
+    if (const auto* comp = composition()) {
+        worldEffects_ = comp->worldEffects();
+    }
+    if (!worldEffects_.empty()) {
+        worldEffectParams_ = world::registerWorldEffectParameters(params_, worldEffects_);
+    }
     resetCameraState();
     shaderLayers_.reattach();
     // The composition's layer parameters (ADR-083), with everything else that has to survive a
@@ -326,6 +342,30 @@ void Engine::noteBindingProblem(std::string message) {
     projectWarnings_.push_back(std::move(message));
 }
 
+Result<void> Engine::setWorldEffects(std::vector<world::WorldEffect> effects) {
+    // Validated before anything is touched, so a refusal leaves the engine exactly as it was.
+    if (auto ok = world::validateWorldEffects(effects); !ok) {
+        return ok;
+    }
+    // The composition owns the authored set (it is what a save writes); the engine owns the live
+    // one. Writing both here is what stops the panel and the file drifting apart.
+    if (auto* comp = composition()) {
+        if (auto ok = comp->setWorldEffects(effects); !ok) {
+            return ok;
+        }
+    }
+    // The parameter set changes shape -- effects appear and disappear -- so the timeline has to let
+    // go of its pointers before the old paths are removed, and rebind afterwards.
+    timeline_.unbind();
+    world::unregisterWorldEffectParameters(params_, worldEffectParams_);
+    worldEffects_ = std::move(effects);
+    if (!worldEffects_.empty()) {
+        worldEffectParams_ = world::registerWorldEffectParameters(params_, worldEffects_);
+    }
+    rebind();
+    return {};
+}
+
 void Engine::detachSceneParameters() {
     if (auto* comp = composition()) {
         comp->detach();
@@ -333,6 +373,9 @@ void Engine::detachSceneParameters() {
     shaderLayers_.detach();
     layers_.detach();
     timeline_.unbind();
+    // ADR-207. After `timeline_.unbind()`, because a track aimed at a `worldfx/...` path holds a
+    // pointer into the parameter that is about to go.
+    world::unregisterWorldEffectParameters(params_, worldEffectParams_);
 }
 
 params::Track* Engine::recordKey(const std::string& path, int component, params::KeyInterp interp,
@@ -733,6 +776,33 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
                                            {"heroAtCut", {shot.heroAtCut.x, shot.heroAtCut.y, shot.heroAtCut.z}}});
         }
         doc["cameraAimFollow"] = std::move(shots);
+    }
+    // ADR-207: the other half of the same bake -- when the camera travels and when it holds, which
+    // is what a world effect time-gates on. A sibling of `cameraAimFollow` for the identical reason,
+    // and saved for a reason the aim-follow table taught the hard way: an offline render loads a
+    // *project document*, so anything the director left only in memory is a cut the render does not
+    // have. Without this the beam and the pulse were correct in the window and absent from every
+    // frame anybody exported.
+    if (!shotSpans_.empty()) {
+        nlohmann::json spans = nlohmann::json::array();
+        for (const world::ShotSpan& span : shotSpans_) {
+            nlohmann::json entry{{"start", span.start},
+                                 {"end", span.end},
+                                 {"travel", span.travel},
+                                 {"spotlight", span.spotlight},
+                                 {"emphasis", span.emphasis},
+                                 {"subject", span.subject},
+                                 {"subjectPosition",
+                                  {span.subjectPosition.x, span.subjectPosition.y, span.subjectPosition.z}},
+                                 {"subjectRadius", span.subjectRadius}};
+            if (!span.handoff.empty()) {
+                entry["handoff"] = span.handoff;
+                entry["handoffPosition"] = {span.handoffPosition.x, span.handoffPosition.y,
+                                            span.handoffPosition.z};
+            }
+            spans.push_back(std::move(entry));
+        }
+        doc["cameraShotSpans"] = std::move(spans);
     }
     if (!states_.empty()) {
         doc["states"] = states_.toJson();
@@ -1150,6 +1220,42 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             }
         }
         comp->setAimFollow(std::move(shots));
+    }
+    // ADR-207, and cleared when absent for the same reason the aim-follow table is: a project with
+    // no cut must not inherit the last one's, or a world effect would fire against a schedule for a
+    // film this scene has never been in.
+    {
+        std::vector<world::ShotSpan> spans;
+        if (doc.contains("cameraShotSpans") && doc["cameraShotSpans"].is_array()) {
+            for (const auto& entry : doc["cameraShotSpans"]) {
+                if (!entry.is_object()) {
+                    continue;
+                }
+                world::ShotSpan span;
+                span.start = entry.value("start", 0.0);
+                span.end = entry.value("end", 0.0);
+                span.travel = entry.value("travel", false);
+                span.spotlight = entry.value("spotlight", false);
+                span.emphasis = entry.value("emphasis", 0.0f);
+                span.subject = entry.value("subject", std::string{});
+                const auto readVec = [&entry](const char* key, glm::vec3& out) {
+                    if (entry.contains(key) && entry[key].is_array() && entry[key].size() == 3) {
+                        out = glm::vec3(entry[key][0].get<float>(), entry[key][1].get<float>(),
+                                        entry[key][2].get<float>());
+                    }
+                };
+                readVec("subjectPosition", span.subjectPosition);
+                span.subjectRadius = entry.value("subjectRadius", 1.0f);
+                span.handoff = entry.value("handoff", std::string{});
+                readVec("handoffPosition", span.handoffPosition);
+                if (!(span.end > span.start)) {
+                    warn("cameraShotSpans: a span with no duration was skipped");
+                    continue;
+                }
+                spans.push_back(std::move(span));
+            }
+        }
+        shotSpans_ = std::move(spans);
     }
     cueState_ = {};
     cueApplied_ = false;
@@ -2379,6 +2485,109 @@ void Engine::applyCues() {
     }
 }
 
+namespace {
+
+// Where the world's nodes are, for a world effect resolving a `node:` source (ADR-207). An interface
+// rather than a lambda so resolution allocates nothing: the engine counts allocations per frame.
+class CompositionEffectScene final : public world::WorldEffectScene {
+public:
+    explicit CompositionEffectScene(const scene::Composition* comp) : comp_(comp) {}
+
+    [[nodiscard]] bool nodePosition(std::string_view name, glm::vec3& out) const override {
+        if (comp_ == nullptr) {
+            return false;
+        }
+        const scene::CompositionNode* node = comp_->findNode(std::string(name));
+        if (node == nullptr) {
+            return false;
+        }
+        out = comp_->nodeWorldTransform(*node).position;
+        return true;
+    }
+
+    [[nodiscard]] bool nodeForward(std::string_view name, glm::vec3& out) const override {
+        if (comp_ == nullptr) {
+            return false;
+        }
+        const scene::CompositionNode* node = comp_->findNode(std::string(name));
+        if (node == nullptr) {
+            return false;
+        }
+        // The node's -Z axis, which is the convention the rest of the engine uses for "forward".
+        out = comp_->nodeWorldTransform(*node).rotation * glm::vec3(0.0f, 0.0f, -1.0f);
+        return true;
+    }
+
+private:
+    const scene::Composition* comp_;
+};
+
+} // namespace
+
+// The camera's velocity, in metres per timeline second.
+//
+// **A finite difference in timeline seconds, never in frame deltas.** A beam pointed where the
+// camera is going has to point the same way in a 30 fps offline render and in a 144 Hz window, and a
+// frame-to-frame difference does not: it is `speed * deltaTime`, and deltaTime is whatever the
+// machine managed. The camera is a baked `camera/position` track (ADR-075), which is a pure function
+// of time, so the honest answer is to evaluate it twice a fixed step apart.
+//
+// Zero when the camera is not automated, which is the truthful answer for a camera that is wherever
+// somebody last dragged it: there is no trajectory to read.
+glm::vec3 Engine::cameraVelocityOnTimeline() const {
+    constexpr double kStep = 1.0 / 60.0; // one 60 Hz frame: short enough to be local, long enough to
+                                         // survive the float precision of a key value
+    const params::Track* track = timeline_.findTrack("camera/position", -1);
+    if (track == nullptr || !track->enabled || track->keys.size() < 2) {
+        return glm::vec3(0.0f);
+    }
+    const double now = timelineClock_.at(track->timeBase);
+    // Beats per second when the track is keyed in beats, so the result is still metres per *second*.
+    const double scale = track->timeBase == params::TimeBase::Beats
+                             ? (sourceContext_.tempoBpm > 1.0f ? sourceContext_.tempoBpm / 60.0 : 2.0)
+                             : 1.0;
+    const params::KeyValue a = track->evaluate(now - kStep * scale);
+    const params::KeyValue b = track->evaluate(now);
+    const glm::vec3 delta(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    return delta / static_cast<float>(kStep);
+}
+
+// Resolves this frame's world effects into the scene (ADR-207).
+//
+// Called from `update()` after the camera has been placed and after the modulation routes have run,
+// so the numbers it reads are this frame's finals and the camera it reads is this frame's camera.
+// Everything it does is a pure function of the transport second, which is what keeps an offline
+// render of second N identical to a playthrough of second N.
+void Engine::updateWorldEffects() {
+    scene::Scene& live = controller_->scene();
+    if (worldEffects_.empty()) {
+        live.worldEffects = world::WorldEffectFrame{};
+        return;
+    }
+    world::applyWorldEffectParameters(worldEffectParams_, worldEffects_);
+
+    const CompositionEffectScene sceneAdapter(composition());
+    world::WorldEffectContext ctx;
+    ctx.seconds = timelineClock_.seconds;
+    ctx.cameraPosition = live.camera.position;
+    ctx.cameraTarget = live.camera.target;
+    const glm::vec3 aim = live.camera.target - live.camera.position;
+    ctx.cameraForward = glm::length(aim) > 1e-5f ? glm::normalize(aim) : glm::vec3(0.0f, 0.0f, -1.0f);
+    ctx.cameraVelocity = cameraVelocityOnTimeline();
+    ctx.shots = shotSpans_;
+    ctx.scene = &sceneAdapter;
+    if (const auto* comp = composition()) {
+        ctx.heroes = comp->heroes();
+    }
+    world::buildWorldEffectFrame(worldEffects_, ctx, live.worldEffects);
+    // Logged on the edge rather than per frame: "why is my effect not firing" is a question about
+    // when it started and stopped, and a line per frame would bury the answer.
+    if (live.worldEffects.count != lastWorldEffectCount_) {
+        lastWorldEffectCount_ = live.worldEffects.count;
+        log::debug("world effects: {} live at {:.2f}s", live.worldEffects.count, ctx.seconds);
+    }
+}
+
 void Engine::update(const FrameTime& time) {
     const auto start = std::chrono::steady_clock::now();
     bool newFrame = false;
@@ -2550,6 +2759,7 @@ void Engine::update(const FrameTime& time) {
         // post/motionBlur/amount stays exactly as authored.
     }
     controller_->scene().post = post_;
+    updateWorldEffects();
     {
         shaders::StdUniforms base;
         const auto& f = latest_;

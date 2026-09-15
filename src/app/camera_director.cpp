@@ -75,6 +75,9 @@ std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state) {
     if (scene::Composition* composition = engine.composition()) {
         composition->setAimFollow({});
     }
+    // ADR-207: and so does the shot schedule. A world effect gated on "the camera is travelling"
+    // must not keep firing against a cut that is no longer driving anything.
+    engine.setShotSpans({});
     // Everything except the settings, which are the user's preferences rather than this cut's state.
     // Resetting the whole struct wiped the panel's choices every time the camera went back to the
     // viewport, so a shot mode chosen once survived until the first hand-back and no longer.
@@ -500,6 +503,27 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
         log::info("auto-director: {} of {} shot(s) hold a subject and will follow it",
                   follow.size(), sequence.shots.size());
         composition->setAimFollow(std::move(follow));
+    }
+    // ADR-207: the cut, flattened for world effects to time-gate against. Installed with the keys
+    // rather than derived per frame, for the same reason the keys exist at all -- a shot schedule is
+    // a fold over a whole track and the frame you are on cannot know it. Nothing here runs per
+    // frame; `resolveWorldEffects` does a linear scan of single digits of spans.
+    {
+        std::vector<world::ShotSpan> spans = sequence.shotSpans();
+        // At debug level, because "why is my world effect not firing" is otherwise unanswerable
+        // without a debugger: an effect gated on the cut is gated on exactly these spans.
+        std::size_t travelling = 0;
+        std::size_t holding = 0;
+        for (const world::ShotSpan& span : spans) {
+            travelling += span.travel ? 1 : 0;
+            holding += span.spotlight ? 1 : 0;
+            log::debug("auto-director: span {:7.2f}s..{:7.2f}s {:<9} {}{}", span.start, span.end,
+                       span.travel ? "travelling" : (span.spotlight ? "holding" : "--"), span.subject,
+                       span.handoff.empty() ? "" : " -> " + span.handoff);
+        }
+        log::info("auto-director: {} span(s) for world effects: {} travelling, {} holding",
+                  spans.size(), travelling, holding);
+        engine.setShotSpans(std::move(spans));
     }
     log::info("auto-director: {} shot(s), {} track(s) installed, {} replaced",
               sequence.shots.size(), added, removed);

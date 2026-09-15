@@ -18,6 +18,7 @@
 
 #include "core/error.hpp"
 #include "signals/musical_events.hpp"
+#include "world/effects.hpp"
 
 #include <glm/glm.hpp>
 #include <nlohmann/json_fwd.hpp>
@@ -299,6 +300,16 @@ struct Sequence {
     // any shot asks for it, the lens. `samplesPerShot` sets how finely a curved move is sampled;
     // straight moves need two keys and curves need enough that the eye cannot see the segments.
     [[nodiscard]] nlohmann::json toTimelineTracks(int samplesPerShot = 8) const;
+
+    // The cut, flattened to what a world effect needs for time gating (ADR-207): when the camera is
+    // travelling between subjects, when it is holding one, and who those subjects are.
+    //
+    // A travel shot is **not** also a hold: a shot whose whole purpose is to leave one subject for
+    // another is not a shot holding either of them, and an effect gated on "the camera has landed"
+    // must not fire while it is still on its way. A hold is any other shot with a subject --
+    // `Spotlight::emphasis` is carried alongside but does not decide it, because emphasis is how
+    // much of the *film* a subject owns and the director leaves it at zero for a whole intro.
+    [[nodiscard]] std::vector<world::ShotSpan> shotSpans() const;
 
     [[nodiscard]] nlohmann::json toJson() const;
     [[nodiscard]] static Result<Sequence> fromJson(const nlohmann::json& j);

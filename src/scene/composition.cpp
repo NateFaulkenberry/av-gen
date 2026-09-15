@@ -1233,6 +1233,19 @@ Result<void> Composition::addGrid(spatial::GridField grid) {
 // ADR-074. Validated as a set, and all-or-nothing: a scene that declares a hero the director cannot
 // use should say so at load rather than silently render without it. Note the deliberate absence of
 // `dirty_ = true` -- see the header; heroes describe nodes that are already placed.
+Result<void> Composition::setWorldEffects(std::vector<world::WorldEffect> effects) {
+    // The whole set or none of it (ADR-207, and the same rule `setHeroes` follows): an effect whose
+    // name collides with another's is two things writing one parameter path, and an effect dropped
+    // for being invalid is an effect that never fires with nothing saying why.
+    if (auto ok = world::validateWorldEffects(effects); !ok) {
+        return ok;
+    }
+    worldEffects_ = std::move(effects);
+    // Deliberately no `dirty_`: a world effect places nothing, occludes nothing and is not an
+    // obstacle, so there is nothing for a flatten to do. What reads them is the Engine, per frame.
+    return {};
+}
+
 Result<void> Composition::setHeroes(std::vector<world::HeroPoint> heroes) {
     for (std::size_t i = 0; i < heroes.size(); ++i) {
         if (auto ok = heroes[i].validate(); !ok) {
@@ -5352,6 +5365,15 @@ nlohmann::json Composition::toJson() const {
         }
         j["heroes"] = std::move(heroes);
     }
+    // ADR-207. Written only when there are effects, so every scene that never declared one writes
+    // back exactly the file it had.
+    if (!worldEffects_.empty()) {
+        json effects = json::array();
+        for (const world::WorldEffect& effect : worldEffects_) {
+            effects.push_back(effect.toJson());
+        }
+        j["worldEffects"] = std::move(effects);
+    }
     if (!profileLibraryPath_.empty()) {
         j["entityProfiles"] = profileLibraryPath_;
     }
@@ -5787,6 +5809,27 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             heroes.push_back(std::move(*hero));
         }
         if (auto ok = comp->setHeroes(std::move(heroes)); !ok) {
+            return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
+        }
+    }
+    // ADR-207: the world effects. Read after the heroes, because a `hero` source names one and a
+    // reader who sees the effects first cannot say whether that name is real.
+    if (j.contains("worldEffects")) {
+        const json& effectsJson = j.at("worldEffects");
+        if (!effectsJson.is_array()) {
+            return fail("scene file '{}': 'worldEffects' must be an array", scenePath.string());
+        }
+        std::vector<world::WorldEffect> effects;
+        effects.reserve(effectsJson.size());
+        for (std::size_t i = 0; i < effectsJson.size(); ++i) {
+            auto effect = world::WorldEffect::fromJson(effectsJson[i]);
+            if (!effect) {
+                return fail("scene file '{}': worldEffects[{}]: {}", scenePath.string(), i,
+                            effect.error().message);
+            }
+            effects.push_back(std::move(*effect));
+        }
+        if (auto ok = comp->setWorldEffects(std::move(effects)); !ok) {
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
     }

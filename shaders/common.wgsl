@@ -12,6 +12,22 @@ struct Light {
                                // z = volumetric strength (volume.wgsl), w = 0
 };
 
+// One world effect, as world::packWorldEffect writes it (ADR-207). The evaluation lives in
+// world_effects.wgsl; the layout lives here because it is part of the frame block.
+struct WorldEffect {
+    originKind: vec4<f32>, // xyz = origin (world), w = kind (0 directional, 1 radial)
+    axisFront: vec4<f32>,  // xyz = unit axis (directional only), w = metres the front has travelled
+    shape: vec4<f32>,      // x = front width, y = trail length, z = range, w = trail falloff exponent
+    vertical: vec4<f32>,   // x = vertical half-extent, y = growth per metre travelled,
+                           // z = secondary ring count, w = beam radius (0 = a plane, not a beam)
+    color: vec4<f32>,      // rgb = core radiance (intensity and the lifetime envelope folded in),
+                           // w = metres at which sparkle has faded out
+    edge: vec4<f32>,       // rgb = leading-edge radiance, w = 1 when the hue comes from the rainbow
+    rainbow: vec4<f32>,    // x = cycles per metre, y = phase, z = saturation, w = brightness
+    sparkle: vec4<f32>,    // x = cells per metre (0 = off), y = size, z = intensity, w = twinkle phase
+    response: vec4<f32>,   // x = ground, y = foliage (the scatter), z = surface, w = emissive gain
+};
+
 struct FrameUniforms {
     viewProj: mat4x4<f32>,
     invViewProj: mat4x4<f32>,
@@ -59,6 +75,12 @@ struct FrameUniforms {
     windTurb: vec4<f32>,       // x = tau/turbulenceScale, y = turbulenceSpeed (m/s),
                                // z = tau/flutterScale, w = 0
     lights: array<Light, 8>,
+    // ADR-207 world effects. Appended after `lights` so no existing offset moved, and in the frame
+    // block for the same reason the wind is (ADR-055): a phenomenon propagating through the world is
+    // frame-global because the world is, and the shadow views inherit it with the rest of the block.
+    // x = how many of the array below are live; the rest of the vector is spare.
+    worldEffectCount: vec4<f32>,
+    worldEffects: array<WorldEffect, 8>,
 };
 
 struct ObjectUniforms {

@@ -31,6 +31,7 @@
 #include "scene/scene_controller.hpp"
 #include "world/city.hpp"
 #include "world/ecology.hpp"
+#include "world/effects.hpp"
 #include "world/hero.hpp"
 #include "world/terrain.hpp"
 #include "world/terrain_query.hpp"
@@ -479,6 +480,18 @@ public:
     // Rejects the whole set rather than dropping the bad member, and names it. A hero silently
     // dropped is a camera director that frames nothing with no explanation of why.
     Result<void> setHeroes(std::vector<world::HeroPoint> heroes);
+
+    // ---- world effects (ADR-207) ----------------------------------------------------------------
+    //
+    // Authored here and round-tripped as `"worldEffects"`, a sibling of `"heroes"` for the same
+    // reason: an effect is a thing in the world. Nothing here *runs* them -- resolving a source to a
+    // world position needs the camera, the shot schedule and the transport clock, all of which the
+    // Engine has and a Composition does not.
+    [[nodiscard]] const std::vector<world::WorldEffect>& worldEffects() const { return worldEffects_; }
+    // Rejects the whole set on a duplicate name or an invalid effect, and names it -- an effect
+    // silently dropped is an effect that never fires with nothing saying why. Duplicates matter more
+    // here than they would elsewhere: a name is half of a parameter path.
+    Result<void> setWorldEffects(std::vector<world::WorldEffect> effects);
     // Bumped by every accepted `setHeroes`. A counter rather than a comparison of the lists,
     // because what reads it is asking "is the shot I cut still the shot these heroes describe" --
     // a question about *when*, not about which fields differ -- and because comparing two vectors
@@ -858,6 +871,7 @@ private:
     };
     std::vector<std::unique_ptr<AnimationSink>> animationSinks_;
 
+    std::vector<world::WorldEffect> worldEffects_; // ADR-207: authored, round-tripped as "worldEffects"
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
     std::uint64_t heroRevision_ = 1;
     std::uint64_t heroPlacementRevision_ = 1;

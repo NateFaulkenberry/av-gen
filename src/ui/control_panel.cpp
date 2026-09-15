@@ -512,6 +512,7 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     panel("Composition", ImVec2(460, 640), [&] { composition.draw(engine); });
     panel("Render", ImVec2(460, 420), [&] { drawRender(engine); });
     panel("Auto-director", ImVec2(440, 560), [&] { drawAutoDirector(engine); });
+    panel("World Effects", ImVec2(460, 620), [&] { worldEffects.draw(engine); });
     panel("Sequence", ImVec2(900, 420), [&] {
         // The transport across the top of the timeline, where the timeline is. Drawn here rather
         // than inside SequencePanel so that one TransportBar serves both places and the time format

@@ -15,6 +15,7 @@
 #include "scene/water_surface.hpp"
 #include "spatial/field.hpp"
 #include "spatial/spline.hpp"
+#include "world/effects.hpp"
 #include "scene/scene_types.hpp"
 
 #include <cstdint>
@@ -90,6 +91,11 @@ struct Scene {
     // is the default; an offline render lifts them. Not serialised -- policy, not content.
     DetailLimits detailLimits{};
     PostSettings post;                // built-in post-processing (copied in by the Engine)
+    // ADR-207: the world effects live *this frame*, already resolved and packed. Copied in by the
+    // Engine the way `post` is, and for the same reason: resolving a source to a world position
+    // needs the hero table and the director's cut, neither of which a renderer has any business
+    // knowing about. Not serialised -- the authored effects live on the Composition.
+    world::WorldEffectFrame worldEffects;
     std::uint64_t meshVersion = 0;    // incremented when meshes change (renderer re-uploads)
     std::uint64_t textureVersion = 0; // incremented when textures change
     // Who this scene is, as distinct from where it lives (see mintSceneIdentity above). Never 0:

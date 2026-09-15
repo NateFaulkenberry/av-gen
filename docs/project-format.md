@@ -268,6 +268,78 @@ Determinism: every behaviour draws from a per-entity PCG32 seeded from `seed` (o
 seed and the entity's name), and nothing reads a clock other than the timeline second. The same
 scene, seed, audio and timeline produce the same frame.
 
+### `"worldEffects"` — waves propagating through the world (ADR-207)
+
+A top-level array beside `"heroes"`, and a sibling of it for the same reason: an effect is a thing in
+the world, not hidden renderer state. Absent from a scene that declares none, so every file written
+before this existed round-trips unchanged.
+
+```json
+"worldEffects": [
+  {
+    "name": "Camera Travel Beam",
+    "enabled": true,
+    "style": "Bioluminescent",
+    "source": { "kind": "camera" },
+    "target": { "kind": "focusHero" },
+    "activation": "cameraTravel",
+    "propagation": {
+      "kind": "directional", "direction": "blended",
+      "forwardWeight": 1.0, "velocityWeight": 0.6, "targetWeight": 1.2,
+      "speed": 110.0, "range": 300.0, "frontWidth": 10.0, "trailLength": 30.0,
+      "falloff": 2.2, "startOffset": 10.0,
+      "verticalExtent": 40.0, "verticalGrowth": 0.15,
+      "ringCount": 0.0, "beamRadius": 0.0
+    },
+    "appearance": {
+      "color": [0.07, 0.78, 1.0], "intensity": 1.0,
+      "edgeColor": [0.72, 1.0, 0.92], "edgeIntensity": 3.2, "width": 1.0,
+      "rainbow": false, "rainbowSpeed": 0.35, "rainbowScale": 0.012,
+      "rainbowSaturation": 0.85, "rainbowBrightness": 1.0
+    },
+    "sparkle": { "enabled": true, "density": 1.1, "size": 0.22, "intensity": 2.4,
+                 "speed": 0.6, "fadeDistance": 85.0, "seed": 1 },
+    "response": { "ground": 0.45, "foliage": 1.1, "surface": 0.7, "emissive": 1.2 },
+    "timing": { "delay": 0.15, "lifetime": 0.0, "fadeIn": 0.5, "fadeOut": 1.1,
+                "windowStart": 0.0, "windowSeconds": 6.0, "repeatSeconds": 2.6 }
+  }
+]
+```
+
+`name` may not contain a `/`: it is half of a parameter path (`worldfx/<name>/intensity`), and two
+effects of one name are refused outright rather than one of them being dropped.
+
+**`source` and `target`** (`kind`, plus `name`, `position` and `groundOffset` where they apply):
+
+| `kind` | resolves to |
+|---|---|
+| `world` | the authored `position` |
+| `node` | the world transform of the scene node of that `name`; falls back to `position` when the scene has no such node, so a scene swap does not send an effect to the origin |
+| `hero` | the node the hero of that `name` **is** (ADR-107), and its `colorAccent`; falls back to `HeroPoint::position` |
+| `camera` | the active camera's eye |
+| `focusHero` | whichever hero the directed camera's cut is holding right now — no name, no wiring |
+
+`groundOffset` drops the resolved origin by that many metres on Y, for a source whose transform sits
+somewhere up its stem.
+
+**`propagation.kind`** is `directional` (distance along an axis) or `radial` (a radius in the ground
+plane). **`propagation.direction`** decides where a directional wave points: `explicit`,
+`sourceForward`, `cameraForward`, `cameraVelocity`, `sourceToTarget`, `cameraToTarget` or `blended`
+(a weighted sum of camera forward, camera velocity and camera-to-target). A direction that needs a
+target and has none is refused at load.
+
+**`activation`** is `always`, `window` (an authored `timing.windowStart` / `windowSeconds`),
+`cameraTravel` (while the director's cut says the camera is moving between subjects) or `heroFocus`
+(while it is holding this effect's source). The last two need a directed camera; with none they
+simply never fire. Note that `always` opens the *window* for the whole timeline — the front still
+makes one pass, so a permanently-visible effect is one with a `timing.repeatSeconds`.
+
+**Every number under `appearance`, `sparkle`, `propagation`, `response` and `timing` is also a
+parameter** at `worldfx/<name>/<property>`, so it can be keyed, preset, cued and modulated. A pulse
+that answers the beat is an ordinary `beat.pulse -> worldfx/<name>/intensity` route in the project's
+`routes` block; there is no audio hook inside the effect. What the *scene* stores is the authored
+value, which is the default those parameters register with.
+
 ### `"entityProfiles"` — a profile library (ADR-097)
 
 A scene-level path to one file holding many named profiles, so a crowd shares a bundle instead of

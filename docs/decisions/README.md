@@ -202,3 +202,5 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [204](ADR-204-a-clip-starts-where-its-keys-start.md) | A clip starts where its keys start, a facing is not an odometer, and a stride speed is a claim about a clip | Accepted |
 | [205](ADR-205-nine-farm-animals-from-one-turntable.md) | Nine farm animals from one turntable scene | Accepted |
 | [206](ADR-206-structure-from-repetition-not-from-energy.md) | Structure from repetition, not from energy | Accepted |
+| [207](ADR-207-world-effects.md) | World effects propagate through one frame-global block, not through per-object state | Accepted |
+| [208](ADR-208-what-world-effects-cost.md) | What world effects cost, and the cross-binary number that is not evidence | Accepted |

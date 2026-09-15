@@ -20,6 +20,11 @@
 // it, so a mesh, an instance and an SDF surface receive light identically.
 #include "material.wgsl"
 #include "lighting.wgsl"
+// ADR-207. Included here, so the one file every shading path goes through is also the one
+// place world effects are applied: entities, skinned characters, the procedural scatter and
+// raymarched SDF surfaces all receive a wave with no per-asset code. It reads `kProceduralDraw`,
+// which every includer of this file already defines.
+#include "world_effects.wgsl"
 
 // applyFog / fogHeightIntegral moved to common.wgsl in ADR-099: water.wgsl needs the same fog and
 // does not include this file, and two copies of a fog curve is how two surfaces end up in
@@ -317,9 +322,13 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     }
 
     if (object.flags.z > 0.5) { // unlit
-        result.color = vec4<f32>(applyFog(baseColor.rgb + emissive, worldPos), alpha);
+        // ADR-207: additive, even here. An unlit surface is one the lighting does not reach, not one
+        // the world cannot touch.
+        let fx = worldEffectsAt(worldPos, n, emissive);
+        result.color = vec4<f32>(applyFog(baseColor.rgb + emissive + fx.radiance, worldPos), alpha);
         result.normal = n;
-        result.emission = baseColor.rgb + emissive;
+        result.emission = baseColor.rgb + emissive + fx.radiance;
+        result.bloomWeight = max(result.bloomWeight, fx.bloom);
         result.flags = 2.0;
         return result;
     }
@@ -361,12 +370,18 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         let ambient = baseColor.rgb * hemisphere * visibility;
         let edge = pow(1.0 - context.nDotV, 4.0) * smoothstep(-0.2, 0.7, n.y);
         let rim = baseColor.rgb * vec3<f32>(0.25, 0.45, 0.5) * edge * 0.16;
-        result.color = vec4<f32>(applyFog(lighting.diffuse + lighting.specular + ambient + emissive + rim,
+        // ADR-207: the world-effect contribution, added to the radiance *before* fog so a wave far
+        // down a valley is seen through the air that is between it and the eye, and added to the
+        // emission target so the bloom chain sees it too.
+        let fx = worldEffectsAt(worldPos, n, emissive);
+        result.color = vec4<f32>(applyFog(lighting.diffuse + lighting.specular + ambient + emissive + rim
+                                          + fx.radiance,
                                          worldPos), alpha);
         result.normal = n;
         result.roughness = roughness;
-        result.emission = emissive;
-        result.flags = select(1.0, 3.0, dot(emissive, emissive) > 1e-6);
+        result.emission = emissive + fx.radiance;
+        result.bloomWeight = max(result.bloomWeight, fx.bloom);
+        result.flags = select(1.0, 3.0, dot(result.emission, result.emission) > 1e-6);
         if (alphaMode > 1.5) {
             result.flags = result.flags + 4.0;
         }
@@ -468,11 +483,14 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     // Fresnel rim tinted with the emissive colour so glowing objects read as luminous at grazing angles.
     let rim = pow(1.0 - nDotV, 3.0) * emissiveBase * (0.3 * matEmissive.w);
 
-    result.color = vec4<f32>(applyFog(direct + ambient + emissive + rim, worldPos), alpha);
+    // ADR-207, as on the styled path above: additive, pre-fog, and into the emission target.
+    let fx = worldEffectsAt(worldPos, n, emissive);
+    result.color = vec4<f32>(applyFog(direct + ambient + emissive + rim + fx.radiance, worldPos), alpha);
     result.normal = n;
     result.roughness = roughness;
-    result.emission = emissive + rim;
-    result.flags = select(1.0, 3.0, dot(emissive, emissive) > 1e-6);
+    result.emission = emissive + rim + fx.radiance;
+    result.bloomWeight = max(result.bloomWeight, fx.bloom);
+    result.flags = select(1.0, 3.0, dot(result.emission, result.emission) > 1e-6);
     if (alphaMode > 1.5) {
         result.flags = result.flags + 4.0;
     }

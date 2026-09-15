@@ -2,13 +2,13 @@
 id: reference/panels
 title: Panel Reference
 category: Reference
-summary: What each of the twelve panels holds, and which topic explains it.
+summary: What each panel holds, and which topic explains it.
 order: 93
 audience: expert
 tags: panels, reference, interface
 keywords: what does this panel do; panel list; where is the parameter panel; world builder; graph editor
 related: start/interface, modulation/parameters, sequencer/overview, rendering/offline-render
-features: panel.world-builder, panel.assets, panel.world, panel.parameters, panel.composition, panel.sequence, panel.render, panel.control, panel.analysis, panel.modulation, panel.graph
+features: panel.world-builder, panel.assets, panel.world, panel.world-effects, panel.parameters, panel.composition, panel.sequence, panel.render, panel.control, panel.analysis, panel.modulation, panel.graph
 ---
 
 # Panel Reference
@@ -33,6 +33,26 @@ Layers, the inspector, scene states, direction, macros and debug draw. It also c
 
 The world-editing half of this panel is being rewritten and is not documented yet. See
 [The world editor](help://gaps/world-editor).
+
+## World Effects — right
+
+Waves propagating through the world (ADR-207): a camera beam that travels ahead of a directed
+camera on its way to the next hero, a ripple that spreads from the hero it lands on, and whatever
+else a scene declares. **Add camera beam** and **Add hero pulse** create one of each with defaults
+that work; **Style** sets colour, intensity, sparkle and the wave's shape in one go and leaves every
+one of them editable underneath.
+
+**Beat response** is a slider that writes an ordinary `beat.pulse` modulation route onto the
+effect's intensity. It is not a hidden audio hook: the route it makes appears in the Modulation
+panel, can be curved, enveloped, re-pointed or deleted there, and is saved with the project.
+
+**Advanced** holds the rest — what the effect is about (its source, when it activates, which way a
+directional wave points), the wave's shape, the sparkle, how hard each kind of surface answers it,
+and the timing. Every control in the panel is an ordinary parameter under `worldfx/<name>/`, so the
+Parameters panel shows the same numbers, the timeline can key them and a preset can recall them.
+
+Effects gated on the camera need a directed camera to gate against. With none, the panel says so
+rather than leaving you to discover it as an effect that does nothing.
 
 ## Parameters — right
 

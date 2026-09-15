@@ -583,6 +583,37 @@ const FocalTarget* Sequence::spotlightAt(double seconds) const {
     return (s != nullptr && s->spotlight.active) ? &s->subject : nullptr;
 }
 
+std::vector<world::ShotSpan> Sequence::shotSpans() const {
+    std::vector<world::ShotSpan> spans;
+    spans.reserve(shots.size());
+    for (const Shot& s : shots) {
+        world::ShotSpan span;
+        span.start = s.startSeconds;
+        span.end = s.endSeconds();
+        // A transition, or any shot that hands its aim to somebody else, is the camera on its way
+        // somewhere -- which is exactly what a camera-travel effect is gated on.
+        span.travel = s.kind == ShotKind::Transition || s.handoff.has_value();
+        // ...and a shot on its way somewhere is not a shot holding a subject, whatever emphasis the
+        // section gave it. An effect gated on "the camera has landed" must not fire in transit.
+        //
+        // What *is* a hold is any shot with a subject that is not going anywhere else -- not
+        // `Spotlight::active`. Emphasis is how much of the film a subject owns and the director
+        // leaves it at zero for a whole intro, so gating on it made "the camera has landed on a
+        // hero" false for the first third of a piece the camera spent landing on three of them.
+        span.spotlight = !span.travel && !s.subject.name.empty();
+        span.emphasis = s.spotlight.active ? s.spotlight.emphasis : 0.0f;
+        span.subject = s.subject.name;
+        span.subjectPosition = s.subject.position;
+        span.subjectRadius = s.subject.radius;
+        if (s.handoff) {
+            span.handoff = s.handoff->name;
+            span.handoffPosition = s.handoff->position;
+        }
+        spans.push_back(std::move(span));
+    }
+    return spans;
+}
+
 json Sequence::spotlightSpans() const {
     json spans = json::array();
     for (const auto& s : shots) {

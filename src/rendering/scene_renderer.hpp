@@ -48,6 +48,7 @@
 #include "rendering/debug_draw.hpp"
 #include "scene/scene.hpp"
 #include "shaders/shader_layers.hpp"
+#include "world/effects.hpp"
 
 #include "analysis/analyzer.hpp"
 
@@ -154,6 +155,7 @@ struct RenderStats {
     SkinningStats skinning;     // ADR-086; the skinned rigs whose palettes reached the GPU
     PostStats post;
     std::uint32_t transientTextures = 0;
+    std::uint32_t worldEffects = 0; // ADR-207: effects live in the frame block this frame
 };
 
 constexpr std::uint32_t kMaxLights = 8; // the uniform fallback path (ADR-033); clustered has no such limit
@@ -245,11 +247,18 @@ struct FrameUniforms {
     // shadow views copy the whole block, so a swaying plant and its shadow cannot disagree.
     wind::WindUniforms wind;
     LightUniform lights[kMaxLights];
+    // ADR-207: the world effects this frame. Appended *after* `lights` so no offset above moved,
+    // and frame-global for the same reason the wind is -- a phenomenon propagating through the
+    // world is a property of the world, and the shadow views copy the whole block.
+    // x = how many of `effects` are live; the rest of the vector is spare.
+    glm::vec4 worldEffectCount{0.0f};
+    world::WorldEffectGpu worldEffects[world::kMaxGpuWorldEffects];
 };
-// 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights. The middle term grew by one vec4 when
-// `skySun` was added; this assert is what caught the WGSL side needing the same field in the same
-// place, which is the whole reason it is written as a sum rather than a number.
-static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512);
+// 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 8x144 world effects. The middle
+// term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
+// the same field in the same place, which is the whole reason it is written as a sum rather than a
+// number.
+static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::kMaxGpuWorldEffects);
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);
@@ -259,6 +268,8 @@ static_assert(offsetof(FrameUniforms, shadowMaskParams) == 544);
 static_assert(offsetof(FrameUniforms, materialTier) == 560);
 static_assert(offsetof(FrameUniforms, wind) == 576);
 static_assert(offsetof(FrameUniforms, lights) == 640);
+static_assert(offsetof(FrameUniforms, worldEffectCount) == 1152);
+static_assert(offsetof(FrameUniforms, worldEffects) == 1168);
 
 struct ObjectUniforms {
     glm::mat4 model;
@@ -409,6 +420,9 @@ public:
         // honestly answer it: a terrain chunk arrives as an ordinary lit entity with no flag saying
         // where it came from, and a name-prefix guess would be a control that lies at the first
         // scene that names something `chunk`.
+        // ADR-207. Off: the frame block reports zero world effects, so the per-fragment loop
+        // returns on its first compare. The arm for "what does the system cost when it is idle".
+        bool worldEffects = true;
         // ADR-187. Off: the FXAA output stage does not run, whatever `post/output/antialias` says.
         // Its own arm rather than part of `post`, because the whole-post arm removes the tone map
         // too -- the frame's transfer function moves with it and every threshold in a measurement

@@ -735,7 +735,9 @@ const std::vector<Pairing>& pairings() {
         {"FrameUniforms",
          {"common.wgsl"},
          "FrameUniforms",
-         {"rendering/scene_renderer.hpp", "core/wind.hpp"},
+         // ADR-207 appended a count vector and an array of `world::WorldEffectGpu` after `lights`;
+         // the bundle has to carry that header or the audit cannot resolve the element type.
+         {"rendering/scene_renderer.hpp", "core/wind.hpp", "world/effects.hpp"},
          "FrameUniforms",
          // The wind field is one nested struct on the C++ side and four loose vec4s in the shader.
          // That is deliberate: `wind::packWind` builds the block once and the shaders read it
