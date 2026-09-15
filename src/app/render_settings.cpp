@@ -56,6 +56,67 @@ double RenderSettings::resolvedEnd(double audioSeconds, double timelineSeconds) 
     return startSeconds + 10.0;
 }
 
+std::span<const std::string_view> RenderSettings::aovNames() {
+    // Each name is a target the scene pass already writes every frame, and each answers a question a
+    // compositor actually asks. Nothing is here because it was cheap to add -- the mandate's own rule
+    // is that a target must correspond to meaningful renderer state, and a pass nobody consumes is
+    // the failure mode it warns about from the other direction.
+    //
+    //   normal    RGB world-space normal, roughness in alpha -- relighting, and the one target the
+    //             renderer has always written and nothing has ever read.
+    //   emission  the emissive term before bloom and before tone mapping -- a glow pass in comp.
+    //   depth     linear depth in metres against the far plane -- depth of field, fog, depth merge.
+    //   velocity  screen-space motion in R and G -- motion blur in comp.
+    //   id        the per-object identifier picking reads -- per-object mattes.
+    static constexpr std::string_view kNames[] = {"normal", "emission", "depth", "velocity", "id"};
+    return kNames;
+}
+
+Result<std::vector<std::string>> RenderSettings::aovList() const {
+    std::vector<std::string> out;
+    const auto names = aovNames();
+    std::size_t start = 0;
+    while (start <= aovs.size()) {
+        const std::size_t comma = aovs.find(',', start);
+        std::string one = aovs.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+        // Trim, because "normal, depth" is what a person types and refusing it would be pedantry.
+        const auto notSpace = [](unsigned char c) { return std::isspace(c) == 0; };
+        one.erase(one.begin(), std::find_if(one.begin(), one.end(), notSpace));
+        one.erase(std::find_if(one.rbegin(), one.rend(), notSpace).base(), one.end());
+        if (!one.empty()) {
+            if (std::find(names.begin(), names.end(), one) == names.end()) {
+                return fail("render aov '{}' is not one of normal, emission, depth, velocity, id", one);
+            }
+            if (std::find(out.begin(), out.end(), one) == out.end()) {
+                out.push_back(std::move(one));
+            }
+        }
+        if (comma == std::string::npos) {
+            break;
+        }
+        start = comma + 1;
+    }
+    return out;
+}
+
+std::filesystem::path RenderSettings::aovFile(const std::filesystem::path& dir, std::uint64_t index,
+                                              std::string_view aov) const {
+    // Built from the *frame* name so an AOV sorts next to the beauty frame it belongs to, whatever
+    // the pattern is -- including a video render, where the beauty frame has no file of its own and
+    // the pattern is still the thing that names an index.
+    std::string name;
+    try {
+        name = fmt::format(fmt::runtime(pattern), index);
+    } catch (const fmt::format_error&) {
+        name = fmt::format(fmt::runtime(defaultPattern(RenderOutput::PngSequence)), index);
+    }
+    const std::size_t dot = name.rfind('.');
+    if (dot != std::string::npos) {
+        name.resize(dot);
+    }
+    return dir / fmt::format("{}.{}.exr", name, aov);
+}
+
 std::filesystem::path RenderSettings::frameFile(const std::filesystem::path& dir, std::uint64_t index) const {
     try {
         return dir / fmt::format(fmt::runtime(pattern), index);
@@ -155,6 +216,21 @@ Result<void> RenderSettings::validate() const {
     }
     // Validated here rather than discovered in the job, so a project file with a typo in it fails
     // when it is loaded and not two hours into a sequence.
+    if (auto list = aovList(); !list) {
+        return std::unexpected(list.error());
+    } else if (!list->empty()) {
+        // ADR-242. The auxiliary targets are sized to the *scaled* resolution, so under
+        // supersampling an AOV is 2x the beauty frame -- and it cannot simply be resolved down with
+        // the beauty pass's filter. Averaging two normals is not a normal, averaging two object
+        // identifiers is a third object, and averaging two depths across a silhouette is a surface
+        // that is not there. Refused rather than written at a size that does not match, or resolved
+        // by an operation that is wrong for three of the five.
+        if (supersample != 1.0f) {
+            return fail("render: aov export and supersample {} cannot be combined -- an identifier, "
+                        "a normal and a depth edge have no correct downsample",
+                        supersample);
+        }
+    }
     if (scene::DetailLimitMode mode{}; !limits.empty() && !scene::detailLimitModeFromName(limits, mode)) {
         return fail("render limits '{}' is not 'tier', 'live' or 'unlimited'", limits);
     }
@@ -186,6 +262,7 @@ nlohmann::json RenderSettings::toJson() const {
                           {"tier", tier},
                           {"supersample", supersample},
                           {"limits", limits},
+                          {"aovs", aovs},
                           {"muxAudio", muxAudio},
                           {"encoderThreads", encoderThreads}};
 }
@@ -247,6 +324,7 @@ Result<RenderSettings> RenderSettings::fromJson(const nlohmann::json& j) {
         s.supersample = j.at("supersample").get<float>();
     }
     if (auto r = text("limits", s.limits); !r) return std::unexpected(r.error());
+    if (auto r = text("aovs", s.aovs); !r) return std::unexpected(r.error());
     if (auto r = text("backend", s.backend); !r) return std::unexpected(r.error());
     if (const auto it = j.find("muxAudio"); it != j.end()) {
         if (!it->is_boolean()) {

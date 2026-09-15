@@ -13,16 +13,21 @@
 #include "support/synth.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <memory>
+#include <set>
 
 using namespace avgen;
+using Catch::Matchers::ContainsSubstring;
 namespace fs = std::filesystem;
 
 namespace {
@@ -390,4 +395,158 @@ TEST_CASE("a scaled scene target still fills the output the caller asked for", "
     CHECK(meanDelta > 0.0);       // half resolution changed the image
     CHECK(meanDelta < 40.0);      // and it is still the same picture, not noise
     CHECK(ctx->errorCount() == 0);
+}
+
+// ADR-242: AOV export. The renderer has written these auxiliary targets every frame since ADR-035
+// and nothing outside a debug view has ever read them; this is the consumer, so this test is what
+// establishes that each file contains what its name says rather than a plausible-looking wrong
+// buffer -- which is the exact failure this repository keeps writing ADRs about.
+//
+// Every assertion below is a property only the RIGHT target has:
+//   normal    a unit vector, checked where there is geometry to have one -- the target is
+//             OCT-ENCODED on the GPU, so this assertion is what proves the export decodes it
+//             rather than shipping an encoded pair no compositor could read
+//   depth     the orb is nearer than the background, and the background is the far plane
+//   emission  exceeds 1.0, because the fixture drives the orb's emissive to 6
+//   velocity  is not all zero, because the fixture scales the orb over the rendered range
+//   id        has more than one value, and agrees with depth about where the orb is
+//
+// The last one is the point: `id` and `depth` are separate targets read back separately, so their
+// agreement about which pixels are the orb is a cross-check neither could fake alone.
+TEST_CASE("Render job exports auxiliary passes that contain what they claim", "[gpu][render][aov]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+    auto settings = smallSettings(f.dir / "aov");
+    settings.aovs = "normal,emission,depth,velocity,id";
+    app::RenderProgress p;
+    {
+        app::RenderJob job(*ctx, shaders, loadOffline(f.project), settings, f.dir);
+        REQUIRE(job.start().has_value());
+        REQUIRE(job.run().has_value());
+        p = job.progress();
+    }
+    CHECK(p.error.empty());
+    CHECK(p.framesRendered == 10);
+    // Ten beauty frames plus five passes each. A count that only reached ten would mean the AOVs
+    // were enqueued and silently dropped.
+    CHECK(p.framesWritten == 10 + 10 * 5);
+
+    const auto read = [&](const char* aov, int frame) {
+        const auto file = f.dir / "aov" / fmt::format("frame_{:06d}.{}.exr", frame, aov);
+        INFO(file.string());
+        REQUIRE(fs::exists(file));
+        auto image = assets::readExr(file);
+        REQUIRE(image.has_value());
+        CHECK(image->width == 96);
+        CHECK(image->height == 64);
+        return std::move(*image);
+    };
+
+    const auto normal = read("normal", 5);
+    const auto depth = read("depth", 5);
+    const auto emission = read("emission", 5);
+    const auto velocity = read("velocity", 5);
+    const auto ids = read("id", 5);
+    const auto nPx = assets::floatPixels(normal);
+    const auto dPx = assets::floatPixels(depth);
+    const auto ePx = assets::floatPixels(emission);
+    const auto vPx = assets::floatPixels(velocity);
+    const auto iPx = assets::floatPixels(ids);
+    REQUIRE(nPx.size() == 96u * 64u * 4u);
+
+    // `id`: more than one value, or the pass is a constant and everything below is vacuous.
+    std::set<int> distinct;
+    for (std::size_t i = 0; i < iPx.size(); i += 4) {
+        distinct.insert(static_cast<int>(iPx[i]));
+    }
+    INFO("distinct identifiers: " << distinct.size());
+    CHECK(distinct.size() >= 2);
+
+    // The orb is whichever identifier is not the most common one (the background).
+    std::map<int, int> histogram;
+    for (std::size_t i = 0; i < iPx.size(); i += 4) {
+        ++histogram[static_cast<int>(iPx[i])];
+    }
+    const int background = std::max_element(histogram.begin(), histogram.end(),
+                                            [](const auto& a, const auto& b) { return a.second < b.second; })
+                               ->first;
+
+    int geometry = 0;
+    int unitNormals = 0;
+    double orbDepth = 0.0;
+    int orbDepthSamples = 0;
+    double backgroundDepth = 0.0;
+    int backgroundDepthSamples = 0;
+    for (std::size_t px = 0; px < 96u * 64u; ++px) {
+        const std::size_t i = px * 4;
+        const bool isBackground = static_cast<int>(iPx[i]) == background;
+        if (!isBackground) {
+            ++geometry;
+            const double len = std::sqrt(static_cast<double>(nPx[i]) * nPx[i] +
+                                         static_cast<double>(nPx[i + 1]) * nPx[i + 1] +
+                                         static_cast<double>(nPx[i + 2]) * nPx[i + 2]);
+            // Roughness rides in alpha after the decode, and is a roughness.
+            CHECK(nPx[i + 3] >= 0.0f);
+            CHECK(nPx[i + 3] <= 1.0f);
+            // Half precision and interpolation across a face both move this a little; a buffer
+            // that is not a normal misses it by far more than a percent.
+            if (std::abs(len - 1.0) < 0.05) {
+                ++unitNormals;
+            }
+            orbDepth += dPx[i];
+            ++orbDepthSamples;
+        } else {
+            backgroundDepth += dPx[i];
+            ++backgroundDepthSamples;
+        }
+    }
+    REQUIRE(geometry > 20); // the orb is on screen at all
+    INFO("unit-length normals on " << unitNormals << " of " << geometry << " geometry pixels");
+    CHECK(unitNormals > geometry * 9 / 10);
+
+    // Depth: the orb is in front of the background, and by a lot. This is the cross-check -- `id`
+    // decided which pixels are the orb and `depth`, read back from a different target, agrees.
+    REQUIRE(orbDepthSamples > 0);
+    REQUIRE(backgroundDepthSamples > 0);
+    const double orbMean = orbDepth / orbDepthSamples;
+    const double bgMean = backgroundDepth / backgroundDepthSamples;
+    INFO("mean depth: orb " << orbMean << ", background " << bgMean);
+    CHECK(orbMean > 0.0);
+    CHECK(orbMean < bgMean);
+
+    // Emission: the fixture drives the orb's emissive to 6, so the pass must exceed what a
+    // display-referred buffer could hold. A tone-mapped frame written here by mistake could not.
+    float brightestEmission = 0.0f;
+    for (std::size_t i = 0; i < ePx.size(); i += 4) {
+        brightestEmission = std::max({brightestEmission, ePx[i], ePx[i + 1], ePx[i + 2]});
+    }
+    INFO("brightest emission " << brightestEmission);
+    CHECK(brightestEmission > 1.0f);
+
+    // Velocity: the orb scales across the rendered range, so something moved. All-zero would mean
+    // the target was read before anything wrote it.
+    double motion = 0.0;
+    for (std::size_t i = 0; i < vPx.size(); i += 4) {
+        motion += std::abs(static_cast<double>(vPx[i])) + std::abs(static_cast<double>(vPx[i + 1]));
+    }
+    INFO("total screen-space motion " << motion);
+    CHECK(motion > 0.0);
+}
+
+TEST_CASE("an AOV export is refused where it cannot be resolved", "[render][aov]") {
+    app::RenderSettings s;
+    s.outputPath = "out";
+    s.aovs = "normal";
+    CHECK(s.validate().has_value());
+    // ADR-242. The auxiliary targets are sized to the scaled resolution, and three of the five have
+    // no correct downsample: averaging two identifiers is a third object, averaging two normals is
+    // not a normal, and averaging two depths across a silhouette is a surface that is not there.
+    s.supersample = 2.0f;
+    auto refused = s.validate();
+    REQUIRE_FALSE(refused.has_value());
+    CHECK_THAT(refused.error().message, ContainsSubstring("supersample"));
+    // And the combination is only refused when an AOV is actually asked for.
+    s.aovs.clear();
+    CHECK(s.validate().has_value());
 }

@@ -110,6 +110,7 @@ struct AppOptions {
     float canvasScale = 1.0f; // --canvas-scale: the world's share of the canvas's pixels
     // --supersample: an offline render's multiple of the output size (ADR-212). 1 = off.
     float supersample = 1.0f;
+    std::optional<std::string> aovs; // ADR-242: --aov, auxiliary passes beside the beauty frames
 
     bool profileCpu = false;
     std::optional<std::filesystem::path> profileCsv; // --profile-csv <file>: one row per frame
