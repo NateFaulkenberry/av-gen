@@ -23,3 +23,4 @@ TEST_CASE("invalid application appearance is rejected safely", "[app][settings][
     document["general"]["appearance"] = 4;
     CHECK_FALSE(app::AppSettings::fromJson(document).has_value());
 }
+

@@ -43,6 +43,7 @@
 #include "signals/signal_bus.hpp"
 #include "entity/navigation.hpp"
 #include "world/world_map.hpp"
+#include "support/stride_speed.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -56,6 +57,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace avgen;
@@ -104,22 +106,8 @@ const scene::AnimationClip& clipNamed(const scene::SkinnedRig& rig, const char* 
 
 // The first and last key times across every channel -- what the asset actually covers, read from
 // the channels rather than from whatever the clip says its duration is.
-struct KeySpan {
-    float first = 0.0f;
-    float last = 0.0f;
-    [[nodiscard]] float period() const { return last - first; }
-};
-KeySpan keySpan(const scene::AnimationClip& clip) {
-    KeySpan span{1e9f, -1e9f};
-    for (const scene::AnimationChannel& c : clip.channels) {
-        if (c.times.empty()) {
-            continue;
-        }
-        span.first = std::min(span.first, c.times.front());
-        span.last = std::max(span.last, c.times.back());
-    }
-    return span;
-}
+using KeySpan = testing::ClipKeySpan;
+KeySpan keySpan(const scene::AnimationClip& clip) { return testing::clipKeySpan(clip); }
 
 // ---- pose helpers -----------------------------------------------------------------------------
 
@@ -172,66 +160,16 @@ bool finite(const std::vector<glm::mat4>& p) {
 
 // ---- the stride estimator ---------------------------------------------------------------------
 
-// Model-space position of `joint` with `clip` sampled at `t`.
-glm::vec3 jointAt(const scene::SkinnedRig& rig, const scene::AnimationClip& clip, int joint, float t,
-                  scene::Pose& pose, std::vector<glm::mat4>& model) {
-    scene::setRestPose(rig.skeleton, pose);
-    scene::sampleClip(clip, t, pose);
-    scene::poseToModel(rig.skeleton, pose, model);
-    return glm::vec3(model[static_cast<std::size_t>(joint)][3]);
-}
-
-// The ground speed a clip implies, in model units per second: the median speed at which a toe
-// travels backwards along the clip's forward axis while that toe is on the ground. Contact is "the
-// bottom `contactFraction` of this toe's own height range over the cycle", which is a property of
-// the take rather than a tuned number -- the answer is the same for any fraction from 0.10 to 0.30.
+// The method and its justification live in `tests/support/stride_speed.hpp`, which
+// `test_stylized_wanderer.cpp` shares: a second character on a Mixamo rig names its feet
+// differently, so the joint names are an argument rather than a constant.
 //
-// Returns 0 when the rig has no toe joints, which is the honest answer for a skeleton this cannot
-// be measured on rather than a number nobody should trust.
-float clipStrideSpeed(const scene::SkinnedRig& rig, const char* clipName, float contactFraction = 0.2f) {
-    const scene::AnimationClip& clip = clipNamed(rig, clipName);
-    const KeySpan span = keySpan(clip);
-    // Sampled on the take's own key grid: 30 fps, which is what the exporter wrote.
-    std::vector<float> times;
-    for (float t = span.first; t <= span.last + 1e-4f; t += 1.0f / 30.0f) {
-        times.push_back(t);
-    }
-    scene::Pose pose;
-    std::vector<glm::mat4> model;
-    std::vector<float> speeds;
-    for (const char* toe : {"toes_01.l", "toes_01.r"}) {
-        const int joint = rig.skeleton.find(toe);
-        if (joint < 0) {
-            continue;
-        }
-        std::vector<glm::vec3> track;
-        track.reserve(times.size());
-        for (const float t : times) {
-            track.push_back(jointAt(rig, clip, joint, t, pose, model));
-        }
-        float lo = track.front().y;
-        float hi = track.front().y;
-        for (const glm::vec3& p : track) {
-            lo = std::min(lo, p.y);
-            hi = std::max(hi, p.y);
-        }
-        const float threshold = lo + (hi - lo) * contactFraction;
-        for (std::size_t k = 0; k + 1 < track.size(); ++k) {
-            if (track[k].y > threshold || track[k + 1].y > threshold) {
-                continue;
-            }
-            const float dt = times[k + 1] - times[k];
-            const float v = -(track[k + 1].z - track[k].z) / dt;
-            if (v > 0.0f) {
-                speeds.push_back(v);
-            }
-        }
-    }
-    if (speeds.empty()) {
-        return 0.0f;
-    }
-    std::sort(speeds.begin(), speeds.end());
-    return speeds[speeds.size() / 2];
+// Sampled on the take's own key grid: 30 fps, which is what the exporter wrote.
+constexpr std::array<std::string_view, 2> kAlienToes{{"toes_01.l", "toes_01.r"}};
+
+float clipStrideSpeed(const scene::SkinnedRig& rig, const char* clipName,
+                      float contactFraction = 0.2f) {
+    return testing::clipStrideSpeed(rig, clipNamed(rig, clipName), kAlienToes, contactFraction);
 }
 
 // ---- the scene file ---------------------------------------------------------------------------
@@ -344,8 +282,8 @@ TEST_CASE("the alien clips are in-place: there is no root motion to extract", "[
             const KeySpan span = keySpan(clip);
             scene::Pose pose;
             std::vector<glm::mat4> model;
-            const glm::vec3 begin = jointAt(rig, clip, root, span.first, pose, model);
-            const glm::vec3 end = jointAt(rig, clip, root, span.last, pose, model);
+            const glm::vec3 begin = testing::jointPositionAt(rig, clip, root, span.first, pose, model);
+            const glm::vec3 end = testing::jointPositionAt(rig, clip, root, span.last, pose, model);
             const float net = glm::length(glm::vec2(end.x - begin.x, end.z - begin.z));
             INFO("net root xz displacement " << net);
             CHECK(net < 1e-4f);

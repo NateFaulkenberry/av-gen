@@ -70,12 +70,10 @@ appear abruptly. `radius` controls how far the spread reaches.
 The engine ships a route from `audio.rms` to `post/bloom/intensity`, which is why a default scene
 already breathes a little.
 
-> [!NOTE]
-> **`post/bloom/emissionWeight` currently has no effect.** It is meant to weight the bloom
-> prefilter by the emission target so that emissive surfaces bloom selectively. The renderer writes
-> that target, but does not yet hand it to the post chain, so the parameter is inert. The same is
-> true of `env/skyBloom`, which depends on it. This is a known gap, not a setting to experiment
-> with.
+`post/bloom/emissionWeight` (0 – 1) makes the bloom **selective**: at 0 every bright pixel blooms,
+and at 1 a pixel blooms in proportion to how much of its radiance it emits rather than reflects. It
+is what stops a white wall under a hard key glowing like a lamp. `env/skyBloom` rides on the same
+mask and needs this above 0 to do anything.
 
 ## Halation and anamorphic
 

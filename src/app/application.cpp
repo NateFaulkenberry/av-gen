@@ -523,6 +523,27 @@ int Application::runAiTask() {
     return 0;
 }
 
+void Application::syncDirectorSettings() {
+    if (engine_ == nullptr) {
+        return;
+    }
+    AutoDirectorSettings& saved = engine_->autoDirector();
+    // The engine's copy moved without the panel touching it, which means a project was loaded.
+    // Checked first, because a load that lands on the same frame as a slider drag is the load
+    // winning: the file is what the author saved and the drag is on a shot that no longer exists.
+    if (saved != lastDirectorSync_) {
+        cameraDirection_.settings = saved;
+        lastDirectorSync_ = saved;
+        return;
+    }
+    // Otherwise the panel moved it, and the project's copy follows. In memory, not to a file: a
+    // project is written when somebody asks for it, so there is nothing here to debounce.
+    if (cameraDirection_.settings != lastDirectorSync_) {
+        saved = cameraDirection_.settings;
+        lastDirectorSync_ = cameraDirection_.settings;
+    }
+}
+
 void Application::saveSettings() {
     if (settingsPath_.empty()) {
         return;
@@ -1299,7 +1320,13 @@ void Application::applyOutputsFromProject() {
     }
 }
 
-void Application::storeOutputsToProject() { engine_->setOutputsJson(outputs_.toJson()); }
+void Application::storeOutputsToProject() {
+    engine_->setOutputsJson(outputs_.toJson());
+    // The last thing before a save, so a headless run that never reaches the frame loop's
+    // `syncDirectorSettings` -- `--direct --director=... --save-project` -- still records the
+    // direction it was given rather than the defaults it never used.
+    syncDirectorSettings();
+}
 
 void Application::startRenderFromUi() {
     if (job_) {
@@ -2540,6 +2567,10 @@ int Application::runLive() {
                 break;
             }
         }
+
+        // The panel edited these in place during the last frame's UI; carry them to the copy the
+        // project file is written from, and take a loaded project's copy back (ADR-225).
+        syncDirectorSettings();
 
         // Before the clock, so a shot re-cut this frame is the shot this frame renders.
         if (auto redirected = refreshDirection(*engine_, cameraDirection_); !redirected) {

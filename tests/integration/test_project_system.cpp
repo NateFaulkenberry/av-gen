@@ -837,3 +837,169 @@ TEST_CASE("A project that names no audio opens silent", "[integration][project][
     CHECK_FALSE(engine.projectWarnings().empty());
     CHECK_FALSE(engine.hasAudio());
 }
+
+// ---- the Auto-director's controls travel with the project (ADR-225) ------------------------------
+//
+// `AutoDirectorSettings` lived on `DirectorState`, which is a member of the running `Application`
+// and of nothing that is written anywhere -- so every control in the Auto-director panel reset on
+// the next launch, and opening a project did not restore the direction it was cut with. For this
+// struct the defaults are the settings the controls exist to move away from: `maxViewRate` and
+// `maxCameraSpeed` are 0, which means off, and `dwellShots` is 1, which is the thing ADR-203 was
+// written to fix.
+
+TEST_CASE("the Auto-director's controls are saved with the project", "[project][director]") {
+    Fixture fx;
+    const fs::path project = fx.dir / "directed.json";
+
+    // Every field the panel edits, each moved off its default, so a field the writer forgets is a
+    // field this catches rather than one it happens to agree about. The expected values are these
+    // literals, written down here and compared against what comes back out of the file -- not
+    // recomputed by the same function that wrote them.
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        app::AutoDirectorSettings& d = engine.autoDirector();
+        d.mode = app::DirectorMode::EditedSequence;
+        d.minShotSeconds = 3.5;
+        d.minBuildShotSeconds = 1.25;
+        d.maxShotSeconds = 18.0;
+        d.wideFocalLength = 21.0f;
+        d.heroFocalLength = 85.0f;
+        d.maxCameraSpeed = 0.4f;
+        d.maxViewRate = 8.0f;
+        d.dwellShots = 6;
+        d.seed = 4242;
+        REQUIRE(d.validate().has_value());
+        REQUIRE(engine.saveProject(project).has_value());
+    }
+
+    // Read as a document first, so what is asserted is what is in the file rather than what a
+    // loader chose to make of it.
+    {
+        std::ifstream in(project);
+        REQUIRE(in.good());
+        const nlohmann::json doc = nlohmann::json::parse(in);
+        REQUIRE(doc.contains("autoDirector"));
+        const nlohmann::json& d = doc.at("autoDirector");
+        CHECK(d.at("mode") == "edited");
+        CHECK(d.at("minShot").get<double>() == 3.5);
+        CHECK(d.at("minBuildShot").get<double>() == 1.25);
+        CHECK(d.at("maxShot").get<double>() == 18.0);
+        CHECK(d.at("wide").get<float>() == 21.0f);
+        CHECK(d.at("hero").get<float>() == 85.0f);
+        CHECK(d.at("maxSpeed").get<float>() == 0.4f);
+        CHECK(d.at("maxSwing").get<float>() == 8.0f);
+        CHECK(d.at("dwell").get<int>() == 6);
+        CHECK(d.at("seed").get<std::uint32_t>() == 4242u);
+    }
+
+    // And a second engine, which has never seen any of it, comes back with all ten.
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.autoDirector() == app::AutoDirectorSettings{}); // it really did start fresh
+        REQUIRE(engine.loadProject(project).has_value());
+        const app::AutoDirectorSettings& d = engine.autoDirector();
+        CHECK(d.mode == app::DirectorMode::EditedSequence);
+        CHECK(d.minShotSeconds == 3.5);
+        CHECK(d.minBuildShotSeconds == 1.25);
+        CHECK(d.maxShotSeconds == 18.0);
+        CHECK(d.wideFocalLength == 21.0f);
+        CHECK(d.heroFocalLength == 85.0f);
+        CHECK(d.maxCameraSpeed == 0.4f);
+        CHECK(d.maxViewRate == 8.0f);
+        CHECK(d.dwellShots == 6);
+        CHECK(d.seed == 4242u);
+    }
+}
+
+TEST_CASE("a project with no director block opens on the defaults, silently", "[project][director]") {
+    // The compatibility a new block is allowed to assume. A project written before it existed is
+    // the ordinary case, not a fault: it must load, it must not warn, and it must not inherit the
+    // settings of whatever was open before it.
+    Fixture fx;
+    const fs::path project = fx.dir / "undirected.json";
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.saveProject(project).has_value());
+    }
+    // An untouched project writes no block at all, which is what keeps a round trip on an existing
+    // file from growing one.
+    {
+        std::ifstream in(project);
+        REQUIRE(in.good());
+        const nlohmann::json doc = nlohmann::json::parse(in);
+        CHECK_FALSE(doc.contains("autoDirector"));
+    }
+    // The engine that opens it has a *non-default* director first, so "the defaults came back" is
+    // a statement about the load rather than about the engine never having been touched.
+    app::Engine engine(app::EngineMode::Offline);
+    engine.autoDirector().dwellShots = 9;
+    engine.autoDirector().maxViewRate = 40.0f;
+    REQUIRE(engine.loadProject(project).has_value());
+    CHECK(engine.autoDirector() == app::AutoDirectorSettings{});
+    CHECK(engine.autoDirector().dwellShots == 1);
+    CHECK(engine.autoDirector().maxViewRate == 0.0f);
+}
+
+TEST_CASE("the director block survives a save, a load and a save", "[project][director]") {
+    // Stability, not just symmetry: a round trip that drifts by a float each time is a file that
+    // changes in version control every time it is opened.
+    Fixture fx;
+    const fs::path first = fx.dir / "rt1.json";
+    const fs::path second = fx.dir / "rt2.json";
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        engine.autoDirector().mode = app::DirectorMode::EditedSequence;
+        engine.autoDirector().maxViewRate = 12.5f;
+        engine.autoDirector().dwellShots = 4;
+        engine.autoDirector().minBuildShotSeconds = 0.75;
+        REQUIRE(engine.saveProject(first).has_value());
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(first).has_value());
+    REQUIRE(engine.saveProject(second).has_value());
+
+    const auto blockOf = [](const fs::path& p) {
+        std::ifstream in(p);
+        REQUIRE(in.good());
+        return nlohmann::json::parse(in).at("autoDirector");
+    };
+    CHECK(blockOf(first) == blockOf(second));
+}
+
+TEST_CASE("a director block outside the ranges validate() accepts is refused",
+          "[project][director]") {
+    // Refused rather than clamped. A project is written by this application, so the only route to
+    // one of these is a hand edit or a file from a build that meant something else by the key --
+    // and a silently different film is worse than a message.
+    Fixture fx;
+    const fs::path project = fx.dir / "bad.json";
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        engine.autoDirector().dwellShots = 6;
+        REQUIRE(engine.saveProject(project).has_value());
+    }
+    const auto rewrite = [&](const char* key, const nlohmann::json& value) {
+        std::ifstream in(project);
+        nlohmann::json doc = nlohmann::json::parse(in);
+        in.close();
+        doc["autoDirector"][key] = value;
+        std::ofstream(project) << doc.dump(2);
+    };
+
+    app::Engine engine(app::EngineMode::Offline);
+    // ADR-203's control accepts 1..12 and nothing else.
+    rewrite("dwell", 40);
+    CHECK_FALSE(engine.loadProject(project).has_value());
+    rewrite("dwell", 0);
+    CHECK_FALSE(engine.loadProject(project).has_value());
+    rewrite("mode", "improvised");
+    CHECK_FALSE(engine.loadProject(project).has_value());
+
+    // ...and the same document with both fields put right loads, or the three refusals above would
+    // have passed for reasons unconnected to the fields they name.
+    rewrite("dwell", 12);
+    rewrite("mode", "edited");
+    REQUIRE(engine.loadProject(project).has_value());
+    CHECK(engine.autoDirector().dwellShots == 12);
+    CHECK(engine.autoDirector().mode == app::DirectorMode::EditedSequence);
+}

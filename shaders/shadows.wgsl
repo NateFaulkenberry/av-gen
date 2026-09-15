@@ -66,6 +66,7 @@ struct ShadowUniforms {
     views: array<ShadowViewGpu, 8>,
     info: vec4<f32>,   // x = atlas resolution, y = cascade count, z = PCF taps, w = 1 when PCSS is on
     splits: vec4<f32>, // cascade far distances in view depth
+    info2: vec4<f32>,  // x = PCSS blocker-search taps (ADR-227); yzw unused
 };
 
 @group(0) @binding(1) var<storage, read> sceneLights: array<GpuLight>;
@@ -220,7 +221,8 @@ fn pcf(view: u32, uv: vec2<f32>, depth: f32, radiusTexels: f32, taps: u32, rotat
 
 // Percentage-closer soft shadows (Fernando 2005): find the average blocker, widen the filter with
 // it, so a large emitter reads as a large emitter. Reserved for the key light.
-fn pcss(view: u32, uv: vec2<f32>, depth: f32, softness: f32, taps: u32, rotation: f32) -> f32 {
+fn pcss(view: u32, uv: vec2<f32>, depth: f32, softness: f32, taps: u32, blockerTaps: u32,
+        rotation: f32) -> f32 {
     let resolution = max(shadowBlock.info.x, 1.0);
     let texel = 1.0 / resolution;
     let searchRadius = clamp(softness * 6.0, 1.0, 24.0);
@@ -228,7 +230,11 @@ fn pcss(view: u32, uv: vec2<f32>, depth: f32, softness: f32, taps: u32, rotation
     let s = sin(rotation);
     var blockerSum = 0.0;
     var blockerCount = 0.0;
-    let search = min(taps, 32u);
+    // Its own budget (ADR-227). The search is uninterpolated `textureLoad`s over a fixed radius and
+    // the filter is hardware comparison samples over a radius the search chose, so they are two
+    // costs and two pictures: ADR-111 measured the search as the largest single contributor to the
+    // shadow mask's residual, and the tiers have always wanted to spend differently on them.
+    let search = min(blockerTaps, 32u);
     for (var i = 0u; i < search; i = i + 1u) {
         let searchAngle = rotation + f32(i / 16u) * 0.19634954;
         let sc = cos(searchAngle);
@@ -300,7 +306,8 @@ fn shadowVisibility(view: u32, light: GpuLight, worldPos: vec3<f32>, normal: vec
     let slope = clamp(tan(acos(clamp(nDotL, 0.02, 1.0))), 0.0, 4.0);
     let depth = lookup.depth - shadowBlock.views[view].params.y * (1.0 + slope);
     if (shadowBlock.info.w > 0.5 && cascaded) {
-        return pcss(view, lookup.uv, depth, max(light.sizeSoft.w, 0.05), taps, rotation);
+        return pcss(view, lookup.uv, depth, max(light.sizeSoft.w, 0.05), taps, shadowBlockerTaps(),
+                    rotation);
     }
     return pcf(view, lookup.uv, depth, max(light.sizeSoft.w, 0.2) * 1.5, taps, rotation);
 }
@@ -308,6 +315,15 @@ fn shadowVisibility(view: u32, light: GpuLight, worldPos: vec3<f32>, normal: vec
 // The tap count a shading pass uses: whatever the tier asked for.
 fn shadowTaps() -> u32 {
     return u32(clamp(shadowBlock.info.z, 1.0, 32.0));
+}
+
+// The PCSS blocker search's own budget (ADR-227). Clamped exactly as `shadowTaps` is, and for the
+// same reason: one meaning for the number in both layers. A fallback here -- "0 means take the
+// filter's count" -- was written and removed, because it gave 0 a second meaning that the C++,
+// which clamps to 1..32 before writing, can never produce; two readings of one lane in two layers
+// is how `info.z` came to serve two tap counts in the first place.
+fn shadowBlockerTaps() -> u32 {
+    return u32(clamp(shadowBlock.info2.x, 1.0, 32.0));
 }
 
 fn shadowFactor(light: GpuLight, worldPos: vec3<f32>, normal: vec3<f32>, toLight: vec3<f32>,

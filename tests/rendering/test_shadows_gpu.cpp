@@ -720,3 +720,108 @@ TEST_CASE("an offline render builds no shadow mask", "[gpu][shadows][mask]") {
     REQUIRE(realtime.has_value());
     CHECK(renderer->shadowMask().active());
 }
+
+// ---- ADR-227: the PCSS blocker search has its own tap budget ------------------------------------
+
+namespace {
+
+// How many of two frames' pixels differ, and by how much at the worst. A count rather than a hash,
+// because "the field is wired" and "the field moved the whole image" are different claims and only
+// the first is being made.
+struct FrameDiff {
+    std::size_t differing = 0;
+    int worst = 0;
+    std::size_t total = 0;
+};
+
+FrameDiff diffOf(const gpu::Image8& a, const gpu::Image8& b) {
+    REQUIRE(a.rgba.size() == b.rgba.size());
+    FrameDiff d;
+    d.total = a.rgba.size() / 4;
+    for (std::size_t p = 0; p + 3 < a.rgba.size(); p += 4) {
+        int worst = 0;
+        for (std::size_t c = 0; c < 3; ++c) {
+            worst = std::max(worst, std::abs(static_cast<int>(a.rgba[p + c]) - static_cast<int>(b.rgba[p + c])));
+        }
+        if (worst > 0) {
+            ++d.differing;
+            d.worst = std::max(d.worst, worst);
+        }
+    }
+    return d;
+}
+
+} // namespace
+
+TEST_CASE("the PCSS blocker search takes the tap count the tier asked it for",
+          "[gpu][shadows][quality]") {
+    // `QualitySettings::pcssBlockerTaps` was read by nothing. The blocker search took
+    // `shadowPcfTaps` through `ShadowUniforms::info.z`, and every lane of `info` and `splits` was
+    // already spoken for, so the field sat in four tier tables with no path to the GPU. It now has
+    // a lane of its own (`info2.x`).
+    //
+    // This is the test that would have caught that, and it is written the way ADR-182 asks: the
+    // arm has to be shown to change the output before anything it says means anything.
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    // A big soft emitter over a box well above the floor: a wide penumbra, which is the only place
+    // the blocker search can show up at all. With a hard light the search finds one depth and any
+    // tap count agrees about it.
+    scene::Scene s = shadowScene(true);
+    s.lights.back().softness = 1.0f;
+    s.entities[1].transform.position = {0.0f, 9.0f, 0.0f};
+
+    const auto renderAtBlockerTaps = [&](std::uint32_t blocker) {
+        // Everything else held, including the filter's own tap count, so a difference cannot be
+        // some other field of the tier moving underneath.
+        rendering::QualitySettings q = rendering::QualitySettings::forTier(rendering::QualityTier::High);
+        q.softShadows = true;
+        q.shadowPcfTaps = 16;
+        q.pcssBlockerTaps = blocker;
+        renderer->setQualitySettings(q);
+        auto image = renderer->renderToImage(s, frameAt(3), kSize, kSize);
+        REQUIRE(image.has_value());
+        return std::move(*image);
+    };
+
+    // The extremes of what the field can express rather than two adjacent tiers, for the reason
+    // the SDF probe gives: adjacent tier values may agree about this scene, and "no difference"
+    // read from two values that agree is indistinguishable from "the field is not wired".
+    const gpu::Image8 sparse = renderAtBlockerTaps(1);
+    const gpu::Image8 dense = renderAtBlockerTaps(32);
+    CHECK(ctx->errorCount() == 0);
+
+    const FrameDiff d = diffOf(sparse, dense);
+    INFO("blocker taps 1 vs 32: " << d.differing << "/" << d.total << " pixels differ, worst "
+                                  << d.worst);
+    // Non-vacuous: the lane reaches the picture. A byte-identical pair here is the defect.
+    CHECK(d.differing > 0);
+    CHECK(d.worst > 1);
+
+    // And it is the *blocker* count doing it, not the filter's: holding the blocker count and
+    // moving nothing changes nothing. Without this the check above would also pass if `info2.x`
+    // had accidentally been wired to the filter.
+    const gpu::Image8 again = renderAtBlockerTaps(32);
+    const FrameDiff repeat = diffOf(dense, again);
+    INFO("the same blocker count twice: " << repeat.differing << " pixels differ");
+    CHECK(repeat.differing == 0);
+
+    // The clamp has one meaning in both layers: a request of 0 is not "use the filter's count", it
+    // is a request below the floor, and the writer clamps it to one tap. So 0 and 1 are the same
+    // frame -- and 0 is not quietly the same frame as the filter's 16, which is what a fallback
+    // would have made it.
+    const gpu::Image8 zero = renderAtBlockerTaps(0);
+    CHECK(diffOf(zero, sparse).differing == 0);
+    const FrameDiff againstFilter = diffOf(zero, renderAtBlockerTaps(16));
+    INFO("0 taps vs the filter's own 16: " << againstFilter.differing << " pixels differ");
+    CHECK(againstFilter.differing > 0);
+
+    // What shipping actually changed, reported rather than asserted. The High tier is the only one
+    // whose two tap counts differ (20 filter, 16 blocker), so it is the only tier whose picture
+    // moves at all -- from a 20-tap blocker search to a 16-tap one, on this scene.
+    const FrameDiff tierMove = diffOf(renderAtBlockerTaps(20), renderAtBlockerTaps(16));
+    WARN("High tier, blocker search 20 -> 16 taps: " << tierMove.differing << "/" << tierMove.total
+                                                     << " pixels differ, worst " << tierMove.worst);
+}

@@ -356,6 +356,14 @@ private:
     std::uint64_t lastTransportDiscontinuity_ = 0;
     // The shot the director cut, so starring an object re-cuts it (see `refreshDirection`).
     DirectorState cameraDirection_;
+    // The Auto-director's controls have two homes and neither can be told when the other moves: the
+    // panel edits `cameraDirection_.settings` in place, and `Engine::autoDirector()` is the copy
+    // `saveProject` writes and `loadProject` replaces. One function reconciles them once a frame,
+    // which is why no load site has to remember to -- a project opened from the command line, from
+    // the menu or by a file drop all arrive the same way, as the engine's copy no longer matching
+    // what was last seen.
+    void syncDirectorSettings();
+    AutoDirectorSettings lastDirectorSync_;
 };
 
 } // namespace avgen::app

@@ -339,6 +339,54 @@ Result<void> AutoDirectorSettings::validate() const {
     return {};
 }
 
+nlohmann::json AutoDirectorSettings::toJson() const {
+    return nlohmann::json{{"mode", directorModeName(mode)},
+                          {"minShot", minShotSeconds},
+                          {"minBuildShot", minBuildShotSeconds},
+                          {"maxShot", maxShotSeconds},
+                          {"wide", wideFocalLength},
+                          {"hero", heroFocalLength},
+                          {"maxSpeed", maxCameraSpeed},
+                          {"maxSwing", maxViewRate},
+                          {"dwell", dwellShots},
+                          {"seed", seed}};
+}
+
+Result<AutoDirectorSettings> AutoDirectorSettings::fromJson(const nlohmann::json& doc) {
+    if (!doc.is_object()) {
+        return fail("director settings must be a JSON object");
+    }
+    AutoDirectorSettings out;
+    if (const auto mode = doc.find("mode"); mode != doc.end()) {
+        if (!mode->is_string()) {
+            return fail("director.mode must be a string");
+        }
+        const auto parsed = directorModeFromName(mode->get<std::string>());
+        if (!parsed) {
+            return fail("director.mode '{}' is not a shot mode", mode->get<std::string>());
+        }
+        out.mode = *parsed;
+    }
+    // Field by field with the current value as the default, so a project written before a control
+    // existed reads as "the author did not set that one" rather than as zero.
+    out.minShotSeconds = doc.value("minShot", out.minShotSeconds);
+    out.minBuildShotSeconds = doc.value("minBuildShot", out.minBuildShotSeconds);
+    out.maxShotSeconds = doc.value("maxShot", out.maxShotSeconds);
+    out.wideFocalLength = doc.value("wide", out.wideFocalLength);
+    out.heroFocalLength = doc.value("hero", out.heroFocalLength);
+    out.maxCameraSpeed = doc.value("maxSpeed", out.maxCameraSpeed);
+    out.maxViewRate = doc.value("maxSwing", out.maxViewRate);
+    out.dwellShots = doc.value("dwell", out.dwellShots);
+    out.seed = doc.value("seed", out.seed);
+    // Refused rather than clamped. A project is written by this application, so the only route to a
+    // value outside the range is a hand edit or a file from a build that meant something else by
+    // the key -- and both are worth a message rather than a silently different film.
+    if (auto ok = out.validate(); !ok) {
+        return std::unexpected(ok.error());
+    }
+    return out;
+}
+
 void AutoDirectorSettings::applyTo(DirectionBrief& brief) const {
     brief.mode = mode;
     brief.minShotSeconds = minShotSeconds;

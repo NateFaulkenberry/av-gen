@@ -198,9 +198,20 @@ Because the upsample no longer multiplies, the same visual weight needs a larger
 `post/bloom/intensity` than it did — roughly double. The shipped examples were re-tuned for this.
 
 **Selective bloom** (`post/bloom/emissionWeight`, 0..1) weights the prefilter by the emission target
-from ADR-035, so a lit-but-not-emissive highlight stops glowing like a light source. The renderer
-does not write that target yet; until it does, `PostFrameInputs::emission` is null, the shader's
-`emissionAvailable` flag is 0 and the parameter has no effect.
+from ADR-035, so a lit-but-not-emissive highlight stops glowing like a light source. At 0 the
+prefilter is the plain threshold; at 1 a pixel's bloom weight is scaled by how much of its radiance
+is actually *emitted*.
+
+The emission target is written by the scene pass, which runs **before** exposure, and the bloom's
+source is the scene after it — so the prefilter is handed the exposure scale and brings the two into
+the same space before taking their ratio. Without that the mask is off by the exposure factor, and
+at ev-2 it suppresses the glow on the very lights it exists to keep.
+
+An emitter keeps most of its glow rather than all of it, which is the technique and not a fault: the
+prefilter's four-tap box mixes the background into `c` at a silhouette while the emission is sampled
+at the pixel centre, so edge pixels mask down a little. Measured on two cubes of matched screen
+brightness, taking the weight from 0 to 1 drops the merely-lit cube's halo by about eight times and
+leaves roughly three quarters of the emitter's.
 
 ## Halation and anamorphic (ADR-039)
 

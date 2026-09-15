@@ -528,13 +528,17 @@ march derived its own budget as `maxSteps / 4` in `shaders/sdf_raymarch.wgsl`. N
 free `info.w` lane, capped by the object's own march so a cheap object cannot get an expensive
 shadow.
 
-**`pcssBlockerTaps` is read by nothing, and is still not wired.** The blocker search takes the same
-tap count as the PCF filter — `shadowPcfTaps`, through `ShadowUniforms::info.z` — and every lane of
-`info` and `splits` is already taken, so wiring it is a uniform-layout change rather than a line.
-Left in place with the truth attached at its declaration rather than deleted, because the tiers do
-want a separate budget for it: ADR-111 measured the blocker search as the largest single contributor
-to the shadow mask's residual. Only the High tier sets the two differently today (20 PCF, 16
-blocker), so wiring it moves one tier's picture and no other.
+**`pcssBlockerTaps` was read by nothing — wired, ADR-227.** The blocker search took the same tap
+count as the PCF filter — `shadowPcfTaps`, through `ShadowUniforms::info.z` — and every lane of
+`info` and `splits` was already taken, so it was a uniform-layout change rather than a line. Which
+is the whole reason it survived this long: a field nobody can wire in one line is a field that stays
+unwired. `ShadowUniforms` now carries a fourth `vec4` and grew from 672 to 688 bytes.
+
+As predicted here, the High tier is the only one that sets the two differently (20 PCF, 16 blocker)
+and the only one whose picture moves: **14 pixels of 36,864** on the reference soft-shadow scene,
+worst delta 13. Non-vacuous at the extremes the field can express — 1 tap against 32 differs on
+**927 of 36,864**, worst 40 — and with the wiring reverted that becomes **zero bytes**, which is the
+negative control and the defect.
 
 ### And the reason the first fix could not be tested: a raymarched SDF casts no shadow
 
@@ -557,6 +561,38 @@ The fix is a per-view rect, or the full-screen fallback the shader already has, 
 and it carries an unmeasured cost: a full shadow-map quad marched per SDF per cascade. That is a
 decision with a number attached, so it is recorded here rather than guessed at. Kept as a probe,
 `avgen_render_tests "[.probe][sdf]"`, which passes when the defect is gone.
+
+### Re-read 2026-09-15: the quad is one of three, and the other two are why this is not a small fix
+
+Going to do the quad turned up two more, both in the same pass and both fatal on their own. The
+diagnosis above is correct and incomplete, and the difference matters because it is the difference
+between "swap the vertex stage" and "change how the march reconstructs a ray".
+
+**`frame.cameraPos` in a shadow view is the camera's.** `ShadowRenderer::upload` builds each view's
+frame block by copying the camera's and overwriting the first two `mat4`s — `viewProj` and
+`invViewProj` — and nothing else. `cameraPos` sits at byte 192, after `prevViewProj`, and is never
+touched. `fs_sdf` does `eye = frame.cameraPos.xyz` and `rdW = normalize(farW - eye)`, so in a shadow
+pass it marches a ray from the *camera's* eye through the *light's* NDC. Even with the right quad,
+that ray goes nowhere near the geometry the shadow map is of.
+
+**A directional cascade is orthographic, and an orthographic view has no eye.** `farW - eye` is not
+the ray for a projection whose rays are parallel — there is no single origin to subtract, and
+`tNearPlane = length(nearW - eye)` is not a near-plane distance either. The form that is right for
+both is the two-point one, `normalize(farW - nearW)` with `t` measured from `nearW`, which is what
+the shadow pass needs and what the lit pass would also have to change to if the entry stayed shared.
+
+So the shape of the fix is: a full-screen (or per-view) quad, a frame block whose `cameraPos` means
+something for the view, **and** a ray reconstruction that does not assume a pinhole. Only the third
+is interesting, and it touches the lit pass — mathematically identical for a perspective camera,
+bit-different in floating point, so the determinism suite will see it. That is a deliberate change
+to make with a baseline in hand, not a stretch item.
+
+The cost question the paragraph above defers is still unanswered and is still the right gate. For
+scale, the hidden throughput probe (`avgen_render_tests "[.perf][sdf]"`, 1920×1080, full march
+budget) puts a full-screen quad of 16 smooth-unioned spheres at **171 ms** of raymarch pass and one
+sphere at **10.7 ms**. A shadow march is much cheaper per pixel — `sdfShadowSteps` is 16 to 48 by
+tier against the object's own `maxSteps` — and a 2048² view is twice 1080p's pixels, so neither
+number is the answer; they are the reason the answer has to be measured rather than assumed small.
 
 Worth noting what this does *not* affect: no shipped example scene uses a raymarched SDF, which is
 why nothing looked wrong. It is a defect in a feature nothing currently leans on.
@@ -590,9 +626,10 @@ Ordered by what blocks the most.
 8. **The performance dashboard (§13)** — the one item that genuinely needs a human to certify.
 9. **AOV export (§B)**, and the debug views the mandate lists that do not exist — neither should be
    built without saying what question each answers.
-10. **Wire `pcssBlockerTaps`**, which needs a lane in `ShadowUniforms`, and **fix the raymarched
-    SDF's shadow-map quad** — both found by the §15 audit above, both left recorded rather than
-    rushed. The SDF one wants its cost measured first.
+10. ~~Wire `pcssBlockerTaps`~~ — **done**, ADR-227, as a fourth `vec4` in `ShadowUniforms`. Still
+    open: **fix the raymarched SDF's shadow-map quad**, which wants its cost measured first — a full
+    shadow-map quad marched per SDF per cascade. `avgen_render_tests "[.probe][sdf]"` passes when it
+    is gone.
 11. **The rest of the realtime/offline parity audit (§15)** beyond `QualitySettings` — the same
     enumeration against the scene's own reduction policies, the particle budgets and the terrain's
     view distances.
