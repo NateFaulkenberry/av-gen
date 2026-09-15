@@ -26,7 +26,7 @@ struct Influence {
     // produces a `MotionOffset`. It was missing here until ADR-211, which meant the one panel whose
     // whole job is answering "why is this moving?" answered "nothing modulates this object; its
     // parameters are static" about a character that was visibly walking across the valley.
-    enum class Kind { Route, Timeline, Cue, State, Macro, Entity } kind = Kind::Route;
+    enum class Kind { Route, Timeline, Cue, State, Macro, Entity, Staging } kind = Kind::Route;
     std::string source;      // signal / track / cue / state / macro / entity name
     std::string detail;      // amount, op, easing…
     float value = 0.0f;      // last contribution when known
@@ -37,8 +37,9 @@ struct Influence {
     std::string routeTarget;
 };
 // Everything that writes to `path`: routes (with their source and last output), timeline tracks,
-// cues whose preset contains it, states whose preset contains it, world macros targeting it, and the
-// entity behaviours that fold a motion offset onto it.
+// cues whose preset contains it, states whose preset contains it, world macros targeting it, the
+// entity behaviours that fold a motion offset onto it, and the staging scenarios that write it
+// directly (ADR-241).
 //
 // "Everything" is a claim this function has to keep, so the way to check it is to enumerate what
 // writes a parameter's *final* rather than to reason about what feels like modulation:

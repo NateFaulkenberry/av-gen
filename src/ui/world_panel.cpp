@@ -114,6 +114,28 @@ std::vector<Influence> influencesOf(app::Engine& engine, const std::string& path
             }
         }
     }
+    // The staging layer (ADR-210, ADR-241). A scenario writes a parameter's *base* directly --
+    // `Staging::writeParameter` -- so a tractor beam's visibility, a particle system's spawn rate or
+    // any absolute path a `set` step names is driven by something no other branch here can see. The
+    // entity branch above names a staged *body*, because a scenario moves one through
+    // `DirectorMotion`; it says nothing about the parameters the scenario writes itself, which is
+    // exactly the hole ADR-211 recorded and declined to fill.
+    if (const scene::Composition* comp = const_cast<app::Engine&>(engine).composition()) {
+        for (const stage::Staging::PathWriter& w : comp->director().writersOf(path)) {
+            Influence i;
+            i.kind = Influence::Kind::Staging;
+            i.source = w.scenario;
+            std::string detail = w.role.empty() ? std::string("scenario") : "role '" + w.role + "'";
+            // Said plainly, because the difference decides whether the user should expect to see the
+            // value move right now.
+            detail += w.running ? ", running" : ", not running";
+            if (!w.live) {
+                detail += ", declared";
+            }
+            i.detail = std::move(detail);
+            out.push_back(std::move(i));
+        }
+    }
     for (const app::WorldMacro& m : engine.worldMacros()) {
         for (const app::WorldMacroTarget& t : m.targets) {
             if (t.path == path) {
@@ -276,6 +298,7 @@ void WorldPanel::drawInspector(app::Engine& engine) {
                 case Influence::Kind::State: kind = "state"; break;
                 case Influence::Kind::Macro: kind = "macro"; break;
                 case Influence::Kind::Entity: kind = "entity"; break;
+                case Influence::Kind::Staging: kind = "staging"; break;
                 }
                 // Build the trailing value first: a temporary std::string's c_str() must not
                 // outlive the full expression it was created in.
