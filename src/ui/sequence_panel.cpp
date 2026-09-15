@@ -1,5 +1,8 @@
 #include "ui/sequence_panel.hpp"
 
+#include "ui/shortcuts.hpp"
+#include "ui/style.hpp"
+#include "ui/theme.hpp"
 #include "ui/ui_logic.hpp"
 
 #include <chrono>
@@ -35,27 +38,40 @@ std::string clock(double seconds) {
 }
 
 // Lane geometry. A lane is a row of the strip; everything in it shares one time axis.
-constexpr float kRulerHeight = 20.0f;
+constexpr float kRulerHeight = 22.0f;
 constexpr float kMarkerHeight = 16.0f;
-constexpr float kLaneHeight = 24.0f;
+constexpr float kLaneHeight = 26.0f;
 constexpr float kLaneGap = 3.0f;
-constexpr float kEdgeGrab = 5.0f; // points either side of a block's right edge that resize it
+constexpr float kSectionLaneHeight = 22.0f;
+// How far inside an edge still grabs it. Seven rather than five: five points is a comfortable
+// target with a mouse and a fiddly one on a trackpad, and `blockZoneAt` shrinks it on a narrow
+// block anyway, so the generous number costs nothing where it would have hurt.
+constexpr float kEdgeGrab = 7.0f;
 // The audio lane is half again as tall as the others. It is the only lane whose content is a
 // picture rather than a label, and a waveform drawn three pixels high says nothing about the music.
 constexpr float kAudioLaneHeight = kLaneHeight * 1.5f;
+// The header column down the left (the brief's section 12). Wide enough for an actor's id and the
+// visibility dot beside it, and no wider: every point here is a point of music not shown.
+constexpr float kGutterWidth = 112.0f;
+// The playhead's handle.
+constexpr float kPlayheadHalfWidth = 6.0f;
+constexpr float kPlayheadHandleHeight = 13.0f;
+// The shortest a block may be trimmed to. A block of zero length cannot be grabbed again, so a
+// trim that reached zero would be a delete with no way back -- and this panel has no undo.
+constexpr double kMinBlockSeconds = 0.25;
+// `splitSection`'s own minimum, named here so the menu's enabled test and the operation agree.
+constexpr double kMinSectionSeconds = 0.25;
+constexpr const char* kStripContextId = "strip-context";
 
-ImU32 shotColour(int index, bool selected) {
-    // Alternating so a cut is visible even between two shots on the same scene, and warmer when
-    // selected rather than merely brighter -- a brighter blue next to a blue reads as "nearer".
-    const ImVec4 surface = ImGui::GetStyleColorVec4(ImGuiCol_FrameBg);
-    const ImVec4 active = ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive);
-    if (selected) {
-        return ImGui::GetColorU32(ImVec4(active.x, active.y, active.z, 0.95f));
-    }
-    const float lift = index % 2 == 0 ? 0.08f : 0.03f;
-    return ImGui::GetColorU32(ImVec4(std::min(surface.x + lift, 1.0f),
-                                     std::min(surface.y + lift, 1.0f),
-                                     std::min(surface.z + lift * 1.4f, 1.0f), 0.92f));
+// A shot's resting colour. Alternating, so a cut between two shots on the same scene is visible as
+// a cut rather than as a join.
+//
+// The selected and hovered variants are *not* here any more: `ui::interactionFill` owns those for
+// the whole application, which is what makes a selected shot, a selected list row and a selected
+// tab the same colour. This function's only remaining job is the alternation.
+ImU32 shotColour(int index) {
+    const Palette& p = palette();
+    return mixColour(p.lane, p.raised, index % 2 == 0 ? 0.85f : 0.55f);
 }
 
 const char* kSnapNames[] = {"Off", "Frames", "Beats", "Markers"};
@@ -63,7 +79,7 @@ const char* kSectionSnapNames[] = {"free", "beat", "bar"};
 
 // One colour per section function, so the shape of a song is readable without reading any of it.
 // Warm for the payoffs, cool for the passages, grey for "the detector did not claim anything".
-ImU32 sectionColour(avgen::analysis::SectionFunction f, bool selected) {
+ImU32 sectionColour(avgen::analysis::SectionFunction f, bool selected, bool hovered) {
     using F = avgen::analysis::SectionFunction;
     ImU32 base = IM_COL32(88, 96, 112, 220);
     switch (f) {
@@ -95,14 +111,13 @@ ImU32 sectionColour(avgen::analysis::SectionFunction f, bool selected) {
         base = IM_COL32(88, 96, 112, 220);
         break;
     }
-    if (!selected) {
-        return base;
-    }
     // Lifted rather than outlined: the outline is what marks the boundary being dragged, and two
-    // outlines in one lane is two things saying "this one".
-    const ImVec4 c = ImGui::ColorConvertU32ToFloat4(base);
-    return ImGui::GetColorU32(ImVec4(std::min(c.x + 0.18f, 1.0f), std::min(c.y + 0.18f, 1.0f),
-                                     std::min(c.z + 0.18f, 1.0f), 1.0f));
+    // outlines in one lane is two things saying "this one". The lift itself is the application's,
+    // so a selected section is as bright as a selected anything else.
+    //
+    // The function's own hue survives the lift, which is the point of this lane -- a chorus stays
+    // red when it is selected, because losing the hue would lose the only thing the lane is for.
+    return interactionFill(base, hovered, selected, false);
 }
 
 } // namespace
@@ -118,6 +133,13 @@ void SequencePanel::draw(app::Engine& engine) {
         engine.audioRevision() != structureRevision_ &&
         engine.sequence().structure.sections.empty()) {
         startStructureAnalysis(engine, false);
+    }
+    // A menu item cannot open another popup from inside the first one's body, so it leaves a flag
+    // and the request is honoured here, at the top of the frame, before anything is submitted.
+    // Before the toolbar, because the toolbar is where that popup's `BeginPopup` lives and a popup
+    // opened after its Begin has been submitted does not appear until the frame after.
+    if (std::exchange(openAudioClips_, false)) {
+        ImGui::OpenPopup("audio-clips");
     }
     drawToolbar(engine);
     ImGui::Separator();
@@ -425,26 +447,34 @@ void SequencePanel::drawImportPopup(app::Engine& engine) {
 void SequencePanel::drawStrip(app::Engine& engine) {
     seq::Sequence& piece = engine.sequence();
     const double duration = std::max({piece.duration(), engine.durationSeconds(), 1.0});
+    const Palette& pal = palette();
 
-    const float width = std::max(ImGui::GetContentRegionAvail().x, 80.0f);
+    const float total = std::max(ImGui::GetContentRegionAvail().x, 160.0f);
     const bool hasAudio = engine.audioFile() != nullptr;
     // One description of where the lanes are, for the height, the drawing and the hit test alike.
     // They were three separate calculations, and when two of them disagreed a click meant to scrub
     // the music moved the music instead (ADR-103); the arithmetic is in `ui_logic.hpp` so it can be
-    // checked without a window, and `tests/unit/test_ui_logic.cpp` checks it.
-    const StripLanes lanes{.hasAudio = hasAudio,
-                           .hasSections = !piece.structure.sections.empty(),
-                           .actorCount = piece.actors.size(),
-                           .hasOverlays = !piece.overlays.empty(),
-                           .rulerHeight = kRulerHeight,
-                           .markerHeight = kMarkerHeight,
-                           .laneHeight = kLaneHeight,
-                           .audioLaneHeight = kAudioLaneHeight,
-                           .gap = kLaneGap};
+    // checked without a window, and `tests/unit/test_ui_logic.cpp` checks it. The header column is
+    // in there for the same reason: it moves where the time axis starts, and both sides ask.
+    StripLanes lanes{.hasAudio = hasAudio,
+                     .hasSections = !piece.structure.sections.empty(),
+                     .actorCount = piece.actors.size(),
+                     .hasOverlays = !piece.overlays.empty(),
+                     .rulerHeight = kRulerHeight,
+                     .markerHeight = kMarkerHeight,
+                     .laneHeight = kLaneHeight,
+                     .audioLaneHeight = kAudioLaneHeight,
+                     .sectionLaneHeight = kSectionLaneHeight,
+                     .gap = kLaneGap};
+    // A narrow panel loses the headers rather than losing the music: below about four hundred
+    // points a header column costs more of the time axis than the names are worth.
+    lanes.gutter = total >= 400.0f ? kGutterWidth : 0.0f;
     const float height = lanes.height();
+    const float width = std::max(total - lanes.gutter, 80.0f);
 
     const ImVec2 origin = ImGui::GetCursorScreenPos();
-    ImGui::InvisibleButton("strip", ImVec2(width, height),
+    const float axisX = origin.x + lanes.gutter;
+    ImGui::InvisibleButton("strip", ImVec2(total, height),
                            ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
     const bool hovered = ImGui::IsItemHovered();
     ImDrawList* draw = ImGui::GetWindowDrawList();
@@ -453,36 +483,108 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     const double span = duration / static_cast<double>(std::max(zoom_, 0.01f));
     view_ = std::clamp(view_, 0.0, std::max(0.0, duration - span));
     const auto toX = [&](double seconds) {
-        return origin.x + static_cast<float>((seconds - view_) / span) * width;
+        return axisX + static_cast<float>((seconds - view_) / span) * width;
     };
     const auto toTime = [&](float x) {
-        return view_ + static_cast<double>((x - origin.x) / width) * span;
+        return view_ + static_cast<double>((x - axisX) / width) * span;
+    };
+    const float axisRight = axisX + width;
+
+    draw->AddRectFilled(origin, ImVec2(origin.x + total, origin.y + height), pal.ground, 4.0f);
+
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    const float localX = mouse.x - origin.x;
+    const float localY = mouse.y - origin.y;
+    const StripLane hoverLane = hovered ? lanes.at(localY) : StripLane::None;
+    const bool overGutter = hovered && lanes.inGutter(localX);
+    const bool overAxis = hovered && !overGutter;
+    const double mouseTime = toTime(mouse.x);
+
+    // Hit-tested once, while the lanes are drawn, and then used three times: for the hover
+    // treatment, for the cursor, and for what a right-click's menu is about. They were three
+    // separate tests, which is the shape ADR-103 records as having produced a click that scrubbed
+    // and moved the audio at the same time.
+    ImGuiMouseCursor wantCursor = ImGuiMouseCursor_Arrow;
+    int hoverBlock = -1;    // index within whichever lane the pointer is over
+    int hoverActorRow = -1; // which actor lane, when the pointer is over one
+
+    // ---- lane backgrounds and the header column (the brief's section 12) ------------------------
+    //
+    // Structure rather than borders. Each lane gets a surface a shade off the strip's own and the
+    // gaps between them stay the ground colour, so the rows separate without a grid drawn over the
+    // music. A border per lane was tried and it reads as a spreadsheet.
+    const auto laneBackground = [&](float top, float h, bool emphasised) {
+        draw->AddRectFilled(ImVec2(axisX, origin.y + top), ImVec2(axisRight, origin.y + top + h),
+                            emphasised ? mixColour(pal.lane, pal.panel, 0.45f) : pal.lane, 2.0f);
+    };
+    // The header itself. `accentLine` marks the lane the selection is in, which is the one piece of
+    // state a header carries that the lane cannot show on its own when it happens to be empty.
+    const auto laneHeader = [&](float top, float h, const char* label, bool active) {
+        if (lanes.gutter <= 0.0f) {
+            return std::pair<ImVec2, ImVec2>{ImVec2(0, 0), ImVec2(0, 0)};
+        }
+        const ImVec2 a(origin.x, origin.y + top);
+        const ImVec2 b(origin.x + lanes.gutter - 1.0f, origin.y + top + h);
+        const bool over = hovered && overGutter && localY >= top && localY < top + h;
+        draw->AddRectFilled(a, b, interactionFill(pal.panel, over, active, false), 2.0f);
+        if (active) {
+            // A three-point bar rather than a fill: the header's job is to name the lane, and a
+            // header that lights up as strongly as a selected clip competes with the clip.
+            draw->AddRectFilled(a, ImVec2(a.x + 3.0f, b.y), pal.accent, 1.0f);
+        }
+        draw->PushClipRect(ImVec2(a.x + 7.0f, a.y), ImVec2(b.x - 4.0f, b.y), true);
+        draw->AddText(ImVec2(a.x + 9.0f, a.y + (h - ImGui::GetTextLineHeight()) * 0.5f),
+                      active ? pal.text : pal.textMuted, label);
+        draw->PopClipRect();
+        return std::pair<ImVec2, ImVec2>{a, b};
     };
 
-    draw->AddRectFilled(origin, ImVec2(origin.x + width, origin.y + height),
-                        ImGui::GetColorU32(ImVec4(0.09f, 0.09f, 0.11f, 1.0f)), 3.0f);
-
-    // ---- ruler ----
-    // A tick every 1, 5, 10, 30 or 60 seconds, whichever gives about ten labels at this zoom.
-    const double targets[] = {1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0};
-    double step = targets[0];
-    for (const double candidate : targets) {
-        step = candidate;
-        if (span / candidate <= 12.0) {
-            break;
+    // ---- the ruler (the brief's section 11) -----------------------------------------------------
+    //
+    // Two tick sizes, because one is a row of scratches. The major ticks carry the labels and run
+    // the full height of the strip as a hairline, so a boundary can be read against them; the minor
+    // ticks live in the ruler only. Which two is `rulerTicks`, over a 1-2-5 ladder, so the labels
+    // never collide and the minors never close into a grey band -- both of which the single fixed
+    // ladder here before did at the ends of its zoom range.
+    draw->AddRectFilled(ImVec2(axisX, origin.y), ImVec2(axisRight, origin.y + kRulerHeight + kMarkerHeight),
+                        mixColour(pal.ground, pal.panel, 0.7f), 0.0f);
+    const RulerTicks ticks = rulerTicks(span, width);
+    if (ticks.minor > 0.0) {
+        for (double t = std::floor(view_ / ticks.minor) * ticks.minor; t <= view_ + span; t += ticks.minor) {
+            const float x = toX(t);
+            if (x < axisX || x > axisRight) {
+                continue;
+            }
+            draw->AddLine(ImVec2(x, origin.y + kRulerHeight - 4.0f), ImVec2(x, origin.y + kRulerHeight),
+                          pal.border);
         }
     }
-    const ImU32 rulerColour = ImGui::GetColorU32(ImVec4(0.5f, 0.52f, 0.58f, 0.75f));
-    for (double t = std::floor(view_ / step) * step; t <= view_ + span; t += step) {
+    for (double t = std::floor(view_ / ticks.major) * ticks.major; t <= view_ + span; t += ticks.major) {
         const float x = toX(t);
-        if (x < origin.x - 1.0f || x > origin.x + width) {
+        if (x < axisX - 1.0f || x > axisRight) {
             continue;
         }
-        draw->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + height), IM_COL32(255, 255, 255, 16));
+        draw->AddLine(ImVec2(x, origin.y + kRulerHeight - 8.0f), ImVec2(x, origin.y + kRulerHeight),
+                      pal.textMuted);
+        // The hairline through the lanes, faint enough to read a clip over.
+        draw->AddLine(ImVec2(x, origin.y + lanes.lanesTop()), ImVec2(x, origin.y + height),
+                      mixColour(pal.ground, pal.border, 0.45f));
         char label[24];
-        std::snprintf(label, sizeof(label), "%d:%02d", static_cast<int>(t / 60.0),
-                      static_cast<int>(std::fmod(t, 60.0)));
-        draw->AddText(ImVec2(x + 3.0f, origin.y + 2.0f), rulerColour, label);
+        // Sub-second divisions get a decimal, because "0:03" three times running is not a ruler.
+        if (ticks.major < 1.0) {
+            std::snprintf(label, sizeof(label), "%d:%05.2f", static_cast<int>(t / 60.0),
+                          std::fmod(t, 60.0));
+        } else {
+            std::snprintf(label, sizeof(label), "%d:%02d", static_cast<int>(t / 60.0),
+                          static_cast<int>(std::fmod(t, 60.0)));
+        }
+        draw->AddText(ImVec2(x + 4.0f, origin.y + 3.0f), pal.textMuted, label);
+    }
+    if (lanes.gutter > 0.0f) {
+        // The ruler's own header names the unit, so nobody has to infer it from the labels.
+        draw->AddRectFilled(origin, ImVec2(origin.x + lanes.gutter - 1.0f, origin.y + kRulerHeight + kMarkerHeight),
+                            pal.panel, 2.0f);
+        draw->AddText(ImVec2(origin.x + 9.0f, origin.y + 3.0f), pal.textMuted, "min:sec");
     }
 
     // ---- beats and markers (spec 19, 20) ----
@@ -494,11 +596,11 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         if (firstGap / span * static_cast<double>(width) >= 3.0) {
             for (const double beat : beatTimes) {
                 const float x = toX(beat);
-                if (x < origin.x || x > origin.x + width) {
+                if (x < axisX || x > axisRight) {
                     continue;
                 }
                 draw->AddLine(ImVec2(x, markerTop + kMarkerHeight - 5.0f),
-                              ImVec2(x, markerTop + kMarkerHeight), IM_COL32(120, 150, 200, 90));
+                              ImVec2(x, markerTop + kMarkerHeight), mixColour(pal.lane, pal.accent, 0.5f));
             }
         }
     }
@@ -513,11 +615,10 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             continue;
         }
         const float x = toX(marker.timeSeconds);
-        if (x < origin.x - 40.0f || x > origin.x + width) {
+        if (x < axisX - 40.0f || x > axisRight) {
             continue;
         }
-        const ImU32 colour = marker.kind == seq::MarkerKind::Section ? IM_COL32(120, 210, 190, 220)
-                                                                    : IM_COL32(220, 190, 120, 220);
+        const ImU32 colour = marker.kind == seq::MarkerKind::Section ? pal.success : pal.warning;
         draw->AddLine(ImVec2(x, markerTop), ImVec2(x, origin.y + height), colour);
         draw->AddText(ImVec2(x + 3.0f, markerTop), colour, marker.name.c_str());
     }
@@ -531,26 +632,34 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     if (!sections.empty()) {
         const float top = origin.y + lanes.sectionsTop();
         const float bottom = top + lanes.sectionLaneHeight;
+        laneBackground(lanes.sectionsTop(), lanes.sectionLaneHeight, false);
+        laneHeader(lanes.sectionsTop(), lanes.sectionLaneHeight, "Sections",
+                   selection_ == Selection::Section);
         for (std::size_t i = 0; i < sections.size(); ++i) {
             const analysis::SongSection& section = sections[i];
             ImVec2 a(toX(section.startSeconds), top);
             ImVec2 b(toX(section.endSeconds), bottom);
-            if (b.x < origin.x || a.x > origin.x + width) {
+            if (b.x < axisX || a.x > axisRight) {
                 continue;
             }
-            a.x = std::max(a.x, origin.x);
-            b.x = std::min(b.x, origin.x + width);
+            a.x = std::max(a.x, axisX);
+            b.x = std::min(b.x, axisRight);
             const bool isSelected = selection_ == Selection::Section && selected_ == static_cast<int>(i);
-            draw->AddRectFilled(a, b, sectionColour(section.function, isSelected), 2.0f);
+            const bool isHovered = hoverLane == StripLane::Sections && overAxis && mouse.x >= a.x &&
+                                   mouse.x <= b.x;
+            if (isHovered) {
+                hoverBlock = static_cast<int>(i);
+            }
+            draw->AddRectFilled(a, b, sectionColour(section.function, isSelected, isHovered), 2.0f);
             if (section.origin != analysis::SectionOrigin::Detected) {
                 // A person's section is marked, because whether the analyser or a person decided a
                 // boundary is the single most useful thing to know before pressing Analyse again.
                 draw->AddRect(ImVec2(a.x + 1.0f, a.y + 1.0f), ImVec2(b.x - 1.0f, b.y - 1.0f),
-                              IM_COL32(245, 225, 150, 190), 2.0f);
+                              pal.warning, 2.0f);
             }
             if (b.x - a.x > 26.0f) {
                 draw->PushClipRect(a, ImVec2(b.x - 3.0f, b.y), true);
-                draw->AddText(ImVec2(a.x + 5.0f, a.y + 3.0f), IM_COL32(244, 244, 248, 235),
+                draw->AddText(ImVec2(a.x + 5.0f, a.y + 3.0f), pal.text,
                               seq::sectionDisplayName(section).c_str());
                 draw->PopClipRect();
             }
@@ -558,24 +667,22 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         // The boundaries, over the blocks and down the whole strip.
         for (std::size_t i = 1; i < sections.size(); ++i) {
             const float x = toX(sections[i].startSeconds);
-            if (x < origin.x || x > origin.x + width) {
+            if (x < axisX || x > axisRight) {
                 continue;
             }
-            const bool dragging = dragKind_ == 5 && dragIndex_ == static_cast<int>(i);
+            const bool dragging = drag_ == Drag::SectionBoundary && dragIndex_ == static_cast<int>(i);
+            const bool nearPointer = overAxis && hoverLane == StripLane::Sections &&
+                                     std::fabs(mouse.x - x) <= kEdgeGrab;
+            if (nearPointer) {
+                // A boundary is the one thing in this lane that resizes, and it beats the block
+                // underneath it for the cursor as well as for the click.
+                wantCursor = ImGuiMouseCursor_ResizeEW;
+            }
             draw->AddLine(ImVec2(x, top), ImVec2(x, origin.y + height),
-                          dragging ? IM_COL32(255, 235, 150, 255) : IM_COL32(230, 236, 246, 120),
-                          dragging ? 2.0f : 1.0f);
+                          dragging || nearPointer ? pal.warning : pal.borderStrong,
+                          dragging || nearPointer ? 2.0f : 1.0f);
         }
-        draw->AddRect(ImVec2(origin.x, top), ImVec2(origin.x + width, bottom),
-                      IM_COL32(0, 0, 0, 110), 2.0f);
     }
-
-    // ---- lanes ----
-    float laneY = origin.y + lanes.audioTop();
-    const auto laneRect = [&](double from, double to) {
-        return std::pair<ImVec2, ImVec2>{ImVec2(toX(from), laneY),
-                                         ImVec2(toX(to), laneY + kLaneHeight)};
-    };
 
     // ---- the audio lane ----
     //
@@ -587,16 +694,11 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     // in every tool that has one, and both of the ways this was got wrong came from separating them:
     // clips drawn as blocks *on* a full-width waveform stole the click that scrubs, and clips moved
     // to a lane of their own left the waveform floating above the box it belongs to.
-    //
-    // The summary is of the mixdown and covers the whole timeline, so a clip's own shape is that
-    // summary restricted to the clip's span -- and the gaps between clips draw nothing, which is
-    // more truthful than a flat line through silence that might be a bug.
+    float laneY = origin.y + lanes.audioTop();
     if (hasAudio) {
         const audio::WaveformSummary& wave = waveform(engine);
-        const ImVec2 laneA(origin.x, laneY);
-        const ImVec2 laneB(origin.x + width, laneY + kAudioLaneHeight);
-        // The empty channel the clips sit in.
-        draw->AddRectFilled(laneA, laneB, IM_COL32(20, 23, 30, 200), 3.0f);
+        laneBackground(lanes.audioTop(), kAudioLaneHeight, false);
+        laneHeader(lanes.audioTop(), kAudioLaneHeight, "Audio", audioSelected_ >= 0);
         const float mid = laneY + kAudioLaneHeight * 0.5f;
         const float halfHeight = kAudioLaneHeight * 0.5f - 3.0f;
         const double perPixel = span / static_cast<double>(width);
@@ -604,19 +706,29 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         for (std::size_t i = 0; i < engine.audioClips().size(); ++i) {
             const audio::AudioClip& clip = engine.audioClips()[i];
             const double end = audio::clipEndSeconds(clip, engine.clipSource(clip.file).get());
-            const ImVec2 lo(std::max(toX(clip.startSeconds), origin.x), laneY);
-            const ImVec2 hi(std::min(toX(end), origin.x + width), laneY + kAudioLaneHeight);
+            const ImVec2 lo(std::max(toX(clip.startSeconds), axisX), laneY);
+            const ImVec2 hi(std::min(toX(end), axisRight), laneY + kAudioLaneHeight);
             if (hi.x <= lo.x) {
                 continue;
             }
             const bool chosen = audioSelected_ == static_cast<int>(i);
-            draw->AddRectFilled(lo, hi,
-                                clip.enabled ? IM_COL32(33, 48, 70, 235) : IM_COL32(40, 42, 48, 210),
-                                3.0f);
+            const bool over = hoverLane == StripLane::Audio && overAxis && mouse.x >= lo.x &&
+                              mouse.x <= hi.x;
+            if (over) {
+                hoverBlock = static_cast<int>(i);
+            }
+            // The clip's body is not draggable (see the interaction block below), so it gets the
+            // hover *lift* that says "this one is under the pointer" and none of the grip treatment
+            // the shots get. Showing a resize edge on something that cannot be resized is the
+            // clearest possible way to lie about an affordance.
+            const ImU32 body = clip.enabled ? mixColour(pal.lane, pal.accentMuted, 0.42f)
+                                            : mixColour(pal.lane, pal.panel, 0.5f);
+            draw->AddRectFilled(lo, hi, interactionFill(body, over, chosen, false), 3.0f);
 
             // The waveform, inside the box and clipped to it.
             draw->PushClipRect(lo, hi, true);
-            const ImU32 ink = clip.enabled ? IM_COL32(108, 156, 214, 200) : IM_COL32(120, 124, 134, 150);
+            const ImU32 ink = clip.enabled ? mixColour(pal.accent, pal.text, 0.25f)
+                                           : pal.textDisabled;
             for (int px = static_cast<int>(lo.x); px <= static_cast<int>(hi.x); ++px) {
                 const double from = toTime(static_cast<float>(px));
                 const auto [low, high] = wave.peak(from, from + perPixel);
@@ -631,36 +743,67 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                 const float bottom = mid - std::max(low, -1.0f) * halfHeight;
                 draw->AddLine(ImVec2(x, top), ImVec2(x, std::max(bottom, top + 1.0f)), ink);
             }
-            draw->AddLine(ImVec2(lo.x, mid), ImVec2(hi.x, mid), IM_COL32(120, 150, 200, 40));
+            draw->AddLine(ImVec2(lo.x, mid), ImVec2(hi.x, mid), mixColour(pal.lane, pal.text, 0.18f));
             const std::string clipLabel = clip.name.empty() ? clip.file.filename().string() : clip.name;
             draw->AddText(ImVec2(lo.x + 5.0f, lo.y + 2.0f),
-                          clip.enabled ? IM_COL32(215, 232, 250, 210) : IM_COL32(150, 150, 160, 170),
-                          clipLabel.c_str());
+                          clip.enabled ? pal.text : pal.textDisabled, clipLabel.c_str());
+            if (!clip.enabled) {
+                draw->AddText(ImVec2(lo.x + 5.0f, lo.y + 2.0f + ImGui::GetTextLineHeight()),
+                              pal.textDisabled, "muted");
+            }
             draw->PopClipRect();
 
-            draw->AddRect(lo, hi, chosen ? IM_COL32(240, 220, 150, 255) : IM_COL32(0, 0, 0, 140), 3.0f,
-                          0, chosen ? 2.0f : 1.0f);
+            if (const ImU32 outline = interactionOutline(over, chosen, false); outline != 0) {
+                draw->AddRect(lo, hi, outline, 3.0f, 0, chosen ? 2.0f : 1.0f);
+            } else {
+                draw->AddRect(lo, hi, pal.border, 3.0f);
+            }
         }
-        draw->AddRect(laneA, laneB, IM_COL32(0, 0, 0, 120), 3.0f);
     }
     laneY = origin.y + lanes.shotsTop();
 
-    // Shots (spec 29).
+    // ---- shots (spec 29) ----
+    //
+    // The one lane whose blocks move and resize, so it is the one lane that has to *say* so. The
+    // grips are drawn only under the pointer: two vertical pips on every shot edge at rest would be
+    // a picket fence, and the affordance is needed at the moment somebody reaches for it.
+    laneBackground(lanes.shotsTop(), kLaneHeight, true);
+    laneHeader(lanes.shotsTop(), kLaneHeight, "Shots", selection_ == Selection::Shot);
+    const double now = engine.timelineClock().seconds;
     for (std::size_t i = 0; i < piece.shots.size(); ++i) {
         const seq::Shot& shot = piece.shots[i];
-        auto [a, b] = laneRect(shot.startSeconds, shot.endSeconds());
-        if (b.x < origin.x || a.x > origin.x + width) {
+        ImVec2 a(toX(shot.startSeconds), laneY);
+        ImVec2 b(toX(shot.endSeconds()), laneY + kLaneHeight);
+        if (b.x < axisX || a.x > axisRight) {
             continue;
         }
-        a.x = std::max(a.x, origin.x);
-        b.x = std::min(b.x, origin.x + width);
+        const float trueLeft = a.x;
+        const float trueRight = b.x;
+        a.x = std::max(a.x, axisX);
+        b.x = std::min(b.x, axisRight);
         const bool isSelected = selection_ == Selection::Shot && selected_ == static_cast<int>(i);
-        draw->AddRectFilled(a, b, shotColour(static_cast<int>(i), isSelected), 3.0f);
-        draw->AddRect(a, b, IM_COL32(0, 0, 0, 120), 3.0f);
+        const bool dragging = dragIndex_ == static_cast<int>(i) &&
+                              (drag_ == Drag::MoveShot || drag_ == Drag::TrimShotStart ||
+                               drag_ == Drag::TrimShotEnd);
+        const BlockZone zone = (hoverLane == StripLane::Shots && overAxis)
+                                   ? blockZoneAt(mouse.x, trueLeft, trueRight, kEdgeGrab)
+                                   : BlockZone::None;
+        const bool over = zone != BlockZone::None;
+        if (over) {
+            hoverBlock = static_cast<int>(i);
+            wantCursor = cursorForBlockZone(zone);
+        }
+        // A shot that is on screen right now: a wash, not an outline, so it does not compete with
+        // the selection.
+        const bool playing = now >= shot.startSeconds && now < shot.endSeconds();
+        draw->AddRectFilled(a, b, interactionFill(shotColour(static_cast<int>(i)), over, isSelected,
+                                                  dragging), 3.0f);
+        if (playing) {
+            draw->AddRectFilled(a, b, pal.playing, 3.0f);
+        }
         if (b.x - a.x > 24.0f) {
             draw->PushClipRect(a, ImVec2(b.x - 3.0f, b.y), true);
-            draw->AddText(ImVec2(a.x + 5.0f, a.y + 4.0f), IM_COL32(240, 240, 245, 255),
-                          shot.name.c_str());
+            draw->AddText(ImVec2(a.x + 6.0f, a.y + 4.0f), pal.text, shot.name.c_str());
             draw->PopClipRect();
         }
         // A fade is drawn where it happens, so a dip to black is visible without opening anything.
@@ -672,12 +815,36 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             draw->AddRectFilled(ImVec2(toX(shot.endSeconds() - shot.out.seconds), a.y), b,
                                 IM_COL32(0, 0, 0, 140), 3.0f);
         }
+        drawEdgeGrip(draw, a, b, zone, dragging ? drag_ : Drag::None, true);
+        if (const ImU32 outline = interactionOutline(over, isSelected, dragging); outline != 0) {
+            draw->AddRect(a, b, outline, 3.0f, 0, (isSelected || dragging) ? 2.0f : 1.0f);
+        } else {
+            draw->AddRect(a, b, pal.border, 3.0f);
+        }
     }
     laneY = origin.y + lanes.actorsTop();
 
-    // One lane per actor, showing its clip cues (spec 13).
+    // ---- one lane per actor, showing its clip cues (spec 13) ----
     for (std::size_t ai = 0; ai < piece.actors.size(); ++ai) {
         const seq::Actor& actor = piece.actors[ai];
+        const float laneTop = lanes.actorsTop() + static_cast<float>(ai) * (kLaneHeight + kLaneGap);
+        const bool isSelected = selection_ == Selection::Actor && selected_ == static_cast<int>(ai);
+        laneBackground(laneTop, kLaneHeight, ai % 2 == 1);
+        // The actor's own header: its id, and a dot that says whether it is visible. `Actor::visible`
+        // is real state the bake reads, so the dot is a control rather than a decoration -- which is
+        // why it is here and why there is no mute dot on the shots lane, where there is nothing for
+        // one to mean.
+        if (hovered && localY >= laneTop && localY < laneTop + kLaneHeight && hoverActorRow < 0) {
+            hoverActorRow = static_cast<int>(ai);
+        }
+        const auto [ha, hb] = laneHeader(laneTop, kLaneHeight, actor.id.c_str(), isSelected);
+        if (lanes.gutter > 0.0f) {
+            const ImVec2 dot(hb.x - 12.0f, (ha.y + hb.y) * 0.5f);
+            draw->AddCircleFilled(dot, 4.0f, actor.visible ? pal.success : pal.textDisabled, 12);
+            if (!actor.visible) {
+                draw->AddCircle(dot, 4.0f, pal.textMuted, 12);
+            }
+        }
         const double endOfPiece = piece.duration();
         for (std::size_t c = 0; c < actor.clips.size(); ++c) {
             const seq::ClipCue& cue = actor.clips[c];
@@ -685,86 +852,221 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             if (cue.clip.empty() || to <= cue.timeSeconds) {
                 continue;
             }
-            auto [a, b] = laneRect(cue.timeSeconds, to);
-            if (b.x < origin.x || a.x > origin.x + width) {
+            ImVec2 a(toX(cue.timeSeconds), origin.y + laneTop);
+            ImVec2 b(toX(to), origin.y + laneTop + kLaneHeight);
+            if (b.x < axisX || a.x > axisRight) {
                 continue;
             }
-            a.x = std::max(a.x, origin.x);
-            b.x = std::min(b.x, origin.x + width);
-            const bool isSelected = selection_ == Selection::Actor && selected_ == static_cast<int>(ai);
+            a.x = std::max(a.x, axisX);
+            b.x = std::min(b.x, axisRight);
+            const bool over = overAxis && hoverLane == StripLane::Actors && mouse.x >= a.x &&
+                              mouse.x <= b.x && localY >= laneTop && localY < laneTop + kLaneHeight;
+            if (over) {
+                hoverBlock = static_cast<int>(c);
+                hoverActorRow = static_cast<int>(ai);
+            }
             draw->AddRectFilled(a, b,
-                                isSelected ? IM_COL32(96, 150, 110, 220) : IM_COL32(66, 108, 84, 200),
+                                interactionFill(mixColour(pal.lane, pal.success, 0.34f), over,
+                                                isSelected, false),
                                 3.0f);
             if (b.x - a.x > 22.0f) {
                 draw->PushClipRect(a, ImVec2(b.x - 3.0f, b.y), true);
-                draw->AddText(ImVec2(a.x + 5.0f, a.y + 4.0f), IM_COL32(225, 240, 228, 255),
-                              cue.clip.c_str());
+                draw->AddText(ImVec2(a.x + 6.0f, a.y + 4.0f), pal.text, cue.clip.c_str());
                 draw->PopClipRect();
             }
+            if (const ImU32 outline = interactionOutline(over, isSelected, false); outline != 0) {
+                draw->AddRect(a, b, outline, 3.0f);
+            }
         }
-        draw->AddText(ImVec2(origin.x + 4.0f, laneY + 4.0f), IM_COL32(160, 190, 170, 110),
-                      actor.id.c_str());
-        laneY += kLaneHeight + kLaneGap;
     }
 
-    // The overlay lane (spec 23, 26).
-    const float overlayLaneY = origin.y + lanes.overlaysTop();
-    laneY = overlayLaneY;
+    // ---- the overlay lane (spec 23, 26) ----
     if (!piece.overlays.empty()) {
+        laneBackground(lanes.overlaysTop(), kLaneHeight, false);
+        laneHeader(lanes.overlaysTop(), kLaneHeight, "Overlays", selection_ == Selection::Overlay);
         for (std::size_t i = 0; i < piece.overlays.size(); ++i) {
             const seq::OverlayCue& cue = piece.overlays[i];
-            auto [a, b] = laneRect(cue.startSeconds, cue.endSeconds);
-            if (b.x < origin.x || a.x > origin.x + width) {
+            ImVec2 a(toX(cue.startSeconds), origin.y + lanes.overlaysTop());
+            ImVec2 b(toX(cue.endSeconds), origin.y + lanes.overlaysTop() + kLaneHeight);
+            if (b.x < axisX || a.x > axisRight) {
                 continue;
             }
-            a.x = std::max(a.x, origin.x);
-            b.x = std::min(b.x, origin.x + width);
+            const float trueLeft = a.x;
+            const float trueRight = b.x;
+            a.x = std::max(a.x, axisX);
+            b.x = std::min(b.x, axisRight);
             const bool isSelected = selection_ == Selection::Overlay && selected_ == static_cast<int>(i);
-            const ImU32 colour = cue.kind == seq::OverlayKind::Shape
-                                     ? IM_COL32(120, 110, 150, 190)
-                                     : (isSelected ? IM_COL32(190, 150, 200, 235)
-                                                   : IM_COL32(120, 96, 148, 210));
-            draw->AddRectFilled(a, b, colour, 3.0f);
+            const bool dragging = dragIndex_ == static_cast<int>(i) &&
+                                  (drag_ == Drag::MoveOverlay || drag_ == Drag::TrimOverlayStart ||
+                                   drag_ == Drag::TrimOverlayEnd);
+            const BlockZone zone = (hoverLane == StripLane::Overlays && overAxis)
+                                       ? blockZoneAt(mouse.x, trueLeft, trueRight, kEdgeGrab)
+                                       : BlockZone::None;
+            const bool over = zone != BlockZone::None;
+            if (over) {
+                hoverBlock = static_cast<int>(i);
+                wantCursor = cursorForBlockZone(zone);
+            }
+            const ImU32 base = cue.kind == seq::OverlayKind::Shape
+                                   ? mixColour(pal.lane, pal.textMuted, 0.3f)
+                                   : mixColour(pal.lane, IM_COL32(150, 120, 190, 255), 0.42f);
+            draw->AddRectFilled(a, b, interactionFill(base, over, isSelected, dragging), 3.0f);
             if (b.x - a.x > 22.0f) {
                 draw->PushClipRect(a, ImVec2(b.x - 3.0f, b.y), true);
-                draw->AddText(ImVec2(a.x + 5.0f, a.y + 4.0f), IM_COL32(240, 232, 245, 255),
-                              cue.content.c_str());
+                draw->AddText(ImVec2(a.x + 6.0f, a.y + 4.0f), pal.text, cue.content.c_str());
                 draw->PopClipRect();
+            }
+            drawEdgeGrip(draw, a, b, zone, dragging ? drag_ : Drag::None, false);
+            if (const ImU32 outline = interactionOutline(over, isSelected, dragging); outline != 0) {
+                draw->AddRect(a, b, outline, 3.0f, 0, (isSelected || dragging) ? 2.0f : 1.0f);
             }
         }
     }
 
-    // ---- the playhead (spec 30) ----
-    const double now = engine.timelineClock().seconds;
+    // ---- snapping feedback (the brief's section 7) ----------------------------------------------
+    //
+    // While a block is being dragged with a grid on, the grid line it is about to land on is drawn
+    // bright. Without it a snap is invisible until it has already happened, and a person cannot
+    // tell a snap from a hand that happened to be steady.
+    if (drag_ != Drag::None && snapMode_ != 0) {
+        const double target = drag_ == Drag::SectionBoundary ? snapSection(engine, mouseTime)
+                                                             : snap(engine, mouseTime);
+        const float x = toX(target);
+        if (x >= axisX && x <= axisRight) {
+            draw->AddLine(ImVec2(x, origin.y + lanes.lanesTop()), ImVec2(x, origin.y + height),
+                          pal.warning, 1.0f);
+        }
+    }
+
+    // ---- the playhead (spec 30, and the brief's section 10) --------------------------------------
+    //
+    // A line was all it was, and a line is what every other vertical mark on this strip also is: a
+    // section boundary, a marker, a major tick, the snap guide. The handle is what makes it the
+    // playhead rather than one more of those -- a shape at the top, in the one warm hue nothing
+    // else on the strip uses, wide enough to grab.
     const float playX = toX(now);
-    if (playX >= origin.x && playX <= origin.x + width) {
-        draw->AddLine(ImVec2(playX, origin.y), ImVec2(playX, origin.y + height),
-                      IM_COL32(255, 220, 120, 230), 1.5f);
+    if (playX >= axisX - kPlayheadHalfWidth && playX <= axisRight + kPlayheadHalfWidth) {
+        const float clampedX = std::clamp(playX, axisX, axisRight);
+        draw->PushClipRect(ImVec2(axisX, origin.y), ImVec2(axisRight, origin.y + height), true);
+        // The line: a dark under-stroke first, so it stays legible over a pale section block as
+        // well as over the dark ground.
+        draw->AddLine(ImVec2(clampedX, origin.y + kRulerHeight), ImVec2(clampedX, origin.y + height),
+                      IM_COL32(0, 0, 0, 120), 3.0f);
+        draw->AddLine(ImVec2(clampedX, origin.y + kRulerHeight), ImVec2(clampedX, origin.y + height),
+                      pal.playhead, 1.0f);
+        // The handle: a flat-topped teardrop sitting in the ruler.
+        const float top = origin.y + 2.0f;
+        const float shoulder = top + kPlayheadHandleHeight * 0.62f;
+        const float tip = top + kPlayheadHandleHeight;
+        const bool grabbing = drag_ == Drag::Playhead;
+        const ImU32 handle = grabbing ? mixColour(pal.playhead, pal.text, 0.4f) : pal.playhead;
+        draw->PathClear();
+        draw->PathLineTo(ImVec2(clampedX - kPlayheadHalfWidth, top));
+        draw->PathLineTo(ImVec2(clampedX + kPlayheadHalfWidth, top));
+        draw->PathLineTo(ImVec2(clampedX + kPlayheadHalfWidth, shoulder));
+        draw->PathLineTo(ImVec2(clampedX, tip));
+        draw->PathLineTo(ImVec2(clampedX - kPlayheadHalfWidth, shoulder));
+        draw->PathFillConvex(handle);
+        draw->PathClear();
+        draw->PathLineTo(ImVec2(clampedX - kPlayheadHalfWidth, top));
+        draw->PathLineTo(ImVec2(clampedX + kPlayheadHalfWidth, top));
+        draw->PathLineTo(ImVec2(clampedX + kPlayheadHalfWidth, shoulder));
+        draw->PathLineTo(ImVec2(clampedX, tip));
+        draw->PathLineTo(ImVec2(clampedX - kPlayheadHalfWidth, shoulder));
+        draw->PathStroke(IM_COL32(0, 0, 0, 90), ImDrawFlags_Closed, 1.0f);
+        draw->PopClipRect();
+    }
+
+    // The hover hairline: where a click on the ruler would put the playhead, *after* snapping, so
+    // the grid is visible before it is committed to rather than discovered afterwards.
+    if (overAxis && hoverLane == StripLane::Ruler && drag_ == Drag::None) {
+        const float x = toX(snap(engine, mouseTime));
+        if (x >= axisX && x <= axisRight) {
+            draw->AddLine(ImVec2(x, origin.y + kRulerHeight), ImVec2(x, origin.y + height),
+                          mixColour(pal.ground, pal.playhead, 0.45f));
+        }
+    }
+
+    // ---- cursors (the brief's section 14) ---------------------------------------------------------
+    //
+    // Said once, from the hover state the drawing above already worked out, rather than by each
+    // lane on its own. The pointer is the only part of the interface that is always visible, and
+    // until this pass it said "arrow" over every draggable block in the application.
+    // The ruler and the playhead: both move the playhead along one axis, so both say so.
+    if (overAxis && hoverLane == StripLane::Ruler) {
+        wantCursor = ImGuiMouseCursor_ResizeEW;
+    }
+    // A header is a thing to click, not a thing to drag.
+    if (overGutter) {
+        wantCursor = ImGuiMouseCursor_Hand;
+    }
+    // A drag in progress outranks whatever the pointer is over now: a gesture that began on a clip
+    // edge is still a resize after the pointer has left the clip behind, and the cursor flickering
+    // back to an arrow mid-drag is the tell that an editor has lost track of what it is doing.
+    switch (drag_) {
+    case Drag::TrimShotStart:
+    case Drag::TrimShotEnd:
+    case Drag::TrimOverlayStart:
+    case Drag::TrimOverlayEnd:
+    case Drag::SectionBoundary:
+    case Drag::Playhead:
+        wantCursor = ImGuiMouseCursor_ResizeEW;
+        break;
+    case Drag::MoveShot:
+    case Drag::MoveOverlay:
+        wantCursor = ImGuiMouseCursor_ResizeAll;
+        break;
+    case Drag::None:
+        break;
+    }
+    if (hovered || drag_ != Drag::None) {
+        setHoverCursor(wantCursor);
     }
 
     // ---- interaction ----
-    const ImVec2 mouse = ImGui::GetIO().MousePos;
-    const double mouseTime = toTime(mouse.x);
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         // Which lane was hit decides what the click means. The ruler, the marker row and the
         // **waveform** are always a scrub, so there is one place on the strip that is guaranteed not
         // to grab a block. The waveform holds no blocks and is deliberately left that way: clicking
         // a moment in the music to hear it is worth more than anything a block there could offer.
-        //
-        // Audio clips are blocks, so they live in a thin lane of their own *under* the waveform
-        // (ADR-103). Drawing them on the waveform was tried and reported within the hour: a click
-        // meant to scrub moved the audio instead, leaving the piece starting fourteen seconds in.
-        dragKind_ = 0;
+        drag_ = Drag::None;
         dragIndex_ = -1;
         bool hitBlock = false;
-        const StripLane lane = lanes.at(mouse.y - origin.y);
-        if (lane == StripLane::Sections) {
+        const StripLane lane = lanes.at(localY);
+        if (overGutter) {
+            // A header click selects the lane rather than scrubbing. It is the one place on the
+            // strip where a click means "this row" instead of "this moment", which is exactly why
+            // the headers are outside the time axis rather than floating over it.
+            hitBlock = true;
+            if (lane == StripLane::Actors) {
+                const int row = static_cast<int>((localY - lanes.actorsTop()) / (kLaneHeight + kLaneGap));
+                if (row >= 0 && row < static_cast<int>(piece.actors.size())) {
+                    selection_ = Selection::Actor;
+                    selected_ = row;
+                    // The visibility dot, which is a control and not a label.
+                    if (mouse.x >= origin.x + lanes.gutter - 20.0f) {
+                        piece.actors[static_cast<std::size_t>(row)].visible =
+                            !piece.actors[static_cast<std::size_t>(row)].visible;
+                        touch();
+                    }
+                }
+            }
+        } else if (lane == StripLane::Ruler) {
+            // The playhead's handle is a grab, and everything else in the ruler is a scrub that
+            // *becomes* a grab -- pressing anywhere on the ruler moves the playhead there and then
+            // keeps it under the pointer, which is how scrubbing works in every editor and is what
+            // the old code already did by accident through its no-block fallthrough. Naming it lets
+            // the cursor and the handle's pressed state say so.
+            drag_ = Drag::Playhead;
+            hitBlock = true;
+            engine.seekSeconds(std::clamp(snap(engine, mouseTime), 0.0, duration));
+        } else if (lane == StripLane::Sections) {
             // A boundary first, because it is a five-point target inside a block and the block is
             // the thing you get when you miss it.
             auto& structure = piece.structure;
             for (std::size_t i = 1; i < structure.sections.size(); ++i) {
                 if (std::fabs(mouse.x - toX(structure.sections[i].startSeconds)) <= kEdgeGrab) {
-                    dragKind_ = 5;
+                    drag_ = Drag::SectionBoundary;
                     dragIndex_ = static_cast<int>(i);
                     // The section the boundary opens, so grabbing an edge also shows you what you
                     // are about to move the start of.
@@ -806,15 +1108,21 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                 const seq::Shot& shot = piece.shots[i];
                 const float a = toX(shot.startSeconds);
                 const float b = toX(shot.endSeconds());
-                if (mouse.x < a || mouse.x > b) {
+                const BlockZone zone = blockZoneAt(mouse.x, a, b, kEdgeGrab);
+                if (zone == BlockZone::None) {
                     continue;
                 }
                 selection_ = Selection::Shot;
                 selected_ = static_cast<int>(i);
                 hitBlock = true;
                 dragIndex_ = static_cast<int>(i);
-                dragKind_ = mouse.x > b - kEdgeGrab ? 2 : 1;
+                drag_ = zone == BlockZone::RightEdge  ? Drag::TrimShotEnd
+                        : zone == BlockZone::LeftEdge ? Drag::TrimShotStart
+                                                      : Drag::MoveShot;
                 dragGrab_ = mouseTime - shot.startSeconds;
+                // Trimming the start must not move the end, so the end is remembered rather than
+                // recomputed from a duration that is about to change underneath it.
+                dragAnchor_ = shot.endSeconds();
                 break;
             }
         } else if (lane == StripLane::Overlays) {
@@ -822,20 +1130,23 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                 const seq::OverlayCue& cue = piece.overlays[i];
                 const float a = toX(cue.startSeconds);
                 const float b = toX(cue.endSeconds);
-                if (mouse.x < a || mouse.x > b) {
+                const BlockZone zone = blockZoneAt(mouse.x, a, b, kEdgeGrab);
+                if (zone == BlockZone::None) {
                     continue;
                 }
                 selection_ = Selection::Overlay;
                 selected_ = static_cast<int>(i);
                 hitBlock = true;
                 dragIndex_ = static_cast<int>(i);
-                dragKind_ = mouse.x > b - kEdgeGrab ? 4 : 3;
+                drag_ = zone == BlockZone::RightEdge  ? Drag::TrimOverlayEnd
+                        : zone == BlockZone::LeftEdge ? Drag::TrimOverlayStart
+                                                      : Drag::MoveOverlay;
                 dragGrab_ = mouseTime - cue.startSeconds;
+                dragAnchor_ = cue.endSeconds;
                 break;
             }
         } else if (lane == StripLane::Actors) {
-            const int row = static_cast<int>((mouse.y - origin.y - lanes.actorsTop()) /
-                                             (kLaneHeight + kLaneGap));
+            const int row = static_cast<int>((localY - lanes.actorsTop()) / (kLaneHeight + kLaneGap));
             if (row >= 0 && row < static_cast<int>(piece.actors.size())) {
                 selection_ = Selection::Actor;
                 selected_ = row;
@@ -849,37 +1160,77 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         }
     }
 
-    if (dragKind_ != 0 && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+    if (drag_ != Drag::None && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
         const double t = snap(engine, mouseTime);
-        if (dragKind_ == 1 && dragIndex_ >= 0 && dragIndex_ < static_cast<int>(piece.shots.size())) {
-            seq::Shot& shot = piece.shots[static_cast<std::size_t>(dragIndex_)];
-            shot.startSeconds = std::max(0.0, t - dragGrab_);
-        } else if (dragKind_ == 2 && dragIndex_ >= 0 &&
-                   dragIndex_ < static_cast<int>(piece.shots.size())) {
-            seq::Shot& shot = piece.shots[static_cast<std::size_t>(dragIndex_)];
-            shot.durationSeconds = std::max(0.25, t - shot.startSeconds);
-        } else if (dragKind_ == 3 && dragIndex_ >= 0 &&
-                   dragIndex_ < static_cast<int>(piece.overlays.size())) {
-            seq::OverlayCue& cue = piece.overlays[static_cast<std::size_t>(dragIndex_)];
-            const double length = cue.durationSeconds();
-            cue.startSeconds = std::max(0.0, t - dragGrab_);
-            cue.endSeconds = cue.startSeconds + length;
-        } else if (dragKind_ == 4 && dragIndex_ >= 0 &&
-                   dragIndex_ < static_cast<int>(piece.overlays.size())) {
-            seq::OverlayCue& cue = piece.overlays[static_cast<std::size_t>(dragIndex_)];
-            cue.endSeconds = std::max(cue.startSeconds + 0.2, t);
-        } else if (dragKind_ == 5 && dragIndex_ > 0) {
-            // The section boundary has its *own* snap, not the strip's: `t` above has already been
-            // through the shot grid, so this starts again from the raw time. A snapped boundary
-            // takes the beat's own value, bit for bit; a free one takes the millisecond it landed
-            // on. Neither is rounded.
-            (void)seq::moveBoundary(piece.structure, static_cast<std::size_t>(dragIndex_),
-                                    snapSection(engine, mouseTime));
+        const auto shot = [&]() -> seq::Shot* {
+            return dragIndex_ >= 0 && dragIndex_ < static_cast<int>(piece.shots.size())
+                       ? &piece.shots[static_cast<std::size_t>(dragIndex_)]
+                       : nullptr;
+        };
+        const auto overlay = [&]() -> seq::OverlayCue* {
+            return dragIndex_ >= 0 && dragIndex_ < static_cast<int>(piece.overlays.size())
+                       ? &piece.overlays[static_cast<std::size_t>(dragIndex_)]
+                       : nullptr;
+        };
+        switch (drag_) {
+        case Drag::Playhead:
+            engine.seekSeconds(std::clamp(t, 0.0, duration));
+            break;
+        case Drag::MoveShot:
+            if (seq::Shot* s = shot(); s != nullptr) {
+                s->startSeconds = std::max(0.0, t - dragGrab_);
+            }
+            break;
+        case Drag::TrimShotEnd:
+            if (seq::Shot* s = shot(); s != nullptr) {
+                s->durationSeconds = std::max(kMinBlockSeconds, t - s->startSeconds);
+            }
+            break;
+        case Drag::TrimShotStart:
+            if (seq::Shot* s = shot(); s != nullptr) {
+                // The end stays where it was: trimming the start of a clip is not the same gesture
+                // as moving it, and a duration recomputed from the live end would do both at once.
+                const double start = std::clamp(t, 0.0, dragAnchor_ - kMinBlockSeconds);
+                s->startSeconds = start;
+                s->durationSeconds = dragAnchor_ - start;
+            }
+            break;
+        case Drag::MoveOverlay:
+            if (seq::OverlayCue* c = overlay(); c != nullptr) {
+                const double length = c->durationSeconds();
+                c->startSeconds = std::max(0.0, t - dragGrab_);
+                c->endSeconds = c->startSeconds + length;
+            }
+            break;
+        case Drag::TrimOverlayEnd:
+            if (seq::OverlayCue* c = overlay(); c != nullptr) {
+                c->endSeconds = std::max(c->startSeconds + kMinBlockSeconds, t);
+            }
+            break;
+        case Drag::TrimOverlayStart:
+            if (seq::OverlayCue* c = overlay(); c != nullptr) {
+                c->startSeconds = std::clamp(t, 0.0, dragAnchor_ - kMinBlockSeconds);
+                c->endSeconds = dragAnchor_;
+            }
+            break;
+        case Drag::SectionBoundary:
+            if (dragIndex_ > 0) {
+                // The section boundary has its *own* snap, not the strip's: `t` above has already
+                // been through the shot grid, so this starts again from the raw time. A snapped
+                // boundary takes the beat's own value, bit for bit; a free one takes the
+                // millisecond it landed on. Neither is rounded.
+                (void)seq::moveBoundary(piece.structure, static_cast<std::size_t>(dragIndex_),
+                                        snapSection(engine, mouseTime));
+            }
+            break;
+        case Drag::None:
+            break;
         }
-    } else if (dragKind_ == 0 && hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+    } else if (drag_ == Drag::None && hovered && overAxis &&
+               ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
         engine.seekSeconds(std::clamp(snap(engine, mouseTime), 0.0, duration));
     }
-    if (dragKind_ != 0 && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+    if (drag_ != Drag::None && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         // The bake waits for the mouse. A drag is sixty edits a second and a bake rebuilds tracks
         // and layers; doing both together would make a smooth drag feel like a stutter. The
         // arrangement waits for the same reason and costs more: a re-mix is a pass over every
@@ -887,16 +1238,30 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         // The markers are derived from the structure, and re-deriving them means re-sorting a list
         // that holds every beat in the song. Once, when the drag ends, rather than sixty times a
         // second while it is moving.
-        if (dragKind_ == 5) {
+        const Drag finished = drag_;
+        if (finished == Drag::SectionBoundary) {
             piece.refreshSectionMarkers();
         }
-        dragKind_ = 0;
+        drag_ = Drag::None;
         dragIndex_ = -1;
-        touch();
+        // A scrub changes nothing the bake reads, so it does not ask for one. Before this every
+        // release of a scrub rebuilt every track in the piece.
+        if (finished != Drag::Playhead) {
+            touch();
+        }
     }
-    // Right-drag pans, wheel zooms about the pointer: the two gestures a time strip needs and the
-    // two everyone already knows.
-    if (hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
+
+    // ---- the view: pan and zoom -------------------------------------------------------------------
+    //
+    // Right-drag pans and the wheel zooms about the pointer: the two gestures a time strip needs and
+    // the two everyone already knows. A right press that does *not* travel is a context menu, and
+    // `updateContextClick` is what separates the two -- Dear ImGui's own context-menu helper opens
+    // on the release of the right button with no test of how far it moved, so without this every pan
+    // would end by opening a menu (the addendum's section 13).
+    const bool wantsMenu = updateContextClick(contextClick_, hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right),
+                                              ImGui::IsMouseReleased(ImGuiMouseButton_Right), mouse.x,
+                                              mouse.y);
+    if (contextClick_.down && contextClick_.travelled && ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
         view_ -= static_cast<double>(ImGui::GetIO().MouseDelta.x / width) * span;
     }
     if (hovered && ImGui::GetIO().MouseWheel != 0.0f) {
@@ -906,7 +1271,380 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         view_ = anchor - (anchor - view_) * (newSpan / span);
     }
     view_ = std::clamp(view_, 0.0, std::max(0.0, duration - duration / static_cast<double>(zoom_)));
+
+    if (wantsMenu) {
+        // What the menu is about is decided *here*, at the click, and remembered. ImGui keeps a
+        // popup open across frames, and by the time its body is submitted the pointer has usually
+        // moved somewhere else -- so a menu that hit-tested from the live pointer would act on
+        // whatever the mouse happened to be over when an item was chosen, which is the single most
+        // damaging bug a context menu can have.
+        menu_.lane = overGutter ? StripLane::None : hoverLane;
+        menu_.header = overGutter ? hoverLane : StripLane::None;
+        menu_.seconds = mouseTime;
+        menu_.index = hoverBlock;
+        menu_.actorRow = hoverActorRow;
+        ImGui::OpenPopup(kStripContextId);
+    }
+    drawStripContextMenu(engine);
 }
+
+// ---- the strip's context menu (the addendum's section 3) ----------------------------------------
+//
+// What a right-click was over, captured at the click. See the note at the call site: a popup
+// outlives the frame that opened it, so nothing here may hit-test the live pointer.
+void SequencePanel::drawStripContextMenu(app::Engine& engine) {
+    seq::Sequence& piece = engine.sequence();
+    ContextMenu menu(kStripContextId, false);
+    if (!menu) {
+        return;
+    }
+    const double at = menu_.seconds;
+    const auto valid = [](int index, std::size_t size) {
+        return index >= 0 && static_cast<std::size_t>(index) < size;
+    };
+
+    // A header: the lane's own actions, not the timeline's.
+    if (menu_.header == StripLane::Actors && valid(menu_.actorRow, piece.actors.size())) {
+        seq::Actor& actor = piece.actors[static_cast<std::size_t>(menu_.actorRow)];
+        menuSubject(fmt::format("Actor: {}", actor.id));
+        if (menuToggle("Visible", actor.visible)) {
+            actor.visible = !actor.visible;
+            touch();
+        }
+        ImGui::Separator();
+        if (menuAction("Add clip cue here")) {
+            actor.clips.push_back(seq::ClipCue{.timeSeconds = at});
+            std::stable_sort(actor.clips.begin(), actor.clips.end(),
+                             [](const seq::ClipCue& l, const seq::ClipCue& r) {
+                                 return l.timeSeconds < r.timeSeconds;
+                             });
+            selection_ = Selection::Actor;
+            selected_ = menu_.actorRow;
+            touch();
+        }
+        if (menuAction("Remove actor")) {
+            piece.actors.erase(piece.actors.begin() + menu_.actorRow);
+            selection_ = Selection::None;
+            selected_ = -1;
+            touch();
+        }
+        return;
+    }
+    if (menu_.header != StripLane::None) {
+        // The other headers name a lane that is a category rather than an object -- Shots, Audio,
+        // Sections, Overlays. There is nothing a professional editor does to "the shots lane" as
+        // such in this application, so rather than a menu of disabled rows there is one useful
+        // thing per lane and no menu where there is none.
+        if (menu_.header == StripLane::Shots && menuAction("Add shot at end")) {
+            addShotAtEnd(engine);
+        }
+        if (menu_.header == StripLane::Audio && menuAction("Audio clips...")) {
+            ImGui::CloseCurrentPopup();
+            openAudioClips_ = true;
+        }
+        return;
+    }
+
+    switch (menu_.lane) {
+    case StripLane::Shots: {
+        if (valid(menu_.index, piece.shots.size())) {
+            const auto index = static_cast<std::size_t>(menu_.index);
+            seq::Shot& shot = piece.shots[index];
+            menuSubject(fmt::format("Shot: {}", shot.name));
+            if (menuAction("Select")) {
+                selection_ = Selection::Shot;
+                selected_ = menu_.index;
+            }
+            if (menuAction("Duplicate")) {
+                seq::Shot copy = shot;
+                copy.name = fmt::format("{} copy", shot.name);
+                copy.startSeconds = shot.endSeconds();
+                piece.shots.insert(piece.shots.begin() + static_cast<std::ptrdiff_t>(index) + 1,
+                                   std::move(copy));
+                selection_ = Selection::Shot;
+                selected_ = menu_.index + 1;
+                touch();
+            }
+            // Splitting is a real operation on a shot -- two shots whose durations add up to the
+            // original's -- and it is offered only where it would produce two shots that are not
+            // degenerate, rather than as a row that is always there and usually refuses.
+            const bool splittable = at > shot.startSeconds + kMinBlockSeconds &&
+                                    at < shot.endSeconds() - kMinBlockSeconds;
+            if (menuAction("Split at pointer", nullptr, splittable)) {
+                seq::Shot tail = shot;
+                tail.name = fmt::format("{} b", shot.name);
+                tail.startSeconds = at;
+                tail.durationSeconds = shot.endSeconds() - at;
+                tail.in = seq::Transition{seq::TransitionKind::Cut, 0.0};
+                piece.shots[index].durationSeconds = at - shot.startSeconds;
+                piece.shots[index].out = seq::Transition{seq::TransitionKind::Cut, 0.0};
+                piece.shots.insert(piece.shots.begin() + static_cast<std::ptrdiff_t>(index) + 1,
+                                   std::move(tail));
+                touch();
+            }
+            ImGui::Separator();
+            if (menuAction("Delete", shortcut::kDelete)) {
+                piece.shots.erase(piece.shots.begin() + static_cast<std::ptrdiff_t>(index));
+                selection_ = Selection::None;
+                selected_ = -1;
+                touch();
+            }
+        } else {
+            menuSubject("Shots lane");
+            if (menuAction("Add shot here")) {
+                addShotAt(engine, at);
+            }
+            if (menuAction("Add shot at end")) {
+                addShotAtEnd(engine);
+            }
+        }
+        break;
+    }
+    case StripLane::Overlays: {
+        if (valid(menu_.index, piece.overlays.size())) {
+            const auto index = static_cast<std::size_t>(menu_.index);
+            seq::OverlayCue& cue = piece.overlays[index];
+            menuSubject(fmt::format("Overlay: {}", cue.content.empty() ? cue.id : cue.content));
+            if (menuAction("Select")) {
+                selection_ = Selection::Overlay;
+                selected_ = menu_.index;
+            }
+            if (menuAction("Duplicate")) {
+                seq::OverlayCue copy = cue;
+                copy.id = fmt::format("{}-copy{}", cue.id, piece.overlays.size());
+                const double length = cue.durationSeconds();
+                copy.startSeconds = cue.endSeconds;
+                copy.endSeconds = copy.startSeconds + length;
+                piece.overlays.insert(piece.overlays.begin() + static_cast<std::ptrdiff_t>(index) + 1,
+                                      std::move(copy));
+                selected_ = menu_.index + 1;
+                selection_ = Selection::Overlay;
+                touch();
+            }
+            ImGui::Separator();
+            if (menuAction("Delete", shortcut::kDelete)) {
+                piece.overlays.erase(piece.overlays.begin() + static_cast<std::ptrdiff_t>(index));
+                selection_ = Selection::None;
+                selected_ = -1;
+                touch();
+            }
+        } else {
+            menuSubject("Overlays lane");
+            if (menuAction("Add lyric here")) {
+                addLyricAt(engine, at);
+            }
+        }
+        break;
+    }
+    case StripLane::Audio: {
+        if (valid(menu_.index, static_cast<int>(engine.audioClips().size()))) {
+            const auto index = static_cast<std::size_t>(menu_.index);
+            std::vector<audio::AudioClip> clips = engine.audioClips();
+            menuSubject(fmt::format("Clip: {}", clips[index].name.empty()
+                                                    ? clips[index].file.filename().string()
+                                                    : clips[index].name));
+            if (menuToggle("Enabled", clips[index].enabled)) {
+                clips[index].enabled = !clips[index].enabled;
+                applyAudioClips(engine, std::move(clips));
+                break;
+            }
+            if (menuAction("Move start to pointer")) {
+                clips[index].startSeconds = std::max(0.0, at);
+                applyAudioClips(engine, std::move(clips));
+                break;
+            }
+            ImGui::Separator();
+            if (menuAction("Remove clip", shortcut::kDelete)) {
+                clips.erase(clips.begin() + static_cast<std::ptrdiff_t>(index));
+                audioSelected_ = -1;
+                applyAudioClips(engine, std::move(clips));
+                break;
+            }
+            if (menuAction("Audio clips...")) {
+                ImGui::CloseCurrentPopup();
+                openAudioClips_ = true;
+            }
+        } else {
+            menuSubject("Audio");
+            if (menuAction("Open audio...", shortcut::kOpenAudio, onOpenAudio != nullptr)) {
+                ImGui::CloseCurrentPopup();
+                if (onOpenAudio) {
+                    onOpenAudio();
+                }
+            }
+        }
+        break;
+    }
+    case StripLane::Sections: {
+        if (valid(menu_.index, piece.structure.sections.size())) {
+            const auto index = static_cast<std::size_t>(menu_.index);
+            menuSubject(fmt::format("Section: {}",
+                                    seq::sectionDisplayName(piece.structure.sections[index])));
+            if (menuAction("Select")) {
+                selection_ = Selection::Section;
+                selected_ = menu_.index;
+            }
+            const analysis::SongSection& section = piece.structure.sections[index];
+            // `splitSection` takes a time and refuses a split that would leave a section shorter
+            // than its minimum, so the enabled test asks the same question the operation will:
+            // an item that is offered and then declines is worse than one that was never offered.
+            const bool splittable = at > section.startSeconds + kMinSectionSeconds &&
+                                    at < section.endSeconds - kMinSectionSeconds;
+            if (menuAction("Split here", nullptr, splittable)) {
+                if (seq::splitSection(piece.structure, at, kMinSectionSeconds)) {
+                    piece.refreshSectionMarkers();
+                    touch();
+                }
+            }
+            // Not "delete": the structure is gapless, so removing a section gives its time to a
+            // neighbour rather than leaving a hole, and the label says which of those it is.
+            if (menuAction("Remove (merge into neighbour)", nullptr,
+                           piece.structure.sections.size() > 1)) {
+                if (seq::removeSection(piece.structure, index)) {
+                    selection_ = Selection::None;
+                    selected_ = -1;
+                    piece.refreshSectionMarkers();
+                    touch();
+                }
+            }
+        } else {
+            menuSubject("Sections");
+            if (menuAction("Analyse song", nullptr, engine.track() != nullptr && work_ == nullptr)) {
+                startStructureAnalysis(engine, true);
+            }
+        }
+        break;
+    }
+    case StripLane::Ruler:
+    case StripLane::None:
+    default: {
+        menuSubject("Timeline");
+        if (menuAction("Play / pause", shortcut::kPlayPause)) {
+            engine.togglePlay();
+        }
+        if (menuAction("Move playhead here")) {
+            engine.seekSeconds(std::clamp(at, 0.0, std::max(piece.duration(), 1.0)));
+        }
+        ImGui::Separator();
+        if (menuAction("Add shot here")) {
+            addShotAt(engine, at);
+        }
+        if (menuAction("Add lyric here")) {
+            addLyricAt(engine, at);
+        }
+        ImGui::Separator();
+        if (menuAction("Zoom to fit")) {
+            zoom_ = 1.0f;
+            view_ = 0.0;
+        }
+        break;
+    }
+    }
+}
+
+// ---- the small mutations the toolbar and the context menu share ---------------------------------
+//
+// Factored out of `drawToolbar` rather than copied into the menu. Two paths that add a shot and
+// disagree about what a new shot looks like is exactly the drift the addendum's section 10 is
+// about; the world editor avoids it by routing everything through `EditSystem`, and the sequencer
+// has no such system, so the next best thing is one function.
+
+void SequencePanel::addShotAt(app::Engine& engine, double seconds) {
+    seq::Sequence& piece = engine.sequence();
+    seq::Shot shot;
+    shot.name = fmt::format("shot {}", piece.shots.size() + 1);
+    shot.startSeconds = std::max(0.0, seconds);
+    shot.durationSeconds = 8.0;
+    if (!piece.shots.empty()) {
+        shot.scene = piece.shots.back().scene;
+    } else if (!piece.scenes.empty()) {
+        shot.scene = piece.scenes.front().id;
+    }
+    app::FocalTarget subject;
+    subject.radius = 10.0f;
+    if (!piece.actors.empty()) {
+        subject.position = piece.actors.front().positionAt(shot.startSeconds);
+        subject.name = piece.actors.front().id;
+    }
+    shot.camera = seq::cameraFromPreset(seq::CameraPreset::Wide, subject);
+    if (!piece.actors.empty()) {
+        shot.camera.lookAtActor = piece.actors.front().id;
+    }
+    piece.shots.push_back(std::move(shot));
+    // Kept in time order, because a shot inherits the *previous* shot's scene slot and "previous"
+    // is a position in this vector. Adding one in the middle without sorting would silently change
+    // which slot the shots after it inherit.
+    std::stable_sort(piece.shots.begin(), piece.shots.end(),
+                     [](const seq::Shot& l, const seq::Shot& r) {
+                         return l.startSeconds < r.startSeconds;
+                     });
+    selection_ = Selection::Shot;
+    selected_ = static_cast<int>(std::distance(
+        piece.shots.begin(),
+        std::find_if(piece.shots.begin(), piece.shots.end(), [&](const seq::Shot& s) {
+            return s.startSeconds == std::max(0.0, seconds);
+        })));
+    touch();
+}
+
+void SequencePanel::addShotAtEnd(app::Engine& engine) {
+    const seq::Sequence& piece = engine.sequence();
+    // A new shot starts where the piece currently ends, so shots never overlap by accident --
+    // which validate() would refuse anyway, loudly, on the next install.
+    addShotAt(engine, piece.shots.empty() ? 0.0 : piece.shots.back().endSeconds());
+}
+
+void SequencePanel::addLyricAt(app::Engine& engine, double seconds) {
+    seq::Sequence& piece = engine.sequence();
+    seq::OverlayCue cue;
+    cue.id = fmt::format("cue{:03}", piece.overlays.size() + 1);
+    cue.content = "LYRIC";
+    cue.style = "lyric";
+    cue.startSeconds = std::max(0.0, seconds);
+    cue.endSeconds = cue.startSeconds + 3.0;
+    cue.anchor = glm::vec2(0.5f, 0.16f);
+    cue.preset = seq::OverlayPreset::FadeInOut;
+    cue.order = 10;
+    piece.overlays.push_back(std::move(cue));
+    selection_ = Selection::Overlay;
+    selected_ = static_cast<int>(piece.overlays.size()) - 1;
+    touch();
+}
+
+void SequencePanel::applyAudioClips(app::Engine& engine, std::vector<audio::AudioClip> clips) {
+    // A re-mix is a pass over every sample in the piece (ADR-103), which is why this is only ever
+    // reached from a discrete act -- a menu item, a field committed -- and never from a drag.
+    if (auto r = engine.setAudioClips(std::move(clips)); !r) {
+        status_ = r.error().message;
+    }
+}
+
+// The grips on a block's edges. Drawn only under the pointer or while that edge is being dragged:
+// a lane of clips each wearing two permanent handles is a picket fence, and the affordance is
+// wanted at the moment somebody reaches for it rather than at all times.
+void SequencePanel::drawEdgeGrip(ImDrawList* draw, ImVec2 a, ImVec2 b, BlockZone zone, Drag active,
+                                 bool isShot) {
+    const bool leftLive = zone == BlockZone::LeftEdge ||
+                          active == (isShot ? Drag::TrimShotStart : Drag::TrimOverlayStart);
+    const bool rightLive = zone == BlockZone::RightEdge ||
+                           active == (isShot ? Drag::TrimShotEnd : Drag::TrimOverlayEnd);
+    if (!leftLive && !rightLive) {
+        return;
+    }
+    const Palette& pal = palette();
+    const float inset = 2.5f;
+    const auto grip = [&](float x) {
+        draw->AddRectFilled(ImVec2(x - 1.5f, a.y + inset), ImVec2(x + 1.5f, b.y - inset),
+                            pal.borderStrong, 1.0f);
+    };
+    if (leftLive) {
+        grip(a.x + 3.0f);
+    }
+    if (rightLive) {
+        grip(b.x - 3.0f);
+    }
+}
+
 
 // ---- inspectors --------------------------------------------------------------------------------
 

@@ -27,6 +27,10 @@
 #include "audio/arrangement.hpp"
 #include "audio/waveform.hpp"
 #include "seq/sequence.hpp"
+#include "ui/ui_logic.hpp"
+
+struct ImDrawList;
+struct ImVec2;
 
 #include <atomic>
 #include <cstdint>
@@ -73,6 +77,40 @@ private:
     void drawOverlayInspector(app::Engine& engine, seq::OverlayCue& cue);
     void drawSectionInspector(app::Engine& engine, std::size_t index);
     void drawSceneSlots(app::Engine& engine);
+    // The strip's right-click menu. Separate from `drawStrip` because a popup outlives the frame
+    // that opened it and must therefore read remembered state rather than the live pointer.
+    void drawStripContextMenu(app::Engine& engine);
+
+    // ---- what a shot, a lyric and an arrangement edit are, in one place each -------------------
+    //
+    // The toolbar and the context menu both add shots, and before this they each had their own idea
+    // of what a new one looks like. Two places that create the same object is the drift the
+    // addendum's section 10 is about -- the world editor solves it by routing everything through
+    // `app::EditSystem`, and the sequencer, which has no such system and therefore no undo, gets
+    // the next best thing: one function per operation, called by both.
+    void addShotAt(app::Engine& engine, double seconds);
+    void addShotAtEnd(app::Engine& engine);
+    void addLyricAt(app::Engine& engine, double seconds);
+    void applyAudioClips(app::Engine& engine, std::vector<audio::AudioClip> clips);
+
+    // ---- what a drag on the strip is -----------------------------------------------------------
+    //
+    // Was `int dragKind_` with a comment listing seven meanings. It became eight when the left-hand
+    // trim arrived, and a switch over an int whose values are documented in a comment is one
+    // off-by-one away from resizing the wrong end of the wrong thing.
+    enum class Drag : std::uint8_t {
+        None,
+        Playhead,          // scrubbing: the ruler's press, held
+        MoveShot,
+        TrimShotStart,     // moves the start and keeps the end where it was
+        TrimShotEnd,
+        MoveOverlay,
+        TrimOverlayStart,
+        TrimOverlayEnd,
+        SectionBoundary,
+    };
+
+    void drawEdgeGrip(ImDrawList* draw, ImVec2 a, ImVec2 b, BlockZone zone, Drag active, bool isShot);
 
     // Marks the sequence as edited. The bake runs at the end of the frame the edit settled in.
     void touch() { dirty_ = true; }
@@ -123,9 +161,33 @@ private:
     int snapMode_ = 2; // Beats
     float zoom_ = 1.0f;
     double view_ = 0.0; // leftmost second shown
-    int dragKind_ = 0;  // 0 none, 1 move shot, 2 resize shot, 3 move overlay, 4 resize overlay
+    Drag drag_ = Drag::None;
     int dragIndex_ = -1;
     double dragGrab_ = 0.0;
+    // The edge a trim is holding still. Remembered at the press rather than recomputed, because
+    // trimming a shot's start changes its duration, and a duration read back from the live object
+    // mid-drag would move the end as well -- which is a move, not a trim.
+    double dragAnchor_ = 0.0;
+
+    // A right press that travels is a pan and a right press that stays put is a menu. Dear ImGui's
+    // own context-menu helper cannot tell them apart -- it opens on the release and measures
+    // nothing -- so the strip keeps its own tracker. See `ui::updateContextClick`.
+    ContextClickTracker contextClick_;
+
+    // What the open context menu is about, captured at the click. A popup is submitted on later
+    // frames, by which time the pointer has moved; a menu that hit-tested live would act on
+    // whatever happened to be under the cursor when an item was chosen.
+    struct MenuTarget {
+        StripLane lane = StripLane::None;   // the lane the click was in, on the time axis
+        StripLane header = StripLane::None; // or the lane whose header it was in
+        double seconds = 0.0;
+        int index = -1;    // which block within the lane, or -1 for empty space
+        int actorRow = -1; // which actor lane, when there is one
+    };
+    MenuTarget menu_;
+    // Set by a menu item that wants the Audio... popup, which cannot be opened from inside another
+    // popup's body.
+    bool openAudioClips_ = false;
     std::string status_;
     std::string lyricPath_;
     char nameBuffer_[96] = "";
