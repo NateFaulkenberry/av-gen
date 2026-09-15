@@ -707,7 +707,7 @@ figure here compares two process runs.
 
 Nine arms, one session. Medians, in milliseconds.
 
-| | idle | sliders | scrub | box | gizmo | camera | hover | panels | strip |
+| | idle | sliders | scrub | box | gizmo † | camera | hover | panels | strip ‡ |
 |---|---|---|---|---|---|---|---|---|---|
 | `engine.update` | 0.454 | 0.434 | 0.426 | 0.440 | 0.438 | 0.453 | 0.452 | 0.450 | 0.459 |
 | `ui.build` | 0.275 | 0.174 | 0.175 | 0.249 | 0.181 | 0.197 | 0.203 | 0.241 | 0.261 |
@@ -719,6 +719,17 @@ Nine arms, one session. Medians, in milliseconds.
 | `# IBL builds` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | FRAME median | 7.98 | 8.42 | 8.27 | 8.12 | 8.48 | 7.95 | 7.97 | 7.96 | 7.97 |
 | FRAME max | 25.9 | 9.3 | 9.4 | 25.1 | 9.3 | 9.2 | 9.8 | 9.2 | 26.4 |
+
+**† The gizmo column of this particular session is vacuous and must not be quoted.** By the time the
+arm ran, four blocks in, the `scrub` arm had moved the transport and the directed camera was looking
+at nothing selectable, and the arm said so: *"nothing selectable is in frame; this arm measured
+nothing"*. Its honest numbers come from a session where it proves itself -- `--ui-ab idle:gizmo`,
+where it reports the node it grabbed, the handle it dragged and where the object ended up, and where
+a gizmo drag is indistinguishable from idle: FRAME median 9.34 against 9.28 for `box` and 16.45 for
+`idle` on a noisier block. **‡** see the arms' limits at the end of this section.
+
+**The counters read 0 in this session**; in others the procedural counter reads exactly 4 at idle on
+the same binary and project. That residual is named at the end of this section and is not diagnosed.
 
 **The most valuable rows are the three counters and `ui.build`**, and both are negative results.
 
