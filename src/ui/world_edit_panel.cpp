@@ -615,6 +615,10 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
         }
     }
 
+    const std::string primary = editor.selection.primary();
+    if (primary.empty()) {
+        scrolledTo_.clear();
+    }
     const std::string filter = objectFilter_;
     const auto matches = [&](const std::string& name) {
         if (filter.empty()) {
@@ -642,7 +646,11 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
                                                                            int depth) {
         const auto kids = children.find(node.name);
         const bool hasKids = kids != children.end() && !kids->second.empty();
-        const bool showSelf = matches(node.name);
+        // A filter narrows what you are *looking* for; it should not hide what you have *got*.
+        // Selecting something in the viewport while a filter is applied used to leave the list
+        // showing no selected row at all, which reads as the click having failed.
+        const bool isSelected = editor.selection.contains(node.name);
+        const bool showSelf = matches(node.name) || isSelected;
         ImGui::PushID(node.name.c_str());
 
         if (showSelf) {
@@ -715,6 +723,13 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
                 } else {
                     editor.selection.set(node.name);
                 }
+            }
+            // Bring a selection made elsewhere into view. After the row, so the scroll target is
+            // the row that was just laid out; only for the primary, so a box-select of forty
+            // objects does not fight itself for the viewport.
+            if (isSelected && !primary.empty() && node.name == primary && scrolledTo_ != primary) {
+                ImGui::SetScrollHereY(0.5f);
+                scrolledTo_ = primary;
             }
             if (ImGui::IsItemHovered()) {
                 // A locked row is inert to a click, and the cursor says which of the two it is

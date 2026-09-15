@@ -55,6 +55,12 @@ private:
     // panel is being *looked at*, not something about the scene, and it must not make a document
     // modified or end up in a file.
     std::set<std::string> expanded_;
+    // The primary selection this list last scrolled to. A selection made *elsewhere* -- a click in
+    // the viewport, the context menu, an undo -- should bring its row into view; one made by
+    // clicking a row already is in view, and scrolling then would yank the list under the pointer.
+    // Comparing against the last value distinguishes the two without the panel needing to be told
+    // who changed it.
+    std::string scrolledTo_;
     // The hero as it was when a drag began, so the whole drag is one undo step rather than sixty.
     // `ImGui::IsItemActivated` opens it and `IsItemDeactivatedAfterEdit` closes it, which is the
     // same shape as the gizmo's drag coalescing.
