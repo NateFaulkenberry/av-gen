@@ -25,7 +25,12 @@ class Context;
 
 class ReadbackRing {
 public:
-    enum class Format : std::uint8_t { Rgba8, Rgba16Float };
+    // The beauty path needs the first two. The three after it are the auxiliary targets an AOV
+    // export reads (ADR-242): RG16Float velocity, R32Float linear depth, R32Uint identifiers. All
+    // three arrive as `imageF`, expanded to RGBA -- a single-channel target replicates into RGB so
+    // the file is viewable and every channel carries the same number, and velocity fills R and G.
+    // The consumer is `writeExr`, which takes RGBA floats, so one unpacked shape serves all of them.
+    enum class Format : std::uint8_t { Rgba8, Rgba16Float, Rg16Float, R32Float, R32Uint };
 
     struct Frame {
         std::uint64_t index = 0;
@@ -39,8 +44,8 @@ public:
     ReadbackRing(const ReadbackRing&) = delete;
     ReadbackRing& operator=(const ReadbackRing&) = delete;
 
-    // Appends the copy of `texture` (RGBA8Unorm for Rgba8, RGBA16Float for Rgba16Float; needs
-    // CopySrc usage) to `encoder`, finishes and submits it, and starts mapping the staging
+    // Appends the copy of `texture` (the format must match: RGBA8Unorm for Rgba8, RGBA16Float for
+    // Rgba16Float, RG16Float, R32Float and R32Uint for their own; needs CopySrc usage) to `encoder`, finishes and submits it, and starts mapping the staging
     // buffer. Blocks only while every slot is in flight.
     [[nodiscard]] Result<void> enqueue(wgpu::CommandEncoder& encoder, const wgpu::Texture& texture,
                                        std::uint32_t width, std::uint32_t height, std::uint64_t frameIndex,

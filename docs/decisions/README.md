@@ -222,4 +222,5 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [233](ADR-233-two-things-rebuilt-that-nobody-changed.md) | Two things were rebuilt every frame that nobody had changed (the idle editor's 22 regenerations, and the sky rebuilt inside the drag) | Accepted |
 | [240](ADR-240-a-placement-is-not-an-offset.md) | A placement is not an offset, a euler triple is not an orientation, a push is not a walk, and a stride speed is still a claim about a clip | Accepted |
 | [241](ADR-241-the-director-says-what-it-writes.md) | The director says what it writes (the Inspector's `Kind::Staging`, declared and observed) | Accepted |
+| [242](ADR-242-a-target-nobody-reads-is-not-a-feature.md) | A target nobody reads is not a feature (AOV export, and the normal pass that was not a normal) | Accepted |
 | [243](ADR-243-the-detector-and-the-eye-disagree.md) | The detector and the eye disagree, and the eye decides what ships (§4 reviewed: the artifact is spatial, FXAA stays, Glowmere supersamples) | Accepted |

@@ -227,6 +227,56 @@ Result<void> RenderJob::start() {
         ldrView_ = ldr_.CreateView();
     }
     ring_ = std::make_unique<gpu::ReadbackRing>(context_, 3);
+
+    // ADR-242: AOV export. The auxiliary targets have been written every frame since ADR-035 and
+    // nothing outside a debug view has ever read them; this is the consumer. Resolved here rather
+    // than per frame so an unknown name fails at `start()` and not two hours into a sequence.
+    if (auto list = settings_.aovList(); !list) {
+        return std::unexpected(list.error());
+    } else if (!list->empty()) {
+        using Format = gpu::ReadbackRing::Format;
+        for (const std::string& name : *list) {
+            AovSource src;
+            src.name = name;
+            if (name == "normal") {
+                // One target, so one readback: roughness travels with the normal rather than
+                // costing a second copy to write the same bytes twice. It is oct-encoded on the
+                // GPU and decoded on the way to the file -- see `decodeNormalRoughness`.
+                src.texture = &renderer_->normalRoughnessTexture();
+                src.format = Format::Rgba16Float;
+                src.decodeNormal = true;
+            } else if (name == "emission") {
+                src.texture = &renderer_->emissionTexture();
+                src.format = Format::Rgba16Float;
+            } else if (name == "depth") {
+                src.texture = &renderer_->linearDepthTexture();
+                src.format = Format::R32Float;
+                src.half = false; // metres against a far plane; a half would quantise it
+            } else if (name == "velocity") {
+                src.texture = &renderer_->velocityTexture();
+                src.format = Format::Rg16Float;
+            } else if (name == "id") {
+                src.texture = &renderer_->identifierTexture();
+                src.format = Format::R32Uint;
+                src.half = false; // an identifier is an integer; half is exact only to 2048
+            } else {
+                return avgen::fail("render: unhandled aov '{}'", name); // aovList() validates
+            }
+            aovs_.push_back(std::move(src));
+        }
+        // One slot per AOV, so a frame's copies are all in flight at once and -- because the ring
+        // hands slots out in order -- each slot sees the same format every frame instead of
+        // resizing its staging buffer as the formats rotate past it.
+        aovRing_ = std::make_unique<gpu::ReadbackRing>(
+            context_, static_cast<std::uint32_t>(std::max<std::size_t>(3, aovs_.size())));
+        aovDir_ = isSequence(settings_.output) ? output_ : output_.parent_path();
+        std::error_code aovEc;
+        std::filesystem::create_directories(aovDir_, aovEc);
+        if (aovEc) {
+            return avgen::fail("cannot create '{}' for AOVs: {}", aovDir_.string(), aovEc.message());
+        }
+        log::info("render: exporting {} AOV(s) beside the frames: {}", aovs_.size(), settings_.aovs);
+    }
     std::error_code ec;
     if (isSequence(settings_.output)) {
         settings_.normalisePattern();
@@ -279,6 +329,42 @@ Result<void> RenderJob::start() {
     return {};
 }
 
+void RenderJob::decodeNormalRoughness(gpu::ImageF& image) {
+    // The inverse of `octEncode`, matching shaders/common.wgsl line for line. Done here rather than
+    // in a shader because there is no pass to put it in: the export is a copy, not a draw, and a
+    // whole render pipeline to move four floats per pixel would cost more than it saves.
+    for (std::size_t i = 0; i + 3 < image.rgba.size(); i += 4) {
+        const float ex = image.rgba[i];
+        const float ey = image.rgba[i + 1];
+        const float roughness = image.rgba[i + 2];
+        float x = ex;
+        float y = ey;
+        const float z = 1.0f - std::abs(ex) - std::abs(ey);
+        if (z < 0.0f) {
+            const float sx = x >= 0.0f ? 1.0f : -1.0f;
+            const float sy = y >= 0.0f ? 1.0f : -1.0f;
+            const float nx = (1.0f - std::abs(y)) * sx;
+            const float ny = (1.0f - std::abs(x)) * sy;
+            x = nx;
+            y = ny;
+        }
+        const float len = std::sqrt(x * x + y * y + z * z);
+        // A texel no geometry wrote is (0,0,0,0), which decodes to a length of exactly one in z --
+        // a normal pointing at the camera, everywhere there is sky. Left as zero instead, because
+        // a matte of "where is there a surface" is half of what this pass is for.
+        const bool empty = ex == 0.0f && ey == 0.0f && roughness == 0.0f;
+        if (empty || len < 1e-6f) {
+            image.rgba[i] = image.rgba[i + 1] = image.rgba[i + 2] = 0.0f;
+            image.rgba[i + 3] = 0.0f;
+            continue;
+        }
+        image.rgba[i] = x / len;
+        image.rgba[i + 1] = y / len;
+        image.rgba[i + 2] = z / len;
+        image.rgba[i + 3] = roughness;
+    }
+}
+
 void RenderJob::encoderLoop() {
     for (;;) {
         Pending item;
@@ -293,6 +379,20 @@ void RenderJob::encoderLoop() {
         }
         spaceCv_.notify_one();
         Result<void> r;
+        if (!item.aov.empty()) {
+            // An AOV, whatever the beauty output is -- including a video, where the frame itself
+            // has no file. `written_` counts it like any other unit of work, so a progress bar
+            // that reaches the end still means the work is done.
+            r = assets::writeExr(settings_.aovFile(aovDir_, item.index, item.aov), item.imageF.width,
+                                 item.imageF.height, item.imageF.rgba, item.aovHalf);
+            if (!r) {
+                fail(fmt::format("frame {} aov {}: {}", item.index, item.aov, r.error().message));
+                cancelled_ = true;
+            }
+            std::lock_guard lock(mutex_);
+            ++written_;
+            continue;
+        }
         if (settings_.output == RenderOutput::PngSequence) {
             r = assets::writePng(settings_.frameFile(output_, item.index), item.image.width, item.image.height,
                                  item.image.rgba);
@@ -330,6 +430,21 @@ Result<void> RenderJob::renderOne() {
     const auto format = exr ? gpu::ReadbackRing::Format::Rgba16Float : gpu::ReadbackRing::Format::Rgba8;
     if (auto r = ring_->enqueue(encoder, source, settings_.width, settings_.height, rendered_, format); !r) {
         return r;
+    }
+    // The auxiliary copies go after the beauty enqueue, which finished and submitted the frame's
+    // command buffer -- so these use the overload that makes its own, which is exactly what it is
+    // for: a texture whose contents are already on the GPU. The index encodes (frame, slot) so a
+    // completed copy knows which AOV of which frame it is without a side table.
+    for (std::size_t i = 0; i < aovs_.size(); ++i) {
+        const AovSource& a = aovs_[i];
+        if (a.texture == nullptr || *a.texture == nullptr) {
+            continue; // a target the renderer has not created at this size
+        }
+        if (auto r = aovRing_->enqueue(*a.texture, settings_.width, settings_.height,
+                                       rendered_ * aovs_.size() + i, a.format);
+            !r) {
+            return r;
+        }
     }
     log::trace("render frame {} t={:.4f} submitted ({} in flight)", rendered_, time.renderTime, ring_->inFlight());
     ++rendered_;
@@ -370,6 +485,39 @@ Result<void> RenderJob::drain(bool all) {
     }
     if (!ring_->error().empty()) {
         return avgen::fail("{}", ring_->error());
+    }
+    // The AOV ring drains beside it and never through `handleFrame`: these images are not the
+    // deliverable and must not touch the frame hashes, the sequence hash or the frame count.
+    if (aovRing_ != nullptr) {
+        if (all) {
+            if (auto r = aovRing_->flush(); !r) {
+                return r;
+            }
+        }
+        while (auto frame = aovRing_->poll()) {
+            const std::size_t slot = static_cast<std::size_t>(frame->index % aovs_.size());
+            Pending item;
+            item.index = frame->index / aovs_.size();
+            item.imageF = std::move(frame->imageF);
+            item.aov = aovs_[slot].name;
+            item.aovHalf = aovs_[slot].half;
+            if (aovs_[slot].decodeNormal) {
+                decodeNormalRoughness(item.imageF);
+            }
+            {
+                std::unique_lock lock(mutex_);
+                if (queue_.size() >= queueLimit_) {
+                    spaceCv_.wait(lock, [&] { return queue_.size() < queueLimit_ || stopEncoders_ || !error_.empty(); });
+                }
+                if (error_.empty() && !stopEncoders_) {
+                    queue_.push_back(std::move(item));
+                }
+            }
+            cv_.notify_one();
+        }
+        if (!aovRing_->error().empty()) {
+            return avgen::fail("aov readback: {}", aovRing_->error());
+        }
     }
     return {};
 }

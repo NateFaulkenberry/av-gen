@@ -13,6 +13,7 @@ namespace avgen::gpu {
 namespace {
 
 std::uint32_t bytesPerPixel(ReadbackRing::Format format) {
+    // Rgba8, Rg16Float, R32Float and R32Uint are all four bytes; only RGBA16Float is eight.
     return format == ReadbackRing::Format::Rgba16Float ? 8u : 4u;
 }
 
@@ -140,7 +141,43 @@ ReadbackRing::Frame ReadbackRing::extract(Slot& slot) {
         return frame;
     }
     const std::size_t pixels = static_cast<std::size_t>(slot.width) * slot.height;
-    if (slot.format == Format::Rgba8) {
+    // The three auxiliary formats. Each is four bytes a texel and each expands to RGBA floats, so
+    // the encoder side has one shape to write whatever the target was.
+    if (slot.format == Format::Rg16Float || slot.format == Format::R32Float ||
+        slot.format == Format::R32Uint) {
+        frame.imageF.width = slot.width;
+        frame.imageF.height = slot.height;
+        frame.imageF.rgba.resize(pixels * 4);
+        std::vector<std::uint8_t> row(static_cast<std::size_t>(slot.width) * 4);
+        for (std::uint32_t y = 0; y < slot.height; ++y) {
+            // The staging rows are 256-byte aligned, so copy the row out before reading it as
+            // anything wider than a byte -- the same reason the RGBA16F branch below does.
+            std::memcpy(row.data(), data + static_cast<std::size_t>(y) * slot.paddedRow, row.size());
+            float* out = frame.imageF.rgba.data() + static_cast<std::size_t>(y) * slot.width * 4;
+            for (std::uint32_t x = 0; x < slot.width; ++x, out += 4) {
+                if (slot.format == Format::Rg16Float) {
+                    std::uint16_t halves[2];
+                    std::memcpy(halves, row.data() + static_cast<std::size_t>(x) * 4, 4);
+                    float xy[2];
+                    halfToFloatArray(halves, xy, 2);
+                    out[0] = xy[0];
+                    out[1] = xy[1];
+                    out[2] = 0.0f;
+                } else if (slot.format == Format::R32Float) {
+                    float v = 0.0f;
+                    std::memcpy(&v, row.data() + static_cast<std::size_t>(x) * 4, 4);
+                    out[0] = out[1] = out[2] = v;
+                } else {
+                    std::uint32_t v = 0;
+                    std::memcpy(&v, row.data() + static_cast<std::size_t>(x) * 4, 4);
+                    // An identifier is an integer and this is the only lossless float that holds
+                    // it up to 2^24; the EXR it lands in is written as 32-bit for the same reason.
+                    out[0] = out[1] = out[2] = static_cast<float>(v);
+                }
+                out[3] = 1.0f;
+            }
+        }
+    } else if (slot.format == Format::Rgba8) {
         frame.image.width = slot.width;
         frame.image.height = slot.height;
         frame.image.rgba.resize(pixels * 4);

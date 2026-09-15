@@ -82,7 +82,31 @@ private:
         std::uint64_t index = 0;
         gpu::Image8 image;  // PNG / video
         gpu::ImageF imageF; // EXR
+        // ADR-242. Empty for the beauty frame; otherwise the AOV this image is, and whether its
+        // EXR is written as half or as 32-bit float. Depth in metres and an integer identifier are
+        // not representable in half -- a half carries integers exactly only to 2048, and a far
+        // plane is hundreds of metres -- so those two are written wide and the rest are not.
+        std::string aov;
+        bool aovHalf = true;
     };
+    // One auxiliary target to export: what to call it, where to get it, how it is laid out, and
+    // what has to happen to it before it is a file somebody else can use.
+    //
+    // `decodeNormal` is not an optional nicety. The normal target is **octahedral**: the scene pass
+    // writes `vec4(octEncode(n), roughness, flags)`, so its red and green are an encoded pair and
+    // not the x and y of anything. Copied out raw it is a pass no compositor can read, and it looks
+    // entirely plausible while being useless. The test that asserts a unit vector is what found it.
+    struct AovSource {
+        std::string name;
+        const wgpu::Texture* texture = nullptr;
+        gpu::ReadbackRing::Format format = gpu::ReadbackRing::Format::Rgba16Float;
+        bool half = true;
+        bool decodeNormal = false;
+    };
+    // The CPU half of `octDecode` in shaders/common.wgsl, applied in place to an RGBA float image:
+    // rg is the encoded normal and b is roughness, and the result is xyz world normal with the
+    // roughness moved into alpha -- which is the layout the name `normal` promises.
+    static void decodeNormalRoughness(gpu::ImageF& image);
     [[nodiscard]] Result<void> renderOne();
     // Hands completed readbacks to the encoders; `all` waits for every frame in flight first.
     [[nodiscard]] Result<void> drain(bool all);
@@ -103,6 +127,18 @@ private:
     // not be one of the differences.
     std::unique_ptr<rendering::CompositionRenderer> compositor_;
     std::unique_ptr<gpu::ReadbackRing> ring_; // after renderer_: destroyed (and flushed) first
+    // ADR-242: a SECOND ring, deliberately not the beauty ring. That one hands frames back in
+    // enqueue order and the job's sequence hash is built from that order, so interleaving five more
+    // copies per frame into it would corrupt the determinism check -- the one thing an offline
+    // render exists to be able to prove. Three slots, which is also the back-pressure: an AOV
+    // enqueue blocks until a slot frees, which bounds how many float images can pile up at once.
+    std::unique_ptr<gpu::ReadbackRing> aovRing_;
+    std::vector<AovSource> aovs_;
+    // Where the AOV files go. For a sequence that is the output directory; for a VIDEO render
+    // `output_` is a file, and writing `<movie.mov>/frame_000000.normal.exr` inside it is not a
+    // path. A video with AOVs beside it is a real request -- the passes are for the compositor,
+    // and the movie is for everyone else -- so the directory is resolved once, here.
+    std::filesystem::path aovDir_;
     wgpu::Texture ldr_;                       // tone-mapped RGBA8 target (CopySrc)
     wgpu::TextureView ldrView_;
     std::unique_ptr<assets::VideoWriter> video_;

@@ -142,11 +142,20 @@ them, and nothing found so far does.
 
 ## B. Incomplete, with the gap named
 
-**AOV export to disk.** The renderer already produces normal+roughness, velocity, emission and
-object/material IDs in HDR and can display them. Nothing writes them beside the beauty pass, and
-depth is not an exportable target. Note the standing oddity: **normal+roughness is written every
-fragment and read by nothing** on the normal path — measured at zero cost, but an export is the thing
-that would give it a consumer.
+**AOV export to disk.** ~~Nothing writes them beside the beauty pass.~~ **Built** — ADR-242.
+`--aov normal,emission,depth,velocity,id` writes each as its own scene-linear EXR sequence beside the
+frames. Two things this entry got wrong, found by reading: **depth was already exportable**
+(`linearDepthTexture()` is an R32Float target on the normal path); and the standing oddity was right
+— normal+roughness had no consumer outside a debug view, and now has one.
+
+A third thing nobody knew: **the normal target is oct-encoded**, so the first version of the export
+shipped a `normal` pass that was not a normal and looked entirely plausible. It is decoded on the way
+to the file now. The test that found it asserts a unit vector and failed at 0 of 3456 pixels.
+
+Not done, and recorded rather than claimed: a multi-layer EXR; `albedo`, `metallic`, `shadow`,
+`volumetric` and `exposure`, none of which has a consumer; and AOVs under supersampling, which is
+*refused* rather than approximated, because an identifier, a normal and a depth edge have no correct
+downsample.
 
 **Debug views the mandate lists that do not exist:** albedo, metallic, material ID (the `Ids` view is
 object identity), shadow, volumetric contribution, bloom contribution, exposure. Each is cheap
@@ -631,8 +640,9 @@ Ordered by what blocks the most.
 7. **§7's cinematic lighting evaluation** — depth, separation, focal hierarchy. This is what remains
    of Priority 2 now that the HDR/emissive plumbing has been verified sound, and it requires looking.
 8. **The performance dashboard (§13)** — the one item that genuinely needs a human to certify.
-9. **AOV export (§B)**, and the debug views the mandate lists that do not exist — neither should be
-   built without saying what question each answers.
+9. ~~**AOV export (§B)**~~ **Done** — ADR-242, five passes, each with its consumer named. The debug
+   views the mandate lists are still **not** built, and deliberately: none of them has been asked for
+   by anything, which is the bar this item set and the bar they still fail.
 10. ~~Wire `pcssBlockerTaps`~~ — **done**, ADR-227, as a fourth `vec4` in `ShadowUniforms`. Still
     open: **fix the raymarched SDF's shadow-map quad**, which wants its cost measured first — a full
     shadow-map quad marched per SDF per cascade. `avgen_render_tests "[.probe][sdf]"` passes when it

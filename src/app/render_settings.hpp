@@ -11,7 +11,10 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <span>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace avgen::app {
 
@@ -83,6 +86,18 @@ struct RenderSettings {
 
     std::string limits = "tier";
 
+    // ---- AOV export (ADR-242) ----------------------------------------------------------------
+    //
+    // Comma-separated, from `aovNames()`, empty by default. The renderer has always written these
+    // auxiliary targets every frame and nothing outside a debug view has ever read them; this is
+    // the consumer. Each requested AOV is written as its own scene-linear EXR sequence beside the
+    // beauty pass, so a compositor gets `frame_000123.exr` and `frame_000123.normal.exr` together.
+    //
+    // A separate file per AOV rather than one multi-layer EXR, because `writeExr` writes a single
+    // RGBA part and separate sequences are what a compositor reads anyway. The layered form is a
+    // better file and a bigger change; it is recorded as not done rather than half-built.
+    std::string aovs;
+
     // Frame count for a resolved end time (endSeconds >= startSeconds); the last frame is the one
     // whose time is < end (end exclusive), at least 1.
     [[nodiscard]] std::uint64_t frameCount(double resolvedEndSeconds) const;
@@ -111,6 +126,16 @@ struct RenderSettings {
     // three words mean anything, so the job, the UI and a test cannot disagree about what "tier"
     // resolves to.
     [[nodiscard]] scene::DetailLimits resolvedLimits() const;
+
+    // Every AOV this build can export, in the order `aovs` lists them for a canonical run.
+    [[nodiscard]] static std::span<const std::string_view> aovNames();
+    // `aovs` split and validated. An unknown name is an error rather than a skipped entry: a typo
+    // that silently exports nothing is the failure this project keeps writing ADRs about.
+    [[nodiscard]] Result<std::vector<std::string>> aovList() const;
+    // Output file for one AOV of frame `index`: the frame pattern with ".<aov>.exr" in place of
+    // its extension, so the AOV sorts beside its own beauty frame.
+    [[nodiscard]] std::filesystem::path aovFile(const std::filesystem::path& dir, std::uint64_t index,
+                                                std::string_view aov) const;
 
     [[nodiscard]] Result<void> validate() const; // sizes > 0 and even for video, fps > 0, quality range, pattern has {}
     [[nodiscard]] nlohmann::json toJson() const;

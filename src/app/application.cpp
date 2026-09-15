@@ -172,6 +172,9 @@ std::string usageText() {
            "                      so each fix has a before arm in the same process\n"
            "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
            "  --supersample <f>   offline render only: render the scene at this multiple of the output\n"
+           "  --aov <list>        offline render only: write auxiliary passes beside the frames as\n"
+           "                      scene-linear EXRs. normal (xyz + roughness in alpha), emission,\n"
+           "                      depth (metres), velocity, id. Comma separated.\n"
            "                      size and resolve down (1 = off, max 2). Buys back the sub-pixel\n"
            "                      detail a small output cannot sample.\n"
            "  --profile-cpu       print the main thread's per-phase frame distribution on exit\n"
@@ -473,6 +476,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             if (options.supersample < 1.0f || options.supersample > 2.0f) {
                 return fail("--supersample must be 1 (off) to 2, got '{}'", *v);
             }
+            ++i;
+        } else if (arg == "--aov") {
+            auto v = need(i, "--aov");
+            if (!v) return std::unexpected(v.error());
+            options.aovs = *v;
             ++i;
         } else if (arg == "--canvas-scale") {
             auto v = need(i, "--canvas-scale");
@@ -3269,6 +3277,7 @@ RenderSettings Application::renderSettingsFromOptions() const {
     if (options_.codec) s.codec = *options_.codec;
     if (options_.quality) s.quality = *options_.quality;
     if (options_.supersample > 1.0f) s.supersample = options_.supersample;
+    if (options_.aovs) s.aovs = *options_.aovs;
     return s;
 }
 
@@ -3365,6 +3374,7 @@ int Application::runQueue(const std::filesystem::path& queueFile) {
         if (options_.codec) settings.codec = *options_.codec;
         if (options_.quality) settings.quality = *options_.quality;
         if (options_.supersample > 1.0f) settings.supersample = options_.supersample;
+        if (options_.aovs) settings.aovs = *options_.aovs;
         if (options_.renderOutput) settings.output = *options_.renderOutput;
         settings.normalisePattern();
         if (settings.outputPath.empty()) {
