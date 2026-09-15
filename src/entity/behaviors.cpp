@@ -65,6 +65,104 @@ float angleDelta(float from, float to) {
     return d - kPi;
 }
 
+// ADR-162's walk back onto the navigable set, shared by every behaviour that steers (ADR-240).
+//
+// The situation it exists for: a body ends up just outside the navigable set -- a step down, the
+// edge of the water, a slope that tipped over the limit on the way down it. From there `pathClear`
+// fails in *every* direction, because it samples navigability from the body's own position
+// outward, so the steering fan finds nothing however wide it reaches. The planner is no help
+// either: it snaps an unwalkable start to the nearest walkable cell and returns a perfectly good
+// route from a place the body is not, and nobody ever tells the body where it snapped to.
+//
+// So the body is walked toward the nearest point the *navigator* calls navigable, found by an
+// outward spiral and clamped to a walking step so it reads as picking its way back onto the path
+// rather than as a teleport. The predicate is the navigator's rather than the grid's on purpose:
+// the grid is baked once from one sample per cell and the obstacle set moves afterwards, so
+// grid-walkable is a claim about build time and `navigable` is a claim about now. An escape that
+// satisfies the wrong predicate escapes to somewhere it is still stuck.
+//
+// **It turns onto the way out before travelling along it**, exactly as the ordinary walk does. The
+// first version of this translated the body along the escape vector while leaving `yaw` untouched,
+// and -- because it also wrote `speed` and `Activity::Walk` -- told the animation layer the body
+// was walking while it did. That is the one branch in the whole locomotion path where the facing
+// did not follow the body, and ADR-204's decomposition mistook its steps for pushes out of solids,
+// which are a different mechanism making a different guarantee.
+//
+// False when the body is on navigable ground (so this is not its problem) or when no navigable
+// point is within reach; the caller then does whatever it did before.
+// The refuge a body is currently walking back to, remembered across frames.
+//
+// It has to be remembered, and that is the price of turning onto the way out rather than sliding
+// along it. The spiral returns the first navigable candidate at the smallest radius that has one,
+// and which candidate that is flips as the body moves -- so a body that re-asked every frame turned
+// toward a new answer every frame and, with travel gated on facing the way it is going, spent its
+// whole time pivoting and covered no ground. Measured on the shipped scene before this: one sheep
+// fell from 63.6 m of travel in ninety seconds to 24.3 m, with 745 frames of a walk gait at an
+// unrepresentable speed.
+struct EscapeMemory {
+    glm::vec2 refuge{0.0f};
+    bool active = false;
+    void reset() { active = false; }
+};
+
+bool escapeToNavigable(const Navigator* navigator, EscapeMemory& memory, EntityState& state,
+                       float speed, float turnRate, double dt) {
+    if (navigator == nullptr) {
+        memory.reset();
+        return false;
+    }
+    const glm::vec3 wedged = state.position();
+    const glm::vec2 here(wedged.x, wedged.z);
+    if (navigator->navigable(here)) {
+        memory.reset();
+        return false;
+    }
+    // Keep walking to the one already chosen while it is still somewhere worth walking to. Re-asked
+    // only when there is no answer yet, when the answer stopped being navigable (the obstacle set
+    // moves; that is the whole reason this predicate is the navigator's and not the grid's), or
+    // when the body has arrived at it and is somehow still off the set.
+    if (!memory.active || !navigator->navigable(memory.refuge) ||
+        glm::length(memory.refuge - here) < 0.75f) {
+        memory.active = false;
+        for (float radius = 2.0f; radius <= 24.0f && !memory.active; radius += 2.0f) {
+            for (int k = 0; k < 12 && !memory.active; ++k) {
+                const float a = static_cast<float>(k) * 0.5235987756f;
+                const glm::vec2 candidate = here + glm::vec2(std::sin(a), std::cos(a)) * radius;
+                if (navigator->navigable(candidate)) {
+                    memory.refuge = candidate;
+                    memory.active = true;
+                }
+            }
+        }
+    }
+    if (!memory.active) {
+        return false;
+    }
+    const glm::vec2 away = memory.refuge - here;
+    const float span = glm::length(away);
+    if (span <= 1e-4f) {
+        memory.reset();
+        return false;
+    }
+    const auto step = static_cast<float>(dt);
+    const float wanted = std::atan2(away.x, away.y);
+    const float delta = angleDelta(state.yaw, wanted);
+    const float turned = std::clamp(delta, -turnRate * step, turnRate * step);
+    state.yaw += turned;
+    state.turnRate = turned / std::max(step, 1e-4f);
+    // Travel along the body's own heading, at the fraction of the step the facing error allows, so
+    // a body that has to turn round pivots first and walks out after. Every metre it covers is a
+    // metre along the way it is drawn facing.
+    const float alignment = std::max(0.0f, std::cos(angleDelta(state.yaw, wanted)));
+    const float limit = std::min(span, std::max(speed, 1.0f) * step) * alignment;
+    const glm::vec2 heading(std::sin(state.yaw), std::cos(state.yaw));
+    state.travel.x += heading.x * limit;
+    state.travel.z += heading.y * limit;
+    state.speed = limit / std::max(step, 1e-4f);
+    state.activity = state.speed > 0.05f ? Activity::Walk : Activity::Turn;
+    return true;
+}
+
 // Two octaves of value-noise over time, decorrelated per channel. Deterministic (a pure function of
 // time and seed), aperiodic, and -- unlike a sine -- it never lands on the same value at the same
 // phase twice, which is the difference between a craft that hangs in the air and one that bobs.
@@ -454,6 +552,7 @@ public:
     void reset(Rng& rng) override {
         hasDestination_ = false;
         pause_ = rng.range(0.0f, 2.0f);
+        escape_.reset();
     }
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
@@ -485,6 +584,7 @@ public:
             if (state.activity == Activity::Walk || state.activity == Activity::Run) {
                 state.activity = Activity::Idle;
             }
+            escape_.reset();
             return;
         }
         if (!hasDestination_) {
@@ -502,6 +602,12 @@ public:
                 ctx.nav->pickDestination(*ctx.rng, from, lo, std::min(hi, home > 0.0f ? home : hi),
                                          destination_)) {
                 hasDestination_ = true;
+            } else if (escapeToNavigable(ctx.nav, escape_, state, speed, turnRate, ctx.dt)) {
+                // Not boxed in: *off the navigable set*, where the rejection sampler can find
+                // nothing in the annulus because the body's own neighbourhood is not walkable.
+                // ADR-162's walk back onto the path, which `explore` has had since then and
+                // `wander` never did -- see the note on the steering branch below.
+                return;
             } else {
                 // Nowhere to go. Wait a beat and ask again rather than retrying every frame: a
                 // character boxed in by terrain should stand still, not burn the frame on
@@ -537,6 +643,27 @@ public:
             const glm::vec2 steered = ctx.nav->steer(flat, destination_, std::max(speed * 1.5f, 2.0f));
             if (glm::length(steered) > 0.5f) {
                 direction = steered;
+            } else if (escapeToNavigable(ctx.nav, escape_, state, speed, turnRate, ctx.dt)) {
+                // Not blocked by the world: standing *off the navigable set*, where `pathClear`
+                // samples from the body's own position outward and so every ray fails whichever
+                // way it points, however wide the fan reaches (ADR-162). The two branches are
+                // indistinguishable from inside the steering fan and they are not the same
+                // situation: one is a pause and the other is a wedge. `explore` was given the walk
+                // back onto the path when ADR-162 found this and `wander` never was, so a farm
+                // animal that stepped off the walkable set stood still in half-second increments
+                // until something else moved it -- measured on the shipped scene at **22.28 s**
+                // for one chick, against a worst of one authored pause for every other animal
+                // (ADR-240).
+                //
+                // Both conditions are required, and the pair is what keeps this rare: a body can
+                // be off the navigable set and still perfectly able to walk, because `pathClear`
+                // starts sampling a quarter of a metre *ahead* of it. Firing on the predicate
+                // alone hijacks a body that was travelling fine -- measured, it took one sheep
+                // from 63.6 m of travel in ninety seconds to 24.3 m.
+                //
+                // The destination is kept: it may still be reachable once the body is back on the
+                // path, and re-picking one every frame is rejection sampling nobody asked for.
+                return;
             } else {
                 // Every way out is blocked. Drop the destination rather than grinding into a
                 // hillside; the next pick will be somewhere else -- and stop claiming to be moving,
@@ -592,6 +719,7 @@ private:
     glm::vec2 destination_{0.0f};
     bool hasDestination_ = false;
     float pause_ = 0.0f;
+    EscapeMemory escape_;
 };
 
 // ---- lookAt ----------------------------------------------------------------------------------
@@ -975,6 +1103,7 @@ public:
         goalKind_ = InterestKind::Vista;
         sinceRepath_ = 0.0f;
         stuckFor_ = 0.0f;
+        escape_.reset();
         bestProgress_ = std::numeric_limits<float>::max();
         failures_ = 0;
         running_ = false;
@@ -1257,63 +1386,12 @@ private:
                 // Every local way out is blocked. Re-plan rather than grinding, and count it: a
                 // character that cannot make progress must eventually choose somewhere else.
                 stuckFor_ += dt;
-                // Standing on ground the navigator does not consider navigable at all.
-                //
-                // This is how the wanderer was stranding itself, and every part of it is a system
-                // behaving correctly. A walker ends up just outside the navigable set -- a step
-                // down, the edge of the water, a slope that tipped over the limit as it came down
-                // it. From there `pathClear` fails in *every* direction, because it samples
-                // navigability from the body's own position outward, so the steering fan finds
-                // nothing however wide it reaches or however short a step it settles for. The
-                // watchdog re-plans, and the planner snaps an unwalkable start to the nearest
-                // walkable cell and returns a perfectly good route *from a place the body is not*.
-                // Status ok, failures zero, and the body has not moved for ten minutes.
-                //
-                // The missing piece is that nobody ever told the body where the planner snapped to.
-                // The planner already knows: `NavGrid::nearestWalkable` is what it uses on the
-                // start cell. Walking the body there is the same guarantee the penetration resolve
-                // makes for solids -- a body may not end a frame inside a rock -- extended to the
-                // case that actually occurs, which is a body ending a frame off the map's walkable
-                // set entirely. Penetration resolve cannot do it: measured at the wedge point it
-                // returns 0.097 m and then nothing, because the body is not inside anything.
-                const glm::vec3 wedged = state.position();
-                const glm::vec2 here2(wedged.x, wedged.z);
-                // The target is a point the *navigator* calls navigable, not a cell the grid calls
-                // walkable. The two disagree here, and that difference is the second half of this
-                // bug: walking to the nearest grid-walkable cell centre moved the body one metre
-                // onto (-14, -242) -- a cell centre, exactly -- where `navigable` is still false,
-                // so it re-stalled there instead. The grid is baked once from a sample per cell and
-                // the obstacle set moves afterwards, so grid-walkable is a claim about build time
-                // and `navigable` is a claim about now. The escape has to satisfy the predicate
-                // that gates steering, or it escapes to somewhere it is still stuck.
-                glm::vec2 refuge(0.0f);
-                bool found = false;
-                if (navigator != nullptr && !navigator->navigable(here2)) {
-                    for (float radius = 2.0f; radius <= 24.0f && !found; radius += 2.0f) {
-                        for (int k = 0; k < 12 && !found; ++k) {
-                            const float a = static_cast<float>(k) * 0.5235987756f;
-                            const glm::vec2 candidate =
-                                here2 + glm::vec2(std::sin(a), std::cos(a)) * radius;
-                            if (navigator->navigable(candidate)) {
-                                refuge = candidate;
-                                found = true;
-                            }
-                        }
-                    }
-                }
-                if (found) {
-                    const glm::vec2 away = refuge - here2;
-                    const float span = glm::length(away);
-                    if (span > 1e-4f) {
-                        // Clamped to a walking step, so the recovery reads as the character picking
-                        // its way back onto the path rather than as a teleport.
-                        const float limit = std::min(span, std::max(speed, 1.0f) * dt);
-                        state.travel.x += away.x / span * limit;
-                        state.travel.z += away.y / span * limit;
-                        state.speed = limit / std::max(dt, 1e-4f);
-                        state.activity = Activity::Walk;
-                        return false;
-                    }
+                // ...unless the body is not blocked but *off the navigable set*, where every ray
+                // out of it fails because `pathClear` samples from the body outward. ADR-162's
+                // walk back onto the path, now shared with `wander` (ADR-240) and, since ADR-240,
+                // turning onto the way out before travelling along it.
+                if (escapeToNavigable(navigator, escape_, state, speed, turnRate, dt)) {
+                    return false;
                 }
                 if (stuckFor_ > stuckSeconds_) {
                     stuckFor_ = 0.0f;
@@ -1720,6 +1798,7 @@ private:
     bool running_ = false;
     float sinceRepath_ = 0.0f;
     float stuckFor_ = 0.0f;
+    EscapeMemory escape_;
     float bestProgress_ = 0.0f;
     int failures_ = 0;
     PathStatus lastStatus_ = PathStatus::Ok;

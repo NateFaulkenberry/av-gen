@@ -868,6 +868,27 @@ glm::quat quatFromEulerDegrees(const glm::vec3& degrees) {
 
 // Inverse of glm::quat(vec3): that constructor builds Rz * Ry * Rx. glm::eulerAngles recovers
 // the middle angle with asin, which loses precision near +-90 degrees; atan2 does not.
+//
+// **Which of the two answers it gives matters, and it is not the one asin picks (ADR-240).** A
+// ZYX decomposition always has exactly two solutions -- (x, y, z) and (x+180, 180-y, z+180) -- and
+// the textbook form returns the one with the middle angle inside [-90, 90]. For a node yawed more
+// than a quarter turn that is the *flipped* one: a pure 140.97 degree yaw comes back as
+// (180, 39.03, -180). Numerically identical, and wrong for this engine in two ways that cost a
+// day to find.
+//
+//   * Everything downstream treats the triple as (pitch, yaw, roll) by position. The entity layer
+//     adds a body's steering to component 1 and the ground follower adds a slope's lean to 0 and 2
+//     (`applyOffsets`, `GroundFollower`). In the flipped branch component 1 is `180 - yaw`, so a
+//     body turning +d degrees is *drawn turning -d*: the gap between where it walks and where it
+//     faces opens at twice the rate it turns, reaching a full reversal after a quarter turn. That
+//     is "moving backward while playing a forward-walking animation", and also the sideways and
+//     every angle in between, because 2d takes every value.
+//   * It is what a scene *saves*. An author writes `[0, 140.97, 0]` and gets `[180, 39.03, -180]`
+//     back on the next save.
+//
+// So the branch is chosen rather than inherited: whichever of the two is nearer to upright, which
+// is the one an author would have written. Both reproduce `q` exactly through
+// `quatFromEulerDegrees`; this is a choice of representation, not an approximation.
 glm::vec3 eulerDegrees(const glm::quat& q) {
     const glm::mat3 m = glm::mat3_cast(q); // m[column][row]
     const float m00 = m[0][0];
@@ -886,8 +907,22 @@ glm::vec3 eulerDegrees(const glm::quat& q) {
         z = std::atan2(m10, m00);
     } else {
         x = std::atan2(-m20 * m01, m11); // gimbal lock: fold roll into pitch
+        return glm::degrees(glm::vec3(x, y, z));
     }
-    return glm::degrees(glm::vec3(x, y, z));
+    const glm::vec3 principal = glm::degrees(glm::vec3(x, y, z));
+    // The other solution, folded back into (-180, 180].
+    const auto fold = [](float degrees) {
+        float d = std::fmod(degrees + 180.0f, 360.0f);
+        if (d < 0.0f) {
+            d += 360.0f;
+        }
+        return d - 180.0f;
+    };
+    const glm::vec3 other(fold(principal.x + 180.0f), fold(180.0f - principal.y),
+                          fold(principal.z + 180.0f));
+    const float uprightPrincipal = std::abs(principal.x) + std::abs(principal.z);
+    const float uprightOther = std::abs(other.x) + std::abs(other.z);
+    return uprightOther < uprightPrincipal ? other : principal;
 }
 
 
@@ -1583,7 +1618,13 @@ void Composition::installEntities() {
             binding.geometryPrefix = "particles/" + sanitise(prefix_) + node.name + "/";
         }
         binding.partNames = node.materialPartNames;
-        binding.anchor = nodeWorldTransform(node).position;
+        const Transform placed = nodeWorldTransform(node);
+        binding.anchor = placed.position;
+        // The facing half of the anchor (ADR-240). Read off the composed orientation rather than
+        // off the euler parameter, so a node placed under a rotated parent reports the direction it
+        // actually points -- which is the same rule `anchor` already follows for position.
+        const glm::vec3 forward = placed.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
+        binding.facing = std::atan2(forward.x, forward.z);
         landmarks.emplace_back(node.name, binding.anchor);
         bindings.push_back(std::move(binding));
     }

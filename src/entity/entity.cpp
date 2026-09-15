@@ -335,6 +335,10 @@ void EntityWorld::setBindings(std::vector<NodeBinding> bindings) {
     for (auto& entity : entities_) {
         if (const NodeBinding* b = binding(entity->desc_.driven())) {
             entity->state_.anchor = b->anchor;
+            // The facing half of the same statement (ADR-240): where the author put the body is
+            // where it starts, in rotation as in position.
+            entity->facing_ = b->facing;
+            entity->state_.yaw = b->facing;
         }
     }
 }
@@ -676,6 +680,8 @@ void EntityWorld::reset() {
         std::fill(entity->entryCount_.begin(), entity->entryCount_.end(), 0u);
         if (const NodeBinding* b = binding(entity->desc_.driven())) {
             entity->state_.anchor = b->anchor;
+            entity->facing_ = b->facing;
+            entity->state_.yaw = b->facing;
         }
         for (auto& behavior : entity->behaviors_) {
             behavior->reset(entity->rng_);
@@ -899,8 +905,14 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
             }
         }
         if (e.rotationParam_ != nullptr) {
+            // Yaw as a *difference* from the facing the author placed the body at, not as a whole
+            // angle added to it (ADR-240). `state_.yaw` starts at `facing_`, so at t = 0 this adds
+            // nothing and the body is drawn exactly where the scene file put it -- and after that
+            // the drawn heading is the heading, rather than the heading plus a placement angle
+            // nobody meant as an offset. Pitch and roll stay additive: those really are offsets on
+            // top of whatever tilt the author authored.
             const glm::vec3 rotation(e.motion_.rotation.x,
-                                     e.motion_.rotation.y + e.state_.yaw * kDegrees,
+                                     e.motion_.rotation.y + (e.state_.yaw - e.facing_) * kDegrees,
                                      e.motion_.rotation.z);
             for (int i = 0; i < 3; ++i) {
                 const auto c = static_cast<std::size_t>(i);

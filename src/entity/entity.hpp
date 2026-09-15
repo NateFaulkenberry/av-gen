@@ -155,6 +155,21 @@ struct NodeBinding {
     // This is what turns "parts/Blue/emissiveGain" into "procedural/ufo/parts/3/emissiveGain".
     std::vector<std::string> partNames;
     glm::vec3 anchor{0.0f};      // the node's authored world position
+    // The node's authored world facing, radians about +Y, measured the way `EntityState::yaw` is.
+    //
+    // The counterpart of `anchor`, and it exists for the same reason (ADR-240). An entity's
+    // *position* was always absolute -- `anchor` is where the author put it and `travel` is
+    // displacement from there -- while its *facing* was purely additive: the drawn rotation was
+    // the author's rotation plus `yaw`, and `yaw` started at zero. So a body placed at a random
+    // heading, which is what a scattered animal is, walked along `yaw` and was drawn along
+    // `placement + yaw`, permanently that many degrees off. Every farm animal in Glowmere Valley 2
+    // carries a scatter facing between -165 and +156 degrees; the four aliens carry none, which is
+    // the only reason ADR-204's facing work did not find this.
+    //
+    // With this, `yaw` *starts* at the authored facing and the write is the difference, so the
+    // placement still places the body and the steering still steers it -- and they are the same
+    // angle rather than two angles added together.
+    float facing = 0.0f;
 };
 
 // A place worth walking to (ADR-093, §6). §6 lists what a character should find interesting --
@@ -362,6 +377,10 @@ private:
     params::Parameter<glm::vec3>* scaleParam_ = nullptr;
 
     double coarseAccum_ = 0.0;
+    // The facing the author placed this body at (ADR-240). `state_.yaw` starts here and the node's
+    // rotation is written as the difference, so a placement heading is a starting facing rather
+    // than a permanent offset between where a body walks and where it is drawn.
+    float facing_ = 0.0f;
     bool active_ = true;
     // Said once per entity per session, never per frame. A body whose travel speed the gait cannot
     // represent is a persistent authoring fault, not an event, and printing it sixty times a second

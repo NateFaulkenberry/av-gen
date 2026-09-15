@@ -49,6 +49,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <fmt/format.h>
+
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -815,6 +817,162 @@ entity::BehaviorDesc behaviorDesc(const char* kind, nlohmann::json settings) {
 
 } // namespace
 
+TEST_CASE("euler degrees survive the trip through a quaternion", "[entity][facing][scene]") {
+    // The second half of the "walking backwards" report, and the one nothing was watching
+    // (ADR-240).  A node's rotation is authored as euler degrees, stored as a quaternion and
+    // recovered as euler degrees when its parameter is registered.  A ZYX decomposition has two
+    // solutions -- (x, y, z) and (x+180, 180-y, z+180) -- and the textbook recovery returns the one
+    // with the middle angle inside [-90, 90].  For a node yawed more than a quarter turn that is
+    // the flipped one, so a pure 140.97 degree yaw came back as (180, 39.03, -180).
+    //
+    // Numerically the same orientation, and catastrophic for everything that reads the triple by
+    // position.  The entity layer adds a body's steering to component 1: in the flipped branch that
+    // component is `180 - yaw`, so a body turning one way is drawn turning the *other* way and the
+    // gap opens at twice the rate it turns.  Every farm animal in Glowmere Valley 2 carries a
+    // scatter facing, nine of the eighteen past 90 degrees, and this is what "moving backward while
+    // playing a forward-walking animation" was.
+    //
+    // No tolerance needed on the statement itself: what goes in comes back.
+    // Compared modulo a turn, because euler degrees are 360-periodic and -180 is 180 -- the same
+    // equivalence `applyOffsets` relies on when it folds a composed angle into (-180, 180].
+    const auto sameAngle = [](float a, float b) {
+        float d = std::fmod(a - b + 180.0f, 360.0f);
+        if (d < 0.0f) {
+            d += 360.0f;
+        }
+        return std::abs(d - 180.0f);
+    };
+    for (float yaw = -175.0f; yaw <= 180.0f; yaw += 5.0f) {
+        for (const glm::vec3 lean : {glm::vec3(0.0f), glm::vec3(12.0f, 0.0f, -7.0f),
+                                     glm::vec3(-30.0f, 0.0f, 25.0f)}) {
+            // Not at the poles.  A yaw of exactly +/-90 is gimbal lock: pitch and roll turn about
+            // the same world axis there and no decomposition can tell them apart, so (-30, 90, 25)
+            // and (-55, 90, 0) are the same orientation and both are correct answers.  The
+            // orientation check below covers the poles; this one is about the triple.
+            if (std::abs(std::abs(yaw) - 90.0f) < 1.0f && (lean.x != 0.0f || lean.z != 0.0f)) {
+                continue;
+            }
+            const glm::vec3 authored(lean.x, yaw, lean.z);
+            INFO("authored " << authored.x << ", " << authored.y << ", " << authored.z);
+            const glm::vec3 recovered = scene::eulerDegrees(scene::quatFromEulerDegrees(authored));
+            INFO("recovered " << recovered.x << ", " << recovered.y << ", " << recovered.z);
+            CHECK(sameAngle(recovered.x, authored.x) < 1e-2f);
+            CHECK(sameAngle(recovered.y, authored.y) < 1e-2f);
+            CHECK(sameAngle(recovered.z, authored.z) < 1e-2f);
+        }
+    }
+    // And whichever branch it picks, it still describes the same orientation -- which is the
+    // property the old version had and that a fix must not trade away.  Checked on the forward
+    // vector, because that is what a viewer sees and what the backwards-step classifier reads.
+    for (float yaw = -180.0f; yaw <= 180.0f; yaw += 7.0f) {
+        for (float pitch = -80.0f; pitch <= 80.0f; pitch += 20.0f) {
+            for (float roll = -170.0f; roll <= 170.0f; roll += 34.0f) {
+                const glm::vec3 authored(pitch, yaw, roll);
+                const glm::quat q = scene::quatFromEulerDegrees(authored);
+                const glm::quat back = scene::quatFromEulerDegrees(scene::eulerDegrees(q));
+                INFO("authored " << authored.x << ", " << authored.y << ", " << authored.z);
+                for (const glm::vec3 axis : {glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f),
+                                             glm::vec3(0.0f, 1.0f, 0.0f)}) {
+                    CHECK(glm::length((q * axis) - (back * axis)) < 1e-3f);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("a placed facing is where a body starts, not an offset it carries for ever",
+          "[aliens][entity][facing]") {
+    // The first half of the same report (ADR-240).  An entity's *position* was always absolute --
+    // `NodeBinding::anchor` is where the author put it and `travel` is displacement from there --
+    // while its *facing* was purely additive: the drawn rotation was the author's rotation plus
+    // `yaw`, and `yaw` started at zero.  So a body placed at a heading, which is what a scattered
+    // animal is, walked along `yaw` and was drawn along `placement + yaw`.
+    //
+    // Reproduced with one beacon and one watcher, on a node placed facing 150 degrees.
+    params::ParameterSet params;
+    signals::SignalBus bus;
+    entity::EntityWorld world;
+    registerNode(params, "beacon");
+    registerNode(params, "watcher");
+    constexpr float kPlaced = 150.0f;
+    auto* watcherRotation = params.findAs<glm::vec3>("nodes/watcher/rotation");
+    REQUIRE(watcherRotation != nullptr);
+    watcherRotation->setBase(glm::vec3(0.0f, kPlaced, 0.0f));
+
+    entity::EntityDesc beacon;
+    beacon.name = "beacon";
+    beacon.node = "beacon";
+    beacon.seed = 1;
+    beacon.behaviors.push_back(behaviorDesc("orbit", {{"radius", 20.0}, {"rate", 90.0}}));
+
+    entity::EntityDesc watcher;
+    watcher.name = "watcher";
+    watcher.node = "watcher";
+    watcher.seed = 2;
+    watcher.behaviors.push_back(behaviorDesc("lookAt", {{"target", "beacon"}, {"turnRate", 720.0}}));
+
+    world.setEntities({beacon, watcher}, 7u);
+    entity::NodeBinding watcherBinding = binding("watcher", glm::vec3(0.0f));
+    watcherBinding.facing = glm::radians(kPlaced);
+    world.setBindings({binding("beacon", glm::vec3(0.0f)), watcherBinding});
+    world.registerParameters(params);
+    world.bind(params);
+
+    const entity::Entity* who = nullptr;
+    for (const auto& e : world.entities()) {
+        if (e->name() == "watcher") {
+            who = e.get();
+        }
+    }
+    REQUIRE(who != nullptr);
+
+    float worstGap = 0.0f;
+    float drawnAtRest = 0.0f;
+    float swept = 0.0f;
+    float lastDrawn = 0.0f;
+    for (int i = 0; i <= 600; ++i) {
+        params.resetFinals();
+        entity::EntityUpdate u;
+        u.time = static_cast<double>(i) / 60.0;
+        u.dt = i == 0 ? 0.0 : 1.0 / 60.0;
+        u.frameIndex = static_cast<std::uint64_t>(i);
+        u.bus = &bus;
+        world.update(u, params);
+
+        const glm::quat q = scene::quatFromEulerDegrees(watcherRotation->value());
+        const glm::vec3 fwd = q * glm::vec3(0.0f, 0.0f, 1.0f);
+        const float drawn = std::atan2(fwd.x, fwd.z);
+        if (i == 0) {
+            drawnAtRest = drawn;
+        } else {
+            float d = std::fmod(drawn - lastDrawn + 3.14159265f, 6.2831853f);
+            if (d < 0.0f) {
+                d += 6.2831853f;
+            }
+            swept += std::abs(d - 3.14159265f);
+        }
+        lastDrawn = drawn;
+        float gap = std::fmod(std::abs(drawn - who->locomotion().yaw), 6.2831853f);
+        if (gap > 3.14159265f) {
+            gap = 6.2831853f - gap;
+        }
+        worstGap = std::max(worstGap, gap);
+    }
+    // The placement still places it: on the first frame, before anything has steered, the body is
+    // drawn exactly where the scene file put it.  A fix that simply ignored the authored rotation
+    // would pass the assertion below and fail this one.
+    INFO("drawn at rest " << glm::degrees(drawnAtRest) << " deg, placed at " << kPlaced);
+    CHECK(glm::degrees(drawnAtRest) == Approx(kPlaced).margin(0.05));
+    // The probe established the state it claims to measure: the body really did turn, so a
+    // placement offset really was reachable (ADR-182).
+    INFO("drawn facing swept " << swept << " rad");
+    REQUIRE(swept > 3.0f);
+    // And the steering steers it: the drawn facing is the body's facing, not the body's facing plus
+    // a placement angle.  This read 2.62 rad -- 150 degrees, exactly the placement -- before.
+    INFO("worst gap between drawn facing and body facing " << worstGap << " rad");
+    CHECK(worstGap < 0.01f);
+}
+
 TEST_CASE("a body drawn facing is its own facing, past a full revolution",
           "[aliens][entity][facing]") {
     // Reproduced from the report that the wanderer "looks like he is walking forwards while moving
@@ -1223,15 +1381,25 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
         float worstWalking = 0.0f;
     };
     std::vector<Row> rows;
+    // The four, plus `vane` -- a fifth animated alien on `alien-pilot.glb` that the rest of this
+    // file does not cover, and the one body in the scene with the largest authored placement
+    // rotation (248 degrees).  It is here because ADR-240's placement-facing defect scales with
+    // exactly that number, and a probe that only looked at the four bodies placed at zero would
+    // have reported it clean.
+    std::vector<std::string> names;
     for (const Cast& c : kCast) {
+        names.emplace_back(c.entity);
+    }
+    names.emplace_back("vane");
+    for (const std::string& name : names) {
         Row r;
-        r.name = c.entity;
+        r.name = name;
         for (const auto& e : comp->entityWorld().entities()) {
-            if (e->name() == c.entity) {
+            if (e->name() == name) {
                 r.who = e.get();
             }
         }
-        r.node = comp->findNode(c.entity);
+        r.node = comp->findNode(name);
         REQUIRE(r.who != nullptr);
         REQUIRE(r.node != nullptr);
         r.last = comp->nodeWorldTransform(*r.node).position;
@@ -1282,10 +1450,12 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
     }
     for (const Row& r : rows) {
         const double rate = r.moving > 0 ? 100.0 * r.backwards / r.moving : 0.0;
-        INFO(r.name << ": moving " << r.moving << ", backwards " << r.backwards << " (" << rate
-                    << "%), of which its own travel explains " << r.backwardsWalking
-                    << "; worst step " << r.worst << " m, worst explained " << r.worstWalking
-                    << " m");
+        // WARN rather than INFO: the rates are the result, and a probe that only prints them when
+        // it fails cannot be used to compare a before with an after.
+        WARN(fmt::format("{:<6} moving {:6d}, backwards {:5d} ({:.2f}%), of which its own travel "
+                         "explains {:5d}; worst step {:.3f} m, worst explained {:.3f} m",
+                         r.name, r.moving, r.backwards, rate, r.backwardsWalking, r.worst,
+                         r.worstWalking));
         REQUIRE(r.moving > 1000);
         // The defect: a body walking one way while drawn facing the other. Zero, not a fraction.
         CHECK(r.backwardsWalking == 0);
