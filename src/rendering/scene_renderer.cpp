@@ -859,6 +859,8 @@ Result<void> SceneRenderer::createPipelines() {
     if (!grid) return std::unexpected(grid.error());
     auto sky = shaders_.load("skybox.wgsl");
     if (!sky) return std::unexpected(sky.error());
+    auto atmosphere = shaders_.load("atmosphere.wgsl");
+    if (!atmosphere) return std::unexpected(atmosphere.error());
     auto tonemap = shaders_.load("tonemap.wgsl");
     if (!tonemap) return std::unexpected(tonemap.error());
     tonemapModule_ = *tonemap;
@@ -885,6 +887,9 @@ Result<void> SceneRenderer::createPipelines() {
     auto s = createSkyboxPipeline(*sky);
     if (!s) return std::unexpected(s.error());
     skyboxPipeline_ = *s;
+    auto atmos = createAtmospherePipeline(*atmosphere);
+    if (!atmos) return std::unexpected(atmos.error());
+    atmospherePipeline_ = *atmos;
     auto d = createDepthOnlyPipeline(*pbr);
     if (!d) return std::unexpected(d.error());
     depthOnlyPipeline_ = *d;
@@ -1024,6 +1029,57 @@ Result<wgpu::RenderPipeline> SceneRenderer::createGridPipeline(const wgpu::Shade
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
     return finishPipeline(desc, "grid-pipeline");
+}
+
+// ADR-230. Additive into the HDR target and the emission target; every other aux target keeps the
+// opaque geometry's, which is the rule `water_renderer.cpp` states -- a normal or a velocity
+// averaged over a transparency is worse than none at all. The comet's velocity in particular is
+// deliberately left alone: writing the sky's camera-only velocity for a fast-moving comet is what
+// would smear it under motion blur, and writing a correct one would need the previous frame's
+// trajectory, which is state this system does not keep.
+Result<wgpu::RenderPipeline> SceneRenderer::createAtmospherePipeline(const wgpu::ShaderModule& module) {
+    wgpu::BlendState additive{};
+    additive.color.operation = wgpu::BlendOperation::Add;
+    additive.color.srcFactor = wgpu::BlendFactor::One;
+    additive.color.dstFactor = wgpu::BlendFactor::One;
+    additive.alpha.operation = wgpu::BlendOperation::Add;
+    additive.alpha.srcFactor = wgpu::BlendFactor::One;
+    additive.alpha.dstFactor = wgpu::BlendFactor::One;
+
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+    fillSceneTargets(colorTargets, kHdrFormat, nullptr);
+    for (std::uint32_t i = 0; i < kSceneTargetCount; ++i) {
+        colorTargets[i].writeMask =
+            (i == 0 || i == 3) ? wgpu::ColorWriteMask::All : wgpu::ColorWriteMask::None;
+    }
+    colorTargets[0].blend = &additive;
+    colorTargets[3].blend = &additive;
+
+    wgpu::FragmentState fragment{};
+    fragment.module = module;
+    fragment.entryPoint = "fs_atmosphere";
+    fragment.targetCount = kSceneTargetCount;
+    fragment.targets = colorTargets.data();
+
+    // The same depth state as the sky: tested so terrain occludes it, never written so the water
+    // and particles drawn after it still composite correctly.
+    wgpu::DepthStencilState depth{};
+    depth.format = kDepthFormat;
+    depth.depthWriteEnabled = wgpu::OptionalBool::False;
+    depth.depthCompare = wgpu::CompareFunction::LessEqual;
+
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "atmosphere-pipeline";
+    desc.layout = scenePipelineLayout_;
+    desc.vertex.module = module;
+    desc.vertex.entryPoint = "vs_atmosphere";
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+    desc.depthStencil = &depth;
+    desc.multisample.count = 1;
+    desc.multisample.mask = 0xFFFFFFFFu;
+    desc.fragment = &fragment;
+    return finishPipeline(desc, "atmosphere-pipeline");
 }
 
 Result<wgpu::RenderPipeline> SceneRenderer::createSkyboxPipeline(const wgpu::ShaderModule& module) {
@@ -1364,6 +1420,9 @@ std::span<const SceneRenderer::PassArm> SceneRenderer::passArms() {
         // "what does World Effects cost when nothing is running", which §22 of the brief asks for
         // separately from "what does one cost when it is".
         {"worldeffects", &T::worldEffects},
+        // ADR-230. Off: the sky-layer draw is skipped entirely, which is what makes the "effects
+        // disabled" arm in §12 a real arm rather than a frame that renders the same pixels.
+        {"atmospherics", &T::atmospherics},
     };
     return kArms;
 }
@@ -1617,6 +1676,15 @@ Result<void> SceneRenderer::reloadEngineShaders() {
         }
     } else {
         keep("skybox.wgsl", std::unexpected(sky.error()));
+    }
+    if (auto atmosphere = shaders_.load("atmosphere.wgsl")) {
+        if (auto ap = createAtmospherePipeline(*atmosphere)) {
+            atmospherePipeline_ = *ap;
+        } else {
+            keep("atmosphere.wgsl", std::unexpected(ap.error()));
+        }
+    } else {
+        keep("atmosphere.wgsl", std::unexpected(atmosphere.error()));
     }
     if (auto tonemap = shaders_.load("tonemap.wgsl")) {
         tonemapModule_ = *tonemap;
@@ -2388,6 +2456,32 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     } else {
         stats_.worldEffects = 0;
     }
+    // ADR-230: the atmospheric effects, on the same terms. `drawAtmosphere_` is read again at the
+    // draw site, so the toggle removes the fragment work and the uniform content together -- an arm
+    // that zeroed the counts but still ran a fullscreen draw would be measuring the wrong thing.
+    drawAtmosphere_ = false;
+    if (toggles_.atmospherics && scene.atmospherics.any()) {
+        const auto& atmos = scene.atmospherics;
+        const std::uint32_t comets = std::min<std::uint32_t>(atmos.cometCount, world::kMaxGpuComets);
+        const std::uint32_t auroras = std::min<std::uint32_t>(atmos.auroraCount, world::kMaxGpuAuroras);
+        frame.atmosCount = glm::vec4(static_cast<float>(comets), static_cast<float>(auroras),
+                                     static_cast<float>(std::max<std::uint32_t>(atmos.cometSteps, 4)), 0.0f);
+        for (std::uint32_t i = 0; i < comets; ++i) {
+            frame.comets[i] = atmos.comets[i];
+        }
+        for (std::uint32_t i = 0; i < auroras; ++i) {
+            frame.auroras[i] = atmos.auroras[i];
+        }
+        frame.skyGround = atmos.ground;
+        stats_.comets = comets;
+        stats_.auroras = auroras;
+        drawAtmosphere_ = true;
+    } else {
+        frame.atmosCount = glm::vec4(0.0f);
+        frame.skyGround = world::SkyGroundGpu{};
+        stats_.comets = 0;
+        stats_.auroras = 0;
+    }
     queue.WriteBuffer(frameUniforms_, 0, &frame, sizeof(frame));
     // Each shadow view is the same block with its own light-space matrix, so the depth-only passes
     // reuse the ordinary vertex shaders (ADR-034).
@@ -3107,6 +3201,30 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             ++stats_.drawCalls;
             // Counted in the legacy total but not in `geometry`: it is one triangle of sky-sized
             // fragment work, and a geometry budget that a resolution change moves is not one.
+            ++stats_.triangles;
+            ++stats_.state.pipelineBinds;
+            stats_.state.bindGroupBinds += 2;
+        }
+        // ---- the atmospheric sky layer (ADR-230) ----
+        //
+        // After the sky and before the water, for the same reason the sky is where it is: it is
+        // behind everything that is not sky, and the things composited over it -- water, motes,
+        // spores -- have to be able to composite over it. Skipped outright when nothing is live,
+        // which is what makes "effects disabled" a real arm rather than a frame that renders the
+        // same pixels through one more branch.
+        //
+        // Note it draws whether or not the skybox above did: a comet does not require a procedural
+        // sky to exist, and making it depend on one is how the effect ends up invisible in exactly
+        // the scene somebody built to show it off.
+        if (drawAtmosphere_ && atmospherePipeline_ != nullptr) {
+            rp.SetPipeline(atmospherePipeline_);
+            const std::uint32_t zeroOffset = 0; // layout requires group 1; this draw ignores it
+            rp.SetBindGroup(1, objectBindGroup_, 1, &zeroOffset);
+            rp.SetBindGroup(2, materialBindGroup(scene::Material{}));
+            rp.Draw(3);
+            ++stats_.drawCalls;
+            // Counted with the sky and not with the geometry: it is one triangle of sky-sized
+            // fragment work, and a geometry budget a resolution change moves is not one.
             ++stats_.triangles;
             ++stats_.state.pipelineBinds;
             stats_.state.bindGroupBinds += 2;

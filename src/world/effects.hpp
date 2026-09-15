@@ -274,6 +274,34 @@ struct ShotSpan {
     glm::vec3 handoffPosition{0.0f};
 };
 
+// The activation window an effect is inside at `seconds`, or nothing.
+//
+// Exported rather than kept private because ADR-230's atmospheric effects reuse `Activation` and
+// `Timing` outright, and two copies of the gating rule would be two places for "why did my effect
+// not fire" to have different answers.
+struct ActivationWindow {
+    double start = 0.0;
+    double end = 0.0;
+    const ShotSpan* span = nullptr;
+};
+
+// `followsFocus` is a source that rides whatever the cut is spotlighting (ADR-207's
+// `SourceKind::FocusHero`); `subject` names the one hero a `HeroFocus` effect fires for, empty
+// meaning any. Both are ignored by every activation except `HeroFocus`.
+[[nodiscard]] std::optional<ActivationWindow> resolveActivationWindow(
+    Activation activation, const Timing& timing, double seconds, std::span<const ShotSpan> shots,
+    bool followsFocus = true, std::string_view subject = {});
+
+// The ramp both effect families fade with: a smoothstep over `width` seconds, guarding the
+// degenerate width that would otherwise divide by zero and put a hard edge exactly where §7 of
+// ADR-207's brief forbids one.
+[[nodiscard]] float envelopeRamp(float x, float width);
+
+// Delay, fade-in, lifetime and fade-out multiplied together; 0 when the effect is not alive at
+// `local` seconds into its window. `windowLength` is the activation's own length, which is what a
+// `lifetime` of 0 means "as long as".
+[[nodiscard]] float timingEnvelope(const Timing& timing, double local, double windowLength);
+
 // Where the world's nodes are. An interface rather than a std::function so resolution allocates
 // nothing: the engine counts allocations per frame and a lambda capture in this path would show up.
 class WorldEffectScene {

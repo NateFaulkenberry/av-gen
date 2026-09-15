@@ -30,6 +30,10 @@
 // declared by every module that includes the file.
 const kProceduralDraw: bool = false;
 #include "world_effects.wgsl"
+// ADR-230 §6. Water takes the sky's ground light for the same reason ADR-207 records for the world
+// effects: Glowmere's elder stands in a pool, and an aurora that lit the bank and stopped at the
+// waterline would draw a hard edge across the exact shot the effect exists for.
+#include "atmosphere_ground.wgsl"
 
 struct WaterUniforms {
     shallowColor: vec4<f32>,   // rgb, w = metres of depth over which the colour reaches deep
@@ -458,7 +462,11 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // own, so a ripple crossing a pool reads as ground-facing and takes the same response weight the
     // bank beside it does -- which is what makes the crossing invisible.
     let fx = worldEffectsAt(in.worldPos, n, glint + sparkle);
-    color = applyFog(color + fx.radiance, in.worldPos);
+    // ADR-230 §6. Water's albedo is its own shaded colour rather than a base-colour texture, so the
+    // wash is scaled by a constant instead: a pool is a dark mirror, and multiplying the sky's light
+    // by an already-lit surface would double-count it.
+    let skyLit = atmosphereGroundAt(in.worldPos, n) * 0.35;
+    color = applyFog(color + fx.radiance + skyLit, in.worldPos);
 
     var out: SceneOut;
     // The pipeline uses the conventional non-premultiplied SrcAlpha blend state. Keep alpha in

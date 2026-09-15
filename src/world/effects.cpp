@@ -652,47 +652,69 @@ WorldEffect heroGroundPulse(std::string name) {
 
 // ---- resolution --------------------------------------------------------------------------------
 
-namespace {
-
-// The activation window this effect is inside at `seconds`, or nothing.
-struct Window {
-    double start = 0.0;
-    double end = 0.0;
-    const ShotSpan* span = nullptr;
-};
-
-std::optional<Window> activeWindow(const WorldEffect& e, const WorldEffectContext& ctx) {
-    switch (e.activation) {
+std::optional<ActivationWindow> resolveActivationWindow(Activation activation, const Timing& timing,
+                                                        double seconds, std::span<const ShotSpan> shots,
+                                                        bool followsFocus, std::string_view subject) {
+    switch (activation) {
     case Activation::Always:
-        return Window{0.0, std::numeric_limits<double>::infinity(), nullptr};
+        return ActivationWindow{0.0, std::numeric_limits<double>::infinity(), nullptr};
     case Activation::Window: {
-        const double end = e.timing.windowStart + e.timing.windowSeconds;
-        if (ctx.seconds < e.timing.windowStart || ctx.seconds >= end) {
+        const double end = timing.windowStart + timing.windowSeconds;
+        if (seconds < timing.windowStart || seconds >= end) {
             return std::nullopt;
         }
-        return Window{e.timing.windowStart, end, nullptr};
+        return ActivationWindow{timing.windowStart, end, nullptr};
     }
     case Activation::CameraTravel:
-        for (const ShotSpan& s : ctx.shots) {
-            if (s.travel && ctx.seconds >= s.start && ctx.seconds < s.end) {
-                return Window{s.start, s.end, &s};
+        for (const ShotSpan& s : shots) {
+            if (s.travel && seconds >= s.start && seconds < s.end) {
+                return ActivationWindow{s.start, s.end, &s};
             }
         }
         return std::nullopt;
     case Activation::HeroFocus:
-        for (const ShotSpan& s : ctx.shots) {
-            if (!s.spotlight || ctx.seconds < s.start || ctx.seconds >= s.end) {
+        for (const ShotSpan& s : shots) {
+            if (!s.spotlight || seconds < s.start || seconds >= s.end) {
                 continue;
             }
             // A `FocusHero` source follows whatever is spotlit; a named source only fires for its
             // own subject, which is what lets a scene give one hero its own effect.
-            if (e.source.kind == SourceKind::FocusHero || e.source.name.empty() || e.source.name == s.subject) {
-                return Window{s.start, s.end, &s};
+            if (followsFocus || subject.empty() || subject == s.subject) {
+                return ActivationWindow{s.start, s.end, &s};
             }
         }
         return std::nullopt;
     }
     return std::nullopt;
+}
+
+float envelopeRamp(float x, float width) { return smoothRamp(x, width); }
+
+float timingEnvelope(const Timing& timing, double local, double windowLength) {
+    if (local < 0.0) {
+        return 0.0f;
+    }
+    const double lifetime = timing.lifetime > 0.0 ? timing.lifetime : windowLength;
+    if (std::isfinite(lifetime) && local >= lifetime) {
+        return 0.0f;
+    }
+    float envelope = 1.0f;
+    if (timing.fadeIn > 0.0) {
+        envelope *= smoothRamp(static_cast<float>(local), static_cast<float>(timing.fadeIn));
+    }
+    if (timing.fadeOut > 0.0 && std::isfinite(lifetime)) {
+        envelope *= smoothRamp(static_cast<float>(lifetime - local), static_cast<float>(timing.fadeOut));
+    }
+    return envelope;
+}
+
+namespace {
+
+using Window = ActivationWindow;
+
+std::optional<Window> activeWindow(const WorldEffect& e, const WorldEffectContext& ctx) {
+    return resolveActivationWindow(e.activation, e.timing, ctx.seconds, ctx.shots,
+                                   e.source.kind == SourceKind::FocusHero, e.source.name);
 }
 
 const HeroPoint* findHero(std::span<const HeroPoint> heroes, std::string_view name) {
