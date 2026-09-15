@@ -26,6 +26,12 @@
   },
   {
    "category": "Lab",
+   "description": "One instance of every animal in the imported farm pack, in profile and to scale: a 1.77 m bull down to a 0.11 m chick, each playing the one clip its rig carries. The validation scene for the conversion, not a dressed environment.",
+   "name": "Farm Animals - Imported Pack",
+   "project": "farm/farm-animals.json"
+  },
+  {
+   "category": "Lab",
    "description": "Every primitive, distribution, variation control, deformer and stack, with audio routes and a performance readout.",
    "name": "Procedural Geometry Lab",
    "project": "lab/lab.json"
