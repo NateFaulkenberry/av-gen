@@ -2,6 +2,11 @@
 build/
 build-*/
 .cache/
+# ...and `.cache` itself, without the slash. A trailing slash matches a *directory* only, so an
+# agent worktree whose `.cache` is a symlink to the main checkout's cache was not ignored, was
+# committed, and merging it back replaced this checkout's real 560 MB cache with a symlink pointing
+# at itself. Cost a full dependency restore to undo.
+.cache
 *.swp
 .vscode/
 .idea/
