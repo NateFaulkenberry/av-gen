@@ -41,18 +41,18 @@ cmake-build-*/
 /examples/world/_flicker_*.scene.json
 
 # The modular aliens (ADR-192): six variants exported from a source .blend that is not in this
-# repository. 27 MB, and -- unlike every other pack here -- with **no recorded licence**, which is
-# the second reason they stay out. assets/aliens/ATTRIBUTION.md is the part the repository keeps:
+# repository. The licence question is settled -- CC0 1.0, recorded in the pack's ATTRIBUTION.md on
+# the owner's statement (2026-09-15) -- so what keeps them out now is only the 27 MB. assets/aliens/ATTRIBUTION.md is the part the repository keeps:
 # what was dropped and why, the variant table, the two engine limitations the export works within,
 # and the one command that regenerates all six (tools/make_aliens.sh). The scenes name the files;
 # a worktree without them loads the squad as a bare plinth and says so per missing asset.
 /assets/aliens/*.glb
 
 # The farm animals (ADR-205): nine animals exported from a source .blend that is not in this
-# repository. 2.5 MB, and -- like the aliens and unlike every other pack here -- with **no recorded
-# licence**, which is the reason they stay out rather than the size. assets/farm/ATTRIBUTION.md is
+# repository. 2.5 MB. The licence that kept them out is settled -- CC0 1.0, recorded in the pack's
+# ATTRIBUTION.md on the owner's statement (2026-09-15) -- and at 2.5 MB the size was never the
+# reason, so they are tracked now. assets/farm/ATTRIBUTION.md is
 # the part the repository keeps: the inventory, the three animals that needed handling, the two
 # warnings that are harmless and why, and the one command that regenerates all nine
 # (tools/make_farm_animals.sh). assets/farm.manifest.json is the other part: it names all nine with
 # their real metre sizes, and it resolves whether or not the meshes are on disk.
-/assets/farm/*.glb

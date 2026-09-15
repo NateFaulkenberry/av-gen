@@ -8,11 +8,11 @@ Nine animals exported from a single low-poly source file.
 laid out along X for a turntable render. Supplied by the project owner; the file is not in this
 repository.
 
-> **Licence: not recorded.** The source file carries no licence text, no author, and no URL — the
-> only copyright string in it belongs to the sRGB profile inside its texture — and none was supplied
-> with it. Fill this in before these assets are distributed outside the project. Every pack here
-> except this one and the aliens has its licence travelling with its meshes
-> (`assets/quaternius/License_Standard.txt`, `assets/imported/ATTRIBUTION.md`).
+> **Licence: CC0 1.0 Universal (public domain dedication)** —
+> <https://creativecommons.org/publicdomain/zero/1.0/>. Recorded 2026-09-15 on the project owner's
+> statement that this pack shares its author, and its licence, with the repository's other asset
+> packs. The source `.blend` still carries no licence text of its own; this line is the owner's
+> assertion of the terms, written down so the next person does not have to ask again.
 
 ## What ships, and what does not
 
