@@ -15136,6 +15136,126 @@
         "priority": 0
       },
       {
+        "id": "hero.comet.parked",
+        "when": {
+          "kind": "time",
+          "time": 0.0
+        },
+        "what": {
+          "kind": "setParameter",
+          "target": "atmos/Hero Comet/windowStart",
+          "amount": [
+            3000.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "component": 0,
+          "seconds": 0.0,
+          "hold": 0.0,
+          "interp": "smooth",
+          "mode": "replace"
+        },
+        "enabled": true,
+        "priority": 0
+      },
+      {
+        "id": "rainbow.comet.parked",
+        "when": {
+          "kind": "time",
+          "time": 0.0
+        },
+        "what": {
+          "kind": "setParameter",
+          "target": "atmos/Rainbow Comet/windowStart",
+          "amount": [
+            3000.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "component": 0,
+          "seconds": 0.0,
+          "hold": 0.0,
+          "interp": "smooth",
+          "mode": "replace"
+        },
+        "enabled": true,
+        "priority": 0
+      },
+      {
+        "id": "burst.emerald.parked",
+        "when": {
+          "kind": "time",
+          "time": 0.0
+        },
+        "what": {
+          "kind": "setParameter",
+          "target": "atmos/Burst Emerald/windowStart",
+          "amount": [
+            3000.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "component": 0,
+          "seconds": 0.0,
+          "hold": 0.0,
+          "interp": "smooth",
+          "mode": "replace"
+        },
+        "enabled": true,
+        "priority": 0
+      },
+      {
+        "id": "burst.magenta.parked",
+        "when": {
+          "kind": "time",
+          "time": 0.0
+        },
+        "what": {
+          "kind": "setParameter",
+          "target": "atmos/Burst Magenta/windowStart",
+          "amount": [
+            3000.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "component": 0,
+          "seconds": 0.0,
+          "hold": 0.0,
+          "interp": "smooth",
+          "mode": "replace"
+        },
+        "enabled": true,
+        "priority": 0
+      },
+      {
+        "id": "burst.spark.parked",
+        "when": {
+          "kind": "time",
+          "time": 0.0
+        },
+        "what": {
+          "kind": "setParameter",
+          "target": "atmos/Burst Spark/windowStart",
+          "amount": [
+            3000.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "component": 0,
+          "seconds": 0.0,
+          "hold": 0.0,
+          "interp": "smooth",
+          "mode": "replace"
+        },
+        "enabled": true,
+        "priority": 0
+      },
+      {
         "id": "aurora.swell",
         "when": {
           "kind": "time",

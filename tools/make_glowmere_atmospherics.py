@@ -232,6 +232,13 @@ def sequence():
         event("aurora.base.top", 0.0, "atmos/Valley Aurora/topColor", 0.58),
         event("comet.hero.base", 0.0, "atmos/Hero Comet/speed", 1.0),
     ]
+    # Each comet's window starts parked past the end of the piece, and stays parked until its launch
+    # event moves it in. Without these baselines the launch value holds *backwards* to t = 0 -- the
+    # engine warns about exactly that -- and the comet would appear on its own schedule whether or
+    # not the sequencer ever fired, which is a demonstration of nothing.
+    for _, name, _, _, _ in COMETS:
+        events.append(event("%s.parked" % name.lower().replace(" ", "."), 0.0,
+                            "atmos/%s/windowStart" % name, 3000.0))
     events += [
         # Aurora intensity transition: a swell into the second half of the piece and a settle after.
         event("aurora.swell", 14.0, "atmos/Valley Aurora/intensity", 4.6, seconds=3.0),

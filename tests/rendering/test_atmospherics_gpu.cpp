@@ -81,7 +81,15 @@ scene::Scene skyScene() {
 }
 
 // A comet placed rather than advanced, so the frame under test depends on nothing but these numbers.
-world::AtmosphericFrame cometFrame(float travelledFraction, bool rainbow = false, bool sparkle = false) {
+//
+// `fragmentSize` is a parameter because this fixture renders at 320x200, where a pixel subtends
+// about 0.0065 rad. The shipped preset's fragments are ~6 m across at 1400 m -- 0.004 rad, well
+// under a pixel -- and the shader's angular anti-aliasing correctly fades them to nothing. The first
+// version of this file did not know that and asserted a visible difference that could not exist; the
+// arm came back byte-identical, which is vacuous rather than a null result. Both halves are now
+// asserted: a supra-pixel fragment shows, and a sub-pixel one is removed.
+world::AtmosphericFrame cometFrame(float travelledFraction, bool rainbow = false, bool sparkle = false,
+                                   float fragmentSize = 0.5f) {
     world::AtmosphericEffect e = world::bioluminescentComet("probe");
     e.comet.path.anchor = world::SkyAnchor::World;
     e.comet.path.anchorPosition = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -95,6 +103,7 @@ world::AtmosphericFrame cometFrame(float travelledFraction, bool rainbow = false
     e.comet.path.curvature = 0.0f;
     e.comet.appearance.tailLength = 600.0f;
     e.comet.sparkle.enabled = sparkle;
+    e.comet.sparkle.size = fragmentSize;
     e.comet.rainbow.enabled = rainbow;
     e.activation = world::Activation::Window;
     e.timing.windowStart = 0.0;
@@ -285,9 +294,19 @@ TEST_CASE("a comet's colour modes are distinguishable on pixels", "[gpu][atmosph
     }
 
     SECTION("sparkling fragments are a different picture too") {
-        scene.atmospherics = cometFrame(0.55f, false, true);
+        scene.atmospherics = cometFrame(0.55f, false, true, 0.5f);
         const gpu::Image8 sparkle = render(scene);
         CHECK(differingPixels(plain, sparkle) > 40);
+    }
+
+    SECTION("a fragment smaller than a pixel is removed rather than sampled") {
+        // The anti-aliasing, asserted rather than assumed. A sub-pixel bright point that *is*
+        // sampled is how a sparkle becomes a shimmer, and it is the artefact ADR-207 had to solve
+        // for its own sparkle. Byte-identity is the expected result here, not a vacuous one: the
+        // section above proves the same switch does something when the fragment is big enough.
+        scene.atmospherics = cometFrame(0.55f, false, true, 0.02f);
+        const gpu::Image8 tiny = render(scene);
+        CHECK(differingPixels(plain, tiny) == 0);
     }
 
     SECTION("a comet moves between two transport seconds") {
