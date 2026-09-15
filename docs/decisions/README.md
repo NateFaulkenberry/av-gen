@@ -197,3 +197,5 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [199](ADR-199-two-bugs-from-one-assumption.md) | Two bugs from one assumption -- that a thing is centred on its origin | Accepted |
 | [200](ADR-200-the-camera-was-fast-in-a-way-the-cap-did-not-measure.md) | The camera was fast in a way the first cap did not measure | Accepted |
 | [201](ADR-201-there-is-no-primary-hero.md) | There is no primary hero, only importance | Accepted |
+| [202](ADR-202-importance-is-the-whole-of-casting.md) | Importance is the whole of casting | Accepted |
+| [203](ADR-203-a-cap-that-broke-the-film.md) | A cap that broke the film, and the control that was missing | Accepted |
