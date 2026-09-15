@@ -10,6 +10,7 @@
 #include "analysis/structure.hpp"
 #include "app/cinematic.hpp"
 #include "seq/sequence.hpp"
+#include "seq/section_direction.hpp"
 #include "seq/song_structure.hpp"
 #include "signals/musical_events.hpp"
 
@@ -425,5 +426,72 @@ TEST_CASE("Every MusicalSection is answered deliberately by all four direction s
         CHECK(app::emphasisForSection(s, 0.0f) >= 0.0f);
         CHECK(app::emphasisForSection(s, 1.0f) <= 1.0f);
         CHECK(app::emphasisForSection(s, 1.0f) >= app::emphasisForSection(s, 0.0f));
+    }
+}
+
+// ---- the seam to the Director (ADR-216) ---------------------------------------------------------
+//
+// Generation itself is gated on the Director decision layer and is not built here. What is built --
+// and therefore what is tested -- is the shape of the connection: given a table, what does a
+// generated event look like, and what happens when there is no table.
+
+TEST_CASE("Generation produces nothing while the Director table is empty",
+          "[seq][structure][director]") {
+    const SongStructure s = detected();
+    const seq::GeneratedDirection generated = seq::generateDirectorEvents(s);
+    CHECK(generated.events.empty());
+    // Silence would be the wrong answer: every kind that was asked about and declined is named, so
+    // filling the table in is a matter of reading the list rather than guessing at it.
+    CHECK_FALSE(generated.warnings.empty());
+    bool namedTheChorus = false;
+    for (const std::string& w : generated.warnings) {
+        namedTheChorus = namedTheChorus || w.find("chorus") != std::string::npos;
+    }
+    CHECK(namedTheChorus);
+}
+
+TEST_CASE("A generated Director event is a Section trigger on the section's own name",
+          "[seq][structure][director]") {
+    SongStructure s = detected();
+    REQUIRE(seq::setSectionLabel(s, 2, "the big one"));
+
+    seq::GenerationOptions options;
+    options.table = [](signals::MusicalSection kind) -> std::optional<seq::SectionDirection> {
+        if (kind != MusicalSection::Chorus && kind != MusicalSection::Intro) {
+            return std::nullopt;
+        }
+        return seq::SectionDirection{.subject = "hero", .verb = "reveal", .argument = {}};
+    };
+    const seq::GeneratedDirection generated = seq::generateDirectorEvents(s, options);
+    REQUIRE(generated.events.size() == 2);
+
+    const seq::SequenceEvent& chorus = generated.events[1];
+    CHECK(chorus.when.kind == seq::TriggerKind::Section);
+    // The *display* name, which is the string the markers carry -- so renaming a section is what
+    // re-points the event, and the two cannot silently disagree.
+    CHECK(chorus.when.name == "the big one");
+    CHECK(chorus.when.repeat == 0); // every occurrence, which is what makes this a table
+    CHECK(chorus.what.kind == seq::EventActionKind::EntityAction);
+    CHECK(chorus.what.target == "hero");
+    CHECK(chorus.what.value == "reveal");
+    // Tier 2 of seq/events.hpp: schedulable, not bakeable. Handing a behaviour to the Director is
+    // imperative, and an event that claimed to bake would be claiming to be scrub-safe.
+    CHECK(seq::triggerIsScheduled(chorus.when.kind));
+    CHECK_FALSE(seq::actionIsBaked(chorus.what.kind));
+
+    SECTION("the events resolve against the sequence the markers came from") {
+        seq::Sequence piece;
+        piece.structure = s;
+        piece.refreshSectionMarkers();
+        piece.durationSeconds = s.durationSeconds;
+        piece.events = generated.events;
+        const seq::TriggerContext ctx = piece.triggerContext();
+        const auto resolved = seq::resolveEvents(piece.events, ctx);
+        // Every generated event finds the section it names -- which is the failure this seam is
+        // most likely to have, and the one a warning would report rather than a crash.
+        for (const std::string& warning : resolved.warnings) {
+            INFO(warning);
+            CHECK(warning.find("which the structure does not contain") == std::string::npos);
+        }
     }
 }

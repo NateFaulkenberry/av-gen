@@ -463,6 +463,12 @@ public:
     [[nodiscard]] audio::AudioPlayer* player() { return player_.get(); }
     [[nodiscard]] analysis::AnalysisRunner* runner() { return runner_.get(); }
     [[nodiscard]] const analysis::AnalysisTrack* track() const { return track_.get(); }
+    // The same track, shareable. A background job that reads it (the song-structure analysis,
+    // ADR-216) has to survive the audio being replaced under it, and a raw pointer into something
+    // `loadAudio` resets is a use-after-free waiting for a person to open two files quickly. Held
+    // as a `shared_ptr` rather than copied into the job because an analysed four-minute track is
+    // tens of megabytes of spectra.
+    [[nodiscard]] std::shared_ptr<const analysis::AnalysisTrack> trackShared() const { return track_; }
     [[nodiscard]] const analysis::AnalysisFrame& latestFrame() const { return latest_; }
     [[nodiscard]] bool hasFrame() const { return hasFrame_; }
     [[nodiscard]] const EngineStats& stats() const { return stats_; }
@@ -586,7 +592,7 @@ private:
     analysis::AnalyzerConfig analyzerConfig_;
     std::unique_ptr<audio::AudioPlayer> player_;
     std::unique_ptr<analysis::AnalysisRunner> runner_;
-    std::unique_ptr<analysis::AnalysisTrack> track_;
+    std::shared_ptr<analysis::AnalysisTrack> track_;
     std::size_t offlineFrameCursor_ = 0;
 
     analysis::AnalysisFrame latest_;

@@ -190,11 +190,44 @@ piece.setSectionMarkers(structure);                  // from the musical fold (A
 piece.setBeatMarkers(engine.track()->beats().beatTimes);
 ```
 
-In the editor, **Sections** does both from the loaded track. Section markers are derived and are
-replaced wholesale; a `cue` marker you placed yourself is never discarded.
+In the editor, **Analyse Song** runs the structure detector (ADR-206) in the background and fills
+`piece.structure`, from which the section markers are derived. A `cue` marker you placed yourself is
+never discarded.
 
 Snapping is `Off`, `Frames`, `Beats` or `Markers`, and it applies to every time field in the panel
-as well as to dragging in the strip — so "cut on the downbeat" is a drag, not arithmetic.
+as well as to dragging in the strip — so "cut on the downbeat" is a drag, not arithmetic. Section
+boundaries have a *separate* snap (`free` / `beat` / `bar`), because the grid you want for a section
+edge is not necessarily the grid you want for a shot.
+
+## The song structure (ADR-215, ADR-216)
+
+`piece.structure` is an `analysis::SongStructure`: ordered, gapless sections with a function, a
+label, a provenance and — for the ones the detector claimed — confidences. It is **saved with the
+project**, and it is the only part of the sequence that is authored data the moment anybody touches
+it.
+
+```cpp
+seq::moveBoundary(piece.structure, i, t);   // both neighbours become Refined
+seq::setSectionLabel(piece.structure, i, "the big one");
+seq::splitSection(piece.structure, t);      // the new half is Authored
+piece.refreshSectionMarkers();              // the markers follow the structure, never the reverse
+```
+
+Re-running the analysis merges rather than replaces:
+
+```cpp
+const seq::ReanalysisReport report = seq::reanalyse(piece.structure, fresh);
+// "5 section(s) detected; kept 2 you had edited (2 refined, 0 authored)"
+```
+
+`Detected` sections are replaced; `Refined` and `Authored` ones are kept exactly and the fresh
+detection is cut around them. Provenance is per *section*, so dragging one boundary protects the two
+sections it separates — deliberately over-protective, because the failure it prevents is losing
+work.
+
+Generating Director events from the structure is `seq/section_direction.hpp`, and it is waiting on
+one thing: a `SectionDirectionTable` from the Director decision layer. Until there is one it
+generates nothing and says, per section kind, that it had no direction to give.
 
 ---
 
@@ -382,8 +415,14 @@ and converting the file is the real fix. See
 
 ## The Sequence panel
 
-One horizontal time axis. A ruler with the song's sections and beats on it, a lane showing the
-song's waveform, a lane of shots, a lane per actor showing its clip cues, and a lane of overlays.
+One horizontal time axis. A ruler with the song's beats and marker names on it, a lane of song
+sections, a lane showing the song's waveform, a lane of shots, a lane per actor showing its clip
+cues, and a lane of overlays.
+
+The section lane sits directly under the ruler and above the audio, because the song's shape is what
+everything below it is cut to. Click a section to edit its name and type; drag the line between two
+sections to move that boundary. It is a lane of its own rather than blocks drawn on the waveform for
+the reason ADR-103 records: blocks on the waveform steal the click that scrubs.
 
 The audio lane is drawn from an `audio::WaveformSummary` -- the minimum and maximum sample in each
 five-millisecond slice, summarised once when the file loads. It is kept in *time* rather than in

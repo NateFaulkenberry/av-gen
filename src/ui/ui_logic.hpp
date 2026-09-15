@@ -225,6 +225,7 @@ enum class ViewportIntent : std::uint8_t {
 // instead (ADR-103). That is arithmetic, and it should be answerable without a window.
 enum class StripLane : std::uint8_t {
     Ruler,    // the time axis and the marker row: always a scrub
+    Sections, // the song's own shape: boundaries are draggable, section bodies are selectable
     Audio,    // the clips and their waveforms: deliberately holds nothing draggable
     Shots,
     Actors,
@@ -234,6 +235,11 @@ enum class StripLane : std::uint8_t {
 
 struct StripLanes {
     bool hasAudio = false;
+    // The song-structure lane (ADR-216). Directly under the ruler and *above* the audio, because it
+    // is the map of the piece everything below it is cut to -- and in a lane of its own rather than
+    // drawn onto the waveform, which is the mistake ADR-103 recorded: blocks on the waveform stole
+    // the click that scrubs.
+    bool hasSections = false;
     std::size_t actorCount = 0;
     bool hasOverlays = false;
     float rulerHeight = 20.0f;
@@ -242,13 +248,17 @@ struct StripLanes {
     // The audio lane is taller than the others: it is the only one whose content is a picture rather
     // than a label, and a waveform three pixels high says nothing about the music.
     float audioLaneHeight = 36.0f;
+    float sectionLaneHeight = 22.0f;
     float gap = 3.0f;
 
     // Where the lanes start, measured from the top of the strip.
     [[nodiscard]] float lanesTop() const { return rulerHeight + markerHeight + gap; }
-    [[nodiscard]] float audioTop() const { return lanesTop(); }
+    [[nodiscard]] float sectionsTop() const { return lanesTop(); }
+    [[nodiscard]] float audioTop() const {
+        return hasSections ? sectionsTop() + sectionLaneHeight + gap : lanesTop();
+    }
     [[nodiscard]] float shotsTop() const {
-        return hasAudio ? audioTop() + audioLaneHeight + gap : lanesTop();
+        return hasAudio ? audioTop() + audioLaneHeight + gap : audioTop();
     }
     [[nodiscard]] float actorsTop() const { return shotsTop() + laneHeight + gap; }
     [[nodiscard]] float overlaysTop() const {
@@ -257,7 +267,8 @@ struct StripLanes {
     [[nodiscard]] float height() const {
         const int rows = 1 + static_cast<int>(actorCount) + (hasOverlays ? 1 : 0);
         return rulerHeight + markerHeight + static_cast<float>(rows) * (laneHeight + gap) + gap +
-               (hasAudio ? audioLaneHeight + gap : 0.0f);
+               (hasAudio ? audioLaneHeight + gap : 0.0f) +
+               (hasSections ? sectionLaneHeight + gap : 0.0f);
     }
 
     // `y` relative to the top of the strip. The gaps between lanes belong to no lane, and that is
@@ -266,6 +277,9 @@ struct StripLanes {
         const auto within = [y](float top, float h) { return y >= top && y < top + h; };
         if (y < lanesTop()) {
             return StripLane::Ruler;
+        }
+        if (hasSections && within(sectionsTop(), sectionLaneHeight)) {
+            return StripLane::Sections;
         }
         if (hasAudio && within(audioTop(), audioLaneHeight)) {
             return StripLane::Audio;

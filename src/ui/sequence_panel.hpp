@@ -21,13 +21,17 @@
 // but it rebuilds tracks and layers, and doing that sixty times a second while a handle is moving
 // would make the drag feel like the thing it is not.
 
+#include "analysis/structure.hpp"
 #include "app/engine.hpp"
+#include "app/job_system.hpp"
 #include "audio/arrangement.hpp"
 #include "audio/waveform.hpp"
 #include "seq/sequence.hpp"
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -38,24 +42,36 @@ public:
     // Asks the host to open a file dialog for a lyric file (LRC/SRT/WebVTT). Optional; without it
     // the import row offers a path field instead.
     std::function<void()> onImportLyrics;
+    // Asks the host to open a file dialog for an audio file. The *same* callback the File menu and
+    // the O shortcut use (ADR-216): the Sequencer is where the button lives now, and all three
+    // routes are one action rather than three that could drift apart.
+    std::function<void()> onOpenAudio;
+    // Where the song-structure analysis runs. Optional: with no job system it runs inline, which is
+    // what a test wants and what a person never should get.
+    app::JobSystem* jobs = nullptr;
 
     void draw(app::Engine& engine);
 
     // What the strip has selected, so the host can show it elsewhere.
-    enum class Selection : std::uint8_t { None, Shot, Actor, Overlay };
+    enum class Selection : std::uint8_t { None, Shot, Actor, Overlay, Section };
     [[nodiscard]] Selection selection() const { return selection_; }
     [[nodiscard]] int selectedIndex() const { return selected_; }
 
     // Called by the host when a lyric file was chosen.
     void importLyrics(app::Engine& engine, const std::filesystem::path& path);
 
+    // Analysis state, for a host that wants to show it elsewhere.
+    [[nodiscard]] bool analysing() const { return work_ != nullptr; }
+
 private:
     void drawToolbar(app::Engine& engine);
+    void drawImportPopup(app::Engine& engine);
     void drawStrip(app::Engine& engine);
     void drawInspector(app::Engine& engine);
     void drawShotInspector(app::Engine& engine, seq::Shot& shot);
     void drawActorInspector(app::Engine& engine, seq::Actor& actor);
     void drawOverlayInspector(app::Engine& engine, seq::OverlayCue& cue);
+    void drawSectionInspector(app::Engine& engine, std::size_t index);
     void drawSceneSlots(app::Engine& engine);
 
     // Marks the sequence as edited. The bake runs at the end of the frame the edit settled in.
@@ -72,6 +88,29 @@ private:
     // The audio arrangement's editor (ADR-103): the clip list behind the toolbar's Audio... button.
     // Where a clip is moved and trimmed, because the strip's audio lane is a scrub and stays one.
     void drawAudioClips(app::Engine& engine);
+
+    // ---- song structure (ADR-215, ADR-216) ------------------------------------------------------
+    //
+    // The detection is a background job. It is never run per frame and never on the UI thread: on a
+    // four-minute track it is a self-similarity matrix and several novelty passes, and doing that
+    // between two frames would stop the editor dead at exactly the moment somebody has just dropped
+    // a file on it.
+    struct StructureWork {
+        std::shared_ptr<const analysis::AnalysisTrack> track;
+        // The audio this was started for. Compared on completion, so a result for a file that has
+        // since been replaced is discarded instead of being merged into the wrong piece.
+        std::uint64_t revision = 0;
+        bool merge = false; // apply the re-analysis policy rather than replacing outright
+        std::atomic<bool> finished{false};
+        analysis::SongStructure result; // written before `finished`, read after it
+        std::string error;
+    };
+    void startStructureAnalysis(app::Engine& engine, bool merge);
+    void pollStructureAnalysis(app::Engine& engine);
+    // Beat- or bar-aware snapping for a section boundary, which is *optional* and separate from the
+    // strip's own snap: a person dragging a section boundary and a person dragging a shot are not
+    // necessarily asking for the same grid. Returns the snap point's own value, never a rounded one.
+    [[nodiscard]] double snapSection(const app::Engine& engine, double seconds) const;
 
     // Which clip the pointer last landed on, for the highlight and the popup. Nothing else: the
     // audio lane holds no drag state, because it holds no drag.
@@ -99,6 +138,20 @@ private:
     std::uint64_t beatRevision_ = 0;
     audio::WaveformSummary waveCache_;
     std::uint64_t waveRevision_ = 0;
+
+    // Import options (the brief's section 4): two checkboxes and no third. There is deliberately no
+    // FFT size, no hop, no confidence threshold and nothing about the Director's internals here --
+    // a person importing a song is deciding whether to look at its shape, not configuring a
+    // spectrum analyser.
+    bool analyseOnImport_ = true;
+    bool generateOnImport_ = false;
+    int sectionSnap_ = 1; // 0 off, 1 beat, 2 bar
+    std::shared_ptr<StructureWork> work_;
+    app::JobId workJob_ = 0;
+    // The audio the structure was last analysed for. 0 means "never", which is what makes a freshly
+    // imported track analyse itself once and a reopened project not analyse at all.
+    std::uint64_t structureRevision_ = 0;
+    char labelBuffer_[96] = "";
 };
 
 } // namespace avgen::ui
