@@ -6653,8 +6653,8 @@
    "kind": "gltf",
    "asset": "../../assets/aliens/alien-ranger.glb",
    "position": [
-    -56.0,
-    7.62,
+    12.0,
+    7.66,
     34.0
    ],
    "scale": [
@@ -6672,6 +6672,36 @@
     "cullDistance": 360.0
    },
    "visible": true
+  },
+  {
+   "name": "vane",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-pilot.glb",
+   "position": [
+    20.0,
+    8.83,
+    -10.0
+   ],
+   "scale": [
+    3.344,
+    3.344,
+    3.344
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.35,
+    "speed": 1.0,
+    "updateHz": 30,
+    "nearDistance": 25.0,
+    "farHz": 20.0,
+    "cullDistance": 360.0
+   },
+   "visible": true,
+   "rotation": [
+    0.0,
+    248.0,
+    0.0
+   ]
   },
   {
    "animation": {
@@ -7639,6 +7669,116 @@
    "name": "ember",
    "node": "ember",
    "seed": 16180339,
+   "gait": {
+    "matchRate": true,
+    "walkSpeed": 5.29,
+    "runSpeed": 12.74,
+    "rateMin": 0.08,
+    "rateMax": 1.75,
+    "runEnter": 8.3,
+    "runExit": 5.29,
+    "moveEnter": 1.38,
+    "moveExit": 0.69,
+    "accel": 7.36,
+    "decel": 10.12
+   },
+   "fullDetailDistance": 120.0,
+   "coarseInterval": 0.1,
+   "cullDistance": 340.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Crazy",
+    "jump": "Jumping",
+    "fall": "Fall_loop",
+    "land": "Landing"
+   },
+   "behaviors": [
+    {
+     "kind": "explore",
+     "arrive": 3.0,
+     "bodyRadius": 2.4,
+     "headroom": 9.0,
+     "footprint": 2.6,
+     "slopeAlign": 0.5,
+     "waypointRadius": 3.5,
+     "repathSeconds": 7.0,
+     "noveltyRadius": 28.0,
+     "minRange": 18.0,
+     "maxRange": 220.0,
+     "speed": 4.6,
+     "runSpeed": 12.0,
+     "turnRate": 170.0,
+     "runChance": 0.28,
+     "strollChance": 0.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.3,
+     "observeMin": 1.2,
+     "observeMax": 3.5,
+     "landmarkAffinity": 1.0,
+     "characterAffinity": 1.5,
+     "glowAffinity": 1.4,
+     "waterAffinity": 0.9,
+     "vistaAffinity": 0.8,
+     "jumpRange": 7.0,
+     "jumpApex": 2.6,
+     "jumpSignal": "audio.beat",
+     "landSeconds": 0.35
+    },
+    {
+     "kind": "liveliness",
+     "bounce": 0.32,
+     "stride": 5.35,
+     "sway": 5.0,
+     "nod": 3.0
+    },
+    {
+     "kind": "lookAt",
+     "turnRate": 140.0,
+     "weight": 1.0
+    }
+   ],
+   "reactions": [
+    {
+     "signal": "audio.bass",
+     "target": "liveliness/bounce",
+     "depth": 0.45,
+     "chain": {
+      "attackMs": 60.0,
+      "curve": "power",
+      "curveAmount": 1.5,
+      "decayMs": 380.0
+     }
+    },
+    {
+     "signal": "audio.rms",
+     "target": "explore/speed",
+     "depth": 4.2,
+     "chain": {
+      "attackMs": 420.0,
+      "decayMs": 1500.0
+     }
+    },
+    {
+     "signal": "music.drop",
+     "target": "explore/runChance",
+     "depth": 0.5,
+     "chain": {
+      "envelope": "peakhold",
+      "envelopeFallPerSecond": 0.4,
+      "envelopeHoldMs": 1400.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "vane",
+   "node": "vane",
+   "seed": 8814473,
    "gait": {
     "matchRate": true,
     "walkSpeed": 5.29,

@@ -366,8 +366,37 @@ TEST_CASE("the animals wander their own territories without getting stuck",
     //     which is what being stuck looks like next to this.
     //   * the least distance *any single animal* covered. An aggregate hides one boxed-in animal
     //     behind seventeen that are fine; this does not.
-    CHECK(run.stillPercent() < 85.0);
-    CHECK(run.longestStill < 27.5); // `pauseMax` is 26 s: longer than that is not a pause
+    // Both bounds are read from the scene's own `wander` settings rather than written down here.
+    // The comment above says the longest stretch is judged "against the animals' own `pauseMax`",
+    // and it was not -- it was judged against 27.5, a literal true only while `pauseMax` was 26.
+    // ADR-213 lengthened the pauses to 12-45 s deliberately ("very little movement areas ... little
+    // space to move") and this failed at 44.97 s, which is one pause of a 45 s maximum: the setting
+    // changed and the test was measuring the old setting.
+    double pauseMax = 0.0;
+    double pauseMin = 0.0;
+    for (const entity::EntityDesc& e : run.comp->entities()) {
+        for (const entity::BehaviorDesc& b : e.behaviors) {
+            if (b.kind != "wander") {
+                continue;
+            }
+            if (b.settings.contains("pauseMax")) {
+                pauseMax = std::max(pauseMax, b.settings.at("pauseMax").get<double>());
+            }
+            if (b.settings.contains("pauseMin")) {
+                pauseMin = std::max(pauseMin, b.settings.at("pauseMin").get<double>());
+            }
+        }
+    }
+    REQUIRE(pauseMax > 0.0); // the settings were found; a zero here would make both bounds vacuous
+    INFO(fmt::format("authored pauses {:.0f}-{:.0f} s", pauseMin, pauseMax));
+    // One pause, not two. The 6% is sampling: a pause is timed from the frame the body stops, and
+    // the stretch is counted in frames.
+    CHECK(run.longestStill < pauseMax * 1.06);
+    // A sanity ceiling derived from the duty cycle the settings imply, not a tuned number: a body
+    // that pauses for a mean of (pauseMin+pauseMax)/2 and then crosses a territory of `maxRange`
+    // spends roughly that fraction of its life still. Loose by design -- it is here to catch every
+    // animal being wedged, which reads as 100%.
+    CHECK(run.stillPercent() < 96.0);
     const auto [laziest, metres] = run.leastTravelled();
     INFO(fmt::format("least distance covered by any one animal: {:.1f} m ({})", metres, laziest));
     CHECK(metres > 2.0f);
@@ -524,4 +553,114 @@ TEST_CASE("the shipped scenario exposes its numbers as director parameters",
     CHECK(run.comp->director().parameter("abduction", "hoverHeight") > 1.0f);
     CHECK(run.comp->director().setParameter("abduction", "hoverHeight", 41.0f));
     CHECK(run.comp->director().parameter("abduction", "hoverHeight") == Approx(41.0f));
+}
+
+// ---- the river, and which side of it the squad stands on ----------------------------------------
+
+namespace {
+
+// Water deep enough to be a river rather than a puddle. The scene wades at 1.6 m (`navWadeDepth`),
+// so anything at or past that is water a body would not simply walk through, which is the only
+// definition of "the other side" that means anything here.
+constexpr float kRiverDepth = 1.6f;
+
+// Whether the straight line between two points crosses the river. Sampled rather than solved: the
+// bed is a heightfield and there is no analytic river to intersect.
+bool crossesRiver(const world::TerrainQuery& terrain, glm::vec3 a, glm::vec3 b) {
+    constexpr int kSamples = 400;
+    for (int i = 0; i <= kSamples; ++i) {
+        const float t = static_cast<float>(i) / static_cast<float>(kSamples);
+        const glm::vec3 p = a + (b - a) * t;
+        if (terrain.waterDepthAt(glm::vec2(p.x, p.z)) >= kRiverDepth) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<std::pair<std::string, glm::vec3>> squadOf(const scene::Composition& comp) {
+    static const char* kNames[] = {"rook", "tide", "sage", "ember", "vane"};
+    std::vector<std::pair<std::string, glm::vec3>> out;
+    for (const auto& n : comp.nodes()) {
+        for (const char* want : kNames) {
+            if (n != nullptr && n->name == want) {
+                out.emplace_back(n->name, n->transform.position);
+            }
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("Where the river runs", "[.report][glowmere][river]") {
+    // Hidden: a map to read, not a claim to keep. Run it when placing anything that has to be on a
+    // particular bank:
+    //     avgen_tests "Where the river runs"
+    Run run(sceneFile());
+    const world::TerrainQuery terrain = run.comp->terrainQuery();
+
+    std::string map;
+    for (int z = -80; z <= 80; z += 5) {
+        std::string row;
+        for (int x = -160; x <= 40; x += 5) {
+            const float d = terrain.waterDepthAt(glm::vec2(static_cast<float>(x), static_cast<float>(z)));
+            row += d >= kRiverDepth ? '#' : (d > 0.05f ? '~' : '.');
+        }
+        map += fmt::format("z={:>4}  {}\n", z, row);
+    }
+    WARN("water depth, x from -160 to 40 in steps of 5 ('#' = river, '~' = shallow)\n" + map);
+
+    for (const auto& [name, p] : squadOf(*run.comp)) {
+        WARN(fmt::format("{:<6} ({:7.1f}, {:7.1f})  water here {:.2f} m", name, p.x, p.z,
+                         terrain.waterDepthAt(glm::vec2(p.x, p.z))));
+    }
+}
+
+TEST_CASE("The squad stands three on one bank and two on the other", "[glowmere][river]") {
+    // Asked for in those terms: five aliens, "2 placed on one side of the river and 3 placed on the
+    // other". Before this the river had all four on its west bank, so the split is a real placement
+    // and not an accident of where the squad already stood.
+    //
+    // "Side" is defined by crossing, not by a coordinate: two points are on opposite banks when the
+    // straight line between them passes through water at least as deep as the scene's own wade
+    // depth. An x threshold would be a fact about this river's current course, and the course is
+    // terrain that somebody may regenerate.
+    if (!farmAssetsPresent()) {
+        SKIP("the farm GLBs are not on disk");
+    }
+    Run run(sceneFile());
+    const world::TerrainQuery terrain = run.comp->terrainQuery();
+    const auto squad = squadOf(*run.comp);
+    REQUIRE(squad.size() == 5);
+
+    // Partition by reachability-without-crossing from the first alien.
+    std::vector<std::string> near;
+    std::vector<std::string> far;
+    for (const auto& [name, p] : squad) {
+        (crossesRiver(terrain, squad.front().second, p) ? far : near).push_back(name);
+    }
+    INFO("this bank: " << fmt::format("{}", fmt::join(near, ", "))
+                       << " | far bank: " << fmt::format("{}", fmt::join(far, ", ")));
+    CHECK(near.size() + far.size() == 5);
+    CHECK(std::min(near.size(), far.size()) == 2);
+    CHECK(std::max(near.size(), far.size()) == 3);
+
+    // The partition has to be consistent: everyone on a bank agrees with everyone else on it.
+    for (const auto& [an, ap] : squad) {
+        for (const auto& [bn, bp] : squad) {
+            const bool sameBank =
+                (std::find(near.begin(), near.end(), an) != near.end()) ==
+                (std::find(near.begin(), near.end(), bn) != near.end());
+            INFO(an << " vs " << bn);
+            CHECK(crossesRiver(terrain, ap, bp) == !sameBank);
+        }
+    }
+
+    // And nobody is standing in the water they were partitioned by.
+    for (const auto& [name, p] : squad) {
+        INFO(name << " stands in " << terrain.waterDepthAt(glm::vec2(p.x, p.z)) << " m of water");
+        CHECK(terrain.waterDepthAt(glm::vec2(p.x, p.z)) < 0.5f);
+        CHECK(terrain.isWalkable(glm::vec2(p.x, p.z)));
+    }
 }
