@@ -6953,36 +6953,6 @@
     "state": "Walk",
     "updateHz": 30
    },
-   "asset": "../../assets/farm/chick.glb",
-   "kind": "gltf",
-   "name": "chick-9",
-   "position": [
-    -200.9199981689453,
-    26.950000762939453,
-    40.470001220703125
-   ],
-   "rotation": [
-    0.0,
-    -93.75,
-    0.0
-   ],
-   "scale": [
-    3.6,
-    3.6,
-    3.6
-   ],
-   "visible": true
-  },
-  {
-   "animation": {
-    "blend": 0.3,
-    "cullDistance": 280.0,
-    "farHz": 15.0,
-    "nearDistance": 20.0,
-    "speed": 1.0,
-    "state": "Walk",
-    "updateHz": 30
-   },
    "asset": "../../assets/farm/bull.glb",
    "kind": "gltf",
    "name": "bull-10",
@@ -7204,36 +7174,6 @@
    "rotation": [
     0.0,
     140.97000122070312,
-    0.0
-   ],
-   "scale": [
-    3.6,
-    3.6,
-    3.6
-   ],
-   "visible": true
-  },
-  {
-   "animation": {
-    "blend": 0.3,
-    "cullDistance": 280.0,
-    "farHz": 15.0,
-    "nearDistance": 20.0,
-    "speed": 1.0,
-    "state": "Walk",
-    "updateHz": 30
-   },
-   "asset": "../../assets/farm/chick.glb",
-   "kind": "gltf",
-   "name": "chick-18",
-   "position": [
-    -3.5,
-    0.7099999785423279,
-    206.75
-   ],
-   "rotation": [
-    0.0,
-    -165.4600067138672,
     0.0
    ],
    "scale": [
@@ -8361,65 +8301,6 @@
    "behaviors": [
     {
      "kind": "liveliness",
-     "bounce": 0.052,
-     "bounceRate": 1.03,
-     "sway": 2.24,
-     "swayRate": 0.161,
-     "nod": 2.18
-    },
-    {
-     "arrive": 0.57,
-     "homeRadius": 16.8,
-     "kind": "wander",
-     "maxRange": 12.23,
-     "minRange": 2.46,
-     "pauseMax": 6.37,
-     "pauseMin": 1.37,
-     "runSpeed": 0.443,
-     "speed": 0.277,
-     "turnRate": 89.6
-    },
-    {
-     "kind": "ground",
-     "slopeAlign": 0.55
-    }
-   ],
-   "clips": {
-    "idle": "Walk",
-    "run": "Walk",
-    "turn": "Walk",
-    "walk": "Walk"
-   },
-   "coarseInterval": 0.1,
-   "cullDistance": 260.0,
-   "fullDetailDistance": 90.0,
-   "gait": {
-    "accel": 0.44,
-    "decel": 0.61,
-    "idleRate": 0.0,
-    "matchRate": true,
-    "moveEnter": 0.06,
-    "moveExit": 0.03,
-    "rateMax": 1.0,
-    "rateMin": 0.0466,
-    "runEnter": 0.443,
-    "runExit": 0.319,
-    "runSpeed": 0.644,
-    "walkSpeed": 0.644
-   },
-   "name": "chick-9",
-   "node": "chick-9",
-   "seed": 20324280,
-   "tags": [
-    "animal",
-    "farm",
-    "chick"
-   ]
-  },
-  {
-   "behaviors": [
-    {
-     "kind": "liveliness",
      "bounce": 0.033,
      "bounceRate": 0.81,
      "sway": 2.93,
@@ -8886,65 +8767,6 @@
     "animal",
     "farm",
     "chicken"
-   ]
-  },
-  {
-   "behaviors": [
-    {
-     "kind": "liveliness",
-     "bounce": 0.021,
-     "bounceRate": 0.79,
-     "sway": 3.09,
-     "swayRate": 0.175,
-     "nod": 1.59
-    },
-    {
-     "arrive": 0.73,
-     "homeRadius": 16.23,
-     "kind": "wander",
-     "maxRange": 11.12,
-     "minRange": 1.97,
-     "pauseMax": 3.22,
-     "pauseMin": 0.8,
-     "runSpeed": 0.653,
-     "speed": 0.408,
-     "turnRate": 101.0
-    },
-    {
-     "kind": "ground",
-     "slopeAlign": 0.55
-    }
-   ],
-   "clips": {
-    "idle": "Walk",
-    "run": "Walk",
-    "turn": "Walk",
-    "walk": "Walk"
-   },
-   "coarseInterval": 0.1,
-   "cullDistance": 260.0,
-   "fullDetailDistance": 90.0,
-   "gait": {
-    "accel": 0.65,
-    "decel": 0.9,
-    "idleRate": 0.0,
-    "matchRate": true,
-    "moveEnter": 0.06,
-    "moveExit": 0.03,
-    "rateMax": 1.0,
-    "rateMin": 0.0466,
-    "runEnter": 0.653,
-    "runExit": 0.469,
-    "runSpeed": 0.644,
-    "walkSpeed": 0.644
-   },
-   "name": "chick-18",
-   "node": "chick-18",
-   "seed": 20395551,
-   "tags": [
-    "animal",
-    "farm",
-    "chick"
    ]
   }
  ],

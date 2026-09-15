@@ -756,7 +756,7 @@ TEST_CASE("the farm animals travel the way they are drawn facing, at the speed t
         // coarsely-updated entity advances a tenth of a second in one jump, which is a reading of
         // the level-of-detail ladder rather than of locomotion (ADR-186, ADR-182).
         REQUIRE(r.coarse == 0);
-        CHECK(r.travelled > 4.0);
+        CHECK(r.travelled > 5.0);
         CHECK(r.moving > 60);
         CHECK(r.locomotor > 60);
         totalBackwardsWalking += r.backwardsWalking;
