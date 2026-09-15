@@ -206,7 +206,7 @@ const std::vector<MusicalMoment>& MusicalEventDetector::update(const MusicalFram
 // ---- structure ---------------------------------------------------------------------------------
 
 namespace {
-constexpr std::array<std::pair<MusicalSection, const char*>, 9> kSectionNames{{
+constexpr std::array<std::pair<MusicalSection, const char*>, 15> kSectionNames{{
     {MusicalSection::Intro, "intro"},
     {MusicalSection::Build, "build"},
     {MusicalSection::Phrase, "phrase"},
@@ -215,8 +215,27 @@ constexpr std::array<std::pair<MusicalSection, const char*>, 9> kSectionNames{{
     {MusicalSection::Breakdown, "breakdown"},
     {MusicalSection::FinalBuild, "finalBuild"},
     {MusicalSection::FinalDrop, "finalDrop"},
+    {MusicalSection::PreChorus, "preChorus"},
+    {MusicalSection::Chorus, "chorus"},
+    {MusicalSection::Break, "break"},
+    {MusicalSection::Bridge, "bridge"},
+    {MusicalSection::Instrumental, "instrumental"},
+    {MusicalSection::FinalChorus, "finalChorus"},
     {MusicalSection::Outro, "outro"},
 }};
+// The net that makes "add a kind and forget about it" a build failure rather than a section that
+// silently answers to the name "phrase". `Outro` is the last enumerator by construction, so a new
+// kind goes before it and this stops compiling until it has a name here.
+static_assert(kSectionNames.size() == static_cast<std::size_t>(MusicalSection::Outro) + 1,
+              "every MusicalSection needs a name in kSectionNames");
+
+constexpr std::array<MusicalSection, kSectionNames.size()> kAllSections = [] {
+    std::array<MusicalSection, kSectionNames.size()> out{};
+    for (std::size_t i = 0; i < kSectionNames.size(); ++i) {
+        out[i] = kSectionNames[i].first;
+    }
+    return out;
+}();
 
 // Which events may open a section, and which of two colliding boundaries survives. The list is
 // short on purpose: Beat, Downbeat, BarStart, PhraseStart, EnergyRise, EnergyDrop and Impact are
@@ -269,6 +288,8 @@ const char* musicalSectionName(MusicalSection s) {
     }
     return "phrase";
 }
+
+std::span<const MusicalSection> allMusicalSections() { return kAllSections; }
 
 std::optional<MusicalSection> musicalSectionFromName(std::string_view name) {
     for (const auto& [kind, text] : kSectionNames) {

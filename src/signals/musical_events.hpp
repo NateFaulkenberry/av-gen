@@ -92,19 +92,49 @@ struct MusicalEventSettings {
 // metre wearing a different name, and anything cut to it cuts constantly. Energy trends never open
 // one either: a trend describes a section, it does not bound one.
 
+// ## Two vocabularies, and which is which (ADR-215)
+//
+// `analysis::SectionFunction` (ADR-206) describes *the music*: it is what a detector concluded, it
+// carries a confidence, and it is allowed to answer `Other`, which is not a failure but the correct
+// answer for a piece that has no verses and no choruses.
+//
+// `MusicalSection` is **the director's vocabulary**, and its rule is different: every value has to
+// mean something to a shot. There is no `Unknown` here and there must not be one, because a shot
+// has to be *some* shot -- `Phrase`, "an ordinary passage", is what "I do not know" becomes when
+// something has to point a camera. The mapping between the two is one-way and total, and it lives
+// in `seq/song_structure.hpp` next to the editable model, because that is the layer that owns the
+// translation. This enum is never parsed from a detector's output directly.
+//
+// Six kinds were added for the song-structure work: the pop/rock half of the vocabulary, which the
+// EDM-shaped original did not have. Each one was answered deliberately in all four of the switches
+// that read this enum (`shotKindForSection`, `isDropSection`, `mayBeSplit`, `emphasisFor`) -- a new
+// kind falling through a `default` there produces a silently bland shot, which is the failure mode
+// worth more than the enum itself.
+//
+// `Outro` is last by construction, and `kSectionNames` is static_asserted against it: a new kind
+// goes *before* Outro and cannot be added without also giving it a name.
 enum class MusicalSection : std::uint8_t {
-    Intro,      // before the piece has committed to anything
-    Build,      // going somewhere
-    Phrase,     // an ordinary passage
-    Drop,       // the payoff a build was for
-    Verse,      // the analyser's own section counter moved, without saying into what
-    Breakdown,  // energy collapsed and stayed down
-    FinalBuild, // the last build, which is a different thing from the first
-    FinalDrop,  // ...and the last drop
-    Outro,      // after the last boundary
+    Intro,        // before the piece has committed to anything
+    Build,        // going somewhere
+    Phrase,       // an ordinary passage; also what an unlabelled section becomes
+    Drop,         // the payoff a build was for
+    Verse,        // the analyser's own section counter moved, without saying into what
+    Breakdown,    // energy collapsed and stayed down
+    FinalBuild,   // the last build, which is a different thing from the first
+    FinalDrop,    // ...and the last drop
+    PreChorus,    // the pop run-up: a build by another name, and cut into no more than one
+    Chorus,       // the recurring payoff; the drop of a song that has words
+    Break,        // the music stops holding still: quieter, and not resolving into anything
+    Bridge,       // the departure, once, usually two thirds in
+    Instrumental, // a passage with the voice out of it: solo, interlude, post-chorus
+    FinalChorus,  // the last chorus, which is a different shot from the first
+    Outro,        // after the last boundary. Always last: see kSectionNames' static_assert.
 };
 [[nodiscard]] const char* musicalSectionName(MusicalSection s);
 [[nodiscard]] std::optional<MusicalSection> musicalSectionFromName(std::string_view name);
+// Every kind, in declaration order. The one list anything that must handle them all iterates, so a
+// test of "all of them" cannot quietly test fourteen of fifteen.
+[[nodiscard]] std::span<const MusicalSection> allMusicalSections();
 
 struct StructureSection {
     MusicalSection kind = MusicalSection::Intro;

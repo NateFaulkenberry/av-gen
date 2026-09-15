@@ -385,4 +385,16 @@ struct DirectionBrief {
 // file and a caller disagreeing with it should be able to see it rather than reverse-engineer it.
 [[nodiscard]] ShotKind shotKindForSection(signals::MusicalSection section);
 
+// The other three tables that read `signals::MusicalSection`, exposed for the same reason and for
+// one more (ADR-215): the four of them have to agree with each other, and a new section kind that
+// falls through one of them produces a silently bland shot rather than a failure. They are the
+// answer to "is every enumerator handled", so they have to be askable from a test.
+//
+// Which sections must open their own shot, exactly on their own first frame.
+[[nodiscard]] bool isDropSectionKind(signals::MusicalSection section);
+// Which sections are "the world going past" and may therefore be more than one shot.
+[[nodiscard]] bool mayBeSplitSection(signals::MusicalSection section);
+// How much of the frame the hero is owed during a section of this kind, at this intensity.
+[[nodiscard]] float emphasisForSection(signals::MusicalSection section, float intensity);
+
 } // namespace avgen::app
