@@ -213,14 +213,30 @@ does not move. `aboveGround` is that anchor: a height measured from the terrain 
 other body. `setDesc` now **refuses** a beat where two roles take their height from each other and
 neither is anchored, and says which two and what to do about it.
 
-### The wander metric was measuring the level-of-detail band
+### The wander metric was measuring the level-of-detail band, and then it could not fail
 
 The first reading was 63.6% of commanded frames still and a **75-second** stall — worse than the
 `sage` precedent this was supposed to beat. The 75 seconds was one chick, culled by
 `EntityDesc::cullDistance` because the camera was 260 m away, holding its last `speed` and its last
 position for the rest of the run. "It did not move this frame" is not a fact about wandering when
 the entity was not updated at all. The measurement now runs with ADR-186's offline setting —
-`entityDistanceCull = false`, every entity every frame — which is the arm the question is about.
+`entityDistanceCull = false`, every entity every frame.
+
+And then the reading went to **0.0%**, which is worse news than it looks: once `wander` stops
+reporting a speed it is not travelling at, the speed it reports *is* the distance it covered, so
+"commanded to move and did not" is zero by construction and the probe can no longer fail (ADR-182).
+It is kept as a regression guard and labelled as one. The measurement that carries the weight is
+two others, chosen because a stuck animal makes them move:
+
+* the **longest unbroken motionless stretch**, against the animals' own authored `pauseMax`.
+  Measured 26.20 s against an authored 26 s — one pause, not two. The `sage` wedge was 62.3 s.
+* the **least distance any single animal covered**. An aggregate percentage hides one boxed-in
+  animal behind seventeen that are fine; a per-animal minimum does not.
+
+The aggregate "percentage still" is 61.8%, and asserting the `sage` 31.7% against it would have
+been measuring the *settings*: these animals pause for 3 to 26 authored seconds between
+destinations, so most of the run is correctly a pause. A number borrowed from a different behaviour
+with different knobs is not a threshold.
 
 ### And two from probes that could not fail (ADR-182)
 

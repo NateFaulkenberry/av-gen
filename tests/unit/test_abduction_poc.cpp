@@ -76,6 +76,20 @@ struct Run {
     std::size_t commandedFrames = 0;
     double longestStall = 0.0;              // seconds, the worst single run of stalled frames
     std::string worstStaller;
+    // The second metric, and the one that can still fail. See the note on the wander test: after
+    // `wander` was fixed to stop claiming a speed it is not travelling at, "commanded to move and
+    // did not" is zero *by construction*, because the speed it reports is the speed it moved at. So
+    // it is a regression guard rather than a discovery, and this is the discovery: how much of the
+    // run an animal spent motionless at all, and the longest unbroken stretch of it. The `sage`
+    // precedent is quoted in these terms -- 92.3% still with a 62.3 s stretch, down to 31.7%.
+    std::size_t stillFrames = 0;
+    std::size_t liveFrames = 0;
+    double longestStill = 0.0;
+    std::string stillest;
+    // Path length per animal. The assertion that can actually fail: one animal boxed in and
+    // re-picking a destination it can never reach walks nowhere, and an *aggregate* percentage
+    // hides it behind seventeen animals that are fine.
+    std::map<std::string, float> travelled;
     double beamPeak = 0.0;                  // the highest spawn rate the beam reached
     double beamRest = 0.0;                  // and where it was left
     float closestApproach = 1e9f;           // how near the saucer got to a target, horizontally
@@ -108,6 +122,7 @@ struct Run {
         std::map<std::string, glm::vec3> was;
         std::map<std::string, glm::vec3> home;
         std::map<std::string, double> stall;
+        std::map<std::string, double> still;
         for (const auto& e : world.entities()) {
             was[e->name()] = e->state().position();
             home[e->name()] = e->state().position();
@@ -167,8 +182,23 @@ struct Run {
                     }
                     was[e.name()] = now;
                     stall[e.name()] = 0.0;
+                    still[e.name()] = 0.0;
                     continue;
                 }
+                const glm::vec2 step2(now.x - was[e.name()].x, now.z - was[e.name()].z);
+                ++liveFrames;
+                if (glm::length(step2) < 0.001f) {
+                    ++stillFrames;
+                    still[e.name()] += step;
+                    if (still[e.name()] > longestStill) {
+                        longestStill = still[e.name()];
+                        stillest = e.name();
+                    }
+                } else {
+                    still[e.name()] = 0.0;
+                }
+                travelled[e.name()] += glm::length(step2);
+
                 const float speed = e.state().speed;
                 if (speed > 0.05f) {
                     ++commandedFrames;
@@ -202,6 +232,22 @@ struct Run {
         }
     }
 
+    // The least distance any one animal covered, and which. Zero would mean an animal that never
+    // went anywhere at all for the whole run.
+    [[nodiscard]] std::pair<std::string, float> leastTravelled() const {
+        std::pair<std::string, float> worst{"", 1e9f};
+        for (const auto& [name, metres] : travelled) {
+            if (metres < worst.second) {
+                worst = {name, metres};
+            }
+        }
+        return worst;
+    }
+    [[nodiscard]] double stillPercent() const {
+        return liveFrames == 0 ? 0.0
+                               : 100.0 * static_cast<double>(stillFrames) /
+                                     static_cast<double>(liveFrames);
+    }
     [[nodiscard]] double stalledPercent() const {
         return commandedFrames == 0
                    ? 0.0
@@ -288,18 +334,43 @@ TEST_CASE("the animals wander their own territories without getting stuck",
     // as shipped, not in a stripped-down one.
     run.play(90.0);
 
-    INFO(fmt::format("commanded to move on {} entity-frames, stalled on {} ({:.1f}%); "
-                     "longest stall {:.2f} s ({})",
+    INFO(fmt::format("commanded to move on {} entity-frames, stalled on {} ({:.1f}%), longest "
+                     "stall {:.2f} s ({}); motionless on {} of {} frames ({:.1f}%), longest "
+                     "unbroken stretch {:.2f} s ({})",
                      run.commandedFrames, run.stalledFrames, run.stalledPercent(),
-                     run.longestStall, run.worstStaller));
+                     run.longestStall, run.worstStaller, run.stillFrames, run.liveFrames,
+                     run.stillPercent(), run.longestStill, run.stillest));
     // The metric has to have something to measure: an arm where nothing was ever commanded to move
     // would report 0% and mean nothing (ADR-182).
     REQUIRE(run.commandedFrames > 2000);
-    // The precedent to beat is the `sage` fix: 31.7% of commanded frames still, 0.1 s longest
-    // stall. These are the numbers this scene actually produces, asserted with room for a small
-    // drift and no more -- a threshold loose enough to pass whatever happens is not a threshold.
-    CHECK(run.stalledPercent() < 31.7);
-    CHECK(run.longestStall < 1.0);
+
+    // **The first metric is a regression guard, not a discovery, and saying so is the point.**
+    // "Commanded to move and did not" is zero by construction now that `wander` stops reporting a
+    // speed it is not travelling at: the number it reports *is* the distance it covered. What it
+    // still catches is that defect coming back.
+    CHECK(run.stalledPercent() == 0.0);
+    CHECK(run.longestStall == 0.0);
+
+    // The metrics that can still fail.
+    //
+    // A note on the percentage, because the obvious threshold is the wrong one. The `sage`
+    // precedent is quoted as 31.7% still, and asserting that here fails at 61.8% -- but 61.8% is
+    // the behaviour *working*: these animals pause for between 3 and 26 authored seconds between
+    // destinations and then walk a few metres, so most of the run is correctly a pause. Borrowing a
+    // number from a different behaviour with different settings would be measuring the settings.
+    // So the percentage gets only a sanity ceiling, and the two assertions that carry the weight
+    // are the ones that separate "paused on purpose" from "stuck":
+    //
+    //   * the longest unbroken motionless stretch, against the animals' own `pauseMax`. Measured:
+    //     26.20 s against an authored 26 s, i.e. one pause and not two. The `sage` wedge was 62.3 s,
+    //     which is what being stuck looks like next to this.
+    //   * the least distance *any single animal* covered. An aggregate hides one boxed-in animal
+    //     behind seventeen that are fine; this does not.
+    CHECK(run.stillPercent() < 85.0);
+    CHECK(run.longestStill < 27.5); // `pauseMax` is 26 s: longer than that is not a pause
+    const auto [laziest, metres] = run.leastTravelled();
+    INFO(fmt::format("least distance covered by any one animal: {:.1f} m ({})", metres, laziest));
+    CHECK(metres > 2.0f);
 
     // And they stayed home. A wander with no territory is a random walk, and a random walk leaves.
     const entity::EntityWorld& world = run.comp->entityWorld();
