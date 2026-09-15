@@ -253,6 +253,19 @@ public:
     [[nodiscard]] const std::string& name() const { return desc_.name; }
     [[nodiscard]] const EntityState& state() const { return state_; }
     [[nodiscard]] const LocomotionState& locomotion() const { return locomotion_; }
+    // Where the body is **drawn**, as distinct from where the simulation says it is.
+    //
+    // `state().position()` is the anchor plus `travel` -- what navigation and a director wrote. The
+    // behaviours' offsets (hover, drift, bank, an authored sway) are folded onto the node's
+    // transform *afterwards* (`applyOffsets`), deliberately, so that a craft keeps hovering and
+    // drifting while it is being flown somewhere. The consequence is that the two numbers are not
+    // the same place: Glowmere's saucer carries `drift` with a radius of 2.4 m, so its node -- and
+    // everything parented to it, a tractor beam included -- is drawn up to 2.4 m away from
+    // `state().position()`.
+    //
+    // Anything that has to line up with what is on screen wants this one.
+    // `EntityWorld::pointOfInterest` has always returned exactly this sum; this is it, named.
+    [[nodiscard]] glm::vec3 visualPosition() const { return state_.position() + motion_.position; }
     [[nodiscard]] std::uint32_t seed() const { return seed_; }
 
     // Where an attached prop should sit. False when this entity has no such socket.

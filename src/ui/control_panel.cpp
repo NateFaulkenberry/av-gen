@@ -12,6 +12,8 @@
 #include "control/midi.hpp"
 #include "core/log.hpp"
 #include "platform/window.hpp"
+#include "scene/composition.hpp"
+#include "stage/staging.hpp"
 
 #include <imgui.h>
 #include <implot.h>
@@ -19,6 +21,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -2767,6 +2770,53 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                     "nothing here can go under without moving the cut.");
             }
 
+            // ADR-217. A list of the scenarios this scene actually stages, plus "off" -- rather
+            // than a text box, because a scenario name that does not exist holds nothing and the
+            // panel should not be able to ask for that.
+            ImGui::Separator();
+            ImGui::TextUnformatted("Stay with a scenario");
+            {
+                std::vector<std::string> scenarios;
+                if (const scene::Composition* composition = engine.composition()) {
+                    for (const stage::ScenarioDesc& sc : composition->staging().scenarios) {
+                        scenarios.push_back(sc.name);
+                    }
+                }
+                const std::string current = s.holdScenario.empty() ? std::string("off") : s.holdScenario;
+                if (ImGui::BeginCombo("mid-event", current.c_str())) {
+                    if (ImGui::Selectable("off", s.holdScenario.empty())) {
+                        s.holdScenario.clear();
+                    }
+                    for (const std::string& name : scenarios) {
+                        if (ImGui::Selectable(name.c_str(), s.holdScenario == name)) {
+                            s.holdScenario = name;
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip(
+                        "Don't cut away from a scenario's actor while it is in the middle of\n"
+                        "something.\n\n"
+                        "The cut is baked from the music before a frame is drawn, so it cannot\n"
+                        "know that a shot lands halfway through an abduction and the next one\n"
+                        "walks out of it. Pick a scenario and the camera keeps that shot's\n"
+                        "framing on its actor -- riding along, so a craft that flies two hundred\n"
+                        "metres stays the same size in frame -- until the scenario lets go.\n\n"
+                        "Off leaves the cut exactly as the music wrote it.");
+                }
+                if (scenarios.empty()) {
+                    ImGui::TextDisabled("this scene stages nothing");
+                }
+                ImGui::BeginDisabled(s.holdScenario.empty());
+                auto release = static_cast<float>(s.holdReleaseSeconds);
+                if (ImGui::SliderFloat("rejoin the cut", &release, 0.0f, 5.0f,
+                                       release > 0.0f ? "%.2f s" : "at once")) {
+                    s.holdReleaseSeconds = static_cast<double>(release);
+                }
+                ImGui::EndDisabled();
+            }
+
             ImGui::Separator();
             auto seed = static_cast<int>(s.seed);
             if (ImGui::InputInt("seed", &seed)) {
@@ -2795,7 +2845,9 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
             // Refuse rather than clamp, and say why in the panel rather than in a log.
             if (const auto ok = s.validate(); !ok) {
                 ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.35f, 1.0f), "%s", ok.error().message.c_str());
-            } else if (std::memcmp(&before, &s, sizeof(s)) != 0 && onDirectCamera &&
+            // `operator==` rather than a memcmp: the struct has padding, and since ADR-217 it has
+            // std::strings in it, so comparing its bytes is both undefined and wrong.
+            } else if (!(before == s) && onDirectCamera &&
                        engine.timeline().isAutomated("camera/position")) {
                 // Already directed: a setting that changes the film should change the film,
                 // rather than waiting for somebody to find the menu item again.

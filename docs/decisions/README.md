@@ -211,6 +211,8 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [213](ADR-213-an-animal-with-one-clip.md) | An animal with one clip | Accepted |
 | [215](ADR-215-a-section-someone-decided-outranks-a-section-someone-detected.md) | A section somebody decided outranks a section somebody detected | Accepted |
 | [216](ADR-216-the-sequencer-is-where-the-song-lives.md) | The Sequencer is where the song lives | Accepted |
+| [217](ADR-217-the-cut-cannot-know-what-the-world-is-doing.md) | The cut cannot know what the world is doing, so let it be told one thing (the camera holds on a scenario's actor) | Accepted |
+| [218](ADR-218-a-body-in-a-beam-has-two-positions-and-a-size.md) | A body in a beam has two positions and a size, and the scenario knew about neither | Accepted |
 | [225](ADR-225-a-setting-nobody-keeps.md) | A setting the application does not keep is not a setting (the Auto-director saves with the project) | Accepted |
 | [226](ADR-226-the-second-scene-with-the-same-stride-defect.md) | The second scene with the same stride defect, and the bands nobody scaled | Accepted |
 | [227](ADR-227-the-blocker-search-gets-its-own-budget.md) | The blocker search gets its own budget, and the lane it needed | Accepted |

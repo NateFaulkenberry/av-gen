@@ -323,6 +323,27 @@ struct AimFollow {
     glm::vec3 heroAtCut{0.0f};   // where that hero stood when the shot was cut
 };
 
+// ADR-217: don't cut away from a director's actor while it is in the middle of something.
+//
+// The auto-director's cut is baked from the music before a frame is drawn, and a staging scenario
+// (ADR-210) is a live state machine -- so the cut cannot know that shot seven lands in the middle of
+// an abduction and shot eight walks out of it. This is the one fact the bake cannot carry, expressed
+// where both halves are already in scope.
+//
+// What it says: *while `scenario` holds `role` bound, and the shot the playhead is in was cut for
+// the scenario's own actor, keep that shot's framing on the actor until the scenario lets go.* The
+// held camera rides with the actor -- the same delta `AimFollow` adds to the aim, added to the eye
+// as well -- so a saucer that flies two hundred metres stays the same size in frame instead of
+// shrinking to a dot, and then the cut resumes over `releaseSeconds`.
+//
+// Off unless a scenario is named, and an unnamed scenario is what every existing project has: a
+// scene that does not use this is byte-identical to what it was.
+struct AimHold {
+    std::string scenario; // a stage::Staging scenario name; "" = the whole feature is off
+    std::string role;     // the role whose binding means "engaged"; "" = "target"
+    double releaseSeconds = 1.0; // how long the camera takes to rejoin the cut when the hold ends
+};
+
 class Composition final : public SceneController {
 public:
     Composition(assets::AssetRegistry& registry, std::string name = "composition");
@@ -395,6 +416,10 @@ public:
     // to grab. Rebuilds the scene first when it is dirty, because bounds read from a stale
     // flattening are bounds of the world as it was before the last edit.
     [[nodiscard]] WorldBounds nodeBounds(const std::string& name);
+    // The eight world-space corners of every mesh the node draws, un-boxed. What a "does it fit
+    // inside a cylinder" question needs: the axis-aligned box of a rotated body is larger than the
+    // body by up to its own diagonal, which on a 3.6x farm animal is a metre of beam.
+    [[nodiscard]] std::vector<glm::vec3> nodeCorners(const std::string& name);
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
     // ---- composition (ADR-038) ----
     // What the frame is about: focal points, depth layers and exclusion regions. Its fields are
@@ -541,6 +566,24 @@ public:
     // engine may not do.
     void setAimFollow(std::vector<AimFollow> shots);
     [[nodiscard]] const std::vector<AimFollow>& aimFollow() const { return aimFollow_; }
+
+    // ADR-217. Off by default (an empty `scenario`). Set by `app::installSequence` from the
+    // auto-director's settings and cleared with the rest of the direction when the camera is handed
+    // back. `clearAimHoldState` drops the *running* state only -- what a seek needs, so that the
+    // seeked second is a function of the second rather than of how the playhead got there.
+    void setAimHold(AimHold hold);
+    [[nodiscard]] const AimHold& aimHold() const { return aimHold_; }
+    void clearAimHoldState() {
+        // Everything except the resolved hero name, which is not running state: it comes from
+        // `setAimHold` and wiping it here would make the first seek turn the hold off for good.
+        std::string hero = std::move(aimHoldState_.hero);
+        aimHoldState_ = AimHoldState{};
+        aimHoldState_.hero = std::move(hero);
+    }
+    // Whether the camera is being held on the scenario's actor *right now*, and on which hero. What
+    // a test asserts on, and what an overlay would show.
+    [[nodiscard]] bool aimHeld() const { return aimHoldState_.holding; }
+    [[nodiscard]] const std::string& aimHeldHero() const { return aimHoldState_.hero; }
 
     // ---- the ground (§3, ADR-090) --------------------------------------------------------------
     //
@@ -912,6 +955,21 @@ private:
     // state: a hero may name an assembly of several nodes rather than one object.
     std::vector<std::optional<glm::vec3>> heroAnchors_;
     std::vector<AimFollow> aimFollow_;  // ADR-158; empty unless a director cut this camera
+    AimHold aimHold_;                   // ADR-217; inert unless a scenario is named
+    // The hold's running state. Not serialised and not part of the document: it is derived from the
+    // frame sequence, exactly like the scenario it follows, and a seek clears it.
+    struct AimHoldState {
+        std::string hero;          // the actor's hero name, resolved once per `setAimHold`
+        bool armed = false;        // the playhead is (or was) in a shot cut for that hero, engaged
+        bool holding = false;      // the override is on this frame
+        glm::vec3 eye{0.0f};       // the camera pose the hold froze, and the hero it froze against
+        glm::vec3 target{0.0f};
+        glm::vec3 heroAt{0.0f};
+        double releaseFrom = -1.0; // the second the hold ended; < 0 = not releasing
+        glm::vec3 releaseEye{0.0f};
+        glm::vec3 releaseTarget{0.0f};
+    };
+    AimHoldState aimHoldState_;
 
     // A hero moved and the world has not settled yet. Moving an object is a *drag* -- sixty
     // positions a second -- and each one that reached `heroRevision_` would re-cut the directed
@@ -920,6 +978,7 @@ private:
     double heroSettleAt_ = 0.0;
     double heroSettleSeconds_ = 0.25;
     void syncHeroesToNodes();
+    void applyAimHold(const AimFollow* active); // ADR-217
     void markHeroesMoved();
     void settleHeroes();
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"

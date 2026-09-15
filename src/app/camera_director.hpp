@@ -27,6 +27,7 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include <span>
+#include <string>
 #include <vector>
 
 namespace avgen::app {
@@ -95,6 +96,20 @@ struct AutoDirectorSettings {
     // however high the slider went. "I'm not sure I can control that enough with just the importance
     // param" -- correct, and this is the thing that was missing.
     int dwellShots = 1;
+    // ADR-217: don't cut away from a director's actor while it is in the middle of something.
+    //
+    // The name of a `stage::Staging` scenario (ADR-210), or "" -- the default -- for off. While that
+    // scenario holds `holdRole` bound *and* the shot the playhead is in was cut for the scenario's
+    // own actor, the camera keeps that shot's framing on the actor, riding along with it, until the
+    // scenario lets go; then it rejoins the cut over `holdReleaseSeconds`.
+    //
+    // A setting rather than a rule, and off by default, because it is a judgement about one kind of
+    // scene: a cut that leaves mid-event is a mistake in a piece whose event is the point, and
+    // exactly right in a piece where the saucer is scenery. Nothing about it is UFO-specific -- it
+    // names a scenario and a role, and knows what neither of them means.
+    std::string holdScenario;
+    std::string holdRole = "target";
+    double holdReleaseSeconds = 1.0;
 
     [[nodiscard]] Result<void> validate() const;
     void applyTo(DirectionBrief& brief) const;
@@ -126,7 +141,11 @@ struct AutoDirectorSettings {
 // camera is somebody's work and directing the camera is not a reason to discard it.
 //
 // Main thread only: it mutates the timeline the renderer reads.
-[[nodiscard]] Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence);
+// `settings` is read only for the parts that are not in the baked sequence -- at present ADR-217's
+// hold, which is a live rule rather than a key. Omitted (the default) means no hold, which is what
+// every call before ADR-217 meant and what an untouched project still means.
+[[nodiscard]] Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
+                                                  const AutoDirectorSettings& settings = {});
 
 // Folds a whole precomputed analysis into a musical structure.
 //

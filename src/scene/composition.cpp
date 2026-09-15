@@ -1342,6 +1342,104 @@ void Composition::syncHeroesToNodes() {
 
 void Composition::setAimFollow(std::vector<AimFollow> shots) { aimFollow_ = std::move(shots); }
 
+// ADR-217. Resolving the actor's hero name happens here, once, rather than in the camera director:
+// the chain scenario -> actor -> body entity -> node is staging's business and the camera has no
+// reason to learn it. A scenario or an actor that is not there leaves the hero empty, which makes
+// the whole feature inert rather than wrong.
+void Composition::setAimHold(AimHold hold) {
+    aimHold_ = std::move(hold);
+    aimHoldState_ = AimHoldState{};
+    if (aimHold_.scenario.empty()) {
+        return;
+    }
+    if (aimHold_.role.empty()) {
+        aimHold_.role = "target";
+    }
+    for (const stage::ScenarioDesc& scenario : stagingDesc_.scenarios) {
+        if (scenario.name != aimHold_.scenario) {
+            continue;
+        }
+        for (const stage::ActorDesc& actor : stagingDesc_.actors) {
+            if (actor.name == scenario.actor) {
+                // The body entity's node is what a hero is named after -- `EntityDesc::node`
+                // defaults to the entity's own name, and every shipped actor takes that default.
+                aimHoldState_.hero = actor.driven();
+                for (const entity::EntityDesc& e : entityDescs_) {
+                    if (e.name == actor.driven() && !e.node.empty()) {
+                        aimHoldState_.hero = e.node;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The hold (ADR-217), applied after the aim so it overrides it rather than racing it.
+//
+// Three states and they are exactly the three the brief describes: *on it* (the playhead is inside a
+// shot cut for the actor -- normal direction, but remember the pose), *holding* (that shot has ended
+// and the scenario has not, so keep the framing and ride along), and *releasing* (the scenario let
+// go, so rejoin the cut over `releaseSeconds` instead of snapping).
+//
+// Everything it reads is a pure function of the frame sequence: the scenario's own state, the
+// heroes the entity pass has just moved, and the timeline second. Nothing here is a wall clock, and
+// a seek clears the state so the second is a function of the second.
+void Composition::applyAimHold(const AimFollow* active) {
+    if (aimHold_.scenario.empty() || aimHoldState_.hero.empty() || heroes_.empty()) {
+        return;
+    }
+    const auto hero = std::find_if(heroes_.begin(), heroes_.end(), [&](const world::HeroPoint& h) {
+        return h.name == aimHoldState_.hero;
+    });
+    if (hero == heroes_.end()) {
+        aimHoldState_.armed = false;
+        aimHoldState_.holding = false;
+        return;
+    }
+    // "Engaged" is the scenario holding a claim on the role it works on, which is a fact the
+    // director already publishes and is not a beat name -- so this file stays as ignorant of what an
+    // abduction is as ADR-210 insisted the rest of the engine be.
+    const bool engaged = !staging_.binding(aimHold_.scenario, aimHold_.role).empty();
+    const bool onActor = active != nullptr && active->hero == aimHoldState_.hero;
+
+    if (onActor) {
+        // The cut is already where it should be. Remember the pose and the hero it belongs to, so a
+        // hold that starts at the end of this shot continues the framing the shot arrived at.
+        aimHoldState_.eye = scene_.camera.position;
+        aimHoldState_.target = scene_.camera.target;
+        aimHoldState_.heroAt = hero->position;
+        aimHoldState_.armed = engaged;
+        aimHoldState_.holding = false;
+        aimHoldState_.releaseFrom = -1.0;
+        return;
+    }
+    if (aimHoldState_.armed && engaged) {
+        const glm::vec3 delta = hero->position - aimHoldState_.heroAt;
+        scene_.camera.position = aimHoldState_.eye + delta;
+        scene_.camera.target = aimHoldState_.target + delta;
+        aimHoldState_.holding = true;
+        aimHoldState_.releaseEye = scene_.camera.position;
+        aimHoldState_.releaseTarget = scene_.camera.target;
+        return;
+    }
+    if (aimHoldState_.holding) {
+        aimHoldState_.holding = false;
+        aimHoldState_.armed = false;
+        aimHoldState_.releaseFrom = currentTime_;
+    }
+    if (aimHoldState_.releaseFrom >= 0.0 && aimHold_.releaseSeconds > 0.0) {
+        const double elapsed = currentTime_ - aimHoldState_.releaseFrom;
+        if (elapsed < 0.0 || elapsed >= aimHold_.releaseSeconds) {
+            aimHoldState_.releaseFrom = -1.0;
+            return;
+        }
+        const auto u = static_cast<float>(elapsed / aimHold_.releaseSeconds);
+        const float eased = u * u * (3.0f - 2.0f * u);
+        scene_.camera.position = glm::mix(aimHoldState_.releaseEye, scene_.camera.position, eased);
+        scene_.camera.target = glm::mix(aimHoldState_.releaseTarget, scene_.camera.target, eased);
+    }
+}
+
 // The aim, and only the aim.
 //
 // Not the position: the camera's path is the bake, and moving it would be re-cutting the shot one
@@ -1370,17 +1468,19 @@ void Composition::applyDirectedAim() {
             break;
         }
     }
-    if (active == nullptr) {
-        return;
-    }
-    const auto hero = std::find_if(heroes_.begin(), heroes_.end(),
-                                   [&](const world::HeroPoint& h) { return h.name == active->hero; });
-    if (hero == heroes_.end()) {
-        // The hero was unstarred or renamed since the cut. The shot keeps the aim it was baked
+    if (active != nullptr) {
+        const auto hero =
+            std::find_if(heroes_.begin(), heroes_.end(),
+                         [&](const world::HeroPoint& h) { return h.name == active->hero; });
+        // A hero that was unstarred or renamed since the cut leaves the shot the aim it was baked
         // with, which is the last place that hero was known to be -- a stale table is inert.
-        return;
+        if (hero != heroes_.end()) {
+            scene_.camera.target += hero->position - active->heroAtCut;
+        }
     }
-    scene_.camera.target += hero->position - active->heroAtCut;
+    // After the aim, because it overrides it: the hold's whole job is to keep a shot that the cut
+    // has moved on from (ADR-217). Inert unless a scenario was named.
+    applyAimHold(active);
 }
 
 // The two halves of the debounce, shared by "a hero followed its object" and "somebody edited one".
@@ -2037,6 +2137,42 @@ CompositionNode cloneNodeSpec(const CompositionNode& node) {
         copy.transform.scale = node.scaleParam->base();
     }
     return copy;
+}
+
+// The corners themselves, rather than the axis-aligned box `nodeBounds` folds them into.
+//
+// Two different questions, and the difference is a metre on a cow. "Does this fit inside a circle of
+// radius R" asked of the box is asked of something up to its own diagonal larger than the body: a
+// 3.6x farm animal is long and thin, and a yaw that is not a multiple of ninety degrees makes its
+// box very much wider than it is. The corners are the same eight points `nodeBounds` transforms --
+// this is that loop, stopping one step earlier.
+std::vector<glm::vec3> Composition::nodeCorners(const std::string& name) {
+    std::vector<glm::vec3> out;
+    const auto it = std::find_if(nodes_.begin(), nodes_.end(),
+                                 [&](const std::unique_ptr<CompositionNode>& n) { return n->name == name; });
+    if (it == nodes_.end()) {
+        return out;
+    }
+    ensureBuilt();
+    const auto index = static_cast<std::size_t>(std::distance(nodes_.begin(), it));
+    if (index >= ranges_.size()) {
+        return out;
+    }
+    const NodeRange& range = ranges_[index];
+    for (std::size_t e = range.firstEntity;
+         e < range.firstEntity + range.entityCount && e < scene_.entities.size(); ++e) {
+        const Entity& entity = scene_.entities[e];
+        if (entity.mesh >= scene_.meshes.size()) {
+            continue;
+        }
+        const auto& [lo, hi] = scene_.meshBounds(entity.mesh);
+        for (int corner = 0; corner < 8; ++corner) {
+            const glm::vec3 p((corner & 1) ? hi.x : lo.x, (corner & 2) ? hi.y : lo.y,
+                              (corner & 4) ? hi.z : lo.z);
+            out.push_back(transformPoint(entity.transform, p));
+        }
+    }
+    return out;
 }
 
 WorldBounds Composition::nodeBounds(const std::string& name) {

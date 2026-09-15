@@ -34,16 +34,32 @@ PARAMS = [
     p("abductSeconds",      4.6,   0.5,   30.0),   # Abduction Duration
     p("liftHeight",        -3.4, -40.0,    0.0),   # Animal Lift Height, under the saucer's belly
     p("animalSpin",       230.0,-1440.0,1440.0),   # Animal Rotation
-    p("animalWobble",       0.85,  0.0,   10.0),
+    # 0.85 before ADR-218. The sway is deliberate comedy and it is also a metre and a half of beam
+    # width: it adds directly to how far off the column's axis the animal can be, and the animal is
+    # 3.6x the size it was when 0.85 was chosen (ADR-213).
+    p("animalWobble",       0.40,  0.0,   10.0),
     p("animalWobbleRate",   1.35,  0.0,   10.0),
     p("animalGait",         1.30,  0.0,   10.0),   # the speed the gait reads: the legs keep going
     p("craftWobble",        0.30,  0.0,   10.0),
     p("craftWobbleRate",    0.45,  0.0,   10.0),
     p("gapSeconds",         3.2,   0.0,   60.0),   # Time Between Targets
-    p("beamSpawnRate",   2900.0,   0.0,20000.0),
+    # 2900 before ADR-218, for a disc of radius 3.6. The disc is now 7.8 -- a 4.7x area -- and a
+    # beam that keeps its spawn rate over four times the volume is a haze rather than a beam. The
+    # shortfall is made up twice: 2.1x the rate (which the node's capacity had to grow for) and
+    # 1.5x the mote, which together restore the coverage at rather less than 4.7x the cost.
+    p("beamSpawnRate",   6100.0,   0.0,20000.0),
     p("beamEmissive",       1.55,  0.0,   10.0),
-    p("beamRestRate",    1050.0,   0.0,20000.0),   # what the scene authored
+    # Zero rather than the 1050 the scene authored, and the reason is ADR-218: a particle system is
+    # *frozen* while it is hidden, not cleared, so a beam that is hidden while it still holds
+    # particles resumes them, unaged, wherever the craft is when it is shown again. Emission has to
+    # stop and the pool has to be allowed to empty before the beam may be hidden at all.
+    p("beamRestRate",       0.0,   0.0,20000.0),
     p("beamRestEmissive",   0.45,  0.0,   10.0),
+    # How long the beam is left *enabled*, emitting nothing, before it is hidden. Particles only age
+    # while their system is enabled, so this has to be at least the emitter's own `lifetimeMax`,
+    # which the scene authors at 5.0 s. It is spent inside the next approach, which lasts at least
+    # aimSeconds + approachSeconds = 7.8 s, so it costs the cut nothing.
+    p("beamDrainSeconds",   5.0,   0.0,   30.0),
 ]
 
 BEATS = [
@@ -70,7 +86,20 @@ BEATS = [
     ]),
     od([
         ("name", "approach"),
-        ("cues", [od([
+        ("cues", [
+         od([
+            ("role", "actor.beam"),
+            # ADR-218. The hide that used to end `depart` happens here instead, once the pool it
+            # would have frozen has had `beamDrainSeconds` of enabled time to empty. A beat ends when
+            # every one of its cues does, and this one is shorter than the approach it runs beside,
+            # so the sequence keeps exactly the timing it had.
+            ("steps", [
+                od([("kind", "wait"), ("name", "beamDrain"),
+                    ("duration", ref("beamDrainSeconds"))]),
+                od([("kind", "hide"), ("name", "beamOff")]),
+            ]),
+         ]),
+         od([
             ("role", "actor"),
             ("steps", [
                 od([("kind", "lookAt"), ("name", "aim"), ("to", "target"),
@@ -87,7 +116,8 @@ BEATS = [
                     ("duration", ref("approachSeconds")),
                     ("clearance", ref("cruiseClearance"))]),
             ]),
-        ])]),
+         ]),
+        ]),
         ("then", "beam"),
     ]),
     od([
@@ -119,6 +149,13 @@ BEATS = [
                 # And the same here, which is the beat the loop actually bit in: the saucer holds
                 # station over the *ground* the animal came off while the animal rises to meet it.
                 od([("kind", "follow"), ("name", "hold"), ("to", "target"),
+                    # ADR-218, and `setDesc` now refuses this beat without it. Once the animal takes
+                    # its station from where the craft is *drawn*, a craft still taking its own from
+                    # the animal closes a loop with the saucer's 2.4 m drift inside it -- the same
+                    # shape as ADR-210's 488 m climb, horizontally. A station resolved once has
+                    # nothing going round it, and during the lift there is nothing to follow anyway:
+                    # the animal is the director's to move.
+                    ("hold", True),
                     ("height", ref("hoverHeight")), ("aboveGround", True),
                     ("duration", ref("abductSeconds")),
                     ("clearance", ref("cruiseClearance")),
@@ -129,6 +166,12 @@ BEATS = [
                 # Up the beam: an eased rise toward the saucer's belly, spinning, wobbling, and with
                 # a gait speed written so the legs keep going all the way up.
                 od([("kind", "moveTo"), ("name", "lift"), ("to", "actor"),
+                    # ADR-218. The beam is a particle node parented to the saucer's *node*, and a
+                    # node carries the behaviours' offsets -- hover, drift, bank -- that
+                    # `Entity::state().position()` deliberately does not. Measured, the two are up
+                    # to 0.92 m apart, so a lift aimed at the simulation's craft rises beside the
+                    # column rather than up it. `visual` is the drawn place.
+                    ("anchor", "visual"),
                     ("height", ref("liftHeight")),
                     ("duration", ref("abductSeconds")),
                     ("spin", ref("animalSpin")),
@@ -149,7 +192,10 @@ BEATS = [
                     ("to", ref("beamRestRate")), ("duration", ref("beamFadeSeconds"))]),
                 od([("kind", "set"), ("name", "beamDim"), ("target", "emissive"),
                     ("to", ref("beamRestEmissive")), ("duration", 0.3)]),
-                od([("kind", "hide"), ("name", "beamOff")]),
+                # No `hide` here any more: see the note in `approach`. Hiding a system that still
+                # holds particles freezes them where they were emitted, and the next `show` -- two
+                # hundred metres away and eleven seconds later -- resumes them there, which is
+                # exactly the "beam drops from its old position before updating" that was reported.
             ])]),
             od([("role", "actor"), ("steps", [
                 od([("kind", "wait"), ("name", "beat"), ("duration", ref("gapSeconds"))]),
@@ -184,9 +230,25 @@ scene = json.load(open(SCENE), object_pairs_hook=od)
 scene["staging"] = STAGING
 # The beam is off until the director lights it. It was authored always-on, which is the right look
 # for a craft that never does anything and the wrong one for a craft that abducts things.
+# ADR-218. The beam has to be able to *contain* what it lifts, and ADR-213 made everything it lifts
+# 3.6 times bigger without anybody re-measuring the beam. Measured across the whole cast as authored,
+# the widest animal -- a bull -- reaches 5.80 m from the point the director puts on the beam's axis,
+# and the residual misalignment after the anchor and hold fixes is 1.42 m; 7.8 m covers both with a
+# little to spare and is, not by accident, just inside the saucer's own 7.99 m radius -- so the beam
+# now reads as the underside of the craft rather than as a spotlight bolted to it.
+BEAM_RADIUS = 7.8
 for node in scene["nodes"]:
     if node.get("name") == "visitor-beam":
         node["visible"] = False
+        ps = node["particles"]
+        ps["extent"] = [BEAM_RADIUS, BEAM_RADIUS, BEAM_RADIUS]
+        # The pool has to hold the higher rate for a full lifetime or the beam truncates:
+        # 6100/s * 5.0 s = 30500.
+        ps["capacity"] = 32768
+        ps["spawnRate"] = 0.0   # the rest rate is nothing now; the director lights it
+        grow = 1.49             # see beamSpawnRate: the half of the coverage the rate does not do
+        ps["sizeStart"] = round(0.44 * grow, 3)
+        ps["sizeEnd"] = round(0.05 * grow, 3)
 with open(SCENE, "w") as out:
     json.dump(scene, out, indent=1)
 print("staging written to %s; now run tools/refresh_scene_fingerprint.py" % SCENE)

@@ -74,6 +74,7 @@ std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state) {
     // "the camera fights me".
     if (scene::Composition* composition = engine.composition()) {
         composition->setAimFollow({});
+        composition->setAimHold({}); // ADR-217; the hold belongs to the cut, not to the viewport
     }
     // ADR-207: and so does the shot schedule. A world effect gated on "the camera is travelling"
     // must not keep firing against a cut that is no longer driving anything.
@@ -336,6 +337,15 @@ Result<void> AutoDirectorSettings::validate() const {
     if (dwellShots < 1 || dwellShots > 12) {
         return fail("auto-director: a subject must be held for 1..12 shots, not {}", dwellShots);
     }
+    // ADR-217. A named scenario with no role to watch would hold for ever, and a release of zero is
+    // a cut that snaps -- both are refused rather than guessed at.
+    if (!holdScenario.empty() && holdRole.empty()) {
+        return fail("auto-director: holding on scenario '{}' needs a role to watch (holdRole)",
+                    holdScenario);
+    }
+    if (holdReleaseSeconds < 0.0 || holdReleaseSeconds > 30.0) {
+        return fail("auto-director: the hold's release must be 0..30 s, not {}", holdReleaseSeconds);
+    }
     return {};
 }
 
@@ -349,6 +359,9 @@ nlohmann::json AutoDirectorSettings::toJson() const {
                           {"maxSpeed", maxCameraSpeed},
                           {"maxSwing", maxViewRate},
                           {"dwell", dwellShots},
+                          {"holdScenario", holdScenario},
+                          {"holdRole", holdRole},
+                          {"holdRelease", holdReleaseSeconds},
                           {"seed", seed}};
 }
 
@@ -377,6 +390,9 @@ Result<AutoDirectorSettings> AutoDirectorSettings::fromJson(const nlohmann::json
     out.maxCameraSpeed = doc.value("maxSpeed", out.maxCameraSpeed);
     out.maxViewRate = doc.value("maxSwing", out.maxViewRate);
     out.dwellShots = doc.value("dwell", out.dwellShots);
+    out.holdScenario = doc.value("holdScenario", out.holdScenario);
+    out.holdRole = doc.value("holdRole", out.holdRole);
+    out.holdReleaseSeconds = doc.value("holdRelease", out.holdReleaseSeconds);
     out.seed = doc.value("seed", out.seed);
     // Refused rather than clamped. A project is written by this application, so the only route to a
     // value outside the range is a hand edit or a file from a build that meant something else by
@@ -421,10 +437,11 @@ Result<std::size_t> directEngine(Engine& engine, std::span<const world::HeroPoin
     }
     log::info("auto-director: {:.0f}s of audio folded into {} section(s)",
               structure->durationSeconds(), structure->sections.size());
-    return installSequence(engine, *sequence);
+    return installSequence(engine, *sequence, settings);
 }
 
-Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
+Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
+                                   const AutoDirectorSettings& settings) {
     if (auto ok = sequence.validate(); !ok) {
         return std::unexpected(ok.error());
     }
@@ -551,6 +568,22 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
         log::info("auto-director: {} of {} shot(s) hold a subject and will follow it",
                   follow.size(), sequence.shots.size());
         composition->setAimFollow(std::move(follow));
+        // ADR-217. Inert unless the settings name a scenario, and inert again if the scenario or
+        // its actor is not in this scene -- `setAimHold` resolves the actor's hero name and leaves
+        // it empty when it cannot, which is what makes a stale setting do nothing rather than
+        // something wrong.
+        composition->setAimHold(scene::AimHold{.scenario = settings.holdScenario,
+                                               .role = settings.holdRole,
+                                               .releaseSeconds = settings.holdReleaseSeconds});
+        if (!settings.holdScenario.empty()) {
+            if (composition->aimHeldHero().empty()) {
+                log::warn("auto-director: hold names the scenario '{}', which this scene does not "
+                          "stage; the camera will not hold", settings.holdScenario);
+            } else {
+                log::info("auto-director: holding the cut on '{}' while '{}' has a '{}'",
+                          composition->aimHeldHero(), settings.holdScenario, settings.holdRole);
+            }
+        }
     }
     // ADR-207: the cut, flattened for world effects to time-gate against. Installed with the keys
     // rather than derived per frame, for the same reason the keys exist at all -- a shot schedule is

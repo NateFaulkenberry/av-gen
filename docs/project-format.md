@@ -131,7 +131,8 @@ an empty `preset` is a marker.
 ```json
 "autoDirector": {
   "mode": "edited", "minShot": 5.0, "minBuildShot": 2.0, "maxShot": 12.0,
-  "wide": 24.0, "hero": 50.0, "maxSpeed": 0.4, "maxSwing": 8.0, "dwell": 6, "seed": 1
+  "wide": 24.0, "hero": 50.0, "maxSpeed": 0.4, "maxSwing": 8.0, "dwell": 6,
+  "holdScenario": "abduction", "holdRole": "target", "holdRelease": 1.0, "seed": 1
 }
 ```
 
@@ -148,6 +149,12 @@ Values are refused rather than clamped when they fall outside what `AutoDirector
 accepts: shot lengths in (0, 120] s with the build's minimum no longer than the ordinary one, focal
 lengths in [8, 400] mm with the wide no longer than the hero, `maxSpeed` 0 (off) or 0.1–2000 m/s,
 `maxSwing` 0 (off) or 1–720 deg/s, and `dwell` 1–12 shots.
+
+`holdScenario` (ADR-217) names a `staging` scenario in the loaded scene, or is absent/empty — the
+default — for off. While that scenario holds `holdRole` bound and the shot the playhead is in was cut
+for the scenario's own actor, the camera keeps that shot's framing on the actor and rides along with
+it, rejoining the cut over `holdRelease` seconds when the scenario lets go. A named scenario with an
+empty `holdRole` is refused; `holdRelease` must be 0–30 s.
 
 ## Scene composition files (milestone 0.7, ADR-017)
 
@@ -540,8 +547,21 @@ many metres of canopy over it; `requireNavigable` rejects one off the map or in 
   above a target while the target rises toward the craft reads the other's *new* height every frame
   -- so a beat shaped like that is refused at load, and `aboveGround` on one of them is the fix: it
   anchors that end to the terrain, which does not move. The horizontal half of the coupling is fine
-  and is the point. `travel: "walk"` hands the move to `ActionKind::Move` instead — routed, steered and
+  and is the point -- *until* `anchor` enters it (below), which is what `hold` is for.
+  `travel: "walk"` hands the move to `ActionKind::Move` instead — routed, steered and
   gaited by the navigation layer, identical to a walk the entity chose for itself.
+- `anchor` (ADR-218) is `"travel"` (the default, and what every step meant before it existed) or
+  `"visual"`. A body has two positions: `Entity::state().position()` is where the simulation put it,
+  and the node it drives is drawn at that plus the behaviours' offsets -- hover, drift, bank -- which
+  the entity layer folds on afterwards, on purpose. Anything that has to line up with something
+  parented to that node (a tractor beam, a mounted light) must measure from the drawn place;
+  Glowmere's saucer drifts 2.4 m, so a lift aimed at the simulated one rises beside the beam.
+- `hold` (ADR-218), on a `follow`, resolves the station **once** and keeps it — the brief's *hover*
+  as distinct from its *follow*. It is also what makes `anchor: "visual"` safe: two cues taking their
+  station from each other put whatever is added on the way round into a loop every frame, and a
+  behaviour offset's time integral (twelve metres, for a 2.4 m drift at 0.031 Hz) is not the eleven
+  centimetres a wobble's is. A beat where two roles chase each other and either measures from the
+  drawn position is **refused at load**, naming both and saying to hold one.
 - `play` names an **activity**, never a clip; `EntityDesc::clips` maps it per asset.
 - `set` / `show` / `hide` write a parameter. A bare `target` resolves against the role's node
   exactly as an entity reaction's does, so `"spawnRate"` on a particle node finds

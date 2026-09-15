@@ -84,7 +84,8 @@ std::string usageText() {
            "                      musical sections and shoots the world's heroes\n"
            "  --director <k=v,..> --direct with the Auto-director panel's settings: mode=continuous|edited,\n"
            "                      minShot, minBuildShot, maxShot (s), wide, hero (mm), maxSpeed (m/s),\n"
-           "                      maxSwing (deg/s), dwell (shots), seed\n"
+           "                      maxSwing (deg/s), dwell (shots), seed,\n"
+           "                      holdScenario (a staging scenario to stay with), holdRole, holdRelease (s)\n"
            "  --save-project <f>  write the project on exit\n"
            "  --play              start playback immediately\n"
            "  --frames <n>        exit after n frames\n"
@@ -2260,6 +2261,16 @@ Result<void> applyDirectorArgs(AutoDirectorSettings& s, std::string_view spec) {
             return {};
         };
         double v = 0.0;
+        // ADR-217: two of the hold's three settings are names rather than numbers, so they are
+        // handled before the number parse the rest share.
+        if (key == "holdScenario") {
+            s.holdScenario = value;
+            continue;
+        }
+        if (key == "holdRole") {
+            s.holdRole = value;
+            continue;
+        }
         if (key == "mode") {
             if (value == "continuous") {
                 s.mode = DirectorMode::ContinuousShot;
@@ -2289,6 +2300,8 @@ Result<void> applyDirectorArgs(AutoDirectorSettings& s, std::string_view spec) {
             s.maxViewRate = static_cast<float>(v);
         } else if (key == "dwell") {
             s.dwellShots = static_cast<int>(v);
+        } else if (key == "holdRelease") {
+            s.holdReleaseSeconds = v;
         } else if (key == "seed") {
             s.seed = static_cast<std::uint32_t>(std::max(0.0, v));
         } else {
