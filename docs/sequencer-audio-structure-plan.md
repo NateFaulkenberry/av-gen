@@ -97,3 +97,85 @@ of it — a table from section kind to behaviour, not a second director.
   current opinion, not of correctness.
 - The transport still works after the Control-section controls are deleted — including with no audio
   loaded, which is the ADR-102 case.
+
+---
+
+# Addendum — research-grounded structure detection (MSA)
+
+The detector is upgraded from the existing fold to a real Music Structure Analysis pipeline:
+beat-synchronous features → self-similarity → Foote novelty → boundaries → recurrence grouping →
+functional labelling with confidence. References: Foote (2000) *Automatic Audio Segmentation Using
+a Measure of Audio Novelty*; FMP C4S4 novelty-based segmentation; librosa's `recurrence_matrix`;
+MIREX Structural Segmentation.
+
+**Boundary detection and functional labelling are two problems and must not be conflated.** A
+boundary can be reliable while its label is a guess, and the model has to be able to say
+`47.312 → 71.842, likely Chorus, confidence 0.87` rather than asserting the label.
+
+## What the analyser already gives us
+
+This is better than expected, and it decides the design.
+
+| Needed for MSA | Already in `src/analysis/` |
+|---|---|
+| Per-frame spectrum | `AnalysisFrame::magnitude` — linear bin magnitudes, sine-normalised. Chroma and a timbre vector fold out of this; **no new FFT infrastructure is required** |
+| Onset / spectral flux | `flux`, `onsetStrength`, `onset` (peak-picked) |
+| Energy | `rms`, `peak`, `bands`, `bandsRaw` |
+| Timbre proxy | `centroidHz`, `centroidNorm`, the band array |
+| **Beat times for the whole track** | `OfflineBeats::beatTimes` — **Ellis (2007) dynamic-programming beat tracking is already implemented** (`trackBeatsOffline`), with a tempogram helper and a confidence |
+| Whole-track offline pass | `AnalysisTrack::analyze(file, config, beatConfig)` |
+
+Beat-synchronous aggregation is the prerequisite for everything else in a Foote pipeline, and the
+beat grid is already there. That is the expensive half.
+
+## What has to be built
+
+A new `src/analysis/structure.{hpp,cpp}` — new files, in a directory no in-flight branch touches,
+so this is the one part of both briefs that can start immediately.
+
+1. **Chroma**, folding `magnitude` bins onto twelve pitch classes; and a compact **timbre** vector
+   (log-band energies, roughly MFCC-shaped). Both normalised per frame.
+2. **Beat-synchronous aggregation** — median of each feature over each beat interval, so the matrix
+   is beats square rather than hops square. A four-minute track is ~500 beats, so a dense 500×500
+   SSM is trivial; at hop resolution it would be ~20,000² and is not.
+3. **Self-similarity matrices**, one per feature family (harmonic, timbral, energetic), combined
+   with weights. Cosine similarity, then a percentile-based normalisation so a quiet track and a
+   loud one produce comparable matrices.
+4. **Foote novelty** — a checkerboard kernel convolved down the SSM diagonal, at two or three kernel
+   widths so both a 4-bar and a 32-bar change are visible. Peak-picking gives candidate boundaries.
+5. **Recurrence grouping** — thresholded nearest-neighbour recurrence between segments to find
+   repetition families, so Verse 1 / Verse 2 and the repeated choruses group together.
+6. **Functional labelling** from structural evidence, not from one heuristic: position in the piece,
+   repetition-family membership and how often the family recurs, energy and density relative to the
+   track's own distribution, and what precedes and follows. Genre robustness is a requirement, not a
+   nicety: on an ambient track the honest answer is `Section A / Section B` with good boundaries,
+   **not** a confidently hallucinated Verse/Chorus.
+7. **Confidence**, separately for each boundary and for each label.
+
+### Metrics must not be fabricated
+
+The brief is explicit and it is the right rule: do not report `tension = 0.83` because a formula
+produced a number. `energy` and `density` have defensible definitions from the existing features.
+`tension` does not, yet — so it is either derived from something real (rising energy plus rising
+density plus harmonic instability across a window) or it is not reported at all. An absent metric is
+better than an invented one, and this project has already paid for the opposite choice.
+
+## Testing this honestly
+
+The hard part is that **there is no ground truth in the repository**, and a test asserting the
+analyser finds a chorus at 1:02.4 tests the analyser's current opinion, not correctness.
+
+So: **structural invariants, and synthetic fixtures with known construction.** A generated signal of
+the form `A B A B C A` — distinct chroma and timbre per letter, at a fixed tempo — has boundaries
+that are known exactly because they were placed, and a repetition grouping that is known because it
+was built. That tests the pipeline without pretending to test musical judgement. Invariants worth
+asserting on any input: sections are ordered, non-overlapping, gapless, cover the track, carry
+sub-second precision, and are deterministic for identical input.
+
+Detection quality on real music is *reported*, not asserted.
+
+## Performance and caching
+
+Analysis runs once, asynchronously, on import — never per frame. The result is cached in the project
+so reopening does not recompute. Determinism is required: the same audio must produce the same
+boundaries, which rules out anything seeded by wall-clock or thread scheduling.
