@@ -22,6 +22,7 @@
 #include "scene/field_params.hpp"
 #include "scene/light_rig.hpp"
 #include "scene/material_params.hpp"
+#include "scene/rebuild_deferral.hpp"
 #include "stage/staging.hpp"
 #include "scene/sdf_object.hpp"
 #include "scene/spline_params.hpp"
@@ -677,25 +678,27 @@ public:
     // Objects currently holding a regeneration back, for the editor to show. Never a silent state:
     // geometry that is deliberately a few frames behind the slider has to say so.
     [[nodiscard]] std::size_t proceduralsAwaitingRebuild() const;
+    // How many times this composition has re-flattened -- the all-or-nothing rebuild that
+    // `dirty_` gates. Counted so an interaction can be judged by what it *caused* rather than by
+    // how long the machine happened to take: "one flatten per click" and "one per frame of the
+    // drag" are different defects and a millisecond figure on a contended machine tells them apart
+    // badly.
+    [[nodiscard]] std::uint64_t flattenCount() const { return flattens_; }
+    // Restores the pre-fix behaviour: generate inside the parameter pass *as well as* in
+    // rebuildProcedurals(). It exists for the same reason AVGEN_SCATTER_WORKERS does -- so the
+    // comparison that justified removing it stays runnable rather than becoming a claim about two
+    // binaries that no longer both exist -- and so `--ui-ab` can interleave the two arms inside one
+    // process, which is the only kind of frame-time comparison this project accepts. Never set by
+    // anything but that A/B: offline and ordinary live editing take the fixed path.
+    void setLegacyProceduralGeneration(bool on) { legacyProceduralGeneration_ = on; }
+    [[nodiscard]] bool legacyProceduralGeneration() const { return legacyProceduralGeneration_; }
 
     // Per-object regeneration cost and deferral state, indexed into the flattened procedural list.
     // Cleared by rebuild(), which is also what rebuilds that list, so the indices cannot go stale.
-    // Public because the policy that reads it is a free function -- see advanceRebuildDeferral in
-    // composition.cpp, which is pure and is where the behaviour is pinned.
-    //
-    // Two timers, not one, and they answer different questions. `settledForMs` asks "have the
-    // inputs stopped moving?" and restarts whenever they move again -- a drag restarts it every
-    // frame, which is what keeps the drag out of the regeneration. `heldForMs` asks "how long has
-    // this object been wrong?" and only resets when it is actually regenerated, so a drag that goes
-    // on for seconds still gets a refresh. With one timer the second question cannot be asked at
-    // all: the first thing a moving target does is reset it.
-    struct ProceduralRebuildState {
-        double lastMs = 0.0;            // what this object's last regeneration actually cost
-        double settledForMs = 0.0;      // since its inputs last moved
-        double heldForMs = 0.0;         // since it first wanted to regenerate and was not let
-        bool deferring = false;
-        std::uint64_t deferredHash = 0; // the hash it is waiting to reach
-    };
+    // The policy that reads it is a pure free function in scene/rebuild_deferral.hpp, shared now
+    // with the renderer's environment rebuild; this name is kept because a great deal of code and
+    // several tests already say it.
+    using ProceduralRebuildState = RebuildDeferral;
     void clearGraph();
     [[nodiscard]] const std::vector<std::string>& graphWarnings() const { return graphWarnings_; }
     // Re-evaluates the graph when dirty and installs the result (called by update()).
@@ -854,6 +857,8 @@ private:
     Scene scene_;
     std::vector<std::unique_ptr<CompositionNode>> nodes_;
     bool dirty_ = true;
+    std::uint64_t flattens_ = 0;
+    bool legacyProceduralGeneration_ = false;
     glm::vec3 center_{0.0f};
     float radius_ = 1.0f;
     float cameraAngle_ = 0.0f;
@@ -1096,12 +1101,5 @@ private:
 };
 
 
-// The interactive-rebuild policy, as a pure function: state in, decision out, no clock read inside.
-// True means regenerate this object now. Defined in composition.cpp beside its only caller and
-// pinned in tests/unit/test_composition.cpp, because the behaviour that matters -- a drag never
-// reaching a regeneration, and a released slider always reaching one -- is a property of this
-// arithmetic and not of any scene.
-[[nodiscard]] bool advanceRebuildDeferral(Composition::ProceduralRebuildState& state, std::uint64_t wanted,
-                                          std::uint64_t built, double elapsedMs);
 
 } // namespace avgen::scene

@@ -7,6 +7,8 @@
 
 #include "core/phase_profiler.hpp"
 
+#include <cstdlib>
+#include <string_view>
 #include <functional>
 #include <map>
 #include <set>
@@ -115,6 +117,19 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
     if (mode_ == EngineMode::Live) {
         if (auto* comp = composition()) {
             comp->setInteractiveRebuildBudget(2.0);
+        }
+    }
+    // AVGEN_LEGACY_PROCGEN=1 restores the pre-ADR-233 double generation, in *any* mode, for one
+    // purpose: so that a headless capture can be taken both ways out of the same binary and the
+    // two compared byte for byte. A switch that only the live editor could reach would leave the
+    // determinism claim resting on two builds that no longer both exist -- the same reason
+    // AVGEN_SCATTER_WORKERS and AVGEN_NO_TERRAIN_CACHE exist. Unset, which is every ordinary run,
+    // nothing here happens.
+    if (const char* legacy = std::getenv("AVGEN_LEGACY_PROCGEN");
+        legacy != nullptr && std::string_view(legacy) == "1") {
+        if (auto* comp = composition()) {
+            comp->setLegacyProceduralGeneration(true);
+            log::warn("AVGEN_LEGACY_PROCGEN=1: procedurals generate twice per frame (the pre-ADR-233 path)");
         }
     }
     // Scene swaps clear the parameter set, so sources, post settings and shader layers must

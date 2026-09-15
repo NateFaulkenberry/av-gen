@@ -603,8 +603,21 @@ constexpr int kMaxEffectors = spatial::kMaxEffectors;
                                                                 const ProceduralGeometry& rest,
                                                                 const std::string& prefix);
 // Copies parameter finals into `live` (rest values are the scene-file authored values; the
-// parameters' bases default to them). Calls live.rebuild() when structure changed. Returns true
-// when a structural rebuild happened.
+// parameters' bases default to them) and **generates nothing**. Returns false only when there are
+// no parameters to apply.
+//
+// Generation is a separate decision because it needs something this function does not have: the
+// `GenerationContext` -- the scene's other procedural objects and its splines. A spline
+// distribution or a `PrimitiveKind::Procedural` source generated against an empty context produces
+// a placeholder, and a placeholder's hash is not the hash of the real thing, so the object is
+// regenerated again the moment somebody asks for it properly. `Composition::applyParameters` calls
+// this and then lets `rebuildProcedurals()` generate, once, with the real context and under the
+// interactive budget -- which is what the comment beside that call site has always claimed.
+bool applyProceduralParameterValues(const ProceduralParameters& p, const ProceduralGeometry& rest,
+                                    ProceduralGeometry& live);
+// The same, then `live.rebuild()` against an empty context. Returns true when that rebuild
+// regenerated. For callers that have no scene around them -- the tests, and anything holding a
+// single object -- where an empty context is the whole truth rather than a placeholder for one.
 bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGeometry& rest, ProceduralGeometry& live);
 void unregisterProceduralParameters(params::ParameterSet& params, const ProceduralParameters& p);
 
@@ -648,5 +661,17 @@ struct ProceduralParameters {
     params::Parameter<float>* lodHysteresis = nullptr;      // lod/hysteresis
     std::array<params::Parameter<float>*, 3> lodDistance{}; // lod/distance1..3
 };
+
+// How many procedural clouds this process has actually regenerated, counted inside
+// `ProceduralGeometry::rebuild` where the work happens rather than at a call site somebody believes
+// is the only one. Two call sites reach it per frame per object -- `applyProceduralParameters` ends
+// with an unbudgeted `rebuild()` of its own, and `Composition::rebuildProcedurals` then rebuilds
+// against the real context -- and a counter at either one would have reported half the truth.
+//
+// This is the structural evidence a timing cannot give on a contended machine: "three regenerations
+// where there were forty" survives a load average of thirty, and a millisecond delta does not.
+// Relaxed atomic because the world builder regenerates on a job worker; the increment is noise
+// beside the generation it counts.
+[[nodiscard]] std::uint64_t proceduralRebuildCount() noexcept;
 
 } // namespace avgen::scene
