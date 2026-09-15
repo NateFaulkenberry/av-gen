@@ -124,13 +124,52 @@ event by a whole swapchain wait and make the measurement blind to the thing bein
 ### Flags
 
 ```
---ui-script <arms>        hover,sliders,panels,select,scrub,camera,tabs -- or idle, or all
+--ui-script <arms>        hover,sliders,panels,select,scrub,camera,tabs,edit,strip,gizmo,box
+                          -- or idle, or all
+--ui-ab <a>:<b>:...       interleave those arms as blocks of ONE process and report them side
+                          by side (ADR-233). An arm may carry '+legacy' or '+skynow', each
+                          restoring one pre-ADR-233 behaviour for the length of its block
+--ui-ab-frames <n>        frames per block (default 120; keep it a multiple of 60)
+--ui-ab-blocks <n>        passes over the arm list (default 4)
+--ui-ab-settle <n>        frames discarded after each switch (default 12)
 --profile-cpu             print the per-phase distribution on exit
---profile-csv <file>      one row per frame, every phase
+--profile-csv <file>      one row per frame, every phase; the group is the first column
 --canvas-scale <f>        render the world at this fraction of the canvas's pixels (0.25-1.0)
-AVGEN_SLIDER_FILTER=<p>   restrict the sliders arm to parameters under this path prefix
+AVGEN_SLIDER_FILTER=<p>   restrict the sliders arm to parameters under this path prefix --
+                          the *cycle*, not only the writes, so one slider means every frame
 AVGEN_SLOW_PHASE_MS=<ms>  a phase slower than this logs what the script wrote on that frame
+AVGEN_LEGACY_PROCGEN=1    restore the pre-ADR-233 double generation, in any mode, so a
+                          headless capture can be taken both ways out of one binary
 ```
+
+### `--ui-ab`, and why a shell loop over `--ui-script` is not the same thing (ADR-233)
+
+Rule 1 of §3 forbids comparing a frame time from one run against another, and on this machine that
+is a practical constraint rather than a pedantic one: the load average during this pass ranged from
+6 to 44. `--ui-ab` cycles the arms as blocks inside one session and reports each one's distribution
+in one table, so the columns were measured seconds apart under the same contention.
+
+Three details are load-bearing:
+
+- **The settling frames belong to no arm.** The first `--ui-ab-settle` frames of a block are
+  labelled `kNoGroup` and excluded. An arm inherits its predecessor's deferral timers and warm
+  pipelines; twelve foreign frames in a block of 120 is a 10% error in one direction.
+- **A block must be a multiple of sixty.** The pointer arms repeat a gesture on a 60-frame cycle.
+  At 90 the gizmo arm went three blocks without completing a press -- and its own probe is what
+  said so.
+- **An empty group reports no samples rather than zero milliseconds.** A column of zeros meaning
+  "this arm never ran" and one meaning "this arm was free" must not look the same.
+
+### The structural counters
+
+`# procedural regen`, `# scene flattens` and `# IBL builds` sit in the same table as the timings,
+per frame. §3 rule 2 explains why they matter more than the milliseconds beside them: "none where
+there were twenty-two" survives a load average of forty-four, and ADR-170 is the case where exactly
+that distinction stopped a phantom regression being filed.
+
+The procedural counter lives **inside `ProceduralGeometry::rebuild`**, not at a call site. That is
+why it found anything: there were two call sites per object per frame (§19), and a counter at either
+one would have reported half the truth.
 
 That last one is how "changing a property costs 200 ms" became the name of the property. Bisecting
 by prefix was not enough — the cost turned out not to be attached to any single prefix but to a
@@ -532,9 +571,23 @@ anywhere in `src/`**.
    for it. The editor's *hover* no longer goes near it: the live
    ghost marches a ray against `WorldMap::sample` on the CPU instead (ADR-092), because a preview
    that follows the cursor cannot block on the GPU sixty times a second.
-5. **The audio-driven root transform** could regenerate every procedural cloud per frame in a scene
-   whose root scale or rotation is audio-routed. P1-1.
-6. **482 allocations per frame** in the composition update. P3-1.
+5. ~~**The audio-driven root transform** could regenerate every procedural cloud per frame in a scene
+   whose root scale or rotation is audio-routed.~~ -- **wider than this, and fixed, ADR-233.** It
+   needed no audio at all: any node not at the world origin was enough, because the node transform
+   was folded into `distributionTransform` *after* the parameter pass had already generated against
+   the unfolded one and stored that hash. The two hashes ping-ponged, so every procedural object in
+   every scene regenerated twice per frame for ever -- measured at **22 per idle frame** on an
+   eleven-node scene. `applyProceduralParameterValues` applies without generating;
+   `rebuildProcedurals()` generates once, with the real context, under the budget.
+   `AVGEN_LEGACY_PROCGEN=1` restores the old path so the comparison stays runnable. P1-1, closed.
+6. **482 allocations per frame** in the composition update. P3-1. §18 names where most of them are:
+   the per-slot `std::string` concatenation inside `applyProceduralParameters`.
+7. **The sky's IBL was rebuilt inside the frame of a lighting drag** -- **fixed, ADR-233.** It took
+   `render.record` to a 26.5 ms mean and 77 ms p95 during a sky drag. It now takes ADR-084's
+   deferral, through the same pure function, moved to `scene/rebuild_deferral.hpp`. §18 has the
+   numbers.
+8. **~90 linear parameter lookups per procedural node per frame** in `applyProceduralParameters`
+   (§18, row 7). Now the largest identified item in `engine.update`. Not fixed.
 
 ---
 
@@ -638,3 +691,127 @@ It failed on its first four runs and every failure was a finding, which is what 
    35.76 s where it had reported 0.00.
 
 A UI cannot be certified by reading its source, and this is the shape of the alternative.
+
+---
+
+## 18. Interaction, measured (ADR-233)
+
+ADR-231 measured **loading**. The complaint that followed it is about **interaction**. This section
+is that measurement and what it found; the decisions are in ADR-233.
+
+Every number below was taken with `--ui-ab`, interleaved inside one process, on
+`examples/world/glowmere-stylized.json` at `--size 1440x900`, three blocks of 120 frames per arm. No
+figure here compares two process runs.
+
+### The matrix
+
+Nine arms, one session. Medians, in milliseconds.
+
+| | idle | sliders | scrub | box | gizmo | camera | hover | panels | strip |
+|---|---|---|---|---|---|---|---|---|---|
+| `engine.update` | 0.454 | 0.434 | 0.426 | 0.440 | 0.438 | 0.453 | 0.452 | 0.450 | 0.459 |
+| `ui.build` | 0.275 | 0.174 | 0.175 | 0.249 | 0.181 | 0.197 | 0.203 | 0.241 | 0.261 |
+| `render.record` | 0.705 | 0.660 | 0.753 | 0.675 | 0.669 | 0.704 | 0.698 | 0.699 | 0.716 |
+| `gpu.acquire WAIT` | 5.72 | 6.76 | 5.81 | 5.73 | 6.76 | 5.75 | 5.76 | 5.75 | 5.73 |
+| `input->present` | — | — | — | 1.98 | — | 2.08 | 2.08 | — | — |
+| `# procedural regen` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `# scene flattens` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `# IBL builds` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| FRAME median | 7.98 | 8.42 | 8.27 | 8.12 | 8.48 | 7.95 | 7.97 | 7.96 | 7.97 |
+| FRAME max | 25.9 | 9.3 | 9.4 | 25.1 | 9.3 | 9.2 | 9.8 | 9.2 | 26.4 |
+
+**The most valuable rows are the three counters and `ui.build`**, and both are negative results.
+
+- **A slider drag causes no flatten.** Not one, in any arm, in any run. The derived-copy rule holds
+  and was not touched. For scale, one cold flatten of this project costs **942 ms**.
+- **The UI is not the problem.** `ui.build` never crossed **0.28 ms** across nine arms against a
+  budget of 1.0 and a frame of 8.33. That is the whole Dear ImGui pass: every panel, the viewport
+  editor, the gizmo overlay, the sequencer strip. Per-panel attribution was not pursued because the
+  total forecloses it. **Opening and closing panels** is the one UI interaction that costs anything
+  visible, and it is a one-off spike (the `panels` arm's 26 ms maximum: a dock rebuild), not a
+  per-frame cost.
+- **The frame is the GPU's.** 5.7 ms of an 8.0 ms frame is the swapchain wait. That is
+  `docs/renderer-2-architecture.md`'s subject; §7 remains this document's contribution to it.
+
+### Input-to-visible-change, for a control that triggers world work
+
+`input->present` measures ~2.0 ms for the pointer arms and cannot measure the value arms at all —
+they write the parameter directly, as a widget's own `changed` branch does, and produce no input
+event to be old. The honest figure for "I moved a slider, when do I see it" is therefore two numbers
+and not one:
+
+- the frame that carries the write: **one frame**, and its cost is the arm's FRAME median;
+- geometry or sky whose regeneration exceeds the 2 ms interactive budget: **90 ms after the drag
+  settles**, by design (ADR-084 §9.2), with a mid-drag ceiling of `max(90 ms, 4 x last cost)`. The
+  canvas says so while it is waiting.
+
+### Two things were rebuilt every frame that nobody had changed
+
+Both found by the counters rather than by the clock. Full account in ADR-233.
+
+**Twenty-two procedural regenerations per idle frame** — exactly twice the scene's eleven procedural
+nodes. `applyProceduralParameters` ended with a `rebuild()` against an empty `GenerationContext` and
+stored that hash; `rebuildProcedurals()` then rebuilt against the real one and stored its own; next
+frame the first disagreed right back. Interleaved, `idle+legacy` against `idle`:
+
+| | before | after |
+|---|---|---|
+| `# procedural regen` per frame | 22 | **0** |
+| `engine.update` median | 0.740 ms | **0.430 ms** |
+
+The frame median did not move, because on this scene the frame is the GPU's. 0.31 ms of main-thread
+work returned is headroom, not frames, and saying otherwise -- implying a fix bought frames it did
+not buy -- is the one thing ADR-231 §6 is emphatic about not doing.
+
+**The procedural sky's IBL rebuilt inside the frame, on 46% of the frames of a lighting drag.**
+`EnvironmentProcessor::processSky`'s own header says it is load-time work; a drag on any of the ten
+sky parameters, or on the key light its sun is resolved from, changed the hash every frame.
+`AVGEN_SLIDER_FILTER=env/sky`, `--ui-ab idle:sliders+skynow:sliders`:
+
+| | idle | before | after |
+|---|---|---|---|
+| `# IBL builds` per frame, mean | 0 | 0.463 | **0.065** |
+| `render.record` mean | 0.98 ms | 26.54 ms | **3.76 ms** |
+| `render.record` p95 | 1.03 ms | 77.24 ms | **36.92 ms** |
+| FRAME median | 33.12 ms | 40.08 ms | **33.08 ms** |
+| FRAME p95 | 50.40 ms | 85.11 ms | **60.18 ms** |
+| frames over 50 ms, of 324 | 34 | 147 | **56** |
+
+A sky drag now costs the same median frame as an idle editor. With `AVGEN_SLIDER_FILTER=lightrig/`:
+IBL builds per frame 0.204 → **0.080**, `render.record` mean 11.87 → **4.83 ms**, frames over 50 ms
+92 → **66**.
+
+### The per-frame UI audit, recorded and deliberately not acted on
+
+Found while looking for the cause, and kept because §5's negative result means nobody should repeat
+it. None of this was changed: `ui.build` is 0.28 ms and the budget is 1.0.
+
+| | where | what |
+|---|---|---|
+| 1 | `src/ui/world_panel.cpp:32-128`, `:257-311` | `influencesOf` rescans every modulation route, timeline track, cue (a `presets().find()` by string each), scene state, entity and world macro, **per parameter row**, allocating a vector and several strings each time |
+| 2 | `src/ui/control_panel.cpp:1247-1261` | `drawParameters` rebuilds a `vector<string>` order and an `unordered_map<string, vector<IParameter*>>` grouping over every exposed parameter, every frame |
+| 3 | `src/ui/world_edit_panel.cpp:523-538` | the map built to avoid "a hundred and sixty thousand string comparisons a frame" calls the linear `findNode` inside its own loop, so it is the O(n²) scan it set out to replace |
+| 4 | `src/ui/world_editor.cpp:43`, `:98`, `:156` | `visuals_ = EditorVisuals{}` discards every vector instead of clearing it; `nodeBounds` per selected node reaches `ensureBuilt()`, a UI read that *can* trigger a flatten; two parent-chain walks per node, each via `findNode` |
+| 5 | `src/ui/world_editor.cpp:198-388` | `updateNavigation` walks up to 12,000 grid cells and formats `navStatus_` with five `fmt::format` calls every frame, for a string only the World panel's Debug tab ever shows |
+| 6 | `src/params/parameter_set.cpp:10-18` | `find(string_view)` does `index_.find(std::string(path))` — a heap allocation on **every** parameter lookup in the program, paths being well past SSO |
+| 7 | `src/scene/procedural.cpp:3165`, `:3426` | ~90 `findRel` linear scans over ~77 entries per procedural node per frame inside `applyProceduralParameters`, plus per-slot `std::string` concatenation. On a 45-node scene that is ~310,000 string comparisons a frame. **This is now the largest identified item in `engine.update`**; `ParticleParameters` shows the fix (cached handles at registration) |
+
+### A residual, named rather than explained away
+
+Four of the thirty flattened procedurals regenerate every frame in *some* sessions and none in
+others, on the same binary and the same project. It is not audio — `--play` changes nothing. The
+likely mechanism is an input that genuinely does change every frame for those four, in which case
+the regeneration is correct and the design is what costs. **It is not diagnosed**, and ADR-199's
+rule applies: a measurement that the output changed is not a measurement of why.
+
+### What the arms can and cannot establish (ADR-182)
+
+- `gizmo` **is proven**: it names the node it grabbed, the handle it dragged and where the object
+  ended up, and it aims with `ui::pickHandle` at the editor's own tolerance so the press is on the
+  handle by construction. When nothing selectable is in frame it says so and reports no number.
+- `box` **is partial**: the editor confirms a selection box is open mid-drag, but on this scene it
+  selects 0 of 16 objects — terrain, procedural clouds and particles are not offered by
+  `nodesInScreenRect`. It measures the gesture, not the cost of holding a large selection.
+- `strip` is a **one-shot** script keyed on the absolute frame number, so inside `--ui-ab` it acts
+  only during the block that happens to cover its window. Its column is an idle editor with the
+  Sequence panel in whatever state the script left it.
