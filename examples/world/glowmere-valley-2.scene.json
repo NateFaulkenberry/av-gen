@@ -6433,7 +6433,7 @@
     "updateHz": 30,
     "nearDistance": 25.0,
     "farHz": 20.0,
-    "cullDistance": 320.0
+    "cullDistance": 360.0
    },
    "visible": true
   },
@@ -6458,7 +6458,7 @@
     "updateHz": 30,
     "nearDistance": 25.0,
     "farHz": 20.0,
-    "cullDistance": 320.0
+    "cullDistance": 360.0
    },
    "visible": true
   },
@@ -6483,7 +6483,7 @@
     "updateHz": 30,
     "nearDistance": 25.0,
     "farHz": 20.0,
-    "cullDistance": 320.0
+    "cullDistance": 360.0
    },
    "visible": true
   },
@@ -6508,7 +6508,7 @@
     "updateHz": 30,
     "nearDistance": 25.0,
     "farHz": 20.0,
-    "cullDistance": 320.0
+    "cullDistance": 360.0
    },
    "visible": true
   }
@@ -6668,10 +6668,10 @@
    "seed": 11235813,
    "gait": {
     "matchRate": true,
-    "walkSpeed": 5.6,
-    "runSpeed": 13.5,
-    "rateMin": 0.35,
-    "rateMax": 1.6,
+    "walkSpeed": 5.71,
+    "runSpeed": 13.75,
+    "rateMin": 0.08,
+    "rateMax": 1.75,
     "runEnter": 9.55,
     "runExit": 6.44,
     "moveEnter": 1.68,
@@ -6753,10 +6753,10 @@
    "seed": 31415926,
    "gait": {
     "matchRate": true,
-    "walkSpeed": 3.2,
-    "runSpeed": 8.0,
-    "rateMin": 0.35,
-    "rateMax": 1.6,
+    "walkSpeed": 5.69,
+    "runSpeed": 13.71,
+    "rateMin": 0.08,
+    "rateMax": 1.75,
     "runEnter": 5.6,
     "runExit": 3.68,
     "moveEnter": 0.96,
@@ -6839,10 +6839,10 @@
    "seed": 27182818,
    "gait": {
     "matchRate": true,
-    "walkSpeed": 4.0,
-    "runSpeed": 9.5,
-    "rateMin": 0.35,
-    "rateMax": 1.6,
+    "walkSpeed": 5.65,
+    "runSpeed": 13.62,
+    "rateMin": 0.08,
+    "rateMax": 1.75,
     "runEnter": 6.75,
     "runExit": 4.6,
     "moveEnter": 1.2,
@@ -6940,10 +6940,10 @@
    "seed": 16180339,
    "gait": {
     "matchRate": true,
-    "walkSpeed": 4.6,
-    "runSpeed": 12.0,
-    "rateMin": 0.35,
-    "rateMax": 1.6,
+    "walkSpeed": 5.29,
+    "runSpeed": 12.74,
+    "rateMin": 0.08,
+    "rateMax": 1.75,
     "runEnter": 8.3,
     "runExit": 5.29,
     "moveEnter": 1.38,
