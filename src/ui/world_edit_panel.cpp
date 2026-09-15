@@ -559,16 +559,31 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
     // somewhere. And a hero can outlive its object -- a file written by hand, an object renamed or
     // deleted -- and one with no row would be a subject the director keeps travelling to that
     // nothing in the application can take back.
-    if (const std::size_t heroCount = composition->heroes().size(); heroCount > 0) {
-        if (ImGui::TreeNodeEx("##heroes", ImGuiTreeNodeFlags_DefaultOpen, "Heroes (%zu)", heroCount)) {
+    // Only the ones that need it. Every hero standing on an object already has a star on its row,
+    // and listing them again was the same information twice -- reported as redundant, and it was.
+    //
+    // What survives is the half the rows cannot do: a hero can outlive its object, when a file is
+    // written by hand or a node is renamed or deleted. That hero has no row, so without this it is a
+    // subject the director keeps travelling to that nothing in the application can take back. When
+    // there are none -- the ordinary case -- nothing is drawn at all.
+    std::vector<world::HeroPoint> orphans;
+    for (const world::HeroPoint& hero : composition->heroes()) {
+        if (composition->findNode(hero.name) == nullptr) {
+            orphans.push_back(hero);
+        }
+    }
+    if (const std::size_t heroCount = orphans.size(); heroCount > 0) {
+        if (ImGui::TreeNodeEx("##heroes", ImGuiTreeNodeFlags_DefaultOpen,
+                              "Heroes with no object (%zu)", heroCount)) {
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("What Camera > Enable Auto-director travels between, in the order it "
-                                  "ranks them. Starring an object here or in the list below only "
-                                  "changes the *next* shot the director cuts -- it does not move a "
-                                  "camera that has already been directed or hand-placed.");
+                ImGui::SetTooltip("Heroes whose object is gone -- renamed, deleted, or never in "
+                                  "this scene. The Auto-director still travels to them and no row "
+                                  "below can take them back, so they are listed here to be "
+                                  "unstarred. Heroes that do have an object are starred on their "
+                                  "own row instead.");
             }
             // Copied rather than iterated: unstarring one rewrites the list under the loop.
-            const std::vector<world::HeroPoint> heroes = composition->heroes();
+            const std::vector<world::HeroPoint>& heroes = orphans;
             for (std::size_t i = 0; i < heroes.size(); ++i) {
                 const world::HeroPoint& hero = heroes[i];
                 ImGui::PushID(static_cast<int>(i));
@@ -579,8 +594,11 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
                 }
                 ImGui::SameLine();
                 const bool onANode = composition->findNode(hero.name) != nullptr;
-                // The first is the subject: that is what `briefFromHeroes` opens the shot on.
-                ImGui::Text("%s%s", i == 0 ? "* " : "  ", hero.name.c_str());
+                // No subject marker. Rank comes from importance and nothing else, so a star that
+                // said "this one is different" was naming a category that does not exist -- an
+                // author who wants a particular hero opened on raises its importance, which is the
+                // same act and one fewer concept (ADR-201).
+                ImGui::TextUnformatted(hero.name.c_str());
                 if (ImGui::IsItemHovered()) {
                     ImGui::SetTooltip("importance %.2f, %.0f m tall, camera stands off %.0f m%s",
                                       static_cast<double>(hero.importance),
@@ -607,7 +625,14 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
         return lower(name).find(lower(filter)) != std::string::npos;
     };
 
-    ImGui::BeginChild("##objects", ImVec2(0.0f, 190.0f), ImGuiChildFlags_Borders);
+    // The list an artist actually works in, so it gets the height rather than a fixed 190 px that
+    // showed six rows in a scene with sixty. Grows with the panel and keeps a floor, so it is usable
+    // when the panel is short and generous when it is tall.
+    {
+        const float available = ImGui::GetContentRegionAvail().y;
+        ImGui::BeginChild("##objects", ImVec2(0.0f, std::max(available - 90.0f, 240.0f)),
+                          ImGuiChildFlags_Borders);
+    }
     // Recursive, and depth-limited for the same reason every other walk of this graph is: a scene
     // file can be hand-edited into a cycle, and a panel that recurses forever takes the app with it.
     const std::function<void(const scene::CompositionNode&, int)> row = [&](const scene::CompositionNode& node,

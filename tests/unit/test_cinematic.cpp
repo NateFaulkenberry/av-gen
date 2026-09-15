@@ -1137,3 +1137,196 @@ TEST_CASE("The film does not settle on one hero and stay there", "[app][cinemati
     CHECK(screenTime.size() >= 3);
     CHECK(heroShare < 0.85);
 }
+
+// ADR-200: "sometimes it's just moving about way too fast."
+//
+// The properties that matter are what the cap must NOT break, not that speeds come down. A cut in
+// this director lands on the music, so the timing is untouchable; and a continuous cut's shots have
+// to still join afterwards, or the fix for one complaint creates the one ADR-185 removed.
+namespace {
+float peakViewRateOf(const app::Shot& shot, int samples = 64) {
+    if (!(shot.durationSeconds > 0.0)) {
+        return 0.0f;
+    }
+    const auto dt = static_cast<float>(shot.durationSeconds) / static_cast<float>(samples - 1);
+    float peak = 0.0f;
+    glm::vec3 pc = shot.cameraAt(0.0f);
+    glm::vec3 pa = shot.targetAt(0.0f);
+    for (int i = 1; i < samples; ++i) {
+        const float t = static_cast<float>(i) / static_cast<float>(samples - 1);
+        const glm::vec3 c = shot.cameraAt(t);
+        const glm::vec3 a = shot.targetAt(t);
+        if (glm::length(pa - pc) > 1e-4f && glm::length(a - c) > 1e-4f) {
+            const float cosine =
+                std::clamp(glm::dot(glm::normalize(pa - pc), glm::normalize(a - c)), -1.0f, 1.0f);
+            peak = std::max(peak, glm::degrees(std::acos(cosine)) / dt);
+        }
+        pc = c;
+        pa = a;
+    }
+    return peak;
+}
+} // namespace
+
+TEST_CASE("a camera speed cap shortens the move and leaves the cut alone",
+          "[app][cinematic][director][pace]") {
+    const auto structure = referenceStructure();
+    auto seq = app::directFromStructure(structure, referenceBrief());
+    REQUIRE(seq.has_value());
+    REQUIRE(seq->shots.size() > 3);
+
+    // What the film was before, so the cap can be shown to have changed only what it should.
+    std::vector<double> starts, durations;
+    std::vector<std::string> subjects;
+    float fastest = 0.0f;
+    for (const app::Shot& s : seq->shots) {
+        starts.push_back(s.startSeconds);
+        durations.push_back(s.durationSeconds);
+        subjects.push_back(s.subject.name);
+        fastest = std::max(fastest, s.peakSpeed());
+    }
+    INFO("fastest shot before the cap: " << fastest << " m/s");
+    REQUIRE(fastest > 1.0f); // the state the measurement assumes: there is something to slow down
+
+    const float cap = fastest * 0.4f;
+    const std::size_t shortened = seq->limitCameraSpeed(cap);
+    INFO("shots shortened: " << shortened << " of " << seq->shots.size());
+    CHECK(shortened > 0);
+
+    // It did what it says. A little over the cap is the iteration's tolerance, not a miss.
+    for (const app::Shot& s : seq->shots) {
+        INFO(s.name << " peak " << s.peakSpeed());
+        CHECK(s.peakSpeed() <= cap * 1.05f);
+    }
+
+    // And nothing else moved. This is the assertion that matters: the cuts are still on the music
+    // and the film is still about the same things in the same order.
+    REQUIRE(seq->shots.size() == starts.size());
+    for (std::size_t i = 0; i < seq->shots.size(); ++i) {
+        INFO(seq->shots[i].name);
+        CHECK(seq->shots[i].startSeconds == starts[i]);
+        CHECK(seq->shots[i].durationSeconds == durations[i]);
+        CHECK(seq->shots[i].subject.name == subjects[i]);
+    }
+
+    // A continuous cut still joins. A shot whose start was chained to the previous end must have
+    // followed that end when it moved -- otherwise this fix reintroduces exactly the teleport
+    // ADR-185 was written to remove.
+    for (std::size_t i = 1; i < seq->shots.size(); ++i) {
+        if (!seq->shots[i].startPosition) {
+            continue;
+        }
+        const glm::vec3 previousEnd = seq->shots[i - 1].cameraAt(1.0f);
+        const glm::vec3 here = seq->shots[i].cameraAt(0.0f);
+        INFO(seq->shots[i].name << " joins at " << glm::length(here - previousEnd) << " m");
+        CHECK(glm::length(here - previousEnd) < 0.01f);
+    }
+
+    // ---- the swing cap, which is the one that addresses what a viewer calls "too fast" ----
+    //
+    // Measured before it existed: capping the camera to 1 m/s took travel from 23.2 to 1.0 and left
+    // the view rotating at 63.7 deg/s, *faster* than the 52.0 it started at. The fastest view in
+    // this cut is a Subject shot, where the aim is a fixed point and every degree comes from the
+    // camera swinging around it -- which no metres-per-second cap can reach.
+    {
+        auto swung = app::directFromStructure(structure, referenceBrief());
+        REQUIRE(swung.has_value());
+        float before = 0.0f;
+        for (const app::Shot& s : swung->shots) {
+            before = std::max(before, peakViewRateOf(s));
+        }
+        REQUIRE(before > 40.0f); // the state the measurement assumes
+        CHECK(swung->limitViewRate(30.0f) > 0);
+        float after = 0.0f;
+        for (const app::Shot& s : swung->shots) {
+            after = std::max(after, peakViewRateOf(s));
+        }
+        INFO("view rate " << before << " -> " << after << " deg/s");
+        // Substantially slower, and under the cap. Asserted as "at least halved" as well as "under
+        // the cap", because a cap that was met by making every shot static would also be under it.
+        CHECK(after <= 30.0f);
+        CHECK(after < before * 0.65f);
+
+        // The cuts did not move. Same assertion as the travel cap, for the same reason: the music
+        // decides when, and nothing here may change that.
+        REQUIRE(swung->shots.size() == starts.size());
+        for (std::size_t i = 0; i < swung->shots.size(); ++i) {
+            CHECK(swung->shots[i].startSeconds == starts[i]);
+            CHECK(swung->shots[i].durationSeconds == durations[i]);
+        }
+    }
+
+    // Off is off: a cap of zero is not a cap of nothing-may-move.
+    auto untouched = app::directFromStructure(structure, referenceBrief());
+    REQUIRE(untouched.has_value());
+    CHECK(untouched->limitCameraSpeed(0.0f) == 0);
+    float stillFastest = 0.0f;
+    for (const app::Shot& s : untouched->shots) {
+        stillFastest = std::max(stillFastest, s.peakSpeed());
+    }
+    CHECK_THAT(stillFastest, Catch::Matchers::WithinAbs(fastest, 1e-4));
+}
+
+// "even at its smallest value it's still moving blazing fast". Is the cap not working, or is the
+// thing that feels fast not the thing it caps? Measured rather than guessed: the camera's own speed
+// and, separately, how fast the point it is LOOKING at sweeps -- because a camera that barely moves
+// while its aim whips across a valley feels very fast indeed, and nothing caps the aim.
+TEST_CASE("what is actually fast in a directed cut", "[.probe][app][cinematic][director][pace]") {
+    const auto structure = referenceStructure();
+    const auto report = [](const char* label, const app::Sequence& seq) {
+        float camPeak = 0.0f, aimPeak = 0.0f, angPeak = 0.0f;
+        std::string worstName = "-";
+        app::LookMode worstMode = app::LookMode::Subject;
+        for (const app::Shot& s : seq.shots) {
+            if (!(s.durationSeconds > 0.0)) {
+                continue;
+            }
+            constexpr int kN = 64;
+            const auto dt = static_cast<float>(s.durationSeconds) / (kN - 1);
+            glm::vec3 pc = s.cameraAt(0.0f);
+            glm::vec3 pa = s.targetAt(0.0f);
+            for (int i = 1; i < kN; ++i) {
+                const float t = static_cast<float>(i) / (kN - 1);
+                const glm::vec3 c = s.cameraAt(t);
+                const glm::vec3 a = s.targetAt(t);
+                camPeak = std::max(camPeak, glm::length(c - pc) / dt);
+                aimPeak = std::max(aimPeak, glm::length(a - pa) / dt);
+                // What the viewer actually experiences: how fast the view direction rotates.
+                const glm::vec3 d0 = glm::normalize(pa - pc);
+                const glm::vec3 d1 = glm::normalize(a - c);
+                const float cosine = std::clamp(glm::dot(d0, d1), -1.0f, 1.0f);
+                const float rate = glm::degrees(std::acos(cosine)) / dt;
+                if (rate > angPeak) {
+                    angPeak = rate;
+                    worstName = s.name;
+                    worstMode = s.lookMode();
+                }
+                pc = c;
+                pa = a;
+            }
+        }
+        UNSCOPED_INFO(fmt::format("{:14} camera {:7.1f} m/s | aim point {:8.1f} m/s | view {:7.1f} deg/s"
+                                  " | fastest view: {} ({})",
+                                  label, camPeak, aimPeak, angPeak, worstName,
+                                  app::lookModeName(worstMode)));
+    };
+
+    auto plain = app::directFromStructure(structure, referenceBrief());
+    REQUIRE(plain.has_value());
+    report("uncapped", *plain);
+
+    for (const float cap : {20.0f, 5.0f, 1.0f}) {
+        auto capped = app::directFromStructure(structure, referenceBrief());
+        REQUIRE(capped.has_value());
+        capped->limitCameraSpeed(cap);
+        report(fmt::format("travel {:.0f} m/s", cap).c_str(), *capped);
+    }
+    // And the control that actually addresses what a viewer calls "too fast".
+    for (const float rate : {30.0f, 15.0f}) {
+        auto capped = app::directFromStructure(structure, referenceBrief());
+        REQUIRE(capped.has_value());
+        capped->limitViewRate(rate);
+        report(fmt::format("swing {:.0f} deg/s", rate).c_str(), *capped);
+    }
+    CHECK(true);
+}

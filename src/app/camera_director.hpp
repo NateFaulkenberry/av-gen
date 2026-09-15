@@ -69,6 +69,22 @@ struct AutoDirectorSettings {
     // Same seed, same heroes, same structure, same film. Exposed because re-cutting with a different
     // seed is the one way to ask for a different edit of the same piece.
     std::uint32_t seed = 1;
+    // The fastest the camera may travel, in metres per second. 0 -- the default -- leaves the cut
+    // exactly as it was (ADR-200).
+    //
+    // What gives way is the *distance*, never the timing: a cut here lands on the music, so slowing
+    // a shot by lengthening it would move every cut after it off the beat it was built for. A shot
+    // that is too fast covers too much ground for the time the music gave it, and the ground is what
+    // shrinks.
+    float maxCameraSpeed = 0.0f;
+    // The fastest the *view* may swing, in degrees per second. 0 is off (ADR-200).
+    //
+    // A second control rather than a refinement of the first, because measurement said they are two
+    // problems. Capping the camera to 1 m/s on a reference cut took its travel from 23.2 to 1.0 and
+    // left the view rotating at 63.7 deg/s -- *faster* than the 52.0 it started at, because a camera
+    // that moves less still has to sweep its aim the same distance in the same time. What a viewer
+    // calls "moving too fast" is nearly always this one.
+    float maxViewRate = 0.0f;
 
     [[nodiscard]] Result<void> validate() const;
     void applyTo(DirectionBrief& brief) const;

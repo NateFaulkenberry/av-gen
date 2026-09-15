@@ -208,6 +208,25 @@ Result<Sequence> directHeroes(std::span<const world::HeroPoint> heroes,
     if (!sequence) {
         return std::unexpected(sequence.error());
     }
+    // ADR-200. Applied after the cut is built rather than while it is being built, because the cap
+    // is a judgement about the *result* -- "this is moving too fast to watch" -- and the shot
+    // geometry that produces a speed is chosen from the music, the hero's size and the shot kind,
+    // none of which should be bent to hit a number.
+    if (settings.maxCameraSpeed > 0.0f) {
+        if (const std::size_t shortened = sequence->limitCameraSpeed(settings.maxCameraSpeed);
+            shortened > 0) {
+            log::info("auto-director: {} of {} shot(s) shortened to hold {:.1f} m/s", shortened,
+                      sequence->shots.size(), settings.maxCameraSpeed);
+        }
+    }
+    // After the travel cap, because widening a swing is measured against the camera path the cap
+    // has already settled.
+    if (settings.maxViewRate > 0.0f) {
+        if (const std::size_t widened = sequence->limitViewRate(settings.maxViewRate); widened > 0) {
+            log::info("auto-director: {} of {} shot(s) given a longer swing to hold {:.0f} deg/s",
+                      widened, sequence->shots.size(), settings.maxViewRate);
+        }
+    }
     return sequence;
 }
 
@@ -262,6 +281,17 @@ Result<void> AutoDirectorSettings::validate() const {
     if (wideFocalLength > heroFocalLength) {
         return fail("auto-director: the wide lens ({} mm) is longer than the hero lens ({} mm)",
                     wideFocalLength, heroFocalLength);
+    }
+    // ADR-200: 0 is off. A negative is somebody's arithmetic, and a cap of a centimetre a second
+    // would shrink every shot to a point rather than slowing anything.
+    if (maxCameraSpeed < 0.0f || (maxCameraSpeed > 0.0f && maxCameraSpeed < 0.1f) ||
+        maxCameraSpeed > 2000.0f) {
+        return fail("auto-director: maximum camera speed {} must be 0 (off) or 0.1..2000 m/s",
+                    maxCameraSpeed);
+    }
+    if (maxViewRate < 0.0f || (maxViewRate > 0.0f && maxViewRate < 1.0f) || maxViewRate > 720.0f) {
+        return fail("auto-director: maximum view rate {} must be 0 (off) or 1..720 deg/s",
+                    maxViewRate);
     }
     return {};
 }

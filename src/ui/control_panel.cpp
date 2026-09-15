@@ -2647,6 +2647,40 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
             }
 
             ImGui::Separator();
+            ImGui::TextUnformatted("Pace");
+            // ADR-200. Off is a real value here, not a disabled control: 0 means the director's own
+            // geometry stands, and that is the right default for a scene nobody has complained
+            // about. The format says so rather than showing a bare 0.
+            ImGui::SliderFloat("max speed", &s.maxCameraSpeed, 0.0f, 120.0f,
+                               s.maxCameraSpeed > 0.0f ? "%.1f m/s" : "off");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "The fastest the camera may travel. Off leaves the cut exactly as the\n"
+                    "director built it.\n\n"
+                    "What gives way is the distance, never the timing: every cut here lands on\n"
+                    "the music, so stretching a shot to slow it would move every cut after it\n"
+                    "off the beat it was built for. A shot that is too fast is one covering too\n"
+                    "much ground for the time the music gave it, so the ground is what shrinks --\n"
+                    "the move starts where it did and simply does not go as far.\n\n"
+                    "A continuous cut re-chains afterwards, so the shots still join.");
+            }
+
+            ImGui::SliderFloat("max swing", &s.maxViewRate, 0.0f, 180.0f,
+                               s.maxViewRate > 0.0f ? "%.0f deg/s" : "off");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "The fastest the view may swing. This is usually the one you want.\n\n"
+                    "Measured on a reference cut: capping the camera to 1 m/s took its travel\n"
+                    "from 23.2 down to 1.0 and left the view rotating at 63.7 deg/s -- faster\n"
+                    "than the 52.0 it started at, because a camera that moves less still has to\n"
+                    "sweep its aim the same distance in the same time. What reads as 'too fast'\n"
+                    "is nearly always the swing, not the travel.\n\n"
+                    "Widens each handoff's swing rather than shortening it: the shot still\n"
+                    "arrives where it was going, at the same moment, having taken longer\n"
+                    "over the turn.");
+            }
+
+            ImGui::Separator();
             auto seed = static_cast<int>(s.seed);
             if (ImGui::InputInt("seed", &seed)) {
                 s.seed = static_cast<std::uint32_t>(std::max(0, seed));

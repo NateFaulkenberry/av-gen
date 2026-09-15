@@ -167,6 +167,14 @@ struct Shot {
     // count in. Any of these, when set, replace the derived value; unset, nothing changes.
     std::optional<glm::vec3> startPosition;
     std::optional<glm::vec3> endPosition;
+    // How much of a handoff shot the swing from one subject to the next happens across, 0..1
+    // (ADR-200). 0.5 -- the default -- is the middle half, which is deliberate: a target already
+    // drifting on the first frame means the first subject is never actually held.
+    //
+    // Widened, never narrowed, and only by the view-rate cap: the same swing spread over more of
+    // the shot is the same composition at a lower angular rate, which is the one way to slow what
+    // a viewer actually experiences without changing where the shot goes or when it cuts.
+    float swingWindow = 0.5f;
     // Where the aim begins, for a shot continuing another (ADR-185). The mirror of `startPosition`,
     // and needed for the same reason: shots are contiguous, so the last key of one and the first key
     // of the next sit at the *same second*. A continuous take pins the position so those coincident
@@ -241,6 +249,33 @@ struct Sequence {
     // back-to-back from the first shot's start. Repacking is all-or-nothing on purpose: a sequence
     // where some shots are timed and some are paced cannot have both be authoritative.
     Result<void> retime();
+
+    // Holds every shot's camera to a speed, in metres per second (ADR-200). 0 leaves the cut alone.
+    //
+    // **The distance gives way, not the timing.** A cut in this director lands on the music -- that
+    // is the whole reason it reads a musical structure -- so slowing a shot by lengthening it would
+    // move every cut after it off the beat it was built for. A shot that is too fast is one that
+    // covers too much ground for the time the music gave it, so what shrinks is the ground.
+    //
+    // The *end* is pulled toward the start rather than the reverse, because in a continuous cut a
+    // shot begins where the last one ended (ADR-185); moving a start would break the chain, and
+    // moving an end is something the chain can simply follow. Continuity is re-established after.
+    //
+    // Returns how many shots were shortened, which is the number worth showing an author: "this cap
+    // is changing your film" or "this cap is doing nothing" are different things to know.
+    std::size_t limitCameraSpeed(float maxMetresPerSecond);
+
+    // Holds how fast the *view* swings, in degrees per second (ADR-200). 0 leaves the cut alone.
+    //
+    // A separate control from the speed above, because measurement said they are separate problems.
+    // Capping the camera to 1 m/s on a reference cut brought its travel from 23.2 to 1.0 -- and left
+    // the view rotating at 63.7 deg/s, *faster* than the 52.0 it started at, because a camera that
+    // moves less still has to sweep its aim the same distance in the same time. What a viewer calls
+    // "moving too fast" is nearly always this one.
+    //
+    // Widens each handoff's swing window rather than shortening the swing: the shot still arrives
+    // where it was going, at the same moment, having taken longer over the turn.
+    std::size_t limitViewRate(float maxDegreesPerSecond);
 
     // Who the film is about at this moment, or nullptr if nothing is spotlit.
     [[nodiscard]] const FocalTarget* spotlightAt(double seconds) const;

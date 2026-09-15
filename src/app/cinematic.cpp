@@ -410,7 +410,8 @@ glm::vec3 Shot::targetWithoutStart(float t) const {
         // The swing happens across the middle of the shot rather than the whole of it. A target
         // already drifting on the first frame means the first subject is never actually held, and
         // the shot reads as an error instead of as leaving one thing to find another.
-        const float s = std::clamp((e - 0.25f) / 0.5f, 0.0f, 1.0f);
+        const float window = std::clamp(swingWindow, 0.05f, 1.0f);
+        const float s = std::clamp((e - (1.0f - window) * 0.5f) / window, 0.0f, 1.0f);
         const glm::vec3 held = subject.position + (to - subject.position) * (s * s * (3.0f - 2.0f * s));
         return framedAim(*this, cameraAt(t), held);
     }
@@ -1134,6 +1135,153 @@ std::vector<ShotSpan> groupSections(const signals::MusicalStructure& structure,
     return split;
 }
 } // namespace
+
+namespace {
+// Defined below, beside the view-rate helpers it shares. Declared here because the travel cap needs
+// it first and the two belong together rather than apart.
+void shrinkShotMotion(Shot& shot, float f);
+} // namespace
+
+std::size_t Sequence::limitCameraSpeed(float maxMetresPerSecond) {
+    if (!(maxMetresPerSecond > 0.0f)) {
+        return 0;
+    }
+    std::size_t shortened = 0;
+    // One forward pass, re-chaining *before* capping each shot rather than after capping all of
+    // them. The first version did it the other way round and was wrong: moving an end shortens that
+    // shot, but it also moves the next shot's start, which changes that shot's path -- so a cap
+    // applied first and a re-chain applied second left later shots faster than the cap again.
+    // Two of nine, one of them barely slowed at all. Each shot's start has to be final before its
+    // speed means anything.
+    for (std::size_t i = 0; i < shots.size(); ++i) {
+        Shot& shot = shots[i];
+        if (i > 0 && shot.startPosition) {
+            // A continuous cut's shot begins where the last one ended (ADR-185), and that end may
+            // have just moved. An orbiting shot chains through its subject instead and is left
+            // alone.
+            shot.startPosition = shots[i - 1].cameraAt(1.0f);
+            if (shot.startTarget) {
+                shot.startTarget = shots[i - 1].targetAt(1.0f);
+            }
+        }
+        if (!(shot.durationSeconds > 0.0)) {
+            continue;
+        }
+        // Peak, not average. A shot can average a gentle pace and still whip through its middle,
+        // and the middle is what reads as too fast.
+        float peak = shot.peakSpeed();
+        if (peak <= maxMetresPerSecond) {
+            continue;
+        }
+        ++shortened;
+        // Speed scales with how much ground the move covers, so the first guess is exact for a
+        // linear move and close for an eased one. Re-measured and re-applied rather than solved,
+        // because `cameraAt` composes easing, an optional height range and two different
+        // parameterisations, and a closed form for that is a worse thing to maintain than a few
+        // iterations of the real function.
+        for (int attempt = 0; attempt < 24 && peak > maxMetresPerSecond; ++attempt) {
+            const float f = std::clamp(maxMetresPerSecond / std::max(peak, 1e-3f), 0.02f, 0.995f);
+            shrinkShotMotion(shot, f);
+            peak = shot.peakSpeed();
+        }
+    }
+    return shortened;
+}
+
+namespace {
+
+// Pulls a shot's end back toward its start by `f`, whichever way the shot is parameterised.
+// Branching on which path `cameraAt` actually takes, not on which fields happen to be set: a shot
+// with an authored end and no authored start slides between two points, and editing its polar
+// fields does nothing at all to it.
+void shrinkShotMotion(Shot& shot, float f) {
+    if (shot.startPosition || shot.endPosition || shot.handoff) {
+        const glm::vec3 from = shot.cameraAt(0.0f);
+        const glm::vec3 to = shot.cameraAt(1.0f);
+        shot.endPosition = from + (to - from) * f;
+    } else {
+        shot.endDistance = shot.startDistance + (shot.endDistance - shot.startDistance) * f;
+        shot.endAzimuth = shot.startAzimuth + (shot.endAzimuth - shot.startAzimuth) * f;
+        shot.endElevation = shot.startElevation + (shot.endElevation - shot.startElevation) * f;
+    }
+    if (shot.heightRange) {
+        const glm::vec2 h = *shot.heightRange;
+        shot.heightRange = glm::vec2(h.x, h.x + (h.y - h.x) * f);
+    }
+}
+
+// Peak rate of change of the view direction, in degrees per second.
+float peakViewRate(const Shot& shot, int samples = 64) {
+    if (!(shot.durationSeconds > 0.0)) {
+        return 0.0f;
+    }
+    const int n = std::clamp(samples, 2, 512);
+    const auto dt = static_cast<float>(shot.durationSeconds) / static_cast<float>(n - 1);
+    float peak = 0.0f;
+    glm::vec3 pc = shot.cameraAt(0.0f);
+    glm::vec3 pa = shot.targetAt(0.0f);
+    for (int i = 1; i < n; ++i) {
+        const float t = static_cast<float>(i) / static_cast<float>(n - 1);
+        const glm::vec3 c = shot.cameraAt(t);
+        const glm::vec3 a = shot.targetAt(t);
+        const glm::vec3 d0 = pa - pc;
+        const glm::vec3 d1 = a - c;
+        if (glm::length(d0) > 1e-4f && glm::length(d1) > 1e-4f) {
+            const float cosine = std::clamp(glm::dot(glm::normalize(d0), glm::normalize(d1)), -1.0f, 1.0f);
+            peak = std::max(peak, glm::degrees(std::acos(cosine)) / dt);
+        }
+        pc = c;
+        pa = a;
+    }
+    return peak;
+}
+
+} // namespace
+
+std::size_t Sequence::limitViewRate(float maxDegreesPerSecond) {
+    if (!(maxDegreesPerSecond > 0.0f)) {
+        return 0;
+    }
+    std::size_t slowed = 0;
+    for (std::size_t i = 0; i < shots.size(); ++i) {
+        Shot& shot = shots[i];
+        if (i > 0 && shot.startPosition) {
+            shot.startPosition = shots[i - 1].cameraAt(1.0f);
+            if (shot.startTarget) {
+                shot.startTarget = shots[i - 1].targetAt(1.0f);
+            }
+        }
+        if (peakViewRate(shot) <= maxDegreesPerSecond) {
+            continue;
+        }
+        ++slowed;
+        // A handoff first: widening its swing spreads the same turn over more of the shot, which
+        // costs nothing -- the shot still arrives where it was going, at the same moment.
+        if (shot.lookMode() == LookMode::Handoff) {
+            for (int attempt = 0; attempt < 12 && shot.swingWindow < 0.999f; ++attempt) {
+                const float rate = peakViewRate(shot);
+                if (rate <= maxDegreesPerSecond) {
+                    break;
+                }
+                shot.swingWindow = std::clamp(
+                    shot.swingWindow * std::max(rate / maxDegreesPerSecond, 1.05f), 0.05f, 1.0f);
+            }
+        }
+        // Then the move itself, for everything still over -- which on a reference cut is most of it.
+        // Measured: the fastest view in that cut is a *Subject* shot, where the aim is a fixed point
+        // and every degree of rotation comes from the camera swinging around it. Neither a swing
+        // window nor a metres-per-second cap reaches that: a camera close to its subject rotates
+        // fast while barely moving.
+        for (int attempt = 0; attempt < 24; ++attempt) {
+            const float rate = peakViewRate(shot);
+            if (rate <= maxDegreesPerSecond) {
+                break;
+            }
+            shrinkShotMotion(shot, std::clamp(maxDegreesPerSecond / std::max(rate, 1e-3f), 0.02f, 0.995f));
+        }
+    }
+    return slowed;
+}
 
 Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
                                      const DirectionBrief& brief) {

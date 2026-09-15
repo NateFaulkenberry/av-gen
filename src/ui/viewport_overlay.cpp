@@ -369,7 +369,8 @@ void drawViewportOverlay(const WorldEditor& editor, const scene::Camera& camera,
         painter.ring(base, glm::vec3(0.0f, 1.0f, 0.0f), hero.radius, colour, 32, 1.4f);
         painter.line(base, glm::vec3(base.x, base.y + hero.height, base.z), colour, 1.2f);
         char text[192];
-        std::snprintf(text, sizeof(text), "%s hero %s  %.2f", hero.subject ? "*" : " ",
+        // ADR-201: no subject marker. Rank is importance, which the number already says.
+        std::snprintf(text, sizeof(text), "hero %s  %.2f",
                       hero.name.c_str(), static_cast<double>(hero.importance));
         painter.label(glm::vec3(base.x, base.y + hero.height, base.z), text, colour);
     }
