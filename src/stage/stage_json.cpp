@@ -419,6 +419,8 @@ Result<ScenarioDesc> scenarioFromJson(const nlohmann::json& j) {
         s.seed = j.at("seed").get<std::uint32_t>();
     }
     s.autoStart = readBool(j, "autoStart", false);
+    s.startOn = readString(j, "startOn");
+    s.stopOn = readString(j, "stopOn");
     if (j.contains("maxCycles") && j.at("maxCycles").is_number()) {
         s.maxCycles = j.at("maxCycles").get<int>();
     }
@@ -464,6 +466,8 @@ nlohmann::json scenarioToJson(const ScenarioDesc& s) {
     if (!s.actor.empty()) j["actor"] = s.actor;
     if (s.seed != 0) j["seed"] = s.seed;
     if (s.autoStart) j["autoStart"] = true;
+    if (!s.startOn.empty()) j["startOn"] = s.startOn;
+    if (!s.stopOn.empty()) j["stopOn"] = s.stopOn;
     if (s.maxCycles != 0) j["maxCycles"] = s.maxCycles;
     if (s.searchInterval != 0.5) j["searchInterval"] = s.searchInterval;
     if (!s.params.empty()) {

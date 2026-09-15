@@ -1288,9 +1288,35 @@ void Staging::update(const StageContext& ctx) {
     lastParams_ = ctx.params;
     bool any = false;
     for (std::size_t i = 0; i < runs_.size(); ++i) {
-        if (!runs_[i].running && desc_.scenarios[i].autoStart && runs_[i].cycle == 0 &&
-            runs_[i].bindings.empty() && !runs_[i].entered) {
-            start(desc_.scenarios[i].name, ctx.time);
+        const ScenarioDesc& s = desc_.scenarios[i];
+        if (!runs_[i].running && s.autoStart && runs_[i].cycle == 0 && runs_[i].bindings.empty() &&
+            !runs_[i].entered) {
+            start(s.name, ctx.time);
+        }
+        // The signal seam. Read before the cues run, so a scenario cued on the beat starts on the
+        // frame the beat fired rather than the one after it.
+        if (ctx.bus != nullptr) {
+            // Names resolved once and cached, the same way a behaviour resolves a signal: the bus
+            // is an id-indexed array and a name lookup per scenario per frame would be paying for
+            // a string hash to read a byte.
+            const auto fired = [&](const std::string& name, std::optional<signals::SignalId>& id) {
+                if (name.empty()) {
+                    return false;
+                }
+                if (!id.has_value()) {
+                    id = ctx.bus->find(name);
+                    if (!id.has_value()) {
+                        return false;
+                    }
+                }
+                return ctx.bus->event(*id);
+            };
+            if (runs_[i].running && fired(s.stopOn, runs_[i].stopId)) {
+                stop(s.name, ctx.time);
+            }
+            if (!runs_[i].running && fired(s.startOn, runs_[i].startId)) {
+                start(s.name, ctx.time);
+            }
         }
         any = any || runs_[i].running;
     }

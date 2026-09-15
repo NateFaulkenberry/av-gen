@@ -486,7 +486,9 @@ adds is the name, so a step can address `actor.beam` without knowing the entity 
 `visitor-beam`.
 
 **A scenario** runs `beats` in order and then starts again, up to `maxCycles` (0 = for ever).
-`autoStart` starts it on load; otherwise the sequencer or the editor calls `start`.
+`autoStart` starts it on load; `startOn` and `stopOn` name signals — so a scenario may be cued by
+`"audio.beat"`, by a musical event, by an OSC message, by anything the signal bus carries under a
+name — and otherwise the sequencer or the editor calls `start`.
 
 **A beat** runs its `find` queries, binds a role for each, then runs every cue in `cues` **at the
 same time**. So: a cue's `steps` are the *sequence*, a beat's `cues` are the *parallel* (across

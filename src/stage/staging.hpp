@@ -74,6 +74,7 @@
 #include "entity/action.hpp"
 #include "entity/locomotion.hpp"
 #include "params/parameter_set.hpp"
+#include "signals/signal_bus.hpp"
 #include "spatial/point_grid.hpp"
 
 #include <glm/glm.hpp>
@@ -279,6 +280,13 @@ struct ScenarioDesc {
     std::string actor;             // the actor bound to the role `actor` at the start of a cycle
     std::uint32_t seed = 0;        // 0 = derived from the name
     bool autoStart = false;
+    // The audio and event seam the brief asks for, and it is one line rather than a subsystem
+    // because the signal bus already carries every musical event, every analysis band and every
+    // OSC and MIDI message under a name. A scenario that starts on "audio.beat" starts on the beat;
+    // one that starts on a sequencer event starts when the sequencer publishes it. Edge-triggered:
+    // `startOn` only starts a scenario that is not running, and only on the frame the event fires.
+    std::string startOn;
+    std::string stopOn;
     int maxCycles = 0;             // 0 = for ever. The brief's "Maximum Abductions".
     double searchInterval = 0.5;   // seconds between candidate-index rebuilds
     std::vector<ScenarioParam> params;
@@ -316,6 +324,10 @@ struct StageContext {
     double dt = 0.0;
     entity::EntityWorld* world = nullptr;
     params::ParameterSet* params = nullptr;
+    // What a scenario's `startOn` / `stopOn` are read against. Null is legal and means a scenario
+    // with either of those never fires -- which is honest, and is what a headless tool that never
+    // built a bus gets.
+    const signals::SignalBus* bus = nullptr;
 };
 
 // What the director did, for a test, a log and an overlay. Every one of these is a fact somebody
@@ -461,6 +473,8 @@ private:
         std::vector<Binding> bindings;
         std::vector<CueRun> cues;
         std::vector<params::Parameter<float>*> params;
+        std::optional<signals::SignalId> startId;
+        std::optional<signals::SignalId> stopId;
     };
     struct Written {
         std::string path;

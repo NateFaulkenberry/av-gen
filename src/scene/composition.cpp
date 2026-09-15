@@ -1823,6 +1823,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
         stageCtx.dt = time.deltaTime;
         stageCtx.world = &entityWorld_;
         stageCtx.params = params_;
+        stageCtx.bus = &bus;
         staging_.update(stageCtx);
     }
     entity::EntityUpdate update;

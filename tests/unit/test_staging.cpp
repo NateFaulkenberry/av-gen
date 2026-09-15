@@ -116,16 +116,27 @@ struct Stage {
         tick(1.0 / 60.0);
     }
 
+    // Published on the next tick only, so a test can fire a one-frame event the way the analysis
+    // layer does.
+    std::string pending;
+    void fire(std::string signal) { pending = std::move(signal); }
+
     void tick(double seconds, double hz = 60.0) {
         const double step = 1.0 / hz;
         const int steps = std::max(1, static_cast<int>(std::round(seconds * hz)));
         for (int i = 0; i < steps; ++i) {
             params.resetFinals();
+            bus.clearEvents();
+            if (!pending.empty()) {
+                bus.setEvent(bus.declare(pending, 0.0f, 1.0f, true), true);
+                pending.clear();
+            }
             stage::StageContext sc;
             sc.time = time;
             sc.dt = step;
             sc.world = &world;
             sc.params = &params;
+            sc.bus = &bus;
             staging.update(sc);
             entity::EntityUpdate u;
             u.time = time;
@@ -738,6 +749,40 @@ TEST_CASE("cancelling a scenario lets go of the body it was holding",
     // back to the anchor -- because a director writes `travel`, which persists.
     CHECK_FALSE(hero->state().driven);
     CHECK(hero->state().position().y == Approx(held.y).margin(0.5));
+}
+
+TEST_CASE("a scenario can be cued by a signal, and stopped by one",
+          "[stage][director][signals]") {
+    // The brief asks the director to operate on "existing audio/event systems". It already does:
+    // the signal bus carries every musical event, analysis band, OSC message and MIDI note under a
+    // name, so this is two fields rather than a subsystem.
+    stage::StagingDesc d = oneCue({waitStep("hold", 30.0f)});
+    d.scenarios[0].startOn = "audio.beat";
+    d.scenarios[0].stopOn = "song.end";
+    Stage s({animal("hero", {})}, {{"hero", glm::vec3(0.0f)}}, std::move(d));
+
+    s.tick(0.5);
+    CHECK_FALSE(s.staging.running("test")); // nothing has fired
+
+    s.fire("audio.beat");
+    s.tick(0.1);
+    CHECK(s.staging.running("test"));
+
+    s.fire("song.end");
+    s.tick(0.1);
+    CHECK_FALSE(s.staging.running("test"));
+}
+
+TEST_CASE("a scenario cued by a signal does not start on a different one",
+          "[stage][director][signals]") {
+    // The negative control: without it the test above would pass against a director that started
+    // on any event at all.
+    stage::StagingDesc d = oneCue({waitStep("hold", 30.0f)});
+    d.scenarios[0].startOn = "audio.beat";
+    Stage s({animal("hero", {})}, {{"hero", glm::vec3(0.0f)}}, std::move(d));
+    s.fire("audio.onset");
+    s.tick(0.5);
+    CHECK_FALSE(s.staging.running("test"));
 }
 
 TEST_CASE("the same seed and the same world decide the same way", "[stage][director][determinism]") {
