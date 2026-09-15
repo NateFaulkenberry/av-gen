@@ -2703,6 +2703,86 @@ TEST_CASE("A procedural node is as big as what it placed, not a box at its root"
 // only when the geometry is centred on its own origin. A cap authored up its own stem is not: the
 // number comes back as the full height, so the box is twice as tall as the cap AND centred on the
 // ground rather than on the cap. Both symptoms, one cause.
+// ADR-199 fixed `Mesh` and `Tube`. It did not fix `Generated`, and every hero mushroom in Glowmere
+// is a `Generated` source -- which is why the box was reported wrong *again*, with a second
+// screenshot, after that ADR shipped ("another example, look how low the yellow box is compared to
+// the elder cap").
+//
+// `primitiveBoxImpl` branches on Mesh, Tube and Cylinder and lets everything else keep
+// `centre = 0, half = sourceHalfExtent(s)`. For `Generated`, `sourceHalfExtent` has no case at all,
+// so it falls through `case Torus: default:` and returns **torus dimensions** --
+// `{majorRadius + minorRadius, minorRadius, majorRadius + minorRadius}` -- for a mushroom. Wrong
+// size from the torus fields, wrong place from the zero centre, which is both reported symptoms.
+//
+// The expected values below are computed from the mesh **this test defines**, not from the function
+// under test. That is the point: a bounds test that asks the bounds code what the bounds are cannot
+// fail.
+TEST_CASE("a generated source gets a box around the geometry it generates",
+          "[scene][composition][bounds]") {
+    scene::clearGenerators();
+    // A slab from y = 10 to y = 12, one metre either side in x and z. Nothing at the origin, and
+    // nothing symmetric about it: centre (0, 11, 0), half-extent (1, 1, 1).
+    //
+    // Deliberately *not* a torus, a tube or a mesh source -- the whole question is what happens to a
+    // kind the box code has no branch for.
+    scene::registerGenerator("slab", [](const scene::GeneratedSource&, int) -> Result<scene::MeshData> {
+        scene::MeshData mesh;
+        for (int i = 0; i < 8; ++i) {
+            scene::Vertex v;
+            v.position = glm::vec3((i & 1) ? 1.0f : -1.0f, (i & 2) ? 12.0f : 10.0f,
+                                   (i & 4) ? 1.0f : -1.0f);
+            v.normal = glm::vec3(0.0f, 1.0f, 0.0f);
+            mesh.vertices.push_back(v);
+        }
+        // Two triangles are enough to be a mesh; the box is a question about vertices.
+        mesh.indices = {0, 1, 2, 1, 3, 2};
+        return mesh;
+    });
+
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(tempDir());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "generated-box");
+    comp.attach(params, modulator);
+
+    scene::CompositionNode node;
+    node.name = "cap";
+    node.kind = scene::NodeKind::Procedural;
+    node.procedural.name = "cap";
+    node.procedural.source.kind = scene::PrimitiveKind::Generated;
+    node.procedural.source.generated.generator = "slab";
+    // A generated source is a parameter vector with provenance (ADR-175); it is refused without one.
+    // The builder above ignores the numbers -- what is being tested is the box, not the generator.
+    node.procedural.source.generated.values = {0.5f, 0.5f, 0.5f};
+    node.procedural.distribution.kind = scene::DistributionKind::Single;
+    const auto added = comp.addNode(std::move(node));
+    if (!added.has_value()) {
+        INFO(added.error().message);
+        FAIL("addNode refused the generated source");
+    }
+
+    FrameTime time{};
+    params.resetFinals();
+    comp.update(time);
+
+    const scene::WorldBounds bounds = comp.nodeBounds("cap");
+    REQUIRE(bounds.valid);
+    INFO("box centre " << bounds.centre().x << ", " << bounds.centre().y << ", " << bounds.centre().z
+                       << "  size " << bounds.size().x << ", " << bounds.size().y << ", "
+                       << bounds.size().z);
+    // The slab's own numbers, written down independently above.
+    CHECK_THAT(bounds.centre().y, Catch::Matchers::WithinAbs(11.0, 0.2));
+    CHECK_THAT(bounds.size().y, Catch::Matchers::WithinAbs(2.0, 0.4));
+    CHECK_THAT(bounds.size().x, Catch::Matchers::WithinAbs(2.0, 0.4));
+    CHECK_THAT(bounds.size().z, Catch::Matchers::WithinAbs(2.0, 0.4));
+    // And the symptom in the words it was reported in: the box must not sit on the ground under a
+    // thing that is ten metres up.
+    CHECK(bounds.min.y > 8.0f);
+
+    scene::clearGenerators();
+}
+
 TEST_CASE("a source that is not centred on its origin still gets a box around itself",
           "[scene][composition][bounds]") {
     assets::AssetRegistry registry;

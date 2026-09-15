@@ -125,6 +125,13 @@ namespace avgen::scene {
 
 using nlohmann::json;
 
+// Defined further down, beside the other mesh builders. Declared up here because the generated-source
+// bounds memo needs it long before that point, and moving either one next to the other would
+// separate it from its own family. At `avgen::scene` scope rather than inside the anonymous
+// namespace below -- a second declaration in there is a second *function*, and every existing call
+// site then becomes ambiguous.
+Result<MeshData> makeSourceMesh(const SourceSpec& spec);
+
 namespace {
 
 constexpr float kTwoPi = 6.283185307179586f;
@@ -497,6 +504,44 @@ glm::vec3 sourceHalfExtent(const SourceSpec& s);
 //
 // The conservative version stays for culling, where a symmetric bound that is too big is safe and a
 // centre nobody uses would be waste. This is for the things a person looks at.
+// The generated mesh a bounds query needs, built once per distinct source (ADR-209).
+//
+// Keyed on everything that decides the geometry -- generator, version, part and the parameter vector
+// -- because `values` is what a generated source *is* (ADR-175) and two mushrooms differing in one
+// number are two different shapes. Not keyed on the node's name or transform: those move the box,
+// they do not change it.
+//
+// A cache rather than a rebuild per call because `Composition::nodeBounds` runs every frame the
+// editor draws a selection. It is only ever added to, and the entries are small; a scene has tens of
+// distinct generated sources, not thousands.
+const MeshData* generatedMeshForBounds(const SourceSpec& s) {
+    if (s.kind != PrimitiveKind::Generated) {
+        return nullptr;
+    }
+    std::string key = s.generated.generator;
+    key += '/';
+    key += std::to_string(s.generated.generatorVersion);
+    key += '/';
+    key += std::to_string(s.generatedPart);
+    for (const float v : s.generated.values) {
+        key += '/';
+        key += std::to_string(v);
+    }
+    static std::map<std::string, std::optional<MeshData>, std::less<>> cache;
+    const auto it = cache.find(key);
+    if (it != cache.end()) {
+        return it->second ? &*it->second : nullptr;
+    }
+    // A generator that refuses is remembered as a refusal, so a broken source is not re-run every
+    // frame. The caller then keeps the symmetric fallback, which is what it had before.
+    auto built = makeSourceMesh(s);
+    auto& slot = cache[key];
+    if (built && !built->vertices.empty()) {
+        slot = std::move(*built);
+    }
+    return slot ? &*slot : nullptr;
+}
+
 void primitiveBoxImpl(const SourceSpec& s, glm::vec3& centre, glm::vec3& half) {
     centre = glm::vec3(0.0f);
     half = sourceHalfExtent(s);
@@ -527,6 +572,29 @@ void primitiveBoxImpl(const SourceSpec& s, glm::vec3& centre, glm::vec3& half) {
             ps.push_back(sample.position);
         }
         fromPoints(ps);
+    } else if (s.kind == PrimitiveKind::Generated) {
+        // ADR-209. The kind ADR-199 missed, and the one every hero mushroom in Glowmere actually
+        // uses -- which is why the box was reported wrong a second time, with a second screenshot,
+        // after that ADR shipped.
+        //
+        // A generated source had no branch here and no case in `sourceHalfExtent` either, so it fell
+        // through that function's `case Torus: default:` and came back with **torus dimensions**:
+        // `{majorRadius + minorRadius, minorRadius, majorRadius + minorRadius}`, from fields a
+        // mushroom never sets. Measured on a generated slab occupying y in [10, 12]: the box came
+        // out centred on (0, 0, 0) at 2.5 x 0.5 x 2.5, so it was the wrong size *and* ten metres
+        // below the object. Both reported symptoms, one missing branch.
+        //
+        // The geometry is the answer, the same way it is for `Mesh`: generate it and take its real
+        // min and max. Memoised below, because a selection box is queried every frame the editor
+        // draws and a mushroom generator is not free.
+        if (const MeshData* mesh = generatedMeshForBounds(s)) {
+            std::vector<glm::vec3> ps;
+            ps.reserve(mesh->vertices.size());
+            for (const Vertex& v : mesh->vertices) {
+                ps.push_back(v.position);
+            }
+            fromPoints(ps);
+        }
     } else if (s.kind == PrimitiveKind::Cylinder) {
         // Authored from its base, not its middle, which is the other asymmetric primitive.
         centre = glm::vec3(0.0f, 0.0f, 0.0f);
