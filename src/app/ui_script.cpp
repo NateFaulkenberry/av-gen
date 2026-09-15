@@ -5,6 +5,11 @@
 #include "app/placement.hpp"
 #include "assets/asset_library.hpp"
 #include "ui/control_panel.hpp"
+#include "ui/gizmo.hpp"
+#include "ui/world_probe.hpp"
+#include "core/log.hpp"
+#include "params/parameter.hpp"
+#include "scene/composition.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -26,7 +31,7 @@ struct ArmName {
     std::string_view name;
     UiScriptArm arm;
 };
-constexpr std::array<ArmName, 9> kArms{{
+constexpr std::array<ArmName, 11> kArms{{
     {"hover", UiScriptArm::Hover},
     {"sliders", UiScriptArm::Sliders},
     {"panels", UiScriptArm::Panels},
@@ -36,6 +41,8 @@ constexpr std::array<ArmName, 9> kArms{{
     {"tabs", UiScriptArm::Tabs},
     {"edit", UiScriptArm::Edit},
     {"strip", UiScriptArm::Strip},
+    {"gizmo", UiScriptArm::Gizmo},
+    {"box", UiScriptArm::Box},
 }};
 
 // Pushes a motion event as though the device had produced it. SDL routes it to the window under
@@ -89,6 +96,10 @@ void pushButton(platform::Window& window, float x, float y, bool down) {
 }
 
 } // namespace
+
+void releaseScriptedPointer(platform::Window& window) {
+    pushButton(window, 0.0f, 0.0f, false);
+}
 
 std::optional<UiScriptArm> parseUiScript(std::string_view spec) {
     if (spec.empty() || spec == "idle" || spec == "none") {
@@ -176,17 +187,33 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
         static const char* const filterEnv = std::getenv("AVGEN_SLIDER_FILTER");
         const std::string_view filter = filterEnv != nullptr ? std::string_view(filterEnv) : std::string_view();
         auto& params = engine.params();
-        const auto& ordered = params.ordered();
-        if (!ordered.empty()) {
-            for (int i = 0; i < 2; ++i) { // two per frame: a drag crosses several widgets
-                params::IParameter* p = ordered[paramCursor_ % ordered.size()];
-                ++paramCursor_;
-                if (!p->flags().exposed) {
+        // The filter restricts the *cycle*, not only the writes.
+        //
+        // It used to advance the cursor over every parameter and write only the matching ones,
+        // which meant a filter naming one slider wrote it on about one frame in a thousand -- so
+        // `AVGEN_SLIDER_FILTER=env/sky` measured an editor that was almost always idle and reported
+        // it as a sky drag. "Dragging one slider" has to mean writing that slider every frame,
+        // because that is what a hand on a slider does and it is the whole question being asked.
+        if (!sliderTargetsResolved_) {
+            sliderTargetsResolved_ = true;
+            for (params::IParameter* p : params.ordered()) {
+                if (p == nullptr || !p->flags().exposed) {
                     continue;
                 }
                 if (!filter.empty() && !std::string_view(p->path()).starts_with(filter)) {
                     continue;
                 }
+                sliderTargets_.push_back(p);
+            }
+            if (!filter.empty()) {
+                log::info("ui-script sliders: {} parameter(s) under '{}'", sliderTargets_.size(), filter);
+            }
+        }
+        const std::vector<params::IParameter*>& ordered = sliderTargets_;
+        if (!ordered.empty()) {
+            for (int i = 0; i < 2; ++i) { // two per frame: a drag crosses several widgets
+                params::IParameter* p = ordered[paramCursor_ % ordered.size()];
+                ++paramCursor_;
                 const std::size_t n = std::min<std::size_t>(p->componentCount(), 4);
                 for (std::size_t c = 0; c < n; ++c) {
                     const float lo = p->softMin(c);
@@ -237,6 +264,14 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
 
     if (has(arms_, UiScriptArm::Strip)) {
         stepStrip(engine, *panel, window, frame);
+    }
+
+    if (has(arms_, UiScriptArm::Gizmo)) {
+        stepGizmo(engine, *panel, window, frame);
+    }
+
+    if (has(arms_, UiScriptArm::Box)) {
+        stepBox(engine, *panel, window, frame);
     }
 
     if (has(arms_, UiScriptArm::Panels)) {
@@ -626,6 +661,183 @@ void UiScript::stepStrip(Engine& engine, ui::ControlPanel& panel, platform::Wind
             warpAndMove(window, x, y);
         }
         break;
+    }
+}
+
+// ---- gizmo: moving an object with the handles ---------------------------------------------------
+//
+// A cycle of 60 frames: select, press on the X arm, drag for forty frames, let go. It repeats so a
+// block of frames measures the *drag*, which is the thing the complaint is about -- a one-shot
+// script would put one drag frame in ninety and report the idle editor.
+//
+// Aimed at the handle rather than at a fixed point on the canvas, and aimed through the same
+// projection the overlay draws it with (`ui::projectPoint`), so the press lands on the arm at
+// whatever distance the camera happens to be. A gizmo arm is a few points wide; guessing at it
+// would be an arm that silently measured an empty canvas, which ADR-182 calls worse than no arm.
+void UiScript::stepGizmo(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                         std::uint64_t frame) {
+    const ui::CanvasRect& canvas = panel.canvas();
+    scene::Composition* composition = engine.composition();
+    if (!canvas.valid() || composition == nullptr) {
+        return;
+    }
+    ui::WorldEditor& editor = panel.editor;
+    const std::uint64_t inCycle = frame % 60;
+    const scene::Camera& camera = engine.scene().camera;
+    const float aspect = canvas.height > 0.0f ? canvas.width / canvas.height : 1.0f;
+    if (inCycle == 0) {
+        // Something with geometry that is **on screen**, re-chosen every cycle.
+        //
+        // The first version took the first Gltf node and kept whatever was already selected, and a
+        // nine-arm run caught it doing nothing at all: the box arm ahead of it had cleared the
+        // selection, the first Gltf node happened to be one standing off past the edge of the
+        // frame, and the arm pressed at (-20092, 26181) for three blocks running while reporting a
+        // perfectly healthy frame time. The probe is what noticed; this is the repair.
+        editor.mode = ui::EditorMode::Select;
+        editor.gizmoMode = ui::GizmoMode::Move;
+        editor.selection.clear();
+        // The candidate nearest the middle of the frame, not the first one that is merely inside
+        // it: the X arm reaches out from the origin and has to land somewhere a person could have
+        // clicked, so the further from centre the subject is the likelier the grab point is off the
+        // canvas entirely.
+        std::string best;
+        float bestDistance = 0.9f; // and no further out than this, or there is no arm to grab
+        for (const auto& node : composition->nodes()) {
+            if (!node || node->locked || node->kind == scene::NodeKind::Terrain ||
+                node->kind == scene::NodeKind::Group) {
+                continue;
+            }
+            const scene::WorldBounds bounds = composition->nodeBounds(node->name);
+            if (!bounds.valid) {
+                continue;
+            }
+            const ui::Projected at = ui::projectPoint(camera, aspect, bounds.centre());
+            if (!at.inFront) {
+                continue;
+            }
+            const float distance = std::max(std::abs(at.ndc.x), std::abs(at.ndc.y));
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = node->name;
+            }
+        }
+        if (best.empty()) {
+            if (gizmoDrags_ == 0 && !saidNoSubject_) {
+                saidNoSubject_ = true;
+                editLog_.emplace_back("gizmo: nothing selectable is in frame; this arm measured nothing");
+            }
+            return;
+        }
+        editor.selection.set({best});
+        return;
+    }
+    if (editor.selection.empty()) {
+        return;
+    }
+    const ui::EditorVisuals& visuals = editor.visuals();
+    const auto [from, to] = ui::axisSegment(visuals.gizmo, ui::GizmoHandle::AxisX);
+    // Where along the arm to press, decided by asking the editor's own hit test rather than by
+    // picking a fraction and hoping. `pickHandle` with `kHandlePickRadius` is literally the
+    // function `WorldEditor::updateGizmo` runs against the live pointer, so a point this loop
+    // accepts is a point the editor will accept -- which turns "the press landed on the handle"
+    // from an assumption into a construction. A fixed two-thirds looked right and missed: the
+    // plane handles crowd the inner arm and the arrow head narrows the outer one, and which
+    // fraction is clear depends on the angle the arm is seen at.
+    ui::Projected grab{};
+    bool aimed = false;
+    for (int step = 0; step <= 12 && !aimed; ++step) {
+        const float t = 0.35f + 0.05f * static_cast<float>(step);
+        const ui::Projected at = ui::projectPoint(camera, aspect, glm::mix(from, to, t));
+        if (!at.inFront) {
+            continue;
+        }
+        if (ui::pickHandle(camera, aspect, visuals.gizmo, ui::GizmoMode::Move, at.ndc,
+                           ui::kHandlePickRadius) == ui::GizmoHandle::AxisX) {
+            grab = at;
+            aimed = true;
+        }
+    }
+    if (!aimed) {
+        return;
+    }
+    const float gx = canvas.x + (grab.ndc.x * 0.5f + 0.5f) * canvas.width;
+    const float gy = canvas.y + (0.5f - grab.ndc.y * 0.5f) * canvas.height;
+    if (inCycle < 4) {
+        // Three frames of hovering before the press, and they are not padding. Dear ImGui resolves
+        // which window is hovered from the *previous* frame's layout, and `WorldEditor` only looks
+        // at a press when `input.overCanvas` is already true -- so a press delivered in the same
+        // frame as the pointer's first appearance over the canvas is a press the editor never sees.
+        // Without these the arm pressed exactly on the X arm, by construction, and reported the
+        // handle it was dragging as `none` for every block of every run.
+        warpAndMove(window, gx, gy);
+    } else if (inCycle == 4) {
+        warpAndMove(window, gx, gy);
+        pushButton(window, gx, gy, true);
+    } else if (inCycle > 4 && inCycle < 50) {
+        // A there-and-back sweep along the screen, so the object ends the cycle near where it
+        // started and a hundred cycles do not walk it out of the world.
+        const float t = static_cast<float>(inCycle - 4) / 45.0f;
+        const float travel = canvas.width * 0.12f * std::sin(t * 6.2831853f);
+        warpAndMove(window, gx + travel, gy);
+        if (visuals.dragging != ui::GizmoHandle::None) {
+            gizmoDragged_ = visuals.dragging; // sampled mid-drag: `hovered` is None while dragging
+        }
+    } else if (inCycle == 50) {
+        warpAndMove(window, gx, gy);
+        pushButton(window, gx, gy, false);
+        ++gizmoDrags_;
+        // An arm that cannot fail is worse than no arm (ADR-182). A press two points off a handle
+        // measures an empty canvas and reports a lovely frame time, so the arm says once what it
+        // actually achieved: whether a drag opened, and how far the object moved.
+        if (gizmoDrags_ == 1) {
+            const scene::CompositionNode* node = composition->findNode(editor.selection.primary());
+            const glm::vec3 now = node != nullptr ? composition->nodeWorldTransform(*node).position
+                                                  : glm::vec3(0.0f);
+            editLog_.push_back(fmt::format(
+                "gizmo: '{}' grabbed at ({:.0f},{:.0f}); the handle being dragged was {}; the "
+                "object ended the cycle at ({:.2f}, {:.2f}, {:.2f})",
+                editor.selection.primary(), gx, gy, ui::gizmoHandleName(gizmoDragged_), now.x, now.y, now.z));
+        }
+    }
+}
+
+// ---- box: dragging a selection rectangle --------------------------------------------------------
+//
+// The other canvas gesture the brief names. A cycle of 60: clear, press near one corner, sweep to
+// the other, release. The sweep is what costs -- every frame of it re-tests what is inside the
+// rectangle -- so the frames in the middle are the measurement and the press is not.
+void UiScript::stepBox(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                       std::uint64_t frame) {
+    const ui::CanvasRect& canvas = panel.canvas();
+    if (!canvas.valid() || engine.composition() == nullptr) {
+        return;
+    }
+    const auto at = [&](float u, float v) {
+        return std::pair<float, float>(canvas.x + canvas.width * u, canvas.y + canvas.height * v);
+    };
+    ui::WorldEditor& editor = panel.editor;
+    const std::uint64_t inCycle = frame % 60;
+    if (inCycle == 0) {
+        editor.mode = ui::EditorMode::Select;
+        editor.selection.clear();
+        const auto [x, y] = at(0.06f, 0.10f);
+        warpAndMove(window, x, y);
+        pushButton(window, x, y, true);
+    } else if (inCycle < 50) {
+        const float t = static_cast<float>(inCycle) / 50.0f;
+        const auto [x, y] = at(0.06f + 0.88f * t, 0.10f + 0.84f * t);
+        warpAndMove(window, x, y);
+        boxOpened_ = boxOpened_ || editor.visuals().boxing;
+    } else if (inCycle == 50) {
+        const auto [x, y] = at(0.94f, 0.94f);
+        warpAndMove(window, x, y);
+        pushButton(window, x, y, false);
+        ++boxDrags_;
+        if (boxDrags_ == 1) {
+            editLog_.push_back(
+                fmt::format("box: the editor had a box open mid-drag: {}; it selected {} of {} object(s)",
+                            boxOpened_, editor.selection.size(), engine.composition()->nodeCount()));
+        }
     }
 }
 

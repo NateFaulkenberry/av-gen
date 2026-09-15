@@ -37,6 +37,11 @@ struct EnvironmentSettings {
     std::uint32_t brdfSamples = 256;
 };
 
+// How many times this process has run the full IBL chain -- cube, irradiance, GGX prefilter -- and
+// blocked the main thread on it. `process`/`processSky` are documented as load-time work; this is
+// how "not per frame" stops being a hope and becomes a number a run can be judged against.
+[[nodiscard]] std::uint64_t environmentBuildCount() noexcept;
+
 class EnvironmentProcessor {
 public:
     EnvironmentProcessor(gpu::Context& context, gpu::ShaderLibrary& shaders);

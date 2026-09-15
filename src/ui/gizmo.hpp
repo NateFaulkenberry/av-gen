@@ -62,6 +62,12 @@ struct GizmoFrame {
 [[nodiscard]] float gizmoWorldScale(const scene::Camera& camera, glm::vec3 origin,
                                     float screenFraction = 0.16f);
 
+// The editor's grab tolerance, in NDC units. Here rather than in world_editor.cpp because a second
+// caller needs to aim *with* it: `--ui-script gizmo` chooses where to press by asking `pickHandle`
+// which points are over the arm, and an arm that guessed at the tolerance would press two points
+// wide of the handle and report a beautiful frame time for an editor that did nothing.
+constexpr float kHandlePickRadius = 0.033f;
+
 // What the pointer is over. `ndc` is the cursor; `pickRadius` is the grab distance in NDC units,
 // which is how a tolerance in pixels arrives here without this file knowing about pixels.
 [[nodiscard]] GizmoHandle pickHandle(const scene::Camera& camera, float aspect, const GizmoFrame& frame,

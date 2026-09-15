@@ -16,7 +16,6 @@ namespace {
 // How close to a handle the pointer has to be, in NDC. A sixtieth of the frame is about ten pixels
 // on a 1200-pixel-high canvas, which is the tolerance every tool uses and the one people's hands
 // are calibrated to.
-constexpr float kHandlePickRadius = 0.033f;
 // A drag has to travel this far in NDC before it counts as a drag rather than a click. Below it a
 // box selection would open on every click and a paint stroke would place twice.
 constexpr float kDragThreshold = 0.012f;

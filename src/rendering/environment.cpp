@@ -5,6 +5,7 @@
 #include "gpu/shader_library.hpp"
 
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstring>
 
@@ -292,12 +293,21 @@ Result<IblResources> EnvironmentProcessor::filterCube(const CubeTexture& sourceC
     return out;
 }
 
+namespace {
+std::atomic<std::uint64_t> gEnvironmentBuilds{0};
+} // namespace
+
+std::uint64_t environmentBuildCount() noexcept {
+    return gEnvironmentBuilds.load(std::memory_order_relaxed);
+}
+
 Result<IblResources> EnvironmentProcessor::process(const scene::TextureData& equirect,
                                                    const EnvironmentSettings& settings) {
     if (!initialised_) {
         return fail("environment processor not initialised");
     }
     const auto start = std::chrono::steady_clock::now();
+    gEnvironmentBuilds.fetch_add(1, std::memory_order_relaxed);
     if (auto r = ensureBrdf(settings); !r) {
         return std::unexpected(r.error());
     }
@@ -359,6 +369,7 @@ Result<IblResources> EnvironmentProcessor::processSky(const scene::SkyRuntime& s
         return fail("environment processor not initialised");
     }
     const auto start = std::chrono::steady_clock::now();
+    gEnvironmentBuilds.fetch_add(1, std::memory_order_relaxed);
     if (auto r = ensureBrdf(settings); !r) {
         return std::unexpected(r.error());
     }
