@@ -20,6 +20,27 @@ namespace {
 
 constexpr float kDegrees = 180.0f / 3.14159265358979323846f;
 
+// An angle folded into (-half, half]. Used on two things that are angles rather than odometers.
+//
+// `EntityState::yaw` is written as `yaw += turned` by every behaviour and action that steers, so
+// over a long walk it is the *total* the body has turned rather than the direction it faces. That
+// was invisible until it reached the node's rotation parameter, whose hard range is +/-360 degrees
+// (composition.cpp, registerNodeParameters): past a net revolution the parameter clamped, the drawn
+// facing stopped following the body, and a character walked while pointing wherever the clamp left
+// it. Measured on Glowmere's wanderer at 31.8% of moving frames drawn travelling backwards.
+//
+// Safe everywhere because nothing reads yaw as an accumulation: every comparison goes through
+// `angleDelta`, which normalises, and everything else takes its sine and cosine. `spin` already
+// does the same thing to its own angle, for the same reason.
+float wrapAngle(float radians, float half) {
+    const float full = half * 2.0f;
+    float wrapped = std::fmod(radians + half, full);
+    if (wrapped < 0.0f) {
+        wrapped += full;
+    }
+    return wrapped - half;
+}
+
 std::uint32_t nameSeed(std::string_view name, std::uint32_t sceneSeed) {
     // FNV-1a over the name, mixed with the scene seed. Deterministic across runs and platforms,
     // and different for two entities that differ only in their name -- which is what stops a row
@@ -879,7 +900,12 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
                                      e.motion_.rotation.z);
             for (int i = 0; i < 3; ++i) {
                 const auto c = static_cast<std::size_t>(i);
-                e.rotationParam_->setFinalComponent(c, e.rotationParam_->finalComponent(c) + rotation[i]);
+                // Folded into (-180, 180] before it is written, because the parameter's hard range
+                // is +/-360 and `setFinalComponent` *clamps*. Euler degrees are 360-periodic, so
+                // this is the same orientation and cannot be anything else; what it removes is the
+                // silent clamp, which is not a rotation at all.
+                e.rotationParam_->setFinalComponent(
+                    c, wrapAngle(e.rotationParam_->finalComponent(c) + rotation[i], 180.0f));
             }
         }
         if (e.scaleParam_ != nullptr) {
@@ -988,6 +1014,10 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         for (auto& behavior : entity.behaviors_) {
             behavior->update(bc, entity.state_, entity.motion_);
         }
+        // The body's facing, not the total it has turned. Canonicalised here, once, after everything
+        // that steers has had its turn and before anything reads it -- the node's rotation, the
+        // sockets, and the LocomotionState the animation layer is handed all see the same angle.
+        entity.state_.yaw = wrapAngle(entity.state_.yaw, 3.14159265358979323846f);
 
         // Fold the behaviours' offsets onto the node's parameter *finals*. Bases are left alone, so
         // saving the project writes back what the author placed rather than wherever the entity

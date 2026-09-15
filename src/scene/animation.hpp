@@ -50,8 +50,19 @@ struct AnimationChannel {
 
 struct AnimationClip {
     std::string name;
+    // The range the keys actually cover. `start` is the *first* key time across every channel and
+    // is not always zero: Blender's glTF exporter writes the frame range it was given, and a take
+    // authored on frames 1..32 arrives as keys at 1/30 s .. 32/30 s. Assuming the range began at
+    // zero cost every clip in the alien pack 1/30 s of held first pose at the top of every loop --
+    // motion no animator authored, and a cycle 3.2% longer than the one in the file. The Mixamo
+    // character this engine was built against starts at 0, which is why it was never noticed.
+    //
+    // `length()` is the playable span and the loop period; `duration` remains the last key time so
+    // a clip whose keys start at zero is byte-for-byte what it always was.
+    float start = 0.0f;
     float duration = 0.0f; // the last key time across every channel
     std::vector<AnimationChannel> channels;
+    [[nodiscard]] float length() const { return duration > start ? duration - start : 0.0f; }
     [[nodiscard]] bool valid() const;
 };
 
@@ -63,8 +74,8 @@ struct AnimationClip {
 // is what makes a clip that animates fifty of a rig's sixty joints leave the other ten alone
 // instead of collapsing them to the origin.
 //
-// `time` is clamped to [0, duration]; wrap it yourself for a looping clip. Channels shorter than
-// two keys hold their single value.
+// `time` is clamped to [start, duration]; wrap it yourself for a looping clip. Channels shorter
+// than two keys hold their single value.
 void sampleClip(const AnimationClip& clip, float time, Pose& pose);
 
 // ---- the state machine -------------------------------------------------------------------------
