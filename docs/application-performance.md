@@ -514,10 +514,22 @@ anywhere in `src/`**.
    *edit*. The LOD debug sliders do not rebuild either -- `TerrainSettings::structuralHash` excludes
    `lodDistance` and `viewDistance` because they choose meshes per frame and change nothing that was
    built.
-3. **`world::scatter` is single-threaded** — ~260k grid cells, ~1.3M `WorldMap::height` evaluations,
-   one layer at a time, while `buildTerrain` beside it is already threaded. P1-3.
-4. **Viewport pick: up to 5 serial blocking GPU round-trips per click.** P2-1. Still true for a
-   click, which is the right place for it. The editor's *hover* no longer goes near it: the live
+3. ~~**`world::scatter` is single-threaded**~~ — **done, ADR-231.** It was worse than this entry
+   suggested: `sample(1)` during start-up put **771 of 1648 main-thread samples inside it**, i.e.
+   47% of a 2.14-second project load. It is now threaded in bands of rows, mirroring
+   `buildTerrain`'s pool. Interleaved in one session: project load **2147 → 1442 ms**, the
+   scene-build stage **1964 → 1259 ms**, and `--headless --capture` byte-identical either way
+   (sha256 `3f4dbe24…aefaaa`). `AVGEN_SCATTER_WORKERS=<n>` forces the count so the comparison stays
+   checkable. Scaling on this machine, scene-build stage: 1967 / 1532 / 1312 / 1234 / 1202 ms at
+   1 / 2 / 4 / 8 / 16 workers — it flattens because the ~800 ms of the scene build that is not
+   scatter is still serial.
+4. ~~**Viewport pick: up to 5 serial blocking GPU round-trips per click.**~~ -- **done, ADR-231**,
+   and this entry was wrong about the number. `pickNormalAt`, which accounted for three of the five,
+   has **no caller anywhere in `src/`**; the live click path did **two**, one for the depth and one
+   for the identifier. `gpu::readTexelsR32` now batches any number of texels across any number of
+   textures into one submission and one map, so a click costs **one** round trip and `pickNormalAt`,
+   if it is ever wired up, costs one rather than three. Still on the click, which is the right place
+   for it. The editor's *hover* no longer goes near it: the live
    ghost marches a ray against `WorldMap::sample` on the CPU instead (ADR-092), because a preview
    that follows the cursor cannot block on the GPU sixty times a second.
 5. **The audio-driven root transform** could regenerate every procedural cloud per frame in a scene
@@ -536,5 +548,93 @@ anywhere in `src/`**.
 - Make the terrain build asynchronous and show the previous mesh until it lands, so opening a world
   does not freeze the editor at all.
 - Coalesce the viewport pick's five readbacks into one submission.
-- Give the deferral of §9.2 a visible indicator; `proceduralsAwaitingRebuild()` exists for it.
-  Geometry that is deliberately a few frames behind the slider should say so.
+- ~~Give the deferral of §9.2 a visible indicator~~ — **done, ADR-231.** The canvas shows it, with
+  job progress and song analysis, after a 180 ms threshold and a 140 ms fade. The threshold is the
+  point: the deferral is 90 ms by design, so an indicator without one would blink through every
+  frame of every drag.
+
+---
+
+## 16. What opening a project costs (ADR-231)
+
+"Opening a project freezes the application" was not a number, and `Engine::loadProject` now makes it
+one. It names nine stages as it enters them and keeps each one's wall clock in `lastLoadTimings()`.
+The list is fixed before the first byte is read, so a stage index is a *countable fact* rather than
+an estimate of time remaining — ADR-064's rule, obeyed here for the same reason.
+
+`examples/world/glowmere-stylized.json`, five consecutive runs, spread 2%:
+
+```
+project load: 2147 ms total -- Reading the project 1 ms; Loading audio 164 ms;
+                               Building the scene 1964 ms; Layers and parameters 15 ms
+```
+
+**92% of a project load is one stage**, and §14.3 is what was inside it. After the scatter was
+threaded the same measurement reads **1442 ms total, 1259 ms of scene build**.
+
+### The load is not on a worker, and that is a decision
+
+The composition is not thread-safe, the environment map's prefilter is GPU work and all GPU work in
+this application is the main thread's (§8), and the parameter set is torn down and rebuilt underneath
+everything that reads it. ADR-084 §2 rejected threading a far smaller piece of this for the same
+reasons.
+
+What the editor does instead is defer the open by one frame and paint "Opening &lt;name&gt;" over the
+scene that is still there, so the window holds *that* picture for the length of the load rather than
+a stale editor that looks like it ignored the click. **The freeze is the same length.** The third
+that came off it came from §14.3, not from the indicator — saying otherwise would be the thing the
+brief's section 19 forbids.
+
+The stage reporter fires during a load that nothing repaints, so it cannot animate. It earns its
+place for two other things: a load that *fails* now says which stage it reached, and the numbers
+above exist at all.
+
+---
+
+## 17. The editor's own frame, re-measured after ADR-231
+
+Whether a palette, cursors, lane headers, a two-tick ruler and context menus made the UI build more
+expensive. On this document's own reference point — §5's arm A, empty scene, idle, 1440×900 — they
+did not:
+
+| | §5 baseline | after ADR-231 |
+|---|---|---|
+| `ui.build` min, empty + idle | 0.044 ms | **0.047 ms** (median 0.063, three runs) |
+| FRAME median, empty + idle | 8.37 ms | 8.40–8.44 ms |
+
+On a loaded world scene `ui.build` is 0.137–0.146 ms median. That is the World panel's parameter tree
+and the sequencer strip, not a regression: the budget in §11 is 1.0 ms, and it is 1.6% of a 120 Hz
+frame.
+
+### The caveat this document's own rules require
+
+Every number in §16 and §17 was taken on a machine at load average 8–34, with an interactive `avgen`
+session belonging to somebody else open for part of it. Rule 2 of §3 is what was leaned on —
+minimum, or best of N by median, because contention is never negative — and the load-stage figures
+are trustworthy chiefly because five consecutive runs agreed within 2%.
+
+**No before/after frame-time comparison across two process runs is offered here**, because §3 rule 1
+forbids it and building two binaries does not turn two processes into one session. The claims that
+carry weight are the structural ones, which contention cannot move: one GPU round trip where there
+were two, a byte-identical capture beside a third less wall clock, and 134 of 135 points of the
+sequencer strip visible where there were 82 of 195.
+
+### A new arm: `--ui-script strip`
+
+Scenario C of the brief — sequencer drag, scrub and resize — had no instrument, so it has one. It
+opens the Sequence panel, **brings it to the front**, presses on the ruler and scrubs, then grabs a
+shot and drags it, all through real SDL events.
+
+It failed on its first four runs and every failure was a finding, which is what §3 rule 5 is about:
+
+1. It reported a scrub to `0.00 s`. The bottom dock holds five panels as *tabs*, and opening one does
+   not make it active — a background tab's `Begin` returns false and its body never runs, so the
+   panel's remembered rectangle was from a single transitional frame during the layout rebuild.
+2. With the panel focused it reported `hovered=true` and a shot still at `0.00 s`, and said why:
+   **190 points of toolbar above a 272-point panel, 82 of a 195-point strip visible.** The shots lane
+   was below the fold at the size the editor opens at.
+3. After moving snap/zoom/status below the strip and letting the lanes compress to fit: **138 points
+   of toolbar, 134 of 135 visible**, the scrub lands on a beat at 72.50 s, and the shot drag lands at
+   35.76 s where it had reported 0.00.
+
+A UI cannot be certified by reading its source, and this is the shape of the alternative.
