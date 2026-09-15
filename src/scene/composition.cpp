@@ -986,58 +986,6 @@ Composition::~Composition() = default;
 std::string Composition::nestedPrefix(const CompositionNode& node) const {
     return nestedPrefixFor(prefix_, node.name, node.child != nullptr && node.child->attached());
 }
-
-// ---- interactive rebuild policy (docs/application-performance.md) -------------------------------
-//
-// Pure, so it can be reasoned about and tested without a scene, a clock or a GPU. `state` is the
-// object's record, `wanted` the hash its inputs currently ask for, `built` the hash it is actually
-// at, `elapsedMs` the wall time since the last poll. Returns true when the caller should regenerate
-// now.
-//
-// The shape of it: an object whose inputs just moved restarts a settle timer, so a drag -- which
-// moves them every frame -- never reaches the regeneration until it stops. Once they hold still for
-// kSettleMs it regenerates. And because a drag can go on for seconds, there is a ceiling on how
-// long it may be held back, scaled by what the object costs: something costing 150 ms refreshes at
-// most every 600 ms while the drag continues, something costing 5 ms every 90, so no object spends
-// more than about a fifth of the time regenerating. A fixed ceiling would either starve the cheap
-// objects or hand the expensive ones the frame back again.
-bool advanceRebuildDeferral(Composition::ProceduralRebuildState& state, std::uint64_t wanted,
-                            std::uint64_t built, double elapsedMs) {
-    // About five frames at 60 Hz: short enough that letting go of a slider feels immediate, long
-    // enough that a drag cannot sneak a regeneration in between two of its own frames.
-    constexpr double kSettleMs = 90.0;
-    constexpr double kCostMultiple = 4.0;
-
-    if (wanted == built) {
-        state.deferring = false;
-        state.settledForMs = 0.0;
-        state.heldForMs = 0.0;
-        return false;
-    }
-    if (!state.deferring) {
-        state.deferring = true;
-        state.deferredHash = wanted;
-        state.settledForMs = 0.0;
-        state.heldForMs = 0.0;
-        return false;
-    }
-    state.heldForMs += elapsedMs;
-    if (wanted != state.deferredHash) {
-        state.deferredHash = wanted; // the inputs moved again: still wrong, but not yet still
-        state.settledForMs = 0.0;
-    } else {
-        state.settledForMs += elapsedMs;
-    }
-    const double ceilingMs = std::max(kSettleMs, state.lastMs * kCostMultiple);
-    if (state.settledForMs < kSettleMs && state.heldForMs < ceilingMs) {
-        return false;
-    }
-    state.deferring = false;
-    state.settledForMs = 0.0;
-    state.heldForMs = 0.0;
-    return true;
-}
-
 void Composition::rebuildProcedurals() {
     // Every object sees the complete list (Procedural sources reference siblings by name, spline
     // distributions read scene_.splines); generateCloud resolves references recursively so the
@@ -2976,6 +2924,7 @@ void Composition::ensureBuilt() {
 }
 
 void Composition::rebuild() {
+    ++flattens_;
     // A flatten is the single most expensive thing the editor does on the main thread, it is
     // triggered by structural edits an artist makes constantly, and until ADR-092 nothing said what
     // it cost. One line per rebuild, so "why did that stutter" has an answer in the log of the run
@@ -4383,7 +4332,17 @@ void Composition::applyParameters() {
             // Parameters drive a live copy; the node transform folds into the distribution
             // transform so the instance records already sit in world space.
             ProceduralGeometry& pg = scene_.procedurals[static_cast<std::size_t>(range.proceduralIndex)];
-            applyProceduralParameters(node.proceduralParams, node.proceduralRest, pg);
+            // Values only. Generating here as well as in rebuildProcedurals() was 2 regenerations
+            // per object per frame, for ever, on an editor nobody was touching: this one runs
+            // against an empty context and stores *that* hash, so the one below always disagreed
+            // with it and always regenerated, and next frame this one disagreed right back. On
+            // glowmere-stylized that measured as 22 regenerations per idle frame -- exactly twice
+            // the eleven procedural nodes -- where the right answer is none.
+            if (legacyProceduralGeneration_) {
+                applyProceduralParameters(node.proceduralParams, node.proceduralRest, pg);
+            } else {
+                applyProceduralParameterValues(node.proceduralParams, node.proceduralRest, pg);
+            }
             prefixFieldReferences(pg, sanitise(prefix_));
             pg.distributionTransform = Transform::fromMatrix(full.matrix() * pg.distributionTransform.matrix());
             pg.visible = pg.visible && visible;
@@ -4398,7 +4357,11 @@ void Composition::applyParameters() {
                 ProceduralGeometry& sub =
                     scene_.procedurals[static_cast<std::size_t>(range.proceduralIndex) + 1 + k];
                 const std::string name = sub.name;
-                applyProceduralParameters(node.proceduralParams, subRest, sub);
+                if (legacyProceduralGeneration_) {
+                    applyProceduralParameters(node.proceduralParams, subRest, sub);
+                } else {
+                    applyProceduralParameterValues(node.proceduralParams, subRest, sub);
+                }
                 sub.name = name;
                 // The material parameters were registered from part 0's material, so applying them
                 // here would repaint the leaves in the bark's colour -- the exact bug this split

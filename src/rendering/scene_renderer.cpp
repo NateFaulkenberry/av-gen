@@ -523,14 +523,42 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
                 setIbl(IblResources{});
                 skyBuilt_ = false;
                 skyHash_ = 0;
+                skyDeferral_ = scene::RebuildDeferral{};
             }
             return;
         }
         const scene::SkyRuntime sky = scene::resolveSky(scene.environment.sky, scene.lights);
         const std::uint64_t hash = sky.hash();
         if (skyBuilt_ && hash == skyHash_ && ibl_.valid) {
+            skyDeferral_.deferring = false;
             return;
         }
+        // ADR-233. The chain below is `processSky`, whose own header says "blocks like `process`
+        // does; call it when the sky's hash changes, not per frame" -- and a drag on any of the ten
+        // sky parameters, or on the key light the sun is resolved from, changes the hash every
+        // frame. Measured interleaved against an idle arm in one process, a sky drag ran the chain
+        // on 46% of its frames and took `render.record` from 0.96 ms median to 26.8 ms mean / 78.8
+        // p95, and the frame from 32.9 ms median to 48.4.
+        //
+        // So the same policy ADR-084 gave procedural geometry: an expensive rebuild waits for the
+        // inputs to hold still, with a ceiling so a long drag still refreshes. The sky that is on
+        // screen meanwhile is the last one built, which is a few frames behind -- and the canvas
+        // says so, because `environmentAwaitingRebuild()` feeds the activity indicator.
+        //
+        // The guard is `skyBuilt_ && ibl_.valid`: a scene that has never had a sky gets one at
+        // once, whatever it costs. There is nothing to be behind.
+        if (interactiveEnvBudgetMs_ > 0.0 && skyBuilt_ && ibl_.valid &&
+            skyDeferral_.lastMs > interactiveEnvBudgetMs_) {
+            const auto now = std::chrono::steady_clock::now();
+            const double sinceMs = lastSkyPollTime_.time_since_epoch().count() == 0
+                                       ? 0.0
+                                       : std::chrono::duration<double, std::milli>(now - lastSkyPollTime_).count();
+            lastSkyPollTime_ = now;
+            if (!scene::advanceRebuildDeferral(skyDeferral_, hash, skyHash_, sinceMs)) {
+                return;
+            }
+        }
+        const auto skyStart = std::chrono::steady_clock::now();
         auto built = environment_->processSky(sky);
         if (!built) {
             log::error("procedural sky: {}", built.error().message);
@@ -538,6 +566,14 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
             skyBuilt_ = false;
             return;
         }
+        // What it cost, which is what decides whether the next one is allowed to wait. Measured
+        // rather than assumed: the chain's cost depends on the cube and prefilter sizes, and a
+        // hard-coded "skies are expensive" would defer a cheap one for no reason.
+        skyDeferral_.lastMs =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - skyStart).count();
+        skyDeferral_.deferring = false;
+        skyDeferral_.settledForMs = 0.0;
+        skyDeferral_.heldForMs = 0.0;
         built->fromSky = true;
         setIbl(*built);
         skyBuilt_ = true;

@@ -2091,6 +2091,89 @@ TEST_CASE("Procedural regeneration is deferred only when a budget is set", "[sce
     }
 }
 
+// ADR-233. A composition that nobody is touching must generate nothing.
+//
+// It generated *twice per procedural object per frame*, for ever, and the mechanism is worth
+// stating because it is invisible from either end on its own. `applyParameters` did two things in
+// order: it copied the parameter finals into the flattened object -- which ended by calling
+// `rebuild()` against an **empty** GenerationContext and storing that hash -- and then folded the
+// node's world transform into the distribution transform. `rebuildProcedurals()` then asked for a
+// rebuild against the **real** context, whose hash differed from the stored one for two independent
+// reasons, so it regenerated and stored its own hash; next frame the first step disagreed right
+// back. Neither call site looked wrong. Only the count did: measured on the editor with
+// `--ui-ab idle`, eleven procedural nodes produced twenty-two regenerations per idle frame.
+//
+// The counter is the assertion, not a timing: a wall clock on this machine is a statement about
+// what else was running, and "none where there were two" is not.
+TEST_CASE("An untouched composition regenerates no procedural geometry", "[scene][composition][performance]") {
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(tempDir());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "composition");
+    comp.attach(params, modulator);
+
+    scene::CompositionNode node;
+    node.name = "grid";
+    node.kind = scene::NodeKind::Procedural;
+    node.procedural.name = "grid";
+    node.procedural.source.kind = scene::PrimitiveKind::Box;
+    node.procedural.distribution.kind = scene::DistributionKind::Grid;
+    node.procedural.distribution.gridCount = glm::ivec3(4, 1, 4);
+    // **The node is not at the origin, and that is the point.** The fold is a no-op at identity, so
+    // an object sitting at the world origin never showed the defect at all -- which is why it
+    // survived two performance passes. Everything a person places is somewhere.
+    node.transform.position = glm::vec3(3.0f, 1.0f, -2.0f);
+    node.transform.scale = glm::vec3(1.5f);
+    REQUIRE(comp.addNode(std::move(node)));
+
+    FrameTime time{};
+    params.resetFinals();
+    comp.update(time); // the first update flattens and builds: it is allowed to generate
+    REQUIRE(comp.scene().procedurals.size() == 1);
+
+    SECTION("ten idle frames generate nothing") {
+        const std::uint64_t before = scene::proceduralRebuildCount();
+        const std::uint32_t version = comp.scene().procedurals[0].structureVersion;
+        for (int frame = 0; frame < 10; ++frame) {
+            params.resetFinals(); // the engine does this each frame; a bare composition has no engine
+            comp.update(time);
+        }
+        CHECK(scene::proceduralRebuildCount() == before);
+        CHECK(comp.scene().procedurals[0].structureVersion == version);
+    }
+
+    SECTION("the arm can fail: with the old path restored the same ten frames generate twenty") {
+        // §3 rule 5 of docs/application-performance.md -- break the code and confirm the test
+        // fails -- done here rather than by hand, so the assertion above cannot quietly become
+        // vacuous if some later change makes regeneration impossible for an unrelated reason.
+        comp.setLegacyProceduralGeneration(true);
+        const std::uint64_t before = scene::proceduralRebuildCount();
+        for (int frame = 0; frame < 10; ++frame) {
+            params.resetFinals();
+            comp.update(time);
+        }
+        CHECK(scene::proceduralRebuildCount() == before + 20);
+    }
+
+    SECTION("a parameter that moves still regenerates, exactly once") {
+        auto* gridX = params.find("procedural/grid/distribution/gridCountX");
+        REQUIRE(gridX != nullptr);
+        const std::uint64_t before = scene::proceduralRebuildCount();
+        gridX->setBaseComponent(0, 7.0f);
+        params.resetFinals();
+        comp.update(time);
+        CHECK(scene::proceduralRebuildCount() == before + 1);
+        // And then settles again, rather than regenerating on for ever at the new value.
+        const std::uint64_t after = scene::proceduralRebuildCount();
+        for (int frame = 0; frame < 5; ++frame) {
+            params.resetFinals();
+            comp.update(time);
+        }
+        CHECK(scene::proceduralRebuildCount() == after);
+    }
+}
+
 // The deferral policy itself, as arithmetic. Pinned here rather than through a composition because
 // the two properties that matter are properties of the policy and not of any scene: a drag must
 // never reach a regeneration, and a released slider must always reach one. Driving it through a

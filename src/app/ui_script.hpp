@@ -21,6 +21,8 @@
 //
 // Both are honest about what they are; neither claims to be the other.
 
+#include "ui/gizmo.hpp"
+
 #include <glm/glm.hpp>
 
 #include <cstdint>
@@ -34,6 +36,9 @@ class Window;
 }
 namespace avgen::ui {
 class ControlPanel;
+}
+namespace avgen::params {
+class IParameter;
 }
 
 namespace avgen::app {
@@ -61,6 +66,11 @@ enum class UiScriptArm : std::uint32_t {
     // and its bake-on-release are wiring that no unit test reaches, and the brief's scenario C asks
     // for drag, scrub and resize responsiveness as numbers rather than as an impression.
     Strip = 1u << 8,
+    // Moving an object with the gizmo, and dragging a selection box: the two canvas gestures the
+    // latency brief names that no arm reached. Both repeat on a cycle rather than running once, so
+    // a block of frames measures the gesture rather than the one frame it started on.
+    Gizmo = 1u << 9,
+    Box = 1u << 10,
 };
 
 [[nodiscard]] constexpr UiScriptArm operator|(UiScriptArm a, UiScriptArm b) {
@@ -75,6 +85,12 @@ enum class UiScriptArm : std::uint32_t {
 // measuring the idle editor and calling it an interaction.
 [[nodiscard]] std::optional<UiScriptArm> parseUiScript(std::string_view spec);
 [[nodiscard]] std::string uiScriptNames();
+
+// Lets go of the left button, wherever an arm had it. Called when `--ui-ab` switches arms: a block
+// that ends mid-drag would otherwise hand the next arm a held button, and every gesture that arm
+// makes would be part of its predecessor's drag. A measurement taken in that state is not the
+// measurement it claims to be.
+void releaseScriptedPointer(platform::Window& window);
 
 class UiScript {
 public:
@@ -101,12 +117,23 @@ public:
 private:
     void stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
     void stepStrip(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepGizmo(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepBox(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
 
     std::vector<std::string> editLog_;
     std::size_t editNodesBefore_ = 0;
     std::vector<std::string> lastWrites_;
     UiScriptArm arms_ = UiScriptArm::None;
     std::size_t paramCursor_ = 0;
+    std::vector<params::IParameter*> sliderTargets_; // the filtered drag set, resolved once
+    bool sliderTargetsResolved_ = false;
+    std::size_t gizmoDrags_ = 0;   // completed gizmo drags, for the report
+    std::size_t boxDrags_ = 0;     // completed box drags
+    // Sampled mid-drag, because that is the only moment either is true: `hovered` is None while a
+    // handle is being dragged, and a selection box exists only between the press and the release.
+    ui::GizmoHandle gizmoDragged_ = ui::GizmoHandle::None;
+    bool boxOpened_ = false;
+    bool saidNoSubject_ = false;
     glm::vec3 boxCamera_{0.0f}; // camera pose at the start of the box drag, for the report
     float phase_ = 0.0f;
 };

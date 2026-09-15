@@ -86,6 +86,20 @@ struct AppOptions {
     // repeatable interaction so "it feels sluggish" can be measured rather than described;
     // --profile-cpu prints the main thread's per-phase distribution on the way out.
     std::string uiScript;
+    // --ui-ab <arm>[:<arm>...]: the same idea as `--ab` (ADR-113), for the main thread's frame.
+    // Each arm is a `--ui-script` spec, and the run cycles through them in blocks *inside this one
+    // process*, so the columns of the report were measured against each other rather than against
+    // a different run on a differently-loaded machine. docs/application-performance.md §3 rule 1
+    // is the reason this exists rather than a shell loop over `--ui-script`.
+    std::string uiAb;
+    // A multiple of 60, and that is a requirement rather than a taste: the pointer arms repeat on a
+    // 60-frame cycle (select, press, drag, release), so a block length that does not divide by it
+    // hands an arm a cycle chopped in half -- measured, a 90-frame block gave the gizmo arm three
+    // blocks in which it never completed a press, and the arm's own probe is what said so.
+    int uiAbFrames = 120; // frames per block
+    int uiAbBlocks = 4;    // passes over the whole arm list
+    int uiAbSettle = 12;   // frames discarded after each switch: an arm must not be charged for
+                           // the deferral, the resize or the first-use pipeline of its predecessor
     // The AI control plane (ADR-094). `--ai-prompt` runs one task at start-up against whatever
     // provider Settings has configured; `--ai-script` swaps in a scripted provider so the whole
     // path -- context, agent loop, main-thread dispatch, transaction, validation -- can be run and

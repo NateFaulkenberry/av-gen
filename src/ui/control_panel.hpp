@@ -129,6 +129,11 @@ public:
     // The frame to show in the canvas, as the ImGui texture id for the render target the host just
     // drew into (a WGPUTextureView, in this backend). Zero before the first frame exists.
     std::uint64_t canvasTexture = 0;
+    // ADR-233: the sky on screen is behind the sky the parameters ask for, because a lighting drag
+    // is still moving and the IBL rebuild is waiting for it to stop. The host sets it per frame
+    // from the renderer. A picture that is deliberately stale has to say so -- the same rule that
+    // put `proceduralsAwaitingRebuild()` on the canvas.
+    bool environmentBehind = false;
     rendering::SceneRenderer* renderer = nullptr; // selected-object diagnostics, developer-only
     // §13: a rolling window of recent frames, so the dashboard shows a distribution rather than
     // whatever this frame happened to be. A single sample of a frame time says very little on this

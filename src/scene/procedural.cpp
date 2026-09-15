@@ -112,6 +112,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <bit>
 #include <cmath>
 #include <map>
@@ -2482,11 +2483,20 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
     return out;
 }
 
+namespace {
+std::atomic<std::uint64_t> gProceduralRebuilds{0};
+} // namespace
+
+std::uint64_t proceduralRebuildCount() noexcept {
+    return gProceduralRebuilds.load(std::memory_order_relaxed);
+}
+
 bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
     const std::uint64_t hash = contextualHash(ctx);
     if (structureVersion != 0 && hash == builtHash) {
         return false;
     }
+    gProceduralRebuilds.fetch_add(1, std::memory_order_relaxed);
     builtHash = hash;
     meshHash = detail::resolvedSourceHash(*this, ctx); // the referenced object's for a Procedural source
     ++structureVersion;
@@ -3423,7 +3433,16 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     return p;
 }
 
-bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGeometry& rest, ProceduralGeometry& live) {
+bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGeometry& rest,
+                               ProceduralGeometry& live) {
+    if (!applyProceduralParameterValues(p, rest, live)) {
+        return false;
+    }
+    return live.rebuild();
+}
+
+bool applyProceduralParameterValues(const ProceduralParameters& p, const ProceduralGeometry& rest,
+                                    ProceduralGeometry& live) {
     if (p.all.empty()) {
         return false;
     }
@@ -3572,7 +3591,7 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
     copyValue(p, "materialVariation/emissiveGradient", mv.emissiveGradient);
 
     copyValue(p, "visible", live.visible);
-    return live.rebuild();
+    return true;
 }
 
 void unregisterProceduralParameters(params::ParameterSet& params, const ProceduralParameters& p) {

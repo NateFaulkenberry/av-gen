@@ -27,6 +27,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -105,27 +106,64 @@ public:
         std::size_t samples = 0;
     };
 
-    [[nodiscard]] Summary summary(int phaseIndex) const;
+    // ---- groups: two conditions compared without comparing two process runs --------------------
+    //
+    // docs/application-performance.md §3 rule 1 forbids comparing a frame time from one run against
+    // another, and this machine's load average makes that rule expensive rather than pedantic. The
+    // answer the renderer side already has is `--ab`: run both conditions inside one process,
+    // interleaved, and report the paired difference. A group is that, for the main thread's frame.
+    //
+    // Every frame carries a group index. `setFrameGroup` is called *during* the frame it labels,
+    // and the label is filed with the frame by `endFrame`. Group `kNoGroup` (-1) means "not part of
+    // an arm" -- the settling frames after a switch, which must be excluded rather than smeared
+    // across the arm they precede. Every summary accepts a group; `kAllGroups` (-2) is every
+    // labelled and unlabelled frame, which is what the ungrouped overloads ask for.
+    static constexpr std::size_t kMaxGroups = 12;
+    static constexpr int kNoGroup = -1;
+    static constexpr int kAllGroups = -2;
+
+    void setFrameGroup(int group) { currentGroup_ = group; }
+    [[nodiscard]] int frameGroup() const { return currentGroup_; }
+    // A name for a group, printed by `compare`. Naming is separate from labelling because the arm
+    // that owns a group knows its name once, and the frame loop labels it thousands of times.
+    void nameGroup(int group, std::string_view name);
+    [[nodiscard]] std::string_view groupName(int group) const;
+
+    [[nodiscard]] Summary summary(int phaseIndex) const { return summary(phaseIndex, kAllGroups); }
+    [[nodiscard]] Summary summary(int phaseIndex, int group) const;
     [[nodiscard]] Summary summary(std::string_view name) const;
-    [[nodiscard]] Summary frameSummary() const;
+    [[nodiscard]] Summary frameSummary() const { return frameSummary(kAllGroups); }
+    [[nodiscard]] Summary frameSummary(int group) const;
     // Frames whose total exceeded `thresholdMs`. The spike count, which is the number the pacing
     // question actually turns on.
-    [[nodiscard]] std::size_t spikes(double thresholdMs) const;
+    [[nodiscard]] std::size_t spikes(double thresholdMs) const { return spikes(thresholdMs, kAllGroups); }
+    [[nodiscard]] std::size_t spikes(double thresholdMs, int group) const;
     [[nodiscard]] std::size_t frames() const { return frames_; }
     [[nodiscard]] std::size_t retained() const;
+    [[nodiscard]] std::size_t retained(int group) const;
     [[nodiscard]] const std::vector<std::string>& names() const { return names_; }
 
     // A table: one row per phase, plus the frame total and the unaccounted remainder. `title` is
     // printed above it. Allocates freely; call it at the end of a run or on a keystroke, never in
     // the loop being measured.
-    [[nodiscard]] std::string report(std::string_view title) const;
-    // One line per frame, phases in registration order: for feeding a histogram or a plot.
+    [[nodiscard]] std::string report(std::string_view title) const { return report(title, kAllGroups); }
+    [[nodiscard]] std::string report(std::string_view title, int group) const;
+    // One column per group: each phase's median under each arm, side by side, with the frame count
+    // each column rests on. This is the whole point of the grouping -- the columns were interleaved
+    // inside one process, so the difference between two of them is a difference and not a comparison
+    // of two machines' moods.
+    [[nodiscard]] std::string compare(std::string_view title, std::span<const int> groups) const;
+    // One line per frame, phases in registration order: for feeding a histogram or a plot. The
+    // group is the first column, so a csv from an interleaved run can still be split by arm.
     [[nodiscard]] std::string csv() const;
 
     void reset();
 
 private:
-    [[nodiscard]] std::vector<double> gather(std::size_t phaseIndex) const;
+    [[nodiscard]] std::vector<double> gather(std::size_t phaseIndex, int group) const;
+    [[nodiscard]] static bool inGroup(int frameGroup, int wanted) {
+        return wanted == kAllGroups ? true : frameGroup == wanted;
+    }
 
     std::vector<std::string> names_;
     std::size_t count_ = 0;
@@ -133,6 +171,9 @@ private:
     // history_[frame][phase]; frame slot is (frames_ - 1) % kHistory once a frame is filed.
     std::vector<std::array<double, kMaxPhases>> history_;
     std::vector<double> frameMs_;
+    std::vector<int> group_; // parallel to frameMs_
+    std::array<std::string, kMaxGroups> groupNames_{};
+    int currentGroup_ = kNoGroup;
     std::size_t frames_ = 0;
 };
 

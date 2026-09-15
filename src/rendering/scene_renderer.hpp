@@ -46,6 +46,7 @@
 #include "rendering/spline_buffers.hpp"
 #include "rendering/volume_renderer.hpp"
 #include "rendering/debug_draw.hpp"
+#include "scene/rebuild_deferral.hpp"
 #include "scene/scene.hpp"
 #include "shaders/shader_layers.hpp"
 #include "world/atmospherics.hpp"
@@ -56,6 +57,7 @@
 #include <glm/glm.hpp>
 #include <webgpu/webgpu_cpp.h>
 
+#include <chrono>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -568,6 +570,19 @@ public:
     // the lit scene. Empty by default, so a frame with no debug geometry is encoded as before.
     [[nodiscard]] DebugDraw& debugDraw() { return *debug_; }
     void setDebugDepthTest(bool on) { debugDepthTest_ = on; }
+
+    // ADR-233. Above this cost, a procedural-sky IBL rebuild waits for the slider driving it to
+    // stop moving rather than taking the frame away on every frame of the drag -- the same policy,
+    // and the same pure function, ADR-084 gave procedural geometry.
+    //
+    // **Zero -- the default -- means rebuild whenever the sky's hash moves**, which is the
+    // behaviour an offline render requires and gets: the deferral reads a wall clock, and a wall
+    // clock has no business deciding what a deterministic render contains. Only the live editor
+    // sets it, in `Application::runLive`.
+    void setInteractiveEnvironmentBudget(double budgetMs) { interactiveEnvBudgetMs_ = budgetMs; }
+    // True while the sky on screen is behind the sky the parameters ask for. The canvas says so;
+    // a picture that is deliberately a few frames stale must never be silently stale.
+    [[nodiscard]] bool environmentAwaitingRebuild() const { return skyDeferral_.deferring; }
     // The frame's GPU timestamp timeline (gpu/frame_timeline.hpp). Every pass marks itself on it;
     // `passes()` is the per-pass breakdown of the last completed frame, in submission order.
     [[nodiscard]] gpu::FrameTimeline& timeline() { return *timeline_; }
@@ -716,6 +731,13 @@ private:
     // ADR-036: the procedural sky is rebuilt only when its resolved parameters change.
     std::uint64_t skyHash_ = 0;
     bool skyBuilt_ = false;
+    // ADR-233: and, in the live editor only, not on every frame of the drag that is changing them.
+    // The full IBL chain -- cube, irradiance, GGX prefilter, all of it blocking -- costs 40-70 ms
+    // on this machine, and `processSky`'s own header says it is load-time work. A lighting drag
+    // called it sixty times a second.
+    double interactiveEnvBudgetMs_ = 0.0; // 0 = rebuild whenever the hash moves (offline, always)
+    scene::RebuildDeferral skyDeferral_;
+    std::chrono::steady_clock::time_point lastSkyPollTime_{};
     bool initialised_ = false;
 
     gpu::RenderTarget hdr_;
