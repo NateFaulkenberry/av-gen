@@ -114,9 +114,6 @@ Result<void> RenderJob::start() {
     if (auto r = renderer_->init(); !r) {
         return r;
     }
-    if (auto r = renderer_->resize(settings_.width, settings_.height); !r) {
-        return r;
-    }
     // ADR-147 / §5.9: the tier the deliverable is rendered at. Without this the job ran at
     // whatever the renderer defaults to -- Realtime -- and a batch frame came out byte-identical
     // to an interactive one, so every promise the Offline tier makes (no temporal shortcut, no
@@ -129,6 +126,20 @@ Result<void> RenderJob::start() {
                 "render: unknown tier '{}' (preview|realtime|high|offline)", settings_.tier)});
         }
         renderer_->setQuality(tier);
+    }
+    // ADR-212: supersampling. **Before the resize**, and after the tier, because `resize()` is what
+    // consumes `renderScale` -- it sizes the HDR target to `output * renderScale` -- and
+    // `setQuality(tier)` replaces the whole settings object. Set it after the resize and the log
+    // line says 2.00x while the target is still the output size: the first version of this did
+    // exactly that and produced a byte-identical sequence hash, which is the only reason it was
+    // caught (ADR-182 -- a probe must prove it established the state it measures).
+    if (settings_.supersample > 1.0f) {
+        rendering::QualitySettings quality = renderer_->qualitySettings();
+        quality.renderScale = std::min(settings_.supersample, 2.0f);
+        renderer_->setQualitySettings(quality);
+    }
+    if (auto r = renderer_->resize(settings_.width, settings_.height); !r) {
+        return r;
     }
     // Quality arms, applied before the pass toggles because an arm sets a policy field and a
     // toggle removes a pass from whatever policy chose.

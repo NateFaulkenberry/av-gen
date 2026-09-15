@@ -94,6 +94,8 @@ struct AppOptions {
     std::string aiPrompt;
     std::optional<std::filesystem::path> aiScript;
     float canvasScale = 1.0f; // --canvas-scale: the world's share of the canvas's pixels
+    // --supersample: an offline render's multiple of the output size (ADR-212). 1 = off.
+    float supersample = 1.0f;
 
     bool profileCpu = false;
     std::optional<std::filesystem::path> profileCsv; // --profile-csv <file>: one row per frame

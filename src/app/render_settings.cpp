@@ -147,6 +147,12 @@ Result<void> RenderSettings::validate() const {
     if (quality < 0 || quality > 100) {
         return fail("render quality {} must be 0..100", quality);
     }
+    // ADR-212. The ceiling is the renderer's own: `QualitySettings::renderScale` clamps to 2, so a
+    // larger number here would be silently truncated -- and a setting that quietly means something
+    // other than what it says is worse than one that is refused.
+    if (!(supersample >= 1.0f) || supersample > 2.0f) {
+        return fail("render supersample {} must be 1 (off) to 2", supersample);
+    }
     // Validated here rather than discovered in the job, so a project file with a typo in it fails
     // when it is loaded and not two hours into a sequence.
     if (scene::DetailLimitMode mode{}; !limits.empty() && !scene::detailLimitModeFromName(limits, mode)) {
@@ -178,6 +184,7 @@ nlohmann::json RenderSettings::toJson() const {
                           {"backend", backend},
                           {"quality", quality},
                           {"tier", tier},
+                          {"supersample", supersample},
                           {"limits", limits},
                           {"muxAudio", muxAudio},
                           {"encoderThreads", encoderThreads}};
@@ -233,6 +240,12 @@ Result<RenderSettings> RenderSettings::fromJson(const nlohmann::json& j) {
     s.normalisePattern(); // a missing pattern follows the output kind
     if (auto r = text("codec", s.codec); !r) return std::unexpected(r.error());
     if (auto r = text("tier", s.tier); !r) return std::unexpected(r.error());
+    if (j.contains("supersample")) {
+        if (!j.at("supersample").is_number()) {
+            return fail("render: 'supersample' must be a number");
+        }
+        s.supersample = j.at("supersample").get<float>();
+    }
     if (auto r = text("limits", s.limits); !r) return std::unexpected(r.error());
     if (auto r = text("backend", s.backend); !r) return std::unexpected(r.error());
     if (const auto it = j.find("muxAudio"); it != j.end()) {

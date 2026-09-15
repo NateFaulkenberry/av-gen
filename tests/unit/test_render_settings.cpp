@@ -177,7 +177,7 @@ TEST_CASE("A chosen path never silently changes the output kind", "[render][sett
 // that stayed invisible was that no test compared a deliverable against the tier it claimed.
 TEST_CASE("a render carries its quality tier", "[render][settings][tier]") {
     SECTION("the default is offline, because a render is a deliverable") {
-        const avgen::app::RenderSettings fresh;
+        const RenderSettings fresh;
         CHECK(fresh.tier == "offline");
     }
 
@@ -193,9 +193,9 @@ TEST_CASE("a render carries its quality tier", "[render][settings][tier]") {
     }
 
     SECTION("it survives a round trip, and an older file without one still loads") {
-        avgen::app::RenderSettings s;
+        RenderSettings s;
         s.tier = "high";
-        const auto parsed = avgen::app::RenderSettings::fromJson(s.toJson());
+        const auto parsed = RenderSettings::fromJson(s.toJson());
         REQUIRE(parsed.has_value());
         CHECK(parsed->tier == "high");
 
@@ -203,7 +203,7 @@ TEST_CASE("a render carries its quality tier", "[render][settings][tier]") {
         // silently downgrade the render either.
         nlohmann::json older = s.toJson();
         older.erase("tier");
-        const auto legacy = avgen::app::RenderSettings::fromJson(older);
+        const auto legacy = RenderSettings::fromJson(older);
         REQUIRE(legacy.has_value());
         CHECK(legacy->tier == "offline");
     }
@@ -277,4 +277,56 @@ TEST_CASE("Render limits resolve against the render's own tier", "[render][setti
         REQUIRE(back.has_value());
         CHECK(back->limits == "tier");
     }
+}
+
+// ADR-212. Supersampling: an offline render may spend pixels a realtime one cannot.
+TEST_CASE("supersample is validated against the renderer's own ceiling", "[render][settings]") {
+    RenderSettings s;
+    // Off by default, so a project that never heard of this renders exactly as it did before.
+    CHECK(s.supersample == 1.0f);
+    CHECK(s.validate().has_value());
+
+    s.supersample = 2.0f;
+    CHECK(s.validate().has_value());
+    s.supersample = 1.5f;
+    CHECK(s.validate().has_value());
+
+    // The ceiling is `QualitySettings::renderScale`'s clamp of 2. A larger number would be silently
+    // truncated by the renderer, and a setting that quietly means something other than what it says
+    // is worse than one that is refused.
+    s.supersample = 4.0f;
+    CHECK_FALSE(s.validate().has_value());
+    // Below 1 is not "supersampling less", it is the downscale `--canvas-scale` already owns.
+    s.supersample = 0.5f;
+    CHECK_FALSE(s.validate().has_value());
+    s.supersample = 0.0f;
+    CHECK_FALSE(s.validate().has_value());
+}
+
+TEST_CASE("supersample round-trips through a project", "[render][settings]") {
+    RenderSettings s;
+    s.supersample = 2.0f;
+    s.width = 1280;
+    s.height = 720;
+    const nlohmann::json j = s.toJson();
+    REQUIRE(j.contains("supersample"));
+    // The literal, read out of the document before any loader sees it.
+    CHECK(j.at("supersample").get<float>() == 2.0f);
+
+    auto back = RenderSettings::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->supersample == 2.0f);
+
+    // A document written before this existed loads onto the default rather than failing, because
+    // every project in the wild is one of those.
+    nlohmann::json older = j;
+    older.erase("supersample");
+    auto old = RenderSettings::fromJson(older);
+    REQUIRE(old.has_value());
+    CHECK(old->supersample == 1.0f);
+
+    // And a value of the wrong type is refused rather than coerced to zero.
+    nlohmann::json bad = j;
+    bad["supersample"] = "two";
+    CHECK_FALSE(RenderSettings::fromJson(bad).has_value());
 }

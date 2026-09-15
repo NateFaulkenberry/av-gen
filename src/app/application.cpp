@@ -95,6 +95,9 @@ std::string usageText() {
            "  --ui-script <arms>  drive the editor with a repeatable interaction: comma-separated from\n"
            "                      hover,sliders,panels,select,scrub,camera,tabs -- or idle, or all\n"
            "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
+           "  --supersample <f>   offline render only: render the scene at this multiple of the output\n"
+           "                      size and resolve down (1 = off, max 2). Buys back the sub-pixel\n"
+           "                      detail a small output cannot sample.\n"
            "  --profile-cpu       print the main thread's per-phase frame distribution on exit\n"
            "  --profile-csv <f>   write one row per frame (every phase) to <f> on exit\n"
            "  --capture <file>    write the last frame as a PPM image\n"
@@ -356,6 +359,14 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
                 return fail("--ui-script '{}' is not an arm; expected some of {}", *v, uiScriptNames());
             }
             options.uiScript = *v;
+            ++i;
+        } else if (arg == "--supersample") {
+            auto v = need(i, "--supersample");
+            if (!v) return std::unexpected(v.error());
+            options.supersample = std::strtof(v->c_str(), nullptr);
+            if (options.supersample < 1.0f || options.supersample > 2.0f) {
+                return fail("--supersample must be 1 (off) to 2, got '{}'", *v);
+            }
             ++i;
         } else if (arg == "--canvas-scale") {
             auto v = need(i, "--canvas-scale");
@@ -2968,6 +2979,7 @@ RenderSettings Application::renderSettingsFromOptions() const {
     if (options_.rangeEnd) s.endSeconds = *options_.rangeEnd;
     if (options_.codec) s.codec = *options_.codec;
     if (options_.quality) s.quality = *options_.quality;
+    if (options_.supersample > 1.0f) s.supersample = options_.supersample;
     return s;
 }
 
@@ -3063,6 +3075,7 @@ int Application::runQueue(const std::filesystem::path& queueFile) {
         }
         if (options_.codec) settings.codec = *options_.codec;
         if (options_.quality) settings.quality = *options_.quality;
+        if (options_.supersample > 1.0f) settings.supersample = options_.supersample;
         if (options_.renderOutput) settings.output = *options_.renderOutput;
         settings.normalisePattern();
         if (settings.outputPath.empty()) {

@@ -65,6 +65,22 @@ struct RenderSettings {
     // render with it lifted is the *better* picture rather than a broken one. The far field draws
     // real geometry instead of billboards, distant characters are posed every frame instead of at
     // 20 Hz, and nothing past 120 m stands frozen.
+    // How many times the output resolution the scene is rendered at, before being resolved back down
+    // (ADR-212). 1 is off and is the default, so nothing changes for a render that does not ask.
+    //
+    // The renderer has supported this since ADR-137 -- `QualitySettings::renderScale` clamps to
+    // [0.25, 2.0] and the resolve is already written -- but nothing could reach the top half of that
+    // range: `--canvas-scale` refuses anything above 1, the settings slider stops at 1, and the
+    // Offline tier pins `renderScale` to 1 under a comment about taking "no resolution shortcut".
+    // That comment is about not going *down*. Going up is not a shortcut, it is spending more, which
+    // is the one thing an offline render is for.
+    //
+    // Why it matters, measured on Glowmere through `--project`: neighbour-to-neighbour chroma noise
+    // is 2.80% at 1280x720, 2.19% at 1920x1080 and 1.86% at 2560x1440. The artifact is undersampling
+    // of sub-pixel foliage, it gets monotonically worse as the output shrinks, and a 720p deliverable
+    // had no way to buy its way out of it.
+    float supersample = 1.0f;
+
     std::string limits = "tier";
 
     // Frame count for a resolved end time (endSeconds >= startSeconds); the last frame is the one

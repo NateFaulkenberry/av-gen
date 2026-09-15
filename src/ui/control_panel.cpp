@@ -2175,10 +2175,32 @@ void ControlPanel::drawRender(app::Engine& engine) {
     ImGui::Separator();
     if (running) {
         ImGui::ProgressBar(static_cast<float>(current.fraction()), ImVec2(-1, 0));
-        ImGui::Text("%llu / %llu frames, %.1f fps, %.0f s elapsed, written %llu",
+        // Remaining, from the rate the job reports rather than from a rate computed here: a long
+        // render's average is the honest predictor, and the first frames of one are not -- shader
+        // compilation, asset upload and a cold pipeline cache all land on them.
+        //
+        // Withheld rather than guessed until the job has actually produced frames. "about 0 s left"
+        // on the first frame of a ten-minute render is worse than saying nothing, and a number that
+        // is wrong at the only moment somebody looks at it teaches them to ignore the number.
+        std::string remaining;
+        if (current.framesTotal > current.framesRendered && current.renderFps > 1e-3 &&
+            current.framesRendered >= 8) {
+            const double left =
+                static_cast<double>(current.framesTotal - current.framesRendered) / current.renderFps;
+            remaining = left >= 90.0
+                            ? fmt::format(", about {:.0f} min left", left / 60.0)
+                            : fmt::format(", about {:.0f} s left", left);
+        }
+        ImGui::Text("%llu / %llu frames, %.1f fps, %.0f s elapsed%s, written %llu",
                     static_cast<unsigned long long>(current.framesRendered),
                     static_cast<unsigned long long>(current.framesTotal), current.renderFps, current.elapsedSeconds,
+                    remaining.c_str(),
                     static_cast<unsigned long long>(current.framesWritten));
+        if (!remaining.empty() && ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("An estimate from the average rate so far. It settles as the render\n"
+                              "goes on; early frames are slower because shaders are still\n"
+                              "compiling and assets are still uploading.");
+        }
         if (ImGui::Button("Cancel") && onCancelRender) {
             onCancelRender();
         }
