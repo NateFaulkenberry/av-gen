@@ -451,6 +451,10 @@ private:
                 warn(fmt::format("animation '{}': keyframe times are not ascending; channel dropped", name));
                 continue;
             }
+            // Both ends of the range the keys cover. `start` is what Blender's exporter leaves at
+            // 1/30 s on a take authored from frame 1, and it is the clip's loop origin.
+            clip.start = clip.channels.empty() ? out.times.front()
+                                               : std::min(clip.start, out.times.front());
             clip.duration = std::max(clip.duration, out.times.back());
             clip.channels.push_back(std::move(out));
         }

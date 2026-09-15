@@ -108,7 +108,10 @@ float wrapTime(float time, float duration) {
 }
 
 void sampleClip(const AnimationClip& clip, float time, Pose& pose) {
-    const float t = std::clamp(time, 0.0f, clip.duration);
+    // Clamped to the range the keys actually cover. `start` is not always zero (see the header),
+    // and clamping to zero instead put the sampler in a stretch before the first key where every
+    // channel holds its first value -- a pose the file does not contain.
+    const float t = std::clamp(time, std::min(clip.start, clip.duration), clip.duration);
     for (const AnimationChannel& channel : clip.channels) {
         if (channel.joint >= pose.local.size() || channel.times.empty() || channel.values.empty()) {
             continue;
@@ -304,8 +307,10 @@ bool AnimationPlayer::finished(const std::vector<AnimationClip>& clips, double n
     if (state.loop) {
         return false;
     }
-    const float duration = state.clip < clips.size() ? clips[state.clip].duration : 0.0f;
-    return stateTime(now) >= duration;
+    // Against the clip's playable length, not its last key time: a one-shot whose keys start at
+    // 1/30 s is over 1/30 s sooner than its last key time says.
+    const float length = state.clip < clips.size() ? clips[state.clip].length() : 0.0f;
+    return stateTime(now) >= length;
 }
 
 float AnimationPlayer::localTime(const Playing& playing, const std::vector<AnimationClip>& clips,
@@ -314,9 +319,15 @@ float AnimationPlayer::localTime(const Playing& playing, const std::vector<Anima
         return 0.0f;
     }
     const AnimationState& state = states_[static_cast<std::size_t>(playing.state)];
-    const float duration = state.clip < clips.size() ? clips[state.clip].duration : 0.0f;
+    const AnimationClip* clip = state.clip < clips.size() ? &clips[state.clip] : nullptr;
+    // A state's local clock starts at zero; the *clip* it plays starts wherever its keys do. The
+    // two are not the same number, and treating them as one is what made every loop 1/30 s too
+    // long on any take exported from frame 1 rather than frame 0 -- a stretch of held first pose at
+    // the top of every cycle, and a stride the feet crossed 3.2% slower than the file says.
+    const float start = clip != nullptr ? clip->start : 0.0f;
+    const float length = clip != nullptr ? clip->length() : 0.0f;
     const auto raw = static_cast<float>((now - playing.start) * static_cast<double>(playing.speed));
-    return state.loop ? wrapTime(raw, duration) : std::clamp(raw, 0.0f, duration);
+    return start + (state.loop ? wrapTime(raw, length) : std::clamp(raw, 0.0f, length));
 }
 
 void AnimationPlayer::sampleInto(const Playing& playing, const std::vector<AnimationClip>& clips,
