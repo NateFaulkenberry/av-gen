@@ -56,6 +56,11 @@ enum class UiScriptArm : std::uint32_t {
     // screenshot, so the only honest way to know it is connected is to make the program do it and
     // then ask the scene what happened.
     Edit = 1u << 7,
+    // The sequencer strip, driven through the pointer: scrub along the ruler, then grab a shot and
+    // drag it. It exists for the same reason `Edit` does -- the strip's hit testing, its drag state
+    // and its bake-on-release are wiring that no unit test reaches, and the brief's scenario C asks
+    // for drag, scrub and resize responsiveness as numbers rather than as an impression.
+    Strip = 1u << 8,
 };
 
 [[nodiscard]] constexpr UiScriptArm operator|(UiScriptArm a, UiScriptArm b) {
@@ -95,6 +100,7 @@ public:
 
 private:
     void stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepStrip(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
 
     std::vector<std::string> editLog_;
     std::size_t editNodesBefore_ = 0;

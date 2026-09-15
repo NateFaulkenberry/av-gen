@@ -369,3 +369,211 @@ TEST_CASE("The panel can tell which camera parameters the current mode ignores",
         }
     }
 }
+
+// ---- the sequencer's blocks (the brief's sections 8 and 9) --------------------------------------
+
+TEST_CASE("A block's body and its grips divide it up without overlapping a neighbour",
+          "[ui][sequencer][blocks]") {
+    // A hundred points wide, seven-point grips.
+    CHECK(ui::blockZoneAt(50.0f, 0.0f, 100.0f, 7.0f) == ui::BlockZone::Body);
+    CHECK(ui::blockZoneAt(2.0f, 0.0f, 100.0f, 7.0f) == ui::BlockZone::LeftEdge);
+    CHECK(ui::blockZoneAt(98.0f, 0.0f, 100.0f, 7.0f) == ui::BlockZone::RightEdge);
+    CHECK(ui::blockZoneAt(0.0f, 0.0f, 100.0f, 7.0f) == ui::BlockZone::LeftEdge);
+    CHECK(ui::blockZoneAt(100.0f, 0.0f, 100.0f, 7.0f) == ui::BlockZone::RightEdge);
+
+    SECTION("nothing outside the block is the block's") {
+        // The property that matters in a lane packed edge to edge: a grip must never reach past
+        // its own block, or it takes the first points of the next one and every click in a full
+        // lane resizes the wrong thing.
+        CHECK(ui::blockZoneAt(-0.5f, 0.0f, 100.0f, 7.0f) == ui::BlockZone::None);
+        CHECK(ui::blockZoneAt(100.5f, 0.0f, 100.0f, 7.0f) == ui::BlockZone::None);
+        // Two blocks meeting exactly: the point belongs to the left one's right grip and to the
+        // right one's left grip, and each is asked about its own block, so neither steals.
+        CHECK(ui::blockZoneAt(100.0f, 0.0f, 100.0f, 7.0f) == ui::BlockZone::RightEdge);
+        CHECK(ui::blockZoneAt(100.0f, 100.0f, 200.0f, 7.0f) == ui::BlockZone::LeftEdge);
+    }
+
+    SECTION("a narrow block keeps a body to drag by") {
+        // With a fixed grip, a 21-point block would be nothing but grips and could not be moved at
+        // all. The grip shrinks to a third of the width, so the middle third is always the body.
+        CHECK(ui::blockZoneAt(10.5f, 0.0f, 21.0f, 7.0f) == ui::BlockZone::Body);
+        CHECK(ui::blockZoneAt(1.0f, 0.0f, 21.0f, 7.0f) == ui::BlockZone::LeftEdge);
+        CHECK(ui::blockZoneAt(20.0f, 0.0f, 21.0f, 7.0f) == ui::BlockZone::RightEdge);
+    }
+
+    SECTION("a block too small to grip is all body") {
+        // Below the threshold there are no grips at all: a three-pixel resize target is not a
+        // target, and the answer is to zoom in.
+        for (float x = 0.0f; x <= 12.0f; x += 1.0f) {
+            CHECK(ui::blockZoneAt(x, 0.0f, 12.0f, 7.0f) == ui::BlockZone::Body);
+        }
+    }
+
+    SECTION("reversed edges are tolerated rather than producing nonsense") {
+        CHECK(ui::blockZoneAt(50.0f, 100.0f, 0.0f, 7.0f) == ui::BlockZone::Body);
+    }
+}
+
+// ---- a right-click that is not the end of a right-drag ------------------------------------------
+
+TEST_CASE("A right press that travels is a pan, and cannot become a menu", "[ui][context-menu]") {
+    // The reason this exists: Dear ImGui's own context-menu helper opens on the release of the
+    // right button and makes no test of how far it moved (`IsPopupOpenRequestForItem`). On the
+    // sequencer strip and over the viewport canvas a right-drag is a pan and a look-around, so
+    // without this every one of those would end by opening a menu.
+    SECTION("a press that stays put opens the menu on release") {
+        ui::ContextClickTracker t;
+        CHECK_FALSE(ui::updateContextClick(t, true, false, 100.0f, 100.0f));
+        CHECK_FALSE(ui::updateContextClick(t, false, false, 101.0f, 100.5f)); // within the slop
+        CHECK(ui::updateContextClick(t, false, true, 101.0f, 100.5f));
+    }
+
+    SECTION("a press that travels does not") {
+        ui::ContextClickTracker t;
+        CHECK_FALSE(ui::updateContextClick(t, true, false, 100.0f, 100.0f));
+        CHECK_FALSE(ui::updateContextClick(t, false, false, 160.0f, 100.0f));
+        CHECK_FALSE(ui::updateContextClick(t, false, true, 160.0f, 100.0f));
+    }
+
+    SECTION("a drag that comes back to where it started is still a drag") {
+        // This is why `travelled` latches rather than being measured at the release. Testing the
+        // distance only at the end would call a there-and-back pan a click, and a pan that returns
+        // to its origin is exactly what happens when somebody nudges the view and changes their
+        // mind.
+        ui::ContextClickTracker t;
+        CHECK_FALSE(ui::updateContextClick(t, true, false, 100.0f, 100.0f));
+        CHECK_FALSE(ui::updateContextClick(t, false, false, 300.0f, 100.0f));
+        CHECK_FALSE(ui::updateContextClick(t, false, false, 100.0f, 100.0f));
+        CHECK_FALSE(ui::updateContextClick(t, false, true, 100.0f, 100.0f));
+    }
+
+    SECTION("a fresh press after a drag can still open a menu") {
+        ui::ContextClickTracker t;
+        static_cast<void>(ui::updateContextClick(t, true, false, 0.0f, 0.0f));
+        static_cast<void>(ui::updateContextClick(t, false, false, 99.0f, 0.0f));
+        static_cast<void>(ui::updateContextClick(t, false, true, 99.0f, 0.0f));
+        CHECK_FALSE(t.down);
+        CHECK_FALSE(t.travelled);
+        CHECK_FALSE(ui::updateContextClick(t, true, false, 5.0f, 5.0f));
+        CHECK(ui::updateContextClick(t, false, true, 5.0f, 5.0f));
+    }
+
+    SECTION("a release with no press opens nothing") {
+        // The button can come up over the strip having gone down somewhere else entirely.
+        ui::ContextClickTracker t;
+        CHECK_FALSE(ui::updateContextClick(t, false, true, 10.0f, 10.0f));
+    }
+}
+
+// ---- the processing indicator's threshold (the brief's section 4) -------------------------------
+
+TEST_CASE("The canvas says nothing about work too short to notice", "[ui][processing]") {
+    SECTION("under the threshold there is no indicator at all") {
+        // Not "a faint one": none. Procedural regeneration defers for 90 ms by design (ADR-084),
+        // and an indicator that appeared for every one of those would blink through every frame of
+        // every slider drag.
+        CHECK_FALSE(ui::processingHint(true, 0.0).visible);
+        CHECK_FALSE(ui::processingHint(true, 90.0).visible);
+        CHECK_FALSE(ui::processingHint(true, ui::kProcessingAppearMs - 1.0).visible);
+    }
+
+    SECTION("past it, it fades in rather than appearing") {
+        const auto justAfter = ui::processingHint(true, ui::kProcessingAppearMs + 1.0);
+        CHECK(justAfter.visible);
+        CHECK(justAfter.opacity < 0.2f);
+        const auto settled =
+            ui::processingHint(true, ui::kProcessingAppearMs + ui::kProcessingFadeMs + 100.0);
+        CHECK(settled.opacity == 1.0f);
+    }
+
+    SECTION("work that is not happening is never shown") {
+        CHECK_FALSE(ui::processingHint(false, 10000.0).visible);
+    }
+}
+
+TEST_CASE("A second burst of work has to earn the indicator again", "[ui][processing]") {
+    // The timer resets the moment the work stops. Carrying it over would make the indicator appear
+    // instantly on every subsequent nudge of a slider, which is the flashing the threshold exists
+    // to prevent.
+    ui::ProcessingTracker tracker;
+    for (int i = 0; i < 40; ++i) {
+        static_cast<void>(tracker.advance(true, 16.0));
+    }
+    CHECK(tracker.advance(true, 16.0).visible);
+    CHECK_FALSE(tracker.advance(false, 16.0).visible);
+    CHECK(tracker.busyForMs == 0.0);
+    CHECK_FALSE(tracker.advance(true, 16.0).visible);
+}
+
+// ---- the ruler's divisions (the brief's section 11) ---------------------------------------------
+
+TEST_CASE("The ruler picks divisions that fit the zoom", "[ui][sequencer][ruler]") {
+    SECTION("labels never collide") {
+        // The property, checked across four decades of zoom rather than at one: whatever the span,
+        // the major step is far enough apart to label.
+        for (const double span : {2.0, 10.0, 45.0, 210.0, 1200.0, 7200.0}) {
+            const ui::RulerTicks ticks = ui::rulerTicks(span, 900.0f);
+            const double spacing = ticks.major / span * 900.0;
+            CHECK(spacing >= 68.0);
+            CHECK(ticks.major > 0.0);
+        }
+    }
+
+    SECTION("minor ticks subdivide the major, or are absent") {
+        for (const double span : {2.0, 10.0, 45.0, 210.0, 1200.0, 7200.0}) {
+            const ui::RulerTicks ticks = ui::rulerTicks(span, 900.0f);
+            if (ticks.minor <= 0.0) {
+                continue;
+            }
+            // Halves, quarters or fifths only: a major divided by three is not something the eye
+            // counts.
+            const double ratio = ticks.major / ticks.minor;
+            CHECK((std::abs(ratio - 2.0) < 1e-6 || std::abs(ratio - 4.0) < 1e-6 ||
+                   std::abs(ratio - 5.0) < 1e-6));
+            // And they never close up into a grey band.
+            CHECK(ticks.minor / span * 900.0 >= 7.0);
+        }
+    }
+
+    SECTION("a zoomed-in strip gets sub-second divisions") {
+        const ui::RulerTicks ticks = ui::rulerTicks(2.0, 900.0f);
+        CHECK(ticks.major < 1.0);
+    }
+
+    SECTION("a degenerate strip asks for nothing") {
+        CHECK(ui::rulerTicks(0.0, 900.0f).minor == 0.0);
+        CHECK(ui::rulerTicks(10.0, 0.0f).minor == 0.0);
+    }
+}
+
+// ---- the strip's header column ------------------------------------------------------------------
+
+TEST_CASE("A click on a lane's header is never a scrub", "[ui][sequencer][lanes]") {
+    // The gutter lives in `StripLanes` with the lane heights for the reason ADR-103 records: the
+    // drawing and the hit test both need to know where the time axis begins, and when two places
+    // calculated the strip's geometry separately a click meant to scrub moved the audio instead.
+    ui::StripLanes lanes{.hasAudio = true, .actorCount = 2};
+    lanes.gutter = 112.0f;
+    CHECK(lanes.timeLeft() == 112.0f);
+    CHECK(lanes.inGutter(0.0f));
+    CHECK(lanes.inGutter(111.9f));
+    CHECK_FALSE(lanes.inGutter(112.0f));
+    CHECK_FALSE(lanes.inGutter(400.0f));
+
+    SECTION("a strip with no headers has no gutter to fall into") {
+        // The default, which is what every lane test written before the headers existed describes.
+        const ui::StripLanes bare{.hasAudio = true, .actorCount = 2};
+        CHECK(bare.gutter == 0.0f);
+        CHECK_FALSE(bare.inGutter(0.0f));
+        CHECK_FALSE(bare.inGutter(-5.0f));
+    }
+
+    SECTION("the gutter does not move any lane") {
+        // It is an x concern only. A header column that changed the lane heights would have made
+        // every existing lane assertion wrong for a reason unrelated to what they are about.
+        const ui::StripLanes bare{.hasAudio = true, .actorCount = 2};
+        CHECK(lanes.height() == bare.height());
+        CHECK(lanes.audioTop() == bare.audioTop());
+        CHECK(lanes.at(lanes.audioTop() + 1.0f) == bare.at(bare.audioTop() + 1.0f));
+    }
+}

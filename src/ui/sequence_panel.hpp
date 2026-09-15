@@ -67,10 +67,37 @@ public:
     // Analysis state, for a host that wants to show it elsewhere.
     [[nodiscard]] bool analysing() const { return work_ != nullptr; }
 
+    // Where the strip was last laid out, in screen points, for the scripted-interaction driver
+    // (`--ui-script strip`). It is only knowable after a frame has been drawn, the same way
+    // `ControlPanel::canvas()` is, and for the same reason: a benchmark that drags "the middle of
+    // the strip" has to be told where that is rather than guessing at a docked panel's position.
+    // All zero until the panel has been drawn once.
+    struct StripRect {
+        float x = 0.0f;
+        float y = 0.0f;
+        float width = 0.0f;
+        float height = 0.0f;
+        float gutter = 0.0f;
+        float shotsTop = 0.0f; // relative to y
+        float rulerHeight = 0.0f;
+        // Whether Dear ImGui considered the strip hovered on the frame this was recorded, and how
+        // much of it survived the panel's clip rectangle. Both are here because the strip arm's
+        // first failures were invisible without them: the gesture was in the right place, the
+        // button was down, and nothing happened.
+        bool hovered = false;
+        float visibleHeight = 0.0f;
+        // How many points of the panel the toolbar above the strip consumed.
+        float toolbarHeight = 0.0f;
+        [[nodiscard]] bool valid() const { return width > 1.0f && height > 1.0f; }
+    };
+    [[nodiscard]] const StripRect& stripRect() const { return stripRect_; }
+
 private:
     void drawToolbar(app::Engine& engine);
     void drawImportPopup(app::Engine& engine);
     void drawStrip(app::Engine& engine);
+    // Snap, zoom and the bake's report: drawn *under* the strip. See the note at the definition.
+    void drawStripControls(app::Engine& engine);
     void drawInspector(app::Engine& engine);
     void drawShotInspector(app::Engine& engine, seq::Shot& shot);
     void drawActorInspector(app::Engine& engine, seq::Actor& actor);
@@ -185,6 +212,7 @@ private:
         int actorRow = -1; // which actor lane, when there is one
     };
     MenuTarget menu_;
+    StripRect stripRect_;
     // Set by a menu item that wants the Audio... popup, which cannot be opened from inside another
     // popup's body.
     bool openAudioClips_ = false;

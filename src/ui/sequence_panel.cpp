@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <utility>
 
@@ -62,6 +63,12 @@ constexpr double kMinBlockSeconds = 0.25;
 // `splitSection`'s own minimum, named here so the menu's enabled test and the operation agree.
 constexpr double kMinSectionSeconds = 0.25;
 constexpr const char* kStripContextId = "strip-context";
+// How much of the panel is kept back for the inspector under the strip, so that compressing the
+// lanes to fit never squeezes the thing they are inspected in down to nothing.
+constexpr float kStripBottomReserve = 46.0f;
+// The floor the lanes compress to. Two thirds still reads as lanes; below that the panel's own
+// scrollbar is the better answer, because a lane a few points high is a line rather than a lane.
+constexpr float kMinLaneScale = 0.66f;
 
 // A shot's resting colour. Alternating, so a cut between two shots on the same scene is visible as
 // a cut rather than as a join.
@@ -144,6 +151,7 @@ void SequencePanel::draw(app::Engine& engine) {
     drawToolbar(engine);
     ImGui::Separator();
     drawStrip(engine);
+    drawStripControls(engine);
     ImGui::Separator();
     drawInspector(engine);
     installIfDirty(engine);
@@ -349,6 +357,21 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
         ImGui::EndPopup();
     }
 
+}
+
+// ---- the view's own controls, under the strip (the brief's section 22) ------------------------
+//
+// These were above the strip, and that is what made the sequencer unusable at the size the editor
+// opens at. Measured with `--ui-script strip` on a 1440x900 window: **190 points of toolbar above
+// a 272-point panel**, leaving 82 points for a 195-point strip -- the ruler, the sections and the
+// waveform fitted and the shots lane did not, so the one gesture the panel exists for could not be
+// performed until somebody dragged the divider.
+//
+// Snap, zoom and the bake's report are all things you consult *about* the strip rather than things
+// you reach for before touching it, so they belong under it. The buttons that make something -- add
+// a shot, import a song -- stay above, where a toolbar belongs. That is roughly where a timeline's
+// zoom control sits in every editor this borrows from anyway.
+void SequencePanel::drawStripControls(app::Engine& engine) {
     ImGui::SetNextItemWidth(110);
     ImGui::Combo("snap", &snapMode_, kSnapNames, IM_ARRAYSIZE(kSnapNames));
     ImGui::SameLine();
@@ -469,6 +492,33 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     // A narrow panel loses the headers rather than losing the music: below about four hundred
     // points a header column costs more of the time axis than the names are worth.
     lanes.gutter = total >= 400.0f ? kGutterWidth : 0.0f;
+
+    // ---- the strip fits the panel, or it is not a strip ---------------------------------------
+    //
+    // Found by `--ui-script strip`, which is exactly what a scripted arm is for. On a 1440x900
+    // window with the default layout, a piece with audio, sections, five shots and two actors laid
+    // out a 195-point strip into 82 points of visible panel: the ruler, the section lane and the
+    // waveform fitted, and **the shots lane did not**. The arm's press on a shot landed on clipped
+    // geometry, ImGui reported the strip as not hovered, and nothing happened -- which is precisely
+    // what a person dragging a shot at the default window size would have experienced.
+    //
+    // The panel scrolls, so the lanes were reachable; they were simply not *there* until somebody
+    // discovered that the sequencer needed its divider dragged before it could be used. A tool
+    // whose main surface is below the fold at the size it opens at is not finished.
+    //
+    // So the lanes compress to fit what there is, down to a floor. Below the floor the panel's own
+    // scrollbar takes over again, because a two-point lane is not a smaller lane, it is a line.
+    // Everything stays proportional, and `StripLanes` still answers for the geometry -- the heights
+    // it is given are simply smaller, so the drawing and the hit testing agree as they always did.
+    const float available = ImGui::GetContentRegionAvail().y - kStripBottomReserve;
+    if (const float wanted = lanes.height(); wanted > available && available > 0.0f) {
+        const float scale = std::max(available / wanted, kMinLaneScale);
+        lanes.rulerHeight *= scale;
+        lanes.markerHeight *= scale;
+        lanes.laneHeight *= scale;
+        lanes.audioLaneHeight *= scale;
+        lanes.sectionLaneHeight *= scale;
+    }
     const float height = lanes.height();
     const float width = std::max(total - lanes.gutter, 80.0f);
 
@@ -491,6 +541,18 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     const float axisRight = axisX + width;
 
     draw->AddRectFilled(origin, ImVec2(origin.x + total, origin.y + height), pal.ground, 4.0f);
+
+    stripRect_ = StripRect{.x = origin.x,
+                           .y = origin.y,
+                           .width = total,
+                           .height = height,
+                           .gutter = lanes.gutter,
+                           .shotsTop = lanes.shotsTop(),
+                           .rulerHeight = kRulerHeight,
+                           .hovered = hovered,
+                           .visibleHeight = std::min(height, ImGui::GetWindowPos().y +
+                                                                 ImGui::GetWindowSize().y - origin.y),
+                           .toolbarHeight = origin.y - (ImGui::GetWindowPos().y - ImGui::GetScrollY())};
 
     const ImVec2 mouse = ImGui::GetIO().MousePos;
     const float localX = mouse.x - origin.x;
