@@ -1035,18 +1035,6 @@ bool mayBeSplit(MusicalSection s) {
     }
 }
 
-bool heroOwns(MusicalSection s) {
-    switch (s) {
-    case MusicalSection::Build:
-    case MusicalSection::Drop:
-    case MusicalSection::FinalBuild:
-    case MusicalSection::FinalDrop:
-        return true;
-    default:
-        return false;
-    }
-}
-
 float emphasisFor(MusicalSection s, float intensity) {
     switch (s) {
     case MusicalSection::FinalDrop:
@@ -1299,32 +1287,67 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
     seq.name = "directed";
     seq.shots.reserve(spans.size());
 
-    // Who the sections the hero does not own are cast from.
+    // Who each section is about (ADR-202).
     //
-    // Normally the supporting cast: the hero has the builds and the drops, which is the arc the film
-    // is about, so holding it off until then is the shape of a reveal rather than a gap. But a
-    // structure with no build and no drop -- a mellow piece, a fold that found only phrases -- gives
-    // the hero nothing at all, and a film that never shows its subject is not restraint either. Then
-    // the hero joins the rotation, at the front.
-    const bool heroHasASection = std::any_of(spans.begin(), spans.end(), [](const ShotSpan& span) {
-        return heroOwns(span.opener->kind);
-    });
+    // There is no primary hero and no supporting cast. There was: the top-ranked hero owned every
+    // build and every drop and the rest shared what was left, which is a *categorical* split -- and
+    // it meant that raising a second subject's importance could never win it a drop, however high
+    // you pushed the slider. Asked for plainly: "I only want an importance weight for heroes."
+    //
+    // So: one cast, ranked, and importance is the whole of it. This is smooth weighted round-robin
+    // -- every subject accrues its own importance each shot, the shot goes to whoever has accrued
+    // the most, and that subject gives back the total. A subject at 0.9 is cast about twice as often
+    // as one at 0.45, and the turns are *spread* rather than clumped, which a proportional draw does
+    // not give you. Nothing looks at the section kind at all: a drop goes to whoever's turn it is.
     std::vector<FocalTarget> cast;
     cast.reserve(brief.supporting.size() + 1);
-    if (!heroHasASection) {
-        cast.push_back(brief.hero);
-    }
+    cast.push_back(brief.hero);
     cast.insert(cast.end(), brief.supporting.begin(), brief.supporting.end());
 
-    // A deterministic walk through the cast rather than a draw from a stream. A PRNG stream would
-    // make every later choice depend on how many earlier ones were made, so adding one section to
-    // the structure would re-cast the whole rest of the film.
+    // A deterministic offset rather than a draw from a stream. A PRNG stream would make every later
+    // choice depend on how many earlier ones were made, so adding one section to the structure would
+    // re-cast the whole rest of the film.
     std::uint32_t h = brief.seed * 0x9E3779B1u;
     h ^= h >> 15;
     h *= 0x2C1B3C6Du;
     h ^= h >> 12;
-    const std::size_t offset = cast.empty() ? 0 : (h >> 8) % cast.size();
-    std::size_t supportingIndex = 0;
+
+    std::vector<double> weight(cast.size(), 0.0);
+    std::vector<double> credit(cast.size(), 0.0);
+    double totalWeight = 0.0;
+    for (std::size_t i = 0; i < cast.size(); ++i) {
+        // A floor, because a subject at importance 0 would never be cast at all and a hero declared
+        // in the scene is a hero somebody wants to see.
+        weight[i] = std::max(static_cast<double>(cast[i].importance), 0.05);
+        totalWeight += weight[i];
+    }
+    // The seed sets each subject's starting credit, spread across the whole weight -- which shifts
+    // the *phase* of the rotation without touching anyone's share, so a re-cut opens on a different
+    // subject and still gives the important ones the same amount of film.
+    //
+    // Scaled against `totalWeight` rather than being a small nudge: an offset much smaller than a
+    // weight cannot change who wins the first round, so the seed stopped re-casting the film at all
+    // -- which the suite caught, because `the seed changes the edit` is a contract.
+    for (std::size_t i = 0; i < cast.size(); ++i) {
+        std::uint32_t k = h + static_cast<std::uint32_t>(i) * 0x9E3779B1u;
+        k ^= k >> 16;
+        k *= 0x7FEB352Du;
+        k ^= k >> 15;
+        credit[i] = totalWeight * (static_cast<double>(k & 0xFFFFu) / 65536.0);
+    }
+    const auto castNext = [&]() -> const FocalTarget& {
+        std::size_t best = 0;
+        for (std::size_t i = 0; i < cast.size(); ++i) {
+            credit[i] += weight[i];
+            // Strictly greater, so a tie goes to the earlier -- the more important -- and two runs
+            // of the same piece cast identically.
+            if (credit[i] > credit[best]) {
+                best = i;
+            }
+        }
+        credit[best] -= totalWeight;
+        return cast[best];
+    };
 
     // Where the camera actually *is*, as opposed to what the last shot was about.
     //
@@ -1336,18 +1359,6 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
     FocalTarget currentTarget = brief.hero;
     bool haveCurrent = false;
 
-    // How many shots in a row the hero has held. The hero owns every build and drop by design --
-    // that is the arc the film is about -- and the design assumes a structure with a few of them.
-    // Glowmere's analyser folded one track into *nineteen consecutive drops*, and the rule then put
-    // the entire middle of the film on one object: reported as "it will continue to spin around a
-    // single hero for about a minute before moving on".
-    //
-    // So the ownership is a preference rather than a right. After this many in a row the next
-    // section goes to the cast even if the hero owns its kind, which changes nothing on a structure
-    // that alternates and everything on one that does not.
-    constexpr std::size_t kMaxHeroRun = 4;
-    std::size_t heroRun = 0;
-
     for (std::size_t i = 0; i < spans.size(); ++i) {
         const auto& span = spans[i];
         const auto sectionKind = span.opener->kind;
@@ -1358,13 +1369,7 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
         shot.startSeconds = span.start;
         shot.durationSeconds = span.end - span.start;
 
-        const bool wantsHero = heroOwns(sectionKind) || cast.empty();
-        const bool hero = wantsHero && (cast.empty() || heroRun < kMaxHeroRun);
-        shot.subject = hero ? brief.hero : cast[(offset + supportingIndex) % cast.size()];
-        if (!hero) {
-            ++supportingIndex;
-        }
-        heroRun = hero ? heroRun + 1 : 0;
+        shot.subject = cast.empty() ? brief.hero : castNext();
 
         if (shot.kind == ShotKind::Transition) {
             // A transition needs somewhere to come from. With no previous shot, or no supporting

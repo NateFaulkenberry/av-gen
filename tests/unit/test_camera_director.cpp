@@ -674,11 +674,13 @@ TEST_CASE("A film with three heroes is about three heroes", "[director][camera][
         CHECK(seconds[h.name] <= total * 6 / 10);
     }
 
-    // The hero still owns the drop: sharing the film is not the same as having no subject, and the
-    // reveal landing on the drop is the reason for reading the structure at all.
+    // The drop still lands on a reveal, on the beat. **Not** on a particular subject: ADR-202
+    // removed the rule that gave the top-ranked hero every build and every drop, because it was a
+    // categorical split that no amount of raising another subject's importance could beat. Who the
+    // reveal is of is now importance's business alone; that it happens, and when, is still the
+    // reason for reading the structure at all.
     const app::Shot* atTheDrop = seq->shotAt(58.0);
     REQUIRE(atTheDrop != nullptr);
-    CHECK(atTheDrop->subject.name == "far-arch");
     CHECK(atTheDrop->kind == app::ShotKind::Reveal);
     CHECK_THAT(atTheDrop->startSeconds, Catch::Matchers::WithinAbs(55.9, 1e-6));   // on the beat
 

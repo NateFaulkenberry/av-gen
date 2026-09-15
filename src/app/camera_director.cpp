@@ -171,6 +171,7 @@ Result<DirectionBrief> briefFromHeroes(std::span<const world::HeroPoint> heroes)
         // twenty-metre tree half a metre wide would be framed as if it were half a metre across --
         // so the larger of the two is what a camera has to fit in frame.
         t.radius = std::max(h.radius, h.height * 0.5f);
+        t.importance = h.importance; // ADR-202: the only thing that decides how often it is cast
         t.preferredDistance = h.preferredCameraDistance;
         // `HeroPoint::preferredCameraElevationDegrees` was authored per hero and read by nothing --
         // the third of three dead properties the panel work turned up. It is wired here rather than

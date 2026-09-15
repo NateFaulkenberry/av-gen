@@ -2675,9 +2675,13 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                     "than the 52.0 it started at, because a camera that moves less still has to\n"
                     "sweep its aim the same distance in the same time. What reads as 'too fast'\n"
                     "is nearly always the swing, not the travel.\n\n"
-                    "Widens each handoff's swing rather than shortening it: the shot still\n"
-                    "arrives where it was going, at the same moment, having taken longer\n"
-                    "over the turn.");
+                    "Widens each handoff's swing rather than shortening it, then shortens the\n"
+                    "move for anything still over: the shot arrives where it was going, at the\n"
+                    "same moment, having taken longer over the turn.\n\n"
+                    "It will not always reach the number you set. A shot that hands one subject\n"
+                    "over to another has to complete that turn inside its own duration, and the\n"
+                    "angle between two subjects over the time the music gave the shot is a floor\n"
+                    "nothing here can go under without moving the cut.");
             }
 
             ImGui::Separator();

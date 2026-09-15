@@ -105,6 +105,10 @@ struct FocalTarget {
     // stating the range in which it actually reads, and the director honours it as a *bound* on the
     // radii rather than replacing them, so the difference between a wide shot and a close one
     // survives.
+    // How much of the film this subject gets, 0..1 (ADR-202). The *only* thing that decides how
+    // often it is cast: there is no primary hero and no supporting cast, just a ranking, and an
+    // author who wants one subject to dominate raises its importance.
+    float importance = 0.5f;
     float preferredDistance = 0.0f;
     // The elevation this subject reads best from, in **degrees** above the horizontal. A 16 m
     // mushroom wants to be looked up at; a pool wants to be looked down into.
