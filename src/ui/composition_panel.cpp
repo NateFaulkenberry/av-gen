@@ -1,5 +1,7 @@
 #include "ui/composition_panel.hpp"
 
+#include "ui/style.hpp"
+
 #include <imgui.h>
 
 #include <algorithm>
@@ -148,6 +150,11 @@ void CompositionPanel::drawList(app::Engine& engine) {
             const bool live = layer->enabled && layer->liveAt(engine.timelineClock().seconds);
             if (!live) {
                 ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
+            }
+            if (ImGui::IsItemHovered()) {
+                // These rows reorder by drag-and-drop (the BeginDragDropSource below), which is
+                // exactly the kind of affordance nobody discovers without being told.
+                setHoverCursor(ImGuiMouseCursor_ResizeAll);
             }
             if (ImGui::Selectable(label, selected_ == layer->id)) {
                 selected_ = layer->id;

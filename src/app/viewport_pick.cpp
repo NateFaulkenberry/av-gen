@@ -3,6 +3,7 @@
 #include "gpu/readback.hpp"
 
 #include <algorithm>
+#include <cstring>
 #include <cmath>
 
 namespace avgen::app {
@@ -65,26 +66,40 @@ Result<PickResult> pickAt(gpu::Context& context, const wgpu::Texture& ids,
         return fail("pick: the scene has not been rendered yet");
     }
 
-    auto depth = gpu::readTexelR32Float(context, linearDepth, pixel.x, pixel.y);
-    if (!depth) {
-        return std::unexpected(depth.error());
+    // Both texels in one submission and one wait.
+    //
+    // This used to read the depth, block for the GPU, and then read the identifier and block again
+    // -- two full CPU stalls on the main thread, on a click, to move eight bytes. The cost of a
+    // readback here is the round trip and not the payload, so the second wait was the entire
+    // second half of the price. It is item 4 of docs/application-performance.md section 14.
+    //
+    // The identifier is now fetched even for a click that turns out to be sky, where the old code
+    // returned before asking for it. That is one more 256-byte copy inside a submission that was
+    // already happening, against a whole round trip saved on every click that hits something --
+    // which is most of them, and the only ones anybody is waiting on.
+    const gpu::TexelRequest requests[] = {
+        {.texture = &linearDepth, .x = pixel.x, .y = pixel.y},
+        {.texture = &ids, .x = pixel.x, .y = pixel.y},
+    };
+    auto texels = gpu::readTexelsR32(context, requests);
+    if (!texels) {
+        return std::unexpected(texels.error());
     }
+    float depth = 0.0f;
+    std::memcpy(&depth, &(*texels)[0], sizeof(depth));
+    const std::uint32_t identifier = (*texels)[1];
+
     PickResult out;
-    out.distance = *depth;
+    out.distance = depth;
     // Sky. Reported as a miss with a valid distance rather than as an error: clicking the sky is a
     // perfectly ordinary thing to do and it means "deselect", not "something went wrong".
-    if (!(*depth < kPickFarDistance)) {
+    if (!(depth < kPickFarDistance)) {
         return out;
     }
-
-    auto identifier = gpu::readTexelR32Uint(context, ids, pixel.x, pixel.y);
-    if (!identifier) {
-        return std::unexpected(identifier.error());
-    }
     out.hit = true;
-    out.objectId = *identifier & 0xffffu;
-    out.materialId = (*identifier >> 16) & 0xffffu;
-    out.position = worldPositionAt(view, pixel, *depth);
+    out.objectId = identifier & 0xffffu;
+    out.materialId = (identifier >> 16) & 0xffffu;
+    out.position = worldPositionAt(view, pixel, depth);
     return out;
 }
 
@@ -108,17 +123,25 @@ Result<glm::vec3> pickNormalAt(gpu::Context& context, const wgpu::Texture& linea
     const glm::uvec2 centre = pixel;
     const glm::uvec2 right(rightX, pixel.y);
     const glm::uvec2 down(pixel.x, downY);
-    glm::vec3 points[3];
     const glm::uvec2 taps[3] = {centre, right, down};
+    // Three taps, one submission, one wait -- as above, and for the same reason.
+    const gpu::TexelRequest requests[] = {
+        {.texture = &linearDepth, .x = taps[0].x, .y = taps[0].y},
+        {.texture = &linearDepth, .x = taps[1].x, .y = taps[1].y},
+        {.texture = &linearDepth, .x = taps[2].x, .y = taps[2].y},
+    };
+    auto texels = gpu::readTexelsR32(context, requests);
+    if (!texels) {
+        return std::unexpected(texels.error());
+    }
+    glm::vec3 points[3];
     for (int i = 0; i < 3; ++i) {
-        auto depth = gpu::readTexelR32Float(context, linearDepth, taps[i].x, taps[i].y);
-        if (!depth) {
-            return std::unexpected(depth.error());
-        }
-        if (!(*depth < kPickFarDistance)) {
+        float depth = 0.0f;
+        std::memcpy(&depth, &(*texels)[static_cast<std::size_t>(i)], sizeof(depth));
+        if (!(depth < kPickFarDistance)) {
             return fail("pick normal: a neighbour is sky");
         }
-        points[i] = worldPositionAt(view, taps[i], *depth);
+        points[i] = worldPositionAt(view, taps[i], depth);
     }
 
     // The winding is chosen so the result points back toward the camera for a surface facing it.

@@ -13,6 +13,12 @@
 #include "core/log.hpp"
 #include "platform/window.hpp"
 #include "scene/composition.hpp"
+#include "app/job_system.hpp"
+#include "ui/style.hpp"
+
+#include <SDL3/SDL_misc.h>
+#include "ui/world_context_menu.hpp"
+#include "ui/theme.hpp"
 #include "stage/staging.hpp"
 
 #include <imgui.h>
@@ -607,6 +613,110 @@ void ControlPanel::drawViewportEditor(app::Engine& engine, const CanvasRect& rec
     }
     drawViewportOverlay(editor, engine.scene().camera, rect, aspect);
     drawViewportHud(editor, rect);
+    drawCanvasActivity(engine, rect);
+    drawCanvasContextMenu(engine, rect);
+}
+
+// ---- right-clicking the world (the addendum's section 4) --------------------------------------
+//
+// The right button over the canvas already means "look around" (`ui::viewportIntent` ->
+// `CameraLook`), and that must not change: turning the head is a gesture people use constantly and
+// a menu that ate it would be a straight loss. So the same rule the sequencer strip uses applies
+// here -- a right press that *travels* is the camera and a right press that does not is a menu --
+// and `ui::updateContextClick` is the shared arithmetic that tells them apart. Dear ImGui's own
+// `BeginPopupContextWindow` cannot: it opens on the release and measures nothing, so it would open
+// a menu at the end of every single look-around.
+//
+// The menu acts on the current selection rather than on whatever is under the pointer, and that is
+// a limitation worth naming: resolving "what is under the cursor" is a GPU readback that this
+// application deliberately performs only on a left click (`Application::serviceViewportPick`), and
+// doing one on a right press would put a blocking round trip on a gesture that is usually the
+// camera. Right-clicking with nothing selected therefore offers the scene-level items -- paste,
+// select all, undo -- which is the honest menu for "you have not told me which object".
+void ControlPanel::drawCanvasContextMenu(app::Engine& engine, const CanvasRect& rect) {
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    const bool over = rect.hovered && rect.contains(mouse.x, mouse.y);
+    const bool wants = updateContextClick(canvasContextClick_,
+                                          over && ImGui::IsMouseClicked(ImGuiMouseButton_Right),
+                                          ImGui::IsMouseReleased(ImGuiMouseButton_Right), mouse.x,
+                                          mouse.y);
+    if (wants) {
+        ImGui::OpenPopup("canvas-context");
+    }
+    if (ContextMenu menu("canvas-context", false); menu) {
+        static_cast<void>(worldObjectMenuBody(engine, editor, {},
+                                              WorldMenuHost{.frameSelection =
+                                                                &editPanel.frameSelectionRequested}));
+    }
+}
+
+// ---- the canvas says what the world is doing (the brief's section 4) ---------------------------
+//
+// Drawn here rather than inside `ui::drawViewportOverlay`, and the distinction matters: the overlay
+// is what `tools/avgen_overlay_shot` rasterises headlessly, and it is the one ImGui surface in this
+// application whose output is compared byte for byte. An indicator that animates off a wall clock
+// belongs nowhere near it. This draws into the canvas *window's* draw list, which only ever reaches
+// the window's own swapchain image.
+void ControlPanel::drawCanvasActivity(app::Engine& engine, const CanvasRect& rect) {
+    const char* stage = nullptr;
+    float fraction = -1.0f;
+    std::string scratch;
+
+    // A load outranks everything: it is the only one of these that owns the main thread, so
+    // nothing else can be running while it is.
+    if (loading.active) {
+        scratch = loading.stage.empty()
+                      ? fmt::format("Opening {}", loading.what)
+                      : fmt::format("Opening {} -- {} ({}/{})", loading.what, loading.stage,
+                                    loading.index + 1, loading.count);
+        stage = scratch.c_str();
+    } else if (jobs != nullptr) {
+        // A world-generation job. `progressKnown` is the job system's own honesty flag (ADR-064):
+        // a stage that never measured itself leaves it false and gets no bar, only its name.
+        for (const app::JobStatus& job : jobs->statuses()) {
+            if (app::jobStateIsTerminal(job.state)) {
+                continue;
+            }
+            scratch = job.stageName.empty() ? job.name : fmt::format("{} -- {}", job.name, job.stageName);
+            stage = scratch.c_str();
+            fraction = job.progressKnown ? job.progress : -1.0f;
+            break;
+        }
+    }
+    if (stage == nullptr && sequence.analysing()) {
+        stage = "Analysing the song";
+    }
+    if (stage == nullptr) {
+        // Geometry deliberately a few frames behind a slider (ADR-084). Its consequences section
+        // ends "`proceduralsAwaitingRebuild()` exists so the editor can say so; nothing shows it
+        // yet, and it should." This is that.
+        if (const scene::Composition* comp = engine.composition(); comp != nullptr) {
+            if (const std::size_t waiting = comp->proceduralsAwaitingRebuild(); waiting > 0) {
+                scratch = waiting == 1 ? std::string("Updating geometry")
+                                       : fmt::format("Updating geometry ({} objects)", waiting);
+                stage = scratch.c_str();
+            }
+        }
+    }
+
+    // A load is shown the instant it is known, with no threshold: the host only sets the flag on
+    // the frame before it blocks, so a fade would mean showing nothing at all on the one frame
+    // that gets presented. Everything else earns the indicator by lasting.
+    ProcessingHint hint;
+    if (loading.active) {
+        hint.visible = true;
+        hint.opacity = 1.0f;
+        processing_.busyForMs = 0.0;
+    } else {
+        hint = processing_.advance(stage != nullptr,
+                                   static_cast<double>(ImGui::GetIO().DeltaTime) * 1000.0);
+    }
+    if (!hint.visible) {
+        return;
+    }
+    drawProcessingIndicator(ImGui::GetWindowDrawList(), ImVec2(rect.x, rect.y),
+                            ImVec2(rect.x + rect.width, rect.y + rect.height), hint.opacity, stage,
+                            fraction, ImGui::GetTime());
 }
 
 void ControlPanel::drawEditWindow(app::Engine& engine) {
@@ -643,8 +753,40 @@ void ControlPanel::drawAssetsWindow() {
             if (ImGui::Selectable(a->name.c_str(), false, ImGuiSelectableFlags_SpanAllColumns) && onOpenAsset) {
                 onOpenAsset(*a);
             }
-            if (ImGui::IsItemHovered() && !a->description.empty()) {
-                ImGui::SetTooltip("%s\n%s", a->description.c_str(), a->path.string().c_str());
+            if (ImGui::IsItemHovered()) {
+                // The row is a thing you click to open, so it says so with the pointer as well as
+                // with a tooltip.
+                setHoverCursor(ImGuiMouseCursor_Hand);
+                if (!a->description.empty()) {
+                    ImGui::SetTooltip("%s\n%s", a->description.c_str(), a->path.string().c_str());
+                }
+            }
+            // ---- the asset row's menu (the addendum's section 5) ---------------------------
+            //
+            // Short, because this browser is short: `scanAssets`/`filterAssets` and the host's
+            // `onOpenAsset`/`onRescanAssets` are the entire asset API. There is no rename, no
+            // duplicate, no import and no remove anywhere in `src/` -- the browser reads a
+            // directory and opens what is in it -- so none of those are offered. A menu of six
+            // greyed-out rows would communicate less than a menu of three live ones.
+            if (ContextMenu menu("##assetmenu"); menu) {
+                menuSubject(a->name);
+                if (menuAction("Open", nullptr, onOpenAsset != nullptr) && onOpenAsset) {
+                    onOpenAsset(*a);
+                }
+                if (menuAction("Show in Finder")) {
+                    // The containing folder, not the file: opening the file itself would hand it
+                    // to whatever application claims the extension, which for a `.json` is a text
+                    // editor and is not what "reveal" means.
+                    const std::string url = "file://" + a->path.parent_path().string();
+                    static_cast<void>(SDL_OpenURL(url.c_str()));
+                }
+                if (menuAction("Copy path")) {
+                    ImGui::SetClipboardText(a->path.string().c_str());
+                }
+                ImGui::Separator();
+                if (menuAction("Rescan assets", nullptr, onRescanAssets != nullptr) && onRescanAssets) {
+                    onRescanAssets();
+                }
             }
             ImGui::PopID();
             ImGui::TableNextColumn();

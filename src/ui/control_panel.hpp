@@ -26,6 +26,7 @@
 #include "ui/settings_panel.hpp"
 #include "ui/transport_bar.hpp"
 #include "ui/editor_layout.hpp"
+#include "ui/ui_logic.hpp"
 #include "ui/graph_editor.hpp"
 #include "ui/help_panel.hpp"
 #include "ui/world_builder_panel.hpp"
@@ -207,6 +208,37 @@ public:
     [[nodiscard]] const std::string& statusMessage() const { return status_; }
     void setStatus(std::string message) { status_ = std::move(message); }
 
+    // ---- what the world is doing (the brief's sections 4 and 5) ----------------------------------
+    //
+    // Two different things, deliberately kept apart because they behave differently and one of them
+    // cannot do what the other can.
+    //
+    // **Processing** is work that happens *across* frames while the editor keeps running: a
+    // procedural object holding its regeneration back until a slider stops moving (ADR-084), a
+    // world-generation job on the job system, a song being analysed. The canvas can show this
+    // properly -- it fades in after a threshold, it animates, and the scene underneath stays live
+    // and interactive. This is the case the brief's section 4 describes and the one where an
+    // indicator is worth having.
+    //
+    // **Loading** is a single synchronous call that owns the main thread until it returns. The
+    // editor is not running during it and no indicator drawn from inside it could be seen, because
+    // nothing presents a frame. What the editor can honestly do is say so *before* it begins: the
+    // host defers an open by one frame, paints "Opening <name>" over the canvas, and does the work
+    // on the frame after. The window then holds that picture for the length of the load instead of
+    // a stale editor that looks like it ignored the click.
+    //
+    // Which is worth stating plainly rather than dressing up: the freeze is the same length. What
+    // changed is that it stops being a mystery -- and separately, `world::scatter` being threaded
+    // made it about a third shorter, which is the part that is actually a fix.
+    struct Loading {
+        bool active = false;
+        std::string what;   // "glowmere-stylized.json"
+        std::string stage;  // the last stage the loader reported
+        int index = 0;
+        int count = 1;
+    };
+    Loading loading;
+
 private:
     void drawTransport(app::Engine& engine);
     void drawResponse(app::Engine& engine);
@@ -236,6 +268,10 @@ private:
     void drawEditWindow(app::Engine& engine);
     // Runs the world editor and draws it over the world, inside the canvas window.
     void drawViewportEditor(app::Engine& engine, const CanvasRect& rect);
+    // The processing / loading indicator over the canvas. Inside the canvas window's draw list,
+    // never in `ui::drawViewportOverlay` -- see the note at the definition.
+    void drawCanvasActivity(app::Engine& engine, const CanvasRect& rect);
+    void drawCanvasContextMenu(app::Engine& engine, const CanvasRect& rect);
     void drawGraphWindow(app::Engine& engine);
     // ---- the shell (ADR-076) ----
     void drawMenuBar(app::Engine& engine);
@@ -249,6 +285,11 @@ private:
 
     EditorLayout layout_;
     CanvasRect canvas_;
+    // How long the world has been busy, for the canvas's processing indicator.
+    ProcessingTracker processing_;
+    // Right-click over the canvas: a menu only if the press did not travel, because a right-drag
+    // there is the camera looking around. See `drawCanvasContextMenu`.
+    ContextClickTracker canvasContextClick_;
     std::filesystem::path layoutFile_;
     std::uint64_t storedLayoutSignature_ = 0;
     double lastLayoutSave_ = 0.0;

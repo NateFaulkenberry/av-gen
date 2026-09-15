@@ -126,12 +126,13 @@ void menuSubject(const std::string& text);
 
 // ---- small shared widgets -----------------------------------------------------------------------
 
-// A square button with a vector glyph rather than a character, so it does not depend on a font
-// having the symbol. Promoted out of `transport_bar.cpp`'s anonymous namespace, where it was the
-// only place in the application that drew a decent icon button.
-enum class Glyph : std::uint8_t { Play, Pause, Stop, Loop, Record, Chevron, Plus, Minus, Dots };
-bool glyphButton(const char* id, Glyph glyph, const char* tooltip, bool enabled = true,
-                 bool engaged = false, ImVec2 size = ImVec2(0.0f, 0.0f));
+// NOTE on icon buttons: there is deliberately **no** `glyphButton` here. `transport_bar.cpp` has
+// one in its anonymous namespace with a richer glyph set than a general version would have started
+// with -- start, end, step-by-one each way, rewind, forward, loop -- and promoting it would have
+// meant either losing glyphs or moving the transport's whole vocabulary into a shared header for
+// one caller. A second, poorer implementation beside it is precisely what section 17 of the brief
+// says not to do, so the transport keeps its own and it now takes its colours from `palette()`
+// like everything else. Promote it here the day something outside the transport needs one.
 
 // A tooltip that only appears after the pointer has settled, and that is styled like the rest of the
 // application. ImGui's own delay is per-context and this is per-call, so a dense toolbar can be

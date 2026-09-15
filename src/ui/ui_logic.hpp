@@ -448,6 +448,22 @@ inline constexpr double kProcessingFadeMs = 140.0;
     return out;
 }
 
+// Accumulates how long the world has been busy, so `processingHint` has something to ask about.
+// Fed the frame's own delta rather than reading a clock, which is what makes it testable and what
+// keeps the one wall clock involved at the call site where it can be seen.
+struct ProcessingTracker {
+    double busyForMs = 0.0;
+
+    ProcessingHint advance(bool busy, double deltaMs) {
+        // The timer resets the moment the work finishes, so a second burst starts from zero and
+        // has to earn the indicator again. Carrying it over would make the indicator appear
+        // instantly on every subsequent slider nudge, which is the flashing the threshold exists
+        // to prevent.
+        busyForMs = busy ? busyForMs + std::max(deltaMs, 0.0) : 0.0;
+        return processingHint(busy, busyForMs);
+    }
+};
+
 // ---- the timeline ruler's divisions ------------------------------------------------------------
 //
 // A ruler with one tick size is a row of scratches; a ruler with two is readable at a glance,

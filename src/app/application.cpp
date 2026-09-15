@@ -980,6 +980,23 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             log::warn("examples: {}", examples.error().message);
         }
         panel_->onOpenExample = [this](const ExampleInfo& ex) { loadAny(ex.file); };
+        // The loader names the stage it is entering. Only the live editor installs this: offline
+        // has no window to tell and `runHeadless` must not acquire a dependency on one.
+        //
+        // Nothing repaints while it fires, because the load owns the main thread -- see `loadAny`.
+        // It earns its place for the two things it can still do: the stage the loader reached is on
+        // screen the moment the frame resumes, so a load that *failed* says where, and
+        // `Engine::lastLoadTimings` gets the per-stage breakdown that turned "opening a project
+        // freezes the application" into a number.
+        engine_->setLoadReporter([this](const Engine::LoadStage& at) {
+            if (panel_ == nullptr) {
+                return;
+            }
+            panel_->loading.active = true;
+            panel_->loading.stage.assign(at.name);
+            panel_->loading.index = at.index;
+            panel_->loading.count = at.count;
+        });
         // ---- asset browser (ADR-031): the example directories plus the current project's folder
         const auto assetDirs = [executablePath]() { return exampleSearchDirs(executablePath); };
         panel_->onRescanAssets = [this, assetDirs] {
@@ -1286,7 +1303,54 @@ void Application::applyShare(const std::string& kind, const std::string& name) {
     log::info("sharing the frame as {} '{}'", kind, share_.name());
 }
 
+// ---- opening something, one frame later (the brief's section 5) -------------------------------
+//
+// Every interactive open funnels through here: the File menu, Open Recent, the examples list, the
+// asset browser and a file dropped on the window. It used to do the work on the spot, which meant
+// the main thread disappeared into `Engine::loadProject` for about two seconds with the window
+// holding whatever was last painted -- an editor that looks exactly like an editor that ignored
+// the click.
+//
+// The load is *not* moved to a worker, and that is a decision rather than an omission: the
+// composition is not thread-safe, the environment map's prefilter is GPU work and all GPU work here
+// is the main thread's, and the parameter set is torn down and rebuilt underneath everything that
+// reads it. ADR-084 rejected threading a far smaller piece of this for the same reasons, and
+// section 19 of the brief rules out moving unsafe work to a background thread to make a number look
+// better.
+//
+// What is safe is to *say so first*. The request is remembered, the canvas paints "Opening <name>"
+// over the scene that is still there, that frame is presented, and the load runs at the top of the
+// next one. The freeze is the same length; it stops being ambiguous. The part that actually made it
+// shorter is `world::scatter` being threaded, which is a third of it.
+//
+// Before the first frame there is no panel and nothing to paint on, so start-up opens immediately.
 void Application::loadAny(const std::filesystem::path& path) {
+    if (panel_ == nullptr) {
+        performOpen(path);
+        return;
+    }
+    pendingOpen_ = path;
+    panel_->loading = ui::ControlPanel::Loading{
+        .active = true, .what = path.filename().string(), .stage = {}, .index = 0, .count = 1};
+    panel_->setStatus(fmt::format("Opening {}...", path.filename().string()));
+}
+
+void Application::servicePendingOpen() {
+    if (!pendingOpen_.has_value()) {
+        return;
+    }
+    const std::filesystem::path path = *pendingOpen_;
+    pendingOpen_.reset();
+    performOpen(path);
+    if (panel_ != nullptr) {
+        // Cleared on every path out of the load, success or failure. A loading state that survives
+        // its own failure is the "stuck forever" the brief's section 20 asks to be tested for, and
+        // the one place it could happen is here.
+        panel_->loading = ui::ControlPanel::Loading{};
+    }
+}
+
+void Application::performOpen(const std::filesystem::path& path) {
     auto r = openAny(path);
     if (!r) {
         log::error("open '{}': {}", path.string(), r.error().message);
@@ -2434,6 +2498,9 @@ int Application::runLive() {
         if (panel_ != nullptr) {
             canvas_ = panel_->canvas();
         }
+        // Before anything else in the frame: a request made last frame is honoured now, so the
+        // "Opening ..." frame it set up has already been presented. See `loadAny`.
+        servicePendingOpen();
         const auto eventsStart = std::chrono::steady_clock::now();
         newestInputNs_ = 0;
         auto events = window_->pollEvents([this](const SDL_Event& e) { handleInputEvent(e); });

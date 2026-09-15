@@ -1,5 +1,8 @@
 #include "ui/world_edit_panel.hpp"
 
+#include "ui/style.hpp"
+#include "ui/world_context_menu.hpp"
+
 #include "core/log.hpp"
 
 #include "scene/composition.hpp"
@@ -712,6 +715,22 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
                 } else {
                     editor.selection.set(node.name);
                 }
+            }
+            if (ImGui::IsItemHovered()) {
+                // A locked row is inert to a click, and the cursor says which of the two it is
+                // rather than promising a selection the row will refuse.
+                setHoverCursor(node.locked ? ImGuiMouseCursor_NotAllowed : ImGuiMouseCursor_Hand);
+            }
+            // The row's context menu. Attached to the `Selectable` above and inside this row's
+            // `PushID`, so an unnamed popup gets a unique id per node without one being invented.
+            //
+            // It is offered on a locked row too, which the left click is not: a lock means "this
+            // does not get selected", and the one thing you most need to do to a locked object is
+            // unlock it. A menu that refused to open on exactly the rows you cannot otherwise
+            // reach would be a trap.
+            if (ContextMenu menu("##rowmenu"); menu) {
+                static_cast<void>(worldObjectMenuBody(engine, editor, node.name,
+                                                      WorldMenuHost{.frameSelection = &frameSelectionRequested}));
             }
             if (node.locked) {
                 ImGui::PopStyleColor();

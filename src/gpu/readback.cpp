@@ -205,6 +205,73 @@ Result<std::uint32_t> readTexelR32Uint(Context& context, const wgpu::Texture& te
     return value;
 }
 
+Result<std::vector<std::uint32_t>> readTexelsR32(Context& context,
+                                                std::span<const TexelRequest> requests) {
+    if (requests.empty()) {
+        return std::vector<std::uint32_t>{};
+    }
+    // WebGPU requires a texture-to-buffer copy's offset to be a multiple of 256, so each texel gets
+    // its own 256-byte slice. The buffer is a couple of kilobytes for a realistic batch; the thing
+    // being saved is the wait, not the memory.
+    constexpr std::uint64_t kSlice = 256;
+    const std::uint64_t bufferSize = kSlice * requests.size();
+
+    wgpu::BufferDescriptor bufferDesc{};
+    bufferDesc.label = "readback-texels";
+    bufferDesc.size = bufferSize;
+    bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
+    wgpu::Buffer staging = context.device().CreateBuffer(&bufferDesc);
+
+    wgpu::CommandEncoder encoder = context.device().CreateCommandEncoder();
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        const TexelRequest& r = requests[i];
+        if (r.texture == nullptr || *r.texture == nullptr) {
+            return fail("readTexelsR32: request {} names no texture", i);
+        }
+        wgpu::TexelCopyTextureInfo source{};
+        source.texture = *r.texture;
+        source.mipLevel = 0;
+        source.origin = {r.x, r.y, 0};
+        wgpu::TexelCopyBufferInfo destination{};
+        destination.buffer = staging;
+        destination.layout.offset = kSlice * i;
+        destination.layout.bytesPerRow = static_cast<std::uint32_t>(kSlice);
+        destination.layout.rowsPerImage = 1;
+        wgpu::Extent3D extent{1, 1, 1};
+        encoder.CopyTextureToBuffer(&source, &destination, &extent);
+    }
+    wgpu::CommandBuffer commands = encoder.Finish();
+    // One submission, and below it one wait, however many texels were asked for. That is the
+    // entire point of the function.
+    context.queue().Submit(1, &commands);
+
+    bool mapped = false;
+    std::string mapError;
+    auto future = staging.MapAsync(wgpu::MapMode::Read, 0, static_cast<std::size_t>(bufferSize),
+                                   wgpu::CallbackMode::WaitAnyOnly,
+                                   [&](wgpu::MapAsyncStatus status, wgpu::StringView message) {
+                                       mapped = status == wgpu::MapAsyncStatus::Success;
+                                       if (!mapped) {
+                                           mapError = Context::toString(message);
+                                       }
+                                   });
+    if (!context.waitFor(future) || !mapped) {
+        return fail("readTexelsR32 map failed: {}", mapError.empty() ? "timeout" : mapError);
+    }
+    const auto* data = static_cast<const std::uint8_t*>(
+        staging.GetConstMappedRange(0, static_cast<std::size_t>(bufferSize)));
+    if (data == nullptr) {
+        staging.Unmap();
+        return fail("readTexelsR32: mapped range unavailable");
+    }
+    std::vector<std::uint32_t> out(requests.size());
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        std::memcpy(&out[i], data + kSlice * i, sizeof(std::uint32_t));
+    }
+    staging.Unmap();
+    return out;
+}
+
 Result<float> readTexelR32Float(Context& context, const wgpu::Texture& texture, std::uint32_t x,
                                 std::uint32_t y) {
     auto raw = readTextureRaw(context, texture, 1, 1, 4, x, y);
