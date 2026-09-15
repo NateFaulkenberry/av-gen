@@ -38,6 +38,7 @@
 #include "params/parameter_set.hpp"
 #include "scene/animation.hpp"
 #include "scene/composition.hpp"
+#include "scene/detail_limits.hpp"
 #include "scene/scene.hpp"
 #include "scene/skeleton.hpp"
 #include "signals/signal_bus.hpp"
@@ -1188,6 +1189,19 @@ TEST_CASE("the four aliens animate independently in the scene they ship in",
     auto* cameraTarget = engine.params().findAs<glm::vec3>("camera/target");
     REQUIRE(cameraMode != nullptr);
     cameraMode->setBase(1);
+    // Every entity updated every frame, however far from the camera (ADR-186).  The camera below
+    // follows the centroid of four bodies that legitimately end up hundreds of metres apart, so any
+    // one of them can pass its own `cullDistance` -- and a culled entity does not write its node,
+    // which means the node snaps back to where the *scene file* put it and out again. That reads as
+    // a 1.68 m step and a 2.79 rad facing gap, and it is a measurement of the level-of-detail
+    // ladder rather than of locomotion.  Pinning the camera to the group was never enough on its
+    // own; this is (`Engine::update` writes its own policy onto the scene's every frame, so it has
+    // to be set here rather than on the composition).
+    {
+        scene::DetailLimits limits = engine.detailLimits();
+        limits.entityDistanceCull = false;
+        engine.setDetailLimits(limits);
+    }
 
     struct Watch {
         std::string name;
@@ -1367,6 +1381,14 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
     auto* cameraTarget = engine.params().findAs<glm::vec3>("camera/target");
     REQUIRE(cameraMode != nullptr);
     cameraMode->setBase(1);
+    // As above: pinning the camera to the group is not enough, because the group spreads.  A culled
+    // entity stops writing its node and the node snaps back to its authored place, which this probe
+    // would count as a step against the facing (ADR-186, ADR-240).
+    {
+        scene::DetailLimits limits = engine.detailLimits();
+        limits.entityDistanceCull = false;
+        engine.setDetailLimits(limits);
+    }
 
     struct Row {
         std::string name;
@@ -1377,6 +1399,8 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
         int moving = 0;
         int backwards = 0;      // travelled against the way it is drawn facing
         int backwardsWalking = 0; // ...and its own locomotion accounts for the step
+        int backwardsCrowded = 0; // ...and another body was overlapping it
+        int backwardsSolid = 0;   // ...and it was inside a solid
         float worst = 0.0f;
         float worstWalking = 0.0f;
     };
@@ -1438,6 +1462,26 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
             }
             ++r.backwards;
             r.worst = std::max(r.worst, len);
+            // Which push. Crowd separation acts while another body's disc overlaps this one; the
+            // penetration resolve acts while the body is inside a solid. Counted rather than
+            // assumed, because "it is a push" is a claim about a mechanism and the two mechanisms
+            // have different answers (ADR-204, ADR-240).
+            const glm::vec3 at = r.who->state().position();
+            for (const auto& other : comp->entityWorld().entities()) {
+                if (other.get() == r.who || other->state().radius <= 0.0f) {
+                    continue;
+                }
+                const glm::vec3 q = other->state().position();
+                if (glm::length(glm::vec2(at.x - q.x, at.z - q.z)) <
+                    r.who->state().radius + other->state().radius) {
+                    ++r.backwardsCrowded;
+                    break;
+                }
+            }
+            if (glm::length(comp->entityWorld().navigator().resolvePenetration(
+                    glm::vec2(at.x, at.z), at.y)) > 1e-4f) {
+                ++r.backwardsSolid;
+            }
             // What the body says it did, over the interval it actually advanced across.
             const entity::LocomotionState& loco = r.who->locomotion();
             const glm::vec2 heading(std::sin(loco.yaw), std::cos(loco.yaw));
@@ -1452,10 +1496,11 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
         const double rate = r.moving > 0 ? 100.0 * r.backwards / r.moving : 0.0;
         // WARN rather than INFO: the rates are the result, and a probe that only prints them when
         // it fails cannot be used to compare a before with an after.
-        WARN(fmt::format("{:<6} moving {:6d}, backwards {:5d} ({:.2f}%), of which its own travel "
-                         "explains {:5d}; worst step {:.3f} m, worst explained {:.3f} m",
-                         r.name, r.moving, r.backwards, rate, r.backwardsWalking, r.worst,
-                         r.worstWalking));
+        WARN(fmt::format("{:<6} moving {:6d}, backwards {:5d} ({:.2f}%): its own travel explains "
+                         "{:5d}, a crowd overlap {:5d}, a solid {:5d}; worst step {:.3f} m, worst "
+                         "explained {:.3f} m",
+                         r.name, r.moving, r.backwards, rate, r.backwardsWalking,
+                         r.backwardsCrowded, r.backwardsSolid, r.worst, r.worstWalking));
         REQUIRE(r.moving > 1000);
         // The defect: a body walking one way while drawn facing the other. Zero, not a fraction.
         CHECK(r.backwardsWalking == 0);
