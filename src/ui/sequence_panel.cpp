@@ -760,6 +760,10 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                 if (std::fabs(mouse.x - toX(structure.sections[i].startSeconds)) <= kEdgeGrab) {
                     dragKind_ = 5;
                     dragIndex_ = static_cast<int>(i);
+                    // The section the boundary opens, so grabbing an edge also shows you what you
+                    // are about to move the start of.
+                    selection_ = Selection::Section;
+                    selected_ = static_cast<int>(i);
                     hitBlock = true;
                     break;
                 }
