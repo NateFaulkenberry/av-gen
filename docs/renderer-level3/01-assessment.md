@@ -562,6 +562,38 @@ and it carries an unmeasured cost: a full shadow-map quad marched per SDF per ca
 decision with a number attached, so it is recorded here rather than guessed at. Kept as a probe,
 `avgen_render_tests "[.probe][sdf]"`, which passes when the defect is gone.
 
+### Re-read 2026-09-15: the quad is one of three, and the other two are why this is not a small fix
+
+Going to do the quad turned up two more, both in the same pass and both fatal on their own. The
+diagnosis above is correct and incomplete, and the difference matters because it is the difference
+between "swap the vertex stage" and "change how the march reconstructs a ray".
+
+**`frame.cameraPos` in a shadow view is the camera's.** `ShadowRenderer::upload` builds each view's
+frame block by copying the camera's and overwriting the first two `mat4`s — `viewProj` and
+`invViewProj` — and nothing else. `cameraPos` sits at byte 192, after `prevViewProj`, and is never
+touched. `fs_sdf` does `eye = frame.cameraPos.xyz` and `rdW = normalize(farW - eye)`, so in a shadow
+pass it marches a ray from the *camera's* eye through the *light's* NDC. Even with the right quad,
+that ray goes nowhere near the geometry the shadow map is of.
+
+**A directional cascade is orthographic, and an orthographic view has no eye.** `farW - eye` is not
+the ray for a projection whose rays are parallel — there is no single origin to subtract, and
+`tNearPlane = length(nearW - eye)` is not a near-plane distance either. The form that is right for
+both is the two-point one, `normalize(farW - nearW)` with `t` measured from `nearW`, which is what
+the shadow pass needs and what the lit pass would also have to change to if the entry stayed shared.
+
+So the shape of the fix is: a full-screen (or per-view) quad, a frame block whose `cameraPos` means
+something for the view, **and** a ray reconstruction that does not assume a pinhole. Only the third
+is interesting, and it touches the lit pass — mathematically identical for a perspective camera,
+bit-different in floating point, so the determinism suite will see it. That is a deliberate change
+to make with a baseline in hand, not a stretch item.
+
+The cost question the paragraph above defers is still unanswered and is still the right gate. For
+scale, the hidden throughput probe (`avgen_render_tests "[.perf][sdf]"`, 1920×1080, full march
+budget) puts a full-screen quad of 16 smooth-unioned spheres at **171 ms** of raymarch pass and one
+sphere at **10.7 ms**. A shadow march is much cheaper per pixel — `sdfShadowSteps` is 16 to 48 by
+tier against the object's own `maxSteps` — and a 2048² view is twice 1080p's pixels, so neither
+number is the answer; they are the reason the answer has to be measured rather than assumed small.
+
 Worth noting what this does *not* affect: no shipped example scene uses a raymarched SDF, which is
 why nothing looked wrong. It is a defect in a feature nothing currently leans on.
 
