@@ -45,7 +45,35 @@ decision for a person, not a defect to fix.** A middle setting (`volumeDensity 0
 `fogDensity 0.0035`) measured p01 0.0143, contrast 0.1129, saturation 0.510 — most of the blacks
 back, most of the atmosphere kept.
 
-## Finding 2: there is severe RGB fringing, and I have not attributed it
+## Correction (2026-09-15): the fringing is authored, and this section tested the wrong thing
+
+Everything in Finding 2 below was measured from `glowmere-valley-2.scene.json` **alone**. The scene
+file is not the whole piece: `glowmere-valley-2.json`, the project, carries the parameter table, and
+it sets
+
+```
+post/lens/chromaticAberration : 0.215
+```
+
+with a route from `audio.onset` onto it at amount 0.35, so it pulses with the music. The parameter
+defaults to 0, so **every arm below rendered with the lens chromatic aberration switched off** -- and
+the effect a person actually sees when they open the project was in none of them. Asking the user to
+verify it as a defect was asking about something these arms had disabled.
+
+Called correctly by the owner of the look: *"I think that's part of the post processing I have on
+Glowmere Valley 2 -- I don't think any change is needed there."* Deliberate art direction, not a
+defect. The section below should have begun by reading the project rather than the scene.
+
+The residue is worth keeping rather than discarding: with CA *off*, the detector still found 20.7%
+of pixels jumping more than 0.06 in chroma from a neighbour. That is a second, smaller, still
+unattributed effect, and it is a candidate for the reported problem with **720p output** -- half the
+linear resolution is a quarter of the samples over the same foliage. That is where to pick it up,
+rather than as a defect in its own right.
+
+**The rule this cost:** a scene file is not the piece. An arm that renders `--composition` without
+the project is measuring a different image from the one anybody looks at.
+
+## Finding 2 (superseded -- see the correction above): RGB fringing with CA disabled
 
 Visible in the renders and not subtle: dense vegetation at middle distance and the water sparkle
 carry violent per-pixel red/blue/green speckle. **Mean saturation cannot see this** — a frame
