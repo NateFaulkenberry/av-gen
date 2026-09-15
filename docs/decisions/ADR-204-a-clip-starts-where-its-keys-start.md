@@ -1,4 +1,4 @@
-# ADR-203: A clip starts where its keys start, a facing is not an odometer, and a stride speed is a claim about a clip
+# ADR-204: A clip starts where its keys start, a facing is not an odometer, and a stride speed is a claim about a clip
 
 **Status:** Accepted
 **Date:** 2026-09-14
