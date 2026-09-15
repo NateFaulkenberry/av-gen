@@ -464,7 +464,12 @@ struct PostBench {
     }
 };
 
-const Field& stage(const std::vector<std::pair<std::string, Field>>& stages, std::string_view name) {
+// Renamed from `stage` in ADR-230's branch, and not for taste: `src/stage/staging.hpp` declares
+// `namespace avgen::stage` (ADR-210), this file says `using namespace avgen;`, and the two make an
+// unqualified `stage(...)` ambiguous. The whole `avgen_render_tests` target stopped building because
+// of it -- verified as already broken at this branch's base commit, so the breakage is older than
+// this change and only the fix is new.
+const Field& stageField(const std::vector<std::pair<std::string, Field>>& stages, std::string_view name) {
     for (const auto& [key, field] : stages) {
         if (key == name) {
             return field;
@@ -512,9 +517,9 @@ TEST_CASE("an impulse through the anamorphic chain comes out as a streak, not a 
     // The chain's shape, measured rather than read off the source: the pyramid starts at half the
     // frame and the wide tier renders at a quarter of it. That mismatch is the subject of the next
     // test; here it only has to be recorded.
-    const Field& prefilter = stage(stages, "bloom/prefilter");
-    const Field& bloom = stage(stages, "bloom/up0");
-    const Field& wide = stage(stages, "wide");
+    const Field& prefilter = stageField(stages, "bloom/prefilter");
+    const Field& bloom = stageField(stages, "bloom/up0");
+    const Field& wide = stageField(stages, "wide");
     CHECK(prefilter.width == kSynthW / 2);
     CHECK(bloom.width == kSynthW / 2);
     CHECK(wide.width == kSynthW / 4);
@@ -557,9 +562,9 @@ TEST_CASE("the ghosts were never what turned an impulse into a row of copies",
 
     scene::PostSettings settings = glowmerePost();
     settings.anamorphicGhosts = 0.0f;
-    const Field noGhosts = stage(bench.run(hdr, settings), "wide");
+    const Field noGhosts = stageField(bench.run(hdr, settings), "wide");
     settings.anamorphicGhosts = 0.223f;
-    const Field withGhosts = stage(bench.run(hdr, settings), "wide");
+    const Field withGhosts = stageField(bench.run(hdr, settings), "wide");
     CHECK(bench.ctx->errorCount() == 0);
 
     const Periodicity a = horizontalPeriodicity(noGhosts);
@@ -598,8 +603,8 @@ TEST_CASE("a sparse point field keeps its own spacing and acquires none from the
     report("sparse grid: spacing 23 px, value 30", stages);
     CHECK(bench.ctx->errorCount() == 0);
 
-    const Periodicity input = horizontalPeriodicity(stage(stages, "scene-hdr"));
-    const Field& wide = stage(stages, "wide");
+    const Periodicity input = horizontalPeriodicity(stageField(stages, "scene-hdr"));
+    const Field& wide = stageField(stages, "wide");
     INFO("input lag=" << input.lag << " " << describe("wide", wide));
     CHECK(input.lag == kInputSpacing);
     // The input's own 23-pixel spacing is legitimate content and survives into the bloom, which is
@@ -641,9 +646,9 @@ TEST_CASE("the ghosts place energy far from the source, and undersample it getti
 
     scene::PostSettings settings = glowmerePost();
     settings.anamorphicGhosts = 0.0f;
-    const Field off = stage(bench.run(hdr, settings), "wide");
+    const Field off = stageField(bench.run(hdr, settings), "wide");
     settings.anamorphicGhosts = 0.223f;
-    const Field on = stage(bench.run(hdr, settings), "wide");
+    const Field on = stageField(bench.run(hdr, settings), "wide");
     CHECK(bench.ctx->errorCount() == 0);
 
     // The ghost contribution is the difference of two runs that differ in one parameter.
@@ -687,7 +692,7 @@ TEST_CASE("the streak no longer prints a copy of its input at every tap step",
     fmt::print("\n== correlation at the old comb period (impulse, ghosts off) ==\n");
     for (const float stretch : {4.0f, 6.0f, 8.0f, 10.386f, 14.0f, 20.0f}) {
         settings.anamorphicStretch = stretch;
-        const Field wide = stage(bench.run(hdr, settings), "wide");
+        const Field wide = stageField(bench.run(hdr, settings), "wide");
         const auto oldPeriod = static_cast<std::uint32_t>(std::lround(stretch));
         const double prominence = combProminence(wide, oldPeriod);
         fmt::print("  stretch {:>6.3f} -> prominence at lag {:>3} = {:+.4f}; correlation {:.3f}; "
@@ -967,7 +972,7 @@ TEST_CASE("the water matrix: which post stage the pattern first appears in",
         // its mean was 0.001595 then and is 0.001588 now, which is the number that says the streak
         // still carries its light rather than having been quietened away.
         if (arm.anamorphic) {
-            const Field& wide = stage(on.stages, "wide");
+            const Field& wide = stageField(on.stages, "wide");
             INFO(describe("wide", wide));
             CHECK(isolatedPeaks(wide, 4.0f, 1e-6f) == 0);
             CHECK(mean(wide) > 1.0e-3);
@@ -1007,7 +1012,7 @@ TEST_CASE("the ghost sweep: does out-of-region energy scale with ghost strength"
         }
         const OutOfRegion out = outsideMask(contribution, support, 1e-3f);
         const Periodicity p = horizontalPeriodicity(contribution);
-        const Field& wide = stage(on.stages, "wide");
+        const Field& wide = stageField(on.stages, "wide");
         fmt::print("  ghosts {:.3f}: outside {} px peak {:.5f} energy {:.4f} | lag {} score {:.3f} | {}\n", ghosts,
                    out.pixels, out.peak, out.energy, p.lag, p.score, describe("wide", wide));
     }
