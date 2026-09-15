@@ -137,6 +137,7 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
     // The canvas before the panels, so the world is submitted whatever a panel does afterwards.
     // The editor runs inside it (ADR-092): the pointer is only the canvas's while the canvas is the
     // current window, and the canvas's rectangle is only known once ImGui has laid it out.
+    statusAgeSeconds_ += static_cast<double>(ImGui::GetIO().DeltaTime);
     canvas_ = drawCanvasWindow(canvasTexture, layout_.regionNode(DockRegion::Centre),
                                [&](const CanvasRect& rect) { drawViewportEditor(engine, rect); });
     drawPanels(engine, stats);
@@ -456,7 +457,7 @@ void ControlPanel::drawStatusBar(app::Engine& engine, const FrameStats& stats) {
     }
     if (!status_.empty()) {
         ImGui::Separator();
-        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "%s", status_.c_str());
+        ImGui::TextColored(statusColour(), "%s", status_.c_str());
     }
     // The adapter is the one thing here that never changes, so it goes where it will be clipped
     // first when the window is narrow.
@@ -1182,7 +1183,7 @@ void ControlPanel::drawTransport(app::Engine& engine) {
                             "drop a file on the window)");
     }
     if (!status_.empty()) {
-        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "%s", status_.c_str());
+        ImGui::TextColored(statusColour(), "%s", status_.c_str());
     }
 
     float position = static_cast<float>(engine.positionSeconds());

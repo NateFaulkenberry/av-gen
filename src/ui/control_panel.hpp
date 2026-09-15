@@ -26,7 +26,10 @@
 #include "ui/settings_panel.hpp"
 #include "ui/transport_bar.hpp"
 #include "ui/editor_layout.hpp"
+#include "ui/theme.hpp"
 #include "ui/ui_logic.hpp"
+
+#include <algorithm>
 #include "ui/graph_editor.hpp"
 #include "ui/help_panel.hpp"
 #include "ui/world_builder_panel.hpp"
@@ -206,7 +209,18 @@ public:
     // panel exactly as a person does rather than through a side door of its own.
     [[nodiscard]] EditorLayout& layout() { return layout_; }
     [[nodiscard]] const std::string& statusMessage() const { return status_; }
-    void setStatus(std::string message) { status_ = std::move(message); }
+    // A status message stays on screen until something replaces it, and before this it stayed
+    // *forever*: "opened night-shift.json" was still in the bar an hour later, beside a frame rate
+    // that had moved on, which is how a status bar stops being read at all.
+    //
+    // It is not cleared on a timer either, because some of these are errors and an error a person
+    // was not looking at when it arrived must not vanish. It ages instead: full strength while it
+    // is news, then muted, so the bar can be scanned for *fresh* information without anything ever
+    // being taken away.
+    void setStatus(std::string message) {
+        status_ = std::move(message);
+        statusAgeSeconds_ = 0.0;
+    }
 
     // ---- what the world is doing (the brief's sections 4 and 5) ----------------------------------
     //
@@ -290,6 +304,20 @@ private:
     // Right-click over the canvas: a menu only if the press did not travel, because a right-drag
     // there is the camera looking around. See `drawCanvasContextMenu`.
     ContextClickTracker canvasContextClick_;
+    double statusAgeSeconds_ = 0.0;
+    // Full strength while the message is news, then muted. Warm rather than red: most of what goes
+    // through here is an outcome rather than a fault, and a bar that shouts at every load teaches
+    // the same lesson an indicator with no threshold does.
+    [[nodiscard]] ImVec4 statusColour() const {
+        constexpr double kFresh = 6.0;
+        constexpr double kFade = 2.0;
+        const float t = static_cast<float>(
+            std::clamp((statusAgeSeconds_ - kFresh) / kFade, 0.0, 1.0));
+        const ImVec4 fresh(1.0f, 0.6f, 0.4f, 1.0f);
+        const ImVec4 old = ImGui::ColorConvertU32ToFloat4(palette().textMuted);
+        return ImVec4(fresh.x + (old.x - fresh.x) * t, fresh.y + (old.y - fresh.y) * t,
+                      fresh.z + (old.z - fresh.z) * t, 1.0f);
+    }
     std::filesystem::path layoutFile_;
     std::uint64_t storedLayoutSignature_ = 0;
     double lastLayoutSave_ = 0.0;
