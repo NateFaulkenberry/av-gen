@@ -8,6 +8,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <regex>
@@ -110,4 +111,72 @@ TEST_CASE("every ADR is indexed and every indexed ADR exists", "[hygiene]") {
     INFO("README rows with no ADR file: " << danglingRows.size());
     CHECK(missingFromIndex.empty());
     CHECK(danglingRows.empty());
+}
+
+// ADR-211. The World panel's Inspector answers "why is this moving?", and its answer is only worth
+// anything if it is complete. It was not: entity behaviours write a node's transform parameters
+// directly, so the panel said "nothing modulates this object; its parameters are static" about a
+// character walking across the valley.
+//
+// Completeness cannot be asserted by asking `influencesOf` what it covers -- that is the function
+// under test answering a question about itself. What can be asserted is the *premise* the
+// completeness argument rests on: the set of places that write a parameter's final value. Every one
+// of them has to be a kind the Inspector knows about, so a new writer added later fails here and
+// whoever adds it has to decide what the panel should say.
+//
+// A grep rather than a link-time check because `influencesOf` lives in `world_panel.cpp`, behind
+// ImGui, which the unit-test binary does not link.
+TEST_CASE("every writer of a parameter final is a kind the Inspector can name", "[hygiene][ui]") {
+    const std::filesystem::path src = std::filesystem::path(AVGEN_SOURCE_DIR) / "src";
+    std::set<std::string> writers;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(src)) {
+        if (!entry.is_regular_file() || entry.path().extension() != ".cpp") {
+            continue;
+        }
+        std::ifstream in(entry.path());
+        std::string line;
+        while (std::getline(in, line)) {
+            // The call, not the word in a comment explaining it.
+            if (line.find("setFinalComponent(") == std::string::npos &&
+                line.find("addToFinal(") == std::string::npos) {
+                continue;
+            }
+            if (line.find("//") != std::string::npos &&
+                line.find("//") < line.find("setFinalComponent(")) {
+                continue;
+            }
+            writers.insert(std::filesystem::relative(entry.path(), src).string());
+        }
+    }
+
+    // What each of these is, and the `Influence::Kind` that names it:
+    //   params/modulation.cpp  -> Kind::Route
+    //   params/timeline.cpp    -> Kind::Timeline  (and Cue and State, which reach a parameter
+    //                             through a preset the timeline applies)
+    //   entity/entity.cpp      -> Kind::Entity    (behaviours and the action system)
+    //   params/parameter_set.cpp -> resets finals; it establishes the base rather than modulating
+    //   ui/edit_history.cpp    -> an undo. A user action, not an influence on a running scene.
+    // World macros do not appear because a macro writes through routes.
+    //   stage/staging.cpp      -> Kind::Entity, and only PARTLY. A scenario (ADR-210) drives a body
+    //                             through `entity::DirectorMotion`, so a staged *entity* is named --
+    //                             but a scenario also writes nodes that are not entities, such as
+    //                             the tractor beam's visibility, and those still show nothing. The
+    //                             honest answer is a `Kind::Staging` that names the scenario and the
+    //                             role; ADR-211 records it as not done rather than claiming it.
+    //
+    // This test found `stage/staging.cpp` the day it landed, which is what it is for.
+    const std::set<std::string> known{
+        "params/modulation.cpp", "params/timeline.cpp", "entity/entity.cpp",
+        "params/parameter_set.cpp", "ui/edit_history.cpp", "stage/staging.cpp",
+    };
+    std::vector<std::string> unexpected;
+    std::set_difference(writers.begin(), writers.end(), known.begin(), known.end(),
+                        std::back_inserter(unexpected));
+    for (const std::string& w : unexpected) {
+        INFO("writes a parameter final and the Inspector has no Influence::Kind for it: " << w);
+    }
+    CHECK(unexpected.empty());
+    // And the premise itself: if this ever empties, the grep has stopped matching and the check
+    // above would pass by finding nothing at all.
+    CHECK(writers.size() >= 4);
 }

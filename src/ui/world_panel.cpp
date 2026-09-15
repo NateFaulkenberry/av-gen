@@ -1,6 +1,7 @@
 #include "ui/world_panel.hpp"
 
 #include "params/preset.hpp"
+#include "scene/composition.hpp"
 #include "ui/world_editor.hpp"
 
 #include <fmt/format.h>
@@ -39,6 +40,8 @@ std::vector<Influence> influencesOf(app::Engine& engine, const std::string& path
         i.source = r.source;
         i.detail = "amount " + std::to_string(r.amount);
         i.value = r.lastOutput;
+        i.routeSource = r.source;
+        i.routeTarget = r.target;
         out.push_back(std::move(i));
     }
     for (const params::Track& t : engine.timeline().tracks()) {
@@ -69,6 +72,46 @@ std::vector<Influence> influencesOf(app::Engine& engine, const std::string& path
             i.source = s.name;
             i.detail = "preset '" + s.preset + "'";
             out.push_back(std::move(i));
+        }
+    }
+    // The behaviour layer (ADR-088, ADR-211). Entities write a `MotionOffset` straight onto their
+    // node's transform parameters -- `entity.cpp` calls `setFinalComponent` on position, rotation
+    // and scale -- so a body with a hover, a sway or a walk cycle is moving for a reason this panel
+    // has to be able to name. It could not, and said "nothing modulates this object; its parameters
+    // are static" about a character walking across the valley.
+    //
+    // Matched on the parameter path rather than by asking the entity what it drives: an entity's
+    // node is `desc.node` (or its name), and the three parameters it writes are that node's
+    // transform. Deriving the paths here keeps the check in one place and means a behaviour that
+    // writes nothing this frame is still listed -- the question is "what can move this", not "what
+    // moved it in the last sixteen milliseconds".
+    if (const scene::Composition* comp = const_cast<app::Engine&>(engine).composition()) {
+        for (const auto& entity : comp->entityWorld().entities()) {
+            if (entity == nullptr) {
+                continue;
+            }
+            const entity::EntityDesc& desc = entity->desc();
+            const std::string node = desc.node.empty() ? desc.name : desc.node;
+            const std::string base = "nodes/" + node + "/";
+            if (path != base + "position" && path != base + "rotation" && path != base + "scale") {
+                continue;
+            }
+            for (const entity::BehaviorDesc& b : desc.behaviors) {
+                Influence i;
+                i.kind = Influence::Kind::Entity;
+                i.source = desc.name;
+                i.detail = b.name.empty() ? b.kind : b.kind + " '" + b.name + "'";
+                out.push_back(std::move(i));
+            }
+            if (desc.behaviors.empty()) {
+                // An entity with no behaviours still moves if the action system is driving it
+                // (ADR-096 writes the transform directly), so its presence is the answer.
+                Influence i;
+                i.kind = Influence::Kind::Entity;
+                i.source = desc.name;
+                i.detail = "entity";
+                out.push_back(std::move(i));
+            }
         }
     }
     for (const app::WorldMacro& m : engine.worldMacros()) {
@@ -232,6 +275,7 @@ void WorldPanel::drawInspector(app::Engine& engine) {
                 case Influence::Kind::Cue: kind = "cue"; break;
                 case Influence::Kind::State: kind = "state"; break;
                 case Influence::Kind::Macro: kind = "macro"; break;
+                case Influence::Kind::Entity: kind = "entity"; break;
                 }
                 // Build the trailing value first: a temporary std::string's c_str() must not
                 // outlive the full expression it was created in.
@@ -239,7 +283,26 @@ void WorldPanel::drawInspector(app::Engine& engine) {
                 if (i.kind == Influence::Kind::Route) {
                     value = fmt::format("= {:.3f}", i.value);
                 }
-                ImGui::BulletText("%s: %s (%s) %s", kind, i.source.c_str(), i.detail.c_str(), value.c_str());
+                const std::string text =
+                    fmt::format("{}: {} ({}) {}", kind, i.source, i.detail, value);
+                if (i.kind != Influence::Kind::Route) {
+                    ImGui::BulletText("%s", text.c_str());
+                    continue;
+                }
+                // A route is clickable: it takes you to the thing you would have gone looking for
+                // (ADR-211). `Selectable` rather than a button, so the row reads as a row and the
+                // whole width is the hit target -- a bullet list you have to hit a five-pixel
+                // widget inside is not clickable in any sense a person cares about.
+                ImGui::Bullet();
+                ImGui::PushID(&i);
+                if (ImGui::Selectable(text.c_str(), false, ImGuiSelectableFlags_AllowDoubleClick)) {
+                    focusRouteSource = i.routeSource;
+                    focusRouteTarget = i.routeTarget;
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("Open this route in the Modulation panel.");
+                }
+                ImGui::PopID();
             }
             ImGui::Text("base %.3f  final %.3f", static_cast<double>(param->baseComponent(0)),
                         static_cast<double>(param->finalComponent(0)));

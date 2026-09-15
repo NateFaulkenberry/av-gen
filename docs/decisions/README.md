@@ -206,6 +206,7 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [208](ADR-208-what-world-effects-cost.md) | What world effects cost, and the cross-binary number that is not evidence | Accepted |
 | [209](ADR-209-the-kind-the-box-fix-missed.md) | The kind the box fix missed | Accepted |
 | [210](ADR-210-the-director-is-a-decision-layer-not-a-behaviour-system.md) | The director is a decision layer, not a second behaviour system | Accepted |
+| [211](ADR-211-a-route-you-can-click-and-an-answer-that-is-complete.md) | A route you can click, and an answer that is complete | Accepted |
 | [215](ADR-215-a-section-someone-decided-outranks-a-section-someone-detected.md) | A section somebody decided outranks a section somebody detected | Accepted |
 | [216](ADR-216-the-sequencer-is-where-the-song-lives.md) | The Sequencer is where the song lives | Accepted |
 | [225](ADR-225-a-setting-nobody-keeps.md) | A setting the application does not keep is not a setting (the Auto-director saves with the project) | Accepted |

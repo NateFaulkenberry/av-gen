@@ -22,13 +22,29 @@ class WorldEditor;
 
 // One reason a parameter is not simply its base value.
 struct Influence {
-    enum class Kind { Route, Timeline, Cue, State, Macro } kind = Kind::Route;
-    std::string source;      // signal / track / cue / state / macro name
+    // `Entity` is the behaviour layer (ADR-088): a hover, a sway, a walk cycle, anything that
+    // produces a `MotionOffset`. It was missing here until ADR-211, which meant the one panel whose
+    // whole job is answering "why is this moving?" answered "nothing modulates this object; its
+    // parameters are static" about a character that was visibly walking across the valley.
+    enum class Kind { Route, Timeline, Cue, State, Macro, Entity } kind = Kind::Route;
+    std::string source;      // signal / track / cue / state / macro / entity name
     std::string detail;      // amount, op, easing…
     float value = 0.0f;      // last contribution when known
+    // Which route this is, for the ones that are routes: enough to find it again in the Modulation
+    // panel. An index would go stale the moment a route above it is deleted, and this panel is
+    // redrawn every frame against a list somebody may be editing in another window.
+    std::string routeSource;
+    std::string routeTarget;
 };
 // Everything that writes to `path`: routes (with their source and last output), timeline tracks,
-// cues whose preset contains it, states whose preset contains it, and world macros targeting it.
+// cues whose preset contains it, states whose preset contains it, world macros targeting it, and the
+// entity behaviours that fold a motion offset onto it.
+//
+// "Everything" is a claim this function has to keep, so the way to check it is to enumerate what
+// writes a parameter's *final* rather than to reason about what feels like modulation:
+// `params::modulation` (routes), `params::timeline` (tracks), `ui::edit_history` (an undo, which is
+// a user action rather than an influence) and `entity::Entity` (behaviours and the action system).
+// Presets reach a parameter through a cue or a state, both of which are listed. See ADR-211.
 [[nodiscard]] std::vector<Influence> influencesOf(app::Engine& engine, const std::string& path);
 
 // Selection shared by the overview and the inspector.
@@ -48,6 +64,17 @@ public:
     WorldSelection selection;
     rendering::DebugViewOptions debug;
     bool showDebugOptions = false;
+
+    // Set when somebody clicks a route in the Inspector's Influences list; the Modulation panel
+    // consumes it, opens that route, scrolls to it and flashes it, then clears it (ADR-211).
+    //
+    // Identified by (source, target) rather than by index, because the two panels are redrawn from
+    // the same live route list and an index is stale the moment a route above it is removed.
+    // Cleared by the consumer rather than by a timer, so a click with the Modulation panel closed
+    // is still waiting when it is opened.
+    std::string focusRouteSource;
+    std::string focusRouteTarget;
+    [[nodiscard]] bool wantsRouteFocus() const { return !focusRouteTarget.empty(); }
 
     // The tabs; each is drawn inside the caller's window/tab bar.
     void drawOverview(app::Engine& engine);

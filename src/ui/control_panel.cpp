@@ -803,7 +803,27 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
         auto& route = routes[i];
         ImGui::PushID(static_cast<int>(i));
         const std::string header = route.source + " -> " + route.target;
+        // A click on a route in the World panel's Influences list lands here (ADR-211): open it,
+        // scroll it into view and mark it, then clear the request so it fires once. Matched on
+        // (source, target) rather than an index, because both panels redraw from the same live list
+        // and an index is stale the moment a route above it is deleted.
+        const bool focused = world.wantsRouteFocus() && route.source == world.focusRouteSource &&
+                             route.target == world.focusRouteTarget;
+        if (focused) {
+            ImGui::SetNextItemOpen(true);
+            world.focusRouteSource.clear();
+            world.focusRouteTarget.clear();
+        }
+        if (focused) {
+            // The accent the rest of this UI uses for "this is the thing you asked for".
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.78f, 0.35f, 1.0f));
+        }
         const bool open = ImGui::TreeNodeEx(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
+        if (focused) {
+            ImGui::PopStyleColor();
+            // After the item, so the scroll target is the row that was just laid out.
+            ImGui::SetScrollHereY(0.35f);
+        }
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 60);
         ImGui::Checkbox("##on", &route.enabled);
         ImGui::SameLine();
