@@ -134,7 +134,7 @@ std::string usageText() {
            "  --codec <id>        video codec: prores4444, prores422, h264, hevc, or an ffmpeg encoder name\n"
            "  --quality <0-100>   video quality\n"
            "  --queue <file>      run a render queue (JSON list of projects and render settings), headless\n"
-           "  --input [name]      analyse a live capture device (substring of its name; default device)\n"
+           "  --input [name]      analyze a live capture device (substring of its name; default device)\n"
            "  --osc-port <n>      OSC listen port (overrides the project's control map)\n"
            "  --list-audio-devices, --list-midi   enumerate inputs and exit\n"
            "  --output <d>[:fullscreen|:WxH]      add an output window on display index <d> (repeatable)\n"

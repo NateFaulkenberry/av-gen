@@ -20,7 +20,7 @@ audio::AudioFile sineFile(double seconds, std::uint32_t rate = kRate) {
 }
 } // namespace
 
-TEST_CASE("AnalysisTrack analyses a whole file with monotonic timestamps", "[analysis][track]") {
+TEST_CASE("AnalysisTrack analyzes a whole file with monotonic timestamps", "[analysis][track]") {
     const auto file = sineFile(2.0);
     const auto track = AnalysisTrack::analyze(file, AnalyzerConfig{});
     REQUIRE_FALSE(track.empty());

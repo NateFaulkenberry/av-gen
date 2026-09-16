@@ -136,7 +136,7 @@ TEST_CASE("estimateTempo stays unconfident on white-noise envelopes", "[analysis
 // trackBeatsOffline
 // ------------------------------------------------------------------------------------------------
 
-TEST_CASE("trackBeatsOffline follows a 120 BPM click track analysed by the Analyzer", "[analysis][beat]") {
+TEST_CASE("trackBeatsOffline follows a 120 BPM click track analyzed by the Analyzer", "[analysis][beat]") {
     constexpr double kSeconds = 10.0;
     const auto frames =
         analyze(testsupport::clickTrack(120.0f, kRate, static_cast<std::size_t>(kSeconds * kRate)));

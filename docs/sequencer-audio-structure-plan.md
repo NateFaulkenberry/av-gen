@@ -95,7 +95,7 @@ of it — a table from section kind to behaviour, not a second director.
   that a `Detected` one is replaced. §17 is a data-loss requirement and deserves a test that would
   fail if it regressed.
 - Detection quality is *not* a pass/fail: report the sections found on a known track and let a human
-  judge. A test that asserts the analyser finds a Chorus at 1:02.4 is a test of the analyser's
+  judge. A test that asserts the analyzer finds a Chorus at 1:02.4 is a test of the analyzer's
   current opinion, not of correctness.
 - The transport still works after the Control-section controls are deleted — including with no audio
   loaded, which is the ADR-102 case.
@@ -114,7 +114,7 @@ MIREX Structural Segmentation.
 boundary can be reliable while its label is a guess, and the model has to be able to say
 `47.312 → 71.842, likely Chorus, confidence 0.87` rather than asserting the label.
 
-## What the analyser already gives us
+## What the analyzer already gives us
 
 This is better than expected, and it decides the design.
 
@@ -165,7 +165,7 @@ better than an invented one, and this project has already paid for the opposite 
 ## Testing this honestly
 
 The hard part is that **there is no ground truth in the repository**, and a test asserting the
-analyser finds a chorus at 1:02.4 tests the analyser's current opinion, not correctness.
+analyzer finds a chorus at 1:02.4 tests the analyzer's current opinion, not correctness.
 
 So: **structural invariants, and synthetic fixtures with known construction.** A generated signal of
 the form `A B A B C A` — distinct chroma and timbre per letter, at a fixed tempo — has boundaries
@@ -189,7 +189,7 @@ boundaries, which rules out anything seeded by wall-clock or thread scheduling.
 Against the four gaps above.
 
 **A -- the editable model.** ADR-215. `seq::Sequence` carries an `analysis::SongStructure` and saves
-it in its own JSON, so it is part of the project. `seq::reanalyse` replaces `Detected` sections,
+it in its own JSON, so it is part of the project. `seq::reanalyze` replaces `Detected` sections,
 keeps `Refined` and `Authored` ones exactly, cuts the fresh detection around them, and reports what
 it kept. Editing marks what it touched. The §17 test asserts both halves directly: a moved boundary
 survives a re-run that changed its mind about everything, and a boundary with detected material on

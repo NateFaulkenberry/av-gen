@@ -622,7 +622,7 @@ TEST_CASE("Directing places the camera even when the scene was left in orbit mod
 // cast, and a thirty-second passage is several shots rather than one hold.
 TEST_CASE("A film with three heroes is about three heroes", "[director][camera][casting]") {
     // The structure the real Glowmere score actually folds to, written out so this measures the
-    // director rather than the analyser.
+    // director rather than the analyzer.
     avgen::signals::MusicalStructure structure;
     structure.sections = {{signals::MusicalSection::Intro, 0.0, 31.1, 0.3f},
                           {signals::MusicalSection::Verse, 31.1, 24.8, 0.6f},

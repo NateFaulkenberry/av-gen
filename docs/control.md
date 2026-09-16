@@ -66,7 +66,7 @@ engine's frame time.
 `Engine::setTempoSource(TempoSource::MidiClock)` (project `control.tempoSource: "midi"`) makes
 `beat.phase/pulse/count/bpm/bar`, the `SourceContext` tempo fields and the timeline's beat clock
 follow the MIDI clock while it is running and has a tempo; otherwise, and with `"analysis"`
-(default), the analyser's beat tracker drives them. The analyser keeps running either way, so
+(default), the analyzer's beat tracker drives them. The analyzer keeps running either way, so
 switching back is instant.
 
 ## Project JSON

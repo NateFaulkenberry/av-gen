@@ -13,7 +13,7 @@ namespace avgen::analysis {
 
 class AnalysisTrack {
 public:
-    // Runs the analyser, then the offline (Ellis) beat tracker and stamps beat fields per frame.
+    // Runs the analyzer, then the offline (Ellis) beat tracker and stamps beat fields per frame.
     static AnalysisTrack analyze(const audio::AudioFile& file, AnalyzerConfig config, BeatTrackerConfig beatConfig = {});
 
     [[nodiscard]] const std::vector<AnalysisFrame>& frames() const { return frames_; }

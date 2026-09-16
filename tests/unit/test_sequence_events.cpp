@@ -347,11 +347,11 @@ TEST_CASE("Beat, bar, section and cue events match the analysis", "[seq][events]
 
     // Negative control for the thing that makes this useful: a beat event in a sequence whose
     // analysis has not been run fires nothing, and says so, rather than silently doing nothing.
-    seq::Sequence unanalysed;
-    unanalysed.shots.push_back(keyedShot("a", 0.0, 16.0));
-    unanalysed.events.push_back(
+    seq::Sequence unanalyzed;
+    unanalyzed.shots.push_back(keyedShot("a", 0.0, 16.0));
+    unanalyzed.events.push_back(
         event("every-beat", seq::Trigger{.kind = seq::TriggerKind::Beat}, setParam("a", 1.0f)));
-    auto quiet = unanalysed.bake(sink);
+    auto quiet = unanalyzed.bake(sink);
     REQUIRE(quiet);
     CHECK(quiet->events.baked.empty());
     CHECK(std::any_of(quiet->warnings.begin(), quiet->warnings.end(), [](const std::string& w) {

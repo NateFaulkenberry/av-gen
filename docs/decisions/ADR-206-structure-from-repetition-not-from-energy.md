@@ -44,7 +44,7 @@ That second one decides the architecture. A four-minute track is ~20,000 analysi
 self-similarity matrix over hops is 400 million cells. Over beats it is ~500 × 500. Beat-synchronous
 aggregation is what makes the whole approach affordable, and the grid was already there.
 
-A track without a beat grid is **refused**, not analysed at hop resolution: that would be a
+A track without a beat grid is **refused**, not analyzed at hop resolution: that would be a
 different algorithm returning results under this one's name, and nothing downstream could tell which
 it had been given.
 
@@ -73,7 +73,7 @@ project has already paid for the opposite choice.
 ### Provenance, because re-analysis must not destroy work
 
 `SectionOrigin` is `Detected`, `Refined` or `Authored`. Re-running analysis may replace what the
-analyser guessed and must leave alone what a person decided, and that is not expressible unless each
+analyzer guessed and must leave alone what a person decided, and that is not expressible unless each
 section remembers which it is.
 
 ## Two bugs the tests found

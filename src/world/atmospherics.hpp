@@ -53,7 +53,7 @@
 // needs sixteen numbers across the sky, and a scalar route cannot carry a vector. Those sixteen
 // bins ride in `AtmosphericContext::spectrum`, filled by the engine from the same
 // `analysis::AnalysisFrame` every other consumer reads, and are documented as the exception rather
-// than smuggled in as a second analyser.
+// than smuggled in as a second analyzer.
 
 #include "core/error.hpp"
 #include "world/effects.hpp"
@@ -255,7 +255,7 @@ struct AuroraAppearance {
     [[nodiscard]] Result<void> validate() const;
 };
 
-// §4.2. These are **depths on an existing signal**, not an analyser: each one scales how much the
+// §4.2. These are **depths on an existing signal**, not an analyzer: each one scales how much the
 // band already in the frame block moves its feature. The mapping the brief proposes is the default
 // and every number is a parameter, which is the whole of "make them adjustable".
 struct AuroraAudio {

@@ -16,7 +16,7 @@ related: audio/input, audio/analysis, audio/beats, modulation/external-control, 
 Work down this list:
 
 1. **Is it playing?** The transport is in the **Control** panel. `Space` toggles it.
-2. **Is the analyser seeing anything?** Open the **Analysis** panel. If the bands are flat, the
+2. **Is the analyzer seeing anything?** Open the **Analysis** panel. If the bands are flat, the
    problem is upstream of modulation.
 3. **Does a route exist?** **Modulation ▸ Routes**. The row shows the route's last output, which
    tells you whether the signal is flat, the amount is zero, or something in the chain is eating it.

@@ -36,7 +36,7 @@ spdlog/fmt, GLM, nlohmann/json; the parameter/modulation model; the injected tim
 Built in this order, each step with tests before moving on: CMake skeleton and core (clock,
 RNG, SPSC ring, triple buffer) → GPU context, shader library, readback, render target, GPU timer,
 scene renderer and WGSL shaders with headless GPU tests → audio decode/playback and the
-analysis stream → STFT analyser, offline track, runner thread → signal bus, parameters,
+analysis stream → STFT analyzer, offline track, runner thread → signal bus, parameters,
 processor chain, modulation, JSON serialisation → scene data model, mesh generators, the orb
 scene → engine (live + offline modes), SDL3 window, ImGui layer, control panel, application loop
 with CLI → integration tests → visual tuning.
@@ -56,7 +56,7 @@ development machine (Apple M2 Max, macOS 26.6.2, Apple clang 21, CMake 4.0.1, Da
 v20260907.201642):
 
 - unit: core (7), headers (1), audio file (5), analysis stream (8), audio player (7 incl. 5
-  device tests that SKIP without an output device), FFT (7), analyser (14), analysis track (4),
+  device tests that SKIP without an output device), FFT (7), analyzer (14), analysis track (4),
   analysis runner (4), signal bus, parameters, processor, modulation, serialisation, scene (74
   across those six files);
 - integration (4): synthetic audio → Engine (offline) → scene: bass raises scale, treble raises
@@ -186,7 +186,7 @@ shader files and for lights being scene data.
 ### Next step
 
 Milestone 0.3 (modulation): LFO, envelope, noise and timeline sources on the `SignalBus`;
-per-route polarity; macros; presets; beat tracking and tempo signals from the analyser.
+per-route polarity; macros; presets; beat tracking and tempo signals from the analyzer.
 
 ## 2026-09-08 — Runtime crash fix (reported by the user)
 
@@ -724,7 +724,7 @@ a hot-reloadable control map, and a staging-buffer ring for faster offline readb
   (stub elsewhere), both with `inject` paths for tests. `app::ControlHub` drains and applies
   both on the engine thread each frame and keeps "learn" state.
 - `audio::AudioInput` (miniaudio capture) feeds the same `AnalysisStream` as the player, so the
-  analyser, beat clock and routes run on a microphone or line input; `--input [device]`,
+  analyzer, beat clock and routes run on a microphone or line input; `--input [device]`,
   `--list-audio-devices`, `--list-midi`, `--osc-port`; transport input selector with a peak
   meter; `audio/inputGain` parameter.
 - UI: Control tab (OSC/MIDI status and settings, learn/bind last message, bindings list).
@@ -984,7 +984,7 @@ project relinking; EXR round trip and EXR render sequences; readback ring determ
 
 - No mesh warp or mask images per output; a single homography and per-side blends. Syphon and
   IOSurface are macOS only; NDI is untested against a live receiver (no runtime here); Spout
-  (Windows) does not exist. MIDI clock cold start hands the first downbeat to the analyser.
+  (Windows) does not exist. MIDI clock cold start hands the first downbeat to the analyzer.
   EXR is half/ZIP only, no AOVs. Windows and Linux builds remain unexercised (Dawn/SDL keep the
   door open; MIDI, Syphon and native video have stubs there).
 
@@ -1272,7 +1272,7 @@ time somebody moved a hill.
 
 ## 2026-09-11 — The cinematic sequence: choreography through time (ADR-089)
 
-The engine could render a world, analyse a song, animate a camera, pose a character, draw type over
+The engine could render a world, analyze a song, animate a camera, pose a character, draw type over
 the frame and export a video. It could not say **when**. Every one of those systems had its own idea
 of time and there was no object that could be handed a second and answer *what does the piece look
 like now*.

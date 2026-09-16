@@ -11,7 +11,7 @@
 //
 //  1. **Persistence.** A structure goes into the project, inside the sequence that owns it, so
 //     reopening a project does not re-detect and a person's edits survive a restart.
-//  2. **A re-analysis policy.** `reanalyse()` replaces what the analyser guessed and keeps what a
+//  2. **A re-analysis policy.** `reanalyze()` replaces what the analyzer guessed and keeps what a
 //     person decided, and says which it did. `SectionOrigin` already existed for exactly this; what
 //     was missing was something that honoured it.
 //  3. **Editing.** Moving a boundary, renaming, retyping, splitting and deleting -- each of which
@@ -58,7 +58,7 @@ namespace avgen::seq {
 // a claim, and a claim about data loss is exactly the kind that should be reported rather than
 // assumed: if a re-run silently dropped a refined chorus, nothing in the UI would say so.
 struct ReanalysisReport {
-    int detectedReplaced = 0;  // sections the analyser had guessed, and has now guessed again
+    int detectedReplaced = 0;  // sections the analyzer had guessed, and has now guessed again
     int refinedKept = 0;       // boundaries or labels a person moved
     int authoredKept = 0;      // sections a person made from nothing
     int detectedTrimmed = 0;   // fresh sections shortened to make room for a kept one
@@ -78,7 +78,7 @@ struct ReanalysisReport {
 // A fresh detection with no sections (the audio changed to something with no beat grid, say) leaves
 // `current` completely alone and reports nothing: refusing to act is the right answer when the new
 // information is empty, and it is very much better than emptying a person's structure.
-ReanalysisReport reanalyse(analysis::SongStructure& current, const analysis::SongStructure& fresh);
+ReanalysisReport reanalyze(analysis::SongStructure& current, const analysis::SongStructure& fresh);
 
 // ---- editing -----------------------------------------------------------------------------------
 //

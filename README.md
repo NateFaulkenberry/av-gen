@@ -4,7 +4,7 @@ A native C++ real-time GPU audiovisual engine. Not a waveform visualizer: the go
 scene engine in which audio analysis drives a general parameter/modulation system that in turn
 drives GPU-rendered 3D scenes, in real time and as deterministic offline frame sequences.
 
-Procedural world engine (current): load audio, analyse it (bands, onsets, beat and tempo) and
+Procedural world engine (current): load audio, analyze it (bands, onsets, beat and tempo) and
 build a world from data. Worlds are made of procedural objects (primitives, points, or another
 object used as a source) instanced by linear, grid, radial, spiral, spline and grammar
 distributions with seeded variation and recursion; typed point clouds with named attributes that

@@ -65,7 +65,7 @@ public:
     void importLyrics(app::Engine& engine, const std::filesystem::path& path);
 
     // Analysis state, for a host that wants to show it elsewhere.
-    [[nodiscard]] bool analysing() const { return work_ != nullptr; }
+    [[nodiscard]] bool analyzing() const { return work_ != nullptr; }
 
     // Where the strip was last laid out, in screen points, for the scripted-interaction driver
     // (`--ui-script strip`). It is only knowable after a frame has been drawn, the same way
@@ -143,7 +143,7 @@ private:
     void touch() { dirty_ = true; }
     void installIfDirty(app::Engine& engine);
     [[nodiscard]] double snap(const app::Engine& engine, double seconds) const;
-    // Beat times from the analysed track, cached: the vector is thousands of doubles and the strip
+    // Beat times from the analyzed track, cached: the vector is thousands of doubles and the strip
     // asks for it every frame.
     [[nodiscard]] const std::vector<double>& beats(const app::Engine& engine);
     // The audio's drawable shape, cached on the file it came from. Summarising is a pass over every
@@ -232,14 +232,14 @@ private:
     // Import options (the brief's section 4): two checkboxes and no third. There is deliberately no
     // FFT size, no hop, no confidence threshold and nothing about the Director's internals here --
     // a person importing a song is deciding whether to look at its shape, not configuring a
-    // spectrum analyser.
-    bool analyseOnImport_ = true;
+    // spectrum analyzer.
+    bool analyzeOnImport_ = true;
     bool generateOnImport_ = false;
     int sectionSnap_ = 1; // 0 off, 1 beat, 2 bar
     std::shared_ptr<StructureWork> work_;
     app::JobId workJob_ = 0;
-    // The audio the structure was last analysed for. 0 means "never", which is what makes a freshly
-    // imported track analyse itself once and a reopened project not analyse at all.
+    // The audio the structure was last analyzed for. 0 means "never", which is what makes a freshly
+    // imported track analyze itself once and a reopened project not analyze at all.
     std::uint64_t structureRevision_ = 0;
     char labelBuffer_[96] = "";
 };

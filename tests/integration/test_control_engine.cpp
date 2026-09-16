@@ -260,7 +260,7 @@ TEST_CASE("MIDI clock drives the beat clock when it is the tempo source", "[inte
     CHECK(engine.control().midiClock().tickCount() == 192);
     CHECK(engine.signals().value(countId) == 7.0f); // tick 191 lies in beat 7
     // Beats 1..7 pulsed once each; the downbeat at tick 0 precedes the first interval, so no
-    // tempo is known yet and the analyser (silent) still owns that frame.
+    // tempo is known yet and the analyzer (silent) still owns that frame.
     CHECK(pulses == 7);
     CHECK_THAT(engine.sourceContext().tempoBpm, WithinAbs(120.0, 0.5));
     CHECK(engine.sourceContext().beatCount == 7);
@@ -270,7 +270,7 @@ TEST_CASE("MIDI clock drives the beat clock when it is the tempo source", "[inte
     CHECK(status.clockMessages == 193);
     CHECK_FALSE(engine.control().lastMidi().has_value()); // and are not learnable
 
-    // Stop: the beat clock falls back to the analyser (silent here: no tempo).
+    // Stop: the beat clock falls back to the analyzer (silent here: no tempo).
     engine.control().injectMidi(stop);
     engine.update(engine.tick(clock));
     CHECK_FALSE(engine.midiClockActive());

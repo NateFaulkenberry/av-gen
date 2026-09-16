@@ -317,7 +317,7 @@ struct Sequence {
     std::vector<OverlayCue> overlays;
     std::vector<Marker> markers;
     // The editable song structure (ADR-215). Saved with the piece, because it is authored data the
-    // moment anybody touches it: detected sections are the analyser's first pass, and a boundary a
+    // moment anybody touches it: detected sections are the analyzer's first pass, and a boundary a
     // person dragged or a section they named is work that a re-analysis must not destroy. The
     // markers above are still *derived* from this -- `setSectionMarkers` -- so the strip and the
     // event triggers see one answer.

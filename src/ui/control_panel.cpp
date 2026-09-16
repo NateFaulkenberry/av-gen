@@ -1153,8 +1153,8 @@ void ControlPanel::drawCanvasActivity(app::Engine& engine, const CanvasRect& rec
             break;
         }
     }
-    if (stage == nullptr && sequence.analysing()) {
-        stage = "Analysing the song";
+    if (stage == nullptr && sequence.analyzing()) {
+        stage = "Analyzing the song";
     }
     if (stage == nullptr) {
         // Geometry deliberately a few frames behind a slider (ADR-084). Its consequences section
@@ -2947,7 +2947,7 @@ void ControlPanel::drawControlTab(app::Engine& engine) {
         engine.setTempoSource(tempo == 1 ? app::TempoSource::MidiClock : app::TempoSource::Analysis);
     }
     ImGui::SameLine();
-    ImGui::TextDisabled("%s, %llu clock msgs", engine.midiClockActive() ? "MIDI clock active" : "analyser tempo",
+    ImGui::TextDisabled("%s, %llu clock msgs", engine.midiClockActive() ? "MIDI clock active" : "analyzer tempo",
                         static_cast<unsigned long long>(status.clockMessages));
     if (ioChanged) {
         hub.applyIo();
@@ -3444,7 +3444,7 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
 
             ImGui::Separator();
             // Named for what the controls do in the mode that is actually selected. All three are
-            // live in both modes -- they group the analyser's sections into shots before either
+            // live in both modes -- they group the analyzer's sections into shots before either
             // mode sees them -- so none of them is disabled here (ADR-203). What changes is what a
             // "shot" *is*: a cut in an edited sequence, and a change of subject and intent inside
             // one unbroken move in a continuous take.

@@ -46,7 +46,7 @@ features: subsystem.cli
 
 | Flag | Does |
 |---|---|
-| `--input [name]` | analyse a live capture device; the name is optional |
+| `--input [name]` | analyze a live capture device; the name is optional |
 | `--osc-port <n>` | override the project's OSC port |
 | `--list-audio-devices`, `--list-midi` | enumerate and exit |
 | `--play` | start playing immediately |

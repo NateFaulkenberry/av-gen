@@ -37,7 +37,7 @@ def sequence(directory):
     return [os.path.join(directory, n) for n in names]
 
 
-def analyse(directory, threshold=6.0, tiles=8):
+def analyze(directory, threshold=6.0, tiles=8):
     paths = sequence(directory)
     if len(paths) < 3:
         return None, f"{directory}: need at least three frames, found {len(paths)}"
@@ -104,7 +104,7 @@ def main(argv):
         print("usage: temporal_stats.py <frame-directory> [threshold]")
         return 2
     threshold = float(argv[2]) if len(argv) > 2 else 6.0
-    stats, err = analyse(argv[1], threshold)
+    stats, err = analyze(argv[1], threshold)
     if err:
         print(err)
         return 1

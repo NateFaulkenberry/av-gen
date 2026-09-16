@@ -145,7 +145,7 @@ and Kenney's mini-characters arrive rigged with 64 clips each.
 ## How to run the prompt
 
 Much more of it will now run than when this document was written. What an assistant can do today,
-in the prompt's own order: create and save a project (§1), import the track and analyse it (§2),
+in the prompt's own order: create and save a project (§1), import the track and analyze it (§2),
 add markers for the story beats (§20), add shots (§13), put a lyric placeholder on the frame (§5),
 generate a world (§6 in part), wire audio reactivity (§15), and put a music influence field in it
 (§18). Then save, close, reopen, and check it all survived (§26).

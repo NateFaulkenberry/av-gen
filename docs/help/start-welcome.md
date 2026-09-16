@@ -20,7 +20,7 @@ It is a native application. Everything here runs on your machine, offline, on th
 
 ## Three things worth knowing first
 
-**Sound drives the picture through *signals*.** AV Gen analyses the audio continuously and
+**Sound drives the picture through *signals*.** AV Gen analyzes the audio continuously and
 publishes the results as named values — `audio.bass`, `audio.onset`, `beat.phase`. You connect
 those to things you can see. That connection is called a **route**, and it is the centre of the
 whole application. See [How AV Gen works](help://start/how-it-works).
@@ -41,7 +41,7 @@ See [The interface](help://start/interface).
 | Understand the whole pipeline in one page | [How AV Gen works](help://start/how-it-works) |
 | Find your way around the editor | [The interface](help://start/interface) |
 | Make something move with the music | [Modulation recipes](help://modulation/recipes) |
-| Know what the analyser measures | [Audio analysis](help://audio/analysis) |
+| Know what the analyzer measures | [Audio analysis](help://audio/analysis) |
 | Render a file | [Offline rendering](help://rendering/offline-render) |
 | Work out why a scene is slow | [Diagnosing performance](help://performance/diagnosis) |
 

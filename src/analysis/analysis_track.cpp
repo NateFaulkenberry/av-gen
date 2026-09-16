@@ -88,7 +88,7 @@ AnalysisTrack AnalysisTrack::analyze(const audio::AudioFile& file, AnalyzerConfi
         track.frames_.reserve((mono.size() - cfg.windowSize) / cfg.hopSize + 1);
     }
 
-    // Feed hop-sized chunks and drain after each so the analyser's ready queue stays short; the
+    // Feed hop-sized chunks and drain after each so the analyzer's ready queue stays short; the
     // result is identical to pushing everything at once (chunking invariance).
     AnalysisFrame frame;
     for (std::size_t offset = 0; offset < mono.size(); offset += cfg.hopSize) {

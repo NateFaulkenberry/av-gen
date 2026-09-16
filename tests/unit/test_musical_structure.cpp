@@ -152,7 +152,7 @@ TEST_CASE("A boundary near a phrase start moves onto it", "[signals][musical][st
 }
 
 TEST_CASE("A section too short to hold a shot is not a section", "[signals][musical][structure]") {
-    // The analyser's own section counter twitching four times in ten seconds is not four sections.
+    // The analyzer's own section counter twitching four times in ten seconds is not four sections.
     std::vector<MusicalMoment> moments{
         at(MusicalEvent::SectionChange, 20.0), at(MusicalEvent::SectionChange, 22.5),
         at(MusicalEvent::SectionChange, 25.0), at(MusicalEvent::SectionChange, 27.5),

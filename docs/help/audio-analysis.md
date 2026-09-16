@@ -5,7 +5,7 @@ category: Audio
 summary: Everything AV Gen measures in the sound — the exact quantities, their ranges, and which one to reach for.
 order: 21
 tags: analysis, fft, spectrum, bands, bass, treble, centroid, flux, onset
-keywords: how do i make something react to the kick; which signal is the bass; what does the analyser measure; how do i react to a drum hit; make it pulse with the music
+keywords: how do i make something react to the kick; which signal is the bass; what does the analyzer measure; how do i react to a drum hit; make it pulse with the music
 related: audio/signals, audio/beats, audio/input, modulation/recipes
 features: panel.analysis, subsystem.analysis
 ---

@@ -1069,7 +1069,7 @@ void registerParameterTools(ToolRegistry& registry) {
         });
 
     add(registry, "asset.import_audio", "Import audio",
-        "Copy an audio file into the open project and make it the session's track, then analyse it. "
+        "Copy an audio file into the open project and make it the session's track, then analyze it. "
         "Copied rather than referenced on purpose: a project that points at a file on somebody's "
         "desktop stops working the day that file moves, and the project format stores a relative "
         "path and a hash precisely so it does not have to. Reports the duration, rate and channel "
@@ -1128,7 +1128,7 @@ void registerParameterTools(ToolRegistry& registry) {
                 out["channels"] = file->channels();
                 out["frames"] = file->frameCount();
             }
-            out["analysed"] = engine.track() != nullptr;
+            out["analyzed"] = engine.track() != nullptr;
             if (engine.track() != nullptr) {
                 out["beatCount"] = engine.track()->beats().beatTimes.size();
             }
@@ -2974,7 +2974,7 @@ void registerAudioTools(ToolRegistry& registry) {
         });
 
     add(registry, "audio.get_analysis", "Audio analysis",
-        "What the analyser currently hears: loudness, the five frequency bands, spectral centroid, "
+        "What the analyzer currently hears: loudness, the five frequency bands, spectral centroid, "
         "onset, tempo and beat position, plus when each musical event (beat, downbeat, build, "
         "break, drop, impact) last fired. This is the state audio-reactive work is built on.",
         noArgs(), readOnly(),

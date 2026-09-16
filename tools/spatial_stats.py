@@ -53,7 +53,7 @@ def sequence(directory):
     return [os.path.join(directory, n) for n in names]
 
 
-def analyse(directory, tiles=8, limit=0):
+def analyze(directory, tiles=8, limit=0):
     """Mean |spatial Laplacian| over the sequence, whole-frame and per tile.
 
     `limit` caps how many frames are read; the measure is spatial, so frames are independent samples
@@ -107,11 +107,11 @@ def main(argv):
         return 2
 
     if compare and len(args) >= 2:
-        a, err = analyse(args[0])
+        a, err = analyze(args[0])
         if err:
             print(err)
             return 1
-        b, err = analyse(args[1])
+        b, err = analyze(args[1])
         if err:
             print(err)
             return 1
@@ -126,7 +126,7 @@ def main(argv):
         return 0
 
     tiles = int(args[1]) if len(args) > 1 else 8
-    stats, err = analyse(args[0], tiles)
+    stats, err = analyze(args[0], tiles)
     if err:
         print(err)
         return 1

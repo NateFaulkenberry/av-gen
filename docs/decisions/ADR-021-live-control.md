@@ -34,7 +34,7 @@ without new third-party dependencies where the platform already provides the tra
   `inject` path so tests and other transports feed the same parser. Everything is drained and
   applied on the engine thread once per frame (`app::ControlHub`).
 - `audio::AudioInput` (miniaudio capture) feeds the same `AnalysisStream` the player does, so
-  the analyser, signals, beat clock and routes run unchanged on live audio; the wall clock is the
+  the analyzer, signals, beat clock and routes run unchanged on live audio; the wall clock is the
   render clock and the capture frame count is the analysis position.
 
 ## Rationale
@@ -53,7 +53,7 @@ stream keeps ADR-012's model: analysis is indexed by sample position, not wall t
   sources; microphone/line input works with the whole pipeline; no new dependencies.
 - Negative: IPv4 only; MIDI clock/tempo sync not yet used; no OSC feedback to controllers;
   MIDI on Linux/Windows needs a backend (ALSA/WinMM or a library); live input has no latency
-  compensation beyond the analyser's hop.
+  compensation beyond the analyzer's hop.
 - Follow-ups: MIDI clock as a beat source and OSC feedback/query (`/avgen/param/*` replies)
   are done (`docs/control.md`: `control::MidiClockTracker`, `Engine::setTempoSource`, feedback
   host in the control map); multi-output and NDI/Syphon (1.2), display/projection workflows.

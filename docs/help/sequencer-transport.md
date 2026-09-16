@@ -113,7 +113,7 @@ Markers are the sequence's own -- the sections the **Sections** button labelled,
 added. The beat markers drawn on the strip are skipped: there are thousands of them, and "the next
 marker" means the next *place*.
 
-Beats come from the analysed beat grid when there is one, so stepping lands on the beats the music
+Beats come from the analyzed beat grid when there is one, so stepping lands on the beats the music
 actually has rather than on a metronome's idea of them. With no analysis and no tempo, a beat step
 does nothing.
 

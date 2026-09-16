@@ -38,7 +38,7 @@ seconds-based.
 
 The play-head follows the audio position when a file is loaded, and render time otherwise.
 
-Tempo itself is not authored and is not a map: it comes from the analyser each frame, or from MIDI
+Tempo itself is not authored and is not a map: it comes from the analyzer each frame, or from MIDI
 clock when that is selected as the tempo source. A bar is four beats.
 
 ## Snapping
@@ -46,7 +46,7 @@ clock when that is selected as the tempo source. A bar is four beats.
 The `snap` combo offers **Off**, **Frames**, **Beats** and **Markers**. The default is **Beats**.
 
 - **Frames** rounds to the render settings' frame rate.
-- **Beats** snaps to the analysed track's beat times, and does nothing if there is no analysed
+- **Beats** snaps to the analyzed track's beat times, and does nothing if there is no analyzed
   track.
 - **Markers** snaps to every marker that is not a beat marker.
 
@@ -86,7 +86,7 @@ mouse button to come up.**
 | **Add Lyric** | a three-second text cue at the play-head |
 | **Add Actor** | choose a node to drive; a node with a rig also gets its first animation cue |
 | **Add Border** | a full-frame rectangle outline, drawn under everything |
-| **Sections** | fold the analysed track into sections and beats, and label the strip. Needs audio |
+| **Sections** | fold the analyzed track into sections and beats, and label the strip. Needs audio |
 | **Import Lyrics...** | LRC, SRT or WebVTT |
 | **Rebuild** | bake again — happens automatically after an edit; this is for after a scene change |
 

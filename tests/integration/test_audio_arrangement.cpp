@@ -36,7 +36,7 @@ struct Scratch {
         fs::remove_all(dir, ec);
     }
 
-    // A tone rather than silence: the analyser has to have something to find, or "the analysis
+    // A tone rather than silence: the analyzer has to have something to find, or "the analysis
     // followed the arrangement" is a claim about two empty things agreeing.
     fs::path tone(const char* name, double seconds, float hz) {
         constexpr std::uint32_t rate = 48000;
@@ -96,7 +96,7 @@ TEST_CASE("The analysis follows the arrangement, not one of its files",
     const double gap = rmsAt(3.0);
     const double second = rmsAt(5.0);
     // The three sections of the arrangement are three different signals, in the order the clips were
-    // placed in -- which is only true if the analyser saw the mixdown rather than one of the files.
+    // placed in -- which is only true if the analyzer saw the mixdown rather than one of the files.
     CHECK(gap < first);
     CHECK(first < second);
     CHECK(gap < 1e-3); // the gap really is silence

@@ -172,7 +172,7 @@
    "menu": "Camera > Enable Auto-director",
    "summary": "Fold the track into musical sections and cut the camera between the world's heroes.",
    "document": "sequencer/camera-direction",
-   "availability": "needs analysed audio and a scene with heroes"
+   "availability": "needs analyzed audio and a scene with heroes"
   },
   {
    "id": "command.camera.hand-back",

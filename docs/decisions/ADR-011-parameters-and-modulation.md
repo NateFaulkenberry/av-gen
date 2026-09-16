@@ -41,7 +41,7 @@ Modulator      { evaluate(bus, dt): for each target, final = clamp(op-fold over 
 
 - Evaluation order per frame: producers update the `SignalBus` -> `Modulator` evaluates all routes
   and writes `final` on each parameter -> scene reads `final` -> renderer reads scene. The
-  renderer never sees a signal; the analyser never sees a parameter.
+  renderer never sees a signal; the analyzer never sees a parameter.
 - Routes are data (serialisable to JSON) held by the scene document, not code.
 - Smoothing is asymmetric attack/decay in the chain, at frame rate, with coefficients derived
   from time constants so results are independent of frame rate (`1 - exp(-dt / tau)`).
@@ -59,7 +59,7 @@ Modulator      { evaluate(bus, dt): for each target, final = clamp(op-fold over 
   Growing it means adding processors, sources and target types, never changing the topology.
 - Data-driven routes make presets, serialisation, OSC addressing and UI generation the same
   mechanism: a path.
-- Keeping smoothing out of the analyser lets one raw signal drive several parameters differently.
+- Keeping smoothing out of the analyzer lets one raw signal drive several parameters differently.
 
 ## Consequences
 

@@ -277,7 +277,7 @@ public:
     //
     // **Processing** is work that happens *across* frames while the editor keeps running: a
     // procedural object holding its regeneration back until a slider stops moving (ADR-084), a
-    // world-generation job on the job system, a song being analysed. The canvas can show this
+    // world-generation job on the job system, a song being analyzed. The canvas can show this
     // properly -- it fades in after a threshold, it animates, and the scene underneath stays live
     // and interactive. This is the case the brief's section 4 describes and the one where an
     // indicator is worth having.

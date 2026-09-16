@@ -38,7 +38,7 @@ Three menus. Everything else in AV Gen is a panel control.
 
 | Entry | Does | Disabled when |
 |---|---|---|
-| Enable Auto-director | fold the track into sections and cut the camera between the world's heroes | there is no analysed audio |
+| Enable Auto-director | fold the track into sections and cut the camera between the world's heroes | there is no analyzed audio |
 | Disable Auto-director | remove the camera's automation | the camera is not automated |
 
 Both are explained in [Directing the camera](help://sequencer/camera-direction). Each shows its

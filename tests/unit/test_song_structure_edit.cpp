@@ -4,7 +4,7 @@
 // Nothing here runs the detector. ADR-206's tests do that, and they already established the rule
 // this file obeys as well: detection quality on real music is *reported*, never asserted. What is
 // asserted here is the thing that has a right answer -- that a boundary a person moved survives a
-// re-analysis and a boundary the analyser guessed does not, which is a data-loss requirement and
+// re-analysis and a boundary the analyzer guessed does not, which is a data-loss requirement and
 // deserves a test that would fail if it regressed.
 
 #include "analysis/structure.hpp"
@@ -112,7 +112,7 @@ TEST_CASE("A sequence carries its structure through its own JSON", "[seq][struct
 
 // ---- the re-analysis policy (the brief's section 17) ---------------------------------------------
 
-TEST_CASE("Re-analysis replaces what the analyser guessed and keeps what a person decided",
+TEST_CASE("Re-analysis replaces what the analyzer guessed and keeps what a person decided",
           "[seq][structure][reanalysis]") {
     SongStructure current = detected();
     // A person drags the boundary that ends the chorus from 1:35.781004 to 1:37.100000.
@@ -139,7 +139,7 @@ TEST_CASE("Re-analysis replaces what the analyser guessed and keeps what a perso
     fresh.sections.push_back(made(51.9, 88.3, SectionFunction::Drop));
     fresh.sections.push_back(made(88.3, 120.372918, SectionFunction::Outro));
 
-    const seq::ReanalysisReport report = seq::reanalyse(current, fresh);
+    const seq::ReanalysisReport report = seq::reanalyze(current, fresh);
 
     CHECK(current.validate().has_value());
     // The refined boundary is still exactly where the person put it.
@@ -153,7 +153,7 @@ TEST_CASE("Re-analysis replaces what the analyser guessed and keeps what a perso
     CHECK(chorus->startSeconds == 62.409117);
     CHECK(chorus->endSeconds == 97.1);
 
-    // ...and the detected one is gone: nothing in the merged structure ends where the analyser's
+    // ...and the detected one is gone: nothing in the merged structure ends where the analyzer's
     // first pass said the intro ended.
     for (const SongSection& s : current.sections) {
         if (s.origin != SectionOrigin::Detected) {
@@ -191,7 +191,7 @@ TEST_CASE("Re-analysis keeps an authored section and stays gapless around it",
     fresh.sections.push_back(made(0.0, 60.0, SectionFunction::Intro));
     fresh.sections.push_back(made(60.0, 120.372918, SectionFunction::Chorus));
 
-    const seq::ReanalysisReport report = seq::reanalyse(current, fresh);
+    const seq::ReanalysisReport report = seq::reanalyze(current, fresh);
     CHECK(current.validate().has_value());
     CHECK(report.authoredKept == 1);
     CHECK(report.refinedKept == 1); // the left half of the split, whose end moved
@@ -217,7 +217,7 @@ TEST_CASE("Re-analysis keeps an authored section and stays gapless around it",
 TEST_CASE("A re-analysis that found nothing changes nothing", "[seq][structure][reanalysis]") {
     SongStructure current = detected();
     const SongStructure before = current;
-    const seq::ReanalysisReport report = seq::reanalyse(current, SongStructure{});
+    const seq::ReanalysisReport report = seq::reanalyze(current, SongStructure{});
     CHECK(report.detectedReplaced == 0);
     CHECK(report.kept() == 0);
     REQUIRE(current.sections.size() == before.sections.size());
@@ -235,7 +235,7 @@ TEST_CASE("Re-analysis of an untouched structure simply replaces it",
     fresh.sections.push_back(made(0.0, 44.4, SectionFunction::Intro));
     fresh.sections.push_back(made(44.4, 120.372918, SectionFunction::Chorus));
 
-    const seq::ReanalysisReport report = seq::reanalyse(current, fresh);
+    const seq::ReanalysisReport report = seq::reanalyze(current, fresh);
     CHECK(report.kept() == 0);
     CHECK(report.detectedReplaced == 2);
     REQUIRE(current.sections.size() == 2);

@@ -467,7 +467,7 @@ Result<SongStructure> detectStructure(const AnalysisTrack& track, const Structur
     }
     const std::vector<double>& beatTimes = track.beats().beatTimes;
     if (beatTimes.size() < 8) {
-        // Refused rather than quietly analysed at hop resolution. Everything below is beat
+        // Refused rather than quietly analyzed at hop resolution. Everything below is beat
         // synchronous; running it on a grid that is not beats would be a different algorithm
         // wearing this one's name, and its output would be indistinguishable from this one's.
         return fail("song structure: needs a beat grid, and this track has {} beat(s). Run the "

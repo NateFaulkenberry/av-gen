@@ -15,7 +15,7 @@ ADR-104 to ADR-107.
 Three inputs, one output:
 
 ```
-  an analysed track  ──▶  musical structure  ──┐
+  an analyzed track  ──▶  musical structure  ──┐
                                                ├──▶  Sequence  ──▶  timeline keys
   the scene's heroes ──▶  DirectionBrief    ──┘
 ```

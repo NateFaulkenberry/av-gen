@@ -190,7 +190,7 @@ piece.setSectionMarkers(structure);                  // from the musical fold (A
 piece.setBeatMarkers(engine.track()->beats().beatTimes);
 ```
 
-In the editor, **Analyse Song** runs the structure detector (ADR-206) in the background and fills
+In the editor, **Analyze Song** runs the structure detector (ADR-206) in the background and fills
 `piece.structure`, from which the section markers are derived. A `cue` marker you placed yourself is
 never discarded.
 
@@ -216,7 +216,7 @@ piece.refreshSectionMarkers();              // the markers follow the structure,
 Re-running the analysis merges rather than replaces:
 
 ```cpp
-const seq::ReanalysisReport report = seq::reanalyse(piece.structure, fresh);
+const seq::ReanalysisReport report = seq::reanalyze(piece.structure, fresh);
 // "5 section(s) detected; kept 2 you had edited (2 refined, 0 authored)"
 ```
 

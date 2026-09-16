@@ -26,7 +26,7 @@ struct Harness {
 
     Harness() {
         // The five bands that exist, plus the events the routes use. Declared here rather than
-        // taken from the analyser so the test states which vocabulary it depends on.
+        // taken from the analyzer so the test states which vocabulary it depends on.
         for (const char* name : {"audio.bass", "audio.lowMid", "audio.mid", "audio.highMid", "audio.treble",
                                  "audio.rms", "audio.spectralFlux"}) {
             bus.declare(name);

@@ -88,10 +88,10 @@ enum class SectionFunction : std::uint8_t {
 [[nodiscard]] std::span<const SectionFunction> allSectionFunctions();
 
 // Where a section's boundaries and label came from. The reason this exists is data loss: re-running
-// analysis must replace what the analyser guessed and leave alone what a person decided, and that is
+// analysis must replace what the analyzer guessed and leave alone what a person decided, and that is
 // not expressible unless each section remembers which it is.
 enum class SectionOrigin : std::uint8_t {
-    Detected, // the analyser's own interpretation; a re-analysis may replace it
+    Detected, // the analyzer's own interpretation; a re-analysis may replace it
     Refined,  // detected, then moved or relabelled by a person; a re-analysis must not touch it
     Authored, // created by a person from nothing
 };
@@ -179,10 +179,10 @@ struct StructureConfig {
     int maxSections = 32;
 };
 
-// The whole pipeline, offline, on a fully analysed track.
+// The whole pipeline, offline, on a fully analyzed track.
 //
 // Needs `track.beats().beatTimes` to be populated -- everything here is beat-synchronous, and a
-// track with no beat grid is refused rather than silently analysed at hop resolution, which would be
+// track with no beat grid is refused rather than silently analyzed at hop resolution, which would be
 // a different algorithm wearing this one's name.
 [[nodiscard]] Result<SongStructure> detectStructure(const AnalysisTrack& track,
                                                     const StructureConfig& config = {});

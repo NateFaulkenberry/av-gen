@@ -7,7 +7,7 @@ at all -- there is nothing to clear, nothing to attribute and nothing to take do
 deterministic: the same arguments produce the same bytes, so a rendered movie can be compared
 against another run of the same movie.
 
-It is written to be *analysed*, not only heard. The engine's routes read bass, treble, spectral
+It is written to be *analyzed*, not only heard. The engine's routes read bass, treble, spectral
 flux and a beat clock, and a track with no transients gives a beat tracker nothing to lock to and
 a bloom threshold nothing to cross. So the arrangement has a deliberate low pulse on beats 1 and 3,
 bell strikes with fast attacks in the top two octaves, and an air bed that moves the spectral

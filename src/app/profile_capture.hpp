@@ -1,7 +1,7 @@
 #pragma once
 
 // Profiling capture (ADR-031): records per-frame timings and counts to a JSON report so a session
-// can be analysed offline or compared between builds. The host feeds it one sample per frame; the
+// can be analyzed offline or compared between builds. The host feeds it one sample per frame; the
 // capture keeps a bounded ring and writes a summary plus the raw samples on stop.
 
 #include "core/error.hpp"

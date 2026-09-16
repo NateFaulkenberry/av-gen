@@ -134,9 +134,9 @@ void SequencePanel::draw(app::Engine& engine) {
     // rather than the one after.
     pollStructureAnalysis(engine);
     // The one automatic trigger: audio arrived, the option is on, and this piece has no structure
-    // of its own yet. A project that was saved with a structure is *not* re-analysed on open --
+    // of its own yet. A project that was saved with a structure is *not* re-analyzed on open --
     // that is the whole point of caching it -- and re-running is an explicit button.
-    if (analyseOnImport_ && work_ == nullptr && engine.track() != nullptr &&
+    if (analyzeOnImport_ && work_ == nullptr && engine.track() != nullptr &&
         engine.audioRevision() != structureRevision_ &&
         engine.sequence().structure.sections.empty()) {
         startStructureAnalysis(engine, false);
@@ -294,8 +294,8 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
     ImGui::SameLine();
     const bool busy = work_ != nullptr;
     ImGui::BeginDisabled(engine.track() == nullptr || busy);
-    if (ImGui::Button(busy ? "Analysing..." : "Analyse Song")) {
-        // Re-running merges rather than replacing: `seq::reanalyse` puts back what a person moved
+    if (ImGui::Button(busy ? "Analyzing..." : "Analyze Song")) {
+        // Re-running merges rather than replacing: `seq::reanalyze` puts back what a person moved
         // or named and reports it (ADR-215). Pressing this twice is safe, which is the property
         // that makes it worth having a button at all.
         startStructureAnalysis(engine, !piece.structure.sections.empty());
@@ -421,7 +421,7 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
         // a real one.
         app::JobStatus job;
         const bool known = jobs != nullptr && workJob_ != 0 && jobs->status(workJob_, job);
-        ImGui::TextColored(ImVec4(0.6f, 0.82f, 0.95f, 1.0f), "analysing the song%s%s",
+        ImGui::TextColored(ImVec4(0.6f, 0.82f, 0.95f, 1.0f), "analyzing the song%s%s",
                            known && !job.stageName.empty() ? ": " : "...",
                            known && !job.stageName.empty() ? job.stageName.c_str() : "");
     }
@@ -433,7 +433,7 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
 void SequencePanel::drawImportPopup(app::Engine& engine) {
     ImGui::TextUnformatted("Import audio");
     ImGui::Separator();
-    ImGui::Checkbox("Analyse song structure", &analyseOnImport_);
+    ImGui::Checkbox("Analyze song structure", &analyzeOnImport_);
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Find the sections -- intro, verse, chorus -- and lay them on the\n"
                           "timeline, where you can move and rename them.");
@@ -714,8 +714,8 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             }
             draw->AddRectFilled(a, b, sectionColour(section.function, isSelected, isHovered), 2.0f);
             if (section.origin != analysis::SectionOrigin::Detected) {
-                // A person's section is marked, because whether the analyser or a person decided a
-                // boundary is the single most useful thing to know before pressing Analyse again.
+                // A person's section is marked, because whether the analyzer or a person decided a
+                // boundary is the single most useful thing to know before pressing Analyze again.
                 draw->AddRect(ImVec2(a.x + 1.0f, a.y + 1.0f), ImVec2(b.x - 1.0f, b.y - 1.0f),
                               pal.warning, 2.0f);
             }
@@ -1571,7 +1571,7 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
             }
         } else {
             menuSubject("Sections");
-            if (menuAction("Analyse song", nullptr, engine.track() != nullptr && work_ == nullptr)) {
+            if (menuAction("Analyze song", nullptr, engine.track() != nullptr && work_ == nullptr)) {
                 startStructureAnalysis(engine, true);
             }
         }
@@ -1788,7 +1788,7 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
     if (section.origin == analysis::SectionOrigin::Detected) {
         ImGui::TextDisabled("%s", originText);
     } else {
-        ImGui::TextColored(ImVec4(0.96f, 0.88f, 0.58f, 1.0f), "%s -- kept when you analyse again",
+        ImGui::TextColored(ImVec4(0.96f, 0.88f, 0.58f, 1.0f), "%s -- kept when you analyze again",
                            originText);
     }
     if (seq::confidenceIsMeaningful(section)) {
@@ -1810,7 +1810,7 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
             selected_ = static_cast<int>(*made);
             piece.refreshSectionMarkers();
             touch();
-            status_ = "split; the new section is yours, not the analyser's";
+            status_ = "split; the new section is yours, not the analyzer's";
         } else {
             status_ = "the playhead is not far enough inside a section to split it";
         }
@@ -2308,7 +2308,7 @@ void SequencePanel::startStructureAnalysis(app::Engine& engine, bool merge) {
     }
     auto track = engine.trackShared();
     if (track == nullptr || track->empty()) {
-        status_ = "no analysed audio to look at";
+        status_ = "no analyzed audio to look at";
         return;
     }
     // Claimed before the job starts, not after it finishes. Otherwise the auto-import trigger sees
@@ -2379,12 +2379,12 @@ void SequencePanel::pollStructureAnalysis(app::Engine& engine) {
     if (work->revision != engine.audioRevision()) {
         // The audio changed while this was running. Its answer is about a file that is no longer
         // open, and merging it would put another song's sections on this one.
-        status_ = "the audio changed while the song was being analysed; nothing applied";
+        status_ = "the audio changed while the song was being analyzed; nothing applied";
         return;
     }
     seq::Sequence& piece = engine.sequence();
     if (work->merge) {
-        const seq::ReanalysisReport report = seq::reanalyse(piece.structure, work->result);
+        const seq::ReanalysisReport report = seq::reanalyze(piece.structure, work->result);
         status_ = report.summary();
     } else {
         piece.structure = std::move(work->result);

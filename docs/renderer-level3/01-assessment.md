@@ -333,7 +333,7 @@ The re-measurement the particle correction owed has been done, and the first thi
 not a number. It is `tools/flicker_bench.py` — a harness that renders every arm through `--render`
 (the path that produces deliverables, so a subsystem inert in it is a defect and not an artifact),
 discards a warm-up so a filling particle pool is not counted as instability, **proves every arm
-changes the analysed frames before reporting its number**, and writes the camera it used to a file.
+changes the analyzed frames before reporting its number**, and writes the camera it used to a file.
 
 That last point is why the original figures cannot be reproduced rather than merely disagreed with:
 **the camera was never written down.** "A static camera over the river bank" does not name a view,
@@ -342,7 +342,7 @@ names its view, and the view ships with the result.
 
 ### The answer is different, and the largest source was not on the list
 
-Glowmere, 960x540, 24 frames analysed after a 2 s warm-up, flicker threshold 6/255, offline tier.
+Glowmere, 960x540, 24 frames analyzed after a 2 s warm-up, flicker threshold 6/255, offline tier.
 Two views: **river** `4,1.6,6 → -1,-1.6,-38` fov 50, and **graze** `2,-1.2,2 → -1,-1.7,-45` fov 50.
 
 | arm | river | graze |

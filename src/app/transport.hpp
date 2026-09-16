@@ -139,7 +139,7 @@ public:
     [[nodiscard]] double durationSeconds() const { return duration_; }
     void setFrameRate(FrameRate rate);
     [[nodiscard]] FrameRate frameRate() const { return frameRate_; }
-    // For the bars/beats display and for beat stepping when there is no analysed beat grid.
+    // For the bars/beats display and for beat stepping when there is no analyzed beat grid.
     void setTempo(double bpm, int beatsPerBar = 4);
     [[nodiscard]] double tempoBpm() const { return tempoBpm_; }
     [[nodiscard]] int beatsPerBar() const { return beatsPerBar_; }

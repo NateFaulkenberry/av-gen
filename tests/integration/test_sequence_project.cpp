@@ -623,7 +623,7 @@ TEST_CASE("an edited song structure survives the project file, and a later re-an
     analysis::SongStructure fresh = detected();
     fresh.sections[0].endSeconds = 12.5;
     fresh.sections[1].startSeconds = 12.5;
-    const seq::ReanalysisReport report = seq::reanalyse(loaded.sequence().structure, fresh);
+    const seq::ReanalysisReport report = seq::reanalyze(loaded.sequence().structure, fresh);
     CHECK(report.kept() == 2);
     CHECK(loaded.sequence().structure.validate().has_value());
     bool stillThere = false;

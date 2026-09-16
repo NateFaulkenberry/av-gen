@@ -140,7 +140,7 @@ carries one. They ride in `AtmosphericContext::spectrum`, folded by the engine f
 because offline that frame is a precomputed track indexed by the render time.
 
 The distinction that matters is that **no audio is read inside `world::atmospherics`**. Resolution
-takes numbers it is handed; it never asks an analyser anything.
+takes numbers it is handed; it never asks an analyzer anything.
 
 ## Consequences
 

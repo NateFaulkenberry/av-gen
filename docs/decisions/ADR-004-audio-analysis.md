@@ -37,10 +37,10 @@ implementation.**
 - Every feature is float32, normalised to a documented range. Normalisation of band energies uses
   a running maximum with a time constant so live input auto-scales; offline mode can substitute a
   whole-file maximum.
-- Smoothing is not applied inside the analyser. Raw features are published; attack/decay
+- Smoothing is not applied inside the analyzer. Raw features are published; attack/decay
   envelopes live in the signal-processing chain on the modulation side (ADR-011), so a single raw
   signal can drive several parameters with different responses.
-- The analyser is a pure function of its input samples and its own state; given the same PCM and
+- The analyzer is a pure function of its input samples and its own state; given the same PCM and
   hop sequence it produces bit-identical output. Chunking (feeding samples in different block
   sizes) must not change results.
 - Signals are exposed through `signals::SignalBus` under the `audio.` namespace.
@@ -57,7 +57,7 @@ implementation.**
 ## Consequences
 
 - Analysis runs on a dedicated thread fed by the playback ring buffer; the render thread reads the
-  latest `AnalysisFrame` through a lock-free triple buffer. Offline mode runs the analyser inline
+  latest `AnalysisFrame` through a lock-free triple buffer. Offline mode runs the analyzer inline
   over the decoded buffer.
 - Test suite uses synthetic signals: 440 Hz sine (peak bin), silence (all zero), white noise
   (flat spectrum, high flatness), impulse train (onsets at known frames), 120 BPM click (tempo,

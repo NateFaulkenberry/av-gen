@@ -66,15 +66,15 @@ passes. It runs on the `JobSystem`, never per frame and never on the UI thread, 
   `job_system.hpp`'s own rule.
 
 It runs **automatically once**, when audio arrives and the piece has no structure yet. A project
-saved with a structure is *not* re-analysed on open: that is what caching it is for. Re-running is a
+saved with a structure is *not* re-analyzed on open: that is what caching it is for. Re-running is a
 button, and re-running merges under ADR-215's policy, so pressing it twice is safe.
 
 ### Two checkboxes and no third
 
-The import popup offers `Analyse song structure` and `Generate initial Director sequence`. There is
+The import popup offers `Analyze song structure` and `Generate initial Director sequence`. There is
 deliberately no FFT size, no hop length, no confidence threshold and nothing about the Director's
 internals: a person importing a song is deciding whether to look at its shape, not configuring a
-spectrum analyser.
+spectrum analyzer.
 
 ### The Director seam, defined and empty
 

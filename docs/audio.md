@@ -15,7 +15,7 @@ Decisions: ADR-003 (engine), ADR-004 (analysis). Research: `docs/research/audio-
 - `analysis::Analyzer`: streaming STFT feature extractor (below).
 - `analysis::AnalysisRunner`: thread that turns the stream into `AnalysisFrame`s and publishes
   the newest through a triple buffer; keeps a 512-frame history for plots.
-- `analysis::AnalysisTrack`: the same analyser run over a whole file for offline evaluation,
+- `analysis::AnalysisTrack`: the same analyzer run over a whole file for offline evaluation,
   addressable by time.
 
 ## Interfaces
@@ -32,7 +32,7 @@ void   Analyzer::reset(uint64_t startFrameIndex);
 
 ## Analysis pipeline (defaults: 48 kHz, window 2048, hop 512, periodic Hann)
 
-Per hop the analyser emits an `AnalysisFrame` stamped with the PCM index of the window centre:
+Per hop the analyzer emits an `AnalysisFrame` stamped with the PCM index of the window centre:
 
 | Feature | Definition | Range |
 |---|---|---|
@@ -56,14 +56,14 @@ in its band, which is intended for visual use (auto-gain); use `bandsRaw` for ab
 
 ## Beat and tempo (milestone 0.3, `analysis::BeatTracker`)
 
-Two paths share the analyser's onset strength at hop rate:
+Two paths share the analyzer's onset strength at hop rate:
 
 - Live (`BeatTracker`, run by `AnalysisRunner`): an autocorrelation tempogram over a 6 s window
   with the Ellis log-Gaussian prior (centre 120 BPM), re-evaluated every 0.5 s; a phase-locked
   predictor that snaps predicted beats to nearby picked onsets. Requires at least four picked
   onsets before trusting a tempo, free-runs through breaks and forgets the tempo after roughly
   9 s without onsets. Measured: 120 BPM click track locks at 2 s, 119.97 BPM, beats within 20 ms
-  (mean 15 ms early, following the analyser's early onset stamps); a 120→150 BPM jump is followed
+  (mean 15 ms early, following the analyzer's early onset stamps); a 120→150 BPM jump is followed
   within 3 s.
 - Offline (`trackBeatsOffline`, run by `AnalysisTrack`): Ellis 2007 dynamic programming with a
   global tempo from the median of windowed estimates. Measured: 119.94 BPM, beats within 10 ms of
@@ -87,7 +87,7 @@ is applied at this level; each modulation route smooths independently.
 case-insensitive substring; `listCaptureDevices()` enumerates them and marks the default) at its
 native rate or a requested one, and its callback downmixes every block to mono (channel average),
 applies a software gain (clamped to 0..16), tracks the block peak for a level meter and writes the
-`AnalysisStream` exactly as the player does, so the analyser, signals and everything downstream see
+`AnalysisStream` exactly as the player does, so the analyzer, signals and everything downstream see
 a microphone or line input as if it were a file. There is no play-head: `framesCaptured()` is the
 sample-accurate stream position (a discontinuity at frame 0 is marked on every open) and the
 engine clock is the wall clock. The callback never allocates, locks or logs. macOS asks for
@@ -97,7 +97,7 @@ microphone permission on first use; a denied device opens but delivers silence.
 
 `Engine::loadAudio` decodes the file, installs it in the player (device recreated at the file's
 rate) and starts a fresh `AnalysisRunner`. Play/pause/seek set atomics read by the callback; a
-seek or resume pushes a discontinuity marker so the analyser resets and re-stamps. The callback
+seek or resume pushes a discontinuity marker so the analyzer resets and re-stamps. The callback
 never allocates, locks, or logs; it copies frames, applies volume, mixes to mono, writes the
 stream, and advances the play-head. The analysis stream receives the unscaled mix so live
 features equal offline features regardless of monitor volume.

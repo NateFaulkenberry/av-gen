@@ -54,7 +54,7 @@ with `FixedStepClock`. Everything from `SignalBus` downwards is identical.
 
 Rules enforced by the target graph: `avgen_core` has no GPU or windowing dependency and is what
 most tests link; only `src/gpu/` includes `webgpu/*.h`; only `src/platform/` and `src/ui/`
-include SDL; the renderer never sees a signal and the analyser never sees a parameter.
+include SDL; the renderer never sees a signal and the analyzer never sees a parameter.
 
 ## 3. Time (ADR-012)
 
@@ -102,7 +102,7 @@ noise over time), `RandomSource` (sample-and-hold per trigger with slew), `Timel
 (keyframes with step/linear/smooth interpolation and looping), `MacroSource` (UI knobs
 `macros/<knob>` mirrored as `macro.<knob>`). The `SourceRack` owns them and survives scene swaps.
 The engine also publishes `time.seconds`, `time.progress`, `time.playing` and a per-frame beat
-clock extrapolated from the analyser's tempo: `beat.phase`, `beat.pulse` (event), `beat.count`,
+clock extrapolated from the analyzer's tempo: `beat.phase`, `beat.pulse` (event), `beat.count`,
 `beat.bpm`, `beat.bar`. Routes have a polarity (bipolar maps 0..1 to -1..1 before the chain).
 
 **User shader layers (milestone 0.4).** Each layer's INPUTS are parameters at

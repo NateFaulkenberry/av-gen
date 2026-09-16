@@ -39,7 +39,7 @@ Devices are matched by a case-insensitive substring of their name, first match w
 means the system default. From the command line, `--input` alone opens the default device and
 `--input <name>` matches a substring. `--list-audio-devices` prints what is available and exits.
 
-A live input is analysed at the device's native rate, mixed to mono in the capture callback. There
+A live input is analyzed at the device's native rate, mixed to mono in the capture callback. There
 is **no whole-track analysis** for a live input, because there is no finite track — which is why
 beat tracking behaves differently. See [Beats and tempo](help://audio/beats).
 

@@ -352,7 +352,7 @@ The active push is turning the showpiece into a finished product driven by audio
 - **A rights-clean score.** `tools/make_glowmere_score.py` renders 90 seconds of D-Dorian ambient at
   72 BPM from pure standard library — a drone, a chord loop, a low pulse on beats 1 and 3, seeded
   pentatonic bells and an air bed. Generated rather than licensed, so there is nothing to clear. It
-  is written to be *analysed*: deliberate transients for the beat tracker, bell attacks for the
+  is written to be *analyzed*: deliberate transients for the beat tracker, bell attacks for the
   treble routes, a noise bed that walks the spectral centroid without producing onsets. Rendered and
   in the tree.
 - **Musical routing.** The scene currently wires two routes. It needs a full mapping: glow on the

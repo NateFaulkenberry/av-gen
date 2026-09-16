@@ -2,7 +2,7 @@
 
 // Musical structure as events (ADR-063, milestone 4 of the cinematic upgrade).
 //
-// The analyser already publishes a great deal: rms, per-band energy, spectral centroid and flux,
+// The analyzer already publishes a great deal: rms, per-band energy, spectral centroid and flux,
 // onsets, tempo, and a beat clock with phase, bar, phrase and section counters. What it does not
 // publish is *structure* -- the difference between a beat and a downbeat, between a passage getting
 // louder and a drop, between a break and silence. Those are the things a visual narrative is cut
@@ -10,7 +10,7 @@
 // audio-reactive work ends up as "everything pulses to rms".
 //
 // This is a classifier over the signals that already exist. It holds a short history, decides what
-// just happened, and emits typed events. It does not analyse audio, does not touch the audio thread
+// just happened, and emits typed events. It does not analyze audio, does not touch the audio thread
 // and does not allocate while running: `update()` is called once per frame with the frame's signal
 // values and returns what it recognised.
 //
@@ -31,7 +31,7 @@ enum class MusicalEvent : std::uint8_t {
     Downbeat,      // the first beat of a bar
     BarStart,
     PhraseStart,   // a phrase boundary from the beat clock
-    SectionChange, // the analyser's own section counter moved
+    SectionChange, // the analyzer's own section counter moved
     EnergyRise,    // sustained increase over several bars
     EnergyDrop,    // sustained decrease
     Build,         // energy rising *and* brightening: the run-up
@@ -118,7 +118,7 @@ enum class MusicalSection : std::uint8_t {
     Build,        // going somewhere
     Phrase,       // an ordinary passage; also what an unlabelled section becomes
     Drop,         // the payoff a build was for
-    Verse,        // the analyser's own section counter moved, without saying into what
+    Verse,        // the analyzer's own section counter moved, without saying into what
     Breakdown,    // energy collapsed and stayed down
     FinalBuild,   // the last build, which is a different thing from the first
     FinalDrop,    // ...and the last drop

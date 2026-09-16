@@ -71,7 +71,7 @@ void AnalysisRunner::threadMain(std::stop_token token) {
         }
         const auto started = clock::now();
         if (result.discontinuity) {
-            // Seek or restart: the analyser restamps and the beat tracker starts from unknown.
+            // Seek or restart: the analyzer restamps and the beat tracker starts from unknown.
             analyzer_.reset(result.startFrame);
             beatTracker_.reset();
         }

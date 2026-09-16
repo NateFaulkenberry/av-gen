@@ -797,7 +797,7 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
         paramSlider(engine, prefix, "horizonGlow", "Horizon glow");
 
         // Section 4.2's per-band depths. These scale the bands already in the frame block; they are
-        // not a second analyser, and every one of them is itself an ordinary parameter a route can
+        // not a second analyzer, and every one of them is itself an ordinary parameter a route can
         // drive.
         ImGui::SeparatorText("Audio response");
         paramSlider(engine, prefix, "audioBass", "Bass -> height");

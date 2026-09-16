@@ -2065,7 +2065,7 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
     // built offline -- which meant `track()` was null in the windowed application and anything
     // needing the whole piece could not exist there. The camera director is exactly that: a musical
     // structure is a fold over a complete track, so "Direct to Music" could never enable no matter
-    // how much audio was loaded. A loaded *file* is a finite, known signal and can be analysed up
+    // how much audio was loaded. A loaded *file* is a finite, known signal and can be analyzed up
     // front whatever mode is playing it; a live input genuinely has no track and correctly gets
     // none.
     //
@@ -2075,7 +2075,7 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
     track_ = std::make_shared<analysis::AnalysisTrack>(
         analysis::AnalysisTrack::analyze(*file, analyzerConfig_));
     offlineFrameCursor_ = 0;
-    log::info("analysed {:.2f} s of audio: {} frames", file->durationSeconds(), track_->frames().size());
+    log::info("analyzed {:.2f} s of audio: {} frames", file->durationSeconds(), track_->frames().size());
     audioFile_ = std::move(file);
     ++audioRevision_;
     modulator_.resetState();
@@ -2280,7 +2280,7 @@ void Engine::refreshTransport() {
     duration = std::max(duration, sequence_.duration());
     duration = std::max(duration, timeline_.durationSeconds());
     transport_.setDuration(duration);
-    // The tempo is for the bars/beats readout and for beat stepping with no analysed grid. It comes
+    // The tempo is for the bars/beats readout and for beat stepping with no analyzed grid. It comes
     // from wherever the beat clock came from this frame, so the display cannot disagree with the
     // signals.
     const double bpm = midiClockActive_ ? controlHub_.midiClock().bpm()
@@ -2336,7 +2336,7 @@ double Engine::beatBoundary(double fromSeconds, int direction) const {
     if (direction == 0) {
         return fromSeconds;
     }
-    // The analysed grid first: it is where the beats actually are, as opposed to where a constant
+    // The analyzed grid first: it is where the beats actually are, as opposed to where a constant
     // tempo says they ought to be, and a piece that breathes is exactly where that difference shows.
     if (track_ != nullptr) {
         const auto& beats = track_->beats().beatTimes;
@@ -2525,7 +2525,7 @@ void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
         beatClockCount_ = midiClock.beatCount();
         pulse = midiClock.beatEvent();
     } else if (bpm > 0.0) {
-        // Advance the per-frame beat clock; re-sync to the analyser whenever it reports a beat.
+        // Advance the per-frame beat clock; re-sync to the analyzer whenever it reports a beat.
         beatClockPhase_ += time.deltaTime * bpm / 60.0;
         if (newAnalysisFrame && latest_.beatCount != lastAnalysisBeatCount_) {
             beatClockPhase_ = static_cast<double>(latest_.beatPhase);
