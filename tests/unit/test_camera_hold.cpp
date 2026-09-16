@@ -528,6 +528,7 @@ TEST_CASE("probe: is the abducted animal in frame while the hold drives", "[.pro
     REQUIRE(app::directEngine(engine, comp->heroes(), s).has_value());
 
     int held = 0, fully = 0, partly = 0, off = 0;
+    int craftFrames = 0, craftFully = 0, craftOff = 0;
     float smallest = 1e9f, worstOut = 0.0f;
     FixedStepClock clock(60.0);
     engine.seekSeconds(0.0);
@@ -574,6 +575,64 @@ TEST_CASE("probe: is the abducted animal in frame while the hold drives", "[.pro
                 worstOut = std::max({worstOut, std::fabs(ndc.x) - 1.0f, std::fabs(ndc.y) - 1.0f});
             }
         }
+        // The CRAFT, as well as the animal. "if the ufo is moving somewhere and we are focused on it
+        // it should be in the shot, it currently is not" -- and nothing was asserting it. A framing
+        // rule that puts the animal on screen by pushing the saucer off it has traded one report for
+        // another.
+        {
+            // Not `nodeCorners`: the visitor is a PROCEDURAL node, whose bounds are the instance
+            // extent memoised at rebuild time (ADR-217), so it comes back empty here and the whole
+            // craft measurement silently reported nothing. The hero carries the craft's own radius,
+            // which is what the director frames against anyway.
+            std::vector<glm::vec3> craftCorners;
+            if (const world::HeroPoint* h = heroNamed(*comp, "visitor")) {
+                const entity::Entity* body = comp->entityWorld().find("visitor");
+                const glm::vec3 c = body != nullptr ? body->visualPosition() : h->position;
+                const float r = std::max(h->radius, 0.5f);
+                for (int sx = -1; sx <= 1; sx += 2) {
+                    for (int sy = -1; sy <= 1; sy += 2) {
+                        for (int sz = -1; sz <= 1; sz += 2) {
+                            craftCorners.push_back(c + glm::vec3(sx, sy, sz) * r);
+                        }
+                    }
+                }
+            }
+            if (!craftCorners.empty()) {
+                int craftIn = 0;
+                for (const glm::vec3& p : craftCorners) {
+                    const glm::vec4 clip = viewProj * glm::vec4(p, 1.0f);
+                    if (clip.w <= 1e-4f) {
+                        continue;
+                    }
+                    const glm::vec2 ndc(clip.x / clip.w, clip.y / clip.w);
+                    if (std::fabs(ndc.x) <= 1.0f && std::fabs(ndc.y) <= 1.0f) {
+                        ++craftIn;
+                    }
+                }
+                ++craftFrames;
+                if (craftIn == static_cast<int>(craftCorners.size())) {
+                    ++craftFully;
+                } else if (craftIn == 0) {
+                    ++craftOff;
+                }
+            }
+        }
+        // How far the eye is from the pair, and how far apart the pair is. If the distance tracks a
+        // separation that collapses as the animal rises, the camera dollies in with it -- which is
+        // "the camera is the one being abducted".
+        {
+            const entity::Entity* prey = comp->entityWorld().find(std::string(target));
+            const world::HeroPoint* craft = heroNamed(*comp, "visitor");
+            if (prey != nullptr && craft != nullptr) {
+                const float apart = glm::length(craft->position - prey->visualPosition());
+                const glm::vec3 mid = (craft->position + prey->visualPosition()) * 0.5f;
+                const float eye = glm::length(cam.position - mid);
+                if (held % 30 == 1) {
+                    fmt::print("[dolly] frame {:5d}  pair apart {:7.2f} m   eye to pair {:8.2f} m\n",
+                               held, apart, eye);
+                }
+            }
+        }
         if (in == static_cast<int>(corners.size())) {
             ++fully;
             smallest = std::min(smallest, std::max(hi.x - lo.x, hi.y - lo.y));
@@ -585,6 +644,10 @@ TEST_CASE("probe: is the abducted animal in frame while the hold drives", "[.pro
     }
     fmt::print("[hold-framing] {} held frames with a bound target: fully in {}, partly {}, off {}\n",
                held, fully, partly, off);
+    if (craftFrames > 0) {
+        fmt::print("[hold-framing] the CRAFT over the same frames: fully in {} ({:.0f}%), entirely off {} ({:.0f}%)\n",
+                   craftFully, 100.0 * craftFully / craftFrames, craftOff, 100.0 * craftOff / craftFrames);
+    }
     if (held > 0) {
         fmt::print("[hold-framing] fully in {:.0f}%, smallest NDC span {:.3f}, worst {:.2f} outside\n",
                    100.0 * fully / held, smallest > 1e8f ? -1.0f : smallest, worstOut);
