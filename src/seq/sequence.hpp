@@ -50,6 +50,8 @@
 #include "seq/events.hpp"
 #include "seq/layers.hpp"
 #include "signals/musical_events.hpp"
+#include "song/section_timeline.hpp"
+#include "song/shot_language.hpp"
 #include "spatial/spline.hpp"
 
 #include <glm/glm.hpp>
@@ -322,6 +324,19 @@ struct Sequence {
     // markers above are still *derived* from this -- `setSectionMarkers` -- so the strip and the
     // event triggers see one answer.
     analysis::SongStructure structure;
+    // The authored section timeline and the vocabulary it is written in (ADR-247).
+    //
+    // `structure` above is the **analyzer's report**: what the audio was found to contain, with
+    // confidences, recomputed whenever somebody presses Analyze. `sectionTimeline` is the **film**:
+    // what the person says each passage is and how it should be treated. The brief that asked for
+    // this is explicit that they are not one object, and the reason is visible the moment somebody
+    // types "Ocean Ambience" -- that is not a claim about the music, and a detector must never be
+    // in a position to overwrite it.
+    //
+    // `shotLanguage` carries only the person's own section types and shot intents. The built-in
+    // vocabulary is code and is never written, so a piece that defined nothing serializes nothing.
+    song::SectionTimeline sectionTimeline;
+    song::ShotLanguage shotLanguage;
     // spec 17 of the cinematic world brief: "when X happens, do Y". Most of these stop being
     // events at bake and become keys; the rest are dispatched. seq/events.hpp is the argument.
     std::vector<SequenceEvent> events;

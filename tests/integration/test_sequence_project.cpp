@@ -14,6 +14,11 @@
 #include "scene/composition.hpp"
 #include "seq/sequence.hpp"
 #include "seq/song_structure.hpp"
+#include "song/from_analysis.hpp"
+#include "song/reanalysis.hpp"
+#include "song/section_cue.hpp"
+#include "song/section_timeline.hpp"
+#include "song/shot_language.hpp"
 #include "support/temp_dir.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -635,4 +640,199 @@ TEST_CASE("an edited song structure survives the project file, and a later re-an
         CHECK(s.endSeconds == 80.25);
     }
     CHECK(stillThere);
+}
+
+// ---- the authored section timeline through a real project file (ADR-247) -------------------------
+//
+// `tests/unit/test_section_timeline.cpp` checks the model and its own JSON; this checks the claim
+// the model exists to make. ADR-225's rule is that a setting the application does not keep is not a
+// setting, and the thing most easily lost here is the *custom vocabulary*: a section whose type is
+// "Ocean Ambience" is meaningless in a file that forgot what Ocean Ambience was, and the failure
+// would look like a section that had merely reverted rather than like data loss.
+//
+// The unit tests could all pass while the engine dropped either block on the way out, which is
+// exactly the shape of bug worth an integration test.
+TEST_CASE("a custom section type and its authored shots survive the project file",
+          "[integration][sequence][project][song]") {
+    Scratch scratch("section_timeline");
+    const fs::path stage = writeStage(scratch.dir, "stage.json");
+    const fs::path file = "song-session.json";
+
+    const auto detected = [] {
+        analysis::SongStructure s;
+        s.durationSeconds = 100.0;
+        for (const auto& [from, to, f] :
+             std::vector<std::tuple<double, double, analysis::SectionFunction>>{
+                 {0.0, 24.318274, analysis::SectionFunction::Intro},
+                 {24.318274, 51.772913, analysis::SectionFunction::Verse},
+                 {51.772913, 78.104558, analysis::SectionFunction::Chorus},
+                 {78.104558, 100.0, analysis::SectionFunction::Outro}}) {
+            analysis::SongSection section;
+            section.startSeconds = from;
+            section.endSeconds = to;
+            section.function = f;
+            section.startConfidence = 0.4f;
+            section.energy = 0.55f;
+            s.sections.push_back(section);
+        }
+        return s;
+    };
+
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadFile(stage).has_value());
+        seq::Sequence built = piece();
+        built.structure = detected();
+
+        // A person invents a treatment and a type that this engine has never heard of.
+        song::ShotIntent tidal;
+        tidal.id = "tidal_drift";
+        tidal.name = "Tidal Drift";
+        tidal.description = "Carried, rather than driven.";
+        tidal.focus = song::SubjectFocus::Environment;
+        tidal.focusStrength = 0.125f;
+        tidal.framing = song::FramingRange{song::Framing::Medium, song::Framing::VeryWide};
+        tidal.movement = 0.1875f;
+        tidal.cutFrequency = 0.0625f;
+        tidal.arc = song::Arc::Falling;
+        REQUIRE(built.shotLanguage.defineIntent(tidal).has_value());
+        REQUIRE(built.shotLanguage
+                    .defineType(song::SectionType{"ocean_ambience", "Ocean Ambience",
+                                                  "Slow underwater environment passage",
+                                                  song::SectionCategory::Custom, "tidal_drift",
+                                                  false})
+                    .has_value());
+
+        // The analysis becomes a film, and then the person edits the film.
+        built.sectionTimeline = song::timelineFromStructure(built.structure, built.shotLanguage);
+        REQUIRE(built.sectionTimeline.sections.size() == 4);
+        REQUIRE(song::setSectionType(built.sectionTimeline, 1, "ocean_ambience",
+                                     built.shotLanguage));
+        REQUIRE(song::setSectionLabel(built.sectionTimeline, 1, "Underwater"));
+        REQUIRE(song::setSectionShotIntent(built.sectionTimeline, 2, "intimate_close_up",
+                                           built.shotLanguage));
+        REQUIRE(song::moveBoundary(built.sectionTimeline, 3, 80.25).has_value());
+
+        REQUIRE(engine.setSequence(std::move(built)).has_value());
+        REQUIRE(engine.saveProject(file).has_value());
+    }
+
+    app::Engine loaded(app::EngineMode::Offline);
+    REQUIRE(loaded.loadProject(file).has_value());
+    const seq::Sequence& back = loaded.sequence();
+
+    // The vocabulary came back, definition and all.
+    REQUIRE(back.shotLanguage.customized());
+    const song::SectionType* type = back.shotLanguage.type("ocean_ambience");
+    REQUIRE(type != nullptr);
+    CHECK(type->name == "Ocean Ambience");
+    CHECK(type->defaultShotIntent == "tidal_drift");
+    const song::ShotIntent* intent = back.shotLanguage.intent("tidal_drift");
+    REQUIRE(intent != nullptr);
+    CHECK(intent->arc == song::Arc::Falling);
+    CHECK(intent->movement == 0.1875f); // exactly
+    CHECK(intent->framing.widest == song::Framing::VeryWide);
+
+    // And so did the film.
+    REQUIRE(back.sectionTimeline.sections.size() == 4);
+    const song::Section& underwater = back.sectionTimeline.sections[1];
+    CHECK(underwater.type == "ocean_ambience");
+    CHECK(underwater.label == "Underwater");
+    CHECK(underwater.origin() == song::SectionOrigin::Refined);
+    CHECK(back.sectionTimeline.sections[2].shotIntent == std::optional<std::string>("intimate_close_up"));
+    CHECK(back.sectionTimeline.sections[2].endSeconds == 80.25); // exactly, not nearly
+    CHECK(back.sectionTimeline.sections[2].isEdited(song::SectionField::End));
+
+    // The custom type resolves through the custom treatment, which is the whole point of keeping
+    // both blocks: either one alone would load without error and mean nothing.
+    CHECK(back.shotLanguage.intentFor(underwater).id == "tidal_drift");
+    const auto cues = song::cueSheet(back.sectionTimeline, back.shotLanguage);
+    REQUIRE(cues.size() == 4);
+    CHECK(cues[1].intent.id == "tidal_drift");
+    CHECK(cues[1].displayName == "Underwater");
+    CHECK(cues[2].intent.id == "intimate_close_up");
+
+    // ...and the detector, run again on the reloaded project, does not take any of it away.
+    analysis::SongStructure freshStructure = detected();
+    freshStructure.sections[0].endSeconds = 12.5;
+    freshStructure.sections[1].startSeconds = 12.5;
+    freshStructure.sections[2].function = analysis::SectionFunction::Drop;
+    song::SectionTimeline current = back.sectionTimeline;
+    const song::SectionTimeline freshTimeline =
+        song::timelineFromStructure(freshStructure, back.shotLanguage);
+    const song::ReanalysisReport report = song::reanalyze(current, freshTimeline);
+    REQUIRE(current.validate().has_value());
+
+    bool stillThere = false;
+    for (const song::Section& s : current.sections) {
+        if (s.type != "ocean_ambience") {
+            continue;
+        }
+        stillThere = true;
+        CHECK(s.label == "Underwater");
+    }
+    CHECK(stillThere);
+    CHECK(report.fieldsCarried >= 2);
+    // And the other half: material nobody touched really was re-detected. The fresh run moved the
+    // first boundary to 12.5 and nothing pinned it, so 12.5 is where it is.
+    CHECK(current.sections.front().endSeconds == 12.5);
+}
+
+// ---- a project that never saw the shot language is unchanged by it -------------------------------
+TEST_CASE("a project with no section timeline gains one from its analysis, and one with no song "
+          "keeps the file it had",
+          "[integration][sequence][project][song]") {
+    Scratch scratch("section_timeline_absent");
+    const fs::path stage = writeStage(scratch.dir, "stage.json");
+
+    // A piece with no song at all writes neither block, so an existing project file is untouched.
+    {
+        seq::Sequence plain = piece();
+        const nlohmann::json doc = plain.toJson();
+        CHECK(!doc.contains("sectionTimeline"));
+        CHECK(!doc.contains("shotLanguage"));
+        CHECK(!doc.contains("structure"));
+    }
+
+    // A project saved before the shot language existed has an analysis and no film. Opening it
+    // derives one, so the person gets a complete first-pass treatment rather than an empty panel --
+    // and it cannot lose anything, because there was nothing authored to lose.
+    seq::Sequence legacy = piece();
+    legacy.structure.durationSeconds = 60.0;
+    for (const auto& [from, to, f] :
+         std::vector<std::tuple<double, double, analysis::SectionFunction>>{
+             {0.0, 20.0, analysis::SectionFunction::Intro},
+             {20.0, 45.0, analysis::SectionFunction::Chorus},
+             {45.0, 60.0, analysis::SectionFunction::Outro}}) {
+        analysis::SongSection section;
+        section.startSeconds = from;
+        section.endSeconds = to;
+        section.function = f;
+        legacy.structure.sections.push_back(section);
+    }
+    // Written as an older engine would have written it: an analysis, and no film.
+    nlohmann::json doc = legacy.toJson();
+    REQUIRE(doc.contains("structure"));
+    REQUIRE(!doc.contains("sectionTimeline"));
+
+    const auto reopened = seq::Sequence::fromJson(doc);
+    REQUIRE(reopened.has_value());
+    REQUIRE(reopened->sectionTimeline.sections.size() == 3);
+    CHECK(reopened->sectionTimeline.sections[0].type == "intro");
+    CHECK(reopened->sectionTimeline.sections[1].type == "chorus");
+    CHECK(reopened->sectionTimeline.sections[0].origin() == song::SectionOrigin::Detected);
+    CHECK(reopened->shotLanguage.intentFor(reopened->sectionTimeline.sections[1]).id ==
+          "dynamic_hero_coverage");
+
+    // But a project that *has* a timeline is never re-derived on load: that would be a silent
+    // re-analysis, which is the one thing this whole model exists to prevent.
+    seq::Sequence authored = legacy;
+    authored.sectionTimeline = reopened->sectionTimeline;
+    nlohmann::json edited = authored.toJson();
+    REQUIRE(edited.contains("sectionTimeline"));
+    edited["sectionTimeline"]["sections"][1]["type"] = "ocean_mood_placeholder";
+    edited["sectionTimeline"]["sections"][1]["edited"] = nlohmann::json::array({"type"});
+    const auto kept = seq::Sequence::fromJson(edited);
+    REQUIRE(kept.has_value());
+    CHECK(kept->sectionTimeline.sections[1].type == "ocean_mood_placeholder");
 }
