@@ -87,6 +87,9 @@ writes a scene file. `--help` lists every flag.
 - [docs/authoring.md](docs/authoring.md): how to build a world, window by window
 - [docs/sequencer.md](docs/sequencer.md): choreography through time -- shots, scene cuts,
   characters, lyrics and markers, and how a piece becomes ordinary timeline tracks
+- [docs/song-direction-manual.md](docs/song-direction-manual.md): the artist's guide -- import a
+  song, analyze it, and turn its sections into an edit you control. Written for someone who has
+  never opened the camera controls
 - [docs/song-analyzer.md](docs/song-analyzer.md): audio to sections -- the detection pipeline,
   confidence, manual refinement, and what pressing Analyze again does to your work
 - [docs/section-shot-language.md](docs/section-shot-language.md): the section and shot-intent
