@@ -1,0 +1,17 @@
+{
+  "format": "avgen-render-queue", "version": 1,
+  "jobs": [
+    { "project": "../../examples/world/glowmere-valley-2.json",
+      "render": { "output": "sequence",
+        "path": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-preview/renders/output-preview/stills-D-preview-same-tier",
+        "pattern": "t{:06d}.png",
+        "width": 1200, "height": 676, "fps": 1, "start": 4.0, "end": 10.0,
+        "tier": "offline", "limits": "unlimited", "supersample": 2.0 } },
+    { "project": "../../examples/world/glowmere-valley-2.json",
+      "render": { "output": "sequence",
+        "path": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-preview/renders/output-preview/stills-E-canvas-same-tier",
+        "pattern": "t{:06d}.png",
+        "width": 1200, "height": 800, "fps": 1, "start": 4.0, "end": 10.0,
+        "tier": "offline", "limits": "unlimited", "supersample": 2.0 } }
+  ]
+}

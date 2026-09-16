@@ -27,6 +27,7 @@
 
 #include "ai/control_plane.hpp"
 #include "core/error.hpp"
+#include "ui/output_preview.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -51,6 +52,24 @@ struct AppSettings {
     // the project: the same project on a laptop and on a workstation wants different answers.
     float canvasRenderScale = 1.0f;
     AppearanceTheme appearance = AppearanceTheme::System;
+
+    // ---- output preview (ADR-246) ----
+    // The editor-local half of the output preview: which of the three view modes the canvas is in,
+    // the zoom, the guides, the letterbox treatment. It lives here rather than in the project for
+    // the same reason `canvasRenderScale` does -- it describes how this person is looking at the
+    // piece on this machine, and opening someone else's project must not change how you are
+    // looking at yours.
+    //
+    // The project-owned half -- the output's width, height and frame rate -- is `RenderSettings`,
+    // in the project under "render", and is deliberately not duplicated here. One output
+    // configuration; a second would be one that drifts.
+    //
+    // ADR-225: a setting the application does not keep is not a setting, which is what this block
+    // and `test_output_preview_settings` are between them for. `panX`/`panY` and `fullscreen` are
+    // the exceptions and are *not* written: a pan only means anything against the canvas size it
+    // was made at, and a session that exits in fullscreen must not reopen with every panel closed
+    // and no memory of which ones they were.
+    ui::PreviewViewState preview;
 
     // ---- ai ----
     ai::AiSettings ai;

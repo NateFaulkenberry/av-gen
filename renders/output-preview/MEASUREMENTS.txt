@@ -1,0 +1,41 @@
+Glowmere Valley 2 -- what the preview shows against what the render produces
+==============================================================================
+
+Reference: A, the deliverable -- 1280x720, tier offline, limits unlimited,
+supersample 2.0. Exactly what `--render` produces for this project.
+
+All numbers are mean absolute difference per channel (0..1) against A, measured on
+a common 64x36 grid over six frames at t = 4..9 s. Lower is closer.
+
+arm                                 mean diff vs the deliverable
+----------------------------------------------------------------
+B preview 1200x676, live tier                            0.01200
+C canvas  1200x800, live tier                            0.04278
+D preview 1200x676, SAME tier                            0.00182
+E canvas  1200x800, SAME tier                            0.04118
+
+Reading these four rows:
+
+  D vs E isolates FRAMING. Same tier, same limits, same supersample as the
+  deliverable; the only thing that moves is the extent's aspect ratio. The
+  preview's extent lands at 0.00182; the canvas's own aspect ratio -- which is what
+  this editor rendered at before ADR-246 -- lands at 0.04118. 22.6x further away.
+
+  B vs D isolates the two differences ADR-246 says it cannot remove. B is what
+  the interactive preview really does: live tier, live detail limits (ADR-186),
+  no supersampling (ADR-212). That costs 0.01018 on top of D's 0.00182 -- so
+  most of what is left between the preview and the deliverable is detail and
+  sampling, which the toolbar's tooltip names, and not framing, which it does not
+  have to.
+
+  B (0.01200) is still 3.6x closer to the deliverable than C (0.04278), the
+  old behaviour measured under identical conditions.
+
+Movies (30 s, 30 fps, audio muxed):
+  A-deliverable-1280x720.mov       sequence hash 5be5207682ca025f
+  B-preview-extent-1200x676.mov    sequence hash f0feaaabfbdb2a45
+
+Play them side by side: the framing is the same shot. What differs is the far
+field (ADR-186 lifts the distance culls for a render and not for live playback)
+and the fineness of the sampling (ADR-212's supersample, which a preview never
+does). Both are stated in the preview toolbar's tooltip rather than hidden.

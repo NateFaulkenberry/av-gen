@@ -31,6 +31,11 @@ target_sources(avgen_tests PRIVATE
     # The editor shell's panel registry and layout file (ADR-076). Deliberately ImGui-free so it
     # can be checked here; the dock builder that reads it lives in avgen_platform.
     "${CMAKE_SOURCE_DIR}/src/ui/editor_layout.cpp"
+    # The output preview's arithmetic (ADR-246). Here for the same reason `editor_layout.cpp` is:
+    # the frame's geometry, the zoom, the safe areas and every coordinate conversion a click goes
+    # through are ImGui-free, and a viewport rule that needs a window and a device to check is a
+    # rule nobody checks. The drawing half lives in control_panel.cpp and is not on this list.
+    "${CMAKE_SOURCE_DIR}/src/ui/output_preview.cpp"
     # The world editor (ADR-092). Every decision it makes -- what the ghost says, which handle the
     # pointer is over, what a drag means, what undo restores -- is ImGui-free for exactly this
     # reason: an editor whose behaviour can only be checked by looking at it is an editor nobody
