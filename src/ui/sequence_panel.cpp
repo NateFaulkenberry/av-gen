@@ -14,6 +14,7 @@
 #include "seq/layer_sink.hpp"
 #include "seq/lyrics.hpp"
 #include "seq/song_structure.hpp"
+#include "song/from_analysis.hpp"
 
 #include <imgui.h>
 
@@ -2383,6 +2384,18 @@ void SequencePanel::pollStructureAnalysis(app::Engine& engine) {
         return;
     }
     seq::Sequence& piece = engine.sequence();
+    // Two layers, updated from the same detection under two policies (ADR-247). `structure` is the
+    // analyzer's report and follows ADR-215's per-section rule; `sectionTimeline` is the film and
+    // follows ADR-247's per-field one, so a passage somebody retyped keeps its type *and* gets the
+    // better boundaries. Neither is derived from the other after this point.
+    //
+    // The status line reports the *analysis* layer only, because the section lane below it edits
+    // that layer and nothing in the UI can yet author the film. Once the lane moves onto the
+    // authored model, this is where `song::ReanalysisReport::summary()` belongs -- it is the one
+    // that will have something to say about kept work.
+    const song::ReanalysisPolicy policy =
+        work->merge ? song::ReanalysisPolicy::Merge : song::ReanalysisPolicy::Replace;
+    song::applyAnalysis(piece.sectionTimeline, work->result, piece.shotLanguage, policy);
     if (work->merge) {
         const seq::ReanalysisReport report = seq::reanalyze(piece.structure, work->result);
         status_ = report.summary();

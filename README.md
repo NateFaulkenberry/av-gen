@@ -87,6 +87,10 @@ writes a scene file. `--help` lists every flag.
 - [docs/authoring.md](docs/authoring.md): how to build a world, window by window
 - [docs/sequencer.md](docs/sequencer.md): choreography through time -- shots, scene cuts,
   characters, lyrics and markers, and how a piece becomes ordinary timeline tracks
+- [docs/song-analyzer.md](docs/song-analyzer.md): audio to sections -- the detection pipeline,
+  confidence, manual refinement, and what pressing Analyze again does to your work
+- [docs/section-shot-language.md](docs/section-shot-language.md): the section and shot-intent
+  vocabulary -- built-in types, your own types, and why a shot intent never names a camera
 - [docs/composition.md](docs/composition.md): the 2D layers over the frame
 - [docs/output-preview.md](docs/output-preview.md): seeing what the render will produce -- the
   output frame in the canvas, safe areas, preview quality, and the two things a preview cannot show

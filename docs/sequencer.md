@@ -201,6 +201,13 @@ edge is not necessarily the grid you want for a shot.
 
 ## The song structure (ADR-215, ADR-216)
 
+> **Two layers, since ADR-247.** `piece.structure` below is the **analyzer's report**; `piece.sectionTimeline`
+> is the **film** — what a person says each passage is and how it should be treated, in a vocabulary
+> that extends past Verse and Chorus to "Ocean Ambience". See
+> [docs/section-shot-language.md](section-shot-language.md) and
+> [docs/song-analyzer.md](song-analyzer.md). The editing calls shown here still drive the *analysis*
+> layer, and the section lane has not yet been moved onto the authored one.
+
 `piece.structure` is an `analysis::SongStructure`: ordered, gapless sections with a function, a
 label, a provenance and — for the ones the detector claimed — confidences. It is **saved with the
 project**, and it is the only part of the sequence that is authored data the moment anybody touches

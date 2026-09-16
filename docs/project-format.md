@@ -758,9 +758,60 @@ Optional, and read **last**, after every parameter a bake could name exists. The
       "color": [0.97, 0.95, 0.92, 1.0], "preset": "fadeInOut", "presetSeconds": 0.32,
       "extra": {} } ],
   "markers": [ { "time": 40.0, "name": "CHORUS", "kind": "section" } ],
-  "tracks": [ ]
+  "tracks": [ ],
+  "structure": { "duration": 210.0, "tempoBpm": 122.6, "tempoConfidence": 0.8,
+                 "sections": [ { "function": "chorus", "start": 57.78, "end": 83.22,
+                                 "origin": "detected", "labelConfidence": 0.7,
+                                 "startConfidence": 0.6, "endConfidence": 0.5,
+                                 "energy": 0.55, "density": 0.4 } ] },
+  "shotLanguage": {
+    "intents": [ { "id": "tidal_drift", "name": "Tidal Drift", "description": "Carried.",
+                   "focus": "environment", "focusStrength": 0.125,
+                   "framing": { "tightest": "medium", "widest": "very-wide" },
+                   "movement": 0.1875, "energy": 0.25, "variation": 0.375,
+                   "cutFrequency": 0.0625, "visualDensity": 0.5,
+                   "cameras": { "fewest": 1, "most": 0 }, "arc": "falling" } ],
+    "types":   [ { "id": "ocean_ambience", "name": "Ocean Ambience",
+                   "description": "Slow underwater environment passage",
+                   "category": "custom", "defaultShotIntent": "tidal_drift" } ] },
+  "sectionTimeline": {
+    "duration": 210.0,
+    "sections": [ { "type": "ocean_ambience", "label": "Underwater",
+                    "start": 57.78, "end": 83.22,
+                    "shotIntent": "floating_unconventional",
+                    "edited": ["type", "label", "shot-intent"],
+                    "startConfidence": 0.6, "endConfidence": 0.5,
+                    "energy": 0.55, "density": 0.4 } ] }
 }
 ```
+
+### `"structure"`, `"shotLanguage"` and `"sectionTimeline"` (ADR-215, ADR-247)
+
+Three optional blocks, each written only when it holds something, so a piece that never imported a
+song keeps exactly the file it had.
+
+`"structure"` is the **analyzer's report** — what the audio was found to contain. `"sectionTimeline"`
+is the **film** — what a person says each passage is and how it should be treated. They are separate
+because only one of them is safe to recompute: pressing Analyze replaces the first and reconciles the
+second. `"shotLanguage"` carries the person's **own** section types and shot intents; the built-in
+vocabulary is code and is never written, so a project that defined nothing has no such block.
+
+`"shotLanguage"` is read **before** `"sectionTimeline"`, because a section may name a type this
+project invented and nothing else knows about.
+
+A project with a `"structure"` and no `"sectionTimeline"` — one saved before ADR-247 — gains one
+derived from its analysis on load. A project that *has* one is never re-derived: that would be a
+silent re-analysis, which is exactly what the override model exists to prevent.
+
+**Confidences are written only while they still mean anything.** A confidence is the detector's claim
+about its own guess, so a section whose type a person changed writes no `labelConfidence`, and one
+whose boundary they dragged writes no `startConfidence`/`endConfidence`. The in-memory values are
+kept — deleting the detector's record would be a second kind of data loss — but persisting them would
+invite the next reader to display a number about nothing.
+
+**`occurrence` is never written.** "Verse 2" is derived from the timeline's order and rebuilt on load,
+for the same reason the baked tracks are not saved: a stored derivation is a copy that goes stale.
+`"structure"`'s `beatTimes` and `novelty` are absent for the same reason, and come back from the track.
 
 `shots[].camera.kind` is `inherit`, `move` or `keys`; a `move` carries an `app::Shot` in the
 ADR-062 vocabulary. Camera and shot-local track times are **relative to the shot's start**, so

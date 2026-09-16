@@ -1,5 +1,7 @@
 #include "seq/sequence.hpp"
 
+#include "song/from_analysis.hpp"
+
 #include "seq/song_structure.hpp"
 
 
@@ -654,6 +656,12 @@ double Actor::endSeconds() const {
 // ---- sequence ---------------------------------------------------------------------------------
 
 Result<void> Sequence::validate() const {
+    // ADR-247: the authored timeline's own invariants -- ordered, gapless, covering -- are part of
+    // the sequence being valid, so a malformed one is refused at the same door as everything else
+    // rather than reaching the director.
+    if (auto ok = sectionTimeline.validate(); !ok) {
+        return fail("sequence '{}': {}", name, ok.error().message);
+    }
     for (std::size_t i = 0; i < scenes.size(); ++i) {
         if (scenes[i].id.empty()) {
             return fail("sequence '{}': scene slot {} has no id", name, i);
@@ -1609,6 +1617,14 @@ json Sequence::toJson() const {
     if (!structure.sections.empty()) {
         j["structure"] = songStructureToJson(structure);
     }
+    // ADR-247. Two separate blocks, both written only when they hold something, so a project that
+    // never analyzed a song and never defined a section type keeps exactly the file it had.
+    if (!sectionTimeline.sections.empty()) {
+        j["sectionTimeline"] = song::sectionTimelineToJson(sectionTimeline);
+    }
+    if (shotLanguage.customized()) {
+        j["shotLanguage"] = shotLanguage.toJson();
+    }
     if (!events.empty()) {
         json eventsJson = json::array();
         for (const auto& e : events) {
@@ -1748,6 +1764,29 @@ Result<Sequence> Sequence::fromJson(const json& j) {
             return fail("sequence '{}': {}", seq.name, parsed.error().message);
         }
         seq.structure = std::move(*parsed);
+    }
+    // ADR-247. The language is read *before* the timeline, because a section may name a type this
+    // project defined and nothing else knows about.
+    if (const auto sl = j.find("shotLanguage"); sl != j.end()) {
+        auto parsed = song::ShotLanguage::fromJson(*sl);
+        if (!parsed) {
+            return fail("sequence '{}': {}", seq.name, parsed.error().message);
+        }
+        seq.shotLanguage = std::move(*parsed);
+    }
+    if (const auto stl = j.find("sectionTimeline"); stl != j.end()) {
+        auto parsed = song::sectionTimelineFromJson(*stl);
+        if (!parsed) {
+            return fail("sequence '{}': {}", seq.name, parsed.error().message);
+        }
+        seq.sectionTimeline = std::move(*parsed);
+    } else if (!seq.structure.sections.empty()) {
+        // Migration, and the only place the two models are allowed to touch. A project saved before
+        // the shot language existed has an analysis and no film; deriving one from the other gives
+        // it a complete first-pass treatment on open, and cannot lose anything because there was
+        // nothing authored to lose. A project that *has* a timeline is never re-derived -- that
+        // would be the re-analysis this whole model exists to make safe, performed silently on load.
+        seq.sectionTimeline = song::timelineFromStructure(seq.structure, seq.shotLanguage);
     }
     if (const auto ev = j.find("events"); ev != j.end()) {
         if (!ev->is_array()) {
