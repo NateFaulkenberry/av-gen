@@ -87,45 +87,21 @@ const char* kSectionSnapNames[] = {"free", "beat", "bar"};
 
 // One colour per section function, so the shape of a song is readable without reading any of it.
 // Warm for the payoffs, cool for the passages, grey for "the detector did not claim anything".
-ImU32 sectionColour(avgen::analysis::SectionFunction f, bool selected, bool hovered) {
-    using F = avgen::analysis::SectionFunction;
-    ImU32 base = IM_COL32(88, 96, 112, 220);
-    switch (f) {
-    case F::Intro:
-    case F::Outro:
-        base = IM_COL32(72, 92, 116, 220);
-        break;
-    case F::Verse:
-    case F::Instrumental:
-        base = IM_COL32(64, 108, 104, 220);
-        break;
-    case F::PreChorus:
-    case F::Build:
-        base = IM_COL32(150, 120, 60, 225);
-        break;
-    case F::Chorus:
-    case F::Drop:
-    case F::FinalChorus:
-        base = IM_COL32(176, 88, 86, 235);
-        break;
-    case F::Break:
-    case F::Breakdown:
-        base = IM_COL32(70, 74, 96, 220);
-        break;
-    case F::Bridge:
-        base = IM_COL32(112, 84, 140, 225);
-        break;
-    case F::Other:
-        base = IM_COL32(88, 96, 112, 220);
-        break;
+// Coloured by the type's CATEGORY rather than by the detector's function, because the lane now shows
+// the film's sections and a custom type has no detector function to colour by. Five categories
+// instead of thirteen functions is also the more useful grouping at a glance: what a passage is FOR
+// reads faster than which label the analyzer reached for.
+ImU32 sectionColour(avgen::song::SectionCategory c, bool selected, bool hovered) {
+    const avgen::ui::Palette& pal = avgen::ui::palette();
+    ImU32 base = pal.panel;
+    switch (c) {
+    case avgen::song::SectionCategory::Structural: base = pal.accent; break;
+    case avgen::song::SectionCategory::Energy:     base = pal.warning; break;
+    case avgen::song::SectionCategory::Texture:    base = pal.processing; break;
+    case avgen::song::SectionCategory::Cinematic:  base = pal.success; break;
+    case avgen::song::SectionCategory::Custom:     base = pal.accentMuted; break;
     }
-    // Lifted rather than outlined: the outline is what marks the boundary being dragged, and two
-    // outlines in one lane is two things saying "this one". The lift itself is the application's,
-    // so a selected section is as bright as a selected anything else.
-    //
-    // The function's own hue survives the lift, which is the point of this lane -- a chorus stays
-    // red when it is selected, because losing the hue would lose the only thing the lane is for.
-    return interactionFill(base, hovered, selected, false);
+    return avgen::ui::interactionFill(base, hovered, selected, false);
 }
 
 } // namespace
@@ -139,7 +115,7 @@ void SequencePanel::draw(app::Engine& engine) {
     // that is the whole point of caching it -- and re-running is an explicit button.
     if (analyzeOnImport_ && work_ == nullptr && engine.track() != nullptr &&
         engine.audioRevision() != structureRevision_ &&
-        engine.sequence().structure.sections.empty()) {
+        engine.sequence().sectionTimeline.sections.empty()) {
         startStructureAnalysis(engine, false);
     }
     // A menu item cannot open another popup from inside the first one's body, so it leaves a flag
@@ -299,7 +275,7 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
         // Re-running merges rather than replacing: `seq::reanalyze` puts back what a person moved
         // or named and reports it (ADR-215). Pressing this twice is safe, which is the property
         // that makes it worth having a button at all.
-        startStructureAnalysis(engine, !piece.structure.sections.empty());
+        startStructureAnalysis(engine, !piece.sectionTimeline.sections.empty());
     }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
@@ -481,7 +457,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     // checked without a window, and `tests/unit/test_ui_logic.cpp` checks it. The header column is
     // in there for the same reason: it moves where the time axis starts, and both sides ask.
     StripLanes lanes{.hasAudio = hasAudio,
-                     .hasSections = !piece.structure.sections.empty(),
+                     .hasSections = !piece.sectionTimeline.sections.empty(),
                      .actorCount = piece.actors.size(),
                      .hasOverlays = !piece.overlays.empty(),
                      .rulerHeight = kRulerHeight,
@@ -691,7 +667,14 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     // The song's own shape, directly under the ruler. Each section is a block; the line between two
     // blocks is the boundary and is what a drag grabs. A boundary is drawn as a full-height line
     // through the whole strip because that is what it is for: seeing whether a cut lands on one.
-    const auto& sections = piece.structure.sections;
+    // ADR-247: the FILM's sections, not the detector's report.
+    //
+    // This lane edited `piece.structure` until now -- the analysis -- while everything downstream
+    // cut from `piece.sectionTimeline`. So dragging a boundary here moved a number nothing read:
+    // the lane looked authoritative and was decorative. The two models are deliberately separate
+    // (a detection is evidence, a timeline is what a person decided), and the lane belongs to the
+    // one a person is deciding in.
+    const auto& sections = piece.sectionTimeline.sections;
     if (!sections.empty()) {
         const float top = origin.y + lanes.sectionsTop();
         const float bottom = top + lanes.sectionLaneHeight;
@@ -699,7 +682,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         laneHeader(lanes.sectionsTop(), lanes.sectionLaneHeight, "Sections",
                    selection_ == Selection::Section);
         for (std::size_t i = 0; i < sections.size(); ++i) {
-            const analysis::SongSection& section = sections[i];
+            const song::Section& section = sections[i];
             ImVec2 a(toX(section.startSeconds), top);
             ImVec2 b(toX(section.endSeconds), bottom);
             if (b.x < axisX || a.x > axisRight) {
@@ -713,8 +696,13 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             if (isHovered) {
                 hoverBlock = static_cast<int>(i);
             }
-            draw->AddRectFilled(a, b, sectionColour(section.function, isSelected, isHovered), 2.0f);
-            if (section.origin != analysis::SectionOrigin::Detected) {
+            const song::SectionType* type = piece.shotLanguage.type(section.type);
+            draw->AddRectFilled(
+                a, b,
+                sectionColour(type != nullptr ? type->category : song::SectionCategory::Custom,
+                              isSelected, isHovered),
+                2.0f);
+            if (section.authored || section.edited != song::SectionField::None) {
                 // A person's section is marked, because whether the analyzer or a person decided a
                 // boundary is the single most useful thing to know before pressing Analyze again.
                 draw->AddRect(ImVec2(a.x + 1.0f, a.y + 1.0f), ImVec2(b.x - 1.0f, b.y - 1.0f),
@@ -723,7 +711,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             if (b.x - a.x > 26.0f) {
                 draw->PushClipRect(a, ImVec2(b.x - 3.0f, b.y), true);
                 draw->AddText(ImVec2(a.x + 5.0f, a.y + 3.0f), pal.text,
-                              seq::sectionDisplayName(section).c_str());
+                              piece.shotLanguage.displayName(section).c_str());
                 draw->PopClipRect();
             }
         }
@@ -1126,7 +1114,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         } else if (lane == StripLane::Sections) {
             // A boundary first, because it is a five-point target inside a block and the block is
             // the thing you get when you miss it.
-            auto& structure = piece.structure;
+            auto& structure = piece.sectionTimeline;
             for (std::size_t i = 1; i < structure.sections.size(); ++i) {
                 if (std::fabs(mouse.x - toX(structure.sections[i].startSeconds)) <= kEdgeGrab) {
                     drag_ = Drag::SectionBoundary;
@@ -1282,7 +1270,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                 // been through the shot grid, so this starts again from the raw time. A snapped
                 // boundary takes the beat's own value, bit for bit; a free one takes the
                 // millisecond it landed on. Neither is rounded.
-                (void)seq::moveBoundary(piece.structure, static_cast<std::size_t>(dragIndex_),
+                (void)song::moveBoundary(piece.sectionTimeline, static_cast<std::size_t>(dragIndex_),
                                         snapSection(engine, mouseTime));
             }
             break;
@@ -1539,22 +1527,22 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
         break;
     }
     case StripLane::Sections: {
-        if (valid(menu_.index, piece.structure.sections.size())) {
+        if (valid(menu_.index, piece.sectionTimeline.sections.size())) {
             const auto index = static_cast<std::size_t>(menu_.index);
             menuSubject(fmt::format("Section: {}",
-                                    seq::sectionDisplayName(piece.structure.sections[index])));
+                                    piece.shotLanguage.displayName(piece.sectionTimeline.sections[index])));
             if (menuAction("Select")) {
                 selection_ = Selection::Section;
                 selected_ = menu_.index;
             }
-            const analysis::SongSection& section = piece.structure.sections[index];
+            const song::Section& section = piece.sectionTimeline.sections[index];
             // `splitSection` takes a time and refuses a split that would leave a section shorter
             // than its minimum, so the enabled test asks the same question the operation will:
             // an item that is offered and then declines is worse than one that was never offered.
             const bool splittable = at > section.startSeconds + kMinSectionSeconds &&
                                     at < section.endSeconds - kMinSectionSeconds;
             if (menuAction("Split here", nullptr, splittable)) {
-                if (seq::splitSection(piece.structure, at, kMinSectionSeconds)) {
+                if (song::splitSection(piece.sectionTimeline, at, kMinSectionSeconds)) {
                     piece.refreshSectionMarkers();
                     touch();
                 }
@@ -1562,8 +1550,8 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
             // Not "delete": the structure is gapless, so removing a section gives its time to a
             // neighbour rather than leaving a hole, and the label says which of those it is.
             if (menuAction("Remove (merge into neighbour)", nullptr,
-                           piece.structure.sections.size() > 1)) {
-                if (seq::removeSection(piece.structure, index)) {
+                           piece.sectionTimeline.sections.size() > 1)) {
+                if (song::removeSection(piece.sectionTimeline, index)) {
                     selection_ = Selection::None;
                     selected_ = -1;
                     piece.refreshSectionMarkers();
@@ -1731,7 +1719,7 @@ void SequencePanel::drawInspector(app::Engine& engine) {
         }
         break;
     case Selection::Section:
-        if (selected_ >= 0 && selected_ < static_cast<int>(piece.structure.sections.size())) {
+        if (selected_ >= 0 && selected_ < static_cast<int>(piece.sectionTimeline.sections.size())) {
             drawSectionInspector(engine, static_cast<std::size_t>(selected_));
         }
         break;
@@ -1743,14 +1731,14 @@ void SequencePanel::drawInspector(app::Engine& engine) {
 
 void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index) {
     seq::Sequence& piece = engine.sequence();
-    analysis::SongSection& section = piece.structure.sections[index];
+    song::Section& section = piece.sectionTimeline.sections[index];
     ImGui::SeparatorText("Section");
 
     std::strncpy(labelBuffer_, section.label.c_str(), sizeof(labelBuffer_) - 1);
     labelBuffer_[sizeof(labelBuffer_) - 1] = '\0';
     ImGui::SetNextItemWidth(200);
     if (ImGui::InputText("name", labelBuffer_, sizeof(labelBuffer_))) {
-        if (seq::setSectionLabel(piece.structure, index, labelBuffer_)) {
+        if (song::setSectionLabel(piece.sectionTimeline, index, labelBuffer_)) {
             piece.refreshSectionMarkers();
             touch();
         }
@@ -1759,23 +1747,74 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
         ImGui::SetTooltip("What events call this section. Leave it empty to use the type's name.");
     }
 
-    // The type, from the one list `analysis::allSectionFunctions()` keeps, so this cannot come to
-    // offer eleven of thirteen.
-    const auto functions = analysis::allSectionFunctions();
-    int current = 0;
-    std::vector<const char*> names;
-    names.reserve(functions.size());
-    for (std::size_t i = 0; i < functions.size(); ++i) {
-        names.push_back(analysis::sectionFunctionName(functions[i]));
-        if (functions[i] == section.function) {
-            current = static_cast<int>(i);
+    // The type, from the `ShotLanguage` -- which is the person's vocabulary, built-ins and their own
+    // together. This used to offer `analysis::allSectionFunctions()`: the DETECTOR's thirteen
+    // categories, which is a different list for a different purpose. A person choosing what a
+    // passage *is* is choosing from their own vocabulary, and "Ocean Ambience" has to be in it or
+    // the custom-type feature has nowhere to appear.
+    {
+        const std::vector<const song::SectionType*> types = piece.shotLanguage.types();
+        int current = 0;
+        std::vector<const char*> names;
+        names.reserve(types.size());
+        for (std::size_t i = 0; i < types.size(); ++i) {
+            names.push_back(types[i]->name.c_str());
+            if (types[i]->id == section.type) {
+                current = static_cast<int>(i);
+            }
+        }
+        ImGui::SetNextItemWidth(200);
+        if (!names.empty() &&
+            ImGui::Combo("type", &current, names.data(), static_cast<int>(names.size()))) {
+            if (song::setSectionType(piece.sectionTimeline, index,
+                                     types[static_cast<std::size_t>(current)]->id,
+                                     piece.shotLanguage)) {
+                piece.refreshSectionMarkers();
+                touch();
+            }
+        }
+        if (ImGui::IsItemHovered() && current < static_cast<int>(types.size())) {
+            ImGui::SetTooltip("%s", types[static_cast<std::size_t>(current)]->description.c_str());
         }
     }
-    ImGui::SetNextItemWidth(200);
-    if (ImGui::Combo("type", &current, names.data(), static_cast<int>(names.size()))) {
-        if (seq::setSectionFunction(piece.structure, index, functions[static_cast<std::size_t>(current)])) {
-            piece.refreshSectionMarkers();
-            touch();
+
+    // The treatment. Storing the ABSENCE of an override is what makes "change the type and the
+    // treatment follows, unless I chose one" fall out of the model rather than needing a rule, so
+    // the first entry clears the override rather than setting a value equal to the default.
+    {
+        const song::SectionType* type = piece.shotLanguage.type(section.type);
+        const std::vector<const song::ShotIntent*> intents = piece.shotLanguage.intents();
+        std::vector<std::string> owned;
+        owned.emplace_back(type != nullptr
+                               ? fmt::format("default ({})", type->defaultShotIntent)
+                               : std::string("default"));
+        int current = 0;
+        for (std::size_t i = 0; i < intents.size(); ++i) {
+            owned.push_back(intents[i]->name);
+            if (section.shotIntent && *section.shotIntent == intents[i]->id) {
+                current = static_cast<int>(i) + 1;
+            }
+        }
+        std::vector<const char*> names;
+        names.reserve(owned.size());
+        for (const std::string& n : owned) {
+            names.push_back(n.c_str());
+        }
+        ImGui::SetNextItemWidth(200);
+        if (ImGui::Combo("shot", &current, names.data(), static_cast<int>(names.size()))) {
+            const bool ok =
+                current == 0
+                    ? song::clearSectionShotIntent(piece.sectionTimeline, index)
+                    : song::setSectionShotIntent(piece.sectionTimeline, index,
+                                                 intents[static_cast<std::size_t>(current - 1)]->id,
+                                                 piece.shotLanguage);
+            if (ok) {
+                touch();
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("What this section should look like. 'default' follows the type, so "
+                              "changing the type changes the treatment too.");
         }
     }
 
@@ -1785,29 +1824,36 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
                 clock(section.endSeconds).c_str(), section.durationSeconds());
     ImGui::TextDisabled("%.6f -> %.6f s", section.startSeconds, section.endSeconds);
 
-    const char* originText = analysis::sectionOriginName(section.origin);
-    if (section.origin == analysis::SectionOrigin::Detected) {
-        ImGui::TextDisabled("%s", originText);
+    // Provenance, which the film's model records per FIELD rather than per section: a boundary a
+    // person dragged and a label they typed are different claims on a re-analysis, and ADR-247's
+    // whole reconciliation rests on telling them apart.
+    const std::vector<std::string> editedFields = song::sectionFieldNames(section.edited);
+    std::string originText;
+    if (section.authored) {
+        originText = "authored";
+    } else if (editedFields.empty()) {
+        originText = "detected";
     } else {
-        ImGui::TextColored(ImVec4(0.96f, 0.88f, 0.58f, 1.0f), "%s -- kept when you analyze again",
-                           originText);
-    }
-    if (seq::confidenceIsMeaningful(section)) {
-        // Only for a detected section. On one a person has touched the number is not a smaller
-        // claim, it is not a claim at all (ADR-215), so it is not shown rather than shown small.
-        ImGui::TextDisabled("label %.0f%%, boundary %.0f%%",
-                            static_cast<double>(section.labelConfidence) * 100.0,
-                            static_cast<double>(section.startConfidence) * 100.0);
-        if (section.repetitionGroup >= 0) {
-            ImGui::SameLine();
-            ImGui::TextDisabled("| repeat %d, occurrence %d", section.repetitionGroup,
-                                section.occurrence + 1);
+        originText = "edited: ";
+        for (std::size_t i = 0; i < editedFields.size(); ++i) {
+            originText += (i == 0 ? "" : ", ") + editedFields[i];
         }
     }
+    if (!section.authored && editedFields.empty()) {
+        ImGui::TextDisabled("%s", originText.c_str());
+    } else {
+        ImGui::TextColored(ImVec4(0.96f, 0.88f, 0.58f, 1.0f), "%s -- kept when you analyze again",
+                           originText.c_str());
+    }
+    // The detector's confidences are deliberately NOT shown here any more. They are a claim about
+    // `analysis::SongStructure`'s sections, and this inspector now edits the film's -- which a person
+    // may have moved, split or retyped since. A number carried across that boundary would be a
+    // confidence about a span that no longer exists, which is worse than no number (ADR-215 makes
+    // the same argument about a touched section).
 
     if (ImGui::Button("Split at playhead")) {
         const double at = engine.timelineClock().seconds;
-        if (const auto made = seq::splitSection(piece.structure, snapSection(engine, at))) {
+        if (const auto made = song::splitSection(piece.sectionTimeline, snapSection(engine, at))) {
             selected_ = static_cast<int>(*made);
             piece.refreshSectionMarkers();
             touch();
@@ -1817,9 +1863,9 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
         }
     }
     ImGui::SameLine();
-    ImGui::BeginDisabled(piece.structure.sections.size() <= 1);
+    ImGui::BeginDisabled(piece.sectionTimeline.sections.size() <= 1);
     if (ImGui::Button("Delete")) {
-        if (seq::removeSection(piece.structure, index)) {
+        if (song::removeSection(piece.sectionTimeline, index)) {
             selection_ = Selection::None;
             selected_ = -1;
             piece.refreshSectionMarkers();

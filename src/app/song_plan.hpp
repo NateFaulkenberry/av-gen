@@ -38,6 +38,8 @@
 #include "analysis/structure.hpp"
 #include "core/error.hpp"
 
+#include "song/section_cue.hpp"
+
 #include <nlohmann/json_fwd.hpp>
 
 #include <cstdint>
@@ -186,17 +188,34 @@ struct SongPlan {
 // Two ways a plan comes into existence, and both of them are here so that there is exactly one file
 // to change when the song data model publishes its vocabulary.
 //
-// **At merge**, `songPlanFromMeasurements` is replaced by
+// **The merge happened, and the note above was one type wrong.** It predicted
 //
 //     Result<SongPlan> songPlanFrom(std::span<const song::Section>);
 //
-// which reads each section's `SectionType`, takes that type's `ShotIntent`, and projects the intent
-// onto a `ShotIntentProfile`. That is roughly twenty lines, it lives in `song_plan.cpp`, and
-// **nothing else in the director moves** -- which is the property this seam exists to buy.
+// and the published vocabulary does not hand a `song::Section` to the director at all. What it
+// publishes is `song::SectionCue`: the section's span, its resolved `ShotIntent` by value, its
+// measured energy and density, and its occurrence -- with the section TYPE deliberately absent, and
+// a test that fails the build if `section_type.hpp` ever becomes reachable from here.
+//
+// That is a better seam than the one predicted, and it is the seam that exists. The adapter reads a
+// cue rather than a section, and nothing else in the director moved -- which is the property this
+// file was built to buy, and it held across a shape neither side chose alone.
 
 // The authored plan, from JSON. This is what a project carries and what the demo ships: a plan
 // somebody wrote down, with the intent ids and profiles they chose.
 [[nodiscard]] Result<SongPlan> songPlanFromJson(const nlohmann::json& doc);
+
+// **The adapter.** A cue sheet from the song data model becomes a plan the director can execute.
+//
+// This is the only function in the application that reads both vocabularies, and it is deliberately
+// the whole of the coupling between them: `song::` knows nothing about cameras, `app::SongPlan`
+// knows nothing about section types, and this projects one onto the other.
+//
+// `ShotIntent` carries more than a director can act on -- a description, a name, a built-in flag, a
+// framing RANGE, a camera range, an arc. `ShotIntentProfile` is five axes and a count. The mapping
+// is a projection and loses information on purpose; what it must not lose is the *ordering* of the
+// axes, because that is what the director actually consumes.
+[[nodiscard]] Result<SongPlan> songPlanFromCues(std::span<const song::SectionCue> cues);
 
 // A plan derived from an analyzed structure **without reading a single label**.
 //

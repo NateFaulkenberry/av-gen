@@ -312,3 +312,83 @@ SongPlan songPlanFromMeasurements(const analysis::SongStructure& structure) {
 }
 
 } // namespace avgen::app
+
+namespace avgen::app {
+
+// The projection, axis by axis. Each line is a decision about what a director can act on.
+Result<SongPlan> songPlanFromCues(std::span<const song::SectionCue> cues) {
+    SongPlan plan;
+    plan.sections.reserve(cues.size());
+    for (const song::SectionCue& cue : cues) {
+        const song::ShotIntent& intent = cue.intent;
+        SongPlanSection section;
+        section.startSeconds = cue.startSeconds;
+        section.endSeconds = cue.endSeconds;
+        section.label = cue.displayName;   // display only, exactly as both sides promised
+        section.energy = cue.energy;
+        section.density = cue.density;
+        section.occurrence = cue.occurrence;
+
+        ShotIntentProfile& profile = section.intent;
+        profile.id = intent.id;
+
+        // `SubjectFocus` is a category and `heroEmphasis` is a number, so the category picks the
+        // anchor and `focusStrength` decides how far from the middle it sits. Environment and Hero
+        // are the two poles; Ensemble leans hero-ward because an ensemble is still people; Mixed is
+        // the middle by definition and ignores the strength, since "strongly mixed" means nothing.
+        switch (intent.focus) {
+        case song::SubjectFocus::Hero:
+            profile.heroEmphasis = 0.5f + 0.5f * intent.focusStrength;
+            break;
+        case song::SubjectFocus::Ensemble:
+            profile.heroEmphasis = 0.5f + 0.25f * intent.focusStrength;
+            break;
+        case song::SubjectFocus::Environment:
+            profile.heroEmphasis = 0.5f - 0.5f * intent.focusStrength;
+            break;
+        case song::SubjectFocus::Mixed:
+            profile.heroEmphasis = 0.5f;
+            break;
+        }
+
+        // A RANGE becomes a number, because the director frames in subject radii and needs one
+        // distance to aim at. The middle of the range is the honest reduction: an intent that says
+        // Close..Wide is asking for Medium and some latitude, and the latitude it loses here is
+        // expressed again as `variation`, which is the axis that actually governs how far the
+        // director may roam between shots.
+        const auto band = [](song::Framing f) {
+            // ExtremeClose..VeryWide over 0..1, so the scale is the enum's own order and adding a
+            // sixth framing later moves the numbers rather than breaking the mapping.
+            return static_cast<float>(static_cast<int>(f)) /
+                   static_cast<float>(static_cast<int>(song::Framing::VeryWide));
+        };
+        profile.distance = 0.5f * (band(intent.framing.tightest) + band(intent.framing.widest));
+
+        profile.movement = intent.movement;
+        profile.variation = intent.variation;
+        profile.cutRate = intent.cutFrequency;
+
+        // `CameraCount` is a range and the profile asks for one number. The FEWEST is the request,
+        // not the most: `cameras` is already documented as a request a world may not be able to
+        // honour, so asking for the minimum the intent needs is the number that can actually be
+        // met. `most` is the latitude, and the director expresses latitude through `variation`.
+        profile.cameras = std::max(1, intent.cameras.fewest);
+
+        if (auto ok = profile.validate(); !ok) {
+            return fail("section '{}': {}", section.label, ok.error().message);
+        }
+        plan.sections.push_back(std::move(section));
+    }
+    // `transition` is a property of a boundary, so it can only be filled once the neighbours are
+    // known. The first section has no incoming boundary and keeps 0.
+    for (std::size_t i = 1; i < plan.sections.size(); ++i) {
+        plan.sections[i].transition =
+            std::abs(plan.sections[i].energy - plan.sections[i - 1].energy);
+    }
+    if (auto ok = plan.validate(); !ok) {
+        return std::unexpected(ok.error());
+    }
+    return plan;
+}
+
+} // namespace avgen::app
