@@ -310,6 +310,48 @@ struct BakeResult {
 };
 
 // The complete timed performance.
+// ---- editing shots (the Shots lane's gestures, as functions) ------------------------------------
+//
+// The section lane's edits have lived in the model since ADR-247 (`song::moveBoundary`,
+// `song::splitSection`); the shot lane's lived inline in `SequencePanel` and could not be tested
+// without ImGui. These are those gestures, moved out unchanged, so a test drives the same arithmetic
+// the pointer does instead of a copy of it that can drift.
+//
+// `minSeconds` is the shortest a shot may become. The panel passes its own `kMinBlockSeconds`; the
+// default matches it.
+inline constexpr double kMinShotSeconds = 0.25;
+
+// Slides a shot, keeping its length. Never before zero.
+void moveShot(Shot& shot, double newStart);
+
+// Moves the END, keeping the start. Refuses to go shorter than `minSeconds`.
+void trimShotEnd(Shot& shot, double newEnd, double minSeconds = kMinShotSeconds);
+
+// Moves the START, keeping the END where it is.
+//
+// The end is passed in rather than read from the shot, and that is the whole subtlety: during a drag
+// the duration is changing under the gesture, so recomputing the end from it would move both edges
+// at once -- trimming a start would become a move. The caller remembers the end when the drag begins.
+void trimShotStart(Shot& shot, double newStart, double fixedEnd, double minSeconds = kMinShotSeconds);
+
+// Splits the shot at `index` at `seconds`. The earlier half keeps everything; the later half is a
+// copy named "<name> b", starting at the cut, and both sides get a hard cut at the new seam.
+//
+// Refuses where either half would be shorter than `minSeconds` -- a split that makes a shot nobody
+// can see is not a split. Returns the index of the new later half.
+[[nodiscard]] std::optional<std::size_t> splitShot(std::vector<Shot>& shots, std::size_t index,
+                                                   double seconds,
+                                                   double minSeconds = kMinShotSeconds);
+
+// Copies the shot at `index`, named "<name> copy", and places it in the list directly after the
+// original and in TIME directly after it too. Both matter: a copy on the same span would never play,
+// because `shotAt` takes the first match. Returns the new index.
+[[nodiscard]] std::optional<std::size_t> duplicateShot(std::vector<Shot>& shots, std::size_t index);
+
+// Removes the shot at `index`. Unlike a section, a timeline of no shots is legal: the piece simply
+// has no authored camera, which is what an untouched project already looks like.
+bool removeShot(std::vector<Shot>& shots, std::size_t index);
+
 struct Sequence {
     std::string name = "sequence";
     // 0 = derive from the shots, the actors and the overlays.

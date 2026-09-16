@@ -1248,23 +1248,22 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         case Drag::Playhead:
             engine.seekSeconds(std::clamp(t, 0.0, duration));
             break;
+        // The three shot gestures live in `seq/sequence.hpp` now, so what a drag does and what a
+        // test can check are the same code rather than two spellings of it.
         case Drag::MoveShot:
             if (seq::Shot* s = shot(); s != nullptr) {
-                s->startSeconds = std::max(0.0, t - dragGrab_);
+                seq::moveShot(*s, t - dragGrab_);
             }
             break;
         case Drag::TrimShotEnd:
             if (seq::Shot* s = shot(); s != nullptr) {
-                s->durationSeconds = std::max(kMinBlockSeconds, t - s->startSeconds);
+                seq::trimShotEnd(*s, t, kMinBlockSeconds);
             }
             break;
         case Drag::TrimShotStart:
             if (seq::Shot* s = shot(); s != nullptr) {
-                // The end stays where it was: trimming the start of a clip is not the same gesture
-                // as moving it, and a duration recomputed from the live end would do both at once.
-                const double start = std::clamp(t, 0.0, dragAnchor_ - kMinBlockSeconds);
-                s->startSeconds = start;
-                s->durationSeconds = dragAnchor_ - start;
+                // `dragAnchor_` is the end remembered when the gesture began -- see `trimShotStart`.
+                seq::trimShotStart(*s, t, dragAnchor_, kMinBlockSeconds);
             }
             break;
         case Drag::MoveOverlay:
@@ -1428,14 +1427,11 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
                 selected_ = menu_.index;
             }
             if (menuAction("Duplicate")) {
-                seq::Shot copy = shot;
-                copy.name = fmt::format("{} copy", shot.name);
-                copy.startSeconds = shot.endSeconds();
-                piece.shots.insert(piece.shots.begin() + static_cast<std::ptrdiff_t>(index) + 1,
-                                   std::move(copy));
-                selection_ = Selection::Shot;
-                selected_ = menu_.index + 1;
-                touch();
+                if (const auto made = seq::duplicateShot(piece.shots, index)) {
+                    selection_ = Selection::Shot;
+                    selected_ = static_cast<int>(*made);
+                    touch();
+                }
             }
             // Splitting is a real operation on a shot -- two shots whose durations add up to the
             // original's -- and it is offered only where it would produce two shots that are not
@@ -1443,16 +1439,9 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
             const bool splittable = at > shot.startSeconds + kMinBlockSeconds &&
                                     at < shot.endSeconds() - kMinBlockSeconds;
             if (menuAction("Split at pointer", nullptr, splittable)) {
-                seq::Shot tail = shot;
-                tail.name = fmt::format("{} b", shot.name);
-                tail.startSeconds = at;
-                tail.durationSeconds = shot.endSeconds() - at;
-                tail.in = seq::Transition{seq::TransitionKind::Cut, 0.0};
-                piece.shots[index].durationSeconds = at - shot.startSeconds;
-                piece.shots[index].out = seq::Transition{seq::TransitionKind::Cut, 0.0};
-                piece.shots.insert(piece.shots.begin() + static_cast<std::ptrdiff_t>(index) + 1,
-                                   std::move(tail));
-                touch();
+                if (seq::splitShot(piece.shots, index, at, kMinBlockSeconds)) {
+                    touch();
+                }
             }
             ImGui::Separator();
             if (menuAction("Delete", shortcut::kDelete)) {

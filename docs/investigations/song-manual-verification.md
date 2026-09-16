@@ -22,11 +22,11 @@ is not there.
 | 5 | Song Mode with no performer rules | full camera sequence | **verified** | `test_song_beginner_path.cpp`, 86 assertions |
 | 6 | More than one camera used | ≥2 distinct cameras | **verified** | same test asserts `used.size() > 1` |
 | 7 | Add a shot | a new shot appears | implemented | "Add Shot" button; "Add shot at end" |
-| 8 | Move a shot | start moves, duration kept | implemented | `Drag::MoveShot` |
-| 9 | Trim a shot | one edge moves, the other holds | implemented | `Drag::TrimShotStart` / `TrimShotEnd`; the end is remembered, not recomputed |
-| 10 | Split a shot | two shots, durations sum to the original | implemented | "Split at pointer", offered only where both halves clear `kMinBlockSeconds` |
-| 11 | Duplicate a shot | a copy | implemented | context menu "Duplicate" |
-| 12 | Delete a shot | removed | implemented | context menu / Delete key |
+| 8 | Move a shot | start moves, duration kept | **verified** | `seq::moveShot`; `test_shot_editing.cpp` |
+| 9 | Trim a shot | one edge moves, the other holds | **verified** | `seq::trimShotStart`/`trimShotEnd`; the end is passed in, not recomputed |
+| 10 | Split a shot | two shots, durations sum to the original | **verified** | `seq::splitShot`; refused near either edge |
+| 11 | Duplicate a shot | a copy, after the original in time | **verified** | `seq::duplicateShot` |
+| 12 | Delete a shot | removed, others untouched | **verified** | `seq::removeShot` |
 | 13 | **Shot crosses a section boundary** | allowed, section unchanged | **verified by construction** | `seq::Shot` has **no section field**; nothing validates a shot against a section |
 | 14 | Many shots in one section | allowed | **verified by construction** | same — sections do not own shots |
 | 15 | Overlapping shots | first in array order wins | implemented | `Sequence::shotAt` returns the first containing span |
@@ -61,10 +61,15 @@ is not there.
    click to open and no `--ui-script` arm opens one. The performer checkbox is therefore the one
    control in this workflow whose appearance is unverified. *Subsystem: test tooling.*
 
-4. **No end-to-end test of the manual editing path.** Add/move/trim/split/duplicate are each
-   implemented and none is covered by a test that drives the lane. The camera path now has an
-   end-to-end test; the editing path does not. *This is the same shape of gap that let
-   `songPlanFromCues` sit unwired.*
+4. ~~**No end-to-end test of the manual editing path.**~~ **Closed.** The six gestures were inline in
+   `SequencePanel` and unreachable without ImGui, so they moved into `seq/sequence.hpp` -- matching
+   how section edits have lived in the model since ADR-247 -- and the panel now calls them.
+   `tests/unit/test_shot_editing.cpp` drives the same code the pointer does.
+
+   The extraction found one thing worth recording: the panel's Duplicate places the copy after the
+   original **in time**, not on top of it, and the first version of the extracted function dropped
+   that. A copy on the same span would never play, because `shotAt` takes the first match -- the
+   gesture would look like it had done nothing. Now asserted.
 
 ---
 
@@ -81,8 +86,7 @@ is not there.
 
 ## Recommended fixes, in priority order
 
-1. **End-to-end test of the editing path** (limitation 4). Highest value; matches the failure mode
-   this repository has already shipped once.
+1. ~~End-to-end test of the editing path~~ -- **done**, see limitation 4.
 2. **A `--ui-script` arm that opens a popup** (limitation 3). Small, and it closes the last
    unverifiable UI surface in this workflow.
 3. **A performer-rule editor** (limitation 1). Real but not blocking: the system works, and the

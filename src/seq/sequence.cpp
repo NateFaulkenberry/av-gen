@@ -763,6 +763,67 @@ double Sequence::duration() const {
     return end;
 }
 
+// ---- editing shots ------------------------------------------------------------------------------
+//
+// Moved out of `SequencePanel` unchanged. Each one is the arithmetic a gesture already performed;
+// the point of the move is that a test can now reach it.
+
+void moveShot(Shot& shot, double newStart) { shot.startSeconds = std::max(0.0, newStart); }
+
+void trimShotEnd(Shot& shot, double newEnd, double minSeconds) {
+    shot.durationSeconds = std::max(minSeconds, newEnd - shot.startSeconds);
+}
+
+void trimShotStart(Shot& shot, double newStart, double fixedEnd, double minSeconds) {
+    // The end is the caller's, not the shot's: see the header. Clamped so the shot cannot be trimmed
+    // through its own end and out the other side.
+    const double start = std::clamp(newStart, 0.0, fixedEnd - minSeconds);
+    shot.startSeconds = start;
+    shot.durationSeconds = fixedEnd - start;
+}
+
+std::optional<std::size_t> splitShot(std::vector<Shot>& shots, std::size_t index, double seconds,
+                                     double minSeconds) {
+    if (index >= shots.size()) {
+        return std::nullopt;
+    }
+    const Shot& shot = shots[index];
+    if (seconds <= shot.startSeconds + minSeconds || seconds >= shot.endSeconds() - minSeconds) {
+        return std::nullopt;
+    }
+    Shot tail = shot;
+    tail.name = fmt::format("{} b", shot.name);
+    tail.startSeconds = seconds;
+    tail.durationSeconds = shot.endSeconds() - seconds;
+    tail.in = Transition{TransitionKind::Cut, 0.0};
+    shots[index].durationSeconds = seconds - shot.startSeconds;
+    shots[index].out = Transition{TransitionKind::Cut, 0.0};
+    shots.insert(shots.begin() + static_cast<std::ptrdiff_t>(index) + 1, std::move(tail));
+    return index + 1;
+}
+
+std::optional<std::size_t> duplicateShot(std::vector<Shot>& shots, std::size_t index) {
+    if (index >= shots.size()) {
+        return std::nullopt;
+    }
+    Shot copy = shots[index];
+    copy.name = fmt::format("{} copy", shots[index].name);
+    // Placed AFTER the original rather than on top of it. A duplicate that lands on the same span
+    // would be invisible -- `shotAt` takes the first match, so the copy would never play and the
+    // gesture would look like it had done nothing.
+    copy.startSeconds = shots[index].endSeconds();
+    shots.insert(shots.begin() + static_cast<std::ptrdiff_t>(index) + 1, std::move(copy));
+    return index + 1;
+}
+
+bool removeShot(std::vector<Shot>& shots, std::size_t index) {
+    if (index >= shots.size()) {
+        return false;
+    }
+    shots.erase(shots.begin() + static_cast<std::ptrdiff_t>(index));
+    return true;
+}
+
 const Shot* Sequence::shotAt(double seconds) const {
     for (const auto& s : shots) {
         if (seconds >= s.startSeconds && seconds < s.endSeconds()) {
