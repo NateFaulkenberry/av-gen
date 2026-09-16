@@ -322,6 +322,9 @@ private:
     void drawTimelineTab(app::Engine& engine);
     void drawRender(app::Engine& engine);
     void drawAutoDirector(app::Engine& engine);
+    // ADR-249: Song Mode's half of that panel. Separate because it is a different question --
+    // how faithfully to execute an authored song -- and because the other half is long enough.
+    void drawSongDirector(app::Engine& engine, app::AutoDirectorSettings& settings);
     // The camera library (ADR-245). Deliberately the smallest surface that lets a novice do the six
     // things the multi-camera brief asks for -- make a camera, put it where the viewport is looking,
     // see which one is live, give it to the Auto-director, put it on the timeline, delete it -- with

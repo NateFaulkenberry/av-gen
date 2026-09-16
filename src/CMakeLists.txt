@@ -6,6 +6,11 @@ file(GLOB_RECURSE AVGEN_CORE_SOURCES CONFIGURE_DEPENDS
 # holds an app::Shot by value in every shot it bakes. It lives in app/ for history's sake; it
 # belongs to the library, or seq/ could not be tested without linking the editor.
 list(APPEND AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/app/cinematic.cpp")
+# Song Mode (ADR-249) is the same shape and here for the same reason: the plan is a value and
+# the director is a pure function from (plan, heroes, cameras) to shots. Neither touches the
+# engine, and keeping them in the library is what lets the tests direct a song without a device.
+list(APPEND AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/app/song_plan.cpp"
+                               "${CMAKE_CURRENT_SOURCE_DIR}/app/song_director.cpp")
 if(APPLE)
     # Native video export (AVFoundation) is Objective-C++; the portable stub is for other platforms.
     # The AI control plane's HTTP transport (ADR-094) is the same shape: NSURLSession has no C
@@ -80,7 +85,9 @@ endif()
 # ---- avgen: the application -------------------------------------------------------------------
 file(GLOB_RECURSE AVGEN_APP_SOURCES CONFIGURE_DEPENDS app/*.cpp)
 # cinematic.cpp is compiled into avgen_core (above); leaving it here too would define it twice.
-list(REMOVE_ITEM AVGEN_APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/app/cinematic.cpp")
+list(REMOVE_ITEM AVGEN_APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/app/cinematic.cpp"
+                                   "${CMAKE_CURRENT_SOURCE_DIR}/app/song_plan.cpp"
+                                   "${CMAKE_CURRENT_SOURCE_DIR}/app/song_director.cpp")
 # The engine revision, regenerated on every build so a benchmark record's conditions cannot be
 # stale (ADR-113). Script mode rather than configure time: a revision captured at configure time is
 # whatever it was the last time somebody ran cmake, which is exactly the kind of number that makes

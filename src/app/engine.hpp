@@ -387,6 +387,19 @@ public:
     [[nodiscard]] AutoDirectorSettings& autoDirector() { return autoDirector_; }
     [[nodiscard]] const AutoDirectorSettings& autoDirector() const { return autoDirector_; }
 
+    // ADR-249: the authored song plan -- what each section of the piece asks the camera to do.
+    //
+    // Here for the same reasons the settings above are: the project file is what `saveProject`
+    // writes and what an offline render loads, and a Song Mode render that does not carry the plan
+    // is a Song Mode render of nothing. Nothing in the engine reads it; the Auto-director does.
+    //
+    // **This is the plan the director is directed to, not a copy of anybody's song structure.** An
+    // empty plan is the normal state: Song Mode then derives one from the analyzed structure
+    // (`songPlanForEngine`), which is what makes the beginner path work before anybody has authored
+    // a single intent.
+    [[nodiscard]] SongPlan& songPlan() { return songPlan_; }
+    [[nodiscard]] const SongPlan& songPlan() const { return songPlan_; }
+
     [[nodiscard]] params::Timeline& timeline() { return timeline_; }
     [[nodiscard]] const params::Timeline& timeline() const { return timeline_; }
     // The clock the timeline is evaluated against this frame: audio time (render time without
@@ -637,6 +650,7 @@ private:
     std::array<float, world::kAuroraBands> auroraSpectrum_{};
     std::vector<world::ShotSpan> shotSpans_;
     AutoDirectorSettings autoDirector_; // ADR-225: saved with the project, read by the host
+    SongPlan songPlan_;                 // ADR-249: the same, for Song Mode's authored intents
     std::uint32_t lastWorldEffectCount_ = 0;
     std::uint32_t lastAtmosphericCount_ = 0;
     void updateWorldEffects();

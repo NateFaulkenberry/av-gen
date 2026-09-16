@@ -19,6 +19,8 @@
 // per frame and nothing here runs on the audio thread.
 
 #include "app/cinematic.hpp"
+#include "app/song_director.hpp"
+#include "app/song_plan.hpp"
 #include "core/error.hpp"
 #include "analysis/analysis_track.hpp"
 #include "signals/musical_events.hpp"
@@ -96,6 +98,15 @@ struct AutoDirectorSettings {
     // however high the slider went. "I'm not sure I can control that enough with just the importance
     // param" -- correct, and this is the thing that was missing.
     int dwellShots = 1;
+    // How much freedom Song Mode has (ADR-249). Read by `DirectorMode::Song` and by nothing else --
+    // the other two modes have no authored intent to be more or less faithful to.
+    //
+    // A **ceiling**, not a setting: the effective autonomy of a section is the lesser of this and
+    // the section's own, so this control can always be trusted to reduce. Defaults to `Expressive`
+    // because a plan's own sections default to `Guided`, and a film-wide control whose default
+    // silently overrode every section would be a control that appeared to do nothing when lowered
+    // and everything when raised.
+    Autonomy autonomy = Autonomy::Expressive;
 
     [[nodiscard]] Result<void> validate() const;
     void applyTo(DirectionBrief& brief) const;
@@ -117,6 +128,36 @@ struct AutoDirectorSettings {
 [[nodiscard]] Result<Sequence> directHeroes(std::span<const world::HeroPoint> heroes,
                                             const signals::MusicalStructure& structure,
                                             const AutoDirectorSettings& settings = {});
+
+// ---- Song Mode (ADR-249) -------------------------------------------------------------------------
+//
+// The same three steps as above, against an authored song plan instead of a fold of the audio: a
+// brief from the heroes, a direction from the plan, and an install that touches the engine. What is
+// different is that a Song Mode direction has two halves -- a framing bake for the Auto-director's
+// own camera, and a *camera track* naming which camera is seen when -- so the install writes to the
+// composition's `CameraDirection` as well as to the timeline.
+
+// Heroes plus a plan plus the scene's cameras into a direction. Engine-free, like `directHeroes`:
+// a direction can be inspected before anything is installed.
+[[nodiscard]] Result<SongDirection> directSongFromPlan(std::span<const world::HeroPoint> heroes,
+                                                       const SongPlan& plan,
+                                                       const scene::CameraDirection& cameras,
+                                                       const AutoDirectorSettings& settings);
+
+// Installs both halves. The timeline half is `installSequence`; the camera-track half replaces every
+// shot the director owns (`CameraShot::Origin::Directed`) and leaves every authored shot exactly
+// where it was -- the same rule the timeline half follows, for the same reason.
+//
+// Main thread only: it mutates the timeline and the composition the renderer reads.
+[[nodiscard]] Result<std::size_t> installSongDirection(Engine& engine,
+                                                       const SongDirection& direction,
+                                                       const AutoDirectorSettings& settings);
+
+// The plan the engine should be directed to, which is the authored one when there is one and a
+// measurement-derived stand-in when there is not (`songPlanFromMeasurements`). Separate from
+// `directEngine` because "what would Song Mode direct" is a question a panel asks without wanting
+// to cut anything.
+[[nodiscard]] Result<SongPlan> songPlanForEngine(const Engine& engine);
 
 // Installs a sequence's baked tracks on the engine's timeline, replacing any tracks that drive the
 // same camera parameters and leaving every other track alone.

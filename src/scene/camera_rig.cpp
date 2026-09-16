@@ -289,6 +289,10 @@ json CameraDirection::toJson() const {
         if (!shot.label.empty()) {
             s["label"] = shot.label;
         }
+        // Written only when it is not the default, so an untouched project is byte-identical.
+        if (shot.origin == CameraShot::Origin::Directed) {
+            s["origin"] = "directed";
+        }
         shotArray.push_back(std::move(s));
     }
     return json{{"cameras", std::move(cams)},
@@ -374,6 +378,14 @@ Result<CameraDirection> CameraDirection::fromJson(const json& doc) {
             shot.blendSeconds = sh.value("blend", 0.0);
             shot.locked = sh.value("locked", false);
             shot.label = sh.value("label", std::string());
+            if (const auto o = sh.find("origin"); o != sh.end() && o->is_string()) {
+                const std::string origin = o->get<std::string>();
+                if (origin == "directed") {
+                    shot.origin = CameraShot::Origin::Directed;
+                } else if (origin != "authored") {
+                    return fail("shot origin '{}' is not one of authored, directed", origin);
+                }
+            }
             out.shots.push_back(std::move(shot));
         }
     }

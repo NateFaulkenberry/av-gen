@@ -24,6 +24,7 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -340,9 +341,18 @@ struct Sequence {
 // from the start, but it was invisible, and what it did was pin positions without doing anything
 // about velocity. A camera that arrives at a section boundary, stops dead, and accelerates away
 // again has cut -- it has just done it without a frame of black.
-enum class DirectorMode : std::uint8_t { ContinuousShot, EditedSequence };
+// **Song** -- the piece's own authored section timeline is the directing script, and the director
+// makes the camera decisions inside each section (ADR-249). Not a third way of cutting one camera:
+// it is the mode that reads a shot intent per section and selects among the scene's cameras to
+// execute it, so it is the only one of the three whose output includes a camera track. It lives in
+// `song_director.hpp`, because everything it consumes is a `SongPlan` and none of it is a fold over
+// audio -- the fold has already happened, and somebody has edited the result.
+enum class DirectorMode : std::uint8_t { ContinuousShot, EditedSequence, Song };
 [[nodiscard]] const char* directorModeName(DirectorMode mode);
 [[nodiscard]] std::optional<DirectorMode> directorModeFromName(std::string_view name);
+// Every mode, in declaration order. One list, so a panel offering the choices and a test checking
+// them all cannot come to disagree about how many there are.
+[[nodiscard]] std::span<const DirectorMode> allDirectorModes();
 
 // film is about; everything else is a preference with a defensible default.
 struct DirectionBrief {

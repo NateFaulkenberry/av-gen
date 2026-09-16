@@ -78,6 +78,20 @@ std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state) {
     // ADR-207: and so does the shot schedule. A world effect gated on "the camera is travelling"
     // must not keep firing against a cut that is no longer driving anything.
     engine.setShotSpans({});
+    // ADR-249: and so do the camera shots Song Mode wrote. Everything the director owns goes;
+    // everything a person authored stays, which is the identical rule the timeline half follows.
+    if (scene::Composition* composition = engine.composition()) {
+        scene::CameraDirection direction = composition->cameraDirection();
+        const std::size_t before = direction.shots.size();
+        std::erase_if(direction.shots, [](const scene::CameraShot& s) {
+            return s.origin == scene::CameraShot::Origin::Directed;
+        });
+        if (direction.shots.size() != before) {
+            if (auto ok = engine.setCameraDirection(std::move(direction)); !ok) {
+                log::warn("auto-director: {}", ok.error().message);
+            }
+        }
+    }
     // Everything except the settings, which are the user's preferences rather than this cut's state.
     // Resetting the whole struct wiped the panel's choices every time the camera went back to the
     // viewport, so a shot mode chosen once survived until the first hand-back and no longer.
@@ -305,7 +319,15 @@ Result<void> AutoDirectorSettings::validate() const {
     if (!(minShotSeconds > 0.0) || minShotSeconds > 120.0) {
         return fail("auto-director: minimum shot length must be in (0, 120] s");
     }
-    if (!(minBuildShotSeconds > 0.0) || minBuildShotSeconds > minShotSeconds) {
+    // The relationship, not the value, and only in the modes that have builds.
+    //
+    // Song Mode has none: a section carries a cut rate and the floor it stops at is
+    // `minShotSeconds`. Enforcing the pair there made the panel a trap -- Song Mode *disables*
+    // `shortest build`, so lowering `shortest shot` past it produced a refusal whose only cure was
+    // a slider the mode had greyed out. The pair is checked again the moment a mode that reads it
+    // is chosen, which is the right time to be told.
+    if (!(minBuildShotSeconds > 0.0) ||
+        (mode != DirectorMode::Song && minBuildShotSeconds > minShotSeconds)) {
         return fail("auto-director: a build's minimum ({} s) must be positive and no longer than the "
                     "ordinary minimum ({} s)",
                     minBuildShotSeconds, minShotSeconds);
@@ -327,8 +349,9 @@ Result<void> AutoDirectorSettings::validate() const {
     if (dwellShots < 1 || dwellShots > 12) {
         return fail("auto-director: a subject must be held for 1..12 shots, not {}", dwellShots);
     }
-    // ADR-217. A named scenario with no role to watch would hold for ever, and a release of zero is
-    // a cut that snaps -- both are refused rather than guessed at.
+    // `autonomy` has no invalid value: it is an enum of three, and a JSON document naming a fourth
+    // is refused by `fromJson` before it reaches a field. Nothing to check here, said out loud so
+    // the omission does not read as one.
     return {};
 }
 
@@ -340,6 +363,7 @@ nlohmann::json AutoDirectorSettings::toJson() const {
                           {"maxSpeed", maxCameraSpeed},
                           {"maxSwing", maxViewRate},
                           {"dwell", dwellShots},
+                          {"autonomy", autonomyName(autonomy)},
                           {"seed", seed}};
 }
 
@@ -366,6 +390,17 @@ Result<AutoDirectorSettings> AutoDirectorSettings::fromJson(const nlohmann::json
     out.maxCameraSpeed = doc.value("maxSpeed", out.maxCameraSpeed);
     out.maxViewRate = doc.value("maxSwing", out.maxViewRate);
     out.dwellShots = doc.value("dwell", out.dwellShots);
+    if (const auto autonomy = doc.find("autonomy"); autonomy != doc.end()) {
+        if (!autonomy->is_string()) {
+            return fail("director.autonomy must be a string");
+        }
+        const auto parsed = autonomyFromName(autonomy->get<std::string>());
+        if (!parsed) {
+            return fail("director.autonomy '{}' is not locked, guided or expressive",
+                        autonomy->get<std::string>());
+        }
+        out.autonomy = *parsed;
+    }
     out.seed = doc.value("seed", out.seed);
     // Refused rather than clamped. A project is written by this application, so the only route to a
     // value outside the range is a hand edit or a file from a build that meant something else by
@@ -385,8 +420,139 @@ void AutoDirectorSettings::applyTo(DirectionBrief& brief) const {
     brief.seed = seed;
 }
 
+// ---- Song Mode (ADR-249) -------------------------------------------------------------------------
+
+Result<SongPlan> songPlanForEngine(const Engine& engine) {
+    // What somebody authored, if they authored anything. This is the whole point of Song Mode and
+    // the only branch that will matter once the song data model publishes its section types.
+    if (!engine.songPlan().empty()) {
+        return engine.songPlan();
+    }
+    // Otherwise, the analyzed structure read for its *measurements* -- never for its labels. The
+    // beginner path in the brief's section 11: import, analyze, Auto-director: Song, play.
+    const analysis::SongStructure& structure = engine.sequence().structure;
+    if (structure.sections.empty()) {
+        return fail("Song Mode needs a song structure: analyze the track in the Sequence panel, or "
+                    "author a song plan, before directing to it");
+    }
+    return songPlanFromMeasurements(structure);
+}
+
+Result<SongDirection> directSongFromPlan(std::span<const world::HeroPoint> heroes,
+                                         const SongPlan& plan,
+                                         const scene::CameraDirection& cameras,
+                                         const AutoDirectorSettings& settings) {
+    auto brief = briefFromHeroes(heroes);
+    if (!brief) {
+        return std::unexpected(brief.error());
+    }
+    settings.applyTo(*brief);
+    const std::vector<scene::CameraRig> eligible = eligibleCameras(cameras);
+    SongDirectorOptions options;
+    options.minShotSeconds = settings.minShotSeconds;
+    options.maxShotSeconds = settings.maxShotSeconds;
+    options.seed = settings.seed;
+    options.autonomy = settings.autonomy;
+    // The lens the framing bake commits to, from the hero's own proportions -- the same choice
+    // `briefFromHeroes` makes, carried through so Song Mode and the other two modes frame a tall
+    // thin subject the same way.
+    options.focalLength = brief->focalLength;
+    auto direction = directSong(plan, *brief, eligible, options);
+    if (!direction) {
+        return std::unexpected(direction.error());
+    }
+    // ADR-200's caps apply to Song Mode exactly as they do to the other two: they are a judgement
+    // about the *result*, and a Song Mode result is a camera moving through a world like any other.
+    if (settings.maxCameraSpeed > 0.0f) {
+        if (const std::size_t shortened =
+                direction->sequence.limitCameraSpeed(settings.maxCameraSpeed);
+            shortened > 0) {
+            log::info("song director: {} of {} shot(s) shortened to hold {:.1f} m/s", shortened,
+                      direction->sequence.shots.size(), settings.maxCameraSpeed);
+        }
+    }
+    if (settings.maxViewRate > 0.0f) {
+        if (const std::size_t widened = direction->sequence.limitViewRate(settings.maxViewRate);
+            widened > 0) {
+            log::info("song director: {} of {} shot(s) given a longer swing to hold {:.0f} deg/s",
+                      widened, direction->sequence.shots.size(), settings.maxViewRate);
+        }
+    }
+    setDirectionSummary(fmt::format(
+        "{} section(s), {} shot(s), {} camera(s) -- {} at most", plan.sections.size(),
+        direction->sequence.shots.size(), direction->camerasUsed(),
+        autonomyName(settings.autonomy)));
+    return direction;
+}
+
+Result<std::size_t> installSongDirection(Engine& engine, const SongDirection& direction,
+                                         const AutoDirectorSettings& settings) {
+    // The framing half first: if the bake is refused, nothing has touched the camera track and the
+    // scene is exactly as it was.
+    auto installed = installSequence(engine, direction.sequence, settings);
+    if (!installed) {
+        return std::unexpected(installed.error());
+    }
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        return fail("Song Mode needs a scene to put its camera track on");
+    }
+    scene::CameraDirection cameras = composition->cameraDirection();
+    // Everything the director owns goes; everything a person authored stays. The identical rule the
+    // timeline half follows a few lines above, and for the identical reason: two cuts on one track
+    // is not a blend, it is whichever the resolver takes last (ADR-245's rule 2).
+    const std::size_t before = cameras.shots.size();
+    std::erase_if(cameras.shots, [](const scene::CameraShot& s) {
+        return s.origin == scene::CameraShot::Origin::Directed;
+    });
+    const std::size_t replaced = before - cameras.shots.size();
+    for (const scene::CameraShot& shot : direction.shots) {
+        scene::CameraShot copy = shot;
+        copy.origin = scene::CameraShot::Origin::Directed;
+        cameras.shots.push_back(std::move(copy));
+    }
+    // In time order, because the resolver takes the *last* match and an unsorted list would make a
+    // directed shot's precedence depend on the order the director happened to emit it in.
+    std::stable_sort(cameras.shots.begin(), cameras.shots.end(),
+                     [](const scene::CameraShot& a, const scene::CameraShot& b) {
+                         return a.startSeconds < b.startSeconds;
+                     });
+    if (auto ok = engine.setCameraDirection(std::move(cameras)); !ok) {
+        return std::unexpected(ok.error());
+    }
+    log::info("song director: {} camera shot(s) installed, {} replaced, {} camera(s) in use",
+              direction.shots.size(), replaced, direction.camerasUsed());
+    for (const SongDecision& decision : direction.decisions) {
+        log::info("song director: {}", decision.line());
+    }
+    return *installed;
+}
+
 Result<std::size_t> directEngine(Engine& engine, std::span<const world::HeroPoint> heroes,
                                  const AutoDirectorSettings& settings) {
+    if (auto ok = settings.validate(); !ok) {
+        return std::unexpected(ok.error());
+    }
+    // Song Mode does not fold audio: the fold has already happened and somebody has edited the
+    // result. So it needs no analyzed track and works on a project whose audio is not loaded, which
+    // is what makes an offline render of a Song Mode cut possible from the project alone.
+    if (settings.mode == DirectorMode::Song) {
+        auto plan = songPlanForEngine(engine);
+        if (!plan) {
+            return std::unexpected(plan.error());
+        }
+        const scene::Composition* composition = engine.composition();
+        if (composition == nullptr) {
+            return fail("Song Mode needs a scene to direct");
+        }
+        auto direction = directSongFromPlan(heroes, *plan, composition->cameraDirection(), settings);
+        if (!direction) {
+            return std::unexpected(direction.error());
+        }
+        log::info("song director: {:.0f}s of authored song in {} section(s)",
+                  plan->durationSeconds(), plan->sections.size());
+        return installSongDirection(engine, *direction, settings);
+    }
     const analysis::AnalysisTrack* track = engine.track();
     if (track == nullptr) {
         return fail("the Auto-director needs analyzed audio; load a track first");
@@ -394,9 +560,6 @@ Result<std::size_t> directEngine(Engine& engine, std::span<const world::HeroPoin
     auto structure = structureOfTrack(*track);
     if (!structure) {
         return std::unexpected(structure.error());
-    }
-    if (auto ok = settings.validate(); !ok) {
-        return std::unexpected(ok.error());
     }
     auto sequence = directHeroes(heroes, *structure, settings);
     if (!sequence) {

@@ -876,6 +876,14 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
         // whose `director` block was the other subsystem's.
         doc["autoDirector"] = autoDirector_.toJson();
     }
+    // ADR-249: the song plan Song Mode directs to, beside the settings that say how freely.
+    //
+    // Its own key rather than a field of `autoDirector`, because the two are different kinds of
+    // thing: the settings are a person's preferences and the plan is the piece's content. Written
+    // only when there is one, so nothing changes for a project that has never used Song Mode.
+    if (!songPlan_.empty()) {
+        doc["songPlan"] = songPlan_.toJson();
+    }
     // ADR-158: which hero each directed shot was cut for, beside the tracks it accompanies.
     //
     // A sibling of `timeline` rather than part of the scene, because that is what it belongs to: the
@@ -1374,6 +1382,17 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             return std::unexpected(parsed.error());
         }
         autoDirector_ = *parsed;
+    }
+    // ADR-249. Cleared when absent for the same reason the settings are reset: a project with no
+    // plan must not inherit the last one's, or Song Mode would direct this piece to another one's
+    // sections.
+    songPlan_ = SongPlan{};
+    if (const auto plan = doc.find("songPlan"); plan != doc.end()) {
+        auto parsed = songPlanFromJson(*plan);
+        if (!parsed) {
+            return std::unexpected(parsed.error());
+        }
+        songPlan_ = std::move(*parsed);
     }
     // ADR-158. Cleared when absent, like the timeline above: a project without a cut must not
     // inherit the last one's, or the camera would chase a hero this scene has never heard of.

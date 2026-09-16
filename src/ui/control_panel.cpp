@@ -3386,6 +3386,133 @@ void ControlPanel::drawCameras(app::Engine& engine) {
     }
 }
 
+// Song Mode's half of the Auto-director panel (ADR-249, the brief's section 17).
+//
+// Deliberately three things and not a matrix: what the plan is, how much freedom the director has
+// over the whole film, and -- per section -- how much freedom that section allows. The brief asks
+// for exactly this shape:
+//
+//     Section
+//       Type: Chorus                     <- the Sequence panel's section inspector owns this
+//       Shot: Dynamic Hero Coverage      <- ...and this
+//       Director: Guided                 <- this panel owns this
+//
+// The type and the intent belong to the song, and the Sequence panel is where a person edits the
+// song. What belongs here is the one decision that is about the *director*: how faithfully to
+// execute what the song asked for.
+//
+// **Unverified visually beyond a capture.** This agent cannot see ImGui while it runs; what is
+// checked here is the model underneath (`tests/unit/test_song_director.cpp`) and one `--capture-ui`
+// screenshot of this panel with Song selected.
+void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettings& s) {
+    ImGui::Separator();
+    // The ceiling. Named for what it does rather than for what it is: "freedom" is the word a
+    // person uses, and the tooltip carries the fact that it only ever reduces.
+    ImGui::TextUnformatted("Director freedom");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+            "The most freedom any section gets. A section may ask for less; none gets more,\n"
+            "so lowering this can always be trusted to make the film more faithful to what\n"
+            "you authored.\n\n"
+            "Locked      one shot, one camera, framed exactly as the section asked.\n"
+            "Guided      the intent is respected; the camera, the cuts and the framing are\n"
+            "            the director's.\n"
+            "Expressive  ...and the director also reads the section's own loudness and\n"
+            "            busyness, so a loud section gets more coverage than a quiet one\n"
+            "            carrying the same intent.");
+    }
+    int autonomy = static_cast<int>(s.autonomy);
+    bool first = true;
+    for (const app::Autonomy a : app::allAutonomies()) {
+        if (!first) {
+            ImGui::SameLine();
+        }
+        first = false;
+        if (ImGui::RadioButton(app::autonomyName(a), &autonomy, static_cast<int>(a))) {
+            s.autonomy = a;
+        }
+    }
+
+    // What Song Mode would actually direct, asked rather than assumed. Cheap: it is either a copy
+    // of the authored plan or one pass over the analyzed sections' measurements -- no analysis runs
+    // here and none may (the brief's section 21).
+    auto plan = app::songPlanForEngine(engine);
+    if (!plan) {
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.35f, 1.0f), "%s", plan.error().message.c_str());
+        return;
+    }
+    const bool authored = !engine.songPlan().empty();
+    ImGui::TextDisabled("%zu section(s), %s", plan->sections.size(),
+                        authored ? "from this project's song plan"
+                                 : "derived from the analyzed structure");
+    if (!authored && ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Nobody has authored shot intents for this song yet, so each section's\n"
+                          "intent is derived from how loud and how busy it measured -- no labels\n"
+                          "are read. Change a section's freedom below and the derived plan becomes\n"
+                          "this project's own, saved with it.");
+    }
+
+    // The per-section rows. In a scrolling child, because a four-minute track is twenty of them and
+    // the panel has eight other controls under this one.
+    const float rowHeight = ImGui::GetTextLineHeightWithSpacing();
+    if (ImGui::BeginChild("song-sections", ImVec2(0.0f, std::min(9.0f, static_cast<float>(plan->sections.size()) + 0.5f) * rowHeight),
+                          ImGuiChildFlags_Borders)) {
+        for (std::size_t i = 0; i < plan->sections.size(); ++i) {
+            const app::SongPlanSection& section = plan->sections[i];
+            ImGui::PushID(static_cast<int>(i));
+            // The combo first and the description after it, rather than the description with the
+            // combo pushed to the right margin. The second reads better on paper and does not
+            // survive a long intent name: `SameLine(avail - 96)` draws the combo *over* text that
+            // is still running, and "Slow Environmental Exploration" put four characters of itself
+            // on the far side of the dropdown. Seen in a `--capture-ui` screenshot, which is the
+            // only way this kind of defect is ever seen.
+            ImGui::SetNextItemWidth(92.0f);
+            int rowAutonomy = static_cast<int>(section.autonomy);
+            const char* names[] = {app::autonomyName(app::Autonomy::Locked),
+                                   app::autonomyName(app::Autonomy::Guided),
+                                   app::autonomyName(app::Autonomy::Expressive)};
+            const bool retyped = ImGui::Combo("##autonomy", &rowAutonomy, names, IM_ARRAYSIZE(names));
+            ImGui::SameLine();
+            ImGui::Text("%5.1f  %s  --  %s", section.startSeconds,
+                        section.label.empty() ? "(unnamed)" : section.label.c_str(),
+                        section.intent.id.c_str());
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s\n\nhero %.0f%%  distance %.0f%%  movement %.0f%%\n"
+                                  "variation %.0f%%  cut rate %.0f%%  cameras %d\n"
+                                  "measured: energy %.0f%%, density %.0f%%\n"
+                                  "pass %d over this material",
+                                  section.intent.id.c_str(),
+                                  static_cast<double>(section.intent.heroEmphasis) * 100.0,
+                                  static_cast<double>(section.intent.distance) * 100.0,
+                                  static_cast<double>(section.intent.movement) * 100.0,
+                                  static_cast<double>(section.intent.variation) * 100.0,
+                                  static_cast<double>(section.intent.cutRate) * 100.0,
+                                  section.intent.cameras,
+                                  static_cast<double>(section.energy) * 100.0,
+                                  static_cast<double>(section.density) * 100.0,
+                                  section.occurrence + 1);
+            }
+            if (retyped) {
+                // The first edit to a derived plan makes it this project's own. Anything else would
+                // be a control whose value is thrown away on the next frame, which ADR-225 calls a
+                // setting nobody keeps.
+                if (engine.songPlan().empty()) {
+                    engine.songPlan() = *plan;
+                }
+                if (i < engine.songPlan().sections.size()) {
+                    engine.songPlan().sections[i].autonomy =
+                        static_cast<app::Autonomy>(rowAutonomy);
+                    if (onDirectCamera && engine.timeline().isAutomated("camera/position")) {
+                        onDirectCamera();
+                    }
+                }
+            }
+            ImGui::PopID();
+        }
+    }
+    ImGui::EndChild();
+}
+
 // The Auto-director panel (section 9). Everything here changes the film; the three properties
 // that would *look* like controls and do nothing -- framing and headroom, a hero's preferred
 // elevation, and Shot::speed -- are deliberately absent, and `AutoDirectorSettings` says why.
@@ -3401,15 +3528,23 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
     const bool directed = engine.timeline().isAutomated("camera/position");
     ImGui::TextUnformatted(directed ? "The Auto-director owns this camera."
                                     : "The camera is with the viewport.");
-    const bool canDirect = engine.track() != nullptr;
+    // Song Mode does not fold audio -- the fold has already happened and somebody has edited the
+    // result -- so it can direct a project whose track is not loaded, and the button must not be
+    // disabled for the absence of something it does not need (ADR-249).
+    const bool songMode = autoDirector->mode == app::DirectorMode::Song;
+    const bool canDirect =
+        songMode ? app::songPlanForEngine(engine).has_value() : engine.track() != nullptr;
     ImGui::BeginDisabled(!canDirect);
     if (ImGui::Button("Enable Auto-director") && onDirectCamera) {
         onDirectCamera();
     }
     ImGui::EndDisabled();
-    if (!canDirect && ImGui::IsItemHovered()) {
+    if (!canDirect && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         // Stated rather than hidden: an absent control reads as a missing feature.
-        ImGui::SetTooltip("Directing cuts to the music; load a track first.");
+        ImGui::SetTooltip(songMode
+                              ? "Song Mode directs a song's own sections; analyze a track in the "
+                                "Sequence panel, or load a song plan, first."
+                              : "Directing cuts to the music; load a track first.");
     }
     ImGui::SameLine();
     ImGui::BeginDisabled(!directed);
@@ -3421,7 +3556,7 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
             app::AutoDirectorSettings& s = *autoDirector;
             const app::AutoDirectorSettings before = s;
 
-            int mode = s.mode == app::DirectorMode::ContinuousShot ? 0 : 1;
+            int mode = static_cast<int>(s.mode);
             ImGui::TextUnformatted("Shot mode");
             if (ImGui::RadioButton("Continuous shot", &mode, 0)) {
                 s.mode = app::DirectorMode::ContinuousShot;
@@ -3439,8 +3574,27 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                                   "camera cuts between compositions and subjects, which is what "
                                   "a piece with distinct sections wants.");
             }
+            // ADR-249. Third, because it is the newest and because the other two are what an
+            // untouched project still means.
+            if (ImGui::RadioButton("Song", &mode, 2)) {
+                s.mode = app::DirectorMode::Song;
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "The song's own sections are the script, and the director decides what\n"
+                    "happens inside each one: which camera, how it is framed, how it moves,\n"
+                    "and when to cut.\n\n"
+                    "Not a shot list played back. Each section carries a shot *intent* -- how\n"
+                    "close, how much movement, how much coverage -- and the same intent gives a\n"
+                    "different film the second time it comes round.\n\n"
+                    "Uses every camera you have ticked 'available to the Auto-director'.");
+            }
 
+            const bool song = s.mode == app::DirectorMode::Song;
             const bool continuous = s.mode == app::DirectorMode::ContinuousShot;
+            if (song) {
+                drawSongDirector(engine, s);
+            }
 
             ImGui::Separator();
             // Named for what the controls do in the mode that is actually selected. All three are
@@ -3470,9 +3624,20 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
             seconds("shortest shot", s.minShotSeconds, 1.0, 30.0,
                     "Below this a musical section is folded into its neighbour rather than "
                     "given a cut of its own: a one-second shot reads as a glitch.");
+            // Disabled in Song Mode rather than hidden: a control that vanishes reads as a missing
+            // feature, and one that is live but read by nothing spends the user's trust -- which is
+            // the rule `AutoDirectorSettings` states about its own three absent knobs. Song Mode has
+            // no "build": it has an authored section carrying a cut rate, and the floor it runs into
+            // is `shortest shot`.
+            ImGui::BeginDisabled(song);
             seconds("shortest build", s.minBuildShotSeconds, 0.5, 10.0,
                     "A build is exempt from the minimum, because a build exists to end. This is "
                     "how short it may get.");
+            ImGui::EndDisabled();
+            if (song && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("Song Mode has no builds to exempt: a section's own cut rate sets "
+                                  "its shot length, and 'shortest shot' is the floor it stops at.");
+            }
             seconds("longest shot", s.maxShotSeconds, 4.0, 60.0,
                     "A passage longer than this becomes several shots inside one section, each "
                     "cast separately -- so a thirty-second verse is the camera travelling "
@@ -3484,9 +3649,20 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
             // caps below run into. Measured on Glowmere with the caps at 0.4 m/s and 2 deg/s:
             // holding each subject for one shot peaks at 42.3 m/s, and for six shots at 0.8 m/s.
             int dwell = s.dwellShots;
+            // Also inert in Song Mode, and for a better reason than the one above: how long the
+            // film stays with one subject is a property of the *section* there, derived from its
+            // intent's `variation`, so a single film-wide number would be a second answer to a
+            // question the plan already answers per section.
+            ImGui::BeginDisabled(song);
             if (ImGui::SliderInt("hold subject", &dwell, 1, 12,
                                  dwell == 1 ? "1 shot" : "%d shots")) {
                 s.dwellShots = std::clamp(dwell, 1, 12);
+            }
+            ImGui::EndDisabled();
+            if (song && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("In Song Mode each section decides this for itself, from its shot "
+                                  "intent's variation: a section that wants one setup held keeps its "
+                                  "subject, and one that wants coverage moves on every shot.");
             }
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip(
@@ -3548,9 +3724,14 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                 s.seed = static_cast<std::uint32_t>(std::max(0, seed));
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Same seed, same heroes, same track, same film. Change it to "
-                                  "ask for a different edit of the same piece -- it picks which "
-                                  "supporting subject each section gets, and nothing else.");
+                ImGui::SetTooltip(
+                    song ? "Same seed, same heroes, same plan, same world, same film. Change it "
+                           "to ask for a different edit of the same piece -- in Song Mode it "
+                           "picks the cameras, the subjects and the framing inside every "
+                           "section."
+                         : "Same seed, same heroes, same track, same film. Change it to "
+                           "ask for a different edit of the same piece -- it picks which "
+                           "supporting subject each section gets, and nothing else.");
             }
 
             if (!directorSummary.empty()) {
