@@ -7849,7 +7849,7 @@
     },
     {
      "kind": "ground",
-     "slopeAlign": 0.55
+     "slopeAlign": 1.0
     }
    ],
    "clips": {
@@ -7908,7 +7908,7 @@
     },
     {
      "kind": "ground",
-     "slopeAlign": 0.55
+     "slopeAlign": 1.0
     }
    ],
    "clips": {
@@ -7967,7 +7967,7 @@
     },
     {
      "kind": "ground",
-     "slopeAlign": 0.55
+     "slopeAlign": 1.0
     }
    ],
    "clips": {
@@ -8026,7 +8026,7 @@
     },
     {
      "kind": "ground",
-     "slopeAlign": 0.55
+     "slopeAlign": 1.0
     }
    ],
    "clips": {
@@ -8085,7 +8085,7 @@
     },
     {
      "kind": "ground",
-     "slopeAlign": 0.55
+     "slopeAlign": 1.0
     }
    ],
    "clips": {
@@ -8144,7 +8144,7 @@
     },
     {
      "kind": "ground",
-     "slopeAlign": 0.55
+     "slopeAlign": 1.0
     }
    ],
    "clips": {
@@ -8321,7 +8321,7 @@
     },
     {
      "kind": "ground",
-     "slopeAlign": 0.55
+     "slopeAlign": 1.0
     }
    ],
    "clips": {
@@ -8380,7 +8380,7 @@
     },
     {
      "kind": "ground",
-     "slopeAlign": 0.55
+     "slopeAlign": 1.0
     }
    ],
    "clips": {
@@ -8439,7 +8439,7 @@
     },
     {
      "kind": "ground",
-     "slopeAlign": 0.55
+     "slopeAlign": 1.0
     }
    ],
    "clips": {
@@ -8498,7 +8498,7 @@
     },
     {
      "kind": "ground",
-     "slopeAlign": 0.55
+     "slopeAlign": 1.0
     }
    ],
    "clips": {
@@ -8557,7 +8557,7 @@
     },
     {
      "kind": "ground",
-     "slopeAlign": 0.55
+     "slopeAlign": 1.0
     }
    ],
    "clips": {
@@ -8616,7 +8616,7 @@
     },
     {
      "kind": "ground",
-     "slopeAlign": 0.55
+     "slopeAlign": 1.0
     }
    ],
    "clips": {
@@ -8791,7 +8791,7 @@
     "actor": "saucer",
     "seed": 20260915,
     "autoStart": true,
-    "maxCycles": 6,
+    "maxCycles": 10,
     "searchInterval": 0.5,
     "params": [
      {

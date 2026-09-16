@@ -65,19 +65,36 @@ struct Species {
     float radius;  // the disc it needs to stand in, generously
     float speed;   // walking m/s -- a chick does not cross a meadow at a horse's pace
     float territory; // metres it will wander from where it was put
+    // Four feet or two, and it decides `slopeAlign` -- the one number the ground follower has for
+    // "how far does this body lie along the surface it stands on".
+    //
+    // `GroundSettings::slopeAlign` defaults to 0.55 under a comment that reads "a walker leans into
+    // a slope, it does not become part of it". That is right for a BIPED: two feet, one roughly
+    // under the body, and the torso stays near upright while the legs take the grade. It is wrong
+    // for a quadruped, whose four feet are planted along a whole body length, so its spine sits
+    // roughly parallel to the ground or its front legs are buried in it.
+    //
+    // Measured, because the difference is not small. A body of length L on a slope t, pitched by p,
+    // puts its nose (L/2)(tan t - tan p) below the surface, and p is exactly `slopeAlign` x t. At
+    // 0.55 on a 22 degree slope a bull -- 2.65 m long, scaled 3.6 by the scene, so 9.54 m -- buries
+    // its nose 0.94 m and floats its tail by the same; at 34 degrees it is 1.67 m. At 1.0 the
+    // residual is 0.145 m and is terrain curvature rather than alignment, which no single pitch can
+    // fix. Measured across footprint 0.55 m to 4.77 m the change is 0.0004 m, so the footprint --
+    // the other suspect -- is not what this is.
+    bool quadruped;
 };
 
 // Ordered biggest to smallest so the hard-to-place animals get first refusal on the good ground.
 constexpr Species kSpecies[] = {
-    {"bull", "bull", 1.7710f, 1.6f, 0.75f, 11.0f},
-    {"horse", "horse", 1.7523f, 1.6f, 1.35f, 15.0f},
-    {"cow", "cow", 1.5739f, 1.5f, 0.70f, 11.0f},
-    {"sheep", "sheep", 0.9412f, 0.9f, 0.85f, 9.0f},
-    {"goat", "goat", 0.7441f, 0.8f, 1.00f, 10.0f},
-    {"pig", "pig", 0.6900f, 0.9f, 0.65f, 7.0f},
-    {"rooster", "rooster", 0.4342f, 0.5f, 0.70f, 6.0f},
-    {"chicken", "chicken", 0.3368f, 0.5f, 0.65f, 5.5f},
-    {"chick", "chick", 0.1100f, 0.35f, 0.55f, 4.0f},
+    {"bull", "bull", 1.7710f, 1.6f, 0.75f, 11.0f, true},
+    {"horse", "horse", 1.7523f, 1.6f, 1.35f, 15.0f, true},
+    {"cow", "cow", 1.5739f, 1.5f, 0.70f, 11.0f, true},
+    {"sheep", "sheep", 0.9412f, 0.9f, 0.85f, 9.0f, true},
+    {"goat", "goat", 0.7441f, 0.8f, 1.00f, 10.0f, true},
+    {"pig", "pig", 0.6900f, 0.9f, 0.65f, 7.0f, true},
+    {"rooster", "rooster", 0.4342f, 0.5f, 0.70f, 6.0f, false},
+    {"chicken", "chicken", 0.3368f, 0.5f, 0.65f, 5.5f, false},
+    {"chick", "chick", 0.1100f, 0.35f, 0.55f, 4.0f, false},
 };
 constexpr int kSpeciesCount = static_cast<int>(std::size(kSpecies));
 
@@ -365,7 +382,8 @@ int main(int argc, char** argv) {
                                                 {"pauseMin", 3.0},
                                                 {"pauseMax", 26.0},
                                                 {"homeRadius", p.species->territory}},
-                                           json{{"kind", "ground"}, {"slopeAlign", 0.55}}});
+                                           json{{"kind", "ground"},
+                                                {"slopeAlign", p.species->quadruped ? 1.0 : 0.55}}});
         entity["fullDetailDistance"] = 90.0;
         entity["coarseInterval"] = 0.1;
         entity["cullDistance"] = 260.0;

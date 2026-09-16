@@ -666,10 +666,28 @@ json Sequence::toTimelineTracks(int samplesPerShot) const {
     json focusKeys = json::array();
     json emphasisKeys = json::array();
 
-    for (const auto& s : shots) {
+    for (std::size_t si = 0; si < shots.size(); ++si) {
+        const auto& s = shots[si];
+        // The last sample lands on the *next shot's own* start time, verbatim, rather than on
+        // `startSeconds + durationSeconds` recomputed here.
+        //
+        // Those two are the same number in exact arithmetic and not always in floating point: a
+        // shot's duration is derived from where the next one begins, so `start + (next - start)`
+        // can come back a few ULPs past `next`. When it does, the two keys at the cut sort the
+        // wrong way round -- the outgoing shot's final key lands *after* the incoming shot's first
+        // -- and the camera jumps to the new framing, snaps back to the old one for a frame, and
+        // replays the move. It reads exactly like the shot starting over.
+        //
+        // Measured on a 31-shot film: 28 boundaries were bit-identical and fine, 2 were 3 ULPs out
+        // (110.78933333333333 against ...35, and 192.02666666666664 against ...67) and both showed
+        // the repeat. Snapping the boundary is what makes it structural rather than a coin toss on
+        // how the arithmetic happened to round.
+        const double endTime = (si + 1 < shots.size()) ? shots[si + 1].startSeconds : s.endSeconds();
         for (int i = 0; i < samples; ++i) {
             const float t = static_cast<float>(i) / static_cast<float>(samples - 1);
-            const double time = s.startSeconds + s.durationSeconds * static_cast<double>(t);
+            const double time = (i == samples - 1)
+                                    ? endTime
+                                    : s.startSeconds + s.durationSeconds * static_cast<double>(t);
             const glm::vec3 p = s.cameraAt(t);
             const glm::vec3 q = s.targetAt(t);
             // The keys carry the eased positions, so the interpolation between them is linear and
