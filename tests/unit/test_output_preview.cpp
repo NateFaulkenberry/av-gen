@@ -562,3 +562,54 @@ TEST_CASE("the presets cover the formats the spec names, and all of them validat
     REQUIRE(vertical);
     REQUIRE(square);
 }
+
+// The toolbar's placement. Bottom-centred rather than top-left, so that the bar does not sit in the
+// corner every other overlay starts from. The arithmetic is trivial; the two clamps are not, and
+// they are the reason this is a function rather than two expressions at the call site.
+TEST_CASE("the preview toolbar sits bottom-centre of the canvas", "[ui][preview][toolbar]") {
+    SECTION("centred horizontally, and on the bottom edge") {
+        const CanvasRect canvas = canvasOf(1000.0f, 600.0f);
+        const ToolbarOrigin o = previewToolbarOrigin(canvas, 400.0f, 30.0f, 8.0f);
+        // (1000 - 400) / 2
+        CHECK(o.x == Approx(300.0f));
+        // 600 - 30 - 8, not the top
+        CHECK(o.y == Approx(562.0f));
+    }
+
+    SECTION("it follows a canvas that is not at the window origin") {
+        const CanvasRect canvas = canvasOf(1000.0f, 600.0f, 250.0f, 40.0f);
+        const ToolbarOrigin o = previewToolbarOrigin(canvas, 400.0f, 30.0f, 8.0f);
+        CHECK(o.x == Approx(250.0f + 300.0f));
+        CHECK(o.y == Approx(40.0f + 562.0f));
+    }
+
+    SECTION("a bar wider than the canvas pins left, so the collapse button stays reachable") {
+        // Centring this honestly would put x at 100 + (400 - 900)/2 = -150: the left end of the
+        // bar, which is where the "<<" button lives, would be off the canvas entirely.
+        const CanvasRect canvas = canvasOf(400.0f, 300.0f, 100.0f, 0.0f);
+        const ToolbarOrigin o = previewToolbarOrigin(canvas, 900.0f, 30.0f, 8.0f);
+        CHECK(o.x == Approx(108.0f));
+        CHECK(o.x >= canvas.x);
+    }
+
+    SECTION("a canvas shorter than the bar pins top rather than above itself") {
+        const CanvasRect canvas = canvasOf(1000.0f, 20.0f, 0.0f, 500.0f);
+        const ToolbarOrigin o = previewToolbarOrigin(canvas, 400.0f, 60.0f, 8.0f);
+        CHECK(o.y == Approx(508.0f));
+        CHECK(o.y >= canvas.y);
+    }
+
+    SECTION("an invalid canvas places nothing") {
+        const ToolbarOrigin o = previewToolbarOrigin(canvasOf(0.0f, 0.0f), 400.0f, 30.0f);
+        CHECK(o.x == Approx(0.0f));
+        CHECK(o.y == Approx(0.0f));
+    }
+
+    SECTION("the collapsed bar is centred too, not left-aligned") {
+        const CanvasRect canvas = canvasOf(1000.0f, 600.0f);
+        const ToolbarOrigin wide = previewToolbarOrigin(canvas, 400.0f, 30.0f, 8.0f);
+        const ToolbarOrigin narrow = previewToolbarOrigin(canvas, 34.0f, 30.0f, 8.0f);
+        CHECK(narrow.x > wide.x);
+        CHECK(narrow.y == Approx(wide.y));
+    }
+}

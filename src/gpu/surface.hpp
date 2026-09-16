@@ -32,6 +32,11 @@ public:
     void present();
 
     [[nodiscard]] wgpu::TextureFormat format() const { return format_; }
+    // The texture behind the view the last `acquire()` handed out, kept so a capture can read the
+    // finished frame back -- interface included. `renderToImage` re-renders the *scene*, which is
+    // why it cannot answer "what does the editor look like": the UI is drawn into this texture and
+    // into nothing else. Valid between an `acquire()` and the `present()` that follows it.
+    [[nodiscard]] wgpu::Texture currentTexture() const { return current_; }
     [[nodiscard]] std::uint32_t width() const { return width_; }
     [[nodiscard]] std::uint32_t height() const { return height_; }
     [[nodiscard]] bool configured() const { return configured_; }
@@ -44,6 +49,7 @@ private:
 
     Context& context_;
     wgpu::Surface surface_;
+    wgpu::Texture current_;
     wgpu::TextureFormat format_ = wgpu::TextureFormat::Undefined;
     std::uint32_t width_ = 0;
     std::uint32_t height_ = 0;

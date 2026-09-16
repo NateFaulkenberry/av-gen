@@ -348,6 +348,9 @@ private:
     // The preview's toolbar across the top of the canvas, and the guides over the frame. Both are
     // editor presentation inside the canvas window's own draw list: neither can reach a render.
     void drawPreviewToolbar(app::Engine& engine, const CanvasRect& rect);
+    // Last frame's measured width of the floating preview toolbar, which is what bottom-centring it
+    // needs and what an auto-sizing child cannot report until after it is drawn.
+    float previewToolbarWidth_ = 0.0f;
     void drawPreviewFrameControls();
     void drawPreviewGuides(const PreviewFrame& frame);
     // The output resolution editor (presets + custom), shared by the toolbar and the Render panel

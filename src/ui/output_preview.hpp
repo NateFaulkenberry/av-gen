@@ -272,6 +272,29 @@ struct GuideRect {
 };
 [[nodiscard]] GuideRect insetFrame(const PreviewFrame& frame, float fraction);
 
+// Where the floating preview toolbar sits inside the canvas, in window points.
+//
+// Bottom-centred rather than top-left. The bar is chrome laid over the picture, and the top-left is
+// the one corner it shares with every other overlay the editor draws -- the frame border, the safe
+// areas and the thirds all start there, so a bar in that corner sits on top of the guides it exists
+// to toggle. Along the bottom edge it overlaps the least-used band of a 16:9 frame and reads as a
+// transport rather than as part of the image.
+//
+// `toolbarWidth` is measured, not predicted: the bar auto-sizes to its contents, so the caller
+// passes what the previous frame came out at. That is a frame of lag on a width that only changes
+// when a control appears or disappears, and none at all on the position itself.
+//
+// Clamped, and that is the case worth having a function for: a bar wider than the canvas would
+// centre to a negative x and be clipped at the left, hiding the collapse button -- the one control
+// that would get the user out of it. It pins to the left margin instead, so the bar runs off the
+// right where the controls are expendable and the button stays reachable.
+struct ToolbarOrigin {
+    float x = 0.0f;
+    float y = 0.0f;
+};
+[[nodiscard]] ToolbarOrigin previewToolbarOrigin(const CanvasRect& canvas, float toolbarWidth,
+                                                 float toolbarHeight, float margin = 8.0f);
+
 // Which overlays the editor is drawing over the frame. Pure view state; none of it is a scene edit
 // and none of it goes on the undo stack (spec §13.2).
 struct GuideSettings {

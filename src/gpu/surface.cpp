@@ -60,7 +60,10 @@ void Surface::configure(std::uint32_t width, std::uint32_t height) {
     wgpu::SurfaceConfiguration config{};
     config.device = context_.device();
     config.format = format_;
-    config.usage = wgpu::TextureUsage::RenderAttachment;
+    // CopySrc so the finished frame -- interface and all -- can be read back for a capture. The
+    // scene has `renderToImage`; the *editor* has only this texture, because that is where Dear
+    // ImGui draws. Costs nothing when nothing copies from it.
+    config.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc;
     config.width = width;
     config.height = height;
     config.alphaMode = wgpu::CompositeAlphaMode::Auto;
@@ -82,6 +85,7 @@ Result<wgpu::TextureView> Surface::acquire() {
         switch (surfaceTexture.status) {
         case wgpu::SurfaceGetCurrentTextureStatus::SuccessOptimal:
         case wgpu::SurfaceGetCurrentTextureStatus::SuccessSuboptimal: {
+            current_ = surfaceTexture.texture;
             wgpu::TextureViewDescriptor viewDesc{};
             viewDesc.label = "swapchain-view";
             viewDesc.format = format_;
