@@ -67,3 +67,7 @@ target_link_libraries(avgen_place_farm_animals PRIVATE avgen_core)
 # example that no longer matches the preset the UI offers under the same name.
 add_executable(avgen_atmos_presets atmos_presets.cpp)
 target_link_libraries(avgen_atmos_presets PRIVATE avgen_core)
+
+# TEMPORARY (docs/investigations/ui-responsiveness.md). Delete with the file.
+add_executable(avgen_bench_flatten bench_flatten.cpp)
+target_link_libraries(avgen_bench_flatten PRIVATE avgen_core)
