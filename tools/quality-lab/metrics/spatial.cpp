@@ -76,8 +76,8 @@ double ssimPlanes(const std::vector<float>& a, const std::vector<float>& b, std:
             double sab = 0.0;
             for (std::uint32_t j = 0; j < kWin; ++j) {
                 for (std::uint32_t i = 0; i < kWin; ++i) {
-                    const double va = a[static_cast<std::size_t>(y + j) * w + x + i];
-                    const double vb = b[static_cast<std::size_t>(y + j) * w + x + i];
+                    const double va = static_cast<double>(a[static_cast<std::size_t>(y + j) * w + x + i]);
+                    const double vb = static_cast<double>(b[static_cast<std::size_t>(y + j) * w + x + i]);
                     sa += va;
                     sb += vb;
                     saa += va * va;
@@ -266,8 +266,11 @@ double spatialLaplacian(const Frame& frame) {
     for (std::uint32_t y = 1; y + 1 < frame.height; ++y) {
         for (std::uint32_t x = 1; x + 1 < w; ++x) {
             const std::size_t i = static_cast<std::size_t>(y) * w + x;
-            const double lap = 4.0 * plane[i] - plane[i - 1] - plane[i + 1] - plane[i - w] -
-                               plane[i + w];
+            const double lap = 4.0 * static_cast<double>(plane[i]) -
+                               static_cast<double>(plane[i - 1]) -
+                               static_cast<double>(plane[i + 1]) -
+                               static_cast<double>(plane[i - w]) -
+                               static_cast<double>(plane[i + w]);
             sum += std::fabs(lap);
             ++n;
         }
@@ -290,10 +293,10 @@ double quantisationSteps(const Frame& frame) {
             // neighbourhood is otherwise flat -- a gradient that should have been smooth arriving in
             // stairs. Texture fails the flatness test and dither fails the step test, which is what
             // keeps this from simply counting edges.
-            const double left = plane[i - 1];
-            const double right = plane[i + 1];
+            const double left = static_cast<double>(plane[i - 1]);
+            const double right = static_cast<double>(plane[i + 1]);
             const double step = std::fabs(right - left);
-            const double curvature = std::fabs(2.0 * plane[i] - left - right);
+            const double curvature = std::fabs(2.0 * static_cast<double>(plane[i]) - left - right);
             if (step > 3.0 && step < 12.0 && curvature > 1.5) {
                 ++stepped;
             }

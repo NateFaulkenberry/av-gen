@@ -221,6 +221,18 @@
       "description": "One scene, four presets: Cathedral, Temple, Helix, Hyperspace morph into each other on a timeline.",
       "name": "Worlds (preset morph)",
       "project": "worlds/worlds.json"
+    },
+    {
+      "category": "Lab",
+      "description": "Quality Lab benchmark 1: thin fence slats, a receding tile grid, shallow diagonal edges and small emissive spheres, all crossing the sampling limit inside one frame. Static free camera.",
+      "name": "Quality Lab: aliasing",
+      "project": "quality/aliasing.json"
+    },
+    {
+      "category": "Lab",
+      "description": "Quality Lab benchmark 2: the aliasing subject on a lateral spline dolly, so the velocity AOV, the disocclusion mask and the motion-compensated residual have real motion to measure.",
+      "name": "Quality Lab: aliasing dolly",
+      "project": "quality/aliasing-dolly.json"
     }
   ]
 }

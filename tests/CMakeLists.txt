@@ -121,6 +121,10 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
     target_include_directories(avgen_render_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     # Output windows need the platform layer (SDL); the window smoke test enumerates displays.
     target_link_libraries(avgen_render_tests PRIVATE avgen_gpu avgen_platform Catch2::Catch2WithMain)
+    # The Quality Lab's metric engine, so the render -> capture -> analyse path can be checked
+    # against frames the engine actually wrote rather than against synthetic ones. The unit ladder
+    # proves the metrics respond to a distortion; only this proves they can read a real AOV.
+    target_link_libraries(avgen_render_tests PRIVATE avgen_quality_metrics)
     if(APPLE)
         target_link_libraries(avgen_render_tests PRIVATE syphon::syphon "-framework Metal")
     endif()

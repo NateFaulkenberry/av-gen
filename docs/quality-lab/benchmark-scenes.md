@@ -1,6 +1,10 @@
 # Benchmark scenes: what exists, what is missing, and what must not be optimized against
 
-Status: research (spec §11, §12, §35). **No scenes are authored yet.**
+Status: **two scenes authored** (spec §11, §12, §35) — `examples/quality/aliasing` and
+`examples/quality/aliasing-dolly`, both registered in `examples/index.json`.
+
+> **Both were vacuous on the first attempt, in two different ways**, and §4 below has gained two
+> rules because of it. See [ADR-254](../decisions/ADR-254-a-benchmark-that-cannot-show-the-artifact.md).
 
 ---
 
@@ -80,7 +84,7 @@ author it, and whether anything already covers it.
 | # | §11 scene | isolates | authorable today? | already covered? |
 |---|---|---|---|---|
 | 1 | **aliasing** | thin wires, fences, diagonal edges, fine repeating texture, small emissive elements | **yes** — `Grid`, `Orb`, `Procedural`, `Spline` nodes; a fence is a spline array | no. **Highest value** |
-| 2 | **temporal stability** | dolly, orbit, fast pan, animated foliage, particles, thin geometry | **yes, with a caveat**: use **Free or Spline** camera placement. The legacy **orbit** mode integrates `orbitSpeed · dt` and is path-dependent, so an orbit arm is not comparable frame-for-frame | partly (`-water`) |
+| 2 | **temporal stability** | dolly, orbit, fast pan, animated foliage, particles, thin geometry | **yes, with a caveat, and it is not the caveat this table first gave.** Use a **Free** camera. The legacy **orbit** mode integrates `orbitSpeed · dt` and is path-dependent — and a **Spline** camera takes its target from a point further along its own path, so it always looks where it is going and a *lateral* dolly aims it off the subject entirely. ⚠ See §4.2 | ✅ `examples/quality/aliasing-dolly` |
 | 3 | **shadow** | cascade transitions, swimming, popping, bias, filtering | yes | no — **and there is no shadow AOV**, so this scene can be rendered and only judged by eye and by the ungated residual |
 | 4 | **specular** | rough/smooth metal, wet surfaces, moving lights, HDR highlights | yes | no |
 | 5 | **vegetation** | grass, leaves, branches, mushrooms, multiple LOD distances | **yes, and it is the class AV Gen actually ships** — but a synthetic version is strictly worse than Glowmere, which already has it at density | **Glowmere covers this better.** Build it only to *isolate*, never to judge |
@@ -93,9 +97,11 @@ author it, and whether anything already covers it.
 1. **Aliasing (1).** The artifact the reviewer reported, the one the metrics disagree about, and the
    one with no existing coverage. It is also the cheapest to author and the easiest to make
    unambiguous.
-2. **Temporal stability (2)** with a **Spline dolly** — because ADR-243 ends by saying *"a moving
+2. **Temporal stability (2)** with a **lateral dolly** — because ADR-243 ends by saying *"a moving
    camera has not been reviewed at all, and crawl on static geometry is exactly what a moving camera
-   would produce."* That is a named open question with a named scene that would answer it.
+   would produce."* That is a named open question with a named scene that would answer it. ⚠ **Not a
+   spline dolly**, against this document's first recommendation: see §4.2. Built as
+   `examples/quality/aliasing-dolly`, and the arms it produced are in ADR-253.
 3. Everything else, only once a real scene has shown the defect is worth isolating.
 
 ---
@@ -107,17 +113,39 @@ wrong produces a comparison that is not a comparison:
 
 1. **A benchmark scene ships with a project.** `--composition` alone renders a different image —
    default exposure, default post, no render block. Every quality render goes through `--project`.
-2. **Free or Spline cameras only.** The legacy orbit mode is path-dependent.
+2. ⚠ **A benchmark camera must be FREE.** Not orbit — it integrates `orbitSpeed · dt` and is
+   path-dependent. And **not spline**, which this document originally recommended: a spline camera
+   takes its position from the spline and its target from a point `lookAhead` units *further along
+   the same spline*, so it always looks where it is going. The motion a temporal benchmark needs is
+   **lateral**, because lateral motion is what produces parallax and parallax is the only thing that
+   disoccludes anything — and a lateral spline track therefore aims the camera sideways at empty
+   background. The first version of the dolly scene did exactly that and rendered a flat frame,
+   `rms_contrast 0.0000`, caught only because the candidate and its supersampled reference came back
+   with the **same sequence hash** (rule 8, and reference-rendering.md §3.4 rule 5). A free camera
+   with keyframed position and target is equally path-independent — a timeline is a pure function of
+   time, which is the property rule 2 was always protecting — and it can look at the subject while
+   moving across it. A spline camera stays right for a flythrough, where looking along the path *is*
+   the shot.
 3. **No ADR-091 live-tier content** — ambient population, props, background vehicles are stateful,
    reset on seek and not frame-accurate under scrub — unless the scene declares it.
 4. **Pin the seed** on every procedural node, every particle system and the world recipe.
+4b. ⚠ **Pin every parameter the experiment's arms will toggle**, explicitly, rather than inheriting a
+   default. `post/output/antialias` defaults to **0.0** — `post_settings.hpp`: *"0 skips the pass
+   entirely"* — so a scene that never asks for FXAA never runs it, and `--disable fxaa` on such a
+   scene logs *"this is a DIAGNOSTIC render"* and writes a **byte-identical sequence hash**. Read
+   naively that is a finding, and it is the reassuring one: "FXAA does not affect this scene." It is
+   ADR-182's exact shape — a measurement whose null result is indistinguishable from a broken
+   instrument — and it happened on the first attempt at ADR-243's three arms. An anti-aliasing
+   benchmark has to have anti-aliasing switched **on** before it can be switched off.
 5. **Bounded duration.** `endSeconds = -1` resolves to the audio duration, and the audio may not be
    there. State a range.
 6. **Additive.** One behaviour per scene beyond the shared baseline, so a difference has one
    candidate cause — the `examples/qa/` ladder's existing design.
 7. **Register in `examples/index.json`**, or the scene is invisible to the engine.
 8. **Declare the sequence hash** at authoring time, so a scene that silently changes is caught by the
-   thing that already catches it.
+   thing that already catches it — **and check it between arms**, which is how both of the failures
+   above were found before any metric had been computed. An arm that cannot differ is void rather
+   than measured.
 
 ---
 
