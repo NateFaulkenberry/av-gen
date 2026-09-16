@@ -20,6 +20,7 @@
 #include "core/error.hpp"
 #include "graph/graph.hpp"
 #include "scene/field_params.hpp"
+#include "scene/camera_rig.hpp"
 #include "scene/light_rig.hpp"
 #include "scene/material_params.hpp"
 #include "scene/rebuild_deferral.hpp"
@@ -50,6 +51,10 @@
 #include <optional>
 #include <string>
 #include <vector>
+
+namespace avgen::params {
+class Timeline;
+}
 
 namespace avgen::scene {
 
@@ -620,6 +625,36 @@ public:
     [[nodiscard]] bool aimHeld() const { return aimHoldState_.holding; }
     [[nodiscard]] const std::string& aimHeldHero() const { return aimHoldState_.hero; }
 
+    // ---- multiple cameras (ADR-245) ------------------------------------------------------------
+    //
+    // The camera collection, the authored shot track and the resolved active camera. See
+    // `scene/camera_rig.hpp` for what each of those three is and why they are three things.
+    //
+    // A composition that has never been touched holds exactly one camera -- the main one, which is
+    // the `camera/*` block this file has always had -- and no shots, so `resolveActiveCamera`
+    // answers "the main camera" at every instant and the frame is evaluated by the code that was
+    // here before. That is the backward-compatibility story in one sentence.
+    [[nodiscard]] const CameraDirection& cameraDirection() const { return cameraDirection_; }
+    // Replaces the collection. Refuses an invalid one whole (a shot naming a camera that is not
+    // there, a duplicate slug) and leaves the old one in place, then re-registers the per-camera
+    // parameters. Call `Engine::refreshCameraParameters` rather than this from the application, so
+    // the timeline re-binds onto the channels that now exist.
+    [[nodiscard]] Result<void> setCameraDirection(CameraDirection direction);
+    // Which camera is on screen this frame and why. **The one published answer**: nothing else in
+    // the engine decides this, and a consumer that wants the pose reads `Scene::camera` as it
+    // always has. Updated once per frame inside `applyParameters`.
+    [[nodiscard]] const ActiveCameraState& activeCamera() const { return activeCamera_; }
+    // Whether the timeline drives any of a camera's own channels -- which is the whole of the
+    // difference between a "static" camera and an "animated" one. There is no mode for it because
+    // there is no state for it: a camera is animated exactly when somebody keyed it.
+    [[nodiscard]] bool cameraIsAnimated(CameraId id, const params::Timeline& timeline) const;
+    // Drops the event observation the director accumulated. Called on a seek, next to
+    // `clearAimHoldState`, and for the same reason: a scenario's run is live state, so the seeked
+    // second must not inherit an event span observed before the jump.
+    void clearCameraEventState() { cameraEvents_.clear(); }
+    // The event spans the director can currently see. Exposed for tests and an overlay.
+    [[nodiscard]] std::span<const CameraEventSpan> cameraEventSpans() const { return cameraEvents_; }
+
     // ---- the ground (§3, ADR-090) --------------------------------------------------------------
     //
     // The scene's spatial queries: height, normal, slope, walkability, water, occupancy and the
@@ -919,7 +954,7 @@ private:
     params::Parameter<int>* volumeSteps_ = nullptr;
     params::Parameter<float>* keyLight_ = nullptr;   // multiplier on the default key light
     bool addedKeyLight_ = false;
-    std::uint64_t frameCounter_ = 0;
+    mutable std::uint64_t frameCounter_ = 0;
     params::Parameter<glm::vec3>* fogColor_ = nullptr;
     float fogDensitySetting_ = 0.0f;
     scene::Environment volumeSetting_; // the scene-file values behind the scene/volume* parameters
@@ -947,6 +982,49 @@ private:
     params::Parameter<float>* cameraShakeDecay_ = nullptr;
     params::Parameter<float>* cameraShakeRotation_ = nullptr;
     params::Parameter<float>* cameraShakeStart_ = nullptr;
+
+    // ---- multiple cameras (ADR-245) -------------------------------------------------------------
+    //
+    // The collection, the parameter handles for the authored cameras, and this frame's answer.
+    //
+    // `cameraChannels_` is parallel to the *authored* cameras (everything but the main one, whose
+    // channels are the `camera*_` handles above). Rebuilt by `registerParameters`, so it is empty
+    // and harmless in an unattached composition.
+    CameraDirection cameraDirection_;
+    struct CameraChannels {
+        CameraId id = kNoCamera;
+        params::Parameter<glm::vec3>* position = nullptr;
+        params::Parameter<glm::vec3>* target = nullptr;
+        params::Parameter<float>* fov = nullptr;
+        params::Parameter<float>* focalLength = nullptr;
+        params::Parameter<float>* splineT = nullptr;
+        params::Parameter<float>* lookAhead = nullptr;
+        params::Parameter<glm::vec3>* splineOffset = nullptr;
+    };
+    std::vector<CameraChannels> cameraChannels_;
+    ActiveCameraState activeCamera_;
+    // What the director has seen happen, as spans. A scenario's run is live state (ADR-210: it is
+    // started by `autoStart` or by a signal edge, not by a second on the timeline), so the only
+    // honest span for one is "it began when this composition first saw it begin". An entry whose
+    // `endSeconds <= startSeconds` is still running.
+    //
+    // This is the one part of camera direction that is not a pure function of the playhead, and it
+    // is the same compromise ADR-217's hold already makes for the same reason. A seek clears it.
+    std::vector<CameraEventSpan> cameraEvents_;
+    // Evaluates one authored camera's channels into a pose. Free function shape kept private
+    // because it needs the composition's splines.
+    [[nodiscard]] CameraPose evaluateAuthoredCamera(const CameraRig& rig,
+                                                    const CameraChannels* channels) const;
+    // Evaluates the main camera exactly as this file always has: orbit, free or spline, from the
+    // `camera/*` parameters. Extracted from `applyParameters` without a change of behaviour.
+    [[nodiscard]] CameraPose evaluateMainCamera() const;
+    // Folds this frame's staging state into `cameraEvents_`. Called from `updateBehaviour`, after
+    // the staging tick, so a scenario that began this frame is visible to this frame's cut.
+    void observeCameraEvents(double seconds);
+    // Registers `cameras/<slug>/*` for every authored camera. Called from `attach` and again when
+    // the collection changes; `ParameterSet::add` returns the existing parameter for a path that is
+    // already there, so a camera that did not move keeps the very pointer its tracks are bound to.
+    void registerCameraChannels(params::ParameterSet& params, float reach);
     double currentTime_ = 0.0;
     void updateCharacters(const FrameTime& time); // ADR-086
     RigStats rigStats_;   // ADR-086: what the last update() spent posing skinned characters

@@ -285,6 +285,17 @@ private:
     void drawTimelineTab(app::Engine& engine);
     void drawRender(app::Engine& engine);
     void drawAutoDirector(app::Engine& engine);
+    // The camera library (ADR-245). Deliberately the smallest surface that lets a novice do the six
+    // things the multi-camera brief asks for -- make a camera, put it where the viewport is looking,
+    // see which one is live, give it to the Auto-director, put it on the timeline, delete it -- with
+    // everything past that reachable through the ordinary Parameters and Sequence panels, because a
+    // camera's channels are ordinary parameters and its shots are ordinary spans.
+    void drawCameras(app::Engine& engine);
+    // The camera the library has selected, by id. Not the *active* camera, which is the engine's
+    // (`Engine::activeCamera`) and is never decided here: an editor selection and a director's
+    // choice are different questions and conflating them is the mistake this whole ADR is about.
+    std::uint32_t selectedCamera_ = 0;
+    std::string cameraProblem_;
     void drawControlTab(app::Engine& engine);
     void drawOutputsTab(app::Engine& engine);
     void drawWorldWindow(app::Engine& engine);

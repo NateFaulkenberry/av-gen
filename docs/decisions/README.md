@@ -225,3 +225,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [242](ADR-242-a-target-nobody-reads-is-not-a-feature.md) | A target nobody reads is not a feature (AOV export, and the normal pass that was not a normal) | Accepted |
 | [243](ADR-243-the-detector-and-the-eye-disagree.md) | The detector and the eye disagree, and the eye decides what ships (§4 reviewed: the artifact is spatial, FXAA stays, Glowmere supersamples) | Accepted |
 | [244](ADR-244-section-7-found-nothing-to-fix.md) | §7 found nothing to fix, and that moved the bottleneck (cinematic lighting reviewed; authoring ergonomics promoted) | Accepted |
+| [245](ADR-245-a-camera-is-not-the-camera.md) | A camera is not *the* camera (multiple cameras, authored shots, event-driven cuts, and the one published active camera) | Accepted |
