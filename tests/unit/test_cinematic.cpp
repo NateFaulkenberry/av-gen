@@ -5,6 +5,9 @@
 #include "app/cinematic.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+
+#include <cmath>
+#include <iomanip>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <nlohmann/json.hpp>
 
@@ -1348,4 +1351,78 @@ TEST_CASE("what is actually fast in a directed cut", "[.probe][app][cinematic][d
         report(fmt::format("swing {:.0f} deg/s", rate).c_str(), *capped);
     }
     CHECK(true);
+}
+
+// A cut's two keys must never sort the wrong way round.
+//
+// Reported as "the shot repeats itself as if it started over", at 3:10 in a 31-shot film, and it
+// did: the camera jumped to the incoming framing, snapped back to the outgoing one, then replayed
+// the move. The cause is that a shot's duration is derived from where the next one begins, so the
+// outgoing shot's final key time -- `startSeconds + durationSeconds` recomputed at bake -- can land
+// a few ULPs PAST the incoming shot's `startSeconds`. Then the sort puts the outgoing key second
+// and the track interpolates backwards for one segment.
+//
+// It is a coin toss on rounding, which is why it hit 2 of 30 boundaries and not all of them, and
+// why "it works on my film" proves nothing. The invariant is exactness, so that is what is asserted.
+TEST_CASE("a cut's boundary keys are bit-identical, whatever the durations round to",
+          "[app][cinematic][timeline]") {
+    // Durations chosen so `start + duration` is *not* exactly the next start in binary floating
+    // point: thirds of a second at 60 fps are the shape the director actually produces, and they
+    // are the case that broke. The starts are the authority; the durations are derived from them,
+    // exactly as the bake does it.
+    const std::vector<double> starts{0.0,
+                                     7.379333333333333,
+                                     14.758666666666666,
+                                     22.137999999999998,
+                                     110.78933333333333,
+                                     192.02666666666664,
+                                     226.29333333333332};
+    app::Sequence seq;
+    seq.name = "boundaries";
+    for (std::size_t i = 0; i + 1 < starts.size(); ++i) {
+        auto shot = parseOne(R"({"name":"s","kind":"establish","duration":6.0,
+            "subject":{"position":[0,0,0],"radius":10}})");
+        shot.startSeconds = starts[i];
+        // Two ULPs past the exact difference, which is the condition the real bake produces and the
+        // reason this test exists. A shot's start and its duration come from different places -- the
+        // start is a musical boundary, the duration is derived -- so `start + duration` is NOT
+        // guaranteed to reproduce the next shot's start bit for bit. Setting the duration to exactly
+        // `next - start` hides that: it round-trips, the boundary is exact anyway, and the test
+        // passes against the unfixed code. It did, on the first writing of this test.
+        shot.durationSeconds =
+            std::nextafter(std::nextafter(starts[i + 1] - starts[i], 1e9), 1e9);
+        seq.shots.push_back(shot);
+    }
+    REQUIRE(seq.shots.size() == starts.size() - 1);
+
+    const auto tracks = seq.toTimelineTracks(7);
+    for (const auto& track : tracks) {
+        const std::string target = track["target"].get<std::string>();
+        if (target != "camera/position" && target != "camera/target" &&
+            target != "camera/lens/focusDistance") {
+            continue; // the per-sample tracks; the per-shot ones have one key at a start
+        }
+        const auto& keys = track["keys"];
+        INFO("track " << target);
+        // Non-decreasing, and -- the part that matters -- every shared boundary is EXACT. A
+        // tolerance here would pass the bug: three ULPs is what broke it.
+        for (std::size_t i = 1; i < keys.size(); ++i) {
+            const double a = keys[i - 1]["time"].get<double>();
+            const double b = keys[i]["time"].get<double>();
+            INFO("key " << i << " at " << std::setprecision(17) << b << " follows " << a);
+            CHECK(b >= a);
+        }
+        // Each shot contributes `samples` keys; the last of shot N and the first of shot N+1 are
+        // the same instant and must be the same double.
+        for (std::size_t s = 0; s + 1 < seq.shots.size(); ++s) {
+            const std::size_t lastOfShot = (s + 1) * 7 - 1;
+            const std::size_t firstOfNext = (s + 1) * 7;
+            REQUIRE(firstOfNext < keys.size());
+            const double outgoing = keys[lastOfShot]["time"].get<double>();
+            const double incoming = keys[firstOfNext]["time"].get<double>();
+            INFO("boundary " << s << ": outgoing " << std::setprecision(17) << outgoing
+                             << " incoming " << incoming);
+            CHECK(outgoing == incoming);
+        }
+    }
 }

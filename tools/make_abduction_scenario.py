@@ -218,7 +218,14 @@ STAGING = od([
         ("actor", "saucer"),
         ("seed", 20260915),
         ("autoStart", True),
-        ("maxCycles", 6),          # Maximum Abductions
+        # Ten, not six. Six was not a find that kept failing -- measured, every cycle succeeds and
+        # always did (`abducted 6 of 6`, distinct names). It was simply the scenario retiring: six
+        # cycles at roughly 22 s each are spent by about 2:30 of a 3:46 film, after which the saucer
+        # goes on flying and never abducts again, which reads as "it rarely picks up animals".
+        # At ten it runs the length of the cut and still finishes rather than being cut off, and the
+        # targets stay distinct -- so at least ten of the sixteen animals clear the canopy and
+        # navigability tests the query applies.
+        ("maxCycles", 10),         # Maximum Abductions
         ("searchInterval", 0.5),
         ("params", PARAMS),
         ("beats", BEATS),
