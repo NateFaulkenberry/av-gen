@@ -191,6 +191,58 @@ Node kinds: `gltf` (a glTF 2.0 file; instances of the same file share meshes and
 particle system, every `ParticleSystem` field optional with the defaults from `docs/rendering.md`),
 `scene` (another scene file). `camera.distance` 0 means "fit to the scene bounds".
 
+### `cameraDirection` — more than one camera (ADR-245)
+
+Optional, and written only when the scene has more than the one camera it has always had, so a scene
+file untouched by the multi-camera system is byte-identical to what it was. Absent means one camera,
+which is what every scene written before ADR-245 has.
+
+```json
+"cameraDirection": {
+  "cameras": [
+    { "id": 1, "name": "Hero Free Roam", "autoDirector": true },
+    { "id": 2, "name": "Valley Wide", "slug": "valleywide", "placement": "free",
+      "position": [-168, 96, -150], "target": [-8, 6, 46], "fov": 52,
+      "focalLength": 24, "autoDirector": false },
+    { "id": 3, "name": "UFO Watch", "slug": "ufowatch", "placement": "free",
+      "fov": 40, "focalLength": 35,
+      "followNode": "visitor", "followOffset": [31, 5, 31],
+      "aimNode": "visitor", "aimOffset": [0, -7, 0],
+      "eventScenario": "abduction", "eventLead": 0.3, "eventTail": 1.4,
+      "eventBlend": 0.0, "eventBeats": ["aim", "beam", "abduct", "depart"],
+      "priority": 10, "autoDirector": true }
+  ],
+  "shots": [
+    { "camera": 2, "start": 0.0,  "end": 7.0,  "transition": "cut",   "locked": true, "label": "establish" },
+    { "camera": 1, "start": 7.0,  "end": 13.5, "transition": "cut",   "locked": true, "label": "hero" },
+    { "camera": 2, "start": 26.0, "end": 31.0, "transition": "blend", "blend": 1.6, "locked": true }
+  ],
+  "default": 1,
+  "nextId": 4
+}
+```
+
+**Camera 1 is always the main camera**: the `camera` block above and the `camera/*` parameters. It
+cannot be deleted, it is what the Auto-director bakes onto and what the viewport drags, and it is why
+an existing project is unaffected. Only its `name` and its director metadata are read here; its
+placement and transform stay in `camera`.
+
+Every other camera registers seven ordinary parameters under `cameras/<slug>/` — `position`,
+`target`, `fov`, `focalLength`, `splineT`, `lookAhead`, `splineOffset`. Keyframing a camera is
+putting timeline tracks on those; modulating one is routing audio at them. `slug` is frozen when the
+camera is created, because a parameter path is what a saved track names and a rename must not orphan
+its animation. `placement` is `free` or `spline` — an authored camera does not orbit, because orbit
+is the one placement in this engine that is not a pure function of the playhead.
+
+`aimNode`/`aimOffset` and `followNode`/`followOffset` name composition nodes, letting a camera watch
+or ride something that moves. `eventScenario` names a staging scenario; while it is running (in one
+of `eventBeats`, or at all when that list is empty) the camera claims the frame, widened by
+`eventLead` and `eventTail`. A `locked` shot is the author's veto: an event does not take it.
+
+Resolution at any instant, highest first: a locked shot, then an event (highest `priority`, then
+lowest id), then the last shot containing the time, then `default`. `Engine::activeCamera()` reports
+which and why; the pose itself is `Scene::camera`, as it always was.
+
 `parent` names another node of the same file: the node's world transform is the parent's world
 transform times its own local one (authored rest values plus the `nodes/<name>/position`,
 `rotation`, `scale` parameter offsets), evaluated up the chain, so moving, rotating or scaling

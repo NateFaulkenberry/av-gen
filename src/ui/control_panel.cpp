@@ -522,6 +522,7 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     panel("Composition", ImVec2(460, 640), [&] { composition.draw(engine); });
     panel("Render", ImVec2(460, 420), [&] { drawRender(engine); });
     panel("Auto-director", ImVec2(440, 560), [&] { drawAutoDirector(engine); });
+    panel("Cameras", ImVec2(420, 560), [&] { drawCameras(engine); });
     panel("World Effects", ImVec2(460, 620), [&] { worldEffects.draw(engine); });
     panel("Sequence", ImVec2(900, 420), [&] {
         // The transport across the top of the timeline, where the timeline is. Drawn here rather
@@ -2764,6 +2765,157 @@ void ControlPanel::drawOutputsTab(app::Engine& /*engine*/) {
     }
 }
 
+
+// The camera library (ADR-245).
+//
+// The whole novice workflow the multi-camera brief asks for, and nothing beyond it:
+//
+//   + Camera            -- makes one where the viewport is looking now
+//   Place here          -- moves the selected camera to the viewport's pose
+//   Available to Auto-director / lens / event scenario  -- what the director may do with it
+//   Add shot at playhead -- puts it on the timeline
+//
+// Deeper editing is not duplicated here on purpose. A camera's channels are ordinary parameters, so
+// keyframing one is the Sequence panel's job and tuning one is the Parameters panel's; a second set
+// of controls for the same values would be a second source of truth, which section 28 of the brief
+// forbids in as many words.
+//
+// **Unverified visually.** This agent cannot see ImGui; what is checked is the model underneath
+// (tests/integration/test_camera_multicam.cpp), not the drawing.
+void ControlPanel::drawCameras(app::Engine& engine) {
+    scene::Composition* comp = engine.composition();
+    if (comp == nullptr) {
+        ImGui::TextUnformatted("This scene has no composition, so it has one fixed camera.");
+        return;
+    }
+    const scene::ActiveCameraState active = engine.activeCamera();
+    scene::CameraDirection direction = comp->cameraDirection();
+    bool changed = false;
+
+    ImGui::Text("Live: %s (%s%s%s)", active.name.empty() ? "Main" : active.name.c_str(),
+                scene::activeCameraReasonName(active.reason),
+                active.eventName.empty() ? "" : " ", active.eventName.c_str());
+    if (active.blending()) {
+        ImGui::SameLine();
+        ImGui::Text("-- blending %.0f%%", static_cast<double>(active.blend) * 100.0);
+    }
+    ImGui::Separator();
+
+    if (ImGui::Button("+ Camera")) {
+        // Where the viewport is looking, because "make a camera here" is what the button means and
+        // a camera that appears at the origin is one the user has to go and find.
+        const scene::Camera& live = comp->scene().camera;
+        scene::CameraRig rig;
+        rig.name = "Camera " + std::to_string(direction.nextId);
+        rig.position = live.position;
+        rig.target = live.target;
+        rig.fovDegrees = glm::degrees(live.effectiveFovY());
+        selectedCamera_ = direction.addCamera(std::move(rig));
+        changed = true;
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("(%zu in this scene)", direction.cameras.size());
+
+    for (scene::CameraRig& rig : direction.cameras) {
+        ImGui::PushID(static_cast<int>(rig.id));
+        const bool isActive = rig.id == active.camera;
+        const bool selected = rig.id == selectedCamera_;
+        std::string label = rig.name;
+        if (isActive) {
+            label += "   [LIVE]";
+        }
+        if (rig.id != scene::kMainCamera && comp->cameraIsAnimated(rig.id, engine.timeline())) {
+            label += "   animated";
+        }
+        if (ImGui::Selectable(label.c_str(), selected)) {
+            selectedCamera_ = rig.id;
+        }
+        if (selected) {
+            ImGui::Indent();
+            if (rig.id != scene::kMainCamera) {
+                if (ImGui::Button("Place here")) {
+                    // The viewport's pose onto this camera's *base* values. A parameter, never the
+                    // derived scene camera: ADR-218's rule, and the reason this does not evaporate
+                    // on the next frame.
+                    const scene::Camera& live = comp->scene().camera;
+                    const std::string prefix = rig.channelPrefix();
+                    if (auto* p = engine.params().find(prefix + "position")) {
+                        p->setBaseComponent(0, live.position.x);
+                        p->setBaseComponent(1, live.position.y);
+                        p->setBaseComponent(2, live.position.z);
+                    }
+                    if (auto* t = engine.params().find(prefix + "target")) {
+                        t->setBaseComponent(0, live.target.x);
+                        t->setBaseComponent(1, live.target.y);
+                        t->setBaseComponent(2, live.target.z);
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Delete")) {
+                    direction.removeCamera(rig.id);
+                    selectedCamera_ = scene::kMainCamera;
+                    changed = true;
+                    ImGui::Unindent();
+                    ImGui::PopID();
+                    break;
+                }
+                float mm = rig.focalLength;
+                if (ImGui::SliderFloat("lens (0 = use fov)", &mm, 0.0f, 200.0f, "%.0f mm")) {
+                    rig.focalLength = mm;
+                    changed = true;
+                }
+            }
+            if (ImGui::Checkbox("available to the Auto-director", &rig.autoDirectorEligible)) {
+                changed = true;
+            }
+            if (!rig.eventScenario.empty()) {
+                ImGui::TextDisabled("watches the '%s' scenario", rig.eventScenario.c_str());
+            }
+            if (ImGui::Button("Add shot at the playhead")) {
+                scene::CameraShot shot;
+                shot.camera = rig.id;
+                shot.startSeconds = engine.timelineClock().seconds;
+                shot.endSeconds = shot.startSeconds + 4.0;
+                direction.shots.push_back(shot);
+                changed = true;
+            }
+            ImGui::Unindent();
+        }
+        ImGui::PopID();
+    }
+
+    if (!direction.shots.empty()) {
+        ImGui::Separator();
+        ImGui::TextUnformatted("Shots");
+        for (std::size_t i = 0; i < direction.shots.size(); ++i) {
+            const scene::CameraShot& shot = direction.shots[i];
+            ImGui::PushID(static_cast<int>(i));
+            ImGui::Text("%6.2f - %6.2f  %s  %s%s", shot.startSeconds, shot.endSeconds,
+                        direction.nameOf(shot.camera).c_str(),
+                        scene::shotTransitionName(shot.transition), shot.locked ? "  locked" : "");
+            ImGui::SameLine();
+            if (ImGui::SmallButton("x")) {
+                direction.shots.erase(direction.shots.begin() + static_cast<std::ptrdiff_t>(i));
+                changed = true;
+                ImGui::PopID();
+                break;
+            }
+            ImGui::PopID();
+        }
+    }
+
+    if (changed) {
+        // Refused whole if it cannot be evaluated, and the message is shown rather than swallowed.
+        if (auto ok = engine.setCameraDirection(std::move(direction)); !ok) {
+            cameraProblem_ = ok.error().message;
+        } else {
+            cameraProblem_.clear();
+        }
+    }
+    if (!cameraProblem_.empty()) {
+        ImGui::TextUnformatted(cameraProblem_.c_str());
+    }
+}
 
 // The Auto-director panel (section 9). Everything here changes the film; the three properties
 // that would *look* like controls and do nothing -- framing and headroom, a hero's preferred

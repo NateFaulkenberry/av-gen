@@ -140,6 +140,12 @@
     },
     {
       "category": "Showcase",
+      "description": "Glowmere Valley 2 directed by three cameras (ADR-245). Hero Free Roam is the Auto-director's camera, unchanged. Valley Wide is an authored establishing shot, keyframed on the ordinary timeline and placed by authored shots. UFO Watch rides the saucer and takes the frame whenever the abduction scenario reaches its beam -- an event claiming the cut, not a special case in the code.",
+      "name": "Glowmere Valley 2 - Multi-Camera",
+      "project": "world/glowmere-valley-2-multicam.json"
+    },
+    {
+      "category": "Showcase",
       "description": "Glowmere at night with ADR-230's atmospheric effects: an audio-reactive aurora rising from the horizon, and bioluminescent comets crossing the sky -- one hero, one rainbow, and a three-comet burst, all launched by sequencer events.",
       "name": "Glowmere Atmospherics",
       "project": "world/glowmere-atmospherics.json"

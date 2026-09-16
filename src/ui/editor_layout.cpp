@@ -18,7 +18,7 @@ constexpr int kFormatVersion = 1;
 // The panels, grouped the way the View menu reads them: what you build with on the left, what you
 // inspect and tune on the right, what runs underneath along the bottom. Nothing is assigned to the
 // centre -- see DockRegion.
-constexpr std::array<EditorPanel, 19> kPanels{{
+constexpr std::array<EditorPanel, 20> kPanels{{
     {"World Builder", "World Builder", DockRegion::Left, true,
      "recipe, Generate World and the job monitor"},
     // ADR-092. One panel, not two: the brush and the selection are the same job seen from two
@@ -37,6 +37,10 @@ constexpr std::array<EditorPanel, 19> kPanels{{
     {"Render", "Render", DockRegion::Right, false, "offline render settings, progress and the queue"},
     {"Auto-director", "Auto-director", DockRegion::Right, false,
      "shot mode, timings, lenses and the seed for the camera that cuts to the music"},
+    // ADR-245. Beside the Auto-director, because the Auto-director is now one of the cameras in
+    // this list rather than the only camera there is.
+    {"Cameras", "Cameras", DockRegion::Right, false,
+     "the camera library: what exists, which one is live, and when each is used"},
     // ADR-207. Beside the Auto-director, because the two shipped effects are gated on its cut and
     // "why is my beam not firing" is nearly always "nothing is directing the camera".
     {"World Effects", "World Effects", DockRegion::Right, false,

@@ -196,6 +196,23 @@ public:
     // Re-registers every layer's parameters (after an edit that changed which exist) and re-binds.
     void refreshLayerParameters();
 
+    // ---- multiple cameras (ADR-245) --------------------------------------------------------------
+    //
+    // The camera collection lives on the `scene::Composition` (it is world content, and a shot names
+    // a camera by an id that only means something inside the scene it was composed for). These two
+    // calls are the engine's part: re-registering a changed collection's parameters so the timeline
+    // can bind onto them, and publishing which camera is live.
+    //
+    // **`activeCamera()` is the one published answer to "which camera is on screen".** Nothing else
+    // in the engine decides it and nothing else should be asked. The camera's *pose* is, as it has
+    // always been, `Scene::camera`; this says which camera that pose belongs to and why, which is
+    // what an overlay, a sequencer lane or an output preview needs and what the pose cannot answer.
+    // A session with no composition reports the main camera, default reason -- which is the truth.
+    [[nodiscard]] scene::ActiveCameraState activeCamera() const;
+    // Replaces the composition's camera collection, re-registers `cameras/<slug>/*` and re-binds the
+    // timeline. Refuses an invalid collection whole and changes nothing on a refusal.
+    [[nodiscard]] Result<void> setCameraDirection(scene::CameraDirection direction);
+
     // ---- the cinematic sequence (ADR-089) ----
     // The timed performance: shots, scene slots, actors, overlay cues, markers. Held by value
     // because it is a value; installing it is what turns it into timeline tracks and layers.

@@ -1,5 +1,7 @@
 #include "scene/composition.hpp"
 
+#include "params/timeline.hpp"
+
 #include "core/log.hpp"
 #include "entity/obstacles.hpp"
 #include "scene/camera.hpp"
@@ -1508,6 +1510,13 @@ void Composition::applyDirectedAim() {
     if (aimFollow_.empty() || heroes_.empty()) {
         return;
     }
+    // ADR-245: the aim-follow table and the ADR-217 hold are the *Auto-director's* mechanisms --
+    // they nudge the shot it baked onto the main camera. While an authored or event camera has the
+    // frame, that shot is not what is on screen, and dragging its aim would move a camera nobody
+    // pointed at the heroes. The main camera keeps them; every other camera is left alone.
+    if (activeCamera_.camera != kMainCamera || activeCamera_.blending()) {
+        return;
+    }
     // Free mode only. The other two place the camera themselves -- an orbit around the root, a
     // spline the author drew -- and a directed sequence always writes mode 1, so this is asking
     // whether the shot on the timeline is still the one driving the camera.
@@ -2026,6 +2035,9 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
         stageCtx.bus = &bus;
         staging_.update(stageCtx);
     }
+    // ADR-245: what the camera director can see of the world's events, read straight after the
+    // staging tick so a scenario that began this frame can claim this frame's cut.
+    observeCameraEvents(time.renderTime);
     entity::EntityUpdate update;
     update.time = time.renderTime;
     update.dt = time.deltaTime;
@@ -2561,6 +2573,7 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         &params.add(floatDesc(prefix_ + "camera/shake/rotation", 0.0f, 0.0f, 45.0f, 0.0f, 3.0f));
     cameraShakeStart_ =
         &params.add(floatDesc(prefix_ + "camera/shake/start", 0.0f, -1e6f, 1e6f, 0.0f, 600.0f));
+    registerCameraChannels(params, reachCam);
     materialParams_.clear();
     for (const MaterialProgram& mp : materialPrograms_) {
         materialParams_.push_back(
@@ -2912,6 +2925,7 @@ void Composition::detach() {
     cameraShakeDecay_ = nullptr;
     cameraShakeRotation_ = nullptr;
     cameraShakeStart_ = nullptr;
+    cameraChannels_.clear();
     envIntensity_ = nullptr;
     envRotation_ = nullptr;
     skyEnabled_ = nullptr;
@@ -4341,6 +4355,207 @@ bool Composition::setNodeAnimation(const std::string& nodeName, const std::strin
     return true;
 }
 
+// ---- multiple cameras (ADR-245) -----------------------------------------------------------------
+
+void Composition::registerCameraChannels(params::ParameterSet& params, float reach) {
+    // ADR-245: every authored camera's own channels, under `cameras/<slug>/`. Ordinary parameters,
+    // which is the entire animation story: a camera is keyframed by putting timeline keys on these,
+    // modulated by routing audio at them, and "static" by leaving them alone. There is no camera
+    // animation system because there did not need to be one.
+    cameraDirection_.ensureMainCamera();
+    cameraChannels_.clear();
+    for (const CameraRig& rig : cameraDirection_.cameras) {
+        if (rig.id == kMainCamera) {
+            continue; // its channels are the `camera/*` handles above
+        }
+        const std::string p = prefix_ + rig.channelPrefix();
+        CameraChannels ch;
+        ch.id = rig.id;
+        ch.position = &params.add(vec3Desc(p + "position", rig.position, -1e5f, 1e5f, -reach, reach));
+        ch.target = &params.add(vec3Desc(p + "target", rig.target, -1e5f, 1e5f, -reach, reach));
+        ch.fov = &params.add(floatDesc(p + "fov", rig.fovDegrees, 5.0f, 120.0f, 20.0f, 90.0f));
+        ch.focalLength = &params.add(floatDesc(p + "focalLength", rig.focalLength, 0.0f, 800.0f, 0.0f, 200.0f));
+        ch.splineT = &params.add(floatDesc(p + "splineT", rig.splineT, -10.0f, 10.0f, 0.0f, 1.0f));
+        ch.lookAhead = &params.add(floatDesc(p + "lookAhead", rig.lookAhead, -100.0f, 100.0f, 0.0f, 10.0f));
+        ch.splineOffset =
+            &params.add(vec3Desc(p + "splineOffset", rig.splineOffset, -1e3f, 1e3f, -5.0f, 5.0f));
+        cameraChannels_.push_back(ch);
+    }
+}
+
+CameraPose Composition::evaluateMainCamera() const {
+    // Byte for byte the placement this file has always done, moved into a function so the camera
+    // director can ask for it like it asks for any other camera's. Orbit lives only here: it
+    // integrates `orbitSpeed * dt` into `cameraAngle_`, which makes it the one placement in this
+    // engine that depends on how the playhead arrived rather than on where it is. Authored cameras
+    // do not get it (scene/camera_rig.hpp).
+    CameraPose pose;
+    const float fit = fitDistance();
+    const float distance =
+        cameraDistance_ != nullptr ? cameraDistance_->value() : cameraDistanceSetting_.value_or(fit);
+    const float height = cameraHeight_ != nullptr
+                             ? cameraHeight_->value()
+                             : cameraHeightSetting_.value_or(center_.y + radius_ * 0.35f);
+    pose.fovDegrees = cameraFov_ != nullptr ? cameraFov_->value() : cameraFovSetting_;
+    const int cameraMode = cameraMode_ != nullptr ? cameraMode_->value() : cameraModeSetting_;
+    const spatial::Spline* cameraSpline =
+        cameraMode == 2 && !cameraSplineSetting_.empty()
+            ? scene_.splines.find(prefixed(sanitise(prefix_), cameraSplineSetting_))
+            : nullptr;
+    if (cameraMode == 2 && cameraSpline != nullptr) {
+        // Spline camera: position at splineT (fraction of the length, wrapped for closed splines),
+        // target lookAhead units further along, offset expressed in the local frame.
+        const float length = cameraSpline->length();
+        const float tRaw = cameraSplineT_ != nullptr ? cameraSplineT_->value() : 0.0f;
+        const float t = cameraSpline->closed ? tRaw - std::floor(tRaw) : std::clamp(tRaw, 0.0f, 1.0f);
+        const float lookAhead = cameraLookAhead_ != nullptr ? cameraLookAhead_->value() : 2.0f;
+        const glm::vec3 offset = cameraSplineOffset_ != nullptr ? cameraSplineOffset_->value() : glm::vec3(0.0f);
+        const spatial::SplineSample at = cameraSpline->sampleByDistance(t * length);
+        const spatial::SplineSample ahead = cameraSpline->sampleByDistance(t * length + lookAhead);
+        const glm::vec3 frameOffset = at.binormal * offset.x + at.normal * offset.y + at.tangent * offset.z;
+        pose.position = at.position + frameOffset;
+        pose.target = ahead.position + at.binormal * offset.x + at.normal * offset.y;
+        ensureDistinctAim(pose, at.tangent);
+    } else if (cameraMode == 1) {
+        // Free camera: explicit position and target (keyable on the timeline, modulatable).
+        pose.position = cameraPosition_ != nullptr ? cameraPosition_->value() : cameraPositionSetting_;
+        pose.target = cameraTarget_ != nullptr ? cameraTarget_->value() : cameraTargetSetting_;
+        ensureDistinctAim(pose);
+        if ((frameCounter_++ % 120) == 0) {
+            log::debug("free camera pos ({:.1f} {:.1f} {:.1f}) target ({:.1f} {:.1f} {:.1f})", pose.position.x,
+                       pose.position.y, pose.position.z, pose.target.x, pose.target.y, pose.target.z);
+        }
+    } else {
+        pose.position =
+            center_ + glm::vec3(std::sin(cameraAngle_) * distance, 0.0f, std::cos(cameraAngle_) * distance);
+        pose.position.y = height;
+        pose.target = center_;
+    }
+    return pose;
+}
+
+CameraPose Composition::evaluateAuthoredCamera(const CameraRig& rig, const CameraChannels* channels) const {
+    CameraPose pose;
+    // The parameters when the composition is attached, the authored bases when it is not: the same
+    // rule every other property in this file follows, and what lets a test evaluate a camera
+    // without standing up a parameter set.
+    pose.position = channels != nullptr ? channels->position->value() : rig.position;
+    pose.target = channels != nullptr ? channels->target->value() : rig.target;
+    pose.fovDegrees = channels != nullptr ? channels->fov->value() : rig.fovDegrees;
+    pose.focalLength = channels != nullptr ? channels->focalLength->value() : rig.focalLength;
+    if (rig.placement == CameraPlacement::Spline && !rig.spline.empty()) {
+        if (const spatial::Spline* spline = scene_.splines.find(prefixed(sanitise(prefix_), rig.spline));
+            spline != nullptr) {
+            const float length = spline->length();
+            const float tRaw = channels != nullptr ? channels->splineT->value() : rig.splineT;
+            const float t = spline->closed ? tRaw - std::floor(tRaw) : std::clamp(tRaw, 0.0f, 1.0f);
+            const float lookAhead = channels != nullptr ? channels->lookAhead->value() : rig.lookAhead;
+            const glm::vec3 offset =
+                channels != nullptr ? channels->splineOffset->value() : rig.splineOffset;
+            const spatial::SplineSample at = spline->sampleByDistance(t * length);
+            const spatial::SplineSample ahead = spline->sampleByDistance(t * length + lookAhead);
+            pose.position = at.position + at.binormal * offset.x + at.normal * offset.y + at.tangent * offset.z;
+            pose.target = ahead.position + at.binormal * offset.x + at.normal * offset.y;
+            ensureDistinctAim(pose, at.tangent);
+            return pose;
+        }
+        // A spline camera whose spline is not in the scene falls back to its free pose rather than
+        // to the origin: a camera that silently jumps to (0,0,0) is a bug that looks like a cut.
+    }
+    // A camera that watches something: resolved against where that node is *now*, which is what
+    // lets one camera cover an event that moves. The node not being there leaves the channels in
+    // charge rather than sending the camera to the origin.
+    if (!rig.followNode.empty()) {
+        if (const CompositionNode* node = findNode(rig.followNode); node != nullptr) {
+            pose.position = nodeWorldTransform(*node).position + rig.followOffset;
+        }
+    }
+    if (!rig.aimNode.empty()) {
+        if (const CompositionNode* node = findNode(rig.aimNode); node != nullptr) {
+            pose.target = nodeWorldTransform(*node).position + rig.aimOffset;
+        }
+    }
+    ensureDistinctAim(pose);
+    return pose;
+}
+
+Result<void> Composition::setCameraDirection(CameraDirection direction) {
+    direction.ensureMainCamera();
+    if (auto ok = direction.validate(); !ok) {
+        return std::unexpected(ok.error());
+    }
+    cameraDirection_ = std::move(direction);
+    // The channels of a camera that has just appeared do not exist yet. Re-registering is the
+    // caller's job (Engine::refreshCameraParameters), because the timeline has to re-bind with it
+    // and this object cannot do that alone; until then the authored bases are used, which is the
+    // same rule an unattached composition follows.
+    if (params_ != nullptr) {
+        registerCameraChannels(*params_, 10.0f * std::max(radius_, 1.0f));
+    }
+    return {};
+}
+
+bool Composition::cameraIsAnimated(CameraId id, const params::Timeline& timeline) const {
+    const CameraRig* rig = cameraDirection_.find(id);
+    if (rig == nullptr) {
+        return false;
+    }
+    const std::string p = prefix_ + rig->channelPrefix();
+    // "Animated" is not a mode and not a stored flag: it is the question "does the timeline drive
+    // any of this camera's channels", asked of the timeline. That is the whole of the difference
+    // between a static camera and an animated one, and it means there is no state to keep in step.
+    static constexpr const char* kChannels[] = {"position", "target", "fov", "focalLength", "splineT"};
+    for (const char* channel : kChannels) {
+        if (timeline.isAutomated(p + channel)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void Composition::observeCameraEvents(double seconds) {
+    // A staging scenario is live state, not a span on the timeline (ADR-210): it is begun by
+    // `autoStart` or a signal edge, and nothing anywhere records when it will end. So the director's
+    // view of an event is what this composition has *seen*: an entry opens the frame a scenario's
+    // role binding appears and closes the frame it lets go. An entry still open has
+    // `endSeconds <= startSeconds`, which `resolveActiveCamera` reads as "still running".
+    //
+    // This is the only part of camera direction that is not a pure function of the playhead, and it
+    // is the same compromise ADR-217's hold already makes, for the same reason. A seek clears it.
+    for (const CameraRig& rig : cameraDirection_.cameras) {
+        if (rig.eventScenario.empty()) {
+            continue;
+        }
+        const std::string_view beat = staging_.beat(rig.eventScenario);
+        bool engaged = false;
+        if (rig.eventBeats.empty()) {
+            // Running *and* holding a subject. `running()` alone goes true on the frame the scenario
+            // starts looking for one, which can be seconds before there is anything to show.
+            engaged = !staging_.binding(rig.eventScenario, "target").empty();
+        } else {
+            engaged = std::ranges::any_of(rig.eventBeats,
+                                          [&](const std::string& name) { return beat == name; });
+        }
+        CameraEventSpan* open = nullptr;
+        for (CameraEventSpan& span : cameraEvents_) {
+            if (span.name == rig.eventScenario && span.endSeconds <= span.startSeconds) {
+                open = &span;
+                break;
+            }
+        }
+        if (engaged && open == nullptr) {
+            cameraEvents_.push_back(CameraEventSpan{rig.eventScenario, seconds, seconds});
+        } else if (!engaged && open != nullptr) {
+            open->endSeconds = seconds;
+        }
+    }
+    // A span nobody can still be inside is dropped, so a ten-minute piece with sixty abductions does
+    // not grow a table the resolver walks every frame.
+    std::erase_if(cameraEvents_, [seconds](const CameraEventSpan& span) {
+        return span.endSeconds > span.startSeconds && seconds > span.endSeconds + 30.0;
+    });
+}
+
 void Composition::applyParameters() {
     // Root: uniform scale about the bounds centre and rotation about +Y, as a Transform so it
     // composes with the node and rest transforms.
@@ -4640,50 +4855,63 @@ void Composition::applyParameters() {
     rebuildProcedurals();
     rebuildSdfs();
 
-    // Orbit camera around the bounds centre (distance fitted to the radius by default).
-    const float fit = fitDistance();
-    const float distance =
-        cameraDistance_ != nullptr ? cameraDistance_->value() : cameraDistanceSetting_.value_or(fit);
-    const float height = cameraHeight_ != nullptr
-                             ? cameraHeight_->value()
-                             : cameraHeightSetting_.value_or(center_.y + radius_ * 0.35f);
-    const float fov = cameraFov_ != nullptr ? cameraFov_->value() : cameraFovSetting_;
-    const int cameraMode = cameraMode_ != nullptr ? cameraMode_->value() : cameraModeSetting_;
-    const spatial::Spline* cameraSpline =
-        cameraMode == 2 && !cameraSplineSetting_.empty() ? scene_.splines.find(prefixed(sanitise(prefix_), cameraSplineSetting_)) : nullptr;
-    if (cameraMode == 2 && cameraSpline != nullptr) {
-        // Spline camera: position at splineT (fraction of the length, wrapped for closed splines),
-        // target lookAhead units further along, offset expressed in the local frame.
-        const float length = cameraSpline->length();
-        const float tRaw = cameraSplineT_ != nullptr ? cameraSplineT_->value() : 0.0f;
-        const float t = cameraSpline->closed ? tRaw - std::floor(tRaw) : std::clamp(tRaw, 0.0f, 1.0f);
-        const float lookAhead = cameraLookAhead_ != nullptr ? cameraLookAhead_->value() : 2.0f;
-        const glm::vec3 offset = cameraSplineOffset_ != nullptr ? cameraSplineOffset_->value() : glm::vec3(0.0f);
-        const spatial::SplineSample at = cameraSpline->sampleByDistance(t * length);
-        const spatial::SplineSample ahead = cameraSpline->sampleByDistance(t * length + lookAhead);
-        const glm::vec3 frameOffset = at.binormal * offset.x + at.normal * offset.y + at.tangent * offset.z;
-        scene_.camera.position = at.position + frameOffset;
-        scene_.camera.target = ahead.position + at.binormal * offset.x + at.normal * offset.y;
-        if (glm::length(scene_.camera.target - scene_.camera.position) < 1e-4f) {
-            scene_.camera.target = scene_.camera.position + at.tangent;
-        }
-    } else if (cameraMode == 1) {
-        // Free camera: explicit position and target (keyable on the timeline, modulatable).
-        scene_.camera.position = cameraPosition_ != nullptr ? cameraPosition_->value() : cameraPositionSetting_;
-        scene_.camera.target = cameraTarget_ != nullptr ? cameraTarget_->value() : cameraTargetSetting_;
-        if (glm::length(scene_.camera.target - scene_.camera.position) < 1e-4f) {
-            scene_.camera.target = scene_.camera.position + glm::vec3(0.0f, 0.0f, -1.0f);
-        }
-        if ((frameCounter_++ % 120) == 0) {
-            log::debug("free camera pos ({:.1f} {:.1f} {:.1f}) target ({:.1f} {:.1f} {:.1f})", scene_.camera.position.x,
-                       scene_.camera.position.y, scene_.camera.position.z, scene_.camera.target.x, scene_.camera.target.y,
-                       scene_.camera.target.z);
-        }
+    // ---- which camera, then where it is (ADR-245) ----------------------------------------------
+    //
+    // Two steps that used to be one. `resolveActiveCamera` is a pure function of the clock and says
+    // which camera owns the frame and why; the evaluation below moves only that camera (and, during
+    // a blend, the one it is coming from). Every other camera in the collection costs its
+    // parameters and nothing else -- no spline sample, no arithmetic, no draw.
+    const CameraId cameraWas = activeCamera_.camera;
+    activeCamera_ = resolveActiveCamera(cameraDirection_, cameraEvents_, currentTime_);
+    // What the director just did and why, once per change (multicam-demo section 21). Cheap enough
+    // to leave on: a camera that changes sixty times a second is a bug worth hearing about.
+    if (activeCamera_.camera != cameraWas && cameraDirection_.directing()) {
+        log::info("camera: {} ({}{}{}) at {:.2f} s", activeCamera_.name,
+                  activeCameraReasonName(activeCamera_.reason),
+                  activeCamera_.eventName.empty() ? "" : " ", activeCamera_.eventName, currentTime_);
+    }
+    const float fov0 = cameraFov_ != nullptr ? cameraFov_->value() : cameraFovSetting_;
+    float fov = fov0;
+    if (!cameraDirection_.directing() && activeCamera_.camera == kMainCamera) {
+        // The untouched path: one camera, evaluated exactly as this file has always evaluated it.
+        const CameraPose pose = evaluateMainCamera();
+        scene_.camera.position = pose.position;
+        scene_.camera.target = pose.target;
     } else {
-        scene_.camera.position =
-            center_ + glm::vec3(std::sin(cameraAngle_) * distance, 0.0f, std::cos(cameraAngle_) * distance);
-        scene_.camera.position.y = height;
-        scene_.camera.target = center_;
+        const auto poseOf = [&](CameraId id) -> CameraPose {
+            if (id == kMainCamera) {
+                return evaluateMainCamera();
+            }
+            const CameraRig* rig = cameraDirection_.find(id);
+            if (rig == nullptr) {
+                return evaluateMainCamera();
+            }
+            const CameraChannels* ch = nullptr;
+            for (const CameraChannels& c : cameraChannels_) {
+                if (c.id == id) {
+                    ch = &c;
+                    break;
+                }
+            }
+            return evaluateAuthoredCamera(*rig, ch);
+        };
+        CameraPose pose = poseOf(activeCamera_.camera);
+        if (activeCamera_.blending()) {
+            pose = blendPoses(poseOf(activeCamera_.previous), pose, activeCamera_.blend);
+        }
+        ensureDistinctAim(pose);
+        scene_.camera.position = pose.position;
+        scene_.camera.target = pose.target;
+        fov = pose.fovDegrees;
+        // An authored camera focuses on what it is aimed at. Without this it inherits whatever
+        // `camera/lens/focusDistance` the Auto-director baked for a shot on a different camera
+        // entirely, and the subject of the shot somebody composed comes back out of focus.
+        if (activeCamera_.camera != kMainCamera) {
+            activeCamera_.focusDistance = glm::length(pose.target - pose.position);
+        }
+        // The active camera's optical identity, published for the engine's physical lens block to
+        // pick up (ADR-037 owns the lens; this only says which focal length the picture is on).
+        activeCamera_.focalLength = pose.focalLength;
     }
     // Shake last, and in every mode: it is an offset applied to whatever placed the camera, which
     // is what makes it compose with an orbit, a spline ride and a baked cinematic move alike
@@ -5313,6 +5541,12 @@ nlohmann::json Composition::toJson() const {
         camera["target"] = {ct.x, ct.y, ct.z};
     }
     j["camera"] = std::move(camera);
+    // ADR-245: the camera collection and the shot track, written only when there is more than the
+    // one camera every scene has always had -- so a scene file untouched by the multi-camera system
+    // is byte-identical to what it was.
+    if (cameraDirection_.directing()) {
+        j["cameraDirection"] = cameraDirection_.toJson();
+    }
 
     json environment = json::object();
     if (!environmentPath_.empty()) {
@@ -5794,6 +6028,14 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         }
         comp->cameraFovSetting_ = *fov;
     }
+    if (j.contains("cameraDirection")) {
+        auto direction = CameraDirection::fromJson(j.at("cameraDirection"));
+        if (!direction) {
+            return std::unexpected(direction.error());
+        }
+        comp->cameraDirection_ = std::move(*direction);
+    }
+    comp->cameraDirection_.ensureMainCamera();
     // A rig is a scene-level idea, so it is accepted at the top level as well as inside
     // `environment`; the environment block wins when both name one.
     if (j.contains("lightRig")) {

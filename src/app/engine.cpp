@@ -264,6 +264,66 @@ void Engine::refreshLayerParameters() {
     rebind();
 }
 
+scene::ActiveCameraState Engine::activeCamera() const {
+    if (const auto* comp = dynamic_cast<const scene::Composition*>(controller_.get()); comp != nullptr) {
+        return comp->activeCamera();
+    }
+    // No composition: the orb scene and a glTF scene each have exactly one camera and no director,
+    // so the honest answer is the main camera, unclaimed. Reported rather than left empty, because a
+    // consumer asking "which camera" must never have to distinguish "none" from "not applicable".
+    return scene::ActiveCameraState{};
+}
+
+Result<void> Engine::setCameraDirection(scene::CameraDirection direction) {
+    auto* comp = composition();
+    if (comp == nullptr) {
+        return fail("this scene has no composition, so it has no camera collection");
+    }
+    // The slugs that are going away, worked out before the swap. A camera that is deleted must take
+    // its parameters and its automation with it: parameters left behind would be saved into the
+    // project for ever and tracks left behind would sit unbound, which is precisely the "a target
+    // nobody reads" failure ADR-242 is about.
+    std::vector<std::string> departing;
+    for (const scene::CameraRig& was : comp->cameraDirection().cameras) {
+        if (was.id == scene::kMainCamera || was.slug.empty()) {
+            continue;
+        }
+        const bool kept = std::ranges::any_of(direction.cameras, [&](const scene::CameraRig& now) {
+            return now.slug == was.slug;
+        });
+        if (!kept) {
+            departing.push_back("cameras/" + was.slug + "/");
+        }
+    }
+    // Unbind first: a track holding a raw `IParameter*` into a parameter that is about to be removed
+    // is a dangling pointer the moment it is. The same order `removeLayer` uses.
+    timeline_.unbind();
+    if (auto ok = comp->setCameraDirection(std::move(direction)); !ok) {
+        (void)timeline_.bind(params_);
+        return ok;
+    }
+    if (!departing.empty()) {
+        auto& tracks = timeline_.tracks();
+        std::erase_if(tracks, [&](const params::Track& track) {
+            return std::ranges::any_of(departing, [&](const std::string& prefix) {
+                return track.target.starts_with(prefix);
+            });
+        });
+        std::vector<std::string> doomed;
+        for (const params::IParameter* param : params_.ordered()) {
+            if (std::ranges::any_of(departing,
+                                    [&](const std::string& prefix) { return param->path().starts_with(prefix); })) {
+                doomed.push_back(param->path());
+            }
+        }
+        for (const std::string& path : doomed) {
+            params_.remove(path);
+        }
+    }
+    rebind();
+    return {};
+}
+
 comp::TextLayer& Engine::addTextLayer(std::string text, double startSeconds, double endSeconds) {
     comp::TextLayer& layer = layers_.addText(std::move(text), startSeconds, endSeconds);
     layer.attach(params_);
@@ -2172,6 +2232,11 @@ void Engine::seekSeconds(double seconds) {
         // scenario's state, and the scenario has just been put back to the top -- a hold left armed
         // across the seek would keep the camera on a shot the new second is nowhere near.
         composition->clearAimHoldState();
+        // ADR-245: and the camera director's view of what has happened, for exactly the same
+        // reason. An event span observed before the jump describes a run of a scenario that the
+        // seek has just abolished; carrying it over would cut to an event camera for an event that
+        // is no longer happening.
+        composition->clearCameraEventState();
         composition->entityWorld().seek(seconds, &params_, nullptr,
                                         composition->scene().camera.position, 1.0 / 60.0, 90.0,
                                         composition->scene().detailLimits.entityDistanceCull);
@@ -2965,6 +3030,21 @@ void Engine::update(const FrameTime& time) {
     // exposure before bloom (ADR-039). With the defaults the exposure scale is exactly 1 and the
     // lens does not touch the field of view, so scenes authored before this render unchanged.
     scene::applyCameraParameters(cameraParams_, lens_, exposure_, focus_);
+    // ADR-245: a camera's optical identity. When the camera that has the frame states a focal
+    // length, the frame is on that lens -- which is what makes "Valley Wide is a 24 mm camera" true
+    // of the depth of field and the circle of confusion and not only of the field of view. A camera
+    // with no opinion (the default, and every camera in every project written before this) leaves
+    // the lens exactly as the `camera/lens/*` parameters set it.
+    {
+        const scene::ActiveCameraState active = activeCamera();
+        if (active.focalLength > 0.0f) {
+            lens_.focalLength = active.focalLength;
+            lens_.useExplicitFov = false;
+        }
+        if (active.focusDistance > 0.0f) {
+            lens_.focusDistance = active.focusDistance;
+        }
+    }
     {
         scene::Scene& live = controller_->scene();
         live.camera.lens = lens_;
