@@ -104,6 +104,9 @@ private:
     void drawOverlayInspector(app::Engine& engine, seq::OverlayCue& cue);
     void drawSectionInspector(app::Engine& engine, std::size_t index);
     void drawSceneSlots(app::Engine& engine);
+    // ADR-216's performer rules, as an editable list. See the implementation for why every field
+    // is a picker.
+    void drawPerformerRules(app::Engine& engine);
     // The strip's right-click menu. Separate from `drawStrip` because a popup outlives the frame
     // that opened it and must therefore read remembered state rather than the live pointer.
     void drawStripContextMenu(app::Engine& engine);

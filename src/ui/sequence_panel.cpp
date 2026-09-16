@@ -1712,6 +1712,7 @@ void SequencePanel::drawEdgeGrip(ImDrawList* draw, ImVec2 a, ImVec2 b, BlockZone
 void SequencePanel::drawInspector(app::Engine& engine) {
     seq::Sequence& piece = engine.sequence();
     drawSceneSlots(engine);
+    drawPerformerRules(engine);
     switch (selection_) {
     case Selection::Shot:
         if (selected_ >= 0 && selected_ < static_cast<int>(piece.shots.size())) {
@@ -1963,6 +1964,170 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         ImGui::SetTooltip("Its time goes to the section before it, so the song stays covered.");
+    }
+}
+
+// The performer rules, as a list somebody can actually edit (ADR-216).
+//
+// These were authored by hand in the project JSON until now, which made the one control that
+// consumes them permanently greyed out for anybody who had not read the file format. The rules are
+// small -- a section kind, who, what, and the verb's object -- so this is a list rather than a
+// system.
+//
+// **Every field is a picker where a picker is possible**, and that is the whole design. A free text
+// box here would let somebody name an entity the scene does not have or a verb the action system
+// cannot map, and both of those fail at RUN time with a log line nobody is reading. Choosing from
+// what exists cannot produce either.
+void SequencePanel::drawPerformerRules(app::Engine& engine) {
+    seq::Sequence& piece = engine.sequence();
+    // Open when this project HAS rules: a collapsed header is the right default for something
+    // nobody has used, and the wrong one for something already in the file, where it hides the only
+    // place those rules are visible.
+    const ImGuiTreeNodeFlags flags =
+        piece.sectionPerformance.empty() ? 0 : ImGuiTreeNodeFlags_DefaultOpen;
+    if (!ImGui::CollapsingHeader("Performers", flags)) {
+        return;
+    }
+    ImGui::TextDisabled("What the CAST does on a section boundary -- walk, turn, pose, react.\n"
+                        "Separate from Song Mode, which directs cameras. Neither needs the other.");
+
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        ImGui::TextDisabled("no scene loaded");
+        return;
+    }
+
+    // What this scene actually contains, so a rule cannot name something that is not there.
+    std::vector<const char*> entityNames;
+    for (const auto& entity : composition->entityWorld().entities()) {
+        entityNames.push_back(entity->name().c_str());
+    }
+    if (entityNames.empty()) {
+        ImGui::TextDisabled("this scene has no characters to direct");
+        return;
+    }
+
+    static constexpr const char* kVerbs[] = {"wait", "move",    "face",    "pose",
+                                             "interact", "equip", "unequip", "set"};
+    const auto sections = signals::allMusicalSections();
+    std::vector<const char*> sectionNames;
+    sectionNames.reserve(sections.size());
+    for (const signals::MusicalSection kind : sections) {
+        sectionNames.push_back(signals::musicalSectionName(kind));
+    }
+
+    const auto indexOf = [](const std::vector<const char*>& list, std::string_view value) {
+        for (std::size_t i = 0; i < list.size(); ++i) {
+            if (value == list[i]) {
+                return static_cast<int>(i);
+            }
+        }
+        return 0;
+    };
+
+    int removeAt = -1;
+    for (std::size_t i = 0; i < piece.sectionPerformance.entries.size(); ++i) {
+        ImGui::PushID(static_cast<int>(i));
+        seq::SectionPerformanceEntry& entry = piece.sectionPerformance.entries[i];
+
+        int section = indexOf(sectionNames, signals::musicalSectionName(entry.kind));
+        ImGui::SetNextItemWidth(110);
+        if (ImGui::Combo("##section", &section, sectionNames.data(),
+                         static_cast<int>(sectionNames.size()))) {
+            entry.kind = sections[static_cast<std::size_t>(section)];
+            touch();
+        }
+        ImGui::SameLine();
+
+        int subject = indexOf(entityNames, entry.direction.subject);
+        ImGui::SetNextItemWidth(110);
+        if (ImGui::Combo("##subject", &subject, entityNames.data(),
+                         static_cast<int>(entityNames.size()))) {
+            entry.direction.subject = entityNames[static_cast<std::size_t>(subject)];
+            touch();
+        }
+        ImGui::SameLine();
+
+        int verb = indexOf({std::begin(kVerbs), std::end(kVerbs)}, entry.direction.verb);
+        ImGui::SetNextItemWidth(90);
+        if (ImGui::Combo("##verb", &verb, kVerbs, IM_ARRAYSIZE(kVerbs))) {
+            entry.direction.verb = kVerbs[verb];
+            // The argument means something different for the new verb, so keeping the old one would
+            // produce a rule that reads sensibly and does nothing -- an activity name in a target
+            // slot, or an entity name where an activity belongs.
+            entry.direction.argument.clear();
+            touch();
+        }
+        ImGui::SameLine();
+
+        // **The argument follows the verb**, which is the difference between a form you can use and
+        // one where you have to already know the answer. `move` and `face` travel toward a
+        // character; `pose` names an activity the rig has; the rest are free or take nothing.
+        const std::string& v = entry.direction.verb;
+        if (v == "move" || v == "face") {
+            int target = indexOf(entityNames, entry.direction.argument);
+            ImGui::SetNextItemWidth(110);
+            if (ImGui::Combo("##argument", &target, entityNames.data(),
+                             static_cast<int>(entityNames.size()))) {
+                entry.direction.argument = entityNames[static_cast<std::size_t>(target)];
+                touch();
+            }
+        } else if (v == "pose") {
+            // The activities this particular character has, not a fixed list: the packs differ, and
+            // offering a clip a rig does not carry is how a rule silently does nothing.
+            std::vector<const char*> activities;
+            if (const entity::Entity* e = composition->entityWorld().find(entry.direction.subject)) {
+                for (const auto& [activity, clip] : e->desc().clips) {
+                    static_cast<void>(clip);
+                    activities.push_back(activity.c_str());
+                }
+            }
+            if (activities.empty()) {
+                ImGui::TextDisabled("(no activities)");
+            } else {
+                int activity = indexOf(activities, entry.direction.argument);
+                ImGui::SetNextItemWidth(110);
+                if (ImGui::Combo("##argument", &activity, activities.data(),
+                                 static_cast<int>(activities.size()))) {
+                    entry.direction.argument = activities[static_cast<std::size_t>(activity)];
+                    touch();
+                }
+            }
+        } else if (v == "wait") {
+            ImGui::TextDisabled("(nothing to aim at)");
+        } else {
+            char buffer[96];
+            std::strncpy(buffer, entry.direction.argument.c_str(), sizeof(buffer) - 1);
+            buffer[sizeof(buffer) - 1] = '\0';
+            ImGui::SetNextItemWidth(110);
+            if (ImGui::InputText("##argument", buffer, sizeof(buffer))) {
+                entry.direction.argument = buffer;
+                touch();
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("x")) {
+            removeAt = static_cast<int>(i);
+        }
+        ImGui::PopID();
+    }
+    if (removeAt >= 0) {
+        piece.sectionPerformance.entries.erase(piece.sectionPerformance.entries.begin() + removeAt);
+        touch();
+    }
+
+    if (ImGui::Button("+ Add rule")) {
+        seq::SectionPerformanceEntry entry;
+        entry.kind = sections.front();
+        entry.direction.subject = entityNames.front();
+        entry.direction.verb = "pose";
+        piece.sectionPerformance.entries.push_back(std::move(entry));
+        touch();
+    }
+    if (!piece.sectionPerformance.empty()) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("%zu rule(s) -- tick \"Generate performer actions\" when you import",
+                            piece.sectionPerformance.entries.size());
     }
 }
 
