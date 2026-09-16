@@ -78,7 +78,7 @@ It is cinematic illumination rather than lighting — a wash weighted by which w
 plus a pool under a low comet — and it casts no shadows.
 
 An aurora's **Audio response** controls are depths on the bands the engine already publishes, not a
-second analyser: bass raises the curtain, low-mid drives the waves, mid the folds, highs the
+second analyzer: bass raises the curtain, low-mid drives the waves, mid the folds, highs the
 filaments. Its overall shape can also be driven by ordinary modulation routes, and **Beat response**
 writes one, exactly as it does above.
 

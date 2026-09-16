@@ -274,7 +274,7 @@ Result<signals::MusicalStructure> structureOfTrack(const analysis::AnalysisTrack
                                                    int phraseBars, int sectionPhrases) {
     const auto& frames = track.frames();
     if (frames.empty()) {
-        return fail("the Auto-director needs an analysed track: this one has no frames");
+        return fail("the Auto-director needs an analyzed track: this one has no frames");
     }
     // A detector of its own, walked over every frame in order. Reusing the engine's would fold from
     // whatever state playback had reached, so the same track would produce a different structure
@@ -288,7 +288,7 @@ Result<signals::MusicalStructure> structureOfTrack(const analysis::AnalysisTrack
     }
     const double total = frames.back().timeSeconds;
     if (!(total > 0.0)) {
-        return fail("the analysed track has no duration");
+        return fail("the analyzed track has no duration");
     }
     auto structure = signals::MusicalStructure::fromMoments(moments, total);
     if (structure.sections.empty()) {
@@ -389,7 +389,7 @@ Result<std::size_t> directEngine(Engine& engine, std::span<const world::HeroPoin
                                  const AutoDirectorSettings& settings) {
     const analysis::AnalysisTrack* track = engine.track();
     if (track == nullptr) {
-        return fail("the Auto-director needs analysed audio; load a track first");
+        return fail("the Auto-director needs analyzed audio; load a track first");
     }
     auto structure = structureOfTrack(*track);
     if (!structure) {

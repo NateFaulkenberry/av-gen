@@ -15,13 +15,13 @@ features: command.camera.direct, command.camera.hand-back
 **Camera ▸ Enable Auto-director** folds the loaded track into musical sections and cuts the camera
 between the world's heroes, landing a reveal on the drop.
 
-It is disabled without analysed audio — the camera is cut to the track's structure, so there has to
+It is disabled without analyzed audio — the camera is cut to the track's structure, so there has to
 be a track — and it needs a scene with **heroes** declared. A generated world has them; a scene
 file declares them in its `heroes` block.
 
 ## What it does, step by step
 
-1. Walks the whole analysed track through a fresh musical-event detector and folds the result into
+1. Walks the whole analyzed track through a fresh musical-event detector and folds the result into
    sections.
 2. Casts the shots: the first hero is the hero, the rest are supporting. `Intro`, `Build`, `Drop`,
    `FinalBuild`, `FinalDrop` and `Outro` belong to the hero; everything else goes to the supporting

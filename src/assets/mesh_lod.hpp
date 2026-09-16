@@ -153,7 +153,7 @@ struct MeshCacheStats {
     float atvr = 0.0f;      // invocations per vertex; 1.0 means every vertex was transformed once
     float overfetch = 0.0f; // bytes fetched / bytes of vertex buffer; 1.0 means each cache line read once
 };
-[[nodiscard]] MeshCacheStats analyseMesh(const scene::MeshData& mesh);
+[[nodiscard]] MeshCacheStats analyzeMesh(const scene::MeshData& mesh);
 
 // LOD0 of an imported mesh source: meshoptimizer's documented order -- index (weld), vertex cache,
 // vertex fetch -- and, when `triangleBudget` is positive and the mesh is over it, a simplification

@@ -55,9 +55,9 @@ ends on its subject.
 The hero owns every build and drop by design — that is the arc the film is about, and holding the
 hero back until then is the shape of a reveal. The design assumes a structure with a *few* of them.
 
-Glowmere's analyser folded this track into **nineteen consecutive drops**, and the rule then handed
+Glowmere's analyzer folded this track into **nineteen consecutive drops**, and the rule then handed
 the entire middle of the film to one object. Whether nineteen drops is a good reading of the music is
-the analyser's business; the director has to stay watchable when it gets one.
+the analyzer's business; the director has to stay watchable when it gets one.
 
 So ownership is now a preference rather than a right: after four hero shots in a row the next section
 goes to the supporting cast whatever its kind. On a structure that alternates this changes nothing —

@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Context
 
-AV Gen could already render a world, analyse a song, animate a camera, pose a character, draw
+AV Gen could already render a world, analyze a song, animate a camera, pose a character, draw
 typography over the frame and export a video. What it could not do was say **when**.
 
 Every one of those systems had its own idea of time. `params::Timeline` keyed parameters.

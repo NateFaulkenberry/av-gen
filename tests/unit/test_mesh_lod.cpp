@@ -197,8 +197,8 @@ TEST_CASE("optimiseMesh reorders a mesh without changing its surface", "[assets]
 
     // And it is worth having done: the point of the pass is the cache behaviour, so that is what
     // is asserted rather than the fact that the indices moved.
-    const assets::MeshCacheStats before = assets::analyseMesh(sphere);
-    const assets::MeshCacheStats after = assets::analyseMesh(optimised);
+    const assets::MeshCacheStats before = assets::analyzeMesh(sphere);
+    const assets::MeshCacheStats after = assets::analyzeMesh(optimised);
     INFO("acmr " << before.acmr << " -> " << after.acmr << ", overfetch " << before.overfetch << " -> "
                  << after.overfetch);
     CHECK(after.acmr < before.acmr);
@@ -581,9 +581,9 @@ TEST_CASE("LOD0 comes back ordered for the GPU", "[assets][lod]") {
             std::swap(sphere.indices[t * 3 + k], sphere.indices[other * 3 + k]);
         }
     }
-    const assets::MeshCacheStats before = assets::analyseMesh(sphere);
+    const assets::MeshCacheStats before = assets::analyzeMesh(sphere);
     const scene::MeshData ordered = assets::sourceLodMesh(sphere, 0, assets::lod0Settings());
-    const assets::MeshCacheStats after = assets::analyseMesh(ordered);
+    const assets::MeshCacheStats after = assets::analyzeMesh(ordered);
     INFO("acmr " << before.acmr << " -> " << after.acmr << ", overfetch " << before.overfetch << " -> "
                  << after.overfetch);
     CHECK(triangles(ordered) == triangles(sphere)); // no geometry was traded for the ordering

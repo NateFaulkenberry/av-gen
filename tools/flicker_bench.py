@@ -16,7 +16,7 @@ deliverables, so a subsystem that is inert in it is a real defect rather than a 
 which is exactly the distinction the withdrawn numbers could not make. It also means the fixed-step
 clock, the single seek and the one-shot target sizing come from the shipped code.
 
-**The tail is analysed, not the head.** A particle pool starts empty: at t = 0 there is nothing to
+**The tail is analyzed, not the head.** A particle pool starts empty: at t = 0 there is nothing to
 flicker, and the frames while it fills are a transient of the harness rather than of the renderer.
 `--warmup` seconds are rendered and discarded.
 
@@ -40,7 +40,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from temporal_stats import analyse, sequence
+from temporal_stats import analyze, sequence
 from image_stats import read_png
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -139,7 +139,7 @@ def render(scene, out, width, height, seconds, arm, extra):
 
 
 def tail(directory, keep, warmup_frames):
-    """Move the frames to analyse into a `tail` subdirectory, discarding the warm-up."""
+    """Move the frames to analyze into a `tail` subdirectory, discarding the warm-up."""
     paths = sequence(directory)
     chosen = paths[warmup_frames:][-keep:] if len(paths) > warmup_frames else paths[-keep:]
     dest = os.path.join(directory, "tail")
@@ -150,7 +150,7 @@ def tail(directory, keep, warmup_frames):
 
 
 def frames_differ(a, b):
-    """Whether two sequences differ anywhere. The non-vacuity test, on the frames that are analysed
+    """Whether two sequences differ anywhere. The non-vacuity test, on the frames that are analyzed
     rather than on the whole render -- an arm that only moves the discarded warm-up has not been
     shown to affect the measurement."""
     pa, pb = sequence(a), sequence(b)
@@ -181,7 +181,7 @@ def main(argv):
     ap.add_argument("--height", type=int, default=540)
     ap.add_argument("--seconds", type=float, default=3.0, help="rendered, including the warm-up")
     ap.add_argument("--warmup", type=float, default=2.0, help="seconds discarded before analysis")
-    ap.add_argument("--keep", type=int, default=24, help="frames analysed, from the end")
+    ap.add_argument("--keep", type=int, default=24, help="frames analyzed, from the end")
     ap.add_argument("--fps", type=float, default=60.0)
     ap.add_argument("--threshold", type=float, default=6.0)
     ap.add_argument("--extra", default="", help="further avgen arguments, space separated")
@@ -202,7 +202,7 @@ def main(argv):
 
     results = {}
     print(f"scene {scene} at {args.width}x{args.height}, "
-          f"{args.seconds:g}s rendered, {args.warmup:g}s discarded, last {args.keep} analysed")
+          f"{args.seconds:g}s rendered, {args.warmup:g}s discarded, last {args.keep} analyzed")
 
     base_dir = os.path.join(args.out, "baseline")
     base_hash = render(scene, base_dir, args.width, args.height, args.seconds, None, extra)
@@ -210,7 +210,7 @@ def main(argv):
         print("baseline render failed")
         return 1
     base_tail = tail(base_dir, args.keep, warmup_frames)
-    base_stats, err = analyse(base_tail, args.threshold)
+    base_stats, err = analyze(base_tail, args.threshold)
     if err:
         print(err)
         return 1
@@ -232,7 +232,7 @@ def main(argv):
             continue
         t = tail(d, args.keep, warmup_frames)
         differs, why = frames_differ(base_tail, t)
-        stats, err = analyse(t, args.threshold)
+        stats, err = analyze(t, args.threshold)
         if err:
             print(f"{arm}: {err}")
             continue

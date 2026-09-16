@@ -1603,7 +1603,7 @@ json Sequence::toJson() const {
            {"actors", std::move(actorsJson)},
            {"overlays", std::move(overlaysJson)},
            {"markers", std::move(markersJson)}};
-    // ADR-215. Written only when there is one, so a project that was never analysed keeps the file
+    // ADR-215. Written only when there is one, so a project that was never analyzed keeps the file
     // it had -- and, unlike the beat markers above, this is *not* derived: it is where a person's
     // boundaries and names live, and dropping it would be the data loss the whole model prevents.
     if (!structure.sections.empty()) {

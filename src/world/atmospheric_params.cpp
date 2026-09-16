@@ -163,7 +163,7 @@ constexpr FloatField kAuroraFloats[] = {
     {"driftSpeed", -4.0f, 4.0f, -1.0f, 1.0f, F_GET(e.aurora.shape.driftSpeed), F_SET(e.aurora.shape.driftSpeed)},
     {"verticalSpeed", -4.0f, 4.0f, -1.0f, 1.0f, F_GET(e.aurora.shape.verticalSpeed),
      F_SET(e.aurora.shape.verticalSpeed)},
-    // Audio response. These are depths on signals that already exist, not an analyser.
+    // Audio response. These are depths on signals that already exist, not an analyzer.
     {"audioBass", 0.0f, 6.0f, 0.0f, 2.0f, F_GET(e.aurora.audio.bass), F_SET(e.aurora.audio.bass)},
     {"audioLowMid", 0.0f, 6.0f, 0.0f, 2.0f, F_GET(e.aurora.audio.lowMid), F_SET(e.aurora.audio.lowMid)},
     {"audioMid", 0.0f, 6.0f, 0.0f, 2.0f, F_GET(e.aurora.audio.mid), F_SET(e.aurora.audio.mid)},

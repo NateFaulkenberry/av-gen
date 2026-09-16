@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Context
 
-The analyser publishes rms, six bands, spectral centroid and flux, onsets, tempo, and a beat clock
+The analyzer publishes rms, six bands, spectral centroid and flux, onsets, tempo, and a beat clock
 with phase, bar, phrase and section counters. What it does not publish is *structure*: the
 difference between a beat and a downbeat, between a passage getting louder and a drop, between a
 break and silence.

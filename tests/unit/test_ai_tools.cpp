@@ -828,7 +828,7 @@ TEST_CASE("sequence.get_state reports the music video, not the timeline", "[ai][
     }
     CHECK(sawChorus);
 
-    // The audio it is cut to, by name and length rather than only as whatever the analyser hears at
+    // The audio it is cut to, by name and length rather than only as whatever the analyzer hears at
     // this instant -- which is all `audio.get_analysis` can say.
     REQUIRE(out.contains("audio"));
     CHECK(out["audio"]["hasAudio"].get<bool>());

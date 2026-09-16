@@ -99,7 +99,7 @@ Fixture abacFixture(double each = 16.0, double bpm = 120.0) {
     return f;
 }
 
-AnalysisTrack analysed(const audio::AudioFile& file) {
+AnalysisTrack analyzed(const audio::AudioFile& file) {
     return AnalysisTrack::analyze(file, AnalyzerConfig{});
 }
 } // namespace
@@ -108,7 +108,7 @@ AnalysisTrack analysed(const audio::AudioFile& file) {
 
 TEST_CASE("A detected structure is ordered, gapless and covers the track", "[analysis][structure]") {
     const auto fixture = abacFixture();
-    const auto track = analysed(fixture.file);
+    const auto track = analyzed(fixture.file);
     auto structure = detectStructure(track);
     INFO((structure ? std::string() : structure.error().message));
     REQUIRE(structure.has_value());
@@ -126,7 +126,7 @@ TEST_CASE("A detected structure is ordered, gapless and covers the track", "[ana
         }
     }
     CHECK_THAT(structure->sections.front().startSeconds, Catch::Matchers::WithinAbs(0.0, 1e-6));
-    // The last section runs to the end of the analysed audio, not to the last beat the tracker was
+    // The last section runs to the end of the analyzed audio, not to the last beat the tracker was
     // confident about -- music carries on past the last beat and that tail belongs to something.
     CHECK(structure->sections.back().endSeconds > track.frames().back().timeSeconds - 1.0);
 }
@@ -144,7 +144,7 @@ TEST_CASE("Boundaries keep sub-second precision", "[analysis][structure]") {
     // beat's own timestamp and never a rounded, snapped or reconstructed one. That holds at any
     // tempo, and it is the property rounding would break.
     const auto fixture = abacFixture();
-    const auto track = analysed(fixture.file);
+    const auto track = analyzed(fixture.file);
     auto structure = detectStructure(track);
     REQUIRE(structure.has_value());
     REQUIRE(structure->sections.size() >= 2);
@@ -162,7 +162,7 @@ TEST_CASE("Boundaries keep sub-second precision", "[analysis][structure]") {
     // And at a tempo whose beats are *not* round numbers, the times that come out are not round
     // numbers either -- which is the thing a user notices when it goes wrong.
     const auto odd = abacFixture(14.0, 131.0);
-    const auto oddTrack = analysed(odd.file);
+    const auto oddTrack = analyzed(odd.file);
     auto oddStructure = detectStructure(oddTrack);
     REQUIRE(oddStructure.has_value());
     if (oddStructure->sections.size() >= 2) {
@@ -179,7 +179,7 @@ TEST_CASE("The same audio gives the same structure", "[analysis][structure]") {
     // then edited by a person, so a detector that answers differently on the second run silently
     // moves work somebody did.
     const auto fixture = abacFixture();
-    const auto track = analysed(fixture.file);
+    const auto track = analyzed(fixture.file);
     auto first = detectStructure(track);
     auto second = detectStructure(track);
     REQUIRE(first.has_value());
@@ -198,7 +198,7 @@ TEST_CASE("A track with no beat grid is refused, not guessed at", "[analysis][st
     // different algorithm returning results under this one's name, and nothing downstream could
     // tell which it had been given.
     const auto quiet = audio::AudioFile::fromInterleaved(std::vector<float>(kRate, 0.0f), 1, kRate);
-    const auto track = analysed(quiet);
+    const auto track = analyzed(quiet);
     auto structure = detectStructure(track);
     CHECK_FALSE(structure.has_value());
 }
@@ -211,7 +211,7 @@ TEST_CASE("Placed boundaries are recovered", "[analysis][structure]") {
     // change, and the checkerboard kernel is symmetric, so sub-bar accuracy is not what this stage
     // promises -- that is what the user's refinement is for.
     const auto fixture = abacFixture();
-    const auto track = analysed(fixture.file);
+    const auto track = analyzed(fixture.file);
     auto structure = detectStructure(track);
     INFO((structure ? std::string() : structure.error().message));
     REQUIRE(structure.has_value());
@@ -248,7 +248,7 @@ TEST_CASE("Repeated material is grouped", "[analysis][structure]") {
     // than one member, or the recurrence half of the pipeline is doing nothing and the labels that
     // depend on it are guesses wearing a confidence.
     const auto fixture = abacFixture();
-    const auto track = analysed(fixture.file);
+    const auto track = analyzed(fixture.file);
     auto structure = detectStructure(track);
     REQUIRE(structure.has_value());
 
@@ -283,7 +283,7 @@ TEST_CASE("Energy and density are measured against the track, not asserted absol
     // B is built to be the loud material and C the quiet one. What is asserted is the *ordering*,
     // because the numbers are rescaled against this track's own range -- which is the point of them.
     const auto fixture = abacFixture();
-    const auto track = analysed(fixture.file);
+    const auto track = analyzed(fixture.file);
     auto structure = detectStructure(track);
     REQUIRE(structure.has_value());
 
@@ -307,7 +307,7 @@ TEST_CASE("A label always carries a confidence, and Other carries none", "[analy
     // for a guess, it is the absence of a claim. A section the detector cannot name reports zero
     // rather than a small number that a progress bar would round up into an opinion.
     const auto fixture = abacFixture();
-    const auto track = analysed(fixture.file);
+    const auto track = analyzed(fixture.file);
     auto structure = detectStructure(track);
     REQUIRE(structure.has_value());
 
@@ -332,7 +332,7 @@ TEST_CASE("Everything detected is marked as detected", "[analysis][structure]") 
     // re-analysis would refuse to replace its own previous guess and the user would be unable to
     // get a fresh reading.
     const auto fixture = abacFixture();
-    const auto track = analysed(fixture.file);
+    const auto track = analyzed(fixture.file);
     auto structure = detectStructure(track);
     REQUIRE(structure.has_value());
     for (const auto& s : structure->sections) {
@@ -359,7 +359,7 @@ TEST_CASE("Section names round-trip", "[analysis][structure]") {
 
 TEST_CASE("sectionAt finds the section a time is in", "[analysis][structure]") {
     const auto fixture = abacFixture();
-    const auto track = analysed(fixture.file);
+    const auto track = analyzed(fixture.file);
     auto structure = detectStructure(track);
     REQUIRE(structure.has_value());
     REQUIRE(structure->sections.size() >= 2);
@@ -431,9 +431,9 @@ TEST_CASE("Chroma ignores level and follows pitch", "[analysis][structure]") {
         }
         return audio::AudioFile::fromInterleaved(mono, 1, kRate);
     };
-    const auto quiet = analysed(tone(440.0f, 0.1f));
-    const auto loud = analysed(tone(440.0f, 0.8f));
-    const auto other = analysed(tone(523.25f, 0.8f)); // C5, three semitones up
+    const auto quiet = analyzed(tone(440.0f, 0.1f));
+    const auto loud = analyzed(tone(440.0f, 0.8f));
+    const auto other = analyzed(tone(523.25f, 0.8f)); // C5, three semitones up
 
     const auto cq = chromagram(quiet);
     const auto cl = chromagram(loud);
@@ -474,7 +474,7 @@ TEST_CASE("Structure of the Glowmere track", "[.report][analysis][structure]") {
     }
     auto file = audio::AudioFile::load(wav);
     REQUIRE(file.has_value());
-    const auto track = analysed(*file);
+    const auto track = analyzed(*file);
     auto structure = detectStructure(track);
     INFO((structure ? std::string() : structure.error().message));
     REQUIRE(structure.has_value());

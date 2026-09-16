@@ -16,10 +16,10 @@ arbitrary resolution and frame rate. Audio analysis must line up with the timeli
   clamped to a maximum step; `FixedStepClock` sets `renderTime = frameIndex / fps`. No engine
   code outside `RealtimeClock` reads a system clock.
 - **Audio position is sample-indexed.** `AudioPlayer::positionSeconds()` derives from the
-  play-head frame count; the analyser stamps every `AnalysisFrame` with the PCM frame index at
+  play-head frame count; the analyzer stamps every `AnalysisFrame` with the PCM frame index at
   its window centre. Live mode: the render thread consumes the most recent frame. Offline mode
   (later): `AnalysisTrack::at(time)` returns the frame whose centre is nearest `renderTime`,
-  computed by running the identical analyser over the decoded buffer ahead of rendering.
+  computed by running the identical analyzer over the decoded buffer ahead of rendering.
 - **Timeline transport.** `Transport` owns play/pause/seek and the mapping between
   `renderTime` and audio position. In 0.1, real-time playback drives `renderTime` from the audio
   play-head when playing (audio is the master clock) and from the frame clock when paused, so

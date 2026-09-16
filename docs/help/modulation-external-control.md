@@ -53,7 +53,7 @@ parameter also carries a `range` mapping the incoming 0…1 onto the parameter's
 
 `Clock`, `Start`, `Continue` and `Stop` never bind and never count as unmatched — they feed the
 tempo tracker. Set `tempo source` to `MIDI clock` to let an incoming clock own the tempo instead of
-the analyser.
+the analyzer.
 
 ## OSC
 

@@ -19,7 +19,7 @@
 // so where `installHeroReactions` does the same thing.
 //
 // THE BAND VOCABULARY IS THE ONE THAT EXISTS. The brief's section 21 asks for sub-bass and highs;
-// the analyser has five bands -- bass (20-150), lowMid (150-400), mid (400-2k), highMid (2k-6k),
+// the analyzer has five bands -- bass (20-150), lowMid (150-400), mid (400-2k), highMid (2k-6k),
 // treble (6k-16k) -- and no sub-bass. The mapping below is written against what is actually
 // published on the bus.
 

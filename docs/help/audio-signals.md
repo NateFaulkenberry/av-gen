@@ -45,7 +45,7 @@ published as signals.
 
 ## The beat clock
 
-Smoothly interpolated at render rate and resynchronised to the analyser.
+Smoothly interpolated at render rate and resynchronised to the analyzer.
 
 | Signal | Range | Event |
 |---|---|---|

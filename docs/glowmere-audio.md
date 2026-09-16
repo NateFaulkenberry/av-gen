@@ -202,7 +202,7 @@ Verified by running the engine:
   resolved to a real, modulatable parameter, and the audio file was found. Pointing
   `assets.audio.path` at a missing file produces `project: audio: audio file not found: …`, so the
   clean load is evidence and not silence.
-- `offline analysis: 8434 frames` — the 90-second track is read and analysed ahead of the render,
+- `offline analysis: 8434 frames` — the 90-second track is read and analyzed ahead of the render,
   which is what makes an offline render and a live window agree about where the events are.
 - The eleven `music.<name>` signals are declared by `src/app/music_runtime.hpp` and all fourteen
   event routes bind. The names in the enum table (`beat`, `downbeat`, `bar`, `phrase`, `section`,

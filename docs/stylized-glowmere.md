@@ -161,7 +161,7 @@ exposure, bloom and the camera have no audio response at all; `music.bar`, `musi
 magnitude, and an explicit list of what was verified against what was not, are in
 [glowmere-audio.md](glowmere-audio.md).
 
-The project loads with 854 parameters, 16 routes and zero warnings, the track is analysed ahead of
+The project loads with 854 parameters, 16 routes and zero warnings, the track is analyzed ahead of
 the render (`offline analysis: 8434 frames`), and a 640×360 range render completes with zero GPU
 errors and no measurable frame-time cost against the two-route baseline. **The soundtrack has still
 not been auditioned at speed with sound**, so the earlier acceptance note stands: soundtrack review

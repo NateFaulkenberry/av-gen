@@ -720,7 +720,7 @@ TEST_CASE("A build sets the camera going and is not cut into", "[app][cinematic]
 }
 
 TEST_CASE("The director does not cut constantly", "[app][cinematic][director]") {
-    // The same three-minute piece, but with the analyser twitching: fourteen extra section changes,
+    // The same three-minute piece, but with the analyzer twitching: fourteen extra section changes,
     // fifty energy trends and a beat every half second. None of it may become a cut.
     std::vector<MusicalMoment> m{
         MusicalMoment{MusicalEvent::Build, 24.0, 0.6f}, MusicalMoment{MusicalEvent::Drop, 40.0, 0.8f},
@@ -1083,8 +1083,8 @@ TEST_CASE("The film does not settle on one hero and stay there", "[app][cinemati
         section.intensity = 0.7f;
         structure.sections.push_back(section);
     };
-    // The analyser really does produce this: 183 s of Glowmere folded into a run of nineteen
-    // consecutive drops. Whether that is a good reading of the music is the analyser's business --
+    // The analyzer really does produce this: 183 s of Glowmere folded into a run of nineteen
+    // consecutive drops. Whether that is a good reading of the music is the analyzer's business --
     // the director has to stay watchable when it gets one.
     add(MusicalSection::Intro, 0.0, 4.0);
     double t = 4.0;

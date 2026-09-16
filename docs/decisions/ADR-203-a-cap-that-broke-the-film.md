@@ -127,7 +127,7 @@ cuts)" in continuous mode.
 
 **Nothing is disabled in continuous mode.** The question was whether the shot-timing controls apply
 there; they do. `groupSections` reads `minShotSeconds`, `minBuildShotSeconds` and `maxShotSeconds`
-before either mode is consulted, and they decide how the analyser's sections become shots. What
+before either mode is consulted, and they decide how the analyzer's sections become shots. What
 changes between modes is what a shot *is* — a cut in an edited sequence, a change of subject and
 intent inside one unbroken move in a continuous take — so they are relabelled and re-explained
 rather than greyed out. Disabling a live control would have been a worse lie than the label was.

@@ -48,7 +48,7 @@ bool waitForFrames(AnalysisRunner& runner, std::uint64_t count, std::chrono::mil
 }
 } // namespace
 
-TEST_CASE("AnalysisRunner analyses a streamed sine on its own thread", "[analysis][runner]") {
+TEST_CASE("AnalysisRunner analyzes a streamed sine on its own thread", "[analysis][runner]") {
     audio::AnalysisStream stream(1u << 16);
     AnalyzerConfig config;
     config.sampleRate = kRate;
@@ -139,7 +139,7 @@ TEST_CASE("AnalysisRunner frames carry tempo and beats for a click track", "[ana
     }
     CHECK(beats >= 3); // 200 hops = 2.1 s at 2 beats/s
 
-    // A seek resets the tracker: tempo is unknown until enough new audio has been analysed.
+    // A seek resets the tracker: tempo is unknown until enough new audio has been analyzed.
     stream.markDiscontinuity(0);
     REQUIRE(feed(stream, std::span<const float>(signal.data(), config.windowSize), std::chrono::seconds(2)));
     REQUIRE(waitForFrames(runner, expectedFrames + 1, std::chrono::seconds(2)));

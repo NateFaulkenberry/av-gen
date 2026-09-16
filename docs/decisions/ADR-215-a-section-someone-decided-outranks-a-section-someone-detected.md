@@ -12,7 +12,7 @@ origin worth honouring. `Sequence::setSectionMarkers` *replaced* the Section mar
 
 * a boundary dragged from 1:02.4 to 1:03.1 survived nothing;
 * re-running analysis destroyed refinements silently;
-* nothing distinguished the analyser's guess from a person's decision.
+* nothing distinguished the analyzer's guess from a person's decision.
 
 ADR-206 also left one thing explicitly open: `signals::MusicalSection` and
 `analysis::SectionFunction` overlap, and "the two need a stated relationship rather than a silent
@@ -38,7 +38,7 @@ second kind of data loss — and `confidenceIsMeaningful()` is what a UI asks be
 
 ### The re-analysis policy
 
-`seq::reanalyse(current, fresh)`: **`Detected` sections are replaced; `Refined` and `Authored` ones
+`seq::reanalyze(current, fresh)`: **`Detected` sections are replaced; `Refined` and `Authored` ones
 are kept exactly, and the fresh detection is cut around them.** A fresh section that straddles a kept
 one is trimmed rather than dropped, which is what keeps the result ordered, gapless and covering.
 Where a trimmed section and a kept one disagree about where they meet, the kept one wins.

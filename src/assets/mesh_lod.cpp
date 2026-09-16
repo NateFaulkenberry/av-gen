@@ -440,7 +440,7 @@ scene::MeshData sourceLodMesh(const scene::MeshData& mesh, int triangleBudget,
     return out;
 }
 
-MeshCacheStats analyseMesh(const scene::MeshData& mesh) {
+MeshCacheStats analyzeMesh(const scene::MeshData& mesh) {
     if (!mesh.valid()) {
         return {};
     }

@@ -1210,7 +1210,7 @@ std::vector<ShotSpan> groupSections(const signals::MusicalStructure& structure,
             spans.back().end = section.startSeconds;
             spans.push_back(ShotSpan{&section, section.startSeconds, section.endSeconds()});
         } else {
-            // Absorbed. Not every section the analyser found deserves a cut, and this is where "do
+            // Absorbed. Not every section the analyzer found deserves a cut, and this is where "do
             // not cut constantly" is actually enforced rather than merely intended.
             spans.back().end = section.endSeconds();
         }
@@ -1219,7 +1219,7 @@ std::vector<ShotSpan> groupSections(const signals::MusicalStructure& structure,
         return spans;
     }
     // The other end of the same judgement. `minShotSeconds` stops the director cutting on every
-    // section the analyser found; this stops one section becoming a shot nobody would hold. The
+    // section the analyzer found; this stops one section becoming a shot nobody would hold. The
     // pieces stay inside the section, so every cut is still on the music, and each piece is cast
     // separately -- which is what stops a long verse being one subject for half a minute.
     std::vector<ShotSpan> split;
@@ -1229,7 +1229,7 @@ std::vector<ShotSpan> groupSections(const signals::MusicalStructure& structure,
         // A build, a drop and a breakdown are single deliberate moves and cutting into one destroys
         // what it is for, so they are exempt however long they run.
         //
-        // That exemption has a cost, and it is unresolved rather than accepted. Glowmere's analyser
+        // That exemption has a cost, and it is unresolved rather than accepted. Glowmere's analyzer
         // folded one track into a *thirty-four second* drop, and the exemption then held the camera
         // on one hero for half a minute -- which is most of what "it spins around a single hero for
         // about a minute" was reporting. Capping the exemption fixes that and contradicts two tests

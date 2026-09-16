@@ -84,4 +84,4 @@ render and a 120 fps editor session agree about where the drop is.
 ## Choosing a tempo source
 
 The Control panel's `tempo source` combo selects `analysis` or `MIDI clock`. With MIDI clock
-selected, an incoming 24-ppqn clock owns the tempo outright and the analyser's estimate is ignored.
+selected, an incoming 24-ppqn clock owns the tempo outright and the analyzer's estimate is ignored.

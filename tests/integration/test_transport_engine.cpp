@@ -227,7 +227,7 @@ TEST_CASE("Frame stepping moves the timeline by exactly one frame", "[integratio
 TEST_CASE("Beat stepping lands on beats", "[integration][transport]") {
     Silent s;
     s.engine.refreshTransport();
-    // No analysed beat grid here, so the tempo is the grid. 120 bpm is a beat every half second.
+    // No analyzed beat grid here, so the tempo is the grid. 120 bpm is a beat every half second.
     s.engine.transport().setTempo(120.0, 4);
     s.engine.seekSeconds(0.0);
 

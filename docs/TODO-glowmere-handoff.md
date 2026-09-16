@@ -340,7 +340,7 @@ region across a rendered sequence of the 90-second shot. That is invalid here: t
 so it sweeps scene detail through a fixed window and swamps the vegetation. The control proved
 it — with wind fully DISABLED the metric got *worse* (jerk 1.559 against 1.234 with wind on).
 Use `--composition examples/world/glowmere-stylized.scene.json`, which renders the scene's own
-static camera without the project timeline, and analyse each pixel's time series separately
+static camera without the project timeline, and analyze each pixel's time series separately
 rather than a region mean, which cancels opposing motion.
 
 Measured that way over 45 frames at 640x400, counting only pixels that actually move:

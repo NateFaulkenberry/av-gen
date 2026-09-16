@@ -160,7 +160,7 @@ std::string ReanalysisReport::summary() const {
                        detectedReplaced, kept(), refinedKept, authoredKept);
 }
 
-ReanalysisReport reanalyse(SongStructure& current, const SongStructure& fresh) {
+ReanalysisReport reanalyze(SongStructure& current, const SongStructure& fresh) {
     ReanalysisReport report;
     if (fresh.sections.empty()) {
         // Nothing was learned, so nothing is replaced. Emptying a person's structure because the

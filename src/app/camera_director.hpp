@@ -146,10 +146,10 @@ struct AutoDirectorSettings {
                                                                  int phraseBars = 4,
                                                                  int sectionPhrases = 4);
 
-// The whole path: an engine holding an analysed track and a world holding heroes, to a camera that
+// The whole path: an engine holding an analyzed track and a world holding heroes, to a camera that
 // moves to the music. Returns how many tracks were installed.
 //
-// Main thread only, and offline-analysed audio only: a live input has no future to fold.
+// Main thread only, and offline-analyzed audio only: a live input has no future to fold.
 // `settings` has no default, on purpose. It used to, and the Enable button omitted it -- so every
 // control in the panel was bound to a struct the first cut never read, and choosing Continuous shot
 // did nothing at all. A defaulted argument that silently means "ignore what the user chose" is worth

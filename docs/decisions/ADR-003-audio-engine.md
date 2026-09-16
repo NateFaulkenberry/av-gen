@@ -27,7 +27,7 @@ capture.
   interleaved stereo retained), reporting sample rate, channel count, and duration.
 - `audio::AudioPlayer` owns a `ma_device` in playback mode. The real-time callback copies from the
   decoded buffer at a `std::atomic<uint64_t>` play-head, applies volume, and pushes the same
-  samples into an SPSC ring buffer for the analyser. No allocation, locks, or logging in the
+  samples into an SPSC ring buffer for the analyzer. No allocation, locks, or logging in the
   callback.
 - Playback position is derived from the play-head frame index, not wall time.
 - Seeking sets the play-head atomically; analysis state is reset on seek.
@@ -46,7 +46,7 @@ capture.
 - Memory use scales with track length; very long files (DJ sets) will need streaming decode in
   a later milestone.
 - OGG Vorbis requires wiring stb_vorbis into miniaudio (documented, deferred).
-- miniaudio's device callback thread is the only real-time thread; the analyser thread is normal
+- miniaudio's device callback thread is the only real-time thread; the analyzer thread is normal
   priority and tolerates jitter because it is fed by a ring buffer.
 
 ## Rejected alternatives

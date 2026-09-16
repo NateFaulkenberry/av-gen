@@ -61,8 +61,8 @@ namespace avgen::app {
 enum class EngineMode { Live, Offline };
 
 // Where the beat clock (beat.* signals, SourceContext tempo fields, the timeline's beat time)
-// comes from: the audio analyser, or an incoming MIDI clock (ADR-021 follow-up). With MidiClock
-// selected but no running clock the analyser is used; the analyser keeps running either way.
+// comes from: the audio analyzer, or an incoming MIDI clock (ADR-021 follow-up). With MidiClock
+// selected but no running clock the analyzer is used; the analyzer keeps running either way.
 enum class TempoSource { Analysis, MidiClock };
 [[nodiscard]] const char* tempoSourceName(TempoSource source);          // "analysis" | "midi"
 [[nodiscard]] std::optional<TempoSource> tempoSourceFromName(std::string_view name);
@@ -430,7 +430,7 @@ public:
     //
     // A piece can be made of several files: a stem set, a song with a spoken outro, two cues with a
     // gap. The clips are mixed down to one buffer and that buffer is installed exactly as a loaded
-    // file is, so the player, the analyser, the waveform and the transport are unchanged -- a
+    // file is, so the player, the analyzer, the waveform and the transport are unchanged -- a
     // one-clip arrangement is bit-identical to the file it names, which is what makes routing
     // `loadAudio` through here safe.
     [[nodiscard]] const std::vector<audio::AudioClip>& audioClips() const { return audioClips_; }
@@ -491,7 +491,7 @@ public:
     // the analysis's and the resynchronising a seek needs is the engine's.
     void stepFrames(std::int64_t frames);
     void stepBeats(int beats);
-    // The next/previous beat boundary from the analysed beat grid, or from the tempo when there is
+    // The next/previous beat boundary from the analyzed beat grid, or from the tempo when there is
     // no grid. Returns the position unchanged when there is neither.
     [[nodiscard]] double beatBoundary(double fromSeconds, int direction) const;
     // The next or previous marker on the sequence, skipping the `Beat` markers -- those are the beat
@@ -543,7 +543,7 @@ public:
     // The same track, shareable. A background job that reads it (the song-structure analysis,
     // ADR-216) has to survive the audio being replaced under it, and a raw pointer into something
     // `loadAudio` resets is a use-after-free waiting for a person to open two files quickly. Held
-    // as a `shared_ptr` rather than copied into the job because an analysed four-minute track is
+    // as a `shared_ptr` rather than copied into the job because an analyzed four-minute track is
     // tens of megabytes of spectra.
     [[nodiscard]] std::shared_ptr<const analysis::AnalysisTrack> trackShared() const { return track_; }
     [[nodiscard]] const analysis::AnalysisFrame& latestFrame() const { return latest_; }

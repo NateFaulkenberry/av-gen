@@ -3,7 +3,7 @@
 //
 // The load-bearing test in this file is the first one. Routing the engine's existing single-file
 // path through the mixer is only safe if a one-clip arrangement is *bit-identical* to the file, and
-// nothing downstream -- the player, the analyser, the waveform, the transport -- can tell the
+// nothing downstream -- the player, the analyzer, the waveform, the transport -- can tell the
 // difference. Everything else here is placement arithmetic.
 
 #include "audio/arrangement.hpp"
