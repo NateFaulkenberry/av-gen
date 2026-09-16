@@ -580,7 +580,24 @@ public:
         std::string hero = std::move(aimHoldState_.hero);
         aimHoldState_ = AimHoldState{};
         aimHoldState_.hero = std::move(hero);
+        // The follow smoother is running state for the same reason and goes with it.
+        aimFollowSmoothed_ = glm::vec3(0.0f);
+        aimFollowPrimed_ = false;
     }
+
+    // How hard the aim-follow delta is filtered, in milliseconds. ADR-158 adds the hero's movement
+    // since the cut straight onto the camera target, which is right for travel and wrong for
+    // anything that oscillates: a hovering saucer with a sine on its height hands the camera that
+    // sine, one frame at a time, and the shot rocks with it.
+    //
+    // A low pass separates the two by *rate* rather than by amount, which is the only thing that
+    // distinguishes them: a body crossing two hundred metres moves far and slowly, a hover bob
+    // moves a little and quickly. Travel passes through with a small constant lag; the bob is
+    // attenuated by roughly the ratio of its period to this constant.
+    //
+    // 0 restores the unfiltered behaviour exactly, so a project that does not ask is unchanged.
+    void setAimFollowSmoothingMs(float ms) { aimFollowSmoothingMs_ = ms; }
+    [[nodiscard]] float aimFollowSmoothingMs() const { return aimFollowSmoothingMs_; }
     // Whether the camera is being held on the scenario's actor *right now*, and on which hero. What
     // a test asserts on, and what an overlay would show.
     [[nodiscard]] bool aimHeld() const { return aimHoldState_.holding; }
@@ -975,6 +992,14 @@ private:
         glm::vec3 releaseTarget{0.0f};
     };
     AimHoldState aimHoldState_;
+    // ADR-245: the filtered aim-follow delta, and whether it has a value yet. Reset by
+    // `clearAimHoldState` (a seek) and whenever the active shot changes -- at a cut the delta is
+    // zero by definition, and inheriting the previous shot's would start the new one off-centre.
+    glm::vec3 aimFollowSmoothed_{0.0f};
+    bool aimFollowPrimed_ = false;
+    const AimFollow* aimFollowLast_ = nullptr;
+    float aimFollowSmoothingMs_ = 0.0f;
+    double aimFollowPrevTime_ = 0.0;
 
     // A hero moved and the world has not settled yet. Moving an object is a *drag* -- sixty
     // positions a second -- and each one that reached `heroRevision_` would re-cut the directed

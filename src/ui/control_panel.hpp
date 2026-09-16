@@ -110,6 +110,12 @@ public:
     std::function<void(const app::AssetEntry&)> onOpenAsset;
     // Offline rendering (1.0): the host owns the settings, the job and the queue.
     app::RenderSettings* renderSettings = nullptr;
+    // ADR-186 lifts the distance limits for a render and not for the viewport, which leaves the
+    // editor showing a herd that stutters and freezes while the deliverable shows one that does
+    // not. Verified rather than assumed: a wide shot at 420 m renders `coarse 0, skipped 0` where
+    // the same shot with the limits kept reports `skipped 21`. This lets the viewport be put on
+    // the render's terms so a wide shot can be judged against what will actually ship.
+    bool* liftViewportLimits = nullptr;
     std::function<void()> onStartRender;
     std::function<void()> onCancelRender;
     std::function<void()> onEnqueueRender;

@@ -111,6 +111,7 @@ struct AppOptions {
     // --supersample: an offline render's multiple of the output size (ADR-212). 1 = off.
     float supersample = 1.0f;
     std::optional<std::string> aovs; // ADR-242: --aov, auxiliary passes beside the beauty frames
+    bool liftViewportLimits = false; // --viewport-matches-render: lift ADR-186's limits live too
 
     bool profileCpu = false;
     std::optional<std::filesystem::path> profileCsv; // --profile-csv <file>: one row per frame
@@ -238,6 +239,11 @@ private:
     RecentFiles recent_{{}};
     std::unique_ptr<RenderJob> job_;             // in-app render in progress
     RenderSettings uiRender_;                     // the Render window's settings
+    // ADR-186's limits, lifted in the viewport as well as in a render. A working default of false
+    // because lifting them costs real frame time on a wide shot -- which is the whole reason live
+    // playback has them -- but the editor showing a different world from the deliverable is a
+    // worse trap than a slower editor, so it is one checkbox away.
+    bool liftViewportLimits_ = false;
     std::deque<std::pair<std::filesystem::path, RenderSettings>> uiQueue_;
     std::filesystem::path renderProjectTemp_;
     RenderProgress lastRender_;
