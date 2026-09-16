@@ -1404,9 +1404,6 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         // file differ from the window that asked for it. It is derived rather than stored -- the
         // settings are already in `autoDirector`, and storing it twice would let the two disagree.
         // A project with no cut gets no hold, because `setAimHold` on an empty scenario is off.
-        comp->setAimHold(scene::AimHold{.scenario = autoDirector_.holdScenario,
-                                        .role = autoDirector_.holdRole,
-                                        .releaseSeconds = autoDirector_.holdReleaseSeconds});
     }
     // ADR-207, and cleared when absent for the same reason the aim-follow table is: a project with
     // no cut must not inherit the last one's, or a world effect would fire against a schedule for a
@@ -2231,7 +2228,7 @@ void Engine::seekSeconds(double seconds) {
         // ADR-217: and the camera's hold on it, for the same reason. The hold is derived from the
         // scenario's state, and the scenario has just been put back to the top -- a hold left armed
         // across the seek would keep the camera on a shot the new second is nowhere near.
-        composition->clearAimHoldState();
+        composition->clearAimFollowState();
         // ADR-245: and the camera director's view of what has happened, for exactly the same
         // reason. An event span observed before the jump describes a run of a scenario that the
         // seek has just abolished; carrying it over would cut to an event camera for an event that

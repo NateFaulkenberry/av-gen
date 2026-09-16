@@ -20,18 +20,13 @@
   },
   "autoDirector": {
     "dwell": 2,
-    "hero": 50.0,
-    "holdRelease": 1.0,
-    "holdRole": "target",
-    "holdScenario": "abduction",
     "maxShot": 6.5,
     "maxSpeed": 3.9000000953674316,
     "maxSwing": 7.0,
     "minBuildShot": 2.0,
     "minShot": 3.700000047683716,
     "mode": "edited",
-    "seed": 1,
-    "wide": 24.0
+    "seed": 1
   },
   "cameraAimFollow": [
     {

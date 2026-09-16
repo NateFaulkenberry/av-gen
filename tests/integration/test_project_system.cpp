@@ -862,8 +862,6 @@ TEST_CASE("the Auto-director's controls are saved with the project", "[project][
         d.minShotSeconds = 3.5;
         d.minBuildShotSeconds = 1.25;
         d.maxShotSeconds = 18.0;
-        d.wideFocalLength = 21.0f;
-        d.heroFocalLength = 85.0f;
         d.maxCameraSpeed = 0.4f;
         d.maxViewRate = 8.0f;
         d.dwellShots = 6;
@@ -884,8 +882,10 @@ TEST_CASE("the Auto-director's controls are saved with the project", "[project][
         CHECK(d.at("minShot").get<double>() == 3.5);
         CHECK(d.at("minBuildShot").get<double>() == 1.25);
         CHECK(d.at("maxShot").get<double>() == 18.0);
-        CHECK(d.at("wide").get<float>() == 21.0f);
-        CHECK(d.at("hero").get<float>() == 85.0f);
+        // ADR-245 retired the global wide/hero lens pair: a camera carries its own optical
+        // identity now. The keys are gone from the document rather than written and ignored.
+        CHECK_FALSE(d.contains("wide"));
+        CHECK_FALSE(d.contains("hero"));
         CHECK(d.at("maxSpeed").get<float>() == 0.4f);
         CHECK(d.at("maxSwing").get<float>() == 8.0f);
         CHECK(d.at("dwell").get<int>() == 6);
@@ -902,8 +902,6 @@ TEST_CASE("the Auto-director's controls are saved with the project", "[project][
         CHECK(d.minShotSeconds == 3.5);
         CHECK(d.minBuildShotSeconds == 1.25);
         CHECK(d.maxShotSeconds == 18.0);
-        CHECK(d.wideFocalLength == 21.0f);
-        CHECK(d.heroFocalLength == 85.0f);
         CHECK(d.maxCameraSpeed == 0.4f);
         CHECK(d.maxViewRate == 8.0f);
         CHECK(d.dwellShots == 6);

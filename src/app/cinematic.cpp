@@ -1633,19 +1633,10 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
         shot.startAzimuth = shot.subject.preferredAzimuth + static_cast<float>(i) * 2.39996f;
         shot.endAzimuth = shot.startAzimuth + d.azimuthSweep;
 
-        switch (shot.kind) {
-        case ShotKind::Establish:
-        case ShotKind::Drift:
-            shot.composition.focalLength = brief.wideFocalLength;
-            break;
-        case ShotKind::HeroReveal:
-        case ShotKind::Reveal:
-        case ShotKind::Approach:
-            shot.composition.focalLength = brief.heroFocalLength;
-            break;
-        default:
-            break;
-        }
+        // One lens, from the camera this cut is being baked for. The shot's *kind* no longer picks
+        // a focal length: a kind is about what the move is doing, and the optics belong to the
+        // camera doing it (ADR-245).
+        shot.composition.focalLength = brief.focalLength;
         if (sectionKind == MusicalSection::Breakdown) {
             // Slow and close. The distance the camera covers is what makes a shot feel fast, not
             // the music under it, so an intimate shot has to actually travel less ground -- pulling

@@ -3479,20 +3479,6 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                     "between subjects rather than holding one for a third of the piece.");
 
             ImGui::Separator();
-            ImGui::TextUnformatted("Lenses");
-            ImGui::SliderFloat("wide", &s.wideFocalLength, 10.0f, 50.0f, "%.0f mm");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("The establishing lens: what wide and drifting shots are shot "
-                                  "on.");
-            }
-            ImGui::SliderFloat("hero", &s.heroFocalLength, 24.0f, 135.0f, "%.0f mm");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("The lens a subject is shot on. Left at its default the "
-                                  "director picks 35 or 50 mm from the subject's own "
-                                  "proportions; move it and your value is used instead.");
-            }
-
-            ImGui::Separator();
             ImGui::TextUnformatted("Pace");
             // First in this block, because it is the one that actually lowers the floor the two
             // caps below run into. Measured on Glowmere with the caps at 0.4 m/s and 2 deg/s:
@@ -3556,50 +3542,6 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
             // ADR-217. A list of the scenarios this scene actually stages, plus "off" -- rather
             // than a text box, because a scenario name that does not exist holds nothing and the
             // panel should not be able to ask for that.
-            ImGui::Separator();
-            ImGui::TextUnformatted("Stay with a scenario");
-            {
-                std::vector<std::string> scenarios;
-                if (const scene::Composition* composition = engine.composition()) {
-                    for (const stage::ScenarioDesc& sc : composition->staging().scenarios) {
-                        scenarios.push_back(sc.name);
-                    }
-                }
-                const std::string current = s.holdScenario.empty() ? std::string("off") : s.holdScenario;
-                if (ImGui::BeginCombo("mid-event", current.c_str())) {
-                    if (ImGui::Selectable("off", s.holdScenario.empty())) {
-                        s.holdScenario.clear();
-                    }
-                    for (const std::string& name : scenarios) {
-                        if (ImGui::Selectable(name.c_str(), s.holdScenario == name)) {
-                            s.holdScenario = name;
-                        }
-                    }
-                    ImGui::EndCombo();
-                }
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip(
-                        "Don't cut away from a scenario's actor while it is in the middle of\n"
-                        "something.\n\n"
-                        "The cut is baked from the music before a frame is drawn, so it cannot\n"
-                        "know that a shot lands halfway through an abduction and the next one\n"
-                        "walks out of it. Pick a scenario and the camera keeps that shot's\n"
-                        "framing on its actor -- riding along, so a craft that flies two hundred\n"
-                        "metres stays the same size in frame -- until the scenario lets go.\n\n"
-                        "Off leaves the cut exactly as the music wrote it.");
-                }
-                if (scenarios.empty()) {
-                    ImGui::TextDisabled("this scene stages nothing");
-                }
-                ImGui::BeginDisabled(s.holdScenario.empty());
-                auto release = static_cast<float>(s.holdReleaseSeconds);
-                if (ImGui::SliderFloat("rejoin the cut", &release, 0.0f, 5.0f,
-                                       release > 0.0f ? "%.2f s" : "at once")) {
-                    s.holdReleaseSeconds = static_cast<double>(release);
-                }
-                ImGui::EndDisabled();
-            }
-
             ImGui::Separator();
             auto seed = static_cast<int>(s.seed);
             if (ImGui::InputInt("seed", &seed)) {

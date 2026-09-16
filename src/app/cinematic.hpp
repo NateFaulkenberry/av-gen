@@ -356,8 +356,16 @@ struct DirectionBrief {
     // the music (the pieces are inside one section) while letting the cast change. Drops are never
     // split: the whole point of reading the structure is that the reveal lands on the beat.
     double maxShotSeconds = 12.0;
-    float wideFocalLength = 24.0f;
-    float heroFocalLength = 50.0f;
+    // The lens the cut is baked with, in millimetres.
+    //
+    // There used to be two of these -- a `wideFocalLength` for establishing shots and a
+    // `heroFocalLength` for close ones -- and the pair was a symptom of a single-camera system: one
+    // camera given two lenses so it could pretend to be two cameras. ADR-245 made cameras real, so a
+    // camera carries its own optical identity and the director picks a camera. A wide establishing
+    // shot is now a wide *camera*, not a wide moment on the hero camera.
+    //
+    // Seeded from the active camera's `CameraRig::focalLength` where one is set.
+    float focalLength = 35.0f;
     // How the film is cut. The reference camera "never orbits, never zooms, and holds its final
     // pose" (audit 1.4), and section 8 lists that restraint among the things not to change, so a
     // continuous take is the default.
