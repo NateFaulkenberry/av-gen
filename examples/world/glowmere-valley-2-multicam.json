@@ -13583,6 +13583,52 @@
    "target": "atmos/Bioluminescent Comet/coreIntensity"
   }
  ],
+ "sequence": {
+  "sectionDirection": [
+   {
+    "section": "intro",
+    "subject": "sage",
+    "verb": "pose",
+    "argument": "observe"
+   },
+   {
+    "section": "verse",
+    "subject": "rook",
+    "verb": "move",
+    "argument": "tide"
+   },
+   {
+    "section": "chorus",
+    "subject": "ember",
+    "verb": "pose",
+    "argument": "react"
+   },
+   {
+    "section": "build",
+    "subject": "vane",
+    "verb": "move",
+    "argument": "sage"
+   },
+   {
+    "section": "drop",
+    "subject": "rook",
+    "verb": "pose",
+    "argument": "react"
+   },
+   {
+    "section": "breakdown",
+    "subject": "tide",
+    "verb": "pose",
+    "argument": "observe"
+   },
+   {
+    "section": "outro",
+    "subject": "ember",
+    "verb": "move",
+    "argument": "vane"
+   }
+  ]
+ },
  "shaders": [],
  "sources": [
   {

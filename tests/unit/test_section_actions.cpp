@@ -211,3 +211,45 @@ TEST_CASE("an authored director table survives a sequence round-trip", "[seq][se
         CHECK_FALSE(bare.toJson().contains("sectionDirection"));
     }
 }
+
+TEST_CASE("the multicam demo's director table is actually read", "[seq][section][integration]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path project =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "world" /
+        "glowmere-valley-2-multicam.json";
+    if (!std::filesystem::exists(project)) {
+        SKIP("the Glowmere multi-camera demo is not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    auto loaded = engine.loadProject(project);
+    INFO((loaded ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+
+    // "It loaded without an error" is not evidence the table was read: an unknown key is ignored by
+    // design, so a table under the wrong name, at the wrong nesting, or spelled differently loads
+    // perfectly and does nothing. This asserts the rows arrived.
+    const seq::SectionDirectionSet& table = engine.sequence().sectionDirection;
+    INFO("rows: " << table.entries.size());
+    REQUIRE(table.entries.size() == 7);
+
+    // Every row has to name a real entity and a verb the action system understands, or the table is
+    // a list of events nothing can apply -- which looks exactly like the feature being broken.
+    scene::Composition* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+    for (const seq::SectionDirectionEntry& entry : table.entries) {
+        INFO("row for " << signals::musicalSectionName(entry.kind) << ": " << entry.direction.subject
+                        << " " << entry.direction.verb << " " << entry.direction.argument);
+        CHECK(comp->entityWorld().find(entry.direction.subject) != nullptr);
+        const auto action = seq::actionFromEvent(entry.direction.subject, entry.direction.verb,
+                                                 entry.direction.argument);
+        CHECK(action.has_value());
+        // A `move` names another character, so its argument has to be one too -- a typo here is a
+        // walk toward nothing, which the action system reports and nobody reads.
+        if (entry.direction.verb == "move") {
+            CHECK(comp->entityWorld().find(entry.direction.argument) != nullptr);
+        }
+    }
+#endif
+}
