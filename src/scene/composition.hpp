@@ -1007,6 +1007,15 @@ private:
         double releaseFrom = -1.0; // the second the hold ended; < 0 = not releasing
         glm::vec3 releaseEye{0.0f};
         glm::vec3 releaseTarget{0.0f};
+        // The pair-framing distance, decided ONCE when the framing engages and held for the rest of
+        // it. < 0 = not yet decided.
+        //
+        // It was a live function of the actor-to-role separation, and that separation collapses:
+        // the animal rises toward the craft over the lift, so the distance fell with it and the
+        // camera pushed in 78 m -> 15 m on every abduction, then snapped back and did it again.
+        // Measured, on the shipped scene, once per cycle. A shot does not re-choose its distance
+        // sixty times a second; deciding it at the cut is what "hold" means.
+        float pairDistance = -1.0f;
     };
     AimHoldState aimHoldState_;
     // ADR-245: the filtered aim-follow delta, and whether it has a value yet. Reset by

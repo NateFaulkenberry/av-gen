@@ -33,6 +33,29 @@
  },
  "heroes": [
   {
+   "name": "visitor",
+   "position": [
+    20.0,
+    28.05,
+    150.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 8.2,
+   "height": 7.1,
+   "importance": 0.8,
+   "focalWeight": 0.5,
+   "preferredCameraDistance": 34.0,
+   "preferredCameraElevation": -4.0,
+   "activationRadius": 260.0,
+   "colorAccent": [
+    0.16,
+    0.66,
+    1.0
+   ],
+   "reactionProfile": ""
+  },
+  {
    "name": "elder-2-cap",
    "position": [
     -14.473,
@@ -43,7 +66,7 @@
    "scale": 1.0,
    "radius": 6.72,
    "height": 16.0,
-   "importance": 0.95,
+   "importance": 0.5,
    "focalWeight": 0.9,
    "preferredCameraDistance": 49.6,
    "preferredCameraElevation": 4.0,
@@ -66,7 +89,7 @@
    "scale": 1.0,
    "radius": 2.73,
    "height": 6.5,
-   "importance": 0.909,
+   "importance": 0.478,
    "focalWeight": 0.85,
    "preferredCameraDistance": 20.2,
    "preferredCameraElevation": 8.0,
@@ -89,7 +112,7 @@
    "scale": 1.0,
    "radius": 1.76,
    "height": 4.2,
-   "importance": 0.868,
+   "importance": 0.457,
    "focalWeight": 0.8,
    "preferredCameraDistance": 13.0,
    "preferredCameraElevation": 8.0,
@@ -112,7 +135,7 @@
    "scale": 1.0,
    "radius": 3.78,
    "height": 9.0,
-   "importance": 0.827,
+   "importance": 0.435,
    "focalWeight": 0.75,
    "preferredCameraDistance": 27.9,
    "preferredCameraElevation": 8.0,
@@ -135,7 +158,7 @@
    "scale": 1.0,
    "radius": 1.43,
    "height": 3.4,
-   "importance": 0.786,
+   "importance": 0.414,
    "focalWeight": 0.7,
    "preferredCameraDistance": 10.5,
    "preferredCameraElevation": 8.0,
@@ -158,7 +181,7 @@
    "scale": 1.0,
    "radius": 2.31,
    "height": 5.5,
-   "importance": 0.745,
+   "importance": 0.392,
    "focalWeight": 0.65,
    "preferredCameraDistance": 17.1,
    "preferredCameraElevation": 8.0,
@@ -181,7 +204,7 @@
    "scale": 1.0,
    "radius": 3.15,
    "height": 7.5,
-   "importance": 0.704,
+   "importance": 0.371,
    "focalWeight": 0.6,
    "preferredCameraDistance": 23.2,
    "preferredCameraElevation": 8.0,
@@ -194,29 +217,6 @@
    "reactionProfile": "organism"
   },
   {
-   "name": "visitor",
-   "position": [
-    20.0,
-    28.05,
-    150.0
-   ],
-   "yaw": 0.0,
-   "scale": 1.0,
-   "radius": 8.2,
-   "height": 7.1,
-   "importance": 0.68,
-   "focalWeight": 0.5,
-   "preferredCameraDistance": 34.0,
-   "preferredCameraElevation": -4.0,
-   "activationRadius": 260.0,
-   "colorAccent": [
-    0.16,
-    0.66,
-    1.0
-   ],
-   "reactionProfile": ""
-  },
-  {
    "name": "ridge-cap",
    "position": [
     130.471,
@@ -227,7 +227,7 @@
    "scale": 1.0,
    "radius": 2.1,
    "height": 5.0,
-   "importance": 0.663,
+   "importance": 0.349,
    "focalWeight": 0.55,
    "preferredCameraDistance": 15.5,
    "preferredCameraElevation": 8.0,
@@ -250,7 +250,7 @@
    "scale": 1.0,
    "radius": 2.6,
    "height": 6.2,
-   "importance": 0.622,
+   "importance": 0.327,
    "focalWeight": 0.5,
    "preferredCameraDistance": 19.2,
    "preferredCameraElevation": 8.0,
@@ -273,7 +273,7 @@
    "scale": 1.0,
    "radius": 1.68,
    "height": 4.0,
-   "importance": 0.581,
+   "importance": 0.306,
    "focalWeight": 0.45,
    "preferredCameraDistance": 12.4,
    "preferredCameraElevation": 8.0,

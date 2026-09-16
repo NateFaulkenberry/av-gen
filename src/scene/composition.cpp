@@ -1430,13 +1430,42 @@ void Composition::applyAimHold(const AimFollow* active) {
                 // for the AIM was the mistake; the two have to agree about when they apply.
                 if (reach > 1e-3f && apart <= aimHold_.framePairMaxSeparation) {
                     const glm::vec3 dir = toward / reach;
-                    const float separation =
-                        std::max(apart, aimHold_.framePairMinSeparation);
-                    const float halfFov = std::max(scene_.camera.effectiveFovY() * 0.5f, 0.02f);
-                    const float fill = std::clamp(aimHold_.framePair, 0.05f, 1.0f);
-                    const float distance = separation / (2.0f * std::tan(halfFov) * fill);
+                    // Decided once, on the first frame the framing engages, and held. Recomputing it
+                    // per frame tracks a separation that collapses as the animal is lifted, which is
+                    // a 63 m push-in disguised as a framing rule.
+                    if (aimHoldState_.pairDistance < 0.0f) {
+                        // The pair's EXTENT, not the gap between their centres. Framing the gap
+                        // treats both as points, and the craft is not one: at 8.2 m of hero radius
+                        // it was clipped by the frame edge on 34% of lift frames while the gap
+                        // itself sat comfortably inside. Never entirely off screen -- which is why
+                        // a check on "is it visible" passed and "is it whole" did not.
+                        //
+                        // The animal's reach is added the same way. Both come from the hero radius
+                        // rather than from `nodeCorners`, which returns nothing for a procedural
+                        // node like the saucer (ADR-217) -- the first version of the probe read it
+                        // and silently measured an empty set.
+                        float bodies = 0.0f;
+                        if (const auto h = std::find_if(
+                                heroes_.begin(), heroes_.end(),
+                                [&](const world::HeroPoint& x) { return x.name == aimHoldState_.hero; });
+                            h != heroes_.end()) {
+                            bodies += h->radius;
+                        }
+                        // The animal is a `gltf` node, so its corners are real -- computed once,
+                        // on the frame the distance is latched, not per frame.
+                        float preyReach = 1.0f;
+                        for (const glm::vec3& c : nodeCorners(std::string(bound))) {
+                            preyReach = std::max(preyReach, glm::length(c - body));
+                        }
+                        bodies += preyReach;
+                        const float separation =
+                            std::max(apart + 2.0f * bodies, aimHold_.framePairMinSeparation);
+                        const float halfFov = std::max(scene_.camera.effectiveFovY() * 0.5f, 0.02f);
+                        const float fill = std::clamp(aimHold_.framePair, 0.05f, 1.0f);
+                        aimHoldState_.pairDistance = separation / (2.0f * std::tan(halfFov) * fill);
+                    }
                     scene_.camera.target = mid;
-                    scene_.camera.position = mid - dir * distance;
+                    scene_.camera.position = mid - dir * aimHoldState_.pairDistance;
                 }
             }
         }
@@ -1448,6 +1477,7 @@ void Composition::applyAimHold(const AimFollow* active) {
     if (aimHoldState_.holding) {
         aimHoldState_.holding = false;
         aimHoldState_.armed = false;
+        aimHoldState_.pairDistance = -1.0f; // the next engagement decides its own
         aimHoldState_.releaseFrom = currentTime_;
     }
     if (aimHoldState_.releaseFrom >= 0.0 && aimHold_.releaseSeconds > 0.0) {
