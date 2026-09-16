@@ -17,6 +17,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <vector>
 
 using namespace avgen;
@@ -136,4 +137,67 @@ TEST_CASE("the adapter refuses a cue it cannot project", "[song][plan][adapter]"
     nameless.id.clear();
     const std::vector<song::SectionCue> cues = {cueWith(nameless)};
     CHECK_FALSE(app::songPlanFromCues(cues).has_value());
+}
+
+// The path the editor's "+ New type..." button takes, tested without the button.
+//
+// The popup itself cannot be exercised headlessly, but everything it does can: derive an id from a
+// display name, define the type, apply it to a section, and resolve the section's treatment through
+// it. That sequence is the whole of the feature, and it is what makes "Ocean Ambience" -- the spec's
+// own proof that nothing is hard-coded around Verse and Chorus -- reachable from the editor rather
+// than only from a hand-edited project file.
+
+#include "song/section_timeline.hpp"
+#include "song/shot_language.hpp"
+
+TEST_CASE("a custom section type can be made from a display name and used", "[song][custom][ui]") {
+    song::ShotLanguage language;   // built-ins are present without being written to a project
+    const std::vector<const song::ShotIntent*> intents = language.intents();
+    REQUIRE_FALSE(intents.empty());
+
+    // Step 1: the id is DERIVED, not asked for. A person types a name; the project carries a key.
+    const auto id = song::makeId("Ocean Ambience");
+    REQUIRE(id.has_value());
+    CHECK(*id == "ocean_ambience");
+    CHECK_FALSE(language.hasType(*id));   // and it is not one of the sixty built-ins
+
+    song::SectionType type;
+    type.id = *id;
+    type.name = "Ocean Ambience";
+    type.description = "Slow underwater environment passage";
+    type.category = song::SectionCategory::Custom;
+    type.defaultShotIntent = intents.front()->id;
+    REQUIRE(language.defineType(std::move(type)).has_value());
+    CHECK(language.hasType(*id));
+
+    // Step 2: it appears in the picker's list, which is what the combo is populated from. Without
+    // this the type would exist and be unselectable, which is the state the button exists to fix.
+    const std::vector<const song::SectionType*> types = language.types();
+    CHECK(std::any_of(types.begin(), types.end(),
+                      [&](const song::SectionType* t) { return t->id == *id; }));
+
+    // Step 3: applying it to a section, and the section resolving its treatment through it.
+    song::SectionTimeline timeline;
+    song::Section section;
+    section.type = types.front()->id;
+    section.startSeconds = 0.0;
+    section.endSeconds = 20.0;
+    timeline.sections.push_back(section);
+    REQUIRE(song::setSectionType(timeline, 0, *id, language));
+    CHECK(timeline.sections[0].type == *id);
+    // No override was set, so the treatment must come from the type -- which is what makes "change
+    // the type and the treatment follows" true, and what a stored copy of the default would break.
+    CHECK_FALSE(timeline.sections[0].shotIntent.has_value());
+
+    SECTION("a name that cannot make an id is refused rather than silently keyed") {
+        CHECK_FALSE(song::makeId("   ").has_value());
+    }
+
+    SECTION("defining a type whose default treatment does not exist is refused") {
+        song::SectionType dangling;
+        dangling.id = "dangling";
+        dangling.name = "Dangling";
+        dangling.defaultShotIntent = "no_such_intent";
+        CHECK_FALSE(language.defineType(std::move(dangling)).has_value());
+    }
 }

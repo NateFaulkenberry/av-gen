@@ -242,6 +242,11 @@ private:
     // imported track analyze itself once and a reopened project not analyze at all.
     std::uint64_t structureRevision_ = 0;
     char labelBuffer_[96] = "";
+    // The "+ New type..." popup's fields. Plain buffers rather than std::string because ImGui's
+    // InputText takes one, and cleared on open so the popup never reopens holding the last attempt.
+    char newTypeName_[64] = "";
+    char newTypeDescription_[160] = "";
+    int newTypeIntent_ = 0;
 };
 
 } // namespace avgen::ui

@@ -1818,6 +1818,84 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
         }
     }
 
+    // **Making a type, which until now had to be done by editing the project file.**
+    //
+    // The model has supported custom types since ADR-247 and the picker above lists them, but there
+    // was no way to *create* one from the editor -- so "Ocean Ambience", the spec's own proof that
+    // the architecture is not hard-coded around Verse and Chorus, was unreachable in the feature
+    // built to hold it.
+    //
+    // Two fields and a treatment, which is what `SectionType` needs and no more. The id is derived
+    // from the name rather than asked for: an id is a stable key a project file carries and a person
+    // should not have to invent one, and `song::makeId` is the one place that derivation lives.
+    if (ImGui::Button("+ New type...")) {
+        newTypeName_[0] = '\0';
+        newTypeDescription_[0] = '\0';
+        newTypeIntent_ = 0;
+        ImGui::OpenPopup("new-section-type");
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Add a section type of your own -- \"Ocean Ambience\", \"Dream "
+                          "Sequence\" -- and give it a default treatment.");
+    }
+    if (ImGui::BeginPopup("new-section-type")) {
+        ImGui::SetNextItemWidth(220);
+        ImGui::InputText("name", newTypeName_, sizeof(newTypeName_));
+        ImGui::SetNextItemWidth(220);
+        ImGui::InputText("description", newTypeDescription_, sizeof(newTypeDescription_));
+
+        const std::vector<const song::ShotIntent*> intents = piece.shotLanguage.intents();
+        std::vector<const char*> intentNames;
+        intentNames.reserve(intents.size());
+        for (const song::ShotIntent* intent : intents) {
+            intentNames.push_back(intent->name.c_str());
+        }
+        ImGui::SetNextItemWidth(220);
+        if (!intentNames.empty()) {
+            ImGui::Combo("default shot", &newTypeIntent_, intentNames.data(),
+                         static_cast<int>(intentNames.size()));
+        }
+
+        // The id is shown, not editable: a person should see the key their project will carry
+        // without being asked to choose it, and seeing it is what makes "that name is already taken"
+        // comprehensible when it happens.
+        const std::optional<song::SectionTypeId> id = song::makeId(newTypeName_);
+        const bool taken = id && piece.shotLanguage.hasType(*id);
+        if (id) {
+            ImGui::TextDisabled("id: %s%s", id->c_str(), taken ? "  (already exists)" : "");
+        } else {
+            ImGui::TextDisabled("id: --");
+        }
+
+        const bool ready = id && !taken && !intents.empty();
+        ImGui::BeginDisabled(!ready);
+        if (ImGui::Button("Create")) {
+            song::SectionType type;
+            type.id = *id;
+            type.name = newTypeName_;
+            type.description = newTypeDescription_;
+            type.category = song::SectionCategory::Custom;
+            type.defaultShotIntent = intents[static_cast<std::size_t>(newTypeIntent_)]->id;
+            if (auto ok = piece.shotLanguage.defineType(std::move(type)); !ok) {
+                status_ = ok.error().message;
+            } else {
+                // Applied to the section the inspector is on, because a person who just made a type
+                // while looking at a section meant it for that section. If they did not, the picker
+                // above takes it back in one click.
+                (void)song::setSectionType(piece.sectionTimeline, index, *id, piece.shotLanguage);
+                piece.refreshSectionMarkers();
+                touch();
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
     // Times in full, because a boundary at 1:02.409117 is the thing this whole feature is about and
     // a display rounded to two places would hide the precision it is claiming to keep.
     ImGui::Text("%s -> %s   (%.3f s)", clock(section.startSeconds).c_str(),
