@@ -1,7 +1,7 @@
 # Quality Lab architecture
 
-Status: proposed (spec §26, §27, §28, §29, §36, §48). **Not implemented.** This document is the
-thing §50 STEP 11 asks to be presented before implementation begins.
+Status: **implemented through Phase 5** (spec §26, §27, §28, §29, §36, §48). Built as described,
+with the differences recorded in §10 and in ADR-252/253/254.
 
 Inputs: [repository-reconnaissance.md](repository-reconnaissance.md) (what exists),
 [research.md](research.md) (what to use and what to reject).
@@ -82,24 +82,35 @@ renderer's output already lives.
 rather than mechanically imposing it. Do not unnecessarily move unrelated source files."* So:
 
 ```
-tools/quality-lab/                  # NEW — the C++ tool and its Python drivers
-    CMakeLists.txt                  #   adds avgen_quality to the existing tools/ target set
-    main.cpp                        #   the CLI
-    capture/   sequence.{hpp,cpp}   #   frame + AOV sequence readers
-    metrics/   spatial.{hpp,cpp}    #   psnr, ssim, msSsim, ciede2000, laplacian, spectrum
-               temporal.{hpp,cpp}   #   alternation, motion-compensated residual
-               flip.{hpp,cpp}       #   ꟻLIP, if it builds (§6)
-    artifacts/ masks.{hpp,cpp}      #   disocclusion, AOV-gated class masks
-    report/    vector.{hpp,cpp}     #   the QualityVector and its JSON
-               diagnostics.{hpp,cpp}#   the PNG heatmaps
-    experiment.py  report.py        #   stdlib drivers (report HTML, experiment manifests)
+tools/quality-lab/                  # the C++ tool and its stdlib Python driver
+    CMakeLists.txt                  #   avgen_quality_metrics (a library) + avgen_quality (the CLI)
+    main.cpp                        #   analyze | compare | validate --ladder | version
+    capture/   sequence.{hpp,cpp}   #   frame + AOV sequence readers. EVERYTHING HERE IS A READER
+    metrics/   spatial.{hpp,cpp}    #   psnr, ssim, msSsim, ciede2000, laplacian, quantisationSteps
+               temporal.{hpp,cpp}   #   alternation, motion-compensated residual, disocclusion, warp floor
+    artifacts/ masks.{hpp,cpp}      #   specular / normal-unchanged / id-churn / material-class masks
+    report/    vector.{hpp,cpp}     #   the QualityVector and its JSON, and the pairing refusal
+               diagnostics.{hpp,cpp}#   difference, heatmap, mask, Laplacian plane, 8x8 tile map
+    external/  vmaf.{hpp,cpp}       #   ffmpeg libvmaf as a SUBPROCESS: vmaf, psnr_hvs, cambi
+    validation/ladder.{hpp,cpp}     #   the distortion ladder as a library, shared by the CLI and the tests
+    report.py                       #   the HTML report; stdlib only, no framework, no CDN
     schemas/   quality-report.v1.json
-tests/unit/test_quality_*.cpp       # EXISTING dir — metric math, the §34 distortion ladder
-tests/rendering/test_quality_*.cpp  # EXISTING dir — render → capture → analyze integration
-docs/quality-lab/                   # this directory
-examples/quality/                   # NEW — benchmark scenes + projects, when they are authored
-quality-results/                    # NEW, .gitignore'd — run outputs
+tests/unit/test_quality_metrics.cpp # the hand-written spatial ladder -- the human-readable gate
+tests/unit/test_quality_lab.cpp     # the shared ladder, the temporal detectors, the masks, the report
+examples/quality/                   # the benchmark scenes: aliasing, aliasing-dolly
+quality-results/                    # .gitignore'd -- run outputs
 ```
+
+**Two differences from the sketch above it, both deliberate.** There is no `metrics/flip.*`: ꟻLIP was
+left unbuilt because the full-reference slot is occupied by MS-SSIM and CIEDE2000 and nothing has yet
+needed a perceptual error *map* that those two cannot localise — the tile map does that job. And
+there is no `experiment.py`: `--queue` is the batch primitive the experiment system should build on,
+and building a second one before an experiment has actually been run would be inventing requirements.
+
+**The validation ladder is a library and not test code**, which is the one structural decision worth
+defending. `validate --ladder` and the unit suite run the *same* arms; a ladder that existed only
+inside Catch2 could not be shown to a person who is holding a render and wondering whether to believe
+the report.
 
 **No existing source file moves.** No `src/` module is added — the Quality Lab is not part of the
 engine. The three existing analysis scripts it supersedes in role (`spatial_stats.py`,
@@ -249,14 +260,25 @@ rubric and fixed-review-frame list rather than creating a second review system.
 |---|---|---|
 | **0** | reconnaissance | ✅ done |
 | **1** | research, this architecture, ADRs | ✅ done — **this is the §50 STEP 11 stopping point** |
-| **2** | vertical slice: one scene → candidate + reference → PSNR/SSIM/MS-SSIM/CIEDE2000/Laplacian → JSON + HTML + diagnostics | the §34 distortion ladder passing, **with its controls** |
-| **3** | motion-compensated residual, disocclusion mask, temporal re-scoping | §1's control arms in artifact-detection.md passing |
-| **4** | AOV-gated per-class detectors | a material-id → class mapping; the shadow-AOV decision |
-| **5** | benchmark suite — **aliasing first**, then a spline-dolly temporal scene | Phase 2–3 validated |
+| **2** | vertical slice: one scene → candidate + reference → PSNR/SSIM/MS-SSIM/CIEDE2000/Laplacian → JSON + HTML + diagnostics | ✅ done — the §34 ladder passes with its controls, **and with a meta-control that catches a deliberately broken metric**. VMAF, PSNR-HVS and CAMBI are in too; see below |
+| **3** | motion-compensated residual, disocclusion mask, temporal re-scoping | ✅ done — §1's control arms pass, including the one that matters: masking is what makes the residual small (ADR-253) |
+| **4** | AOV-gated per-class detectors | ✅ **partly.** `specularResidual`, `shadingResidual` and `lodIdentifierChurn` are built and controlled. `vegetationResidual` reports unavailable — the mask machinery is tested, the **material-id → class mapping does not exist**. `shadowStability` reports unavailable — **no shadow AOV**. Both are human decisions |
+| **5** | benchmark suite — **aliasing first**, then a dolly temporal scene | ✅ done — `examples/quality/aliasing` and `-dolly`, both vacuous on the first attempt (ADR-254) |
 | **6** | real-scene validation against human assessment | **the owner's time** |
 | **7** | experiment framework, Pareto | a quiet machine for the cost axis |
 | **8** | optimization research | metric validation complete |
 
-**Phase 2 does not include VMAF or CAMBI**, against §39's sketch, for the simple reason that neither
-exists on this machine. The slice is built from what is available and gains them the day ffmpeg is
-installed — which is the degradation contract in §6 doing exactly what it is for.
+~~**Phase 2 does not include VMAF or CAMBI**, against §39's sketch, for the simple reason that neither
+exists on this machine.~~ **ffmpeg 9.0.1 with libvmaf was installed, and Phase 2 gained all three
+without a design change** — which is the degradation contract in §6 doing exactly what it is for, and
+the only interesting thing about it is that nothing had to happen. The metrics arrived as
+`available: true` rows where there had been `available: false` rows with reasons.
+
+What they cost was a day of putting them on the ladder, which is not optional for a metric somebody
+else wrote: the default VMAF model scores a posterised frame **100.0** against an identical pair's
+**97.3**, CAMBI is blind to coarse posterisation, and the native banding proxy scores dither as
+banding. All three are pinned as ladder arms. See
+[ADR-252](../decisions/ADR-252-the-banding-instruments-are-blind-in-opposite-places.md).
+
+**Phase 6 — validation against human assessment — is the gate that has not been passed, and none of
+the above substitutes for it.** Every direction check so far is one instrument agreeing with another.

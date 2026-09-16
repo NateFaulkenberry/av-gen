@@ -1,0 +1,82 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "_note": "The temporal arm. The camera tracks 4.4 m laterally in two seconds while holding its aim on the fence corridor, so every frame has a large, smooth, exactly-known screen motion and the fence slats pass in front of each other -- which is what the disocclusion mask exists to exclude. Linear interpolation on purpose: an eased dolly has a near-zero velocity at each end, and a residual measured where nothing moved is a measurement of the static case wearing a moving camera's name. Two seconds at 30 fps is 60 frames, enough for a residual to have a tail worth reporting and short enough to render twice -- candidate and supersampled reference -- inside one GPU lock.",
+  "app": {
+    "name": "Quality Lab: aliasing dolly"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "aliasing-dolly.scene.json"
+    }
+  },
+  "parameters": {
+    "post/bloom/enabled": false,
+    "post/output/vignette": 0.0,
+    "post/output/grain": 0.0,
+    "post/lens/chromaticAberration": 0.0,
+    "post/output/antialias": 0.75
+  },
+  "sources": [],
+  "routes": [],
+  "presets": [],
+  "timeline": {
+    "enabled": true,
+    "tracks": [
+      {
+        "target": "camera/position",
+        "timeBase": "seconds",
+        "mode": "replace",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              -2.2,
+              1.9,
+              7.5
+            ],
+            "interp": "linear"
+          },
+          {
+            "time": 2.0,
+            "value": [
+              2.2,
+              1.9,
+              7.5
+            ],
+            "interp": "linear"
+          }
+        ]
+      },
+      {
+        "target": "camera/target",
+        "timeBase": "seconds",
+        "mode": "replace",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.0,
+              1.1,
+              -26.0
+            ],
+            "interp": "linear"
+          }
+        ]
+      }
+    ],
+    "cues": []
+  },
+  "render": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "startSeconds": 0.0,
+    "endSeconds": 2.0,
+    "output": "sequence",
+    "tier": "offline",
+    "limits": "unlimited"
+  },
+  "_parametersNote": "`post/output/antialias` is set EXPLICITLY and it is not a detail. It defaults to 0.0 in scene/post_settings.hpp -- '0 skips the pass entirely' -- so a scene that does not ask for FXAA never runs it, and `--disable fxaa` on such a scene produces a DIAGNOSTIC-render warning and a byte-identical sequence hash. That is ADR-182's exact failure shape: an attribution arm whose null result is indistinguishable from a broken instrument, and it happened here on the first attempt at ADR-243's three arms. An anti-aliasing benchmark has to have anti-aliasing switched on before it can be switched off. 0.75 is the value world/art_direction.hpp uses."
+}

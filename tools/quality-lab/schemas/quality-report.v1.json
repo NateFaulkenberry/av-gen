@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/avgen/quality-lab/schemas/quality-report.v1.json",
+  "title": "AV Gen Quality Lab report, schema 1",
+  "description": "The output of `avgen_quality analyze`. Committed so nothing depends on ad-hoc output (mandate §19, ADR-250). Three shapes here are decisions rather than conveniences: there is no field anywhere that holds a composite score; `findings` (measurements) and `hypotheses` (inferences) are separate arrays with different required fields, so nothing can promote one to the other by accident; and every metric carries `available` and `limitations` so an absent tool or a known blind spot travels with the number instead of being omitted or defaulted to zero.",
+  "type": "object",
+  "required": ["schemaVersion", "run", "renderer", "metrics", "findings", "hypotheses", "diagnostics", "limitations"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "type": "string", "pattern": "^1\\.[0-9]+\\.[0-9]+$" },
+    "run": {
+      "type": "object",
+      "required": ["id", "timestamp", "gitCommit", "scene", "targetProfile", "candidateDirectory", "referenceDirectory", "framesAnalysed", "frameStride", "candidateSequenceHash", "referenceSequenceHash"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "gitCommit": { "type": "string", "description": "A reference is not stable across engine versions -- a renderer upgrade changes pixels on purpose -- so a report without its commit is not reproducible." },
+        "scene": { "type": "string" },
+        "targetProfile": { "type": "string", "description": "Quality is conditional on delivery. Two numbers taken under different profiles are not comparable and `compare` refuses to rank them." },
+        "candidateDirectory": { "type": "string" },
+        "referenceDirectory": { "type": "string" },
+        "framesAnalysed": { "type": "integer", "minimum": 0 },
+        "frameStride": { "type": "integer", "minimum": 1, "description": "A subsampled run may not be cited as a regression check (metrics.md §5)." },
+        "candidateSequenceHash": { "type": "string", "description": "From RenderJob. Two arms expected to differ that hash identically are vacuous, and the experiment is void rather than measured (ADR-182)." },
+        "referenceSequenceHash": { "type": "string" }
+      }
+    },
+    "renderer": {
+      "type": "object",
+      "required": ["configuration", "gpu", "contentionWitness", "gpuFrameMsMin", "cpuPhaseMsMin"],
+      "additionalProperties": false,
+      "properties": {
+        "configuration": { "type": "string" },
+        "gpu": { "type": "string" },
+        "contentionWitness": { "type": "string", "description": "ADR-170: a timing is evidence only if the device was also quiet. A run that cannot say so reports its milliseconds as a record of having taken them, not as a measurement." },
+        "gpuFrameMsMin": { "type": ["number", "null"], "description": "MIN over a long run, from gpu::FrameTimeline. Contention is never negative. Never summed with cpuPhaseMsMin -- one is GPU timestamps and the other is CPU wall clock on one thread." },
+        "cpuPhaseMsMin": { "type": ["number", "null"], "description": "MIN over a long run, from core::PhaseProfiler." }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "available", "unit", "source", "pooling", "value", "limitations"],
+        "properties": {
+          "name": { "type": "string", "description": "Named for what it COMPUTES, not for the artifact it is believed to indicate. ADR-243: 'temporal stability' was the label, 'temporal alternation of the luminance signal' was the measurement, and 'spatial aliasing on moving geometry' was the artifact -- three things wearing one name is how a correct measurement came to rank two remedies backwards." },
+          "available": { "type": "boolean" },
+          "reason": { "type": "string", "description": "Required when available is false. A metric whose tool or input is absent reports this; it is never omitted and never defaulted to zero." },
+          "unit": { "type": "string" },
+          "source": { "type": "string", "description": "WHICH FILE the number came from. A PSNR on EXRs and a PSNR on PNGs are different numbers about different images." },
+          "pooling": { "type": "string" },
+          "value": { "type": ["number", "null"] },
+          "valueNote": { "type": "string", "enum": ["infinite", "negative infinite"], "description": "JSON has no infinity. PSNR of an identical pair is infinite and that is the alignment test passing, so it is named rather than silently becoming null." },
+          "pooled": {
+            "type": "object",
+            "required": ["mean", "min", "max", "p5", "p95", "worstFrameIndex", "frames"],
+            "additionalProperties": false,
+            "properties": {
+              "mean": { "type": "number" },
+              "min": { "type": "number" },
+              "max": { "type": "number" },
+              "p5": { "type": "number" },
+              "p95": { "type": "number" },
+              "worstFrameIndex": { "type": "integer", "minimum": 0, "description": "Never a mean alone: a three-frame pop in three hundred frames is invisible in a mean, and popping is an artifact class the Lab hunts." },
+              "frames": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "limitations": { "type": "array", "items": { "type": "string" } }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "available": { "const": false } }, "required": ["available"] },
+            "then": { "required": ["reason"] }
+          }
+        ]
+      }
+    },
+    "findings": {
+      "description": "MEASURED FACT. A number and a region. No cause, no adjective, no recommendation.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "metric", "statement", "value"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "const": "measurement" },
+          "metric": { "type": "string" },
+          "statement": { "type": "string" },
+          "value": { "type": ["number", "null"] },
+          "frameIndex": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "hypotheses": {
+      "description": "INFERRED CAUSE, labelled. Carries its evidence and a confidence. Nothing automatic promotes a hypothesis to a finding, which is why these are different arrays with different required fields rather than one array with a flag.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "statement", "evidence", "confidence", "note"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "const": "hypothesis" },
+          "statement": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" } },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "diagnostics": {
+      "description": "Relative paths to the images written beside this report. Mandatory, not a feature: a post chain judged on its final frame cannot be debugged, and neither can a quality vector judged on its pooled numbers (docs/post-artifact-forensics.md).",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "limitations": { "type": "array", "items": { "type": "string" } }
+  }
+}

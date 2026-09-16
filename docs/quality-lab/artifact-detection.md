@@ -1,9 +1,11 @@
 # Artifact detection: the detectors, their inputs, their failure modes, and the artifact they may not claim
 
-Status: research (spec §4, §5, §15, §16, §32). **Nothing here is implemented.** §16 requires each
-detector to carry an algorithm description, a mathematical definition, inputs, output range,
-interpretation, known failure modes, test cases and a debug visualization — this document is that,
-per detector, before any code exists.
+Status: **implemented** (spec §4, §5, §15, §16, §32) as `tools/quality-lab/metrics/temporal.*` and
+`tools/quality-lab/artifacts/masks.*`. §16 requires each detector to carry an algorithm description,
+a mathematical definition, inputs, output range, interpretation, known failure modes, test cases and
+a debug visualization — this document was that, per detector, *before* any code existed, and the
+three ⚠ notes below are where writing the code changed it
+([ADR-253](../decisions/ADR-253-the-residual-knows-where-the-pixel-came-from.md)).
 
 ---
 
@@ -84,8 +86,16 @@ shading instability.
   1/3/4 to the opaque surfaces behind it, so a blended pixel's velocity is the *background's*.
   Transparent regions must be excluded or declared.
 * **Sub-pixel warping is itself a resample.** Bilinear prediction blurs, which floors the residual
-  above zero. The floor is measured on the smooth-motion control and subtracted as a stated constant,
-  or the metric is reported relative to that control — not treated as an absolute.
+  above zero. ⚠ **The floor is now computed directly** rather than inferred from the control:
+  `warpFloor` warps a frame back and forward with the same velocity, with no renderer in the loop, so
+  what it reports is the instrument's own cost. Measured on the synthetic control, a whole-pixel warp
+  costs 1.2×10⁻⁶ luma steps and a half-pixel warp costs 7.8 — the first is the velocity's float
+  encoding (and the engine's target is RG16Float, coarser still) and the second is the resample.
+* ⚠ **The sampler's edge handling is a disocclusion source if you get it wrong.** Rejecting every
+  sample whose `x0 + 1` tap falls off the frame rejects the entire last row and column *at zero
+  velocity* — 2.6% of a 96×64 frame reported as disoccluded by a static camera looking at a static
+  scene. Clamp the tap, whose weight is zero there; never the coordinate. Found by the zero-velocity
+  control arm, which is what that arm is for.
 
 **Test cases (ADR-182 — the probe must be shown capable of failing).**
 
@@ -186,8 +196,12 @@ Frame-local, so a band that *crawls* between frames scores the same as a static 
 §1's residual beside it. Its thresholds assume a display brightness, which must be pinned in the
 target profile (§10).
 
-**Availability.** Requires libvmaf. **Absent on this machine.** Reports `available: false` rather than
-a zero.
+**Availability.** Requires libvmaf. ⚠ **Present since 2026-09-16** (ffmpeg 9.0.1), and measured
+rather than assumed: a single-code 8-bit ramp scores **18.95** and its dithered twin **0.00**, which
+is the artifact and its remedy in the right order. But the same ramp quantised to 4-code steps or
+more also scores **0.00** — a step above its `max_log_contrast` reads as a genuine edge rather than a
+band. **CAMBI answers for subtle banding only**; the native `quantisationSteps` proxy answers for the
+coarse band, and scores dither as banding. Neither covers the range alone. See ADR-252.
 
 ---
 

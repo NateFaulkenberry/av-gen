@@ -61,3 +61,9 @@ cmake-build-*/
 # next one needs). 80 MB for one feature and regenerable from the queue file beside it, which is
 # the part worth keeping -- so the queue is committed with the ADR and the pixels are not.
 /renders/
+
+# Quality Lab run outputs (ADR-250, mandate §36). A 300-frame 1080p PNG pair plus AOVs is several
+# gigabytes; the manifest and metrics.json are the durable record and are small, and the frames are
+# reproducible from them plus the git commit. Never committed, for the reason tools/certify.py
+# already states: a renderer upgrade changes pixels on purpose.
+/quality-results/

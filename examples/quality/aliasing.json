@@ -1,0 +1,40 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "_note": "A benchmark scene ships with a project, and the Quality Lab renders through --project and never --composition. benchmark-scenes.md \u00a74.1 states why and this repository has the receipt twice: --composition alone renders a different image, with default exposure, default post and no render block, and two separate renderer findings here were wrong because an arm rendered the scene alone. The post settings below are pinned rather than defaulted for the same reason -- bloom, vignette and grain all move a spatial-frequency measurement, and an aliasing benchmark whose bloom radius drifts is not a benchmark.",
+  "app": {
+    "name": "Quality Lab: aliasing"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "aliasing.scene.json"
+    }
+  },
+  "parameters": {
+    "post/bloom/enabled": false,
+    "post/output/vignette": 0.0,
+    "post/output/grain": 0.0,
+    "post/lens/chromaticAberration": 0.0,
+    "post/output/antialias": 0.75
+  },
+  "sources": [],
+  "routes": [],
+  "presets": [],
+  "timeline": {
+    "enabled": false,
+    "tracks": [],
+    "cues": []
+  },
+  "render": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "startSeconds": 0.0,
+    "endSeconds": 1.0,
+    "output": "sequence",
+    "tier": "offline",
+    "limits": "unlimited"
+  },
+  "_parametersNote": "`post/output/antialias` is set EXPLICITLY and it is not a detail. It defaults to 0.0 in scene/post_settings.hpp -- '0 skips the pass entirely' -- so a scene that does not ask for FXAA never runs it, and `--disable fxaa` on such a scene produces a DIAGNOSTIC-render warning and a byte-identical sequence hash. That is ADR-182's exact failure shape: an attribution arm whose null result is indistinguishable from a broken instrument, and it happened here on the first attempt at ADR-243's three arms. An anti-aliasing benchmark has to have anti-aliasing switched on before it can be switched off. 0.75 is the value world/art_direction.hpp uses."
+}

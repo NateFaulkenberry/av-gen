@@ -1,8 +1,15 @@
 # The quality vector: what is reported, how it is defined, and what each number may not be used to say
 
-Status: research (spec §8, §9, §16, §19, §34). Definitions are proposed; **nothing here is
-implemented yet.** The selection reasoning is in [research.md](research.md); the detector
-algorithms are in [artifact-detection.md](artifact-detection.md).
+Status: **implemented** (spec §8, §9, §16, §19, §34). The selection reasoning is in
+[research.md](research.md); the detector algorithms are in
+[artifact-detection.md](artifact-detection.md); the code is `tools/quality-lab/`.
+
+> **Amended by implementation.** Three claims in the sections below were written as predictions about
+> instrument behaviour and turned out to be wrong when the instruments were built and run. They are
+> corrected in place and marked ⚠, and the measurements are in
+> [ADR-252](../decisions/ADR-252-the-banding-instruments-are-blind-in-opposite-places.md) and
+> [ADR-253](../decisions/ADR-253-the-residual-knows-where-the-pixel-came-from.md). A specification
+> that survives contact with its implementation unchanged is a specification nobody tested.
 
 ---
 
@@ -93,10 +100,12 @@ approximated.
 |---|---|---|
 | `spatialLaplacian` | mean \|4c − left − right − up − down\| over luma, interior pixels only — `tools/spatial_stats.py` | **cannot separate aliasing from detail.** Meaningful only between arms of one view; never between scenes; never as an absolute bar |
 | `detailRetentionRatio` | ratio of radially-averaged power above a cutoff, candidate ÷ reference | > 1 means *more* high-frequency energy than the reference — which is aliasing or sharpening, not detail. **The sign must be read with `flipMean` beside it** |
+| `spatialLaplacianRatio` | `spatialLaplacian(candidate) ÷ spatialLaplacian(reference)` | ⚠ **the sign depends on the scene, measured both ways.** On `examples/quality/aliasing-dolly` — 2 cm fence slats crossing the sampling limit — the candidate is **1.22×** the reference, which is the aliasing the reference resolved away. On a single smooth orb at 96×64 it is **0.82×**, because there is no staircase to resolve and supersampling instead brings more genuine shading detail into the frame. Both are correct measurements of the same quantity. This is why "it cannot separate aliasing from detail" is not a hedge in a header: it flips the comparison's sign |
 | `sharpnessRatio` | mean gradient magnitude ratio — `tools/sharpness.py` | *"a filter that blurs everything scores perfectly on flicker"*; this is the counterweight, and it is a ratio, never an absolute |
 | `chromaSpeckle` | opponent-chroma (R−G, G−B) 4-neighbour speckle — `tools/chroma_speckle.py` | the metric ADR-212 quotes; comparable only between arms of one view |
 | `chromaRetention` | mean saturation of the candidate ÷ the reference in highlights | measures the tonemap's chroma path, which is an authored look as much as a defect |
-| `cambi` | Contrast-Aware Multiscale Banding Index | luma only; frame-local, so a *crawling* band scores as a static one; thresholds assume a display brightness that must be in the target profile |
+| `cambi` | Contrast-Aware Multiscale Banding Index | luma only; frame-local, so a *crawling* band scores as a static one; thresholds assume a display brightness that must be in the target profile. ⚠ **Measured: it detects SUBTLE banding and is blind to coarse posterisation** — quantising a ramp to 4-code steps or more takes it to 0.00, because a step above its `max_log_contrast` reads as a genuine edge (ADR-252) |
+| `quantisationSteps` | the fraction of pixels showing a 3-to-12 luma step in an otherwise flat neighbourhood — the native proxy, named for what it computes | ⚠ **Two measured failures, both kept in writing rather than reweighted (§4.3).** It is blind to ordinary single-code 8-bit banding, which CAMBI scores 18.95; and it scores a ±2-code **dither** — the remedy — at 0.031 against the banded frame's 0.000, so it is anti-correlated with the fix. Kept because it answers for the coarse band CAMBI cannot see. Where `cambi` is available, `cambi` is the banding number |
 
 ### 2.5 Delivery
 
@@ -164,13 +173,21 @@ rendered frame so the only variable is the distortion:
 | severe blur | σ = 3.0 | the same, much further | `cambi` |
 | aliasing | nearest-neighbour ½ downsample then ×2 up | `spatialLaplacian` ↑, `detailRetentionRatio` **> 1** | `chromaSpeckle` should barely move |
 | over-sharpen | unsharp mask | `sharpnessRatio` > 1, `detailRetentionRatio` **> 1**, `flipMean` > 0 | `cambi` |
-| banding | quantise to 5 bits on a gradient region | **`cambi` ↑ sharply** | `sharpnessRatio` ≈ 1 |
+| banding ⚠ **corrected** | ~~quantise to 5 bits on a gradient region~~ → **a smooth single-code ramp against its dithered twin** | **`cambi` 18.95 → 0.00 for the dither** | `sharpnessRatio` ≈ 1. The original arm had the direction backwards: coarse quantisation drives CAMBI to **zero**, not up (ADR-252). The dither arm is also the direction a renderer's own remedy moves in |
+| banding blind spot ⚠ **added** | the same pair, under `quantisationSteps` | **nothing — and that is the assertion.** 0.000 banded, 0.031 dithered | pinned so the blind spot cannot drift into a trusted zero |
 | colour shift | +2 ΔE₀₀ in a\*b\* | **`ciede2000` ↑** | `msSsim` ≈ 1, `spatialLaplacian` ≈ 1 |
 | exposure shift | ×1.05 linear | `psnr` collapses | `msSsim` barely moves — **this arm is why PSNR is not a quality metric, demonstrated rather than asserted** |
 | compression | encode at a low bitrate and decode | `vmaf` ↓ | — |
 | **shimmer** | a synthetic sequence alternating two sub-pixel-shifted renders | **`temporalAlternation` ↑** | `spatialLaplacian` ≈ 1 per frame |
-| **smooth motion** | a synthetic sequence translating one frame by 1 px/frame | **nothing** — `temporalAlternation` ≈ 0, `motionCompensatedResidual` ≈ 0 | this is the control that makes the shimmer arm non-vacuous |
+| **smooth motion** ⚠ **corrected** | a synthetic sequence translating one frame by 1 px/frame | `motionCompensatedResidual` ≈ **0.000**; but `temporalAlternation` is **31.3**, not ≈ 0 | this is the control that makes the shimmer arm non-vacuous — **and the correction is the whole point.** The second difference in time of translating content is not zero, so pure authored motion reads as large instability to the measure ADR-243 was using. The prediction that both would be zero was the same mistake ADR-243 records, written into its own control arm (ADR-253) |
 | **disocclusion** | a translating sequence with a foreground occluder | `disocclusionFraction` > 0 and `motionCompensatedResidual` **unchanged** after masking | if the residual moves, the mask is broken |
+
+**And the ladder itself has a control.** `runSpatialLadder` takes its metrics as bindings so a
+deliberately broken metric — `spatialLaplacian` replaced by a constant — can be substituted and the
+ladder required to fail. Without it, "the ladder passes" is a sentence with no information in it, and
+a validator that passes whatever it is given is ADR-182's failure one level up from where ADR-182
+found it. The test asserts the *targeted* arms fail while the identity arm still passes, so it is a
+sabotage and not a global break.
 
 The identity arm and the smooth-motion arm are the **controls**. ADR-182's rule is that a probe must
 be shown capable of failing; ADR-242's test is the precedent — every assertion is a property only the

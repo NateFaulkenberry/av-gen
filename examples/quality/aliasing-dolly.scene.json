@@ -1,0 +1,289 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "Quality Lab: aliasing on a lateral dolly",
+  "_note": "docs/quality-lab/benchmark-scenes.md \u00a73, scene 2. The same subject as aliasing.scene.json with a MOVING camera, because ADR-243 closes on a named open question: 'a moving camera has not been reviewed at all, and crawl on static geometry is exactly what a moving camera would produce.' A moving camera is also the only way to exercise the velocity AOV, the disocclusion mask and the motion-compensated residual on real content -- with a static camera every motion vector is zero and every temporal arm is vacuous. **The camera is FREE and not SPLINE, against the benchmark-scenes.md recommendation, and the reason was measured rather than reasoned.** A spline camera takes its target from a point further along its own path (Composition::evaluateMainCamera), so it always looks where it is going. A LATERAL dolly -- which is the motion that produces parallax, and therefore the only motion that disoccludes anything -- then aims the camera sideways, off the subject entirely. The first version of this scene did exactly that and rendered a flat frame with rms_contrast 0.0000, caught by the sequence hashes of the candidate and its supersampled reference matching: an arm that cannot differ is void rather than measured (ADR-182). A free camera with keyframed position and target is equally path-independent -- the timeline is a pure function of time -- and it can look at the subject while moving across it. Orbit remains refused: it integrates orbitSpeed*dt.",
+  "camera": {
+    "mode": 1,
+    "position": [
+      0.0,
+      1.9,
+      7.5
+    ],
+    "target": [
+      0.0,
+      1.1,
+      -26.0
+    ],
+    "fov": 38.0,
+    "orbitSpeed": 0.0
+  },
+  "environment": {
+    "background": [
+      0.012,
+      0.016,
+      0.028
+    ],
+    "intensity": 0.85,
+    "fogDensity": 0.0,
+    "volumeDensity": 0.0,
+    "sky": {
+      "enabled": false,
+      "background": false
+    }
+  },
+  "nodes": [
+    {
+      "name": "fence-left",
+      "kind": "procedural",
+      "position": [
+        -2.6,
+        1.0,
+        -14.0
+      ],
+      "_note": "A picket fence receding from the camera. 2 cm slats at 22 cm spacing: near the camera they are several pixels wide and resolve, and by the far end they are well under one pixel, so the same object crosses the sampling limit inside one frame. That crossing is the point -- an aliasing arm whose subject is uniformly sub-pixel measures total signal loss, not aliasing (the lesson the first version of the ladder's aliasing arm cost).",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            0.02,
+            2.0,
+            0.02
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 160,
+          "start": [
+            0.0,
+            0.0,
+            17.0
+          ],
+          "end": [
+            0.0,
+            0.0,
+            -17.0
+          ]
+        },
+        "variation": {
+          "seed": 101
+        },
+        "material": {
+          "baseColor": [
+            0.82,
+            0.8,
+            0.74
+          ],
+          "roughness": 0.45
+        }
+      }
+    },
+    {
+      "name": "fence-right",
+      "kind": "procedural",
+      "position": [
+        2.6,
+        1.0,
+        -14.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            0.02,
+            2.0,
+            0.02
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 160,
+          "start": [
+            0.0,
+            0.0,
+            17.0
+          ],
+          "end": [
+            0.0,
+            0.0,
+            -17.0
+          ]
+        },
+        "variation": {
+          "seed": 102
+        },
+        "material": {
+          "baseColor": [
+            0.82,
+            0.8,
+            0.74
+          ],
+          "roughness": 0.45
+        }
+      }
+    },
+    {
+      "name": "tile-floor",
+      "kind": "procedural",
+      "position": [
+        0.0,
+        0.0,
+        -14.0
+      ],
+      "_note": "A fine repeating pattern built from geometry rather than a texture, so it aliases in the rasteriser rather than in a sampler and no mip chain hides it. 24x1x64 tiles at 24 cm pitch: the projected period falls below two pixels somewhere in the middle distance, which is exactly where moire appears.",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            0.12,
+            0.04,
+            0.12
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "grid",
+          "gridCount": [
+            24,
+            1,
+            64
+          ],
+          "gridSpacing": [
+            0.24,
+            1.0,
+            0.24
+          ]
+        },
+        "variation": {
+          "seed": 103
+        },
+        "material": {
+          "baseColor": [
+            0.3,
+            0.33,
+            0.38
+          ],
+          "roughness": 0.75
+        }
+      }
+    },
+    {
+      "name": "diagonal-blades",
+      "kind": "procedural",
+      "position": [
+        0.0,
+        1.4,
+        -6.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        22.0
+      ],
+      "_note": "Thin plates rotated 22 degrees about Z: a shallow diagonal is the edge that staircases worst, because it crosses many pixels per row. This is the geometric form of the distortion ladder's diagonal-edge arm.",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            0.03,
+            1.1,
+            0.4
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 26,
+          "start": [
+            -2.2,
+            0.0,
+            0.0
+          ],
+          "end": [
+            2.2,
+            0.0,
+            0.0
+          ]
+        },
+        "variation": {
+          "seed": 104
+        },
+        "material": {
+          "baseColor": [
+            0.7,
+            0.72,
+            0.78
+          ],
+          "roughness": 0.35
+        }
+      }
+    },
+    {
+      "name": "emissive-motes",
+      "kind": "procedural",
+      "position": [
+        0.0,
+        2.3,
+        -11.0
+      ],
+      "_note": "Small emissive spheres, which is the class the bioluminescence work cares about: an emissive element below the sampling rate flickers between frames and blooms unevenly within one. Kept at a modest intensity so the tone mapper is not the subject.",
+      "procedural": {
+        "source": {
+          "kind": "sphere",
+          "radius": 0.035,
+          "segments": 10,
+          "rings": 8
+        },
+        "distribution": {
+          "kind": "radial",
+          "count": 48,
+          "radius": 3.4,
+          "plane": "xz",
+          "orientation": "outward"
+        },
+        "variation": {
+          "seed": 105
+        },
+        "material": {
+          "baseColor": [
+            0.1,
+            0.14,
+            0.18
+          ],
+          "emissiveColor": [
+            0.35,
+            0.85,
+            1.0
+          ],
+          "emissiveIntensity": 2.2,
+          "roughness": 0.2
+        }
+      }
+    },
+    {
+      "name": "reference-orb",
+      "kind": "orb",
+      "position": [
+        0.0,
+        1.1,
+        -3.0
+      ],
+      "scale": [
+        0.9,
+        0.9,
+        0.9
+      ],
+      "_note": "One large, smooth, fully-resolved object. It is the control: it cannot alias, so a metric that moves on this scene's arms must not be moving here. The per-class masks and the tile map both need somewhere in frame that is known good.",
+      "material": {
+        "baseColor": [
+          0.78,
+          0.36,
+          0.22
+        ],
+        "roughness": 0.55
+      }
+    }
+  ]
+}
