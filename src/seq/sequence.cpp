@@ -1622,6 +1622,11 @@ json Sequence::toJson() const {
     if (!sectionTimeline.sections.empty()) {
         j["sectionTimeline"] = song::sectionTimelineToJson(sectionTimeline);
     }
+    if (!sectionDirection.empty()) {
+        // ADR-216. Written only when authored, so a project nobody has given a director table to
+        // does not grow an empty array on every save.
+        j["sectionDirection"] = ::avgen::seq::toJson(sectionDirection);
+    }
     if (shotLanguage.customized()) {
         j["shotLanguage"] = shotLanguage.toJson();
     }
@@ -1773,6 +1778,13 @@ Result<Sequence> Sequence::fromJson(const json& j) {
             return fail("sequence '{}': {}", seq.name, parsed.error().message);
         }
         seq.shotLanguage = std::move(*parsed);
+    }
+    if (const auto sd = j.find("sectionDirection"); sd != j.end()) {
+        auto parsed = sectionDirectionSetFromJson(*sd);
+        if (!parsed) {
+            return fail("sequence '{}': {}", seq.name, parsed.error().message);
+        }
+        seq.sectionDirection = std::move(*parsed);
     }
     if (const auto stl = j.find("sectionTimeline"); stl != j.end()) {
         auto parsed = song::sectionTimelineFromJson(*stl);

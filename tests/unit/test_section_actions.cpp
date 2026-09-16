@@ -9,6 +9,7 @@
 #include "entity/action.hpp"
 #include "seq/section_actions.hpp"
 #include "seq/section_direction.hpp"
+#include "seq/sequence.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
@@ -187,4 +188,26 @@ TEST_CASE("a fired section event reaches the action system", "[seq][section][int
     // applier existed: the event fired then too, and the queue never moved.
     CHECK(peak > before);
 #endif
+}
+
+TEST_CASE("an authored director table survives a sequence round-trip", "[seq][section]") {
+    // ADR-225. The table is what makes the "Generate initial Director sequence" checkbox live, so a
+    // table the application does not keep is a checkbox that greys itself out after a save.
+    seq::Sequence piece;
+    piece.name = "sequence";
+    piece.sectionDirection.entries.push_back(
+        {signals::MusicalSection::Drop, {.subject = "visitor", .verb = "pose", .argument = "hover"}});
+    piece.sectionDirection.entries.push_back(
+        {signals::MusicalSection::Outro, {.subject = "rook", .verb = "move", .argument = "cairn"}});
+
+    const nlohmann::json doc = piece.toJson();
+    const auto restored = seq::Sequence::fromJson(doc);
+    REQUIRE(restored.has_value());
+    CHECK(restored->sectionDirection == piece.sectionDirection);
+
+    SECTION("a project with no table writes no key, rather than an empty array") {
+        seq::Sequence bare;
+        bare.name = "sequence";
+        CHECK_FALSE(bare.toJson().contains("sectionDirection"));
+    }
 }

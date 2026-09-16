@@ -71,3 +71,6 @@ target_link_libraries(avgen_atmos_presets PRIVATE avgen_core)
 # TEMPORARY (docs/investigations/ui-responsiveness.md). Delete with the file.
 add_executable(avgen_bench_flatten bench_flatten.cpp)
 target_link_libraries(avgen_bench_flatten PRIVATE avgen_core)
+
+# The Quality Lab (ADR-250): a measurement instrument for the renderer, kept out of the engine.
+add_subdirectory(quality-lab)

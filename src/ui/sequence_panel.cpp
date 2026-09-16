@@ -13,6 +13,7 @@
 #include "scene/composition.hpp"
 #include "seq/layer_sink.hpp"
 #include "seq/lyrics.hpp"
+#include "seq/section_direction.hpp"
 #include "seq/song_structure.hpp"
 #include "song/from_analysis.hpp"
 
@@ -415,17 +416,31 @@ void SequencePanel::drawImportPopup(app::Engine& engine) {
         ImGui::SetTooltip("Find the sections -- intro, verse, chorus -- and lay them on the\n"
                           "timeline, where you can move and rename them.");
     }
-    // Present, and honest about being unavailable. Generation is a thin translation on top of the
-    // Director decision layer (seq/section_direction.hpp), and that layer does not exist yet; a
-    // checkbox that silently did nothing would be worse than one that says why.
-    const bool directorReady = false;
-    ImGui::BeginDisabled(!directorReady);
+    // The Director decision layer exists now, and so does the thing that applies what it produces
+    // (`seq::actionFromEvent`, `Engine::applySectionActions`). What gates this is no longer whether
+    // the code is written -- it is whether this project has said what a section should MAKE HAPPEN.
+    //
+    // That table is authored on purpose (ADR-216): `section_direction.hpp` refuses to hold an
+    // opinion about the vocabulary of behaviours, because a built-in table saying *a Drop means the
+    // visitor hovers* would put one scene's cast into a generic seam. So a project with no table
+    // generates nothing, and the checkbox says that rather than producing an empty sequence and
+    // calling it a result.
+    const std::size_t directorRows = engine.sequence().sectionDirection.entries.size();
+    ImGui::BeginDisabled(directorRows == 0);
     ImGui::Checkbox("Generate initial Director sequence", &generateOnImport_);
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("Not yet: this turns each section into a Director event, and the\n"
-                          "Director decision layer it would call is still being built.\n"
-                          "The connection is seq/section_direction.hpp.");
+        if (directorRows == 0) {
+            ImGui::SetTooltip("This project has no director table yet, so there is nothing to\n"
+                              "generate. A table says what each kind of section should make\n"
+                              "happen -- \"on a Drop, the visitor poses\" -- and lives in the\n"
+                              "project's `sectionDirection`.");
+        } else {
+            ImGui::SetTooltip("Turn each section into a Director event, using this project's\n"
+                              "%zu-row table. Sections whose kind the table does not name are\n"
+                              "skipped, and the panel says which.",
+                              directorRows);
+        }
     }
     ImGui::Separator();
     if (ImGui::Button("Choose file...")) {
@@ -2530,6 +2545,35 @@ void SequencePanel::pollStructureAnalysis(app::Engine& engine) {
     piece.refreshSectionMarkers();
     if (engine.track() != nullptr) {
         piece.setBeatMarkers(engine.track()->beats().beatTimes);
+    }
+    // ADR-216: the generated Director events, if this project has a table and the box was ticked.
+    //
+    // After the markers are refreshed, because a generated event's trigger is a section NAME and the
+    // markers are what carry those names -- generating before them would produce events keyed to the
+    // previous analysis's sections.
+    if (generateOnImport_ && !piece.sectionDirection.empty()) {
+        seq::GenerationOptions options;
+        options.table = seq::tableFrom(piece.sectionDirection);
+        const seq::GeneratedDirection generated = seq::generateDirectorEvents(piece.structure, options);
+        // Replace what a previous generation left rather than accumulating: pressing Analyze twice
+        // must not leave two events per section, and these are identified by their `director.` id
+        // prefix precisely so a regeneration can find its own work.
+        std::erase_if(piece.events, [&](const seq::SequenceEvent& e) {
+            return e.id.rfind(options.idPrefix + ".", 0) == 0;
+        });
+        piece.events.insert(piece.events.end(), generated.events.begin(), generated.events.end());
+        std::string note = fmt::format("{}, {} director event(s)", status_, generated.events.size());
+        if (!generated.warnings.empty()) {
+            // The declines, said out loud. "The table had no answer for bridge" is the single most
+            // useful thing this can report while a table is being filled in, and an event count
+            // alone cannot say it.
+            note += " (" + generated.warnings.front();
+            if (generated.warnings.size() > 1) {
+                note += fmt::format(" and {} more", generated.warnings.size() - 1);
+            }
+            note += ")";
+        }
+        status_ = std::move(note);
     }
     touch();
 }

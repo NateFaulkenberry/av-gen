@@ -1,0 +1,10 @@
+# The Quality Lab's metric engine (ADR-250). A `tools/` target, not a `src/` module: the Lab measures
+# the engine and is not part of it, which is §49's principles 7 and 8 satisfied by construction
+# rather than by discipline.
+#
+# Links `avgen_core` because that is where image I/O already lives (tinyexr, stb, `ImageF`/`Image8`).
+# It adds no dependency to the engine and nothing in `src/` includes anything here.
+add_library(avgen_quality_metrics STATIC
+    metrics/spatial.cpp)
+target_include_directories(avgen_quality_metrics PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(avgen_quality_metrics PUBLIC avgen_core)

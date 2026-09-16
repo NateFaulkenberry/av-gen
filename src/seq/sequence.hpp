@@ -48,6 +48,7 @@
 #include "core/error.hpp"
 #include "params/timeline.hpp"
 #include "seq/events.hpp"
+#include "seq/section_actions.hpp"
 #include "seq/layers.hpp"
 #include "signals/musical_events.hpp"
 #include "song/section_timeline.hpp"
@@ -337,6 +338,14 @@ struct Sequence {
     // vocabulary is code and is never written, so a piece that defined nothing serializes nothing.
     song::SectionTimeline sectionTimeline;
     song::ShotLanguage shotLanguage;
+    // ADR-216's table: what the world should DO when a section of a given kind begins -- as opposed
+    // to what the camera should do, which is the shot language above. Two different questions about
+    // the same boundary, and keeping them apart is why neither had to learn the other's vocabulary.
+    //
+    // Empty by default and empty in most projects. `generateDirectorEvents` declines every kind the
+    // set does not name, so an unauthored project generates nothing -- which is the honest report
+    // that nobody has said what a Drop should make happen, rather than a guess dressed as one.
+    SectionDirectionSet sectionDirection;
     // spec 17 of the cinematic world brief: "when X happens, do Y". Most of these stop being
     // events at bake and become keys; the rest are dispatched. seq/events.hpp is the argument.
     std::vector<SequenceEvent> events;
