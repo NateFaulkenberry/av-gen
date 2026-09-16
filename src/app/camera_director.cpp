@@ -428,9 +428,26 @@ Result<SongPlan> songPlanForEngine(const Engine& engine) {
     if (!engine.songPlan().empty()) {
         return engine.songPlan();
     }
-    // Otherwise, the analyzed structure read for its *measurements* -- never for its labels. The
-    // beginner path in the brief's section 11: import, analyze, Auto-director: Song, play.
-    const analysis::SongStructure& structure = engine.sequence().structure;
+    // Then the FILM: the authored section timeline, through the shot language. This is the branch
+    // the whole feature exists for -- a person retypes a section to "Ocean Ambience" or overrides
+    // its treatment, and the director cuts differently because of it.
+    //
+    // It goes above the measurements branch because a timeline is what a person decided and a
+    // structure is what a detector reported, and the decision outranks the report (ADR-247). A
+    // project that has been analyzed at all has a timeline, since `sequenceFromJson` migrates one
+    // from the structure on load; the branch below survives for a project with neither.
+    const seq::Sequence& piece = engine.sequence();
+    if (!piece.sectionTimeline.sections.empty()) {
+        const std::vector<song::SectionCue> cues =
+            song::cueSheet(piece.sectionTimeline, piece.shotLanguage);
+        if (!cues.empty()) {
+            return songPlanFromCues(cues);
+        }
+    }
+    // Otherwise, the analyzed structure read for its *measurements* -- never for its labels. Kept as
+    // the fallback for a project that has a detection and no film, and as the thing that makes the
+    // beginner path work the instant the analysis finishes.
+    const analysis::SongStructure& structure = piece.structure;
     if (structure.sections.empty()) {
         return fail("Song Mode needs a song structure: analyze the track in the Sequence panel, or "
                     "author a song plan, before directing to it");

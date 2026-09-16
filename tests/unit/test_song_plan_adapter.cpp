@@ -201,3 +201,76 @@ TEST_CASE("a custom section type can be made from a display name and used", "[so
         CHECK_FALSE(language.defineType(std::move(dangling)).has_value());
     }
 }
+
+// The wire from the authored film to the director.
+//
+// The adapter existing is not the same as the adapter being CALLED. Until this was checked,
+// `songPlanForEngine` fell through to `songPlanFromMeasurements` in every case -- so retyping a
+// section, or inventing "Ocean Ambience", changed the picker and changed nothing else. Everything
+// passed: the model was right, the adapter was right, and they were not connected.
+#include "app/camera_director.hpp"
+#include "app/engine.hpp"
+
+#include <filesystem>
+
+TEST_CASE("Song Mode plans from the authored film, not the detector's report",
+          "[song][plan][integration]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path project =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "world" /
+        "glowmere-valley-2-multicam.json";
+    if (!std::filesystem::exists(project)) {
+        SKIP("the Glowmere multi-camera demo is not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(project).has_value());
+
+    // The timeline is BUILT here rather than taken from the project, and that is deliberate. The
+    // first version of this test loaded the demo and skipped when it found no analyzed sections --
+    // which it does, because nobody has pressed Analyze on it. A test that skips is a test that
+    // proves nothing, and this one exists precisely to prove a connection.
+    seq::Sequence piece = engine.sequence();
+    piece.sectionTimeline.sections.clear();
+    for (int i = 0; i < 2; ++i) {
+        song::Section section;
+        section.type = "verse";
+        section.startSeconds = i * 20.0;
+        section.endSeconds = (i + 1) * 20.0;
+        piece.sectionTimeline.sections.push_back(std::move(section));
+    }
+
+    // Give one section a treatment nobody could have detected, which is the whole claim of the
+    // feature: a person's decision reaches the camera.
+    song::ShotIntent invented;
+    invented.id = "locked_off_test";
+    invented.name = "Locked Off";
+    invented.focus = song::SubjectFocus::Environment;
+    invented.focusStrength = 1.0f;
+    invented.framing.tightest = song::Framing::VeryWide;
+    invented.framing.widest = song::Framing::VeryWide;
+    invented.movement = 0.0f;
+    invented.cutFrequency = 0.0f;
+    invented.cameras.fewest = 1;
+    invented.cameras.most = 1;
+    REQUIRE(piece.shotLanguage.defineIntent(invented).has_value());
+    REQUIRE(song::setSectionShotIntent(piece.sectionTimeline, 0, "locked_off_test",
+                                       piece.shotLanguage));
+    REQUIRE(engine.setSequence(std::move(piece)).has_value());
+
+    const auto plan = app::songPlanForEngine(engine);
+    REQUIRE(plan.has_value());
+    REQUIRE_FALSE(plan->sections.empty());
+
+    // The authored intent reached the plan. Its id is opaque to the director, which is exactly why
+    // finding it here proves the path rather than proving a coincidence: nothing else in the engine
+    // could have produced that string.
+    INFO("first section intent: " << plan->sections[0].intent.id);
+    CHECK(plan->sections[0].intent.id == "locked_off_test");
+    // ...and its numbers came with it, so this is the intent and not just its name.
+    CHECK(plan->sections[0].intent.movement == Approx(0.0f));
+    CHECK(plan->sections[0].intent.cameras == 1);
+    CHECK(plan->sections[0].intent.heroEmphasis < 0.5f);   // Environment focus, fully weighted
+#endif
+}
