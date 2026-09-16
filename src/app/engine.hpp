@@ -51,6 +51,7 @@
 #include <optional>
 #include <array>
 #include <cstdint>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
@@ -253,6 +254,7 @@ public:
     [[nodiscard]] const seq::EventDispatcher& sequenceEvents() const { return sequenceEvents_; }
     // What fired during the most recent `update()`, in (time, priority, declaration) order.
     [[nodiscard]] std::span<const seq::FiredEvent> firedEvents() const { return firedEvents_; }
+
 
     // ---- built-in post-processing ----
     [[nodiscard]] scene::PostSettings& post() { return post_; }
@@ -614,6 +616,12 @@ private:
     seq::InstallReport sequenceReport_;
     seq::EventDispatcher sequenceEvents_;
     std::vector<seq::FiredEvent> firedEvents_;
+    // ADR-216: hands this frame's EntityAction firings to the action system. Not a decision about
+    // what a verb means -- `seq::actionFromEvent` owns that -- only about who to ask.
+    void applySectionActions();
+    // Event ids already complained about, so a table row that names a missing entity says so once
+    // rather than sixty times a second.
+    std::set<std::string> sectionActionProblems_;
     void removeLayerParameters(); // drops "layers/*" from params_ (before a reload or a delete)
     scene::PostSettings post_;
     // ADR-207. `worldEffects_` is the live set (authored + modulated); `worldEffectParams_` owns the

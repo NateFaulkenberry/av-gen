@@ -60,6 +60,8 @@ struct SectionDirection {
     std::string argument; // the verb's own object, where it needs one
     int priority = 0;     // ordering against other events at the same instant
     double delaySeconds = 0.0; // fire this long after the section opens; usually 0
+    // So an authored table can be compared, which is what a round-trip test asserts on.
+    [[nodiscard]] bool operator==(const SectionDirection&) const = default;
 };
 
 // **The thing to fill in.** Given a section kind in the director's vocabulary, what the Director
