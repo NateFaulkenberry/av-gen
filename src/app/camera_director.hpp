@@ -49,9 +49,12 @@ class Engine;
 // Every field here changes the film. Three that a panel would obviously want are deliberately
 // absent, because a knob wired to nothing spends the user's trust:
 //
-//   * `CompositionProfile::framing` and `headroom` -- stored, serialised, and read by no geometry
-//     function. They look like framing controls and are dead.
-//   * `HeroPoint::preferredCameraElevationDegrees` -- authored per hero and never read by the
+//   * `CompositionProfile::framing` and `headroom` -- WIRED, despite what this comment used to say:
+//     `framedAim` in cinematic.cpp reads both and three call sites use it. Left here corrected
+//     rather than deleted, because ADR-245's migration table repeated the stale claim.
+//   * `HeroPoint::preferredCameraElevationDegrees` -- ALSO WIRED now, via `preferredElevationDegrees`,
+//     which cinematic.cpp reads. The note below describes how it used to be:
+//     authored per hero and never read by the
 //     director.
 //   * `Shot::speed` -- real, but only through `Sequence::retime()`, which the director never calls;
 //     exposing it as "camera speed" would move nothing.
@@ -66,9 +69,6 @@ struct AutoDirectorSettings {
     double minBuildShotSeconds = 2.0;
     double maxShotSeconds = 12.0;
     // The two lenses the film is shot on, in millimetres: the wide for establishing and drifting,
-    // the long for a hero. Baked into `camera/lens/focalLength` keys.
-    float wideFocalLength = 24.0f;
-    float heroFocalLength = 50.0f;
     // Same seed, same heroes, same structure, same film. Exposed because re-cutting with a different
     // seed is the one way to ask for a different edit of the same piece.
     std::uint32_t seed = 1;
@@ -96,20 +96,6 @@ struct AutoDirectorSettings {
     // however high the slider went. "I'm not sure I can control that enough with just the importance
     // param" -- correct, and this is the thing that was missing.
     int dwellShots = 1;
-    // ADR-217: don't cut away from a director's actor while it is in the middle of something.
-    //
-    // The name of a `stage::Staging` scenario (ADR-210), or "" -- the default -- for off. While that
-    // scenario holds `holdRole` bound *and* the shot the playhead is in was cut for the scenario's
-    // own actor, the camera keeps that shot's framing on the actor, riding along with it, until the
-    // scenario lets go; then it rejoins the cut over `holdReleaseSeconds`.
-    //
-    // A setting rather than a rule, and off by default, because it is a judgement about one kind of
-    // scene: a cut that leaves mid-event is a mistake in a piece whose event is the point, and
-    // exactly right in a piece where the saucer is scenery. Nothing about it is UFO-specific -- it
-    // names a scenario and a role, and knows what neither of them means.
-    std::string holdScenario;
-    std::string holdRole = "target";
-    double holdReleaseSeconds = 1.0;
 
     [[nodiscard]] Result<void> validate() const;
     void applyTo(DirectionBrief& brief) const;

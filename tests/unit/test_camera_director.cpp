@@ -1311,18 +1311,23 @@ TEST_CASE("Auto-director settings reach the film, and refuse what they cannot me
 #endif
     }
 
-    SECTION("the wide lens reaches the baked keys") {
-        app::AutoDirectorSettings wide;
-        wide.wideFocalLength = 14.0f;
-        const auto seq = app::directHeroes(heroes, structure, wide);
+    // The global wide/hero lens pair was retired with ADR-245: a camera carries its own optical
+    // identity, and a wide establishing shot is a wide *camera* rather than a wide moment on the
+    // hero camera. What survives that retirement -- and is the thing this section now guards -- is
+    // the subject-derived choice `briefFromHeroes` makes, which the migration was explicitly not
+    // allowed to drop. The camera rig's own override is covered in the [multicam] suite.
+    SECTION("the subject's proportions still decide the lens, and it reaches the baked keys") {
+        const auto seq = app::directHeroes(heroes, structure, app::AutoDirectorSettings{});
         REQUIRE(seq.has_value());
-        bool sawIt = false;
+        REQUIRE_FALSE(seq->shots.empty());
+        const auto brief = app::briefFromHeroes(heroes);
+        REQUIRE(brief.has_value());
+        // 50 mm for a tall subject, 35 for a squat one -- not the 35 mm CompositionProfile default,
+        // or this would pass against a bake that had forgotten the brief entirely.
+        const float expected = brief->focalLength;
         for (const app::Shot& s : seq->shots) {
-            if (std::fabs(s.composition.focalLength - 14.0f) < 0.01f) {
-                sawIt = true;
-            }
+            CHECK(std::fabs(s.composition.focalLength - expected) < 0.01f);
         }
-        REQUIRE(sawIt);
     }
 
     SECTION("settings that cannot mean anything are refused rather than clamped") {
@@ -1330,9 +1335,6 @@ TEST_CASE("Auto-director settings reach the film, and refuse what they cannot me
         app::AutoDirectorSettings bad;
         bad.maxShotSeconds = 1.0; // shorter than the minimum
         REQUIRE_FALSE(bad.validate().has_value());
-        app::AutoDirectorSettings lens;
-        lens.wideFocalLength = 90.0f; // a "wide" longer than the hero lens
-        REQUIRE_FALSE(lens.validate().has_value());
         app::AutoDirectorSettings zero;
         zero.minShotSeconds = 0.0;
         REQUIRE_FALSE(zero.validate().has_value());

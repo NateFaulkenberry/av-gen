@@ -74,7 +74,6 @@ std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state) {
     // "the camera fights me".
     if (scene::Composition* composition = engine.composition()) {
         composition->setAimFollow({});
-        composition->setAimHold({}); // ADR-217; the hold belongs to the cut, not to the viewport
     }
     // ADR-207: and so does the shot schedule. A world effect gated on "the camera is travelling"
     // must not keep firing against a cut that is no longer driving anything.
@@ -197,7 +196,7 @@ Result<DirectionBrief> briefFromHeroes(std::span<const world::HeroPoint> heroes)
     // The hero's own preferred stand-off is expressed in the shot distances the director picks, but
     // the lens is a property of the *hero*: a tall subject shot on a wide lens leans, and this is
     // the one place that knows the subject's proportions.
-    brief.heroFocalLength = heroes.front().height > heroes.front().radius * 4.0f ? 50.0f : 35.0f;
+    brief.focalLength = heroes.front().height > heroes.front().radius * 4.0f ? 50.0f : 35.0f;
     return brief;
 }
 
@@ -314,15 +313,6 @@ Result<void> AutoDirectorSettings::validate() const {
     if (maxShotSeconds < minShotSeconds || maxShotSeconds > 600.0) {
         return fail("auto-director: maximum shot length must be between the minimum and 600 s");
     }
-    for (const float mm : {wideFocalLength, heroFocalLength}) {
-        if (!(mm >= 8.0f) || mm > 400.0f) {
-            return fail("auto-director: focal lengths must be in [8, 400] mm");
-        }
-    }
-    if (wideFocalLength > heroFocalLength) {
-        return fail("auto-director: the wide lens ({} mm) is longer than the hero lens ({} mm)",
-                    wideFocalLength, heroFocalLength);
-    }
     // ADR-200: 0 is off. A negative is somebody's arithmetic, and a cap of a centimetre a second
     // would shrink every shot to a point rather than slowing anything.
     if (maxCameraSpeed < 0.0f || (maxCameraSpeed > 0.0f && maxCameraSpeed < 0.1f) ||
@@ -339,13 +329,6 @@ Result<void> AutoDirectorSettings::validate() const {
     }
     // ADR-217. A named scenario with no role to watch would hold for ever, and a release of zero is
     // a cut that snaps -- both are refused rather than guessed at.
-    if (!holdScenario.empty() && holdRole.empty()) {
-        return fail("auto-director: holding on scenario '{}' needs a role to watch (holdRole)",
-                    holdScenario);
-    }
-    if (holdReleaseSeconds < 0.0 || holdReleaseSeconds > 30.0) {
-        return fail("auto-director: the hold's release must be 0..30 s, not {}", holdReleaseSeconds);
-    }
     return {};
 }
 
@@ -354,14 +337,9 @@ nlohmann::json AutoDirectorSettings::toJson() const {
                           {"minShot", minShotSeconds},
                           {"minBuildShot", minBuildShotSeconds},
                           {"maxShot", maxShotSeconds},
-                          {"wide", wideFocalLength},
-                          {"hero", heroFocalLength},
                           {"maxSpeed", maxCameraSpeed},
                           {"maxSwing", maxViewRate},
                           {"dwell", dwellShots},
-                          {"holdScenario", holdScenario},
-                          {"holdRole", holdRole},
-                          {"holdRelease", holdReleaseSeconds},
                           {"seed", seed}};
 }
 
@@ -385,14 +363,9 @@ Result<AutoDirectorSettings> AutoDirectorSettings::fromJson(const nlohmann::json
     out.minShotSeconds = doc.value("minShot", out.minShotSeconds);
     out.minBuildShotSeconds = doc.value("minBuildShot", out.minBuildShotSeconds);
     out.maxShotSeconds = doc.value("maxShot", out.maxShotSeconds);
-    out.wideFocalLength = doc.value("wide", out.wideFocalLength);
-    out.heroFocalLength = doc.value("hero", out.heroFocalLength);
     out.maxCameraSpeed = doc.value("maxSpeed", out.maxCameraSpeed);
     out.maxViewRate = doc.value("maxSwing", out.maxViewRate);
     out.dwellShots = doc.value("dwell", out.dwellShots);
-    out.holdScenario = doc.value("holdScenario", out.holdScenario);
-    out.holdRole = doc.value("holdRole", out.holdRole);
-    out.holdReleaseSeconds = doc.value("holdRelease", out.holdReleaseSeconds);
     out.seed = doc.value("seed", out.seed);
     // Refused rather than clamped. A project is written by this application, so the only route to a
     // value outside the range is a hand edit or a file from a build that meant something else by
@@ -408,12 +381,6 @@ void AutoDirectorSettings::applyTo(DirectionBrief& brief) const {
     brief.minShotSeconds = minShotSeconds;
     brief.minBuildShotSeconds = minBuildShotSeconds;
     brief.maxShotSeconds = maxShotSeconds;
-    brief.wideFocalLength = wideFocalLength;
-    // `briefFromHeroes` picks 50 or 35 mm from the subject's own proportions, and a user who has not
-    // touched the control should keep that. The panel's value wins only when it is not the default.
-    if (heroFocalLength != AutoDirectorSettings{}.heroFocalLength) {
-        brief.heroFocalLength = heroFocalLength;
-    }
     brief.dwellShots = dwellShots;
     brief.seed = seed;
 }
@@ -568,22 +535,6 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
         log::info("auto-director: {} of {} shot(s) hold a subject and will follow it",
                   follow.size(), sequence.shots.size());
         composition->setAimFollow(std::move(follow));
-        // ADR-217. Inert unless the settings name a scenario, and inert again if the scenario or
-        // its actor is not in this scene -- `setAimHold` resolves the actor's hero name and leaves
-        // it empty when it cannot, which is what makes a stale setting do nothing rather than
-        // something wrong.
-        composition->setAimHold(scene::AimHold{.scenario = settings.holdScenario,
-                                               .role = settings.holdRole,
-                                               .releaseSeconds = settings.holdReleaseSeconds});
-        if (!settings.holdScenario.empty()) {
-            if (composition->aimHeldHero().empty()) {
-                log::warn("auto-director: hold names the scenario '{}', which this scene does not "
-                          "stage; the camera will not hold", settings.holdScenario);
-            } else {
-                log::info("auto-director: holding the cut on '{}' while '{}' has a '{}'",
-                          composition->aimHeldHero(), settings.holdScenario, settings.holdRole);
-            }
-        }
     }
     // ADR-207: the cut, flattened for world effects to time-gate against. Installed with the keys
     // rather than derived per frame, for the same reason the keys exist at all -- a shot schedule is

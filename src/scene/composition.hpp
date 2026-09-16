@@ -329,43 +329,6 @@ struct AimFollow {
     glm::vec3 heroAtCut{0.0f};   // where that hero stood when the shot was cut
 };
 
-// ADR-217: don't cut away from a director's actor while it is in the middle of something.
-//
-// The auto-director's cut is baked from the music before a frame is drawn, and a staging scenario
-// (ADR-210) is a live state machine -- so the cut cannot know that shot seven lands in the middle of
-// an abduction and shot eight walks out of it. This is the one fact the bake cannot carry, expressed
-// where both halves are already in scope.
-//
-// What it says: *while `scenario` holds `role` bound, and the shot the playhead is in was cut for
-// the scenario's own actor, keep that shot's framing on the actor until the scenario lets go.* The
-// held camera rides with the actor -- the same delta `AimFollow` adds to the aim, added to the eye
-// as well -- so a saucer that flies two hundred metres stays the same size in frame instead of
-// shrinking to a dot, and then the cut resumes over `releaseSeconds`.
-//
-// Off unless a scenario is named, and an unnamed scenario is what every existing project has: a
-// scene that does not use this is byte-identical to what it was.
-struct AimHold {
-    std::string scenario; // a stage::Staging scenario name; "" = the whole feature is off
-    std::string role;     // the role whose binding means "engaged"; "" = "target"
-    double releaseSeconds = 1.0; // how long the camera takes to rejoin the cut when the hold ends
-    // How much of the frame the actor-to-role separation should fill while the hold is engaged.
-    // 0 keeps the old behaviour exactly -- translate the shot's framing of the ACTOR and let the
-    // role fall where it may.
-    //
-    // It fell badly, and the number is why this exists. Over ten abductions with the hold driving,
-    // 9,709 frames: the animal was ENTIRELY OFF SCREEN for 7,867 of them -- 81% -- and fully in
-    // frame for 15%. With the pair framed: 97% fully in, 1.5% off. The worst excursion went from
-    // 513,014 NDC units outside the frame (a body projecting essentially at the eye plane) to 2.46.
-    //
-    // The cause is arithmetic rather than taste: the hold translates the eye and the target by the
-    // ACTOR's delta, so the craft keeps its screen position and size exactly, and the body hanging
-    // a hover height beneath it appears nowhere in the calculation.
-    float framePair = 0.55f;
-    // The separation is clamped before it sets a distance, so a role bound while it is still two
-    // hundred metres away -- which is every approach -- does not fling the camera to the horizon.
-    float framePairMinSeparation = 6.0f;
-    float framePairMaxSeparation = 45.0f;
-};
 
 class Composition final : public SceneController {
 public:
@@ -590,19 +553,10 @@ public:
     void setAimFollow(std::vector<AimFollow> shots);
     [[nodiscard]] const std::vector<AimFollow>& aimFollow() const { return aimFollow_; }
 
-    // ADR-217. Off by default (an empty `scenario`). Set by `app::installSequence` from the
-    // auto-director's settings and cleared with the rest of the direction when the camera is handed
-    // back. `clearAimHoldState` drops the *running* state only -- what a seek needs, so that the
-    // seeked second is a function of the second rather than of how the playhead got there.
-    void setAimHold(AimHold hold);
-    [[nodiscard]] const AimHold& aimHold() const { return aimHold_; }
-    void clearAimHoldState() {
-        // Everything except the resolved hero name, which is not running state: it comes from
-        // `setAimHold` and wiping it here would make the first seek turn the hold off for good.
-        std::string hero = std::move(aimHoldState_.hero);
-        aimHoldState_ = AimHoldState{};
-        aimHoldState_.hero = std::move(hero);
-        // The follow smoother is running state for the same reason and goes with it.
+    // Drops the aim-follow smoother's running state. What a seek needs, so that the seeked second
+    // is a function of the second rather than of how the playhead got there. (This is all that is
+    // left of `clearAimHoldState`: the hold it also cleared was retired with ADR-217.)
+    void clearAimFollowState() {
         aimFollowSmoothed_ = glm::vec3(0.0f);
         aimFollowPrimed_ = false;
     }
@@ -620,11 +574,6 @@ public:
     // 0 restores the unfiltered behaviour exactly, so a project that does not ask is unchanged.
     void setAimFollowSmoothingMs(float ms) { aimFollowSmoothingMs_ = ms; }
     [[nodiscard]] float aimFollowSmoothingMs() const { return aimFollowSmoothingMs_; }
-    // Whether the camera is being held on the scenario's actor *right now*, and on which hero. What
-    // a test asserts on, and what an overlay would show.
-    [[nodiscard]] bool aimHeld() const { return aimHoldState_.holding; }
-    [[nodiscard]] const std::string& aimHeldHero() const { return aimHoldState_.hero; }
-
     // ---- multiple cameras (ADR-245) ------------------------------------------------------------
     //
     // The camera collection, the authored shot track and the resolved active camera. See
@@ -649,7 +598,7 @@ public:
     // there is no state for it: a camera is animated exactly when somebody keyed it.
     [[nodiscard]] bool cameraIsAnimated(CameraId id, const params::Timeline& timeline) const;
     // Drops the event observation the director accumulated. Called on a seek, next to
-    // `clearAimHoldState`, and for the same reason: a scenario's run is live state, so the seeked
+    // `clearAimFollowState`, and for the same reason: a scenario's run is live state, so the seeked
     // second must not inherit an event span observed before the jump.
     void clearCameraEventState() { cameraEvents_.clear(); }
     // The event spans the director can currently see. Exposed for tests and an overlay.
@@ -1072,32 +1021,8 @@ private:
     // state: a hero may name an assembly of several nodes rather than one object.
     std::vector<std::optional<glm::vec3>> heroAnchors_;
     std::vector<AimFollow> aimFollow_;  // ADR-158; empty unless a director cut this camera
-    AimHold aimHold_;                   // ADR-217; inert unless a scenario is named
-    // The hold's running state. Not serialised and not part of the document: it is derived from the
-    // frame sequence, exactly like the scenario it follows, and a seek clears it.
-    struct AimHoldState {
-        std::string hero;          // the actor's hero name, resolved once per `setAimHold`
-        bool armed = false;        // the playhead is (or was) in a shot cut for that hero, engaged
-        bool holding = false;      // the override is on this frame
-        glm::vec3 eye{0.0f};       // the camera pose the hold froze, and the hero it froze against
-        glm::vec3 target{0.0f};
-        glm::vec3 heroAt{0.0f};
-        double releaseFrom = -1.0; // the second the hold ended; < 0 = not releasing
-        glm::vec3 releaseEye{0.0f};
-        glm::vec3 releaseTarget{0.0f};
-        // The pair-framing distance, decided ONCE when the framing engages and held for the rest of
-        // it. < 0 = not yet decided.
-        //
-        // It was a live function of the actor-to-role separation, and that separation collapses:
-        // the animal rises toward the craft over the lift, so the distance fell with it and the
-        // camera pushed in 78 m -> 15 m on every abduction, then snapped back and did it again.
-        // Measured, on the shipped scene, once per cycle. A shot does not re-choose its distance
-        // sixty times a second; deciding it at the cut is what "hold" means.
-        float pairDistance = -1.0f;
-    };
-    AimHoldState aimHoldState_;
     // ADR-245: the filtered aim-follow delta, and whether it has a value yet. Reset by
-    // `clearAimHoldState` (a seek) and whenever the active shot changes -- at a cut the delta is
+    // `clearAimFollowState` (a seek) and whenever the active shot changes -- at a cut the delta is
     // zero by definition, and inheriting the previous shot's would start the new one off-centre.
     glm::vec3 aimFollowSmoothed_{0.0f};
     bool aimFollowPrimed_ = false;
@@ -1112,7 +1037,6 @@ private:
     double heroSettleAt_ = 0.0;
     double heroSettleSeconds_ = 0.25;
     void syncHeroesToNodes();
-    void applyAimHold(const AimFollow* active); // ADR-217
     void markHeroesMoved();
     void settleHeroes();
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
