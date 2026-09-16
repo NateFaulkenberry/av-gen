@@ -490,3 +490,107 @@ TEST_CASE("A saved hold is installed again when the project is loaded", "[direct
     std::filesystem::remove(out, ec);
 #endif
 }
+
+// Is the animal in frame while the hold is driving the camera? (the framing half of ADR-217)
+//
+// Reported as "you cant always see the animal as its being abducted". The mechanism is visible in
+// `applyAimHold` without running anything: it translates the eye AND the target by the *craft's*
+// delta, so the saucer keeps its screen position and size exactly, and the body hanging a hover
+// height beneath it appears nowhere in that arithmetic.
+//
+// This probe has to run where the hold is LIVE, which means a loaded project, a directed cut and a
+// `holdScenario`. A first version of it was built on the abduction-alignment harness instead --
+// which never directs a camera at all, so `applyDirectedAim` returned early, `applyAimHold` never
+// executed, and it measured the scene's static authored camera. The numbers looked plausible and
+// were about something else entirely; the fix under test could not move them by a single frame,
+// which is the only reason it was caught.
+TEST_CASE("probe: is the abducted animal in frame while the hold drives", "[.probe][hold][framing]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    if (!std::filesystem::exists(glowmereProject())) {
+        SKIP("Glowmere Valley 2 is not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(glowmereProject()).has_value());
+    if (engine.track() == nullptr) {
+        SKIP("the project's audio is not available here");
+    }
+    scene::Composition* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+    app::AutoDirectorSettings base;
+    const Cut cut = firstVisitorShot(engine, *comp, base);
+    REQUIRE(cut.found);
+    app::AutoDirectorSettings s = base;
+    s.seed = cut.seed;
+    s.holdScenario = "abduction";
+    s.holdRole = "target";
+    REQUIRE(app::directEngine(engine, comp->heroes(), s).has_value());
+
+    int held = 0, fully = 0, partly = 0, off = 0;
+    float smallest = 1e9f, worstOut = 0.0f;
+    FixedStepClock clock(60.0);
+    engine.seekSeconds(0.0);
+    const int steps = static_cast<int>(std::min(240.0, engine.durationSeconds()) * 60.0);
+    for (int i = 0; i < steps; ++i) {
+        engine.update(engine.tick(clock));
+        // Only the frames the hold is actually driving: everywhere else the camera is the cut's and
+        // the animal's framing is not this feature's business.
+        if (!comp->aimHeld()) {
+            continue;
+        }
+        const std::string_view target = comp->director().binding("abduction", "target");
+        if (target.empty()) {
+            continue;
+        }
+        // The LIFT, not the whole engagement. A role binds at `acquire` and stays bound through
+        // approach, beam, abduct and depart; during the approach the craft is still flying toward an
+        // animal that has no reason to be in shot yet, and counting those frames answers a question
+        // nobody asked. "as its being abducted" is the `abduct` beat.
+        if (comp->director().beat("abduction") != "abduct") {
+            continue;
+        }
+        const std::vector<glm::vec3> corners = comp->nodeCorners(std::string(target));
+        if (corners.empty()) {
+            continue;
+        }
+        ++held;
+        const scene::Camera& cam = comp->scene().camera;
+        const glm::mat4 viewProj = cam.projection(16.0f / 9.0f) * cam.view();
+        int in = 0;
+        glm::vec2 lo(1e9f), hi(-1e9f);
+        for (const glm::vec3& p : corners) {
+            const glm::vec4 clip = viewProj * glm::vec4(p, 1.0f);
+            if (clip.w <= 1e-4f) { // behind the eye
+                worstOut = std::max(worstOut, 2.0f);
+                continue;
+            }
+            const glm::vec2 ndc(clip.x / clip.w, clip.y / clip.w);
+            lo = glm::min(lo, ndc);
+            hi = glm::max(hi, ndc);
+            if (std::fabs(ndc.x) <= 1.0f && std::fabs(ndc.y) <= 1.0f) {
+                ++in;
+            } else {
+                worstOut = std::max({worstOut, std::fabs(ndc.x) - 1.0f, std::fabs(ndc.y) - 1.0f});
+            }
+        }
+        if (in == static_cast<int>(corners.size())) {
+            ++fully;
+            smallest = std::min(smallest, std::max(hi.x - lo.x, hi.y - lo.y));
+        } else if (in > 0) {
+            ++partly;
+        } else {
+            ++off;
+        }
+    }
+    fmt::print("[hold-framing] {} held frames with a bound target: fully in {}, partly {}, off {}\n",
+               held, fully, partly, off);
+    if (held > 0) {
+        fmt::print("[hold-framing] fully in {:.0f}%, smallest NDC span {:.3f}, worst {:.2f} outside\n",
+                   100.0 * fully / held, smallest > 1e8f ? -1.0f : smallest, worstOut);
+    }
+    // The probe must be able to see a bound target at all, or every number above is a zero that
+    // means "this never ran" rather than "this never failed".
+    CHECK(held > 0);
+#endif
+}

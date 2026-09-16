@@ -844,6 +844,103 @@ void WorldEditPanel::drawParentOffset(app::Engine& engine, WorldEditor& editor, 
     ImGui::Separator();
 }
 
+// The emitter's own shape, for a `particles` node.
+//
+// There was no UI for any of this. A particle emitter's radius, spawn rate, spread and size were
+// reachable only as raw rows in the Parameters list -- and only at the Intermediate authoring layer
+// or above, because `particles/` is not a Beginner prefix, so at the default layer they were not
+// visible anywhere in the application at all. "Where do I set the width of the beam" had no answer.
+//
+// What is edited is the parameter, which is a MULTIPLIER over the authored value
+// (`extent = rest.extent * param`, scene/particles.cpp). The control shows metres, because a
+// multiplier is not what anybody is thinking in: the number typed is the radius the emitter will
+// have, and the multiplier it implies is written underneath. The authored value stays where the
+// scene put it, so this is a live adjustment rather than a re-authoring -- which is also the only
+// form the undo system supports, since `EditCommand` carries parameter changes and whole nodes but
+// has no entry for "a node's payload changed".
+void WorldEditPanel::drawParticleSettings(app::Engine& engine, WorldEditor& editor, const std::string& node) {
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        return;
+    }
+    const scene::CompositionNode* object = composition->findNode(node);
+    if (object == nullptr || object->kind != scene::NodeKind::Particles) {
+        return;
+    }
+    const scene::ParticleSystem& rest = object->particles;
+    const std::string base = "particles/" + node + "/";
+
+    // One undo step per drag, the same coalescing the gizmo and the parent offset use.
+    const auto drag = [&](const char* leaf, const char* label, float value, float lo, float hi,
+                          const char* fmt, const char* tip) -> std::optional<float> {
+        params::IParameter* p = engine.params().find(base + leaf);
+        if (p == nullptr) {
+            return std::nullopt;
+        }
+        ImGui::SetNextItemWidth(-110.0f);
+        float v = value;
+        const bool edited = ImGui::DragFloat(label, &v, (hi - lo) * 0.002f, lo, hi, fmt);
+        if (ImGui::IsItemHovered() && tip != nullptr) {
+            ImGui::SetTooltip("%s", tip);
+        }
+        if (ImGui::IsItemActivated()) {
+            editor.history().beginDrag(engine, fmt::format("{} {}", label, node),
+                                       std::vector<std::string>{base + leaf},
+                                       std::vector<std::string>{node});
+        }
+        if (ImGui::IsItemDeactivatedAfterEdit() && editor.history().dragging()) {
+            editor.history().commitDrag(engine);
+        }
+        return edited ? std::optional<float>(v) : std::nullopt;
+    };
+
+    // Named here rather than by exporting `shapeName` out of composition.cpp for a label: the
+    // serialiser's spelling is a file format and this is a caption, and tying the two together
+    // would mean a rename in one silently changing the other.
+    const char* shape = "emitter";
+    switch (rest.shape) {
+    case scene::EmitterShape::Point: shape = "point"; break;
+    case scene::EmitterShape::Sphere: shape = "sphere"; break;
+    case scene::EmitterShape::Disc: shape = "disc"; break;
+    case scene::EmitterShape::Box: shape = "box"; break;
+    case scene::EmitterShape::Spline: shape = "spline"; break;
+    }
+    ImGui::TextColored(ImVec4(0.55f, 0.85f, 1.0f, 1.0f), "particles -- %s emitter", shape);
+
+    // Radius in metres rather than as the multiplier it writes. A disc's radius is extent.x; a
+    // sphere's is the same field, which is why one control serves both.
+    if (params::IParameter* p = engine.params().find(base + "extent")) {
+        const float authored = std::max(rest.extent.x, 1e-4f);
+        const float metres = authored * p->finalComponent(0);
+        if (const auto edited = drag("extent", "radius", metres, 0.05f, authored * 8.0f, "%.2f m",
+                                     "How wide the emitter is, in metres.\n\n"
+                                     "Written as a multiple of the size the scene authored, so the "
+                                     "authored value stays put and this rides on top of it -- which "
+                                     "is what makes it keyable and modulatable like anything else.")) {
+            ui::setBaseComponents(engine, base + "extent", {*edited / authored});
+        }
+    }
+    if (params::IParameter* p = engine.params().find(base + "spawnRate")) {
+        if (const auto edited = drag("spawnRate", "spawn rate", p->finalComponent(0), 0.0f, 20000.0f,
+                                     "%.0f /s", "Particles emitted per second.")) {
+            ui::setBaseComponents(engine, base + "spawnRate", {*edited});
+        }
+    }
+    if (params::IParameter* p = engine.params().find(base + "spread")) {
+        if (const auto edited = drag("spread", "spread", p->finalComponent(0), 0.0f, 3.2f, "%.3f rad",
+                                     "The cone the emitter fires into. 0 is a straight column.")) {
+            ui::setBaseComponents(engine, base + "spread", {*edited});
+        }
+    }
+    if (params::IParameter* p = engine.params().find(base + "size")) {
+        if (const auto edited = drag("size", "particle size", p->finalComponent(0), 0.01f, 8.0f, "%.2fx",
+                                     "A multiplier over the authored particle size.")) {
+            ui::setBaseComponents(engine, base + "size", {*edited});
+        }
+    }
+    ImGui::Separator();
+}
+
 void WorldEditPanel::drawObjectSettings(app::Engine& engine, WorldEditor& editor, const std::string& node) {
     scene::Composition* composition = engine.composition();
     if (composition == nullptr) {
@@ -863,6 +960,7 @@ void WorldEditPanel::drawObjectSettings(app::Engine& engine, WorldEditor& editor
     // world position is the parent's transform times this. So an offset typed here survives the
     // parent moving, which is the whole reason the emitter was parented rather than placed.
     drawParentOffset(engine, editor, node);
+    drawParticleSettings(engine, editor, node);
 
     const auto& heroes = composition->heroes();
     const auto it = std::find_if(heroes.begin(), heroes.end(),
