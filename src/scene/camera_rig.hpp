@@ -201,6 +201,20 @@ struct CameraShot {
     bool locked = false;
     std::string label;         // optional, for the sequencer lane
 
+    // Who wrote this shot (ADR-249).
+    //
+    // The Auto-director's Song Mode writes camera shots -- that is how it uses the multi-camera
+    // system instead of building a second one -- and the moment two authors write to one list, the
+    // list needs to say which is which. Without it, re-directing would either erase a person's own
+    // shots or pile a second cut on top of the first, and both of those are the failure
+    // `installSequence` already refuses to make on the timeline: everything the director owns goes,
+    // everything else stays.
+    //
+    // `Authored` is the default and is not serialised, so every project written before this exists
+    // reads back byte-identical and every shot in it is a person's.
+    enum class Origin : std::uint8_t { Authored, Directed };
+    Origin origin = Origin::Authored;
+
     [[nodiscard]] bool contains(double seconds) const {
         return seconds >= startSeconds && seconds < endSeconds;
     }

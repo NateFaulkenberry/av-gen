@@ -227,3 +227,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [244](ADR-244-section-7-found-nothing-to-fix.md) | §7 found nothing to fix, and that moved the bottleneck (cinematic lighting reviewed; authoring ergonomics promoted) | Accepted |
 | [245](ADR-245-a-camera-is-not-the-camera.md) | A camera is not *the* camera (multiple cameras, authored shots, event-driven cuts, and the one published active camera) | Accepted |
 | [246](ADR-246-the-preview-is-not-a-picture-of-the-render.md) | The preview is not a picture of the render, it is the render (output preview, the output frame in the canvas, safe areas) | Accepted |
+| [249](ADR-249-a-section-says-what-it-wants-not-which-camera.md) | A section says what it wants, not which camera (Song Mode: semantic shot intents, multi-camera execution, and variation that is not randomness) | Accepted |

@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <span>
 #include <cmath>
 #include <numbers>
 #include <utility>
@@ -267,6 +268,8 @@ const char* directorModeName(DirectorMode mode) {
         return "continuous";
     case DirectorMode::EditedSequence:
         return "edited";
+    case DirectorMode::Song:
+        return "song";
     }
     return "continuous";
 }
@@ -278,7 +281,16 @@ std::optional<DirectorMode> directorModeFromName(std::string_view name) {
     if (name == "edited" || name == "edited-sequence") {
         return DirectorMode::EditedSequence;
     }
+    if (name == "song" || name == "song-mode") {
+        return DirectorMode::Song;
+    }
     return std::nullopt;
+}
+
+std::span<const DirectorMode> allDirectorModes() {
+    static constexpr std::array<DirectorMode, 3> kModes{
+        DirectorMode::ContinuousShot, DirectorMode::EditedSequence, DirectorMode::Song};
+    return kModes;
 }
 
 const char* shotKindName(ShotKind k) {
@@ -1466,6 +1478,13 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
         return fail("the hero '{}' has a radius of {}; distances are in radii, so a hero with no "
                     "size has no film",
                     brief.hero.name, brief.hero.radius);
+    }
+    if (brief.mode == DirectorMode::Song) {
+        // Refused rather than treated as Edited. Song Mode reads an authored plan and this function
+        // reads a fold of the audio -- they are different inputs, and quietly directing the wrong
+        // one would look like Song Mode working and produce a film nobody authored (ADR-249).
+        return fail("Song Mode is directed from the song's own section plan, not from a fold of the "
+                    "audio: call directSong() rather than directFromStructure()");
     }
 
     const auto spans = groupSections(structure, brief);

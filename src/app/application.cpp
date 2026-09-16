@@ -147,10 +147,14 @@ std::string usageText() {
            "  --generate <file>   compose a world from a recipe (see examples/recipes/) at start-up\n"
            "  --direct            cut the camera to the loaded track: folds the audio into\n"
            "                      musical sections and shoots the world's heroes\n"
-           "  --director <k=v,..> --direct with the Auto-director panel's settings: mode=continuous|edited,\n"
-           "                      minShot, minBuildShot, maxShot (s), wide, hero (mm), maxSpeed (m/s),\n"
-           "                      maxSwing (deg/s), dwell (shots), seed,\n"
+           "  --director <k=v,..> --direct with the Auto-director panel's settings:\n"
+           "                      mode=continuous|edited|song, autonomy=locked|guided|expressive,\n"
+           "                      minShot, minBuildShot, maxShot (s), maxSpeed (m/s),\n"
+           "                      maxSwing (deg/s), dwell (shots), seed\n"
+           "  --song-plan <file>  load a song plan (sections and shot intents) for mode=song\n"
            "  --save-project <f>  write the project on exit\n"
+           "  --save-scene <f>    write the scene on exit (the camera collection and its shot\n"
+           "                      track live here, not in the project)\n"
            "  --play              start playback immediately\n"
            "  --frames <n>        exit after n frames\n"
            "  --stress <seed>     apply random slider-like actions every frame (seek, params, routes, volume)\n"
@@ -359,6 +363,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             options.directorSettings = *v;
             options.directCamera = true;
             ++i;
+        } else if (arg == "--song-plan") {
+            auto v = need(i, "--song-plan");
+            if (!v) return std::unexpected(v.error());
+            options.songPlan = *v;
+            ++i;
         } else if (arg == "--generate") {
             auto v = need(i, "--generate");
             if (!v) return std::unexpected(v.error());
@@ -368,6 +377,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--save-project");
             if (!v) return std::unexpected(v.error());
             options.saveProject = *v;
+            ++i;
+        } else if (arg == "--save-scene") {
+            auto v = need(i, "--save-scene");
+            if (!v) return std::unexpected(v.error());
+            options.saveScene = *v;
             ++i;
         } else if (arg == "--capture") {
             auto v = need(i, "--capture");
@@ -1366,6 +1380,19 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // director with no scene at all and failed with "--direct needs a scene; load a project or
         // generate a world first" every single time. The flag worked only for `--project` and
         // `--generate`, which is not what its own usage line claims.
+        //
+        // The project's own Auto-director settings first, and the command line's over the top of
+        // them. `syncDirectorSettings()` is what normally carries a loaded project's settings onto
+        // this copy, and it runs *below* -- so before this line, `--project p.json --direct` on a
+        // project that had saved a shot mode directed with the defaults and silently produced a
+        // different film from the one the file describes. The same shape of bug as the missing
+        // `settings` argument ADR-225 records, in the other direction.
+        //
+        // Only here, and deliberately not inside `directCameraFromTrack()`: on the interactive path
+        // that function is called by the panel *while a slider is being dragged*, and the engine's
+        // copy has not caught up yet -- taking it there would throw the drag away.
+        cameraDirection_.settings = engine_->autoDirector();
+        lastDirectorSync_ = cameraDirection_.settings;
         if (auto r = directCameraFromTrack(); !r) {
             log::error("direct: {}", r.error().message);
             if (options.headless) {
@@ -2500,13 +2527,24 @@ Result<void> applyDirectorArgs(AutoDirectorSettings& s, std::string_view spec) {
         };
         double v = 0.0;
         if (key == "mode") {
-            if (value == "continuous") {
-                s.mode = DirectorMode::ContinuousShot;
-            } else if (value == "edited") {
-                s.mode = DirectorMode::EditedSequence;
-            } else {
-                return fail("--director: mode must be 'continuous' or 'edited', got '{}'", value);
+            // Through the same table the panel and the project file use, so one setting has one
+            // spelling however it arrives.
+            const auto parsed = directorModeFromName(value);
+            if (!parsed) {
+                return fail("--director: mode must be 'continuous', 'edited' or 'song', got '{}'",
+                            value);
             }
+            s.mode = *parsed;
+            continue;
+        }
+        if (key == "autonomy") {
+            const auto parsed = autonomyFromName(value);
+            if (!parsed) {
+                return fail("--director: autonomy must be 'locked', 'guided' or 'expressive', got "
+                            "'{}'",
+                            value);
+            }
+            s.autonomy = *parsed;
             continue;
         }
         if (auto ok = number(v); !ok) {
@@ -2543,6 +2581,29 @@ Result<void> Application::directCameraFromTrack() {
         if (auto ok = applyDirectorArgs(cameraDirection_.settings, options_.directorSettings); !ok) {
             return std::unexpected(ok.error());
         }
+    }
+    // ADR-249. Loaded here rather than at start-up because a plan belongs to the piece that is
+    // loaded, and `--project` has already run by the time this is called -- so a plan on the command
+    // line replaces the project's rather than being replaced by it, which is the way round a person
+    // typing one expects.
+    if (options_.songPlan) {
+        std::ifstream in(*options_.songPlan);
+        if (!in) {
+            return fail("--song-plan: cannot open {}", options_.songPlan->string());
+        }
+        nlohmann::json doc;
+        try {
+            in >> doc;
+        } catch (const std::exception& e) {
+            return fail("--song-plan {}: {}", options_.songPlan->string(), e.what());
+        }
+        auto plan = songPlanFromJson(doc);
+        if (!plan) {
+            return std::unexpected(plan.error());
+        }
+        log::info("song plan: {} section(s) from {}", plan->sections.size(),
+                  options_.songPlan->string());
+        engine_->songPlan() = std::move(*plan);
     }
     // Heroes come from whichever source the world has one. An authored scene declares them
     // (ADR-074); a generated world's composer places them (ADR-072). Preferring the scene's own is
@@ -2589,6 +2650,13 @@ int Application::run() {
             return code == 0 ? 6 : code;
         }
         log::info("project saved to {}", options_.saveProject->string());
+    }
+    if (options_.saveScene) {
+        if (auto r = engine_->saveComposition(*options_.saveScene); !r) {
+            log::error("save scene: {}", r.error().message);
+            return code == 0 ? 6 : code;
+        }
+        log::info("scene saved to {}", options_.saveScene->string());
     }
     if (options_.bundle) {
         if (auto r = engine_->exportBundle(*options_.bundle); !r) {

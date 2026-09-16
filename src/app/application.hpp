@@ -79,7 +79,15 @@ struct AppOptions {
     // the only other way to set these, so before this flag nothing about the director could be
     // measured, reproduced or regression-tested without a human at a GUI.
     std::string directorSettings;
+    // `--song-plan <file>`: the song plan Song Mode directs to (ADR-249), for a run whose project
+    // does not carry one. The same reason `--director` exists: a mode that can only be reached
+    // through a GUI is a mode nobody can measure, reproduce or regression-test.
+    std::optional<std::filesystem::path> songPlan;
     std::optional<std::filesystem::path> saveProject;  // write on exit
+    // `--save-scene <file>`: write the composition on exit, the symmetry `--save-project`
+    // has always lacked. Needed by Song Mode (ADR-249), whose camera track lives in the
+    // *scene* document (ADR-245) and therefore cannot be persisted by saving the project.
+    std::optional<std::filesystem::path> saveScene;
     bool autoplay = false;
     int frames = -1; // exit after this many frames (-1 = run until closed)
     std::uint64_t stressSeed = 0; // > 0: apply random UI-like actions every frame (crash reproduction)
