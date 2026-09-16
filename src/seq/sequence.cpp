@@ -1644,6 +1644,11 @@ json Sequence::toJson() const {
         if (!s.tracks.empty()) {
             j["tracks"] = tracksToJson(s.tracks);
         }
+        // Written only for a directed shot, so a hand-authored project gains nothing it did not
+        // have, and the absence of the key means what it looks like it means.
+        if (s.origin == Shot::Origin::Directed) {
+            j["origin"] = "directed";
+        }
         shotsJson.push_back(std::move(j));
     }
     json actorsJson = json::array();
@@ -1750,6 +1755,8 @@ Result<Sequence> Sequence::fromJson(const json& j) {
             s.startSeconds = readNumber(e, "start", 0.0);
             s.durationSeconds = readNumber(e, "duration", 8.0);
             s.scene = readString(e, "scene");
+            s.origin = readString(e, "origin") == "directed" ? Shot::Origin::Directed
+                                                             : Shot::Origin::Authored;
             if (const auto cam = e.find("camera"); cam != e.end()) {
                 auto parsed = cameraFromJson(*cam);
                 if (!parsed) {

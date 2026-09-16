@@ -504,12 +504,100 @@ Result<SongDirection> directSongFromPlan(std::span<const world::HeroPoint> heroe
 
 Result<std::size_t> installSongDirection(Engine& engine, const SongDirection& direction,
                                          const AutoDirectorSettings& settings) {
-    // The framing half first: if the bake is refused, nothing has touched the camera track and the
-    // scene is exactly as it was.
-    auto installed = installSequence(engine, direction.sequence, settings);
-    if (!installed) {
-        return std::unexpected(installed.error());
+    // **The framing half becomes real shots on the sequencer, not a private bake.**
+    //
+    // This used to call `installSequence(engine, direction.sequence, …)`, which takes a sequence the
+    // engine does not own, bakes it straight to timeline tracks, and throws the shot objects away.
+    // The camera moved correctly and the Shots lane stayed empty, so the generated edit existed only
+    // as keyframes and a list in the Auto-director panel -- nothing a person could select, drag,
+    // trim, split or replace.
+    //
+    // Now the director's shots are converted into ordinary `seq::Shot`s and put in the engine's own
+    // sequence, which is then installed by the **same call a manual edit makes**
+    // (`Engine::installSequence`). A generated shot is an ordinary shot: same type, same lane, same
+    // editing, same serialization, same bake. The only thing that marks it is `Origin::Directed`,
+    // and that exists solely so re-directing can replace its own work and leave a person's alone.
+    //
+    // The conversion is faithful rather than approximate, because the sequencer's shot model was
+    // built to hold exactly this: `ShotCamera::move` IS an `app::Shot`, and `seq::install` bakes a
+    // `CameraKind::Move` shot by sampling the same `cameraAt`/`targetAt` the old path sampled.
+    seq::Sequence piece = engine.sequence();
+    const std::size_t authored =
+        static_cast<std::size_t>(std::count_if(piece.shots.begin(), piece.shots.end(),
+                                               [](const seq::Shot& s) {
+                                                   return s.origin == seq::Shot::Origin::Authored;
+                                               }));
+    std::erase_if(piece.shots, [](const seq::Shot& s) {
+        return s.origin == seq::Shot::Origin::Directed;
+    });
+    for (std::size_t i = 0; i < direction.sequence.shots.size(); ++i) {
+        const Shot& move = direction.sequence.shots[i];
+        seq::Shot shot;
+        // Named for the decision that produced it, so the lane reads as the film rather than as
+        // "Shot 7" -- "Chorus 2 · UFO Watch" tells a person what they are looking at.
+        shot.name = i < direction.decisions.size()
+                        ? fmt::format("{} · {}", direction.decisions[i].sectionLabel,
+                                      direction.decisions[i].cameraName)
+                        : move.name;
+        shot.startSeconds = move.startSeconds;
+        shot.durationSeconds = move.durationSeconds;
+        shot.camera.kind = seq::CameraKind::Move;
+        shot.camera.move = move;
+        shot.origin = seq::Shot::Origin::Directed;
+        piece.shots.push_back(std::move(shot));
     }
+    // In time order, so the lane reads left to right.
+    std::stable_sort(piece.shots.begin(), piece.shots.end(),
+                     [](const seq::Shot& a, const seq::Shot& b) {
+                         return a.startSeconds < b.startSeconds;
+                     });
+
+    // **Directed shots yield to authored ones**, because `Sequence::validate` refuses an overlap
+    // outright -- "two cameras at once is not something a single-camera engine can honour" -- and a
+    // director that emitted one would make the whole install fail rather than produce a film.
+    //
+    // A person's shot is the fixed point and the generated film parts around it: a directed shot
+    // overlapping one is trimmed to the gap, and dropped if what remains is too short to be a shot.
+    // The alternative -- trimming the person's work to fit the machine's -- is the wrong way round.
+    for (const seq::Shot& fixed : piece.shots) {
+        if (fixed.origin != seq::Shot::Origin::Authored) {
+            continue;
+        }
+        for (seq::Shot& shot : piece.shots) {
+            if (shot.origin != seq::Shot::Origin::Directed) {
+                continue;
+            }
+            const double start = shot.startSeconds;
+            const double end = shot.endSeconds();
+            if (end <= fixed.startSeconds || start >= fixed.endSeconds()) {
+                continue;   // no overlap
+            }
+            if (start < fixed.startSeconds) {
+                seq::trimShotEnd(shot, fixed.startSeconds, 0.0);   // keep the part before
+            } else if (end > fixed.endSeconds()) {
+                seq::trimShotStart(shot, fixed.endSeconds(), end, 0.0);   // keep the part after
+            } else {
+                shot.durationSeconds = 0.0;   // wholly inside: nothing survives
+            }
+        }
+    }
+    const std::size_t crowded = static_cast<std::size_t>(
+        std::count_if(piece.shots.begin(), piece.shots.end(), [](const seq::Shot& s) {
+            return s.origin == seq::Shot::Origin::Directed &&
+                   s.durationSeconds < seq::kMinShotSeconds;
+        }));
+    std::erase_if(piece.shots, [](const seq::Shot& s) {
+        return s.origin == seq::Shot::Origin::Directed && s.durationSeconds < seq::kMinShotSeconds;
+    });
+    if (crowded > 0) {
+        log::info("song director: {} directed shot(s) gave way to authored ones", crowded);
+    }
+    const std::size_t generated = piece.shots.size() - authored;
+    if (auto ok = engine.setSequence(std::move(piece)); !ok) {
+        return std::unexpected(ok.error());
+    }
+    log::info("song director: {} shot(s) on the sequencer ({} authored kept)", generated, authored);
+    const std::size_t installedCount = generated;
     scene::Composition* composition = engine.composition();
     if (composition == nullptr) {
         return fail("Song Mode needs a scene to put its camera track on");
@@ -542,7 +630,7 @@ Result<std::size_t> installSongDirection(Engine& engine, const SongDirection& di
     for (const SongDecision& decision : direction.decisions) {
         log::info("song director: {}", decision.line());
     }
-    return *installed;
+    return installedCount;
 }
 
 Result<std::size_t> directEngine(Engine& engine, std::span<const world::HeroPoint> heroes,

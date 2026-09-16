@@ -181,6 +181,13 @@ struct Transition {
 // slot and differ only in camera, lighting or which of the scene's parameters they animate, which
 // is what makes reusing an expensive environment cheap.
 struct Shot {
+    // Who made this shot. The artist cannot tell the difference and is not meant to -- a directed
+    // shot is an ordinary shot in every respect, editable, serialized and undoable like any other.
+    // This exists for exactly one purpose: so re-running the director replaces the shots IT made and
+    // leaves the ones a person made or edited, which is the same rule `scene::CameraShot::Origin`
+    // already follows on the camera track (ADR-245).
+    enum class Origin : std::uint8_t { Authored, Directed };
+
     std::string name;
     double startSeconds = 0.0;
     double durationSeconds = 8.0;
@@ -191,6 +198,7 @@ struct Shot {
     // spec 17: arbitrary scene parameters animated within this shot. Key times are relative to the
     // shot start, so a shot can be moved without rewriting its automation.
     std::vector<params::Track> tracks;
+    Origin origin = Origin::Authored;
 
     [[nodiscard]] double endSeconds() const { return startSeconds + durationSeconds; }
 };
