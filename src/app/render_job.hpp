@@ -107,6 +107,9 @@ private:
     // rg is the encoded normal and b is roughness, and the result is xyz world normal with the
     // roughness moved into alpha -- which is the layout the name `normal` promises.
     static void decodeNormalRoughness(gpu::ImageF& image);
+    // ADR-251: box-average a supersampled HDR frame down to the output size. Not static: it needs
+    // `settings_.width`/`height` to know what it is resolving to.
+    void resolveToOutput(gpu::ImageF& image);
     [[nodiscard]] Result<void> renderOne();
     // Hands completed readbacks to the encoders; `all` waits for every frame in flight first.
     [[nodiscard]] Result<void> drain(bool all);

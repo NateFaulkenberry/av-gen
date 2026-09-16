@@ -550,3 +550,108 @@ TEST_CASE("an AOV export is refused where it cannot be resolved", "[render][aov]
     s.aovs.clear();
     CHECK(s.validate().has_value());
 }
+
+// ADR-251. A supersampled EXR was the top-left QUARTER of the frame, at the right size and in the
+// right format, so nothing about the file said it was wrong.
+//
+// The assertion that catches it is a *positional* one. "The supersampled frame differs from the
+// plain one" passes against the bug -- a crop differs too. What only the correct image can do is
+// agree with the plain render everywhere at once: a crop matches one corner and disagrees with the
+// rest, so comparing the whole frame against the whole frame is what separates them.
+TEST_CASE("a supersampled EXR is the whole frame, not a corner of it", "[gpu][render][exr][scale]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+
+    struct Frame {
+        std::uint32_t width = 0;
+        std::uint32_t height = 0;
+        std::vector<float> rgba;
+        [[nodiscard]] const float* pixel(std::uint32_t x, std::uint32_t y) const {
+            return rgba.data() + (static_cast<std::size_t>(y) * width + x) * 4;
+        }
+    };
+    const auto render = [&](const fs::path& dir, float supersample) {
+        auto settings = smallSettings(dir);
+        settings.output = app::RenderOutput::ExrSequence;
+        settings.supersample = supersample;
+        app::RenderJob job(*ctx, shaders, loadOffline(f.project), settings, f.dir);
+        REQUIRE(job.start().has_value());
+        REQUIRE(job.run().has_value());
+        CHECK(job.progress().error.empty());
+        auto image = assets::readExr(dir / "frame_000000.exr");
+        REQUIRE(image.has_value());
+        Frame out;
+        out.width = image->width;
+        out.height = image->height;
+        const std::span<const float> pixels = assets::floatPixels(*image);
+        out.rgba.assign(pixels.begin(), pixels.end());
+        return out;
+    };
+
+    const Frame plain = render(f.dir / "exr-plain", 1.0f);
+    const Frame scaled = render(f.dir / "exr-ss2", 2.0f);
+
+    // Same file shape either way: supersampling is a sampling rate, not an output size.
+    CHECK(scaled.width == plain.width);
+    CHECK(scaled.height == plain.height);
+    REQUIRE(scaled.rgba.size() == plain.rgba.size());
+
+    // **Where the light is**, as a luminance-weighted centroid in normalised frame coordinates.
+    //
+    // This is the measure the defect actually calls for. The first version of this test compared
+    // radiance channel by channel and failed at 58% -- correctly, because a supersampled render is
+    // *supposed* to differ from a plain one at every antialiased edge, and an absolute threshold of
+    // 0.05 on HDR values reaching 10.0 flags all of them. That measured resolving, not framing.
+    //
+    // A crop does something a resolve never does: it moves the content. Magnifying the top-left
+    // quarter about the origin drags the centre of light toward the corner, and no amount of extra
+    // sampling does that.
+    const auto centroid = [](const Frame& image) {
+        double sum = 0.0;
+        double cx = 0.0;
+        double cy = 0.0;
+        for (std::uint32_t y = 0; y < image.height; ++y) {
+            for (std::uint32_t x = 0; x < image.width; ++x) {
+                const float* px = image.pixel(x, y);
+                const double l = 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2];
+                sum += l;
+                cx += l * (static_cast<double>(x) + 0.5);
+                cy += l * (static_cast<double>(y) + 0.5);
+            }
+        }
+        REQUIRE(sum > 0.0);
+        return std::pair{cx / sum / image.width, cy / sum / image.height};
+    };
+    const auto [px, py] = centroid(plain);
+    const auto [sx, sy] = centroid(scaled);
+
+    // **The control arm, synthesised here rather than assumed.** A peak-brightness guard could not
+    // do this job on this fixture -- the bright orb sits near the top-left, so the quarter's peak is
+    // 9.81 against the whole frame's 10.08 and a crop would have passed on luck. So the crop the
+    // defect produced is built from the good frame and measured with the same instrument. If it does
+    // not move the centroid, the assertion below cannot detect the bug and the test is vacuous.
+    Frame cropped;
+    cropped.width = plain.width;
+    cropped.height = plain.height;
+    cropped.rgba.resize(plain.rgba.size());
+    for (std::uint32_t y = 0; y < cropped.height; ++y) {
+        for (std::uint32_t x = 0; x < cropped.width; ++x) {
+            const float* src = plain.pixel(x / 2, y / 2);
+            float* dst = cropped.rgba.data() + (static_cast<std::size_t>(y) * cropped.width + x) * 4;
+            for (int c = 0; c < 4; ++c) {
+                dst[c] = src[c];
+            }
+        }
+    }
+    const auto [qx, qy] = centroid(cropped);
+    const double cropShift = std::hypot(qx - px, qy - py);
+    INFO("a top-left crop moves the centre of light by " << cropShift << " of the frame");
+    REQUIRE(cropShift > 0.05);   // the instrument can see a crop, so not seeing one means something
+
+    const double shift = std::hypot(sx - px, sy - py);
+    INFO("supersampled centre of light moved " << shift << ", against " << cropShift << " for a crop");
+    CHECK(shift < cropShift / 4.0);
+
+    CHECK(ctx->errorCount() == 0);
+}

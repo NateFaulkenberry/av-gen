@@ -329,6 +329,59 @@ Result<void> RenderJob::start() {
     return {};
 }
 
+// ADR-251: bring a supersampled HDR frame down to the output size.
+//
+// A box average over each output pixel's block of source pixels. Radiance is the ONE thing an
+// average is correct for -- ADR-242 refuses AOVs under supersampling precisely because averaging two
+// normals is not a normal, averaging two identifiers is a third object, and averaging two depths
+// across a silhouette is a surface that is not there. None of that applies to light: the mean of the
+// radiance arriving over a pixel's footprint IS the radiance of that pixel, which is what
+// supersampling was doing for the LDR path on the GPU all along.
+//
+// On the CPU because there is no pass to put it in -- the EXR path is a copy, not a draw -- and
+// because ADR-212 has already established that an offline render may spend pixels. It runs once per
+// frame on the readback thread, not on the GPU's critical path.
+//
+// A non-integer ratio is not resolved and not silently approximated: the frame is left alone and the
+// caller writes what the renderer produced, because a half-pixel box is a different filter and
+// guessing which one is how a wrong image ships looking right.
+void RenderJob::resolveToOutput(gpu::ImageF& image) {
+    if (image.rgba.empty() || image.width == settings_.width) {
+        return;
+    }
+    if (image.width < settings_.width || image.height < settings_.height ||
+        image.width % settings_.width != 0 || image.height % settings_.height != 0) {
+        log::warn("render: a {}x{} HDR frame does not resolve evenly to {}x{}; writing it unresolved",
+                  image.width, image.height, settings_.width, settings_.height);
+        return;
+    }
+    const std::uint32_t bx = image.width / settings_.width;
+    const std::uint32_t by = image.height / settings_.height;
+    const float inv = 1.0f / static_cast<float>(bx * by);
+    gpu::ImageF out;
+    out.width = settings_.width;
+    out.height = settings_.height;
+    out.rgba.resize(static_cast<std::size_t>(out.width) * out.height * 4);
+    for (std::uint32_t y = 0; y < out.height; ++y) {
+        for (std::uint32_t x = 0; x < out.width; ++x) {
+            float acc[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+            for (std::uint32_t sy = 0; sy < by; ++sy) {
+                const float* row = image.pixel(x * bx, y * by + sy);
+                for (std::uint32_t sx = 0; sx < bx; ++sx) {
+                    for (int c = 0; c < 4; ++c) {
+                        acc[c] += row[sx * 4 + c];
+                    }
+                }
+            }
+            float* dst = out.rgba.data() + (static_cast<std::size_t>(y) * out.width + x) * 4;
+            for (int c = 0; c < 4; ++c) {
+                dst[c] = acc[c] * inv;
+            }
+        }
+    }
+    image = std::move(out);
+}
+
 void RenderJob::decodeNormalRoughness(gpu::ImageF& image) {
     // The inverse of `octEncode`, matching shaders/common.wgsl line for line. Done here rather than
     // in a shader because there is no pass to put it in: the export is a copy, not a draw, and a
@@ -428,7 +481,21 @@ Result<void> RenderJob::renderOne() {
     const bool exr = settings_.output == RenderOutput::ExrSequence;
     const auto& source = exr ? renderer_->hdrOutputTexture() : ldr_;
     const auto format = exr ? gpu::ReadbackRing::Format::Rgba16Float : gpu::ReadbackRing::Format::Rgba8;
-    if (auto r = ring_->enqueue(encoder, source, settings_.width, settings_.height, rendered_, format); !r) {
+    // ADR-251: read the SOURCE's own extent, not the output's.
+    //
+    // `ldr_` is created at the output size, so for a video or PNG render these are the same number
+    // and this changes nothing. The HDR texture is not: `resize()` sizes it to `output *
+    // renderScale`, so under ADR-212's supersampling it is twice the output in each axis -- and
+    // copying `settings_.width x settings_.height` out of it took the TOP-LEFT QUARTER. The file was
+    // the right size, the right format, scene-linear and full of the wrong part of the picture.
+    //
+    // Measured: with `--supersample 2 --format exr`, the frame was bit-exact the top-left quarter of
+    // the same render's unsupersampled frame -- 0 of 57,600 pixels differing on all three channels --
+    // against controls at top-right (4.70% differing), bottom-left (74.93%) and centre (51.93%).
+    // The kept quarter peaked at 0.0069 where the whole frame peaks at 4.0391: it was sky.
+    const std::uint32_t sourceWidth = exr ? source.GetWidth() : settings_.width;
+    const std::uint32_t sourceHeight = exr ? source.GetHeight() : settings_.height;
+    if (auto r = ring_->enqueue(encoder, source, sourceWidth, sourceHeight, rendered_, format); !r) {
         return r;
     }
     // The auxiliary copies go after the beauty enqueue, which finished and submitted the frame's
@@ -462,6 +529,9 @@ Result<void> RenderJob::renderOne() {
 }
 
 void RenderJob::handleFrame(gpu::ReadbackRing::Frame frame) {
+    // The resolve comes BEFORE the hash, because the hash is the deliverable's proof and it has to
+    // describe the frame that is written rather than an intermediate nobody receives.
+    resolveToOutput(frame.imageF);
     lastHash_ = frame.format == gpu::ReadbackRing::Format::Rgba16Float ? gpu::hashImage(frame.imageF)
                                                                        : gpu::hashImage(frame.image);
     sequenceHash_ = (sequenceHash_ ^ lastHash_) * 1099511628211ull;
