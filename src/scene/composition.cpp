@@ -2311,6 +2311,23 @@ std::unique_ptr<CompositionNode> Composition::detachNode(const std::string& name
         return nullptr;
     }
     unregisterNodeParameters(**it);
+    // The entity layer caches RAW POINTERS to a node's transform parameters (`positionParam_` and
+    // its two siblings), and the line above has just destroyed them. Nothing else re-binds:
+    // `Engine::rebind()` re-binds the modulator and the timeline and not the entity world, and
+    // `installEntities()` is a rebuild-time call that a delete does not reach. So an entity driving
+    // a deleted node kept a dangling pointer, and the next `updateBehaviour` wrote through it.
+    //
+    // Reported as "deleting objects crashes the app", and it is a heap-use-after-free: ASan names
+    // `EntityWorld::update` reading a `Parameter<vec3>` freed by `ParameterSet::remove`. It survived
+    // release builds because the freed block usually still held plausible floats -- the two crash
+    // reports it did produce landed in unrelated AppKit timer code, which is what corruption looks
+    // like from the outside.
+    //
+    // `bind()` resolves each pointer by *name* through the parameter set, so a path that has just
+    // been removed resolves to nullptr and the entity is correctly left driving nothing.
+    if (params_ != nullptr) {
+        entityWorld_.bind(*params_, prefix_ + "entity/");
+    }
     const std::string grandParent = (*it)->parent;
     std::unique_ptr<CompositionNode> taken = std::move(*it);
     nodes_.erase(it);

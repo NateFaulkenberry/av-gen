@@ -10,8 +10,14 @@
 // scene long enough for the staging to bind animals, then delete them out from under it and keep
 // stepping.
 //
-// Hidden by default ([.]) only until it is understood; a crash in the suite is worse than a crash
-// in the editor for everyone else's ability to work.
+// The defect, once found: `detachNode` destroys the node's transform parameters, and `EntityWorld`
+// caches RAW POINTERS to them. Nothing re-bound -- `Engine::rebind()` covers the modulator and the
+// timeline, not the entity world -- so the next `updateBehaviour` wrote through a freed pointer.
+//
+// **This test only fails under ASan, and that is the point.** In a release build the freed block
+// still holds plausible floats and the run completes; the corruption surfaces later and somewhere
+// else entirely (both of the owner's crash reports landed in AppKit timer code). Run it with
+// `cmake --build --preset asan --target avgen_tests && ./build/asan/tests/avgen_tests "[delete]"`.
 
 #include "app/engine.hpp"
 #include "scene/composition.hpp"
@@ -32,7 +38,7 @@ std::filesystem::path glowmereProject() {
 }
 } // namespace
 
-TEST_CASE("deleting animals while the scene runs does not crash", "[.delete-crash][editor]") {
+TEST_CASE("deleting animals while the scene runs does not crash", "[editor][delete][regression]") {
 #ifndef AVGEN_SOURCE_DIR
     SKIP("AVGEN_SOURCE_DIR not defined");
 #else
