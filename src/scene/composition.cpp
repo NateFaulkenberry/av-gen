@@ -1400,6 +1400,46 @@ void Composition::applyAimHold(const AimFollow* active) {
         const glm::vec3 delta = hero->position - aimHoldState_.heroAt;
         scene_.camera.position = aimHoldState_.eye + delta;
         scene_.camera.target = aimHoldState_.target + delta;
+        // Frame the PAIR, not just the actor. Everything above keeps the craft exactly where the
+        // cut put it on screen; this puts the body it is working on in frame too, which the
+        // translation alone cannot do because the body is not in it.
+        //
+        // The view *direction* is kept -- the shot's angle on the scene is the cut's decision, and
+        // re-choosing it here would be re-directing rather than holding. Only the aim point and the
+        // distance move: aim at the midpoint, and stand far enough back that the separation fills
+        // `framePair` of the frame.
+        if (aimHold_.framePair > 0.0f) {
+            const std::string_view bound = staging_.binding(aimHold_.scenario, aimHold_.role);
+            const entity::Entity* prey =
+                bound.empty() ? nullptr : entityWorld_.find(std::string(bound));
+            if (prey != nullptr) {
+                const glm::vec3 craft = hero->position;
+                const glm::vec3 body = prey->visualPosition();
+                const glm::vec3 mid = (craft + body) * 0.5f;
+                const glm::vec3 toward = scene_.camera.target - scene_.camera.position;
+                const float reach = glm::length(toward);
+                const float apart = glm::length(craft - body);
+                // Only when there IS a pair to frame. A role binds at `acquire`, when the craft may
+                // still be two hundred metres from its target, and the midpoint of a pair that far
+                // apart is a hundred metres from the actor -- so the hold would spend the whole
+                // approach pointed at empty valley instead of at the craft it exists to hold.
+                //
+                // Measured, by the test that caught it: the worst aim miss after the shot ended went
+                // to 102.97 m against a 41.68 m bound, and ~100 m is exactly half of a long
+                // approach. Clamping the separation for the DISTANCE while taking the TRUE midpoint
+                // for the AIM was the mistake; the two have to agree about when they apply.
+                if (reach > 1e-3f && apart <= aimHold_.framePairMaxSeparation) {
+                    const glm::vec3 dir = toward / reach;
+                    const float separation =
+                        std::max(apart, aimHold_.framePairMinSeparation);
+                    const float halfFov = std::max(scene_.camera.effectiveFovY() * 0.5f, 0.02f);
+                    const float fill = std::clamp(aimHold_.framePair, 0.05f, 1.0f);
+                    const float distance = separation / (2.0f * std::tan(halfFov) * fill);
+                    scene_.camera.target = mid;
+                    scene_.camera.position = mid - dir * distance;
+                }
+            }
+        }
         aimHoldState_.holding = true;
         aimHoldState_.releaseEye = scene_.camera.position;
         aimHoldState_.releaseTarget = scene_.camera.target;

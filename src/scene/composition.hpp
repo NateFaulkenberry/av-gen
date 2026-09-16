@@ -343,6 +343,23 @@ struct AimHold {
     std::string scenario; // a stage::Staging scenario name; "" = the whole feature is off
     std::string role;     // the role whose binding means "engaged"; "" = "target"
     double releaseSeconds = 1.0; // how long the camera takes to rejoin the cut when the hold ends
+    // How much of the frame the actor-to-role separation should fill while the hold is engaged.
+    // 0 keeps the old behaviour exactly -- translate the shot's framing of the ACTOR and let the
+    // role fall where it may.
+    //
+    // It fell badly, and the number is why this exists. Over ten abductions with the hold driving,
+    // 9,709 frames: the animal was ENTIRELY OFF SCREEN for 7,867 of them -- 81% -- and fully in
+    // frame for 15%. With the pair framed: 97% fully in, 1.5% off. The worst excursion went from
+    // 513,014 NDC units outside the frame (a body projecting essentially at the eye plane) to 2.46.
+    //
+    // The cause is arithmetic rather than taste: the hold translates the eye and the target by the
+    // ACTOR's delta, so the craft keeps its screen position and size exactly, and the body hanging
+    // a hover height beneath it appears nowhere in the calculation.
+    float framePair = 0.55f;
+    // The separation is clamped before it sets a distance, so a role bound while it is still two
+    // hundred metres away -- which is every approach -- does not fling the camera to the horizon.
+    float framePairMinSeparation = 6.0f;
+    float framePairMaxSeparation = 45.0f;
 };
 
 class Composition final : public SceneController {

@@ -77,6 +77,8 @@ struct Lift {
     float worstCorner = 0.0f;  // farthest horizontal reach of the body from the beam axis
     float worstOrigin = 0.0f;  // and of the node's own origin, which is the alignment half alone
     float bodyReach = 0.0f;    // the body's own reach from its origin, which is the size half
+    float peakGlow = 0.0f;     // the brightest `emissiveBoost` the lift reached
+    float lastGlow = 0.0f;     // and what it was on the final frame -- the fade has to finish
 };
 
 // One run of the shipped scene with everything the engine does per frame that the director, the
@@ -259,6 +261,15 @@ struct Run {
                 reach = std::max(reach, glm::length(glm::vec2(p.x - origin.x, p.z - origin.z)));
             }
             ++lift.frames;
+            // Does the glow actually reach the animal? The scenario drives `emissiveBoost` on the
+            // bound role over the first 70% of the lift. Sampled here rather than assumed: a `set`
+            // step that resolved to nothing writes a warning and carries on, and a glow nobody can
+            // see is indistinguishable from one that was never applied.
+            if (const params::IParameter* boost =
+                    params.find("nodes/" + std::string(target) + "/emissiveBoost")) {
+                lift.peakGlow = std::max(lift.peakGlow, boost->finalComponent(0));
+                lift.lastGlow = boost->finalComponent(0);
+            }
             lift.beamRadius = beam->extent.x;
             lift.worstCorner = std::max(lift.worstCorner, corner);
             lift.worstOrigin =
@@ -512,4 +523,52 @@ TEST_CASE("A step's anchor and hold round-trip, and default to what existed",
     nlohmann::json broken = doc;
     broken["beats"][0]["cues"][0]["steps"][0]["anchor"] = "wherever";
     CHECK_FALSE(stage::scenarioFromJson(broken).has_value());
+}
+
+// Does the abduction glow actually reach the animal? (the second half of "add an awesome glowing
+// rainbow shader to the animal as its being abducted")
+//
+// The scenario drives `emissiveBoost` on whatever `target` is bound to, rising over
+// `glowRiseSeconds` and falling to zero over `glowFadeSeconds` -- 1.3 s and 1.9 s of a 4.6 s lift,
+// so the glow is spent at 70% of the way up, which is what was asked for.
+//
+// Asserted rather than eyeballed, because a `set` step whose target resolves to nothing logs a
+// warning and carries on: a glow that was never applied and one that is simply dim look identical
+// from outside. The first version of this drove `worldfx/<effect>/intensity`, which the ENGINE
+// registers -- so in a composition built without one, which is how this file drives the director,
+// the path did not exist at all. `emissiveBoost` is a node parameter and exists wherever the animal
+// does.
+TEST_CASE("The abducted animal lights up, and the glow is spent before it arrives",
+          "[stage][abduction][glow]") {
+    Run run(sceneFile());
+    run.play(120.0);
+    REQUIRE_FALSE(run.lifts.empty());
+    // A run ends on whatever frame it ends on, so the last lift is usually still in the air. A
+    // truncated observation is not evidence: the final lift of this run showed peak 3.58 and final
+    // 3.58 over 46 frames, which is a glow caught mid-rise -- and is also exactly what a fade that
+    // never ran would look like. The two are separated by completeness rather than by widening a
+    // bound, because widening it would accept the real defect too.
+    int longest = 0;
+    for (const Lift& l : run.lifts) {
+        longest = std::max(longest, l.frames);
+    }
+    std::vector<const Lift*> complete;
+    for (const Lift& l : run.lifts) {
+        fmt::print("[glow] {:<12} {:3d} frames, peak emissiveBoost {:.2f}, final {:.2f}{}\n",
+                   l.animal, l.frames, l.peakGlow, l.lastGlow,
+                   l.frames >= longest * 9 / 10 ? "" : "   (cut off by the end of the run)");
+        if (l.frames >= longest * 9 / 10) {
+            complete.push_back(&l);
+        }
+    }
+    // Enough complete lifts that "it works sometimes" cannot pass -- which is the shape of the
+    // report this feature came from.
+    REQUIRE(complete.size() >= 5);
+    for (const Lift* l : complete) {
+        INFO(l->animal << " peak " << l->peakGlow << " final " << l->lastGlow);
+        // It reaches the authored brightness rather than a fraction of it...
+        CHECK(l->peakGlow > 4.0f);
+        // ...and it is out before the animal reaches the craft, which is the "fades away" half.
+        CHECK(l->lastGlow < 0.5f);
+    }
 }

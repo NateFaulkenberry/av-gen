@@ -8943,6 +8943,24 @@
       "value": 5.0,
       "min": 0.0,
       "max": 30.0
+     },
+     {
+      "name": "glowIntensity",
+      "value": 6.5,
+      "min": 0.0,
+      "max": 40.0
+     },
+     {
+      "name": "glowRiseSeconds",
+      "value": 1.3,
+      "min": 0.0,
+      "max": 10.0
+     },
+     {
+      "name": "glowFadeSeconds",
+      "value": 1.9,
+      "min": 0.0,
+      "max": 10.0
      }
     ],
     "beats": [
@@ -9145,6 +9163,32 @@
          {
           "kind": "retire",
           "name": "vanish"
+         }
+        ]
+       },
+       {
+        "role": "target",
+        "steps": [
+         {
+          "kind": "set",
+          "name": "glow-rise",
+          "target": "emissiveBoost",
+          "from": 0.0,
+          "to": {
+           "param": "glowIntensity"
+          },
+          "duration": {
+           "param": "glowRiseSeconds"
+          }
+         },
+         {
+          "kind": "set",
+          "name": "glow-fade",
+          "target": "emissiveBoost",
+          "to": 0.0,
+          "duration": {
+           "param": "glowFadeSeconds"
+          }
          }
         ]
        }
