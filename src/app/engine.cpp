@@ -2933,7 +2933,7 @@ void Engine::applySectionActions() {
         }
         auto directed = seq::actionFromEvent(event.what.target, event.what.value, event.what.argument);
         if (!directed) {
-            // Not necessarily a mistake. `section_direction.hpp` says the verb vocabulary belongs to
+            // Not necessarily a mistake. `section_performance.hpp` says the verb vocabulary belongs to
             // the Director layer, and a host that reads `firedEvents()` itself may define verbs this
             // engine has no action for -- `test_sequence_project` does exactly that with `walkTo`.
             // So this says what was skipped and why without calling it broken, once per event id,

@@ -3,6 +3,15 @@
 **Status:** Accepted
 **Date:** 2026-09-16
 
+
+> **Terminology note, added 2026-09-16.** What this ADR calls `SectionDirection` /
+> `SectionDirectionTable` is now `SectionPerformance` / `SectionPerformanceTable`, and its project
+> key is `sectionPerformance`. The rename followed an audit
+> (`docs/investigations/song-director-section-direction-audit.md`) which found the old name was the
+> whole problem: this system produces **character actions** — move, face, pose — and "direction" was
+> read as *camera* direction, so a disabled checkbox about performers looked like a blocked Song
+> Director workflow. The decision recorded below is unchanged; only the names are.
+
 ## Context
 
 AV Gen can analyze a song into sections (ADR-206), let a person edit those sections and keep their

@@ -1,4 +1,4 @@
-#include "seq/section_direction.hpp"
+#include "seq/section_performance.hpp"
 
 #include "seq/song_structure.hpp"
 
@@ -10,11 +10,11 @@
 
 namespace avgen::seq {
 
-SectionDirectionTable defaultSectionDirectionTable() {
-    return [](signals::MusicalSection) -> std::optional<SectionDirection> { return std::nullopt; };
+SectionPerformanceTable defaultSectionPerformanceTable() {
+    return [](signals::MusicalSection) -> std::optional<SectionPerformance> { return std::nullopt; };
 }
 
-GeneratedDirection generateDirectorEvents(const analysis::SongStructure& structure,
+GeneratedDirection generatePerformanceEvents(const analysis::SongStructure& structure,
                                           const GenerationOptions& options) {
     GeneratedDirection out;
     if (!options.table) {
@@ -36,7 +36,7 @@ GeneratedDirection generateDirectorEvents(const analysis::SongStructure& structu
             continue;
         }
         const signals::MusicalSection kind = kinds[i];
-        const std::optional<SectionDirection> direction = options.table(kind);
+        const std::optional<SectionPerformance> direction = options.table(kind);
         if (!direction) {
             declined.insert(kind);
             continue;

@@ -3587,7 +3587,10 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                     "Not a shot list played back. Each section carries a shot *intent* -- how\n"
                     "close, how much movement, how much coverage -- and the same intent gives a\n"
                     "different film the second time it comes round.\n\n"
-                    "Uses every camera you have ticked 'available to the Auto-director'.");
+                    "Uses every camera you have ticked 'available to the Auto-director'.\n\n"
+                    "Needs only an analyzed song -- import audio, tick 'Analyze song structure',\n"
+                    "and this has everything it needs. Performer actions are a separate, optional\n"
+                    "system for what the CAST does; nothing here waits on them.");
             }
 
             const bool song = s.mode == app::DirectorMode::Song;

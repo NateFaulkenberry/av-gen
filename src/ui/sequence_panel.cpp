@@ -13,7 +13,7 @@
 #include "scene/composition.hpp"
 #include "seq/layer_sink.hpp"
 #include "seq/lyrics.hpp"
-#include "seq/section_direction.hpp"
+#include "seq/section_performance.hpp"
 #include "seq/song_structure.hpp"
 #include "song/from_analysis.hpp"
 
@@ -416,30 +416,36 @@ void SequencePanel::drawImportPopup(app::Engine& engine) {
         ImGui::SetTooltip("Find the sections -- intro, verse, chorus -- and lay them on the\n"
                           "timeline, where you can move and rename them.");
     }
-    // The Director decision layer exists now, and so does the thing that applies what it produces
-    // (`seq::actionFromEvent`, `Engine::applySectionActions`). What gates this is no longer whether
-    // the code is written -- it is whether this project has said what a section should MAKE HAPPEN.
+    // **Two systems, and they are not a chain.** Analysis above feeds the Song Director -- sections,
+    // shot intents, cameras -- and needs nothing else to produce a first film. What follows is the
+    // *performer* side: character actions from the same section boundaries, going to the entity
+    // action system and never to a camera.
     //
-    // That table is authored on purpose (ADR-216): `section_direction.hpp` refuses to hold an
-    // opinion about the vocabulary of behaviours, because a built-in table saying *a Drop means the
-    // visitor hovers* would put one scene's cast into a generic seam. So a project with no table
-    // generates nothing, and the checkbox says that rather than producing an empty sequence and
-    // calling it a result.
-    const std::size_t directorRows = engine.sequence().sectionDirection.entries.size();
-    ImGui::BeginDisabled(directorRows == 0);
-    ImGui::Checkbox("Generate initial Director sequence", &generateOnImport_);
+    // They used to sit together with the second one called "Generate initial Director sequence"
+    // (the historical label, kept here only to explain the change),
+    // which made a disabled checkbox about characters read as a blocked camera workflow. The
+    // separator and the heading are the fix: the Song Director path is complete above this line.
+    ImGui::Separator();
+    ImGui::TextDisabled("Performers (optional -- not needed for Song Mode)");
+
+    const std::size_t performerRows = engine.sequence().sectionPerformance.entries.size();
+    ImGui::BeginDisabled(performerRows == 0);
+    ImGui::Checkbox("Generate performer actions", &generateOnImport_);
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        if (directorRows == 0) {
-            ImGui::SetTooltip("This project has no director table yet, so there is nothing to\n"
-                              "generate. A table says what each kind of section should make\n"
-                              "happen -- \"on a Drop, the visitor poses\" -- and lives in the\n"
-                              "project's `sectionDirection`.");
+        if (performerRows == 0) {
+            ImGui::SetTooltip(
+                "Makes characters move, pose and react on section boundaries.\n\n"
+                "This project has no performer rules yet, so there is nothing to generate. Rules\n"
+                "say what a kind of section should make happen -- \"on a Drop, the alien reacts\"\n"
+                "-- and live in the project's `sectionPerformance`.\n\n"
+                "Song Mode does not use these. Analyze above is all the Auto-director needs.");
         } else {
-            ImGui::SetTooltip("Turn each section into a Director event, using this project's\n"
-                              "%zu-row table. Sections whose kind the table does not name are\n"
-                              "skipped, and the panel says which.",
-                              directorRows);
+            ImGui::SetTooltip("Makes characters move, pose and react on section boundaries, using\n"
+                              "this project's %zu rule(s). Sections whose kind the rules do not\n"
+                              "name are skipped, and the panel says which.\n\n"
+                              "Independent of Song Mode, which directs cameras rather than cast.",
+                              performerRows);
         }
     }
     ImGui::Separator();
@@ -2551,10 +2557,10 @@ void SequencePanel::pollStructureAnalysis(app::Engine& engine) {
     // After the markers are refreshed, because a generated event's trigger is a section NAME and the
     // markers are what carry those names -- generating before them would produce events keyed to the
     // previous analysis's sections.
-    if (generateOnImport_ && !piece.sectionDirection.empty()) {
+    if (generateOnImport_ && !piece.sectionPerformance.empty()) {
         seq::GenerationOptions options;
-        options.table = seq::tableFrom(piece.sectionDirection);
-        const seq::GeneratedDirection generated = seq::generateDirectorEvents(piece.structure, options);
+        options.table = seq::tableFrom(piece.sectionPerformance);
+        const seq::GeneratedDirection generated = seq::generatePerformanceEvents(piece.structure, options);
         // Replace what a previous generation left rather than accumulating: pressing Analyze twice
         // must not leave two events per section, and these are identified by their `director.` id
         // prefix precisely so a regeneration can find its own work.

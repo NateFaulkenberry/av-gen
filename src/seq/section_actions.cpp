@@ -24,14 +24,14 @@ std::string knownVerbs() {
 
 } // namespace
 
-const SectionDirection* SectionDirectionSet::find(signals::MusicalSection kind) const {
+const SectionPerformance* SectionPerformanceSet::find(signals::MusicalSection kind) const {
     const auto it = std::find_if(entries.begin(), entries.end(),
-                                 [&](const SectionDirectionEntry& e) { return e.kind == kind; });
+                                 [&](const SectionPerformanceEntry& e) { return e.kind == kind; });
     return it == entries.end() ? nullptr : &it->direction;
 }
 
-Result<void> validate(const SectionDirectionSet& set) {
-    for (const SectionDirectionEntry& entry : set.entries) {
+Result<void> validate(const SectionPerformanceSet& set) {
+    for (const SectionPerformanceEntry& entry : set.entries) {
         const char* kindName = signals::musicalSectionName(entry.kind);
         if (entry.direction.subject.empty()) {
             return fail("section direction for '{}': needs a subject to act on", kindName);
@@ -48,9 +48,9 @@ Result<void> validate(const SectionDirectionSet& set) {
     return {};
 }
 
-nlohmann::json toJson(const SectionDirectionSet& set) {
+nlohmann::json toJson(const SectionPerformanceSet& set) {
     nlohmann::json out = nlohmann::json::array();
-    for (const SectionDirectionEntry& entry : set.entries) {
+    for (const SectionPerformanceEntry& entry : set.entries) {
         nlohmann::json row;
         row["section"] = signals::musicalSectionName(entry.kind);
         row["subject"] = entry.direction.subject;
@@ -71,23 +71,23 @@ nlohmann::json toJson(const SectionDirectionSet& set) {
     return out;
 }
 
-Result<SectionDirectionSet> sectionDirectionSetFromJson(const nlohmann::json& doc) {
-    SectionDirectionSet set;
+Result<SectionPerformanceSet> sectionPerformanceSetFromJson(const nlohmann::json& doc) {
+    SectionPerformanceSet set;
     if (doc.is_null()) {
         return set;
     }
     if (!doc.is_array()) {
-        return fail("sectionDirection must be an array of rows");
+        return fail("sectionPerformance must be an array of rows");
     }
     for (const nlohmann::json& row : doc) {
         if (!row.is_object()) {
-            return fail("sectionDirection: every row must be an object");
+            return fail("sectionPerformance: every row must be an object");
         }
-        SectionDirectionEntry entry;
+        SectionPerformanceEntry entry;
         const std::string section = row.value("section", std::string());
         const auto kind = signals::musicalSectionFromName(section);
         if (!kind) {
-            return fail("sectionDirection: '{}' is not a section kind", section);
+            return fail("sectionPerformance: '{}' is not a section kind", section);
         }
         entry.kind = *kind;
         entry.direction.subject = row.value("subject", std::string());
@@ -103,9 +103,9 @@ Result<SectionDirectionSet> sectionDirectionSetFromJson(const nlohmann::json& do
     return set;
 }
 
-SectionDirectionTable tableFrom(SectionDirectionSet set) {
-    return [set = std::move(set)](signals::MusicalSection kind) -> std::optional<SectionDirection> {
-        if (const SectionDirection* found = set.find(kind)) {
+SectionPerformanceTable tableFrom(SectionPerformanceSet set) {
+    return [set = std::move(set)](signals::MusicalSection kind) -> std::optional<SectionPerformance> {
+        if (const SectionPerformance* found = set.find(kind)) {
             return *found;
         }
         return std::nullopt;

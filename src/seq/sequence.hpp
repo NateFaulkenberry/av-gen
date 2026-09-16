@@ -342,10 +342,10 @@ struct Sequence {
     // to what the camera should do, which is the shot language above. Two different questions about
     // the same boundary, and keeping them apart is why neither had to learn the other's vocabulary.
     //
-    // Empty by default and empty in most projects. `generateDirectorEvents` declines every kind the
+    // Empty by default and empty in most projects. `generatePerformanceEvents` declines every kind the
     // set does not name, so an unauthored project generates nothing -- which is the honest report
     // that nobody has said what a Drop should make happen, rather than a guess dressed as one.
-    SectionDirectionSet sectionDirection;
+    SectionPerformanceSet sectionPerformance;
     // spec 17 of the cinematic world brief: "when X happens, do Y". Most of these stop being
     // events at bake and become keys; the rest are dispatched. seq/events.hpp is the argument.
     std::vector<SequenceEvent> events;

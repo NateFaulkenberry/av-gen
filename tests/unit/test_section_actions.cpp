@@ -8,7 +8,7 @@
 
 #include "entity/action.hpp"
 #include "seq/section_actions.hpp"
-#include "seq/section_direction.hpp"
+#include "seq/section_performance.hpp"
 #include "seq/sequence.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -57,7 +57,7 @@ TEST_CASE("a verb becomes the action the action system already understands", "[s
 }
 
 TEST_CASE("an authored section table round-trips and refuses what it cannot mean", "[seq][section]") {
-    seq::SectionDirectionSet set;
+    seq::SectionPerformanceSet set;
     set.entries.push_back({signals::MusicalSection::Drop,
                            {.subject = "visitor", .verb = "pose", .argument = "hover", .priority = 3}});
     set.entries.push_back(
@@ -65,14 +65,14 @@ TEST_CASE("an authored section table round-trips and refuses what it cannot mean
     REQUIRE(validate(set).has_value());
 
     // ADR-225: a setting the application does not keep is not a setting.
-    const auto restored = seq::sectionDirectionSetFromJson(seq::toJson(set));
+    const auto restored = seq::sectionPerformanceSetFromJson(seq::toJson(set));
     REQUIRE(restored.has_value());
     CHECK(*restored == set);
 
     SECTION("a verb that is not an action kind is refused at load") {
         nlohmann::json doc = seq::toJson(set);
         doc[0]["verb"] = "dance";
-        const auto bad = seq::sectionDirectionSetFromJson(doc);
+        const auto bad = seq::sectionPerformanceSetFromJson(doc);
         REQUIRE_FALSE(bad.has_value());
         CHECK(bad.error().message.find("dance") != std::string::npos);
     }
@@ -80,11 +80,11 @@ TEST_CASE("an authored section table round-trips and refuses what it cannot mean
     SECTION("a section kind that does not exist is refused at load") {
         nlohmann::json doc = seq::toJson(set);
         doc[0]["section"] = "ocean";
-        REQUIRE_FALSE(seq::sectionDirectionSetFromJson(doc).has_value());
+        REQUIRE_FALSE(seq::sectionPerformanceSetFromJson(doc).has_value());
     }
 
     SECTION("a row with no subject is refused: it would generate an event nothing could apply") {
-        seq::SectionDirectionSet orphan;
+        seq::SectionPerformanceSet orphan;
         orphan.entries.push_back({signals::MusicalSection::Chorus, {.subject = "", .verb = "wait"}});
         REQUIRE_FALSE(validate(orphan).has_value());
     }
@@ -92,20 +92,20 @@ TEST_CASE("an authored section table round-trips and refuses what it cannot mean
 
 TEST_CASE("the authored table is what fills the hole, and an empty one still declines",
           "[seq][section]") {
-    // `section_direction.hpp` is explicit that declining is the honest answer until somebody
+    // `section_performance.hpp` is explicit that declining is the honest answer until somebody
     // authors something, and that a table full of guesses would be a second director. Both halves
     // of that are asserted here, because it is a design rule and rules rot silently.
-    const seq::SectionDirectionTable empty = seq::tableFrom(seq::SectionDirectionSet{});
-    const seq::SectionDirectionTable builtIn = seq::defaultSectionDirectionTable();
+    const seq::SectionPerformanceTable empty = seq::tableFrom(seq::SectionPerformanceSet{});
+    const seq::SectionPerformanceTable builtIn = seq::defaultSectionPerformanceTable();
     for (const auto kind : {signals::MusicalSection::Intro, signals::MusicalSection::Drop,
                             signals::MusicalSection::Chorus, signals::MusicalSection::Outro}) {
         CHECK_FALSE(empty(kind).has_value());
         CHECK_FALSE(builtIn(kind).has_value());
     }
 
-    seq::SectionDirectionSet set;
+    seq::SectionPerformanceSet set;
     set.entries.push_back({signals::MusicalSection::Drop, {.subject = "visitor", .verb = "pose"}});
-    const seq::SectionDirectionTable authored = seq::tableFrom(set);
+    const seq::SectionPerformanceTable authored = seq::tableFrom(set);
     REQUIRE(authored(signals::MusicalSection::Drop).has_value());
     CHECK(authored(signals::MusicalSection::Drop)->subject == "visitor");
     // Only what it names. A table that answered for everything would be inventing behaviour.
@@ -154,7 +154,7 @@ TEST_CASE("a fired section event reaches the action system", "[seq][section][int
     entity::Entity* subject = comp->entityWorld().find("rook");
     REQUIRE(subject != nullptr);
 
-    // A scheduled EntityAction at a known second: the exact shape `generateDirectorEvents` emits,
+    // A scheduled EntityAction at a known second: the exact shape `generatePerformanceEvents` emits,
     // built here directly so this case tests the wire rather than the generator (which has its own).
     seq::Sequence sequence = engine.sequence();
     seq::SequenceEvent event;
@@ -190,25 +190,25 @@ TEST_CASE("a fired section event reaches the action system", "[seq][section][int
 #endif
 }
 
-TEST_CASE("an authored director table survives a sequence round-trip", "[seq][section]") {
-    // ADR-225. The table is what makes the "Generate initial Director sequence" checkbox live, so a
+TEST_CASE("an authored performer table survives a sequence round-trip", "[seq][section]") {
+    // ADR-225. The table is what makes the "Generate performer actions" checkbox live, so a
     // table the application does not keep is a checkbox that greys itself out after a save.
     seq::Sequence piece;
     piece.name = "sequence";
-    piece.sectionDirection.entries.push_back(
+    piece.sectionPerformance.entries.push_back(
         {signals::MusicalSection::Drop, {.subject = "visitor", .verb = "pose", .argument = "hover"}});
-    piece.sectionDirection.entries.push_back(
+    piece.sectionPerformance.entries.push_back(
         {signals::MusicalSection::Outro, {.subject = "rook", .verb = "move", .argument = "cairn"}});
 
     const nlohmann::json doc = piece.toJson();
     const auto restored = seq::Sequence::fromJson(doc);
     REQUIRE(restored.has_value());
-    CHECK(restored->sectionDirection == piece.sectionDirection);
+    CHECK(restored->sectionPerformance == piece.sectionPerformance);
 
     SECTION("a project with no table writes no key, rather than an empty array") {
         seq::Sequence bare;
         bare.name = "sequence";
-        CHECK_FALSE(bare.toJson().contains("sectionDirection"));
+        CHECK_FALSE(bare.toJson().contains("sectionPerformance"));
     }
 }
 
@@ -230,7 +230,7 @@ TEST_CASE("the multicam demo's director table is actually read", "[seq][section]
     // "It loaded without an error" is not evidence the table was read: an unknown key is ignored by
     // design, so a table under the wrong name, at the wrong nesting, or spelled differently loads
     // perfectly and does nothing. This asserts the rows arrived.
-    const seq::SectionDirectionSet& table = engine.sequence().sectionDirection;
+    const seq::SectionPerformanceSet& table = engine.sequence().sectionPerformance;
     INFO("rows: " << table.entries.size());
     REQUIRE(table.entries.size() == 7);
 
@@ -238,7 +238,7 @@ TEST_CASE("the multicam demo's director table is actually read", "[seq][section]
     // a list of events nothing can apply -- which looks exactly like the feature being broken.
     scene::Composition* comp = engine.composition();
     REQUIRE(comp != nullptr);
-    for (const seq::SectionDirectionEntry& entry : table.entries) {
+    for (const seq::SectionPerformanceEntry& entry : table.entries) {
         INFO("row for " << signals::musicalSectionName(entry.kind) << ": " << entry.direction.subject
                         << " " << entry.direction.verb << " " << entry.direction.argument);
         CHECK(comp->entityWorld().find(entry.direction.subject) != nullptr);

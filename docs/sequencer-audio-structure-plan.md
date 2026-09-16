@@ -2,7 +2,8 @@
 
 **Status:** **A, B, C and D done** (ADR-215, ADR-216, 2026-09-15). Generation -- the second half of
 D -- is defined as a seam (`seq/section_direction.hpp`) and waits on the Director decision layer
-(`docs/director-poc-plan.md`) to supply a `SectionDirectionTable`. See "What was built" at the foot
+(`docs/director-poc-plan.md`) to supply a `SectionDirectionTable` (renamed `SectionPerformanceTable`
+in 2026-09; see the Song Director audit). See "What was built" at the foot
 of this file.
 **Written:** 2026-09-14
 

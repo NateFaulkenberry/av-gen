@@ -10,7 +10,7 @@
 #include "analysis/structure.hpp"
 #include "app/cinematic.hpp"
 #include "seq/sequence.hpp"
-#include "seq/section_direction.hpp"
+#include "seq/section_performance.hpp"
 #include "seq/song_structure.hpp"
 #include "signals/musical_events.hpp"
 
@@ -438,7 +438,7 @@ TEST_CASE("Every MusicalSection is answered deliberately by all four direction s
 TEST_CASE("Generation produces nothing while the Director table is empty",
           "[seq][structure][director]") {
     const SongStructure s = detected();
-    const seq::GeneratedDirection generated = seq::generateDirectorEvents(s);
+    const seq::GeneratedDirection generated = seq::generatePerformanceEvents(s);
     CHECK(generated.events.empty());
     // Silence would be the wrong answer: every kind that was asked about and declined is named, so
     // filling the table in is a matter of reading the list rather than guessing at it.
@@ -456,13 +456,13 @@ TEST_CASE("A generated Director event is a Section trigger on the section's own 
     REQUIRE(seq::setSectionLabel(s, 2, "the big one"));
 
     seq::GenerationOptions options;
-    options.table = [](signals::MusicalSection kind) -> std::optional<seq::SectionDirection> {
+    options.table = [](signals::MusicalSection kind) -> std::optional<seq::SectionPerformance> {
         if (kind != MusicalSection::Chorus && kind != MusicalSection::Intro) {
             return std::nullopt;
         }
-        return seq::SectionDirection{.subject = "hero", .verb = "reveal", .argument = {}};
+        return seq::SectionPerformance{.subject = "hero", .verb = "reveal", .argument = {}};
     };
-    const seq::GeneratedDirection generated = seq::generateDirectorEvents(s, options);
+    const seq::GeneratedDirection generated = seq::generatePerformanceEvents(s, options);
     REQUIRE(generated.events.size() == 2);
 
     const seq::SequenceEvent& chorus = generated.events[1];

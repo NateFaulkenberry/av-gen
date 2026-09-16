@@ -233,7 +233,7 @@ sections it separates — deliberately over-protective, because the failure it p
 work.
 
 Generating Director events from the structure is `seq/section_direction.hpp`, and it is waiting on
-one thing: a `SectionDirectionTable` from the Director decision layer. Until there is one it
+one thing: a `SectionPerformanceTable` of authored performer rules. Until there is one it
 generates nothing and says, per section kind, that it had no direction to give.
 
 ---

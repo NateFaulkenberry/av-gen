@@ -1622,10 +1622,10 @@ json Sequence::toJson() const {
     if (!sectionTimeline.sections.empty()) {
         j["sectionTimeline"] = song::sectionTimelineToJson(sectionTimeline);
     }
-    if (!sectionDirection.empty()) {
+    if (!sectionPerformance.empty()) {
         // ADR-216. Written only when authored, so a project nobody has given a director table to
         // does not grow an empty array on every save.
-        j["sectionDirection"] = ::avgen::seq::toJson(sectionDirection);
+        j["sectionPerformance"] = ::avgen::seq::toJson(sectionPerformance);
     }
     if (shotLanguage.customized()) {
         j["shotLanguage"] = shotLanguage.toJson();
@@ -1779,12 +1779,15 @@ Result<Sequence> Sequence::fromJson(const json& j) {
         }
         seq.shotLanguage = std::move(*parsed);
     }
-    if (const auto sd = j.find("sectionDirection"); sd != j.end()) {
-        auto parsed = sectionDirectionSetFromJson(*sd);
+    // ADR-216's performer table. One key, no legacy spelling: this project is in heavy development
+    // and does not carry compatibility shims -- the one example that used the old name was migrated
+    // in the same commit that renamed it.
+    if (const auto sp = j.find("sectionPerformance"); sp != j.end()) {
+        auto parsed = sectionPerformanceSetFromJson(*sp);
         if (!parsed) {
             return fail("sequence '{}': {}", seq.name, parsed.error().message);
         }
-        seq.sectionDirection = std::move(*parsed);
+        seq.sectionPerformance = std::move(*parsed);
     }
     if (const auto stl = j.find("sectionTimeline"); stl != j.end()) {
         auto parsed = song::sectionTimelineFromJson(*stl);

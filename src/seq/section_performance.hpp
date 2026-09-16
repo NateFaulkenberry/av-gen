@@ -2,15 +2,15 @@
 
 // The seam between the song structure and the Director (ADR-216, the brief's sections 10 and 12).
 //
-// "Generate initial Director sequence" is one sentence with two halves, and only one of them belongs
+// "Generate performer actions" is one sentence with two halves, and only one of them belongs
 // here. The half that belongs here is a **translation**: an edited `analysis::SongStructure` becomes
 // `seq::SequenceEvent`s whose triggers are `TriggerKind::Section`. The half that does not is the
 // decision about *what a camera should actually do* when a drop lands, which is the Director
 // decision layer (`docs/director-poc-plan.md`) and is being built separately.
 //
 // So this file deliberately contains **no direction**. It contains the shape of the connection and
-// one hole -- `SectionDirectionTable` -- and the hole is the entire remaining job. Nothing here
-// invents a behaviour, and `defaultSectionDirectionTable()` answers "nothing" for every kind on
+// one hole -- `SectionPerformanceTable` -- and the hole is the entire remaining job. Nothing here
+// invents a behaviour, and `defaultSectionPerformanceTable()` answers "nothing" for every kind on
 // purpose: an empty generated sequence is an honest report that the Director is not wired up, and a
 // generated sequence full of guesses would be a second director competing with the real one. That is
 // the duplication this project keeps paying for when it is not refused up front.
@@ -54,27 +54,27 @@ namespace avgen::seq {
 // Every field here is a string the Director layer defines the meaning of. That is on purpose: this
 // file must not grow an opinion about the vocabulary of behaviours, or it becomes the thing it is a
 // seam for.
-struct SectionDirection {
+struct SectionPerformance {
     std::string subject;  // which entity or cast role -- `EventAction::target`
     std::string verb;     // what to ask of it -- `EventAction::value`
     std::string argument; // the verb's own object, where it needs one
     int priority = 0;     // ordering against other events at the same instant
     double delaySeconds = 0.0; // fire this long after the section opens; usually 0
     // So an authored table can be compared, which is what a round-trip test asserts on.
-    [[nodiscard]] bool operator==(const SectionDirection&) const = default;
+    [[nodiscard]] bool operator==(const SectionPerformance&) const = default;
 };
 
 // **The thing to fill in.** Given a section kind in the director's vocabulary, what the Director
 // should do -- or nothing, which is a real answer and the current one for every kind.
-using SectionDirectionTable =
-    std::function<std::optional<SectionDirection>(signals::MusicalSection)>;
+using SectionPerformanceTable =
+    std::function<std::optional<SectionPerformance>(signals::MusicalSection)>;
 
 // Declines everything. Not a stub awaiting a body: the honest answer until a Director decision layer
 // exists to answer differently, and it keeps "generate" from fabricating a cut.
-[[nodiscard]] SectionDirectionTable defaultSectionDirectionTable();
+[[nodiscard]] SectionPerformanceTable defaultSectionPerformanceTable();
 
 struct GenerationOptions {
-    SectionDirectionTable table = defaultSectionDirectionTable();
+    SectionPerformanceTable table = defaultSectionPerformanceTable();
     std::string idPrefix = "director";
     // Where in the piece a payoff becomes *the* payoff; passed through to `sectionKindsFor`, so a
     // generated sequence distinguishes the last drop from the first exactly as the shot planner
@@ -90,7 +90,7 @@ struct GeneratedDirection {
 };
 
 // The translation. Pure, deterministic, and dependent on nothing that is not in its arguments.
-[[nodiscard]] GeneratedDirection generateDirectorEvents(const analysis::SongStructure& structure,
+[[nodiscard]] GeneratedDirection generatePerformanceEvents(const analysis::SongStructure& structure,
                                                         const GenerationOptions& options = {});
 
 } // namespace avgen::seq
