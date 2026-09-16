@@ -100,6 +100,14 @@ writes a scene file. `--help` lists every flag.
   [docs/gpu-culling-lod.md](docs/gpu-culling-lod.md),
   [docs/scene-states-and-macros.md](docs/scene-states-and-macros.md)
 - [docs/dependencies.md](docs/dependencies.md): every third-party library, licence and reason
+- [docs/quality-lab/](docs/quality-lab/): the Render Quality Lab -- objective, repeatable measurement
+  of rendered output. [reconnaissance](docs/quality-lab/repository-reconnaissance.md),
+  [research](docs/quality-lab/research.md) (what was adopted and what was rejected, with reasons),
+  [architecture](docs/quality-lab/architecture.md), [metrics](docs/quality-lab/metrics.md),
+  [artifact detection](docs/quality-lab/artifact-detection.md),
+  [reference rendering](docs/quality-lab/reference-rendering.md),
+  [benchmark scenes](docs/quality-lab/benchmark-scenes.md),
+  [experiments](docs/quality-lab/experiments.md)
 - [docs/decisions/](docs/decisions/): Architecture Decision Records
 - [docs/research/](docs/research/): the Phase 0 technology research with sources
 - [docs/development-log.md](docs/development-log.md): what was built, tested, and measured
