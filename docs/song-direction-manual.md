@@ -157,6 +157,28 @@ gives you two different takes, and a second chorus is deliberately not a copy of
 
 **Song mode needs nothing but an analyzed song.** No tables, no manual setup.
 
+### What it leaves you
+
+**Real shots, in the Shots lane.** Not a plan, not a suggestion, not a list in a panel — actual shot
+objects, the same kind you get from **Add Shot**. Look at the lane after directing and you will see
+them, named for what they are: "Chorus 2 · UFO Watch".
+
+Everything in section 7 works on them. Drag one. Trim it. Split it in four. Change its camera. Delete
+it and put your own there instead. Nothing about a generated shot is special or locked, and there is
+no step where you "convert" the director's output into something editable — it already is.
+
+Think of it as opening a project where somebody else has made a rough cut. The cut is yours now.
+
+### If you direct again
+
+Re-running the director replaces the shots **it** made and leaves the shots **you** made. A generated
+shot you have edited stays generated, so a re-direct will replace it; a shot you created yourself is
+never touched.
+
+Where the two would collide, **the generated film gives way**: a directed shot overlapping one of
+yours is trimmed to the gap around it, or dropped if too little of it is left. Your shot is the fixed
+point. The machine works around you, not the other way about.
+
 ---
 
 ## 7. Shots: creating and editing
@@ -178,10 +200,21 @@ Trimming the start moves only the start — the end stays where it is.
 **Split** is offered only where it would produce two shots that are both long enough to be real. If
 the option is greyed out, you're too close to an edge.
 
-### If two shots overlap
+### Shots cannot overlap
 
-The one **earlier in the list** wins for the overlapping time. This is predictable but invisible, so
-the practical advice is: avoid overlaps unless you mean them.
+Two shots covering the same moment is not allowed, and AV Gen says so rather than guessing. There is
+one camera, and two shots pointing it in different directions at the same instant has no answer —
+picking one silently would be worse than refusing.
+
+You can still *drag* a shot into an overlap; what happens is that the change is refused when it goes
+in, with a message naming the shot that starts inside the one before it. Move one of them apart and
+it takes.
+
+**Shots may sit edge to edge.** One ending exactly where the next begins is a cut, and that is the
+normal way to build a sequence.
+
+If you want one image to become another gradually, that is a **transition** on the shot, not an
+overlap — see the shot's `in` and `out` settings.
 
 ---
 
@@ -240,7 +273,7 @@ Auto-directed  →  adjust a shot  →  replace a shot  →  hand-place the came
 
 **Your work is safe.** Every shot is marked as either **authored** (yours) or **directed**
 (generated). Re-running the Auto-director replaces only the generated ones. Your hand-made shots
-survive untouched.
+survive untouched, and a generated shot that would have overlapped one of yours gives way to it.
 
 So the normal way to work is:
 
@@ -396,8 +429,9 @@ shot set to Inherit after a static shot stays static.
 **My keys aren't doing anything.** Keys only apply when the camera kind is **Keys**. Switching to Move
 or Inherit ignores them — it doesn't delete them.
 
-**Two shots overlap and the wrong one is playing.** The one earlier in the list wins. Move one so they
-don't overlap.
+**I dragged a shot and my change was refused.** You probably dragged it into another shot. Shots
+cannot overlap — one camera cannot be in two places — and the message names the shot that starts
+inside the one before it. Move one apart and the edit takes.
 
 **I want the director to take it back.** Re-enable the Auto-director. It replaces its own shots and
 leaves yours.

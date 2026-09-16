@@ -52,7 +52,11 @@ constexpr float kSectionLaneHeight = 22.0f;
 constexpr float kEdgeGrab = 7.0f;
 // The audio lane is half again as tall as the others. It is the only lane whose content is a
 // picture rather than a label, and a waveform drawn three pixels high says nothing about the music.
-constexpr float kAudioLaneHeight = kLaneHeight * 1.5f;
+// The same height as every other lane. It was 1.5x on the argument that a waveform is a picture
+// rather than a label -- true, but it made the audio lane the odd one out in a strip whose whole job
+// is comparing lanes against each other at a glance. Vertical zoom is the answer to "I need to see
+// the waveform better", and it scales all of them together.
+constexpr float kAudioLaneHeight = kLaneHeight;
 // The header column down the left (the brief's section 12). Wide enough for an actor's id and the
 // visibility dot beside it, and no wider: every point here is a point of music not shown.
 constexpr float kGutterWidth = 112.0f;
@@ -361,11 +365,24 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
                           "A snapped boundary takes the beat's own time, not a rounded one.");
     }
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(120);
-    ImGui::SliderFloat("zoom", &zoom_, 0.25f, 8.0f, "%.2fx");
+    ImGui::SetNextItemWidth(110);
+    ImGui::SliderFloat("horizontal zoom", &zoom_, 0.25f, 8.0f, "%.2fx");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("How much of the piece fits across the strip.");
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(110);
+    // Scales every lane together rather than one of them, so the strip keeps its proportions and a
+    // taller waveform does not come at the cost of the lanes beside it.
+    ImGui::SliderFloat("vertical zoom", &laneZoom_, 0.5f, 4.0f, "%.2fx");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("How tall the lanes are. Useful for reading the waveform, or for fitting\n"
+                          "a long cast on screen at once.");
+    }
     ImGui::SameLine();
     if (ImGui::Button("Fit")) {
         zoom_ = 1.0f;
+        laneZoom_ = 1.0f;
         view_ = 0.0;
     }
     ImGui::SameLine();
@@ -483,9 +500,9 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                      .hasOverlays = !piece.overlays.empty(),
                      .rulerHeight = kRulerHeight,
                      .markerHeight = kMarkerHeight,
-                     .laneHeight = kLaneHeight,
-                     .audioLaneHeight = kAudioLaneHeight,
-                     .sectionLaneHeight = kSectionLaneHeight,
+                     .laneHeight = kLaneHeight * laneZoom_,
+                     .audioLaneHeight = kAudioLaneHeight * laneZoom_,
+                     .sectionLaneHeight = kSectionLaneHeight * laneZoom_,
                      .gap = kLaneGap};
     // A narrow panel loses the headers rather than losing the music: below about four hundred
     // points a header column costs more of the time axis than the names are worth.
@@ -769,17 +786,17 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     float laneY = origin.y + lanes.audioTop();
     if (hasAudio) {
         const audio::WaveformSummary& wave = waveform(engine);
-        laneBackground(lanes.audioTop(), kAudioLaneHeight, false);
-        laneHeader(lanes.audioTop(), kAudioLaneHeight, "Audio", audioSelected_ >= 0);
-        const float mid = laneY + kAudioLaneHeight * 0.5f;
-        const float halfHeight = kAudioLaneHeight * 0.5f - 3.0f;
+        laneBackground(lanes.audioTop(), lanes.audioLaneHeight, false);
+        laneHeader(lanes.audioTop(), lanes.audioLaneHeight, "Audio", audioSelected_ >= 0);
+        const float mid = laneY + lanes.audioLaneHeight * 0.5f;
+        const float halfHeight = lanes.audioLaneHeight * 0.5f - 3.0f;
         const double perPixel = span / static_cast<double>(width);
 
         for (std::size_t i = 0; i < engine.audioClips().size(); ++i) {
             const audio::AudioClip& clip = engine.audioClips()[i];
             const double end = audio::clipEndSeconds(clip, engine.clipSource(clip.file).get());
             const ImVec2 lo(std::max(toX(clip.startSeconds), axisX), laneY);
-            const ImVec2 hi(std::min(toX(end), axisRight), laneY + kAudioLaneHeight);
+            const ImVec2 hi(std::min(toX(end), axisRight), laneY + lanes.audioLaneHeight);
             if (hi.x <= lo.x) {
                 continue;
             }
@@ -1172,6 +1189,11 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                 const double end = audio::clipEndSeconds(clip, engine.clipSource(clip.file).get());
                 if (mouse.x >= toX(clip.startSeconds) && mouse.x <= toX(end)) {
                     audioSelected_ = static_cast<int>(i);
+                    // A clip is a selection like a shot is, so the inspector and the Delete key have
+                    // one thing to ask rather than two. The click still scrubs -- `hitBlock` stays
+                    // false -- because this lane's promise is that clicking a moment plays it.
+                    selection_ = Selection::Clip;
+                    selected_ = static_cast<int>(i);
                     break;
                 }
             }
@@ -1232,6 +1254,64 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         }
     }
 
+    // **Delete, which the context menus have been advertising and nothing implemented.**
+    //
+    // Every one of those menus draws the shortcut beside its Delete row, so the key has looked bound
+    // since the menus were written. It was not: there was no keyboard handler on this panel at all.
+    //
+    // Gated on the strip being hovered rather than on focus, because that is where the selection is
+    // visible and a Delete pressed while typing a shot's name must reach the text field instead --
+    // `WantTextInput` is what separates the two.
+    if (hovered && !ImGui::GetIO().WantTextInput &&
+        (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace))) {
+        switch (selection_) {
+        case Selection::Shot:
+            if (selected_ >= 0 && selected_ < static_cast<int>(piece.shots.size())) {
+                seq::removeShot(piece.shots, static_cast<std::size_t>(selected_));
+                selection_ = Selection::None;
+                selected_ = -1;
+                touch();
+            }
+            break;
+        case Selection::Overlay:
+            if (selected_ >= 0 && selected_ < static_cast<int>(piece.overlays.size())) {
+                piece.overlays.erase(piece.overlays.begin() + selected_);
+                selection_ = Selection::None;
+                selected_ = -1;
+                touch();
+            }
+            break;
+        case Selection::Actor:
+            if (selected_ >= 0 && selected_ < static_cast<int>(piece.actors.size())) {
+                piece.actors.erase(piece.actors.begin() + selected_);
+                selection_ = Selection::None;
+                selected_ = -1;
+                touch();
+            }
+            break;
+        case Selection::Clip: {
+            // Through the same call the menu's "Remove clip" makes, so a clip removed by key and one
+            // removed by menu are the same edit -- `applyAudioClips` is what re-opens the sources.
+            std::vector<audio::AudioClip> clips(engine.audioClips().begin(), engine.audioClips().end());
+            if (audioSelected_ >= 0 && audioSelected_ < static_cast<int>(clips.size())) {
+                clips.erase(clips.begin() + audioSelected_);
+                audioSelected_ = -1;
+                selection_ = Selection::None;
+                selected_ = -1;
+                applyAudioClips(engine, std::move(clips));
+            }
+            break;
+        }
+        case Selection::Section:
+            // Deliberately not deletable by key. A section is a landmark rather than an object, and
+            // removing one gives its span to a neighbour -- a bigger, less obvious change than
+            // deleting a block, and one the context menu should have to ask for.
+            break;
+        case Selection::None:
+            break;
+        }
+    }
+
     if (drag_ != Drag::None && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
         const double t = snap(engine, mouseTime);
         const auto shot = [&]() -> seq::Shot* {
@@ -1250,20 +1330,26 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             break;
         // The three shot gestures live in `seq/sequence.hpp` now, so what a drag does and what a
         // test can check are the same code rather than two spellings of it.
+        // The neighbour-aware forms: a drag cannot push a shot into the one beside it, and lands
+        // flush when it gets close. Overlap is refused by `Sequence::validate` anyway, so clamping
+        // here is the difference between a control that will not do the wrong thing and one that
+        // does it and then reports a failure.
         case Drag::MoveShot:
-            if (seq::Shot* s = shot(); s != nullptr) {
-                seq::moveShot(*s, t - dragGrab_);
+            if (dragIndex_ >= 0) {
+                seq::moveShot(piece.shots, static_cast<std::size_t>(dragIndex_), t - dragGrab_);
             }
             break;
         case Drag::TrimShotEnd:
-            if (seq::Shot* s = shot(); s != nullptr) {
-                seq::trimShotEnd(*s, t, kMinBlockSeconds);
+            if (dragIndex_ >= 0) {
+                seq::trimShotEnd(piece.shots, static_cast<std::size_t>(dragIndex_), t,
+                                 kMinBlockSeconds);
             }
             break;
         case Drag::TrimShotStart:
-            if (seq::Shot* s = shot(); s != nullptr) {
+            if (dragIndex_ >= 0) {
                 // `dragAnchor_` is the end remembered when the gesture began -- see `trimShotStart`.
-                seq::trimShotStart(*s, t, dragAnchor_, kMinBlockSeconds);
+                seq::trimShotStart(piece.shots, static_cast<std::size_t>(dragIndex_), t, dragAnchor_,
+                                   kMinBlockSeconds);
             }
             break;
         case Drag::MoveOverlay:
@@ -1711,8 +1797,10 @@ void SequencePanel::drawEdgeGrip(ImDrawList* draw, ImVec2 a, ImVec2 b, BlockZone
 
 void SequencePanel::drawInspector(app::Engine& engine) {
     seq::Sequence& piece = engine.sequence();
-    drawSceneSlots(engine);
-    drawPerformerRules(engine);
+    // The selected thing first, then the piece-wide collections. What a person is looking at should
+    // be at the top of what they are looking at: Scenes and Performers belong to the whole piece and
+    // do not change when the selection does, so they were pushing the thing that DID change off the
+    // bottom of the panel.
     switch (selection_) {
     case Selection::Shot:
         if (selected_ >= 0 && selected_ < static_cast<int>(piece.shots.size())) {
@@ -1738,6 +1826,9 @@ void SequencePanel::drawInspector(app::Engine& engine) {
         ImGui::TextDisabled("Click a section, a shot, a character lane or a lyric to edit it.");
         break;
     }
+    ImGui::Spacing();
+    drawSceneSlots(engine);
+    drawPerformerRules(engine);
 }
 
 void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index) {
@@ -2183,6 +2274,39 @@ void SequencePanel::drawSceneSlots(app::Engine& engine) {
 
 void SequencePanel::drawShotInspector(app::Engine& engine, seq::Shot& shot) {
     seq::Sequence& piece = engine.sequence();
+    ImGui::SeparatorText("Transitions");
+    const char* transitions[] = {"cut", "fade in", "fade out"};
+    int in = static_cast<int>(shot.in.kind);
+    ImGui::SetNextItemWidth(100);
+    if (ImGui::Combo("in", &in, transitions, IM_ARRAYSIZE(transitions))) {
+        shot.in.kind = static_cast<seq::TransitionKind>(in);
+        touch();
+    }
+    if (shot.in.kind != seq::TransitionKind::Cut) {
+        ImGui::SameLine();
+        auto seconds = static_cast<float>(shot.in.seconds);
+        ImGui::SetNextItemWidth(90);
+        if (ImGui::DragFloat("##inlen", &seconds, 0.02f, 0.0f, 10.0f, "%.2f s")) {
+            shot.in.seconds = static_cast<double>(seconds);
+            touch();
+        }
+    }
+    int out = static_cast<int>(shot.out.kind);
+    ImGui::SetNextItemWidth(100);
+    if (ImGui::Combo("out", &out, transitions, IM_ARRAYSIZE(transitions))) {
+        shot.out.kind = static_cast<seq::TransitionKind>(out);
+        touch();
+    }
+    if (shot.out.kind != seq::TransitionKind::Cut) {
+        ImGui::SameLine();
+        auto seconds = static_cast<float>(shot.out.seconds);
+        ImGui::SetNextItemWidth(90);
+        if (ImGui::DragFloat("##outlen", &seconds, 0.02f, 0.0f, 10.0f, "%.2f s")) {
+            shot.out.seconds = static_cast<double>(seconds);
+            touch();
+        }
+    }
+
     ImGui::SeparatorText("Shot");
     char name[96];
     std::strncpy(name, shot.name.c_str(), sizeof(name) - 1);
@@ -2336,39 +2460,6 @@ void SequencePanel::drawShotInspector(app::Engine& engine, seq::Shot& shot) {
             if (ImGui::SliderFloat("weight", &shot.camera.lookAtWeight, 0.0f, 1.0f)) {
                 touch();
             }
-        }
-    }
-
-    ImGui::SeparatorText("Transitions");
-    const char* transitions[] = {"cut", "fade in", "fade out"};
-    int in = static_cast<int>(shot.in.kind);
-    ImGui::SetNextItemWidth(100);
-    if (ImGui::Combo("in", &in, transitions, IM_ARRAYSIZE(transitions))) {
-        shot.in.kind = static_cast<seq::TransitionKind>(in);
-        touch();
-    }
-    if (shot.in.kind != seq::TransitionKind::Cut) {
-        ImGui::SameLine();
-        auto seconds = static_cast<float>(shot.in.seconds);
-        ImGui::SetNextItemWidth(90);
-        if (ImGui::DragFloat("##inlen", &seconds, 0.02f, 0.0f, 10.0f, "%.2f s")) {
-            shot.in.seconds = static_cast<double>(seconds);
-            touch();
-        }
-    }
-    int out = static_cast<int>(shot.out.kind);
-    ImGui::SetNextItemWidth(100);
-    if (ImGui::Combo("out", &out, transitions, IM_ARRAYSIZE(transitions))) {
-        shot.out.kind = static_cast<seq::TransitionKind>(out);
-        touch();
-    }
-    if (shot.out.kind != seq::TransitionKind::Cut) {
-        ImGui::SameLine();
-        auto seconds = static_cast<float>(shot.out.seconds);
-        ImGui::SetNextItemWidth(90);
-        if (ImGui::DragFloat("##outlen", &seconds, 0.02f, 0.0f, 10.0f, "%.2f s")) {
-            shot.out.seconds = static_cast<double>(seconds);
-            touch();
         }
     }
 

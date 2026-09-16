@@ -332,6 +332,28 @@ inline constexpr double kMinShotSeconds = 0.25;
 // Slides a shot, keeping its length. Never before zero.
 void moveShot(Shot& shot, double newStart);
 
+// ---- the same three, aware of the neighbours -----------------------------------------------------
+//
+// `Sequence::validate` refuses overlapping shots outright -- one camera cannot be in two places --
+// so a drag that produces one is not a state to resolve later, it is an edit that will be rejected
+// when it goes in. These clamp at the gesture instead, which is the difference between a control
+// that will not let you do the wrong thing and one that lets you do it and then complains.
+//
+// They also SNAP: released within `snapSeconds` of a neighbour's edge, a shot lands flush against it.
+// Butted edges are how a cut is made, and hitting one to the millisecond by hand is not a skill
+// worth requiring.
+//
+// `index` is into `shots`, which `validate` requires to be in time order; the neighbours are
+// therefore `index - 1` and `index + 1`.
+inline constexpr double kShotSnapSeconds = 0.15;
+
+void moveShot(std::vector<Shot>& shots, std::size_t index, double newStart,
+              double snapSeconds = kShotSnapSeconds);
+void trimShotEnd(std::vector<Shot>& shots, std::size_t index, double newEnd,
+                 double minSeconds = kMinShotSeconds, double snapSeconds = kShotSnapSeconds);
+void trimShotStart(std::vector<Shot>& shots, std::size_t index, double newStart, double fixedEnd,
+                   double minSeconds = kMinShotSeconds, double snapSeconds = kShotSnapSeconds);
+
 // Moves the END, keeping the start. Refuses to go shorter than `minSeconds`.
 void trimShotEnd(Shot& shot, double newEnd, double minSeconds = kMinShotSeconds);
 

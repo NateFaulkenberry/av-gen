@@ -184,3 +184,52 @@ TEST_CASE("the edited result is what playback would read", "[seq][shot][editing]
     REQUIRE(onTheSeam != nullptr);
     CHECK(onTheSeam->name == "Shot 01 b");
 }
+
+// Dragging cannot make an overlap, because `Sequence::validate` refuses one and a gesture that
+// produces a rejected edit is a control that lets you do the wrong thing and then complains.
+TEST_CASE("a drag clamps at its neighbours and snaps flush", "[seq][shot][editing]") {
+    SECTION("moving stops at the shot before and the shot after") {
+        std::vector<seq::Shot> shots = threeShots();   // 0-10, 10-20, 20-30
+        seq::moveShot(shots, 1, 5.0);                  // dragged left, into shot 0
+        CHECK(shots[1].startSeconds == Approx(10.0));  // stopped at its neighbour's end
+        CHECK(shots[1].durationSeconds == Approx(10.0));
+
+        seq::moveShot(shots, 1, 25.0);                 // dragged right, into shot 2
+        CHECK(shots[1].endSeconds() == Approx(20.0));  // stopped at its neighbour's start
+    }
+
+    SECTION("a shot released near an edge lands exactly on it") {
+        std::vector<seq::Shot> shots = threeShots();
+        seq::moveShot(shots, 1, 10.08);                // just past flush, inside the snap window
+        CHECK(shots[1].startSeconds == Approx(10.0));  // not 10.08
+    }
+
+    SECTION("trimming the end stops at the next shot") {
+        std::vector<seq::Shot> shots = threeShots();
+        seq::trimShotEnd(shots, 0, 18.0);
+        CHECK(shots[0].endSeconds() == Approx(10.0));
+    }
+
+    SECTION("trimming the start stops at the previous shot") {
+        std::vector<seq::Shot> shots = threeShots();
+        const double end = shots[1].endSeconds();
+        seq::trimShotStart(shots, 1, 3.0, end);
+        CHECK(shots[1].startSeconds == Approx(10.0));
+        CHECK(shots[1].endSeconds() == Approx(end));   // and the far edge still did not move
+    }
+
+    SECTION("the result is a sequence the engine will actually accept") {
+        // The point of all of the above. Before clamping, these drags produced an edit that
+        // `validate` refused -- so the gesture appeared to work and the change never landed.
+        seq::Sequence piece;
+        piece.shots = threeShots();
+        seq::moveShot(piece.shots, 1, 2.0);
+        seq::trimShotEnd(piece.shots, 0, 40.0);
+        seq::trimShotStart(piece.shots, 2, 0.0, piece.shots[2].endSeconds());
+        const auto ok = piece.validate();
+        if (!ok) {
+            INFO(ok.error().message);
+        }
+        CHECK(ok.has_value());
+    }
+}

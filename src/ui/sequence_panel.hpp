@@ -57,7 +57,7 @@ public:
     void draw(app::Engine& engine);
 
     // What the strip has selected, so the host can show it elsewhere.
-    enum class Selection : std::uint8_t { None, Shot, Actor, Overlay, Section };
+    enum class Selection : std::uint8_t { None, Shot, Actor, Overlay, Section, Clip };
     [[nodiscard]] Selection selection() const { return selection_; }
     [[nodiscard]] int selectedIndex() const { return selected_; }
 
@@ -190,6 +190,9 @@ private:
     bool dirty_ = false;
     int snapMode_ = 2; // Beats
     float zoom_ = 1.0f;
+    // Vertical zoom: a multiplier on every lane's height. One number rather than a height per lane,
+    // so the strip keeps its proportions and the lanes stay comparable.
+    float laneZoom_ = 1.0f;
     double view_ = 0.0; // leftmost second shown
     Drag drag_ = Drag::None;
     int dragIndex_ = -1;

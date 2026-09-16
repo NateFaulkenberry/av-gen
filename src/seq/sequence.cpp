@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include <unordered_map>
 #include <utility>
@@ -780,6 +781,61 @@ void trimShotStart(Shot& shot, double newStart, double fixedEnd, double minSecon
     const double start = std::clamp(newStart, 0.0, fixedEnd - minSeconds);
     shot.startSeconds = start;
     shot.durationSeconds = fixedEnd - start;
+}
+
+namespace {
+// Nudges `value` onto `edge` when it is already within `snap` of it.
+double snapTo(double value, double edge, double snap) {
+    return std::fabs(value - edge) <= snap ? edge : value;
+}
+} // namespace
+
+void moveShot(std::vector<Shot>& shots, std::size_t index, double newStart, double snapSeconds) {
+    if (index >= shots.size()) {
+        return;
+    }
+    Shot& shot = shots[index];
+    const double length = shot.durationSeconds;
+    double start = std::max(0.0, newStart);
+    // The room this shot has, which is the gap its neighbours leave. A shot cannot be dragged past
+    // a neighbour -- reordering is done by moving the others, not by swapping underneath them.
+    const double floorAt = index > 0 ? shots[index - 1].endSeconds() : 0.0;
+    const double ceilAt = index + 1 < shots.size() ? shots[index + 1].startSeconds
+                                                   : std::numeric_limits<double>::max();
+    start = snapTo(start, floorAt, snapSeconds);
+    if (ceilAt != std::numeric_limits<double>::max()) {
+        start = snapTo(start + length, ceilAt, snapSeconds) - length;
+    }
+    start = std::max(start, floorAt);
+    if (ceilAt != std::numeric_limits<double>::max()) {
+        start = std::min(start, ceilAt - length);
+    }
+    shot.startSeconds = std::max(0.0, start);
+}
+
+void trimShotEnd(std::vector<Shot>& shots, std::size_t index, double newEnd, double minSeconds,
+                 double snapSeconds) {
+    if (index >= shots.size()) {
+        return;
+    }
+    Shot& shot = shots[index];
+    double end = newEnd;
+    if (index + 1 < shots.size()) {
+        const double next = shots[index + 1].startSeconds;
+        end = std::min(snapTo(end, next, snapSeconds), next);
+    }
+    trimShotEnd(shot, end, minSeconds);
+}
+
+void trimShotStart(std::vector<Shot>& shots, std::size_t index, double newStart, double fixedEnd,
+                   double minSeconds, double snapSeconds) {
+    if (index >= shots.size()) {
+        return;
+    }
+    double start = newStart;
+    const double floorAt = index > 0 ? shots[index - 1].endSeconds() : 0.0;
+    start = std::max(snapTo(start, floorAt, snapSeconds), floorAt);
+    trimShotStart(shots[index], start, fixedEnd, minSeconds);
 }
 
 std::optional<std::size_t> splitShot(std::vector<Shot>& shots, std::size_t index, double seconds,

@@ -3359,12 +3359,44 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         for (std::size_t i = 0; i < direction.shots.size(); ++i) {
             const scene::CameraShot& shot = direction.shots[i];
             ImGui::PushID(static_cast<int>(i));
-            ImGui::Text("%6.2f - %6.2f  %s  %s%s", shot.startSeconds, shot.endSeconds,
-                        direction.nameOf(shot.camera).c_str(),
-                        scene::shotTransitionName(shot.transition), shot.locked ? "  locked" : "");
+            // Clickable: a row is a moment in the piece, and the useful thing to do with a moment is
+            // go to it. Selectable rather than Text so the whole row is the target -- a row you have
+            // to hit a word inside is a row people miss.
+            char row[160];
+            std::snprintf(row, sizeof(row), "%6.2f - %6.2f  %s  %s%s", shot.startSeconds,
+                          shot.endSeconds, direction.nameOf(shot.camera).c_str(),
+                          scene::shotTransitionName(shot.transition),
+                          shot.locked ? "  locked" : "");
+            const double now = engine.timelineClock().seconds;
+            const bool live = now >= shot.startSeconds && now < shot.endSeconds;
+            if (ImGui::Selectable(row, live, ImGuiSelectableFlags_AllowOverlap)) {
+                engine.seekSeconds(shot.startSeconds);
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Go to the start of this shot.");
+            }
             ImGui::SameLine();
             if (ImGui::SmallButton("x")) {
+                // **The sequencer shot goes too.** A camera shot says which camera is live over a
+                // span; the sequencer shot is the framing over that same span. Removing one and
+                // leaving the other is how a piece ends up with a cut to a camera that has nothing
+                // to show, or a framing nobody cuts to -- two halves of one edit, deleted by halves.
+                const double start = shot.startSeconds;
+                const double end = shot.endSeconds;
                 direction.shots.erase(direction.shots.begin() + static_cast<std::ptrdiff_t>(i));
+                seq::Sequence piece = engine.sequence();
+                const std::size_t before = piece.shots.size();
+                std::erase_if(piece.shots, [&](const seq::Shot& s) {
+                    // The span this camera shot covered, by overlap rather than by exact equality:
+                    // a directed camera shot merges adjacent spans on the same camera, so its start
+                    // and end need not match any one sequencer shot's to the microsecond.
+                    return s.startSeconds < end - 1e-6 && s.endSeconds() > start + 1e-6;
+                });
+                if (piece.shots.size() != before) {
+                    if (auto ok = engine.setSequence(std::move(piece)); !ok) {
+                        cameraProblem_ = ok.error().message;
+                    }
+                }
                 changed = true;
                 ImGui::PopID();
                 break;
