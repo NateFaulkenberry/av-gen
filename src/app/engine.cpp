@@ -4,6 +4,7 @@
 #include "scene/tree_generated.hpp"
 
 #include "seq/layer_sink.hpp"
+#include "seq/section_actions.hpp"
 
 #include "core/phase_profiler.hpp"
 
@@ -2878,6 +2879,67 @@ void Engine::updateAtmosphericEffects() {
     }
 }
 
+// ADR-216's seam, connected at last.
+//
+// `firedEvents()` has existed since ADR-098 and, until now, **nothing in the shipping application
+// read it**. Only a test did. That was not an oversight: the comment on `firedEvents()` refuses to
+// let the engine invent a meaning for an EntityAction, because a second interpretation of the event
+// stream is exactly the duplication the design was avoiding.
+//
+// The refusal was right and the consequence was that the whole path was inert -- a section could
+// generate an event, the event could fire, and nothing moved. So the meaning lives in ONE place that
+// is not here (`seq::actionFromEvent`), and this function does the only thing left: hand what that
+// returns to the action system. The engine still does not decide what a verb is; it decides who to
+// ask, which is its job.
+//
+// A firing whose verb does not resolve is reported once and dropped. Once, because these repeat
+// every occurrence of a section name and a per-frame log would bury the run; reported, because a
+// section that was supposed to make something happen and made nothing happen is the silent failure
+// this repository keeps paying for.
+void Engine::applySectionActions() {
+    if (firedEvents_.empty()) {
+        return;
+    }
+    scene::Composition* composition = this->composition();
+    if (composition == nullptr) {
+        return;
+    }
+    for (const seq::FiredEvent& fired : firedEvents_) {
+        if (fired.eventIndex >= sequence_.events.size()) {
+            continue;
+        }
+        const seq::SequenceEvent& event = sequence_.events[fired.eventIndex];
+        if (event.what.kind != seq::EventActionKind::EntityAction) {
+            continue;   // a Notify belongs to the host, exactly as before
+        }
+        auto directed = seq::actionFromEvent(event.what.target, event.what.value, event.what.argument);
+        if (!directed) {
+            // Not necessarily a mistake. `section_direction.hpp` says the verb vocabulary belongs to
+            // the Director layer, and a host that reads `firedEvents()` itself may define verbs this
+            // engine has no action for -- `test_sequence_project` does exactly that with `walkTo`.
+            // So this says what was skipped and why without calling it broken, once per event id,
+            // and a genuine typo still surfaces instead of vanishing.
+            if (sectionActionProblems_.insert(event.id).second) {
+                log::info("section event '{}' not applied here ({}); a host reading firedEvents() "
+                          "may own this verb",
+                          event.id, directed.error().message);
+            }
+            continue;
+        }
+        // ADR-093: a seek re-delivers a standing intent rather than replaying it as news. The action
+        // system is told the same thing either way -- what differs is that a restored firing is the
+        // character being put back where the piece says it already is, so it must not queue behind
+        // whatever it was doing before the jump.
+        if (!composition->entityWorld().direct(directed->entity, {directed->action},
+                                               timelineClock_.seconds)) {
+            if (sectionActionProblems_.insert(event.id).second) {
+                log::warn("section event '{}': nothing here is called '{}'", event.id,
+                          directed->entity);
+            }
+        }
+    }
+}
+
 void Engine::update(const FrameTime& time) {
     const auto start = std::chrono::steady_clock::now();
     bool newFrame = false;
@@ -3016,6 +3078,7 @@ void Engine::update(const FrameTime& time) {
     // when no host is listening.
     sequenceEvents_.advanceTo(timelineClock_.seconds);
     firedEvents_ = sequenceEvents_.drain(timelineClock_.seconds);
+    applySectionActions();
     stats_.allocsModulation = allocsNow() - allocMark;
     allocMark = allocsNow();
     controller_->update(time);
