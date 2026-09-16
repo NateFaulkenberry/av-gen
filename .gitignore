@@ -56,3 +56,8 @@ cmake-build-*/
 # warnings that are harmless and why, and the one command that regenerates all nine
 # (tools/make_farm_animals.sh). assets/farm.manifest.json is the other part: it names all nine with
 # their real metre sizes, and it resolves whether or not the meshes are on disk.
+
+# Render evidence produced for a change's review (ADR-246's movies and stills, and whatever the
+# next one needs). 80 MB for one feature and regenerable from the queue file beside it, which is
+# the part worth keeping -- so the queue is committed with the ADR and the pixels are not.
+/renders/

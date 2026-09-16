@@ -4,6 +4,8 @@
 
 #include <imgui_internal.h>
 
+#include <algorithm>
+
 namespace avgen::ui {
 
 namespace {
@@ -219,7 +221,8 @@ std::size_t enforceCanvasCentre(ImGuiID dockspace, const EditorLayout& layout) {
 }
 
 CanvasRect drawCanvasWindow(std::uint64_t texture, std::uint32_t centreNode,
-                            const std::function<void(const CanvasRect&)>& overlay) {
+                            const std::function<void(const CanvasRect&, const PreviewFrame&)>& overlay,
+                            const CanvasPlacement& placement, std::uint32_t outsideColour) {
     CanvasRect rect;
     if (centreNode != 0) {
         ImGui::SetNextWindowDockID(centreNode, ImGuiCond_FirstUseEver);
@@ -238,14 +241,43 @@ CanvasRect drawCanvasWindow(std::uint64_t texture, std::uint32_t centreNode,
         rect.y = origin.y;
         rect.width = size.x;
         rect.height = size.y;
+
+        // Where the picture goes. The default -- no placement, or one that could not be computed --
+        // is the whole region, which is the canvas this editor has always had.
+        PreviewFrame frame = placement ? placement(rect) : PreviewFrame{};
+        if (!frame.valid()) {
+            frame = previewFrameFromCanvas(rect);
+        }
         if (texture != 0 && rect.valid()) {
-            ImGui::Image(static_cast<ImTextureID>(texture), size);
+            // `SetCursorScreenPos` rather than a dummy plus padding: the frame can be *outside* the
+            // content region when the zoom overflows the canvas, and only an absolute position can
+            // express that. ImGui clips the image to the window either way.
+            ImGui::SetCursorScreenPos(ImVec2(frame.x, frame.y));
+            ImGui::Image(static_cast<ImTextureID>(texture), ImVec2(frame.width, frame.height));
+        }
+        // The letterbox, under everything the editor draws. Four rectangles rather than one with a
+        // hole, because ImGui's draw list has no hole; four is also what makes the frame's own
+        // pixels provably untouched, which is the thing a dimming overlay must never get wrong.
+        if (outsideColour != 0 && rect.valid() && frame.valid()) {
+            ImDrawList* list = ImGui::GetWindowDrawList();
+            const float x0 = rect.x;
+            const float y0 = rect.y;
+            const float x1 = rect.x + rect.width;
+            const float y1 = rect.y + rect.height;
+            const float fx0 = std::clamp(frame.x, x0, x1);
+            const float fy0 = std::clamp(frame.y, y0, y1);
+            const float fx1 = std::clamp(frame.x + frame.width, x0, x1);
+            const float fy1 = std::clamp(frame.y + frame.height, y0, y1);
+            list->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, fy0), outsideColour);   // above
+            list->AddRectFilled(ImVec2(x0, fy1), ImVec2(x1, y1), outsideColour);   // below
+            list->AddRectFilled(ImVec2(x0, fy0), ImVec2(fx0, fy1), outsideColour); // left
+            list->AddRectFilled(ImVec2(fx1, fy0), ImVec2(x1, fy1), outsideColour); // right
         }
         // What decides whether a mouse event is the scene's. Asked here, while the canvas is the
         // current window, so that a panel, a popup or a menu over the canvas answers false.
         rect.hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
         if (overlay) {
-            overlay(rect);
+            overlay(rect, frame);
         }
     }
     ImGui::End();

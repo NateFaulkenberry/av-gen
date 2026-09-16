@@ -26,6 +26,7 @@
 #include "ui/settings_panel.hpp"
 #include "ui/transport_bar.hpp"
 #include "ui/editor_layout.hpp"
+#include "ui/output_preview.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_logic.hpp"
 
@@ -155,6 +156,42 @@ public:
     // Where the canvas ended up this frame. The host sizes the next frame's render target, the
     // camera's aspect and every click's coordinates from this, so it is the shell's one output.
     [[nodiscard]] const CanvasRect& canvas() const { return canvas_; }
+
+    // ---- the output preview (ADR-246, output-preview spec) -------------------------------------
+    //
+    // The editor-local half. The project-owned half -- the output's width, height and frame rate --
+    // is `renderSettings` above and is deliberately not restated here: one output configuration,
+    // which is the whole of the spec's §5.1.
+    //
+    // Public because the host owns the persistence (it goes into `AppSettings`, ADR-225) and
+    // because the host has to read it to size the frame's render target. The panel edits it in
+    // place, exactly as it does `canvasRenderScale`.
+    PreviewViewState preview;
+    // What the host should resize the renderer and the engine's viewport to this frame, and why.
+    // Computed by the panel from `preview`, the canvas it was just laid out at, and the project's
+    // output size -- one place, so the extent the picture is rendered at and the rectangle it is
+    // drawn into cannot come to disagree. Zero width before the first frame is laid out.
+    [[nodiscard]] const PreviewRender& previewRender() const { return previewRender_; }
+    // Where the frame ended up this frame, in window points. The canvas when the mode is Workspace.
+    [[nodiscard]] const PreviewFrame& previewFrame() const { return previewFrame_; }
+    // The adapter's per-axis texture limit, for validating a custom output resolution against the
+    // machine rather than against a constant (spec §5.3). The host sets it from
+    // `gpu::Capabilities::limits`; zero keeps `ui::kMaxOutputDimension`.
+    std::uint32_t maxTextureDimension = 0;
+    // Set by the host while the output's resolution is being rebuilt on the GPU, so the toolbar can
+    // say the preview is busy rather than appearing to have ignored the change (spec §15).
+    bool previewResizing = false;
+    // Entering fullscreen preview closes every panel and leaves the canvas the whole window;
+    // leaving it puts back exactly what was open. Held here rather than in `EditorLayout` because
+    // it is a *suspended* state and not a layout: it must not be written to the layout file, or a
+    // crash in fullscreen would reopen the editor with no panels at all.
+    void setFullscreenPreview(bool on);
+    // What the camera indicator says (spec §8.1). Set by the host each frame from the engine, and
+    // deliberately a string rather than a camera handle: this editor has exactly one camera --
+    // `scene::Scene::camera` -- and the only thing there is to report is *what is driving it*
+    // (the timeline's baked shot keys, the free viewport gesture, or the orbit). See ADR-246 for
+    // why this is the single seam a camera-selection system would arrive at.
+    std::string previewCameraLabel = "camera";
 
     // Where the open-panel set is kept, and whether ImGui found a dock tree of its own. Without a
     // dock tree the shell has to build the default one before the first panel is submitted, or
@@ -292,7 +329,19 @@ private:
     void drawWorldBuilderWindow(app::Engine& engine);
     void drawEditWindow(app::Engine& engine);
     // Runs the world editor and draws it over the world, inside the canvas window.
-    void drawViewportEditor(app::Engine& engine, const CanvasRect& rect);
+    //
+    // Two rectangles, and the difference is load-bearing (ADR-246). `rect` is the canvas window and
+    // decides whose the pointer is; `frame` is where the picture actually is and is what every
+    // coordinate conversion divides by. They are the same rectangle in Workspace mode.
+    void drawViewportEditor(app::Engine& engine, const CanvasRect& rect, const PreviewFrame& frame);
+    // The preview's toolbar across the top of the canvas, and the guides over the frame. Both are
+    // editor presentation inside the canvas window's own draw list: neither can reach a render.
+    void drawPreviewToolbar(app::Engine& engine, const CanvasRect& rect);
+    void drawPreviewFrameControls();
+    void drawPreviewGuides(const PreviewFrame& frame);
+    // The output resolution editor (presets + custom), shared by the toolbar and the Render panel
+    // so the two cannot come to offer different sizes. Returns true when it changed the settings.
+    bool drawOutputResolutionControls(app::RenderSettings& output);
     // The processing / loading indicator over the canvas. Inside the canvas window's draw list,
     // never in `ui::drawViewportOverlay` -- see the note at the definition.
     void drawCanvasActivity(app::Engine& engine, const CanvasRect& rect);
@@ -310,6 +359,18 @@ private:
 
     EditorLayout layout_;
     CanvasRect canvas_;
+    // ADR-246. Recomputed every frame from the canvas ImGui has just laid out; read by the host at
+    // the top of the next frame, exactly as `canvas_` is.
+    PreviewFrame previewFrame_;
+    PreviewRender previewRender_;
+    // The panel set that was open before fullscreen preview was entered, restored on the way out.
+    std::vector<std::string> suspendedPanels_;
+    // The last output size the toolbar refused, and why. Kept so the message stays on screen while
+    // the boxes still show the rejected numbers (spec §5.3: "Preserve the last valid configuration
+    // if the new value is rejected").
+    std::uint32_t pendingOutputWidth_ = 0;
+    std::uint32_t pendingOutputHeight_ = 0;
+    std::string outputError_;
     // How long the world has been busy, for the canvas's processing indicator.
     ProcessingTracker processing_;
     // Right-click over the canvas: a menu only if the press did not travel, because a right-drag

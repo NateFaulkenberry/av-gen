@@ -35,6 +35,20 @@ json AppSettings::toJson() const {
     doc["format"] = kFormatName;
     doc["version"] = kFormatVersion;
     doc["general"] = json{{"canvasRenderScale", canvasRenderScale}, {"appearance", appearanceThemeName(appearance)}};
+    doc["outputPreview"] = json{
+        {"mode", ui::previewViewModeName(preview.mode)},
+        {"outside", ui::outsideFrameName(preview.outside)},
+        {"quality", ui::previewQualityName(preview.quality)},
+        {"zoomFit", preview.zoom.fit},
+        {"zoomScale", preview.zoom.scale},
+        {"safeAreas", preview.guides.safeAreas},
+        {"thirds", preview.guides.thirds},
+        {"centreCross", preview.guides.centreCross},
+        {"frameBorder", preview.guides.frameBorder},
+        {"actionSafe", preview.guides.safe.actionFraction},
+        {"titleSafe", preview.guides.safe.titleFraction},
+        {"toolbar", preview.toolbar},
+    };
     doc["ai"] = ai.toJson();
     return doc;
 }
@@ -58,6 +72,45 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
             if (!appearance->is_string() || !appearanceThemeFromName(appearance->get<std::string>(), out.appearance)) {
                 return fail("general.appearance must be System, Dark or Light");
             }
+        }
+    }
+    if (const auto pv = doc.find("outputPreview"); pv != doc.end() && pv->is_object()) {
+        // A name this build does not know is a hard failure rather than a silent fall back to the
+        // default. The whole point of the view mode is that the editor is in a state the person put
+        // it in; quietly opening in Workspace because a newer build wrote "outputStereo" would be
+        // the same class of defect ADR-225 exists about, one step removed.
+        if (const auto it = pv->find("mode"); it != pv->end()) {
+            if (!it->is_string() || !ui::previewViewModeFromName(it->get<std::string>(), out.preview.mode)) {
+                return fail("outputPreview.mode is not a view mode this build knows");
+            }
+        }
+        if (const auto it = pv->find("outside"); it != pv->end()) {
+            if (!it->is_string() || !ui::outsideFrameFromName(it->get<std::string>(), out.preview.outside)) {
+                return fail("outputPreview.outside must be show, dim or hide");
+            }
+        }
+        if (const auto it = pv->find("quality"); it != pv->end()) {
+            if (!it->is_string() ||
+                !ui::previewQualityFromName(it->get<std::string>(), out.preview.quality)) {
+                return fail("outputPreview.quality must be draft, realtime or native");
+            }
+        }
+        out.preview.zoom.fit = pv->value("zoomFit", out.preview.zoom.fit);
+        out.preview.zoom.scale = pv->value("zoomScale", out.preview.zoom.scale);
+        out.preview.guides.safeAreas = pv->value("safeAreas", out.preview.guides.safeAreas);
+        out.preview.guides.thirds = pv->value("thirds", out.preview.guides.thirds);
+        out.preview.guides.centreCross = pv->value("centreCross", out.preview.guides.centreCross);
+        out.preview.guides.frameBorder = pv->value("frameBorder", out.preview.guides.frameBorder);
+        out.preview.guides.safe.actionFraction =
+            pv->value("actionSafe", out.preview.guides.safe.actionFraction);
+        out.preview.guides.safe.titleFraction =
+            pv->value("titleSafe", out.preview.guides.safe.titleFraction);
+        out.preview.toolbar = pv->value("toolbar", out.preview.toolbar);
+        // Refused rather than clamped. A title-safe area outside the action-safe area draws two
+        // boxes in the wrong order and looks entirely plausible, which is precisely why a silent
+        // repair here would be worse than a loud refusal.
+        if (auto r = ui::validatePreviewViewState(out.preview); !r) {
+            return fail("outputPreview: {}", r.error().message);
         }
     }
     if (const auto ai = doc.find("ai"); ai != doc.end()) {

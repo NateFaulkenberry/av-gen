@@ -24,6 +24,7 @@
 #include "rendering/output_mapper.hpp"
 #include "rendering/transform_history.hpp"
 #include "ui/editor_layout.hpp"
+#include "ui/output_preview.hpp"
 #include "share/texture_share.hpp"
 
 #include <webgpu/webgpu_cpp.h>
@@ -112,6 +113,9 @@ struct AppOptions {
     float supersample = 1.0f;
     std::optional<std::string> aovs; // ADR-242: --aov, auxiliary passes beside the beauty frames
     bool liftViewportLimits = false; // --viewport-matches-render: lift ADR-186's limits live too
+    // --preview-mode: which of ADR-246's three canvas modes to open in. Unset keeps whatever the
+    // settings file remembers, which is what a person's own session should do.
+    std::optional<ui::PreviewViewMode> previewMode;
 
     bool profileCpu = false;
     std::optional<std::filesystem::path> profileCsv; // --profile-csv <file>: one row per frame
@@ -293,6 +297,10 @@ private:
     UiScript uiScript_;
 
     ui::CanvasRect canvas_;
+    // When the preview's view state was last written to the settings file (ADR-246). Throttled for
+    // the same reason the editor layout is: a zoom combo dragged through its stops must not be a
+    // file write per frame.
+    double lastPreviewSave_ = 0.0;
     std::uint32_t renderWidth_ = 0;   // canvas size in framebuffer pixels; what the renderer is sized to
     std::uint32_t renderHeight_ = 0;
     std::uint32_t pendingWidth_ = 0;  // a canvas size waiting to settle before it is acted on

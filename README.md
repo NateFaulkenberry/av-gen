@@ -88,6 +88,8 @@ writes a scene file. `--help` lists every flag.
 - [docs/sequencer.md](docs/sequencer.md): choreography through time -- shots, scene cuts,
   characters, lyrics and markers, and how a piece becomes ordinary timeline tracks
 - [docs/composition.md](docs/composition.md): the 2D layers over the frame
+- [docs/output-preview.md](docs/output-preview.md): seeing what the render will produce -- the
+  output frame in the canvas, safe areas, preview quality, and the two things a preview cannot show
 - [docs/art-direction.md](docs/art-direction.md): the World Director, looks, composition and phrasing
 - [docs/visual-cookbook/scale-and-silhouette.md](docs/visual-cookbook/scale-and-silhouette.md): why a hero cannot supply its own scale, and three things behind it that fight its silhouette
 - The procedural world: [docs/procedural-geometry.md](docs/procedural-geometry.md),

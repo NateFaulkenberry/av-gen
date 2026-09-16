@@ -1,0 +1,42 @@
+{
+  "format": "avgen-render-queue",
+  "version": 1,
+  "jobs": [
+    {
+      "project": "../../examples/world/glowmere-valley-2.json",
+      "render": {
+        "output": "video",
+        "path": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-preview/renders/output-preview/A-deliverable-1280x720.mov",
+        "width": 1280,
+        "height": 720,
+        "fps": 30,
+        "start": 0.0,
+        "end": 30.0,
+        "tier": "offline",
+        "limits": "unlimited",
+        "supersample": 2.0,
+        "codec": "h264",
+        "quality": 90,
+        "muxAudio": true
+      }
+    },
+    {
+      "project": "../../examples/world/glowmere-valley-2.json",
+      "render": {
+        "output": "video",
+        "path": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-preview/renders/output-preview/B-preview-extent-1200x676.mov",
+        "width": 1200,
+        "height": 676,
+        "fps": 30,
+        "start": 0.0,
+        "end": 30.0,
+        "tier": "realtime",
+        "limits": "live",
+        "supersample": 1.0,
+        "codec": "h264",
+        "quality": 90,
+        "muxAudio": true
+      }
+    }
+  ]
+}

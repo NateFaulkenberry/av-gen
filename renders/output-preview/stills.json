@@ -1,0 +1,23 @@
+{
+  "format": "avgen-render-queue", "version": 1,
+  "jobs": [
+    { "project": "../../examples/world/glowmere-valley-2.json",
+      "render": { "output": "sequence",
+        "path": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-preview/renders/output-preview/stills-A-deliverable",
+        "pattern": "t{:06d}.png",
+        "width": 1280, "height": 720, "fps": 1, "start": 4.0, "end": 10.0,
+        "tier": "offline", "limits": "unlimited", "supersample": 2.0 } },
+    { "project": "../../examples/world/glowmere-valley-2.json",
+      "render": { "output": "sequence",
+        "path": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-preview/renders/output-preview/stills-B-preview",
+        "pattern": "t{:06d}.png",
+        "width": 1200, "height": 676, "fps": 1, "start": 4.0, "end": 10.0,
+        "tier": "realtime", "limits": "live", "supersample": 1.0 } },
+    { "project": "../../examples/world/glowmere-valley-2.json",
+      "render": { "output": "sequence",
+        "path": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-preview/renders/output-preview/stills-C-canvas-arm",
+        "pattern": "t{:06d}.png",
+        "width": 1200, "height": 800, "fps": 1, "start": 4.0, "end": 10.0,
+        "tier": "realtime", "limits": "live", "supersample": 1.0 } }
+  ]
+}

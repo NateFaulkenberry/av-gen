@@ -173,7 +173,10 @@ std::string usageText() {
            "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
            "  --supersample <f>   offline render only: render the scene at this multiple of the output\n"
            "  --viewport-matches-render   lift the distance detail limits in the viewport too, so\n"
-           "                      live playback shows what a render will (costs frame time)\n"           "  --aov <list>        offline render only: write auxiliary passes beside the frames as\n"
+           "                      live playback shows what a render will (costs frame time)\n"
+           "  --preview-mode <m>  open the canvas in workspace | outputFrame | outputPreview. The\n"
+           "                      last two render at the project's output aspect ratio (ADR-246)\n"
+           "  --aov <list>        offline render only: write auxiliary passes beside the frames as\n"
            "                      scene-linear EXRs. normal (xyz + roughness in alpha), emission,\n"
            "                      depth (metres), velocity, id. Comma separated.\n"
            "                      size and resolve down (1 = off, max 2). Buys back the sub-pixel\n"
@@ -480,6 +483,19 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             ++i;
         } else if (arg == "--viewport-matches-render") {
             options.liftViewportLimits = true;
+        } else if (arg == "--preview-mode") {
+            // ADR-246. Exists so the output preview can be driven by the scripted-interaction
+            // driver and by a benchmark arm: the mode is otherwise only reachable from a toolbar,
+            // and a UI mode that can only be entered by hand is a UI mode nobody measures.
+            auto v = need(i, "--preview-mode");
+            if (!v) return std::unexpected(v.error());
+            ui::PreviewViewMode mode{};
+            if (!ui::previewViewModeFromName(*v, mode)) {
+                return fail("--preview-mode must be workspace, outputFrame or outputPreview, got '{}'",
+                            *v);
+            }
+            options.previewMode = mode;
+            ++i;
         } else if (arg == "--aov") {
             auto v = need(i, "--aov");
             if (!v) return std::unexpected(v.error());
@@ -681,6 +697,11 @@ void Application::saveSettings() {
     }
     if (panel_) {
         settings_.canvasRenderScale = panel_->canvasRenderScale;
+        // ADR-225/ADR-246: the preview's view state is the editor's, and it has to come back.
+        // Taken from the panel here rather than written through a pointer by every toolbar widget,
+        // for the same reason the render scale is: ImGui writes these flags directly and there is
+        // no hook to set a dirty bit in.
+        settings_.preview = panel_->preview;
     }
     if (auto r = settings_.save(settingsPath_); !r) {
         log::warn("settings: {}", r.error().message);
@@ -940,6 +961,19 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         edits_.addContext(panel_->editor);
         panel_->canvasRenderScale =
             options_.canvasScale != 1.0f ? options_.canvasScale : settings_.canvasRenderScale;
+        panel_->preview = settings_.preview;
+        // The flag outranks the remembered state, and only when it was given: a benchmark arm has
+        // to be able to say which mode it is measuring without depending on how this machine's
+        // settings file happens to be left.
+        if (options_.previewMode) {
+            panel_->preview.mode = *options_.previewMode;
+        }
+        // Never restored: a fullscreen preview closes every panel, and a session that ended in one
+        // must not reopen with an empty editor and no record of what was open. The pan is dropped
+        // for the same class of reason -- it only means anything against the canvas it was made at.
+        panel_->preview.fullscreen = false;
+        panel_->preview.panX = 0.0f;
+        panel_->preview.panY = 0.0f;
         panel_->ai.plane = ai_.get();
         panel_->settings.plane = ai_.get();
         panel_->settings.settings = &settings_;
@@ -2757,6 +2791,27 @@ int Application::runLive() {
             cw = std::max(1u, static_cast<std::uint32_t>(std::lround(canvas_.width * pixelScale * renderScale)));
             ch = std::max(1u, static_cast<std::uint32_t>(std::lround(canvas_.height * pixelScale * renderScale)));
         }
+        // ---- the output preview (ADR-246) ----------------------------------------------------
+        //
+        // The one substitution the whole feature is. When the canvas is showing the output frame,
+        // the extent comes from the preview's geometry instead of from the canvas's -- and because
+        // that extent carries the *output's* aspect ratio, everything downstream follows: the
+        // renderer's HDR target, `Camera::projection(aspect)`, the froxel grid, the terrain LOD's
+        // frustum and the pixel a click resolves to. The picture in the frame is not an
+        // approximation of the deliverable's framing; it is the deliverable's framing, produced by
+        // the same code from the same camera at a different number of samples.
+        //
+        // The editor's own render scale is deliberately *not* applied on top. `canvasRenderScale`
+        // is "soften the workspace to keep the frame rate up" (ADR-084); the preview's own quality
+        // rung is the lever here, and two multiplying scales would make the number the toolbar
+        // reports a lie.
+        const ui::PreviewRender previewExtent =
+            panel_ != nullptr ? panel_->previewRender() : ui::PreviewRender{};
+        const bool previewFramed = previewExtent.width > 0 && previewExtent.height > 0;
+        if (previewFramed) {
+            cw = previewExtent.width;
+            ch = previewExtent.height;
+        }
         // A new size only takes effect once it has held still for a few frames. Following every
         // frame of a splitter drag would be more correct and much worse: each size is a new render
         // target and a new texture view, and ImGui's WebGPU backend caches a bind group per view
@@ -2794,9 +2849,42 @@ int Application::runLive() {
             // built for it, and that bind group is the last reference to a whole render target.
             imgui_->forgetCachedTextures();
         }
+        // The preview's view state, when it has moved and the throttle is due. Same shape and same
+        // reason as `ControlPanel::serviceLayoutStore`: ImGui writes these flags straight through,
+        // so there is no hook to set a dirty bit in and the honest thing is to compare.
+        if (panel_ != nullptr && !settingsPath_.empty()) {
+            const bool moved = !(panel_->preview == settings_.preview);
+            const double now = ImGui::GetTime();
+            if (moved && now - lastPreviewSave_ > 2.0) {
+                lastPreviewSave_ = now;
+                saveSettings();
+            }
+        }
         if (panel_ != nullptr) {
             panel_->canvasTexture = reinterpret_cast<std::uint64_t>(finalView_.Get());
             panel_->environmentBehind = renderer_->environmentAwaitingRebuild();
+            // The resolution the toolbar validates a custom size against is the adapter's, not a
+            // constant (output-preview spec §5.3).
+            panel_->maxTextureDimension = context_->capabilities().limits.maxTextureDimension2D;
+            // The target has been asked for but not yet built: the settle above holds a new extent
+            // for a few frames, and during those the picture on screen is the old size stretched.
+            // Saying so is the difference between "busy" and "ignored the click" (spec §15).
+            panel_->previewResizing = previewFramed && (cw != renderWidth_ || ch != renderHeight_);
+            // ---- the camera indicator, and the one seam a camera system would arrive at --------
+            //
+            // This engine has exactly one camera: `scene::Scene::camera`, rewritten every frame by
+            // `Composition::applyParameters` from the `camera/*` parameters. There is no camera
+            // list, no camera entity and no selection -- the shot system bakes its cameras down to
+            // keys on `camera/position` and `camera/target`, so a directed shot and a hand-flown
+            // viewport differ in *what writes the parameters*, never in which camera is read.
+            //
+            // So the preview does not choose a camera and must not: it renders `engine_->scene()`,
+            // which already holds whatever the authoritative answer is this frame. All that is left
+            // to report is what is driving it, which is what this line does. If a camera-selection
+            // system is added, it will publish its choice by writing those same parameters, and
+            // this indicator is the only line here that will need to know its name.
+            panel_->previewCameraLabel =
+                cameraLooksDirected(*engine_) ? "shot camera" : "viewport camera";
         }
         prof.add(kPhResize, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
                                                                       resizeStart).count());
@@ -3228,6 +3316,12 @@ int Application::runLive() {
     // ImGui saves its own ini from DestroyContext, so the two halves of the layout land together.
     if (panel_) {
         panel_->saveLayout();
+        // ADR-225/ADR-246. Written on the way out as well as when a toolbar toggle moves, because
+        // the in-frame check below is throttled and the last thing someone does before quitting is
+        // very often the thing they most want kept.
+        if (!(panel_->preview == settings_.preview)) {
+            saveSettings();
+        }
     }
     if (options_.profileCpu) {
         // stderr rather than the log, so the table is not interleaved with timestamps and levels

@@ -138,8 +138,51 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
     // The editor runs inside it (ADR-092): the pointer is only the canvas's while the canvas is the
     // current window, and the canvas's rectangle is only known once ImGui has laid it out.
     statusAgeSeconds_ += static_cast<double>(ImGui::GetIO().DeltaTime);
+    // ADR-246. Three things are handed to the canvas and all three come from one computation:
+    // where the picture goes inside the window, what the letterbox is painted with, and -- through
+    // the overlay -- which rectangle every coordinate conversion divides by.
+    const app::RenderSettings* out = renderSettings;
+    const std::uint32_t outW = out != nullptr ? out->width : 0;
+    const std::uint32_t outH = out != nullptr ? out->height : 0;
+    const bool framed = preview.showsOutputFrame() && outW > 0 && outH > 0;
+    const float pixelScale = std::max(ImGui::GetIO().DisplayFramebufferScale.x, 1.0f);
+
+    CanvasPlacement placement;
+    if (framed) {
+        placement = [&](const CanvasRect& rect) {
+            // The pan is clamped against the *unpanned* frame every frame rather than only when a
+            // drag ends: the canvas can be resized under a held pan (a panel opens, the window is
+            // dragged to another display) and a pan that was legal at the old size can put the
+            // whole frame off the new one.
+            const PreviewFrame unpanned = fitOutputFrame(rect, outW, outH, preview.zoom, pixelScale);
+            clampPreviewPan(rect, unpanned, preview.panX, preview.panY);
+            return fitOutputFrame(rect, outW, outH, preview.zoom, pixelScale, preview.panX, preview.panY);
+        };
+    }
+    std::uint32_t outside = 0;
+    if (framed) {
+        switch (preview.outside) {
+        case OutsideFrame::Show: outside = 0; break;
+        case OutsideFrame::Dim: outside = IM_COL32(0, 0, 0, 150); break;
+        case OutsideFrame::Hide: outside = palette().ground | IM_COL32(0, 0, 0, 255); break;
+        }
+    }
     canvas_ = drawCanvasWindow(canvasTexture, layout_.regionNode(DockRegion::Centre),
-                               [&](const CanvasRect& rect) { drawViewportEditor(engine, rect); });
+                               [&](const CanvasRect& rect, const PreviewFrame& frame) {
+                                   previewFrame_ = frame;
+                                   drawViewportEditor(engine, rect, frame);
+                               },
+                               placement, outside);
+    // What the host will render at next frame. Computed here because this is where the frame's
+    // size is known, and stored rather than recomputed by the host so the extent the picture is
+    // rendered at and the rectangle it is drawn into cannot come to disagree.
+    if (framed && previewFrame_.valid()) {
+        previewRender_ = previewRenderExtent(previewFrame_, outW, outH, pixelScale, preview.quality,
+                                             maxTextureDimension != 0 ? maxTextureDimension
+                                                                      : kMaxOutputDimension);
+    } else {
+        previewRender_ = PreviewRender{};
+    }
     drawPanels(engine, stats);
     serviceLayoutStore();
 }
@@ -595,12 +638,21 @@ void ControlPanel::drawWorldBuilderWindow(app::Engine& engine) {
     editor.reconcile(engine);
 }
 
-void ControlPanel::drawViewportEditor(app::Engine& engine, const CanvasRect& rect) {
+void ControlPanel::drawViewportEditor(app::Engine& engine, const CanvasRect& rect,
+                                     const PreviewFrame& frame) {
     if (!rect.valid()) {
         return;
     }
-    const float aspect = rect.width / std::max(rect.height, 1.0f);
-    const EditorInput input = editorInputFromImGui(rect);
+    // The frame, not the window. This one substitution is the whole of ADR-246's §10.2 answer: the
+    // image was drawn by a projection built from the frame's aspect ratio, so a conversion that
+    // divided by the window's would put every gizmo handle, every selection outline and every
+    // picked ray out by the width of the letterbox -- close enough to look right, which is why it
+    // would have survived a screenshot.
+    //
+    // In Workspace mode the frame *is* the window, so nothing about the old behaviour changes.
+    const CanvasRect image = frame.valid() ? frame.asCanvasRect(rect.hovered) : rect;
+    const float aspect = image.width / std::max(image.height, 1.0f);
+    const EditorInput input = editorInputFromImGui(image);
     editor.update(engine, worldBuilder.library(), engine.scene().camera, aspect, input);
     // AVGEN_EDITOR_TRACE=1 prints the editor's per-frame inputs and what it made of them. The
     // editor's wiring is the half of it that no unit test reaches and that this machine cannot
@@ -612,10 +664,416 @@ void ControlPanel::drawViewportEditor(app::Engine& engine, const CanvasRect& rec
                   input.leftDown, editor.preview().armed, editor.preview().ground.valid,
                   editor.preview().instances.size());
     }
-    drawViewportOverlay(editor, engine.scene().camera, rect, aspect);
-    drawViewportHud(editor, rect);
+    // In Output Preview mode the editor's overlays are suppressed (spec §10.1): the mode exists to
+    // look at the picture, and a gizmo over it is the one thing guaranteed not to be in the
+    // deliverable. Navigation and selection still work -- this hides the drawing, not the editor --
+    // and the toolbar's mode selector is the obvious way back, which is what §10.1 asks be
+    // "consistent, discoverable, and documented".
+    const bool chrome = preview.mode != PreviewViewMode::OutputPreview;
+    if (chrome) {
+        drawViewportOverlay(editor, engine.scene().camera, image, aspect);
+        drawViewportHud(editor, image);
+    }
+    drawPreviewGuides(frame);
     drawCanvasActivity(engine, rect);
     drawCanvasContextMenu(engine, rect);
+    drawPreviewToolbar(engine, rect);
+}
+
+// ---- the preview's guides (spec §9) ------------------------------------------------------------
+//
+// Editor presentation, drawn into the canvas *window's* draw list. That is the same rule
+// `drawCanvasActivity` states and it is what makes "guides are not rendered into the scene or
+// export" (§9.1) true by construction rather than by care: this draw list only ever reaches the
+// main window's swapchain image, and the offline renderer builds its own engine from the project
+// file and never runs any of this code at all.
+void ControlPanel::drawPreviewGuides(const PreviewFrame& frame) {
+    if (!preview.showsOutputFrame() || !frame.valid()) {
+        return;
+    }
+    ImDrawList* list = ImGui::GetWindowDrawList();
+    if (list == nullptr) {
+        return;
+    }
+    const GuideSettings& g = preview.guides;
+    const ImVec2 a(frame.x, frame.y);
+    const ImVec2 b(frame.x + frame.width, frame.y + frame.height);
+
+    if (g.frameBorder) {
+        // Two strokes, dark under light: a single hairline vanishes over a bright sky and over a
+        // dark forest in turn, and the frame edge is the one line in this feature that must be
+        // findable on every possible image.
+        list->AddRect(ImVec2(a.x - 1.0f, a.y - 1.0f), ImVec2(b.x + 1.0f, b.y + 1.0f),
+                      IM_COL32(0, 0, 0, 160), 0.0f, 0, 3.0f);
+        list->AddRect(a, b, IM_COL32(255, 255, 255, 200), 0.0f, 0, 1.0f);
+    }
+    if (g.thirds) {
+        const ImU32 colour = IM_COL32(255, 255, 255, 70);
+        for (int i = 1; i <= 2; ++i) {
+            const float t = static_cast<float>(i) / 3.0f;
+            const float x = frame.x + frame.width * t;
+            const float y = frame.y + frame.height * t;
+            list->AddLine(ImVec2(x, a.y), ImVec2(x, b.y), colour, 1.0f);
+            list->AddLine(ImVec2(a.x, y), ImVec2(b.x, y), colour, 1.0f);
+        }
+    }
+    if (g.centreCross) {
+        const ImU32 colour = IM_COL32(255, 255, 255, 120);
+        const float cx = frame.x + frame.width * 0.5f;
+        const float cy = frame.y + frame.height * 0.5f;
+        const float arm = std::min(frame.width, frame.height) * 0.03f;
+        list->AddLine(ImVec2(cx - arm, cy), ImVec2(cx + arm, cy), colour, 1.0f);
+        list->AddLine(ImVec2(cx, cy - arm), ImVec2(cx, cy + arm), colour, 1.0f);
+    }
+    if (g.safeAreas) {
+        const auto box = [&](float fraction, ImU32 colour, const char* label) {
+            const GuideRect r = insetFrame(frame, fraction);
+            list->AddRect(ImVec2(r.x, r.y), ImVec2(r.x + r.width, r.y + r.height), colour, 0.0f, 0,
+                          1.0f);
+            // Inside the box and hard against its corner, so a label never sits over the subject --
+            // §9.1: "Labels, if provided, do not obscure the scene."
+            if (r.width > 120.0f && r.height > 40.0f) {
+                list->AddText(ImVec2(r.x + 4.0f, r.y + 2.0f), colour, label);
+            }
+        };
+        box(preview.guides.safe.actionFraction, IM_COL32(255, 210, 90, 140), "action");
+        box(preview.guides.safe.titleFraction, IM_COL32(120, 200, 255, 140), "title");
+    }
+}
+
+
+// ---- the output resolution (spec §5.2, §5.3) ----------------------------------------------------
+//
+// One function, drawn in two places -- the preview toolbar and the Render panel. Two surfaces
+// editing one setting through two bits of code is how they come to disagree about what is valid,
+// and the resolution is the setting where disagreeing matters most: the preview would be framing
+// the shot at a size the render then refuses.
+bool ControlPanel::drawOutputResolutionControls(app::RenderSettings& output) {
+    bool changed = false;
+    const std::uint32_t cap = maxTextureDimension != 0 ? maxTextureDimension : kMaxOutputDimension;
+
+    // The boxes hold the *pending* numbers, which are the last thing typed rather than the last
+    // thing accepted. §5.3: "Preserve the last valid configuration if the new value is rejected" --
+    // and equally, do not silently put the old number back under someone who is halfway through
+    // typing a new one.
+    if (pendingOutputWidth_ == 0 || (outputError_.empty() && (pendingOutputWidth_ != output.width ||
+                                                              pendingOutputHeight_ != output.height))) {
+        pendingOutputWidth_ = output.width;
+        pendingOutputHeight_ = output.height;
+    }
+
+    const std::string current = fmt::format("{} x {}", output.width, output.height);
+    ImGui::SetNextItemWidth(150.0f);
+    if (ImGui::BeginCombo("##output-preset", current.c_str())) {
+        for (const OutputPreset& preset : outputPresets()) {
+            const std::string label =
+                fmt::format("{}  {} x {}  ({})", preset.label, preset.width, preset.height,
+                            aspectLabel(preset.width, preset.height));
+            const bool selected = output.width == preset.width && output.height == preset.height;
+            if (ImGui::Selectable(label.c_str(), selected)) {
+                // A preset is known-good by construction (a unit test proves every one of them
+                // validates), so it clears any error the custom boxes left standing.
+                output.width = preset.width;
+                output.height = preset.height;
+                pendingOutputWidth_ = preset.width;
+                pendingOutputHeight_ = preset.height;
+                outputError_.clear();
+                changed = true;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", aspectLabel(output.width, output.height).c_str());
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("The output's aspect ratio, derived from its width and height.\nIt is not "
+                          "separately editable: an aspect that could disagree with the pixel\n"
+                          "dimensions is an aspect that will.");
+    }
+
+    int custom[2] = {static_cast<int>(pendingOutputWidth_), static_cast<int>(pendingOutputHeight_)};
+    ImGui::SetNextItemWidth(150.0f);
+    const bool edited = ImGui::InputInt2("custom", custom);
+    const bool commit = edited && ImGui::IsItemDeactivatedAfterEdit();
+    if (edited) {
+        pendingOutputWidth_ = static_cast<std::uint32_t>(std::max(0, custom[0]));
+        pendingOutputHeight_ = static_cast<std::uint32_t>(std::max(0, custom[1]));
+    }
+    if (edited || commit) {
+        // Validated as 64-bit against the *adapter's* limit, and applied only if it passes. A
+        // rejected size never reaches `RenderSettings`, so no GPU resource is ever allocated for
+        // one (spec §5.3: "Avoid allocating a render target until the configuration is valid").
+        const auto ok = validateOutputResolution(static_cast<std::uint64_t>(std::max(0, custom[0])),
+                                                 static_cast<std::uint64_t>(std::max(0, custom[1])), cap);
+        if (ok) {
+            outputError_.clear();
+            if (output.width != pendingOutputWidth_ || output.height != pendingOutputHeight_) {
+                output.width = pendingOutputWidth_;
+                output.height = pendingOutputHeight_;
+                changed = true;
+            }
+        } else {
+            outputError_ = ok.error().message;
+        }
+    }
+    if (!outputError_.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette().error));
+        ImGui::TextWrapped("%s", outputError_.c_str());
+        ImGui::PopStyleColor();
+        ImGui::TextDisabled("still rendering at %u x %u", output.width, output.height);
+    }
+    return changed;
+}
+
+// ---- the preview toolbar (spec §8.1) ------------------------------------------------------------
+//
+// Drawn inside the canvas window, over the top edge of the picture, rather than as a panel. The
+// canvas is the point of this editor (ADR-076) and a permanent strip of chrome above it would cost
+// the world a row of pixels in every session, including the ones that never use the preview. It
+// collapses to a single chevron, and it is absent entirely in Workspace mode until the mode
+// selector is reached for.
+void ControlPanel::drawPreviewToolbar(app::Engine& engine, const CanvasRect& rect) {
+    static_cast<void>(engine);
+    if (!rect.valid()) {
+        return;
+    }
+    ImGui::SetCursorScreenPos(ImVec2(rect.x + 8.0f, rect.y + 8.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 4.0f);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(
+                                                (palette().panel & 0x00FFFFFFu) | IM_COL32(0, 0, 0, 205)));
+    const float height = ImGui::GetFrameHeight() + ImGui::GetStyle().WindowPadding.y * 2.0f;
+    if (ImGui::BeginChild("preview-toolbar", ImVec2(preview.toolbar ? 0.0f : 34.0f, height),
+                          ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AlwaysUseWindowPadding,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+        if (ImGui::SmallButton(preview.toolbar ? "<<" : ">>")) {
+            preview.toolbar = !preview.toolbar;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Show or hide the output preview controls.");
+        }
+        if (preview.toolbar) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(130.0f);
+            if (ImGui::BeginCombo("##view-mode", previewViewModeLabel(preview.mode))) {
+                for (const auto mode : {PreviewViewMode::Workspace, PreviewViewMode::OutputFrame,
+                                        PreviewViewMode::OutputPreview}) {
+                    if (ImGui::Selectable(previewViewModeLabel(mode), mode == preview.mode)) {
+                        preview.mode = mode;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "Workspace -- the world fills the canvas, at the canvas's own shape.\n"
+                    "Output Frame -- the world is rendered at the output's shape and placed in the\n"
+                    "  canvas. This is the deliverable's framing: same camera, same projection.\n"
+                    "Preview -- the same frame with the editor's overlays out of the way.");
+            }
+
+            if (preview.showsOutputFrame()) {
+                ImGui::SameLine();
+                drawPreviewFrameControls();
+            } else {
+                ImGui::SameLine();
+                ImGui::TextDisabled("the canvas's own shape, not the output's");
+            }
+        }
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
+}
+
+// The half of the toolbar that only means anything while a frame is on screen. Split out so the
+// mode selector above stays readable, not because it is a different concern.
+void ControlPanel::drawPreviewFrameControls() {
+    app::RenderSettings* out = renderSettings;
+    if (out == nullptr) {
+        ImGui::TextDisabled("no render settings");
+        return;
+    }
+    ImGui::SetNextItemWidth(120.0f);
+    const std::string size = fmt::format("{} x {}  {}", out->width, out->height,
+                                         aspectLabel(out->width, out->height));
+    if (ImGui::BeginCombo("##output-size", size.c_str(), ImGuiComboFlags_HeightLarge)) {
+        static_cast<void>(drawOutputResolutionControls(*out));
+        ImGui::EndCombo();
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("The output resolution -- the same setting the Render panel edits and the\n"
+                          "one the deliverable is rendered at. It is the project's, not the editor's.");
+    }
+
+    // ---- zoom ----
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(110.0f);
+    const std::string zoom = zoomLabel(preview.zoom, previewFrame_.fittedScale);
+    if (ImGui::BeginCombo("##zoom", zoom.c_str())) {
+        if (ImGui::Selectable("Fit", preview.zoom.fit)) {
+            preview.zoom.fit = true;
+            preview.panX = 0.0f;
+            preview.panY = 0.0f;
+        }
+        for (const float stop : zoomStops()) {
+            const std::string label = fmt::format("{:.0f}%", static_cast<double>(stop) * 100.0);
+            const bool selected = !preview.zoom.fit && preview.zoom.scale == stop;
+            if (ImGui::Selectable(label.c_str(), selected)) {
+                preview.zoom.fit = false;
+                preview.zoom.scale = stop;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("How large the frame is *displayed*. 100%% is one output pixel per screen\n"
+                          "pixel. Zoom changes nothing about the output resolution, the camera or\n"
+                          "the scene -- for that, use the size and the quality controls beside it.");
+    }
+
+    // ---- preview quality ----
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(140.0f);
+    if (ImGui::BeginCombo("##quality", previewQualityLabel(preview.quality))) {
+        for (const auto q : {PreviewQuality::Draft, PreviewQuality::Realtime, PreviewQuality::Native}) {
+            if (ImGui::Selectable(previewQualityLabel(q), q == preview.quality)) {
+                preview.quality = q;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("How many pixels the frame is *rendered* at, which is a different question\n"
+                          "from how large it is shown. Every rung here is a real render-target\n"
+                          "extent at the output's aspect ratio -- none of them is a label.");
+    }
+
+    // ---- what is actually happening, said out loud (spec §8.1) ----
+    ImGui::SameLine();
+    if (previewResizing) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette().processing));
+        ImGui::TextUnformatted("rebuilding...");
+        ImGui::PopStyleColor();
+    } else if (previewRender_.width == 0) {
+        ImGui::TextDisabled("no frame");
+    } else {
+        const std::string what = previewRender_.describe(out->width, out->height);
+        const bool reduced = !previewRender_.nativeOutput;
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(
+                                                 reduced ? palette().warning : palette().success));
+        ImGui::TextUnformatted(what.c_str());
+        ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "What the frame on screen was actually rendered at.\n\n"
+                "The framing is the deliverable's exactly -- the projection is built from this\n"
+                "extent's aspect ratio, which is the output's. What differs is how finely it is\n"
+                "sampled, and these two things it cannot show you at all:\n"
+                "  - an offline render may supersample (ADR-212); this preview never does.\n"
+                "  - an offline render lifts the distance detail limits and live playback does\n"
+                "    not (ADR-186), so a wide shot has more in it in the deliverable. The Render\n"
+                "    panel's \"viewport matches the render\" puts the viewport on those terms.");
+        }
+    }
+    if (!previewRender_.aspectMatches) {
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette().error));
+        ImGui::TextUnformatted("framing differs");
+        ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("The output is larger than this device will allocate, so the preview\n"
+                              "could not be given the output's exact shape. It is NOT showing the\n"
+                              "deliverable's framing. Lower the output resolution to fix it.");
+        }
+    }
+
+    // ---- the toggles ----
+    ImGui::SameLine();
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
+    ImGui::Checkbox("safe", &preview.guides.safeAreas);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Title-safe (%.0f%%) and action-safe (%.0f%%) areas, SMPTE ST 2046-1 /\n"
+                          "EBU R 95. Editor guides: they cannot reach a render.",
+                          static_cast<double>(preview.guides.safe.titleFraction) * 100.0,
+                          static_cast<double>(preview.guides.safe.actionFraction) * 100.0);
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("thirds", &preview.guides.thirds);
+    ImGui::SameLine();
+    ImGui::Checkbox("centre", &preview.guides.centreCross);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(90.0f);
+    if (ImGui::BeginCombo("##outside", outsideFrameName(preview.outside))) {
+        for (const auto o : {OutsideFrame::Show, OutsideFrame::Dim, OutsideFrame::Hide}) {
+            if (ImGui::Selectable(outsideFrameName(o), o == preview.outside)) {
+                preview.outside = o;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("What the canvas outside the frame looks like. An editor overlay: it is\n"
+                          "painted after the picture and reaches nothing but this window.");
+    }
+
+    // ---- fullscreen (spec §11) ----
+    ImGui::SameLine();
+    if (ImGui::SmallButton(preview.fullscreen ? "exit full" : "fullscreen")) {
+        setFullscreenPreview(!preview.fullscreen);
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Close the panels and leave the canvas the whole window. Everything that\n"
+                          "was open comes back when you leave. Esc also leaves.");
+    }
+    if (preview.fullscreen && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+        setFullscreenPreview(false);
+    }
+
+    // ---- which camera (spec §8.1: "Camera/shot indicator") ----
+    ImGui::SameLine();
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", previewCameraLabel.c_str());
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Which camera this frame was rendered through. There is one camera in this\n"
+                          "engine -- the scene's -- and the shot system writes it by keying\n"
+                          "camera/position and camera/target on the timeline. So the preview,\n"
+                          "the viewport and the deliverable cannot be looking through different\n"
+                          "cameras: there is only the one to look through.");
+    }
+}
+
+// Fullscreen preview (spec §11): a view-state change inside the existing window, not an OS-level
+// mode. That is the least disruptive option and the one consistent with what this editor already
+// does -- the canvas already grows when panels close, and this is that gesture with one click and
+// a way back. Nothing about the project, the transport or the dock tree is touched, so there is
+// nothing to restore beyond the panel set.
+void ControlPanel::setFullscreenPreview(bool on) {
+    if (on == preview.fullscreen) {
+        return;
+    }
+    if (on) {
+        suspendedPanels_.clear();
+        for (const EditorPanel& panel : editorPanels()) {
+            if (layout_.visible(panel.id)) {
+                suspendedPanels_.emplace_back(panel.id);
+                layout_.setVisible(panel.id, false);
+            }
+        }
+        // A preview with nothing else on screen wants to be the deliverable's frame and not the
+        // canvas's, so entering fullscreen from Workspace arrives in Preview rather than showing
+        // the same wrong shape at a larger size.
+        if (!preview.showsOutputFrame()) {
+            preview.mode = PreviewViewMode::OutputPreview;
+        }
+    } else {
+        for (const std::string& id : suspendedPanels_) {
+            layout_.setVisible(id, true);
+        }
+        suspendedPanels_.clear();
+    }
+    preview.fullscreen = on;
 }
 
 // ---- right-clicking the world (the addendum's section 4) --------------------------------------
@@ -2181,11 +2639,12 @@ void ControlPanel::drawRender(app::Engine& engine) {
     const app::RenderProgress current = renderProgress ? renderProgress() : app::RenderProgress{};
     const bool running = current.framesTotal > 0 && !current.finished;
     ImGui::BeginDisabled(running);
-    int size[2] = {static_cast<int>(s.width), static_cast<int>(s.height)};
-    if (ImGui::InputInt2("size", size)) {
-        s.width = static_cast<std::uint32_t>(std::clamp(size[0], 2, 16384));
-        s.height = static_cast<std::uint32_t>(std::clamp(size[1], 2, 16384));
-    }
+    // ADR-246: the same control the preview toolbar offers, drawn from the same function. Before
+    // this it was a bare `InputInt2` that clamped silently to [2, 16384] -- so typing 1 gave you 2
+    // and typing 20000 gave you 16384, with nothing said either way, which is exactly the "silently
+    // alter the aspect ratio or clamp dimensions without informing the user" the spec's §5.3
+    // refuses. It now rejects and explains, and keeps the last valid size.
+    static_cast<void>(drawOutputResolutionControls(s));
     auto fps = static_cast<float>(s.fps);
     if (ImGui::InputFloat("fps", &fps, 1.0f, 10.0f, "%.3f")) {
         s.fps = static_cast<double>(std::clamp(fps, 1.0f, 240.0f));
