@@ -134,6 +134,23 @@ private:
     // enqueue blocks until a slot frees, which bounds how many float images can pile up at once.
     std::unique_ptr<gpu::ReadbackRing> aovRing_;
     std::vector<AovSource> aovs_;
+    // ADR-186 says an offline render lifts the live distance limits, and the job logs that it is
+    // doing so. A log line is not evidence that a thing happened -- this repository has an ADR
+    // about a supersample fix that logged "2.00x" while doing nothing -- so the entity world's own
+    // structural counters are carried out with the render and reported beside the frame count.
+    // `coarse` or `skipped` above zero in a render means the lift did not reach the simulation,
+    // whatever the log said.
+    std::size_t entityCoarseMax_ = 0;
+    std::size_t entitySkippedMax_ = 0;
+    std::size_t entityFullMax_ = 0;
+    // The rig half of the same question. `RigStats` has carried these three since ADR-086 and
+    // nothing has ever read them either. A rig counted rateLimited or culled in a render is a
+    // distant character posed at 15 Hz (feet sliding) or not posed at all (gliding in a frozen
+    // pose) in the deliverable -- the *other* artifact reported, and not the one the entity
+    // counters above can see.
+    std::uint32_t rigRateLimitedMax_ = 0;
+    std::uint32_t rigCulledMax_ = 0;
+    std::uint32_t rigPosedMax_ = 0;
     // Where the AOV files go. For a sequence that is the output directory; for a VIDEO render
     // `output_` is a file, and writing `<movie.mov>/frame_000000.normal.exr` inside it is not a
     // path. A video with AOVs beside it is a real request -- the passes are for the compositor,

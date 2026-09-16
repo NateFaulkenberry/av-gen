@@ -446,6 +446,16 @@ Result<void> RenderJob::renderOne() {
             return r;
         }
     }
+    if (const scene::Composition* comp = engine_->composition()) {
+        const auto counts = comp->entityWorld().counts();
+        entityFullMax_ = std::max(entityFullMax_, counts.full);
+        entityCoarseMax_ = std::max(entityCoarseMax_, counts.coarse);
+        entitySkippedMax_ = std::max(entitySkippedMax_, counts.skipped);
+        const scene::RigStats& rig = comp->rigStats();
+        rigPosedMax_ = std::max(rigPosedMax_, rig.posed);
+        rigRateLimitedMax_ = std::max(rigRateLimitedMax_, rig.rateLimited);
+        rigCulledMax_ = std::max(rigCulledMax_, rig.culled);
+    }
     log::trace("render frame {} t={:.4f} submitted ({} in flight)", rendered_, time.renderTime, ring_->inFlight());
     ++rendered_;
     return drain(false);
@@ -555,6 +565,19 @@ Result<void> RenderJob::finish() {
         log::info("render complete: {} frames in {:.1f}s ({:.1f} fps), {} written, sequence hash {:016x}, GPU errors: {}",
                   p.framesReadBack, p.elapsedSeconds, p.renderFps, p.framesWritten, p.sequenceHash,
                   context_.errorCount());
+        // The structural check on ADR-186's lift, reported whether or not it looks right. An
+        // entity counted coarse or skipped in an offline render is a distant character that froze
+        // or stuttered in the deliverable -- the artifact the lift exists to remove.
+        log::info("render: entity updates per frame, worst case -- full {}, coarse {}, skipped {}{}",
+                  entityFullMax_, entityCoarseMax_, entitySkippedMax_,
+                  (entityCoarseMax_ > 0 || entitySkippedMax_ > 0)
+                      ? "  <-- the distance limits reached the simulation; distant bodies stuttered or froze"
+                      : "  (every body simulated at full rate at every distance)");
+    log::info("render: rig poses per frame, worst case -- posed {}, rate-limited {}, culled {}{}",
+              rigPosedMax_, rigRateLimitedMax_, rigCulledMax_,
+              (rigRateLimitedMax_ > 0 || rigCulledMax_ > 0)
+                  ? "  <-- the rig ladder reached the deliverable; distant characters slid or glided"
+                  : "  (every rig posed at its authored rate at every distance)");
         log::info("render: the render thread waited {:.2f}s for the GPU (readback ring full) and {:.2f}s for the "
                   "encoders (queue full)",
                   ring_ ? ring_->blockedSeconds() : 0.0, encoderWaitSeconds_);

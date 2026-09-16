@@ -2211,6 +2211,19 @@ void ControlPanel::drawRender(app::Engine& engine) {
         if (ImGui::Combo("tier", &tier, kTierNames, 4)) {
             s.tier = kTierNames[tier];
         }
+        if (liftViewportLimits != nullptr) {
+            ImGui::Checkbox("viewport matches the render", liftViewportLimits);
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "Lift the distance limits in the VIEWPORT, so it shows what a render will.\n\n"
+                    "A render already lifts them (ADR-186): distant characters keep simulating and\n"
+                    "stay posed. Live playback does not, so past the scene's thresholds a far body\n"
+                    "is simulated in steps and posed at a lower rate -- which reads as gliding and\n"
+                    "as stepping between positions. That is the editor, not the deliverable.\n\n"
+                    "Costs real time on a wide shot, which is why live playback does not do it by\n"
+                    "default. Turn it on to judge a wide shot; turn it off to work at speed.");
+            }
+        }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip(
                 "The quality tier this render is made at -- not the viewport's.\n\n"

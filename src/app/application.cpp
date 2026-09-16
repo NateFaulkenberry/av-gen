@@ -172,7 +172,8 @@ std::string usageText() {
            "                      so each fix has a before arm in the same process\n"
            "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
            "  --supersample <f>   offline render only: render the scene at this multiple of the output\n"
-           "  --aov <list>        offline render only: write auxiliary passes beside the frames as\n"
+           "  --viewport-matches-render   lift the distance detail limits in the viewport too, so\n"
+           "                      live playback shows what a render will (costs frame time)\n"           "  --aov <list>        offline render only: write auxiliary passes beside the frames as\n"
            "                      scene-linear EXRs. normal (xyz + roughness in alpha), emission,\n"
            "                      depth (metres), velocity, id. Comma separated.\n"
            "                      size and resolve down (1 = off, max 2). Buys back the sub-pixel\n"
@@ -477,6 +478,8 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
                 return fail("--supersample must be 1 (off) to 2, got '{}'", *v);
             }
             ++i;
+        } else if (arg == "--viewport-matches-render") {
+            options.liftViewportLimits = true;
         } else if (arg == "--aov") {
             auto v = need(i, "--aov");
             if (!v) return std::unexpected(v.error());
@@ -1147,6 +1150,8 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->renderer = renderer_.get();
         panel_->videoBackends = assets::describeVideoBackends();
         panel_->renderProgress = [this]() -> RenderProgress { return job_ ? job_->progress() : lastRender_; };
+        liftViewportLimits_ = options.liftViewportLimits;
+        panel_->liftViewportLimits = &liftViewportLimits_;
         panel_->onStartRender = [this] { startRenderFromUi(); };
         panel_->onCancelRender = [this] {
             if (job_) job_->cancel();
@@ -1545,6 +1550,16 @@ void Application::startRenderFromUi() {
 }
 
 void Application::rememberProject(const std::filesystem::path& path) {
+    // The Render panel edits `uiRender_`, and `uiRender_` was copied from the engine exactly once,
+    // in `init()` -- which runs *before* a `--project` on the command line is even loaded. So the
+    // panel has never shown a loaded project's render settings: it shows the start-up defaults, and
+    // because saving writes the panel's copy back over the project, every save replaced whatever
+    // the project had with those defaults. A `supersample` set in the file was silently lost twice
+    // in one afternoon that way, which is how this was found.
+    //
+    // Refreshed here, where a project has just *become* the current one -- the same hook the recent
+    // list and the window title use. The panel's pointer is to `uiRender_` itself and stays valid.
+    uiRender_ = engine_->renderSettings();
     if (context_ && shaders_) {
         applyOutputsFromProject();
         if (auto r = outputs_.open(*context_, *shaders_); !r) {
@@ -2912,6 +2927,13 @@ int Application::runLive() {
             core::PhaseProfiler::Scope scope(prof, kPhAi);
             ai_->pump();
         }
+
+        // ADR-186's limits in the viewport. Set every frame rather than on the checkbox's edge:
+        // loading a project rebuilds the composition, and a policy applied once at the click would
+        // be lost by the next scene the editor opened -- which is the same shape of defect as the
+        // render settings the panel copied once at start-up.
+        engine_->setDetailLimits(liftViewportLimits_ ? scene::DetailLimits::unlimited()
+                                                      : scene::DetailLimits{});
 
         // Background render: a few frames per UI frame, then the next queued job.
         if (job_) {

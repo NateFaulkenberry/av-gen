@@ -1451,6 +1451,14 @@ void Composition::applyDirectedAim() {
             break;
         }
     }
+    if (active != aimFollowLast_) {
+        // A cut. The delta is zero by definition at the start of a shot -- the hero is at
+        // `heroAtCut` -- so the filter starts from zero rather than from the last shot's offset,
+        // which would open the new shot pointing at where the previous hero had got to.
+        aimFollowSmoothed_ = glm::vec3(0.0f);
+        aimFollowPrimed_ = false;
+        aimFollowLast_ = active;
+    }
     if (active != nullptr) {
         const auto hero =
             std::find_if(heroes_.begin(), heroes_.end(),
@@ -1458,9 +1466,31 @@ void Composition::applyDirectedAim() {
         // A hero that was unstarred or renamed since the cut leaves the shot the aim it was baked
         // with, which is the last place that hero was known to be -- a stale table is inert.
         if (hero != heroes_.end()) {
-            scene_.camera.target += hero->position - active->heroAtCut;
+            const glm::vec3 raw = hero->position - active->heroAtCut;
+            glm::vec3 delta = raw;
+            if (aimFollowSmoothingMs_ > 1e-3f) {
+                // ADR-245. Framed in seconds of the *timeline* rather than of the wall clock, so an
+                // offline render and live playback filter identically -- the same rule every other
+                // smoother in this file follows.
+                const double dt = std::max(currentTime_ - aimFollowPrevTime_, 0.0);
+                if (!aimFollowPrimed_) {
+                    // The first frame of a shot has no previous sample to move away from, and the
+                    // honest starting value is the delta itself: at a cut that is zero, and after a
+                    // seek it is wherever the hero actually is. Starting at zero instead would make
+                    // the camera crawl to its subject over the filter's constant, every seek.
+                    aimFollowSmoothed_ = raw;
+                    aimFollowPrimed_ = true;
+                } else if (dt > 0.0) {
+                    const double tau = static_cast<double>(aimFollowSmoothingMs_) / 1000.0;
+                    const auto rate = static_cast<float>(1.0 - std::exp(-dt / std::max(tau, 1e-6)));
+                    aimFollowSmoothed_ += (raw - aimFollowSmoothed_) * rate;
+                }
+                delta = aimFollowSmoothed_;
+            }
+            scene_.camera.target += delta;
         }
     }
+    aimFollowPrevTime_ = currentTime_;
     // After the aim, because it overrides it: the hold's whole job is to keep a shot that the cut
     // has moved on from (ADR-217). Inert unless a scenario was named.
     applyAimHold(active);
