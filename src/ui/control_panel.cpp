@@ -838,11 +838,18 @@ void ControlPanel::drawPreviewToolbar(app::Engine& engine, const CanvasRect& rec
     if (!rect.valid()) {
         return;
     }
-    ImGui::SetCursorScreenPos(ImVec2(rect.x + 8.0f, rect.y + 8.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 4.0f);
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(
                                                 (palette().panel & 0x00FFFFFFu) | IM_COL32(0, 0, 0, 205)));
     const float height = ImGui::GetFrameHeight() + ImGui::GetStyle().WindowPadding.y * 2.0f;
+    // Bottom-centred. The width has to be measured rather than predicted -- the bar auto-sizes to
+    // whichever controls the current mode shows -- so this uses what the last frame came out at.
+    // Before the first measurement the collapsed width is the better guess of the two: it is exact
+    // when the bar is collapsed, and when it is not, one frame of a too-far-right bar is less
+    // visible than one frame of a bar centred as though it had no width at all.
+    const float measured = previewToolbarWidth_ > 0.0f ? previewToolbarWidth_ : 34.0f;
+    const ToolbarOrigin origin = previewToolbarOrigin(rect, measured, height);
+    ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y));
     if (ImGui::BeginChild("preview-toolbar", ImVec2(preview.toolbar ? 0.0f : 34.0f, height),
                           ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AlwaysUseWindowPadding,
                           ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
@@ -882,6 +889,9 @@ void ControlPanel::drawPreviewToolbar(app::Engine& engine, const CanvasRect& rec
         }
     }
     ImGui::EndChild();
+    // EndChild submits the child as an item, so this is the width the bar actually came out at.
+    // Fed back into the placement above on the next frame.
+    previewToolbarWidth_ = ImGui::GetItemRectSize().x;
     ImGui::PopStyleColor();
     ImGui::PopStyleVar();
 }

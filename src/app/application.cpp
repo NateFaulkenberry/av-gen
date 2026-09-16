@@ -20,6 +20,7 @@
 #include "core/time.hpp"
 #include "gpu/context.hpp"
 #include "gpu/readback.hpp"
+#include "gpu/surface.hpp"
 #include "gpu/shader_library.hpp"
 #include "platform/window.hpp"
 #include "rendering/environment.hpp"
@@ -374,6 +375,18 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             if (!v) return std::unexpected(v.error());
             options.capture = *v;
             ++i;
+        } else if (arg == "--capture-ui") {
+            auto v = need(i, "--capture-ui");
+            if (!v) return std::unexpected(v.error());
+            options.captureUi = *v;
+            ++i;
+        } else if (arg == "--capture-ui-frame") {
+            auto v = need(i, "--capture-ui-frame");
+            if (!v) return std::unexpected(v.error());
+            options.captureUiFrame = std::max(1, std::atoi(v->c_str()));
+            ++i;
+        } else if (arg == "--capture-ui-stay") {
+            options.captureUiQuit = false;
         } else if (arg == "--debug-target") {
             auto v = need(i, "--debug-target");
             if (!v) return std::unexpected(v.error());
@@ -2883,8 +2896,31 @@ int Application::runLive() {
             // to report is what is driving it, which is what this line does. If a camera-selection
             // system is added, it will publish its choice by writing those same parameters, and
             // this indicator is the only line here that will need to know its name.
-            panel_->previewCameraLabel =
-                cameraLooksDirected(*engine_) ? "shot camera" : "viewport camera";
+            // ADR-245 published the answer this used to guess at. `cameraLooksDirected` could only
+            // ever say "something is driving the camera"; `activeCamera()` says *which* camera and
+            // *why*, which is the difference between "shot camera" and "UFO Watch -- abduction".
+            const scene::ActiveCameraState active = engine_->activeCamera();
+            switch (active.reason) {
+            case scene::ActiveCameraReason::Event:
+                panel_->previewCameraLabel =
+                    active.eventName.empty()
+                        ? active.name + " -- event"
+                        : fmt::format("{} -- {}", active.name, active.eventName);
+                break;
+            case scene::ActiveCameraReason::Shot:
+                panel_->previewCameraLabel = active.name + " -- shot";
+                break;
+            case scene::ActiveCameraReason::Default:
+            default:
+                // Nothing is directing, so the old distinction is still the useful one: is the
+                // camera where the Auto-director put it, or where the person dragged it?
+                panel_->previewCameraLabel =
+                    cameraLooksDirected(*engine_) ? active.name + " -- directed" : "viewport camera";
+                break;
+            }
+            if (active.blending()) {
+                panel_->previewCameraLabel += fmt::format("  ({:.0f}%)", active.blend * 100.0f);
+            }
         }
         prof.add(kPhResize, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
                                                                       resizeStart).count());
@@ -3159,6 +3195,32 @@ int Application::runLive() {
             wgpu::CommandBuffer commands = encoder.Finish();
             context_->queue().Submit(1, &commands);
         }
+        // The editor, as a picture. After Submit so Dear ImGui's draw has actually happened, and
+        // before `present()` because the swapchain texture is only ours until then. This is the one
+        // capture that contains the interface: `--capture` re-renders the scene and shows the world
+        // with nothing on top of it.
+        if (options_.captureUi && framesRendered >= options_.captureUiFrame) {
+            const std::filesystem::path path = *options_.captureUi;
+            options_.captureUi.reset();   // once, whatever happens next
+            gpu::Surface* surface = context_->primarySurface();
+            const wgpu::Texture texture = surface != nullptr ? surface->currentTexture() : nullptr;
+            if (texture == nullptr) {
+                log::error("--capture-ui: no swapchain texture to read");
+            } else if (auto image = gpu::readTexture8(
+                           *context_, texture, window_->pixelWidth(), window_->pixelHeight(),
+                           surface->format() == wgpu::TextureFormat::BGRA8Unorm);
+                       !image) {
+                log::error("--capture-ui: {}", image.error().message);
+            } else if (auto r = writeCapture(*image, path); !r) {
+                log::error("--capture-ui: {}", r.error().message);
+            } else {
+                log::info("captured the interface ({}x{}) at frame {} to {}", image->width,
+                          image->height, framesRendered, path.string());
+            }
+            if (options_.captureUiQuit) {
+                uiCaptureDone_ = true;
+            }
+        }
         renderer_->collectFrameTimings();
         compositor_->collectTimings();
         if (panel_ != nullptr) {
@@ -3211,6 +3273,9 @@ int Application::runLive() {
         const auto workEnd = std::chrono::steady_clock::now();
         const auto presentStart = workEnd;
         context_->present();
+        if (uiCaptureDone_) {
+            break;   // --capture-ui, without --capture-ui-stay: the picture is written, we are done
+        }
         if (newestInputNs_ != 0) {
             // How old the input is by the time the frame carrying it is handed to the compositor.
             // Not the whole of what a person perceives -- scanout and the compositor's own queue are

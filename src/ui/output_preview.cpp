@@ -391,6 +391,26 @@ GuideRect insetFrame(const PreviewFrame& frame, float fraction) {
     return rect;
 }
 
+ToolbarOrigin previewToolbarOrigin(const CanvasRect& canvas, float toolbarWidth, float toolbarHeight,
+                                   float margin) {
+    ToolbarOrigin origin;
+    if (!canvas.valid()) {
+        return origin;
+    }
+    const float m = std::max(margin, 0.0f);
+    const float w = std::max(toolbarWidth, 0.0f);
+    const float h = std::max(toolbarHeight, 0.0f);
+    // Centred on the canvas, then pinned to the left margin if it does not fit. `std::max` rather
+    // than a clamp of the centred value: the two differ only when the bar is wider than the canvas,
+    // and that is exactly the case that has to resolve towards the left so the collapse button
+    // stays on screen.
+    origin.x = std::max(canvas.x + m, canvas.x + (canvas.width - w) * 0.5f);
+    // The bottom edge, inset by the same margin. Pinned to the top if the canvas is shorter than
+    // the bar, for the same reason: a bar whose controls are above the canvas cannot be reached.
+    origin.y = std::max(canvas.y + m, canvas.y + canvas.height - h - m);
+    return origin;
+}
+
 Result<void> validatePreviewViewState(const PreviewViewState& state) {
     if (auto r = state.guides.safe.validate(); !r) {
         return r;

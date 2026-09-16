@@ -123,6 +123,13 @@ struct AppOptions {
     double offlineFps = 60.0;
     bool fpsGiven = false;
     std::optional<std::filesystem::path> capture; // PPM written after the last frame
+    // The *editor*, captured: the swapchain after Dear ImGui has drawn into it, which is the only
+    // surface the interface exists on. `--capture` re-renders the scene through `renderToImage` and
+    // therefore shows the world with no interface over it -- which is why "I cannot see ImGui" has
+    // been a standing limitation of every agent that has worked on this repository.
+    std::optional<std::filesystem::path> captureUi;
+    int captureUiFrame = 90;      // which frame to grab; late enough for a layout to settle
+    bool captureUiQuit = true;    // exit once it is written, so a script is one command
     // ADR-035: display one auxiliary target instead of the shaded frame; ADR-033/034: the quality
     // tier that scales shadow, occlusion and cluster sample counts.
     std::string debugTarget;
@@ -238,6 +245,9 @@ private:
     void storeOutputsToProject();
     void applyShare(const std::string& kind, const std::string& name); // "syphon" | "ndi" | "off"
     Result<void> captureFrame(const FrameTime& time, const std::filesystem::path& path);
+    // Set once `--capture-ui` has written its file, so the loop leaves after the frame it captured
+    // has been presented rather than in the middle of it.
+    bool uiCaptureDone_ = false;
 
     AppOptions options_;
     RecentFiles recent_{{}};
