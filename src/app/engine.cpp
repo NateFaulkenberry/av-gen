@@ -1543,6 +1543,23 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     if (auto r = params::loadProject(doc, params_, modulator_, nullptr, nullptr); !r) {
         return r;
     }
+    // And re-anchor the entity layer, because the document that just landed can *move nodes*.
+    //
+    // A project serialises every node's position, rotation and scale -- Glowmere Valley 2's carries
+    // 5,489 parameters -- and those values are applied *over* whatever the scene registered. The
+    // entity layer was bound before that happened, so every entity driving a node the project moved
+    // went on believing the node was where the scene file put it while the renderer drew it where
+    // the project said. Nothing reported the disagreement and nothing closed it: measured in
+    // Glowmere, the saucer's entity and the saucer's node were **28.661 m apart for the whole run**,
+    // which is why an animal lifted correctly onto the beam's drawn axis was dragged twenty-eight
+    // metres sideways on the way up (ADR-263).
+    //
+    // `installEntities` is idempotent and re-derives each anchor from the node's world transform,
+    // now read from the parameter *bases* -- so this is the whole of the fix and it is general: it
+    // is about projects and nodes, and knows nothing about saucers.
+    if (scene::Composition* comp = composition(); comp != nullptr) {
+        comp->installEntities();
+    }
     rebind();
     modulator_.resetState();
     // The sequence goes on last, after every parameter a bake could possibly name exists: the

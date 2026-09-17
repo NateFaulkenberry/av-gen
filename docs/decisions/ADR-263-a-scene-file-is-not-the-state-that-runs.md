@@ -1,0 +1,187 @@
+# ADR-263: A scene file is not the state that runs, and the entity layer was anchored before the project spoke
+
+**Status:** Accepted
+**Date:** 2026-09-17
+
+ADR-262 fixed the abduction and proved it in a lab. Production stayed wrong, and the report changed
+shape: the animal was now pulled up **at an angle**, missing the craft.
+
+That change of shape is the clue. It is what a correct fix looks like when it is applied to a body
+whose position nobody agrees on: before ADR-262 the animal rose toward the craft's *simulated*
+position, which was directly above it, so it went straight up and the beam was somewhere else
+entirely. After ADR-262 it rises to the beam's *drawn* axis — correctly — and the drawn axis was
+**28.661 m away**. The diagonal is the fix working against a lie.
+
+Two defects, in the same place, neither visible to any test this repository has ever had.
+
+---
+
+## 0. Why no test could see it: every test loads a scene, and nothing runs a scene
+
+A project's `parameters` block is applied **over** the values its scene registers
+(`params::loadDocument`). `examples/world/glowmere-valley-2-multicam.json` carries **5,489** of them,
+including every node's `position`, `rotation`, `scale` and `visible`.
+
+So a scene file is not the state that runs. It is the state that runs *before the project has had
+its say*. Every test in this repository — including the Tractor Beam Lab, which was built precisely
+to be the honest instrument — loads `Composition::loadFile(scene)` and stops there. The owner opens
+the project. `--render` is pointed at the project.
+
+The probe now takes `AVGEN_BEAM_LAB_PROJECT`, and with it the same measurement code reports two
+different worlds from the same scene:
+
+| `glowmere-valley-2-multicam`, same build, same probe | scene only | + its project |
+|---|---|---|
+| beam emitter radius | **7.80 m** | **3.07 m** |
+| beam mouth below the craft | 2.04 m | 0.12 m |
+| `Entity::visualPosition()` → the node the renderer places | **0.000 m** | **28.661 m** |
+| animal's body centre off the beam's axis | 0.029–0.086 m | **1.637–1.666 m** |
+| animals abducted in 190 s | 10 | 6 |
+| every animal's corners inside the beam | yes | **no, all of them, always** |
+
+A survey of the repository's 36 projects: **only the four Glowmere ones** override a node transform
+their scene authors differently. Every other project has 62 parameters or fewer and zero overrides.
+This is not how projects work; it is residue in four files.
+
+---
+
+## 1. Defect one, data: a saved node scale is a saved beam width
+
+```
+nodes/visitor-beam/scale = [1.0, 0.061, 1.0]        the scene authors no scale at all
+```
+
+`applyParameters` scales a particle system by its node's `lengthScale`, which is
+`cbrt(|sx·sy·sz|)`. `cbrt(0.061)` is **0.3936**. So in production:
+
+* `extent` ran at **3.07 m** against the **7.8 m** ADR-218 sized from the cast,
+* `position` — the emitter's node-local `(0, −2.05, 0)` — put the beam's mouth **0.12 m** under the
+  hull instead of 2.05 m,
+* `sizeStart` shrank with it, which is why the column always looked thin.
+
+A cow reaches 4.43 m from its own centre and a bull 4.97 m. **Every large animal was wider than the
+beam lifting it**, in every render, for as long as the file has existed. No alignment fixes that;
+ADR-262's careful centring was putting the animal exactly in the middle of a beam two and a half
+times too narrow.
+
+It is not authorship. 0.061 is not a number anybody types, the scene has no scale for that node, and
+`glowmere-valley-2-song.scene.json` had the same value *promoted into the scene* by a `--save-scene`
+from a running session.
+
+## 2. Defect two, engine: an entity is anchored before the project can move its node
+
+```
+nodes/visitor/position = [17.35, 29.85, 178.54]     the scene says [20, 29.5, 150]
+```
+
+28.66 m apart — and that one is the engine's fault, not the file's.
+
+`EntityState::anchor` is "where the scene put it: the point motion is relative to", taken in
+`Composition::installEntities()` from the node's world transform. The load order is:
+
+```
+composition loads -> entities installed and bound -> attach() registers parameters
+                  -> params::loadProject writes the bases -> ...nothing
+```
+
+Nothing re-anchors. So from frame zero the renderer drew the node at the project's position while
+the entity layer believed it was at the scene's, **28.661 m away, for the whole run, in silence**.
+
+And it is worse than a stale number, because the two halves of the abduction read different sources:
+the saucer's `follow`/`hold` uses `Anchor::Travel` — `Entity::state().position()` — so the director
+parked the craft's *simulation* over the animal, while the craft's *node*, and therefore its beam,
+was drawn twenty-eight metres away. ADR-262's lift correctly chases the drawn beam. The animal was
+dragged twenty-eight metres sideways as it rose.
+
+There was a second, quieter half to the same bug: `installEntities` read the anchor from the
+parameter's **final**, not its **base**. Finals are rebuilt from bases at the top of every frame, so
+an anchor taken from a final is "whatever modulation had done at the instant the bindings were last
+built". Calling `installEntities()` after the project load therefore did *nothing* — measured — until
+the anchor was made to read the base. Both halves are needed and neither is sufficient.
+
+### The fix
+
+* `Composition::nodeBaseTransform` / `nodeWorldBaseTransform`, and `binding.anchor` reads them. An
+  anchor is an authoring fact; `applyOffsets` writes `travel + motion` onto a final whose starting
+  point is the base, so `anchor` **must** be the base for `state().position()` and the drawn node to
+  describe the same body. That was true only by accident of install order.
+* `Engine::loadProject` re-installs the entity layer after the project's parameters are applied.
+  `installEntities` is idempotent and already re-derives every anchor.
+
+Both are general. Neither knows what a saucer is, and the fix is about *projects and nodes*: any
+entity driving any node any project moves now agrees with the renderer about where it is.
+
+Measured, on the unmodified production project, changing nothing else:
+
+| | before | after |
+|---|---|---|
+| `Entity::visualPosition()` → the drawn node | 28.661 m | **0.000 m** |
+| `state().position()` → the drawn node | 28.839 m | **0.186 m** (the behaviours' own offsets) |
+| body centre off the beam's axis | 1.647 m | **0.048 m** |
+
+## 3. What multicam had to do with it: nothing
+
+`glowmere-valley-2` (single camera) reads 28.661 m and 1.634 m. `glowmere-valley-2-multicam` reads
+28.661 m and 1.647 m. `glowmere-atmospherics` reads 28.661 m and 1.630 m, and a **7.80 m** beam —
+because its project carries the position residue and not the scale residue, which is a control
+nobody arranged and which separates the two terms in shipped data.
+
+The bug is identical with one camera and with five. Nothing in the abduction path reads a camera.
+The multicam file was where it was noticed, not where it came from.
+
+## 4. The residue, and why removing it is not a magic offset
+
+`tools/clean_staged_body_overrides.py` drops a project override only when it **contradicts the
+scene** and only for a node the scene's **own scenario** owns — the actors, their parts, and any
+entity carrying a tag one of the scenario's queries filters on. Those bodies are the director's: it
+moves the saucer, lights the beam and retires the animals, so a saved value for one of them is a
+photograph of a run and never authorship. An override that agrees with the scene is a no-op and is
+left alone; the forty-one mushroom rotations somebody dragged in the editor are left alone.
+
+Twelve overrides, across four files, each printed with the scene's value beside it:
+
+```
+glowmere-valley-2.json            visitor-beam/scale, visitor-beam/visible, visitor/position
+glowmere-valley-2-multicam.json   + chicken-17/visible, goat-14/visible, pig-15/visible
+glowmere-valley-2-song.json       visitor-beam/visible, visitor-beam/scale
+glowmere-atmospherics.json        visitor-beam/visible, visitor/position
+```
+
+The three invisible animals are the same residue 940232a cleared out of `glowmere-valley-2.json` and
+never out of the other three; they are why production abducted six animals in 190 s where the scene
+offers ten.
+
+`make_abduction_scenario.py` now also states the beam node's own transform — concentric, unrotated,
+unscaled — because that is the contract ADR-218 sizes `extent` against and ADR-262 resolves
+`anchor: drawn` through, and it had been promoted out of a session into a scene file once already.
+
+## 5. So it cannot come back
+
+* **`No project contradicts its scene about a body its scenario owns`** — pure JSON, 530 assertions,
+  milliseconds. Run against the pre-fix data it names all twelve. This is the cheap arm that would
+  have caught the entire thing, four rounds ago.
+* **`The shipped Glowmere project abducts the way its scene says it does`** — loads
+  `glowmere-valley-2-multicam` the way the owner does, scene *and* project, and asserts the beam's
+  runtime radius equals the radius the scene file authors, that the craft's entity and the craft's
+  node are the same body to within a centimetre, and then ADR-262's invariants. It is the first test
+  in this repository to load a project.
+
+## Consequences
+
+- `src/scene/composition.{hpp,cpp}`: `nodeBaseTransform`, `nodeWorldBaseTransform`; `binding.anchor`
+  from the bases.
+- `src/app/engine.cpp`: re-install the entity layer after a project's parameters are applied.
+- `tools/clean_staged_body_overrides.py`; `tools/make_abduction_scenario.py` normalises the beam
+  node's transform; the four Glowmere scenes and projects re-generated and re-fingerprinted.
+- `tests/unit/test_beam_lab.cpp`: `AVGEN_BEAM_LAB_PROJECT`, a terrain-aware ground height (the old
+  probe assumed a flat world and read Glowmere's hillsides as beam shortfall), the runtime beam
+  extent and mouth, and the two tests above.
+
+## Revisit triggers
+
+- A second project that legitimately wants to move a staged body. The rule would then need a way for
+  a project to say so, rather than being inferred from disagreement.
+- Anything that saves a project from a running session. The residue got in that way and will again;
+  the test is the guard, not the tool.
+- An entity layer that is bound *after* parameters are loaded by construction. The re-install becomes
+  unnecessary then, and the base-valued anchor becomes the only thing holding the invariant.

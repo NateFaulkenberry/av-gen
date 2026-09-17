@@ -56,7 +56,9 @@
 #include "entity/entity.hpp"
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
+#include "params/serialization.hpp"
 #include "scene/composition.hpp"
+#include "world/terrain_query.hpp"
 #include "signals/signal_bus.hpp"
 #include "stage/staging.hpp"
 
@@ -73,6 +75,8 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -89,6 +93,21 @@ fs::path labScene() {
         return fs::path(override);
     }
     return fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "tractor-beam-lab.scene.json";
+}
+
+// The **project** beside a scene, when one is asked for. `AVGEN_BEAM_LAB_PROJECT` makes the probe
+// load what the owner actually opens rather than what the tests have always loaded.
+//
+// That distinction is not pedantry, it is ADR-263's whole subject. A project's `parameters` block is
+// applied *over* the values the scene registers, and Glowmere's projects serialise **every node's
+// position, rotation and scale** -- 5,489 parameters in the multicam one. So a scene file is not the
+// state that runs; it is the state that runs *before* the project has had its say, and every test in
+// this repository has been measuring the former while every render measures the latter.
+fs::path labProject() {
+    if (const char* override = std::getenv("AVGEN_BEAM_LAB_PROJECT"); override != nullptr) {
+        return fs::path(override);
+    }
+    return {};
 }
 
 bool farmAssetsPresent() {
@@ -183,8 +202,13 @@ struct Lift {
     float toY = 0.0f;
     float highestY = 0.0f;   // the top of the drawn body at the top of the lift
     float emitterY = 0.0f;   // where the column *starts*, at that same moment
-    float craftAboveGround = 0.0f; // how high the saucer actually holds station
+    float craftAboveGround = 0.0f; // how high the saucer actually holds station, over the TERRAIN
     float columnReach = 0.0f;      // how far down the column's particles actually get
+    // What the beam actually is at runtime, as distinct from what the scene file authors. Both are
+    // scaled by the beam node's world transform in `applyParameters`, and a project that saved a
+    // squashed scale for that node changes both without touching a line of the scene (ADR-263).
+    float beamExtent = 0.0f;       // the emitter disc's world radius
+    float emitterBelowCraft = 0.0f; // metres from the craft's node origin down to the beam's mouth
 };
 
 // How far a particle from this emitter travels before its life runs out, integrated with the
@@ -215,25 +239,40 @@ float columnReach(const scene::ParticleSystem& ps) {
 struct Run {
     assets::AssetRegistry registry;
     std::unique_ptr<scene::Composition> comp;
+    std::optional<world::TerrainQuery> terrainOwned;
+    fs::path project_;
     params::ParameterSet params;
     params::Modulator modulator;
     signals::SignalBus bus;
     std::vector<Lift> lifts;
     std::vector<std::pair<double, std::string>> beats; // when each beat began, for a render range
     std::string lastBeat;
+    std::string loadedProject;
     float beamRadius = 0.0f;
     double liftSeconds = 1.0;
 
-    explicit Run(const fs::path& file) : registry(file.parent_path()) {
+    explicit Run(const fs::path& file, fs::path projectOverride = {})
+        : registry(file.parent_path()), project_(std::move(projectOverride)) {
         auto loaded = scene::Composition::loadFile(file, registry);
         REQUIRE(loaded.has_value());
         comp = std::move(*loaded);
         comp->attach(params, modulator);
+        // The project, if one was named, applied exactly where the engine applies it: after the
+        // composition has registered its parameters and before a frame has run.
+        if (const fs::path project = project_.empty() ? labProject() : project_; !project.empty()) {
+            auto ok = params::loadProjectFile(project, params, modulator);
+            REQUIRE(ok.has_value());
+            loadedProject = project.filename().string();
+            // Exactly what `Engine::loadProject` does after the same call, and for the same reason:
+            // a project moves nodes, and the entity layer was anchored before it spoke (ADR-263).
+            comp->installEntities();
+        }
         comp->setViewport(1920, 1080);
         // ADR-186's offline setting. The lab's entities already declare no cull distance; this is
         // the belt to that pair of braces, because a culled animal is not simulated at all and an
         // alignment measured on a frame the entity skipped is a measurement of the cull.
         comp->scene().detailLimits.entityDistanceCull = false;
+        terrainOwned = comp->terrainQuery();
         if (const params::IParameter* p = params.find("staging/abduction/abductSeconds");
             p != nullptr) {
             liftSeconds = static_cast<double>(p->baseComponent(0));
@@ -255,6 +294,7 @@ struct Run {
             comp->updateBehaviour(time, bus);
             comp->update(time);
 
+            const world::TerrainQuery& terrain = *terrainOwned;
             const scene::ParticleSystem* beam = beamOf(comp->scene());
             REQUIRE(beam != nullptr);
             beamRadius = beam->extent.x;
@@ -291,10 +331,16 @@ struct Run {
             const glm::vec3 craftDrawn = craftNodeOrigin("visitor");
             const glm::vec3 animalDrawn = craftNodeOrigin(std::string(target));
             const glm::vec3 axis = beam->position;
-            // The lab's world is flat at y = 0 by construction (see the generator), which is what
-            // makes "how high does the saucer actually hold station" a number rather than a
-            // question about which bit of hillside was under it.
-            const float groundY = 0.0f;
+            // The ground *under the craft*, from the terrain itself.
+            //
+            // This was `0.0f` -- true of the lab, whose world is flat by construction, and false of
+            // every scene with relief. Run against Glowmere it reported the saucer holding station
+            // between 21.8 m and 49.8 m and six of ten columns "stopping short", which is not a
+            // fact about the beam at all: it is terrain elevation being read as altitude. A probe
+            // carrying an assumption its caller can violate is the same defect as a probe measuring
+            // the wrong point, one level up (ADR-182).
+            const float groundY =
+                terrain.valid() ? terrain.heightAt(glm::vec2(craftDrawn.x, craftDrawn.z)) : 0.0f;
 
             if (liftAnimal != target) {
                 liftAnimal = std::string(target);
@@ -330,6 +376,8 @@ struct Run {
             // ---- and the column, vertically ----
             l.craftAboveGround = std::max(l.craftAboveGround, craftDrawn.y - groundY);
             l.columnReach = columnReach(*beam);
+            l.beamExtent = beam->extent.x;
+            l.emitterBelowCraft = craftDrawn.y - axis.y;
             if (body.centre.y > l.toY) {
                 l.toY = body.centre.y;
                 l.highestY = body.highest;
@@ -379,6 +427,13 @@ TEST_CASE("probe: the tractor beam lab, hop by hop", "[.probe][beam][lab]") {
         fmt::print("  {:<18} horizontal {:.3f} m, vertical {:.3f} m\n", l.animal,
                    l.craftVisualToDrawn, l.craftVisualToDrawnY);
     }
+    fmt::print("\nwhat the beam actually is at runtime ({}):\n",
+               run.loadedProject.empty() ? "scene only, no project" : run.loadedProject);
+    for (const Lift& l : run.lifts) {
+        fmt::print("  {:<18} emitter radius {:5.2f} m, mouth {:5.2f} m under the craft's origin\n",
+                   l.animal, l.beamExtent, l.emitterBelowCraft);
+    }
+
     fmt::print("\nthe column, vertically. Does the drawn beam reach the animal, and does the animal\n"
                "stay under the top of it?\n");
     for (const Lift& l : run.lifts) {
@@ -626,4 +681,211 @@ TEST_CASE("Every Glowmere project agrees with its scene about the abduction",
     INFO("checked " << checked << " scene/project pairs, " << compared << " shared parameters");
     CHECK(checked >= 3);
     CHECK(compared >= 50);
+}
+
+// ---- production integration (ADR-263) ------------------------------------------------------------
+//
+// Everything above this line loads a **scene**. What the owner opens, and what `--render` is pointed
+// at, is a **project** -- and a project's `parameters` block is applied *over* the values the scene
+// registers. Glowmere Valley 2's multicam project carries 5,489 of them, including every node's
+// position, rotation, scale and visibility.
+//
+// So a scene file is not the state that runs. Until this file, no test in this repository had ever
+// loaded a project, which is why three rounds of correct measurement sat beside a production render
+// that was wrong in ways none of them could see:
+//
+//   nodes/visitor-beam/scale   [1, 0.061, 1]   -> `cbrt(|sx*sy*sz|)` = 0.394, so the beam's emitter
+//                                                 ran at 3.07 m against the 7.8 m the scene authors,
+//                                                 and its mouth sat 0.12 m under the hull instead of
+//                                                 2.05 m. Every large animal was wider than the beam.
+//   nodes/visitor/position     28.66 m away    -> the entity layer was anchored before the project
+//                                                 spoke, so `Entity::state().position()` and the node
+//                                                 the renderer drew were 28.661 m apart, all run.
+//                                                 The lift aims at the beam's *drawn* axis (ADR-262),
+//                                                 so the animal was dragged twenty-eight metres
+//                                                 sideways as it rose: the reported diagonal.
+//
+// The first is data and is cleaned by `tools/clean_staged_body_overrides.py`; the second is an engine
+// defect and is fixed in `Engine::loadProject` and `Composition::installEntities`. Both are asserted
+// here, and the first arm is the cheap one that would have caught the whole thing.
+
+namespace {
+
+// Every node a scenario owns: its actors, their parts, and everything its queries can bind. The same
+// derivation `tools/clean_staged_body_overrides.py` makes, from the same declarations.
+std::set<std::string> stagedBodies(const nlohmann::json& scene) {
+    // The entity list by value, not by pointer into a temporary: `json::value()` returns a *copy*,
+    // and a range-for over it keeps that copy alive only for the loop. Storing pointers into it and
+    // reading them afterwards is a dangling read that json reports as "cannot use value() with
+    // null" -- a confusing message for a plain lifetime mistake.
+    std::map<std::string, nlohmann::json> entities;
+    if (const auto it = scene.find("entities"); it != scene.end() && it->is_array()) {
+        for (const nlohmann::json& e : *it) {
+            entities[e.value("name", std::string{})] = e;
+        }
+    }
+    std::set<std::string> owned;
+    std::set<std::string> tags;
+    const nlohmann::json staging = scene.value("staging", nlohmann::json::object());
+    for (const nlohmann::json& actor : staging.value("actors", nlohmann::json::array())) {
+        const std::string body = actor.value("body", std::string{});
+        owned.insert(body.empty() ? actor.value("name", std::string{}) : body);
+        for (const nlohmann::json& part : actor.value("parts", nlohmann::json::array())) {
+            owned.insert(part.value("entity", std::string{}));
+        }
+    }
+    for (const nlohmann::json& sc : staging.value("scenarios", nlohmann::json::array())) {
+        for (const nlohmann::json& beat : sc.value("beats", nlohmann::json::array())) {
+            for (const nlohmann::json& q : beat.value("find", nlohmann::json::array())) {
+                if (const std::string t = q.value("tag", std::string{}); !t.empty()) tags.insert(t);
+                if (const std::string n = q.value("name", std::string{}); !n.empty()) owned.insert(n);
+            }
+        }
+    }
+    for (const auto& [name, e] : entities) {
+        if (const auto it = e.find("tags"); it != e.end() && it->is_array()) {
+            for (const nlohmann::json& t : *it) {
+                if (t.is_string() && tags.count(t.get<std::string>()) != 0) {
+                    owned.insert(name);
+                }
+            }
+        }
+    }
+    std::set<std::string> nodes;
+    for (const std::string& name : owned) {
+        const auto it = entities.find(name);
+        nodes.insert(it == entities.end() ? name : it->second.value("node", name));
+    }
+    return nodes;
+}
+
+} // namespace
+
+TEST_CASE("No project contradicts its scene about a body its scenario owns",
+          "[stage][beam][abduction][project]") {
+    const fs::path world = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world";
+    std::size_t pairs = 0;
+    std::size_t compared = 0;
+    for (const fs::directory_entry& entry : fs::directory_iterator(world)) {
+        const std::string name = entry.path().filename().string();
+        if (name.size() < 12 || name.substr(name.size() - 11) != ".scene.json") {
+            continue;
+        }
+        std::ifstream in(entry.path());
+        nlohmann::json scene;
+        in >> scene;
+        if (!scene.contains("staging")) {
+            continue;
+        }
+        const fs::path project =
+            entry.path().parent_path() / (name.substr(0, name.size() - 11) + ".json");
+        if (!fs::is_regular_file(project)) {
+            continue;
+        }
+        std::ifstream pin(project);
+        nlohmann::json doc;
+        pin >> doc;
+        if (!doc.contains("parameters") || !doc["parameters"].is_object()) {
+            continue;
+        }
+        ++pairs;
+        const std::set<std::string> bodies = stagedBodies(scene);
+        std::map<std::string, nlohmann::json> nodes;
+        for (const nlohmann::json& n : scene["nodes"]) {
+            nodes[n.value("name", std::string{})] = n;
+        }
+        for (const auto& [path, saved] : doc["parameters"].items()) {
+            // "nodes/<name>/<field>"
+            const std::size_t first = path.find('/');
+            const std::size_t last = path.rfind('/');
+            if (first == std::string::npos || first == last || path.compare(0, 6, "nodes/") != 0) {
+                continue;
+            }
+            const std::string node = path.substr(first + 1, last - first - 1);
+            const std::string field = path.substr(last + 1);
+            if (bodies.count(node) == 0 || nodes.count(node) == 0) {
+                continue;
+            }
+            const nlohmann::json& n = nodes[node];
+            nlohmann::json authored;
+            if (field == "position" || field == "rotation") {
+                authored = n.value(field, nlohmann::json::array({0.0, 0.0, 0.0}));
+            } else if (field == "scale") {
+                authored = n.value(field, nlohmann::json::array({1.0, 1.0, 1.0}));
+            } else if (field == "visible") {
+                authored = n.value(field, nlohmann::json(true));
+            } else {
+                continue;
+            }
+            ++compared;
+            INFO(project.filename().string()
+                 << " overrides " << path << " with " << saved.dump() << " while the scene says "
+                 << authored.dump() << ". The project wins at load, and '" << node
+                 << "' is a body the scenario drives -- so that value is a photograph of a run, not "
+                    "authorship. Run tools/clean_staged_body_overrides.py.");
+            if (authored.is_array() && saved.is_array() && authored.size() == saved.size()) {
+                for (std::size_t i = 0; i < authored.size(); ++i) {
+                    CHECK(std::fabs(saved[i].get<double>() - authored[i].get<double>()) <= 1e-3);
+                }
+            } else {
+                CHECK(saved == authored);
+            }
+        }
+    }
+    // ADR-182: an arm that examined nothing passes for the wrong reason.
+    INFO("checked " << pairs << " scene/project pairs, " << compared << " staged-body parameters");
+    CHECK(pairs >= 3);
+    CHECK(compared >= 20);
+}
+
+TEST_CASE("The shipped Glowmere project abducts the way its scene says it does",
+          "[stage][beam][abduction][project][glowmere]") {
+    if (!farmAssetsPresent()) {
+        SKIP("assets/farm is not present (the GLBs are gitignored; run tools/make_farm_animals.sh)");
+    }
+    const fs::path world = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world";
+    const fs::path scene = world / "glowmere-valley-2-multicam.scene.json";
+    const fs::path project = world / "glowmere-valley-2-multicam.json";
+    REQUIRE(fs::is_regular_file(scene));
+    REQUIRE(fs::is_regular_file(project));
+
+    // What the scene authors for the beam, read straight out of the file, so the assertion below is
+    // "production runs what the scene says" rather than "production runs 7.8".
+    std::ifstream in(scene);
+    nlohmann::json doc;
+    in >> doc;
+    float authoredExtent = 0.0f;
+    for (const nlohmann::json& n : doc["nodes"]) {
+        if (n.value("name", std::string{}) == "visitor-beam") {
+            authoredExtent = n["particles"]["extent"][0].get<float>();
+        }
+    }
+    REQUIRE(authoredExtent > 1.0f);
+
+    Run run(scene, project);
+    run.play(60.0);
+    REQUIRE(run.lifts.size() >= 2);
+    REQUIRE(!run.loadedProject.empty());
+
+    for (const Lift& l : run.lifts) {
+        // 1. The project did not resize the beam. `applyParameters` scales `extent` by the node's
+        //    own `cbrt(|sx*sy*sz|)`, so a saved node scale is a saved beam width.
+        INFO(l.animal << ": the beam ran at " << l.beamExtent << " m against the " << authoredExtent
+                      << " m the scene authors");
+        CHECK(std::fabs(l.beamExtent - authoredExtent) <= 0.01f);
+
+        // 2. The craft's entity and the craft's node are the same body. This is the one the 28.661 m
+        //    failed, for the whole run, in silence -- and it is the reason the lift went diagonal.
+        INFO(l.animal << ": Entity::visualPosition() is " << l.craftVisualToDrawn
+                      << " m horizontally and " << l.craftVisualToDrawnY
+                      << " m vertically from the node the renderer places");
+        CHECK(l.craftVisualToDrawn <= 0.01f);
+
+        // 3. And then the ADR-262 invariants, in production rather than in the lab.
+        INFO(l.animal << ": body centre " << l.bodyOffAxisEnd << " m off the axis at the top");
+        CHECK(l.bodyOffAxisEnd <= kOnAxis);
+        CHECK(l.worstCornerLate <= l.beamRadius);
+        CHECK(l.columnReach >= l.craftAboveGround);
+        CHECK(l.highestY <= l.emitterY);
+    }
 }

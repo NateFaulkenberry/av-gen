@@ -1675,7 +1675,10 @@ void Composition::installEntities() {
             binding.geometryPrefix = "particles/" + sanitise(prefix_) + node.name + "/";
         }
         binding.partNames = node.materialPartNames;
-        const Transform placed = nodeWorldTransform(node);
+        // From the **bases**: see `nodeWorldBaseTransform`. An anchor is an authoring fact, and
+        // reading it off this instant's finals made it depend on when the bindings happened to be
+        // taken relative to a project load.
+        const Transform placed = nodeWorldBaseTransform(node);
         binding.anchor = placed.position;
         // The facing half of the anchor (ADR-240). Read off the composed orientation rather than
         // off the euler parameter, so a node placed under a rotated parent reports the direction it
@@ -3106,6 +3109,46 @@ Transform Composition::nodeTransform(const CompositionNode& node) const {
         t.scale = node.scaleParam->value();
     }
     return t;
+}
+
+// The same transform read from the parameter **bases** instead of their finals: where the file puts
+// this node, rather than where this instant's modulation has it.
+//
+// The two are the same number for most of a node's life and they are not the same *fact*, and
+// ADR-263 is what the difference cost. An entity's anchor is "where the scene put it: the point
+// motion is relative to", and `applyOffsets` writes `travel + motion` onto the position parameter's
+// final -- which is rebuilt from the **base** at the top of every frame. So the drawn position is
+// `base + travel + motion` and `Entity::state().position()` is `anchor + travel`: for those to
+// describe the same body, `anchor` has to be the base. Taking it from the final made it whatever
+// modulation happened to have done at the instant the bindings were last built, which for a project
+// load is the value the *scene* carried, one pass before the project overwrote the base with its
+// own. Measured in Glowmere: 28.661 m, for the whole run, in silence.
+Transform Composition::nodeBaseTransform(const CompositionNode& node) const {
+    Transform t = node.transform;
+    if (node.positionParam != nullptr) {
+        t.position = node.positionParam->base();
+    }
+    if (node.rotationParam != nullptr) {
+        t.rotation = quatFromEulerDegrees(node.rotationParam->base());
+    }
+    if (node.scaleParam != nullptr) {
+        t.scale = node.scaleParam->base();
+    }
+    return t;
+}
+
+Transform Composition::nodeWorldBaseTransform(const CompositionNode& node) const {
+    Transform world = nodeBaseTransform(node);
+    const CompositionNode* current = &node;
+    for (std::size_t guard = 0; !current->parent.empty() && guard < nodes_.size(); ++guard) {
+        const CompositionNode* parent = findNode(current->parent);
+        if (parent == nullptr || parent == &node) {
+            break;
+        }
+        world = compose(nodeBaseTransform(*parent), world);
+        current = parent;
+    }
+    return world;
 }
 
 bool Composition::nodeVisible(const CompositionNode& node) const {

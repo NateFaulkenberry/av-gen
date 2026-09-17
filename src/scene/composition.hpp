@@ -881,6 +881,11 @@ private:
     std::chrono::steady_clock::time_point lastRebuildPollTime_{};
     void rebuildSdfs();
     [[nodiscard]] Transform nodeTransform(const CompositionNode& node) const; // params or authored values (local)
+    // The same, from the parameter **bases**: where the file puts the node rather than where this
+    // instant's modulation has it. What an entity's anchor must be -- see the note on the
+    // definition, and ADR-263.
+    [[nodiscard]] Transform nodeBaseTransform(const CompositionNode& node) const;
+    [[nodiscard]] Transform nodeWorldBaseTransform(const CompositionNode& node) const;
     // True when making `parent` the parent of `node` would close a cycle (node and parent by name).
     [[nodiscard]] bool wouldCycle(const std::string& node, const std::string& parent) const;
     // Whether a node is drawn: its own `visible`, and every ancestor's. Inherited, because a group

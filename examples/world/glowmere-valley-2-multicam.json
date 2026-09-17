@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-2-multicam.scene.json",
-        "sha256": "e9a642c1db374df6370089053bf7730db4246f167fffdda35516147643f76bcc",
-        "size": 210864
+        "sha256": "a3b55f5b068fbb94f72af5ebbc024891d813b467db4583532170220a8b2ce1cf",
+        "size": 210995
       }
     }
   },
@@ -3648,7 +3648,6 @@
       3.5999999046325684,
       3.5999999046325684
     ],
-    "nodes/chicken-17/visible": false,
     "nodes/chicken-8/emissiveBoost": 1.0,
     "nodes/chicken-8/lightColor": [
       1.0,
@@ -4032,7 +4031,6 @@
       3.5999999046325684,
       3.5999999046325684
     ],
-    "nodes/goat-14/visible": false,
     "nodes/goat-5/emissiveBoost": 0.0,
     "nodes/goat-5/lightColor": [
       1.0,
@@ -4248,7 +4246,6 @@
       3.5999999046325684,
       3.5999999046325684
     ],
-    "nodes/pig-15/visible": false,
     "nodes/pig-6/emissiveBoost": 1.0,
     "nodes/pig-6/lightColor": [
       1.0,
@@ -5242,12 +5239,6 @@
       0.0
     ],
     "nodes/visitor-beam/roughnessScale": 1.0,
-    "nodes/visitor-beam/scale": [
-      1.0,
-      0.061000000685453415,
-      1.0
-    ],
-    "nodes/visitor-beam/visible": true,
     "nodes/visitor/emissiveBoost": 1.0,
     "nodes/visitor/lightColor": [
       1.0,
@@ -5255,11 +5246,6 @@
       1.0
     ],
     "nodes/visitor/lightIntensity": 1.0,
-    "nodes/visitor/position": [
-      17.35176658630371,
-      29.852590560913086,
-      178.5384979248047
-    ],
     "nodes/visitor/rotation": [
       3.500000476837158,
       -24.000003814697266,
