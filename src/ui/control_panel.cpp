@@ -573,6 +573,9 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
         // a person picks in one is the format they get in the other.
         transport.draw(engine);
         ImGui::Separator();
+        // The sequencer joins the editor's one undo stack rather than keeping its own; see the note
+        // on `SequencePanel::edits`.
+        sequence.edits = edits;
         sequence.draw(engine);
     });
     panel("Control", ImVec2(420, 300), [&] {

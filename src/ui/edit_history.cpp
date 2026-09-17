@@ -13,7 +13,8 @@ const std::string kNoLabel;
 } // namespace
 
 std::size_t EditCommand::touched() const {
-    return params.size() + parents.size() + heroes.size() + added.size() + removed.size();
+    return params.size() + parents.size() + heroes.size() + added.size() + removed.size() +
+           (timeline != nullptr ? 1 : 0);
 }
 
 std::vector<float> baseComponents(app::Engine& engine, const std::string& path) {
@@ -95,9 +96,34 @@ bool heroNamesNode(const world::HeroPoint& hero, const std::string& node) {
 
 EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
     EditApply out;
+
+    // The sequencer's half, first and on its own terms. It is settled before the composition is
+    // even looked for, because a sequence edit does not need one -- and because `setSequence`
+    // bakes, which wants the scene as it will be rather than as it was.
+    if (command.timeline != nullptr) {
+        const TimelineChange& change = *command.timeline;
+        if (change.clipsTouched) {
+            // Before the sequence, not after: installing clips re-mixes the piece, and the bake
+            // reads the mix's duration.
+            if (auto r = engine.setAudioClips(forward ? change.clipsAfter : change.clipsBefore); !r) {
+                out.problems.push_back(r.error().message);
+            }
+        }
+        if (auto r = engine.setSequence(forward ? change.after : change.before); !r) {
+            out.problems.push_back(r.error().message);
+        } else {
+            out.timelinesInstalled = 1;
+        }
+    }
+
     scene::Composition* composition = engine.composition();
     if (composition == nullptr) {
-        out.problems.push_back("there is no composition to edit");
+        // Not a failure when the command was the sequencer's: there was nothing here for a
+        // composition to do.
+        if (command.timeline == nullptr || !command.params.empty() || !command.added.empty() ||
+            !command.removed.empty() || !command.parents.empty() || !command.heroes.empty()) {
+            out.problems.push_back("there is no composition to edit");
+        }
         return out;
     }
 

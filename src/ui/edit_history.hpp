@@ -29,8 +29,10 @@
 // Everything here is ImGui-free and testable without a window or a GPU; see
 // tests/unit/test_edit_history.cpp.
 
+#include "audio/arrangement.hpp"
 #include "core/error.hpp"
 #include "scene/composition.hpp"
+#include "seq/sequence.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -95,6 +97,31 @@ struct NodeRecord {
         : name(std::move(n)), held(std::move(h)) {}
 };
 
+// A sequencer edit, recorded **whole**.
+//
+// The note at the top of this file argues against snapshots, and that argument is about the
+// *composition*: 256 terrain chunks and a quarter of a million scattered instances are not
+// something to copy so that one flower can be undone. **A sequence is not that.** It is a name, a
+// duration, a handful of shots, a cast, some cues and a section timeline -- kilobytes, all of it
+// value types -- and the audio clips beside it are file paths and offsets, not samples.
+//
+// So the calculation reverses, and with it the design: rather than a record type per gesture
+// (delete a shot, trim one, split one, drop a clip, add an actor -- each with its own inverse to
+// get right), one before-and-after covers every edit the sequencer can make, including the ones
+// nobody has written yet. The reversal of "the sequence was this, now it is that" is not something
+// that has to be derived.
+//
+// `clipsTouched` exists because installing audio clips **re-opens the sources and re-mixes the
+// piece** (ADR-103), which is a pass over every sample. A shot drag must not pay for that, so an
+// edit says whether it touched the audio at all and the apply believes it.
+struct TimelineChange {
+    seq::Sequence before;
+    seq::Sequence after;
+    std::vector<audio::AudioClip> clipsBefore;
+    std::vector<audio::AudioClip> clipsAfter;
+    bool clipsTouched = false;
+};
+
 // One reversible change. Move-only, because it owns nodes.
 struct EditCommand {
     // What the user did, in their words, for the status bar and the history list: "Place 12 x fern",
@@ -105,6 +132,9 @@ struct EditCommand {
     std::vector<HeroChange> heroes;
     std::vector<NodeRecord> added;    // put into the scene by this command
     std::vector<NodeRecord> removed;  // taken out of the scene by this command
+    // The sequencer's side of the same history, or null for the world edits that are most of it.
+    // A pointer so that a command which moves eleven rocks does not carry a sequence-shaped hole.
+    std::unique_ptr<TimelineChange> timeline;
     // The selection either side, so undoing a delete gives you back what you had selected rather
     // than leaving you staring at a scene with nothing chosen and no idea what came back.
     std::vector<std::string> selectionBefore;
@@ -118,7 +148,8 @@ struct EditCommand {
     EditCommand& operator=(const EditCommand&) = delete;
 
     [[nodiscard]] bool empty() const {
-        return params.empty() && parents.empty() && heroes.empty() && added.empty() && removed.empty();
+        return params.empty() && parents.empty() && heroes.empty() && added.empty() &&
+               removed.empty() && timeline == nullptr;
     }
     // How many things the user would say this touched, for the label and for tests.
     [[nodiscard]] std::size_t touched() const;
@@ -129,6 +160,9 @@ struct EditCommand {
 // claims to have undone something it did not.
 struct EditApply {
     std::size_t nodesAdded = 0;
+    // 1 when this command installed a sequence, 0 otherwise. Counted rather than flagged so the
+    // field reads like the four beside it.
+    std::size_t timelinesInstalled = 0;
     std::size_t nodesRemoved = 0;
     std::size_t paramsWritten = 0;
     std::size_t parentsSet = 0;

@@ -27,6 +27,7 @@
 #include "audio/arrangement.hpp"
 #include "audio/waveform.hpp"
 #include "seq/sequence.hpp"
+#include "ui/edit_history.hpp"
 #include "ui/ui_logic.hpp"
 
 struct ImDrawList;
@@ -38,6 +39,10 @@ struct ImVec2;
 #include <memory>
 #include <string>
 #include <vector>
+
+namespace avgen::app {
+class EditSystem;
+}
 
 namespace avgen::ui {
 
@@ -53,6 +58,15 @@ public:
     // Where the song-structure analysis runs. Optional: with no job system it runs inline, which is
     // what a test wants and what a person never should get.
     app::JobSystem* jobs = nullptr;
+    // The editor's one undo stack (ADR-092), so that Cmd+Z means the same thing in the sequencer as
+    // it does in the viewport. Optional: without it the panel still edits, it simply cannot take an
+    // edit back -- which is what it did before, and the reason the comment above `trimShotEnd` used
+    // to say "this panel has no undo".
+    //
+    // **One history, not two.** A second stack owned by the panel would have been less plumbing and
+    // would have got the *order* wrong: delete a shot, move a rock, press Cmd+Z, and the two stacks
+    // cannot agree on which edit was last.
+    app::EditSystem* edits = nullptr;
 
     void draw(app::Engine& engine);
 
@@ -96,8 +110,12 @@ private:
     void drawToolbar(app::Engine& engine);
     void drawImportPopup(app::Engine& engine);
     void drawStrip(app::Engine& engine);
-    // Snap, zoom and the bake's report: drawn *under* the strip. See the note at the definition.
+    // Snap, the two zooms, Fit and Rebuild: the toolbar's second column. See the note at the
+    // definition for the two moves this block has made and why it ended up here.
     void drawStripControls(app::Engine& engine);
+    // Unresolved bake targets, analysis progress, the last error: under the strip, because they
+    // come and go and a toolbar that changes height moves the strip out from under the pointer.
+    void drawStripStatus(app::Engine& engine);
     void drawInspector(app::Engine& engine);
     void drawShotInspector(app::Engine& engine, seq::Shot& shot);
     void drawActorInspector(app::Engine& engine, seq::Actor& actor);
@@ -144,6 +162,18 @@ private:
 
     // Marks the sequence as edited. The bake runs at the end of the frame the edit settled in.
     void touch() { dirty_ = true; }
+
+    // ---- recording an edit for the undo stack --------------------------------------------------
+    //
+    // Bracket a mutation: `beginEdit` copies the sequence (and, when asked, the clips) as they
+    // stand, the caller mutates them in place, and `commitEdit` copies them again and pushes the
+    // pair. `touchesAudio` is not a convenience -- installing clips re-mixes the whole piece, so an
+    // edit that did not touch the audio must say so; see `TimelineChange::clipsTouched`.
+    //
+    // Safe to call with no `edits`: both become no-ops and the mutation still happens.
+    void beginEdit(app::Engine& engine, bool touchesAudio = false);
+    void commitEdit(app::Engine& engine, std::string label);
+    std::unique_ptr<TimelineChange> pendingEdit_;
     void installIfDirty(app::Engine& engine);
     [[nodiscard]] double snap(const app::Engine& engine, double seconds) const;
     // Beat times from the analyzed track, cached: the vector is thousands of doubles and the strip

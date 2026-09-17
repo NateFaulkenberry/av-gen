@@ -10,6 +10,7 @@
 #include "analysis/analysis_track.hpp"
 #include "analysis/structure.hpp"
 #include "core/log.hpp"
+#include "app/edit_system.hpp"
 #include "scene/composition.hpp"
 #include "seq/layer_sink.hpp"
 #include "seq/lyrics.hpp"
@@ -72,6 +73,11 @@ constexpr const char* kStripContextId = "strip-context";
 // How much of the panel is kept back for the inspector under the strip, so that compressing the
 // lanes to fit never squeezes the thing they are inspected in down to nothing.
 constexpr float kStripBottomReserve = 46.0f;
+// What the toolbar's second column needs before it is worth putting beside the buttons rather than
+// under them. Two combos, two sliders and two buttons at their set widths, plus the spacing between
+// them and the labels to their right -- measured from the row rather than guessed, and deliberately
+// a little generous so the column is never drawn touching the panel's edge.
+constexpr float kStripControlsWidth = 960.0f;
 // The floor the lanes compress to. Two thirds still reads as lanes; below that the panel's own
 // scrollbar is the better answer, because a lane a few points high is a line rather than a lane.
 constexpr float kMinLaneScale = 0.66f;
@@ -133,7 +139,7 @@ void SequencePanel::draw(app::Engine& engine) {
     drawToolbar(engine);
     ImGui::Separator();
     drawStrip(engine);
-    drawStripControls(engine);
+    drawStripStatus(engine);
     ImGui::Separator();
     drawInspector(engine);
     installIfDirty(engine);
@@ -145,6 +151,15 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
     seq::Sequence& piece = engine.sequence();
 
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 4.0f));
+    // The toolbar is two columns of two rows each, and both columns read the same way: a line of
+    // text that says what you are looking at, then the row of controls that act on it. The right
+    // column is built below, after the left one has been drawn and its width is therefore known.
+    const float toolbarTop = ImGui::GetCursorPosY();
+    float leftEdge = 0.0f;
+    const auto widen = [&leftEdge]() {
+        leftEdge = std::max(leftEdge, ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x +
+                                          ImGui::GetScrollX());
+    };
     ImGui::PushItemWidth(160);
     std::strncpy(nameBuffer_, piece.name.c_str(), sizeof(nameBuffer_) - 1);
     nameBuffer_[sizeof(nameBuffer_) - 1] = '\0';
@@ -155,6 +170,7 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
     ImGui::SameLine();
     ImGui::TextDisabled("%s | %zu shot(s), %zu actor(s), %zu cue(s)", clock(piece.duration()).c_str(),
                         piece.shots.size(), piece.actors.size(), piece.overlays.size());
+    widen();
 
     if (ImGui::Button("Add Shot")) {
         // A new shot starts where the piece currently ends, so shots never overlap by accident --
@@ -313,6 +329,31 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
             ImGui::OpenPopup("import-lyrics");
         }
     }
+    widen();
+
+    // ---- the second column ---------------------------------------------------------------------
+    //
+    // The strip's own controls -- snap, the two zooms, Fit, Rebuild -- used to sit *under* the
+    // strip, and the note at `drawStripControls` records why they were moved there: they cost two
+    // rows above a panel that had none to spare, and the shots lane fell below the fold.
+    //
+    // Beside the buttons they cost **no rows at all**, because the left column is already two rows
+    // tall and the space to its right was empty. So the strip gains back the two rows it lost under
+    // it as well, and the original complaint is answered more completely than moving them down
+    // answered it.
+    //
+    // The fallback matters: on a narrow window the column will not fit, and a control row that runs
+    // off the right edge is worse than one on its own line. Below the width it needs, the block goes
+    // back under the buttons -- still above the strip, still two rows, simply stacked.
+    const float afterLeft = ImGui::GetCursorPosY();
+    const float columnX = leftEdge + ImGui::GetStyle().ItemSpacing.x * 4.0f;
+    if (ImGui::GetWindowContentRegionMax().x - columnX >= kStripControlsWidth) {
+        ImGui::SetCursorPos(ImVec2(columnX, toolbarTop));
+        drawStripControls(engine);
+        ImGui::SetCursorPosY(std::max(afterLeft, ImGui::GetCursorPosY()));
+    } else {
+        drawStripControls(engine);
+    }
     ImGui::PopStyleVar();
     if (ImGui::BeginPopup("import-audio")) {
         drawImportPopup(engine);
@@ -354,6 +395,20 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
 // a shot, import a song -- stay above, where a toolbar belongs. That is roughly where a timeline's
 // zoom control sits in every editor this borrows from anyway.
 void SequencePanel::drawStripControls(app::Engine& engine) {
+    // Where this block starts, remembered because the second row has to start there too. A new
+    // ImGui line begins at the window's own left edge, not at wherever the previous line began, so
+    // a two-row block placed in a second column comes apart on its second row unless it is told.
+    const float columnX = ImGui::GetCursorPosX();
+
+    // The text row first, then the controls -- the same shape as the column beside it. Aligned to a
+    // frame's padding so that this row is as tall as the left column's, whose first row contains an
+    // input field; without it the two columns' second rows sit at different heights.
+    const seq::InstallReport& report = engine.sequenceReport();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("%d track(s), %d key(s), %d layer(s)", report.trackCount, report.keyCount,
+                        report.layersRealised);
+
+    ImGui::SetCursorPosX(columnX);
     ImGui::SetNextItemWidth(110);
     ImGui::Combo("snap", &snapMode_, kSnapNames, IM_ARRAYSIZE(kSnapNames));
     ImGui::SameLine();
@@ -394,9 +449,14 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
                           "Happens on its own after an edit; this is for after a scene change.");
     }
 
+}
+
+// What the panel has to say for itself: a bake that bound to nothing, an analysis still running, the
+// last thing that went wrong. Drawn *under* the strip rather than in the toolbar, because all three
+// are transient and a toolbar that changes height as they come and go moves the strip under the
+// pointer.
+void SequencePanel::drawStripStatus(app::Engine& engine) {
     const seq::InstallReport& report = engine.sequenceReport();
-    ImGui::TextDisabled("%d track(s), %d key(s), %d layer(s)", report.trackCount, report.keyCount,
-                        report.layersRealised);
     if (!report.unresolved.empty()) {
         // The one failure that must never be left to the log: a track that binds to nothing
         // evaluates perfectly and changes nothing, forever (ADR-075).
@@ -502,7 +562,11 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                      .markerHeight = kMarkerHeight,
                      .laneHeight = kLaneHeight * laneZoom_,
                      .audioLaneHeight = kAudioLaneHeight * laneZoom_,
-                     .sectionLaneHeight = kSectionLaneHeight * laneZoom_,
+                     // **Not scaled by the vertical zoom, deliberately.** Vertical zoom exists to
+                     // read a waveform or fit a long cast; a section block is a label on a span and
+                     // a taller one says nothing more than a short one. It also stays put while the
+                     // lanes under it grow, which is what makes it usable as the ruler it is.
+                     .sectionLaneHeight = kSectionLaneHeight,
                      .gap = kLaneGap};
     // A narrow panel loses the headers rather than losing the music: below about four hundred
     // points a header column costs more of the time axis than the names are worth.
@@ -1267,26 +1331,32 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         switch (selection_) {
         case Selection::Shot:
             if (selected_ >= 0 && selected_ < static_cast<int>(piece.shots.size())) {
+                beginEdit(engine);
                 seq::removeShot(piece.shots, static_cast<std::size_t>(selected_));
                 selection_ = Selection::None;
                 selected_ = -1;
                 touch();
+                commitEdit(engine, "Delete shot");
             }
             break;
         case Selection::Overlay:
             if (selected_ >= 0 && selected_ < static_cast<int>(piece.overlays.size())) {
+                beginEdit(engine);
                 piece.overlays.erase(piece.overlays.begin() + selected_);
                 selection_ = Selection::None;
                 selected_ = -1;
                 touch();
+                commitEdit(engine, "Delete lyric");
             }
             break;
         case Selection::Actor:
             if (selected_ >= 0 && selected_ < static_cast<int>(piece.actors.size())) {
+                beginEdit(engine);
                 piece.actors.erase(piece.actors.begin() + selected_);
                 selection_ = Selection::None;
                 selected_ = -1;
                 touch();
+                commitEdit(engine, "Delete performer");
             }
             break;
         case Selection::Clip: {
@@ -1294,11 +1364,13 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             // removed by menu are the same edit -- `applyAudioClips` is what re-opens the sources.
             std::vector<audio::AudioClip> clips(engine.audioClips().begin(), engine.audioClips().end());
             if (audioSelected_ >= 0 && audioSelected_ < static_cast<int>(clips.size())) {
+                beginEdit(engine, /*touchesAudio=*/true);
                 clips.erase(clips.begin() + audioSelected_);
                 audioSelected_ = -1;
                 selection_ = Selection::None;
                 selected_ = -1;
                 applyAudioClips(engine, std::move(clips));
+                commitEdit(engine, "Remove audio clip");
             }
             break;
         }
@@ -1531,10 +1603,12 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
             }
             ImGui::Separator();
             if (menuAction("Delete", shortcut::kDelete)) {
+                beginEdit(engine);
                 piece.shots.erase(piece.shots.begin() + static_cast<std::ptrdiff_t>(index));
                 selection_ = Selection::None;
                 selected_ = -1;
                 touch();
+                commitEdit(engine, "Delete shot");
             }
         } else {
             menuSubject("Shots lane");
@@ -1570,10 +1644,12 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
             }
             ImGui::Separator();
             if (menuAction("Delete", shortcut::kDelete)) {
+                beginEdit(engine);
                 piece.overlays.erase(piece.overlays.begin() + static_cast<std::ptrdiff_t>(index));
                 selection_ = Selection::None;
                 selected_ = -1;
                 touch();
+                commitEdit(engine, "Delete lyric");
             }
         } else {
             menuSubject("Overlays lane");
@@ -1602,9 +1678,11 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
             }
             ImGui::Separator();
             if (menuAction("Remove clip", shortcut::kDelete)) {
+                beginEdit(engine, /*touchesAudio=*/true);
                 clips.erase(clips.begin() + static_cast<std::ptrdiff_t>(index));
                 audioSelected_ = -1;
                 applyAudioClips(engine, std::move(clips));
+                commitEdit(engine, "Remove audio clip");
                 break;
             }
             if (menuAction("Audio clips...")) {
@@ -1756,6 +1834,33 @@ void SequencePanel::addLyricAt(app::Engine& engine, double seconds) {
     selection_ = Selection::Overlay;
     selected_ = static_cast<int>(piece.overlays.size()) - 1;
     touch();
+}
+
+void SequencePanel::beginEdit(app::Engine& engine, bool touchesAudio) {
+    if (edits == nullptr) {
+        return;
+    }
+    auto change = std::make_unique<TimelineChange>();
+    change->before = engine.sequence();
+    change->clipsTouched = touchesAudio;
+    if (touchesAudio) {
+        change->clipsBefore.assign(engine.audioClips().begin(), engine.audioClips().end());
+    }
+    pendingEdit_ = std::move(change);
+}
+
+void SequencePanel::commitEdit(app::Engine& engine, std::string label) {
+    if (!pendingEdit_) {
+        return;
+    }
+    std::unique_ptr<TimelineChange> change = std::move(pendingEdit_);
+    change->after = engine.sequence();
+    if (change->clipsTouched) {
+        change->clipsAfter.assign(engine.audioClips().begin(), engine.audioClips().end());
+    }
+    EditCommand command(std::move(label));
+    command.timeline = std::move(change);
+    edits->history().push(std::move(command));
 }
 
 void SequencePanel::applyAudioClips(app::Engine& engine, std::vector<audio::AudioClip> clips) {
