@@ -442,6 +442,34 @@ glm::vec3 Shot::targetWithoutStart(float t) const {
     return cameraAt(t) + (travel / len) * std::max(subject.radius * 4.0f, 1.0f) * (0.6f + 0.4f * e);
 }
 
+const FocalTarget* Shot::heldSubjectAt(float t) const {
+    switch (lookMode()) {
+    case LookMode::Subject:
+        return &subject;
+    case LookMode::Handoff: {
+        // The same window `targetWithoutStart` swings across, read the same way and from the same
+        // clamp, so "the aim is still on the first subject" and "the shot is holding the first
+        // subject" cannot come to disagree. Before the swing the aim is exactly `subject`; after it
+        // exactly `handoff`; between them it is somewhere along the arc and holds neither.
+        const float e = ease(t, easeIn, easeOut);
+        const float window = std::clamp(swingWindow, 0.05f, 1.0f);
+        const float s = (e - (1.0f - window) * 0.5f) / window;
+        if (s <= 0.0f) {
+            return &subject;
+        }
+        if (s >= 1.0f && handoff) {
+            return &*handoff;
+        }
+        return nullptr;
+    }
+    case LookMode::Fixed:
+    case LookMode::Parallel:
+    case LookMode::Ahead:
+        break;
+    }
+    return nullptr;
+}
+
 float Shot::focusDistanceAt(float t) const {
     const glm::vec3 focus = composition.focusOnSubject ? subject.position : targetAt(t);
     return std::max(glm::length(cameraAt(t) - focus), 0.01f);
@@ -667,6 +695,21 @@ const Shot* Sequence::shotAt(double seconds) const {
         }
     }
     return nullptr;
+}
+
+std::vector<const FocalTarget*> Sequence::heldSubjectPerKey(int samplesPerShot) const {
+    // The clamp and the two loop bounds are `toTimelineTracks`'s, verbatim. They have to be: the
+    // contract of this function is that its i-th entry describes that function's i-th key.
+    const int samples = std::clamp(samplesPerShot, 2, 64);
+    std::vector<const FocalTarget*> held;
+    held.reserve(shots.size() * static_cast<std::size_t>(samples));
+    for (const Shot& s : shots) {
+        for (int i = 0; i < samples; ++i) {
+            const float t = static_cast<float>(i) / static_cast<float>(samples - 1);
+            held.push_back(s.heldSubjectAt(t));
+        }
+    }
+    return held;
 }
 
 json Sequence::toTimelineTracks(int samplesPerShot) const {

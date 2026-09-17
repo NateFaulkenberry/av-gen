@@ -19,6 +19,10 @@ namespace {
 //   * Entity LOD is not live. `rendering::RepresentationSelector` exists, is tested, and is called
 //     by nothing in `scene_renderer.cpp`; the ladder that runs is the scatter one in `cull.wgsl`
 //     and the terrain one in `world::chunkLod`.
+//   * The Camera Lab's decision site is `heroSightline` rather than `clearPath`. ADR-080 keeps the
+//     camera *out of* the scenery and that half was already built; what the lab was staffed to
+//     answer -- can the camera see the hero it is framing -- is the half that was missing, and it is
+//     where the interesting decision now is.
 constexpr std::array<LabDescriptor, 14> kLabs{{
     {LabId::Animation, "animation", "Animation Lab", LabStatus::InProgress,
      "Is this pose the one the clip asked for at this time?",
@@ -48,13 +52,13 @@ constexpr std::array<LabDescriptor, 14> kLabs{{
      "shaders/cull.wgsl:cs_cull_classify", "docs/engineering-labs.md",
      "examples/stress/stress.json", ""},
 
-    {LabId::Camera, "camera", "Camera / Framing Lab", LabStatus::Planned,
+    {LabId::Camera, "camera", "Camera / Framing Lab", LabStatus::Built,
      "Is the camera where the shot says, and can it see what it is framing?",
-     "camera evaluation, the frustum the cull is given, terrain clearance and line of sight to the "
-     "subject",
+     "camera evaluation, the frustum the cull is given, terrain clearance, line of sight to the "
+     "subject, and which camera the viewport is showing",
      "which objects survive that frustum -- that is the Visibility Lab",
-     "src/world/camera_clearance.cpp", "docs/engineering-labs.md",
-     "examples/camera/behaviors.json", ""},
+     "src/world/camera_clearance.cpp:heroSightline", "docs/camera-lab.md",
+     "examples/camera/behaviors.json", "examples/labs/camera/cases.json"},
 
     {LabId::Shadow, "shadow", "Shadow Lab", LabStatus::Planned,
      "Why is this surface lit when it should be shadowed, or shadowed when it should be lit?",

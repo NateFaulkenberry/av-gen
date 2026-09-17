@@ -214,6 +214,21 @@ struct Shot {
     [[nodiscard]] glm::vec3 targetAt(float t) const;
     // The aim the look mode alone asks for, before `startTarget`'s pan is applied.
     [[nodiscard]] glm::vec3 targetWithoutStart(float t) const;
+    // Which subject this shot is actually **holding** at `t`, or nullptr when it is holding none.
+    //
+    // Not the same question as "what does this shot have a `subject` field for". Every shot carries
+    // one -- it is what the polar geometry is composed around -- but three of the five look modes
+    // never point at it: `Ahead` aims down the move, `Parallel` freezes a direction so the parallax
+    // is the shot, and `Fixed` holds a place. Those shots cannot be "obstructed", because nothing
+    // about them is a claim that the subject is on screen.
+    //
+    // `Handoff` is the one that needs a *time*, and it is the reason this is a function rather than
+    // a predicate. A handoff holds the first subject up to the swing, holds the second after it, and
+    // holds neither in between -- the swing is the shot leaving one thing to find another, and
+    // whatever is in frame halfway through is deliberately in transit. Twenty of the twenty-three
+    // shots the Auto-director bakes for Glowmere are handoffs, so a rule that treats a handoff as
+    // "holds nothing" is a rule that examines 13% of the film.
+    [[nodiscard]] const FocalTarget* heldSubjectAt(float t) const;
     [[nodiscard]] LookMode lookMode() const;
     [[nodiscard]] MovementCurve movementCurve() const;
     [[nodiscard]] float bowAmount() const;
@@ -301,6 +316,18 @@ struct Sequence {
     // any shot asks for it, the lens. `samplesPerShot` sets how finely a curved move is sampled;
     // straight moves need two keys and curves need enough that the eye cannot see the segments.
     [[nodiscard]] nlohmann::json toTimelineTracks(int samplesPerShot = 8) const;
+
+    // Which subject each `camera/position` key of `toTimelineTracks(samplesPerShot)` is holding, in
+    // the same order and the same count, nullptr where the shot holds none.
+    //
+    // A companion rather than a re-derivation: a caller that wanted this could walk the baked times
+    // back through `shotAt`, and would get the cut boundaries wrong -- the last key of every shot
+    // deliberately lands on the *next* shot's start second, so `shotAt` answers with the shot that
+    // has not begun. Emitting the two from the same loop is the only way they cannot drift.
+    //
+    // The pointers are into `shots` and are valid while this sequence is. This is a bake-time
+    // question and a bake is one call.
+    [[nodiscard]] std::vector<const FocalTarget*> heldSubjectPerKey(int samplesPerShot = 8) const;
 
     // The cut, flattened to what a world effect needs for time gating (ADR-207): when the camera is
     // travelling between subjects, when it is holding one, and who those subjects are.

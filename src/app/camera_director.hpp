@@ -98,6 +98,17 @@ struct AutoDirectorSettings {
     // however high the slider went. "I'm not sure I can control that enough with just the importance
     // param" -- correct, and this is the thing that was missing.
     int dwellShots = 1;
+    // How far a key may be moved to restore a hero's line of sight, as a fraction of that key's
+    // distance to the hero (ADR-080's missing half; see `world::clearSightlines`).
+    //
+    // 0 turns the pass into a pure measurement -- every obstruction is still found and reported, and
+    // nothing is moved -- which is what the lab's control arm runs with. The default 0.25 is read
+    // off `defaultsFor`'s own elevation table rather than chosen: `Shot::startElevation` is a height
+    // as a multiple of the orbit radius, exactly this ratio, and every ordinary shot kind composes
+    // below 0.25 of it (Establish 0.22, Orbit 0.24, Approach 0.20, Track 0.12). A larger correction
+    // moves the eye further than the whole range of elevations the vocabulary works in, which is
+    // what "this is no longer the shot anybody composed" means in numbers.
+    float maxSightlineCorrection = 0.25f;
     // How much freedom Song Mode has (ADR-249). Read by `DirectorMode::Song` and by nothing else --
     // the other two modes have no authored intent to be more or less faithful to.
     //

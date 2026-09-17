@@ -642,12 +642,15 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
     // air. Glowmere's first directed pass went through the trees.
     nlohmann::json cleared = baked;
     std::size_t movedKeys = 0;
+    world::SightlineResult sight;
     if (const scene::CompositionNode* terrain = terrainNodeOf(engine)) {
         world::ClearanceField field;
         field.map = &terrain->worldMap;
         field.ecology = &terrain->ecology;
         const std::vector<world::HeroPoint>& heroes = engine.composition()->heroes();
         field.heroes = heroes;
+        // Which subject every baked position key is holding, from the sequence that produced them.
+        const std::vector<const FocalTarget*> held = sequence.heldSubjectPerKey();
         for (auto& track : cleared) {
             if (track.value("target", std::string()) != "camera/position") {
                 continue;
@@ -660,7 +663,48 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
                 path.emplace_back(v[0].get<float>(), v[1].get<float>(), v[2].get<float>());
             }
             // Heroes are pushed out sideways and terrain lifts, so this is no longer only a lift.
-            movedKeys = world::clearPath(field, path);
+            //
+            // `+=`, and the `=` it replaces was a real reporting bug: this loop runs over every
+            // baked track and the count of the last one overwrote all the others. It read correctly
+            // only because exactly one track is named `camera/position` today, which is a fact about
+            // the bake and not about this loop.
+            movedKeys += world::clearPath(field, path);
+
+            // Then the half ADR-080 never had: whether anything stands *between* the cleared eye and
+            // the hero it is framing. Run after `clearPath` on purpose -- a camera inside a hillside
+            // has no sightline worth asking about, and the lift that gets it out changes the answer.
+            std::vector<world::SightlineTarget> targets(path.size());
+            for (std::size_t i = 0; i < path.size() && i < held.size(); ++i) {
+                if (held[i] == nullptr) {
+                    continue;   // this key's shot is aiming down its move, or mid-handoff-swing
+                }
+                targets[i].holds = true;
+                targets[i].subject.name = held[i]->name;
+                targets[i].subject.position = held[i]->position;
+                targets[i].subject.radius = held[i]->radius;
+                // A `FocalTarget` carries a radius and no height, because a shot composes in radii.
+                // The hero it names carries both, so the capsule is the hero's own where the world
+                // has one -- a sixteen-metre elder and a sixteen-metre-wide pool are not the same
+                // silhouette, and a sightline that assumed they were would clear the wrong thing.
+                targets[i].subject.height = held[i]->radius * 2.0f;
+                for (const world::HeroPoint& hero : heroes) {
+                    if (hero.name == held[i]->name) {
+                        targets[i].subject.position = hero.position;
+                        targets[i].subject.radius = hero.radius;
+                        targets[i].subject.height = hero.height;
+                        break;
+                    }
+                }
+            }
+            const world::SightlineResult r =
+                world::clearSightlines(field, path, targets, settings.maxSightlineCorrection);
+            sight.examined += r.examined;
+            sight.obstructed += r.obstructed;
+            sight.corrected += r.corrected;
+            sight.refused += r.refused;
+            sight.worstRefused = std::max(sight.worstRefused, r.worstRefused);
+            sight.largestApplied = std::max(sight.largestApplied, r.largestApplied);
+
             for (std::size_t i = 0; i < keys.size() && i < path.size(); ++i) {
                 keys[i]["value"] = {path[i].x, path[i].y, path[i].z};
             }
@@ -670,6 +714,15 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
         log::info("auto-director: moved {} camera key(s) clear of the terrain, the canopy or a hero "
                   "-- up out of the ground, and sideways out of a subject",
                   movedKeys);
+    }
+    if (sight.obstructed > 0) {
+        log::info("auto-director: {} of {} key(s) holding a hero could not see it; {} moved clear "
+                  "(worst {:.2f} m), {} left as composed because clearing them would have cost more "
+                  "than the shot (worst {:.2f} m)",
+                  sight.obstructed, sight.examined, sight.corrected, sight.largestApplied,
+                  sight.refused, sight.worstRefused);
+    } else if (sight.examined > 0) {
+        log::info("auto-director: all {} key(s) holding a hero can see it", sight.examined);
     }
 
     std::size_t added = 0;
