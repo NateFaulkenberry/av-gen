@@ -8868,7 +8868,7 @@
           },
           {
             "name": "liftHeight",
-            "value": -7.5,
+            "value": -6.6,
             "min": -40.0,
             "max": 0.0
           },
@@ -9059,9 +9059,6 @@
                     "duration": {
                       "param": "hoverSeconds"
                     },
-                    "clearance": {
-                      "param": "cruiseClearance"
-                    },
                     "wobble": {
                       "param": "craftWobble"
                     },
@@ -9121,9 +9118,6 @@
                     "duration": {
                       "param": "abductSeconds"
                     },
-                    "clearance": {
-                      "param": "cruiseClearance"
-                    },
                     "wobble": {
                       "param": "craftWobble"
                     },
@@ -9139,8 +9133,9 @@
                   {
                     "kind": "moveTo",
                     "name": "lift",
-                    "to": "actor",
-                    "anchor": "visual",
+                    "to": "actor.beam",
+                    "anchor": "drawn",
+                    "place": "drawn",
                     "height": {
                       "param": "liftHeight"
                     },

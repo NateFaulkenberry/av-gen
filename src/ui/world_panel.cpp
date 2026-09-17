@@ -692,6 +692,15 @@ void WorldPanel::drawDebugOptions(app::Engine& engine, WorldEditor* editor) {
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Every skinned entity's joints and bones, in world space.");
     }
+    ImGui::SameLine();
+    ImGui::Checkbox("Beam axes", &debug.beams);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Every particle emitter's disc, the axis its column actually fires\n"
+                          "along, and a second ring where the column ends -- its own speed and\n"
+                          "lifetime, integrated. The end ring is the point: a beam treated as an\n"
+                          "axis is a line of infinite length, and the tractor beam was stopping\n"
+                          "four metres above the animal it was supposedly lifting (ADR-260).");
+    }
     if (ImGui::InputText("Selected entity", selectedEntity, sizeof(selectedEntity))) {
         debug.selectedEntity = selectedEntity;
     }

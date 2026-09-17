@@ -195,6 +195,11 @@ std::string usageText() {
            "  --capture-ui-panel <a,b>  open and raise these panels first, so a closed or\n"
            "                      tab-buried panel can be photographed; last named ends up on top\n"
            "  --capture-ui-stay   keep running after the capture instead of quitting\n"
+           "  --debug-draw <list> debug overlays, comma separated: beams (every particle\n"
+           "                      emitter's disc, its column's axis and where the column ends),\n"
+           "                      entityOrigins, entityBounds, entityIds, skeletons, worldAxes,\n"
+           "                      frustum, transformTrail, points, bounds, normals, splines.\n"
+           "                      Works in --render, where there is no panel to switch them on\n"
            "  --debug-target <t>  display an auxiliary render target: normal|roughness|velocity|\n"
            "                      emission|ids|occlusion|depth|linear depth|depth edges|\n"
            "                      object depth|overdraw|fragment density\n"
@@ -423,6 +428,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             ++i;
         } else if (arg == "--capture-ui-stay") {
             options.captureUiQuit = false;
+        } else if (arg == "--debug-draw") {
+            auto v = need(i, "--debug-draw");
+            if (!v) return std::unexpected(v.error());
+            options.debugDraw = *v;
+            ++i;
         } else if (arg == "--debug-target") {
             auto v = need(i, "--debug-target");
             if (!v) return std::unexpected(v.error());
@@ -896,6 +906,10 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         }
     }
 
+    if (auto applied = applyDebugDraw(); !applied) {
+        return applied;
+    }
+
     if (window_) {
         context_->configureSurface(window_->pixelWidth(), window_->pixelHeight());
         if (auto r = renderer_->resize(window_->pixelWidth(), window_->pixelHeight()); !r) {
@@ -1003,6 +1017,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         });
 
         panel_ = std::make_unique<ui::ControlPanel>();
+        panel_->world.debug = cliDebug_; // `--debug-draw` seeds the panel; the panel then owns them
         // The world editor records into the application's history rather than one of its own, and
         // registers as the context that answers Copy, Delete and the rest for world objects.
         panel_->editor.attachEdits(edits_);
@@ -1582,6 +1597,61 @@ void Application::performOpen(const std::filesystem::path& path) {
     } else if (window_) {
         window_->setTitle("avgen " + std::string(app::Engine::kAppVersion) + " - " + path.filename().string());
     }
+}
+
+const rendering::DebugViewOptions& Application::debugOptions() const {
+    return panel_ != nullptr ? panel_->world.debug : cliDebug_;
+}
+
+Result<void> Application::applyDebugDraw() {
+    if (options_.debugDraw.empty()) {
+        return {};
+    }
+    rendering::DebugViewOptions& d = cliDebug_;
+    const std::pair<std::string_view, bool*> known[] = {
+        {"beams", &d.beams},
+        {"entityOrigins", &d.entityOrigins},
+        {"entityBounds", &d.entityBounds},
+        {"entityIds", &d.entityIds},
+        {"skeletons", &d.skeletons},
+        {"worldAxes", &d.worldAxes},
+        {"frustum", &d.frustum},
+        {"transformTrail", &d.transformTrail},
+        {"points", &d.points},
+        {"bounds", &d.bounds},
+        {"normals", &d.normals},
+        {"splines", &d.splines},
+    };
+    std::string enabled;
+    std::stringstream stream(options_.debugDraw);
+    std::string name;
+    while (std::getline(stream, name, ',')) {
+        while (!name.empty() && std::isspace(static_cast<unsigned char>(name.front()))) name.erase(name.begin());
+        while (!name.empty() && std::isspace(static_cast<unsigned char>(name.back()))) name.pop_back();
+        if (name.empty()) {
+            continue;
+        }
+        bool found = false;
+        for (const auto& [key, flag] : known) {
+            if (key == name) {
+                *flag = true;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            std::string all;
+            for (const auto& [key, flag] : known) {
+                all += (all.empty() ? "" : ", ") + std::string(key);
+            }
+            return fail("--debug-draw: unknown overlay '{}' (have: {})", name, all);
+        }
+        enabled += (enabled.empty() ? "" : ", ") + name;
+    }
+    // Printed, because an overlay that legitimately draws nothing -- no particles in the scene, no
+    // entity selected -- is indistinguishable from one that was never switched on.
+    log::info("--debug-draw: {}", enabled);
+    return {};
 }
 
 Result<void> Application::ensureFinalTexture(std::uint32_t width, std::uint32_t height) {
@@ -3739,6 +3809,7 @@ Result<std::unique_ptr<RenderJob>> Application::makeRenderJob(const std::filesys
     }
     auto job = std::make_unique<RenderJob>(*context_, *shaders_, std::move(offline), std::move(settings),
                                            std::filesystem::absolute(projectFile).parent_path());
+    job->setDebugOptions(debugOptions());
     if (auto r = job->start(); !r) {
         return std::unexpected(r.error());
     }
@@ -4044,8 +4115,11 @@ int Application::runHeadless() {
             }
             // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
             // options; an empty set costs nothing.
-            if (panel_) {
-                const rendering::DebugViewOptions& options = panel_->world.debug;
+            {
+                // Not guarded on the panel any more: a headless render has no panel, and "the
+                // overlays only exist in the editor" is what made them unreachable to every
+                // diagnosis done from a rendered frame.
+                const rendering::DebugViewOptions& options = debugOptions();
                 renderer_->setDebugDepthTest(options.depthTest);
                 rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime);
             }

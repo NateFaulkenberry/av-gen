@@ -348,7 +348,7 @@ struct AimFollow {
 };
 
 
-class Composition final : public SceneController {
+class Composition final : public SceneController, public stage::IVisualPlacement {
 public:
     Composition(assets::AssetRegistry& registry, std::string name = "composition");
     ~Composition() override;
@@ -424,6 +424,35 @@ public:
     // inside a cylinder" question needs: the axis-aligned box of a rotated body is larger than the
     // body by up to its own diagonal, which on a 3.6x farm animal is a metre of beam.
     [[nodiscard]] std::vector<glm::vec3> nodeCorners(const std::string& name);
+
+    // ---- what a node contributes to the picture (`stage::IVisualPlacement`) ----
+    //
+    // "Where is this node's contribution to the picture centred, and where is the node itself?"
+    // Both in world, both read out of the *flattened* scene -- so both carry the parent chain, the
+    // parameter finals, the entity offsets, and whatever the asset does inside its own node.
+    //
+    // The centre, per node kind, and each is the honest answer for that kind rather than a rule
+    // bent to fit:
+    //
+    //   Particles   the emitter's world point. A tractor beam authored 2.05 m under a tilted saucer
+    //               has an axis that is not the saucer's origin, and the axis is the thing anything
+    //               lining up with the beam must line up with.
+    //   meshes      the centre of the box those meshes occupy. A farm GLB is not centred on its own
+    //               origin; that offset is an asset property, it rotates with the body, and it is
+    //               what a viewer is looking at.
+    //   else        the node's own origin. A procedural draws through a point cloud rather than
+    //               through scene entities, and its origin is the best answer available without
+    //               walking a cloud every frame -- which would cost more than the whole director
+    //               and would be the wrong number anyway for a scatter layer.
+    //
+    // `const`, and deliberately **does not rebuild**: the director runs before the entity pass that
+    // writes the finals the next flattening reads, so this is last frame's answer by construction.
+    // Rebuilding here to hide that would be a second flattening per frame *and* would still be a
+    // different frame's answer from the one the renderer used. False while the scene is dirty --
+    // frame zero, and after a structural edit -- so the caller falls back rather than reading a
+    // stale box as if it were current.
+    [[nodiscard]] bool visualPlacement(std::string_view node,
+                                       stage::VisualPlacement& out) const override;
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
     // ---- composition (ADR-038) ----
     // What the frame is about: focal points, depth layers and exclusion regions. Its fields are
@@ -1124,6 +1153,19 @@ private:
     struct NodeRange {
         std::size_t firstEntity = 0;
         std::size_t entityCount = 0;
+        // The node's world transform *as the last flattening used it* -- root fold included, so it
+        // is the transform every entity, emitter and light in this range was placed by.
+        //
+        // Recorded rather than recomputed, and the difference is not bookkeeping. `applyParameters`
+        // reads the parameter **finals**, and finals are rebuilt from bases at the top of every
+        // frame and then written by routes, reactions and `EntityWorld::applyOffsets` -- so between
+        // the reset and the entity pass, `nodeWorldTransform` answers *the position the file was
+        // authored with*, not the one anything is drawn at. The director runs in exactly that
+        // window. Asking it there cost an afternoon: a wandering cow's `Drawn` placement came out
+        // 5.3 m wrong -- the distance it had walked from its authored spot -- while every animal
+        // that never left its authored spot looked perfect.
+        Transform world;
+        bool worldValid = false;
         std::vector<Transform> restTransforms;       // entity transforms inside the asset
         std::vector<float> restEmissive;
         std::vector<float> restRoughness;

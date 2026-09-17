@@ -6,6 +6,7 @@
 #include "assets/image.hpp"
 #include "core/log.hpp"
 #include "gpu/context.hpp"
+#include "rendering/debug_visualizer.hpp"
 
 #include <fmt/format.h>
 
@@ -470,6 +471,11 @@ Result<void> RenderJob::renderOne() {
     engine_->update(time);
     const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                     engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+    // The debug overlays, if `--debug-draw` asked for any. Built from the scene the frame is about
+    // to be drawn from, so the lines are the same frame's as the pixels. An empty option set builds
+    // nothing and costs a handful of branches, which is what a deliverable render pays.
+    renderer_->setDebugDepthTest(debug_.depthTest);
+    rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), debug_, time.renderTime);
     // The same clock the live path uses, so frame f lands in the same place either way.
     // The frame's passes and its readback copy go into one command buffer; the ring submits it
     // and starts the map, and only blocks when all its slots are still on the GPU.

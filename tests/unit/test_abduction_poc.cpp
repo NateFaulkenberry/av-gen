@@ -141,6 +141,14 @@ struct Run {
             comp->updateFields(time, bus, modulator);
             modulator.applyRoutes(bus, params, time.deltaTime);
             comp->updateBehaviour(time, bus);
+            // The rest of the frame. This loop used to stop at `updateBehaviour`, which is half a
+            // frame: `Composition::update` is what folds the parameter finals onto the node
+            // transforms and re-flattens the scene, and the flattened scene is what the emitter's
+            // world position, every node's world transform and (ADR-260) the director's `Drawn`
+            // anchor are read from. Without it the director was deciding against a scene that had
+            // never been drawn -- which was invisible while every anchor was entity arithmetic, and
+            // became a sheep flown 152 m across the valley the moment one of them was not.
+            comp->update(time);
 
             // ---- the beam ----
             const double rate = beamRate->baseComponent(0);

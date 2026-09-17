@@ -1976,6 +1976,9 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
         stageCtx.world = &entityWorld_;
         stageCtx.params = params_;
         stageCtx.bus = &bus;
+        // The flattened scene, so a step may ask where a node is *drawn* rather than only where the
+        // entity arithmetic says it is. One frame old by construction -- see `visualPlacement`.
+        stageCtx.visuals = this;
         staging_.update(stageCtx);
     }
     // ADR-245: what the camera director can see of the world's events, read straight after the
@@ -2217,6 +2220,80 @@ std::vector<glm::vec3> Composition::nodeCorners(const std::string& name) {
         }
     }
     return out;
+}
+
+bool Composition::visualPlacement(std::string_view node, stage::VisualPlacement& out) const {
+    const auto it = std::find_if(nodes_.begin(), nodes_.end(),
+                                 [&](const std::unique_ptr<CompositionNode>& n) { return n->name == node; });
+    if (it == nodes_.end()) {
+        return false; // the only false: there is no such node, and a caller must not use `out`
+    }
+    // The origin never needs the flattening. `nodeWorldTransform` walks the parent chain and reads
+    // the parameter finals, which is exactly what the flattening will do with it -- so this half of
+    // the answer is right on the first frame and on every frame, and a `Drawn` anchor on a parented
+    // node degrades to "the node's own world origin" instead of to the entity's anchor, which for
+    // anything parented is a point in the wrong space entirely (the tractor beam's would be the
+    // world origin, two hundred metres from the saucer).
+    const auto index = static_cast<std::size_t>(std::distance(nodes_.begin(), it));
+    // Everything below comes out of the last flattening and nothing out of the parameters, for the
+    // reason written on `NodeRange::world`: the finals are reset at the top of the frame and the
+    // director runs before the entity pass writes them back, so a parameter read here is the
+    // authored number rather than the drawn one. One frame old and self-consistent beats current
+    // and mixed.
+    if (dirty_ || index >= ranges_.size() || !ranges_[index].worldValid) {
+        // Nothing has been flattened, so there is no drawn position to report -- and this must be
+        // **false**, not a best guess. `nodeWorldTransform` here would read the parameter finals,
+        // which at director time have been reset to their authored bases, and hand back the
+        // position the *file* was written with. Measured: `test_abduction_poc`'s frame loop omits
+        // `Composition::update`, so with a best guess the lift flew a sheep 152 m across the valley
+        // to the saucer's authored spot, and did it plausibly enough that only a wander test noticed.
+        // A diagnostic that cannot say "I have no answer" is the failure this whole ADR is about.
+        out.origin = glm::vec3(0.0f);
+        out.centre = out.origin;
+        return false;
+    }
+
+    const NodeRange& range = ranges_[index];
+    out.origin = range.world.position;
+    out.centre = out.origin;
+    // A particle node: the emitter's own world point, which `applyParameters` already produced by
+    // putting the system's node-local `position` through the node's world matrix.
+    if (range.particleIndex >= 0 &&
+        static_cast<std::size_t>(range.particleIndex) < scene_.particles.size()) {
+        out.centre = scene_.particles[static_cast<std::size_t>(range.particleIndex)].position;
+        return true;
+    }
+    // Otherwise the box the node's meshes occupy, from the *cached* mesh bounds through each scene
+    // entity's world transform -- eight corners per mesh, which is the same arithmetic
+    // `nodeCorners` does and the same arithmetic the renderer's own culling does.
+    bool any = false;
+    glm::vec3 lo(0.0f);
+    glm::vec3 hi(0.0f);
+    for (std::size_t e = range.firstEntity;
+         e < range.firstEntity + range.entityCount && e < scene_.entities.size(); ++e) {
+        const Entity& entity = scene_.entities[e];
+        if (entity.mesh >= scene_.meshes.size()) {
+            continue;
+        }
+        const auto& [bmin, bmax] = scene_.meshBounds(entity.mesh);
+        for (int corner = 0; corner < 8; ++corner) {
+            const glm::vec3 p((corner & 1) ? bmax.x : bmin.x, (corner & 2) ? bmax.y : bmin.y,
+                              (corner & 4) ? bmax.z : bmin.z);
+            const glm::vec3 w = transformPoint(entity.transform, p);
+            if (!any) {
+                lo = w;
+                hi = w;
+                any = true;
+            } else {
+                lo = glm::min(lo, w);
+                hi = glm::max(hi, w);
+            }
+        }
+    }
+    if (any) {
+        out.centre = (lo + hi) * 0.5f;
+    }
+    return true;
 }
 
 WorldBounds Composition::nodeBounds(const std::string& name) {
@@ -4593,6 +4670,8 @@ void Composition::applyParameters() {
         const float roughnessScale =
             node.roughnessParam != nullptr ? node.roughnessParam->value() : node.roughnessScale;
         const Transform full = compose(root, nodeT);
+        range.world = full;
+        range.worldValid = true;
 
         // The lights the node's asset brought in. Applied here, per frame, rather than at rebuild:
         // `rebuild` repopulates `scene_.lights` wholesale, so a value written onto a light was

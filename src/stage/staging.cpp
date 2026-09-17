@@ -144,12 +144,17 @@ const char* anchorName(Anchor anchor) {
     switch (anchor) {
     case Anchor::Travel: return "travel";
     case Anchor::Visual: return "visual";
+    case Anchor::Drawn: return "drawn";
     }
     return "?";
 }
 std::optional<Anchor> anchorFromName(std::string_view name) {
     if (name == "travel" || name == "simulated") return Anchor::Travel;
-    if (name == "visual" || name == "drawn" || name == "rendered") return Anchor::Visual;
+    if (name == "visual") return Anchor::Visual;
+    // "drawn" and "rendered" used to be spellings of `Visual`, which was the closest thing there
+    // was to the flattened scene's answer. Now that there is a real one they name it instead. No
+    // shipped scene used either word, so this renames nothing that existed.
+    if (name == "drawn" || name == "rendered") return Anchor::Drawn;
     return std::nullopt;
 }
 
@@ -261,6 +266,13 @@ namespace {
         std::string to;
         bool visual = false;
     };
+    // A part is its body. `actor.beam` is a particle node parented to `actor`, so a step that takes
+    // its station from the beam is taking it from the saucer -- and a loop check that compared the
+    // spelled role would have let exactly that pair through, which is the pair this work created.
+    const auto body = [](const std::string& role) {
+        const std::size_t dot = role.find('.');
+        return dot == std::string::npos ? role : role.substr(0, dot);
+    };
     std::vector<Link> links;
     for (const CueDesc& cue : beat.cues) {
         for (const StepDesc& step : cue.steps) {
@@ -271,9 +283,9 @@ namespace {
                 continue;
             }
             const std::string& self = step.role.empty() ? cue.role : step.role;
-            links.push_back(Link{.from = self,
-                                 .to = step.toRole,
-                                 .visual = step.anchor == Anchor::Visual});
+            links.push_back(Link{.from = body(self),
+                                 .to = body(step.toRole),
+                                 .visual = step.anchor != Anchor::Travel});
         }
     }
     for (const Link& x : links) {
@@ -930,14 +942,71 @@ bool Staging::runQuery(Run& run, const QueryDesc& query, const StageContext& ctx
 
 // ---- points -------------------------------------------------------------------------------------
 
+// The one place that turns "a body" and "which of its positions" into a world point.
+//
+// Spelled once, as a member, because there are now two callers that must not disagree: a step's
+// *destination* (`resolvePoint`) and the point *of the moving body* that is put on it (`MoveTo`).
+// They were one question asked from one side, and the day a lift had to land the animal's body --
+// not its origin -- on the beam's axis -- not the craft's origin -- they became two.
+//
+// `Drawn` falls back to `Visual` rather than failing -- a scenario that stalled because frame zero
+// had nothing flattened yet would be a worse answer than one that used the arithmetic for a frame --
+// but it says so, once, and that half is not optional. A caller that drives the director without
+// `Composition::update` never flattens anything, and the fallback for a *parented* node is a point
+// in the wrong space: `test_abduction_poc`'s frame loop was exactly that caller, and the silent
+// version of this flew a sheep 152 m across the valley without a word in the log.
+glm::vec3 Staging::pointOn(const entity::Entity& e, Anchor anchor, const StageContext& ctx) const {
+    if (anchor == Anchor::Drawn) {
+        VisualPlacement vp;
+        const std::string& node = e.desc().node.empty() ? e.desc().name : e.desc().node;
+        if (ctx.visuals != nullptr && ctx.visuals->visualPlacement(node, vp)) {
+            return vp.centre;
+        }
+        // Said out loud, once. `Drawn` is answerable only by something that has flattened the
+        // scene, and a caller that drives the director without `Composition::update` has not --
+        // which is a legitimate thing for a headless tool to be, and an illegitimate thing to be
+        // silent about, because what it falls back to is a *different point* by metres.
+        if (!warnedNoDrawn_) {
+            warnedNoDrawn_ = true;
+            log::warn("staging: a step asked for the drawn position of '{}' and nothing has "
+                      "flattened the scene (no Composition::update this frame); falling back to "
+                      "Entity::visualPosition(), which for a parented node is in the wrong space",
+                      node);
+        }
+    }
+    if (anchor == Anchor::Travel) {
+        return e.state().position();
+    }
+    return e.visualPosition();
+}
+
+// How far the body's own drawn centre is from the node origin the director actually writes, in
+// world metres. Subtracted from a destination so that what lands there is the body rather than the
+// origin -- and zero, exactly, for anything that does not ask.
+//
+// It is *not* a magic offset: it is the asset's own model-space centre, read out of the flattened
+// scene (so it carries the glTF node chain and the node's scale), already rotated into world by the
+// body's own facing (so it is a different vector for every one of the four yaws in the lab, which
+// is the point). Nothing here is tuned and nothing here is per-species.
+glm::vec3 Staging::placementOffset(const entity::Entity& e, Anchor place,
+                                   const StageContext& ctx) const {
+    if (place != Anchor::Drawn || ctx.visuals == nullptr) {
+        return glm::vec3(0.0f);
+    }
+    // No warning here and no fallback: a placement offset that cannot be computed is *zero*, which
+    // is exactly what every step did before this field existed. `pointOn` has already said so.
+    VisualPlacement vp;
+    const std::string& node = e.desc().node.empty() ? e.desc().name : e.desc().node;
+    if (!ctx.visuals->visualPlacement(node, vp)) {
+        return glm::vec3(0.0f);
+    }
+    return vp.offset();
+}
+
 bool Staging::resolvePoint(const Run& run, const StepDesc& step, const StageContext& ctx,
                            glm::vec3& out) const {
-    // `Visual` is where the body is *drawn* -- the simulation's number plus the behaviours' offsets
-    // the entity layer folds onto the node afterwards. A step that has to line up with something
-    // parented to that node (a tractor beam) must measure from the drawn place, not the simulated
-    // one; see the note on `Anchor`.
     const auto placeOf = [&](const entity::Entity& e) {
-        return step.anchor == Anchor::Visual ? e.visualPosition() : e.state().position();
+        return pointOn(e, step.anchor, ctx);
     };
     glm::vec3 base(0.0f);
     if (!step.toRole.empty()) {
@@ -1216,6 +1285,15 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         if (!resolvePoint(run, step, ctx, goal)) {
             return StepStatus::Failed; // the target went away mid-approach
         }
+        // Horizontally only, and that is a decision rather than an oversight. The invariant a lift
+        // has to keep is "the body is on the beam's axis", and the axis is vertical; the *vertical*
+        // relationship is separately authored and separately reasoned about -- `aboveGround` is a
+        // height over terrain, `clearance` is air under the hull, and `liftHeight` was chosen
+        // (940232a) against the node origin so that the widest animal's back clears the saucer.
+        // Folding a body-centre offset into y would move all three at once to fix none of them.
+        const glm::vec3 placeOffset = placementOffset(*self, step.place, ctx);
+        goal.x -= placeOffset.x;
+        goal.z -= placeOffset.z;
         if (step.travel == Travel::Walk) {
             // Delegated to ADR-096 entirely: one `move` on the Director tier, routed, steered and
             // gaited by the layer that already does all three.
@@ -1332,6 +1410,9 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
                 cue.started = true;
             }
         }
+        const glm::vec3 placeOffset = placementOffset(*self, step.place, ctx);
+        goal.x -= placeOffset.x;
+        goal.z -= placeOffset.z;
         cue.phase += ctx.dt;
         glm::vec3 p = goal;
         const float wobble = value(run, step.wobble);

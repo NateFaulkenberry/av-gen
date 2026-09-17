@@ -602,12 +602,25 @@ many metres of canopy over it; `requireNavigable` rejects one off the map or in 
   and is the point -- *until* `anchor` enters it (below), which is what `hold` is for.
   `travel: "walk"` hands the move to `ActionKind::Move` instead — routed, steered and
   gaited by the navigation layer, identical to a walk the entity chose for itself.
-- `anchor` (ADR-218) is `"travel"` (the default, and what every step meant before it existed) or
-  `"visual"`. A body has two positions: `Entity::state().position()` is where the simulation put it,
-  and the node it drives is drawn at that plus the behaviours' offsets -- hover, drift, bank -- which
-  the entity layer folds on afterwards, on purpose. Anything that has to line up with something
-  parented to that node (a tractor beam, a mounted light) must measure from the drawn place;
-  Glowmere's saucer drifts 2.4 m, so a lift aimed at the simulated one rises beside the beam.
+- `anchor` (ADR-218, ADR-260) is `"travel"` (the default, and what every step meant before it
+  existed), `"visual"`, or `"drawn"`. It says **which point of the destination role** the step
+  measures from. `travel` is `Entity::state().position()`, where the simulation put the body.
+  `visual` adds the behaviours' offsets -- hover, drift, bank -- which the entity layer folds onto
+  the node afterwards, on purpose; Glowmere's saucer drifts 2.4 m, so a lift aimed at the simulated
+  one rises beside the beam. `drawn` asks the **flattened scene** instead, and is the only one of
+  the three that can see the parent chain, the parameter finals, and what the node actually
+  contains -- for a particle node it is the emitter's world point, for a mesh node the centre of the
+  box those meshes occupy, and for anything else the node's own origin. The tractor beam is 2.05 m
+  under a tilted saucer, so its axis is up to 0.55 m from the saucer's origin and no amount of
+  entity arithmetic can find it.
+- `place` (ADR-260) is the same three words asked of the **other** end: which point *of the body
+  being moved* is put on that destination. A director writes an entity's position, and an entity
+  drives its node's **origin**, so every `moveTo` before this field placed the origin -- which is
+  only the body when the asset happens to be centred on it. A farm GLB is not: a cow's box centre is
+  0.89 m from its origin at the farm's 3.6x, and that vector turns with the animal's facing, so four
+  identical cows at 0/90/180/270 degrees land in four different places. `place: "drawn"` puts the
+  centre of the drawn box there instead. Horizontal only: the vertical relationship is
+  `aboveGround`, `clearance` and `height`, and they are authored against the origin.
 - `hold` (ADR-218), on a `follow`, resolves the station **once** and keeps it — the brief's *hover*
   as distinct from its *follow*. It is also what makes `anchor: "visual"` safe: two cues taking their
   station from each other put whatever is added on the way round into a loop every frame, and a
