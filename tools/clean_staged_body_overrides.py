@@ -37,6 +37,15 @@ the 7.8 m the scene authors**, and its mouth sat 0.12 m under the hull instead o
 large animal was wider than the beam lifting it, in every render, for as long as the file has
 existed. No amount of alignment fixes a beam that is two and a half times too narrow.
 
+## Residue, not authorship -- and the history says so rather than a judgement
+
+`git log -S` places the scale exactly: commit 569ae64, "The abducted animal is in shot and lights up,
+and a particle emitter has a UI", changed it from [1,1,1] to [1,0.061,1] inside a 7,114-line whole-
+file re-save of the project, in the same commit that *added the particle emitter UI*. The scene
+changed by 46 lines in that commit and gained no scale. e08d25c then created the multicam project
+wholesale (22,113 lines, from `make_multicam_demo.py`) and copied the residue forward; Song Mode did
+the same. Somebody dragged a new gizmo and saved; two generators propagated it.
+
 Usage:  tools/clean_staged_body_overrides.py <project.json> [...]
         tools/clean_staged_body_overrides.py            # every project beside a staged scene
 """
