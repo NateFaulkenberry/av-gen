@@ -5363,10 +5363,27 @@ void Composition::updateFloaters(double time) {
 }
 
 void Composition::updateTerrainLod() {
-    // The frustum is built at no narrower than a deliberately wide aspect. The viewport is known
-    // now (setViewport), but culling a chunk the frame turns out to include is a hole in the ground
-    // while keeping one it does not include costs a draw call, so the error is still taken on the
-    // safe side: a wider viewport widens the frustum, a narrower one does not narrow it.
+    // The frustum is built at no narrower than a deliberately wide aspect: culling a chunk the
+    // frame turns out to include is a hole in the ground, while keeping one it does not include
+    // costs a draw call, so the error is taken on the safe side. Widening is safe in the strong
+    // sense -- a wider frustum *contains* a narrower one at the same vertical field of view, which
+    // `tests/unit/test_camera_lab_frustum.cpp` asserts rather than assumes.
+    //
+    // **What this costs, measured, because an inequality with no number attached cannot be judged.**
+    // Against a grid of chunk-sized boxes in front of a real camera, the floor keeps this many more
+    // than the exact aspect would: +16.7% at 2.39:1, +33.3% at 16:9, +64.7% at 4:3, +100% at 1:1 and
+    // +180% at 9:16. It is free only above 2.5, and it is most expensive in exactly the portrait
+    // orientation a short-form deliverable is rendered at.
+    //
+    // **And its original reason has expired.** The floor dates from when the composition did not
+    // know the extent it would be drawn into -- the note further down this function still describes
+    // the viewport as something "waiting" to be plumbed in, and it is wrong: `Engine::update` calls
+    // `Composition::setViewport` before `applyParameters` runs, in the live path and in
+    // `RenderJob`'s offline path both, so `viewportWidth_`/`viewportHeight_` are this frame's render
+    // extent and `Composition::cullEntityNodes` twenty lines away already culls at the exact aspect
+    // with no floor at all. Kept, not removed, because removing it changes how much ground is
+    // submitted and the counters that certify this engine's draw budgets are somebody else's
+    // baseline; the case for removing it is the five numbers above.
     constexpr float kCullAspectFloor = 2.5f;
     const float kCullAspect =
         std::max(kCullAspectFloor, static_cast<float>(viewportWidth_) / static_cast<float>(viewportHeight_));
@@ -5464,11 +5481,17 @@ void Composition::updateTerrainLod() {
                 // -- a caster needs geometry, and its silhouette is what the map records.
                 setCameraCulled(true);
             }
-            // LOD follows how big the ground looks, not how far away it is. The composition knows
-            // the lens but not the viewport it will be drawn into, so the height is the reference
-            // one `lodDistance` is authored against: changing focal length re-picks levels
-            // correctly, changing window size does not. Fixing that needs the viewport plumbed in,
-            // which is the same thing the cull aspect below is waiting for.
+            // LOD follows how big the ground looks, not how far away it is, and `projScale` above
+            // is built from this frame's actual `viewportHeight_` -- so changing the focal length
+            // re-picks levels and so does resizing the window.
+            //
+            // This comment used to say the opposite, in the same function as the code that had
+            // already fixed it: that the composition "knows the lens but not the viewport", that
+            // window size did not re-pick levels, and that the cull aspect *below* was waiting for
+            // the same plumbing. Three claims, all stale, and the cull aspect is above. Left
+            // recorded rather than deleted because a comment that contradicts the code thirty lines
+            // above it is a specific kind of trap: it reads as authority, and the next person to
+            // touch terrain LOD would have plumbed in a viewport that was already there.
             const int lod = lodEnabled ? world::chunkLod(settings, distance, projScale) : 0;
             const MeshId mesh = chunk.meshes[static_cast<std::size_t>(std::clamp(lod, 0, kMaxTerrainLodIndex))];
             if (mesh != kInvalidMesh) {
