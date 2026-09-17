@@ -187,6 +187,23 @@ unscaled — because that is the contract ADR-218 sizes `extent` against and ADR
   node are the same body to within a centimetre, and then ADR-262's invariants. It is the first test
   in this repository to load a project.
 
+## 6. The picture
+
+`glowmere-valley-2-multicam`, rendered from the project the way the owner renders it, twenty seconds
+at 6 fps, the same frame from each arm. "Before" is main's engine *and* main's data, reached by
+reverting the five files and rebuilding, so it is the real prior state and not a reconstruction.
+
+At t = 17 s the saucer is beaming in both. Measured off the frames, the hull spans 425 px:
+
+| | beam column width | as a fraction of the hull |
+|---|---|---|
+| before | 175 px | **41 %** |
+| after | 415 px | **98 %** |
+
+7.8 / 7.99 is 97.6 %, and 3.07 / 7.99 is 38 %. The picture and the arithmetic agree, which is the
+whole point of having both. The before frame also has no animal in shot at all during the lift --
+its target was being raised twenty-eight metres away, outside the frame.
+
 ## Consequences
 
 - `src/scene/composition.{hpp,cpp}`: `nodeBaseTransform`, `nodeWorldBaseTransform`; `binding.anchor`
