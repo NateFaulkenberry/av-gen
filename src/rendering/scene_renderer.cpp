@@ -20,6 +20,7 @@
 #include <cstring>
 #include <limits>
 #include <optional>
+#include <span>
 #include <utility>
 
 namespace avgen::rendering {
@@ -1944,20 +1945,9 @@ const gpu::GpuTexture& SceneRenderer::textureOrDefault(const scene::TextureRef& 
     return fallback;
 }
 
-// True when any part of the world-space box is inside the frustum. The usual conservative test:
-// take the corner furthest along each plane's normal, and reject only when even that is behind
-// the plane. `world::aabbVisible` is the same construction, but rendering does not depend on
-// world/ and should not start here.
-bool aabbInsideFrustum(const FrustumPlanes& planes, const glm::vec3& min, const glm::vec3& max) {
-    for (const glm::vec4& plane : planes) {
-        const glm::vec3 far(plane.x >= 0.0f ? max.x : min.x, plane.y >= 0.0f ? max.y : min.y,
-                            plane.z >= 0.0f ? max.z : min.z);
-        if (glm::dot(glm::vec3(plane), far) + plane.w < 0.0f) {
-            return false;
-        }
-    }
-    return true;
-}
+// `aabbInsideFrustum` moved to rendering/shadow_math.hpp, where `casterState` needs the same test.
+// Two copies of a six-line frustum test in two files is how a diagnostic and the pass it describes
+// come to disagree about one entity, which is the whole subject of the Shadow Lab's §37 note.
 
 const wgpu::BindGroup& SceneRenderer::materialBindGroup(const scene::Material& material) {
     // The program slot is part of the key: the same textures with a different program need their
@@ -2613,31 +2603,18 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     for (std::uint32_t v = 0; v < shadowViews && v < shadowViewList.size(); ++v) {
         cascadePlanes[v] = frustumPlanes(shadowViewList[v].viewProj);
     }
+    // The bounds and the second cull both moved to rendering/shadow_math.hpp, and they moved for
+    // the Shadow Lab's reason rather than for tidiness: these three lambdas *were* the caster rule,
+    // and a rule that lives inside a 1,450-line render function cannot be asked a question by
+    // anything else. An overlay that wants to colour an entity by whether this frame made it a
+    // caster had the choice of reaching into the renderer or writing the rule again, and a rule
+    // written twice is one that disagrees with itself the first time somebody edits a copy (§37).
+    // Now the renderer and the overlay call the same function, and it needs no device.
     const auto entityWorldBounds = [&](const scene::Entity& entity) {
-        const auto& [lo, hi] = scene.meshBounds(entity.mesh);
-        const glm::mat4 model = entity.transform.matrix();
-        glm::vec3 wlo(std::numeric_limits<float>::max());
-        glm::vec3 whi(std::numeric_limits<float>::lowest());
-        for (int c = 0; c < 8; ++c) {
-            const glm::vec3 corner((c & 1) ? hi.x : lo.x, (c & 2) ? hi.y : lo.y, (c & 4) ? hi.z : lo.z);
-            const glm::vec3 w = glm::vec3(model * glm::vec4(corner, 1.0f));
-            wlo = glm::min(wlo, w);
-            whi = glm::max(whi, w);
-        }
-        return std::pair{wlo, whi};
+        return rendering::entityWorldBounds(entity, scene.meshBounds(entity.mesh));
     };
-    const auto anyCascadeSees = [&](const scene::Entity& entity) {
-        if (cascadePlanes.empty()) {
-            return false;
-        }
-        const auto [wlo, whi] = entityWorldBounds(entity);
-        for (std::uint32_t v = 0; v < cascadePlanes.size() && v < shadowViewList.size(); ++v) {
-            if (aabbInsideFrustum(cascadePlanes[v], wlo, whi)) {
-                return true;
-            }
-        }
-        return false;
-    };
+    const std::span<const FrustumPlanes> viewPlanes(cascadePlanes.data(),
+                                                    std::min(cascadePlanes.size(), shadowViewList.size()));
     std::uint32_t objectIndex = 0;
     // Writes one 256-byte object slot and returns the draw item, or nothing when the budget is
     // spent. Shared by the camera pass and the shadow-only pass so the two cannot describe the
@@ -2714,12 +2691,6 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         ++objectIndex;
         return DrawItem{offset, &entity, depth, skin};
     };
-    // True when the shadow passes would draw this entity: they take the opaque list only.
-    const auto shadowEligible = [](const scene::Entity& entity) {
-        return entity.castsShadow && entity.style != scene::MeshStyle::Grid &&
-               entity.style != scene::MeshStyle::Water &&
-               entity.material.alphaMode != scene::AlphaMode::Blend;
-    };
     std::size_t entityIndex = 0;
     for (const auto& entity : scene.entities) {
         const std::size_t thisEntity = entityIndex++;
@@ -2771,11 +2742,17 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     entityIndex = 0;
     for (const auto& entity : scene.entities) {
         const std::size_t thisEntity = entityIndex++;
-        if (!entity.cameraCulled || !drawable(entity) || !shadowEligible(entity)) {
+        if (!entity.cameraCulled || !drawable(entity)) {
             continue;
         }
-        if (!anyCascadeSees(entity)) {
-            ++stats_.shadows.entitiesCulled;
+        const CasterState state = casterState(entity, scene.meshBounds(entity.mesh), viewPlanes);
+        if (!casts(state)) {
+            // Only the second cull's own rejections are counted here. An entity the scene already
+            // said does not cast was never a candidate, and counting it as "culled by a cascade"
+            // would inflate the one number that says whether the second cull is earning its keep.
+            if (state == CasterState::OutsideEveryView) {
+                ++stats_.shadows.entitiesCulled;
+            }
             continue;
         }
         const auto item = makeItem(entity, thisEntity);
@@ -2982,6 +2959,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                 const auto [wlo, whi] = entityWorldBounds(*item.entity);
                 if (!aabbInsideFrustum(cascadePlanes[v], wlo, whi)) {
                     ++stats_.shadows.entitiesCulled;
+                    ++stats_.shadows.view[v].entitiesCulled;
                     continue;
                 }
             }
@@ -3006,6 +2984,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             ++stats_.state.vertexBufferBinds;
             ++stats_.state.indexBufferBinds;
             ++stats_.shadows.entityDraws;
+            ++stats_.shadows.view[v].entityDraws;
         }
         sdfs_->drawMeshes(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
                           &depthOnlyPipeline_);
@@ -3686,6 +3665,40 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                   procShadow.triangles, procShadow.instances,
                   g.shadow.triangles - procShadow.triangles,
                   g.shadow.instances - procShadow.instances);
+    }
+    // AVGEN_SHADOW_STATS=1 prints everything §15 asks a shadow diagnostic to expose, per frame and
+    // per view: the cascade id, the depths it covers, the volume it covers them with, its texel,
+    // both halves of its bias in the units each is applied in, the caster accounting, and the
+    // light direction and camera position the fit was made from. One line per view, because a
+    // cascade is the unit somebody is asking about.
+    //
+    // It is printed rather than only exposed because a counter nobody can get at from a command
+    // line does not get read -- the same reason AVGEN_FRAME_COUNTERS exists. Nothing here is
+    // recomputed: every number is `ShadowRenderer::stats()`, which is written from `reportView`,
+    // which is the same call that writes the uniform the shader reads.
+    static const bool dumpShadow = std::getenv("AVGEN_SHADOW_STATS") != nullptr;
+    if (dumpShadow && time.frameIndex % 30 == 0) {
+        const ShadowStats& sh = stats_.shadows;
+        log::info("shadows: {} view(s) ({} cascade, {} spot, {} point) at {}x{}; range {:.2f} m, "
+                  "fade from {:.2f} m, coarsest texel {:.4f} m; splits {:.2f}/{:.2f}/{:.2f}/{:.2f}; "
+                  "{} casters, {} entity draws, {} rejected by a view's own frustum; "
+                  "light ({:.3f}, {:.3f}, {:.3f}) camera ({:.2f}, {:.2f}, {:.2f})",
+                  sh.views, sh.cascades, sh.spots, sh.points, sh.resolution, sh.resolution, sh.range,
+                  sh.fadeStart, sh.coarsestTexel, sh.splits[0], sh.splits[1], sh.splits[2],
+                  sh.splits[3], stats_.shadowCasters, sh.entityDraws, sh.entitiesCulled,
+                  sh.lightDirection.x, sh.lightDirection.y, sh.lightDirection.z, sh.cameraPosition.x,
+                  sh.cameraPosition.y, sh.cameraPosition.z);
+        for (std::uint32_t v = 0; v < sh.views && v < kMaxShadowViews; ++v) {
+            const ShadowViewReport& r = sh.view[v];
+            log::info("  view {} {}: depth {:.2f}..{:.2f} m, centre ({:.2f}, {:.2f}, {:.2f}), "
+                      "half-extent {:.2f} m, texel {:.4f} m, depth range {:.2f} m, "
+                      "bias {:.4f} m = {:.6f} normalised, normal offset {:.4f} m, "
+                      "{} draws, {} culled",
+                      r.index, r.cascade ? "cascade" : (r.cube ? "cube face" : "spot"), r.nearDepth,
+                      r.farDepth, r.center.x, r.center.y, r.center.z, r.orthoRadius,
+                      r.texelWorldSize, r.depthRange, r.worldBias, r.depthBias, r.normalOffset,
+                      r.entityDraws, r.entitiesCulled);
+        }
     }
     // AVGEN_CPU_STAGES=1 prints the breakdown. It is reachable from the API as stats().cpu, but the
     // headless benchmark's own log line is in src/app and a measurement nobody can get at from a

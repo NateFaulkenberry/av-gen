@@ -53,6 +53,21 @@ struct ShadowStats {
     double shadowMs = -1.0;       // GPU time of the depth passes (-1 = unavailable)
     std::uint32_t entityDraws = 0; // entity draws recorded across every cascade this frame
     std::uint32_t entitiesCulled = 0; // casters a cascade's own frustum rejected (ADR-055)
+    // Shadow Lab (§15). The eight things §15 asks a shadow diagnostic to expose, per view, taken
+    // from the fit rather than re-derived from it. `views` entries 0..`views - 1` are live.
+    //
+    // This is what an atlas occupancy figure honestly is on this engine: how many of the eight
+    // layers a frame claims, what world area each of them spends its texels on, and how many
+    // casters each one actually drew. The *texel* occupancy -- what fraction of a layer a caster
+    // wrote to -- would need the atlas read back, and the atlas is created without
+    // `TextureUsage::CopySrc`, so no tool in this repository can read it. Said plainly rather than
+    // approximated: an occupancy number invented from the caster count would be a number nobody
+    // could check.
+    std::array<ShadowViewReport, kMaxShadowViews> view{};
+    glm::vec3 lightDirection{0.0f};   // the direction the cascaded light travels
+    glm::vec3 cameraPosition{0.0f};   // where the fit was made from
+    std::array<float, kMaxCascades> splits{}; // the cascade far depths the shader selects on
+    float fadeStart = 0.0f;           // view depth the whole term starts fading out at (ADR-112)
 };
 
 class ShadowRenderer {
@@ -91,6 +106,16 @@ public:
     // The same format as the scene depth buffer, so the depth-only pipelines of every renderer
     // (entities, procedural instances, raymarched SDFs) serve both the prepass and the shadow maps.
     static constexpr wgpu::TextureFormat kFormat = wgpu::TextureFormat::Depth24Plus;
+
+    // Where `cameraRight` and `cameraUp` sit in `SceneRenderer::FrameUniforms`.
+    //
+    // `upload()` already knew the block's first two matrices by their offsets; these two are the
+    // same kind of knowledge and are named rather than written as literals in a memcpy.
+    // `scene_renderer.hpp` asserts both against `offsetof`, so the day somebody inserts a field
+    // above them the build stops instead of a shadow pass writing a light direction into
+    // `cameraPos`.
+    static constexpr std::uint64_t kFrameCameraRightOffset = 208;
+    static constexpr std::uint64_t kFrameCameraUpOffset = 224;
 
 private:
     struct Impl;

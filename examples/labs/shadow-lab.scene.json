@@ -1,0 +1,855 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Shadow Lab",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   6.0,
+   14.0
+  ],
+  "target": [
+   0.0,
+   3.0,
+   -80.0
+  ],
+  "fov": 55.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0.02,
+   0.03,
+   0.05
+  ],
+  "skyIntensity": 0.0,
+  "lightFromEnvironment": false,
+  "fogDensity": 0.0,
+  "volumeDensity": 0.0,
+  "shadowCascades": 3
+ },
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "terrain",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "terrain": {
+    "chunkSize": 48.0,
+    "resolution": 32,
+    "lodLevels": 3,
+    "lodDistance": 140.0,
+    "viewDistance": 420.0,
+    "shadowDistance": 150.0,
+    "skirtDepth": 1.0,
+    "groundMottle": false,
+    "groundGlow": 0.0
+   },
+   "world": {
+    "name": "shadow-lab",
+    "seed": 20260917,
+    "size": [
+     420.0,
+     420.0
+    ],
+    "baseHeight": 0.0,
+    "erosion": 0.0,
+    "seaLevel": -1000.0,
+    "moistureReach": 110.0,
+    "lowlandMoisture": 0.35,
+    "layers": [
+     {
+      "frequency": 0.004,
+      "amplitude": 0.0
+     }
+    ],
+    "features": []
+   }
+  },
+  {
+   "name": "tree",
+   "kind": "gltf",
+   "asset": "../../assets/quaternius/glTF/CommonTree_1.gltf",
+   "position": [
+    0.0,
+    0.0,
+    -32.0
+   ],
+   "scale": [
+    1.9,
+    1.9,
+    1.9
+   ]
+  },
+  {
+   "name": "character",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-scout.glb",
+   "position": [
+    9.0,
+    0.0,
+    -20.0
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "building",
+   "kind": "procedural",
+   "position": [
+    2.0,
+    4.5,
+    -46.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      7.0,
+      9.0,
+      7.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "thin-upright",
+   "kind": "procedural",
+   "position": [
+    11.0,
+    3.0,
+    -58.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.0,
+      6.0,
+      0.04
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.8,
+      0.3,
+      0.2
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "thin-flat",
+   "kind": "procedural",
+   "position": [
+    15.0,
+    2.4,
+    -22.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.0,
+      0.04,
+      6.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.8,
+      0.55,
+      0.2
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "small-pebble",
+   "kind": "procedural",
+   "position": [
+    21.0,
+    0.125,
+    -19.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.25,
+      0.25,
+      0.25
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.78,
+      0.78,
+      0.72
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "large-slab",
+   "kind": "procedural",
+   "position": [
+    -40.0,
+    5.0,
+    -62.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      16.0,
+      10.0,
+      1.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.35,
+      0.45,
+      0.6
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "post-00",
+   "kind": "procedural",
+   "position": [
+    -8.0,
+    2.0,
+    1.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      4.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.9,
+      0.86,
+      0.55
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "post-01",
+   "kind": "procedural",
+   "position": [
+    -8.0,
+    2.0,
+    -4.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      4.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.9,
+      0.86,
+      0.55
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "post-02",
+   "kind": "procedural",
+   "position": [
+    -8.0,
+    2.0,
+    -9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      4.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.9,
+      0.86,
+      0.55
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "post-03",
+   "kind": "procedural",
+   "position": [
+    -8.0,
+    2.0,
+    -14.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      4.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.9,
+      0.86,
+      0.55
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "post-04",
+   "kind": "procedural",
+   "position": [
+    -8.0,
+    2.0,
+    -19.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      4.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.9,
+      0.86,
+      0.55
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "post-05",
+   "kind": "procedural",
+   "position": [
+    -8.0,
+    2.0,
+    -24.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      4.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.9,
+      0.86,
+      0.55
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "post-06",
+   "kind": "procedural",
+   "position": [
+    -8.0,
+    2.0,
+    -29.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      4.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.9,
+      0.86,
+      0.55
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "post-07",
+   "kind": "procedural",
+   "position": [
+    -8.0,
+    2.0,
+    -34.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      4.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.9,
+      0.86,
+      0.55
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "post-08",
+   "kind": "procedural",
+   "position": [
+    -8.0,
+    2.0,
+    -39.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      4.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.9,
+      0.86,
+      0.55
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "post-09",
+   "kind": "procedural",
+   "position": [
+    -8.0,
+    2.0,
+    -44.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      4.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.9,
+      0.86,
+      0.55
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "post-10",
+   "kind": "procedural",
+   "position": [
+    -8.0,
+    2.0,
+    -49.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      4.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.9,
+      0.86,
+      0.55
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "post-11",
+   "kind": "procedural",
+   "position": [
+    -8.0,
+    2.0,
+    -54.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      4.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.9,
+      0.86,
+      0.55
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "post-12",
+   "kind": "procedural",
+   "position": [
+    -8.0,
+    2.0,
+    -59.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      4.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.9,
+      0.86,
+      0.55
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "pair-entity",
+   "kind": "gltf",
+   "asset": "../../assets/quaternius/glTF/CommonTree_1.gltf",
+   "position": [
+    -26.0,
+    0.0,
+    -34.0
+   ],
+   "scale": [
+    1.9,
+    1.9,
+    1.9
+   ]
+  },
+  {
+   "name": "pair-instance",
+   "kind": "procedural",
+   "position": [
+    -26.0,
+    0.0,
+    -46.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/CommonTree_1.gltf",
+     "meshBudget": 900
+    },
+    "sourceTransform": {
+     "scale": [
+      1.9,
+      1.9,
+      1.9
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      1,
+      1,
+      1
+     ],
+     "gridSpacing": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "center": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "castsShadow": true,
+    "lod": {
+     "cull": true,
+     "maxDistance": 400.0,
+     "minScreenRadius": 1.0,
+     "count": 1
+    },
+    "material": {
+     "baseColor": [
+      0.38,
+      0.46,
+      0.3
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "name": "impostor-row",
+   "kind": "procedural",
+   "position": [
+    24.0,
+    0.0,
+    -55.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/CommonTree_1.gltf",
+     "meshBudget": 900
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      1,
+      1,
+      3
+     ],
+     "gridSpacing": [
+      9.0,
+      0.0,
+      9.0
+     ],
+     "center": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "castsShadow": true,
+    "lod": {
+     "cull": true,
+     "maxDistance": 400.0,
+     "minScreenRadius": 1.0,
+     "count": 4,
+     "distance1": 400.0,
+     "distance2": 300.0,
+     "distance3": 20.0,
+     "byScreenSize": true,
+     "spread": 0.0,
+     "hysteresis": 0.0
+    },
+    "material": {
+     "baseColor": [
+      0.38,
+      0.46,
+      0.3
+     ],
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "name": "mesh-row",
+   "kind": "procedural",
+   "position": [
+    40.0,
+    0.0,
+    -55.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/CommonTree_1.gltf",
+     "meshBudget": 900
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      1,
+      1,
+      3
+     ],
+     "gridSpacing": [
+      9.0,
+      0.0,
+      9.0
+     ],
+     "center": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "castsShadow": true,
+    "lod": {
+     "cull": true,
+     "maxDistance": 400.0,
+     "minScreenRadius": 1.0,
+     "count": 1
+    },
+    "material": {
+     "baseColor": [
+      0.38,
+      0.46,
+      0.3
+     ],
+     "roughness": 0.9
+    }
+   }
+  }
+ ],
+ "lightRig": "../lightrigs/shadow-lab.rig.json"
+}

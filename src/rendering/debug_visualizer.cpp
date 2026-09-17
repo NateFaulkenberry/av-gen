@@ -1,10 +1,12 @@
 #include "rendering/debug_visualizer.hpp"
 
+#include "rendering/visibility.hpp"
 #include "spatial/field.hpp"
 
 #include <array>
 
 #include <algorithm>
+#include <vector>
 #include <cmath>
 #include <limits>
 
@@ -22,6 +24,20 @@ constexpr glm::vec4 kTrailColour{1.0f, 0.45f, 0.15f, 0.9f};
 constexpr glm::vec4 kFrustumColour{0.85f, 0.85f, 0.4f, 0.7f};
 constexpr glm::vec4 kJointColour{1.0f, 0.85f, 0.3f, 0.95f};
 constexpr glm::vec4 kBoneColour{0.3f, 0.9f, 1.0f, 0.85f};
+
+// One colour per cascade, in the order the shader selects them: near to far. Four, because
+// `kMaxCascades` is four; a spot or a cube face past that takes the last one and is distinguished
+// by not having a camera slice.
+constexpr glm::vec4 kCascadeColour[4] = {{1.00f, 0.35f, 0.30f, 0.80f},
+                                         {0.45f, 1.00f, 0.40f, 0.80f},
+                                         {0.35f, 0.60f, 1.00f, 0.80f},
+                                         {1.00f, 0.85f, 0.30f, 0.80f}};
+// Caster state, coloured. Green casts, amber casts from off screen, red does not cast at all --
+// and red is one colour rather than four because the reason is a string the panel prints, not
+// something a line can carry.
+constexpr glm::vec4 kCasterColour{0.35f, 1.00f, 0.45f, 0.85f};
+constexpr glm::vec4 kCasterOffScreenColour{1.00f, 0.70f, 0.20f, 0.85f};
+constexpr glm::vec4 kNotCasterColour{1.00f, 0.30f, 0.30f, 0.55f};
 
 // Blue to red across a normalised value.
 glm::vec4 heat(float t, float alpha) {
@@ -63,6 +79,37 @@ void drawFrustum(DebugDraw& draw, const scene::Camera& camera, float aspect) {
     draw.axis(frame, glm::length(corner[0] - camera.position) * 0.5f);
 }
 
+
+// The twelve edges of a box given as eight corners in the bit order (x, y, z) = (1, 2, 4), which is
+// the order `frustumCorners` and the NDC loops above both produce.
+void drawCorners(DebugDraw& draw, const std::array<glm::vec3, 8>& c, const glm::vec4& colour) {
+    static constexpr int kNear[4] = {0, 1, 3, 2};
+    static constexpr int kFar[4] = {4, 5, 7, 6};
+    for (int i = 0; i < 4; ++i) {
+        draw.line(c[static_cast<std::size_t>(kNear[i])], c[static_cast<std::size_t>(kNear[(i + 1) % 4])], colour);
+        draw.line(c[static_cast<std::size_t>(kFar[i])], c[static_cast<std::size_t>(kFar[(i + 1) % 4])], colour);
+        draw.line(c[static_cast<std::size_t>(kNear[i])], c[static_cast<std::size_t>(kFar[i])], colour);
+    }
+}
+
+// The part of the camera frustum between two view depths: the volume whose pixels select this
+// cascade. `frustumCorners` gives the whole thing; a view depth is linear along each edge between
+// the near and far faces, which is the same interpolation `fitDirectionalCascade` does -- and it is
+// the same call, so the slice drawn is the slice fitted.
+std::array<glm::vec3, 8> cameraSlice(const glm::mat4& invViewProj, float cameraNear, float cameraFar,
+                                     float nearDepth, float farDepth) {
+    const std::array<glm::vec3, 8> corners = frustumCorners(invViewProj);
+    const float span = std::max(cameraFar - cameraNear, 1e-4f);
+    const float t0 = std::clamp((nearDepth - cameraNear) / span, 0.0f, 1.0f);
+    const float t1 = std::clamp((farDepth - cameraNear) / span, 0.0f, 1.0f);
+    std::array<glm::vec3, 8> slice{};
+    for (std::size_t i = 0; i < 4; ++i) {
+        slice[i] = corners[i] + (corners[i + 4] - corners[i]) * t0;
+        slice[i + 4] = corners[i] + (corners[i + 4] - corners[i]) * t1;
+    }
+    return slice;
+}
+
 glm::vec4 idColour(int id, float alpha) {
     const auto h = static_cast<std::uint32_t>(id) * 2654435761u;
     return glm::vec4(static_cast<float>((h >> 16) & 0xFF) / 255.0f, static_cast<float>((h >> 8) & 0xFF) / 255.0f,
@@ -72,7 +119,7 @@ glm::vec4 idColour(int id, float alpha) {
 } // namespace
 
 void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugViewOptions& options, double time,
-                        const TransformHistory* history) {
+                        const TransformHistory* history, std::span<const ShadowView> shadowViews) {
     int budget = std::max(0, options.maxPoints);
 
     if (options.worldAxes) {
@@ -87,6 +134,38 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
         drawFrustum(draw, scene.camera, options.frustumAspect);
     }
 
+    // ---- the cascades (Shadow Lab) ------------------------------------------------------------
+    if ((options.shadowCascades || options.shadowCascadeSlices) && !shadowViews.empty()) {
+        const glm::mat4 cameraViewProj =
+            scene.camera.projection(std::max(1e-3f, options.frustumAspect)) * scene.camera.view();
+        const glm::mat4 invCamera = glm::inverse(cameraViewProj);
+        for (std::size_t v = 0; v < shadowViews.size(); ++v) {
+            if (options.shadowCascade >= 0 && static_cast<std::size_t>(options.shadowCascade) != v) {
+                continue;
+            }
+            const ShadowView& view = shadowViews[v];
+            const glm::vec4 colour = kCascadeColour[v % 4];
+            if (options.shadowCascades) {
+                // Through the inverse of the matrix the depth pass rasterised with. A view whose
+                // matrix is singular -- which the renderer's own finite check already refuses to
+                // upload -- draws nothing rather than a box at infinity.
+                const glm::mat4 inverse = glm::inverse(view.viewProj);
+                if (std::isfinite(inverse[0][0])) {
+                    drawCorners(draw, frustumCorners(inverse), colour);
+                    // The centre the fit snapped to, so a cascade that is crawling can be watched
+                    // crawl: this point moves in whole texels or not at all.
+                    draw.point(view.center, options.pointSize * 0.6f, colour);
+                }
+            }
+            if (options.shadowCascadeSlices && view.cascade) {
+                drawCorners(draw,
+                            cameraSlice(invCamera, scene.camera.nearPlane, scene.camera.farPlane,
+                                        view.nearDistance, view.farDistance),
+                            colour);
+            }
+        }
+    }
+
     if (options.transformTrail && history != nullptr) {
         const std::vector<glm::vec3> points = history->path();
         if (points.size() >= 2) {
@@ -94,6 +173,31 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
         }
         for (const glm::vec3& p : points) {
             draw.point(p, options.pointSize * 0.5f, kTrailColour);
+        }
+    }
+
+    // ---- caster state (Shadow Lab) ------------------------------------------------------------
+    // Its own loop, deliberately, rather than a colour inside the entity loop below: that loop
+    // honours `submittedOnly`, which skips exactly the camera-culled entities this overlay exists
+    // to show. An off-screen caster is the interesting case, and an overlay that hides it while
+    // another switch is on would be worse than none.
+    if (options.shadowCasters) {
+        std::vector<std::array<glm::vec4, 6>> planes;
+        planes.reserve(shadowViews.size());
+        for (const ShadowView& view : shadowViews) {
+            planes.push_back(frustumPlanes(view.viewProj));
+        }
+        for (const scene::Entity& entity : scene.entities) {
+            if ((!options.selectedEntity.empty() && entity.name != options.selectedEntity) ||
+                entity.mesh >= scene.meshes.size()) {
+                continue;
+            }
+            const auto bounds = scene.meshes[entity.mesh].bounds();
+            const CasterState state = casterState(entity, bounds, planes);
+            const auto [lo, hi] = entityWorldBounds(entity, bounds);
+            draw.box(lo, hi, state == CasterState::Caster            ? kCasterColour
+                             : state == CasterState::CasterOffScreen ? kCasterOffScreenColour
+                                                                     : kNotCasterColour);
         }
     }
 

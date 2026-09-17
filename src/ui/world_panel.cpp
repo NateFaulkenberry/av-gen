@@ -692,6 +692,32 @@ void WorldPanel::drawDebugOptions(app::Engine& engine, WorldEditor* editor) {
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Every skinned entity's joints and bones, in world space.");
     }
+    // Shadow Lab (§15). Three switches, and the third is the one that answers the question people
+    // actually ask: an entity's box coloured by what the shadow passes did with it.
+    ImGui::Checkbox("Cascade volumes", &debug.shadowCascades);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("The orthographic box each cascade rasterises into, drawn from the matrix the\n"
+                          "renderer uploaded -- not from a second fit. The dot is the texel-snapped centre:\n"
+                          "it moves in whole texels or not at all, so a crawling cascade can be watched crawl.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Cascade slices", &debug.shadowCascadeSlices);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("The part of the camera frustum whose pixels select each cascade, in the same\n"
+                          "colour as its volume. Like Frustum, this is the screen edge on a live camera and\n"
+                          "is worth seeing from a second view or while frozen.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Shadow casters", &debug.shadowCasters);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Green casts. Amber casts although the camera cannot see it -- the second cull\n"
+                          "kept it (ADR-046). Red does not cast: not drawable, castsShadow off, a style the\n"
+                          "shadow passes skip, or outside every cascade.");
+    }
+    ImGui::SliderInt("Cascade shown", &debug.shadowCascade, -1, 7);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("-1 draws every shadow view; 0..7 restricts both cascade overlays to one layer.");
+    }
     if (ImGui::InputText("Selected entity", selectedEntity, sizeof(selectedEntity))) {
         debug.selectedEntity = selectedEntity;
     }

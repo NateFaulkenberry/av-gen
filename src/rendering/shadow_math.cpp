@@ -1,9 +1,12 @@
 #include "rendering/shadow_math.hpp"
 
+#include "scene/scene.hpp"
+
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace avgen::rendering {
 
@@ -138,6 +141,11 @@ ShadowView fitDirectionalCascade(const glm::mat4& invViewProj, float cameraNear,
 
     const glm::vec3 eye = snapped - dir * (radius + back);
     const glm::mat4 lightView = glm::lookAt(eye, snapped, stableUp(dir));
+    // The view's own basis, read out of the matrix that defines it rather than rebuilt beside it:
+    // `lookAt` puts s, u and -f in the rows of the rotation, so these two are exactly the axes the
+    // depth pass rasterises along and cannot drift from them.
+    const glm::vec3 viewRight(lightView[0][0], lightView[1][0], lightView[2][0]);
+    const glm::vec3 viewUp(lightView[0][1], lightView[1][1], lightView[2][1]);
 
     const float zFar = back + 2.0f * radius;
     const glm::mat4 proj = glm::ortho(-radius, radius, -radius, radius, 0.01f, zFar);
@@ -147,6 +155,14 @@ ShadowView fitDirectionalCascade(const glm::mat4& invViewProj, float cameraNear,
     view.texelWorldSize = texel;
     view.depthRange = zFar;
     view.farDistance = farDepth;
+    view.nearDistance = nearDepth;
+    // The snapped centre and the half-width, published rather than recomputed. `snapped` is where
+    // the volume actually is -- up to one texel from `center`, because the snap floors -- and an
+    // overlay drawn at the unsnapped centre would be showing a cascade the renderer did not use.
+    view.center = snapped;
+    view.orthoRadius = radius;
+    view.right = viewRight;
+    view.up = viewUp;
     view.cascade = true;
     return view;
 }
@@ -160,10 +176,14 @@ ShadowView fitSpotShadow(const scene::PunctualLight& light, std::uint32_t resolu
     const glm::mat4 proj = glm::perspective(fov, 1.0f, near, far);
     ShadowView out;
     out.viewProj = proj * view;
+    out.right = glm::vec3(view[0][0], view[1][0], view[2][0]);
+    out.up = glm::vec3(view[0][1], view[1][1], view[2][1]);
     // A texel at the far plane, which is the conservative end of the range.
     out.texelWorldSize = 2.0f * std::tan(fov * 0.5f) * far / static_cast<float>(std::max(resolution, 1u));
     out.depthRange = far - near;
     out.farDistance = far;
+    out.nearDistance = near;
+    out.center = light.position;
     out.cascade = false;
     return out;
 }
@@ -204,13 +224,151 @@ std::array<ShadowView, kPointShadowFaces> fitPointShadow(const scene::PunctualLi
         const glm::mat4 view = glm::lookAt(light.position, light.position + kForward[f], kUp[f]);
         const glm::mat4 proj = glm::perspective(kFaceFov, 1.0f, near, far);
         out[f].viewProj = proj * view;
+        out[f].right = glm::vec3(view[0][0], view[1][0], view[2][0]);
+        out[f].up = glm::vec3(view[0][1], view[1][1], view[2][1]);
         out[f].texelWorldSize =
             2.0f * std::tan(kFaceFov * 0.5f) * far / static_cast<float>(std::max(resolution, 1u));
         out[f].depthRange = far - near;
         out[f].farDistance = far;
+        out[f].nearDistance = near;
+        out[f].center = light.position;
         out[f].cascade = false;
         out[f].cube = true;
     }
+    return out;
+}
+
+// ---- who casts ---------------------------------------------------------------------------------
+
+bool aabbInsideFrustum(const std::array<glm::vec4, 6>& planes, const glm::vec3& min,
+                       const glm::vec3& max) {
+    for (const glm::vec4& plane : planes) {
+        // The corner furthest along the plane normal. If even that is behind the plane the whole
+        // box is, which is the only rejection one plane can prove.
+        const glm::vec3 positive(plane.x >= 0.0f ? max.x : min.x, plane.y >= 0.0f ? max.y : min.y,
+                                 plane.z >= 0.0f ? max.z : min.z);
+        if (glm::dot(glm::vec3(plane), positive) + plane.w < 0.0f) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::string_view casterStateName(CasterState state) {
+    switch (state) {
+    case CasterState::Caster: return "caster";
+    case CasterState::CasterOffScreen: return "caster (off screen)";
+    case CasterState::NotDrawable: return "not drawable";
+    case CasterState::ShadowDisabled: return "castsShadow off";
+    case CasterState::StyleExcluded: return "style or alpha mode excluded";
+    case CasterState::OutsideEveryView: return "outside every shadow view";
+    case CasterState::NoShadowViews: return "no shadow views this frame";
+    }
+    return "unknown";
+}
+
+bool casts(CasterState state) {
+    return state == CasterState::Caster || state == CasterState::CasterOffScreen;
+}
+
+CasterState casterEligibility(const scene::Entity& entity) {
+    if (!entity.visible || entity.mesh == scene::kInvalidMesh) {
+        return CasterState::NotDrawable;
+    }
+    if (!entity.castsShadow) {
+        return CasterState::ShadowDisabled;
+    }
+    // The three exclusions the shadow passes apply, and they are the opaque list's own membership
+    // test: a grid is a wireframe, water is translucent (ADR-099), and a blended surface casting a
+    // hard silhouette is the bug that flag was added to avoid.
+    if (entity.style == scene::MeshStyle::Grid || entity.style == scene::MeshStyle::Water ||
+        entity.material.alphaMode == scene::AlphaMode::Blend) {
+        return CasterState::StyleExcluded;
+    }
+    return CasterState::Caster;
+}
+
+std::pair<glm::vec3, glm::vec3> entityWorldBounds(const scene::Entity& entity,
+                                                  const std::pair<glm::vec3, glm::vec3>& meshBounds) {
+    const glm::mat4 model = entity.transform.matrix();
+    glm::vec3 lo(std::numeric_limits<float>::max());
+    glm::vec3 hi(std::numeric_limits<float>::lowest());
+    for (int c = 0; c < 8; ++c) {
+        const glm::vec3 corner((c & 1) ? meshBounds.second.x : meshBounds.first.x,
+                               (c & 2) ? meshBounds.second.y : meshBounds.first.y,
+                               (c & 4) ? meshBounds.second.z : meshBounds.first.z);
+        const glm::vec3 w = glm::vec3(model * glm::vec4(corner, 1.0f));
+        lo = glm::min(lo, w);
+        hi = glm::max(hi, w);
+    }
+    return {lo, hi};
+}
+
+CasterState casterState(const scene::Entity& entity, const std::pair<glm::vec3, glm::vec3>& meshBounds,
+                        std::span<const std::array<glm::vec4, 6>> viewPlanes) {
+    const CasterState eligible = casterEligibility(entity);
+    if (eligible != CasterState::Caster) {
+        return eligible;
+    }
+    if (!entity.cameraCulled) {
+        return CasterState::Caster;
+    }
+    if (viewPlanes.empty()) {
+        return CasterState::NoShadowViews;
+    }
+    const auto [lo, hi] = entityWorldBounds(entity, meshBounds);
+    for (const auto& planes : viewPlanes) {
+        if (aabbInsideFrustum(planes, lo, hi)) {
+            return CasterState::CasterOffScreen;
+        }
+    }
+    return CasterState::OutsideEveryView;
+}
+
+std::uint32_t cascadeForDepth(float viewDepth, std::span<const float> splits) {
+    if (splits.empty()) {
+        return 0;
+    }
+    for (std::size_t i = 0; i < splits.size(); ++i) {
+        if (viewDepth <= splits[i]) {
+            return static_cast<std::uint32_t>(i);
+        }
+    }
+    return static_cast<std::uint32_t>(splits.size() - 1);
+}
+
+ShadowViewReport reportView(const ShadowView& view, std::uint32_t index) {
+    ShadowViewReport out;
+    out.index = index;
+    out.cascade = view.cascade;
+    out.cube = view.cube;
+    out.lightIndex = view.lightIndex;
+    out.nearDepth = view.nearDistance;
+    out.farDepth = view.farDistance;
+    out.center = view.center;
+    out.orthoRadius = view.orthoRadius;
+    out.texelWorldSize = view.texelWorldSize;
+    out.depthRange = view.depthRange;
+    // The bias, stated once. `ShadowRenderer::update` used to compute these two lines inline and
+    // then there was nowhere to read them from; now it writes the uniform from this report, so the
+    // number a diagnostic prints is the number the shader subtracts and not a second opinion.
+    //
+    // Why the bias exists and why it is this (spec §28, which asks for exactly this paragraph):
+    // a depth map samples the caster's surface at texel centres, so a receiver that *is* the
+    // caster reads its own depth quantised to a texel and shadows itself in stripes. The constant
+    // has to be at least the depth error one texel of slope produces, which is why it is expressed
+    // as a multiple of the view's own texel (two of them) rather than as a number: a cascade
+    // covering 10 m and one covering 1 km would otherwise need different constants for the same
+    // picture. The 5 mm floor is for a view whose texel is tiny, where two texels is not enough to
+    // clear the depth buffer's own quantisation. The division by `depthRange` converts the whole
+    // thing from metres into the normalised depth the comparison happens in.
+    out.worldBias = view.texelWorldSize * 2.0f + 0.005f;
+    out.depthBias = out.worldBias / std::max(view.depthRange, 1e-3f);
+    // shaders/shadows.wgsl: `normal * (texelWorld * (1 + 2 * (1 - NdotL)) * 1.4 + light.shadowBias)`.
+    // At normal incidence the bracket is 1, so this is the floor of the offset; at grazing angles
+    // it reaches three times this. The light's own `shadowBias` is added on top and is not here,
+    // because it belongs to the light and this report is about the view.
+    out.normalOffset = view.texelWorldSize * 1.4f;
     return out;
 }
 

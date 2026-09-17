@@ -277,6 +277,11 @@ static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);
 static_assert(offsetof(FrameUniforms, cameraPos) == 192);
+// ADR-034 / the Shadow Lab: `ShadowRenderer::upload` overwrites these two lanes per shadow view so
+// a camera-facing impostor faces the light it is being rasterised from. The offsets live there as
+// named constants and are checked here, where the struct is.
+static_assert(offsetof(FrameUniforms, cameraRight) == ShadowRenderer::kFrameCameraRightOffset);
+static_assert(offsetof(FrameUniforms, cameraUp) == ShadowRenderer::kFrameCameraUpOffset);
 static_assert(offsetof(FrameUniforms, params) == 256);
 static_assert(offsetof(FrameUniforms, shadowMaskParams) == 544);
 static_assert(offsetof(FrameUniforms, materialTier) == 560);

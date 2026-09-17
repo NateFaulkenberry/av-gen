@@ -161,6 +161,34 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
     const glm::mat4 invViewProj = glm::inverse(viewProj);
     const std::uint32_t cascades = std::clamp(quality.cascadeCount, 1u, kMaxCascades);
     const std::vector<float> splits = cascadeSplits(cameraNear, shadowFar, cascades);
+    // §15's "camera position", and it is taken from the matrix the fit was made from rather than
+    // from the scene's camera. Those are the same thing until a frozen view or a debug camera makes
+    // them different, and the number worth reporting is the one the cascades were fitted to.
+    //
+    // Recorded because the first version was wrong in a way that read as right: unprojecting
+    // NDC (0, 0, 0) gives the centre of the NEAR PLANE, not the eye, and on a 0.5 m near plane
+    // those differ by half a metre -- small enough to look like the camera and large enough to be
+    // the wrong answer. The eye is that point walked back along the view axis by exactly the near
+    // distance, which is a number this function is already given.
+    {
+        const glm::vec4 nearH = invViewProj * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        const glm::vec4 farH = invViewProj * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+        if (std::abs(nearH.w) > 1e-8f && std::abs(farH.w) > 1e-8f) {
+            const glm::vec3 nearCentre = glm::vec3(nearH) / nearH.w;
+            const glm::vec3 farCentre = glm::vec3(farH) / farH.w;
+            const glm::vec3 axis = farCentre - nearCentre;
+            const float length = glm::length(axis);
+            stats_.cameraPosition =
+                length > 1e-6f ? nearCentre - axis * (cameraNear / length) : nearCentre;
+        }
+    }
+    for (std::uint32_t c = 0; c < kMaxCascades; ++c) {
+        stats_.splits[c] = c < splits.size() ? splits[c] : shadowFar;
+    }
+    // shaders/shadows.wgsl: SHADOW_RANGE_FADE of the last split, eased. Published because "where do
+    // the shadows stop" has two answers -- where the map ends and where the fade begins -- and the
+    // second is the one a person sees.
+    stats_.fadeStart = (splits.empty() ? shadowFar : splits.back()) * (1.0f - 0.18f);
 
     bool directionalDone = false;
     for (std::uint32_t i = 0; i < lights.size(); ++i) {
@@ -209,6 +237,7 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
             }
             directionalDone = true;
             stats_.cascades += cascades;
+            stats_.lightDirection = light.direction;
         } else if (light.type == scene::PunctualLight::Type::Spot) {
             if (views_.size() >= kMaxShadowViews) {
                 continue;
@@ -241,13 +270,12 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
     im.block = ShadowUniforms{};
     for (std::size_t v = 0; v < views_.size(); ++v) {
         im.block.views[v].viewProj = views_[v].viewProj;
-        // The constant bias is expressed in world units (a couple of the view's own texels) and
-        // converted to normalised depth here, so a cascade covering 10 m and one covering 1 km get
-        // the same visual bias instead of the same number. The shader scales it by the slope and
-        // adds the normal offset on top.
-        const float worldBias = views_[v].texelWorldSize * 2.0f + 0.005f;
-        const float depthBias = worldBias / std::max(views_[v].depthRange, 1e-3f);
-        im.block.views[v].params = glm::vec4(views_[v].texelWorldSize, depthBias,
+        // The bias, and the report, from one place. `reportView` owns the arithmetic and the
+        // paragraph explaining it; this loop writes the uniform from what it returns, so the bias a
+        // diagnostic prints cannot drift from the bias the shader subtracts (§37).
+        const ShadowViewReport report = reportView(views_[v], static_cast<std::uint32_t>(v));
+        stats_.view[v] = report;
+        im.block.views[v].params = glm::vec4(views_[v].texelWorldSize, report.depthBias,
                                              views_[v].cascade ? 1.0f : 0.0f, views_[v].farDistance);
     }
     im.block.info = glm::vec4(static_cast<float>(im.resolution), static_cast<float>(cascades),
@@ -282,6 +310,26 @@ void ShadowRenderer::upload(const void* frameUniforms, std::uint64_t frameUnifor
         std::memcpy(copy.data(), &views_[v].viewProj, sizeof(glm::mat4));
         const glm::mat4 inverse = glm::inverse(views_[v].viewProj);
         std::memcpy(copy.data() + sizeof(glm::mat4), &inverse, sizeof(glm::mat4));
+        // ...and the billboard basis, which the block used to carry straight through from the
+        // camera. The LOD ladder's rungs 2 and 3 are camera-facing quads built in the vertex shader
+        // from `frame.cameraRight` / `frame.cameraUp`; leaving the camera's there meant an impostor
+        // was oriented for the viewer and then rasterised from the light, so it presented its edge
+        // to the sun whenever the sun was at right angles to the camera -- and a stationary tree
+        // under a stationary sun cast a shadow whose size depended on where the camera stood.
+        // Measured on the lab fixture's plan view before this line existed: the impostor row
+        // darkened 0.4% of the ground its shadow falls on where the identical mesh row darkened
+        // 28.3%.
+        //
+        // Only these two lanes are replaced, and that is deliberate. `cameraPos` stays the camera's
+        // because `deformWorld` and the wind take a to-camera vector from it, and a caster deformed
+        // differently in the shadow pass than in the camera pass is a shadow that does not line up
+        // with its object. Nothing else in a depth-only pass reads either axis: the only other
+        // readers of `frame.cameraRight` are the debug point sprites, GTAO and the shadow-mask
+        // pass, and none of the three runs here.
+        const glm::vec4 right(views_[v].right, 0.0f);
+        const glm::vec4 up(views_[v].up, 0.0f);
+        std::memcpy(copy.data() + kFrameCameraRightOffset, &right, sizeof(glm::vec4));
+        std::memcpy(copy.data() + kFrameCameraUpOffset, &up, sizeof(glm::vec4));
         queue.WriteBuffer(im.viewUniforms[v], 0, copy.data(), copy.size());
     }
 }

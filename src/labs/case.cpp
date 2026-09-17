@@ -281,7 +281,14 @@ std::string reproduceCommand(const LabCase& c) {
     // Deliberately built from the case's own fields and not from a stored string: a command line
     // saved beside a configuration is a second copy of it, and the two diverge the first time
     // somebody edits one.
-    std::string cmd = fmt::format("avgen --headless --project {}", c.fixture);
+    // The flag the application would have used for this fixture, not a flag that happens to be
+    // right for most of them: `Application` routes a `.scene.json` to `--composition` and anything
+    // else to `--project`, and the printed command has to be the one that works. Found by the
+    // Shadow Lab, whose fixture is the first composition a case has named -- `--project` on a
+    // composition is a command that reproduces nothing.
+    const bool composition = c.fixture.size() > 11 && c.fixture.compare(c.fixture.size() - 11, 11, ".scene.json") == 0;
+    std::string cmd =
+        fmt::format("avgen --headless {} {}", composition ? "--composition" : "--project", c.fixture);
     cmd += fmt::format(" --size {}x{} --fps {:g}", c.width, c.height, c.fps);
     if (c.supersample != 1.0) {
         cmd += fmt::format(" --supersample {:g}", c.supersample);

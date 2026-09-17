@@ -1,0 +1,54 @@
+{
+ "format": "avgen-lightrig",
+ "version": 1,
+ "name": "ShadowLab",
+ "description": "One key and one flat ambient, and nothing else. The key sits at azimuth -90 and elevation 34, which puts the sun exactly to the world's -X at a right angle to the lab camera's view axis: every shadow lies to its caster's RIGHT, along +X, with no Z component at all. Two things in the lab depend on that and neither is cosmetic. Yawing the camera right takes a caster off the left edge of frame BEFORE its own shadow, which is the only camera move that separates 'this object stopped casting' from 'this object left the shot'. And a camera-facing quad -- what the LOD ladder draws at rungs 2 and 3 -- is edge-on to a light perpendicular to the camera, which is the angle at which a billboard's shadow is at its smallest. 34 degrees makes the run 1.482 m of shadow per metre of height, so a caster's length on the ground is a number the lab can predict rather than measure. The ambient is 0.16 and grey: enough that a shadowed surface is readable rather than black, low enough that the lit/shadowed ratio is large and a pixel probe does not have to resolve a few counts.",
+ "keyIntensity": 4.5,
+ "ambientIntensity": 0.16,
+ "ambientColor": [
+  0.62,
+  0.68,
+  0.80
+ ],
+ "ambientTemperature": 6500,
+ "lights": [
+  {
+   "name": "key",
+   "type": "directional",
+   "role": "key",
+   "azimuth": -90.0,
+   "elevation": 34.0,
+   "distance": 3.0,
+   "intensity": 1.0,
+   "color": [
+    1.0,
+    0.97,
+    0.92
+   ],
+   "temperature": 6200,
+   "castsShadow": true,
+   "shadowStrength": 1.0,
+   "softness": 0.2,
+   "volumetric": 0.0,
+   "followCamera": false
+  },
+  {
+   "name": "ambient",
+   "type": "directional",
+   "role": "ambient",
+   "azimuth": 90.0,
+   "elevation": 70.0,
+   "distance": 3.0,
+   "intensity": 1.0,
+   "color": [
+    0.62,
+    0.68,
+    0.80
+   ],
+   "temperature": 6500,
+   "castsShadow": false,
+   "volumetric": 0.0,
+   "followCamera": false
+  }
+ ]
+}
