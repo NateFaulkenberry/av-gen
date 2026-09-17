@@ -125,16 +125,26 @@ TEST_CASE("import, analyze, Song Mode: a first film with no performer rules",
 #endif
 }
 
-// Song Mode's output is ordinary shots, and this is the test that says so.
+// **Song Mode leaves the Shots lane alone, and this is the test that says so.**
 //
-// The defect it guards against is subtle because everything *looked* right: the camera moved, the
-// film played, and the Shots lane was empty. The generated edit existed only as baked keyframes and
-// a list in a panel -- nothing a person could select, drag, trim or replace. "It works" and "the
-// artist can edit it" were two different claims and only the first was true.
+// The contract changed, and the reversal is worth recording rather than just deleting a test. This
+// file briefly asserted the opposite: that Song Mode writes ordinary `seq::Shot`s into the
+// sequencer, on the argument that a generated edit a person cannot select or drag is not an edit.
+//
+// That argument is right about an *edited sequence* and wrong about Song Mode, which is a live
+// directing mode -- it decides coverage from the song's structure and re-deciding is how it is used.
+// In practice it put forty-three shots a person did not author into their lane on every run, refused
+// to install at all if any hand-made shot happened to overlap the first generated one
+// (`Sequence::validate` refuses overlaps outright), and had to be cleared by hand to get back to an
+// empty timeline.
+//
+// So Song Mode does what the other two director modes do: bake the framing onto the timeline and
+// leave the sequencer to the person. What that also restores is `setShotSpans` -- the flattened cut
+// that world effects gate on, which Song Mode had silently lost by not calling `installSequence`.
 
 #include "seq/sequence.hpp"
 
-TEST_CASE("Song Mode creates real, editable sequencer shots", "[integration][song][beginner]") {
+TEST_CASE("Song Mode bakes a film without touching the Shots lane", "[integration][song][beginner]") {
 #ifndef AVGEN_SOURCE_DIR
     SKIP("AVGEN_SOURCE_DIR not defined");
 #else
@@ -147,18 +157,24 @@ TEST_CASE("Song Mode creates real, editable sequencer shots", "[integration][son
         SKIP("the project's audio is not available here");
     }
 
-    // A hand-made shot, before the director runs. It stands in for a person's work.
+    // A hand-made shot, before the director runs. It stands in for a person's work, and it is what
+    // must still be there afterwards -- untouched, and the only thing in the lane.
     seq::Sequence piece = engine.sequence();
     auto detected = analysis::detectStructure(*engine.track());
     REQUIRE(detected.has_value());
     piece.structure = std::move(*detected);
     piece.sectionTimeline = song::timelineFromStructure(piece.structure, piece.shotLanguage);
+    // Cleared first: the project on disk may carry shots from an earlier run, and this test is about
+    // what the director does to a lane rather than about what was in it.
+    piece.shots.clear();
     seq::Shot mine;
     mine.name = "my shot";
     mine.startSeconds = 0.0;
     mine.durationSeconds = 5.0;
     piece.shots.push_back(mine);
-    REQUIRE(engine.setSequence(std::move(piece)).has_value());
+    auto set = engine.setSequence(std::move(piece));
+    INFO((set ? std::string() : set.error().message));
+    REQUIRE(set.has_value());
 
     const auto plan = app::songPlanForEngine(engine);
     REQUIRE(plan.has_value());
@@ -167,89 +183,33 @@ TEST_CASE("Song Mode creates real, editable sequencer shots", "[integration][son
     const auto direction = app::directSongFromPlan(comp->heroes(), *plan, comp->cameraDirection(),
                                                    engine.autoDirector());
     REQUIRE(direction.has_value());
+    REQUIRE(direction->sequence.shots.size() > 1); // the director really did decide a film
     REQUIRE(app::installSongDirection(engine, *direction, engine.autoDirector()).has_value());
 
     const seq::Sequence& after = engine.sequence();
 
-    // 1. The shots are ON THE SEQUENCER, which is the whole point. Before this change the lane was
-    //    empty and the edit lived only as keyframes.
-    INFO("shots on the sequencer: " << after.shots.size());
-    REQUIRE(after.shots.size() > 1);
+    // 1. **The lane is exactly what the person left there.** Not "mostly", not "plus the generated
+    //    ones marked so you can tell" -- the same one shot.
+    INFO("shots on the sequencer after directing: " << after.shots.size());
+    REQUIRE(after.shots.size() == 1);
+    CHECK(after.shots.front().name == "my shot");
+    CHECK(after.shots.front().durationSeconds == Catch::Approx(5.0));
 
-    // 2. They are ordinary shots: real spans, a camera, and the same type a person creates.
-    std::size_t directed = 0;
-    for (const seq::Shot& shot : after.shots) {
-        INFO("shot '" << shot.name << "'");
-        CHECK(shot.durationSeconds > 0.0);
-        if (shot.origin == seq::Shot::Origin::Directed) {
-            ++directed;
-            // A directed shot carries a real camera move, not a placeholder to be resolved later.
-            CHECK(shot.camera.kind == seq::CameraKind::Move);
-        }
-    }
+    // 2. And the film exists anyway, which is the half that makes (1) acceptable rather than a
+    //    regression: the camera track carries the cut.
+    const scene::CameraDirection& cameras = comp->cameraDirection();
+    const std::size_t directed = static_cast<std::size_t>(
+        std::count_if(cameras.shots.begin(), cameras.shots.end(), [](const scene::CameraShot& s) {
+            return s.origin == scene::CameraShot::Origin::Directed;
+        }));
+    INFO("directed camera cuts: " << directed);
     CHECK(directed > 1);
 
-    // 3. **The artist's shot survived.** This is the promise that makes the rest usable: a
-    //    re-direct replaces what the director made and leaves what a person made.
-    const seq::Shot* kept = after.shotNamed("my shot");
-    REQUIRE(kept != nullptr);
-    CHECK(kept->origin == seq::Shot::Origin::Authored);
-    CHECK(kept->durationSeconds == Catch::Approx(5.0));
-
-    // 4. They edit like any other shot -- through the same functions the lane's gestures call.
-    {
-        seq::Sequence edited = after;
-        const std::size_t before = edited.shots.size();
-        std::size_t target = 0;
-        for (std::size_t i = 0; i < edited.shots.size(); ++i) {
-            if (edited.shots[i].origin == seq::Shot::Origin::Directed) {
-                target = i;
-                break;
-            }
-        }
-        const double end = edited.shots[target].endSeconds();
-        seq::trimShotEnd(edited.shots[target], end + 7.0);
-        CHECK(edited.shots[target].endSeconds() == Catch::Approx(end + 7.0));
-        REQUIRE(seq::duplicateShot(edited.shots, target).has_value());
-        CHECK(edited.shots.size() == before + 1);
-    }
-
-    // 5. **Extending a generated shot does not move its section.** Sections are landmarks, not
-    //    containers, and the two timelines are independent -- so this asserts the section is
-    //    untouched by an edit that crosses it.
-    {
-        seq::Sequence edited = engine.sequence();
-        REQUIRE_FALSE(edited.sectionTimeline.sections.empty());
-        const double sectionEnd = edited.sectionTimeline.sections.front().endSeconds;
-        std::size_t first = 0;
-        for (std::size_t i = 0; i < edited.shots.size(); ++i) {
-            if (edited.shots[i].origin == seq::Shot::Origin::Directed) {
-                first = i;
-                break;
-            }
-        }
-        seq::trimShotEnd(edited.shots[first], sectionEnd + 10.0);
-        CHECK(edited.shots[first].endSeconds() > sectionEnd);           // it crossed
-        CHECK(edited.sectionTimeline.sections.front().endSeconds ==
-              Catch::Approx(sectionEnd));                               // and the section did not move
-    }
-
-    // 6. They persist as ordinary shot data -- no regeneration on load.
-    {
-        const nlohmann::json doc = engine.sequence().toJson();
-        const auto restored = seq::Sequence::fromJson(doc);
-        REQUIRE(restored.has_value());
-        CHECK(restored->shots.size() == after.shots.size());
-        const seq::Shot* mineAgain = restored->shotNamed("my shot");
-        REQUIRE(mineAgain != nullptr);
-        CHECK(mineAgain->origin == seq::Shot::Origin::Authored);
-        // And a directed shot comes back still marked directed, or the next re-direct would treat
-        // the whole previous film as somebody's authored work and never replace any of it.
-        const std::size_t directedAfter = static_cast<std::size_t>(
-            std::count_if(restored->shots.begin(), restored->shots.end(), [](const seq::Shot& s) {
-                return s.origin == seq::Shot::Origin::Directed;
-            }));
-        CHECK(directedAfter == directed);
-    }
+    // 3. **The cut is published to world effects.** This is the thing Song Mode had lost by not
+    //    going through `installSequence`, and the World Effects panel reported it accurately as
+    //    "No directed camera: effects gated on the cut cannot fire". A shot span list is what a
+    //    camera-gated effect activates against.
+    INFO("shot spans for world effects: " << engine.shotSpans().size());
+    CHECK_FALSE(engine.shotSpans().empty());
 #endif
 }

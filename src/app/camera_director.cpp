@@ -504,100 +504,31 @@ Result<SongDirection> directSongFromPlan(std::span<const world::HeroPoint> heroe
 
 Result<std::size_t> installSongDirection(Engine& engine, const SongDirection& direction,
                                          const AutoDirectorSettings& settings) {
-    // **The framing half becomes real shots on the sequencer, not a private bake.**
+    // **The framing half is baked; it does not become shots on the sequencer.**
     //
-    // This used to call `installSequence(engine, direction.sequence, …)`, which takes a sequence the
-    // engine does not own, bakes it straight to timeline tracks, and throws the shot objects away.
-    // The camera moved correctly and the Shots lane stayed empty, so the generated edit existed only
-    // as keyframes and a list in the Auto-director panel -- nothing a person could select, drag,
-    // trim, split or replace.
+    // It briefly did. The reasoning was that a generated edit a person cannot select, drag or trim
+    // is not an edit -- true of an *edited sequence*, and wrong about Song Mode, which is the thing
+    // that was actually changed. Song Mode is a live directing mode: it decides coverage from the
+    // song's own structure, and re-deciding is how it is used. Writing 43 shots into the Shots lane
+    // every time it ran gave a person a lane full of objects they did not author, could not
+    // meaningfully re-cut without the director overwriting them, and had to delete by hand to get
+    // back to an empty timeline. It also quietly broke any hand-made shot that happened to overlap
+    // the first generated one, because `Sequence::validate` refuses overlaps outright.
     //
-    // Now the director's shots are converted into ordinary `seq::Shot`s and put in the engine's own
-    // sequence, which is then installed by the **same call a manual edit makes**
-    // (`Engine::installSequence`). A generated shot is an ordinary shot: same type, same lane, same
-    // editing, same serialization, same bake. The only thing that marks it is `Origin::Directed`,
-    // and that exists solely so re-directing can replace its own work and leave a person's alone.
-    //
-    // The conversion is faithful rather than approximate, because the sequencer's shot model was
-    // built to hold exactly this: `ShotCamera::move` IS an `app::Shot`, and `seq::install` bakes a
-    // `CameraKind::Move` shot by sampling the same `cameraAt`/`targetAt` the old path sampled.
-    seq::Sequence piece = engine.sequence();
-    const std::size_t authored =
-        static_cast<std::size_t>(std::count_if(piece.shots.begin(), piece.shots.end(),
-                                               [](const seq::Shot& s) {
-                                                   return s.origin == seq::Shot::Origin::Authored;
-                                               }));
-    std::erase_if(piece.shots, [](const seq::Shot& s) {
-        return s.origin == seq::Shot::Origin::Directed;
-    });
-    for (std::size_t i = 0; i < direction.sequence.shots.size(); ++i) {
-        const Shot& move = direction.sequence.shots[i];
-        seq::Shot shot;
-        // Named for the decision that produced it, so the lane reads as the film rather than as
-        // "Shot 7" -- "Chorus 2 · UFO Watch" tells a person what they are looking at.
-        shot.name = i < direction.decisions.size()
-                        ? fmt::format("{} · {}", direction.decisions[i].sectionLabel,
-                                      direction.decisions[i].cameraName)
-                        : move.name;
-        shot.startSeconds = move.startSeconds;
-        shot.durationSeconds = move.durationSeconds;
-        shot.camera.kind = seq::CameraKind::Move;
-        shot.camera.move = move;
-        shot.origin = seq::Shot::Origin::Directed;
-        piece.shots.push_back(std::move(shot));
+    // So Song Mode goes back to what the other two director modes do: bake the framing onto the
+    // timeline and leave the sequencer alone. `installSequence` is the same call `Continuous shot`
+    // and `Edited sequence` make, which also means Song Mode regains the thing it had silently lost
+    // by not calling it -- **`setShotSpans`**, the flattened cut that world effects gate on. Without
+    // it the World Effects panel correctly reported "No directed camera: effects gated on the cut
+    // cannot fire", because there was no cut to gate on.
+    const auto installed = installSequence(engine, direction.sequence, settings);
+    if (!installed) {
+        // Reported rather than swallowed: a Song Mode that failed to bake its framing and then
+        // installed a camera track anyway would cut between cameras that are not being moved.
+        return std::unexpected(installed.error());
     }
-    // In time order, so the lane reads left to right.
-    std::stable_sort(piece.shots.begin(), piece.shots.end(),
-                     [](const seq::Shot& a, const seq::Shot& b) {
-                         return a.startSeconds < b.startSeconds;
-                     });
+    const std::size_t installedCount = *installed;
 
-    // **Directed shots yield to authored ones**, because `Sequence::validate` refuses an overlap
-    // outright -- "two cameras at once is not something a single-camera engine can honour" -- and a
-    // director that emitted one would make the whole install fail rather than produce a film.
-    //
-    // A person's shot is the fixed point and the generated film parts around it: a directed shot
-    // overlapping one is trimmed to the gap, and dropped if what remains is too short to be a shot.
-    // The alternative -- trimming the person's work to fit the machine's -- is the wrong way round.
-    for (const seq::Shot& fixed : piece.shots) {
-        if (fixed.origin != seq::Shot::Origin::Authored) {
-            continue;
-        }
-        for (seq::Shot& shot : piece.shots) {
-            if (shot.origin != seq::Shot::Origin::Directed) {
-                continue;
-            }
-            const double start = shot.startSeconds;
-            const double end = shot.endSeconds();
-            if (end <= fixed.startSeconds || start >= fixed.endSeconds()) {
-                continue;   // no overlap
-            }
-            if (start < fixed.startSeconds) {
-                seq::trimShotEnd(shot, fixed.startSeconds, 0.0);   // keep the part before
-            } else if (end > fixed.endSeconds()) {
-                seq::trimShotStart(shot, fixed.endSeconds(), end, 0.0);   // keep the part after
-            } else {
-                shot.durationSeconds = 0.0;   // wholly inside: nothing survives
-            }
-        }
-    }
-    const std::size_t crowded = static_cast<std::size_t>(
-        std::count_if(piece.shots.begin(), piece.shots.end(), [](const seq::Shot& s) {
-            return s.origin == seq::Shot::Origin::Directed &&
-                   s.durationSeconds < seq::kMinShotSeconds;
-        }));
-    std::erase_if(piece.shots, [](const seq::Shot& s) {
-        return s.origin == seq::Shot::Origin::Directed && s.durationSeconds < seq::kMinShotSeconds;
-    });
-    if (crowded > 0) {
-        log::info("song director: {} directed shot(s) gave way to authored ones", crowded);
-    }
-    const std::size_t generated = piece.shots.size() - authored;
-    if (auto ok = engine.setSequence(std::move(piece)); !ok) {
-        return std::unexpected(ok.error());
-    }
-    log::info("song director: {} shot(s) on the sequencer ({} authored kept)", generated, authored);
-    const std::size_t installedCount = generated;
     scene::Composition* composition = engine.composition();
     if (composition == nullptr) {
         return fail("Song Mode needs a scene to put its camera track on");

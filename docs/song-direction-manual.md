@@ -159,25 +159,37 @@ gives you two different takes, and a second chorus is deliberately not a copy of
 
 ### What it leaves you
 
-**Real shots, in the Shots lane.** Not a plan, not a suggestion, not a list in a panel — actual shot
-objects, the same kind you get from **Add Shot**. Look at the lane after directing and you will see
-them, named for what they are: "Chorus 2 · UFO Watch".
+**A baked film, and your Shots lane untouched.**
 
-Everything in section 7 works on them. Drag one. Trim it. Split it in four. Change its camera. Delete
-it and put your own there instead. Nothing about a generated shot is special or locked, and there is
-no step where you "convert" the director's output into something editable — it already is.
+Song Mode does not put anything in the Shots lane. It bakes its camera work straight onto the
+timeline and writes its cuts onto the **camera track** in the Cameras panel — which is where the
+director's own decisions live. Press play and the film is there; look at the Shots lane and it
+contains exactly what you put there, including nothing.
 
-Think of it as opening a project where somebody else has made a rough cut. The cut is yours now.
+This is deliberate, and it is a reversal: Song Mode briefly *did* write shots into the lane. The
+argument was that a generated edit you cannot select or drag is not an edit. That is a good argument
+about an **Edited sequence** and the wrong one about Song Mode, which is a *live directing mode* —
+you re-run it as you change sections, intents and importance, and re-deciding is how it is used. In
+practice it meant forty-three shot objects you did not author appearing in your lane on every run,
+a re-direct that would overwrite any of them you had edited, and an install that refused outright if
+one of your own shots happened to overlap the first generated one.
+
+So the division is the one the other two director modes already use:
+
+| | lives in | who owns it |
+|---|---|---|
+| your shots | the **Shots lane** | you, always |
+| the director's coverage | the **camera track** and the baked timeline | the director, replaced on every run |
 
 ### If you direct again
 
-Re-running the director replaces the shots **it** made and leaves the shots **you** made. A generated
-shot you have edited stays generated, so a re-direct will replace it; a shot you created yourself is
-never touched.
+Re-running the director replaces **its own** camera cuts and the timeline tracks it owns, and touches
+nothing of yours. Your shots are not involved, because it never put any there.
 
-Where the two would collide, **the generated film gives way**: a directed shot overlapping one of
-yours is trimmed to the gap around it, or dropped if too little of it is left. Your shot is the fixed
-point. The machine works around you, not the other way about.
+### If you want the film as editable shots
+
+Use **Edited sequence** instead of **Song**. That mode exists to hand you a cut you take over; Song
+Mode exists to keep deciding while you change the song's structure underneath it.
 
 ---
 

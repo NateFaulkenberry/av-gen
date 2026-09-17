@@ -1569,12 +1569,15 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     if (contextClick_.down && contextClick_.travelled && ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
         view_ -= static_cast<double>(ImGui::GetIO().MouseDelta.x / width) * span;
     }
-    if (hovered && ImGui::GetIO().MouseWheel != 0.0f) {
-        const double anchor = mouseTime;
-        zoom_ = std::clamp(zoom_ * (ImGui::GetIO().MouseWheel > 0.0f ? 1.15f : 1.0f / 1.15f), 0.25f, 64.0f);
-        const double newSpan = duration / static_cast<double>(zoom_);
-        view_ = anchor - (anchor - view_) * (newSpan / span);
-    }
+    // **The wheel belongs to the panel, not to the strip.**
+    //
+    // It used to zoom the time axis, and the strip does not consume the event -- so one flick both
+    // zoomed the lanes and scrolled the panel under them, which is two answers to one gesture and
+    // neither is the one being asked for. The panel is taller than it is on screen whenever there
+    // are more than a couple of lanes, so scrolling it is the common intent by a wide margin.
+    //
+    // Zoom is still one gesture away and now says which axis it means: the two sliders in the
+    // toolbar, or the grip under the lanes for the vertical.
     view_ = std::clamp(view_, 0.0, std::max(0.0, duration - duration / static_cast<double>(zoom_)));
 
     if (wantsMenu) {
