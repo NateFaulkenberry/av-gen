@@ -1142,7 +1142,7 @@
     "atmos/Aurora/audioLowMid": 0.550000011920929,
     "atmos/Aurora/audioMid": 0.44999998807907104,
     "atmos/Aurora/audioSensitivity": 1.0,
-    "atmos/Aurora/baseHeight": -400.0,
+    "atmos/Aurora/baseHeight": -223.0,
     "atmos/Aurora/complexity": 26.0,
     "atmos/Aurora/curtainHeight": 2600.0,
     "atmos/Aurora/curtains": 3.0,
@@ -3543,7 +3543,7 @@
       3.5999999046325684,
       3.5999999046325684
     ],
-    "nodes/bull-1/visible": false,
+    "nodes/bull-1/visible": true,
     "nodes/bull-10/emissiveBoost": 1.0,
     "nodes/bull-10/lightColor": [
       1.0,
@@ -3747,7 +3747,7 @@
       3.5999999046325684,
       3.5999999046325684
     ],
-    "nodes/cow-3/visible": false,
+    "nodes/cow-3/visible": true,
     "nodes/elder-2-cap/emissiveBoost": 1.0,
     "nodes/elder-2-cap/lightColor": [
       1.0,
@@ -4059,7 +4059,7 @@
       3.5999999046325684,
       3.5999999046325684
     ],
-    "nodes/goat-14/visible": false,
+    "nodes/goat-14/visible": true,
     "nodes/goat-5/emissiveBoost": 0.0,
     "nodes/goat-5/lightColor": [
       1.0,
@@ -4083,7 +4083,7 @@
       3.5999999046325684,
       3.5999999046325684
     ],
-    "nodes/goat-5/visible": false,
+    "nodes/goat-5/visible": true,
     "nodes/horse-11/emissiveBoost": 1.0,
     "nodes/horse-11/lightColor": [
       1.0,
@@ -4131,7 +4131,7 @@
       3.5999999046325684,
       3.5999999046325684
     ],
-    "nodes/horse-2/visible": false,
+    "nodes/horse-2/visible": true,
     "nodes/lantern-cap/emissiveBoost": 1.0,
     "nodes/lantern-cap/lightColor": [
       1.0,
@@ -4275,7 +4275,7 @@
       3.5999999046325684,
       3.5999999046325684
     ],
-    "nodes/pig-15/visible": false,
+    "nodes/pig-15/visible": true,
     "nodes/pig-6/emissiveBoost": 1.0,
     "nodes/pig-6/lightColor": [
       1.0,
@@ -4695,7 +4695,7 @@
       3.5999999046325684,
       3.5999999046325684
     ],
-    "nodes/sheep-13/visible": false,
+    "nodes/sheep-13/visible": true,
     "nodes/sheep-4/emissiveBoost": 0.0,
     "nodes/sheep-4/lightColor": [
       1.0,
@@ -4719,7 +4719,7 @@
       3.5999999046325684,
       3.5999999046325684
     ],
-    "nodes/sheep-4/visible": false,
+    "nodes/sheep-4/visible": true,
     "nodes/spire-cap/emissiveBoost": 1.0,
     "nodes/spire-cap/lightColor": [
       1.0,
