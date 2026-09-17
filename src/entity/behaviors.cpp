@@ -301,7 +301,27 @@ public:
             // Normalised against the clip's own authored speed, so `bounce` is "how much at a
             // normal walk" rather than a number that means something different per character.
             const float strength = std::min(travel / strideDefault_, 2.0f);
-            motion.position.y += std::sin(phase_ * 2.0f) * bounce * strength;
+            // A rise from ground contact, not an oscillation about it.
+            //
+            // This was `sin(phase * 2)`, which is symmetric, and a symmetric bob on a *grounded*
+            // body is a body drawn underground for half of every stride. Grounding cannot see it:
+            // grounding writes `state.travel.y`, the simulation position, and this writes
+            // `motion.position.y`, the visual offset added to it afterwards. The two never meet, so
+            // the simulation reports a perfectly grounded character while the renderer draws it
+            // buried. Measured on Glowmere's own numbers (bounce 0.32, stride 5.35 -- the `ember`
+            // and `vane` aliens) the drawn body sank 0.1819 m below its own ground and rose
+            // 0.1838 m above it, while `state().position()` never left the surface by more than
+            // 0.0030 m. That gap is the whole lesson: the convenient variable was clean.
+            //
+            // `1 - cos` has the same amplitude and the same period as the sine it replaces, so
+            // `bounce` still means what an author tuned it to mean and the stride still reads as
+            // twice a cycle. What changes is the phase reference: the trough is now ground contact
+            // -- where a walking body's lowest point actually is, both feet planted -- instead of
+            // the midpoint of a swing with nothing holding up its bottom half.
+            //
+            // `hover` above keeps its symmetric noise deliberately: a craft oscillates about a
+            // hover height and has no ground contact to be the floor of.
+            motion.position.y += (1.0f - std::cos(phase_ * 2.0f)) * bounce * strength;
         }
 
         // The idle drift, on noise rather than a sine for the reason `slowNoise` gives: a sine lands

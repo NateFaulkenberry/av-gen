@@ -1,0 +1,36 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Character Animation Lab"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "character-animation-lab.scene.json"
+  }
+ },
+ "parameters": {
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": -0.1,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": false,
+  "post/grade/contrast": 1.02,
+  "post/output/vignette": 0.12,
+  "post/output/grain": 0.0
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": false,
+  "tracks": [],
+  "cues": []
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "sequence"
+ }
+}

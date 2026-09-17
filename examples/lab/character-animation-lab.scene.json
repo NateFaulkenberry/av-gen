@@ -1,0 +1,980 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "character-animation-lab",
+ "camera": {
+  "mode": 1,
+  "position": [
+   -6.0,
+   6.5,
+   14.0
+  ],
+  "target": [
+   -4.0,
+   1.0,
+   -2.0
+  ],
+  "fov": 42.0,
+  "orbitSpeed": 0.0
+ },
+ "lightRig": "../lightrigs/studio-softbox.rig.json",
+ "environment": {
+  "intensity": 0.55,
+  "background": [
+   0.055,
+   0.058,
+   0.065
+  ],
+  "fogColor": [
+   0.06,
+   0.062,
+   0.07
+  ],
+  "fogDensity": 0.0,
+  "volumeDensity": 0.0,
+  "sky": {
+   "zenithColor": [
+    0.26,
+    0.29,
+    0.36
+   ],
+   "horizonColor": [
+    0.3,
+    0.31,
+    0.33
+   ],
+   "groundColor": [
+    0.05,
+    0.05,
+    0.055
+   ],
+   "haze": 0.15,
+   "sunColor": [
+    1.0,
+    0.97,
+    0.93
+   ],
+   "sunIntensity": 12.0,
+   "sunSize": 0.4,
+   "sunGlow": 0.4,
+   "intensity": 0.45
+  }
+ },
+ "nodes": [
+  {
+   "name": "floor",
+   "kind": "procedural",
+   "position": [
+    0,
+    -0.05,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      46.0,
+      0.1,
+      16.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.2,
+      0.205,
+      0.215
+     ],
+     "roughness": 0.72,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0
+    }
+   }
+  },
+  {
+   "name": "A-Idle",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-scout.glb",
+   "position": [
+    -20.0,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "A-Walking",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-ranger.glb",
+   "position": [
+    -18.2,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Walking",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "A-Running",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-trooper.glb",
+   "position": [
+    -16.4,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Running",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "A-Idle_turn",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-pilot.glb",
+   "position": [
+    -14.6,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Idle_turn",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "A-marker",
+   "kind": "procedural",
+   "position": [
+    -18.3,
+    0.005,
+    -6.2
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      7.6,
+      0.02,
+      0.25
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.3
+     ],
+     "roughness": 0.72,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0
+    }
+   }
+  },
+  {
+   "name": "C-inplace-Walking",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-scout.glb",
+   "position": [
+    -10.0,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Walking",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "C-travelling-Dying_forward",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-scout.glb",
+   "position": [
+    -7.0,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Dying_forward",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "C-travelling-Landing",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-scout.glb",
+   "position": [
+    -4.0,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Landing",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "C-marker",
+   "kind": "procedural",
+   "position": [
+    -7.0,
+    0.005,
+    -6.2
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      7.6,
+      0.02,
+      0.25
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.6,
+      0.3,
+      0.28
+     ],
+     "roughness": 0.72,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0
+    }
+   }
+  },
+  {
+   "name": "C-origin-0",
+   "kind": "procedural",
+   "position": [
+    -10.0,
+    0.01,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.28,
+      0.03,
+      0.28
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.85,
+      0.25,
+      0.22
+     ],
+     "roughness": 0.72,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0
+    }
+   }
+  },
+  {
+   "name": "C-origin-1",
+   "kind": "procedural",
+   "position": [
+    -7.0,
+    0.01,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.28,
+      0.03,
+      0.28
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.85,
+      0.25,
+      0.22
+     ],
+     "roughness": 0.72,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0
+    }
+   }
+  },
+  {
+   "name": "C-origin-2",
+   "kind": "procedural",
+   "position": [
+    -4.0,
+    0.01,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.28,
+      0.03,
+      0.28
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.85,
+      0.25,
+      0.22
+     ],
+     "roughness": 0.72,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0
+    }
+   }
+  },
+  {
+   "name": "R-yaw000",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-ranger.glb",
+   "position": [
+    1.0,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Walking",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "R-yaw090",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-ranger.glb",
+   "position": [
+    3.0,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    90,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Walking",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "R-yaw180",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-ranger.glb",
+   "position": [
+    5.0,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    180,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Walking",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "R-yaw270",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-ranger.glb",
+   "position": [
+    7.0,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    270,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Walking",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "R-marker",
+   "kind": "procedural",
+   "position": [
+    4.0,
+    0.005,
+    -6.2
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      8.4,
+      0.02,
+      0.25
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.3,
+      0.45,
+      0.62
+     ],
+     "roughness": 0.72,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0
+    }
+   }
+  },
+  {
+   "name": "S-0.5x",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-elder.glb",
+   "position": [
+    11.0,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "animation": {
+    "state": "Walking",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "S-1.0x",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-elder.glb",
+   "position": [
+    13.6,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "animation": {
+    "state": "Walking",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "S-2.0x",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-elder.glb",
+   "position": [
+    16.2,
+    0,
+    -4.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "animation": {
+    "state": "Walking",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "S-marker",
+   "kind": "procedural",
+   "position": [
+    13.6,
+    0.005,
+    -6.2
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      8.0,
+      0.02,
+      0.25
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.35,
+      0.58,
+      0.42
+     ],
+     "roughness": 0.72,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0
+    }
+   }
+  },
+  {
+   "name": "I-bull",
+   "kind": "gltf",
+   "asset": "../../assets/farm/bull.glb",
+   "position": [
+    -20.0,
+    0,
+    2.5
+   ],
+   "rotation": [
+    0,
+    -90,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "animation": {
+    "state": "Walk",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "I-horse",
+   "kind": "gltf",
+   "asset": "../../assets/farm/horse.glb",
+   "position": [
+    -17.6,
+    0,
+    2.5
+   ],
+   "rotation": [
+    0,
+    -90,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "animation": {
+    "state": "Walk",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "I-cow",
+   "kind": "gltf",
+   "asset": "../../assets/farm/cow.glb",
+   "position": [
+    -15.2,
+    0,
+    2.5
+   ],
+   "rotation": [
+    0,
+    -90,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "animation": {
+    "state": "Walk",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "I-sheep",
+   "kind": "gltf",
+   "asset": "../../assets/farm/sheep.glb",
+   "position": [
+    -12.8,
+    0,
+    2.5
+   ],
+   "rotation": [
+    0,
+    -90,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "animation": {
+    "state": "Walk",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "I-goat",
+   "kind": "gltf",
+   "asset": "../../assets/farm/goat.glb",
+   "position": [
+    -10.4,
+    0,
+    2.5
+   ],
+   "rotation": [
+    0,
+    -90,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "animation": {
+    "state": "Walk",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "I-pig",
+   "kind": "gltf",
+   "asset": "../../assets/farm/pig.glb",
+   "position": [
+    -8.0,
+    0,
+    2.5
+   ],
+   "rotation": [
+    0,
+    -90,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "animation": {
+    "state": "Walk",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "I-rooster",
+   "kind": "gltf",
+   "asset": "../../assets/farm/rooster.glb",
+   "position": [
+    -5.600000000000001,
+    0,
+    2.5
+   ],
+   "rotation": [
+    0,
+    -90,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "animation": {
+    "state": "Walk",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "I-chicken",
+   "kind": "gltf",
+   "asset": "../../assets/farm/chicken.glb",
+   "position": [
+    -3.1999999999999993,
+    0,
+    2.5
+   ],
+   "rotation": [
+    0,
+    -90,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "animation": {
+    "state": "Walk",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "I-marker",
+   "kind": "procedural",
+   "position": [
+    -11.6,
+    0.005,
+    4.4
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      20.0,
+      0.02,
+      0.25
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.52,
+      0.5,
+      0.55
+     ],
+     "roughness": 0.72,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0
+    }
+   }
+  }
+ ]
+}
