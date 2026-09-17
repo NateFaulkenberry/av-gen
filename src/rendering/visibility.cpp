@@ -33,10 +33,13 @@ float cullProjScale(float fovYRadians, std::uint32_t viewportHeight) {
 }
 
 int cullLodLevel(const scene::LodSettings& lod, const FrustumPlanes& planes, const CullCamera& camera,
-                 glm::vec3 center, float radius) {
+                 glm::vec3 center, float radius, float lodRadius) {
     const int lodCount = std::clamp(lod.lodCount, 1, scene::kMaxLodLevels);
     const float distance = glm::length(center - camera.position);
     const float screenRadius = radius / std::max(distance, 1e-4f) * camera.projScale;
+    // The ladder's own sphere (see the header, and the note in shaders/cull.wgsl).
+    const float ladderScreenRadius =
+        (lodRadius > 0.0f ? lodRadius : radius) / std::max(distance, 1e-4f) * camera.projScale;
     if (lod.cull) {
         for (const glm::vec4& plane : planes) {
             if (glm::dot(glm::vec3(plane), center) + plane.w < -radius) {
@@ -57,7 +60,7 @@ int cullLodLevel(const scene::LodSettings& lod, const FrustumPlanes& planes, con
         if (!(threshold > 0.0f)) {
             break;
         }
-        const bool take = lod.lodByScreenSize ? screenRadius <= threshold : distance >= threshold;
+        const bool take = lod.lodByScreenSize ? ladderScreenRadius <= threshold : distance >= threshold;
         if (!take) {
             break;
         }
@@ -74,16 +77,23 @@ InstanceBounds instanceBounds(const std::vector<scene::InstanceRecord>& records)
     glm::vec3 lo(std::numeric_limits<float>::max());
     glm::vec3 hi(std::numeric_limits<float>::lowest());
     float maxScale = 0.0f;
+    float minScale = std::numeric_limits<float>::max();
     for (const scene::InstanceRecord& r : records) {
         const glm::vec3 p(r.position);
         lo = glm::min(lo, p);
         hi = glm::max(hi, p);
         const glm::vec3 s = glm::abs(glm::vec3(r.scale));
-        maxScale = std::max(maxScale, std::max(std::max(s.x, s.y), s.z));
+        // The shader's radius is `sourceRadius * max(|scale.x|, |scale.y|, |scale.z|)`, so the
+        // per-record number to take extremes of is that max -- not the smallest component of any
+        // record, which would describe a sphere the shader never forms.
+        const float record = std::max(std::max(s.x, s.y), s.z);
+        maxScale = std::max(maxScale, record);
+        minScale = std::min(minScale, record);
     }
     bounds.min = lo;
     bounds.max = hi;
     bounds.maxAbsScale = maxScale;
+    bounds.minAbsScale = minScale;
     bounds.valid = true;
     return bounds;
 }
@@ -151,6 +161,106 @@ float sourceCullRadius(const glm::vec3& boundsMin, const glm::vec3& boundsMax) {
     return std::max(glm::length(corner), 1e-4f);
 }
 
+// ---- which rungs this object's records could be on (see visibility.hpp) -------------------------
+
+namespace {
+
+// The ladder of shaders/cull.wgsl cs_cull_classify, evaluated with the thresholds already scaled:
+// the largest level whose every threshold up to it is taken. `metric` is the projected radius when
+// `lod.lodByScreenSize` and the distance otherwise, and `scale` multiplies each threshold.
+int ladderLevel(const scene::LodSettings& lod, float metric, float scale) {
+    const int lodCount = std::clamp(lod.lodCount, 1, scene::kMaxLodLevels);
+    int level = 0;
+    for (int k = 0; k + 1 < lodCount && k < 3; ++k) {
+        const float threshold = lod.lodDistances[k];
+        if (!(threshold > 0.0f)) {
+            break; // a zero threshold ends the ladder, exactly as the shader's `break` does
+        }
+        const float t = threshold * scale;
+        if (!(lod.lodByScreenSize ? metric <= t : metric >= t)) {
+            break;
+        }
+        level = k + 1;
+    }
+    return level;
+}
+
+} // namespace
+
+LevelRange objectLevelRange(const scene::LodSettings& lod, const CullCamera& camera,
+                            const glm::mat4& objectToWorld, const InstanceBounds& bounds,
+                            float sourceRadius, float detailMin, float detailMax, bool hysteresisActive) {
+    LevelRange range;
+    const int lodCount = std::clamp(lod.lodCount, 1, scene::kMaxLodLevels);
+    range.highest = lodCount - 1;
+    if (!bounds.valid || lodCount <= 1) {
+        range.highest = std::max(range.highest, 0);
+        return range;
+    }
+    float objectScale = 0.0f;
+    for (int c = 0; c < 3; ++c) {
+        objectScale = std::max(objectScale, glm::length(glm::vec3(objectToWorld[c])));
+    }
+    objectScale = std::max(objectScale, 1e-6f);
+    const float radiusMax = sourceRadius * bounds.maxAbsScale * objectScale;
+    const float radiusMin = sourceRadius * std::min(bounds.minAbsScale, bounds.maxAbsScale) * objectScale;
+
+    // The world AABB of every record centre, and the nearest and furthest any of them can be.
+    glm::vec3 lo(std::numeric_limits<float>::max());
+    glm::vec3 hi(std::numeric_limits<float>::lowest());
+    for (int corner = 0; corner < 8; ++corner) {
+        const glm::vec3 p((corner & 1) ? bounds.max.x : bounds.min.x, (corner & 2) ? bounds.max.y : bounds.min.y,
+                          (corner & 4) ? bounds.max.z : bounds.min.z);
+        const glm::vec3 world(objectToWorld * glm::vec4(p, 1.0f));
+        lo = glm::min(lo, world);
+        hi = glm::max(hi, world);
+    }
+    if (!std::isfinite(lo.x) || !std::isfinite(hi.x)) {
+        return range;
+    }
+    const glm::vec3 nearest = glm::clamp(camera.position, lo, hi);
+    const float nearDistance = std::max(glm::length(nearest - camera.position), 1e-4f);
+    float farDistance = 0.0f;
+    for (int corner = 0; corner < 8; ++corner) {
+        const glm::vec3 p((corner & 1) ? hi.x : lo.x, (corner & 2) ? hi.y : lo.y, (corner & 4) ? hi.z : lo.z);
+        farDistance = std::max(farDistance, glm::length(p - camera.position));
+    }
+    farDistance = std::max(farDistance, nearDistance);
+
+    // Everything that can widen one instance's threshold, as a multiplier on it. ADR-082's spread
+    // offsets each instance's threshold by up to half `lodSpread`; its dead zone moves the bar by
+    // `lodHysteresis` in whichever direction keeps the instance where it was. ADR-038's `detail`
+    // divides a screen-size threshold and multiplies a distance one, so the extremes swap between
+    // the two modes.
+    const float spread = 0.5f * std::clamp(lod.lodSpread, 0.0f, 0.5f);
+    const float hysteresis = hysteresisActive ? std::clamp(lod.lodHysteresis, 0.0f, 0.5f) : 0.0f;
+    const float detailLo = std::max(std::min(detailMin, detailMax), 1e-3f);
+    const float detailHi = std::max(std::max(detailMin, detailMax), 1e-3f);
+    const float wide = (1.0f + spread) * (1.0f + hysteresis);
+    const float narrow = (1.0f - spread) * (1.0f - hysteresis);
+    const float scaleHi = lod.lodByScreenSize ? wide / detailLo : wide * detailHi;
+    const float scaleLo = lod.lodByScreenSize ? narrow / detailHi : narrow * detailLo;
+
+    if (lod.lodByScreenSize) {
+        // Bigger on screen means a lower rung, so the lowest rung is the biggest an instance can
+        // look against the tightest thresholds, and the highest rung the smallest against the
+        // loosest.
+        const float screenMax = radiusMax / nearDistance * camera.projScale;
+        const float screenMin = radiusMin / farDistance * camera.projScale;
+        range.lowest = ladderLevel(lod, screenMax, scaleLo);
+        range.highest = ladderLevel(lod, screenMin, scaleHi);
+    } else {
+        range.lowest = ladderLevel(lod, nearDistance, scaleHi);
+        range.highest = ladderLevel(lod, farDistance, scaleLo);
+    }
+    if (range.highest < range.lowest) {
+        std::swap(range.lowest, range.highest);
+    }
+    range.lowest = std::clamp(range.lowest, 0, lodCount - 1);
+    range.highest = std::clamp(range.highest, range.lowest, lodCount - 1);
+    return range;
+}
+
 // ---- reason codes -------------------------------------------------------------------------------
 
 std::string_view visibilityReasonName(VisibilityReason reason) {
@@ -170,7 +280,8 @@ std::string_view visibilityReasonName(VisibilityReason reason) {
 }
 
 InstanceVisibility instanceVisibility(const scene::LodSettings& lod, const FrustumPlanes& planes,
-                                      const CullCamera& camera, glm::vec3 center, float radius) {
+                                      const CullCamera& camera, glm::vec3 center, float radius,
+                                      float lodRadius) {
     InstanceVisibility out;
     out.center = center;
     out.radius = radius;
@@ -187,7 +298,7 @@ InstanceVisibility instanceVisibility(const scene::LodSettings& lod, const Frust
 
     // The verdict. Not recomputed: this is the function the renderer's own parameters go through,
     // and the one the GPU is pinned against.
-    out.lodLevel = cullLodLevel(lod, planes, camera, center, radius);
+    out.lodLevel = cullLodLevel(lod, planes, camera, center, radius, lodRadius);
     if (out.lodLevel >= 0) {
         out.reason = VisibilityReason::Visible;
         return out;

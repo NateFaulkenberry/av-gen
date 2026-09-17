@@ -156,8 +156,9 @@ struct Frame {
     }
 };
 
-// cull.wgsl / procedural_renderer.cpp `cullLodLevel`, transcribed -- see
-// tests/unit/test_triangle_size_analysis.cpp, which transcribes it for the same reason.
+// cull.wgsl / `rendering::cullLodLevel`, transcribed -- see
+// tests/unit/test_triangle_size_analysis.cpp, which transcribes it for the same reason and which
+// records how this copy diverges from the engine since ADR-262 (one radius here, two there).
 int lodLevelFor(const scene::LodSettings& lod, const std::array<glm::vec4, 6>& planes,
                 glm::vec3 cameraPosition, float projScale, glm::vec3 center, float radius) {
     const int lodCount = std::clamp(lod.lodCount, 1, scene::kMaxLodLevels);

@@ -71,8 +71,21 @@ glm::vec4 idColour(int id, float alpha) {
 
 } // namespace
 
+// The rung colours. Deliberately not a heat ramp over a normalised value like `heat()`: a rung is
+// one of four named things, not a position on a scale, and four fixed colours can be read off a
+// still frame without a legend. Grey is "no decision available", which is a different statement
+// from rung 0 and has to look like one.
+constexpr std::array<glm::vec4, 4> kLodColours{{
+    {0.30f, 1.00f, 0.45f, 0.95f}, // rung 0, the full mesh
+    {1.00f, 0.90f, 0.25f, 0.95f}, // rung 1
+    {1.00f, 0.50f, 0.15f, 0.95f}, // rung 2
+    {1.00f, 0.25f, 0.30f, 0.95f}, // rung 3
+}};
+constexpr glm::vec4 kLodCulledColour{0.45f, 0.10f, 0.55f, 0.9f}; // rejected by the cull
+constexpr glm::vec4 kLodUnknownColour{0.55f, 0.55f, 0.55f, 0.6f}; // the pass did not run for it
+
 void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugViewOptions& options, double time,
-                        const TransformHistory* history) {
+                        const TransformHistory* history, const ProceduralLodLevels* lodLevels) {
     int budget = std::max(0, options.maxPoints);
 
     if (options.worldAxes) {
@@ -164,9 +177,21 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
         if (options.bounds) {
             draw.box(pg.boundsMin, pg.boundsMax, kBoundsColour);
         }
-        const bool wantPoints = options.points || options.density || options.instanceIds || !options.attribute.empty();
+        const bool wantPoints = options.points || options.density || options.instanceIds ||
+                                options.lod || !options.attribute.empty();
         if (!wantPoints && !options.normals) {
             continue;
+        }
+        // ADR-029's rungs, as the cull pass assigned them (ADR-225: this checkbox had been in the
+        // World panel since the option struct was written and this file read the field nowhere, so
+        // it drew nothing at all). An object the caller did not read levels for is drawn grey --
+        // the overlay says "I do not know", never rung 0.
+        const std::vector<int>* levels = nullptr;
+        if (options.lod && lodLevels != nullptr) {
+            const auto found = lodLevels->find(pg.name);
+            if (found != lodLevels->end() && found->second.size() == pg.instances.size()) {
+                levels = &found->second;
+            }
         }
         // Attribute colouring needs the cloud; instance records carry the rest.
         const spatial::PointCloud& cloud = pg.cloud;
@@ -181,7 +206,16 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
             const scene::InstanceRecord& record = pg.instances[i];
             const glm::vec3 position(record.position);
             glm::vec4 colour(0.85f, 0.9f, 1.0f, 0.9f);
-            if (attribute != nullptr) {
+            if (options.lod) {
+                if (levels == nullptr) {
+                    colour = kLodUnknownColour;
+                } else {
+                    const int level = (*levels)[i];
+                    colour = level < 0 ? kLodCulledColour
+                                       : kLodColours[static_cast<std::size_t>(
+                                             std::clamp(level, 0, scene::kMaxLodLevels - 1))];
+                }
+            } else if (attribute != nullptr) {
                 const glm::vec4 value = spatial::readAsVec4(*attribute, i);
                 const float span = stats.max.x - stats.min.x;
                 colour = heat(span > 1e-6f ? (value.x - stats.min.x) / span : 0.5f, 0.9f);

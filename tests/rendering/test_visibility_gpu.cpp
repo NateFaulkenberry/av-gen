@@ -323,12 +323,19 @@ TEST_CASE("The reason code says VISIBLE exactly for the instances the GPU drew",
     cull.position = s.camera.position;
     cull.projScale = rendering::cullProjScale(s.camera.effectiveFovY(), kHeight);
     const float radius = rendering::sourceCullRadius(tree.lo, tree.hi) * tree.sourceScale;
+    // The ladder measures projected size with the tight sphere about the source's box, not with the
+    // conservative sphere the rejection tests use (rendering/visibility.hpp, shaders/cull.wgsl).
+    // Passed explicitly here because this case checks the *rung* as well as the verdict, and with
+    // the two numbers conflated it would report the wrong level for every non-centred asset -- and
+    // a tree standing on its own origin is the only asset in this file.
+    const float lodRadius = std::max(0.5f * glm::length(tree.hi - tree.lo), 1e-4f) * tree.sourceScale;
 
     std::size_t saidVisible = 0;
     std::size_t saidCulled = 0;
     for (std::size_t i = 0; i < count; ++i) {
         const glm::vec3 centre(s.procedurals[0].instances[i].position);
-        const auto v = rendering::instanceVisibility(s.procedurals[0].lod, planes, cull, centre, radius);
+        const auto v =
+            rendering::instanceVisibility(s.procedurals[0].lod, planes, cull, centre, radius, lodRadius);
         const bool inDrawList = std::binary_search(drawn.begin(), drawn.end(), static_cast<std::uint32_t>(i));
         INFO("instance " << i << " at (" << centre.x << ", " << centre.z << ") reported "
                          << rendering::visibilityReasonName(v.reason) << ", drawn=" << inDrawList);
