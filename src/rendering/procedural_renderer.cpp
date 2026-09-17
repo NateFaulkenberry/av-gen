@@ -132,139 +132,12 @@ glm::mat3 rotationOf(const glm::mat4& m) {
 
 } // namespace
 
-// ---- culling maths, shared with shaders/cull.wgsl and the tests ---------------------------------
+// The culling maths this file used to define -- frustumPlanes, cullProjScale, cullLodLevel,
+// instanceBounds, objectFullyCulled -- moved to rendering/visibility.cpp. They need no device,
+// and a decision that can only be checked by rendering something is a decision nobody checks;
+// they are now in the unit suite rather than only in the GPU one. Every name is re-exported
+// through procedural_renderer.hpp, so no caller changed.
 
-FrustumPlanes frustumPlanes(const glm::mat4& m) {
-    // Gribb-Hartmann on a 0..1 depth range. glm is column major, so row i is
-    // (m[0][i], m[1][i], m[2][i], m[3][i]); the near plane is row 2 alone (z >= 0).
-    const auto row = [&](int i) { return glm::vec4(m[0][i], m[1][i], m[2][i], m[3][i]); };
-    const glm::vec4 r0 = row(0);
-    const glm::vec4 r1 = row(1);
-    const glm::vec4 r2 = row(2);
-    const glm::vec4 r3 = row(3);
-    FrustumPlanes planes{{r3 + r0, r3 - r0, r3 + r1, r3 - r1, r2, r3 - r2}};
-    for (glm::vec4& plane : planes) {
-        const float length = glm::length(glm::vec3(plane));
-        if (length > 1e-12f) {
-            plane /= length;
-        }
-    }
-    return planes;
-}
-
-float cullProjScale(float fovYRadians, std::uint32_t viewportHeight) {
-    const float tangent = std::tan(std::max(fovYRadians, 1e-4f) * 0.5f);
-    return static_cast<float>(viewportHeight) / (2.0f * std::max(tangent, 1e-6f));
-}
-
-int cullLodLevel(const scene::LodSettings& lod, const FrustumPlanes& planes, const CullCamera& camera,
-                 glm::vec3 center, float radius) {
-    const int lodCount = std::clamp(lod.lodCount, 1, scene::kMaxLodLevels);
-    const float distance = glm::length(center - camera.position);
-    const float screenRadius = radius / std::max(distance, 1e-4f) * camera.projScale;
-    if (lod.cull) {
-        for (const glm::vec4& plane : planes) {
-            if (glm::dot(glm::vec3(plane), center) + plane.w < -radius) {
-                return -1;
-            }
-        }
-        if (lod.maxDistance > 0.0f && distance - radius > lod.maxDistance) {
-            return -1;
-        }
-        if (lod.minScreenRadius > 0.0f && screenRadius < lod.minScreenRadius) {
-            return -1;
-        }
-    }
-    // A threshold of 0 ends the ladder, so an unconfigured object stays at LOD0.
-    int level = 0;
-    for (int k = 0; k + 1 < lodCount && k < 3; ++k) {
-        const float threshold = lod.lodDistances[k];
-        if (!(threshold > 0.0f)) {
-            break;
-        }
-        const bool take = lod.lodByScreenSize ? screenRadius <= threshold : distance >= threshold;
-        if (!take) {
-            break;
-        }
-        level = k + 1;
-    }
-    return level;
-}
-
-InstanceBounds instanceBounds(const std::vector<scene::InstanceRecord>& records) {
-    InstanceBounds bounds;
-    if (records.empty()) {
-        return bounds;
-    }
-    glm::vec3 lo(std::numeric_limits<float>::max());
-    glm::vec3 hi(std::numeric_limits<float>::lowest());
-    float maxScale = 0.0f;
-    for (const scene::InstanceRecord& r : records) {
-        const glm::vec3 p(r.position);
-        lo = glm::min(lo, p);
-        hi = glm::max(hi, p);
-        const glm::vec3 s = glm::abs(glm::vec3(r.scale));
-        maxScale = std::max(maxScale, std::max(std::max(s.x, s.y), s.z));
-    }
-    bounds.min = lo;
-    bounds.max = hi;
-    bounds.maxAbsScale = maxScale;
-    bounds.valid = true;
-    return bounds;
-}
-
-// `limitDistance` is `DetailLimits::proceduralDistanceCull` (ADR-186). It gates only the two
-// distance tests: the frustum rejection below stays whatever the policy is, because an object
-// entirely behind the camera contributes nothing to any render, offline or not.
-bool objectFullyCulled(const scene::LodSettings& lod, const FrustumPlanes& planes, const CullCamera& camera,
-                       const glm::mat4& objectToWorld, const InstanceBounds& bounds, float sourceRadius,
-                       bool limitDistance) {
-    if (!bounds.valid || !lod.cull) {
-        return false;
-    }
-    // The object matrix's largest column length, exactly the `limits.w` the cull pass is given.
-    float objectScale = 0.0f;
-    for (int c = 0; c < 3; ++c) {
-        objectScale = std::max(objectScale, glm::length(glm::vec3(objectToWorld[c])));
-    }
-    // No record's bounding sphere can be larger than this one, because the shader's radius is
-    // sourceRadius * max|record scale| * objectScale and maxAbsScale is the largest of those.
-    const float radius = sourceRadius * bounds.maxAbsScale * std::max(objectScale, 1e-6f);
-    // World AABB of every record centre: the eight corners of the record-space box through the
-    // object matrix. Every centre the shader computes lies inside it.
-    glm::vec3 lo(std::numeric_limits<float>::max());
-    glm::vec3 hi(std::numeric_limits<float>::lowest());
-    for (int corner = 0; corner < 8; ++corner) {
-        const glm::vec3 p((corner & 1) ? bounds.max.x : bounds.min.x, (corner & 2) ? bounds.max.y : bounds.min.y,
-                          (corner & 4) ? bounds.max.z : bounds.min.z);
-        const glm::vec3 world(objectToWorld * glm::vec4(p, 1.0f));
-        lo = glm::min(lo, world);
-        hi = glm::max(hi, world);
-    }
-    // Frustum: the shader culls a record when dot(n, centre) + w < -radius. The most positive any
-    // centre in the box can be is at the corner the normal points at, so if that corner fails, so
-    // does every record.
-    for (const glm::vec4& plane : planes) {
-        const glm::vec3 n(plane);
-        const glm::vec3 farthest(n.x >= 0.0f ? hi.x : lo.x, n.y >= 0.0f ? hi.y : lo.y, n.z >= 0.0f ? hi.z : lo.z);
-        if (glm::dot(n, farthest) + plane.w < -radius) {
-            return true;
-        }
-    }
-    // Distance and screen size both key on the *closest* the box gets to the camera, which is the
-    // most favourable any record can be: the shader keeps a record when dist - radius <= maxDistance
-    // and when radius / dist * projScale >= minScreenRadius.
-    const glm::vec3 nearest = glm::clamp(camera.position, lo, hi);
-    const float nearDistance = glm::length(nearest - camera.position);
-    if (limitDistance && lod.maxDistance > 0.0f && nearDistance - radius > lod.maxDistance) {
-        return true;
-    }
-    if (limitDistance && lod.minScreenRadius > 0.0f &&
-        radius / std::max(nearDistance, 1e-4f) * camera.projScale < lod.minScreenRadius) {
-        return true;
-    }
-    return false;
-}
 
 struct ProceduralRenderer::Impl {
     struct CachedMesh {
@@ -273,6 +146,11 @@ struct ProceduralRenderer::Impl {
         std::uint32_t indexCount = 0;  // 0 = generation failed (kept so the error is logged once)
         std::uint32_t vertexCount = 0;
         float radius = 1.0f;           // half diagonal of the source bounds (normal epsilon scale)
+        // The radius the *cull* uses: the sphere about the source's own origin, which is where
+        // shaders/cull.wgsl centres it (rendering/visibility.hpp sourceCullRadius). Equal to
+        // `radius` for geometry centred on its origin and larger for anything that stands on it --
+        // a tree, a mushroom, a character -- which is the whole reason it is a second number.
+        float cullRadius = 1.0f;
         glm::vec3 boundsMin{0.0f};     // source mesh bounds (object space; Path deformer "fit" extent)
         glm::vec3 boundsMax{0.0f};
         std::uint64_t lastUsed = 0;
@@ -874,6 +752,7 @@ ProceduralRenderer::Impl::CachedMesh ProceduralRenderer::Impl::uploadMesh(const 
     cached.vertexCount = static_cast<std::uint32_t>(mesh->vertices.size());
     const auto [lo, hi] = mesh->bounds();
     cached.radius = std::max(0.5f * glm::length(hi - lo), 1e-4f);
+    cached.cullRadius = sourceCullRadius(lo, hi);
     cached.boundsMin = lo;
     cached.boundsMax = hi;
     return cached;
@@ -1375,7 +1254,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             // to be part 0: a trunk's radius would cull a canopy that is still on screen. Resolved
             // here rather than in the loop below because the lead is reached first.
             if (const Impl::CachedMesh* partMesh = im.ensureMesh(part); partMesh != nullptr) {
-                groupRadius[lead] = std::max(groupRadius[lead], partMesh->radius * sourceScaleOf(part));
+                groupRadius[lead] = std::max(groupRadius[lead], partMesh->cullRadius * sourceScaleOf(part));
             }
         }
     }
@@ -1513,7 +1392,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // excluded because the GPU moves its records after these bounds were taken.
         // ADR-108: the bound has to cover every material part of the asset, or the trunk's radius
         // culls a canopy that is still on screen. `groupRadius` is zero for an object with no parts.
-        const float cullRadius = std::max(mesh->radius * sourceScaleOf(object), groupRadius[i]);
+        const float cullRadius = std::max(mesh->cullRadius * sourceScaleOf(object), groupRadius[i]);
         const bool fullyCulled = isPart ? fullyCulledOf[leadIndex] != 0
                                         : (cullActive && !usesLive &&
                                            objectFullyCulled(lodSettings, planes, cullCamera, model,
@@ -1538,7 +1417,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             sf.objectToWorld = model;
             sf.cameraPosition = cullCamera.position;
             sf.projScale = cullCamera.projScale;
-            sf.sourceRadius = mesh->radius;
+            sf.sourceRadius = mesh->cullRadius;
             sf.extentY = windExtent;
             sf.renderTime = static_cast<float>(time.renderTime);
             sf.deltaTime = static_cast<float>(time.deltaTime);

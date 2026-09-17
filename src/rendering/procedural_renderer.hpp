@@ -30,6 +30,10 @@
 #include "core/error.hpp"
 #include "core/time.hpp"
 #include "rendering/render_stats.hpp"
+// The culling decision -- FrustumPlanes, CullCamera, frustumPlanes, cullProjScale, cullLodLevel,
+// InstanceBounds, instanceBounds, objectFullyCulled -- and the reason codes that name it. Device-
+// free, and included here so every caller keeps reaching the decision through this header.
+#include "rendering/visibility.hpp"
 #include "scene/procedural.hpp"
 #include "scene/scene.hpp"
 #include "core/plant_chain.hpp"
@@ -124,49 +128,6 @@ struct ProceduralStats {
     std::uint64_t lodCounts[4] = {0, 0, 0, 0}; // survivors per LOD level
     double cullMs = -1.0;                 // GPU time of the last measured cull pass (-1 = none / unavailable)
 };
-
-// The six frustum planes of a view-projection in world space, in the order left, right, bottom,
-// top, near, far; xyz is a unit normal pointing inwards, w the plane offset (a point p is inside
-// when dot(n, p) + w >= 0). Gribb-Hartmann on a 0..1 depth clip range (WebGPU/Metal).
-using FrustumPlanes = std::array<glm::vec4, 6>;
-[[nodiscard]] FrustumPlanes frustumPlanes(const glm::mat4& viewProj);
-
-// The camera terms the cull pass needs beyond the planes.
-struct CullCamera {
-    glm::vec3 position{0.0f};
-    float projScale = 1.0f; // viewportHeight / (2 tan(fovY / 2)): pixels per world unit at 1 unit
-};
-[[nodiscard]] float cullProjScale(float fovYRadians, std::uint32_t viewportHeight);
-
-// CPU reference of the per-instance decision in shaders/cull.wgsl: the LOD level 0..lodCount-1,
-// or -1 when the instance is culled. `center`/`radius` are the world bounding sphere. Shared with
-// the tests, which compare the GPU's compacted lists against it.
-[[nodiscard]] int cullLodLevel(const scene::LodSettings& lod, const FrustumPlanes& planes, const CullCamera& camera,
-                               glm::vec3 center, float radius);
-
-// The whole object's records reduced to two numbers that do not change until the record set does:
-// the AABB of the instance positions (record space, before the object matrix) and the largest
-// |scale| any record carries. Cached per object and recomputed on a structureVersion change.
-struct InstanceBounds {
-    glm::vec3 min{0.0f};
-    glm::vec3 max{0.0f};
-    float maxAbsScale = 1.0f;
-    bool valid = false;
-};
-[[nodiscard]] InstanceBounds instanceBounds(const std::vector<scene::InstanceRecord>& records);
-
-// True when shaders/cull.wgsl is certain to reject *every* record of the object: the conservative
-// whole-object bound fails the same frustum / maxDistance / minScreenRadius tests the per-instance
-// path applies, so every LOD level's instance count will be zero. Skipping the object's cull
-// dispatches and all of its indirect draws is then bit-exact -- there is nothing to pop in,
-// because a level that would have drawn nothing draws nothing either way.
-//
-// Only valid when the records the GPU culls are the ones these bounds were built from: an object
-// with effectors moves its records on the GPU, so the caller must not use this for those.
-[[nodiscard]] bool objectFullyCulled(const scene::LodSettings& lod, const FrustumPlanes& planes,
-                                     const CullCamera& camera, const glm::mat4& objectToWorld,
-                                     const InstanceBounds& bounds, float sourceRadius,
-                                     bool limitDistance = true);
 
 // Per-object result of the cull pass (blocking readback; tests and tools).
 struct CullCounts {
