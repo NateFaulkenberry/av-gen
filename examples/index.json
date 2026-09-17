@@ -26,6 +26,12 @@
     },
     {
       "category": "Lab",
+      "description": "The diagnostic environment for character problems: clip playback, root motion made visible (an in-place clip beside Dying_forward and Landing, each on its own origin pip), four yaws, three scales, and the farm pack for telling an asset bug from a systemic one. Neutral ground and studio light on purpose -- the character is the subject. Contracts and regression tests in docs/character-animation-lab.md.",
+      "name": "Character Animation Lab",
+      "project": "lab/character-animation-lab.json"
+    },
+    {
+      "category": "Lab",
       "description": "One instance of every animal in the imported farm pack, in profile and to scale: a 1.77 m bull down to a 0.11 m chick, each playing the one clip its rig carries. The validation scene for the conversion, not a dressed environment.",
       "name": "Farm Animals - Imported Pack",
       "project": "farm/farm-animals.json"
