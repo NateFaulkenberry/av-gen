@@ -1,6 +1,6 @@
 # The AV Gen Engineering Lab Suite
 
-Status: **Phase 0 (research) and Phase 1 (shared infrastructure) complete.** Twelve of the fourteen
+Status: **Phase 0 (research) and Phase 1 (shared infrastructure) complete.** Eleven of the fourteen
 labs are unbuilt; this document is what they are built on and what each of them owns.
 
 The suite answers a different question from a production scene. Glowmere answers *does the complete
@@ -68,7 +68,10 @@ Named by file and symbol, because a category is not an address.
 * Evaluated per frame at the end of `Composition::applyParameters` (`src/scene/composition.cpp`).
   Viewport free-roam is an override **on the result**, never an input — ADR-091's purity rests on it.
 * Terrain clearance: `world::clearPath` (`src/world/camera_clearance.cpp`), one caller,
-  `src/app/camera_director.cpp`.
+  `src/app/camera_director.cpp`. **Line of sight to the subject** is in the same file —
+  `world::heroSightline` and `world::clearSightlines`, same caller, run immediately after — and is
+  the half ADR-080 never had: `clearPath` keeps the camera *out of* things, and nothing asked what
+  was *between* it and the hero it was framing. See [camera-lab.md](camera-lab.md).
 
 ### Visibility and culling
 
@@ -288,7 +291,7 @@ the copy that a test checks.
 | Character Runtime | root motion, grounding, steering, navigation | what the joints do → Animation | `src/entity/entity.cpp` |
 | Visibility | whether an object reaches a draw call | which representation → LOD | `Composition::cullEntityNodes` |
 | LOD / Geometry | which level, and whether it holds still | whether it was culled → Visibility | `cull.wgsl:cs_cull_classify` |
-| Camera / Framing | camera pose, the frustum handed to the cull, clearance, line of sight | which objects survive that frustum → Visibility | `src/world/camera_clearance.cpp` |
+| Camera / Framing **(built)** | camera pose, the frustum handed to the cull, clearance, line of sight, which camera the viewport shows | which objects survive that frustum → Visibility | `src/world/camera_clearance.cpp:heroSightline` |
 | Shadow | cascade fitting, the caster list, the atlas, the mask, the contact march | the light's position and intensity → Lighting | `shadow_math.cpp:fitDirectionalCascade` |
 | Lighting | light packing, cluster assignment, LTC, IBL | whether a light is occluded → Shadow | `light_data.cpp:assignClusters` |
 | HDR / Exposure / Bloom | metering, exposure state, bloom, halation, tonemap | the radiance that entered → Lighting | `post_processor.cpp:PostProcessor::run` |
@@ -464,9 +467,9 @@ Grouped by the files they touch, so the groups can run in parallel.
 
 **Wave 1 — the decisions everything else is read against.**
 *Visibility* (`debug_visualizer.cpp`, `cull.wgsl`, `scene_renderer.cpp`'s diagnostic block) and
-*Camera* (`camera_clearance.cpp`, `camera_rig.cpp`, a new line-of-sight check). Both are running or
-next; they share no file. Visibility must land before LOD, because "which level" is only a question
-about objects that survived.
+*Camera* (`camera_clearance.cpp`, `camera_rig.cpp`, a new line-of-sight check) — **Camera is built**;
+see [camera-lab.md](camera-lab.md). They share no file. Visibility must land before LOD, because
+"which level" is only a question about objects that survived.
 
 **Wave 2 — one shared file each, no overlap.**
 *LOD* (`cull.wgsl`, `representation.cpp`) · *Shadow* (`shadow_math.cpp`, `shadow_renderer.cpp`) ·

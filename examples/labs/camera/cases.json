@@ -1,0 +1,112 @@
+{
+ "format": "avgen-lab-cases",
+ "version": 1,
+ "lab": "camera",
+ "_note": "The Camera / Framing Lab's reproducible configurations. Cases 1-4 are the ten camera presets and the three canvases -- the interactions section 16 names -- on the fixture that already exists for them. Cases 5-8 are the line-of-sight work: 5 and 6 are the arm and the control of the production reproduction (a hero standing in front of another hero on glowmere-atmospherics), and 7 and 8 are the frustum's two aspect regimes. Every case names a fixture this repository already ships; none of them carries an expectation as a number, because a case that graded itself would be a probe grading itself.",
+ "cases": [
+  {
+   "lab": "camera",
+   "number": 1,
+   "title": "The camera-behaviour fixture, from the first shot",
+   "question": "Does each of the six shot-level camera behaviours do the thing the handbook says it does?",
+   "expectation": "Shot 1 the camera does not move, shot 2 it travels with the performer, shot 3 the performer stands still and the camera circles, shot 4 the camera is the performer. The differences are meant to be unarguable side by side in time, which is why this fixture is one clip rather than six.",
+   "fixture": "examples/camera/behaviors.json",
+   "timeSeconds": 1.0,
+   "size": [1280, 720],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "The permanent visual fixture for the presets; it predates this lab and is registered rather than replaced. Render the whole thing with --render to see all six."
+  },
+  {
+   "lab": "camera",
+   "number": 2,
+   "title": "The same second at the output's aspect ratio, portrait",
+   "question": "Is the preview's framing the deliverable's framing when the deliverable is not 16:9?",
+   "expectation": "The vertical field of view is identical to case 1 and the horizontal one is much narrower, because this engine fixes fovY and derives fovX from the aspect (ADR-246). Anything else means a canvas change is a reframe, which would make the Output Frame canvas a lie.",
+   "fixture": "examples/camera/behaviors.json",
+   "timeSeconds": 1.0,
+   "size": [720, 1280],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "The arithmetic half is asserted in tests/unit/test_camera_lab_viewport.cpp; this is the case that lets a person look at it."
+  },
+  {
+   "lab": "camera",
+   "number": 3,
+   "title": "The same second at an ultrawide aspect",
+   "question": "What does the terrain cull's 2.5 aspect floor cost, and where does it stop costing anything?",
+   "expectation": "Nothing visible changes -- that is the point. At 2.5:1 and wider the floor is inert, so this case is the control for case 4: it is the aspect at which the exact frustum and the floored one are the same frustum.",
+   "fixture": "examples/world/terrain.json",
+   "timeSeconds": 8.0,
+   "size": [2560, 1024],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "2.5:1 exactly. Measured cost of the floor at narrower aspects, against a grid of chunk-sized boxes: +16.7% at 2.39:1, +33.3% at 16:9, +64.7% at 4:3, +100% at 1:1, +180% at 9:16."
+  },
+  {
+   "lab": "camera",
+   "number": 4,
+   "title": "Terrain in portrait, where the cull frustum is four times the frame",
+   "question": "How much ground is submitted that the frame cannot contain?",
+   "expectation": "The picture is correct and the draw count is not. At 9:16 the terrain cull builds its frustum at 2.5 while the frame is 0.5625, so roughly 2.8x the ground survives the frustum test. Nothing is missing; the cost is entirely in what is kept.",
+   "fixture": "examples/world/terrain.json",
+   "timeSeconds": 8.0,
+   "size": [720, 1280],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "The arm for case 3. Entity culling has no floor and uses the exact aspect, so the asymmetry is visible only in the terrain chunk counts."
+  },
+  {
+   "lab": "camera",
+   "number": 5,
+   "title": "A hero standing in front of the hero the shot is framing",
+   "question": "Can the directed camera see the hero it is holding?",
+   "expectation": "On this project in continuous mode, four of the 185 baked keys that hold a hero were framing `spire-cap` from behind `elder-2-cap` before the sightline pass existed, and none are after it. The camera was correctly outside both heroes the whole time, which is why ADR-080's clearance never saw it.",
+   "fixture": "examples/world/glowmere-atmospherics.json",
+   "timeSeconds": 0.0,
+   "size": [1280, 720],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Reproduced headlessly and measured in tests/unit/test_director_sightline.cpp, with a hand-written march against TerrainQuery::surfaceAt rather than against the query that does the fixing. Requires the Auto-director to be run on the project; the timeline as shipped is already baked."
+  },
+  {
+   "lab": "camera",
+   "number": 6,
+   "title": "CONTROL for case 5: the same bake with the correction budget at zero",
+   "question": "Does the count in case 5 move because of the sightline pass, or would it have moved anyway?",
+   "expectation": "The four blocked keys are still blocked. AutoDirectorSettings::maxSightlineCorrection = 0 makes the pass a pure instrument -- it still finds every obstruction and still reports the correction it would have applied -- and the path comes back byte for byte.",
+   "fixture": "examples/world/glowmere-atmospherics.json",
+   "timeSeconds": 0.0,
+   "size": [1280, 720],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "ADR-182's control, and the reason case 5's number is a finding. Not reachable from the CLI: it is a settings value, and the arm that runs it is the test named above."
+  },
+  {
+   "lab": "camera",
+   "number": 7,
+   "title": "The director's camera against the ground on the shipped Glowmere cut",
+   "question": "Does the clearance pass keep the baked camera out of the terrain and the canopy in production?",
+   "expectation": "It does, and by more than it needs to. 0 of 184 baked keys and 0 of 4001 interpolated samples sit below surface + 1.2 m. The uncleared bake's tightest sightline to its hero clears the ground by 0.63 m; after clearance it is 3.48 m -- so ADR-080's canopy lift is also doing most of the line-of-sight work against terrain, by accident.",
+   "fixture": "examples/world/glowmere-valley-2.json",
+   "timeSeconds": 0.0,
+   "size": [1280, 720],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Measured in tests/unit/test_director_terrain.cpp and tests/unit/test_director_sightline.cpp. The second is the reason this case is worth keeping: a count of zero that came from a margin of a few centimetres is a count the next terrain seed would not reproduce, and this one did not."
+  },
+  {
+   "lab": "camera",
+   "number": 8,
+   "title": "A free-roaming viewport under a director that keeps cutting",
+   "question": "Does the viewport stay the artist's when the shot or the camera changes?",
+   "expectation": "It does, across a cut, a re-installed camera direction, an added camera and a resize in all three canvases -- and a following viewport still moves for all of them, which is what stops the first half being satisfied by a viewport that never moves at all.",
+   "fixture": "examples/world/glowmere-valley-2-multicam.json",
+   "timeSeconds": 7.0,
+   "size": [1280, 720],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Asserted headlessly in tests/unit/test_camera_lab_viewport.cpp. What this case will NOT show is protection from a seq::Shot's baked camera: a shot camera writes camera/position on the main camera, which is exactly the camera free-roam hands the viewport back to. See docs/camera-lab.md."
+  }
+ ]
+}

@@ -91,6 +91,46 @@ TEST_CASE("every lab's fixture, doc and case file exist", "[labs][registry]") {
     }
 }
 
+TEST_CASE("every case file a lab names actually parses", "[labs][registry]") {
+    // The test above checks the file is *there*, which is what a registry test naturally checks and
+    // is half the promise. A case file that exists and does not parse resolves `--lab-case
+    // camera:5` to an error message at the moment somebody is trying to reproduce a bug, and
+    // nothing in the suite would have said so. Written when the Camera Lab's case file was added
+    // and could have been malformed in any of six ways with the registry still green.
+    std::size_t files = 0;
+    std::size_t cases = 0;
+    for (const labs::LabDescriptor& d : labs::labs()) {
+        if (d.cases.empty()) {
+            continue;
+        }
+        INFO("lab: " << d.key << "  cases: " << d.cases);
+        auto loaded = labs::loadCases(repoRoot() / d.cases);
+        INFO((loaded ? std::string() : loaded.error().message));
+        REQUIRE(loaded.has_value());
+        ++files;
+        std::set<int> numbers;
+        for (const labs::LabCase& c : *loaded) {
+            INFO("case " << c.number << ": " << c.title);
+            // The file's lab and the entry's lab must agree -- a case answering to two names is a
+            // case somebody will reproduce in the wrong place.
+            CHECK(c.lab == d.key);
+            CHECK(c.number > 0);
+            CHECK(numbers.insert(c.number).second);
+            // §5's first two questions. A case whose `question` is empty is one nobody can tell is
+            // still worth running.
+            CHECK_FALSE(c.question.empty());
+            CHECK_FALSE(c.expectation.empty());
+            // And the fixture it names has to be something `Engine::loadFile` could open.
+            CHECK(fs::exists(repoRoot() / c.fixture));
+            ++cases;
+        }
+    }
+    // The control: a loop over nothing passes every assertion in it.
+    INFO(files << " case file(s), " << cases << " case(s)");
+    CHECK(files >= 2);
+    CHECK(cases >= 10);
+}
+
 TEST_CASE("lab keys are unique, lowercase and resolvable", "[labs][registry]") {
     std::set<std::string_view> keys;
     for (const labs::LabDescriptor& d : labs::labs()) {
