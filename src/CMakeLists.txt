@@ -1,6 +1,12 @@
 # ---- avgen_core: GPU-free engine logic (core, audio, analysis, signals, params, scene, entity, assets)
+#
+# `labs/` is the Engineering Lab Suite's registry, case format, overlay profiles and visibility
+# vocabulary (ADR-260). It is here, inside the glob, for the reason the test tree is globbed: a lab
+# agent adds a file and does not touch this list, which is what keeps twelve parallel agents off one
+# shared line. Everything in it is names, paths and plain data -- no device, no renderer -- so the
+# CPU suite can check it.
 file(GLOB_RECURSE AVGEN_CORE_SOURCES CONFIGURE_DEPENDS
-    core/*.cpp audio/*.cpp analysis/*.cpp signals/*.cpp params/*.cpp scene/*.cpp spatial/*.cpp world/*.cpp graph/*.cpp shaders/*.cpp assets/*.cpp ai/*.cpp entity/*.cpp stage/*.cpp search/*.cpp organism/*.cpp
+    core/*.cpp labs/*.cpp audio/*.cpp analysis/*.cpp signals/*.cpp params/*.cpp scene/*.cpp spatial/*.cpp world/*.cpp graph/*.cpp shaders/*.cpp assets/*.cpp ai/*.cpp entity/*.cpp stage/*.cpp search/*.cpp organism/*.cpp
     control/*.cpp comp/*.cpp seq/*.cpp song/*.cpp help/*.cpp)
 # The cinematic shot vocabulary (ADR-062) is pure geometry and JSON, and the sequencer (ADR-089)
 # holds an app::Shot by value in every shot it bakes. It lives in app/ for history's sake; it

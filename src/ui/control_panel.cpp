@@ -267,6 +267,37 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
             }
             ImGui::EndMenu();
         }
+        // The Engineering Lab Suite (ADR-260, spec 6). Beside Examples rather than in a panel of
+        // its own: opening a lab *is* opening a scene, and this is the menu a person already uses
+        // to do that. What it adds over Examples is the two things a file list cannot carry -- the
+        // lab's overlay profile, applied on open, and its boundary, in the tooltip, which is what
+        // stops somebody diagnosing a LOD symptom in the Temporal Lab.
+        //
+        // Every lab is shown, including the twelve that are unbuilt, with its status. Hiding them
+        // would make this menu useless for handing work out; opening one silently would teach
+        // people the suite is decorative. A lab with no fixture is greyed, because a menu item
+        // that opens nothing is the defect ADR-225 is about.
+        if (ImGui::BeginMenu("Engineering Labs")) {
+            for (const labs::LabDescriptor& lab : labs::labs()) {
+                const bool openable = !lab.fixture.empty() && onOpenLab;
+                const std::string label =
+                    lab.status == labs::LabStatus::Built
+                        ? std::string(lab.title)
+                        : fmt::format("{}  ({})", lab.title, labs::statusName(lab.status));
+                if (ImGui::MenuItem(label.c_str(), nullptr, false, openable)) {
+                    onOpenLab(lab);
+                }
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    ImGui::SetTooltip("%s\n\nOwns: %s\nNot its: %s\nDecided in: %s%s",
+                                      std::string(lab.question).c_str(),
+                                      std::string(lab.owns).c_str(),
+                                      std::string(lab.doesNotOwn).c_str(),
+                                      std::string(lab.decides).c_str(),
+                                      lab.fixture.empty() ? "\n\nNo fixture yet." : "");
+                }
+            }
+            ImGui::EndMenu();
+        }
         if (ImGui::BeginMenu("Open Recent", !recentProjects.empty())) {
             // Two entries called `night-shift.json` -- one in this checkout, one in a worktree --
             // are not duplicates, so the list is right to hold both. The label has to say which is

@@ -1,0 +1,128 @@
+{
+ "format": "avgen-lab-cases",
+ "version": 1,
+ "lab": "rendering",
+ "_note": "The Rendering Lab's reproducible configurations. Every one of these is a recipe that already existed -- in docs/quality-lab/README.md's 'Using it' block, in ADR-243 and in ADR-257 -- written down in the one place a case number can be resolved from. Nothing here is a new experiment; it is the existing ones made addressable, which is the whole of spec 32.",
+ "cases": [
+  {
+   "lab": "rendering",
+   "number": 1,
+   "title": "Aliasing, candidate against its own supersampled reference",
+   "question": "On the benchmark scene built to alias, how far is a production frame from a better-sampled one of the same second?",
+   "expectation": "The candidate is measurably worse. This is the arm that must MOVE -- a metric that cannot separate 1x from 2x on a scene of fence slats and a receding tile grid is not measuring sampling.",
+   "fixture": "examples/quality/aliasing.json",
+   "timeSeconds": 0.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "The reference arm is this case with supersample 2.0 (case 2). --aov and --supersample are refused together (ADR-242), which is why the reference carries no AOVs and why the pair is two cases rather than one."
+  },
+  {
+   "lab": "rendering",
+   "number": 2,
+   "title": "Aliasing, the supersampled reference",
+   "question": "What does this second of this scene look like when sampling is not the limit?",
+   "expectation": "Nothing to assert on its own. This case exists to be the other half of case 1, and a report that names it as a reference must carry its sequence hash -- two arms that hash identically are void, not equal.",
+   "fixture": "examples/quality/aliasing.json",
+   "timeSeconds": 0.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "supersample": 2.0
+  },
+  {
+   "lab": "rendering",
+   "number": 3,
+   "title": "Aliasing dolly, with the AOVs the temporal detectors need",
+   "question": "Under lateral camera motion, does the motion-compensated residual separate real instability from authored movement?",
+   "expectation": "The residual stays low while the temporal alternation is large, because the second difference of a translating image is not zero. ADR-243 in miniature: the temporal detector calls authored motion instability and the residual does not.",
+   "fixture": "examples/quality/aliasing-dolly.json",
+   "timeSeconds": 0.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "aovs": [
+    "velocity",
+    "depth",
+    "id",
+    "normal",
+    "emission"
+   ],
+   "notes": "Two seconds of frames, not one: the temporal detectors have nothing to say about a single frame. Reproduce with --range 0:2 in place of the single-frame range the printed command uses."
+  },
+  {
+   "lab": "rendering",
+   "number": 4,
+   "title": "Aliasing dolly with FXAA removed",
+   "question": "How much of the spatial measure's reading is FXAA?",
+   "expectation": "The spatial Laplacian rises with FXAA off. This is a control for case 3, not a quality question: an instrument that does not move when the only antialiasing in the pipe is removed is reading something other than antialiasing.",
+   "fixture": "examples/quality/aliasing-dolly.json",
+   "timeSeconds": 0.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "disable": [
+    "fxaa"
+   ],
+   "notes": "There is no TAA in this engine. fxaa is the whole antialiasing arm, and removing it is the strongest available."
+  },
+  {
+   "lab": "rendering",
+   "number": 5,
+   "title": "The shadow AOV against the mask the lit pass consumed",
+   "question": "Does the `shadow` AOV's recomputed visibility term equal the one the lit pass actually used?",
+   "expectation": "Close and not exact. ADR-258 measured 0.43% of pixels differing, max 22/255 -- so the metric built on it ships labelled an approximation. This case is the arm; case 6 is its control.",
+   "fixture": "examples/world/terrain.json",
+   "timeSeconds": 8.0,
+   "size": [
+    640,
+    360
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "tier": "offline",
+   "qualityArms": [
+    "maskconsume"
+   ],
+   "aovs": [
+    "shadow"
+   ],
+   "notes": "`maskconsume` is a diagnostic configuration no tier sets and nothing ships: the shadow mask at full resolution AND consumed. It exists so the comparison has something to compare against -- at `high` and `offline` the engine's own mask is never built."
+  },
+  {
+   "lab": "rendering",
+   "number": 6,
+   "title": "CONTROL for case 5: the shadow atlas halved",
+   "question": "Does the comparison in case 5 move at all when the shadows genuinely change?",
+   "expectation": "Both arms move. ADR-258 measured 1.86% inline and 1.93% masked -- four times case 5's disagreement. Without this, 'close' in case 5 is a number with no scale on it.",
+   "fixture": "examples/world/terrain.json",
+   "timeSeconds": 8.0,
+   "size": [
+    640,
+    360
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "tier": "offline",
+   "qualityArms": [
+    "shadowatlas1k"
+   ],
+   "aovs": [
+    "shadow"
+   ],
+   "notes": "ADR-182's positive control for case 5, and the reason case 5's finding is a finding."
+  }
+ ]
+}

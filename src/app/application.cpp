@@ -1,4 +1,5 @@
 #include "app/application.hpp"
+#include "labs/overlays.hpp"
 
 #include "ai/scripted_provider.hpp"
 
@@ -138,6 +139,10 @@ std::string usageText() {
            "  --input [name]      analyze a live capture device (substring of its name; default device)\n"
            "  --osc-port <n>      OSC listen port (overrides the project's control map)\n"
            "  --list-audio-devices, --list-midi   enumerate inputs and exit\n"
+           "  --labs                              the Engineering Lab Suite: what each lab owns,\n"
+           "                                      what it does not, and where its decision is made\n"
+           "  --lab-case <lab>:<n>                open a lab case: its fixture, second, size, tier,\n"
+           "                                      arms and overlays (docs/engineering-labs.md)\n"
            "  --output <d>[:fullscreen|:WxH]      add an output window on display index <d> (repeatable)\n"
            "  --example <name>    open a built-in example by name (see examples/index.json)\n"
            "  --syphon <name>     publish the frame as a Syphon server (macOS)\n"
@@ -286,6 +291,15 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             ++i;
         } else if (arg == "--list-audio-devices") {
             options.listAudioDevices = true;
+        } else if (arg == "--labs") {
+            options.listLabs = true;
+        } else if (arg == "--lab-case") {
+            auto v = need(i, "--lab-case");
+            if (!v) return std::unexpected(v.error());
+            auto resolved = labs::resolveCaseSpec(*v, labs::repositoryRoot());
+            if (!resolved) return std::unexpected(resolved.error());
+            options.labCase = *resolved;
+            ++i;
         } else if (arg == "--list-midi") {
             options.listMidi = true;
         } else if (arg == "--render") {
@@ -607,6 +621,51 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             ++i;
         } else {
             return fail("unknown argument '{}'\n{}", arg, usageText());
+        }
+    }
+    // A lab case is a set of flags with a number for a name (spec 32). Applying it HERE, rather
+    // than anywhere downstream, is what makes that true: everything below this line sees a plain
+    // set of options and cannot behave differently because a case was named. A flag written
+    // explicitly beside `--lab-case` wins, because the case is the starting point of an
+    // investigation and the thing a person then varies is the flag they typed.
+    if (options.labCase) {
+        const labs::LabCase& c = *options.labCase;
+        const std::filesystem::path fixture = labs::repositoryRoot() / c.fixture;
+        // `.scene.json` is a composition; anything else `--project` loads. The extension is what
+        // `Engine::loadFile` routes on, so this is the same rule and not a second one.
+        const std::string name = fixture.filename().string();
+        const bool isScene = name.size() > 11 && name.substr(name.size() - 11) == ".scene.json";
+        if (isScene) {
+            if (!options.composition) options.composition = fixture;
+        } else if (!options.project) {
+            options.project = fixture;
+        }
+        if (!options.renderWidth) options.renderWidth = c.width;
+        if (!options.renderHeight) options.renderHeight = c.height;
+        if (!options.fpsGiven) {
+            options.offlineFps = c.fps;
+            options.fpsGiven = true;
+        }
+        if (options.qualityTier.empty()) options.qualityTier = c.tier;
+        if (options.disablePasses.empty()) {
+            for (const std::string& arm : c.disable) {
+                options.disablePasses += (options.disablePasses.empty() ? "" : ",") + arm;
+            }
+        }
+        if (options.qualityArms.empty()) {
+            for (const std::string& arm : c.qualityArms) {
+                options.qualityArms += (options.qualityArms.empty() ? "" : ",") + arm;
+            }
+        }
+        if (!options.aovs && !c.aovs.empty()) {
+            std::string list;
+            for (const std::string& aov : c.aovs) {
+                list += (list.empty() ? "" : ",") + aov;
+            }
+            options.aovs = list;
+        }
+        if (c.supersample != 1.0 && options.supersample <= 1.0) {
+            options.supersample = static_cast<float>(c.supersample);
         }
     }
     return options;
@@ -1182,6 +1241,15 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             log::warn("examples: {}", examples.error().message);
         }
         panel_->onOpenExample = [this](const ExampleInfo& ex) { loadAny(ex.file); };
+        // Opening a lab is opening its fixture *and* selecting what to look at while it is open.
+        // The second half is the whole difference from File > Examples, and it is why this is not
+        // just another index entry.
+        panel_->onOpenLab = [this](const labs::LabDescriptor& lab) {
+            loadAny(labs::repositoryRoot() / std::string(lab.fixture));
+            panel_->world.debug = labs::overlaysFor(lab.id);
+            panel_->world.showDebugOptions = true;
+            panel_->setStatus(fmt::format("{}: {}", lab.title, lab.question));
+        };
         // The loader names the stage it is entering. Only the live editor installs this: offline
         // has no window to tell and `runHeadless` must not acquire a dependency on one.
         //
@@ -1437,6 +1505,27 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             if (panel_) panel_->setStatus(id.error().message);
         }
     }
+    // The two halves of a lab case that are not flags: the second it is about, and the overlays
+    // its lab looks at while asking its question (spec 8, 32). Both after the load, because there
+    // is nothing to seek in and no panel to configure before it.
+    //
+    // `seekSeconds` moves the clock and `update` re-derives the scene (ADR-091); this only does the
+    // first, and that is correct -- the run loop's next `update` is what derives the frame. A
+    // `seekSeconds` here followed by a read here would report the frame the engine was already on,
+    // which is the mistake that has produced two false results in this repository.
+    if (options.labCase) {
+        const labs::LabCase& c = *options.labCase;
+        if (c.timeSeconds > 0.0) {
+            engine_->seekSeconds(c.timeSeconds);
+        }
+        if (const auto id = labs::findLab(c.lab); id && panel_) {
+            panel_->world.debug = labs::overlaysFor(*id);
+            panel_->world.showDebugOptions = true;
+        }
+        log::info("{} case {}: {}", c.lab, c.number, c.title);
+        log::info("  reproduce: {}", labs::reproduceCommand(c));
+    }
+
     // Hot reload of the engine's own shaders.
     for (const char* name : {"common.wgsl", "pbr.wgsl", "grid.wgsl", "skybox.wgsl", "tonemap.wgsl"}) {
         if (auto located = shaders_->locate(name)) {

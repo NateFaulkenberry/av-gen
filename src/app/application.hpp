@@ -17,6 +17,7 @@
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
 #include "app/settings.hpp"
+#include "labs/case.hpp"
 #include "ai/control_plane.hpp"
 #include "rendering/composition_renderer.hpp"
 #include "app/ui_script.hpp"
@@ -185,6 +186,12 @@ struct AppOptions {
     std::optional<int> oscPort;
     bool listAudioDevices = false;
     bool listMidi = false;
+    // The Engineering Lab Suite (ADR-260). `--labs` prints the registry and exits; `--lab-case`
+    // resolves `<lab>:<number>` into the flags the case is equivalent to, which is why almost
+    // nothing downstream of `parseArgs` knows a lab case exists -- by the time the options leave
+    // the parser a case has become a project, a size, a tier and a set of arms.
+    bool listLabs = false;
+    std::optional<labs::LabCase> labCase;
     std::vector<std::string> outputs; // --output <display>[:fullscreen|:WxH]
     std::optional<std::string> syphon; // --syphon <name>
     std::optional<std::string> example; // --example <name>
