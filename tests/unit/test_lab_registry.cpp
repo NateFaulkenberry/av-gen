@@ -1,4 +1,4 @@
-// The lab registry, and the two probes that make it more than a table of strings (ADR-260).
+// The lab registry, and the two probes that make it more than a table of strings (ADR-261).
 //
 // The registry claims two things about the repository: that each lab's decision is made in a named
 // file, and that each lab opens on a fixture that exists. Both claims rot silently -- a rename

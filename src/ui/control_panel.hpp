@@ -109,7 +109,7 @@ public:
     std::vector<std::filesystem::path> recentProjects; // shown in File > Open Recent
     std::vector<app::ExampleInfo> examples;             // File > Examples
     std::function<void(const app::ExampleInfo&)> onOpenExample;
-    // File > Engineering Labs (ADR-260). The host opens the lab's fixture and applies its overlay
+    // File > Engineering Labs (ADR-261). The host opens the lab's fixture and applies its overlay
     // profile; the menu itself holds no lab knowledge beyond the registry it prints.
     std::function<void(const labs::LabDescriptor&)> onOpenLab;
     // Asset browser (ADR-031): the host scans directories and opens what the user picks.

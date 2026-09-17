@@ -70,6 +70,12 @@ public:
     [[nodiscard]] Result<void> run();
     void cancel(); // stops after the current frame; partial output is kept (video is finished)
 
+    // Debug overlays to draw into the sequence (`--debug-draw`). Off by default, and off is what a
+    // deliverable wants -- but a render is also the *only* place a lot of this engine can be looked
+    // at, and until ADR-262 the overlays existed exclusively behind ImGui checkboxes, which meant
+    // the one artefact everybody diagnoses from was the one artefact they could not appear in.
+    void setDebugOptions(const rendering::DebugViewOptions& options) { debug_ = options; }
+
     [[nodiscard]] RenderProgress progress() const;
     [[nodiscard]] const RenderSettings& settings() const { return settings_; }
     [[nodiscard]] const std::filesystem::path& outputPath() const { return output_; }
@@ -126,6 +132,7 @@ private:
     std::filesystem::path baseDir_;
     std::filesystem::path output_;
     std::unique_ptr<rendering::SceneRenderer> renderer_;
+    rendering::DebugViewOptions debug_{}; // `--debug-draw`; every flag false by default
     // The 2D composition (ADR-083), installed as the renderer's overlay exactly as the live path
     // installs it. The offline frame is the live frame plus a fixed clock; the composition must
     // not be one of the differences.

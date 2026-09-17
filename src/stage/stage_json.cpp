@@ -213,9 +213,17 @@ namespace {
         const std::string name = readString(j, "anchor");
         const auto anchor = anchorFromName(name);
         if (!anchor) {
-            return fail("a step's `anchor` is '{}', which is not travel/visual", name);
+            return fail("a step's `anchor` is '{}', which is not travel/visual/drawn", name);
         }
         s.anchor = *anchor;
+    }
+    if (j.contains("place")) {
+        const std::string name = readString(j, "place");
+        const auto place = anchorFromName(name);
+        if (!place) {
+            return fail("a step's `place` is '{}', which is not travel/visual/drawn", name);
+        }
+        s.place = *place;
     }
     if (j.contains("travel")) {
         const std::string name = readString(j, "travel");
@@ -270,6 +278,7 @@ namespace {
     if (s.relative) j["relative"] = true;
     if (s.hold) j["hold"] = true;
     if (s.anchor != Anchor::Travel) j["anchor"] = anchorName(s.anchor);
+    if (s.place != Anchor::Travel) j["place"] = anchorName(s.place);
     if (s.travel != Travel::Fly) j["travel"] = travelName(s.travel);
     writeValue(j, "duration", s.duration, 0.0f);
     writeValue(j, "height", s.height, 0.0f);

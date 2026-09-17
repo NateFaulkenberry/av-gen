@@ -5831,9 +5831,9 @@
         "emissive": 0.44999998807907104,
         "enabled": true,
         "extent": [
-          7.800000190734863,
-          7.800000190734863,
-          7.800000190734863
+          7.8,
+          7.8,
+          7.8
         ],
         "gravity": [
           0.0,
@@ -5850,8 +5850,8 @@
         ],
         "seed": 20260911,
         "shape": "disc",
-        "sizeEnd": 0.07400000095367432,
-        "sizeStart": 0.656000018119812,
+        "sizeEnd": 0.074,
+        "sizeStart": 0.656,
         "softness": 0.20000000298023224,
         "spawnRate": 0.0,
         "speedMax": 12.5,
@@ -5880,7 +5880,7 @@
         0.061000000685453415,
         1.0
       ],
-      "visible": true
+      "visible": false
     },
     {
       "emissiveBoost": 1.0,
@@ -21378,54 +21378,232 @@
   "staging": {
     "actors": [
       {
-        "body": "visitor",
         "name": "saucer",
+        "body": "visitor",
         "parts": [
           {
-            "entity": "visitor-beam",
-            "name": "beam"
+            "name": "beam",
+            "entity": "visitor-beam"
           }
         ]
       }
     ],
     "scenarios": [
       {
+        "name": "abduction",
         "actor": "saucer",
+        "seed": 20260915,
         "autoStart": true,
+        "maxCycles": 10,
+        "searchInterval": 0.5,
+        "params": [
+          {
+            "name": "searchRadius",
+            "value": 260.0,
+            "min": 20.0,
+            "max": 600.0
+          },
+          {
+            "name": "minRange",
+            "value": 25.0,
+            "min": 0.0,
+            "max": 200.0
+          },
+          {
+            "name": "targetClearance",
+            "value": 6.5,
+            "min": 0.0,
+            "max": 40.0
+          },
+          {
+            "name": "hoverHeight",
+            "value": 23.0,
+            "min": 5.0,
+            "max": 80.0
+          },
+          {
+            "name": "cruiseClearance",
+            "value": 34.0,
+            "min": 5.0,
+            "max": 120.0
+          },
+          {
+            "name": "travelSpeed",
+            "value": 30.0,
+            "min": 1.0,
+            "max": 120.0
+          },
+          {
+            "name": "approachSeconds",
+            "value": 7.0,
+            "min": 0.5,
+            "max": 60.0
+          },
+          {
+            "name": "aimSeconds",
+            "value": 0.8,
+            "min": 0.0,
+            "max": 10.0
+          },
+          {
+            "name": "hoverSeconds",
+            "value": 2.4,
+            "min": 0.0,
+            "max": 30.0
+          },
+          {
+            "name": "beamSeconds",
+            "value": 1.1,
+            "min": 0.0,
+            "max": 10.0
+          },
+          {
+            "name": "beamFadeSeconds",
+            "value": 0.9,
+            "min": 0.0,
+            "max": 10.0
+          },
+          {
+            "name": "abductSeconds",
+            "value": 4.6,
+            "min": 0.5,
+            "max": 30.0
+          },
+          {
+            "name": "liftHeight",
+            "value": -6.6,
+            "min": -40.0,
+            "max": 0.0
+          },
+          {
+            "name": "animalSpin",
+            "value": 230.0,
+            "min": -1440.0,
+            "max": 1440.0
+          },
+          {
+            "name": "animalWobble",
+            "value": 0.0,
+            "min": 0.0,
+            "max": 10.0
+          },
+          {
+            "name": "animalWobbleRate",
+            "value": 1.35,
+            "min": 0.0,
+            "max": 10.0
+          },
+          {
+            "name": "animalGait",
+            "value": 1.3,
+            "min": 0.0,
+            "max": 10.0
+          },
+          {
+            "name": "craftWobble",
+            "value": 0.3,
+            "min": 0.0,
+            "max": 10.0
+          },
+          {
+            "name": "craftWobbleRate",
+            "value": 0.45,
+            "min": 0.0,
+            "max": 10.0
+          },
+          {
+            "name": "gapSeconds",
+            "value": 3.2,
+            "min": 0.0,
+            "max": 60.0
+          },
+          {
+            "name": "beamSpawnRate",
+            "value": 6100.0,
+            "min": 0.0,
+            "max": 20000.0
+          },
+          {
+            "name": "beamEmissive",
+            "value": 1.55,
+            "min": 0.0,
+            "max": 10.0
+          },
+          {
+            "name": "beamRestRate",
+            "value": 0.0,
+            "min": 0.0,
+            "max": 20000.0
+          },
+          {
+            "name": "beamRestEmissive",
+            "value": 0.45,
+            "min": 0.0,
+            "max": 10.0
+          },
+          {
+            "name": "beamDrainSeconds",
+            "value": 5.0,
+            "min": 0.0,
+            "max": 30.0
+          },
+          {
+            "name": "glowIntensity",
+            "value": 6.5,
+            "min": 0.0,
+            "max": 40.0
+          },
+          {
+            "name": "glowRiseSeconds",
+            "value": 1.3,
+            "min": 0.0,
+            "max": 10.0
+          },
+          {
+            "name": "glowFadeSeconds",
+            "value": 1.9,
+            "min": 0.0,
+            "max": 10.0
+          }
+        ],
         "beats": [
           {
-            "cues": [],
+            "name": "acquire",
             "find": [
               {
                 "bind": "target",
-                "clearance": {
-                  "param": "targetClearance"
-                },
+                "tag": "animal",
                 "from": "actor",
-                "minRadius": {
-                  "param": "minRange"
-                },
                 "radius": {
                   "param": "searchRadius"
                 },
+                "minRadius": {
+                  "param": "minRange"
+                },
+                "clearance": {
+                  "param": "targetClearance"
+                },
+                "pick": "nearest",
                 "requireNavigable": true,
-                "tag": "animal"
+                "claim": true
               }
             ],
-            "name": "acquire",
-            "then": "approach"
+            "cues": [],
+            "then": "approach",
+            "otherwise": ""
           },
           {
+            "name": "approach",
             "cues": [
               {
                 "role": "actor.beam",
                 "steps": [
                   {
+                    "kind": "wait",
+                    "name": "beamDrain",
                     "duration": {
                       "param": "beamDrainSeconds"
-                    },
-                    "kind": "wait",
-                    "name": "beamDrain"
+                    }
                   },
                   {
                     "kind": "hide",
@@ -21437,56 +21615,53 @@
                 "role": "actor",
                 "steps": [
                   {
-                    "duration": {
-                      "param": "aimSeconds"
-                    },
                     "kind": "lookAt",
                     "name": "aim",
-                    "to": "target"
+                    "to": "target",
+                    "duration": {
+                      "param": "aimSeconds"
+                    }
                   },
                   {
+                    "kind": "moveTo",
+                    "name": "approach",
+                    "to": "target",
+                    "height": {
+                      "param": "hoverHeight"
+                    },
                     "aboveGround": true,
-                    "clearance": {
-                      "param": "cruiseClearance"
+                    "speed": {
+                      "param": "travelSpeed"
                     },
                     "duration": {
                       "param": "approachSeconds"
                     },
-                    "height": {
-                      "param": "hoverHeight"
-                    },
-                    "kind": "moveTo",
-                    "name": "approach",
-                    "speed": {
-                      "param": "travelSpeed"
-                    },
-                    "to": "target"
+                    "clearance": {
+                      "param": "cruiseClearance"
+                    }
                   }
                 ]
               }
             ],
-            "name": "approach",
             "then": "beam"
           },
           {
+            "name": "beam",
             "cues": [
               {
                 "role": "actor",
                 "steps": [
                   {
-                    "aboveGround": true,
-                    "clearance": {
-                      "param": "cruiseClearance"
-                    },
-                    "duration": {
-                      "param": "hoverSeconds"
-                    },
-                    "height": {
-                      "param": "hoverHeight"
-                    },
                     "kind": "follow",
                     "name": "hover",
                     "to": "target",
+                    "height": {
+                      "param": "hoverHeight"
+                    },
+                    "aboveGround": true,
+                    "duration": {
+                      "param": "hoverSeconds"
+                    },
                     "wobble": {
                       "param": "craftWobble"
                     },
@@ -21504,51 +21679,48 @@
                     "name": "beamOn"
                   },
                   {
-                    "duration": {
-                      "param": "beamSeconds"
-                    },
                     "kind": "set",
                     "name": "beamRise",
                     "target": "spawnRate",
                     "to": {
                       "param": "beamSpawnRate"
+                    },
+                    "duration": {
+                      "param": "beamSeconds"
                     }
                   },
                   {
-                    "duration": 0.20000000298023224,
                     "kind": "set",
                     "name": "beamGlow",
                     "target": "emissive",
                     "to": {
                       "param": "beamEmissive"
-                    }
+                    },
+                    "duration": 0.2
                   }
                 ]
               }
             ],
-            "name": "beam",
             "then": "abduct"
           },
           {
+            "name": "abduct",
             "cues": [
               {
                 "role": "actor",
                 "steps": [
                   {
-                    "aboveGround": true,
-                    "clearance": {
-                      "param": "cruiseClearance"
-                    },
-                    "duration": {
-                      "param": "abductSeconds"
-                    },
-                    "height": {
-                      "param": "hoverHeight"
-                    },
-                    "hold": true,
                     "kind": "follow",
                     "name": "hold",
                     "to": "target",
+                    "hold": true,
+                    "height": {
+                      "param": "hoverHeight"
+                    },
+                    "aboveGround": true,
+                    "duration": {
+                      "param": "abductSeconds"
+                    },
                     "wobble": {
                       "param": "craftWobble"
                     },
@@ -21562,27 +21734,28 @@
                 "role": "target",
                 "steps": [
                   {
-                    "anchor": "visual",
-                    "duration": {
-                      "param": "abductSeconds"
-                    },
+                    "kind": "moveTo",
+                    "name": "lift",
+                    "to": "actor.beam",
+                    "anchor": "drawn",
+                    "place": "drawn",
                     "height": {
                       "param": "liftHeight"
                     },
-                    "kind": "moveTo",
-                    "name": "lift",
-                    "rate": {
-                      "param": "animalGait"
+                    "duration": {
+                      "param": "abductSeconds"
                     },
                     "spin": {
                       "param": "animalSpin"
                     },
-                    "to": "actor",
                     "wobble": {
                       "param": "animalWobble"
                     },
                     "wobbleRate": {
                       "param": "animalWobbleRate"
+                    },
+                    "rate": {
+                      "param": "animalGait"
                     }
                   },
                   {
@@ -21595,55 +21768,57 @@
                 "role": "target",
                 "steps": [
                   {
-                    "duration": {
-                      "param": "glowRiseSeconds"
-                    },
-                    "from": 0.0,
                     "kind": "set",
                     "name": "glow-rise",
                     "target": "emissiveBoost",
+                    "from": 0.0,
                     "to": {
                       "param": "glowIntensity"
+                    },
+                    "duration": {
+                      "param": "glowRiseSeconds"
                     }
                   },
                   {
-                    "duration": {
-                      "param": "glowFadeSeconds"
-                    },
                     "kind": "set",
                     "name": "glow-fade",
-                    "target": "emissiveBoost"
+                    "target": "emissiveBoost",
+                    "to": 0.0,
+                    "duration": {
+                      "param": "glowFadeSeconds"
+                    }
                   }
                 ]
               }
             ],
-            "name": "abduct",
             "then": "depart"
           },
           {
+            "name": "depart",
+            "release": true,
             "cues": [
               {
                 "role": "actor.beam",
                 "steps": [
                   {
-                    "duration": {
-                      "param": "beamFadeSeconds"
-                    },
                     "kind": "set",
                     "name": "beamFall",
                     "target": "spawnRate",
                     "to": {
                       "param": "beamRestRate"
+                    },
+                    "duration": {
+                      "param": "beamFadeSeconds"
                     }
                   },
                   {
-                    "duration": 0.30000001192092896,
                     "kind": "set",
                     "name": "beamDim",
                     "target": "emissive",
                     "to": {
                       "param": "beamRestEmissive"
-                    }
+                    },
+                    "duration": 0.3
                   }
                 ]
               },
@@ -21651,192 +21826,17 @@
                 "role": "actor",
                 "steps": [
                   {
+                    "kind": "wait",
+                    "name": "beat",
                     "duration": {
                       "param": "gapSeconds"
-                    },
-                    "kind": "wait",
-                    "name": "beat"
+                    }
                   }
                 ]
               }
-            ],
-            "name": "depart",
-            "release": true
+            ]
           }
-        ],
-        "maxCycles": 10,
-        "name": "abduction",
-        "params": [
-          {
-            "max": 600.0,
-            "min": 20.0,
-            "name": "searchRadius",
-            "value": 260.0
-          },
-          {
-            "max": 200.0,
-            "min": 0.0,
-            "name": "minRange",
-            "value": 25.0
-          },
-          {
-            "max": 40.0,
-            "min": 0.0,
-            "name": "targetClearance",
-            "value": 6.5
-          },
-          {
-            "max": 80.0,
-            "min": 5.0,
-            "name": "hoverHeight",
-            "value": 23.0
-          },
-          {
-            "max": 120.0,
-            "min": 5.0,
-            "name": "cruiseClearance",
-            "value": 34.0
-          },
-          {
-            "max": 120.0,
-            "min": 1.0,
-            "name": "travelSpeed",
-            "value": 30.0
-          },
-          {
-            "max": 60.0,
-            "min": 0.5,
-            "name": "approachSeconds",
-            "value": 7.0
-          },
-          {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "aimSeconds",
-            "value": 0.800000011920929
-          },
-          {
-            "max": 30.0,
-            "min": 0.0,
-            "name": "hoverSeconds",
-            "value": 2.4000000953674316
-          },
-          {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "beamSeconds",
-            "value": 1.100000023841858
-          },
-          {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "beamFadeSeconds",
-            "value": 0.8999999761581421
-          },
-          {
-            "max": 30.0,
-            "min": 0.5,
-            "name": "abductSeconds",
-            "value": 4.599999904632568
-          },
-          {
-            "max": 0.0,
-            "min": -40.0,
-            "name": "liftHeight",
-            "value": -7.5
-          },
-          {
-            "max": 1440.0,
-            "min": -1440.0,
-            "name": "animalSpin",
-            "value": 230.0
-          },
-          {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "animalWobble",
-            "value": 0.0
-          },
-          {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "animalWobbleRate",
-            "value": 1.350000023841858
-          },
-          {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "animalGait",
-            "value": 1.2999999523162842
-          },
-          {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "craftWobble",
-            "value": 0.30000001192092896
-          },
-          {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "craftWobbleRate",
-            "value": 0.44999998807907104
-          },
-          {
-            "max": 60.0,
-            "min": 0.0,
-            "name": "gapSeconds",
-            "value": 3.200000047683716
-          },
-          {
-            "max": 20000.0,
-            "min": 0.0,
-            "name": "beamSpawnRate",
-            "value": 6100.0
-          },
-          {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "beamEmissive",
-            "value": 1.5499999523162842
-          },
-          {
-            "max": 20000.0,
-            "min": 0.0,
-            "name": "beamRestRate",
-            "value": 0.0
-          },
-          {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "beamRestEmissive",
-            "value": 0.44999998807907104
-          },
-          {
-            "max": 30.0,
-            "min": 0.0,
-            "name": "beamDrainSeconds",
-            "value": 5.0
-          },
-          {
-            "max": 40.0,
-            "min": 0.0,
-            "name": "glowIntensity",
-            "value": 6.5
-          },
-          {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "glowRiseSeconds",
-            "value": 1.2999999523162842
-          },
-          {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "glowFadeSeconds",
-            "value": 1.899999976158142
-          }
-        ],
-        "seed": 20260915
+        ]
       }
     ]
   },

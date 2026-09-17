@@ -1,4 +1,4 @@
-// Lab cases: the reproduction format (ADR-260, spec §32).
+// Lab cases: the reproduction format (ADR-261, spec §32).
 //
 // The format's only promise is that a number resolves to a configuration, so the tests that matter
 // are the refusals. A format that accepts a case with no question, two cases with the same number,

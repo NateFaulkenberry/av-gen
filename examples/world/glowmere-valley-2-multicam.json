@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-2-multicam.scene.json",
-        "sha256": "f0253a0f540d2bec686e2eae0434225903df7a6a3894aa1c53d17b848f6dbb4f",
-        "size": 211037
+        "sha256": "e9a642c1db374df6370089053bf7730db4246f167fffdda35516147643f76bcc",
+        "size": 210864
       }
     }
   },
@@ -12890,7 +12890,7 @@
     "staging/abduction/aimSeconds": 0.800000011920929,
     "staging/abduction/animalGait": 1.2999999523162842,
     "staging/abduction/animalSpin": 230.0,
-    "staging/abduction/animalWobble": 0.4000000059604645,
+    "staging/abduction/animalWobble": 0.0,
     "staging/abduction/animalWobbleRate": 1.350000023841858,
     "staging/abduction/approachSeconds": 7.0,
     "staging/abduction/beamDrainSeconds": 5.0,
@@ -12909,7 +12909,7 @@
     "staging/abduction/glowRiseSeconds": 1.2999999523162842,
     "staging/abduction/hoverHeight": 23.0,
     "staging/abduction/hoverSeconds": 2.4000000953674316,
-    "staging/abduction/liftHeight": -3.4000000953674316,
+    "staging/abduction/liftHeight": -6.6,
     "staging/abduction/minRange": 25.0,
     "staging/abduction/searchRadius": 260.0,
     "staging/abduction/targetClearance": 6.5,

@@ -51,6 +51,21 @@ struct DebugViewOptions {
     // where the joint is -- reading a bone position out of it is the kind of plausible-looking
     // mistake a skeleton overlay exists to catch, not to make.
     bool skeletons = false;
+    // ADR-262. Every particle system's **emitter disc and centreline**, drawn from the flattened
+    // scene: a ring of `extent.x` at the emitter's world point, the vertical axis the column
+    // actually fires along (`direction` is not transformed by `applyParameters`, so it is world
+    // down however the emitter's node is rotated), and a second ring where the column *ends* --
+    // `speedMin x lifetimeMin`, integrated with the system's own gravity and drag.
+    //
+    // The bottom ring is the point of this. Every diagnostic ever pointed at the tractor beam
+    // treated it as an axis, which is a line of infinite length, and asked only how far the animal
+    // was from it sideways; the beam that is drawn is a column with a bottom, and for the whole
+    // first half of every lift the animal was underneath it. A centreline with an end on it is a
+    // picture of that; the beam volume is not.
+    //
+    // Pair it with `entityBounds` + `entityOrigins`: the origin marker is the point the director
+    // aims, the box is what a viewer sees, and the gap between them is the other half of ADR-262.
+    bool beams = false;
     bool depthTest = true;
     float pointSize = 3.0f;
     int maxPoints = 200000;       // safety cap per frame

@@ -267,7 +267,7 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
             }
             ImGui::EndMenu();
         }
-        // The Engineering Lab Suite (ADR-260, spec 6). Beside Examples rather than in a panel of
+        // The Engineering Lab Suite (ADR-261, spec 6). Beside Examples rather than in a panel of
         // its own: opening a lab *is* opening a scene, and this is the menu a person already uses
         // to do that. What it adds over Examples is the two things a file list cannot carry -- the
         // lab's overlay profile, applied on open, and its boundary, in the tooltip, which is what

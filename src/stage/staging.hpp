@@ -214,11 +214,42 @@ enum class Travel : std::uint8_t {
 // rises beside the beam rather than up it.
 //
 // `Travel` is the default because it is what every step did before this existed, and because it is
-// the right answer for a query: "how far is the nearest cow" is a fact about the simulation. `Visual`
-// is the right answer for anything that has to line up with a picture.
+// the right answer for a query: "how far is the nearest cow" is a fact about the simulation.
+//
+// ## And why `Visual` was still not the picture
+//
+// `Visual` is arithmetic on an *entity*. It is `anchor + travel + the behaviours' offsets`, and it
+// is right about all three. What it cannot see is everything between an entity and a pixel:
+//
+//  * **the parent chain.** A node parented to another is drawn at its parent's world transform
+//    times its own local one. An entity's anchor is the node's *local* position, so `visualPosition()`
+//    on anything parented answers in the wrong space entirely -- for the tractor beam, whose local
+//    position is `[0,0,0]`, it answers "the world origin".
+//  * **the node's own contents.** The saucer's beam is a particle emitter authored 2.05 m *under*
+//    the node, so the column's axis is the node's world matrix applied to that offset -- and the
+//    saucer is tilted, so the axis stands up to 0.55 m from the node origin. An animal lifted to the
+//    node origin is lifted beside the column by exactly that.
+//  * **what the mesh does inside its own node.** A farm GLB is not centred on its own origin: a
+//    cow's bind-pose box centre is 0.223 model units behind it, and ADR-213's 3.6x makes that
+//    0.89 m of world. The scenario spins the animal at 230 deg/s about the origin, so the *body*
+//    travels a 1.8 m circle while the origin the director aimed does not move at all.
+//  * **routes and reactions.** Both write the node's position *parameter*, and `applyOffsets` adds
+//    the entity's own offsets on top of whatever they left -- so whatever a route put there is in
+//    the drawn position and is not in `visualPosition()`. Glowmere's saucer carries two audio
+//    reactions on `position` component 1 with a combined depth of 1.23 m. Measured against a silent
+//    bus the gap is 0.000 m, which is the honest number and not the reassuring one: it is zero
+//    because nothing was driving the routes, not because the two agree.
+//
+// `Drawn` is the answer to all four at once, and it is not more arithmetic -- it is a *question put
+// to the flattened scene*: "where is this node's contribution to the picture centred?" One frame
+// old, because the director decides before the entity pass writes the finals the flattening reads;
+// measured, that costs millimetres while a craft holds station and is reported rather than assumed.
 enum class Anchor : std::uint8_t {
     Travel, // state().position(): the simulation's number. The default.
-    Visual, // visualPosition(): the simulation's number plus the behaviours' offsets. What is drawn.
+    Visual, // visualPosition(): the simulation's number plus the behaviours' offsets.
+    // The flattened scene's answer: the parent chain, the parameters, and the centre of what the
+    // node actually draws. What anything that has to line up with a picture wants.
+    Drawn,
 };
 [[nodiscard]] const char* anchorName(Anchor anchor);
 [[nodiscard]] std::optional<Anchor> anchorFromName(std::string_view name);
@@ -238,9 +269,26 @@ struct StepDesc {
     Value height;             // metres added to the destination's y
     bool aboveGround = false; // measure `height` from the terrain under the destination instead
     bool relative = false;    // MoveBy: `point` is an offset from where the body is *now*
-    // Which of the destination role's two positions the point is measured from. Default `Travel`,
+    // Which of the destination role's positions the point is measured from. Default `Travel`,
     // which is what every step did before this field existed.
     Anchor anchor = Anchor::Travel;
+    // And the other half of the same question, which had no way of being asked: which point *of the
+    // body being moved* is put on that destination.
+    //
+    // A director moves an entity, and an entity drives a node's origin -- so every `moveTo` before
+    // this field put the node's **origin** on the destination. For a body whose mesh is centred on
+    // its origin that is the same thing; for one that is not, the difference is the asset's own
+    // model-space offset, turned into world by the body's rotation, and it therefore *changes with
+    // the body's facing*. Four identical cows at 0/90/180/270 degrees, aimed identically, end up in
+    // four different places relative to the beam: measured in the lab, 1.06, 1.18, 1.20 and 1.02 m
+    // off the axis, a 0.18 m spread between bodies that differ in nothing but which way they face.
+    // That is the signature of this defect and nothing else produces it -- a constant error is the
+    // same for all four.
+    //
+    // `Travel` and `Visual` both mean the node's origin here, because that is what the director
+    // writes. `Drawn` means the centre of the box the node's meshes occupy -- the thing a viewer
+    // is looking at when they say the animal is not in the beam.
+    Anchor place = Anchor::Travel;
     // `Follow` only: resolve the destination **once**, on the step's first frame, and hold it.
     //
     // The brief's Hover, as distinct from its Follow, and the difference is load-bearing rather than
@@ -352,11 +400,42 @@ struct StagingDesc {
 
 // ---- runtime ------------------------------------------------------------------------------------
 
+// What the director may ask about the *picture*, as distinct from about the simulation.
+//
+// An interface rather than a `scene::Composition&` for the reason every other seam in this file is
+// one: `stage/` decides what actors do and knows about entities, parameters and signals. It does
+// not know what a mesh is, and the day it does is the day the director cannot be tested without a
+// scene. `Composition` implements this in one function.
+//
+// Both answers are for the same node and are returned together because they are the same lookup,
+// and because a caller that took one without the other would be a caller that had re-derived the
+// second from stale halves of the first.
+struct VisualPlacement {
+    glm::vec3 centre{0.0f}; // world: where this node's contribution to the picture is centred
+    glm::vec3 origin{0.0f}; // world: the node's own origin, parent chain and parameters included
+    // `centre - origin`: the world-space vector from the node's origin to that centre. Constant in
+    // the node's own space and therefore a property of the asset; it is returned already rotated
+    // because the caller wants it in world and the rotation is the flattening's to know.
+    [[nodiscard]] glm::vec3 offset() const { return centre - origin; }
+};
+
+class IVisualPlacement {
+public:
+    virtual ~IVisualPlacement() = default;
+    // False when there is no such node, or when the scene has not been flattened yet -- on frame
+    // zero there is nothing drawn to ask about. A caller that gets false must fall back to the
+    // simulation's answer rather than to a zero, which is the whole reason this returns a bool.
+    [[nodiscard]] virtual bool visualPlacement(std::string_view node, VisualPlacement& out) const = 0;
+};
+
 struct StageContext {
     double time = 0.0; // the timeline second, never a wall clock
     double dt = 0.0;
     entity::EntityWorld* world = nullptr;
     params::ParameterSet* params = nullptr;
+    // Null is legal and means `Anchor::Drawn` falls back to `Visual`: a headless tool that drives
+    // the director without a composition still runs, and gets the answer it had before this existed.
+    const IVisualPlacement* visuals = nullptr;
     // What a scenario's `startOn` / `stopOn` are read against. Null is legal and means a scenario
     // with either of those never fires -- which is honest, and is what a headless tool that never
     // built a bus gets.
@@ -550,6 +629,13 @@ private:
     [[nodiscard]] entity::Entity* resolve(const Run& run, std::string_view role,
                                           const StageContext& ctx) const;
     [[nodiscard]] std::string resolveName(const Run& run, std::string_view role) const;
+    // Which world point of a body an `Anchor` names, and how far that point is from the node origin
+    // the director actually writes. See staging.cpp; the pair exists because a destination and the
+    // thing put on it are two halves of one question.
+    [[nodiscard]] glm::vec3 pointOn(const entity::Entity& e, Anchor anchor,
+                                    const StageContext& ctx) const;
+    [[nodiscard]] glm::vec3 placementOffset(const entity::Entity& e, Anchor place,
+                                            const StageContext& ctx) const;
     [[nodiscard]] bool resolvePoint(const Run& run, const StepDesc& step, const StageContext& ctx,
                                     glm::vec3& out) const;
     [[nodiscard]] std::string parameterPath(const Run& run, std::string_view role,
@@ -584,6 +670,9 @@ private:
     std::vector<Written> written_;
     std::vector<std::string> registered_;
     std::string prefix_ = "staging/";
+    // Said once per Staging rather than once per frame: a director running sixty times a second
+    // against a caller that never flattens would otherwise be a log file.
+    mutable bool warnedNoDrawn_ = false;
 
     std::vector<StageEvent> events_;
     std::vector<StageEvent> log_;

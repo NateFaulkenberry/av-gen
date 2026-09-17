@@ -22,6 +22,11 @@ constexpr glm::vec4 kTrailColour{1.0f, 0.45f, 0.15f, 0.9f};
 constexpr glm::vec4 kFrustumColour{0.85f, 0.85f, 0.4f, 0.7f};
 constexpr glm::vec4 kJointColour{1.0f, 0.85f, 0.3f, 0.95f};
 constexpr glm::vec4 kBoneColour{0.3f, 0.9f, 1.0f, 0.85f};
+// ADR-262: the emitter disc and the column's own axis.
+constexpr glm::vec4 kBeamColour{0.25f, 0.95f, 1.0f, 0.95f};
+// Where the column ends, dimmer -- "it stops here" is a softer fact than "it starts here", because
+// the particles fade over their life rather than switching off.
+constexpr glm::vec4 kBeamEndColour{0.25f, 0.95f, 1.0f, 0.35f};
 
 // Blue to red across a normalised value.
 glm::vec4 heat(float t, float alpha) {
@@ -81,6 +86,35 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
         const float span = std::max(1.0f, glm::length(scene.camera.position) * 0.25f);
         draw.axis(glm::mat4(1.0f), span);
         draw.point(glm::vec3(0.0f), options.pointSize * 0.12f, kOriginColour);
+    }
+
+    if (options.beams) {
+        // The same integration `tests/unit/test_beam_lab.cpp` asserts against, spelled here so the
+        // overlay and the test cannot disagree about where the column ends.
+        const auto reach = [](const scene::ParticleSystem& ps) {
+            const float dt = 1.0f / 120.0f;
+            float v = ps.speedMin;
+            float travelled = 0.0f;
+            for (float t = 0.0f; t < ps.lifetimeMin; t += dt) {
+                v += -ps.gravity.y * dt;
+                v *= std::max(0.0f, 1.0f - ps.drag * dt);
+                travelled += v * dt;
+            }
+            return travelled;
+        };
+        for (const scene::ParticleSystem& ps : scene.particles) {
+            if (!ps.enabled) {
+                continue;
+            }
+            const glm::vec3 axis = glm::normalize(ps.direction + glm::vec3(1e-5f, 0.0f, 0.0f));
+            const glm::vec3 bottom = ps.position + axis * reach(ps);
+            draw.circle(ps.position, axis, ps.extent.x, kBeamColour);
+            draw.line(ps.position, bottom, kBeamColour);
+            // Where it stops. Dimmer, because "the column ends here" is a softer fact than "the
+            // column starts here" -- the particles fade over their life rather than switching off.
+            draw.circle(bottom, axis, ps.extent.x, kBeamEndColour);
+            draw.point(ps.position, options.pointSize * 0.12f, kBeamColour);
+        }
     }
 
     if (options.frustum) {

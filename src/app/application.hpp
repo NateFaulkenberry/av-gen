@@ -149,6 +149,12 @@ struct AppOptions {
     // ADR-035: display one auxiliary target instead of the shaded frame; ADR-033/034: the quality
     // tier that scales shadow, occlusion and cluster sample counts.
     std::string debugTarget;
+    // ADR-262. Comma-separated debug *overlays* (`beams`, `entityOrigins`, `entityBounds`,
+    // `worldAxes`, `skeletons`, `entityIds`), as distinct from `--debug-target`'s auxiliary render
+    // targets. They were reachable only from the World panel's Debug tab, which means they were
+    // unreachable to `--render`, to `--headless` and to anybody diagnosing from a rendered frame --
+    // which is every agent working on this repository and, for a filmed sequence, the owner too.
+    std::string debugDraw;
     std::string qualityTier;
     // ADR-186: "tier" | "live" | "unlimited" -- which distance-based detail reductions a `--render`
     // runs under. Empty leaves whatever the project asked for.
@@ -186,7 +192,7 @@ struct AppOptions {
     std::optional<int> oscPort;
     bool listAudioDevices = false;
     bool listMidi = false;
-    // The Engineering Lab Suite (ADR-260). `--labs` prints the registry and exits; `--lab-case`
+    // The Engineering Lab Suite (ADR-261). `--labs` prints the registry and exits; `--lab-case`
     // resolves `<lab>:<number>` into the flags the case is equivalent to, which is why almost
     // nothing downstream of `parseArgs` knows a lab case exists -- by the time the options leave
     // the parser a case has become a project, a size, a tier and a set of arms.
@@ -262,7 +268,17 @@ private:
     void startRenderFromUi();
     // Outputs (1.2): keeps the offscreen final texture sized to the main window, (re)opens the
     // output windows from the engine's project block, and stores them back before saves.
+    // `--debug-draw`'s list onto the World panel's own switches, which is where the overlays live
+    // and where both the live and the offline frame loops read them from. Fails on an unknown name
+    // rather than ignoring it: a diagnostic switch that silently did nothing is the defect this
+    // repository keeps shipping, and it is worse than no switch at all.
+    [[nodiscard]] Result<void> applyDebugDraw();
+    // The overlays this frame should draw. The World panel's switches when there is a panel; the
+    // `--debug-draw` set when there is not -- which is every headless render, and which is exactly
+    // the case the overlays were previously unreachable in.
+    [[nodiscard]] const rendering::DebugViewOptions& debugOptions() const;
     [[nodiscard]] Result<void> ensureFinalTexture(std::uint32_t width, std::uint32_t height);
+    rendering::DebugViewOptions cliDebug_{}; // `--debug-draw`, for the windowless path
     void applyOutputsFromProject();
     void storeOutputsToProject();
     void applyShare(const std::string& kind, const std::string& name); // "syphon" | "ndi" | "off"

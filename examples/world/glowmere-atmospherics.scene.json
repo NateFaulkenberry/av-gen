@@ -8791,7 +8791,7 @@
         "actor": "saucer",
         "seed": 20260915,
         "autoStart": true,
-        "maxCycles": 6,
+        "maxCycles": 10,
         "searchInterval": 0.5,
         "params": [
           {
@@ -8868,7 +8868,7 @@
           },
           {
             "name": "liftHeight",
-            "value": -7.5,
+            "value": -6.6,
             "min": -40.0,
             "max": 0.0
           },
@@ -8943,6 +8943,24 @@
             "value": 5.0,
             "min": 0.0,
             "max": 30.0
+          },
+          {
+            "name": "glowIntensity",
+            "value": 6.5,
+            "min": 0.0,
+            "max": 40.0
+          },
+          {
+            "name": "glowRiseSeconds",
+            "value": 1.3,
+            "min": 0.0,
+            "max": 10.0
+          },
+          {
+            "name": "glowFadeSeconds",
+            "value": 1.9,
+            "min": 0.0,
+            "max": 10.0
           }
         ],
         "beats": [
@@ -9041,9 +9059,6 @@
                     "duration": {
                       "param": "hoverSeconds"
                     },
-                    "clearance": {
-                      "param": "cruiseClearance"
-                    },
                     "wobble": {
                       "param": "craftWobble"
                     },
@@ -9103,9 +9118,6 @@
                     "duration": {
                       "param": "abductSeconds"
                     },
-                    "clearance": {
-                      "param": "cruiseClearance"
-                    },
                     "wobble": {
                       "param": "craftWobble"
                     },
@@ -9121,8 +9133,9 @@
                   {
                     "kind": "moveTo",
                     "name": "lift",
-                    "to": "actor",
-                    "anchor": "visual",
+                    "to": "actor.beam",
+                    "anchor": "drawn",
+                    "place": "drawn",
                     "height": {
                       "param": "liftHeight"
                     },
@@ -9145,6 +9158,32 @@
                   {
                     "kind": "retire",
                     "name": "vanish"
+                  }
+                ]
+              },
+              {
+                "role": "target",
+                "steps": [
+                  {
+                    "kind": "set",
+                    "name": "glow-rise",
+                    "target": "emissiveBoost",
+                    "from": 0.0,
+                    "to": {
+                      "param": "glowIntensity"
+                    },
+                    "duration": {
+                      "param": "glowRiseSeconds"
+                    }
+                  },
+                  {
+                    "kind": "set",
+                    "name": "glow-fade",
+                    "target": "emissiveBoost",
+                    "to": 0.0,
+                    "duration": {
+                      "param": "glowFadeSeconds"
+                    }
                   }
                 ]
               }
