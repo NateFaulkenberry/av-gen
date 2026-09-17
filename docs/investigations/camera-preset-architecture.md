@@ -1,6 +1,7 @@
 # Camera preset architecture — Phase 1 findings
 
-**Status:** research complete, implementation not started beyond the groundwork noted in §7
+**Status:** research complete; §4's Follow finding **withdrawn and replaced** by
+[follow-chase-discrepancy.md](follow-chase-discrepancy.md) after it was measured
 **Date:** 2026-09-16
 **Mandate:** *Shot-Level Camera Presets & Behaviors*, Phase 1 — "audit existing camera architecture
 and produce findings", "do not immediately implement anything"
@@ -140,10 +141,15 @@ move kinds, five aim modes, four path shapes and easing. Against the mandate's �
 
 **Two findings worth acting on before any new preset is written:**
 
-* **Follow is the conflict, not Chase.** The mandate's Follow (fixed eye, live aim) does not exist
-  and today's Follow is a different shot. Meanwhile `CameraRig::aimNode` is *exactly* the mandate's
-  Follow, already built, on the other architecture. Follow should arguably be the first preset
-  migrated, not Chase — it is the one whose current behaviour actively contradicts its name.
+* ~~**Follow is the conflict, not Chase.**~~ **Withdrawn — see
+  [follow-chase-discrepancy.md](follow-chase-discrepancy.md).** The reading was factually right and
+  the conclusion was wrong. Follow's eye does move, by **3.48 m**, and the engine reproduces that to
+  five significant figures — but in the same shot the *aim* travels **40 m**, an 11.5:1 ratio at
+  constant distance and constant height, which is why a viewer correctly reports a camera that holds
+  still and turns. It is a 20° authored flourish that does not react to the actor at all, so on the
+  letter of the contract ("Follow does not translate the camera *because the actor moves*") today's
+  Follow already complies. What remains is a one-line preference, not an architectural conflict, and
+  this entry overstated it.
 * **Tracking needs no work.** §8 asks for a refactor "if the current implementation does not maintain
   the distinction". It does. This should be recorded and closed rather than reopened.
 
