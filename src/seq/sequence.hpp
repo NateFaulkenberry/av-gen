@@ -59,7 +59,9 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -104,9 +106,10 @@ struct SceneSlot {
 // ---- camera (spec 8-11) -----------------------------------------------------------------------
 
 enum class CameraKind : std::uint8_t {
-    Inherit, // emit nothing; the previous shot's last key holds (the timeline holds after the end)
-    Move,    // a subject-relative move in the ADR-062 vocabulary
-    Keys,    // hand-authored position/target keys
+    Inherit,  // emit nothing; the previous shot's last key holds (the timeline holds after the end)
+    Move,     // a subject-relative move in the ADR-062 vocabulary
+    Keys,     // hand-authored position/target keys
+    Behavior, // a relationship to a performer, resolved per camera sample: chase, orbit, POV
 };
 [[nodiscard]] const char* cameraKindName(CameraKind kind);
 [[nodiscard]] std::optional<CameraKind> cameraKindFromName(std::string_view name);
@@ -118,6 +121,139 @@ struct CameraKey {
     float focalLength = 0.0f; // 0 = do not key the lens at this key
     params::KeyInterp interp = params::KeyInterp::Smooth;
 };
+
+// ---- camera behaviours: a relationship to a performer rather than a path ----------------------
+//
+// `CameraKind::Move` composes a camera around a *point*: a subject, a radius, a distance in radii.
+// That is the right model for a shot about a place, and the wrong one for a shot about somebody who
+// walks -- the point is fixed at the cut and the world moves past it.
+//
+// A behaviour is the other model. It states a *relationship* -- four metres behind, two above; an
+// arc of ninety degrees; at the eyes -- and the relationship is resolved against wherever the
+// performer is at each camera sample.
+//
+// ## Why this can be baked, which is the whole design
+//
+// The mandate asks whether "live" must mean "nondeterministic". Here it does not, and the reason is
+// specific rather than general: a `seq::Actor`'s position is `positionAt(t)`, a **pure function of
+// time** over its keys or its spline path. So the bake can ask where the performer *will be* at each
+// sample and emit ordinary `camera/position` keys -- and every determinism requirement in the
+// mandate's section 14 is then satisfied by construction, exactly as it already is for `lookAtActor`.
+// Scrubbing to a frame and playing to it read the same keys. There is no state to reset at a cut,
+// because there is no state.
+//
+// The boundary is worth stating plainly, because it is the thing that decides what a behaviour can
+// target: **a performer, not an arbitrary object.** A node moved by modulation, by an entity
+// behaviour's walk cycle or by a staging scenario is not a function of time the bake can evaluate,
+// and a behaviour aimed at one would have to be evaluated per frame -- which is the authored camera
+// rig's job (`scene::CameraRig::followNode`), not the sequencer's. See
+// docs/investigations/camera-preset-architecture.md.
+
+// Where a behaviour camera points. Separate from where it *is*, because the two are independent
+// decisions: a chase can look at the performer, or ahead down their line of travel, or at a fixed
+// place they are walking towards.
+enum class CameraAim : std::uint8_t {
+    Subject, // at the performer, plus `aimOffset`
+    Travel,  // along the performer's direction of travel -- what POV wants, and a chase often does
+    Custom,  // at a fixed world point, whatever the performer does
+};
+[[nodiscard]] const char* cameraAimName(CameraAim aim);
+[[nodiscard]] std::optional<CameraAim> cameraAimFromName(std::string_view name);
+
+enum class CameraBehaviorKind : std::uint8_t {
+    Chase, // hold a spatial relationship as the performer travels
+    Orbit, // circle the performer, who may be standing still
+    Pov,   // occupy the performer's viewpoint
+};
+[[nodiscard]] const char* cameraBehaviorName(CameraBehaviorKind kind);
+[[nodiscard]] std::optional<CameraBehaviorKind> cameraBehaviorFromName(std::string_view name);
+
+struct CameraBehavior {
+    CameraBehaviorKind kind = CameraBehaviorKind::Chase;
+    // Which performer this is about. Empty means the behaviour cannot resolve, and the bake says so
+    // rather than silently placing the camera at the origin.
+    std::string actor;
+
+    // ---- chase ---------------------------------------------------------------------------------
+    //
+    // **Performer-local axes, and the convention is load-bearing**: x is lateral (+ is the
+    // performer's right), y is vertical (+ up), z is forward/back (+ is ahead of them, so a chase
+    // sits at negative z). That matches the engine's own convention -- `headingDegrees` builds to
+    // +Z forward, rotation about +Y -- so "four metres behind and two above" is (0, 2, -4) and stays
+    // behind when they turn.
+    glm::vec3 offset{0.0f, 2.0f, -4.0f};
+    // False interprets `offset` in world axes instead, which is a camera that holds a compass
+    // bearing while the performer turns under it. Occasionally what you want; rarely.
+    bool actorSpace = true;
+    // Stand where the performer *was*, not where they are. A time lag rather than a spring: a spring
+    // integrates, so its position at t depends on the path taken to reach t, and a scrub and a
+    // play-through would disagree. Sampling `positionAt(t - lag)` is a fact about the performer and
+    // two runs that agree about them agree about the camera. What it cannot do is overshoot and
+    // settle, which is what integration buys.
+    double lagSeconds = 0.0;
+
+    // ---- orbit ---------------------------------------------------------------------------------
+    //
+    // Angles in degrees about +Y, from the performer's position, evaluated from **shot-local time**
+    // rather than accumulated -- `angle(t) = mix(start, end, t)` -- so the same frame gives the same
+    // pose however you arrived at it. A full circle is a 360 degree span; direction is the sign.
+    float radius = 8.0f;
+    float height = 2.0f;
+    float startDegrees = 0.0f;
+    float endDegrees = 90.0f;
+    // Ease the *angle*, not the timing, so an orbit starts and ends without a jerk.
+    bool easeInOut = true;
+
+    // ---- pov -----------------------------------------------------------------------------------
+    //
+    // Performer-local, same axes as `offset`. 1.7 m is roughly eye height on a human-scaled rig.
+    glm::vec3 eyeOffset{0.0f, 1.7f, 0.0f};
+
+    // ---- aim, for all three --------------------------------------------------------------------
+    CameraAim aim = CameraAim::Subject;
+    glm::vec3 aimOffset{0.0f, 1.0f, 0.0f}; // where in the performer to look; chest rather than feet
+    glm::vec3 aimPoint{0.0f};              // `aim == Custom`
+    // Sample the performer this far *ahead* for the aim, so the camera leads them into a turn.
+    double lookAheadSeconds = 0.0;
+
+    // ---- clearance -------------------------------------------------------------------------------
+    //
+    // Metres the eye is kept above the ground, 0 to leave it alone. Applied at bake, which is the
+    // only place the whole camera path is known at once -- so a chase that would have gone through a
+    // hill is lifted over it before a single frame is rendered, rather than corrected while running.
+    //
+    // The ground only. That scope is deliberate and is the honest limit: the ground is what a chase
+    // camera actually hits, it is exactly queryable, and it cannot jitter. Trunks and rocks are not
+    // covered -- a camera squeezing between scattered instances pops, and a popping camera is worse
+    // than one that clips a tree.
+    float clearance = 0.0f;
+
+    friend bool operator==(const CameraBehavior&, const CameraBehavior&) = default;
+};
+
+// Where a performer is and which way they face, at one instant. The behaviour evaluator takes these
+// rather than an `Actor` and a time, so it is a pure function of its arguments and a test can hand it
+// whatever pose it wants to ask about.
+struct ActorPose {
+    glm::vec3 position{0.0f};
+    float headingDegrees = 0.0f; // about +Y; 0 faces +Z, matching `Actor::headingAt`
+    [[nodiscard]] glm::vec3 forward() const;
+    [[nodiscard]] glm::vec3 right() const;
+};
+
+struct BehaviorPose {
+    glm::vec3 eye{0.0f};
+    glm::vec3 target{0.0f};
+};
+
+// **The evaluator.** Pure: everything time-varying has already been resolved into the two poses.
+//
+// `t01` is the normalised position within the shot, which only Orbit reads. `eyeRef` is the
+// performer at the time the *eye* is composed against -- t for orbit and POV, t - lag for a chase.
+// `aimRef` is the performer at the time the *aim* is composed against, which is t + lookAhead.
+// Splitting them is what lets a chase trail the performer while still looking where they are going.
+[[nodiscard]] BehaviorPose cameraPoseFor(const CameraBehavior& behavior, float t01,
+                                         const ActorPose& eyeRef, const ActorPose& aimRef);
 
 // What the camera does during a shot.
 //
@@ -135,6 +271,7 @@ struct ShotCamera {
     CameraKind kind = CameraKind::Inherit;
     app::Shot move;                 // kind == Move
     std::vector<CameraKey> keys;    // kind == Keys
+    CameraBehavior behavior;        // kind == Behavior
     // spec 10: aim at an actor rather than at a fixed point.
     std::string lookAtActor;
     float lookAtHeight = 1.6f;      // aim this far above the actor's origin (eye height, metres)
@@ -146,7 +283,13 @@ struct ShotCamera {
 
 // Useful initial configurations, not a system. Each one fills a `ShotCamera` with a move that reads
 // as the named shot against a subject of the given radius; the author then edits it like any other.
-enum class CameraPreset : std::uint8_t { Isometric, Follow, Wide, Close, TopDown, Tracking, Reveal };
+// The three at the end are behaviours rather than moves: they stamp a `CameraBehavior` and set
+// `kind = CameraKind::Behavior`, where the first seven stamp an `app::Shot`. The picker does not
+// distinguish them, because to an author they are all "how should this shot's camera work".
+enum class CameraPreset : std::uint8_t {
+    Isometric, Follow, Wide, Close, TopDown, Tracking, Reveal, Chase, Orbit, Pov
+};
+[[nodiscard]] std::span<const CameraPreset> allCameraPresets();
 [[nodiscard]] const char* cameraPresetName(CameraPreset preset);
 [[nodiscard]] std::optional<CameraPreset> cameraPresetFromName(std::string_view name);
 [[nodiscard]] ShotCamera cameraFromPreset(CameraPreset preset, const app::FocalTarget& subject);
@@ -290,6 +433,14 @@ struct BakeOptions {
     // of the shot. Emitted as Multiply tracks so the bake does not have to know -- or restore --
     // the values the author chose; see `bake()`.
     bool spotlightQuality = true;
+    // How high the ground is at a world point, for a camera behaviour's `clearance`. Null -- the
+    // default -- means no clearance is applied and the bake *says so* rather than leaving a setting
+    // that silently does nothing (ADR-225).
+    //
+    // A callback rather than a `world::TerrainQuery`, so `seq/` does not learn what terrain is: the
+    // sequencer's job is to ask how high the ground is, and whose ground it is belongs to whoever
+    // installs the sequence.
+    std::function<float(float x, float z)> groundHeightAt;
     // How many beats are in a bar, for `TriggerKind::Bar`. The analysis publishes a beat list and a
     // bar counter but a sequence only carries the beats, so the fold back into bars is stated here
     // rather than assumed to be four everywhere.

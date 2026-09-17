@@ -1383,9 +1383,19 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             }
         }
         if (!hitBlock) {
-            // Scrubbing. Spec 30 wants this to update everything, and it does: seekSeconds moves
-            // the audio play-head, the timeline clock follows it, and every track is an evaluation.
-            engine.seekSeconds(std::clamp(snap(engine, mouseTime), 0.0, duration));
+            // **A click on empty lane space deselects; it does not scrub.**
+            //
+            // It used to. The ruler branch above scrubs deliberately, and this fall-through scrubbed
+            // as well -- so missing a shot by three pixels, or clicking the gap after the last one,
+            // moved the playhead. Reported as "any lane I click in causes the playhead to jump",
+            // which is exactly what it did.
+            //
+            // Scrubbing now belongs to the ruler and the marker band above the lanes, where a
+            // timeline's scrub bar lives in every editor this borrows from. Down here a click on
+            // nothing means what it means everywhere else in this application: nothing is selected.
+            selection_ = Selection::None;
+            selected_ = -1;
+            audioSelected_ = -1;
         }
     }
 
@@ -2462,6 +2472,171 @@ void SequencePanel::drawSceneSlots(app::Engine& engine) {
     }
 }
 
+// A camera behaviour's controls, and **only the ones the chosen behaviour reads**.
+//
+// The mandate is explicit about this and it is right: a chase does not have an orbit radius, and
+// showing one invites somebody to set it and wonder why nothing moved. So the shared controls are
+// drawn once and the rest is a switch.
+void SequencePanel::drawBehaviorInspector(app::Engine& engine, seq::Shot& shot) {
+    seq::Sequence& piece = engine.sequence();
+    seq::CameraBehavior& b = shot.camera.behavior;
+
+    // Which behaviour. Separate from the preset buttons, because the preset is a stamp and this is
+    // the shot's own state -- changing it here keeps the offsets you have tuned.
+    {
+        int kind = static_cast<int>(b.kind);
+        const char* kinds[] = {"chase", "orbit", "pov"};
+        if (ImGui::Combo("behavior", &kind, kinds, IM_ARRAYSIZE(kinds))) {
+            b.kind = static_cast<seq::CameraBehaviorKind>(kind);
+            touch();
+        }
+    }
+
+    // The performer. The list is the piece's cast for the same reason `look at`'s is: a behaviour is
+    // resolved at bake against `Actor::positionAt`, so it can only follow something whose position
+    // is a function of time.
+    {
+        std::vector<const char*> names{"(none)"};
+        int current = 0;
+        for (std::size_t i = 0; i < piece.actors.size(); ++i) {
+            names.push_back(piece.actors[i].id.c_str());
+            if (piece.actors[i].id == b.actor) {
+                current = static_cast<int>(i) + 1;
+            }
+        }
+        if (ImGui::Combo("performer", &current, names.data(), static_cast<int>(names.size()))) {
+            b.actor = current == 0 ? std::string{}
+                                   : piece.actors[static_cast<std::size_t>(current - 1)].id;
+            touch();
+        }
+        if (b.actor.empty()) {
+            ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.45f, 1.0f),
+                               "a %s camera needs a performer to be about",
+                               seq::cameraBehaviorName(b.kind));
+        }
+    }
+
+    switch (b.kind) {
+    case seq::CameraBehaviorKind::Chase:
+        // Spelled as the three words an operator would use, not as x/y/z: "four behind, two above"
+        // is the instruction, and the axis convention is an implementation detail of it.
+        if (ImGui::DragFloat("behind", &shot.camera.behavior.offset.z, 0.1f, -200.0f, 200.0f,
+                             "%.2f m")) {
+            touch();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Negative is behind the performer, positive is in front of them.");
+        }
+        if (ImGui::DragFloat("above", &b.offset.y, 0.1f, -200.0f, 200.0f, "%.2f m")) {
+            touch();
+        }
+        if (ImGui::DragFloat("lateral", &b.offset.x, 0.1f, -200.0f, 200.0f, "%.2f m")) {
+            touch();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Positive is the performer's right.");
+        }
+        if (ImGui::Checkbox("offset turns with the performer", &b.actorSpace)) {
+            touch();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("On: \"behind\" stays behind through a turn.\n"
+                              "Off: the offset is world axes, so the camera holds a compass bearing\n"
+                              "while the performer turns under it.");
+        }
+        {
+            auto lag = static_cast<float>(b.lagSeconds);
+            if (ImGui::DragFloat("lag", &lag, 0.01f, 0.0f, 5.0f, "%.2f s")) {
+                b.lagSeconds = static_cast<double>(std::max(0.0f, lag));
+                touch();
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Stand where the performer WAS, this long ago.\n"
+                                  "A time lag, not a spring -- so scrubbing to a frame and playing\n"
+                                  "to it give the same camera. It trails and catches up; it does\n"
+                                  "not overshoot and settle.");
+            }
+        }
+        break;
+    case seq::CameraBehaviorKind::Orbit:
+        if (ImGui::DragFloat("radius", &b.radius, 0.1f, 0.1f, 1000.0f, "%.2f m")) {
+            touch();
+        }
+        if (ImGui::DragFloat("height", &b.height, 0.1f, -200.0f, 200.0f, "%.2f m")) {
+            touch();
+        }
+        if (ImGui::DragFloat("from angle", &b.startDegrees, 1.0f, -1440.0f, 1440.0f, "%.0f deg")) {
+            touch();
+        }
+        if (ImGui::DragFloat("to angle", &b.endDegrees, 1.0f, -1440.0f, 1440.0f, "%.0f deg")) {
+            touch();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("The arc travelled over the shot. A full circle is 360 degrees\n"
+                              "further than the start; the direction is the sign.\n"
+                              "Evaluated from shot time, so the same frame is the same pose.");
+        }
+        if (ImGui::Checkbox("ease the arc", &b.easeInOut)) {
+            touch();
+        }
+        break;
+    case seq::CameraBehaviorKind::Pov:
+        if (ImGui::DragFloat("eye height", &b.eyeOffset.y, 0.05f, -10.0f, 20.0f, "%.2f m")) {
+            touch();
+        }
+        if (ImGui::DragFloat("forward", &b.eyeOffset.z, 0.05f, -10.0f, 10.0f, "%.2f m")) {
+            touch();
+        }
+        if (ImGui::DragFloat("lateral ", &b.eyeOffset.x, 0.05f, -10.0f, 10.0f, "%.2f m")) {
+            touch();
+        }
+        break;
+    }
+
+    // ---- aim: shared, because where a camera looks is a separate decision from where it is -------
+    {
+        int aim = static_cast<int>(b.aim);
+        const char* aims[] = {"the performer", "where they are going", "a fixed point"};
+        if (ImGui::Combo("aim at", &aim, aims, IM_ARRAYSIZE(aims))) {
+            b.aim = static_cast<seq::CameraAim>(aim);
+            touch();
+        }
+        if (b.aim == seq::CameraAim::Custom) {
+            if (ImGui::DragFloat3("point", &b.aimPoint.x, 0.1f)) {
+                touch();
+            }
+        } else if (ImGui::DragFloat3("aim offset", &b.aimOffset.x, 0.05f)) {
+            touch();
+        }
+        auto ahead = static_cast<float>(b.lookAheadSeconds);
+        if (ImGui::DragFloat("look ahead", &ahead, 0.01f, 0.0f, 5.0f, "%.2f s")) {
+            b.lookAheadSeconds = static_cast<double>(std::max(0.0f, ahead));
+            touch();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Aim at where the performer will be, this far ahead.\n"
+                              "Leads them into a turn instead of following them round it.");
+        }
+    }
+
+    if (ImGui::DragFloat("clearance", &b.clearance, 0.05f, 0.0f, 50.0f, "%.2f m")) {
+        touch();
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Keep the camera at least this far above the ground.\n"
+                          "0 leaves it alone. Applied at bake, where the whole path is known, so a\n"
+                          "chase that would cross a hill is lifted over it before anything renders.\n"
+                          "The ground only -- not trunks or rocks.");
+    }
+    if (ImGui::DragInt("samples", &shot.camera.samples, 1.0f, 2, 256)) {
+        touch();
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("How many camera keys this shot bakes. A behaviour follows something that\n"
+                          "moves, so it wants more than a move does.");
+    }
+}
+
 void SequencePanel::drawShotInspector(app::Engine& engine, seq::Shot& shot) {
     seq::Sequence& piece = engine.sequence();
     ImGui::SeparatorText("Transitions");
@@ -2538,17 +2713,14 @@ void SequencePanel::drawShotInspector(app::Engine& engine, seq::Shot& shot) {
     // Camera.
     ImGui::SeparatorText("Camera");
     int kind = static_cast<int>(shot.camera.kind);
-    const char* kinds[] = {"inherit", "move", "keys"};
+    const char* kinds[] = {"inherit", "move", "keys", "behavior"};
     if (ImGui::Combo("kind", &kind, kinds, IM_ARRAYSIZE(kinds))) {
         shot.camera.kind = static_cast<seq::CameraKind>(kind);
         touch();
     }
     if (shot.camera.kind == seq::CameraKind::Move) {
         ImGui::TextDisabled("preset");
-        for (const seq::CameraPreset preset :
-             {seq::CameraPreset::Isometric, seq::CameraPreset::Follow, seq::CameraPreset::Wide,
-              seq::CameraPreset::Close, seq::CameraPreset::TopDown, seq::CameraPreset::Tracking,
-              seq::CameraPreset::Reveal}) {
+        for (const seq::CameraPreset preset : seq::allCameraPresets()) {
             ImGui::SameLine();
             if (ImGui::SmallButton(seq::cameraPresetName(preset))) {
                 app::FocalTarget subject;
@@ -2562,6 +2734,16 @@ void SequencePanel::drawShotInspector(app::Engine& engine, seq::Shot& shot) {
                 const std::string keepLookAt = shot.camera.lookAtActor;
                 shot.camera = seq::cameraFromPreset(preset, subject);
                 shot.camera.lookAtActor = keepLookAt;
+                // A behaviour needs a performer, and the shot usually already names one. Carrying
+                // it over is the difference between a preset that works on the click and one that
+                // lands refusing to validate until you notice a second empty field.
+                if (shot.camera.kind == seq::CameraKind::Behavior &&
+                    shot.camera.behavior.actor.empty()) {
+                    shot.camera.behavior.actor =
+                        !keepLookAt.empty() ? keepLookAt
+                                            : (piece.actors.empty() ? std::string{}
+                                                                    : piece.actors.front().id);
+                }
                 touch();
             }
         }
@@ -2608,6 +2790,8 @@ void SequencePanel::drawShotInspector(app::Engine& engine, seq::Shot& shot) {
         if (ImGui::DragInt("samples", &shot.camera.samples, 1.0f, 2, 256)) {
             touch();
         }
+    } else if (shot.camera.kind == seq::CameraKind::Behavior) {
+        drawBehaviorInspector(engine, shot);
     } else if (shot.camera.kind == seq::CameraKind::Keys) {
         for (std::size_t i = 0; i < shot.camera.keys.size(); ++i) {
             ImGui::PushID(static_cast<int>(i));

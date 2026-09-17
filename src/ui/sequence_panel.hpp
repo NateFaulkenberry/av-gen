@@ -121,6 +121,8 @@ private:
     void drawLaneZoomGrip();
     void drawInspector(app::Engine& engine);
     void drawShotInspector(app::Engine& engine, seq::Shot& shot);
+    // The chase/orbit/POV controls, showing only what the chosen behaviour reads.
+    void drawBehaviorInspector(app::Engine& engine, seq::Shot& shot);
     void drawActorInspector(app::Engine& engine, seq::Actor& actor);
     void drawOverlayInspector(app::Engine& engine, seq::OverlayCue& cue);
     void drawSectionInspector(app::Engine& engine, std::size_t index);

@@ -211,7 +211,23 @@ Result<seq::InstallReport> Engine::installSequence() {
     // The sink is built fresh each time and owns nothing between calls: what identifies a
     // sequencer layer is its name, which survives in the stack, not a handle held here.
     seq::CompositionLayerSink sink(layers_, &params_);
-    auto report = seq::install(sequence_, timeline_, params_, sink, sequenceTargets_);
+
+    // What a camera behaviour's `clearance` measures against. Supplied here because this is the
+    // layer that knows there is a world: `seq/` asks how high the ground is and does not learn what
+    // terrain is (see `BakeOptions::groundHeightAt`).
+    //
+    // `surfaceAt` rather than `heightAt`, so a chase following someone along a shoreline does not
+    // dive through the lake on its way -- a shot from under water is a decision, not a side effect.
+    // Null when the scene has no terrain, which the bake reports rather than silently ignoring.
+    seq::BakeOptions options;
+    if (scene::Composition* comp = composition()) {
+        if (const world::TerrainQuery ground = comp->terrainQuery(); ground.valid()) {
+            options.groundHeightAt = [ground](float x, float z) {
+                return ground.surfaceAt(glm::vec2(x, z));
+            };
+        }
+    }
+    auto report = seq::install(sequence_, timeline_, params_, sink, sequenceTargets_, options);
     if (!report) {
         // The install left the timeline consistent (old tracks gone) even when the bake failed, so
         // forget the targets: there is nothing left for the next install to erase.

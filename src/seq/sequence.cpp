@@ -25,10 +25,11 @@ constexpr std::array<std::pair<MarkerKind, const char*>, 3> kMarkerKinds{{
     {MarkerKind::Beat, "beat"},
 }};
 
-constexpr std::array<std::pair<CameraKind, const char*>, 3> kCameraKinds{{
+constexpr std::array<std::pair<CameraKind, const char*>, 4> kCameraKinds{{
     {CameraKind::Inherit, "inherit"},
     {CameraKind::Move, "move"},
     {CameraKind::Keys, "keys"},
+    {CameraKind::Behavior, "behavior"},
 }};
 
 constexpr std::array<std::pair<TransitionKind, const char*>, 4> kTransitionKinds{{
@@ -38,7 +39,19 @@ constexpr std::array<std::pair<TransitionKind, const char*>, 4> kTransitionKinds
     {TransitionKind::MatchCut, "matchCut"},
 }};
 
-constexpr std::array<std::pair<CameraPreset, const char*>, 7> kCameraPresets{{
+constexpr std::array<std::pair<CameraAim, const char*>, 3> kCameraAims{{
+    {CameraAim::Subject, "subject"},
+    {CameraAim::Travel, "travel"},
+    {CameraAim::Custom, "custom"},
+}};
+
+constexpr std::array<std::pair<CameraBehaviorKind, const char*>, 3> kCameraBehaviors{{
+    {CameraBehaviorKind::Chase, "chase"},
+    {CameraBehaviorKind::Orbit, "orbit"},
+    {CameraBehaviorKind::Pov, "pov"},
+}};
+
+constexpr std::array<std::pair<CameraPreset, const char*>, 10> kCameraPresets{{
     {CameraPreset::Isometric, "isometric"},
     {CameraPreset::Follow, "follow"},
     {CameraPreset::Wide, "wide"},
@@ -46,6 +59,9 @@ constexpr std::array<std::pair<CameraPreset, const char*>, 7> kCameraPresets{{
     {CameraPreset::TopDown, "topDown"},
     {CameraPreset::Tracking, "tracking"},
     {CameraPreset::Reveal, "reveal"},
+    {CameraPreset::Chase, "chase"},
+    {CameraPreset::Orbit, "orbit"},
+    {CameraPreset::Pov, "pov"},
 }};
 
 constexpr std::array<std::pair<SnapMode, const char*>, 4> kSnapModes{{
@@ -483,6 +499,93 @@ std::optional<TransitionKind> transitionKindFromName(std::string_view name) {
     return valueOf(kTransitionKinds, name);
 }
 const char* cameraPresetName(CameraPreset preset) { return nameOf(kCameraPresets, preset); }
+
+std::span<const CameraPreset> allCameraPresets() {
+    static constexpr std::array<CameraPreset, 10> kAll{
+        CameraPreset::Isometric, CameraPreset::Follow,   CameraPreset::Wide,
+        CameraPreset::Close,     CameraPreset::TopDown,  CameraPreset::Tracking,
+        CameraPreset::Reveal,    CameraPreset::Chase,    CameraPreset::Orbit,
+        CameraPreset::Pov};
+    return kAll;
+}
+
+const char* cameraAimName(CameraAim aim) { return nameOf(kCameraAims, aim); }
+std::optional<CameraAim> cameraAimFromName(std::string_view name) {
+    return valueOf(kCameraAims, name);
+}
+const char* cameraBehaviorName(CameraBehaviorKind kind) { return nameOf(kCameraBehaviors, kind); }
+std::optional<CameraBehaviorKind> cameraBehaviorFromName(std::string_view name) {
+    return valueOf(kCameraBehaviors, name);
+}
+
+// ---- the behaviour evaluator -------------------------------------------------------------------
+
+glm::vec3 ActorPose::forward() const {
+    const float r = glm::radians(headingDegrees);
+    // +Z forward, rotation about +Y -- the same convention `headingDegrees` builds to, so a heading
+    // of zero faces +Z.
+    return {std::sin(r), 0.0f, std::cos(r)};
+}
+
+glm::vec3 ActorPose::right() const {
+    // cross(up, forward), not cross(forward, up): with +Z forward and +Y up the first gives +X and
+    // the second gives -X, and a chase offset of "+0.5 lateral" has to mean the performer's right.
+    return glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), forward()));
+}
+
+BehaviorPose cameraPoseFor(const CameraBehavior& behavior, float t01, const ActorPose& eyeRef,
+                           const ActorPose& aimRef) {
+    // How far in front of the performer a `Travel` aim looks. A look-at target is a direction and not
+    // a distance, so any positive number does; ten metres keeps it clear of the near plane and of the
+    // performer's own geometry without being so far that a turn reads as a lag.
+    constexpr float kTravelAimAhead = 10.0f;
+
+    BehaviorPose out;
+    const glm::vec3 fwd = eyeRef.forward();
+    const glm::vec3 right = eyeRef.right();
+    constexpr glm::vec3 kUp{0.0f, 1.0f, 0.0f};
+
+    switch (behavior.kind) {
+    case CameraBehaviorKind::Chase: {
+        const glm::vec3 delta = behavior.actorSpace
+                                    ? right * behavior.offset.x + kUp * behavior.offset.y +
+                                          fwd * behavior.offset.z
+                                    : behavior.offset;
+        out.eye = eyeRef.position + delta;
+        break;
+    }
+    case CameraBehaviorKind::Orbit: {
+        // Eased on the angle rather than on the clock, so the arc starts and stops smoothly without
+        // the shot's own timing being touched. smoothstep, spelled out rather than pulled in.
+        const float w = std::clamp(t01, 0.0f, 1.0f);
+        const float eased = behavior.easeInOut ? w * w * (3.0f - 2.0f * w) : w;
+        const float a = glm::radians(std::lerp(behavior.startDegrees, behavior.endDegrees, eased));
+        out.eye = eyeRef.position +
+                  glm::vec3(std::sin(a) * behavior.radius, behavior.height,
+                            std::cos(a) * behavior.radius);
+        break;
+    }
+    case CameraBehaviorKind::Pov:
+        out.eye = eyeRef.position + right * behavior.eyeOffset.x + kUp * behavior.eyeOffset.y +
+                  fwd * behavior.eyeOffset.z;
+        break;
+    }
+
+    switch (behavior.aim) {
+    case CameraAim::Subject:
+        out.target = aimRef.position + behavior.aimOffset;
+        break;
+    case CameraAim::Travel:
+        // Ahead of the *performer*, not ahead of the camera. From a POV eye that is looking where
+        // they are looking; from a chase it is looking where they are going, past them.
+        out.target = aimRef.position + aimRef.forward() * kTravelAimAhead + behavior.aimOffset;
+        break;
+    case CameraAim::Custom:
+        out.target = behavior.aimPoint;
+        break;
+    }
+    return out;
+}
 std::optional<CameraPreset> cameraPresetFromName(std::string_view name) {
     return valueOf(kCameraPresets, name);
 }
@@ -563,6 +666,49 @@ ShotCamera cameraFromPreset(CameraPreset preset, const app::FocalTarget& subject
         m.curve = app::MovementCurve::Straight;
         m.composition.focalLength = 45.0f;
         break;
+    case CameraPreset::Chase:
+    case CameraPreset::Orbit:
+    case CameraPreset::Pov: {
+        // A behaviour, not a move: the camera is composed against a performer at each sample rather
+        // than against a point fixed at the cut. `actor` is left empty on purpose -- the panel fills
+        // it from the shot's `lookAtActor` if there is one, and an unset behaviour warns at bake
+        // instead of quietly shooting the origin.
+        cam.kind = CameraKind::Behavior;
+        cam.move = app::Shot{}; // nothing here reads it; do not leave a stale move behind
+        CameraBehavior& b = cam.behavior;
+        b.actor.clear();
+        if (preset == CameraPreset::Chase) {
+            b.kind = CameraBehaviorKind::Chase;
+            // Four behind, two above, level with them laterally: the over-the-shoulder default.
+            b.offset = {0.0f, 2.0f, -4.0f};
+            b.actorSpace = true;
+            b.lagSeconds = 0.25;
+            b.aim = CameraAim::Subject;
+            b.aimOffset = {0.0f, 1.2f, 0.0f};
+            b.clearance = 0.8f;
+        } else if (preset == CameraPreset::Orbit) {
+            b.kind = CameraBehaviorKind::Orbit;
+            // A quarter turn over the shot, at a distance that reads for a human-scaled subject.
+            b.radius = std::max(subject.radius * 4.0f, 4.0f);
+            b.height = std::max(subject.radius * 1.2f, 1.5f);
+            b.startDegrees = 0.0f;
+            b.endDegrees = 90.0f;
+            b.easeInOut = true;
+            b.aim = CameraAim::Subject;
+            b.aimOffset = {0.0f, subject.radius * 0.5f, 0.0f};
+            b.clearance = 0.8f;
+        } else {
+            b.kind = CameraBehaviorKind::Pov;
+            b.eyeOffset = {0.0f, 1.7f, 0.0f};
+            // Looking where they are looking. Aiming a POV camera *at* its own performer would put
+            // the target inside the eye, which is the one aim mode this preset must not take.
+            b.aim = CameraAim::Travel;
+            b.aimOffset = {0.0f, 1.6f, 0.0f};
+            b.clearance = 0.0f; // the performer is already standing on the ground
+        }
+        cam.samples = 48; // a behaviour follows something that moves; two keys will not describe it
+        break;
+    }
     case CameraPreset::Reveal:
         m.kind = app::ShotKind::Reveal;
         m.startDistance = 3.0f;
@@ -710,6 +856,31 @@ Result<void> Sequence::validate() const {
         }
         if (s.camera.kind == CameraKind::Keys && s.camera.keys.empty()) {
             return fail("sequence '{}': shot '{}' has a keyed camera with no keys", name, s.name);
+        }
+        if (s.camera.kind == CameraKind::Behavior) {
+            // A behaviour is a relationship, so it needs the other end of it. Refused rather than
+            // warned, unlike the bake's own message: a sequence that reaches `install` with an
+            // unresolvable behaviour has already been saved, and the point of failing here is that
+            // it cannot be.
+            const CameraBehavior& b = s.camera.behavior;
+            if (b.actor.empty()) {
+                return fail("sequence '{}': shot '{}' has a {} camera that names no performer", name,
+                            s.name, cameraBehaviorName(b.kind));
+            }
+            if (actorNamed(b.actor) == nullptr) {
+                return fail("sequence '{}': shot '{}' has a {} camera on performer '{}', which does "
+                            "not exist", name, s.name, cameraBehaviorName(b.kind), b.actor);
+            }
+            if (b.kind == CameraBehaviorKind::Orbit && b.radius <= 0.0f) {
+                return fail("sequence '{}': shot '{}' orbits at radius {:.3f}; an orbit of zero "
+                            "radius is a camera inside its subject", name, s.name, b.radius);
+            }
+            if (b.lagSeconds < 0.0) {
+                // A negative lag would sample the performer in their own future, which the bake can
+                // actually do -- and which is a different feature wearing this one's name.
+                return fail("sequence '{}': shot '{}' has a camera lag of {:.3f}s; a lag is how far "
+                            "*behind* the performer the camera stands", name, s.name, b.lagSeconds);
+            }
         }
     }
     for (std::size_t i = 0; i < actors.size(); ++i) {
@@ -1266,6 +1437,69 @@ Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) c
                 builder.key("camera/lens/focalLength", s.startSeconds, cam.move.composition.focalLength,
                             params::KeyInterp::Step);
             }
+        } else if (cam.kind == CameraKind::Behavior) {
+            // ---- a behaviour, resolved against the performer at each sample --------------------
+            //
+            // This is the whole of "live target, deterministic camera". `Actor::positionAt` and
+            // `::headingAt` are pure functions of time, so asking them at each sample is asking a
+            // fact rather than running a simulation -- and what comes out is an ordinary key track,
+            // indistinguishable from a hand-authored one and just as scrub-exact.
+            const Actor* subject = cam.behavior.actor.empty() ? nullptr
+                                                              : actorNamed(cam.behavior.actor);
+            if (subject == nullptr) {
+                // Named nothing, or named a performer that is not in the piece. Warned rather than
+                // defaulted: a camera behaviour with no subject would sit at the world origin
+                // looking at the world origin, which is a shot that renders and means nothing.
+                result.warnings.push_back(fmt::format(
+                    "shot '{}': camera behaviour '{}' names {} -- no camera keys emitted",
+                    s.name, cameraBehaviorName(cam.behavior.kind),
+                    cam.behavior.actor.empty() ? "no performer"
+                                               : "performer '" + cam.behavior.actor + "'"));
+            } else {
+                int samples = cam.samples > 0 ? cam.samples : options.cameraSamplesPerShot;
+                samples = std::clamp(samples, 2, 256);
+                const CameraBehavior& b = cam.behavior;
+                for (int i = 0; i < samples; ++i) {
+                    const float t01 = static_cast<float>(i) / static_cast<float>(samples - 1);
+                    const double time = std::lerp(s.startSeconds, cameraEnd, static_cast<double>(t01));
+                    // Two sample times, and the split is what lets a chase trail while still looking
+                    // where the performer is going. The lag is clamped to the shot's own start:
+                    // sampling before a shot begins is legitimate (the performer existed then) but
+                    // sampling before the performer's first key just repeats it, which is the
+                    // correct and quiet behaviour rather than something to guard against.
+                    const double eyeTime = time - (b.kind == CameraBehaviorKind::Chase
+                                                       ? std::max(0.0, b.lagSeconds)
+                                                       : 0.0);
+                    const double aimTime = time + std::max(0.0, b.lookAheadSeconds);
+                    const ActorPose eyeRef{.position = subject->positionAt(eyeTime),
+                                           .headingDegrees = subject->headingAt(eyeTime)};
+                    const ActorPose aimRef{.position = subject->positionAt(aimTime),
+                                           .headingDegrees = subject->headingAt(aimTime)};
+                    BehaviorPose pose = cameraPoseFor(b, t01, eyeRef, aimRef);
+
+                    // Clearance, applied here because the bake is the only place the whole path is
+                    // known at once -- a chase that would have crossed a hill is lifted over it
+                    // before a frame is rendered. Raised, never lowered: a camera legitimately above
+                    // the hill it is crossing must not be dragged down onto it.
+                    if (b.clearance > 0.0f && options.groundHeightAt) {
+                        const float floorY = options.groundHeightAt(pose.eye.x, pose.eye.z) + b.clearance;
+                        pose.eye.y = std::max(pose.eye.y, floorY);
+                    }
+                    builder.key3("camera/position", time, pose.eye);
+                    builder.key3("camera/target", time, pose.target);
+                }
+                if (b.clearance > 0.0f && !options.groundHeightAt) {
+                    // Said once per shot rather than swallowed: a clearance that silently does
+                    // nothing is a setting the application does not keep (ADR-225).
+                    result.warnings.push_back(fmt::format(
+                        "shot '{}': camera clearance {:.2f} m was not applied -- this bake has no "
+                        "ground to measure against", s.name, b.clearance));
+                }
+                if (cam.move.composition.focalLength > 0.0f) {
+                    builder.key("camera/lens/focalLength", s.startSeconds,
+                                cam.move.composition.focalLength, params::KeyInterp::Step);
+                }
+            }
         } else if (cam.kind == CameraKind::Keys) {
             for (const auto& k : cam.keys) {
                 const double time = std::min(s.startSeconds + k.timeSeconds, cameraEnd);
@@ -1512,6 +1746,42 @@ json cameraToJson(const ShotCamera& cam) {
         }
         j["keys"] = std::move(keys);
     }
+    if (cam.kind == CameraKind::Behavior) {
+        const CameraBehavior& b = cam.behavior;
+        json e{{"kind", cameraBehaviorName(b.kind)},
+               {"actor", b.actor},
+               {"aim", cameraAimName(b.aim)},
+               {"aimOffset", json::array({b.aimOffset.x, b.aimOffset.y, b.aimOffset.z})}};
+        // Only what the behaviour in hand actually reads. A chase's orbit radius is not a fact about
+        // the chase, and writing one would invite somebody to edit it and wonder why nothing moved.
+        switch (b.kind) {
+        case CameraBehaviorKind::Chase:
+            e["offset"] = json::array({b.offset.x, b.offset.y, b.offset.z});
+            e["actorSpace"] = b.actorSpace;
+            e["lagSeconds"] = b.lagSeconds;
+            break;
+        case CameraBehaviorKind::Orbit:
+            e["radius"] = b.radius;
+            e["height"] = b.height;
+            e["startDegrees"] = b.startDegrees;
+            e["endDegrees"] = b.endDegrees;
+            e["easeInOut"] = b.easeInOut;
+            break;
+        case CameraBehaviorKind::Pov:
+            e["eyeOffset"] = json::array({b.eyeOffset.x, b.eyeOffset.y, b.eyeOffset.z});
+            break;
+        }
+        if (b.aim == CameraAim::Custom) {
+            e["aimPoint"] = json::array({b.aimPoint.x, b.aimPoint.y, b.aimPoint.z});
+        }
+        if (b.lookAheadSeconds > 0.0) {
+            e["lookAheadSeconds"] = b.lookAheadSeconds;
+        }
+        if (b.clearance > 0.0f) {
+            e["clearance"] = b.clearance;
+        }
+        j["behavior"] = std::move(e);
+    }
     if (!cam.lookAtActor.empty()) {
         j["lookAtActor"] = cam.lookAtActor;
         j["lookAtHeight"] = cam.lookAtHeight;
@@ -1542,6 +1812,40 @@ Result<ShotCamera> cameraFromJson(const json& j) {
         if (!parsed->shots.empty()) {
             cam.move = parsed->shots.front();
         }
+    }
+    if (const auto bj = j.find("behavior"); bj != j.end()) {
+        if (!bj->is_object()) {
+            return fail("shot camera 'behavior' must be an object");
+        }
+        CameraBehavior& b = cam.behavior;
+        if (const auto k = bj->find("kind"); k != bj->end() && k->is_string()) {
+            const auto parsed = cameraBehaviorFromName(k->get<std::string>());
+            if (!parsed) {
+                return fail("unknown camera behaviour '{}'", k->get<std::string>());
+            }
+            b.kind = *parsed;
+        }
+        if (const auto a = bj->find("aim"); a != bj->end() && a->is_string()) {
+            const auto parsed = cameraAimFromName(a->get<std::string>());
+            if (!parsed) {
+                return fail("unknown camera aim '{}'", a->get<std::string>());
+            }
+            b.aim = *parsed;
+        }
+        b.actor = bj->value("actor", b.actor);
+        b.offset = readVec3(*bj, "offset", b.offset);
+        b.actorSpace = bj->value("actorSpace", b.actorSpace);
+        b.lagSeconds = readNumber(*bj, "lagSeconds", b.lagSeconds);
+        b.radius = static_cast<float>(readNumber(*bj, "radius", b.radius));
+        b.height = static_cast<float>(readNumber(*bj, "height", b.height));
+        b.startDegrees = static_cast<float>(readNumber(*bj, "startDegrees", b.startDegrees));
+        b.endDegrees = static_cast<float>(readNumber(*bj, "endDegrees", b.endDegrees));
+        b.easeInOut = bj->value("easeInOut", b.easeInOut);
+        b.eyeOffset = readVec3(*bj, "eyeOffset", b.eyeOffset);
+        b.aimOffset = readVec3(*bj, "aimOffset", b.aimOffset);
+        b.aimPoint = readVec3(*bj, "aimPoint", b.aimPoint);
+        b.lookAheadSeconds = readNumber(*bj, "lookAheadSeconds", b.lookAheadSeconds);
+        b.clearance = static_cast<float>(readNumber(*bj, "clearance", b.clearance));
     }
     if (const auto keys = j.find("keys"); keys != j.end()) {
         if (!keys->is_array()) {
