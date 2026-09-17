@@ -15,6 +15,7 @@
 #include "assets/asset_catalog.hpp"
 #include "app/asset_browser.hpp"
 #include "app/examples.hpp"
+#include "labs/lab.hpp"
 #include "app/render_job.hpp"
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
@@ -108,6 +109,9 @@ public:
     std::vector<std::filesystem::path> recentProjects; // shown in File > Open Recent
     std::vector<app::ExampleInfo> examples;             // File > Examples
     std::function<void(const app::ExampleInfo&)> onOpenExample;
+    // File > Engineering Labs (ADR-260). The host opens the lab's fixture and applies its overlay
+    // profile; the menu itself holds no lab knowledge beyond the registry it prints.
+    std::function<void(const labs::LabDescriptor&)> onOpenLab;
     // Asset browser (ADR-031): the host scans directories and opens what the user picks.
     std::vector<app::AssetEntry> assets;
     std::vector<assets::AssetRecord> catalogAssets;
