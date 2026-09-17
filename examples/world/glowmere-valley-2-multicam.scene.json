@@ -2297,7 +2297,17 @@
           0.0
         ]
       },
-      "visible": false
+      "visible": false,
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
     },
     {
       "name": "river-lilies",

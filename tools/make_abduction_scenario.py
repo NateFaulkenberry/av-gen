@@ -304,6 +304,19 @@ def apply(scene, staging=None):
     for node in scene["nodes"]:
         if node.get("name") == "visitor-beam":
             node["visible"] = False
+            # The beam node's own transform, stated rather than left to whatever a session saved.
+            #
+            # It is concentric with the craft, unrotated and unscaled -- that is the contract
+            # ADR-218 sizes `extent` against and ADR-262 resolves `anchor: drawn` through, and none
+            # of it is an aesthetic choice anybody would edit. `glowmere-valley-2-song.scene.json`
+            # was carrying `scale: [1, 0.061, 1]`, promoted into the scene by a `--save-scene` from
+            # a running session; `applyParameters` scales a particle system's `extent` by
+            # `cbrt(|sx*sy*sz|)`, so that one number ran the beam at **3.07 m against the 7.8 m
+            # authored below** and put its mouth 0.12 m under the hull instead of 2.05 m. Every
+            # large animal was wider than the beam lifting it (ADR-264).
+            node["position"] = [0.0, 0.0, 0.0]
+            node["rotation"] = [0.0, 0.0, 0.0]
+            node["scale"] = [1.0, 1.0, 1.0]
             ps = node["particles"]
             ps["extent"] = [BEAM_RADIUS, BEAM_RADIUS, BEAM_RADIUS]
             # The pool has to hold the higher rate for a full lifetime or the beam truncates:

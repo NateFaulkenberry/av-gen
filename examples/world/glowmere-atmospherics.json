@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-atmospherics.scene.json",
-        "sha256": "65a0300631ab70b46d0cb7615cec040b9680101054b1987dc24f5312808e0a65",
-        "size": 233977
+        "sha256": "83312ebcae0fbc225707cebc8229f3bb9dc13785e68f492ed896ee1b7e7de16a",
+        "size": 234108
       }
     }
   },
@@ -1781,7 +1781,6 @@
       1.0,
       1.0
     ],
-    "nodes/visitor-beam/visible": true,
     "nodes/visitor/emissiveBoost": 1.0,
     "nodes/visitor/lightColor": [
       1.0,
@@ -1789,11 +1788,6 @@
       1.0
     ],
     "nodes/visitor/lightIntensity": 1.0,
-    "nodes/visitor/position": [
-      17.35176658630371,
-      29.852590560913086,
-      178.5384979248047
-    ],
     "nodes/visitor/rotation": [
       3.500000476837158,
       -24.000003814697266,

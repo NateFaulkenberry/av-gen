@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-2-song.scene.json",
-        "sha256": "85ea0b518c95a5c5784a2592b1a3fd58fa6d898cb05b8da5f115d1c0f49c88d3",
-        "size": 527500
+        "sha256": "cd2ca160c68f3e288607ba3e7f4be83e6aa4550805207bf09046d4806fde7092",
+        "size": 527482
       }
     }
   },
@@ -4464,12 +4464,6 @@
       0.0
     ],
     "nodes/visitor-beam/roughnessScale": 1.0,
-    "nodes/visitor-beam/scale": [
-      1.0,
-      0.061000000685453415,
-      1.0
-    ],
-    "nodes/visitor-beam/visible": true,
     "nodes/visitor/emissiveBoost": 1.0,
     "nodes/visitor/lightColor": [
       1.0,
