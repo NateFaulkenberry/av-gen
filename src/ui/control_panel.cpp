@@ -632,9 +632,6 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     }
     panel("AI", ImVec2(460, 620), [&] { ai.draw(engine); });
     panel("Settings", ImVec2(560, 520), [&] { settings.draw(engine); });
-    if (bool* demo = layout_.slot("Dear ImGui Demo"); demo != nullptr && *demo) {
-        ImGui::ShowDemoWindow(demo);
-    }
 }
 
 void ControlPanel::drawGraphWindow(app::Engine& engine) {

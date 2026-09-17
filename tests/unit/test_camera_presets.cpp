@@ -26,6 +26,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <glm/glm.hpp>
+#include <glm/trigonometric.hpp>
 
 #include <algorithm>
 
@@ -69,34 +70,62 @@ TEST_CASE("Two presets hold the camera still and the rest move it", "[camera][pr
     CHECK(presetTravel(seq::CameraPreset::Tracking) > 1.0f);
     CHECK(presetTravel(seq::CameraPreset::Reveal) > 1.0f);
 
-    // **The disputed one.** Follow is `ShotKind::Track` with the azimuth swinging 0.9 -> 0.55 at a
-    // fixed 5 radii and a fixed elevation: a ~20 degree arc around the subject at constant height
-    // and constant distance. It is a move, and the arc is 3.48 m on a 2 m subject.
+    // **The disputed one, and now a third member of the still group.** Follow used to swing 0.9 ->
+    // 0.55 -- a 20 degree arc, 3.48 m on a 2 m subject -- and nobody noticed, because with
+    // `lookAtActor` set the aim is dragged across the world by the actor while the eye creeps, at a
+    // constant distance and a constant height that hide it. The measured ratio was 11.5 to 1.
     //
-    // This is asserted rather than described because it is the fact the disagreement turned on. If
-    // somebody later redefines Follow as a fixed-eye preset, this is the test that should fail and
-    // be deliberately rewritten, rather than the change landing unnoticed.
-    CHECK(presetTravel(seq::CameraPreset::Follow) > 1.0f);
+    // The contract is that Follow's eye is authored and static, so the swing is now zero by default
+    // and lives on as the shot inspector's `drift`. See
+    // docs/investigations/follow-chase-discrepancy.md.
+    CHECK_THAT(presetTravel(seq::CameraPreset::Follow), Catch::Matchers::WithinAbs(0.0, 1e-4));
 }
 
-TEST_CASE("Follow's move is an arc, not an approach", "[camera][preset]") {
+TEST_CASE("Drift is what moves a held camera, and it is per shot", "[camera][preset]") {
     app::FocalTarget subject;
     subject.position = {0.0f, 0.0f, 0.0f};
     subject.radius = 2.0f;
-    const seq::ShotCamera cam = seq::cameraFromPreset(seq::CameraPreset::Follow, subject);
+
+    seq::ShotCamera cam = seq::cameraFromPreset(seq::CameraPreset::Follow, subject);
+    REQUIRE_THAT(glm::length(cam.move.cameraAt(1.0f) - cam.move.cameraAt(0.0f)),
+                 Catch::Matchers::WithinAbs(0.0, 1e-4));
+
+    // The control writes the *difference* onto the azimuth pair, leaving the start angle alone --
+    // so "where the camera stands" and "how far it travels" stay separate decisions.
+    const float start = cam.move.startAzimuth;
+    cam.move.endAzimuth = cam.move.startAzimuth + glm::radians(20.0f);
+    CHECK_THAT(cam.move.startAzimuth, Catch::Matchers::WithinAbs(start, 1e-6));
+
+    // 20 degrees at 5 radii on a 2 m subject is the arc Follow used to ship with, so this is also
+    // the check that the old behaviour is still reachable rather than deleted.
+    const float travel = glm::length(cam.move.cameraAt(1.0f) - cam.move.cameraAt(0.0f));
+    INFO("20 degrees of drift moves the eye " << travel << " m");
+    CHECK(travel > 3.0f);
+    CHECK(travel < 4.0f);
+
+    // Still an arc: same height, same distance. Drift changes how far around, never how far away.
+    const glm::vec3 a = cam.move.cameraAt(0.0f);
+    const glm::vec3 b = cam.move.cameraAt(1.0f);
+    CHECK_THAT(a.y, Catch::Matchers::WithinAbs(b.y, 1e-3));
+    CHECK_THAT(glm::length(a - subject.position),
+               Catch::Matchers::WithinAbs(glm::length(b - subject.position), 1e-3));
+}
+
+TEST_CASE("A moving preset's move is an arc, not an approach", "[camera][preset]") {
+    // Tracking rather than Follow, now that Follow holds still: the property being checked is that
+    // the azimuth presets circle the subject rather than closing on it, and Tracking is the one
+    // whose whole point is that travel.
+    app::FocalTarget subject;
+    subject.position = {0.0f, 0.0f, 0.0f};
+    subject.radius = 2.0f;
+    const seq::ShotCamera cam = seq::cameraFromPreset(seq::CameraPreset::Tracking, subject);
     const glm::vec3 a = cam.move.cameraAt(0.0f);
     const glm::vec3 b = cam.move.cameraAt(1.0f);
 
-    // Same height and same distance from the subject at both ends: the camera circles rather than
-    // closing in. This is what makes Follow read as "staying with" the subject -- and it is also
-    // why a viewer watching the subject rather than the background sees very little.
     CHECK_THAT(a.y, Catch::Matchers::WithinAbs(b.y, 1e-3));
     CHECK_THAT(glm::length(a - subject.position),
                Catch::Matchers::WithinAbs(glm::length(b - subject.position), 1e-3));
     CHECK(glm::length(b - a) > 1.0f);
-    // The aim barely moves, because the subject does not. In the app it is `lookAtActor` that makes
-    // the aim swing -- see the engine test below.
-    CHECK(glm::length(cam.move.targetAt(1.0f) - cam.move.targetAt(0.0f)) < 1.0f);
 }
 
 // ---- the running engine ------------------------------------------------------------------------
@@ -169,14 +198,65 @@ TEST_CASE("The baked camera is the preset's camera, through a real seek", "[came
     const float aimTravel = glm::length(aims.back() - aims.front());
     INFO("eye travelled " << eyeTravel << " m, aim travelled " << aimTravel << " m");
 
-    // **The engine agrees with the pure function.** `Sequence::install` bakes `cameraAt(t)` straight
-    // into `camera/position` keys, so there is no step between the preset and the screen that could
-    // discard the arc. The code being read is not stale.
-    CHECK(eyeTravel > 1.0f);
+    // **The contract, end to end.** Follow's eye is authored and static: it does not move because
+    // the actor moved, and it does not move at all. This is the assertion that would have caught the
+    // original discrepancy, and it runs through a real bake and 240 real frames rather than over the
+    // pure function -- so it also proves `Sequence::install` does not introduce motion of its own.
+    CHECK_THAT(eyeTravel, Catch::Matchers::WithinAbs(0.0, 1e-3));
 
-    // **And this is why it looks like it holds still.** The aim is dragged across forty metres by
-    // the walker while the eye travels a few. The ratio is the whole explanation: a viewer watching
-    // the actor sees an enormous pan and a small arc, and reads the pair as a stationary camera
-    // turning to follow. Both observations are of the same frames.
-    CHECK(aimTravel > eyeTravel * 3.0f);
+    // And the aim goes the whole forty metres with the walker, which is the half of Follow that is
+    // supposed to move. Without this the test above would pass on a camera that does nothing at all.
+    CHECK(aimTravel > 30.0f);
+}
+
+TEST_CASE("Drift survives a bake, and it is the only thing that moves Follow's eye",
+          "[camera][preset]") {
+    if (!std::filesystem::exists(project())) {
+        SKIP("night-shift is not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    auto loaded = engine.loadProject(project());
+    INFO((loaded ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+    scene::Composition* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+    REQUIRE_FALSE(comp->nodes().empty());
+
+    app::FocalTarget subject;
+    subject.position = {0.0f, 0.0f, 0.0f};
+    subject.radius = 2.0f;
+
+    // The same shot twice, differing only in drift. Two arms rather than one, because "the eye
+    // moved" means nothing without an arm in which it did not (ADR-182) -- and the zero arm is the
+    // control that says the motion came from drift and not from the bake.
+    const auto eyeTravelWithDrift = [&](float degrees) {
+        seq::Sequence piece;
+        piece.name = "drift-probe";
+        seq::Shot shot;
+        shot.name = "probe";
+        shot.startSeconds = 0.0;
+        shot.durationSeconds = 4.0;
+        shot.camera = seq::cameraFromPreset(seq::CameraPreset::Follow, subject);
+        shot.camera.move.endAzimuth = shot.camera.move.startAzimuth + glm::radians(degrees);
+        piece.shots.push_back(shot);
+        REQUIRE(engine.setSequence(piece).has_value());
+
+        FixedStepClock clock(60.0);
+        engine.seekSeconds(0.0);
+        glm::vec3 first{0.0f}, last{0.0f};
+        for (int frame = 0; frame <= 240; ++frame) {
+            engine.update(engine.tick(clock));
+            if (frame == 0) {
+                first = comp->scene().camera.position;
+            }
+            last = comp->scene().camera.position;
+        }
+        return glm::length(last - first);
+    };
+
+    const float still = eyeTravelWithDrift(0.0f);
+    const float drifted = eyeTravelWithDrift(20.0f);
+    INFO("0 deg -> " << still << " m, 20 deg -> " << drifted << " m");
+    CHECK_THAT(still, Catch::Matchers::WithinAbs(0.0, 1e-3));
+    CHECK(drifted > 3.0f);
 }

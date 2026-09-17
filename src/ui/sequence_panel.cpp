@@ -18,6 +18,8 @@
 #include "seq/song_structure.hpp"
 #include "song/from_analysis.hpp"
 
+#include <glm/trigonometric.hpp> // degrees/radians for the drift control
+
 #include <imgui.h>
 
 #include <algorithm>
@@ -42,22 +44,16 @@ std::string clock(double seconds) {
 }
 
 // Lane geometry. A lane is a row of the strip; everything in it shares one time axis.
+//
+// The heights themselves live in `ui_logic.hpp` as `kStrip*` and are assembled by `stripLanesFor`,
+// where a test can reach them -- the ruler and marker are still here because only the drawing uses
+// them, and only from this file.
 constexpr float kRulerHeight = 22.0f;
 constexpr float kMarkerHeight = 16.0f;
-constexpr float kLaneHeight = 26.0f;
-constexpr float kLaneGap = 3.0f;
-constexpr float kSectionLaneHeight = 22.0f;
 // How far inside an edge still grabs it. Seven rather than five: five points is a comfortable
 // target with a mouse and a fiddly one on a trackpad, and `blockZoneAt` shrinks it on a narrow
 // block anyway, so the generous number costs nothing where it would have hurt.
 constexpr float kEdgeGrab = 7.0f;
-// The audio lane is half again as tall as the others. It is the only lane whose content is a
-// picture rather than a label, and a waveform drawn three pixels high says nothing about the music.
-// The same height as every other lane. It was 1.5x on the argument that a waveform is a picture
-// rather than a label -- true, but it made the audio lane the odd one out in a strip whose whole job
-// is comparing lanes against each other at a glance. Vertical zoom is the answer to "I need to see
-// the waveform better", and it scales all of them together.
-constexpr float kAudioLaneHeight = kLaneHeight;
 // The header column down the left (the brief's section 12). Wide enough for an actor's id and the
 // visibility dot beside it, and no wider: every point here is a point of music not shown.
 constexpr float kGutterWidth = 112.0f;
@@ -1461,11 +1457,6 @@ void SequencePanel::drawStrip(app::Engine& engine) {
 
     if (drag_ != Drag::None && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
         const double t = snap(engine, mouseTime);
-        const auto shot = [&]() -> seq::Shot* {
-            return dragIndex_ >= 0 && dragIndex_ < static_cast<int>(piece.shots.size())
-                       ? &piece.shots[static_cast<std::size_t>(dragIndex_)]
-                       : nullptr;
-        };
         const auto overlay = [&]() -> seq::OverlayCue* {
             return dragIndex_ >= 0 && dragIndex_ < static_cast<int>(piece.overlays.size())
                        ? &piece.overlays[static_cast<std::size_t>(dragIndex_)]
@@ -2002,6 +1993,25 @@ void SequencePanel::drawInspector(app::Engine& engine) {
             drawSectionInspector(engine, static_cast<std::size_t>(selected_));
         }
         break;
+    case Selection::Clip: {
+        // An audio clip has an inspector already -- the Audio... dialog, which owns adding,
+        // removing, gain and audition. Repeating those controls here would be a second place to
+        // edit one thing, so this says what is selected and what the two ways to act on it are.
+        const auto& clips = engine.audioClips();
+        if (audioSelected_ >= 0 && audioSelected_ < static_cast<int>(clips.size())) {
+            const audio::AudioClip& clip = clips[static_cast<std::size_t>(audioSelected_)];
+            ImGui::TextUnformatted(clip.name.empty() ? clip.file.filename().string().c_str()
+                                                     : clip.name.c_str());
+            ImGui::TextDisabled("audio clip -- %s to remove it, or open Audio... to set its gain.",
+                                shortcut::kDelete);
+            if (ImGui::SmallButton("Audio clips...")) {
+                openAudioClips_ = true;
+            }
+        } else {
+            ImGui::TextDisabled("the selected clip is gone.");
+        }
+        break;
+    }
     case Selection::None:
         ImGui::TextDisabled("Click a section, a shot, a character lane or a lyric to edit it.");
         break;
@@ -2570,6 +2580,30 @@ void SequencePanel::drawShotInspector(app::Engine& engine, seq::Shot& shot) {
         }
         if (ImGui::DragFloat("to", &shot.camera.move.endDistance, 0.1f, 0.1f, 100000.0f)) {
             touch();
+        }
+        // How far the camera swings around the subject across the shot, in degrees.
+        //
+        // The azimuth *pair* is what the shot actually stores and what `cameraAt` reads; a start and
+        // an end angle in radians are not two numbers anybody wants to type. So the control is the
+        // difference, in degrees, and the start angle stays wherever the preset put it -- which
+        // keeps "where the camera stands" and "how far it travels" as separate decisions.
+        //
+        // Zero means a held viewpoint. Follow ships at zero for that reason; Wide, Close, Tracking
+        // and Reveal ship with their own drift because the movement is the shot.
+        {
+            float drift = glm::degrees(shot.camera.move.endAzimuth - shot.camera.move.startAzimuth);
+            if (ImGui::DragFloat("drift", &drift, 0.25f, -360.0f, 360.0f, "%.1f deg")) {
+                shot.camera.move.endAzimuth =
+                    shot.camera.move.startAzimuth + glm::radians(drift);
+                touch();
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "How far the camera swings around the subject over the shot.\n"
+                    "0 holds the viewpoint still -- the aim can still follow a performer.\n"
+                    "The eye moves at a constant distance and height, so a small drift is\n"
+                    "read as parallax rather than as a move.");
+            }
         }
         if (ImGui::DragInt("samples", &shot.camera.samples, 1.0f, 2, 256)) {
             touch();

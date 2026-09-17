@@ -510,10 +510,21 @@ ShotCamera cameraFromPreset(CameraPreset preset, const app::FocalTarget& subject
         cam.samples = 2;
         break;
     case CameraPreset::Follow:
+        // **The eye is authored and static; only the aim follows.** That is the contract, and it is
+        // what `startAzimuth == endAzimuth` buys: no swing around the subject, no travel at all.
+        //
+        // It used to swing 0.9 -> 0.55 -- a 20 degree arc, 3.48 m on a 2 m subject. Nobody noticed,
+        // and the reason is measured: with `lookAtActor` set, the aim is dragged across the world by
+        // the actor while the eye creeps, and at constant distance and constant height there is no
+        // looming and no vertical parallax to give the arc away. The ratio was 11.5 to 1. A camera
+        // that reads as still to the person operating it should be still.
+        //
+        // The swing is not gone, it is `drift` in the shot inspector -- a per-shot value on the
+        // azimuth pair, which every shot has already serialised. See
+        // docs/investigations/follow-chase-discrepancy.md.
         m.kind = app::ShotKind::Track;
         m.startDistance = m.endDistance = 5.0f;
-        m.startAzimuth = 0.9f;
-        m.endAzimuth = 0.55f;
+        m.startAzimuth = m.endAzimuth = 0.9f;
         m.startElevation = m.endElevation = 0.42f;
         m.composition.focalLength = 42.0f;
         m.look = app::LookMode::Subject;

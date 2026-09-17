@@ -18,7 +18,7 @@ constexpr int kFormatVersion = 1;
 // The panels, grouped the way the View menu reads them: what you build with on the left, what you
 // inspect and tune on the right, what runs underneath along the bottom. Nothing is assigned to the
 // centre -- see DockRegion.
-constexpr std::array<EditorPanel, 20> kPanels{{
+constexpr std::array<EditorPanel, 19> kPanels{{
     {"World Builder", "World Builder", DockRegion::Left, true,
      "recipe, Generate World and the job monitor"},
     // ADR-092. One panel, not two: the brush and the selection are the same job seen from two
@@ -62,7 +62,13 @@ constexpr std::array<EditorPanel, 20> kPanels{{
      "ask for changes in words; the assistant inspects the project and makes them"},
     {"Settings", "Settings", DockRegion::Right, false,
      "application settings: rendering, AI providers and credentials"},
-    {"Dear ImGui Demo", "ImGui Demo", DockRegion::Floating, false, "the Dear ImGui widget gallery"},
+    // The Dear ImGui widget gallery used to be listed here. Removed at the owner's request: it is a
+    // demo of the UI toolkit rather than a part of this application, it is the one panel in the View
+    // menu that does nothing for the work, and a floating window of unrelated widgets turning up in
+    // a screenshot of the editor is exactly the confusion it caused.
+    //
+    // A saved layout that still names it is harmless -- `EditorLayout::slot` returns null for an id
+    // the registry does not have, and the restore skips it.
 }};
 
 std::size_t regionIndex(DockRegion region) { return static_cast<std::size_t>(region); }
