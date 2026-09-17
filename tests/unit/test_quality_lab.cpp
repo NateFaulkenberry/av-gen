@@ -369,6 +369,112 @@ TEST_CASE("a material-class mask selects by the identifier's material half", "[q
     CHECK(quality::materialClassMask(id, {}).empty());
 }
 
+
+TEST_CASE("an object splits into an interior that cannot alias and a silhouette that can",
+          "[quality][aov][adr257]") {
+    // ADR-257. `examples/quality/aliasing*.scene.json` called its large smooth orb a control -- "it
+    // cannot alias, so a metric that moves on this scene's arms must not be moving here" -- and a
+    // reviewer handed it as one correctly reported that it differed. A sphere's INTERIOR shading is
+    // unaffected by anti-aliasing; its SILHOUETTE is a curved edge like any other. This is the
+    // machinery that separates the two claims, and the arms below are what stop it being believed
+    // when it is empty.
+    const std::uint32_t width = 32;
+    const std::uint32_t height = 32;
+    const auto pack = [](std::uint32_t material, std::uint32_t object) {
+        return static_cast<float>((material << 16) | object);
+    };
+    quality::Plane id;
+    id.width = width;
+    id.height = height;
+    id.rgba.assign(static_cast<std::size_t>(width) * height * 4, 0.0f);
+    // A 12x12 square of object 7 in the middle of a frame of object 9. A square rather than a disc
+    // so the geometry of the split is arithmetic and not an approximation.
+    for (std::uint32_t y = 0; y < height; ++y) {
+        for (std::uint32_t x = 0; x < width; ++x) {
+            const bool inside = x >= 10 && x < 22 && y >= 10 && y < 22;
+            id.rgba[(static_cast<std::size_t>(y) * width + x) * 4] = pack(1, inside ? 7 : 9);
+        }
+    }
+
+    const quality::SilhouetteSplit split = quality::splitSilhouette(id, 7, 2);
+    const double pixels = static_cast<double>(width) * height;
+    CHECK(quality::coverage(split.object) == Approx(144.0 / pixels));
+    // eroded by 2: 8x8. dilated by 2: 16x16. The band is what lies between them.
+    CHECK(quality::coverage(split.interior) == Approx(64.0 / pixels));
+    CHECK(quality::coverage(split.band) == Approx((256.0 - 64.0) / pixels));
+    CHECK(quality::coverage(split.elsewhere) == Approx((pixels - 256.0) / pixels));
+    // The masks partition the frame exactly: nothing counted twice, nothing dropped.
+    bool partitions = true;
+    for (std::size_t i = 0; i < split.object.size(); ++i) {
+        partitions = partitions && (split.interior[i] + split.band[i] + split.elsewhere[i] == 1);
+    }
+    CHECK(partitions);
+    // **The vacuity arms.** Neither region may be empty and neither may be the whole frame -- both
+    // look like a working detector and neither is (ADR-242's identifier survey, same reason).
+    CHECK(quality::coverage(split.interior) > 0.0);
+    CHECK(quality::coverage(split.band) > 0.0);
+    CHECK(quality::coverage(split.interior) < 1.0);
+    CHECK(quality::coverage(split.band) < 1.0);
+    // An object that is not in the frame produces nothing rather than everything.
+    CHECK(quality::coverage(quality::splitSilhouette(id, 4242, 2).object) == Approx(0.0));
+    // An object thinner than the erosion has NO interior, which is the whole reason a fence cannot
+    // be measured this way and the orb can.
+    CHECK(quality::coverage(quality::splitSilhouette(id, 7, 8).interior) == Approx(0.0));
+
+    // Now the measurement. Two frames identical except for a one-pixel ring on the object's
+    // boundary -- which is what an anti-aliasing filter does to a resolved shape.
+    quality::Frame base;
+    base.width = width;
+    base.height = height;
+    base.rgba.assign(static_cast<std::size_t>(width) * height * 4, 0);
+    for (std::size_t i = 0; i < static_cast<std::size_t>(width) * height; ++i) {
+        const bool inside = split.object[i] != 0;
+        const std::uint8_t value = inside ? 200 : 40;
+        base.rgba[i * 4 + 0] = value;
+        base.rgba[i * 4 + 1] = value;
+        base.rgba[i * 4 + 2] = value;
+        base.rgba[i * 4 + 3] = 255;
+    }
+    quality::Frame filtered = base;
+    const quality::Mask ring = quality::splitSilhouette(id, 7, 1).band;
+    for (std::size_t i = 0; i < ring.size(); ++i) {
+        if (ring[i] != 0) {
+            filtered.rgba[i * 4 + 0] = 120;
+            filtered.rgba[i * 4 + 1] = 120;
+            filtered.rgba[i * 4 + 2] = 120;
+        }
+    }
+
+    const quality::MaskedDifference interior =
+        quality::maskedLumaDifference(filtered, base, split.interior);
+    const quality::MaskedDifference band =
+        quality::maskedLumaDifference(filtered, base, split.band);
+    CHECK(interior.pixels == 64);
+    CHECK(interior.mean == Approx(0.0));
+    CHECK(interior.max == Approx(0.0));
+    CHECK(band.pixels > 0);
+    CHECK(band.mean > 1.0);
+    CHECK(band.max > 50.0);
+
+    // **The arm that makes the interior zero mean something** (ADR-182): the same interior mask over
+    // a pair that differs everywhere must NOT report zero. Without it, "the interior did not change"
+    // is indistinguishable from an instrument that cannot see the interior at all.
+    quality::Frame shifted = base;
+    for (std::size_t i = 0; i < shifted.rgba.size(); i += 4) {
+        shifted.rgba[i + 0] = static_cast<std::uint8_t>(shifted.rgba[i + 0] / 2);
+        shifted.rgba[i + 1] = static_cast<std::uint8_t>(shifted.rgba[i + 1] / 2);
+        shifted.rgba[i + 2] = static_cast<std::uint8_t>(shifted.rgba[i + 2] / 2);
+    }
+    const quality::MaskedDifference moved =
+        quality::maskedLumaDifference(shifted, base, split.interior);
+    CHECK(moved.mean > 50.0);
+    // And a mask with nothing in it reports no pixels rather than a mean of zero that reads as
+    // "no difference".
+    const quality::MaskedDifference empty = quality::maskedLumaDifference(
+        filtered, base, quality::Mask(static_cast<std::size_t>(width) * height, 0));
+    CHECK(empty.pixels == 0);
+}
+
 // ---- capture -----------------------------------------------------------------------------------
 
 TEST_CASE("a frame survives a PNG round trip bit for bit", "[quality][capture]") {

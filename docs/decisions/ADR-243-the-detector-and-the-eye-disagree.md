@@ -134,3 +134,38 @@ artifacts do not exist in this engine — a moving camera has not been reviewed 
 static geometry is exactly what a moving camera would produce. It says that on *this* scene, at
 *this* view, the artifact a viewer objects to is spatial, and the instrument in use ranked its
 remedies backwards.
+
+---
+
+## Follow-up, 2026-09-17: the anti-correlation was tested on a moving camera and did not reproduce
+
+Appended, not rewritten. Everything above stands as measured; this records what the axis this ADR
+named as unexamined turned out to contain. The full record is
+[ADR-257](ADR-257-the-eye-ranked-them-the-way-the-spatial-measure-did.md).
+
+This document closes by saying *"a moving camera has not been reviewed at all, and crawl on static
+geometry is exactly what a moving camera would produce."* It has now been reviewed: three arms of
+`examples/quality/aliasing-dolly` — the same three, FXAA off / baseline / supersample 2× — at
+1280×720, blind, with the instrument's prediction registered beforehand.
+
+**The reviewer ranked C > B > A**, which is `spatialLaplacian`'s ordering in both directions, and
+which this document's reviewer gave for the same two remedies on different content.
+
+**`temporalAlternation` did not rank them backwards.** It went *uninformative*, and the distinction
+matters enough to be spelled out: here it separates FXAA-off from the baseline on 58 of 58 frames by
+0.62%, and calls the supersampled arm — the one the reviewer found *"immediately obvious"* — **worse
+on 26 of 58 frames**. Not inverted. Not a ranking either.
+
+So the two failures are different and neither generalises to the other. Above: a **static camera over
+wind-animated sub-pixel geometry**, where both remedies are scored backwards by 42% and 9%. Below the
+follow-up: a **moving camera over static geometry**, where nothing is backwards and nothing is
+separated on the arm a person had no difficulty with. The hypothesis this ADR offered — that the
+anti-correlation lives in the interaction between FXAA's per-frame threshold decision and geometry
+moving relative to the sampling grid at sub-pixel scale, which wind produces and a smooth camera
+translation does not — is **consistent with that** and is still a hypothesis: the experiment that
+would settle it is these three arms on Glowmere with a person watching, and it has not been run.
+
+**Section 4 stays closed and decision 1 is re-confirmed by a second person on different content.**
+Asked whether they would ship the arms, the new reviewer said *"I would object to the worst clip (A)"*
+— FXAA off — and *"C is good enough to not worry about"*, which answers the question this ADR left
+open when it turned on `supersample: 2.0` without being able to say whether supersampling was enough.

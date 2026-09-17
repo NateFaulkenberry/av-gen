@@ -108,3 +108,34 @@ scene that repeats either mistake fails in the same place.
 documented to do, and for a flythrough that is the behaviour you want. It says a benchmark's camera
 has a requirement a shot's camera does not: it must keep the subject in frame while moving relative
 to it, and only one of the three placement modes can do both.
+
+---
+
+## Correction, 2026-09-17: the orb's interior is a control; the orb is not
+
+The scene description above says **"the orb is a control**: it is large, smooth and fully resolved, so
+a metric that moves on this scene's arms must not be moving there." Half of that is wrong, and it was
+wrong when written.
+
+A sphere's *interior shading* is unaffected by anti-aliasing. Its *silhouette* is a curved edge like
+every other edge in the frame and is affected exactly as much as the fence is. A reviewer handed the
+orb as a control in Phase 6 said so — *"ball looks smoother in C — less jagged"* — and was right.
+
+Measured over 60 frames with `avgen_quality control`, which splits the object out of the identifier
+AOV into an eroded interior and a silhouette band:
+
+| the orb, band 2 px | FXAA off vs baseline | supersample 2× vs baseline |
+|---|---:|---:|
+| interior, mean / max \|Δluma\| | **0.0000 / 0.0000** | 0.1486 / 2.7152 |
+| silhouette band, mean / max | 2.6981 / 122.26 | 5.3941 / 140.63 |
+
+with both ADR-182 arms beside them: the same interior mask moves **2.90** steps between consecutive
+frames of one arm, so it is not a dead region; and the same split on the fences and the diagonal
+blades gives interiors of **2.1 to 6.7**, because sub-pixel geometry has no invariant interior.
+
+So the claim that survives is narrower and is the useful one: **a metric that moves on this scene's
+arms must not be moving in the orb's interior.** The orb as a whole is a perfectly ordinary
+silhouette. `benchmark-scenes.md` and both `aliasing*.scene.json` `_note`s are corrected to match,
+and [ADR-257](ADR-257-the-eye-ranked-them-the-way-the-spatial-measure-did.md) records what it cost to
+find out — which was one honest answer to a question that invited the reviewer to contradict the
+instructions.

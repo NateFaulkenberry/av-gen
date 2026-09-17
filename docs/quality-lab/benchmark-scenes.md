@@ -146,6 +146,18 @@ wrong produces a comparison that is not a comparison:
    thing that already catches it — **and check it between arms**, which is how both of the failures
    above were found before any metric had been computed. An arm that cannot differ is void rather
    than measured.
+9. ⚠ **A region of the frame is not a control for an aliasing arm, and a scene may not claim one
+   is.** This document and ADR-254 both described the aliasing scene's large smooth orb as a control
+   — *"it cannot alias, so a metric that moves on this scene's arms must not be moving there"* — and
+   a Phase 6 reviewer handed it as a control reported, correctly, that it differed. A sphere's
+   *interior shading* is unaffected by anti-aliasing; its *silhouette* is a curved edge like any
+   other and is affected exactly as much. Measured over 60 frames (`avgen_quality control`): the
+   orb's interior is **bit-identical** with FXAA off and moves 0.15 luma steps under supersampling,
+   while its silhouette band moves 2.70 and 5.39 with peaks over 120. **So the claim a scene may
+   make is about an object's interior, never about the object.** Nothing visible is invariant under
+   anti-aliasing, because everything visible has an edge — and the control for a *human* comparison
+   is therefore a **duplicated arm**, one clip shown twice under two labels (metrics.md §4.4), not
+   something in the frame. ADR-257.
 
 ---
 

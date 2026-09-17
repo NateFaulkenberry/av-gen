@@ -156,3 +156,31 @@ judgment. Nobody has tested that, and the single most expensive lesson in this r
 detector can be correct, non-vacuous, well-controlled and still rank remedies backwards. It says the
 detector measures what it claims to measure, that its mask is what makes the number valid, and that
 the arms which would prove it wrong have been built and run.
+
+---
+
+## Follow-up, 2026-09-17: "the temporal measure agrees" was a statement about 640×360
+
+Appended, not rewritten. The measurement above reproduces exactly and is not withdrawn; the
+*conclusion drawn from it* does not survive a change of render size, which this ADR did not test.
+
+This document reports the three `aliasing-dolly` arms at **640×360, 30 frames** and observes that
+`temporalAlternation` ranks them in the same order as `spatialLaplacian` — *"which is not what
+ADR-243 found."* Re-run at **1280×720, 60 frames**, the size a reviewer actually watched, that
+agreement is gone. One variable isolated — same scene, same arms, same 2-second window, same 60
+frames, only the resolution:
+
+| | spatial A vs B | spatial C vs B | temporal A vs B | **temporal C vs B** |
+|---|---|---|---|---|
+| 640×360 | +8.40%, 60/60 frames | −17.65%, 0/60 | +2.31%, 58/58 | −2.97%, **14/58 wrong-direction** |
+| 1280×720 | +6.98%, 60/60 frames | −16.90%, 0/60 | +0.62%, 58/58 | −0.74%, **26/58 wrong-direction** |
+
+The spatial measure holds its size and its unanimity at both. The temporal measure's separation of
+the supersampled arm shrinks fourfold and degrades to a coin flip. Halving the resolution puts more
+of the content below the sampling rate, so supersampling changes more pixels: the effect size is a
+property of the render size and not of the renderer.
+
+**The rule that follows is general and this ADR did not state it:** an instrument's effect size is
+evidence only at the resolution it was measured at, and the resolution that counts is the delivery
+one. [ADR-257](ADR-257-the-eye-ranked-them-the-way-the-spatial-measure-did.md) carries the rest of
+it, including the human ranking this ADR correctly said it did not have.

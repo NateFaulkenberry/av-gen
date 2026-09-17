@@ -179,6 +179,22 @@ intact:
 **Harness rule, not advice:** the report emits `temporalAlternation` and `spatialLaplacian`
 **together or not at all**.
 
+⚠ **Phase 6 tested the moving-camera case ADR-243 named and did not close, and the result is a second
+kind of failure** ([ADR-257](../decisions/ADR-257-the-eye-ranked-them-the-way-the-spatial-measure-did.md)).
+It does **not** invert on a moving camera — nothing about the Glowmere ordering reproduced. It goes
+**uninformative, and precisely where the eye is most certain**: on the three `aliasing-dolly` arms at
+1280×720 it separates FXAA-off from the baseline on 58 of 58 frames by 0.62%, and calls the
+supersampled arm — which a blind reviewer ranked best and called *"immediately obvious"* — **worse on
+26 of 58 frames**. Two further things follow, both of which change how this number may be read:
+
+* **Its effect size is a property of the render size.** The same arms over the same window separate
+  4× more strongly at 640×360 than at 1280×720. ADR-253's conclusion that "the temporal measure
+  agrees" on a moving camera was a statement about 640×360 and does not survive at delivery size.
+* **A difference of pooled means is not a ranking.** Two arms of one experiment are paired — same
+  camera, same times — so the question is whether the ordering survives frame by frame.
+  `avgen_quality analyze --per-frame` writes the series so it can be asked; the mean ordering here is
+  "correct" for all three arms and one of the three does not survive the pairing at all.
+
 ---
 
 ## 5. Banding — CAMBI

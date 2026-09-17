@@ -67,6 +67,11 @@ cmake-build-*/
 # reproducible from them plus the git commit. Never committed, for the reason tools/certify.py
 # already states: a renderer upgrade changes pixels on purpose.
 /quality-results/
+# ...and the same frames when a Quality Lab render lands beside its scene. `--render out/candidate`
+# is resolved against the PROJECT file's directory, not the working directory (RenderJob takes
+# `absolute(projectFile).parent_path()` as its base), so the README's recipe writes 119 MB into
+# `examples/quality/out/` and not into the repository root. Same rule, same reason.
+/examples/quality/out/
 
 # Staged sources for the published handbook artifact (regenerate rather than commit)
 .avgen-manual/
