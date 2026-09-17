@@ -100,6 +100,28 @@ most expensive lesson in this repository is that a detector can be correct, non-
 well-controlled and still rank remedies backwards — so until a person has watched these arms, the
 numbers describe the renderer and do not rank it.
 
+## The two engine gaps, now answered
+
+Both were carried into this phase as questions for a person, and both have answers:
+
+* **The shadow AOV: yes** — and the research changed the size of the job.
+  [ADR-255](../decisions/ADR-255-the-shadow-aov-and-the-tier-that-has-no-shadow-texture.md). The
+  engine has a screen-space shadow term as its own target (ADR-087), and exporting it looked like a
+  texture and a switch case. It is not: `shadowMaskScale = 1.0` at both `high` and `offline`, so the
+  mask pass **does not run at all** at the tier the Quality Lab renders its candidate at. An AOV
+  built on it would be a constant in exactly the configuration that needs it, and correct everywhere
+  else. The decision is a dedicated full-resolution pass gated on `--aov shadow`, with the fidelity
+  claim measured rather than inherited.
+* **The material-id → class mapping: emitted, never authored.**
+  [ADR-256](../decisions/ADR-256-a-material-id-is-not-a-class.md). A material id is a scene-build
+  index, so a hand-written list of integers is silently wrong the moment the scene changes -- the
+  mask would be well-formed, the residual correct, and the surfaces the wrong ones.
+  `scene::Material` gains a surface class, the generators set it where the knowledge already is, and
+  `--aov id` writes a `materials.json` beside the frames. A mapping that ships with the frames
+  cannot disagree with them.
+
+Neither is implemented. Both are scoped.
+
 ## Human decisions collected, and not taken
 
 Listed at [research.md §10](research.md#10-unresolved-questions-carried-into-the-next-phase), minus

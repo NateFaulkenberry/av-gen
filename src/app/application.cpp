@@ -190,8 +190,8 @@ std::string usageText() {
            "  --capture <file>    write the last frame as a PPM image\n"
            "  --capture-ui <f>    write the editor, ImGui and all, as a PNG\n"
            "  --capture-ui-frame <n>  which frame to grab (default 90)\n"
-           "  --capture-ui-panel <a,b>  raise these panels first, so a docked panel sharing a\n"
-           "                      tab bar can be photographed; the last named ends up on top\n"
+           "  --capture-ui-panel <a,b>  open and raise these panels first, so a closed or\n"
+           "                      tab-buried panel can be photographed; last named ends up on top\n"
            "  --capture-ui-stay   keep running after the capture instead of quitting\n"
            "  --debug-target <t>  display an auxiliary render target: normal|roughness|velocity|\n"
            "                      emission|ids|occlusion|depth|linear depth|depth edges|\n"
@@ -3154,6 +3154,16 @@ int Application::runLive() {
         {
             core::PhaseProfiler::AllocScope scope(prof, kPhUi, kPhAllocUi);
             imgui_->newFrame();
+            // A panel that is closed is not drawn at all, so focusing it does nothing: the capture
+            // comes back showing whichever tab happened to be in front, and it looks like a
+            // successful capture of the wrong panel. Opened *before* the draw, raised after it.
+            if (options_.captureUi) {
+                for (const std::string& name : options_.captureUiPanels) {
+                    if (bool* open = panel_->layout().slot(name); open != nullptr) {
+                        *open = true;
+                    }
+                }
+            }
             panel_->draw(*engine_, stats);
             // Raised *after* the panels are submitted, because ImGui cannot focus a window it has
             // not seen this frame. The focus lands on the next frame, which is why the capture frame

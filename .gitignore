@@ -67,3 +67,6 @@ cmake-build-*/
 # reproducible from them plus the git commit. Never committed, for the reason tools/certify.py
 # already states: a renderer upgrade changes pixels on purpose.
 /quality-results/
+
+# Staged sources for the published handbook artifact (regenerate rather than commit)
+.avgen-manual/
