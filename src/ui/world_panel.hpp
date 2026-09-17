@@ -35,6 +35,10 @@ struct Influence {
     // redrawn every frame against a list somebody may be editing in another window.
     std::string routeSource;
     std::string routeTarget;
+    // Empty when this influence writes the parameter directly. Otherwise what it writes instead --
+    // "the world root", "parent 'oak_3'" -- for an influence that moves this node by moving
+    // something it hangs off. See the long note in `influencesOf`.
+    std::string via;
 };
 // Everything that writes to `path`: routes (with their source and last output), timeline tracks,
 // cues whose preset contains it, states whose preset contains it, world macros targeting it, the

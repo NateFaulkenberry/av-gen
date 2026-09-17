@@ -29,7 +29,11 @@ std::string WorldSelection::parameterPrefix() const {
     return {};
 }
 
-std::vector<Influence> influencesOf(app::Engine& engine, const std::string& path) {
+namespace {
+
+// Everything that writes to exactly this path. `influencesOf` below is this plus what the node
+// inherits from above it.
+std::vector<Influence> directInfluencesOf(app::Engine& engine, const std::string& path) {
     std::vector<Influence> out;
     for (const params::ModRoute& r : engine.modulator().routes()) {
         if (r.target != path || !r.enabled) {
@@ -146,6 +150,88 @@ std::vector<Influence> influencesOf(app::Engine& engine, const std::string& path
                 out.push_back(std::move(i));
             }
         }
+    }
+    return out;
+}
+
+// "nodes/<name>/position" -> {"<name>", "position"}. Empty name for anything else.
+struct NodeField {
+    std::string node;
+    std::string field;
+};
+[[nodiscard]] NodeField nodeFieldOf(const std::string& path) {
+    constexpr std::string_view kPrefix = "nodes/";
+    if (!path.starts_with(kPrefix)) {
+        return {};
+    }
+    const std::size_t slash = path.rfind('/');
+    if (slash == std::string::npos || slash <= kPrefix.size()) {
+        return {};
+    }
+    return {path.substr(kPrefix.size(), slash - kPrefix.size()), path.substr(slash + 1)};
+}
+
+[[nodiscard]] bool isTransformField(const std::string& field) {
+    return field == "position" || field == "rotation" || field == "scale";
+}
+
+} // namespace
+
+std::vector<Influence> influencesOf(app::Engine& engine, const std::string& path) {
+    std::vector<Influence> out = directInfluencesOf(engine, path);
+
+    // ---- what the node inherits ----------------------------------------------------------------
+    //
+    // A node's transform is not the only thing that moves it. Everything in the composition hangs
+    // off a root whose rotation integrates `root/rotationSpeed`, and `addDefaultRoutes` wires that
+    // to `audio.mid` on **every** composition that does not already route it -- so with music
+    // playing, the whole world turns. A node inside a group inherits its group's transform the same
+    // way.
+    //
+    // Asked "why is this moving" about a spinning terrain, this panel answered "nothing modulates
+    // this object; its parameters are static". That was *true* -- nothing modulates
+    // `nodes/terrain/rotation` -- and completely useless, which is the second time this panel has
+    // given that answer about something visibly in motion. The first time it was an entity walking
+    // (see the note in `directInfluencesOf`); this is the same miss one level up, and the fix is
+    // the same shape: the question is "what can move this", and an ancestor's transform can.
+    //
+    // Reported with `via` set rather than merged in silently, because the distinction is what the
+    // user needs: a route on this node is edited here, and a route on the root is not.
+    const NodeField self = nodeFieldOf(path);
+    if (self.node.empty() || !isTransformField(self.field)) {
+        return out;
+    }
+
+    const auto inherit = [&out](std::vector<Influence> more, const std::string& via) {
+        for (Influence& i : more) {
+            i.via = via;
+            out.push_back(std::move(i));
+        }
+    };
+
+    if (scene::Composition* comp = engine.composition()) {
+        // The ancestor chain, nearest first. Bounded by the node count for the same reason
+        // `nodeVisible` is: a hand-edited file can describe a parent cycle.
+        const scene::CompositionNode* node = comp->findNode(self.node);
+        std::size_t guard = 0;
+        while (node != nullptr && !node->parent.empty() && guard++ < 1024) {
+            const scene::CompositionNode* parent = comp->findNode(node->parent);
+            if (parent == nullptr) {
+                break;
+            }
+            const std::string base = "nodes/" + parent->name + "/";
+            const std::string via = "parent '" + parent->name + "'";
+            for (const char* field : {"position", "rotation", "scale"}) {
+                inherit(directInfluencesOf(engine, base + field), via);
+            }
+            node = parent;
+        }
+    }
+
+    // The root, which every node is under whether or not it has a parent. `root/impulse` is in the
+    // list because it is a transform term too -- a scene that punches on an onset punches here.
+    for (const char* rootPath : {"root/rotationSpeed", "root/scale", "root/impulse"}) {
+        inherit(directInfluencesOf(engine, rootPath), "the world root");
     }
     return out;
 }
@@ -276,7 +362,8 @@ void WorldPanel::drawInspector(app::Engine& engine) {
         }
     }
     ImGui::SeparatorText("Influences");
-    ImGui::TextDisabled("Why is this moving? Timeline, routes and state changes are listed here.");
+    ImGui::TextDisabled("Why is this moving? Timeline, routes and state changes are listed here,\n"
+                        "including the ones that move this object by moving what it hangs off.");
     bool any = false;
     for (params::IParameter* param : engine.params().ordered()) {
         if (!detail::pathStartsWith(param->path(), prefix)) {
@@ -307,7 +394,12 @@ void WorldPanel::drawInspector(app::Engine& engine) {
                     value = fmt::format("= {:.3f}", i.value);
                 }
                 const std::string text =
-                    fmt::format("{}: {} ({}) {}", kind, i.source, i.detail, value);
+                    i.via.empty()
+                        ? fmt::format("{}: {} ({}) {}", kind, i.source, i.detail, value)
+                        // The via clause goes first, because it is the answer to the question the
+                        // user actually asked: this object is moving because something above it is.
+                        : fmt::format("via {} -- {}: {} ({}) {}", i.via, kind, i.source, i.detail,
+                                      value);
                 if (i.kind != Influence::Kind::Route) {
                     ImGui::BulletText("%s", text.c_str());
                     continue;

@@ -217,6 +217,10 @@ public:
     // the mouse belongs to it before starting a camera gesture, and has to hand it what the GPU
     // picker resolved a click to.
     WorldEditor editor;
+    // What `editor.selection.primary()` was last frame, so the World panel's inspector can follow it
+    // on a change without overriding a selection made in the World panel itself. See the note at
+    // the top of `ControlPanel::draw`.
+    std::string lastEditorSelection_;
     WorldEditPanel editPanel;
     app::JobSystem* jobs = nullptr;
     app::WorldBuilder* builder = nullptr;

@@ -112,6 +112,34 @@ void ControlPanel::restoreDefaultLayout() {
 }
 
 void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
+    // ---- one selection, two panels -------------------------------------------------------------
+    //
+    // The Edit panel's list and the World panel's inspector had separate selections, so choosing a
+    // hero in the list left the inspector showing whatever was last picked in the viewport -- and
+    // the inspector is where "what is modulating this" lives. A viewport pick already synced them
+    // (`Application::pick`); a click in the list, a box select, a group operation and an undo that
+    // restores a selection did not.
+    //
+    // Followed here, once a frame, rather than at each of those call sites. The editor's selection
+    // is the authority and this is a projection of it, so every route that can change it is covered
+    // by construction -- including the ones nobody has written yet, which is the half of this that
+    // patching call sites would have kept getting wrong.
+    //
+    // Only on a *change*, so the World panel's own Overview can still select a field, a material or
+    // the environment without this dragging it back to a node every frame.
+    {
+        const std::string primary = editor.selection.empty() ? std::string() : editor.selection.primary();
+        if (primary != lastEditorSelection_) {
+            lastEditorSelection_ = primary;
+            if (primary.empty()) {
+                world.selection = WorldSelection{};
+            } else {
+                world.selection.kind = WorldSelection::Kind::Node;
+                world.selection.name = primary;
+            }
+        }
+    }
+
     // Menu bar and status bar first: both take their height out of the viewport's work area, and
     // the dockspace is sized from what is left.
     drawMenuBar(engine);
