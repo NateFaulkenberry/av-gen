@@ -66,6 +66,32 @@ struct DebugViewOptions {
     // Pair it with `entityBounds` + `entityOrigins`: the origin marker is the point the director
     // aims, the box is what a viewer sees, and the gap between them is the other half of ADR-262.
     bool beams = false;
+    // ---- Shadow Lab (§15) --------------------------------------------------------------------
+    //
+    // The cascades had no overlay at all: `rendering::ShadowView` carried four matrices and nothing
+    // drew them, so "which cascade is this pixel in" and "what volume does that cascade cover" were
+    // questions with no answer short of reading a uniform buffer in a debugger.
+    //
+    // Both switches draw from the views the renderer **uploaded this frame**, handed to
+    // `buildDebugGeometry` as a span. Neither re-fits anything: a cascade overlay that fitted its
+    // own cascades would agree with the renderer exactly until the day it mattered.
+    //
+    // The light-space volume: the orthographic box each cascade rasterises into, through the
+    // inverse of its own view-projection. This is where the shadow map *is*.
+    bool shadowCascades = false;
+    // The camera-space slice: the part of the camera frustum between a cascade's near and far view
+    // depths, in the same colour. This is which pixels *select* that cascade, and it is the half
+    // that answers "why did the shadow change when I dollied". Drawn from `scene.camera` at
+    // `frustumAspect`, like `frustum`, so on a live camera it is the screen edge and tells you
+    // nothing -- it is worth drawing frozen, or from a second view.
+    bool shadowCascadeSlices = false;
+    // Restrict both of the above to one view index; -1 draws every one. Four overlapping boxes is
+    // four boxes, and the question is usually about one of them.
+    int shadowCascade = -1;
+    // Entity bounds coloured by `rendering::casterState`: what the shadow passes did with this
+    // object, and why not when they did nothing. Green casts, amber casts from off screen, red is
+    // one of the four reasons it does not.
+    bool shadowCasters = false;
     bool depthTest = true;
     float pointSize = 3.0f;
     int maxPoints = 200000;       // safety cap per frame

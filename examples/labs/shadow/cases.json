@@ -1,0 +1,151 @@
+{
+ "format": "avgen-lab-cases",
+ "version": 1,
+ "lab": "shadow",
+ "_note": "Every arm here has a control, and the controls are named as controls. Two of the six exist only to say that an arm's measurement can move at all -- without them 'the impostor cast nothing' is a sentence with no scale on it (ADR-182). The fixture is examples/labs/shadow-lab.scene.json and the light is examples/lightrigs/shadow-lab.rig.json; the sun travels exactly +X at 34 degrees, which is what makes 'the caster left the shot before its shadow did' a camera move rather than a coincidence.",
+ "cases": [
+  {
+   "lab": "shadow",
+   "number": 1,
+   "title": "The bench: every shape, every cascade, one frame",
+   "question": "What does each of the seven shapes actually cast, and where do the cascades fall?",
+   "expectation": "Nothing asserted. This is the frame the numbers in docs/shadow-lab/README.md were read from: run it with AVGEN_SHADOW_STATS=1 and the three cascades report 0.50..6.19, 6.19..19.99 and 19.99..77.28 m, texels 0.0070 / 0.0218 / 0.0848 m, biases 0.0190 / 0.0486 / 0.1747 m. The post row is 13 identical posts at 13, 18, 23 ... 73 m of view depth: the 19.99 m split falls between post-01 and post-02, the fade begins between post-10 and post-11, and the range ends just past post-12.",
+   "fixture": "examples/labs/shadow-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "The small-pebble is 25 cm against a coarsest texel of 8.5 cm: it is in the fixture to be barely there, not to be found."
+  },
+  {
+   "lab": "shadow",
+   "number": 2,
+   "title": "A tree the camera cannot see stops casting -- if it is an instance",
+   "question": "When the camera pans away from a caster whose shadow still falls into shot, does the shadow survive?",
+   "expectation": "For an entity, yes -- ADR-046's second pass keeps it. For a procedural instance, no. Yaw the fixture's camera from 0 to 40 degrees and the instances reaching the shadow map fall 51 of 61 to 27 of 61 while entity shadow draws hold at 42. Same frames, so the entity count is the control.",
+   "fixture": "examples/labs/shadow-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     0.0,
+     6.0,
+     14.0
+    ],
+    "aim": [
+     -47.0,
+     3.0,
+     -67.4
+    ]
+   },
+   "notes": "The aim is the fixture's own target yawed 40 degrees about the camera. `pair-entity` and `pair-instance` are the same asset at the same scale 12 m apart in depth: one keeps its shadow and one does not, and which is which is the finding. README §3.1."
+  },
+  {
+   "lab": "shadow",
+   "number": 3,
+   "title": "The plan view: an impostor's shadow against its own mesh's",
+   "question": "Does a caster on LOD rung 2 cast the shadow the same caster on rung 0 casts?",
+   "expectation": "Before 2026-09-17, no: `impostor-row` darkened 0.45% of the ground its shadow falls on where `mesh-row` -- the same asset, the same scale, the same depths, one rung -- darkened 28.3%. After, 12.3% against an unchanged 28.3%. The mesh row is the control and it must not move.",
+   "fixture": "examples/labs/shadow-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     20.0,
+     48.0,
+     -14.0
+    ],
+    "aim": [
+     20.0,
+     0.0,
+     -56.0
+    ]
+   },
+   "notes": "A plan camera because the level one sees the ground at such a grazing angle that a shadow band is four pixels tall, and a four-pixel band is a measurement that depends on where you put the rectangle. README §3.2."
+  },
+  {
+   "lab": "shadow",
+   "number": 4,
+   "title": "CONTROL for case 3: shadows off",
+   "question": "Does the ground in case 3's measurement rectangles read as lit when there is nothing casting?",
+   "expectation": "Both rows' rectangles go to the open-ground value. Without this, 'the impostor row is dark in 0.45% of its rectangle' cannot be told from 'the rectangle is in the wrong place'.",
+   "fixture": "examples/labs/shadow-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     20.0,
+     48.0,
+     -14.0
+    ],
+    "aim": [
+     20.0,
+     0.0,
+     -56.0
+    ]
+   },
+   "disable": [
+    "shadows"
+   ]
+  },
+  {
+   "lab": "shadow",
+   "number": 5,
+   "title": "The range rule, removed",
+   "question": "How much of where the shadows stop is ADR-112's coarsest-texel rule rather than the world's size?",
+   "expectation": "All of it, on this fixture. `shadowrange` sets shadowTexelTarget to 0 and the range goes from 77.28 m to the camera's far plane; the post row keeps its shadows to the end, and the coarsest texel goes from 8.5 cm to something that resolves nothing. This is the arm for 'do not hide a problem by increasing the shadow distance' (spec 28): it shows what increasing it actually buys and costs.",
+   "fixture": "examples/labs/shadow-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "qualityArms": [
+    "shadowrange"
+   ],
+   "notes": "Read with AVGEN_SHADOW_STATS=1; the range and the coarsest texel are both on the frame line."
+  },
+  {
+   "lab": "shadow",
+   "number": 6,
+   "title": "The half-resolution mask, built and consumed at a tier that never builds one",
+   "question": "Is the term the mask computes the term the lit pass computes, on a fixture full of thin and sub-texel casters?",
+   "expectation": "Close and not exact, as ADR-258 measured on terrain (0.43% of pixels). This fixture is the harder case for it: `thin-upright` is 4 cm and `small-pebble` is 25 cm against a coarsest texel of 8.5 cm, and a bilateral upsample at half resolution is at its worst on exactly that. `maskconsume` is a diagnostic no tier sets; case 4's shadowatlas1k equivalent in examples/labs/rendering/cases.json is its scale.",
+   "fixture": "examples/labs/shadow-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "tier": "offline",
+   "qualityArms": [
+    "maskconsume"
+   ],
+   "aovs": [
+    "shadow"
+   ]
+  }
+ ]
+}

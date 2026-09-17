@@ -65,13 +65,15 @@ constexpr std::array<LabDescriptor, 14> kLabs{{
      "src/world/camera_clearance.cpp:heroSightline", "docs/camera-lab.md",
      "examples/camera/behaviors.json", "examples/labs/camera/cases.json"},
 
-    {LabId::Shadow, "shadow", "Shadow Lab", LabStatus::Planned,
+    {LabId::Shadow, "shadow", "Shadow Lab", LabStatus::Built,
      "Why is this surface lit when it should be shadowed, or shadowed when it should be lit?",
      "cascade fitting and splits, the caster list, the atlas, the half-resolution mask and the "
      "contact march",
-     "the light's own position and intensity -- that is the Lighting Lab",
-     "src/rendering/shadow_math.cpp:fitDirectionalCascade", "docs/engineering-labs.md",
-     "examples/qa/renderer-qa.scene.json", ""},
+     "the light's own position and intensity -- that is the Lighting Lab; which LOD rung an "
+     "instance draws at -- that is the LOD Lab; and how the camera frustum handed to the fit is "
+     "built -- that is the Camera Lab",
+     "src/rendering/shadow_math.cpp:casterState", "docs/shadow-lab/README.md",
+     "examples/labs/shadow-lab.scene.json", "examples/labs/shadow/cases.json"},
 
     {LabId::Lighting, "lighting", "Lighting Lab", LabStatus::Planned,
      "Which lights reached this pixel, and with how much?",

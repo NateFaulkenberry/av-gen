@@ -10,6 +10,9 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 namespace avgen::rendering {
@@ -24,6 +27,28 @@ struct ShadowView {
     float texelWorldSize = 0.01f;
     float depthRange = 1.0f;  // world units the view's normalised depth spans (the bias scale)
     float farDistance = 0.0f; // cascade: the view depth this cascade covers up to
+    // The near end of the same interval. The fit has always been given it and never published it,
+    // so every reader that wanted to know which depths a cascade covers had to re-derive the split
+    // scheme -- and a diagnostic that re-derives the number it is describing is the §37 trap.
+    float nearDistance = 0.0f;
+    // The volume the fit chose, in world space: the centre after texel snapping and the half-width
+    // of the orthographic box about it. Both are already computed inside `fitDirectionalCascade`;
+    // publishing them is what lets an overlay draw the cascade the renderer used rather than one it
+    // fitted again for itself.
+    glm::vec3 center{0.0f};
+    float orthoRadius = 0.0f;
+    // The two axes a camera-facing impostor must be built from while THIS view is the one being
+    // rendered: the right and up of the view's own basis.
+    //
+    // They exist because the LOD ladder's rungs 2 and 3 are camera-facing quads
+    // (`shaders/procedural.wgsl`, the `fieldInfo.z > 0.5` branch), built from
+    // `frame.cameraRight` and `frame.cameraUp`. A shadow pass runs those vertex shaders against a
+    // copy of the frame block with only the view-projection replaced, so the quad faced the
+    // *camera* while being rasterised from the *light* -- and the shadow of a stationary tree under
+    // a stationary sun then depended on where the camera was standing. See
+    // docs/shadow-lab/README.md.
+    glm::vec3 right{1.0f, 0.0f, 0.0f};
+    glm::vec3 up{0.0f, 1.0f, 0.0f};
     int lightIndex = -1;      // index into the packed light buffer
     bool cascade = false;
     bool cube = false;        // one of six faces around a light with no single direction
@@ -121,5 +146,113 @@ constexpr std::uint32_t kShadowRangeReference = 2048;
 // One perspective map covering a spot light's cone.
 [[nodiscard]] ShadowView fitSpotShadow(const scene::PunctualLight& light, std::uint32_t resolution,
                                        float range);
+
+// ---- who casts (Shadow Lab) ---------------------------------------------------------------------
+//
+// The shadow caster list is a **second cull**, and until this header it was written out longhand
+// inside `SceneRenderer::render` -- `shadowEligible`, `anyCascadeSees` and the opaque-list branch,
+// three lambdas over 180 lines. That is fine for a renderer and impossible for a diagnostic: an
+// overlay that wants to colour an entity by whether the frame made it a caster either reaches into
+// the renderer or writes the rule a second time, and a rule written twice is a rule that disagrees
+// with itself the first time somebody edits one copy (§37).
+//
+// So the decision lives here, the renderer calls it, and the overlay calls the same function. It
+// needs no device: it is an entity's own flags and an AABB against some planes.
+
+// Why the shadow passes do or do not draw an entity. One value per branch that actually exists in
+// the renderer; there is deliberately no "not submitted" catch-all, for the reason
+// `rendering::VisibilityReason` gives -- every value but the first is one.
+enum class CasterState : std::uint8_t {
+    // In the opaque draw list and casting: the ordinary case.
+    Caster,
+    // The camera frustum rejected it and a shadow view still contains it, so it is added by the
+    // second pass and casts anyway (ADR-046). A hill behind the camera.
+    CasterOffScreen,
+    // `Entity::visible` is false, or it has no mesh.
+    NotDrawable,
+    // `Entity::castsShadow` is false. Terrain writes this per chunk from its own shadow distance;
+    // a scene can write it per node.
+    ShadowDisabled,
+    // A style or an alpha mode the shadow passes skip: Grid, Water, or a blended material.
+    StyleExcluded,
+    // Camera-culled, and no shadow view's frustum contains its world bounds either.
+    OutsideEveryView,
+    // Camera-culled and there are no shadow views at all this frame -- shadows off, or no casting
+    // light. Distinct from the line above because the answer to "why" is the frame, not the object.
+    NoShadowViews,
+};
+// True when any part of a world-space box is inside a frustum: the corner furthest along each
+// plane's normal, rejected only when even that is behind the plane.
+//
+// It lives here rather than in `scene_renderer.cpp`, where it was, for the reason the caster rule
+// moved: `casterState` needs exactly this test, and a second copy of it beside the first is the
+// thing this header exists to stop. `world::aabbVisible` is the same construction for the world
+// module, and rendering does not depend on world/.
+[[nodiscard]] bool aabbInsideFrustum(const std::array<glm::vec4, 6>& planes, const glm::vec3& min,
+                                     const glm::vec3& max);
+
+[[nodiscard]] std::string_view casterStateName(CasterState state);
+// True for the two states in which the entity is drawn into at least one shadow view.
+[[nodiscard]] bool casts(CasterState state);
+
+// The entity's own half of the rule: everything decidable without a frustum. Split out because the
+// renderer applies exactly this much in its first pass over the opaque list, where the camera has
+// already decided the object is on screen.
+[[nodiscard]] CasterState casterEligibility(const scene::Entity& entity);
+
+// The world-space AABB of an entity's mesh bounds under its transform: the eight corners
+// transformed and re-bounded, which is what the second cull tests. `meshBounds` is the scene's
+// own local-space pair for `entity.mesh`.
+[[nodiscard]] std::pair<glm::vec3, glm::vec3> entityWorldBounds(const scene::Entity& entity,
+                                                                const std::pair<glm::vec3, glm::vec3>& meshBounds);
+
+// The whole verdict. `views` is this frame's shadow views (empty when shadows are off), and
+// `viewPlanes` their frustum planes in the same order -- passed in rather than derived so the
+// caller can build them once per frame instead of once per entity.
+[[nodiscard]] CasterState casterState(const scene::Entity& entity,
+                                      const std::pair<glm::vec3, glm::vec3>& meshBounds,
+                                      std::span<const std::array<glm::vec4, 6>> viewPlanes);
+
+// Which cascade covers a view depth. The CPU mirror of `cascadeFor` in shaders/shadows.wgsl, and a
+// mirrored pair in the same sense `pointShadowFace`/`cubeFace` are: two implementations of one
+// test, kept identical by hand and by a test that walks the interesting values. The comparison is
+// `<=`, so a point exactly on a split belongs to the *nearer* cascade -- which matters, because
+// that is the half of the boundary the crossfade band is measured from.
+[[nodiscard]] std::uint32_t cascadeForDepth(float viewDepth, std::span<const float> splits);
+
+// ---- what the frame did (Shadow Lab) ------------------------------------------------------------
+
+// One shadow view, reported. Everything §15 asks a shadow diagnostic to expose about a cascade,
+// taken from the fit rather than recomputed from it: cascade id, the depths it covers, the volume
+// it covers them with, its texel, and both halves of its bias in the units each is expressed in.
+struct ShadowViewReport {
+    std::uint32_t index = 0;      // the atlas layer, and the cascade id the shader selects
+    bool cascade = false;
+    bool cube = false;
+    int lightIndex = -1;
+    float nearDepth = 0.0f;       // view depth this view covers from
+    float farDepth = 0.0f;        // ... and to
+    glm::vec3 center{0.0f};       // the snapped centre of the fitted volume, world space
+    float orthoRadius = 0.0f;     // half the width of the orthographic box (0 for a perspective fit)
+    float texelWorldSize = 0.0f;  // metres per texel
+    float depthRange = 0.0f;      // world units the normalised depth spans
+    // The two biases, in the units they are applied in. `worldBias` is what the renderer computes
+    // (two texels plus 5 mm) and `depthBias` is that divided by `depthRange`, which is the number
+    // the shader subtracts. Reported as a pair because a bias quoted in one of them alone cannot be
+    // compared between two cascades: the whole point of the conversion is that the same visual
+    // bias is a different number in each.
+    float worldBias = 0.0f;
+    float depthBias = 0.0f;
+    // The normal offset the shader pushes the sample point along, at normal incidence. The shader's
+    // full expression is `texel * (1 + 2 * (1 - NdotL)) * 1.4 + light.shadowBias`; this is its
+    // value at NdotL = 1, which is the floor.
+    float normalOffset = 0.0f;
+    std::uint32_t entityDraws = 0;    // entity draws this view recorded
+    std::uint32_t entitiesCulled = 0; // casters this view's own frustum rejected
+};
+
+// Fill a report from a view. The bias arithmetic is duplicated nowhere: `ShadowRenderer::update`
+// calls this and writes the uniform from what it returns.
+[[nodiscard]] ShadowViewReport reportView(const ShadowView& view, std::uint32_t index);
 
 } // namespace avgen::rendering

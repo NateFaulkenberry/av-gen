@@ -302,7 +302,7 @@ the copy that a test checks.
 | Visibility | whether an object reaches a draw call | which representation → LOD | `Composition::cullEntityNodes` |
 | LOD / Geometry | which level, and whether it holds still | whether it was culled → Visibility | `cull.wgsl:cs_cull_classify` |
 | Camera / Framing **(built)** | camera pose, the frustum handed to the cull, clearance, line of sight, which camera the viewport shows | which objects survive that frustum → Visibility | `src/world/camera_clearance.cpp:heroSightline` |
-| Shadow | cascade fitting, the caster list, the atlas, the mask, the contact march | the light's position and intensity → Lighting | `shadow_math.cpp:fitDirectionalCascade` |
+| Shadow **(built)** | cascade fitting, the caster list, the atlas, the mask, the contact march | the light's position and intensity → Lighting; which LOD rung an instance draws at → LOD; how the camera frustum is built → Camera | `shadow_math.cpp:casterState` |
 | Lighting | light packing, cluster assignment, LTC, IBL | whether a light is occluded → Shadow | `light_data.cpp:assignClusters` |
 | HDR / Exposure / Bloom | metering, exposure state, bloom, halation, tonemap | the radiance that entered → Lighting | `post_processor.cpp:PostProcessor::run` |
 | Volumetric / Atmosphere | the march, its scaling, the composite, atmospheric effects | the bloom the in-scatter feeds → HDR | `src/rendering/volume_renderer.cpp` |
@@ -458,8 +458,10 @@ the debug flag. `[gpu]` tests take `tools/gpu-lock.sh`.
 2. **The GPU instance cull reports no reason at all.** `cs_cull_classify` collapses six planes, a
    distance test, a screen-radius test and a depth-band thinning into one bool and writes only
    `0xFFFFFFFF`. Four of the eight `Unreported` codes are this one shader. **Owner: Visibility Lab.**
-3. **The shadow cascades have no overlay.** `rendering::ShadowView` carries the matrices and nothing
-   draws them, so "which cascade is this pixel in" has no visual answer. **Owner: Shadow Lab.**
+3. ~~**The shadow cascades have no overlay.**~~ **Built, 2026-09-17.** `DebugViewOptions::shadowCascades`
+   draws each view's orthographic volume from the matrix the renderer uploaded, `::shadowCascadeSlices`
+   draws the part of the camera frustum whose pixels select it, and `::shadowCasters` colours every
+   entity by `rendering::casterState`. See `docs/shadow-lab/README.md` §4.
 4. **Nothing checks line of sight from a directed camera to the hero it is framing.** Terrain
    clearance (ADR-080, `world::clearPath`) does hold — 0 of 184 baked keys and 0 of 4,001
    interpolated samples below surface + 1.2 m on both Glowmere projects — but an object standing

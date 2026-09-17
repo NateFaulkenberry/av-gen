@@ -3510,9 +3510,13 @@ int Application::runLive() {
             renderer_->setDiagnosticEntity(options.selectedEntity);
             renderer_->setDebugDepthTest(options.depthTest);
             transformHistory_.setSubject(options.selectedEntity);
+            // The shadow views are LAST frame's: this call runs before `render()` fits this
+            // frame's. Drawing a cascade one frame stale is the honest option and the note is here
+            // so nobody reads a lagging box as a fitting bug -- the alternative, fitting a second
+            // set here to draw, is the §37 trap the span exists to avoid.
             const rendering::ProceduralLodLevels lodLevels = readProceduralLodLevels(options);
             rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime,
-                                          &transformHistory_, &lodLevels);
+                                          &transformHistory_, &lodLevels, renderer_->shadows().views());
         }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                         engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
@@ -4240,7 +4244,7 @@ int Application::runHeadless() {
                 renderer_->setDebugDepthTest(options.depthTest);
                 const rendering::ProceduralLodLevels lodLevels = readProceduralLodLevels(options);
                 rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime,
-                                              nullptr, &lodLevels);
+                                              nullptr, &lodLevels, renderer_->shadows().views());
             }
             const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                             engine_->hasFrame() ? &engine_->latestFrame() : nullptr};

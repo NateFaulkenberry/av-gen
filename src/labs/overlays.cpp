@@ -46,10 +46,17 @@ rendering::DebugViewOptions overlaysFor(LabId id) {
         o.entityBounds = true;
         break;
     case LabId::Shadow:
-        // Caster bounds and the camera volume. The cascade volumes themselves have no overlay
-        // today; `rendering::ShadowView` carries the matrices and nothing draws them, which is the
-        // Shadow Lab's first work item.
-        o.entityBounds = true;
+        // The two halves of a cascade and the caster list. `shadowCascades` is the volume the
+        // depth pass rasterises into; `shadowCascadeSlices` is the part of the camera frustum whose
+        // pixels select it, which is the half that answers "why did the shadow change when I
+        // dollied". Both are drawn from the views the renderer uploaded, not from a second fit.
+        //
+        // `entityBounds` is deliberately OFF here and `shadowCasters` on in its place: two boxes
+        // per entity in two colour schemes is one box too many, and the caster colouring already
+        // carries the bound.
+        o.shadowCascades = true;
+        o.shadowCascadeSlices = true;
+        o.shadowCasters = true;
         o.frustum = true;
         break;
     case LabId::Lighting:
