@@ -120,6 +120,13 @@ struct QualitySettings {
     // before the mask existed, which is what keeps offline renders unchanged.
     float shadowMaskScale = 0.5f;
 
+    // ADR-255, DIAGNOSTIC ONLY: build the mask at full resolution *and let the lit pass read it*,
+    // whatever `shadowMaskScale` says. No tier sets this and nothing ships with it. It exists so
+    // the question ADR-087 answered by assertion -- whether the mask is "exactly the combined
+    // visibility the lit pass would otherwise compute" -- can be answered by a difference between
+    // two frames instead. Reached as `--quality-arm maskconsume`.
+    bool shadowMaskFullConsume = false;
+
     // ADR-139: the fraction of the scene's resolution the volumetric march (shaders/volume.wgsl
     // `fs_volume`) runs at, before the depth-aware upsample the composite pass does. 0.5 is the
     // half-resolution march ADR-032 shipped with and is what every tier below High still uses.

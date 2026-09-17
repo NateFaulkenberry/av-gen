@@ -72,6 +72,7 @@ cmake-build-*/
 # `absolute(projectFile).parent_path()` as its base), so the README's recipe writes 119 MB into
 # `examples/quality/out/` and not into the repository root. Same rule, same reason.
 /examples/quality/out/
+/examples/world/out/
 
 # Staged sources for the published handbook artifact (regenerate rather than commit)
 .avgen-manual/

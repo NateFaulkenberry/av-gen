@@ -241,7 +241,7 @@ targetProfile}`, `renderer {configuration, gpu, frameTimeMs, contentionWitness}`
 §18 it shows the dimensions **separately** and never a composite:
 
 ```
-Spatial similarity 93.2   Temporal alternation 88.7   Shadow stability  unavailable (no shadow AOV)
+Spatial similarity 93.2   Temporal alternation 88.7   Shadow stability  3.15 over 4.6% (approximation)
 Specular residual  82.4   Banding  unavailable (no libvmaf)   Detail retention 0.91
 ```
 
@@ -277,7 +277,7 @@ rubric and fixed-review-frame list rather than creating a second review system.
 | **1** | research, this architecture, ADRs | ✅ done — **this is the §50 STEP 11 stopping point** |
 | **2** | vertical slice: one scene → candidate + reference → PSNR/SSIM/MS-SSIM/CIEDE2000/Laplacian → JSON + HTML + diagnostics | ✅ done — the §34 ladder passes with its controls, **and with a meta-control that catches a deliberately broken metric**. VMAF, PSNR-HVS and CAMBI are in too; see below |
 | **3** | motion-compensated residual, disocclusion mask, temporal re-scoping | ✅ done — §1's control arms pass, including the one that matters: masking is what makes the residual small (ADR-253) |
-| **4** | AOV-gated per-class detectors | ✅ **partly.** `specularResidual`, `shadingResidual` and `lodIdentifierChurn` are built and controlled. `vegetationResidual` reports unavailable — the mask machinery is tested, the **material-id → class mapping does not exist**. `shadowStability` reports unavailable — **no shadow AOV**. Both are human decisions |
+| **4** | AOV-gated per-class detectors | ✅ **all five.** `specularResidual`, `shadingResidual` and `lodIdentifierChurn` were built and controlled in Phase 4; `shadowStability` and `vegetationResidual` were the two named absences and both are now numbers (ADR-258, ADR-259) — the first labelled an approximation because the shadow AOV recomputes the term rather than capturing it (0.43% of pixels differ), the second keyed on the identifier half that is actually unique, because the half named `materialId` is not a material |
 | **5** | benchmark suite — **aliasing first**, then a dolly temporal scene | ✅ done — `examples/quality/aliasing` and `-dolly`, both vacuous on the first attempt (ADR-254) |
 | **6** | real-scene validation against human assessment | **the owner's time** |
 | **7** | experiment framework, Pareto | a quiet machine for the cost axis |

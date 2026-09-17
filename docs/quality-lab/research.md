@@ -611,7 +611,7 @@ Legend: **FR** full-reference · **NR** no-reference · **S** spatial · **T** t
 | **mean \|Laplacian\|** | ✓ | ✓ | ✗ | **cannot separate aliasing from detail**; valid only between arms of one view | trivial | ✓ | ✓ | exists (`tools/spatial_stats.py`) |
 | **2nd temporal difference** | ✓ | ✓ | ✗ (same camera) | **ranks AA remedies backwards** on spatial aliasing over moving geometry (ADR-243); needs ≥ 3 frames; loads the sequence into memory | low | ✓ | ✓ | exists (`tools/temporal_stats.py`) |
 | **motion-compensated residual** | ✓ | ✓ | ✗ — it *creates* the alignment | **disocclusion**: newly-revealed pixels always score high and are not artifacts; inherits any velocity-buffer defect | moderate | ✓ | ✓ | native; needs `--aov velocity,depth,id` |
-| **AOV-gated residual** | ✓ | ✓ | ✗ | **no shadow AOV exists**; emission ≠ specular exactly; masks are candidate-resolution | moderate | ✓ | ✓ | native; needs `--aov` |
+| **AOV-gated residual** | ✓ | ✓ | ✗ | ⚠ *amended 2026-09-17:* a shadow AOV now exists and **recomputes** the term rather than capturing it, 0.43% of pixels differing (ADR-255/258); emission ≠ specular exactly; masks are candidate-resolution | moderate | ✓ | ✓ | native; needs `--aov` |
 | **spectral detail retention** | ✓ | ✓ | ✓ | a sharpening filter and genuine detail both raise it — the sign must be read with ꟻLIP beside it | low | ✓ | ✓ | native |
 | **directional-energy aliasing** | ✓ | ~ | ✗ | patent-encumbered implementations exist; implement from the principle | moderate | ✓ | ✓ | native, deferred |
 | **optical flow** | ~ | ~ | ✗ | worst precisely on thin, fast, low-texture geometry — our artifact regions | **high** | ✓ | ✓ | OpenCV — absent here |

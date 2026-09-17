@@ -161,6 +161,37 @@ struct TextureRef {
 
 enum class AlphaMode : std::uint8_t { Opaque, Mask, Blend };
 
+// What kind of surface this material is (ADR-256), as the thing that built it knew.
+//
+// **This is not a Quality Lab concept and it is not inferred.** A material id is an index; the
+// identifier AOV carries an index; and no consumer downstream of a generator can recover "this is
+// grass" from either. The class is set at the one point in the pipeline where it is known for
+// free -- the terrain builder knows the ground is ground, the ecology's scatter layers carry the
+// asset library's own category -- and travels with the material from there.
+//
+// ⚠ **A taxonomy already exists**: `assets::AssetCategory` (Flora, Fungi, Rock, Crystal, Creature,
+// Structure, Terrain, Water, Architectural, Organic, ...). This enum is deliberately a coarser
+// *rendering-side* view of the same fact rather than a second opinion about it -- `scene/` sits
+// under `assets/` in the dependency order, and the asset library's categories describe a file
+// while these describe a surface in a frame. Where both exist the mapping is one-way and lives in
+// the generator, so the two can never be independently authored and disagree.
+//
+// `Unclassified` is the default and means "nobody said", never "none of the above": a metric gated
+// on a class must report how much of the frame it covered and must not treat the unclassified
+// remainder as background.
+enum class SurfaceClass : std::uint8_t {
+    Unclassified = 0,
+    Vegetation,
+    Terrain,
+    Water,
+    Rock,
+    Architecture,
+    Character,
+    Effect,
+};
+[[nodiscard]] const char* surfaceClassName(SurfaceClass c);
+[[nodiscard]] std::optional<SurfaceClass> surfaceClassFromName(std::string_view name);
+
 // glTF metallic-roughness material. Textures multiply the factors.
 struct Material {
     glm::vec3 baseColor{0.75f, 0.2f, 0.9f};
@@ -175,6 +206,10 @@ struct Material {
     float alphaCutoff = 0.5f;
     bool doubleSided = false;
     bool unlit = false;
+    // ADR-256. Defaulted, so every existing material, every glTF import and every hand-written
+    // scene file is unchanged and every serialisation round-trips byte-identically: nothing reads
+    // this except the AOV manifest, and nothing writes it except a generator that knows.
+    SurfaceClass surfaceClass = SurfaceClass::Unclassified;
     std::string program;                 // procedural material program name (ADR-030; empty = none)
     TextureRef baseColorTexture;         // sRGB, rgb * baseColor, a * opacity
     TextureRef metallicRoughnessTexture; // linear, g = roughness, b = metallic

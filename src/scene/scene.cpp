@@ -348,4 +348,32 @@ std::vector<std::string> danglingMaterialPrograms(const Scene& scene) {
     return out;
 }
 
+// ---- surface classes (ADR-256) -----------------------------------------------------------------
+
+const char* surfaceClassName(SurfaceClass c) {
+    switch (c) {
+    case SurfaceClass::Vegetation: return "vegetation";
+    case SurfaceClass::Terrain: return "terrain";
+    case SurfaceClass::Water: return "water";
+    case SurfaceClass::Rock: return "rock";
+    case SurfaceClass::Architecture: return "architecture";
+    case SurfaceClass::Character: return "character";
+    case SurfaceClass::Effect: return "effect";
+    case SurfaceClass::Unclassified: break;
+    }
+    return "unclassified";
+}
+
+std::optional<SurfaceClass> surfaceClassFromName(std::string_view name) {
+    for (const SurfaceClass c :
+         {SurfaceClass::Unclassified, SurfaceClass::Vegetation, SurfaceClass::Terrain,
+          SurfaceClass::Water, SurfaceClass::Rock, SurfaceClass::Architecture,
+          SurfaceClass::Character, SurfaceClass::Effect}) {
+        if (name == surfaceClassName(c)) {
+            return c;
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace avgen::scene

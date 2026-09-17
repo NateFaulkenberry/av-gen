@@ -3,6 +3,7 @@
 #include "app/render_settings.hpp"
 
 #include "rendering/render_quality.hpp"
+#include "scene/scene.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -329,4 +330,71 @@ TEST_CASE("supersample round-trips through a project", "[render][settings]") {
     nlohmann::json bad = j;
     bad["supersample"] = "two";
     CHECK_FALSE(RenderSettings::fromJson(bad).has_value());
+}
+
+// ---- the shadow AOV's preconditions (ADR-255, ADR-182) ------------------------------------------
+
+TEST_CASE("--aov shadow refuses the configurations where it would be a constant",
+          "[render][settings][aov][adr255]") {
+    // ADR-255 asked for one clause; running the arm produced a second. Both are here because a
+    // refusal nobody can exercise is a refusal nobody knows still works -- and because the shape
+    // being refused is the one this repository keeps writing ADRs about: a valid file, of the
+    // right size, in the right format, containing something that is not what its name says.
+    avgen::scene::Scene scene;
+
+    SECTION("a scene with no lights at all") {
+        // The scene as flattened, not as authored: Composition adds a default key light to a scene
+        // that declares none, so this is the state only a scene with authored non-directional
+        // lighting reaches.
+        CHECK_FALSE(shadowAovPreconditions(scene, "").has_value());
+    }
+
+    SECTION("a scene lit only by point lights") {
+        avgen::scene::PunctualLight lamp;
+        lamp.type = avgen::scene::PunctualLight::Type::Point;
+        lamp.castsShadow = true;
+        scene.lights.push_back(lamp);
+        auto r = shadowAovPreconditions(scene, "");
+        REQUIRE_FALSE(r.has_value());
+        CHECK(r.error().message.find("directional") != std::string::npos);
+    }
+
+    SECTION("a directional light that does not cast") {
+        avgen::scene::PunctualLight key;
+        key.type = avgen::scene::PunctualLight::Type::Directional;
+        key.castsShadow = false;
+        scene.lights.push_back(key);
+        CHECK_FALSE(shadowAovPreconditions(scene, "").has_value());
+    }
+
+    SECTION("a directional light that is switched off") {
+        avgen::scene::PunctualLight key;
+        key.type = avgen::scene::PunctualLight::Type::Directional;
+        key.castsShadow = true;
+        key.enabled = false;
+        scene.lights.push_back(key);
+        CHECK_FALSE(shadowAovPreconditions(scene, "").has_value());
+    }
+
+    // The arm that makes every refusal above mean something: the configuration that must PASS.
+    avgen::scene::PunctualLight key;
+    key.type = avgen::scene::PunctualLight::Type::Directional;
+    key.castsShadow = true;
+    scene.lights.push_back(key);
+
+    SECTION("a casting directional light is what it needs") {
+        CHECK(shadowAovPreconditions(scene, "").has_value());
+        CHECK(shadowAovPreconditions(scene, "particles,water").has_value());
+    }
+
+    SECTION("...and the shadow passes must still be running") {
+        // Measured, not reasoned: with `--disable shadows` the exported plane marked 28.9% of the
+        // frame shadowed against 4.6% in the same render with shadows on, because the mask pass
+        // samples an atlas the disabled passes never drew and an undrawn depth atlas reads as an
+        // occluder in front of everything.
+        auto r = shadowAovPreconditions(scene, "shadows");
+        REQUIRE_FALSE(r.has_value());
+        CHECK(r.error().message.find("--disable shadows") != std::string::npos);
+        CHECK_FALSE(shadowAovPreconditions(scene, "particles,shadows").has_value());
+    }
 }

@@ -1,5 +1,6 @@
 #include "app/render_job.hpp"
 
+#include <fstream>
 #include <sstream>
 
 #include "assets/exr.hpp"
@@ -8,12 +9,65 @@
 #include "gpu/context.hpp"
 
 #include <fmt/format.h>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
 
 namespace avgen::app {
+
+namespace {
+
+// ADR-256: the mapping from what the identifier AOV actually carries to what a surface IS, written
+// by the run that produced the frames.
+//
+// **The key is the identifier's low 16 bits, not its high 16.** ADR-256 assumed the high half was a
+// material index; it is not. Every renderer that writes this target puts the object's own index
+// within its pick space plus one there -- `thisEntity + 1`, `i + 1`, `objectId + 1` -- so two
+// objects sharing one material get different numbers and an entity and a procedural with nothing
+// in common get the same one. The low half is `packPickId`, which carries a two-bit `PickSpace`
+// tag and is unique across all three. Both halves are written out so the file says what it is
+// keyed on rather than leaving a reader to assume.
+//
+// Written only for `--aov id`, because without the identifier plane there is nothing to key.
+nlohmann::ordered_json materialManifest(const scene::Scene& scene) {
+    nlohmann::ordered_json j;
+    j["format"] = "avgen-materials";
+    j["version"] = 1;
+    j["key"] = "objectId: the low 16 bits of the id AOV (scene::pickIndexOf plus a 2-bit PickSpace "
+               "tag). NOT the high 16 bits, which carry the object's ordinal within its pick space "
+               "and are named 'materialId' for historical reasons only (ADR-256)";
+    nlohmann::ordered_json objects = nlohmann::ordered_json::array();
+    const auto add = [&](scene::PickSpace space, std::size_t index, const std::string& name,
+                         const scene::Material& material) {
+        nlohmann::ordered_json o;
+        o["objectId"] = scene::packPickId(space, index);
+        o["materialId"] = static_cast<std::uint32_t>(index + 1); // what the high half will hold
+        o["space"] = space == scene::PickSpace::Entity       ? "entity"
+                     : space == scene::PickSpace::Procedural ? "procedural"
+                                                             : "sdf";
+        o["name"] = name;
+        o["class"] = scene::surfaceClassName(material.surfaceClass);
+        objects.push_back(std::move(o));
+    };
+    for (std::size_t i = 0; i < scene.entities.size(); ++i) {
+        add(scene::PickSpace::Entity, i, scene.entities[i].name, scene.entities[i].material);
+    }
+    for (std::size_t i = 0; i < scene.procedurals.size(); ++i) {
+        add(scene::PickSpace::Procedural, i, scene.procedurals[i].name, scene.procedurals[i].material);
+    }
+    for (std::size_t i = 0; i < scene.sdfs.size(); ++i) {
+        add(scene::PickSpace::Sdf, i, scene.sdfs[i].name, scene.sdfs[i].material);
+    }
+    j["objects"] = std::move(objects);
+    return j;
+}
+
+} // namespace
+
+
+
 
 RenderJob::RenderJob(gpu::Context& context, gpu::ShaderLibrary& shaders, std::unique_ptr<Engine> engine,
                      RenderSettings settings, std::filesystem::path baseDir)
@@ -259,6 +313,25 @@ Result<void> RenderJob::start() {
                 src.texture = &renderer_->identifierTexture();
                 src.format = Format::R32Uint;
                 src.half = false; // an identifier is an integer; half is exact only to 2048
+            } else if (name == "shadow") {
+                // ADR-255. The only AOV whose target is not written unless somebody asks: at the
+                // `high` and `offline` tiers no shadow mask is built at all, because the lit pass
+                // computes the term per pixel inline. So the request turns a dedicated
+                // full-resolution pass on, and the pass is NOT consumed by the lit pass -- the
+                // shaded frame is byte-for-byte what it would have been without `--aov shadow`.
+                //
+                // **The refusal that makes the file mean something.** A scene with no directional
+                // light has no shadow-map term, so the mask would be a plane of 1.0: a valid EXR,
+                // of the right size, in the right format, containing a constant. ADR-242 refused
+                // exactly this shape once already and ADR-255 asks for it again here.
+                if (const scene::Composition* comp = engine_->composition()) {
+                    if (auto r = shadowAovPreconditions(comp->scene(), settings_.disablePasses); !r) {
+                        return r;
+                    }
+                }
+                renderer_->shadowMask().setExportRequested(true);
+                src.texture = &renderer_->shadowTexture();
+                src.format = Format::Rgba16Float;
             } else {
                 return avgen::fail("render: unhandled aov '{}'", name); // aovList() validates
             }
@@ -276,6 +349,27 @@ Result<void> RenderJob::start() {
             return avgen::fail("cannot create '{}' for AOVs: {}", aovDir_.string(), aovEc.message());
         }
         log::info("render: exporting {} AOV(s) beside the frames: {}", aovs_.size(), settings_.aovs);
+        // ADR-256: the identifier plane is a plane of integers, and an integer is not a name. The
+        // run that produced it writes what they mean, beside them, so the mapping cannot disagree
+        // with the frames it describes -- which a hand-maintained list of ids silently would, the
+        // first time the scene gained an object.
+        bool wantsId = false;
+        for (const AovSource& a : aovs_) {
+            wantsId = wantsId || a.name == "id";
+        }
+        if (wantsId) {
+            if (const scene::Composition* comp = engine_->composition()) {
+                materialManifest_ = materialManifest(comp->scene()).dump(2);
+                std::ofstream file(aovDir_ / "materials.json");
+                file << materialManifest_ << "\n";
+                if (!file) {
+                    return avgen::fail("cannot write '{}'", (aovDir_ / "materials.json").string());
+                }
+                log::info("render: wrote materials.json ({} object(s)) beside the id AOV",
+                          comp->scene().entities.size() + comp->scene().procedurals.size() +
+                              comp->scene().sdfs.size());
+            }
+        }
     }
     std::error_code ec;
     if (isSequence(settings_.output)) {
@@ -619,6 +713,29 @@ Result<void> RenderJob::finish() {
         }
     }
     encoders_.clear();
+    // ADR-256, the check that makes the manifest worth trusting: re-derive it now and compare. A
+    // scene whose object set moved during the render -- ADR-091 live-tier population, a rebuild on
+    // seek -- would leave a mapping that is well-formed, plausible, and about a different set of
+    // objects than the frames beside it. That is the exact failure the manifest exists to prevent,
+    // so it is not left to be assumed away.
+    if (!materialManifest_.empty()) {
+        if (const scene::Composition* comp = engine_->composition()) {
+            const std::string now = materialManifest(comp->scene()).dump(2);
+            if (now != materialManifest_) {
+                log::warn("render: the scene's objects changed during the render, so materials.json "
+                          "describes the frames it was written beside and not the ones that "
+                          "followed. Rewriting it as UNSTABLE; a per-class measurement over this "
+                          "render is not valid (ADR-256)");
+                nlohmann::ordered_json unstable = nlohmann::ordered_json::parse(now, nullptr, false);
+                if (!unstable.is_discarded()) {
+                    unstable["stable"] = false;
+                    unstable["reason"] = "the scene's object set changed during the render";
+                    std::ofstream file(aovDir_ / "materials.json");
+                    file << unstable.dump(2) << "\n";
+                }
+            }
+        }
+    }
     if (video_) {
         if (auto r = video_->finish(); !r) {
             fail("video: " + r.error().message);

@@ -33,6 +33,7 @@
 
 namespace avgen::app {
 
+
 struct RenderProgress {
     std::uint64_t framesRendered = 0;  // submitted to the GPU
     std::uint64_t framesReadBack = 0;  // read back and hashed (<= framesRendered while in flight)
@@ -159,6 +160,10 @@ private:
     // path. A video with AOVs beside it is a real request -- the passes are for the compositor,
     // and the movie is for everyone else -- so the directory is resolved once, here.
     std::filesystem::path aovDir_;
+    // ADR-256: what `materials.json` said at `start()`. Kept so `finish()` can re-derive it and
+    // say so if the scene's object set moved under the render -- a mapping that ships with the
+    // frames can only be trusted if the frames it shipped with are the frames it described.
+    std::string materialManifest_;
     wgpu::Texture ldr_;                       // tone-mapped RGBA8 target (CopySrc)
     wgpu::TextureView ldrView_;
     std::unique_ptr<assets::VideoWriter> video_;

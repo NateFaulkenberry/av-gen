@@ -13,10 +13,15 @@
 // measuring, and it reports the mask's coverage beside every number it produces, because a residual
 // over 0.4% of the frame is a statement about 0.4% of the frame.
 //
-// **What is deliberately absent: shadow.** There is no shadow AOV. ADR-242 lists it among the views
-// not added because nothing had asked for one, and the Quality Lab is the first consumer with a
-// reason to ask. Approximating it from "regions the lighting model says are shadowed" is refused —
-// it would be a number whose name promised more than it knew.
+// **Shadow is no longer absent, and what arrived is not quite what was asked for.** ADR-255 built
+// `--aov shadow`: a dedicated full-resolution pass, because at the `offline` tier the Quality Lab
+// renders at, the engine's own shadow mask is never built and an AOV taken from it would have been
+// a constant. The pass therefore **recomputes** the shadow-map term rather than capturing the one
+// the lit pass used, and ADR-255 required that to be measured rather than assumed. It was: on
+// Glowmere at 640x360, a frame whose lit pass consumes this term differs from the frame that
+// computes it inline on **0.43% of pixels, peak 22 of 255** -- against a control (the shadow atlas
+// halved) that moves 1.86%. So the agreement is close, real and not exact, and every number gated
+// on this mask says so in its own limitations. A second opinion, labelled one.
 
 #include "capture/sequence.hpp"
 
@@ -98,6 +103,29 @@ struct IdentifierSurvey {
 // 16 bits an object id (of which the top two are a `PickSpace` tag), the high 16 a material id.
 [[nodiscard]] std::uint32_t materialIdOf(float packed);
 [[nodiscard]] std::uint32_t objectIdOf(float packed);
+
+// **Shadowed pixels**, from `--aov shadow` (ADR-255). rgb is the shadow-map visibility of
+// directional lights 0, 1 and 2 and alpha is the view depth the term was computed at, so a pixel
+// is in shadow when the key light's visibility is below `maxVisibility` -- and the sky is excluded
+// by its depth rather than by its visibility, because the pass writes unshadowed white there and a
+// threshold alone would have put the whole sky in the "lit" half of a mask that is about surfaces.
+//
+// The threshold is a decision and not a fact. A penumbra is a continuum; 0.5 is the half-lit point
+// and any number in it is a choice about where a soft edge stops being shadow.
+[[nodiscard]] Mask shadowedMask(const Plane& shadow, double maxVisibility = 0.5);
+
+// **Surface class** (ADR-256). The Lab is handed a set of packed identifier values by the render's
+// own `materials.json` and masks the pixels that carry them.
+//
+// This is NOT `materialClassMask` with a different name, and the difference is the finding ADR-256
+// was half a step away from: the identifier's high 16 bits are **not a material index**. Every
+// renderer that writes the identifier target puts the object's own index within its pick space,
+// plus one, in that field -- `obj.ids.y = thisEntity + 1` in scene_renderer.cpp,
+// `static_cast<float>(i + 1)` in procedural_renderer.cpp, `objectId + 1` in sdf_renderer.cpp. Two
+// objects sharing one material get different numbers there, and an entity and a procedural with
+// nothing in common get the same one. So a class is keyed on the value that IS unique -- the low
+// 16 bits, which carry a `PickSpace` tag -- and `materials.json` is written against that.
+[[nodiscard]] Mask objectClassMask(const Plane& id, const std::vector<std::uint32_t>& objectIds);
 
 // Every pixel. The control arm for every mask above: a gated residual over `everything()` must equal
 // the ungated residual, or the gating machinery is doing something other than gating.

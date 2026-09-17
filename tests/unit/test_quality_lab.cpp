@@ -13,6 +13,8 @@
 
 #include "artifacts/masks.hpp"
 #include "capture/sequence.hpp"
+
+#include "scene/scene_types.hpp"
 #include "external/vmaf.hpp"
 #include "metrics/temporal.hpp"
 #include "report/diagnostics.hpp"
@@ -473,6 +475,68 @@ TEST_CASE("an object splits into an interior that cannot alias and a silhouette 
     const quality::MaskedDifference empty = quality::maskedLumaDifference(
         filtered, base, quality::Mask(static_cast<std::size_t>(width) * height, 0));
     CHECK(empty.pixels == 0);
+}
+
+TEST_CASE("the shadow mask finds shadowed surfaces and never the sky", "[quality][aov][adr255]") {
+    // ADR-255's AOV: rgb = the shadow-map visibility of directional lights 0/1/2, a = the view
+    // depth it was computed at. The sky is the arm that matters here -- the pass writes UNSHADOWED
+    // white there, so a threshold on visibility alone would be correct about the sky by accident
+    // and wrong the day the pass writes anything else. The depth is what excludes it.
+    quality::Plane shadow;
+    shadow.width = 4;
+    shadow.height = 1;
+    shadow.rgba.assign(16, 0.0f);
+    const auto set = [&](std::uint32_t x, float visibility, float depth) {
+        shadow.rgba[x * 4 + 0] = visibility;
+        shadow.rgba[x * 4 + 1] = visibility;
+        shadow.rgba[x * 4 + 2] = visibility;
+        shadow.rgba[x * 4 + 3] = depth;
+    };
+    set(0, 0.0f, 12.0f);  // fully shadowed surface
+    set(1, 0.9f, 12.0f);  // lit surface
+    set(2, 1.0f, 0.0f);   // sky: unshadowed, and no depth
+    set(3, 0.2f, 0.0f);   // sky that somehow reads dark -- still not a surface
+    CHECK(quality::coverage(quality::shadowedMask(shadow)) == Approx(0.25));
+    // The threshold is a decision and the mask moves with it, which is what makes it a decision.
+    CHECK(quality::coverage(quality::shadowedMask(shadow, 0.95)) == Approx(0.5));
+    // The controls: at the extremes it is empty and it is every SURFACE -- never every pixel,
+    // because the sky is not a surface however the threshold is set.
+    CHECK(quality::coverage(quality::shadowedMask(shadow, 0.0)) == Approx(0.0));
+    CHECK(quality::coverage(quality::shadowedMask(shadow, 2.0)) == Approx(0.5));
+}
+
+TEST_CASE("a class mask keys on the identifier half that is actually unique",
+          "[quality][aov][adr256]") {
+    // ADR-256 assumed the identifier's high 16 bits were a material index. They are not: every
+    // renderer that writes this target puts the object's own ordinal within its pick space plus
+    // one there. So an entity and a procedural that share NOTHING share that number, and the mask
+    // that keys on it selects both.
+    quality::Plane id;
+    id.width = 4;
+    id.height = 1;
+    id.rgba.assign(16, 0.0f);
+    const auto pack = [](std::uint32_t high, std::uint32_t low) {
+        return static_cast<float>((high << 16) | low);
+    };
+    const std::uint32_t entity0 = avgen::scene::packPickId(avgen::scene::PickSpace::Entity, 0);
+    const std::uint32_t procedural0 =
+        avgen::scene::packPickId(avgen::scene::PickSpace::Procedural, 0);
+    REQUIRE(entity0 != procedural0);
+    id.rgba[0] = pack(1, entity0);      // entity 0: its "material id" is 1
+    id.rgba[4] = pack(1, procedural0);  // procedural 0: ALSO 1, and nothing to do with the entity
+    id.rgba[8] = pack(2, avgen::scene::packPickId(avgen::scene::PickSpace::Entity, 1));
+    id.rgba[12] = 0.0f;                 // nothing wrote here
+
+    // The failure the object-keyed mask exists to avoid, demonstrated rather than asserted: keyed
+    // on the high half, one class selects two unrelated objects.
+    CHECK(quality::coverage(quality::materialClassMask(id, {1})) == Approx(0.5));
+    // Keyed on the low half, it selects the one object it was given.
+    CHECK(quality::coverage(quality::objectClassMask(id, {entity0})) == Approx(0.25));
+    CHECK(quality::coverage(quality::objectClassMask(id, {entity0, procedural0})) == Approx(0.5));
+    // The controls: an empty class list selects nothing rather than everything, and an id that is
+    // in no class selects nothing rather than the background.
+    CHECK(quality::objectClassMask(id, {}).empty());
+    CHECK(quality::coverage(quality::objectClassMask(id, {4242})) == Approx(0.0));
 }
 
 // ---- capture -----------------------------------------------------------------------------------

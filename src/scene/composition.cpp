@@ -3,6 +3,7 @@
 #include "params/timeline.hpp"
 
 #include "core/log.hpp"
+#include "assets/asset_library.hpp"
 #include "entity/obstacles.hpp"
 #include "scene/camera.hpp"
 #include "scene/mesh_generators.hpp"
@@ -778,6 +779,62 @@ int partBudget(const std::vector<AssetPart>& parts, std::size_t index, int asset
 // already starts with the prefix is left alone, which also covers the per-frame re-application).
 // The generated ground material's name, before this composition's prefix is applied. One place, so
 // the node that names it and the pass that creates it cannot drift apart.
+
+// ADR-256: the surface class of a scatter layer, from the thing that already knows.
+//
+// **The asset library's own category first**, because that is where the knowledge came from and a
+// second heuristic over the same asset is two classifications that can disagree -- the failure
+// `entity::classifyAsset` records in its own first comment.
+//
+// `entity::classifyScatterLayer` is deliberately NOT used as the primary path even though it reads
+// the same field, because it is a *navigation* classifier and its collapse is wrong here: it maps
+// Terrain, Water, Particle and Atmosphere onto Vegetation, which is correct for "can a walker pass
+// through it" and false about what the surface is. It is used only as the fallback, where it is the
+// filename-and-layer-name keyword table and nothing else exists -- which is Glowmere's case, whose
+// scene file predates categories entirely.
+SurfaceClass scatterSurfaceClass(const world::ScatterLayer& layer) {
+    if (const std::optional<assets::AssetCategory> c = assets::assetCategoryFromName(layer.category)) {
+        switch (*c) {
+        case assets::AssetCategory::Flora:
+        case assets::AssetCategory::Fungi:
+        case assets::AssetCategory::Organic:
+        case assets::AssetCategory::Floating:
+            return SurfaceClass::Vegetation;
+        case assets::AssetCategory::Rock:
+        case assets::AssetCategory::Crystal:
+            return SurfaceClass::Rock;
+        case assets::AssetCategory::Structure:
+        case assets::AssetCategory::Architectural:
+            return SurfaceClass::Architecture;
+        case assets::AssetCategory::Creature:
+            return SurfaceClass::Character;
+        case assets::AssetCategory::Terrain:
+            return SurfaceClass::Terrain;
+        case assets::AssetCategory::Water:
+            return SurfaceClass::Water;
+        case assets::AssetCategory::Particle:
+        case assets::AssetCategory::Atmosphere:
+            return SurfaceClass::Effect;
+        case assets::AssetCategory::Unknown:
+            break;
+        }
+    }
+    switch (entity::classifyScatterLayer(layer)) {
+    case spatial::ObstacleType::Vegetation:
+    case spatial::ObstacleType::Trunk: // a tree is vegetation; only navigation cares that it is solid
+        return SurfaceClass::Vegetation;
+    case spatial::ObstacleType::Rock:
+        return SurfaceClass::Rock;
+    case spatial::ObstacleType::Structure:
+        return SurfaceClass::Architecture;
+    case spatial::ObstacleType::Creature:
+        return SurfaceClass::Character;
+    case spatial::ObstacleType::Custom:
+        break;
+    }
+    return SurfaceClass::Unclassified;
+}
+
 std::string terrainGroundProgramName(const std::string& node) {
     return node + "_ground";
 }
@@ -3527,6 +3584,7 @@ void Composition::rebuild() {
                 // distributionTransform would scale the placements with it and move a tree scaled
                 // x2 twice as far from the origin.
                 pg.material.baseColor *= layer.tint;
+                pg.material.surfaceClass = scatterSurfaceClass(layer); // ADR-256
                 if (layer.emissiveIntensity > 0.0f) {
                     pg.material.emissiveColor = layer.emissiveColor;
                     pg.material.emissiveIntensity = layer.emissiveIntensity;
@@ -3711,6 +3769,10 @@ void Composition::rebuild() {
                 Entity& e = scene_.addEntity(fmt::format("{}.chunk{}", node.name, c), chunk.meshes[0]);
                 e.style = MeshStyle::Lit;
                 e.material = node.terrainMaterial;
+                // ADR-256: the class, set where it is known for free. The terrain builder is the
+                // only thing in the pipeline that knows this mesh is the ground -- downstream it
+                // is an entity with a mesh and a material program, and no consumer can recover it.
+                e.material.surfaceClass = SurfaceClass::Terrain;
                 if (e.material.program.empty() && !node.worldMap.biomes.empty()) {
                     e.material.program = prefixed(sanitise(prefix_), terrainGroundProgramName(node.name));
                 }
@@ -3738,6 +3800,7 @@ void Composition::rebuild() {
                 e.material.metallic = 0.0f;
                 e.material.doubleSided = true; // a surface seen from under it is still a surface
                 e.material.program = prefixed(sanitise(prefix_), terrainWaterProgramName(node.name));
+                e.material.surfaceClass = SurfaceClass::Water; // ADR-256
                 e.castsShadow = false; // a translucent sheet casting a hard shadow on its own bed
                 e.transform = nodeT;
                 e.visible = visible;
