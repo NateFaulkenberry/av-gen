@@ -18,6 +18,7 @@
 #include "core/rng.hpp"
 #include "scene/procedural.hpp"
 #include "core/time.hpp"
+#include "core/phase2_probe.hpp" // TEMPORARY: ui-responsiveness phase 2
 #include "gpu/context.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/surface.hpp"
@@ -162,7 +163,8 @@ std::string usageText() {
            "  --ai-script <file>  run the AI control plane against a scripted provider (JSON with a\n"
            "                      'turns' array). Deterministic: no key, no network, real tools\n"
            "  --ui-script <arms>  drive the editor with a repeatable interaction: comma-separated from\n"
-           "                      hover,sliders,panels,select,scrub,camera,tabs,edit,strip,gizmo,box\n"
+           "                      hover,sliders,panels,select,scrub,camera,tabs,edit,strip,gizmo,box,\n"
+           "                      star,click\n"
            "                      -- or idle, or all\n"
            "  --ui-ab <a>:<b>..   interleave those --ui-script arms in blocks inside ONE process and\n"
            "                      report each arm's frame distribution side by side. The only honest\n"
@@ -1974,6 +1976,20 @@ void Application::handleInputEvent(const SDL_Event& event) {
             if (uiSelfTestEvents_) {
                 uiEventTypes_[event.type] += 1;
             }
+            // TEMPORARY (ui-responsiveness phase 2): every event, not only the motions, and the
+            // oldest as well as the newest. A timeline click is a BUTTON_DOWN, so the existing
+            // `input->present ms` -- motion only -- cannot see the interaction this phase is about.
+            ++probe2::frame().inputEvents;
+            if (event.type == SDL_EVENT_MOUSE_MOTION) {
+                probe2::frame().note(event.motion.timestamp);
+                ++probe2::frame().pointerEvents;
+            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
+                       event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                probe2::frame().note(event.button.timestamp);
+                ++probe2::frame().pointerEvents;
+            } else {
+                probe2::frame().note(event.common.timestamp);
+            }
             if (event.type == SDL_EVENT_MOUSE_MOTION) {
                 ++uiMotionEvents_;
                 newestInputNs_ = std::max(newestInputNs_, event.motion.timestamp);
@@ -2712,6 +2728,35 @@ int Application::runLive() {
     // is the reason these are here -- a phantom 3.8x regression was nearly filed off timings while
     // the structural counters moved 3.6%, and it was the counters that indicted the machine. A
     // regeneration count cannot be inflated by somebody else's build.
+    // TEMPORARY (ui-responsiveness phase 2). These are the phases the investigation added; they
+    // are pure measurement and none of them is read by anything that decides what the frame does.
+    const int kPhSeek = prof.phase("engine.seek ms");
+    const int kPhEntitySeek = prof.phase("  entity re-sim ms");
+    const int kPhSeekCount = prof.phase("# seeks/frame");
+    const int kPhSimBodies = prof.phase("# resim ksteps");
+    const int kPhCatchup = prof.phase("analysis.catchup ms");
+    const int kPhUpdControl = prof.phase("upd.control ms");
+    const int kPhUpdSignals = prof.phase("upd.signals ms");
+    const int kPhUpdMod = prof.phase("upd.modulation ms");
+    const int kPhUpdCtrl = prof.phase("upd.controller ms");
+    const int kPhUpdOther = prof.phase("upd.other ms");
+    const int kPhUiAck = prof.phase("input->ui.build ms");
+    const int kPhOldestAck = prof.phase("input oldest->pres");
+    const int kPhInputEvents = prof.phase("# input events");
+    const int kPhGpuFrame = prof.phase("gpu.frame ms (GPU)");
+    // TEMPORARY (ui-responsiveness phase 2): the renderer's own CPU stage breakdown, surfaced into
+    // the frame profiler so a `render.record` spike can be attributed to a stage instead of guessed.
+    const int kPhRrUploads = prof.phase("rr.uploads ms");
+    const int kPhRrProc = prof.phase("rr.procedural ms");
+    const int kPhRrObjects = prof.phase("rr.objects ms");
+    const int kPhRrFields = prof.phase("rr.fields ms");
+    const int kPhRrSdf = prof.phase("rr.sdf ms");
+    const int kPhRrLights = prof.phase("rr.lights ms");
+    const int kPhMeshUp = prof.phase("mesh upload ms");
+    const int kPhTexUp = prof.phase("texture upload ms");
+    const int kPhTexCount = prof.phase("# textures uploaded");
+    const int kPhEnvMs = prof.phase("environment ms");
+    const int kPhMeshCount = prof.phase("# meshes uploaded");
     const int kPhProcGen = prof.phase("# procedural regen");
     const int kPhFlatten = prof.phase("# scene flattens");
     const int kPhEnvBuild = prof.phase("# IBL builds");
@@ -2793,6 +2838,7 @@ int Application::runLive() {
             prof.setFrameGroup(withinBlock < options_.uiAbSettle ? core::PhaseProfiler::kNoGroup
                                                                  : abGroups[static_cast<std::size_t>(arm)]);
         }
+        probe2::frame().clear(); // TEMPORARY: ui-responsiveness phase 2
         const std::uint64_t allocsAtFrameStart = core::allocCounters().allocations;
         // Last frame's canvas. Events are read before this frame is laid out, so this is the most
         // recent answer there is; on a still window it is the current one.
@@ -3135,6 +3181,18 @@ int Application::runLive() {
             imgui_->newFrame();
             panel_->draw(*engine_, stats);
         }
+        // TEMPORARY (ui-responsiveness phase 2). The frame's UI state is now decided: the playhead
+        // has been drawn wherever this frame's input put it and every widget has taken its new
+        // value. Everything after this point records and presents a picture of a decision already
+        // made -- so this is the moment "the UI acknowledged the input", as distinct from the
+        // moment the pixels reach the compositor (`input->present ms`).
+        if (probe2::frame().newestInputNs != 0) {
+            const std::uint64_t nowNs = SDL_GetTicksNS();
+            if (nowNs > probe2::frame().newestInputNs) {
+                prof.add(kPhUiAck,
+                         static_cast<double>(nowNs - probe2::frame().newestInputNs) / 1.0e6);
+            }
+        }
         if (uiSelfTest && (time.frameIndex % 30) == 0) {
             const ImGuiIO& io = ImGui::GetIO();
             int wx = 0;
@@ -3210,6 +3268,15 @@ int Application::runLive() {
             const double recordMs =
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - recordStart).count();
             prof.add(kPhRecord, recordMs);
+            {   // TEMPORARY: phase 2
+                const rendering::CpuFrameBreakdown& rr = renderer_->stats().cpu;
+                prof.add(kPhRrUploads, rr.uploadsMs);
+                prof.add(kPhRrProc, rr.proceduralMs);
+                prof.add(kPhRrObjects, rr.objectsMs);
+                prof.add(kPhRrFields, rr.fieldsMs);
+                prof.add(kPhRrSdf, rr.sdfMs);
+                prof.add(kPhRrLights, rr.lightsMs);
+            }
             prof.count(kPhAllocRecord,
                        static_cast<double>(core::allocCounters().allocations - recordAllocsBefore));
             if (slowPhaseMs() > 0.0 && recordMs > slowPhaseMs()) {
@@ -3337,6 +3404,16 @@ int Application::runLive() {
                 prof.add(kPhLatency, static_cast<double>(nowNs - newestInputNs_) / 1.0e6);
             }
         }
+        // TEMPORARY (ui-responsiveness phase 2): how long the *oldest* event in this frame's batch
+        // waited. A backlog shows up here and nowhere else -- the newest event is by construction
+        // young no matter how many stale ones were drained ahead of it.
+        if (probe2::frame().oldestInputNs != 0) {
+            const std::uint64_t nowNs = SDL_GetTicksNS();
+            if (nowNs > probe2::frame().oldestInputNs) {
+                prof.add(kPhOldestAck,
+                         static_cast<double>(nowNs - probe2::frame().oldestInputNs) / 1.0e6);
+            }
+        }
         prof.add(kPhPresent, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
                                                                        presentStart).count());
         const auto outputsStart = std::chrono::steady_clock::now();
@@ -3383,6 +3460,31 @@ int Application::runLive() {
             lastProcGen = procGen;
             lastEnvBuild = envBuild;
             lastFlatten = flatten;
+        }
+        {
+            // TEMPORARY (ui-responsiveness phase 2). `gpu.frame ms (GPU)` is a GPU timestamp read
+            // out of gpu::FrameTimeline, not CPU wall clock around a GPU call -- it is two or three
+            // frames behind, which over a 120-frame block is immaterial and inside one frame is not.
+            const probe2::Frame& pr = probe2::frame();
+            prof.add(kPhSeek, pr.seekMs);
+            prof.add(kPhEntitySeek, pr.entitySeekMs);
+            prof.count(kPhSeekCount, static_cast<double>(pr.seeks));
+            prof.count(kPhSimBodies, static_cast<double>(pr.entitySimBodies) / 1000.0);
+            prof.add(kPhCatchup, pr.analysisCatchupMs);
+            prof.add(kPhUpdControl, pr.updControlMs);
+            prof.add(kPhUpdSignals, pr.updSignalsMs);
+            prof.add(kPhUpdMod, pr.updModulationMs);
+            prof.add(kPhUpdCtrl, pr.updControllerMs);
+            prof.add(kPhUpdOther, pr.updOtherMs);
+            prof.count(kPhInputEvents, static_cast<double>(pr.inputEvents));
+            prof.add(kPhMeshUp, pr.meshUploadMs);
+            prof.add(kPhTexUp, pr.textureUploadMs);
+            prof.count(kPhTexCount, static_cast<double>(pr.texturesUploaded));
+            prof.add(kPhEnvMs, pr.environmentMs);
+            prof.count(kPhMeshCount, static_cast<double>(pr.meshesUploaded));
+            if (stats.gpuFrameMs >= 0.0) {
+                prof.add(kPhGpuFrame, stats.gpuFrameMs);
+            }
         }
         prof.endFrame(stats.frameIntervalMs);
         ++fpsFrames;
@@ -3474,6 +3576,14 @@ int Application::runLive() {
     for (const std::string& line : uiScript_.editLog()) {
         log::info("{}", line);
     }
+    // TEMPORARY (ui-responsiveness phase 2): what the run actually rendered, at the END of it.
+    // The existing line above is printed at frame 60, before a docked layout has settled, and a
+    // rendering-sensitivity arm that cannot say what size its render target was is an arm that
+    // cannot fail (ADR-182).
+    log::info("phase2: final canvas {}x{} px ({:.2f} Mpx), {} triangles, {} draw calls",
+              renderWidth_, renderHeight_,
+              static_cast<double>(renderWidth_) * renderHeight_ / 1.0e6, renderer_->stats().triangles,
+              renderer_->stats().drawCalls);
     log::info("rendered {} frames; GPU errors: {}", framesRendered, context_->errorCount());
     return context_->errorCount() == 0 ? 0 : 5;
 }

@@ -71,6 +71,16 @@ enum class UiScriptArm : std::uint32_t {
     // a block of frames measures the gesture rather than the one frame it started on.
     Gizmo = 1u << 9,
     Box = 1u << 10,
+    // Starring a hero, through the same EditCommand the star button builds (ADR-193). Phase 1 of
+    // the UI-responsiveness investigation measured this headlessly at 282 ms and could not put it
+    // beside the other interactions in one process, because there was no arm for it.
+    Star = 1u << 11,
+    // A *discrete* timeline click: press and release on the ruler, at a new second, with no pointer
+    // motion between clicks. `Strip` is a press and a 52-frame drag, so its frames are drag frames;
+    // this one's are click frames, which is what "clicking the timeline feels slow" is about. No
+    // motion between the clicks is deliberate: it makes `input->ui.build ms` sample only the frames
+    // that carried a click.
+    Click = 1u << 12,
 };
 
 [[nodiscard]] constexpr UiScriptArm operator|(UiScriptArm a, UiScriptArm b) {
@@ -119,6 +129,8 @@ private:
     void stepStrip(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
     void stepGizmo(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
     void stepBox(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepStar(Engine& engine, ui::ControlPanel& panel, std::uint64_t frame);
+    void stepClick(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
 
     std::vector<std::string> editLog_;
     std::size_t editNodesBefore_ = 0;
@@ -134,6 +146,11 @@ private:
     ui::GizmoHandle gizmoDragged_ = ui::GizmoHandle::None;
     bool boxOpened_ = false;
     bool saidNoSubject_ = false;
+    std::size_t starToggles_ = 0;      // completed star/unstar pairs, for the arm's own report
+    std::string starSubject_;          // the node this arm keeps starring and unstarring
+    std::size_t clicks_ = 0;           // completed ruler clicks
+    std::size_t clickSteps_ = 0;       // steps since this arm started, not the global frame number
+    double clickLastSeconds_ = -1.0;   // where the playhead was left by the last click
     glm::vec3 boxCamera_{0.0f}; // camera pose at the start of the box drag, for the report
     float phase_ = 0.0f;
 };
