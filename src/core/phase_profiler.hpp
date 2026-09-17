@@ -36,7 +36,7 @@ namespace avgen::core {
 
 class PhaseProfiler {
 public:
-    static constexpr std::size_t kMaxPhases = 40;
+    static constexpr std::size_t kMaxPhases = 56; // TEMPORARY: ui-responsiveness phase 2 added 14
     static constexpr std::size_t kHistory = 2048;
 
     // Resolves a phase name to a stable index. Call once (a function-local static) and reuse it;

@@ -1,4 +1,5 @@
 #include "rendering/scene_renderer.hpp"
+#include "core/phase2_probe.hpp" // TEMPORARY: ui-responsiveness phase 2
 
 #include "rendering/environment.hpp"
 #include "rendering/scene_targets.hpp"
@@ -1849,6 +1850,11 @@ void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
         meshes_.size() == scene.meshes.size()) {
         return;
     }
+    // TEMPORARY (ui-responsiveness phase 2): this early-out was not taken, so every mesh in the
+    // scene is about to be destroyed and re-created -- all of them, not the ones that changed.
+    const probe2::Add probeUpload(probe2::frame().meshUploadMs);
+    ++probe2::frame().meshUploadPasses;
+    probe2::frame().meshesUploaded += scene.meshes.size();
     meshes_.clear();
     meshes_.reserve(scene.meshes.size());
     for (std::size_t i = 0; i < scene.meshes.size(); ++i) {
@@ -1892,6 +1898,9 @@ void SceneRenderer::uploadTextures(const scene::Scene& scene) {
         scene.textureVersion == textureVersion_ && textures_.size() == scene.textures.size()) {
         return;
     }
+    // TEMPORARY (ui-responsiveness phase 2): same shape as the mesh probe above.
+    const probe2::Add probeTexUpload(probe2::frame().textureUploadMs);
+    probe2::frame().texturesUploaded += scene.textures.size();
     textures_.clear();
     textures_.reserve(scene.textures.size());
     for (std::size_t i = 0; i < scene.textures.size(); ++i) {
@@ -2213,7 +2222,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         skinning_->setFrozen(!toggles_.animationMotion);
         skinning_->update(scene);
     }
-    updateEnvironment(scene);
+    {
+        const probe2::Add probeEnv(probe2::frame().environmentMs); // TEMPORARY: phase 2
+        updateEnvironment(scene);
+    }
     ensureTonemapBindGroup();
 
     // ---- user shader layers: sync GPU objects, spectrum texture, background intermediate passes ----

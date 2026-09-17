@@ -7,6 +7,8 @@
 #include "seq/section_actions.hpp"
 
 #include "core/phase_profiler.hpp"
+#include "core/phase2_probe.hpp" // TEMPORARY: ui-responsiveness phase 2
+#include <optional>
 
 #include <cstdlib>
 #include <string_view>
@@ -2208,6 +2210,9 @@ void Engine::stop() {
 }
 
 void Engine::seekSeconds(double seconds) {
+    // TEMPORARY (ui-responsiveness phase 2): every seek, wherever it came from.
+    ++probe2::frame().seeks;
+    const probe2::Add probeSeek(probe2::frame().seekMs);
     // Clamped by the transport first, and everything below resynchronises to the position it
     // actually took. Passing the *requested* second on to the entity world and the event scheduler
     // while the playhead sat somewhere else is how a seek past the end used to leave the two
@@ -2244,7 +2249,10 @@ void Engine::seekSeconds(double seconds) {
         // left invisible twenty metres in the air. A scenario that autostarts picks up again on the
         // next frame, which is what makes the seeked second a function of the second rather than of
         // how the playhead got there.
-        composition->director().reset(&composition->entityWorld(), &params_);
+        {
+            const probe2::Add probeDirector(probe2::frame().directorResetMs); // TEMPORARY: phase 2
+            composition->director().reset(&composition->entityWorld(), &params_);
+        }
         // ADR-217: and the camera's hold on it, for the same reason. The hold is derived from the
         // scenario's state, and the scenario has just been put back to the top -- a hold left armed
         // across the seek would keep the camera on a shot the new second is nowhere near.
@@ -2998,6 +3006,8 @@ void Engine::update(const FrameTime& time) {
         bool onset = false;
         float onsetStrength = 0.0f;
         std::size_t cursor = offlineFrameCursor_;
+        const std::size_t probeCursorStart = cursor; // TEMPORARY: phase 2
+        std::optional<probe2::Add> probeCatchup(std::in_place, probe2::frame().analysisCatchupMs);
         while (cursor < frames.size() && frames[cursor].timeSeconds <= time.renderTime) {
             if (frames[cursor].onset) {
                 onset = true;
@@ -3010,6 +3020,8 @@ void Engine::update(const FrameTime& time) {
             music_.consume(frames[cursor], phraseBars_, sectionPhrases_);
             ++cursor;
         }
+        probeCatchup.reset(); // TEMPORARY: phase 2 -- stop the clock before the publish below
+        probe2::frame().analysisFramesConsumed += cursor - probeCursorStart;
         if (cursor > offlineFrameCursor_) {
             analysis::AnalysisFrame frame = frames[cursor - 1];
             frame.onset = onset;
@@ -3032,6 +3044,13 @@ void Engine::update(const FrameTime& time) {
     const auto allocsNow = [] { return static_cast<std::uint32_t>(core::allocCounters().allocations); };
     const std::uint32_t allocsAtStart = allocsNow();
     std::uint32_t allocMark = allocsNow();
+    // TEMPORARY (ui-responsiveness phase 2): the same stage boundaries the alloc marks already use.
+    auto probeMark = std::chrono::steady_clock::now();
+    const auto probeStage = [&probeMark](double& sink) {
+        const auto now = std::chrono::steady_clock::now();
+        sink += std::chrono::duration<double, std::milli>(now - probeMark).count();
+        probeMark = now;
+    };
 
     // Live control first: MIDI clock messages feed this frame's beat clock, transport commands
     // move the position the time signals read, parameter writes precede modulation.
@@ -3040,6 +3059,7 @@ void Engine::update(const FrameTime& time) {
         sources_.attach(bus_, params_); // new control channels: declare and rebind routes
         rebind();
     }
+    probeStage(probe2::frame().updControlMs); // TEMPORARY: phase 2
     stats_.allocsControl = allocsNow() - allocMark;
     allocMark = allocsNow();
     updateTimeSignals(time, newFrame);
@@ -3061,6 +3081,7 @@ void Engine::update(const FrameTime& time) {
         bus_.set(stateProgressSignal_, states_.progress());
         bus_.set(stateIndexSignal_, static_cast<float>(std::max(0, states_.currentIndex())));
     }
+    probeStage(probe2::frame().updSignalsMs); // TEMPORARY: phase 2
     stats_.allocsSignals = allocsNow() - allocMark;
     allocMark = allocsNow();
     if (input_ && inputGain_ != nullptr) {
@@ -3098,9 +3119,11 @@ void Engine::update(const FrameTime& time) {
     sequenceEvents_.advanceTo(timelineClock_.seconds);
     firedEvents_ = sequenceEvents_.drain(timelineClock_.seconds);
     applySectionActions();
+    probeStage(probe2::frame().updModulationMs); // TEMPORARY: phase 2
     stats_.allocsModulation = allocsNow() - allocMark;
     allocMark = allocsNow();
     controller_->update(time);
+    probeStage(probe2::frame().updControllerMs); // TEMPORARY: phase 2
     stats_.allocsController = allocsNow() - allocMark;
     scene::applyPostParameters(postParams_, post_);
     // ---- physical camera (ADR-037) ---------------------------------------------------------
@@ -3167,6 +3190,7 @@ void Engine::update(const FrameTime& time) {
     }
     bus_.clearEvents();
 
+    probeStage(probe2::frame().updOtherMs); // TEMPORARY: phase 2
     stats_.allocsOther = (allocsNow() - allocsAtStart) - stats_.allocsControl - stats_.allocsSignals -
                          stats_.allocsModulation - stats_.allocsController;
     const auto end = std::chrono::steady_clock::now();

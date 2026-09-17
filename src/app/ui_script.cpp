@@ -7,6 +7,8 @@
 #include "ui/control_panel.hpp"
 #include "ui/gizmo.hpp"
 #include "ui/world_probe.hpp"
+#include "ui/world_edit.hpp"
+#include "ui/sequence_panel.hpp"
 #include "core/log.hpp"
 #include "params/parameter.hpp"
 #include "scene/composition.hpp"
@@ -31,7 +33,7 @@ struct ArmName {
     std::string_view name;
     UiScriptArm arm;
 };
-constexpr std::array<ArmName, 11> kArms{{
+constexpr std::array<ArmName, 13> kArms{{
     {"hover", UiScriptArm::Hover},
     {"sliders", UiScriptArm::Sliders},
     {"panels", UiScriptArm::Panels},
@@ -43,6 +45,8 @@ constexpr std::array<ArmName, 11> kArms{{
     {"strip", UiScriptArm::Strip},
     {"gizmo", UiScriptArm::Gizmo},
     {"box", UiScriptArm::Box},
+    {"star", UiScriptArm::Star},
+    {"click", UiScriptArm::Click},
 }};
 
 // Pushes a motion event as though the device had produced it. SDL routes it to the window under
@@ -272,6 +276,14 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
 
     if (has(arms_, UiScriptArm::Box)) {
         stepBox(engine, *panel, window, frame);
+    }
+
+    if (has(arms_, UiScriptArm::Star)) {
+        stepStar(engine, *panel, frame);
+    }
+
+    if (has(arms_, UiScriptArm::Click)) {
+        stepClick(engine, *panel, window, frame);
     }
 
     if (has(arms_, UiScriptArm::Panels)) {
@@ -838,6 +850,140 @@ void UiScript::stepBox(Engine& engine, ui::ControlPanel& panel, platform::Window
                 fmt::format("box: the editor had a box open mid-drag: {}; it selected {} of {} object(s)",
                             boxOpened_, editor.selection.size(), engine.composition()->nodeCount()));
         }
+    }
+}
+
+// ---- star: declaring a hero, which is the interaction phase 1 measured at 282 ms --------------
+//
+// Through `ui::setNodesHero`, which is the function the star button in the Objects list calls --
+// not through `Composition::setHeroes`, which would skip the command, the validation and the undo
+// entry that a person's click pays for.
+//
+// A cycle of 40 frames: star on frame 0, unstar on frame 20. Alternating rather than starring once
+// is what makes a block of frames measure the interaction: a one-shot arm would put one edit in a
+// hundred and twenty frames and report the idle editor as the cost of starring.
+//
+// It proves it did something (ADR-182). A hero list that did not change, or a flatten that did not
+// happen, means the frames in this block measured nothing, and the arm says so in its log rather
+// than letting a healthy frame time stand as evidence that starring is cheap.
+void UiScript::stepStar(Engine& engine, ui::ControlPanel& panel, std::uint64_t frame) {
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        return;
+    }
+    const std::uint64_t inCycle = frame % 40;
+    if (inCycle != 0 && inCycle != 20) {
+        return;
+    }
+    if (starSubject_.empty()) {
+        // Something that is not already a hero, and not the terrain: starring a hero again is a
+        // no-op that `setNodesHero` refuses, and an arm whose edit is refused measures nothing.
+        for (const auto& node : composition->nodes()) {
+            if (!node || node->kind == scene::NodeKind::Terrain || node->kind == scene::NodeKind::Group) {
+                continue;
+            }
+            bool already = false;
+            for (const world::HeroPoint& h : composition->heroes()) {
+                if (h.name == node->name) {
+                    already = true;
+                    break;
+                }
+            }
+            if (!already) {
+                starSubject_ = node->name;
+                break;
+            }
+        }
+        if (starSubject_.empty()) {
+            editLog_.emplace_back("star: every node is already a hero; this arm measured nothing");
+            return;
+        }
+    }
+    const std::size_t heroesBefore = composition->heroes().size();
+    const std::uint64_t flattensBefore = composition->flattenCount();
+    const std::array<std::string, 1> names{starSubject_};
+    const ui::EditCommand command = ui::setNodesHero(engine, names, inCycle == 0);
+    const std::size_t heroesAfter = composition->heroes().size();
+    // The flatten is triggered by `dirty_` and paid by the next `controller_->update()`, so the
+    // count cannot have moved yet. What can be checked here is that the edit was accepted at all.
+    if (starToggles_ == 0) {
+        editLog_.push_back(fmt::format(
+            "star: '{}' -- command {} hero change(s), heroes {} -> {}, flattens at {} (the flatten "
+            "this caused is paid by the next engine.update, so watch '# scene flattens')",
+            starSubject_, command.heroes.size(), heroesBefore, heroesAfter, flattensBefore));
+        if (command.heroes.empty() || heroesAfter == heroesBefore) {
+            editLog_.emplace_back("star: the hero list did not change -- THIS ARM MEASURED NOTHING");
+        }
+    }
+    if (inCycle == 20) {
+        ++starToggles_;
+    }
+}
+
+// ---- click: a discrete press on the timeline ruler ---------------------------------------------
+//
+// The gesture the complaint is actually about: put the pointer on the ruler, press, let go, and see
+// how long it takes for the playhead to be somewhere else. `Strip` already drags; a drag and a
+// click are different measurements, because a drag frame has a held button (which stops Dear
+// ImGui's SDL3 backend overwriting the pointer) and a click frame does not.
+//
+// A cycle of 15 frames: park the pointer for four frames, press on frame 8, release on frame 10,
+// and touch nothing else. The parking frames are what make the press land -- `HoveredWindow` is
+// computed from the previous frame's pointer -- and the silent frames between clicks are what make
+// `input->ui.build ms` a distribution over click frames rather than over hover frames.
+void UiScript::stepClick(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                         std::uint64_t frame) {
+    // Counted from the arm's own first step rather than from the application's frame number.
+    // `--ui-ab` rebuilds the script at every block switch and keeps handing it the *global* frame
+    // counter, so an arm whose setup is written as `case 2:` sets itself up in exactly one block of
+    // one run and does nothing in every other -- which is what `strip` and `edit` do today. The
+    // layout is *not* restored here: that would change the canvas size, and an arm that resizes the
+    // render target is not comparable with the arm interleaved beside it.
+    ++clickSteps_;
+    if (clickSteps_ <= 3) {
+        if (bool* slot = panel.layout().slot("Sequence"); slot != nullptr) {
+            *slot = true;
+        }
+        ImGui::SetWindowFocus("Sequence");
+        return;
+    }
+    const ui::SequencePanel::StripRect& strip = panel.sequence.stripRect();
+    if (!strip.valid()) {
+        if (clickSteps_ == 20) {
+            editLog_.emplace_back("click: the Sequence panel never laid out; this arm measured nothing");
+        }
+        return;
+    }
+    // A different second every cycle, walking across the middle of the ruler, so no click is a
+    // no-op repeat of the last one and every click is a real discontinuity.
+    const std::uint64_t cycle = frame / 15;
+    // Across the whole ruler, starting near zero. Where the click lands is not cosmetic: the
+    // re-simulation a seek performs is proportional to the second seeked to, so an arm that only
+    // ever clicks in the second half measures one point of a straight line and cannot see that it
+    // is one.
+    const float u = 0.02f + 0.06f * static_cast<float>(cycle % 15);
+    const float x = strip.x + strip.gutter + (strip.width - strip.gutter) * u;
+    const float y = strip.y + strip.rulerHeight * 0.5f;
+    const std::uint64_t inCycle = frame % 15;
+    if (inCycle >= 4 && inCycle <= 7) {
+        warpAndMove(window, x, y);
+    } else if (inCycle == 8) {
+        warpAndMove(window, x, y);
+        pushButton(window, x, y, true);
+    } else if (inCycle == 10) {
+        pushButton(window, x, y, false);
+    } else if (inCycle == 12) {
+        const double now = engine.timelineClock().seconds;
+        ++clicks_;
+        if (clicks_ <= 16) {
+            editLog_.push_back(fmt::format(
+                "click #{}: u={:.2f} x={:.0f} -> playhead {:.3f} s (was {:.3f} s, piece is {:.1f} s)",
+                clicks_, u, x, now, clickLastSeconds_, engine.durationSeconds()));
+            if (clicks_ >= 2 && std::abs(now - clickLastSeconds_) < 1e-6) {
+                editLog_.emplace_back("click: the playhead did not move -- THIS ARM MEASURED NOTHING");
+            }
+        }
+        clickLastSeconds_ = now;
     }
 }
 

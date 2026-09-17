@@ -1,4 +1,5 @@
 #include "entity/entity.hpp"
+#include "core/phase2_probe.hpp" // TEMPORARY: ui-responsiveness phase 2
 
 #include "entity/nav_grid.hpp"
 
@@ -720,6 +721,10 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
     const double dt = std::max(step, 1e-3);
     const double span = std::min(target, std::max(maxSeconds, 0.0));
     const auto steps = static_cast<std::uint64_t>(span / dt);
+    // TEMPORARY (ui-responsiveness phase 2): what the re-simulation actually integrated.
+    probe2::frame().entitySimSteps += steps;
+    probe2::frame().entitySimBodies += steps * static_cast<std::uint64_t>(entities_.size());
+    const probe2::Add probeEntitySeek(probe2::frame().entitySeekMs);
     // A fixed step, not the frame's. That is what makes the answer a function of `time` alone: a
     // seek that integrated whatever dt the last frame happened to take would land somewhere that
     // depended on the machine it ran on.
