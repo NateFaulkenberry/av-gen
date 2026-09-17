@@ -220,10 +220,15 @@ TEST_CASE("a walking body is never drawn below the ground it was grounded to",
     // The invariant. A grounded, walking body is drawn on or above its ground -- never under it.
     CHECK(bobbed.deepestPenetration < 0.02f);
 
-    // And the bob is still a bob. Without this the case above could be satisfied by deleting the
-    // feature outright, which would "pass" while removing the thing the author tuned. The rise has
-    // to survive at roughly the amplitude that was authored.
+    // And the bob is still a bob, at the height it was authored to be. A lower bound alone would
+    // be satisfied by deleting the feature outright -- and, as it turned out, by overshooting it:
+    // the first version of this fix used `1 - cos` unscaled, which spans [0, 2] where `sin` spanned
+    // [-1, 1]. It lifted the trough to the ground correctly and doubled the peak while doing it,
+    // taking the drawn rise from 0.1838 m to 0.3641 m with every test still green. Hence a band
+    // rather than a floor: this is the authored amplitude, and a fix is not allowed to move it in
+    // either direction.
     CHECK(bobbed.highestFloat > 0.10f);
+    CHECK(bobbed.highestFloat < 0.25f);
 }
 
 TEST_CASE("the simulation position cannot see a visual offset, and so cannot police one",

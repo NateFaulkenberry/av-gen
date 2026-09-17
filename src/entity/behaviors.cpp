@@ -313,15 +313,21 @@ public:
             // 0.1838 m above it, while `state().position()` never left the surface by more than
             // 0.0030 m. That gap is the whole lesson: the convenient variable was clean.
             //
-            // `1 - cos` has the same amplitude and the same period as the sine it replaces, so
+            // `(1 - cos) / 2` has the same period as the sine it replaces and the same peak, so
             // `bounce` still means what an author tuned it to mean and the stride still reads as
             // twice a cycle. What changes is the phase reference: the trough is now ground contact
             // -- where a walking body's lowest point actually is, both feet planted -- instead of
             // the midpoint of a swing with nothing holding up its bottom half.
             //
+            // The halving is not cosmetic and was not in the first version of this fix. `1 - cos`
+            // spans [0, 2] where `sin` spanned [-1, 1]: lifting the trough to the ground without it
+            // also doubles the peak, and measurement said exactly that -- the drawn rise went from
+            // 0.1838 m to 0.3641 m, so every walking character in Glowmere bobbed twice as high as
+            // anyone had asked it to. Fixing a floor is not a licence to move a ceiling.
+            //
             // `hover` above keeps its symmetric noise deliberately: a craft oscillates about a
             // hover height and has no ground contact to be the floor of.
-            motion.position.y += (1.0f - std::cos(phase_ * 2.0f)) * bounce * strength;
+            motion.position.y += 0.5f * (1.0f - std::cos(phase_ * 2.0f)) * bounce * strength;
         }
 
         // The idle drift, on noise rather than a sine for the reason `slowNoise` gives: a sine lands
