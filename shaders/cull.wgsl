@@ -53,7 +53,11 @@ struct CullParams {
     planes: array<vec4<f32>, 6>, // left, right, bottom, top, near, far; xyz = unit normal, w = d
     cameraPos: vec4<f32>,        // xyz = camera position, w = projScale (pixels per unit at 1 unit)
     limits: vec4<f32>,           // x = maxDistance, y = minScreenRadius, z = source radius, w = object scale
-    thresholds: vec4<f32>,       // xyz = lodDistances (LOD0->1, 1->2, 2->3), w = 0
+    // xyz = lodDistances (LOD0->1, 1->2, 2->3).
+    // w = the radius the *ladder* measures size with, in source units, or 0 to use limits.z.
+    //     See the note above cs_cull_classify: the rejection tests and the ladder are asking two
+    //     different questions and need two different spheres.
+    thresholds: vec4<f32>,
     counts: vec4<u32>,           // x = record count, y = lod count, z = visible stride, w = scan blocks
     flags: vec4<u32>,            // x = cull enabled, y = thresholds are screen radii, z = stats slot, w = 0
     indexCounts: vec4<u32>,      // index count of each level's mesh (for the indirect args)
@@ -173,6 +177,30 @@ fn cs_cull_classify(@builtin(global_invocation_id) gid: vec3<u32>) {
     // Projected radius in pixels: radius / distance * (height / (2 tan(fovY / 2))).
     let screenRadius = radius / max(dist, 1e-4) * cullParams.cameraPos.w;
 
+    // Two spheres, because there are two questions.
+    //
+    // `radius` above is the conservative one: it is centred on the record position, which is where
+    // this pass puts it, so it has to reach the furthest corner of the source *from the source's
+    // own origin*. That is the right bound for a rejection -- an instance must never be discarded
+    // while some of its geometry is on screen -- and the Visibility Lab corrected it to exactly
+    // that (rendering::sourceCullRadius).
+    //
+    // It is the wrong number for the **ladder**, which is not asking whether anything is on screen
+    // but how large the thing looks, and the difference between the two rules is how far the artist
+    // put the geometry from its origin. Measured over Glowmere's thirteen scatter layers, the same
+    // authored threshold of 28 px fires when an object's drawn radius is 11.1..18.7 px under the
+    // conservative rule and 14.8..22.6 px under the tight one -- so a tree and a fern, side by side
+    // at the same apparent size, change mesh at sizes that differ by a factor which says nothing
+    // about either of them (tests/unit/test_lod_ladder.cpp, "What 28 px means, per production
+    // layer"). `lodRadius` is the tight sphere about the source's own box, which is what the
+    // thresholds were authored against and is a property of the shape rather than of the origin.
+    //
+    // 0 means the renderer did not supply one, and the ladder then measures with the cull's sphere,
+    // which is what this pass did before the two were separated.
+    let lodSource = select(cullParams.thresholds.w, cullParams.limits.z, cullParams.thresholds.w <= 0.0);
+    let lodRadius = lodSource * max(max(s.x, s.y), s.z) * cullParams.limits.w;
+    let lodScreenRadius = lodRadius / max(dist, 1e-4) * cullParams.cameraPos.w;
+
     // Hysteresis and per-instance spread (ADR-082).
     //
     // Every threshold below used to be a hard binary comparison, evaluated fresh from the current
@@ -249,7 +277,7 @@ fn cs_cull_classify(@builtin(global_invocation_id) gid: vec3<u32>) {
         if (byScreen) {
             let t = t0 / detail * spread;
             // Already down a level: keep it until the radius grows back past the upper edge.
-            take = screenRadius <= select(t * (1.0 - hysteresis), t * (1.0 + hysteresis), alreadyTaken);
+            take = lodScreenRadius <= select(t * (1.0 - hysteresis), t * (1.0 + hysteresis), alreadyTaken);
         } else {
             let t = t0 * detail * spread;
             take = dist >= select(t * (1.0 + hysteresis), t * (1.0 - hysteresis), alreadyTaken);

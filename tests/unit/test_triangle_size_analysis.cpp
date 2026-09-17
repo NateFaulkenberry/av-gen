@@ -174,10 +174,16 @@ struct Totals {
     std::uint64_t skippedBehindCamera = 0;
 };
 
-// shaders/cull.wgsl / procedural_renderer.cpp `cullLodLevel`, transcribed. -1 means culled.
-// Transcribed rather than called because it lives in an anonymous namespace inside the renderer;
-// the alternative -- exporting it for a test -- would widen the renderer's surface for a
-// diagnostic, which is the trade ADR-115 already refused once.
+// shaders/cull.wgsl / `rendering::cullLodLevel`, transcribed. -1 means culled.
+//
+// **This transcription is now behind the engine in two ways, on purpose, and the numbers it prints
+// are an estimate either way.** The function it copies moved out of the renderer's anonymous
+// namespace into `rendering/visibility.hpp` (it needs no device), so it could be called; and since
+// ADR-263 the ladder measures projected size with a *second* radius -- the tight sphere about the
+// source's box rather than the conservative one about the instance record -- which this copy has
+// only one of. The effect on this instrument is that it puts non-centred assets one rung lower
+// than the engine does, which moves the triangle estimate up. Keeping it transcribed is still the
+// right trade for an `[.analysis]` instrument; keeping the divergence unwritten would not be.
 int lodLevelFor(const scene::LodSettings& lod, const std::array<glm::vec4, 6>& planes,
                 glm::vec3 cameraPosition, float projScale, glm::vec3 center, float radius) {
     const int lodCount = std::clamp(lod.lodCount, 1, scene::kMaxLodLevels);

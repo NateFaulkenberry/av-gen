@@ -41,8 +41,15 @@ struct CullCamera {
 // CPU reference of the per-instance decision in shaders/cull.wgsl: the LOD level 0..lodCount-1,
 // or -1 when the instance is culled. `center`/`radius` are the world bounding sphere. Shared with
 // the tests, which compare the GPU's compacted lists against it.
+//
+// `lodRadius` is the radius the **ladder** measures projected size with, which is not the one the
+// rejection tests use. `radius` is centred on the record position and must reach the furthest
+// corner of the source from its own origin, so that nothing is discarded while its geometry is on
+// screen; the ladder is asking how large the object looks, and that question is answered by the
+// tight sphere about the source's box. For geometry centred on its origin the two are equal. 0
+// means "the same as `radius`", which is what this function did before the two were separated.
 [[nodiscard]] int cullLodLevel(const scene::LodSettings& lod, const FrustumPlanes& planes, const CullCamera& camera,
-                               glm::vec3 center, float radius);
+                               glm::vec3 center, float radius, float lodRadius = 0.0f);
 
 // The whole object's records reduced to two numbers that do not change until the record set does:
 // the AABB of the instance positions (record space, before the object matrix) and the largest
@@ -51,6 +58,10 @@ struct InstanceBounds {
     glm::vec3 min{0.0f};
     glm::vec3 max{0.0f};
     float maxAbsScale = 1.0f;
+    // The *smallest* |scale| any record carries. `maxAbsScale` bounds how big a record's sphere can
+    // be, which is what a rejection test needs; this bounds how small it can be, which is what
+    // `objectLevelRange` needs to know how far down the ladder the population could have gone.
+    float minAbsScale = 1.0f;
     bool valid = false;
 };
 [[nodiscard]] InstanceBounds instanceBounds(const std::vector<scene::InstanceRecord>& records);
@@ -86,6 +97,42 @@ struct InstanceBounds {
 // pass reads. For geometry that *is* centred on its origin the two numbers are identical, so
 // nothing centred changes.
 [[nodiscard]] float sourceCullRadius(const glm::vec3& boundsMin, const glm::vec3& boundsMax);
+
+// ---- which rungs this object's records could be on (the LOD Lab) -------------------------------
+
+// The inclusive range of LOD levels any record of one object could be assigned this frame.
+// Conservative in one direction only: it may name a level nothing is actually on, and it must never
+// omit a level something is on. A level outside it is **provably** empty, so its indirect draw
+// would draw nothing and leaving it unrecorded cannot change the frame.
+//
+// This exists because the alternative does change the frame. `ProceduralRenderer` used to decide
+// which levels to record from how many frames a level had been empty *in the last completed cull
+// readback* -- and that readback lags the drawn frame by one to three frames, so the rule was a
+// prediction of the present from the past. It is wrong at exactly one moment: the frame an instance
+// arrives on a level it has not been on. Measured on Glowmere's `canopy` tree, the frame it reached
+// rung 1 drew **0 lit pixels** where the settled frame at the identical camera drew 89. That is one
+// to three frames of nothing, at every rung change, for every object -- which is the popping the
+// brief is about, and no counter in the frame reports it because the cull pass ran and its numbers
+// were right.
+//
+// The bound is arithmetic over the same quantities `objectFullyCulled` uses -- the record AABB
+// through the object matrix, the camera, and the extreme record scales -- widened by everything
+// that can move a threshold for an individual instance: ADR-082's per-instance spread and dead
+// zone, and ADR-038's depth-band `detail`. It is a proof rather than a margin (spec §28): every
+// term is the range of a term the shader evaluates.
+struct LevelRange {
+    int lowest = 0;
+    int highest = scene::kMaxLodLevels - 1;
+    [[nodiscard]] bool contains(int level) const { return level >= lowest && level <= highest; }
+};
+
+// `detailMin` / `detailMax` are the extremes of ADR-038's depth-band `detail` over the bands the
+// scene declares (1.0 when it declares none). `hysteresisActive` is whether the renderer is letting
+// ADR-082's dead zone run this frame, because with it off the thresholds are not widened by it.
+[[nodiscard]] LevelRange objectLevelRange(const scene::LodSettings& lod, const CullCamera& camera,
+                                          const glm::mat4& objectToWorld, const InstanceBounds& bounds,
+                                          float sourceRadius, float detailMin, float detailMax,
+                                          bool hysteresisActive);
 
 // ---- reason codes (§9) --------------------------------------------------------------------------
 //
@@ -166,7 +213,8 @@ struct InstanceVisibility {
 // ShadowOnlyRejected. Those are the renderer's to report, and `proceduralVisibility` below is
 // where an object-level verdict is turned into the same vocabulary.
 [[nodiscard]] InstanceVisibility instanceVisibility(const scene::LodSettings& lod, const FrustumPlanes& planes,
-                                                    const CullCamera& camera, glm::vec3 center, float radius);
+                                                    const CullCamera& camera, glm::vec3 center, float radius,
+                                                    float lodRadius = 0.0f);
 
 // The object-level verdict, in the same vocabulary: what ProceduralRenderer::update decides before
 // any instance is looked at. `shadowPass` applies the castsShadow gate the draw applies.

@@ -10,13 +10,15 @@
 // selectively enable relevant overlays."* That selection is this file, and it is the only thing
 // here.
 //
-// **Two switches are deliberately absent from every profile.** `DebugViewOptions::lod` and
-// `::culling` have checkboxes in `world_panel.cpp` and `debug_visualizer.cpp` never reads either
-// field, so both draw nothing. That is ADR-225's defect exactly -- a control wired to nothing --
-// and turning them on in the LOD and Visibility profiles would have made the suite's own launcher
-// the place the defect was hidden (§37). They stay off until the scatter cull's per-instance state
-// is readable, which is the Visibility Lab's first work item and is recorded as such in
-// `docs/engineering-labs.md`.
+// **One switch is still absent from every profile.** `DebugViewOptions::culling` has a checkbox in
+// `world_panel.cpp` and `debug_visualizer.cpp` reads the field nowhere, so it draws nothing -- and
+// turning it on in the Visibility profile would make the suite's own launcher the place that defect
+// was hidden (§37, ADR-225).
+//
+// `::lod` was in the same state and is not any more: the LOD Lab wired it to
+// `ProceduralRenderer::readLodLevels`, which is the rung the cull pass wrote for each record, and
+// it is on in the LOD profile. It colours an object grey rather than rung 0 when the pass did not
+// run for it that frame, because the alternative is an overlay that reports history.
 
 #include "labs/lab.hpp"
 #include "rendering/debug_view_options.hpp"

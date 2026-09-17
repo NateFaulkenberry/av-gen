@@ -1,0 +1,153 @@
+{
+ "format": "avgen-lab-cases",
+ "version": 1,
+ "lab": "lod",
+ "_note": "The LOD / Geometry Lab's reproductions. Cases 1-4 are the three defects this lab found, each in the frame it was found in; case 5 is the threshold measurement; case 6 is the Glowmere verification the fixes were checked against. Every one of them has an assertion in tests/rendering/test_lod_gpu.cpp or tests/unit/test_lod_ladder.cpp -- a case carries the recipe and the question, never its own pass criterion.",
+ "cases": [
+  {
+   "lab": "lod",
+   "number": 1,
+   "title": "A rung change with nothing drawn on the frame it happens",
+   "question": "On the frame an instance first reaches a rung, is anything drawn for it?",
+   "expectation": "It is. It was not: the renderer decided which levels to record from a cull readback one to three frames old, so the frame an instance arrived on a level nothing had been on recently drew no geometry for it at all. Watch one tree cross the first threshold; nothing may blink.",
+   "fixture": "examples/labs/lod-geometry-lab.scene.json",
+   "timeSeconds": 0.0,
+   "size": [
+    1280,
+    800
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     0.0,
+     6.0,
+     300.0
+    ],
+    "aim": [
+     0.0,
+     6.0,
+     -340.0
+    ]
+   },
+   "notes": "Reproduced in isolation by tests/rendering/test_lod_gpu.cpp, 'A rung change draws the object on the frame it happens': the arrival frame drew 0 lit pixels where the identical settled frame drew 89. Fixed by rendering::objectLevelRange, which proves which rungs the population can be on instead of remembering which ones were empty."
+  },
+  {
+   "lab": "lod",
+   "number": 2,
+   "title": "What rungs 2 and 3 of an imported asset actually draw",
+   "question": "Does the representation a far rung draws occupy the region the object occupies?",
+   "expectation": "It does. It did not: every level of a Mesh source has been a simplified mesh since ADR-085, and the renderer still sent levels 2 and 3 down the impostor vertex path -- their vertices taken as offsets in the camera's basis, at the asset's authored size rather than the layer's and centred on the instance record. Look at the tree layer past 200 m: the trunk feet must stay on the ground.",
+   "fixture": "examples/labs/lod-geometry-lab.scene.json",
+   "timeSeconds": 0.0,
+   "size": [
+    1280,
+    800
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     0.0,
+     6.0,
+     300.0
+    ],
+    "aim": [
+     0.0,
+     6.0,
+     -340.0
+    ]
+   },
+   "notes": "Measured at 90 m with the thresholds forced: rung 2 drew rows 362..419 where rung 0 drew 304..424 -- half the height, sunk to the ground. After: 309..418."
+  },
+  {
+   "lab": "lod",
+   "number": 3,
+   "title": "The same apparent size, two origin conventions",
+   "question": "Do a tree and a rock that are the same size on screen give up their full mesh at the same size?",
+   "expectation": "They should, within the looseness a bounding sphere has on two different shapes. The two layers 'tree-on-its-foot' and 'rock-on-its-centre' are both 14 m tall and differ only in where the artist put the origin; the ladder must not be able to tell them apart by that.",
+   "fixture": "examples/labs/lod-geometry-lab.scene.json",
+   "timeSeconds": 0.0,
+   "size": [
+    1280,
+    800
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     0.0,
+     6.0,
+     300.0
+    ],
+    "aim": [
+     0.0,
+     6.0,
+     -340.0
+    ]
+   },
+   "notes": "Before: 13.5 px and 14.0 px of drawn radius -- which looks like agreement and is a coincidence of two errors cancelling on this pair. Over all thirteen Glowmere layers the same threshold meant 11.1..18.7 px of drawn radius; after, 14.8..22.6 px."
+  },
+  {
+   "lab": "lod",
+   "number": 4,
+   "title": "One population across every rung at once",
+   "question": "What do the rung boundaries look like when every rung is on screen in the same frame?",
+   "expectation": "The 'graded' layer is one asset scaled 0.35x to 2.4x, so the transitions are a texture across the frame rather than an event in time. With DebugViewOptions::lod on, the rungs are coloured green / yellow / orange / red and the boundaries must be bands of mixed colour (ADR-082's per-instance spread), not hard lines.",
+   "fixture": "examples/labs/lod-geometry-lab.scene.json",
+   "timeSeconds": 0.0,
+   "size": [
+    1280,
+    800
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     0.0,
+     6.0,
+     300.0
+    ],
+    "aim": [
+     0.0,
+     6.0,
+     -340.0
+    ]
+   },
+   "notes": "The whole fixture reports 573/510/53/0 over 10,610 instances, identically on every frame."
+  },
+  {
+   "lab": "lod",
+   "number": 5,
+   "title": "What the first threshold costs and what it buys",
+   "question": "How different are the two representations either side of the first threshold, at the sizes it fires at?",
+   "expectation": "Barely. Measured on CommonTree_1, rung 1 keeps 93-96% of the object's lit pixels and its outline is within 1-3 px of rung 0's at every drawn radius from 8 px to 40 px -- so the ladder has headroom above where it fires, and the per-pixel measure ADR-085 used saturates on foliage and cannot answer this.",
+   "fixture": "examples/labs/lod-geometry-lab.scene.json",
+   "timeSeconds": 0.0,
+   "size": [
+    960,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "tests/rendering/test_lod_gpu.cpp, 'What the first threshold costs and what it buys', prints the table."
+  },
+  {
+   "lab": "lod",
+   "number": 6,
+   "title": "Glowmere, the production verification",
+   "question": "Does the world the owner actually renders draw the same instances at cheaper rungs?",
+   "expectation": "Same frame, same seed: 494 visible instances before and after -- the Visibility Lab's cull fix is untouched -- with the rung population moving 232/136/126/0 to 43/282/162/7 and submitted triangles 449,524 to 350,545.",
+   "fixture": "examples/world/glowmere-valley-2-multicam.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    800
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "tier": "realtime",
+   "notes": "Reproduced headless: avgen --project examples/world/glowmere-valley-2-multicam.json --headless --frames 360 --tier realtime, and read the 'instances=' line at frame 30."
+  }
+ ]
+}

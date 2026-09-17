@@ -660,6 +660,12 @@ void WorldPanel::drawDebugOptions(app::Engine& engine, WorldEditor* editor) {
     ImGui::Checkbox("Instance ids", &debug.instanceIds);
     ImGui::SameLine();
     ImGui::Checkbox("LOD", &debug.lod);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Colour every scattered instance by the LOD rung the cull pass gave it:\n"
+                          "green 0 (full mesh), yellow 1, orange 2, red 3, purple culled.\n"
+                          "Grey means the pass did not run for that object this frame, so there is\n"
+                          "no decision to show. Costs one buffer readback per scattered object.");
+    }
     ImGui::SameLine();
     ImGui::Checkbox("Culling", &debug.culling);
     ImGui::Checkbox("Entity bounds", &debug.entityBounds);

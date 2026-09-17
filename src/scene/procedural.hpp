@@ -207,9 +207,24 @@ struct SourceSpec {
 //   2 = a camera-facing billboard quad circumscribing the source's bounding sphere, edge
 //       2 * impostorSize * boundingRadius(spec);
 //   3 = a single point quad (edge 2 * impostorSize * boundingRadius / 8) - a dot at distance.
-// Levels 2 and 3 are drawn through the shader's Point path (camera-facing), so they need no
-// orientation of their own. Pure and deterministic: the same spec/level always gives the same mesh.
+// **Levels 2 and 3 are impostors only for a generated primitive.** A `Mesh` source has had all
+// three of its levels built by `assets::buildLodChain` since ADR-085, so for every scatter layer,
+// every city piece and every imported asset, levels 1-3 are simplified meshes in the source's own
+// space. `lodLevelIsImpostor` below is the one place that distinction is written down; ask it
+// rather than testing the level index.
+// Pure and deterministic: the same spec/level always gives the same mesh.
 [[nodiscard]] Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize = 1.0f);
+// True when `makeLodMesh(spec, level)` returns a camera-facing impostor quad rather than geometry
+// in the source's own space.
+//
+// The two are drawn by different vertex paths -- an impostor's corners are offsets in the camera's
+// basis from the instance centre and deliberately skip the source transform and the deformer stack;
+// a mesh goes through both -- so a caller that picks the path from the level index is right only
+// for as long as level index and representation agree. They stopped agreeing at ADR-085, and the
+// cost of that was a production tree drawn at rung 2 as its own simplified mesh flattened into the
+// camera plane, at the asset's authored size rather than the layer's and centred on the foot of
+// its trunk: half the height, in the wrong place, at every distance past the second threshold.
+[[nodiscard]] bool lodLevelIsImpostor(const SourceSpec& spec, int level);
 // Vertex-clustering decimation (ADR-045): snaps vertices to a grid sized from `targetTriangles`,
 // welds each cell to one averaged vertex and drops the triangles that collapse. Deterministic and
 // linear in the input. It suits scanned organic shapes, where the silhouette matters and the

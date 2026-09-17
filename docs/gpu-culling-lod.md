@@ -49,8 +49,8 @@ storage writes are visible to later dispatches, so reduce feeds top feeds scatte
 | 6 | storage, read_write | the renderer's shared stats buffer, 8 u32 per object slot |
 
 `CullParams` is `objectToWorld`, six frustum planes, `cameraPos.xyz` + `projScale`, `limits`
-(maxDistance, minScreenRadius, source radius, object matrix scale), `thresholds` (the three LOD
-distances), `counts` (record count, lod count, visible stride, scan blocks), `flags` (cull enabled,
+(maxDistance, minScreenRadius, source cull radius, object matrix scale), `thresholds` (the three LOD
+distances, and in `w` the radius the ladder measures projected size with), `counts` (record count, lod count, visible stride, scan blocks), `flags` (cull enabled,
 thresholds are screen radii, stats slot) and `indexCounts` (the index count of each level's mesh,
 which `cs_cull_top` copies into the indirect args).
 
@@ -78,6 +78,8 @@ object's visible buffer; objects that do not cull bind a shared 256-byte inert p
 `scene::makeLodMesh(spec, level, impostorSize)` (in `src/scene/procedural.cpp`) generates the mesh
 of each level from the same `SourceSpec`:
 
+For a **generated primitive**:
+
 | Level | Mesh |
 |---|---|
 | 0 | `makeSourceMesh(spec)` — the source, unchanged |
@@ -85,18 +87,31 @@ of each level from the same `SourceSpec`:
 | 2 | a camera-facing billboard quad of edge `2 × impostorSize × boundingRadius(spec)` — at `impostorSize = 1` it circumscribes the source's bounding sphere |
 | 3 | the same quad at an eighth of that edge — a dot at distance |
 
-`boundingRadius` is the half-diagonal of the source's axis-aligned bounds
-(`scene::sourceBoundingRadius`). The renderer caches level meshes under a key derived from the
-object's `meshHash`, the level and `impostorSize`, alongside the source meshes.
+For a **`Mesh` source** — every scatter layer, every city piece, every imported asset — levels 1, 2
+and 3 are all simplifications built by `assets::buildLodChain` with `vegetationLodSettings()`
+(ADR-085). **None of them is an impostor.** `scene::lodLevelIsImpostor(spec, level)` is the one
+place that distinction is written down, and the renderer asks it rather than testing the level
+index: an impostor's corners are offsets in the camera's basis from the instance centre and skip
+the source transform and the deformer stack, and a simplified *mesh* drawn that way comes out
+flattened, at the asset's authored size rather than the layer's, centred on the instance record.
+That is what happened to rungs 2 and 3 of every imported asset between ADR-085 and the LOD Lab
+(`docs/lod-lab/README.md` §3.2).
+
+`boundingRadius` is `scene::sourceBoundingRadius`, which is `max(|vertex|)` — the radius about the
+source's **own origin**, not the half-diagonal of its box (ADR-199). The renderer caches level
+meshes under a key derived from the object's `meshHash`, the level and `impostorSize`, alongside the
+source meshes.
 
 The level of one instance (`cs_cull_classify`; CPU reference `rendering::cullLodLevel`, which the
 tests compare against):
 
 ```
-center       = objectToWorld * record.position
-radius       = boundingRadius(source) × max|record.scale| × objectMatrixScale
-distance     = |center − cameraPosition|
-screenRadius = radius / distance × projScale,  projScale = height / (2 tan(fovY/2))
+center          = objectToWorld * record.position
+radius          = sourceCullRadius(source) × max|record.scale| × objectMatrixScale
+lodRadius       = halfDiagonal(source)     × max|record.scale| × objectMatrixScale
+distance        = |center − cameraPosition|
+screenRadius    = radius    / distance × projScale,  projScale = height / (2 tan(fovY/2))
+lodScreenRadius = lodRadius / distance × projScale
 
 if cull:
     culled if  dot(plane.xyz, center) + plane.w < −radius  for any of the six planes
@@ -106,12 +121,22 @@ if cull:
 level = 0
 for k in 0..min(lodCount − 2, 2):
     t = lodDistances[k]
-    if t <= 0: break                                    # a zero threshold ends the ladder
-    if lodByScreenSize: take = screenRadius <= t         # thresholds descend
-    else:               take = distance >= t             # thresholds ascend
+    if t <= 0: break                                       # a zero threshold ends the ladder
+    if lodByScreenSize: take = lodScreenRadius <= t         # thresholds descend
+    else:               take = distance >= t                # thresholds ascend
     if not take: break
     level = k + 1
 ```
+
+**Two radii, because there are two questions.** `radius` is the sphere the *rejections* use. It is
+centred on the record position — which is where this pass puts it, and for a scatter that is the
+point on the ground the thing was planted at — so it has to reach the furthest corner of the source
+from the source's own origin, or an instance can be discarded with its canopy on screen. `lodRadius`
+is the tight sphere about the source's box, and it is what the *ladder* measures with: the ladder is
+not asking whether anything is on screen but how large the thing looks, and the difference between
+the two rules is how far the artist put the geometry from its origin. For geometry centred on its
+origin they are the same number. `thresholds.w` carries `lodRadius`; 0 means "use `limits.z`", which
+is what this pass did before the two were separated (`docs/lod-lab/README.md` §2).
 
 A threshold of `0` ending the ladder is what makes `lodCount > 1` with unset thresholds a no-op
 (everything stays at LOD0) instead of collapsing to the last level.
@@ -164,8 +189,13 @@ is a per-frame uniform, so moving a threshold never rebuilds a cloud.
   lands at offset 0 exactly as before.
 - The stats (`ProceduralStats::visibleInstances`, `culledInstances`, `lodCounts`) come from an
   **asynchronous** readback of the shared stats buffer and lag the drawn frame by a frame or two.
-  They are a readout, never an input. `ProceduralRenderer::readCullCounts` /
-  `readVisibleIndices` are the blocking, exact versions for tests and tools.
+  They are a readout, never an input. `ProceduralRenderer::readCullCounts`,
+  `readVisibleIndices` and `readLodLevels` are the blocking, exact versions for tests and tools.
+  Using that readback as an input is what cost a frame of geometry at every rung change: the
+  renderer used to decide which levels to record a draw for from how long a level had been empty
+  *in it*, and the frame an instance arrived on a level was exactly the frame it was wrong about.
+  Which levels are recorded is now `rendering::objectLevelRange`, a proof over the object's own
+  record bounds that never reads the readback at all.
 
 ## Effectors and the effector pass
 

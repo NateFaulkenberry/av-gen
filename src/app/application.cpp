@@ -1807,6 +1807,31 @@ void Application::startRenderFromUi() {
     panel_->setStatus("rendering...");
 }
 
+rendering::ProceduralLodLevels
+Application::readProceduralLodLevels(const rendering::DebugViewOptions& options) {
+    rendering::ProceduralLodLevels out;
+    if (!options.lod || !renderer_ || !engine_) {
+        return out;
+    }
+    for (const scene::ProceduralGeometry& pg : engine_->scene().procedurals) {
+        if (!pg.visible || pg.instances.empty()) {
+            continue;
+        }
+        // ADR-108: a material part shares its lead's decision and owns no buffer of its own, so the
+        // lead is asked and the part is coloured from the same answer.
+        const std::string& owner = pg.partOf.empty() ? pg.name : pg.partOf;
+        auto levels = renderer_->procedurals().readLodLevels(owner);
+        // Not `fresh` means the cull dispatches were not encoded this frame, so the buffer holds
+        // the last frame that ran them. Dropped rather than drawn: an overlay that shows history
+        // while claiming to show this frame is worse than one that shows nothing (spec §37).
+        if (!levels || !levels->fresh || levels->level.size() != pg.instances.size()) {
+            continue;
+        }
+        out.emplace(pg.name, std::move(levels->level));
+    }
+    return out;
+}
+
 void Application::rememberProject(const std::filesystem::path& path) {
     // The Render panel edits `uiRender_`, and `uiRender_` was copied from the engine exactly once,
     // in `init()` -- which runs *before* a `--project` on the command line is even loaded. So the
@@ -3485,8 +3510,9 @@ int Application::runLive() {
             renderer_->setDiagnosticEntity(options.selectedEntity);
             renderer_->setDebugDepthTest(options.depthTest);
             transformHistory_.setSubject(options.selectedEntity);
+            const rendering::ProceduralLodLevels lodLevels = readProceduralLodLevels(options);
             rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime,
-                                          &transformHistory_);
+                                          &transformHistory_, &lodLevels);
         }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                         engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
@@ -4212,7 +4238,9 @@ int Application::runHeadless() {
                 // diagnosis done from a rendered frame.
                 const rendering::DebugViewOptions& options = debugOptions();
                 renderer_->setDebugDepthTest(options.depthTest);
-                rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime);
+                const rendering::ProceduralLodLevels lodLevels = readProceduralLodLevels(options);
+                rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime,
+                                              nullptr, &lodLevels);
             }
             const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                             engine_->hasFrame() ? &engine_->latestFrame() : nullptr};

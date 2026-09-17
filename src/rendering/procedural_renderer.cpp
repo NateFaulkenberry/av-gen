@@ -36,10 +36,6 @@ constexpr std::uint32_t kEffectorWorkgroup = 64;     // points.wgsl cs_effectors
 constexpr std::uint32_t kCullWorkgroup = 64;        // cull.wgsl cs_cull_classify
 constexpr std::uint32_t kCullScanBlock = 1024;      // cull.wgsl kScanBlock (256 threads x 4 elements)
 constexpr std::uint32_t kCullStatsStride = 8;       // u32 per object slot in the shared stats buffer
-// How many consecutive frames a LOD level must have been empty before its draw stops being
-// recorded. Long enough that a level flickering around zero keeps its draw; short enough that the
-// steady state is clean.
-constexpr std::uint32_t kEmptyLevelFrames = 3;
 constexpr std::uint32_t kIndirectStride = 20;       // drawIndexedIndirect args: five u32
 static_assert(scene::kMaxLodLevels == 4, "shaders/cull.wgsl hardcodes kMaxLodLevels to stride the shared indirect buffer");
 // Per-level slot in the object's deformer/time buffer. Uniform bind-group offsets must be a
@@ -151,6 +147,11 @@ struct ProceduralRenderer::Impl {
         // `radius` for geometry centred on its origin and larger for anything that stands on it --
         // a tree, a mushroom, a character -- which is the whole reason it is a second number.
         float cullRadius = 1.0f;
+        // True when this level is a camera-facing impostor quad rather than geometry in the
+        // source's own space (scene::lodLevelIsImpostor). The two are drawn by different vertex
+        // paths, and the level index is not the answer: a Mesh source's levels 1-3 have been
+        // simplified meshes since ADR-085.
+        bool impostor = false;
         glm::vec3 boundsMin{0.0f};     // source mesh bounds (object space; Path deformer "fit" extent)
         glm::vec3 boundsMax{0.0f};
         std::uint64_t lastUsed = 0;
@@ -173,6 +174,7 @@ struct ProceduralRenderer::Impl {
         // Culling / LOD (ADR-029); allocated only for objects that use it.
         wgpu::Buffer cullUniforms;
         wgpu::Buffer lodIndex;                  // per record: level, or 0xFFFFFFFF when culled
+        std::uint64_t lastCullFrame = 0;        // the frame this object's cull dispatches were encoded
         wgpu::Buffer blockSums;                 // kMaxLodLevels x scan blocks
         wgpu::Buffer visible;                   // kMaxLodLevels slices of visibleStride elements
         wgpu::BindGroup cullGroup;              // cull pass over the base records
@@ -195,10 +197,6 @@ struct ProceduralRenderer::Impl {
         glm::mat4 prevModel{1.0f};              // last frame's object matrix (ADR-035 velocity)
         bool hasPrevModel = false;
         std::uint64_t lastUsed = 0;
-            // Consecutive frames each LOD level has been empty, from the cull readback. The CPU cannot
-        // know a level is empty when it records the draw -- the GPU writes the count -- but it can
-        // know the level has been empty for a while.
-        std::array<std::uint32_t, scene::kMaxLodLevels> emptyFrames{};
         // ADR-056 Tier 1. One buffer holds both halves: the per-record slot map at offset 0 and the
         // compact per-slot bend array at `bendOffset` (256-aligned, because a bind group entry's
         // offset must be). It is bound twice, at bindings 6 and 7, because WGSL cannot read one
@@ -223,6 +221,12 @@ struct ProceduralRenderer::Impl {
         // The cull pass would have zeroed every level's instance count, so nothing is recorded in
         // any pass. Provable on the CPU from the object's whole-record bounds (objectFullyCulled).
         bool fullyCulled = false;
+        // The levels the cull pass could possibly have put a record on, from the same bounds
+        // (rendering::objectLevelRange). Levels outside it are provably empty and their indirect
+        // draws are not recorded; every level inside it is recorded whether or not the last
+        // readback said it was occupied, because that readback is one to three frames old and the
+        // frame an instance *arrives* on a level is exactly the frame it is wrong about.
+        LevelRange levels{};
     };
     struct ComputeItem {
         const ObjectState* state;
@@ -332,10 +336,6 @@ struct ProceduralRenderer::Impl {
     // a material part reached later in the object loop appends itself to its lead's fanout list
     // (ADR-108); they all go up in one sweep after the loop, before the pass is encoded.
     std::vector<CullPassUniforms> cullUniformStaging;
-    // Every object whose per-level counts the cull pass writes this frame -- leads and the parts
-    // their decision serves. Only the leads are in `cullItems`, so this is what advances the
-    // empty-level counters for a part without its instances being added up twice.
-    std::vector<ObjectState*> cullStatsWatch;
     std::array<StatsSlot, 3> statsSlots{};
     std::vector<std::uint32_t> statsSnapshot; // latest completed stats readback
     int pendingStatsSlot = -1;
@@ -804,6 +804,7 @@ const ProceduralRenderer::Impl::CachedMesh* ProceduralRenderer::Impl::ensureLodM
                                   : 0.0,
                    sourceTris);
         it = meshes.emplace(key, uploaded).first;
+        it->second.impostor = scene::lodLevelIsImpostor(object.source, level);
     }
     it->second.lastUsed = frame;
     return it->second.indexCount > 0 ? &it->second : nullptr;
@@ -1150,7 +1151,6 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     im.computeItems.clear();
     im.cullItems.clear();
     im.cullUniformStaging.clear();
-    im.cullStatsWatch.clear();
     im.passThisFrame = false;
     im.cullPassThisFrame = false;
     if (!im.initialised) {
@@ -1201,6 +1201,10 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     const std::size_t objectCount = scene.procedurals.size();
     std::vector<std::size_t> leadOf(objectCount, kNoLead);
     std::vector<float> groupRadius(objectCount, 0.0f); // the lead's bound must cover every part
+    // The same, for the radius the LOD ladder measures size with. A separate array because it is a
+    // separate quantity: `groupRadius` must contain every part about the record position and this
+    // one describes how large the asset looks.
+    std::vector<float> groupLodRadius(objectCount, 0.0f);
     // A cached mesh's radius is measured on the *uploaded* mesh, which is the source before the
     // object's own `sourceTransform`. That transform is where a scatter layer's size actually lives
     // -- composition.cpp puts the "make this 0.45 m tall" normalisation there deliberately, because
@@ -1255,6 +1259,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             // here rather than in the loop below because the lead is reached first.
             if (const Impl::CachedMesh* partMesh = im.ensureMesh(part); partMesh != nullptr) {
                 groupRadius[lead] = std::max(groupRadius[lead], partMesh->cullRadius * sourceScaleOf(part));
+                groupLodRadius[lead] = std::max(groupLodRadius[lead], partMesh->radius * sourceScaleOf(part));
             }
         }
     }
@@ -1262,6 +1267,18 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     std::vector<Impl::ObjectState*> stateOf(objectCount, nullptr);
     std::vector<std::size_t> cullItemOf(objectCount, kNoLead);
     std::vector<char> fullyCulledOf(objectCount, 0);
+    std::vector<LevelRange> levelRangeOf(objectCount);
+    // ADR-038's depth bands move the ladder per band; `objectLevelRange` needs the extremes over
+    // every band the scene declares. 1.0 seeds them because it is the value a scene with no bands
+    // uses, and keeping it in when there are bands only widens the range -- which can make the
+    // proof less tight but never wrong, and the shader's band search never returns to 1.0 once a
+    // scene declares one.
+    float bandDetailMin = 1.0f;
+    float bandDetailMax = 1.0f;
+    for (const scene::DepthLayer& layer : scene.composition.layers) {
+        bandDetailMin = std::min(bandDetailMin, layer.detail);
+        bandDetailMax = std::max(bandDetailMax, layer.detail);
+    }
 
     std::uint32_t slot = 0;
     for (std::size_t i = 0; i < scene.procedurals.size(); ++i) {
@@ -1393,6 +1410,12 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // ADR-108: the bound has to cover every material part of the asset, or the trunk's radius
         // culls a canopy that is still on screen. `groupRadius` is zero for an object with no parts.
         const float cullRadius = std::max(mesh->cullRadius * sourceScaleOf(object), groupRadius[i]);
+        // What the ladder measures with: the tight sphere about the source's box, in world units.
+        // Not the cull's sphere -- see shaders/cull.wgsl's note above `lodRadius` and
+        // rendering/visibility.hpp. In source units, because that is what the uniform carries and
+        // what the shader multiplies by the record and object scales.
+        const float lodSourceRadius = std::max(mesh->radius * sourceScaleOf(object),
+                                               groupLodRadius[i]);
         const bool fullyCulled = isPart ? fullyCulledOf[leadIndex] != 0
                                         : (cullActive && !usesLive &&
                                            objectFullyCulled(lodSettings, planes, cullCamera, model,
@@ -1401,6 +1424,30 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         if (fullyCulled) {
             ++stats_.culledObjects;
         }
+        // Which rungs this object's records could be on. A part shares its lead's decision
+        // (ADR-108), so it shares the range; an object whose records the GPU moves after these
+        // bounds were taken can prove nothing and records every level.
+        LevelRange levels{};
+        levels.highest = static_cast<int>(lodCount) - 1;
+        if (cullActive && !usesLive && state.bounds.valid) {
+            if (isPart) {
+                levels = levelRangeOf[leadIndex];
+            } else {
+                // ADR-186 again: with the rungs lifted the thresholds uniform is zeroed, which
+                // ends the ladder at rung 0. The proof has to be about the ladder the pass was
+                // actually given.
+                scene::LodSettings effective = lodSettings;
+                if (!scene.detailLimits.proceduralLodRungs) {
+                    effective.lodDistances[0] = 0.0f;
+                    effective.lodDistances[1] = 0.0f;
+                    effective.lodDistances[2] = 0.0f;
+                }
+                // The ladder's radius, because this proof is about rungs.
+                levels = objectLevelRange(effective, cullCamera, model, state.bounds, lodSourceRadius,
+                                          bandDetailMin, bandDetailMax, lodHysteresisAllowed_);
+            }
+        }
+        levelRangeOf[i] = levels;
 
         // ---- ADR-056 Tier 1: choose, integrate, upload ----
         // Everything here is proportional to the *active* set. The grid is built once per scatter;
@@ -1553,14 +1600,23 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             emissiveSlot = fields->slotOf(object.emissiveField);
         }
         const bool isPoint = object.source.kind == scene::PrimitiveKind::Point;
-        // One slot per LOD level: levels 2 and 3 are camera-facing billboards, so they take the
-        // same shader path as a Point source; fieldInfo.w switches the visible-list indirection on.
+        // One slot per LOD level. A level whose mesh is an impostor quad takes the same shader path
+        // as a Point source; fieldInfo.w switches the visible-list indirection on.
+        //
+        // The flag comes from the *mesh* and not from the level index. It used to read
+        // `isPoint || level >= 2`, which was true when ADR-029 wrote it and false from ADR-085
+        // onwards: that ADR gave a Mesh source simplified meshes at every level, and those were
+        // then drawn through the billboard path -- their vertices taken as offsets in the camera's
+        // basis, skipping the source transform and the deformer stack. A 14 m production tree drew
+        // at rung 2 as a 7.3 m flat shape centred on the foot of its trunk (measured:
+        // tests/rendering/test_lod_gpu.cpp).
         // With the defaults (no culling, one level) this is the single write it has always been.
         // The levels differ in one float, and their slots are contiguous, so they go up as one
         // write rather than as lodCount of them (four per object, forty-eight in a world frame).
         im.deformerStaging.assign(static_cast<std::size_t>(lodCount) * kDeformerSlotStride, 0);
         for (std::uint32_t level = 0; level < lodCount; ++level) {
-            const bool billboard = isPoint || level >= 2;
+            const bool billboard =
+                isPoint || (lodMeshes[level] != nullptr && lodMeshes[level]->impostor);
             u.fieldInfo = glm::vec4(static_cast<float>(emissiveSlot), object.emissiveFieldAmount,
                                     billboard ? 1.0f : 0.0f, cullActive ? 1.0f : 0.0f);
             // ADR-155: this rung's tier. Rung tracks projected size, so demoting from rung N
@@ -1595,7 +1651,6 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                 }
                 lead.fanoutInfo.x = used + 1;
             }
-            im.cullStatsWatch.push_back(&state);
         } else if (cullActive && !fullyCulled) {
             CullPassUniforms cull{};
             cull.objectToWorld = model;
@@ -1622,8 +1677,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                                     limitDistance ? std::max(lodSettings.minScreenRadius, 0.0f) : 0.0f,
                                     cullRadius, std::max(objectScale, 1e-6f));
             cull.thresholds = limitRungs ? glm::vec4(lodSettings.lodDistances[0], lodSettings.lodDistances[1],
-                                                     lodSettings.lodDistances[2], 0.0f)
-                                         : glm::vec4(0.0f);
+                                                     lodSettings.lodDistances[2], lodSourceRadius)
+                                         : glm::vec4(0.0f, 0.0f, 0.0f, lodSourceRadius);
             cull.stability = glm::vec4(std::clamp(lodSettings.lodSpread, 0.0f, 0.5f),
                                        lodHysteresisAllowed_
                                            ? std::clamp(lodSettings.lodHysteresis, 0.0f, 0.5f)
@@ -1648,7 +1703,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             cullItemOf[i] = im.cullItems.size();
             im.cullUniformStaging.push_back(cull);
             im.cullItems.push_back(Impl::CullItem{&state, instanceCount, lodCount, blocks, usesLive});
-            im.cullStatsWatch.push_back(&state);
+            state.lastCullFrame = im.frame;
             ++stats_.cullObjects;
         }
 
@@ -1686,7 +1741,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         std::memcpy(im.staging.data() + offset, &obj, sizeof(obj));
 
         im.items.push_back(
-            Impl::DrawItem{i, lodMeshes, &state, offset, instanceCount, lodCount, cullActive, fullyCulled});
+            Impl::DrawItem{i, lodMeshes, &state, offset, instanceCount, lodCount, cullActive, fullyCulled,
+                           levels});
         ++stats_.objects;
         stats_.sourceVertices += mesh->vertexCount;
         stats_.sourceTriangles += mesh->indexCount / 3;
@@ -1771,22 +1827,6 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                 im.pendingStatsSlot = static_cast<int>(i);
                 break;
             }
-        }
-    }
-    // How long each LOD level of each object has had nothing in it. The instance count is written
-    // by the GPU, so the CPU cannot know a level is empty when it records the draw -- but it can
-    // know that the level has been empty for a while, which for the far LOD levels of a scatter is
-    // almost always true and almost never about to stop being true. Every object the cull pass
-    // writes counts for is here, including the material parts served by another object's decision
-    // (ADR-108), because each of those records its own draws and can skip its own empty levels.
-    for (Impl::ObjectState* watched : im.cullStatsWatch) {
-        const std::size_t base = static_cast<std::size_t>(watched->statsSlot) * kCullStatsStride;
-        if (base + kCullStatsStride > im.statsSnapshot.size() || im.statsSnapshot[base + 5] == 0) {
-            continue;
-        }
-        for (std::size_t level = 0; level < 4; ++level) {
-            const std::uint32_t count = im.statsSnapshot[base + level];
-            watched->emptyFrames[level] = count == 0 ? watched->emptyFrames[level] + 1 : 0;
         }
     }
     // Aggregate whatever the latest completed readback holds. Over the *leads* only: a part shares
@@ -1921,24 +1961,31 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             }
             continue;
         }
-        // One indirect draw per LOD level, instance counts written by the cull pass. Levels 2 and
-        // 3 are camera-facing billboards, so they are never back-face culled.
+        // One indirect draw per LOD level, instance counts written by the cull pass. A level whose
+        // mesh is an impostor quad is never back-face culled -- it faces the camera by
+        // construction. A level that is a simplified *mesh* is culled like any other mesh, which
+        // is every level of every imported asset since ADR-085.
         for (std::uint32_t level = 0; level < item.lodCount; ++level) {
             const Impl::CachedMesh* mesh = item.meshes[level];
             if (mesh == nullptr || !groups[level]) {
                 continue;
             }
-            // A level that has had no instances for several frames is not recorded at all. Level 0
-            // is always recorded: it is the level an object enters when it comes into view, and one
-            // frame of it missing is an object popping in. The far levels are the ones that are
-            // reliably empty -- half of every frame's indirect draws -- and an instance arriving in
-            // one of them a frame late is a distant billboard, which nobody sees arrive.
-            if (level > 0 && item.state->emptyFrames[level] >= kEmptyLevelFrames) {
+            // A level no record can be on this frame is not recorded at all: its indirect draw
+            // would read an instance count of zero.
+            //
+            // This used to be decided from how many consecutive frames the level had been empty in
+            // the last completed cull readback -- which lags the drawn frame by one to three, so
+            // the rule was wrong at exactly the moment it mattered: the frame an instance arrives
+            // on a level it has not been on. The object was then drawn by nothing at all until the
+            // readback caught up. `objectLevelRange` replaces the guess with a proof over the same
+            // bounds `fullyCulled` above uses, so it can never be wrong about an arrival, and in a
+            // scatter whose whole cloud is near the camera it skips more than the guess did.
+            if (!item.levels.contains(static_cast<int>(level))) {
                 ++stats_.skippedIndirectDraws;
                 continue;
             }
             setPipeline(depthOnly ? im.pipelineDepth
-                                  : (twoSided || level >= 2 ? im.pipelineNoCull : im.pipelineCull));
+                                  : (twoSided || mesh->impostor ? im.pipelineNoCull : im.pipelineCull));
             pass.SetBindGroup(1, groups[level], 1, &item.offset);
             ++stats_.state.bindGroupBinds;
             setMaterial(materialGroup);
@@ -2035,6 +2082,35 @@ Result<std::array<std::uint32_t, 5>> ProceduralRenderer::readIndirectArgs(const 
     std::array<std::uint32_t, 5> args{};
     std::memcpy(args.data(), data->data(), sizeof(args));
     return args;
+}
+
+Result<ProceduralRenderer::InstanceLevels> ProceduralRenderer::readLodLevels(const std::string& name) {
+    Impl& im = *impl_;
+    const auto it = im.objects.find(name);
+    // A material part shares its lead's decision and owns no `lodIndex` of its own (ADR-108), so
+    // the caller is told to ask the lead rather than handed the part's unwritten buffer.
+    if (it == im.objects.end() || !it->second.lodIndex) {
+        return fail("procedural object '{}' has no per-instance LOD state", name);
+    }
+    const Impl::ObjectState& state = it->second;
+    const std::uint32_t count = static_cast<std::uint32_t>(state.uploadedCount);
+    InstanceLevels out;
+    out.fresh = state.lastCullFrame == im.frame && im.frame != 0;
+    if (count == 0) {
+        return out;
+    }
+    auto data = gpu::readBuffer(im.context, state.lodIndex, 0,
+                                static_cast<std::uint64_t>(count) * sizeof(std::uint32_t));
+    if (!data) {
+        return std::unexpected(data.error());
+    }
+    std::vector<std::uint32_t> raw(count);
+    std::memcpy(raw.data(), data->data(), data->size());
+    out.level.reserve(count);
+    for (const std::uint32_t v : raw) {
+        out.level.push_back(v == 0xFFFFFFFFu ? -1 : static_cast<int>(v));
+    }
+    return out;
 }
 
 Result<std::vector<std::uint32_t>> ProceduralRenderer::readVisibleIndices(const std::string& name, int level) {

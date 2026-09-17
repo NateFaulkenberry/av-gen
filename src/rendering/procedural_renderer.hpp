@@ -313,6 +313,20 @@ public:
     [[nodiscard]] Result<CullCounts> readCullCounts(const std::string& name);
     // Blocking readback of the compacted visible list of one LOD level (ascending record indices).
     [[nodiscard]] Result<std::vector<std::uint32_t>> readVisibleIndices(const std::string& name, int level);
+    // Blocking readback of the rung the cull pass assigned every record of `name`: 0..lodCount-1,
+    // or -1 for a record it rejected. This is `lodIndex`, the buffer cs_cull_classify writes and
+    // the compaction reads, so it is the decision itself rather than a second account of it.
+    //
+    // `fresh` is false when the object's cull dispatches were not encoded in the frame just
+    // recorded -- the whole object was provably rejected, or it has no cull state. The buffer then
+    // still holds whatever the last frame that did run the pass left in it, and a tool that draws
+    // it anyway is drawing history. The Visibility Lab paid a failing assertion to learn that about
+    // `readVisibleIndices`; this says it in the return type instead.
+    struct InstanceLevels {
+        std::vector<int> level;
+        bool fresh = false;
+    };
+    [[nodiscard]] Result<InstanceLevels> readLodLevels(const std::string& name);
     // Blocking readback of the drawIndexedIndirect args the draw will read for one LOD level:
     // {indexCount, instanceCount, firstIndex, baseVertex, firstInstance}. The bytes the draw
     // addresses, not the counts the cull pass believes it wrote -- since every object's args now

@@ -1,0 +1,235 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "LOD / Geometry Lab",
+ "_note": "Flat, unlit-by-atmosphere and fixed-seed, for the reason the Visibility Lab's fixture is: anything that can change an object's appearance with distance -- fog, volumetrics, a hillside that cuts each instance at a different height -- makes 'it changed' ambiguous, and a rung change is exactly a change with distance. The camera is 6 m up and level, looking down 640 m of flat ground, so distance is the only thing that varies along the frame. The six layers are chosen to separate the hypotheses rather than to look like a world: three pairs that are the same size on screen and differ in where their geometry sits relative to its own origin, which is the quantity the ladder's projected size was found to be contaminated by, plus one population scaled 0.35x to 2.4x so a single layer occupies every rung at once.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   6.0,
+   300.0
+  ],
+  "target": [
+   0.0,
+   6.0,
+   -340.0
+  ],
+  "fov": 50.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0.02,
+   0.03,
+   0.05
+  ],
+  "skyIntensity": 0.35,
+  "lightFromEnvironment": true,
+  "fogDensity": 0.0,
+  "volumeDensity": 0.0
+ },
+ "lights": [
+  {
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    -0.35,
+    -0.72,
+    -0.6
+   ],
+   "color": [
+    1.0,
+    0.97,
+    0.92
+   ],
+   "intensity": 4.0,
+   "castsShadow": true
+  }
+ ],
+ "nodes": [
+  {
+   "name": "lodlab",
+   "kind": "terrain",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "terrain": {
+    "chunkSize": 48.0,
+    "resolution": 40,
+    "lodLevels": 4,
+    "lodDistance": 86.0,
+    "viewDistance": 640.0,
+    "shadowDistance": 150.0,
+    "skirtDepth": 1.2,
+    "groundMottle": false,
+    "groundGlow": 0.0
+   },
+   "world": {
+    "name": "lod-lab",
+    "seed": 20260917,
+    "size": [
+     720.0,
+     720.0
+    ],
+    "baseHeight": 0.0,
+    "erosion": 0.0,
+    "seaLevel": -1000.0,
+    "moistureReach": 110.0,
+    "lowlandMoisture": 0.35,
+    "layers": [
+     {
+      "frequency": 0.004,
+      "amplitude": 0.0
+     }
+    ],
+    "features": []
+   },
+   "scatter": [
+    {
+     "name": "tree-on-its-foot",
+     "asset": "../../assets/quaternius/glTF/CommonTree_1.gltf",
+     "densities": {
+      "marsh": 0.0016,
+      "meadow": 0.0016,
+      "forest": 0.0016,
+      "scree": 0.0016,
+      "rim": 0.0016
+     },
+     "height": 14.0,
+     "minScale": 1.0,
+     "maxScale": 1.0,
+     "sink": 0.05,
+     "randomYaw": 1.0,
+     "clustering": 0.0,
+     "seed": 31,
+     "maxInstances": 4000,
+     "meshBudget": 900,
+     "viewDistance": 520.0,
+     "minScreenRadius": 1.0,
+     "castsShadow": true
+    },
+    {
+     "name": "rock-on-its-centre",
+     "asset": "../../assets/quaternius/glTF/Rock_Medium_1.gltf",
+     "densities": {
+      "marsh": 0.0016,
+      "meadow": 0.0016,
+      "forest": 0.0016,
+      "scree": 0.0016,
+      "rim": 0.0016
+     },
+     "height": 14.0,
+     "minScale": 1.0,
+     "maxScale": 1.0,
+     "sink": 0.05,
+     "randomYaw": 1.0,
+     "clustering": 0.0,
+     "seed": 59,
+     "maxInstances": 4000,
+     "meshBudget": 180,
+     "viewDistance": 520.0,
+     "minScreenRadius": 1.0,
+     "castsShadow": true
+    },
+    {
+     "name": "worst-offset",
+     "asset": "../../assets/quaternius/glTF/TwistedTree_2.gltf",
+     "densities": {
+      "marsh": 0.001,
+      "meadow": 0.001,
+      "forest": 0.001,
+      "scree": 0.001,
+      "rim": 0.001
+     },
+     "height": 15.0,
+     "minScale": 1.0,
+     "maxScale": 1.0,
+     "sink": 0.05,
+     "randomYaw": 1.0,
+     "clustering": 0.0,
+     "seed": 47,
+     "maxInstances": 4000,
+     "meshBudget": 700,
+     "viewDistance": 520.0,
+     "minScreenRadius": 1.0,
+     "castsShadow": true
+    },
+    {
+     "name": "least-offset",
+     "asset": "../../assets/quaternius/glTF/Fern_1.gltf",
+     "densities": {
+      "marsh": 0.009,
+      "meadow": 0.009,
+      "forest": 0.009,
+      "scree": 0.009,
+      "rim": 0.009
+     },
+     "height": 1.4,
+     "minScale": 1.0,
+     "maxScale": 1.0,
+     "sink": 0.05,
+     "randomYaw": 1.0,
+     "clustering": 0.0,
+     "seed": 53,
+     "maxInstances": 4000,
+     "meshBudget": 260,
+     "viewDistance": 130.0,
+     "minScreenRadius": 2.6,
+     "castsShadow": false
+    },
+    {
+     "name": "below-the-bar",
+     "asset": "../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.014,
+      "meadow": 0.014,
+      "forest": 0.014,
+      "scree": 0.014,
+      "rim": 0.014
+     },
+     "height": 0.7,
+     "minScale": 1.0,
+     "maxScale": 1.0,
+     "sink": 0.05,
+     "randomYaw": 1.0,
+     "clustering": 0.0,
+     "seed": 61,
+     "maxInstances": 4000,
+     "meshBudget": 80,
+     "viewDistance": 72.0,
+     "minScreenRadius": 2.4,
+     "castsShadow": false
+    },
+    {
+     "name": "graded",
+     "asset": "../../assets/quaternius/glTF/CommonTree_1.gltf",
+     "densities": {
+      "marsh": 0.0008,
+      "meadow": 0.0008,
+      "forest": 0.0008,
+      "scree": 0.0008,
+      "rim": 0.0008
+     },
+     "height": 10.0,
+     "minScale": 0.35,
+     "maxScale": 2.4,
+     "sink": 0.05,
+     "randomYaw": 1.0,
+     "clustering": 0.0,
+     "seed": 67,
+     "maxInstances": 4000,
+     "meshBudget": 900,
+     "viewDistance": 520.0,
+     "minScreenRadius": 1.0,
+     "castsShadow": true
+    }
+   ]
+  }
+ ],
+ "wind": {
+  "speed": 0.0
+ }
+}

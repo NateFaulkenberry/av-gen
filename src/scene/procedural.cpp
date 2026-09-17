@@ -114,6 +114,7 @@
 #include <algorithm>
 #include <atomic>
 #include <bit>
+#include <cassert>
 #include <cmath>
 #include <map>
 #include <cstring>
@@ -1700,6 +1701,17 @@ MeshData decimateMesh(const MeshData& mesh, int targetTriangles) {
     return out;
 }
 
+// The one statement of which levels are impostors. `makeLodMesh` branches on it below, and the
+// renderer asks it when it chooses a vertex path, so there is one rule rather than two that agreed
+// until ADR-085 and then did not.
+bool lodLevelIsImpostor(const SourceSpec& spec, int level) {
+    if (level < 2 || level > 3) {
+        return false;
+    }
+    // A mesh source's levels 1-3 are simplifications of the asset, in the asset's own space.
+    return !(spec.kind == PrimitiveKind::Mesh && spec.assetMesh);
+}
+
 Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize) {
     // An imported mesh has no generator parameters to halve, so its levels are simplifications of
     // whatever the budget already left.
@@ -1769,6 +1781,9 @@ Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSi
         return std::unexpected(ok.error());
     }
     // LOD2: a billboard circumscribing the bounding sphere. LOD3: an eighth of that - a dot.
+    // Only reachable for a source `lodLevelIsImpostor` calls an impostor: the Mesh branch above
+    // returns before here, which is the whole content of that predicate.
+    assert(lodLevelIsImpostor(spec, level));
     const float size = 2.0f * std::max(impostorSize, 1e-4f) * sourceBoundingRadius(spec);
     MeshData quad = makePointQuad(level == 2 ? size : size * 0.125f);
     quad.name = level == 2 ? "lod-impostor" : "lod-point";

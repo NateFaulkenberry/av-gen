@@ -164,17 +164,29 @@ TEST_CASE("every lab states what it owns and what it does not", "[labs][registry
     CHECK(labs::labKeys().find("visibility") != std::string_view::npos);
 }
 
-TEST_CASE("the two inert debug overlays are in no lab's profile", "[labs][overlays]") {
-    // `DebugViewOptions::lod` and `::culling` have checkboxes and `debug_visualizer.cpp` reads
-    // neither, so both draw nothing. A lab profile that switched one on would be the suite showing
-    // a person a control that does nothing -- ADR-225, committed by the thing built to prevent it.
-    // When the Visibility Lab wires them up, this test is what says the prohibition can be lifted.
+TEST_CASE("an inert debug overlay is in no lab's profile", "[labs][overlays]") {
+    // `DebugViewOptions::culling` has a checkbox in `world_panel.cpp` and `debug_visualizer.cpp`
+    // reads the field nowhere, so it draws nothing. A lab profile that switched it on would be the
+    // suite showing a person a control that does nothing -- ADR-225, committed by the thing built
+    // to prevent it. When the Visibility Lab wires it up, this test is what says the prohibition
+    // can be lifted.
+    //
+    // `::lod` was here too and is not any more: the LOD Lab wired it to the rung the cull pass
+    // writes for each record (`ProceduralRenderer::readLodLevels`), so its profile is allowed to
+    // turn it on and the assertion below is now the opposite one.
     for (const labs::LabDescriptor& d : labs::labs()) {
         const rendering::DebugViewOptions o = labs::overlaysFor(d.id);
         INFO("lab: " << d.key);
-        CHECK_FALSE(o.lod);
         CHECK_FALSE(o.culling);
     }
+    // The LOD profile does switch the rung overlay on, and it is the only one that does: an
+    // overlay every profile enabled would be a decoration rather than a selection.
+    std::size_t withLod = 0;
+    for (const labs::LabDescriptor& d : labs::labs()) {
+        withLod += labs::overlaysFor(d.id).lod ? 1 : 0;
+    }
+    CHECK(labs::overlaysFor(labs::LabId::Lod).lod);
+    CHECK(withLod == 1);
 
     // And the control: the profiles are not simply all-default. If they were, the loop above would
     // pass while saying nothing.
