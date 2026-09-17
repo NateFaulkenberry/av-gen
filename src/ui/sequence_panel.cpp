@@ -612,20 +612,8 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     // the music moved the music instead (ADR-103); the arithmetic is in `ui_logic.hpp` so it can be
     // checked without a window, and `tests/unit/test_ui_logic.cpp` checks it. The header column is
     // in there for the same reason: it moves where the time axis starts, and both sides ask.
-    StripLanes lanes{.hasAudio = hasAudio,
-                     .hasSections = !piece.sectionTimeline.sections.empty(),
-                     .actorCount = piece.actors.size(),
-                     .hasOverlays = !piece.overlays.empty(),
-                     .rulerHeight = kRulerHeight,
-                     .markerHeight = kMarkerHeight,
-                     .laneHeight = lanes.laneHeight * laneZoom_,
-                     .audioLaneHeight = kAudioLaneHeight * laneZoom_,
-                     // **Not scaled by the vertical zoom, deliberately.** Vertical zoom exists to
-                     // read a waveform or fit a long cast; a section block is a label on a span and
-                     // a taller one says nothing more than a short one. It also stays put while the
-                     // lanes under it grow, which is what makes it usable as the ruler it is.
-                     .sectionLaneHeight = kSectionLaneHeight,
-                     .gap = kLaneGap};
+    StripLanes lanes = stripLanesFor(hasAudio, !piece.sectionTimeline.sections.empty(),
+                                     piece.actors.size(), !piece.overlays.empty(), laneZoom_);
     // A narrow panel loses the headers rather than losing the music: below about four hundred
     // points a header column costs more of the time axis than the names are worth.
     lanes.gutter = total >= 400.0f ? kGutterWidth : 0.0f;
@@ -658,7 +646,6 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     }
     const float height = lanes.height();
     const float width = std::max(total - lanes.gutter, 80.0f);
-
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const float axisX = origin.x + lanes.gutter;
     ImGui::InvisibleButton("strip", ImVec2(total, height),

@@ -188,6 +188,11 @@ std::string usageText() {
            "  --profile-cpu       print the main thread's per-phase frame distribution on exit\n"
            "  --profile-csv <f>   write one row per frame (every phase) to <f> on exit\n"
            "  --capture <file>    write the last frame as a PPM image\n"
+           "  --capture-ui <f>    write the editor, ImGui and all, as a PNG\n"
+           "  --capture-ui-frame <n>  which frame to grab (default 90)\n"
+           "  --capture-ui-panel <a,b>  raise these panels first, so a docked panel sharing a\n"
+           "                      tab bar can be photographed; the last named ends up on top\n"
+           "  --capture-ui-stay   keep running after the capture instead of quitting\n"
            "  --debug-target <t>  display an auxiliary render target: normal|roughness|velocity|\n"
            "                      emission|ids|occlusion|depth|linear depth|depth edges|\n"
            "                      object depth|overdraw|fragment density\n"
@@ -397,6 +402,22 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--capture-ui-frame");
             if (!v) return std::unexpected(v.error());
             options.captureUiFrame = std::max(1, std::atoi(v->c_str()));
+            ++i;
+        } else if (arg == "--capture-ui-panel") {
+            auto v = need(i, "--capture-ui-panel");
+            if (!v) return std::unexpected(v.error());
+            // Comma-separated, so one flag can raise a whole tab group's worth in one run and the
+            // last one named is the one on top.
+            for (std::size_t start = 0; start <= v->size();) {
+                const std::size_t comma = v->find(',', start);
+                std::string one = v->substr(start, comma == std::string::npos ? std::string::npos
+                                                                              : comma - start);
+                if (!one.empty()) {
+                    options.captureUiPanels.push_back(std::move(one));
+                }
+                if (comma == std::string::npos) break;
+                start = comma + 1;
+            }
             ++i;
         } else if (arg == "--capture-ui-stay") {
             options.captureUiQuit = false;
@@ -3134,6 +3155,14 @@ int Application::runLive() {
             core::PhaseProfiler::AllocScope scope(prof, kPhUi, kPhAllocUi);
             imgui_->newFrame();
             panel_->draw(*engine_, stats);
+            // Raised *after* the panels are submitted, because ImGui cannot focus a window it has
+            // not seen this frame. The focus lands on the next frame, which is why the capture frame
+            // defaults to well after the layout settles.
+            if (options_.captureUi) {
+                for (const std::string& name : options_.captureUiPanels) {
+                    ImGui::SetWindowFocus(name.c_str());
+                }
+            }
         }
         if (uiSelfTest && (time.frameIndex % 30) == 0) {
             const ImGuiIO& io = ImGui::GetIO();

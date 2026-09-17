@@ -235,6 +235,16 @@ enum class StripLane : std::uint8_t {
     None,
 };
 
+// The strip's resting lane heights, before any zoom or fit-to-panel scaling. Here rather than in the
+// panel because `stripLanesFor` below needs them and a test needs `stripLanesFor`.
+inline constexpr float kStripRulerHeight = 22.0f;
+inline constexpr float kStripMarkerHeight = 16.0f;
+inline constexpr float kStripLaneHeight = 26.0f;
+// The audio lane is the same height as the others by default, and grows with them.
+inline constexpr float kStripAudioLaneHeight = kStripLaneHeight;
+inline constexpr float kStripSectionLaneHeight = 22.0f;
+inline constexpr float kStripLaneGap = 3.0f;
+
 struct StripLanes {
     bool hasAudio = false;
     // The song-structure lane (ADR-216). Directly under the ruler and *above* the audio, because it
@@ -313,6 +323,39 @@ struct StripLanes {
         return StripLane::None;
     }
 };
+
+// The strip's lanes for a piece, at a given vertical zoom.
+//
+// A free function rather than an aggregate initialiser in the panel, and the reason is a bug rather
+// than a preference. Written inline it was
+//
+//     StripLanes lanes{ ..., .laneHeight = kLaneHeight * laneZoom_, ... };
+//
+// and a bulk rename turned the right-hand `kLaneHeight` into `lanes.laneHeight` -- the member of the
+// object being initialised, which is zero. Every lane below the waveform then drew at zero height:
+// the shots lane, every actor lane and the overlay lane vanished from a piece that had five shots,
+// and the whole unit suite passed, because nothing outside a window could see the construction.
+//
+// Here it can. `sectionLaneHeight` does not take the zoom, deliberately: vertical zoom exists to read
+// a waveform or fit a long cast, and a section block is a label on a span that says nothing more for
+// being taller -- it also stays put while the lanes under it grow, which is what makes it usable as
+// the ruler it is.
+[[nodiscard]] inline StripLanes stripLanesFor(bool hasAudio, bool hasSections, std::size_t actorCount,
+                                              bool hasOverlays, float laneZoom) {
+    const float zoom = laneZoom > 0.0f ? laneZoom : 1.0f;
+    StripLanes lanes;
+    lanes.hasAudio = hasAudio;
+    lanes.hasSections = hasSections;
+    lanes.actorCount = actorCount;
+    lanes.hasOverlays = hasOverlays;
+    lanes.rulerHeight = kStripRulerHeight;
+    lanes.markerHeight = kStripMarkerHeight;
+    lanes.laneHeight = kStripLaneHeight * zoom;
+    lanes.audioLaneHeight = kStripAudioLaneHeight * zoom;
+    lanes.sectionLaneHeight = kStripSectionLaneHeight;
+    lanes.gap = kStripLaneGap;
+    return lanes;
+}
 
 // ---- blocks in a lane: where the body ends and the grip begins -------------------------------
 //

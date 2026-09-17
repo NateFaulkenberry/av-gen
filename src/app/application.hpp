@@ -138,6 +138,13 @@ struct AppOptions {
     std::optional<std::filesystem::path> captureUi;
     int captureUiFrame = 90;      // which frame to grab; late enough for a layout to settle
     bool captureUiQuit = true;    // exit once it is written, so a script is one command
+    // Panels to bring to the front before the capture, in order, so a docked panel that shares a tab
+    // bar with five others can be photographed. Names are the panel titles exactly as the View menu
+    // spells them ("Sequence", "Auto-director", "Camera track"...).
+    //
+    // Focus rather than a layout change: a panel raised this way is the panel the user would see
+    // after clicking its tab, in the layout they actually have, rather than one torn out of it.
+    std::vector<std::string> captureUiPanels;
     // ADR-035: display one auxiliary target instead of the shaded frame; ADR-033/034: the quality
     // tier that scales shadow, occlusion and cluster sample counts.
     std::string debugTarget;

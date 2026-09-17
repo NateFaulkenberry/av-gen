@@ -577,3 +577,54 @@ TEST_CASE("A click on a lane's header is never a scrub", "[ui][sequencer][lanes]
         CHECK(lanes.at(lanes.audioTop() + 1.0f) == bare.at(bare.audioTop() + 1.0f));
     }
 }
+
+// ---- the strip's lanes, as the panel actually builds them ---------------------------------------
+//
+// The tests above check `StripLanes`'s arithmetic given heights. These check the *construction* --
+// the step that turns "a piece and a zoom" into those heights -- because that is the step that
+// broke. A bulk rename made the panel initialise `.laneHeight` from `lanes.laneHeight`, the member
+// of the object being built, so it was zero; the shots lane, every actor lane and the overlay lane
+// drew at zero height on a piece with five shots, and the whole unit suite passed because the
+// construction lived inside a function that needs a window.
+
+TEST_CASE("Every lane a piece has is given a height", "[ui][strip]") {
+    const ui::StripLanes lanes = ui::stripLanesFor(true, true, 2, true, 1.0f);
+    // The guard that was missing. A zero here is not a small lane, it is no lane.
+    CHECK(lanes.laneHeight > 0.0f);
+    CHECK(lanes.audioLaneHeight > 0.0f);
+    CHECK(lanes.sectionLaneHeight > 0.0f);
+    CHECK(lanes.rulerHeight > 0.0f);
+
+    // And the lanes are in order, with each one clear of the one above it.
+    CHECK(lanes.sectionsTop() >= lanes.lanesTop());
+    CHECK(lanes.audioTop() >= lanes.sectionsTop() + lanes.sectionLaneHeight);
+    CHECK(lanes.shotsTop() >= lanes.audioTop() + lanes.audioLaneHeight);
+    CHECK(lanes.actorsTop() >= lanes.shotsTop() + lanes.laneHeight);
+    CHECK(lanes.overlaysTop() >= lanes.actorsTop() + 2.0f * lanes.laneHeight);
+    CHECK(lanes.height() >= lanes.overlaysTop() + lanes.laneHeight);
+}
+
+TEST_CASE("The vertical zoom scales the lanes and leaves the sections alone", "[ui][strip]") {
+    const ui::StripLanes one = ui::stripLanesFor(true, true, 1, false, 1.0f);
+    const ui::StripLanes two = ui::stripLanesFor(true, true, 1, false, 2.0f);
+
+    CHECK_THAT(two.laneHeight, Catch::Matchers::WithinAbs(one.laneHeight * 2.0f, 1e-4));
+    CHECK_THAT(two.audioLaneHeight, Catch::Matchers::WithinAbs(one.audioLaneHeight * 2.0f, 1e-4));
+    // The section lane is a label on a span; a taller one says nothing more, and it stays put while
+    // the lanes under it grow.
+    CHECK_THAT(two.sectionLaneHeight, Catch::Matchers::WithinAbs(one.sectionLaneHeight, 1e-4));
+    CHECK(two.height() > one.height());
+
+    // A zoom of zero would be the same failure as the bug, arriving by a different route.
+    CHECK(ui::stripLanesFor(true, true, 1, false, 0.0f).laneHeight > 0.0f);
+}
+
+TEST_CASE("A lane the piece does not have takes no room", "[ui][strip]") {
+    const ui::StripLanes bare = ui::stripLanesFor(false, false, 0, false, 1.0f);
+    const ui::StripLanes full = ui::stripLanesFor(true, true, 0, false, 1.0f);
+    CHECK(bare.height() < full.height());
+    // With no audio and no sections the shots lane is the first lane.
+    CHECK_THAT(bare.shotsTop(), Catch::Matchers::WithinAbs(bare.lanesTop(), 1e-4));
+    // And a click in it still resolves to the shots lane rather than to the ruler.
+    CHECK(bare.at(bare.shotsTop() + 1.0f) == ui::StripLane::Shots);
+}
