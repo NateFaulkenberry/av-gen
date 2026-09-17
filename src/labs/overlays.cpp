@@ -31,7 +31,10 @@ rendering::DebugViewOptions overlaysFor(LabId id) {
         o.worldAxes = true;
         break;
     case LabId::Lod:
-        // Instance origins and the scatter clouds' bounds. Not `lod` -- see the header.
+        // The rung every instance was assigned, over the scatter clouds' bounds. `lod` reads the
+        // cull pass's own `lodIndex` buffer now (it drew nothing at all when this profile was
+        // written, which is why the header used to say it was deliberately off).
+        o.lod = true;
         o.points = true;
         o.bounds = true;
         break;

@@ -89,6 +89,16 @@ Named by file and symbol, because a category is not an address.
 * Scatter: the decision is in `cs_cull_classify`; the data is `scene::LodSettings`
   (`src/scene/procedural.hpp`). World scatter layers are authored at
   `lodDistances = {28, 11, 4}` px of projected radius, `lodByScreenSize = true`.
+* **The ladder and the rejection tests measure with two different spheres.** The rejection tests use
+  the conservative radius about the instance record (`rendering::sourceCullRadius`); the ladder uses
+  the tight radius about the source's box (`CullParams::thresholds.w`). They were one number, and
+  that made a threshold in pixels mean a size that depended on where the artist put the asset's
+  origin — 28 px meant a drawn radius of 11.1 px on `grass` and 18.7 px on `ferns`. See
+  `docs/lod-lab/README.md` §2.
+* **Rungs 2 and 3 are impostors only for a generated primitive** (`scene::lodLevelIsImpostor`). A
+  Mesh source's levels 1–3 have been simplified meshes since ADR-085, and the renderer drew them
+  through the impostor vertex path until the LOD Lab; ask the predicate, never the level index.
+* **Which rungs are recorded as draws is a proof, not a guess** (`rendering::objectLevelRange`).
 * Hysteresis: two mechanisms, both ADR-082 — `lodSpread` (default 0.12, per-instance threshold
   offset, **on**) and `lodHysteresis` (default 0.0, dead zone, **opt-in**, forced to zero offline).
 * Terrain: `world::chunkLod` (`src/world/terrain.hpp`). **No hysteresis.**
@@ -383,7 +393,8 @@ reason added to the renderer fails that test.
   vocabulary), its fixtures are `examples/`, its cases are `examples/labs/<lab>/cases.json`, its
   tests are `tests/unit` and `tests/rendering`, and its instruments stay in `tools/`. Moving the
   Quality Lab under a new tree would have renamed working code to satisfy a diagram.
-* **Turning on `DebugViewOptions::lod` or `::culling` in any profile.** See §8 below.
+* **Turning on `DebugViewOptions::culling` in any profile.** See §8 below. (`::lod` was on that
+  list and has since been wired by the LOD Lab; its profile turns it on.)
 
 ---
 
@@ -433,11 +444,14 @@ the debug flag. `[gpu]` tests take `tools/gpu-lock.sh`.
 
 ## 8. Known defects this audit found, and who owns them
 
-1. **`DebugViewOptions::lod` and `::culling` are inert.** Both have checkboxes in
-   `world_panel.cpp`; `debug_visualizer.cpp` reads neither field. A control wired to nothing is
-   ADR-225's defect, and it is worse in a diagnostic than anywhere else because somebody trusts it.
-   **Owner: Visibility Lab (culling) and LOD Lab (lod).** Until they are wired, no lab overlay
-   profile turns them on, and `test_lab_registry.cpp` enforces that.
+1. **`DebugViewOptions::culling` is inert.** It has a checkbox in `world_panel.cpp`;
+   `debug_visualizer.cpp` reads the field nowhere. A control wired to nothing is ADR-225's defect,
+   and it is worse in a diagnostic than anywhere else because somebody trusts it.
+   **Owner: Visibility Lab.** Until it is wired, no lab overlay profile turns it on, and
+   `test_lab_registry.cpp` enforces that.
+   *(`::lod` was the other half of this item. **Done**: the LOD Lab wired it to
+   `ProceduralRenderer::readLodLevels`, the rung the cull pass writes per record, and the registry
+   test now asserts the LOD profile turns it on and that no other profile does.)*
 2. **The GPU instance cull reports no reason at all.** `cs_cull_classify` collapses six planes, a
    distance test, a screen-radius test and a depth-band thinning into one bool and writes only
    `0xFFFFFFFF`. Four of the eight `Unreported` codes are this one shader. **Owner: Visibility Lab.**

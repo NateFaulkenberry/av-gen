@@ -18,7 +18,11 @@ namespace {
 //     LOD ladder's hysteresis and spread, the async cull readback, and the exposure meter.
 //   * Entity LOD is not live. `rendering::RepresentationSelector` exists, is tested, and is called
 //     by nothing in `scene_renderer.cpp`; the ladder that runs is the scatter one in `cull.wgsl`
-//     and the terrain one in `world::chunkLod`.
+//     and the terrain one in `world::chunkLod`. The LOD Lab confirmed this and did not wire it up:
+//     a ladder nobody asked for is a change to every frame, not a gap to fill.
+//   * The LOD Lab's `decides` is `cs_cull_classify` and not `composition.cpp`'s thresholds,
+//     because the thresholds are data the shader reads and the rung is the shader's decision. The
+//     quantity it compares them against turned out to be the thing worth owning.
 constexpr std::array<LabDescriptor, 14> kLabs{{
     {LabId::Animation, "animation", "Animation Lab", LabStatus::InProgress,
      "Is this pose the one the clip asked for at this time?",
@@ -41,12 +45,13 @@ constexpr std::array<LabDescriptor, 14> kLabs{{
      "src/scene/composition.cpp:cullEntityNodes", "docs/engineering-labs.md",
      "examples/qa/renderer-qa.scene.json", ""},
 
-    {LabId::Lod, "lod", "LOD / Geometry Lab", LabStatus::Planned,
-     "Which representation was chosen, and does the choice hold still?",
-     "the scatter ladder's level selection, its spread and hysteresis, and the terrain chunk ladder",
+    {LabId::Lod, "lod", "LOD / Geometry Lab", LabStatus::Built,
+     "Which representation was chosen, does it look like the object, and does it reach the frame?",
+     "the scatter ladder's level selection, the size measure it selects on, which rungs are drawn "
+     "at all, and the vertex path each rung's mesh takes",
      "whether the object was culled at all -- that is the Visibility Lab",
-     "shaders/cull.wgsl:cs_cull_classify", "docs/engineering-labs.md",
-     "examples/stress/stress.json", ""},
+     "shaders/cull.wgsl:cs_cull_classify", "docs/lod-lab/README.md",
+     "examples/labs/lod-geometry-lab.scene.json", "examples/labs/lod/cases.json"},
 
     {LabId::Camera, "camera", "Camera / Framing Lab", LabStatus::Planned,
      "Is the camera where the shot says, and can it see what it is framing?",
