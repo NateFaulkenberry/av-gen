@@ -226,6 +226,10 @@ struct FrameSeries {
     std::vector<double> specularCoverage;
     std::vector<double> shadingResidual;
     std::vector<double> shadingCoverage;
+    std::vector<double> shadowResidual;
+    std::vector<double> shadowCoverage;
+    std::vector<double> vegetationResidual;
+    std::vector<double> vegetationCoverage;
     std::vector<double> idChurn;
 };
 
@@ -307,6 +311,48 @@ int analyze(const Args& args) {
     bool sawDepth = false;
     bool sawEmission = false;
     bool sawNormal = false;
+    bool sawShadow = false;
+
+    // ADR-256: the surface classes of THIS render, written by the run that produced the AOVs.
+    // Read rather than authored, for the reason the ADR is named after -- a list of integers
+    // maintained beside the scene is silently wrong the moment the scene gains an object, and the
+    // mask it produces is well-formed, the residual over it correct, and the surfaces the wrong
+    // ones.
+    std::vector<std::uint32_t> vegetationObjects;
+    std::string manifestReason = "no materials.json beside the frames (render with --aov id)";
+    {
+        const fs::path manifestPath = aovRoot / "materials.json";
+        std::ifstream manifest(manifestPath);
+        if (manifest) {
+            nlohmann::json doc = nlohmann::json::parse(manifest, nullptr, false);
+            if (doc.is_discarded() || !doc.contains("objects")) {
+                manifestReason = fmt::format("'{}' did not parse", manifestPath.string());
+            } else if (doc.value("stable", true) == false) {
+                // The render itself said its object set moved. A mapping that does not describe
+                // the frames beside it is worse than no mapping, because it looks like one.
+                manifestReason = fmt::format(
+                    "materials.json is marked UNSTABLE: {}",
+                    doc.value("reason", std::string("the scene changed during the render")));
+            } else {
+                std::size_t classified = 0;
+                for (const auto& object : doc["objects"]) {
+                    const std::string surface = object.value("class", std::string("unclassified"));
+                    if (surface != "unclassified") {
+                        ++classified;
+                    }
+                    if (surface == "vegetation" && object.contains("objectId")) {
+                        vegetationObjects.push_back(object["objectId"].get<std::uint32_t>());
+                    }
+                }
+                manifestReason =
+                    vegetationObjects.empty()
+                        ? fmt::format("materials.json classifies no object as vegetation ({} of {} "
+                                      "object(s) carry any class at all)",
+                                      classified, doc["objects"].size())
+                        : std::string{};
+            }
+        }
+    }
 
     Frame previousCandidate;
     Frame twoBackCandidate;
@@ -394,6 +440,27 @@ int analyze(const Args& args) {
                         const auto gated = residual.over(shading);
                         series.shadingResidual.push_back(gated.residual);
                         series.shadingCoverage.push_back(gated.coverage);
+                    }
+                }
+                // ADR-255. The shadow AOV is a RECOMPUTED term, not the one the lit pass used --
+                // measured, not assumed: 0.43% of pixels differ. The limitation travels with the
+                // number below rather than living only in a document.
+                if (std::optional<Plane> shadow = loadAov(i, "shadow"); shadow.has_value()) {
+                    sawShadow = true;
+                    const Mask shadowed = shadowedMask(*shadow);
+                    if (!shadowed.empty()) {
+                        const auto gated = residual.over(shadowed);
+                        series.shadowResidual.push_back(gated.residual);
+                        series.shadowCoverage.push_back(gated.coverage);
+                    }
+                }
+                // ADR-256.
+                if (identifier.has_value() && !vegetationObjects.empty()) {
+                    const Mask vegetation = objectClassMask(*identifier, vegetationObjects);
+                    if (!vegetation.empty()) {
+                        const auto gated = residual.over(vegetation);
+                        series.vegetationResidual.push_back(gated.residual);
+                        series.vegetationCoverage.push_back(gated.coverage);
                     }
                 }
                 if (identifier.has_value() && previousId.has_value()) {
@@ -606,15 +673,62 @@ int analyze(const Args& args) {
                                                      : "no id AOV"));
     }
 
-    // Named absences. These are the answer, not a gap in the implementation.
-    report.add(Metric::unavailable(
-        "perClass.shadowStability",
-        "no shadow AOV. An approximation over 'regions the lighting model says are shadowed' is "
-        "refused: it would be a number whose name promised more than it knew (ADR-242, ADR-250)"));
-    report.add(Metric::unavailable(
-        "perClass.vegetationResidual",
-        "no material-id to class mapping exists. The mask mechanism is built and tested; the "
-        "mapping is a human decision"));
+    // ADR-255: shadow. No longer a named absence -- and no longer quite what its name promises
+    // either, which is why the qualification is in the metric and not only in an ADR.
+    if (!series.shadowResidual.empty()) {
+        report.add(makeMetric(
+            "perClass.shadowStability", "luma steps 0..255",
+            "candidate PNG sequence + velocity/depth/id AOVs, masked by the shadow AOV",
+            "mean over frame pairs", series.shadowResidual, true,
+            {"⚠ THE SHADOW AOV IS A SECOND OPINION, NOT A CAPTURE. At the tiers an offline render "
+             "uses the engine builds no shadow mask at all -- the lit pass computes the term "
+             "inline -- so --aov shadow runs a dedicated pass that RECOMPUTES it (ADR-255). "
+             "Measured rather than assumed: a frame whose lit pass consumes this term differs from "
+             "one that computes it inline on 0.43% of pixels, peak 22 of 255, against a control "
+             "(the shadow atlas halved) that moves 1.86%. The likely cause is that this pass "
+             "reconstructs its normal from the depth buffer and the lit pass uses the shading "
+             "normal, which moves the shadow lookup's bias -- a hypothesis, not a finding",
+             "the mask is the KEY light's visibility below 0.5, and a penumbra is a continuum: "
+             "where a soft edge stops being shadow is a threshold somebody chose",
+             "the screen-space contact march is deliberately not in this term (ADR-087), so a "
+             "contact shadow is not in this mask",
+             "inherits every limitation of the motion-compensated residual it is a gating of"}));
+        report.add(makeMetric("perClass.shadowCoverage", "fraction", "the shadow AOV",
+                              "mean over frame pairs", series.shadowCoverage, false,
+                              {"read it beside shadowStability, always: a residual over 2% of the "
+                               "frame is a statement about 2% of the frame"}));
+    } else {
+        report.add(Metric::unavailable("perClass.shadowStability",
+                                       sawShadow ? "the shadow AOV carried no shadowed pixel at "
+                                                   "the 0.5 visibility threshold"
+                                                 : "no shadow AOV beside the frames (render with "
+                                                   "--aov shadow; ADR-255)"));
+    }
+
+    // ADR-256: vegetation. The mask mechanism was always here; the mapping is what was missing,
+    // and it now ships with the frames rather than beside the scene.
+    if (!series.vegetationResidual.empty()) {
+        report.add(makeMetric(
+            "perClass.vegetationResidual", "luma steps 0..255",
+            "candidate PNG sequence + velocity/depth/id AOVs, masked by materials.json",
+            "mean over frame pairs", series.vegetationResidual, true,
+            {"the class comes from materials.json, written by the render that produced these "
+             "frames (ADR-256). It is keyed on the identifier's LOW 16 bits: the high half is the "
+             "object's ordinal within its pick space and not a material index, whatever its name",
+             "a scatter layer whose asset carries no library category falls back to a keyword "
+             "table over its filename, which is inspectable and wrong in ways an author can see -- "
+             "on Glowmere it reads 'pebbles' and 'beacons' as vegetation",
+             "inherits every limitation of the motion-compensated residual it is a gating of"}));
+        report.add(makeMetric("perClass.vegetationCoverage", "fraction",
+                              "the id AOV + materials.json", "mean over frame pairs",
+                              series.vegetationCoverage, false,
+                              {"read it beside vegetationResidual, always"}));
+    } else {
+        report.add(Metric::unavailable("perClass.vegetationResidual",
+                                       manifestReason.empty()
+                                           ? "no id AOV beside the frames to mask with"
+                                           : manifestReason));
+    }
 
     // ---- optional external metrics --------------------------------------------------------
     if (!args.noExternal) {

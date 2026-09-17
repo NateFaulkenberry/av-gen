@@ -145,15 +145,31 @@ algorithms measuring the same thing under four names is how a metric suite becom
 | **specular** | emission AOV above a threshold, **or** roughness (alpha of the decoded normal AOV) below one | unexplained temporal change on shiny or emissive pixels | **emission is not specular.** A rough emissive surface is in the mask and should not be. Roughness is the better half of this mask and is half-precision |
 | **geometric vs shading** | normal AOV changed / unchanged between frames | a normal that changed means geometry moved; a normal that did not while colour did means **shading** is unstable | a normal changing by less than the half epsilon reads as unchanged; the threshold is a decision, not a fact |
 | **LOD popping** | `id` changed while depth and velocity say the surface did not move | a geometric level swapped under a stationary surface | a genuine object change at a silhouette is indistinguishable from a pop without more information. **Report as a candidate, not a detection** |
-| **vegetation / thin geometry** | `id` restricted to vegetation material identifiers | the residual over exactly the content ADR-243's reviewer objected to | needs a material-id → class mapping that **does not exist yet** |
+| **vegetation / thin geometry** | ⚠ `id` restricted to the object ids `materials.json` classifies — **not** material identifiers: the identifier's high 16 bits are the object's ordinal within its pick space and not a material index at all (ADR-259) | the residual over exactly the content ADR-243's reviewer objected to. On Glowmere: **2.800 over 18.74%** of the frame, against 1.114 ungated | the class is generator-set; a layer whose asset has no library category falls back to a filename keyword table, which on Glowmere reads `pebbles` and `beacons` as vegetation |
 
-**Shadow is missing and stays missing.** There is no shadow AOV; ADR-242 lists it among the views
-deliberately not added because nothing had asked for one. The Quality Lab is the first consumer with
-a reason to ask, and that is a [human decision](research.md#10-unresolved-questions-carried-into-the-next-phase),
-not one to take here. Until it is taken, `shadowStability` reports
-`available: false, reason: "no shadow AOV"`. **An approximation over "regions the lighting model says
-are shadowed" is refused**, because it would be a number with a name that promised more than it knew
-— which is the failure this whole document is organised around.
+⚠ **Shadow is no longer missing, and what arrived is not quite what was asked for.**
+[ADR-255](../decisions/ADR-255-the-shadow-aov-and-the-tier-that-has-no-shadow-texture.md) decided a
+dedicated full-resolution pass gated on `--aov shadow`, because at `high` and `offline` -- the tiers
+an offline render uses -- the engine's own mask is **never built**, and an AOV taken from it would
+have been a constant in exactly the configuration that needs it.
+[ADR-258](../decisions/ADR-258-the-shadow-aov-is-a-second-opinion.md) is what the required fidelity
+experiment measured:
+
+* The pass **recomputes** the term rather than capturing it, and a frame whose lit pass consumes it
+  differs from one that computes it inline on **0.43% of pixels, peak 22 of 255** -- against a
+  control (the shadow atlas halved) that moves 1.86%. So `shadowStability` ships **labelled an
+  approximation**, in its own `limitations`.
+* The exported plane **does not change the deliverable**: Glowmere renders the same sequence hash
+  with and without `--aov shadow`. An AOV that changed the frame would not be an AOV of it.
+* Two refusals. `--aov shadow` needs a directional light that is enabled and **casts**, because
+  without one the term is the constant 1.0. And it refuses `--disable shadows`: the mask pass samples
+  the atlas those passes would have drawn, and an undrawn depth atlas reads as an occluder in front
+  of everything -- measured, the plane marked **28.9%** of the frame shadowed against 4.6% with
+  shadows on. Read naively that is a finding, and it is an inversion of the truth.
+
+**An approximation over "regions the lighting model says are shadowed" is still refused.** What
+shipped is not that: it is the engine's own shader, over the engine's own atlas, at full resolution,
+with its disagreement measured rather than assumed.
 
 **The identifier AOV is what makes any of this non-vacuous**, and ADR-242's test already records why:
 without asserting that `id` has more than one distinct value, every mask-based row is vacuous. That

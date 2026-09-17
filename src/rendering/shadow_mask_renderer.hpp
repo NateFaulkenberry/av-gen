@@ -66,10 +66,28 @@ public:
     [[nodiscard]] Result<void> init(const wgpu::BindGroupLayout& frameLayout);
     [[nodiscard]] Result<void> reload(); // hot reload of shadow_mask.wgsl (keeps the old pipeline)
 
+    // ADR-255: **export the term as an AOV, without letting the export change the picture.**
+    //
+    // `--aov shadow` asks for the shadow-map visibility at full resolution. The tiers the Quality
+    // Lab renders at -- `high` and `offline` -- set `shadowMaskScale = 1.0`, which is how a tier
+    // says "do not build a mask", so at exactly those tiers this pass does not run and an AOV taken
+    // from `output()` would be a 1x1 white texel widened into a plausible-looking constant. That is
+    // the finding ADR-255 exists for.
+    //
+    // So an export request runs the pass at scale 1.0 whatever the tier says, and the result is
+    // **not consumed by the lit pass**: `active()` stays false, `frame.shadowMaskParams.x` stays 0,
+    // and the shaded frame is byte-for-byte the frame the same command would have produced without
+    // `--aov shadow`. An AOV that changed the deliverable would not be an AOV *of* it.
+    //
+    // The cost is that the exported term is **recomputed** rather than captured, which ADR-255 says
+    // in as many words must be measured rather than assumed -- see `--quality-arm maskconsume`.
+    void setExportRequested(bool requested);
+    [[nodiscard]] bool exportRequested() const;
+
     // Sizes the target and writes the uniforms. Reports nothing and encodes nothing when the tier
-    // asks for full resolution (`shadowMaskScale >= 1`), when the caller switched it off, or when
-    // the scene has no directional light: in every one of those the lit pass computes the term
-    // itself, exactly as it did before this pass existed.
+    // asks for full resolution (`shadowMaskScale >= 1`) and nobody asked for an export, when the
+    // caller switched it off, or when the scene has no directional light: in every one of those the
+    // lit pass computes the term itself, exactly as it did before this pass existed.
     void update(std::uint32_t width, std::uint32_t height, const QualitySettings& quality, bool enabled,
                 std::uint32_t directionalLights, float fovYRadians, float aspect, float nearPlane,
                 float farPlane);
@@ -81,9 +99,20 @@ public:
 
     // The mask the shading pass samples. Falls back to a 1x1 white texel when the mask is off, so
     // the binding is always valid; `active()` is what decides whether the shader reads it.
+    //
+    // **`active()` is deliberately false for an export-only pass**, so the shading path binds the
+    // same white texel it binds today at `high` and `offline` and nothing about the lit frame
+    // moves. The exported texture is reached through `exportTexture()` instead, which is a
+    // different question with a different answer.
     [[nodiscard]] const wgpu::TextureView& output() const;
     [[nodiscard]] const wgpu::TextureView& placeholder() const; // 1x1 white
     [[nodiscard]] bool active() const;
+    // True when a pass was encoded this frame, for whatever reason -- which is what decides
+    // whether the depth prepass has a consumer, and whether there is anything to read back.
+    [[nodiscard]] bool encoded() const;
+    // The target `--aov shadow` reads. rgb = the shadow-map visibility of directional lights 0, 1
+    // and 2; a = the view depth it was computed at. Only valid while `encoded()`.
+    [[nodiscard]] const wgpu::Texture& exportTexture() const;
     [[nodiscard]] const ShadowMaskStats& stats() const { return stats_; }
 
     static constexpr wgpu::TextureFormat kFormat = wgpu::TextureFormat::RGBA16Float;

@@ -164,6 +164,40 @@ Mask identifierChurnMask(const Plane& idPrevious, const Plane& idCurrent, const 
     return mask;
 }
 
+Mask shadowedMask(const Plane& shadow, double maxVisibility) {
+    if (!shadow.valid()) {
+        return {};
+    }
+    const std::size_t pixels = static_cast<std::size_t>(shadow.width) * shadow.height;
+    Mask mask(pixels, 0);
+    for (std::size_t i = 0; i < pixels; ++i) {
+        const float visibility = shadow.rgba[i * 4];
+        const float depth = shadow.rgba[i * 4 + 3];
+        // depth <= 0 is what the pass writes where the prepass drew nothing: sky, not surface.
+        if (depth > 0.0f && static_cast<double>(visibility) < maxVisibility) {
+            mask[i] = 1;
+        }
+    }
+    return mask;
+}
+
+Mask objectClassMask(const Plane& id, const std::vector<std::uint32_t>& objectIds) {
+    if (!id.valid() || objectIds.empty()) {
+        return {};
+    }
+    const std::unordered_set<std::uint32_t> wanted(objectIds.begin(), objectIds.end());
+    const std::size_t pixels = static_cast<std::size_t>(id.width) * id.height;
+    Mask mask(pixels, 0);
+    for (std::size_t i = 0; i < pixels; ++i) {
+        const float packed = id.rgba[i * 4];
+        if (packed == 0.0f) {
+            continue; // nothing wrote here
+        }
+        mask[i] = wanted.count(objectIdOf(packed)) != 0 ? 1 : 0;
+    }
+    return mask;
+}
+
 Mask materialClassMask(const Plane& id, const std::vector<std::uint32_t>& materialIds) {
     if (!id.valid() || materialIds.empty()) {
         return {};

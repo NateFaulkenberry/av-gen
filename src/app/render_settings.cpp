@@ -1,5 +1,7 @@
 #include "app/render_settings.hpp"
 
+#include "scene/scene.hpp"
+
 #include "rendering/render_quality.hpp"
 
 #include <fmt/format.h>
@@ -68,7 +70,14 @@ std::span<const std::string_view> RenderSettings::aovNames() {
     //   depth     linear depth in metres against the far plane -- depth of field, fog, depth merge.
     //   velocity  screen-space motion in R and G -- motion blur in comp.
     //   id        the per-object identifier picking reads -- per-object mattes.
-    static constexpr std::string_view kNames[] = {"normal", "emission", "depth", "velocity", "id"};
+    //   shadow    ADR-255: the directional shadow-map visibility, rgb = lights 0/1/2, a = the view
+    //             depth it was computed at. The one name here that is NOT a target the scene pass
+    //             already writes: at `high` and `offline` -- the tiers an offline render uses --
+    //             no shadow mask is built at all, because the lit pass computes the term inline.
+    //             Asking for it runs a dedicated full-resolution pass that would not otherwise
+    //             exist, and the exported term is therefore RECOMPUTED rather than captured.
+    static constexpr std::string_view kNames[] = {"normal", "emission", "depth",
+                                                  "velocity", "id", "shadow"};
     return kNames;
 }
 
@@ -85,7 +94,8 @@ Result<std::vector<std::string>> RenderSettings::aovList() const {
         one.erase(std::find_if(one.rbegin(), one.rend(), notSpace).base(), one.end());
         if (!one.empty()) {
             if (std::find(names.begin(), names.end(), one) == names.end()) {
-                return fail("render aov '{}' is not one of normal, emission, depth, velocity, id", one);
+                return fail("render aov '{}' is not one of normal, emission, depth, velocity, id, shadow",
+                            one);
             }
             if (std::find(out.begin(), out.end(), one) == out.end()) {
                 out.push_back(std::move(one));
@@ -336,6 +346,31 @@ Result<RenderSettings> RenderSettings::fromJson(const nlohmann::json& j) {
         return std::unexpected(r.error());
     }
     return s;
+}
+
+Result<void> shadowAovPreconditions(const scene::Scene& scene, std::string_view disabledPasses) {
+    std::size_t casting = 0;
+    for (const scene::PunctualLight& light : scene.lights) {
+        if (light.type == scene::PunctualLight::Type::Directional && light.enabled &&
+            light.castsShadow) {
+            ++casting;
+        }
+    }
+    if (casting == 0) {
+        return avgen::fail(
+            "render: --aov shadow needs a directional light that casts, and this scene has none. "
+            "The shadow-map term of a scene lit only by point, spot or area lights -- or by a "
+            "directional light with castsShadow off -- is the constant 1.0, and a constant that "
+            "looks like a render is worse than a refusal (ADR-242, ADR-255)");
+    }
+    if (disabledPasses.find("shadows") != std::string_view::npos) {
+        return avgen::fail(
+            "render: --aov shadow and --disable shadows cannot be combined. The mask pass reads "
+            "the shadow atlas the disabled passes would have drawn, and an undrawn atlas reads as "
+            "an occluder in front of everything: measured, the exported plane marks 28.9% of the "
+            "frame shadowed against 4.6% with shadows on (ADR-182, ADR-255)");
+    }
+    return {};
 }
 
 } // namespace avgen::app

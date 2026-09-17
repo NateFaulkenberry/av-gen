@@ -196,7 +196,10 @@ Plus `linearDepth_` (`R32Float`) and the `Depth24Plus` depth-stencil. **All of t
 scaled resolution** — `resize()` is the only consumer of `renderScale`, and it rescales before
 `createAuxTargets`. That is the mechanical fact behind ADR-242's refusal.
 
-There is **no shadow AOV, no albedo, no metallic, no volumetric-contribution and no exposure
+⚠ *Amended 2026-09-17: a shadow AOV now exists (`--aov shadow`, ADR-255/258) and is the one name in
+the list that is not a target the scene pass already writes -- it runs a dedicated pass and
+recomputes the term.* At the time of the reconnaissance there was
+**no shadow AOV, no albedo, no metallic, no volumetric-contribution and no exposure
 target.** ADR-242 lists them as deliberately not added because nothing had asked for one.
 
 ### 4.2 `--aov` export

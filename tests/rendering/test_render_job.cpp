@@ -534,6 +534,84 @@ TEST_CASE("Render job exports auxiliary passes that contain what they claim", "[
     CHECK(motion > 0.0);
 }
 
+TEST_CASE("the shadow AOV is exported without changing the frame it describes",
+          "[gpu][render][aov][adr255]") {
+    // ADR-255. Unlike the other five, this target is not written every frame: at `high` and
+    // `offline` the engine builds no shadow mask at all, so `--aov shadow` turns on a dedicated
+    // full-resolution pass that would not otherwise run. Two things have to be true of it, and
+    // the second is the one an AOV lives or dies by.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+
+    std::vector<std::uint64_t> withoutAov;
+    {
+        auto settings = smallSettings(f.dir / "noshadowaov");
+        app::RenderJob job(*ctx, shaders, loadOffline(f.project), settings, f.dir);
+        REQUIRE(job.start().has_value());
+        REQUIRE(job.run().has_value());
+        withoutAov = job.frameHashes();
+    }
+    REQUIRE_FALSE(withoutAov.empty());
+
+    app::RenderProgress p;
+    std::vector<std::uint64_t> withAov;
+    {
+        auto settings = smallSettings(f.dir / "shadowaov");
+        settings.aovs = "shadow";
+        app::RenderJob job(*ctx, shaders, loadOffline(f.project), settings, f.dir);
+        REQUIRE(job.start().has_value());
+        REQUIRE(job.run().has_value());
+        withAov = job.frameHashes();
+        p = job.progress();
+    }
+    CHECK(p.error.empty());
+    CHECK(p.framesWritten == 10 + 10); // ten beauty frames and ten shadow planes
+
+    // **The property that makes it an AOV of the deliverable rather than a different render.** The
+    // export runs a pass the lit frame does not read, so every beauty frame must come back with
+    // the hash it had without the flag. Anything else and the file describes a frame nobody shipped.
+    CHECK(withAov == withoutAov);
+
+    const auto file = f.dir / "shadowaov" / "frame_000005.shadow.exr";
+    INFO(file.string());
+    REQUIRE(fs::exists(file));
+    auto image = assets::readExr(file);
+    REQUIRE(image.has_value());
+    CHECK(image->width == 96);
+    CHECK(image->height == 64);
+
+    // **The arm that separates "the pass ran" from "I read the placeholder".** When no mask is
+    // built, `output()` is a 1x1 white texel and every channel of it is a constant -- including
+    // alpha, which is 0. So the depth channel is the question to ask: a pass that ran writes the
+    // view depth it computed each pixel at, and that varies across an orb against a background.
+    //
+    // ⚠ **The visibility channel on THIS scene is the constant 1.0, and that is correct.** The
+    // fixture is one convex orb over nothing: a sphere has no receiver to cast onto and its own
+    // far side is back-facing, which `shadowFactor` returns lit for before it looks anything up.
+    // The first version of this test asserted the plane varied and failed, which is the same
+    // lesson ADR-254 records from the scene side -- a scene that cannot show the artifact cannot
+    // exercise the probe that looks for it. The non-constant arm lives where there is geometry to
+    // cast: on Glowmere the exported plane marks 4.55% of the frame shadowed, and 28.9% when the
+    // shadow passes are disabled, which is why that combination is now refused (ADR-255).
+    float minVisibility = 2.0f;
+    float maxVisibility = -1.0f;
+    float minDepth = 1e9f;
+    float maxDepth = 0.0f;
+    const auto px = assets::floatPixels(*image);
+    for (std::size_t i = 0; i < px.size(); i += 4) {
+        minVisibility = std::min(minVisibility, px[i]);
+        maxVisibility = std::max(maxVisibility, px[i]);
+        minDepth = std::min(minDepth, px[i + 3]);
+        maxDepth = std::max(maxDepth, px[i + 3]);
+    }
+    INFO("visibility " << minVisibility << ".." << maxVisibility << ", depth " << minDepth << ".."
+                       << maxDepth);
+    CHECK(maxVisibility > 0.5f); // something is lit
+    CHECK(maxDepth > 0.0f);      // the alpha channel is a view depth, not the placeholder's zero
+    CHECK(maxDepth > minDepth);  // and it varies, so this is a rendered plane and not a constant
+}
+
 TEST_CASE("an AOV export is refused where it cannot be resolved", "[render][aov]") {
     app::RenderSettings s;
     s.outputPath = "out";

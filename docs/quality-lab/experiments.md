@@ -143,7 +143,7 @@ axis.** That is the correct output, not a placeholder — §22 asks for cost *re
       "label": "HYPOTHESIS — not established" }
   ],
   "limitations": [ "cambi unavailable: no libvmaf on this host",
-                   "shadowStability unavailable: no shadow AOV",
+                   "shadowStability is an approximation: --aov shadow recomputes the term (ADR-258)",
                    "gpuFrameMsMin pending: device not quiet (pgrep avgen -> 2 processes)" ]
 }
 ```

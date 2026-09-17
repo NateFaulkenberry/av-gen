@@ -551,6 +551,12 @@ public:
     [[nodiscard]] const wgpu::Texture& emissionTexture() const { return emission_.texture; }
     [[nodiscard]] const wgpu::Texture& identifierTexture() const { return ids_.texture; }
     [[nodiscard]] const wgpu::Texture& linearDepthTexture() const { return linearDepth_.texture; }
+    // ADR-255: the shadow AOV's source. Unlike the five above this target is NOT written every
+    // frame -- it exists only when something asked for it, which for an export is
+    // `shadowMask().setExportRequested(true)`. `shadowMask().encoded()` is the question to ask
+    // before reading it; a texture read when no pass ran is the 1x1 white stand-in, and a constant
+    // that looks like a render is the failure ADR-242 and ADR-255 are both about.
+    [[nodiscard]] const wgpu::Texture& shadowTexture() const { return shadowMask_->exportTexture(); }
     // The packed lights and the froxel grid of the last frame (tests and tools). The cluster buffer
     // holds `kClusterCount` counts followed by `kMaxLightsPerCluster` indices per cluster.
     [[nodiscard]] const wgpu::Buffer& lightBuffer() const { return lightBuffer_; }

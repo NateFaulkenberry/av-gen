@@ -16,6 +16,11 @@
 #include <string_view>
 #include <vector>
 
+namespace avgen::scene {
+struct Scene;
+}
+
+
 namespace avgen::app {
 
 // PngSequence: display-referred 8-bit PNGs after tone mapping. ExrSequence: scene-linear half
@@ -23,6 +28,22 @@ namespace avgen::app {
 enum class RenderOutput : std::uint8_t { PngSequence, Video, ExrSequence };
 [[nodiscard]] const char* renderOutputName(RenderOutput output); // "sequence" | "video" | "exr"
 [[nodiscard]] bool isSequence(RenderOutput output);
+
+
+// ADR-255 + ADR-182: what `--aov shadow` needs before its output is a measurement rather than a
+// constant. A free function, and here rather than on the render job, so the preconditions can be
+// tested without a GPU -- a refusal nobody can exercise is a refusal nobody knows still works.
+//
+// Two conditions, and the second was found by running the arm rather than by reasoning about it:
+//   * the scene must have an enabled directional light that CASTS. Without one the shadow-map term
+//     is the constant 1.0, and a plane of 1.0 in a valid EXR of the right size is the exact failure
+//     ADR-242 refused an approximated shadow AOV over.
+//   * the shadow passes must not be disabled. `--disable shadows` skips the cascade passes and the
+//     mask pass samples the atlas they would have drawn: an undrawn depth atlas reads as an
+//     occluder in front of everything, so the exported plane came back marking 28.9% of the frame
+//     shadowed against 4.6% in the same render with shadows on. Inverted, plausible, and silent.
+[[nodiscard]] Result<void> shadowAovPreconditions(const scene::Scene& scene,
+                                                  std::string_view disabledPasses);
 
 struct RenderSettings {
     std::uint32_t width = 1920;

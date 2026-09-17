@@ -42,7 +42,8 @@ sketch are justified in §3.
 QualityVector
 ├── spatial            msSsim, ssim, psnr, psnrHvs, flipMean, flipP95, ciede2000Mean, ciede2000P95
 ├── temporal           temporalAlternation, motionCompensatedResidual, disocclusionFraction
-├── perClass           specularResidual, shadingResidual, lodIdentifierChurn, vegetationResidual
+├── perClass           specularResidual, shadingResidual, lodIdentifierChurn, vegetationResidual,
+│                       shadowStability (+ a coverage field beside each masked one)
 ├── detail             spatialLaplacian, detailRetentionRatio, sharpnessRatio
 ├── color              chromaSpeckle, chromaRetention, ciede2000Mean
 ├── banding            cambi
@@ -87,12 +88,19 @@ One residual, four masks. See [artifact-detection.md](artifact-detection.md) §3
 | `specularResidual` | emission AOV above threshold, or roughness (normal AOV alpha) below threshold | emission is not specular; a rough emissive surface is in the mask and should not be |
 | `shadingResidual` | pixels whose **normal did not change** but whose colour did | a normal that changed by less than the half-float epsilon reads as unchanged |
 | `lodIdentifierChurn` | pixels where the `id` AOV changed while depth and velocity say the surface did not move | a genuine object swap at a silhouette is indistinguishable from a LOD pop without more information |
-| `vegetationResidual` | `id` AOV restricted to vegetation material identifiers | needs a material-id → class mapping that does not exist yet |
+| `vegetationResidual` | ⚠ `id` AOV restricted to the object ids `materials.json` classifies as vegetation — **not** to "material identifiers", which the identifier AOV does not carry (ADR-259) | a scatter layer whose asset has no library category falls back to a keyword table over its filename; on Glowmere that reads `pebbles` and `beacons` as vegetation |
+| `shadowStability` | the shadow AOV's key-light visibility below 0.5, excluding the sky by its depth | ⚠ **the AOV is a second opinion, not a capture**: at `offline` the engine builds no shadow mask, so `--aov shadow` recomputes the term. Measured at **0.43% of pixels differing** from the lit pass's own, peak 22/255, against a control that moves 1.86% (ADR-258) |
 
-**`shadowStability` is absent and that is the honest answer.** There is no shadow AOV. Adding one is
-a named [human decision](research.md#10-unresolved-questions-carried-into-the-next-phase). Until
-then §9's shadow dimension is reported as `available: false, reason: "no shadow AOV"`, not
-approximated.
+**Both of these were "absent, with a reason" until 2026-09-17 and both are now numbers** — with the
+reasons converted into limitations that travel inside the metric rather than sitting in a document
+beside it. On Glowmere at 640×360, against an ungated residual of 1.114: `shadowStability` **3.149
+over 4.55%** of the frame, `vegetationResidual` **2.800 over 18.74%**. Shadowed pixels are 2.8× less
+stable than the frame average and vegetation is 2.5×, which is the first thing either dimension has
+said. Neither is validated against a person; §4.2 is the only metric here that is.
+
+**Read the coverage or do not quote the number.** `perClass.shadowCoverage` and
+`perClass.vegetationCoverage` are emitted beside them for the reason every masked metric here has
+one: a residual over 4.55% of the frame is a statement about 4.55% of the frame.
 
 ### 2.4 Detail, colour, banding
 
@@ -147,7 +155,7 @@ main thread. A quality/cost frontier built from separate invocations is a fronti
 | `lpips` | **dropped.** ImageNet features on stylized synthetic content; per-frame only; named in the rendered-VQA literature as poorly correlated; ꟻLIP occupies the slot without PyTorch |
 | `temporalStability` | **renamed** `temporalAlternation`. ADR-243: the name was the error |
 | `edgeStability` | **merged** into `motionCompensatedResidual` + `spatialLaplacian`. A separate "edge stability" number would be a third name for one of these two |
-| `shadowStability` | **absent, with a reason.** No shadow AOV |
+| `shadowStability` | ⚠ **was absent, now present and labelled.** `--aov shadow` exists (ADR-255/258) and recomputes the term rather than capturing it, so the number ships with its 0.43% disagreement stated |
 | `bloomStability`, `hdrStability` | **merged** into `specularResidual` (emission-masked) and `chromaRetention`. Separate detectors for these would be the same residual under the same mask |
 | `spatialAliasing` | **renamed** `spatialLaplacian`, because that is what it computes, and it cannot separate aliasing from detail |
 | `gradientQuality` | **replaced** by `cambi`, which is a validated instrument for the same question |

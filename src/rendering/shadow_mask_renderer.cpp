@@ -39,8 +39,10 @@ struct ShadowMaskRenderer::Impl {
     wgpu::TextureView whiteView;
     gpu::FrameTimeline* timeline = nullptr;
     double lastMs = -1.0;
-    bool activeThisFrame = false;
+    bool activeThisFrame = false;  // the LIT PASS reads the mask this frame
+    bool encodeThisFrame = false;  // a pass is encoded this frame (shading, export, or both)
     bool passThisFrame = false;
+    bool exportRequested = false;  // ADR-255: --aov shadow asked for the term at full resolution
     bool initialised = false;
 };
 
@@ -197,19 +199,31 @@ void ShadowMaskRenderer::update(std::uint32_t width, std::uint32_t height, const
     Impl& im = *impl_;
     collectTimings();
     im.activeThisFrame = false;
+    im.encodeThisFrame = false;
     im.passThisFrame = false;
     stats_ = ShadowMaskStats{};
     // `shadowMaskScale >= 1` is how a tier says "do not build a mask": a full-resolution mask is a
     // second full-resolution pass over the same term and would cost more than it saves, so the
     // knob's top of range is off rather than a redundant pass. Offline and high sit there, which is
     // what keeps an offline render identical to the frame this code shipped without.
+    //
+    // ADR-142's `maskconsume` arm is the one exception and it is a DIAGNOSTIC: it asks for the mask
+    // at full resolution AND consumed, which no tier does and nothing ships, because it exists to
+    // answer whether the term this pass computes is the term the lit pass computes (ADR-255).
     const std::uint32_t lights = std::min(directionalLights, kMaxMaskedDirectionalLights);
-    if (!im.initialised || !enabled || quality.shadowMaskScale >= 1.0f || lights == 0 || width == 0 ||
-        height == 0) {
+    const bool shadingWantsMask =
+        enabled && (quality.shadowMaskScale < 1.0f || quality.shadowMaskFullConsume);
+    const bool anythingWantsMask = shadingWantsMask || im.exportRequested;
+    if (!im.initialised || !anythingWantsMask || lights == 0 || width == 0 || height == 0) {
         return;
     }
-    const std::uint32_t mw = scaled(width, quality.shadowMaskScale);
-    const std::uint32_t mh = scaled(height, quality.shadowMaskScale);
+    // An export is always full resolution: it is pixel-aligned with the other AOVs or it is not an
+    // AOV. So is the diagnostic consume arm, for the same reason it exists.
+    const float scale = (im.exportRequested || quality.shadowMaskFullConsume)
+                            ? 1.0f
+                            : quality.shadowMaskScale;
+    const std::uint32_t mw = scaled(width, scale);
+    const std::uint32_t mh = scaled(height, scale);
     if (auto r = im.ensureTarget(mw, mh); !r) {
         log::warn("shadow mask disabled this frame: {}", r.error().message);
         return;
@@ -229,7 +243,8 @@ void ShadowMaskRenderer::update(std::uint32_t width, std::uint32_t height, const
     u.params = glm::vec4(static_cast<float>(lights), static_cast<float>(taps), 0.0f, 0.0f);
     im.context.queue().WriteBuffer(im.uniforms, 0, &u, sizeof(u));
 
-    im.activeThisFrame = true;
+    im.encodeThisFrame = true;
+    im.activeThisFrame = shadingWantsMask;
     stats_.width = mw;
     stats_.height = mh;
     stats_.lights = lights;
@@ -239,7 +254,7 @@ void ShadowMaskRenderer::update(std::uint32_t width, std::uint32_t height, const
 
 void ShadowMaskRenderer::encode(wgpu::CommandEncoder& encoder, const wgpu::BindGroup& frameBindGroup) {
     Impl& im = *impl_;
-    if (!im.activeThisFrame) {
+    if (!im.encodeThisFrame) {
         return;
     }
     wgpu::RenderPassColorAttachment attachment{};
@@ -279,8 +294,18 @@ void ShadowMaskRenderer::collectTimings() {
 
 const wgpu::TextureView& ShadowMaskRenderer::output() const {
     Impl& im = *impl_;
+    // `activeThisFrame`, not `encodeThisFrame`: an export-only pass must leave the shading path
+    // bound to the same white texel it binds when there is no mask at all (ADR-255).
     return im.activeThisFrame && im.target.valid() ? im.target.colorView() : im.whiteView;
 }
+
+void ShadowMaskRenderer::setExportRequested(bool requested) { impl_->exportRequested = requested; }
+
+bool ShadowMaskRenderer::exportRequested() const { return impl_->exportRequested; }
+
+bool ShadowMaskRenderer::encoded() const { return impl_->encodeThisFrame; }
+
+const wgpu::Texture& ShadowMaskRenderer::exportTexture() const { return impl_->target.colorTexture(); }
 
 const wgpu::TextureView& ShadowMaskRenderer::placeholder() const { return impl_->whiteView; }
 

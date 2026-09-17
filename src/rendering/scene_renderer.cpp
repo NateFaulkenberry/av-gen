@@ -1494,6 +1494,18 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         // one. Separates "the mask pass costs this" from "the mask's half resolution saves this".
         {"maskfull", [](QualitySettings& q) { q.shadowMaskScale = 1.0f; },
          "shadowMaskScale=1.0 (the mask computed per pixel, as High/Offline do)"},
+        // ADR-255's fidelity arm, and the only configuration in the engine where the mask pass runs
+        // at full resolution AND the lit pass reads it. Against the same frame without it, the
+        // difference is the answer to "is the exported shadow AOV the term the lit pass computed,
+        // or a second opinion about it" -- which ADR-087 asserted and nobody had differenced.
+        // Diagnostic: no tier sets it and no deliverable should.
+        {"maskconsume", [](QualitySettings& q) { q.shadowMaskFullConsume = true; },
+         "the mask at FULL resolution and consumed by the lit pass (ADR-255's fidelity arm)"},
+        // The positive control for that comparison (ADR-182): halve the shadow atlas. Both arms
+        // read the same atlas, so both must move -- an agreement measured by an instrument that
+        // cannot disagree is not agreement.
+        {"shadowatlas1k", [](QualitySettings& q) { q.shadowResolution = 1024; },
+         "shadowResolution=1024 (the control arm: it must move the masked and unmasked frames alike)"},
         // ADR-133: the two material tiers, forced on every draw. These are *ceilings on the
         // saving*, not shippable configurations -- a shipping frame assigns the tier per draw from
         // importance, so only the small and distant reach it. Forcing the whole frame is how the
@@ -2847,8 +2859,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // shoreline and its depth colour are made of. A scene with water in it therefore asks for the
     // prepass whatever else is on -- 0.20 ms of depth-only geometry, against a surface that
     // otherwise falls back to the vertex depth and to the mesh's own edge for its waterline.
+    // ADR-255: an export-only mask pass needs the prepass exactly as a consumed one does -- it
+    // reads the linear depth the prepass resolves -- so the question is whether a pass was
+    // ENCODED, not whether the lit pass will read it. `active()` here would have produced a shadow
+    // AOV computed against a depth target nobody filled.
     const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows ||
-                                   shadowMask_->active() || !scene.waters.empty();
+                                   shadowMask_->encoded() || !scene.waters.empty();
     // ---- water surfaces (ADR-099) ----
     // One uniform slot per authored surface, uploaded once a frame. `flowTime` is the timeline
     // second, never a wall clock and never an accumulated delta: a river at t = 12.0 has to be in

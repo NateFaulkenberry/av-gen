@@ -166,33 +166,49 @@ not a region of the frame at all — it is a **duplicated arm**, one clip shown 
 which is the review-level form of the rule the harness already runs on renders: two arms that hash
 identically are void, not equal.
 
-## The two engine gaps, now answered
+## The two engine gaps, now closed — and what each one cost to close
 
-Both were carried into this phase as questions for a person, and both have answers:
+Both were carried into this phase as questions for a person, both were answered yes, and both are now
+built. Neither turned out to be the change it looked like.
 
-* **The shadow AOV: yes** — and the research changed the size of the job.
-  [ADR-255](../decisions/ADR-255-the-shadow-aov-and-the-tier-that-has-no-shadow-texture.md). The
-  engine has a screen-space shadow term as its own target (ADR-087), and exporting it looked like a
-  texture and a switch case. It is not: `shadowMaskScale = 1.0` at both `high` and `offline`, so the
-  mask pass **does not run at all** at the tier the Quality Lab renders its candidate at. An AOV
-  built on it would be a constant in exactly the configuration that needs it, and correct everywhere
-  else. The decision is a dedicated full-resolution pass gated on `--aov shadow`, with the fidelity
-  claim measured rather than inherited.
-* **The material-id → class mapping: emitted, never authored.**
-  [ADR-256](../decisions/ADR-256-a-material-id-is-not-a-class.md). A material id is a scene-build
-  index, so a hand-written list of integers is silently wrong the moment the scene changes -- the
-  mask would be well-formed, the residual correct, and the surfaces the wrong ones.
-  `scene::Material` gains a surface class, the generators set it where the knowledge already is, and
-  `--aov id` writes a `materials.json` beside the frames. A mapping that ships with the frames
-  cannot disagree with them.
+* **The shadow AOV.** [ADR-255](../decisions/ADR-255-the-shadow-aov-and-the-tier-that-has-no-shadow-texture.md)
+  found that `shadowMaskScale = 1.0` at both `high` and `offline`, so the mask pass **does not run at
+  all** at the tier the Lab renders its candidate at: an AOV built on the engine's own mask would
+  have been a constant in exactly the configuration that needs it, and correct everywhere else. The
+  decision was a dedicated full-resolution pass gated on `--aov shadow`, with the fidelity claim
+  **measured rather than inherited**.
+  [ADR-258](../decisions/ADR-258-the-shadow-aov-is-a-second-opinion.md) is the measurement: the pass
+  recomputes the term rather than capturing it, and a frame whose lit pass consumes it differs from
+  one that computes it inline on **0.43% of pixels, peak 22 of 255**, against a control (the shadow
+  atlas halved) that moves 1.86%. So `shadowStability` ships **labelled an approximation**. The AOV
+  does not change the deliverable — the same sequence hash with and without it — and it refuses two
+  configurations where it would be a constant or an inversion, the second of which was found by
+  running the arm rather than by reasoning about it.
+* **The material-id → class mapping.**
+  [ADR-256](../decisions/ADR-256-a-material-id-is-not-a-class.md) argued the mapping must be emitted
+  by the run rather than authored beside it, and that is what shipped.
+  [ADR-259](../decisions/ADR-259-the-identifiers-material-half-is-not-a-material.md) records that its
+  premise about the data was wrong in a way that makes its conclusion stronger: **the identifier's
+  "material" half is not a material index at all** — every renderer writes the object's own ordinal
+  within its pick space there, so two objects sharing a material differ and an entity and a
+  procedural with nothing in common collide. `materials.json` is keyed on the low 16 bits, which are
+  unique, and says so in the file.
 
-Neither is implemented. Both are scoped.
+**Both dimensions are now numbers.** On Glowmere at 640×360, against an ungated residual of 1.114:
+`shadowStability` **3.149 over 4.55%** of the frame, `vegetationResidual` **2.800 over 18.74%**.
+Shadowed pixels are 2.8× less stable than the frame average and vegetation 2.5× — the artifact
+ADR-243's reviewer objected to, with a number about the grass rather than about the frame the grass
+is in. **Neither is validated against a person.** §4.2 remains the only place in this instrument
+where a metric and an eye have been compared.
 
 ## Human decisions collected, and not taken
 
 Listed at [research.md §10](research.md#10-unresolved-questions-carried-into-the-next-phase), minus
 the ones since answered (ffmpeg is installed; ADR-251 was resolved by fixing the resolve; the
 **human-validation protocol** was run and is written down at [metrics.md §4.4](metrics.md), and the
-reviewer budget it cost was one sitting and six questions). Still open: whether the engine gets a
-**shadow AOV**, and the **material-id → class mapping** that `vegetationResidual` needs — both
-scoped, neither implemented.
+reviewer budget it cost was one sitting and six questions). Nothing on that list is
+still open: the **shadow AOV** was approved and built (ADR-255, ADR-258) and the **material-id →
+class mapping** was approved and built (ADR-256, ADR-259). The open questions now are the ones the
+work produced — whether the shadow AOV's 0.43% disagreement is *visible*, which nobody has looked at,
+and whether Glowmere's scene should carry asset categories so its scatter layers stop being
+classified by a keyword table over their filenames.
