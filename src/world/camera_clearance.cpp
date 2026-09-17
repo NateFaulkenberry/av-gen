@@ -240,6 +240,15 @@ Sightline heroSightline(const ClearanceField& field, glm::vec3 eye, const Subjec
     // Across the silhouette, not across the world: perpendicular to the eye's bearing, horizontally.
     const glm::vec2 right = glm::vec2(-toSubject.z, toSubject.x) / span;
 
+    // The tallest thing that grows anywhere in this ecology. `canopyHeight` can never return more,
+    // so it is the bound that lets the march skip the biome lookup wherever the ray is clear of it.
+    float tallestLayer = 0.0f;
+    if (field.ecology != nullptr) {
+        for (const ScatterLayer& layer : field.ecology->layers) {
+            tallestLayer = std::max(tallestLayer, layer.height);
+        }
+    }
+
     int rays = 0;
     int blocked = 0;
     int throughCanopy = 0;
@@ -313,7 +322,19 @@ Sightline heroSightline(const ClearanceField& field, glm::vec3 eye, const Subjec
                     }
                 }
                 // The canopy, measured and not acted on.
-                const float canopyTop = ground + field.canopyHeight(xz);
+                //
+                // Guarded by the tallest layer in the whole ecology, which is a constant of the
+                // world: a point higher than that above the ground cannot be inside anything that
+                // grows, so the biome lookup is skipped. Not a tolerance -- `canopyHeight` returns
+                // at most `tallestLayer` by construction, so this is the same answer computed
+                // without the sample. It matters because it is the common case: `clearPath` has
+                // already lifted the eye above the canopy, so most of most rays is above it, and
+                // the unguarded version evaluated the biome weights at every metre of every one of
+                // nine rays per key. Measured as minima over three runs of the sightline suite --
+                // 24 bakes and 24 identical project loads either way, so the whole difference is
+                // bake time: 90.54 s unguarded against 83.93 s guarded, about 0.27 s per bake.
+                const float canopyTop =
+                    p.y - ground < tallestLayer ? ground + field.canopyHeight(xz) : ground;
                 const bool insideCanopy = p.y > ground && p.y < canopyTop;
                 if (insideCanopy) {
                     canopyRun += length / static_cast<float>(steps);

@@ -331,7 +331,35 @@ the arm passing quietly.
 
 ---
 
-## 6. Unsupported
+## 6. The Glowmere audit (§30)
+
+Two problems were assigned to this lab by name.
+
+**Camera behaviour — line of sight.** Lab: this one. Reproduction:
+`glowmere-atmospherics`, continuous mode, 4 of 185 hero-holding keys. Root cause: ADR-080 models
+what the camera must stay *out of* and nothing modelled what stood *between* it and its subject; the
+camera was correctly outside both heroes throughout. Fix: `world::heroSightline` /
+`world::clearSightlines`, run at bake time in `installSequence`. Regression:
+`tests/unit/test_director_sightline.cpp`, which carries the arm and its control in the same run.
+Verification: 4 → 0 on the project, measured with an instrument that shares no code with the fix,
+and 0 → 0 unchanged on the other five project/mode pairs.
+
+**Camera lock and free-roam.** Already fixed before this lab opened —
+`Composition::setViewportFreeRoam` applied to `resolveActiveCamera`'s result, with
+`Application::ensureFreeCamera` standing down an authored rig and seeding free-roam from the live
+pose. Nothing in it was found to be wrong. What was missing was coverage: two tests existed and
+covered one event (a cut). This lab did not re-fix it; it made the interaction testable across every
+event, every canvas and all ten presets, and in doing so found that free-roam protects against rigs
+and not against tracks (§3 above).
+
+**Nothing else in `docs/TODO-glowmere-handoff.md` is an open camera defect.** The camera items there
+are about the journey's *composition* — the ending's visual destination, a timestamped review of the
+full movie — which are authoring decisions rather than engine behaviour and need a person watching a
+render.
+
+---
+
+## 7. Unsupported
 
 **Occlusion of a hero by scenery that is neither terrain, a hero, nor the statistical canopy.** There
 is no occlusion culling in this engine and no per-object obstacle representation the camera can
@@ -340,6 +368,16 @@ framing a hero through a particular tree cannot be told apart from one framing i
 beside that tree. What it would take is `TerrainQuery`'s `ObstacleField` seam — the interface §5 of
 the world-authoring brief describes for navigation — populated with the near-camera scatter, and a
 decision about what "near" means that is a budget rather than a geometry question.
+
+**A screen-space projected-bounds overlay.** §16 asks for "frustum and projected bounds" to be made
+visible. The frustum half exists — `DebugViewOptions::frustum`, which `overlaysFor(LabId::Camera)`
+turns on along with `worldAxes` and `entityBounds`, and which is informative exactly when the camera
+is frozen, because then it is the volume the cull used rather than the screen edge. There is no
+overlay that draws an object's bounds *projected into screen space*; the numeric answer to the same
+question is `RenderObjectDiagnostic::frustumMargins`, six signed distances per object, and §4 above
+records that those are currently measured against the wrong box. Fixing the box is the prerequisite:
+drawing a projected bound from a diagnostic that disagrees with the cull would make the disagreement
+harder to find, not easier.
 
 **A rendered confirmation that a corrected shot looks better.** §37 says the renderer is the source
 of truth, and everything above is CPU-side geometry. The four corrected keys on
