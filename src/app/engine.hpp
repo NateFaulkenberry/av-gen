@@ -224,8 +224,26 @@ public:
     // Non-const for editing. Edit, then call `installSequence()`; the two are separate because a
     // bake is a moment and an editor drags a shot handle sixty times a second.
     [[nodiscard]] seq::Sequence& sequence() { return sequence_; }
+    // Is there a sequence worth writing to the project file?
+    //
+    // **This decides whether the whole `sequence` block is saved, so anything missing from it is
+    // data a save silently destroys.** It tested shots, actors and overlays, which was already
+    // incomplete and became load-bearing the day Song Mode stopped writing shots: a piece with ten
+    // sections and seven performer rules but no shots answered *false*, and one Save later the
+    // sections, the rules, the shot language and the analyzed structure were gone from the file.
+    //
+    // So the question is asked the other way round -- not "does it have the three things somebody
+    // listed once", but "is it still the empty sequence a new project starts with". Everything a
+    // `seq::Sequence` can carry is named here, and a field added to that struct without being added
+    // here is a field that will not survive a round trip.
     [[nodiscard]] bool hasSequence() const {
-        return !sequence_.shots.empty() || !sequence_.actors.empty() || !sequence_.overlays.empty();
+        return !sequence_.shots.empty() || !sequence_.actors.empty() ||
+               !sequence_.overlays.empty() || !sequence_.scenes.empty() ||
+               !sequence_.markers.empty() || !sequence_.events.empty() ||
+               !sequence_.tracks.empty() || !sequence_.sectionTimeline.sections.empty() ||
+               !sequence_.sectionPerformance.entries.empty() ||
+               !sequence_.structure.sections.empty() ||
+               sequence_.shotLanguage.customized();
     }
     // Replaces the sequence and installs it.
     [[nodiscard]] Result<seq::InstallReport> setSequence(seq::Sequence sequence);

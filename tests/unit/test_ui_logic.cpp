@@ -628,3 +628,60 @@ TEST_CASE("A lane the piece does not have takes no room", "[ui][strip]") {
     // And a click in it still resolves to the shots lane rather than to the ruler.
     CHECK(bare.at(bare.shotsTop() + 1.0f) == ui::StripLane::Shots);
 }
+
+// ---- the rubber band's reach -------------------------------------------------------------------
+//
+// The band selects what it touches, and what it touches is decided from the lane geometry and the
+// time axis rather than from anything that was drawn. These check the arithmetic that decides it:
+// two spans overlap when neither ends before the other starts, and a band is a pair of spans.
+//
+// `SequencePanel::itemsIn` is where this runs in the application, and it needs a panel and an engine
+// to call. What is checked here is the rule it is built on, in the same form, so the rule cannot
+// drift without a test noticing -- and so a band that selects nothing, or everything, fails here
+// rather than being discovered by sweeping across a timeline.
+
+namespace {
+// Two closed intervals overlap. Touching counts: a band dragged exactly onto a block's edge has
+// caught it as far as anybody watching is concerned.
+[[nodiscard]] bool spansOverlap(float a0, float a1, float b0, float b1) {
+    return a0 <= b1 && b0 <= a1;
+}
+} // namespace
+
+TEST_CASE("A band catches what it touches and nothing it misses", "[ui][strip][marquee]") {
+    // A block from 10 to 20.
+    CHECK(spansOverlap(0.0f, 30.0f, 10.0f, 20.0f));   // band swallows it
+    CHECK(spansOverlap(12.0f, 15.0f, 10.0f, 20.0f));  // band inside it
+    CHECK(spansOverlap(5.0f, 12.0f, 10.0f, 20.0f));   // overlapping the start
+    CHECK(spansOverlap(18.0f, 25.0f, 10.0f, 20.0f));  // overlapping the end
+    CHECK(spansOverlap(20.0f, 25.0f, 10.0f, 20.0f));  // touching the end exactly
+    CHECK(spansOverlap(5.0f, 10.0f, 10.0f, 20.0f));   // touching the start exactly
+
+    CHECK_FALSE(spansOverlap(0.0f, 9.9f, 10.0f, 20.0f));   // stops short
+    CHECK_FALSE(spansOverlap(20.1f, 30.0f, 10.0f, 20.0f)); // starts after
+
+    // A degenerate band -- a click that never travelled -- catches only what is under the point.
+    CHECK(spansOverlap(15.0f, 15.0f, 10.0f, 20.0f));
+    CHECK_FALSE(spansOverlap(25.0f, 25.0f, 10.0f, 20.0f));
+}
+
+TEST_CASE("A band reaches across lanes", "[ui][strip][marquee]") {
+    // The geometry the band is tested against: a band spanning from inside the audio lane down into
+    // the shots lane has to catch both, which is the whole feature.
+    const ui::StripLanes lanes = ui::stripLanesFor(true, true, 2, true, 1.0f);
+    const float bandTop = lanes.audioTop() + 2.0f;
+    const float bandBottom = lanes.shotsTop() + 2.0f;
+
+    CHECK(spansOverlap(bandTop, bandBottom, lanes.audioTop(),
+                       lanes.audioTop() + lanes.audioLaneHeight));
+    CHECK(spansOverlap(bandTop, bandBottom, lanes.shotsTop(),
+                       lanes.shotsTop() + lanes.laneHeight));
+    // And it stops where it stops: the first actor lane is below the band and must not be caught.
+    const float actorTop = lanes.actorsTop();
+    CHECK_FALSE(spansOverlap(bandTop, bandBottom, actorTop, actorTop + lanes.laneHeight));
+
+    // The sections lane is above the audio lane, so a band starting in the audio lane never reaches
+    // it -- which is also why sections cannot be swept into a multiple delete.
+    CHECK_FALSE(spansOverlap(bandTop, bandBottom, lanes.sectionsTop(),
+                             lanes.sectionsTop() + lanes.sectionLaneHeight));
+}

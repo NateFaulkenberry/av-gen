@@ -935,7 +935,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             if (hi.x <= lo.x) {
                 continue;
             }
-            const bool chosen = audioSelected_ == static_cast<int>(i);
+            const bool chosen = isChosen(Selection::Clip, static_cast<int>(i));
             const bool over = hoverLane == StripLane::Audio && overAxis && mouse.x >= lo.x &&
                               mouse.x <= hi.x;
             if (over) {
@@ -1005,7 +1005,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         const float trueRight = b.x;
         a.x = std::max(a.x, axisX);
         b.x = std::min(b.x, axisRight);
-        const bool isSelected = selection_ == Selection::Shot && selected_ == static_cast<int>(i);
+        const bool isSelected = isChosen(Selection::Shot, static_cast<int>(i));
         const bool dragging = dragIndex_ == static_cast<int>(i) &&
                               (drag_ == Drag::MoveShot || drag_ == Drag::TrimShotStart ||
                                drag_ == Drag::TrimShotEnd);
@@ -1052,7 +1052,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     for (std::size_t ai = 0; ai < piece.actors.size(); ++ai) {
         const seq::Actor& actor = piece.actors[ai];
         const float laneTop = lanes.actorsTop() + static_cast<float>(ai) * (lanes.laneHeight + lanes.gap);
-        const bool isSelected = selection_ == Selection::Actor && selected_ == static_cast<int>(ai);
+        const bool isSelected = isChosen(Selection::Actor, static_cast<int>(ai));
         laneBackground(laneTop, lanes.laneHeight, ai % 2 == 1);
         // The actor's own header: its id, and a dot that says whether it is visible. `Actor::visible`
         // is real state the bake reads, so the dot is a control rather than a decoration -- which is
@@ -1119,7 +1119,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             const float trueRight = b.x;
             a.x = std::max(a.x, axisX);
             b.x = std::min(b.x, axisRight);
-            const bool isSelected = selection_ == Selection::Overlay && selected_ == static_cast<int>(i);
+            const bool isSelected = isChosen(Selection::Overlay, static_cast<int>(i));
             const bool dragging = dragIndex_ == static_cast<int>(i) &&
                                   (drag_ == Drag::MoveOverlay || drag_ == Drag::TrimOverlayStart ||
                                    drag_ == Drag::TrimOverlayEnd);
@@ -1160,6 +1160,19 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             draw->AddLine(ImVec2(x, origin.y + lanes.lanesTop()), ImVec2(x, origin.y + height),
                           pal.warning, 1.0f);
         }
+    }
+
+    // ---- the rubber band -------------------------------------------------------------------------
+    //
+    // Drawn over the lanes and under the playhead: it is a transient thing about the lanes, and the
+    // playhead is the one mark that should never be obscured.
+    if (drag_ == Drag::Marquee) {
+        const ImVec2 a(origin.x + std::min(marqueeFromX_, marqueeToX_),
+                       origin.y + std::min(marqueeFromY_, marqueeToY_));
+        const ImVec2 b(origin.x + std::max(marqueeFromX_, marqueeToX_),
+                       origin.y + std::max(marqueeFromY_, marqueeToY_));
+        draw->AddRectFilled(a, b, mixColour(pal.accent, pal.lane, 0.75f), 2.0f);
+        draw->AddRect(a, b, pal.accent, 2.0f, 0, 1.0f);
     }
 
     // ---- the playhead (spec 30, and the brief's section 10) --------------------------------------
@@ -1256,6 +1269,11 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         drag_ = Drag::None;
         dragIndex_ = -1;
         bool hitBlock = false;
+        // **A press replaces the selection.** Cleared here, once, rather than in each of the eight
+        // branches below that set `selection_` -- a click on a shot is a single selection whether or
+        // not a rubber band was up a moment ago, and an invariant enforced in one place cannot be
+        // forgotten by the ninth branch somebody adds later. The band's own branch re-populates it.
+        chosen_.clear();
         const StripLane lane = lanes.at(localY);
         if (overGutter) {
             // A header click selects the lane rather than scrubbing. It is the one place on the
@@ -1383,19 +1401,32 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             }
         }
         if (!hitBlock) {
-            // **A click on empty lane space deselects; it does not scrub.**
+            // **A press on empty lane space starts a rubber band; it does not scrub.**
             //
-            // It used to. The ruler branch above scrubs deliberately, and this fall-through scrubbed
-            // as well -- so missing a shot by three pixels, or clicking the gap after the last one,
-            // moved the playhead. Reported as "any lane I click in causes the playhead to jump",
-            // which is exactly what it did.
+            // It used to scrub. The ruler branch above scrubs deliberately, and this fall-through
+            // scrubbed as well -- so missing a shot by three pixels, or pressing in the gap after
+            // the last one, moved the playhead. Scrubbing now belongs to the ruler and the marker
+            // band above the lanes, where a timeline's scrub bar lives in every editor this borrows
+            // from.
             //
-            // Scrubbing now belongs to the ruler and the marker band above the lanes, where a
-            // timeline's scrub bar lives in every editor this borrows from. Down here a click on
-            // nothing means what it means everywhere else in this application: nothing is selected.
-            selection_ = Selection::None;
-            selected_ = -1;
-            audioSelected_ = -1;
+            // What the empty background is for instead is selecting across it. Shift keeps what was
+            // already selected, which is the convention everywhere else that has a band.
+            drag_ = Drag::Marquee;
+            marqueeAdds_ = ImGui::GetIO().KeyShift;
+            marqueeKept_.clear();
+            if (marqueeAdds_) {
+                marqueeKept_ = chosen_;
+                if (chosen_.empty() && selection_ != Selection::None) {
+                    marqueeKept_.push_back({selection_, selected_});
+                }
+            }
+            marqueeFromX_ = localX;
+            marqueeFromY_ = localY;
+            marqueeToX_ = localX;
+            marqueeToY_ = localY;
+            if (!marqueeAdds_) {
+                chooseOne(Selection::None, -1);
+            }
         }
     }
 
@@ -1408,7 +1439,67 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     // visible and a Delete pressed while typing a shot's name must reach the text field instead --
     // `WantTextInput` is what separates the two.
     if (hovered && !ImGui::GetIO().WantTextInput &&
-        (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace))) {
+        (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace)) &&
+        chosen_.size() > 1) {
+        // **A multiple selection is deleted as one edit**, which is what makes the rubber band worth
+        // having: sweep four shots and a clip, press Delete, take it all back with one Cmd+Z.
+        //
+        // Descending by index, because every erase shifts everything after it. Grouped by kind
+        // first so the audio is installed once rather than once per clip -- `setAudioClips` re-opens
+        // the sources and re-mixes the whole piece (ADR-103), and doing that five times would be
+        // five passes over every sample in the track.
+        std::vector<int> shots, overlays, actors, clips;
+        for (const SelectedItem& item : chosen_) {
+            switch (item.kind) {
+            case Selection::Shot: shots.push_back(item.index); break;
+            case Selection::Overlay: overlays.push_back(item.index); break;
+            case Selection::Actor: actors.push_back(item.index); break;
+            case Selection::Clip: clips.push_back(item.index); break;
+            case Selection::Section: break; // a landmark, not an object; never swept into the bin
+            case Selection::None: break;
+            }
+        }
+        const auto descending = [](std::vector<int>& v) {
+            std::sort(v.begin(), v.end(), std::greater<int>());
+            v.erase(std::unique(v.begin(), v.end()), v.end());
+        };
+        descending(shots);
+        descending(overlays);
+        descending(actors);
+        descending(clips);
+
+        beginEdit(engine, /*touchesAudio=*/!clips.empty());
+        for (const int i : shots) {
+            if (i >= 0 && i < static_cast<int>(piece.shots.size())) {
+                seq::removeShot(piece.shots, static_cast<std::size_t>(i));
+            }
+        }
+        for (const int i : overlays) {
+            if (i >= 0 && i < static_cast<int>(piece.overlays.size())) {
+                piece.overlays.erase(piece.overlays.begin() + i);
+            }
+        }
+        for (const int i : actors) {
+            if (i >= 0 && i < static_cast<int>(piece.actors.size())) {
+                piece.actors.erase(piece.actors.begin() + i);
+            }
+        }
+        if (!clips.empty()) {
+            std::vector<audio::AudioClip> remaining(engine.audioClips().begin(),
+                                                    engine.audioClips().end());
+            for (const int i : clips) {
+                if (i >= 0 && i < static_cast<int>(remaining.size())) {
+                    remaining.erase(remaining.begin() + i);
+                }
+            }
+            applyAudioClips(engine, std::move(remaining));
+        }
+        chooseOne(Selection::None, -1);
+        touch();
+        commitEdit(engine, fmt::format("Delete {} item(s)",
+                                       shots.size() + overlays.size() + actors.size() + clips.size()));
+    } else if (hovered && !ImGui::GetIO().WantTextInput &&
+               (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace))) {
         switch (selection_) {
         case Selection::Shot:
             if (selected_ >= 0 && selected_ < static_cast<int>(piece.shots.size())) {
@@ -1476,6 +1567,36 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         case Drag::Playhead:
             engine.seekSeconds(std::clamp(t, 0.0, duration));
             break;
+        case Drag::Marquee: {
+            marqueeToX_ = mouse.x - origin.x;
+            marqueeToY_ = mouse.y - origin.y;
+            // Recomputed every frame rather than accumulated, so shrinking the band unselects what
+            // it no longer covers. An accumulating band can only ever grow, which is the behaviour
+            // people complain about in tools that have it.
+            std::vector<SelectedItem> hit = itemsIn(engine, lanes, axisX, width, view_, span,
+                                                    marqueeFromX_, marqueeFromY_, marqueeToX_,
+                                                    marqueeToY_);
+            if (marqueeAdds_) {
+                for (const SelectedItem& had : marqueeKept_) {
+                    if (std::find(hit.begin(), hit.end(), had) == hit.end()) {
+                        hit.push_back(had);
+                    }
+                }
+            }
+            chosen_ = std::move(hit);
+            // The primary follows the band so the inspector shows something while it is dragged --
+            // the first thing found, which is the topmost lane's leftmost block.
+            if (!chosen_.empty()) {
+                selection_ = chosen_.front().kind;
+                selected_ = chosen_.front().index;
+                audioSelected_ = chosen_.front().kind == Selection::Clip ? chosen_.front().index : -1;
+            } else {
+                selection_ = Selection::None;
+                selected_ = -1;
+                audioSelected_ = -1;
+            }
+            break;
+        }
         // The three shot gestures live in `seq/sequence.hpp` now, so what a drag does and what a
         // test can check are the same code rather than two spellings of it.
         // The neighbour-aware forms: a drag cannot push a shot into the one beside it, and lands
@@ -1550,9 +1671,21 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         drag_ = Drag::None;
         dragIndex_ = -1;
         // A scrub changes nothing the bake reads, so it does not ask for one. Before this every
-        // release of a scrub rebuilt every track in the piece.
-        if (finished != Drag::Playhead) {
+        // release of a scrub rebuilt every track in the piece. A rubber band changes nothing either
+        // -- it selects; it does not edit.
+        if (finished != Drag::Playhead && finished != Drag::Marquee) {
             touch();
+        }
+        if (finished == Drag::Marquee) {
+            marqueeKept_.clear();
+            // A band that never travelled is a click on the background, which means "select
+            // nothing" -- and `chosen_` is already empty, so there is nothing more to do.
+            if (chosen_.size() == 1) {
+                // One thing caught is a plain selection. Collapsing it keeps the common case out of
+                // the multiple-selection paths entirely.
+                const SelectedItem only = chosen_.front();
+                chooseOne(only.kind, only.index);
+            }
         }
     }
 
@@ -1913,6 +2046,92 @@ void SequencePanel::addLyricAt(app::Engine& engine, double seconds) {
     selection_ = Selection::Overlay;
     selected_ = static_cast<int>(piece.overlays.size()) - 1;
     touch();
+}
+
+// ---- the selection set -------------------------------------------------------------------------
+
+bool SequencePanel::isChosen(Selection kind, int index) const {
+    if (selection_ == kind && selected_ == index) {
+        return true; // the primary is always part of the selection
+    }
+    return std::any_of(chosen_.begin(), chosen_.end(), [&](const SelectedItem& i) {
+        return i.kind == kind && i.index == index;
+    });
+}
+
+void SequencePanel::chooseOne(Selection kind, int index) {
+    chosen_.clear();
+    selection_ = kind;
+    selected_ = index;
+    // The audio lane keeps its own index because a clip is addressed by it everywhere else in this
+    // file; kept in step here so the two cannot disagree about what is selected.
+    audioSelected_ = kind == Selection::Clip ? index : -1;
+}
+
+std::vector<SequencePanel::SelectedItem> SequencePanel::itemsIn(
+    const app::Engine& engine, const StripLanes& lanes, float axisX, float width, double view,
+    double span, float x0, float y0, float x1, float y1) const {
+    // **Computed from the data and the lane geometry, never from anything that was drawn.** The
+    // blocks on screen are themselves a function of those two things, so working from the same
+    // inputs is what stops the band and the picture disagreeing about where a block is -- the exact
+    // class of bug ADR-103 records, where the hit test and the drawing each did their own
+    // arithmetic.
+    const seq::Sequence& piece = engine.sequence();
+    const float left = std::min(x0, x1);
+    const float right = std::max(x0, x1);
+    const float top = std::min(y0, y1);
+    const float bottom = std::max(y0, y1);
+
+    const auto toX = [&](double seconds) {
+        return axisX + static_cast<float>((seconds - view) / span) * width;
+    };
+    // Two spans overlap if neither ends before the other starts. Touching counts: a band dragged
+    // exactly onto a block's edge has selected it as far as anyone watching is concerned.
+    const auto overlaps = [](float a0, float a1, float b0, float b1) {
+        return a0 <= b1 && b0 <= a1;
+    };
+    const auto rowHit = [&](float laneTop, float laneHeight, double startSeconds, double endSeconds) {
+        return overlaps(top, bottom, laneTop, laneTop + laneHeight) &&
+               overlaps(left, right, toX(startSeconds), toX(endSeconds));
+    };
+
+    std::vector<SelectedItem> out;
+    if (lanes.hasAudio) {
+        const auto& clips = engine.audioClips();
+        for (std::size_t i = 0; i < clips.size(); ++i) {
+            const double end = clips[i].startSeconds + clips[i].durationSeconds;
+            if (rowHit(lanes.audioTop(), lanes.audioLaneHeight, clips[i].startSeconds, end)) {
+                out.push_back({Selection::Clip, static_cast<int>(i)});
+            }
+        }
+    }
+    for (std::size_t i = 0; i < piece.shots.size(); ++i) {
+        if (rowHit(lanes.shotsTop(), lanes.laneHeight, piece.shots[i].startSeconds,
+                   piece.shots[i].endSeconds())) {
+            out.push_back({Selection::Shot, static_cast<int>(i)});
+        }
+    }
+    for (std::size_t a = 0; a < piece.actors.size(); ++a) {
+        const float laneTop = lanes.actorsTop() + static_cast<float>(a) * (lanes.laneHeight + lanes.gap);
+        // An actor is selected by touching its lane at all, not by touching one of its cues: the
+        // lane is the object here, and a performer with no clips would otherwise be unselectable.
+        if (overlaps(top, bottom, laneTop, laneTop + lanes.laneHeight) &&
+            overlaps(left, right, axisX, axisX + width)) {
+            out.push_back({Selection::Actor, static_cast<int>(a)});
+        }
+    }
+    if (lanes.hasOverlays) {
+        for (std::size_t i = 0; i < piece.overlays.size(); ++i) {
+            if (rowHit(lanes.overlaysTop(), lanes.laneHeight, piece.overlays[i].startSeconds,
+                       piece.overlays[i].endSeconds)) {
+                out.push_back({Selection::Overlay, static_cast<int>(i)});
+            }
+        }
+    }
+    // Sections are deliberately not selectable by band, for the reason they are not deletable by
+    // key: a section is a landmark rather than an object, and sweeping a band across the strip
+    // should not put the song's structure in the bin along with the shots.
+    return out;
 }
 
 void SequencePanel::beginEdit(app::Engine& engine, bool touchesAudio) {

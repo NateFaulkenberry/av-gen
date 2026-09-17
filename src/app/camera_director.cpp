@@ -423,19 +423,24 @@ void AutoDirectorSettings::applyTo(DirectionBrief& brief) const {
 // ---- Song Mode (ADR-249) -------------------------------------------------------------------------
 
 Result<SongPlan> songPlanForEngine(const Engine& engine) {
-    // What somebody authored, if they authored anything. This is the whole point of Song Mode and
-    // the only branch that will matter once the song data model publishes its section types.
-    if (!engine.songPlan().empty()) {
-        return engine.songPlan();
-    }
-    // Then the FILM: the authored section timeline, through the shot language. This is the branch
-    // the whole feature exists for -- a person retypes a section to "Ocean Ambience" or overrides
-    // its treatment, and the director cuts differently because of it.
+    // **The FILM first.** The section timeline, through the shot language -- what the person has in
+    // front of them in the Sequence panel right now.
     //
-    // It goes above the measurements branch because a timeline is what a person decided and a
-    // structure is what a detector reported, and the decision outranks the report (ADR-247). A
-    // project that has been analyzed at all has a timeline, since `sequenceFromJson` migrates one
-    // from the structure on load; the branch below survives for a project with neither.
+    // This used to sit *below* `engine.songPlan()`, and that ordering was the bug: an authored plan
+    // is a snapshot with its own start and end times, so a project carrying one ignored every
+    // subsequent edit to the sections. Drag Verse 2 to twenty seconds and Song Mode kept listing it
+    // where it used to be; split a Chorus in two and Song Mode still saw one. Reported exactly that
+    // way, and `glowmere-valley-2-multicam` was carrying a ten-section plan that shadowed a timeline
+    // the owner had been editing for days.
+    //
+    // ADR-247 already had the principle -- a timeline is what a person decided and a structure is
+    // what a detector reported, and the decision outranks the report. What it did not say, because
+    // the case had not arisen, is that a *saved* decision does not outrank a *live* one. The
+    // sections are edited in the sequencer; the sequencer is therefore the authority.
+    //
+    // Nothing is lost by the reordering. A section's intent lives on its type and its per-section
+    // treatment, both of which the timeline carries and `cueSheet` resolves -- so the deliberate
+    // authoring a plan used to hold is held by the thing being edited instead.
     const seq::Sequence& piece = engine.sequence();
     if (!piece.sectionTimeline.sections.empty()) {
         const std::vector<song::SectionCue> cues =
@@ -443,6 +448,10 @@ Result<SongPlan> songPlanForEngine(const Engine& engine) {
         if (!cues.empty()) {
             return songPlanFromCues(cues);
         }
+    }
+    // Then a plan somebody authored, for a project that has one and no film to derive from.
+    if (!engine.songPlan().empty()) {
+        return engine.songPlan();
     }
     // Otherwise, the analyzed structure read for its *measurements* -- never for its labels. Kept as
     // the fallback for a project that has a detection and no film, and as the thing that makes the

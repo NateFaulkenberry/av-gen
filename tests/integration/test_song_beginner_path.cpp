@@ -17,6 +17,7 @@
 #include "audio/audio_file.hpp"
 #include "scene/composition.hpp"
 #include "seq/sequence.hpp"
+#include "world/effects.hpp"
 #include "song/from_analysis.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -211,5 +212,215 @@ TEST_CASE("Song Mode bakes a film without touching the Shots lane", "[integratio
     //    camera-gated effect activates against.
     INFO("shot spans for world effects: " << engine.shotSpans().size());
     CHECK_FALSE(engine.shotSpans().empty());
+#endif
+}
+
+// Does a camera-travel world effect have anything to fire on in Song Mode?
+//
+// Reported as a possible regression: "the camera travel beam seems not to work in Song Mode -- it
+// may work but it never fires (there could be a reason for this that I don't understand that is not
+// a bug)". Both halves of that hunch turned out to be right, and they are different things.
+//
+// **There was a real bug, and it is fixed.** Song Mode had stopped calling `installSequence`, so
+// `setShotSpans` was never reached and `engine.shotSpans()` was empty.
+// `resolveActivationWindow` walks that list looking for a span with `travel` set, finds nothing, and
+// the effect correctly never activates -- on any song, always.
+//
+// **And there is a second reason, which is not a bug.** `Sequence::shotSpans` sets `travel` only for
+// a `Transition` shot or one that hands its aim on -- the camera in transit *between* subjects.
+// `shotKindForIntent` emits `Transition` only for an intent in the middle hero-emphasis band
+// (0.35..0.70) that is also moving and close. Glowmere's sections all resolve to
+// `dynamic_hero_coverage`, which is high-emphasis, so every shot holds or approaches one subject and
+// none of them travel between two. The camera moves -- an approach from 12.6 to 6.8 radii is not a
+// still camera -- but it is not *travelling*, which is what the effect is gated on.
+//
+// So the two tests below are a measurement and its control: what this song actually produces, and
+// proof that the mechanism fires when a song asks it to.
+
+TEST_CASE("Song Mode publishes spans, and this song's are all holds",
+          "[integration][song][effects]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    if (!std::filesystem::exists(glowmereProject())) {
+        SKIP("the Glowmere multi-camera demo is not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(glowmereProject()).has_value());
+    if (engine.track() == nullptr) {
+        SKIP("the project's audio is not available here");
+    }
+    const auto plan = app::songPlanForEngine(engine);
+    REQUIRE(plan.has_value());
+    scene::Composition* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+    const auto direction = app::directSongFromPlan(comp->heroes(), *plan, comp->cameraDirection(),
+                                                   engine.autoDirector());
+    REQUIRE(direction.has_value());
+    REQUIRE(app::installSongDirection(engine, *direction, engine.autoDirector()).has_value());
+
+    // The half that was broken: the spans reach the engine at all.
+    const auto& spans = engine.shotSpans();
+    REQUIRE_FALSE(spans.empty());
+
+    const std::size_t travelling = static_cast<std::size_t>(
+        std::count_if(spans.begin(), spans.end(), [](const world::ShotSpan& s) { return s.travel; }));
+    const std::size_t holding = static_cast<std::size_t>(
+        std::count_if(spans.begin(), spans.end(), [](const world::ShotSpan& s) { return s.spotlight; }));
+    INFO(spans.size() << " span(s): " << travelling << " travelling, " << holding << " holding");
+
+    // The half that is not broken: on THIS song every shot is about somebody, so a camera-travel
+    // effect has nothing to fire on and is correctly inert. Asserted rather than merely noted,
+    // because if this ever changes the explanation above stops being true and should be revisited.
+    CHECK(holding > 0);
+    CHECK(travelling == 0);
+#endif
+}
+
+// The control (ADR-182). Without it the test above is "the effect never fires and here is a story
+// about why" -- which is indistinguishable from a mechanism that is simply broken.
+TEST_CASE("A travelling intent does produce a span the beam fires on",
+          "[integration][song][effects]") {
+    // An intent in the middle hero-emphasis band, moving and close: the one combination
+    // `shotKindForIntent` answers with `Transition`.
+    app::ShotIntentProfile travelling;
+    travelling.id = "a passage between two things";
+    travelling.heroEmphasis = 0.5f;  // neither the world's shot nor the subject's
+    travelling.movement = 0.8f;      // moving
+    travelling.distance = 0.3f;      // close
+    CHECK(app::shotKindForIntent(travelling) == app::ShotKind::Transition);
+
+    // And the two neighbouring bands do not, which is what says the band above is the reason rather
+    // than a coincidence.
+    app::ShotIntentProfile hero = travelling;
+    hero.heroEmphasis = 0.85f; // what Glowmere's sections actually resolve to
+    CHECK(app::shotKindForIntent(hero) == app::ShotKind::Approach);
+    app::ShotIntentProfile world = travelling;
+    world.heroEmphasis = 0.2f;
+    CHECK(app::shotKindForIntent(world) == app::ShotKind::Drift);
+
+    // A `Transition` shot that knows where it came from marks its span as travelling, which is the
+    // link between the intent and the effect.
+    app::Sequence film;
+    app::Shot shot;
+    shot.kind = app::ShotKind::Transition;
+    shot.startSeconds = 0.0;
+    shot.durationSeconds = 4.0;
+    shot.subject.name = "from";
+    shot.subject.radius = 2.0f;
+    app::FocalTarget to;
+    to.name = "to";
+    to.radius = 2.0f;
+    shot.handoff = to;
+    film.shots.push_back(shot);
+
+    const std::vector<world::ShotSpan> spans = film.shotSpans();
+    REQUIRE(spans.size() == 1);
+    CHECK(spans.front().travel);
+
+    world::WorldEffect beam = world::cameraTravelBeam();
+    CHECK(world::resolveActivationWindow(beam.activation, beam.timing, 2.0, spans).has_value());
+    // And it does not fire where there is no travel, or the check above would pass on anything.
+    app::Sequence held;
+    app::Shot still = shot;
+    still.kind = app::ShotKind::Track;
+    still.handoff.reset();
+    held.shots.push_back(still);
+    const std::vector<world::ShotSpan> holds = held.shotSpans();
+    REQUIRE(holds.size() == 1);
+    CHECK_FALSE(holds.front().travel);
+    CHECK_FALSE(world::resolveActivationWindow(beam.activation, beam.timing, 2.0, holds).has_value());
+}
+
+// Editing the sections edits the film, and Song Mode follows.
+//
+// Reported as: drag Verse 2 to start at twenty seconds and Song Mode still lists it where it was;
+// split a Chorus in two and Song Mode still sees one section. Both were the same cause --
+// `songPlanForEngine` consulted `engine.songPlan()` *before* the section timeline, so any project
+// carrying an authored plan had a frozen snapshot shadowing the thing being edited.
+// `glowmere-valley-2-multicam` was carrying a ten-section one.
+//
+// ADR-247 had the principle already: a timeline is what a person decided, a structure is what a
+// detector reported, and the decision outranks the report. What it had not had to say is that a
+// *saved* decision does not outrank a *live* one.
+
+TEST_CASE("Song Mode's sections follow the sequencer's", "[integration][song][sections]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    if (!std::filesystem::exists(glowmereProject())) {
+        SKIP("the Glowmere multi-camera demo is not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(glowmereProject()).has_value());
+    if (engine.track() == nullptr) {
+        SKIP("the project's audio is not available here");
+    }
+
+    seq::Sequence piece = engine.sequence();
+    if (piece.sectionTimeline.sections.empty()) {
+        auto detected = analysis::detectStructure(*engine.track());
+        REQUIRE(detected.has_value());
+        piece.structure = std::move(*detected);
+        piece.sectionTimeline = song::timelineFromStructure(piece.structure, piece.shotLanguage);
+        REQUIRE(engine.setSequence(piece).has_value());
+    }
+    REQUIRE(engine.sequence().sectionTimeline.sections.size() > 2);
+
+    const auto before = app::songPlanForEngine(engine);
+    REQUIRE(before.has_value());
+    const std::size_t sectionsBefore = engine.sequence().sectionTimeline.sections.size();
+    REQUIRE(before->sections.size() == sectionsBefore);
+
+    // ---- 1. moving a boundary moves it in Song Mode too ----------------------------------------
+    {
+        seq::Sequence edited = engine.sequence();
+        const double was = edited.sectionTimeline.sections[1].startSeconds;
+        const double now = was + 7.5;
+        REQUIRE(song::moveBoundary(edited.sectionTimeline, 1, now));
+        edited.refreshSectionMarkers();
+        REQUIRE(engine.setSequence(std::move(edited)).has_value());
+
+        const auto after = app::songPlanForEngine(engine);
+        REQUIRE(after.has_value());
+        REQUIRE(after->sections.size() > 1);
+        INFO("boundary was " << was << "s, moved to " << now << "s, plan says "
+                             << after->sections[1].startSeconds << "s");
+        CHECK(after->sections[1].startSeconds == Catch::Approx(now).margin(0.05));
+        // The section before it ends where the next one starts -- the structure is gapless, and a
+        // plan that disagreed with the timeline about that would direct across a hole.
+        CHECK(after->sections[0].endSeconds == Catch::Approx(now).margin(0.05));
+    }
+
+    // ---- 2. splitting a section adds one to Song Mode -------------------------------------------
+    {
+        seq::Sequence edited = engine.sequence();
+        const std::size_t was = edited.sectionTimeline.sections.size();
+        const song::Section& target = edited.sectionTimeline.sections[1];
+        const double at = (target.startSeconds + target.endSeconds) * 0.5;
+        REQUIRE(song::splitSection(edited.sectionTimeline, at, 0.25));
+        edited.refreshSectionMarkers();
+        REQUIRE(engine.setSequence(std::move(edited)).has_value());
+        REQUIRE(engine.sequence().sectionTimeline.sections.size() == was + 1);
+
+        const auto after = app::songPlanForEngine(engine);
+        REQUIRE(after.has_value());
+        INFO("timeline has " << engine.sequence().sectionTimeline.sections.size()
+                             << " section(s), the plan has " << after->sections.size());
+        CHECK(after->sections.size() == was + 1);
+    }
+
+    // ---- 3. and the plan is still directable, which is what makes 1 and 2 worth anything --------
+    {
+        const auto plan = app::songPlanForEngine(engine);
+        REQUIRE(plan.has_value());
+        CHECK(plan->validate().has_value());
+        scene::Composition* comp = engine.composition();
+        REQUIRE(comp != nullptr);
+        const auto direction = app::directSongFromPlan(comp->heroes(), *plan, comp->cameraDirection(),
+                                                       engine.autoDirector());
+        INFO((direction ? std::string() : direction.error().message));
+        REQUIRE(direction.has_value());
+    }
 #endif
 }

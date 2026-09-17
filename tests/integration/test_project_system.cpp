@@ -1001,3 +1001,110 @@ TEST_CASE("a director block outside the ranges validate() accepts is refused",
     CHECK(engine.autoDirector().dwellShots == 12);
     CHECK(engine.autoDirector().mode == app::DirectorMode::EditedSequence);
 }
+
+// A sequence that carries anything at all survives a save.
+//
+// **This is a data-loss regression and it deserves the long note.** `Engine::hasSequence` decides
+// whether the whole `sequence` block is written to the project file, and it tested three things:
+// shots, actors and overlays. That was already incomplete, and it became load-bearing the day Song
+// Mode stopped writing shots into the sequencer.
+//
+// What happened on `glowmere-valley-2-multicam`: ten sections, seven performer rules, a shot
+// language and an analyzed structure -- and no shots, no actors, no overlays. `hasSequence()`
+// answered false, the block was omitted, and one Save later all of it was gone from the file. The
+// project loaded perfectly afterwards, which is what made it quiet: an absent key is not an error.
+//
+// So each field gets its own arm. A single "the sequence survives" test would pass on any one of
+// them and would not have caught the case that actually happened, which was a sequence with only
+// the *unlisted* fields populated.
+
+TEST_CASE("Saving keeps a sequence that has no shots", "[integration][project][sequence]") {
+    const auto check = [](const char* what, auto&& populate) {
+        app::Engine engine(app::EngineMode::Offline);
+        seq::Sequence piece;
+        piece.name = "kept";
+        populate(piece);
+        // Deliberately none of the three fields the old predicate looked at.
+        REQUIRE(piece.shots.empty());
+        REQUIRE(piece.actors.empty());
+        REQUIRE(piece.overlays.empty());
+        auto set = engine.setSequence(std::move(piece));
+        INFO("a sequence carrying only: " << what << " -- "
+             << (set ? std::string("installed") : set.error().message));
+        REQUIRE(set.has_value());
+        CHECK(engine.hasSequence());
+    };
+
+    check("a section timeline", [](seq::Sequence& p) {
+        song::Section s;
+        s.type = song::SectionTypeId{"verse"}; // a section without one is refused, and rightly
+        s.startSeconds = 0.0;
+        s.endSeconds = 8.0;
+        s.label = "Verse";
+        p.sectionTimeline.sections.push_back(std::move(s));
+    });
+    check("performer rules", [](seq::Sequence& p) {
+        seq::SectionPerformanceEntry e;
+        e.kind = signals::MusicalSection::Chorus;
+        p.sectionPerformance.entries.push_back(std::move(e));
+    });
+    check("scene slots", [](seq::Sequence& p) {
+        seq::SceneSlot slot;
+        slot.id = "main";
+        slot.node = "valley";
+        p.scenes.push_back(std::move(slot));
+    });
+    check("an analyzed structure", [](seq::Sequence& p) {
+        analysis::SongSection s;
+        s.startSeconds = 0.0;
+        s.endSeconds = 10.0;
+        p.structure.sections.push_back(std::move(s));
+    });
+
+    // And the control, or every arm above would pass on a predicate that simply returned true: the
+    // empty sequence a new project starts with is still not worth writing.
+    app::Engine engine(app::EngineMode::Offline);
+    CHECK_FALSE(engine.hasSequence());
+}
+
+TEST_CASE("A sections-only sequence round-trips through a project file",
+          "[integration][project][sequence]") {
+    // The end-to-end version of the arms above: the failure was only ever visible after a save and
+    // a reload, because the in-memory sequence was always correct.
+    const std::filesystem::path dir =
+        std::filesystem::temp_directory_path() / "avgen-sequence-roundtrip";
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    const std::filesystem::path file = dir / "piece.json";
+
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        seq::Sequence piece;
+        piece.name = "sections only";
+        for (int i = 0; i < 3; ++i) {
+            song::Section s;
+            s.type = song::SectionTypeId{"verse"};
+            s.startSeconds = i * 8.0;
+            s.endSeconds = (i + 1) * 8.0;
+            s.label = fmt::format("part {}", i + 1);
+            piece.sectionTimeline.sections.push_back(std::move(s));
+        }
+        seq::SectionPerformanceEntry e;
+        e.kind = signals::MusicalSection::Chorus;
+        piece.sectionPerformance.entries.push_back(std::move(e));
+        REQUIRE(engine.setSequence(std::move(piece)).has_value());
+        REQUIRE(engine.saveProject(file).has_value());
+    }
+
+    // Read the file rather than the engine: what is being checked is that the bytes carry it.
+    std::ifstream in(file);
+    REQUIRE(in.good());
+    nlohmann::json doc;
+    in >> doc;
+    REQUIRE(doc.contains("sequence"));
+    REQUIRE(doc["sequence"].contains("sectionTimeline"));
+    CHECK(doc["sequence"]["sectionTimeline"]["sections"].size() == 3);
+    CHECK(doc["sequence"].contains("sectionPerformance"));
+
+    std::filesystem::remove_all(dir, ec);
+}

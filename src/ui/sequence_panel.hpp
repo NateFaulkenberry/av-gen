@@ -72,6 +72,15 @@ public:
 
     // What the strip has selected, so the host can show it elsewhere.
     enum class Selection : std::uint8_t { None, Shot, Actor, Overlay, Section, Clip };
+
+    // One selected thing, in any lane. The strip's selection is a *set* of these, because a rubber
+    // band across three lanes selects three kinds of object and "the selection" has to be able to
+    // hold that.
+    struct SelectedItem {
+        Selection kind = Selection::None;
+        int index = -1;
+        friend bool operator==(const SelectedItem&, const SelectedItem&) = default;
+    };
     [[nodiscard]] Selection selection() const { return selection_; }
     [[nodiscard]] int selectedIndex() const { return selected_; }
 
@@ -123,6 +132,17 @@ private:
     void drawShotInspector(app::Engine& engine, seq::Shot& shot);
     // The chase/orbit/POV controls, showing only what the chosen behaviour reads.
     void drawBehaviorInspector(app::Engine& engine, seq::Shot& shot);
+
+    // ---- the selection set ---------------------------------------------------------------------
+    [[nodiscard]] bool isChosen(Selection kind, int index) const;
+    // Replaces the whole selection with one thing, which is what a plain click means.
+    void chooseOne(Selection kind, int index);
+    // Everything the rubber band touches, in strip-local points. Pure apart from reading the piece:
+    // it works from the data and the lane geometry rather than from anything that was drawn, so it
+    // cannot disagree with the blocks on screen about where they are.
+    [[nodiscard]] std::vector<SelectedItem> itemsIn(const app::Engine& engine, const StripLanes& lanes,
+                                                    float axisX, float width, double view, double span,
+                                                    float x0, float y0, float x1, float y1) const;
     void drawActorInspector(app::Engine& engine, seq::Actor& actor);
     void drawOverlayInspector(app::Engine& engine, seq::OverlayCue& cue);
     void drawSectionInspector(app::Engine& engine, std::size_t index);
@@ -161,7 +181,9 @@ private:
         TrimOverlayStart,
         TrimOverlayEnd,
         SectionBoundary,
+        Marquee,           // a rubber band over the lane backgrounds, selecting what it touches
     };
+
 
     void drawEdgeGrip(ImDrawList* draw, ImVec2 a, ImVec2 b, BlockZone zone, Drag active, bool isShot);
 
@@ -220,8 +242,31 @@ private:
     int audioSelected_ = -1;
     char audioPath_[512] = {};
 
+    // The **primary** selection: the last thing clicked, and what the inspector shows. Kept as a
+    // kind and an index rather than folded into `chosen_` because every existing caller -- the
+    // inspector, the host's `selection()`, the context menus -- asks "what one thing is selected",
+    // and a rubber band is the only thing that ever selects more.
     Selection selection_ = Selection::None;
     int selected_ = -1;
+    // Everything selected, when that is more than one thing. Empty means the primary above is the
+    // whole selection, which is the common case and costs nothing.
+    //
+    // A vector rather than a set: it is a handful of items, it is iterated far more often than it is
+    // searched, and the order is the order the rubber band found them -- which is the order a
+    // multiple delete should remove them in.
+    std::vector<SelectedItem> chosen_;
+    // The rubber band, in strip-local points, while `drag_ == Drag::Marquee`. Four floats rather
+    // than two `ImVec2`s because this header is deliberately ImGui-free -- `ImVec2` is forward
+    // declared and cannot be held by value.
+    float marqueeFromX_ = 0.0f;
+    float marqueeFromY_ = 0.0f;
+    float marqueeToX_ = 0.0f;
+    float marqueeToY_ = 0.0f;
+    // Whether the band adds to what was already selected (shift) rather than replacing it, and what
+    // that selection was when the band started. Remembered rather than merged as it goes, because
+    // the band recomputes its own hits every frame and a merged set could only ever grow.
+    bool marqueeAdds_ = false;
+    std::vector<SelectedItem> marqueeKept_;
     bool dirty_ = false;
     int snapMode_ = 2; // Beats
     float zoom_ = 1.0f;
