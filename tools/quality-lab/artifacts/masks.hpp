@@ -103,4 +103,41 @@ struct IdentifierSurvey {
 // the ungated residual, or the gating machinery is doing something other than gating.
 [[nodiscard]] Mask everything(std::uint32_t width, std::uint32_t height);
 
+// ---- interior versus silhouette (ADR-257) ------------------------------------------------------
+
+// Morphology over a mask, by a Chebyshev radius -- a (2r+1)x(2r+1) box, applied separably. Out of
+// bounds counts as NOT set, so erosion clips an object touching the frame edge rather than
+// pretending the frame continues.
+[[nodiscard]] Mask erode(const Mask& mask, std::uint32_t width, std::uint32_t height, int radius);
+[[nodiscard]] Mask dilate(const Mask& mask, std::uint32_t width, std::uint32_t height, int radius);
+
+// One object, split into the part that is safely inside it and the band around its silhouette.
+//
+// **This exists because a scene called a shape a control and it was only half one** (ADR-257). A
+// large smooth sphere's interior shading is unaffected by anti-aliasing; its silhouette is a curved
+// edge like any other and is affected exactly as much. The two claims are only separable if the two
+// regions are, so they are separated here and measured apart.
+//
+// `band` is every pixel within `radius` of the boundary, inside OR outside it, because a filter that
+// works on an edge reads across it. `interior + band + elsewhere` is exactly the frame.
+struct SilhouetteSplit {
+    Mask object;    // the identifier's own pixels
+    Mask interior;  // object, eroded by radius
+    Mask band;      // dilate(object) minus erode(object)
+    Mask elsewhere; // everything outside dilate(object)
+};
+[[nodiscard]] SilhouetteSplit splitSilhouette(const Plane& id, std::uint32_t objectId, int radius);
+
+// Mean and max |luma difference| of two frames over a mask, in luma steps 0..255 -- the unit the
+// rest of the Lab reports in, so these numbers sit beside the others without conversion. `pixels` is
+// how many contributed, and a caller that does not print it is publishing a headline about an
+// unknown number of pixels.
+struct MaskedDifference {
+    double mean = 0.0;
+    double max = 0.0;
+    std::size_t pixels = 0;
+};
+[[nodiscard]] MaskedDifference maskedLumaDifference(const Frame& a, const Frame& b,
+                                                    const Mask& mask);
+
 } // namespace avgen::quality

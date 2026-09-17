@@ -83,7 +83,7 @@
       "kind": "orb",
       "position": [0.0, 1.1, -3.0],
       "scale": [0.9, 0.9, 0.9],
-      "_note": "One large, smooth, fully-resolved object. It is the control: it cannot alias, so a metric that moves on this scene's arms must not be moving here. The per-class masks and the tile map both need somewhere in frame that is known good.",
+      "_note": "One large, smooth, fully-resolved object. **Its INTERIOR is the control; the object is not** -- the claim this note made until 2026-09-17 was that the whole orb 'cannot alias, so a metric that moves on this scene's arms must not be moving here', and half of that is wrong. A sphere's interior shading is unaffected by anti-aliasing; its silhouette is a curved edge like every other edge in the frame and is affected exactly as much. A Phase 6 reviewer handed the orb as a control said so -- 'ball looks smoother in C - less jagged' -- and was right. Measured over 60 frames with `avgen_quality control`, which splits the object out of the id AOV into an eroded interior and a silhouette band: the interior is BIT-IDENTICAL with FXAA off (at 1, 2, 4 and 8 px of erosion) and moves 0.1486 luma steps under supersample 2x, while the silhouette band moves 2.70 and 5.39 with peaks over 120. For scale, the same interior mask moves 2.90 steps between consecutive frames of one arm, and the same split on the fences and blades gives interiors of 2.1 to 6.7 -- sub-pixel geometry has no invariant interior. So: a metric that moves on this scene's arms must not be moving in this object's INTERIOR. The per-class masks and the tile map both need somewhere in frame that is known good, and this is it. ADR-257, ADR-254's correction.",
       "material": { "baseColor": [0.78, 0.36, 0.22], "roughness": 0.55 }
     }
   ]

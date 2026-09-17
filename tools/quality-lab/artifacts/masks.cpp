@@ -177,4 +177,111 @@ Mask materialClassMask(const Plane& id, const std::vector<std::uint32_t>& materi
     return mask;
 }
 
+// ---- interior versus silhouette (ADR-257) ------------------------------------------------------
+
+namespace {
+
+Mask boxFilter(const Mask& mask, std::uint32_t width, std::uint32_t height, int radius, bool minimum) {
+    const std::uint8_t seed = minimum ? 1 : 0;
+    const std::uint8_t outside = 0; // out of bounds is NOT set, for both operations
+    Mask horizontal(mask.size(), 0);
+    for (std::uint32_t y = 0; y < height; ++y) {
+        for (std::uint32_t x = 0; x < width; ++x) {
+            std::uint8_t value = seed;
+            for (int d = -radius; d <= radius; ++d) {
+                const long sx = static_cast<long>(x) + d;
+                const std::uint8_t sample =
+                    (sx < 0 || sx >= static_cast<long>(width))
+                        ? outside
+                        : mask[static_cast<std::size_t>(y) * width + static_cast<std::size_t>(sx)];
+                value = minimum ? std::min(value, sample) : std::max(value, sample);
+            }
+            horizontal[static_cast<std::size_t>(y) * width + x] = value;
+        }
+    }
+    Mask out(mask.size(), 0);
+    for (std::uint32_t y = 0; y < height; ++y) {
+        for (std::uint32_t x = 0; x < width; ++x) {
+            std::uint8_t value = seed;
+            for (int d = -radius; d <= radius; ++d) {
+                const long sy = static_cast<long>(y) + d;
+                const std::uint8_t sample =
+                    (sy < 0 || sy >= static_cast<long>(height))
+                        ? outside
+                        : horizontal[static_cast<std::size_t>(sy) * width + x];
+                value = minimum ? std::min(value, sample) : std::max(value, sample);
+            }
+            out[static_cast<std::size_t>(y) * width + x] = value;
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+Mask erode(const Mask& mask, std::uint32_t width, std::uint32_t height, int radius) {
+    if (radius <= 0 || mask.size() != static_cast<std::size_t>(width) * height) {
+        return mask;
+    }
+    return boxFilter(mask, width, height, radius, true);
+}
+
+Mask dilate(const Mask& mask, std::uint32_t width, std::uint32_t height, int radius) {
+    if (radius <= 0 || mask.size() != static_cast<std::size_t>(width) * height) {
+        return mask;
+    }
+    return boxFilter(mask, width, height, radius, false);
+}
+
+SilhouetteSplit splitSilhouette(const Plane& id, std::uint32_t objectId, int radius) {
+    SilhouetteSplit split;
+    if (!id.valid()) {
+        return split;
+    }
+    const std::size_t pixels = static_cast<std::size_t>(id.width) * id.height;
+    split.object.assign(pixels, 0);
+    for (std::size_t i = 0; i < pixels; ++i) {
+        const float packed = id.rgba[i * 4];
+        // A packed identifier of exactly 0 is "no geometry wrote here", which is a sky matte and
+        // not object 0. Objects with an id of 0 in a non-default pick space are still reachable,
+        // because their packed word carries a material id in its high bits.
+        if (packed != 0.0f && objectIdOf(packed) == objectId) {
+            split.object[i] = 1;
+        }
+    }
+    split.interior = erode(split.object, id.width, id.height, radius);
+    const Mask outer = dilate(split.object, id.width, id.height, radius);
+    split.band.assign(pixels, 0);
+    split.elsewhere.assign(pixels, 0);
+    for (std::size_t i = 0; i < pixels; ++i) {
+        split.band[i] = (outer[i] != 0 && split.interior[i] == 0) ? 1 : 0;
+        split.elsewhere[i] = outer[i] == 0 ? 1 : 0;
+    }
+    return split;
+}
+
+MaskedDifference maskedLumaDifference(const Frame& a, const Frame& b, const Mask& mask) {
+    MaskedDifference result;
+    if (!a.valid() || !a.sameShapeAs(b) ||
+        mask.size() != static_cast<std::size_t>(a.width) * a.height) {
+        return result;
+    }
+    // `luma()` returns 0..255 and not 0..1 -- its own header said 0..1 until a caller believed it
+    // and produced a table of luma differences in the tens of thousands.
+    const std::vector<float> la = luma(a);
+    const std::vector<float> lb = luma(b);
+    double sum = 0.0;
+    for (std::size_t i = 0; i < mask.size(); ++i) {
+        if (mask[i] == 0) {
+            continue;
+        }
+        const double d = std::abs(static_cast<double>(la[i]) - static_cast<double>(lb[i]));
+        sum += d;
+        result.max = std::max(result.max, d);
+        ++result.pixels;
+    }
+    result.mean = result.pixels == 0 ? 0.0 : sum / static_cast<double>(result.pixels);
+    return result;
+}
+
 } // namespace avgen::quality

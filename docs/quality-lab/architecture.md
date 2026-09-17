@@ -84,7 +84,7 @@ rather than mechanically imposing it. Do not unnecessarily move unrelated source
 ```
 tools/quality-lab/                  # the C++ tool and its stdlib Python driver
     CMakeLists.txt                  #   avgen_quality_metrics (a library) + avgen_quality (the CLI)
-    main.cpp                        #   analyze | compare | validate --ladder | version
+    main.cpp                        #   analyze | compare | control | validate --ladder | version
     capture/   sequence.{hpp,cpp}   #   frame + AOV sequence readers. EVERYTHING HERE IS A READER
     metrics/   spatial.{hpp,cpp}    #   psnr, ssim, msSsim, ciede2000, laplacian, quantisationSteps
                temporal.{hpp,cpp}   #   alternation, motion-compensated residual, disocclusion, warp floor
@@ -127,10 +127,25 @@ repository's naming (`avgen_world_preview`, `avgen_help_lint`, …), the binary 
 ```
 avgen_quality analyze    --candidate <dir> --reference <dir> [--aov-dir <dir>]
                          --profile <target-profile.json> --out <run-dir>
+                         [--per-frame <file.csv>]
 avgen_quality compare    --runs <run-dir>... --out <report-dir>
+avgen_quality control    --runs <arm-dir>... [--object N] [--band N]
 avgen_quality validate   --ladder            # the §34 distortion ladder, self-contained
 avgen_quality version
 ```
+
+**`control` answers a question no pooled metric can** (ADR-257): does an arm change a surface, or
+only its edges? It splits one object out of the identifier AOV into an eroded **interior** and a
+**silhouette band**, builds the mask from one arm and applies it unchanged to all of them, and prints
+each region's coverage beside every row. Without `--object` it surveys the identifier plane. It
+exists because a benchmark scene claimed a large smooth orb was a control and only its interior was
+one — and because a claim like that is testable, which in this repository means it gets tested rather
+than argued about.
+
+**`--per-frame` exists for the same reason at the other end.** Two arms of one experiment are
+rendered from the same camera at the same times, so their metrics are **paired**; a pooled mean
+cannot say whether an ordering survives frame by frame, and on `aliasing-dolly` one of the three arms
+does not (ADR-257).
 
 **`render` and `experiment` are deliberately not subcommands of the C++ binary.** Rendering is
 `avgen --project … --render …` and batching is `--queue`, both of which exist, are tested, and

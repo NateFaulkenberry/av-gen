@@ -183,3 +183,11 @@ human agrees.**
 coherence: stable under motion — no boiling, crawling or popping?"* — and the fixed review-frame
 list. The human-validation loop (§24) should extend that document, not compete with it. **How often,
 and how much reviewer time it may cost, is the owner's decision**, not the harness's.
+
+⚠ **Run once, and the protocol it produced is written down.** Phase 6
+([ADR-257](../decisions/ADR-257-the-eye-ranked-them-the-way-the-spatial-measure-did.md)) put three
+arms in front of a person, blind, with the prediction registered first; it cost one sitting and six
+questions, and it both validated `spatialLaplacian` and found a mis-specified control that had been
+copied into three files. The rules are [metrics.md §4.4](metrics.md), and the one that is easy to get
+wrong is rule 4: **the control for a human comparison is a duplicated arm, not a region of the
+frame.**

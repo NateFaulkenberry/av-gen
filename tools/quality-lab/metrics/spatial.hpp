@@ -39,7 +39,11 @@ struct Frame {
     }
 };
 
-// Rec.709 luma, 0..1, one plane. Every structural metric works on this.
+// Rec.709 luma over the 8-bit channels, one plane. **The range is 0..255 and not 0..1**: the
+// coefficients are applied to the bytes, so every metric below reports in luma STEPS, which is what
+// their units say and what `spatialLaplacian`'s "0..255 luma" means. The comment here claimed 0..1
+// until 2026-09-17, when a caller believed it and produced a table of luma differences in the tens
+// of thousands.
 [[nodiscard]] std::vector<float> luma(const Frame& frame);
 
 // ---- the metrics -------------------------------------------------------------------------------

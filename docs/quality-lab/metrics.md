@@ -74,7 +74,7 @@ a tail statistic beside its mean.
 
 | field | definition | limitations |
 |---|---|---|
-| `temporalAlternation` | mean and **peak** of \|x(t+1) − 2x(t) + x(t−1)\| over luma, per pixel then pooled — `tools/temporal_stats.py`'s measure | **ADR-243: anti-correlated with human judgment on spatial aliasing over moving geometry.** Never reported without `spatialLaplacian` beside it. Never used alone to choose work |
+| `temporalAlternation` | mean and **peak** of \|x(t+1) − 2x(t) + x(t−1)\| over luma, per pixel then pooled — `tools/temporal_stats.py`'s measure | **ADR-243: anti-correlated with human judgment on a static camera over wind-animated sub-pixel geometry**, where it ranked both remedies backwards. **ADR-257: on a moving camera it does not invert and does not discriminate** — a coin flip (26 of 58 frames) on the arm a blind reviewer called *"immediately obvious"*. Never reported without `spatialLaplacian` beside it. Never used alone to choose work |
 | `motionCompensatedResidual` | \|frame(t+1) − warp(frame(t), velocity(t+1))\| over pixels **not** masked as disoccluded | inherits every velocity-buffer defect; the disocclusion mask is the whole validity of the number |
 | `disocclusionFraction` | the fraction of pixels excluded by that mask | **a diagnostic, not a quality number.** A high value means the residual covers less of the frame, and a residual computed over 4% of the frame is not a statement about the frame |
 
@@ -98,7 +98,7 @@ approximated.
 
 | field | definition | limitations |
 |---|---|---|
-| `spatialLaplacian` | mean \|4c − left − right − up − down\| over luma, interior pixels only — `tools/spatial_stats.py` | **cannot separate aliasing from detail.** Meaningful only between arms of one view; never between scenes; never as an absolute bar |
+| `spatialLaplacian` | mean \|4c − left − right − up − down\| over luma, interior pixels only — `tools/spatial_stats.py` | **cannot separate aliasing from detail.** Meaningful only between arms of one view; never between scenes; never as an absolute bar. **ADR-257: validated against a blind human ranking** of three anti-aliasing arms on a moving camera, matching on both arms and on 60 of 60 frames — with one sensitivity point in each direction and no more: 6.5% invisible at 1× playback, 16.9% *"immediately obvious"* (§4.2) |
 | `detailRetentionRatio` | ratio of radially-averaged power above a cutoff, candidate ÷ reference | > 1 means *more* high-frequency energy than the reference — which is aliasing or sharpening, not detail. **The sign must be read with `flipMean` beside it** |
 | `spatialLaplacianRatio` | `spatialLaplacian(candidate) ÷ spatialLaplacian(reference)` | ⚠ **the sign depends on the scene, measured both ways.** On `examples/quality/aliasing-dolly` — 2 cm fence slats crossing the sampling limit — the candidate is **1.22×** the reference, which is the aliasing the reference resolved away. On a single smooth orb at 96×64 it is **0.82×**, because there is no staircase to resolve and supersampling instead brings more genuine shading detail into the frame. Both are correct measurements of the same quantity. This is why "it cannot separate aliasing from detail" is not a hedge in a header: it flips the comparison's sign |
 | `sharpnessRatio` | mean gradient magnitude ratio — `tools/sharpness.py` | *"a filter that blurs everything scores perfectly on flicker"*; this is the counterweight, and it is a ratio, never an absolute |
@@ -194,7 +194,7 @@ be shown capable of failing; ADR-242's test is the precedent — every assertion
 right answer has, *"because a pass that writes a plausible-looking wrong buffer is the failure this
 repository keeps writing ADRs about."*
 
-### 4.2 The direction check against a human
+### 4.2 The direction check against a human — **and it has now been run twice**
 
 Separate from §4.1 and not replaceable by it. ADR-243's arms are the first regression case the
 Quality Lab must reproduce, because the answer is already known:
@@ -209,11 +209,64 @@ Any composite, any weighting, any new detector that ranks these three in a diffe
 **wrong**, and the fix is the detector. §44: *"Do not 'fix' the human by changing the weighting until
 the human agrees."*
 
+⚠ **This gate is no longer a regression case inherited from another scene.** Phase 6
+([ADR-257](../decisions/ADR-257-the-eye-ranked-them-the-way-the-spatial-measure-did.md)) put the same
+three arms of `examples/quality/aliasing-dolly` in front of a reviewer at 1280×720, **blind**, with
+the prediction registered beforehand, and they ranked **C > B > A** — supersample, baseline, FXAA
+off — which is `spatialLaplacian`'s ordering in both directions:
+
+| arm | `spatialLaplacian` | vs baseline | paired per frame | the reviewer |
+|---|---:|---:|---|---|
+| FXAA off | 9.5991 | **+6.5%** | worse on **60 of 60** frames | *"I would object to the worst clip"* |
+| baseline | 9.0103 | — | — | *"Better"* than FXAA off, in the close-up |
+| supersample 2× | 7.4912 | **−16.9%** | better on **60 of 60** frames | *"Immediately obvious"*, *"Best"*, shippable |
+
+Two things that gate now carries and did not before:
+
+**A sensitivity bracket, with one point in each direction.** The **6.5%** difference was *not* visible
+at 1× playback on a moving camera and *was* visible in a frozen close-up; the **16.9%** difference was
+*"immediately obvious"*. One shot, one reviewer, one sitting. It is a bracket and not a threshold, and
+quoting it as a threshold is the failure §44 is about.
+
+**A resolution qualifier, which is general.** `temporalAlternation` passes this gate at 640×360 and
+fails it at 1280×720 on the same arms and the same window — it calls supersampling worse on 26 of 58
+frames there, a coin flip on the arm the reviewer was surest about. **A metric set must meet §4.2 at
+the delivery resolution.** An instrument's effect size is evidence only at the size it was measured
+at, and a metric validated at preview size has been validated for preview size.
+
 ### 4.3 Where a metric fails the ladder
 
 It is **recorded as a limitation and kept or dropped on the merits**, never quietly reweighted. §34:
 *"Does the metric behave sensibly? If not, document it. Do not force a metric into the system because
 it is popular."*
+
+### 4.4 The human protocol
+
+§4.2 is only worth what the review that produced it was worth, so the review has rules of its own.
+These are what Phase 6 ran; ADR-257 is the record of what each one caught.
+
+1. **The prediction is registered before the reviewer looks.** In writing, with numbers. A metric
+   that is consulted afterwards agrees with everything.
+2. **Blind labels, mapping withheld.** A/B/C, disclosed after the answers are written.
+3. **Distinct sequence hashes.** Two arms that hash identically are void, not equal — and the arms
+   the reviewer watches are the arms that were measured, which is worth checking by re-rendering and
+   comparing the hash rather than assuming.
+4. ⚠ **The control is a duplicated arm, not a region of the frame.** One arm shown twice under two
+   labels: a reviewer who reports a difference between a clip and itself has told you the review's
+   resolution, and nothing else calibrates the other answers. **A region of the frame cannot do this
+   job in an aliasing review** — anything visible has a silhouette, and a silhouette is an edge. The
+   first version of this protocol offered the aliasing scene's smooth orb as the control; the
+   reviewer correctly reported that it differed, and it does (ADR-254's correction).
+5. **Four questions about the footage, asked separately and in this order**: the *ranking*; the
+   *magnitude* and how long it took to be sure; *where* in the frame it was seen; and the *shipping
+   decision* — would you object to any of these. With rule 4's control question and one open field at
+   the end, that is six, which is what Phase 6 cost. The magnitude question is what produced the
+   sensitivity bracket above, and the location question is what makes a ranking checkable against a
+   scene built to put the artifact somewhere specific.
+6. **An invitation to contradict the instructions**, and it must be a real one. Phase 6's control
+   question told the reviewer what it expected them to see and asked them to say so loudly if they
+   disagreed. They did, and they were right, and the instructions were wrong. A review that cannot
+   produce that answer is a review nobody can learn from.
 
 ---
 

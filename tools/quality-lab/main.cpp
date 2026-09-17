@@ -27,13 +27,16 @@
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -58,9 +61,12 @@ struct Args {
     std::string profile;
     std::string scene;
     std::string configuration;
+    std::string perFrame;
     std::string candidateHash;
     std::string referenceHash;
     std::size_t stride = 1;
+    std::size_t band = 2;
+    long long object = -1;
     double fps = 30.0;
     bool ladder = false;
     bool noExternal = false;
@@ -139,6 +145,12 @@ bool parseArgs(int argc, char** argv, Args& args, std::string& error) {
             args.candidateHash = next(i);
         } else if (flag == "--reference-hash") {
             args.referenceHash = next(i);
+        } else if (flag == "--per-frame") {
+            args.perFrame = next(i);
+        } else if (flag == "--band") {
+            args.band = static_cast<std::size_t>(std::max(1, std::atoi(next(i).c_str())));
+        } else if (flag == "--object") {
+            args.object = std::atoll(next(i).c_str());
         } else if (flag == "--stride") {
             args.stride = static_cast<std::size_t>(std::max(1, std::atoi(next(i).c_str())));
         } else if (flag == "--fps") {
@@ -169,9 +181,17 @@ void usage() {
   analyze   --candidate <dir> --reference <dir> --out <run-dir>
             [--aov-dir <dir>] [--profile <target-profile.json>] [--stride N]
             [--fps F] [--scene NAME] [--configuration NAME] [--no-external]
-            [--candidate-hash H] [--reference-hash H]
+            [--candidate-hash H] [--reference-hash H] [--per-frame <file.csv>]
 
   compare   --runs <run-dir> <run-dir> [...] [--out <dir>]
+
+  control   --runs <arm-dir> <arm-dir> [...] [--aov-dir <dir>] [--object N]
+            [--band N] [--out <dir>]
+            Splits one object out of the identifier AOV into INTERIOR and SILHOUETTE-BAND
+            pixels and reports how far each arm's luma moves from the first arm's over each,
+            separately. A scene that calls a shape "the control" is making a claim about
+            where a difference may appear; this is the thing that checks it. Without
+            --object it surveys the identifier plane and prints what it found.
 
   validate  --ladder [--json]
             Runs the distortion ladder and the temporal control arms, and then runs
@@ -399,6 +419,31 @@ int analyze(const Args& args) {
         previousNormal = normal;
     }
 
+    // metrics.md §5 pools and never reports a mean alone, and the pooled fields answer "how bad is
+    // the worst frame". They do not answer "is arm A worse than arm B on THIS frame", which is a
+    // different and stronger question: two arms of one experiment are rendered from the same
+    // camera at the same times, so their metrics are PAIRED, and a difference of means that does
+    // not survive the pairing is a difference nobody can act on. `--per-frame` writes the series
+    // the pooling consumed, so the pairing can be done outside this tool.
+    if (!args.perFrame.empty()) {
+        std::ofstream csv(args.perFrame);
+        if (!csv) {
+            std::cerr << fmt::format("cannot write '{}'\n", args.perFrame);
+            return 1;
+        }
+        csv << "frame,spatialLaplacian,spatialLaplacianRatio,msSsim,temporalAlternation\n";
+        for (std::size_t i = 0; i < analysed.size(); ++i) {
+            csv << analysed[i] << ',' << fmt::format("{:.6f}", series.laplacianCandidate[i]) << ','
+                << fmt::format("{:.6f}", series.laplacianRatio[i]) << ','
+                << fmt::format("{:.6f}", series.msSsim[i]) << ',';
+            // alternation needs three frames, so its first value belongs to the third analysed one
+            if (i >= 2 && (i - 2) < series.alternation.size()) {
+                csv << fmt::format("{:.6f}", series.alternation[i - 2]);
+            }
+            csv << '\n';
+        }
+    }
+
     Report report;
     report.schemaVersion = kSchemaVersion;
     report.run.id = nowIso8601();
@@ -437,7 +482,13 @@ int analyze(const Args& args) {
         "detail.spatialLaplacian", "mean |4c-l-r-u-d| on 0..255 luma", "candidate PNG",
         "mean over frames", series.laplacianCandidate, true,
         {"cannot separate aliasing from detail. Meaningful only between arms of one view; never "
-         "between scenes; never as an absolute bar (ADR-243, tools/spatial_stats.py)"}));
+         "between scenes; never as an absolute bar (ADR-243, tools/spatial_stats.py)",
+         "ADR-257: this is the one metric here validated against a person. A blind reviewer ranked "
+         "three anti-aliasing arms on a moving camera in this metric's order, in both directions, "
+         "and it holds frame by frame on 60 of 60 frames",
+         "its sensitivity has ONE calibration point in each direction and is a bracket, not a "
+         "threshold: a 6.5% difference was invisible at 1x playback on a moving camera (visible in "
+         "a frozen close-up) and a 16.9% difference was 'immediately obvious'"}));
     report.add(makeMetric("detail.spatialLaplacianRatio", "ratio candidate/reference", pngPair,
                           "mean over frames", series.laplacianRatio, true,
                           {"above 1 means the candidate carries MORE high-frequency energy than a "
@@ -457,9 +508,18 @@ int analyze(const Args& args) {
         report.add(makeMetric(
             "temporal.temporalAlternation", "luma steps 0..255", "candidate PNG sequence",
             "mean over frames", series.alternation, true,
-            {"ADR-243: anti-correlated with human judgement on spatial aliasing over moving "
-             "geometry. Never reported without detail.spatialLaplacian beside it, and never used "
-             "alone to choose work",
+            {"ADR-243: anti-correlated with human judgement on a STATIC camera over "
+             "wind-animated sub-pixel geometry, where it ranked both remedies backwards. Never "
+             "reported without detail.spatialLaplacian beside it, and never used alone to choose "
+             "work",
+             "ADR-257: on a MOVING camera it does not invert -- and it does not discriminate "
+             "either. On the three aliasing-dolly arms at 1280x720 it separated FXAA-off from the "
+             "baseline on 58 of 58 frames by 0.6%, and called the supersampled arm -- the one a "
+             "blind reviewer called 'immediately obvious' and best -- WORSE on 26 of 58. Where the "
+             "eye was most certain this number is a coin flip",
+             "its effect size is a property of the render size: the same arms separate 4x more "
+             "strongly at 640x360 than at 1280x720, so a direction check passed at preview "
+             "resolution has been passed for preview resolution (ADR-253's follow-up)",
              "authored smooth motion produces a LARGE value: the second difference in time of "
              "translating content is not zero"}));
         report.add(makeMetric("temporal.temporalAlternationPeak", "luma steps 0..255",
@@ -925,6 +985,315 @@ int compare(const Args& args) {
     return 0;
 }
 
+// ---- control -----------------------------------------------------------------------------------
+//
+// **A scene that calls a shape "the control" is making a claim, and the claim is testable.**
+// `examples/quality/aliasing*.scene.json` calls its large smooth orb a control -- "it cannot alias,
+// so a metric that moves on this scene's arms must not be moving here" -- and half of that is
+// wrong: a sphere's *interior shading* is unaffected by anti-aliasing and its *silhouette* is a
+// curved edge like any other, affected exactly as much as the fence is. The half that is true is
+// the half this subcommand can isolate, so it isolates it rather than arguing about it.
+//
+// The split comes from the identifier AOV, which is exact (R32Uint), and is built ONCE from the
+// first arm and applied unchanged to every arm -- the arms differ only in how the renderer filtered
+// the same geometry, so a mask rebuilt per arm would be a different mask per arm and the comparison
+// would no longer be a comparison.
+//
+// Two guards, both ADR-182: the interior mask and the band mask must each be non-empty and neither
+// may be the whole frame, and a **temporal control** is reported beside every row -- the same masks
+// applied to consecutive frames of the first arm, which must be clearly non-zero. An interior that
+// cannot differ between arms because nothing in it can differ at all is the reassuring null result
+// this repository keeps writing ADRs about.
+
+struct RegionRow {
+    std::vector<double> interiorMean;
+    std::vector<double> interiorMax;
+    std::vector<double> bandMean;
+    std::vector<double> bandMax;
+    std::vector<double> elsewhereMean;
+};
+
+double meanOf(const std::vector<double>& values) {
+    if (values.empty()) {
+        return 0.0;
+    }
+    double sum = 0.0;
+    for (const double v : values) {
+        sum += v;
+    }
+    return sum / static_cast<double>(values.size());
+}
+
+double maxOf(const std::vector<double>& values) {
+    double m = 0.0;
+    for (const double v : values) {
+        m = std::max(m, v);
+    }
+    return m;
+}
+
+int control(const Args& args) {
+    if (args.runs.size() < 2 && args.object >= 0) {
+        std::cerr << "control needs at least two --runs directories to compare\n";
+        return 2;
+    }
+    if (args.runs.empty()) {
+        std::cerr << "control needs --runs\n";
+        return 2;
+    }
+    std::vector<Sequence> sequences;
+    for (const std::string& run : args.runs) {
+        auto sequence = discoverSequence(run);
+        if (!sequence) {
+            std::cerr << sequence.error().message << "\n";
+            return 1;
+        }
+        if (sequence->empty()) {
+            std::cerr << fmt::format("'{}' has no frames\n", run);
+            return 1;
+        }
+        sequences.push_back(std::move(*sequence));
+    }
+    std::size_t frames = sequences[0].size();
+    for (const Sequence& sequence : sequences) {
+        frames = std::min(frames, sequence.size());
+    }
+
+    // The identifier AOV comes from ONE arm and is applied to all of them.
+    std::vector<fs::path> idFrames;
+    if (args.aovDir.empty()) {
+        for (std::size_t i = 0; i < frames; ++i) {
+            idFrames.push_back(sequences[0].frames[i]);
+        }
+    } else {
+        auto aovSequence = discoverSequence(args.aovDir);
+        if (!aovSequence || aovSequence->size() < frames) {
+            std::cerr << fmt::format("--aov-dir '{}' does not carry {} frames\n", args.aovDir,
+                                     frames);
+            return 1;
+        }
+        for (std::size_t i = 0; i < frames; ++i) {
+            idFrames.push_back(aovSequence->frames[i]);
+        }
+    }
+    if (!hasAov(idFrames[0], "id")) {
+        std::cerr << fmt::format(
+            "no id AOV beside '{}'. Render the arm the mask comes from with --aov id: without an "
+            "identifier plane there is no object to split and every number below would be about "
+            "the whole frame\n",
+            idFrames[0].string());
+        return 1;
+    }
+
+    // ---- the survey. Also the non-vacuity evidence: an identifier plane of one constant produces
+    // a mask of everything or a mask of nothing, and both look like a working detector.
+    auto firstId = readPlane(aovPathFor(idFrames[0], "id"));
+    if (!firstId) {
+        std::cerr << firstId.error().message << "\n";
+        return 1;
+    }
+    const IdentifierSurvey survey = surveyIdentifiers(*firstId);
+    if (!survey.usable()) {
+        std::cerr << fmt::format("the identifier plane has {} distinct value(s): every mask built "
+                                 "from it is everything or nothing (ADR-242's test, inherited)\n",
+                                 survey.distinctValues);
+        return 1;
+    }
+    if (args.object < 0) {
+        struct ObjectExtent {
+            std::size_t pixels = 0;
+            std::uint32_t material = 0;
+            std::uint32_t minX = 0xffffffffu;
+            std::uint32_t minY = 0xffffffffu;
+            std::uint32_t maxX = 0;
+            std::uint32_t maxY = 0;
+        };
+        std::map<std::uint32_t, ObjectExtent> counts;
+        for (std::uint32_t y = 0; y < firstId->height; ++y) {
+            for (std::uint32_t x = 0; x < firstId->width; ++x) {
+                const float packed = firstId->at(x, y)[0];
+                if (packed == 0.0f) {
+                    continue;
+                }
+                ObjectExtent& extent = counts[objectIdOf(packed)];
+                ++extent.pixels;
+                extent.material = materialIdOf(packed);
+                extent.minX = std::min(extent.minX, x);
+                extent.minY = std::min(extent.minY, y);
+                extent.maxX = std::max(extent.maxX, x);
+                extent.maxY = std::max(extent.maxY, y);
+            }
+        }
+        std::vector<std::pair<std::uint32_t, ObjectExtent>> ordered(counts.begin(), counts.end());
+        std::sort(ordered.begin(), ordered.end(),
+                  [](const auto& a, const auto& b) { return a.second.pixels > b.second.pixels; });
+        const double total = static_cast<double>(firstId->width) * firstId->height;
+        std::cout << fmt::format(
+            "{}: {} distinct identifiers, background {:.2f}% of the frame\n\n",
+            aovPathFor(idFrames[0], "id").filename().string(), survey.distinctValues,
+            survey.backgroundFraction * 100.0);
+        // The bounding box and the fill are how you tell a compact object from a scattered one:
+        // a sphere fills most of its box, and an array of 160 fence slats fills almost none of it.
+        std::cout << fmt::format("{:>10}{:>10}{:>10}{:>9}{:>22}{:>7}\n", "object", "material",
+                                 "pixels", "of frame", "bounding box", "fill");
+        for (std::size_t i = 0; i < ordered.size() && i < 16; ++i) {
+            const ObjectExtent& e = ordered[i].second;
+            const double box = static_cast<double>(e.maxX - e.minX + 1) *
+                               static_cast<double>(e.maxY - e.minY + 1);
+            std::cout << fmt::format(
+                "{:>10}{:>10}{:>10}{:>8.3f}%{:>22}{:>6.2f}\n", ordered[i].first, e.material,
+                e.pixels, 100.0 * static_cast<double>(e.pixels) / total,
+                fmt::format("({},{})-({},{})", e.minX, e.minY, e.maxX, e.maxY),
+                static_cast<double>(e.pixels) / box);
+        }
+        std::cout << "\npass one of these to --object.\n";
+        return 0;
+    }
+
+    const auto objectId = static_cast<std::uint32_t>(args.object);
+    const int band = static_cast<int>(args.band);
+    RegionRow zero;
+    std::vector<RegionRow> rows(sequences.size(), zero);
+    RegionRow temporalControl; // the first arm against its own previous frame, same masks
+    std::vector<double> interiorCoverage;
+    std::vector<double> bandCoverage;
+    std::vector<double> objectCoverage;
+    Frame previousBaseline;
+    std::size_t framesMeasured = 0;
+    std::size_t framesWithoutObject = 0;
+
+    for (std::size_t i = 0; i < frames; ++i) {
+        auto idPlane = readPlane(aovPathFor(idFrames[i], "id"));
+        if (!idPlane) {
+            std::cerr << idPlane.error().message << "\n";
+            return 1;
+        }
+        std::vector<Frame> armFrames;
+        for (const Sequence& sequence : sequences) {
+            auto frame = readFrame(sequence.frames[i]);
+            if (!frame) {
+                std::cerr << frame.error().message << "\n";
+                return 1;
+            }
+            if (frame->width != idPlane->width || frame->height != idPlane->height) {
+                std::cerr << fmt::format(
+                    "frame {} is {}x{} and the identifier plane is {}x{}: the mask would be "
+                    "measuring different pixels than the arms\n",
+                    i, frame->width, frame->height, idPlane->width, idPlane->height);
+                return 1;
+            }
+            armFrames.push_back(std::move(*frame));
+        }
+
+        const SilhouetteSplit split = splitSilhouette(*idPlane, objectId, band);
+        const double interiorFraction = coverage(split.interior);
+        const double rimFraction = coverage(split.band);
+        if (interiorFraction <= 0.0 || rimFraction <= 0.0) {
+            ++framesWithoutObject;
+            continue;
+        }
+        interiorCoverage.push_back(interiorFraction);
+        bandCoverage.push_back(rimFraction);
+        objectCoverage.push_back(coverage(split.object));
+
+        for (std::size_t k = 0; k < sequences.size(); ++k) {
+            const MaskedDifference inside =
+                maskedLumaDifference(armFrames[k], armFrames[0], split.interior);
+            const MaskedDifference edge =
+                maskedLumaDifference(armFrames[k], armFrames[0], split.band);
+            const MaskedDifference rest =
+                maskedLumaDifference(armFrames[k], armFrames[0], split.elsewhere);
+            rows[k].interiorMean.push_back(inside.mean);
+            rows[k].interiorMax.push_back(inside.max);
+            rows[k].bandMean.push_back(edge.mean);
+            rows[k].bandMax.push_back(edge.max);
+            rows[k].elsewhereMean.push_back(rest.mean);
+        }
+        if (previousBaseline.valid()) {
+            const MaskedDifference inside =
+                maskedLumaDifference(armFrames[0], previousBaseline, split.interior);
+            const MaskedDifference edge =
+                maskedLumaDifference(armFrames[0], previousBaseline, split.band);
+            const MaskedDifference rest =
+                maskedLumaDifference(armFrames[0], previousBaseline, split.elsewhere);
+            temporalControl.interiorMean.push_back(inside.mean);
+            temporalControl.interiorMax.push_back(inside.max);
+            temporalControl.bandMean.push_back(edge.mean);
+            temporalControl.bandMax.push_back(edge.max);
+            temporalControl.elsewhereMean.push_back(rest.mean);
+        }
+        previousBaseline = armFrames[0];
+        ++framesMeasured;
+    }
+
+    if (framesMeasured == 0) {
+        std::cerr << fmt::format("object {} produced no frame with both an interior and a "
+                                 "silhouette band at band={} px. Nothing was measured\n",
+                                 objectId, band);
+        return 1;
+    }
+
+    std::cout << fmt::format(
+        "\nobject {} over {} frame(s){}, band {} px, mask from '{}'\n", objectId, framesMeasured,
+        framesWithoutObject == 0
+            ? std::string{}
+            : fmt::format(" ({} skipped: the object had no interior or no band in them)",
+                          framesWithoutObject),
+        band, args.aovDir.empty() ? args.runs[0] : args.aovDir);
+    std::cout << fmt::format(
+        "coverage: object {:.3f}%   interior {:.3f}%   silhouette band {:.3f}%   of the frame\n",
+        meanOf(objectCoverage) * 100.0, meanOf(interiorCoverage) * 100.0,
+        meanOf(bandCoverage) * 100.0);
+    std::cout << "every number is |luma difference| in steps 0..255, against the FIRST arm\n\n";
+    std::cout << fmt::format("{:<26}{:>12}{:>12}{:>12}{:>12}{:>12}\n", "arm", "interior",
+                             "int. max", "band", "band max", "elsewhere");
+    for (std::size_t k = 0; k < sequences.size(); ++k) {
+        std::cout << fmt::format("{:<26}{:>12.4f}{:>12.4f}{:>12.4f}{:>12.4f}{:>12.4f}\n",
+                                 fs::path(args.runs[k]).filename().string(),
+                                 meanOf(rows[k].interiorMean), maxOf(rows[k].interiorMax),
+                                 meanOf(rows[k].bandMean), maxOf(rows[k].bandMax),
+                                 meanOf(rows[k].elsewhereMean));
+    }
+    std::cout << fmt::format(
+        "\n{:<26}{:>12.4f}{:>12.4f}{:>12.4f}{:>12.4f}{:>12.4f}\n", "CONTROL frame-to-frame",
+        meanOf(temporalControl.interiorMean), maxOf(temporalControl.interiorMax),
+        meanOf(temporalControl.bandMean), maxOf(temporalControl.bandMax),
+        meanOf(temporalControl.elsewhereMean));
+    std::cout << "  the first arm against its own previous frame, over the same masks. It is what\n"
+                 "  makes an interior row of zero a statement about the arms rather than about a\n"
+                 "  region where nothing can change (ADR-182).\n";
+
+    if (!args.out.empty()) {
+        nlohmann::ordered_json out;
+        out["schemaVersion"] = kSchemaVersion;
+        out["object"] = objectId;
+        out["bandPixels"] = band;
+        out["framesMeasured"] = framesMeasured;
+        out["unit"] = "luma steps 0..255, |arm - first arm|";
+        out["coverage"] = {{"object", meanOf(objectCoverage)},
+                           {"interior", meanOf(interiorCoverage)},
+                           {"silhouetteBand", meanOf(bandCoverage)}};
+        out["note"] = "the mask is built from ONE arm's identifier AOV and applied unchanged to "
+                      "every arm; a mask rebuilt per arm would be a different mask per arm";
+        for (std::size_t k = 0; k < sequences.size(); ++k) {
+            out["arms"][args.runs[k]] = {{"interiorMean", meanOf(rows[k].interiorMean)},
+                                         {"interiorMax", maxOf(rows[k].interiorMax)},
+                                         {"bandMean", meanOf(rows[k].bandMean)},
+                                         {"bandMax", maxOf(rows[k].bandMax)},
+                                         {"elsewhereMean", meanOf(rows[k].elsewhereMean)}};
+        }
+        out["frameToFrameControl"] = {{"interiorMean", meanOf(temporalControl.interiorMean)},
+                                      {"interiorMax", maxOf(temporalControl.interiorMax)},
+                                      {"bandMean", meanOf(temporalControl.bandMean)},
+                                      {"bandMax", maxOf(temporalControl.bandMax)}};
+        std::error_code ec;
+        fs::create_directories(args.out, ec);
+        std::ofstream file(fs::path(args.out) / "control.json");
+        file << out.dump(2) << "\n";
+    }
+    return 0;
+}
+
 // ---- validate ----------------------------------------------------------------------------------
 
 void printLadder(const LadderResult& result) {
@@ -1048,6 +1417,9 @@ int main(int argc, char** argv) {
     }
     if (args.command == "compare") {
         return compare(args);
+    }
+    if (args.command == "control") {
+        return control(args);
     }
     if (args.command == "validate") {
         return validate(args);
