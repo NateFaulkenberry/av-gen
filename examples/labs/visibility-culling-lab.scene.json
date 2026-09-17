@@ -1,0 +1,234 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Visibility / Culling Lab",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   32.0,
+   40.0
+  ],
+  "target": [
+   0.0,
+   32.0,
+   -40.0
+  ],
+  "fov": 50.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0.02,
+   0.03,
+   0.05
+  ],
+  "skyIntensity": 0.35,
+  "lightFromEnvironment": true,
+  "fogDensity": 0.0,
+  "volumeDensity": 0.0
+ },
+ "lights": [
+  {
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    -0.35,
+    -0.72,
+    -0.6
+   ],
+   "color": [
+    1.0,
+    0.97,
+    0.92
+   ],
+   "intensity": 4.0,
+   "castsShadow": true
+  }
+ ],
+ "nodes": [
+  {
+   "name": "vislab",
+   "kind": "terrain",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "terrain": {
+    "chunkSize": 48.0,
+    "resolution": 40,
+    "lodLevels": 4,
+    "lodDistance": 86.0,
+    "viewDistance": 640.0,
+    "shadowDistance": 150.0,
+    "skirtDepth": 1.2,
+    "groundMottle": false,
+    "groundGlow": 0.0
+   },
+   "world": {
+    "name": "visibility-lab",
+    "seed": 20260917,
+    "size": [
+     640.0,
+     640.0
+    ],
+    "baseHeight": 0.0,
+    "erosion": 0.0,
+    "seaLevel": -1000.0,
+    "moistureReach": 110.0,
+    "lowlandMoisture": 0.35,
+    "layers": [
+     {
+      "frequency": 0.004,
+      "amplitude": 0.0
+     }
+    ],
+    "features": []
+   },
+   "scatter": [
+    {
+     "name": "large-tree",
+     "asset": "../../assets/quaternius/glTF/CommonTree_1.gltf",
+     "densities": {
+      "marsh": 0.0022,
+      "meadow": 0.0022,
+      "forest": 0.0022,
+      "scree": 0.0022,
+      "rim": 0.0022
+     },
+     "height": 14.0,
+     "minScale": 1.0,
+     "maxScale": 1.0,
+     "sink": 0.1,
+     "randomYaw": 1.0,
+     "clustering": 0.0,
+     "seed": 31,
+     "maxInstances": 4000,
+     "meshBudget": 900,
+     "viewDistance": 520.0,
+     "minScreenRadius": 1.0,
+     "castsShadow": true
+    },
+    {
+     "name": "small-tree",
+     "asset": "../../assets/quaternius/glTF/TwistedTree_2.gltf",
+     "densities": {
+      "marsh": 0.0016,
+      "meadow": 0.0016,
+      "forest": 0.0016,
+      "scree": 0.0016,
+      "rim": 0.0016
+     },
+     "height": 3.5,
+     "minScale": 1.0,
+     "maxScale": 1.0,
+     "sink": 0.1,
+     "randomYaw": 1.0,
+     "clustering": 0.0,
+     "seed": 47,
+     "maxInstances": 4000,
+     "meshBudget": 700,
+     "viewDistance": 520.0,
+     "minScreenRadius": 1.0,
+     "castsShadow": true
+    },
+    {
+     "name": "elongated",
+     "asset": "../../assets/quaternius/glTF/Plant_1_Big.gltf",
+     "densities": {
+      "marsh": 0.0012,
+      "meadow": 0.0012,
+      "forest": 0.0012,
+      "scree": 0.0012,
+      "rim": 0.0012
+     },
+     "height": 4.0,
+     "minScale": 1.0,
+     "maxScale": 1.0,
+     "sink": 0.1,
+     "randomYaw": 1.0,
+     "clustering": 0.0,
+     "seed": 53,
+     "maxInstances": 4000,
+     "meshBudget": 280,
+     "viewDistance": 300.0,
+     "minScreenRadius": 1.0,
+     "castsShadow": true
+    },
+    {
+     "name": "irregular",
+     "asset": "../../assets/quaternius/glTF/Rock_Medium_1.gltf",
+     "densities": {
+      "marsh": 0.0018,
+      "meadow": 0.0018,
+      "forest": 0.0018,
+      "scree": 0.0018,
+      "rim": 0.0018
+     },
+     "height": 2.2,
+     "minScale": 1.0,
+     "maxScale": 1.0,
+     "sink": 0.1,
+     "randomYaw": 1.0,
+     "clustering": 0.0,
+     "seed": 59,
+     "maxInstances": 4000,
+     "meshBudget": 180,
+     "viewDistance": 260.0,
+     "minScreenRadius": 2.4,
+     "castsShadow": true
+    },
+    {
+     "name": "tiny",
+     "asset": "../../assets/quaternius/glTF/Pebble_Round_2.gltf",
+     "densities": {
+      "marsh": 0.006,
+      "meadow": 0.006,
+      "forest": 0.006,
+      "scree": 0.006,
+      "rim": 0.006
+     },
+     "height": 0.28,
+     "minScale": 1.0,
+     "maxScale": 1.0,
+     "sink": 0.1,
+     "randomYaw": 1.0,
+     "clustering": 0.0,
+     "seed": 61,
+     "maxInstances": 4000,
+     "meshBudget": 90,
+     "viewDistance": 300.0,
+     "minScreenRadius": 4.0,
+     "castsShadow": false
+    },
+    {
+     "name": "scaled",
+     "asset": "../../assets/quaternius/glTF/CommonTree_1.gltf",
+     "densities": {
+      "marsh": 0.0008,
+      "meadow": 0.0008,
+      "forest": 0.0008,
+      "scree": 0.0008,
+      "rim": 0.0008
+     },
+     "height": 10.0,
+     "minScale": 0.35,
+     "maxScale": 2.4,
+     "sink": 0.1,
+     "randomYaw": 1.0,
+     "clustering": 0.0,
+     "seed": 67,
+     "maxInstances": 4000,
+     "meshBudget": 900,
+     "viewDistance": 520.0,
+     "minScreenRadius": 1.0,
+     "castsShadow": true
+    }
+   ]
+  }
+ ],
+ "wind": {
+  "speed": 0.0
+ }
+}

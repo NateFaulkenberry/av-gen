@@ -72,6 +72,12 @@ target_sources(avgen_tests PRIVATE
     # risk lives in the hysteresis and it has to be checkable without rendering anything.
     "${CMAKE_SOURCE_DIR}/src/rendering/importance.cpp"
     "${CMAKE_SOURCE_DIR}/src/rendering/representation.cpp"
+    # The culling decision and its reason codes (Visibility / Culling Lab). Same shape and the same
+    # reason as the three selectors above: whether an instance is drawn is arithmetic over a camera,
+    # a bounding sphere and a set of limits, and the bug that put this file here -- a cull sphere
+    # that did not contain the tree it was culling -- is provable from the asset's own bounds with
+    # no device in the room. It is also compiled into avgen_gpu, where the renderer calls it.
+    "${CMAKE_SOURCE_DIR}/src/rendering/visibility.cpp"
     # Phase D's third selector (ADR-133). Same shape and the same reason: the tier a drawable shades
     # at is pure arithmetic over an importance record and a policy.
     "${CMAKE_SOURCE_DIR}/src/rendering/material_tier.cpp"
