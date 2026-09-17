@@ -3371,7 +3371,9 @@ void ControlPanel::drawCameras(app::Engine& engine) {
             if (!rig.eventScenario.empty()) {
                 ImGui::TextDisabled("watches the '%s' scenario", rig.eventScenario.c_str());
             }
-            if (ImGui::Button("Add shot at the playhead")) {
+            // "Cut to", not "Add shot": this list is the camera track and the word `shot` already
+            // means something else two panels away. See the note on the heading below.
+            if (ImGui::Button("Cut to this camera at the playhead")) {
                 scene::CameraShot shot;
                 shot.camera = rig.id;
                 shot.startSeconds = engine.timelineClock().seconds;
@@ -3386,25 +3388,70 @@ void ControlPanel::drawCameras(app::Engine& engine) {
 
     if (!direction.shots.empty()) {
         ImGui::Separator();
-        ImGui::TextUnformatted("Shots");
+        // ---- this list is not the sequencer's shot list ------------------------------------------
+        //
+        // It was called "Shots", and so is the sequencer's lane, and they are different things:
+        //
+        //   scene::CameraShot  -- {camera, span, transition, locked}. WHICH CAMERA IS LIVE.
+        //   seq::Shot          -- {scene, camera move, tracks, transitions}. WHAT THE SHOT IS.
+        //
+        // In a multi-camera piece one sequencer shot can legitimately span several camera cuts, and
+        // one camera can legitimately stay live across several sequencer shots, so ADR-245 keeps
+        // them apart on purpose and neither is derivable from the other.
+        //
+        // Reported as a disagreement -- "the shots list has incorrect start times", "clicking one
+        // jumps the playhead to the wrong spot" -- and both halves of that were the same mistake:
+        // two lists wearing one word. The row was going to the right place; it was not the place the
+        // name promised. So the name changes, and every row that does not line up with a sequencer
+        // shot says so, because a drift you cannot see is a drift you cannot fix.
+        ImGui::TextUnformatted("Camera track");
+        ImGui::TextDisabled("Which camera is live, and when. Not the sequencer's shot list:\n"
+                            "a sequencer shot is the framing, a row here is the cut.");
+        const std::vector<seq::Shot>& pieceShots = engine.sequence().shots;
         for (std::size_t i = 0; i < direction.shots.size(); ++i) {
             const scene::CameraShot& shot = direction.shots[i];
             ImGui::PushID(static_cast<int>(i));
             // Clickable: a row is a moment in the piece, and the useful thing to do with a moment is
             // go to it. Selectable rather than Text so the whole row is the target -- a row you have
             // to hit a word inside is a row people miss.
-            char row[160];
-            std::snprintf(row, sizeof(row), "%6.2f - %6.2f  %s  %s%s", shot.startSeconds,
+            // How this cut sits against the sequencer's shots. Silence when they agree, which is
+            // the common case and the one that deserves no ink.
+            const auto agrees = [&](const seq::Shot& s) {
+                constexpr double kSame = 0.05; // a frame and a half at 30 fps
+                return std::abs(s.startSeconds - shot.startSeconds) < kSame &&
+                       std::abs(s.endSeconds() - shot.endSeconds) < kSame;
+            };
+            std::size_t covered = 0;
+            bool exact = false;
+            for (const seq::Shot& s : pieceShots) {
+                if (s.startSeconds < shot.endSeconds - 1e-6 && s.endSeconds() > shot.startSeconds + 1e-6) {
+                    ++covered;
+                    exact = exact || agrees(s);
+                }
+            }
+            const char* drift = "";
+            if (pieceShots.empty()) {
+                drift = ""; // nothing to disagree with
+            } else if (covered == 0) {
+                drift = "  -- no shot here";
+            } else if (!exact) {
+                drift = covered == 1 ? "  -- offset from its shot" : "  -- spans several shots";
+            }
+            char row[224];
+            std::snprintf(row, sizeof(row), "%6.2f - %6.2f  %s  %s%s%s", shot.startSeconds,
                           shot.endSeconds, direction.nameOf(shot.camera).c_str(),
                           scene::shotTransitionName(shot.transition),
-                          shot.locked ? "  locked" : "");
+                          shot.locked ? "  locked" : "", drift);
             const double now = engine.timelineClock().seconds;
             const bool live = now >= shot.startSeconds && now < shot.endSeconds;
             if (ImGui::Selectable(row, live, ImGuiSelectableFlags_AllowOverlap)) {
                 engine.seekSeconds(shot.startSeconds);
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Go to the start of this shot.");
+                ImGui::SetTooltip("Go to %.2fs, where this camera becomes live.\n"
+                                  "That is this cut's own start, which need not be a sequencer\n"
+                                  "shot's start -- the two lists are different things.",
+                                  shot.startSeconds);
             }
             ImGui::SameLine();
             if (ImGui::SmallButton("x")) {

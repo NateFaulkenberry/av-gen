@@ -1290,6 +1290,115 @@ Result<void> Composition::setHeroes(std::vector<world::HeroPoint> heroes) {
 //
 // A hero that names an assembly rather than a node has no anchor and is left alone; there is no one
 // object whose movement would be the assembly's.
+void Composition::recordFollowTrails() {
+    // What has to be remembered, and for how long. Collected from the rigs each frame rather than
+    // cached, because a rig's lag is a parameter somebody can change mid-session and a trail sized
+    // against a stale lag is a chase that silently stops lagging.
+    double longest = 0.0;
+    std::vector<const std::string*> wanted;
+    for (const CameraRig& rig : cameraDirection_.cameras) {
+        if (rig.followNode.empty() || rig.followLagSeconds <= 0.0) {
+            continue;
+        }
+        longest = std::max(longest, rig.followLagSeconds);
+        if (std::none_of(wanted.begin(), wanted.end(),
+                         [&](const std::string* n) { return *n == rig.followNode; })) {
+            wanted.push_back(&rig.followNode);
+        }
+    }
+    if (wanted.empty()) {
+        // Nothing chases anything. Release rather than leave, so switching a chase off stops paying
+        // for it immediately instead of at the next scene load.
+        followTrails_.clear();
+        return;
+    }
+
+    // A margin over the longest lag, so a query lands inside the samples rather than on the oldest
+    // one; and a ceiling, because a lag of an hour is a typo and not a request.
+    const double keep = std::min(longest + 1.0, 60.0);
+
+    for (const std::string* name : wanted) {
+        auto it = std::find_if(followTrails_.begin(), followTrails_.end(),
+                               [&](const FollowTrail& t) { return t.node == *name; });
+        if (it == followTrails_.end()) {
+            followTrails_.push_back(FollowTrail{.node = *name, .samples = {}});
+            it = std::prev(followTrails_.end());
+        }
+        const CompositionNode* node = findNode(*name);
+        if (node == nullptr) {
+            continue; // a chase whose subject left the scene keeps the trail it had
+        }
+        const Transform world = nodeWorldTransform(*node);
+        // A seek is a discontinuity in a record of *when things were*, not a gap to interpolate
+        // across: time going backwards, or forwards by more than a long frame, means the samples
+        // after it do not describe the same play-through as the ones before. Dropping the old ones
+        // is what stops a chase interpolating the subject across a cut in time.
+        if (!it->samples.empty()) {
+            const double last = it->samples.back().seconds;
+            if (currentTime_ < last || currentTime_ - last > 0.5) {
+                it->samples.clear();
+                followTrailShortReported_ = false;
+            }
+        }
+        it->samples.push_back(FollowTrail::Sample{.seconds = currentTime_,
+                                                  .position = world.position,
+                                                  .rotation = world.rotation});
+        const auto stale = std::find_if(it->samples.begin(), it->samples.end(),
+                                        [&](const FollowTrail::Sample& sm) {
+                                            return sm.seconds >= currentTime_ - keep;
+                                        });
+        if (stale != it->samples.begin()) {
+            // One sample before the window is kept deliberately: a query at exactly the window's
+            // edge needs something on both sides of it to interpolate between.
+            it->samples.erase(it->samples.begin(), std::prev(stale));
+        }
+    }
+
+    // Trails nobody chases any more.
+    std::erase_if(followTrails_, [&](const FollowTrail& t) {
+        return std::none_of(wanted.begin(), wanted.end(),
+                            [&](const std::string* n) { return *n == t.node; });
+    });
+}
+
+FollowTrail::Sample Composition::followTrailAt(const std::string& node, double seconds,
+                                               const FollowTrail::Sample& fallback) const {
+    const auto trail = std::find_if(followTrails_.begin(), followTrails_.end(),
+                                    [&](const FollowTrail& t) { return t.node == node; });
+    if (trail == followTrails_.end() || trail->samples.empty()) {
+        return fallback;
+    }
+    const std::vector<FollowTrail::Sample>& s = trail->samples;
+    if (seconds <= s.front().seconds) {
+        // Before anything this play-through has seen. The camera runs un-lagged rather than
+        // pretending, and says so once -- an un-lagged chase looks exactly like a working one, so
+        // nothing but a log line distinguishes "the lag is not ready" from "the lag is zero".
+        if (!followTrailShortReported_) {
+            followTrailShortReported_ = true;
+            log::info("chase: '{}' has no trail back to {:.2f}s yet; the camera runs un-lagged "
+                      "until it does (the head of a render, or just after a seek)",
+                      node, seconds);
+        }
+        return fallback;
+    }
+    if (seconds >= s.back().seconds) {
+        return s.back();
+    }
+    const auto after = std::lower_bound(s.begin(), s.end(), seconds,
+                                        [](const FollowTrail::Sample& sm, double t) {
+                                            return sm.seconds < t;
+                                        });
+    const FollowTrail::Sample& b = *after;
+    const FollowTrail::Sample& a = *std::prev(after);
+    const double span = b.seconds - a.seconds;
+    const float u = span > 1e-9 ? static_cast<float>((seconds - a.seconds) / span) : 0.0f;
+    FollowTrail::Sample out;
+    out.seconds = seconds;
+    out.position = glm::mix(a.position, b.position, u);
+    out.rotation = glm::slerp(a.rotation, b.rotation, u);
+    return out;
+}
+
 void Composition::syncHeroesToNodes() {
     if (heroes_.empty()) {
         return;
@@ -4106,6 +4215,9 @@ void Composition::update(const FrameTime& time) {
     // After the parameters, because a node's position is one of them: a hero follows the object it
     // describes, and where that object is has only just been decided for this frame.
     syncHeroesToNodes();
+    // The chase trails, recorded at the same moment and for the same reason: this is the frame at
+    // which where a node *is* has stopped being a question.
+    recordFollowTrails();
     // And after *that*, because the aim follows where the hero is now. Putting it inside
     // `applyParameters` would have aimed at last frame's position, which is a lag nobody would ever
     // see and a wrongness anybody could later trip over.
@@ -4318,7 +4430,39 @@ CameraPose Composition::evaluateAuthoredCamera(const CameraRig& rig, const Camer
     // charge rather than sending the camera to the origin.
     if (!rig.followNode.empty()) {
         if (const CompositionNode* node = findNode(rig.followNode); node != nullptr) {
-            pose.position = nodeWorldTransform(*node).position + rig.followOffset;
+            const Transform now = nodeWorldTransform(*node);
+            // Where the subject is, or -- for a chase -- where it was. Both the position and the
+            // facing come from the same instant, so a camera behind a turning subject stays behind
+            // the heading it had then rather than snapping to the one it has now.
+            FollowTrail::Sample at{.seconds = currentTime_,
+                                   .position = now.position,
+                                   .rotation = now.rotation};
+            if (rig.followLagSeconds > 0.0) {
+                at = followTrailAt(rig.followNode, currentTime_ - rig.followLagSeconds, at);
+            }
+            // World axes by default, which is every rig that existed before this; the subject's own
+            // frame when asked, which is what makes "behind" mean behind.
+            const glm::vec3 offset =
+                rig.followLocal ? at.rotation * rig.followOffset : rig.followOffset;
+            pose.position = at.position + offset;
+
+            // The whole of camera collision: keep the eye above the surface. Applied after the
+            // offset rather than to the subject, because it is the camera that hits the hill.
+            //
+            // `surfaceAt` rather than `heightAt`, so the camera does not dive through a lake on its
+            // way round a shoreline -- a shot from under water is a decision, not a side effect of
+            // chasing something downhill.
+            if (rig.followClearance > 0.0f) {
+                const world::TerrainQuery ground = terrainQuery();
+                if (ground.valid()) {
+                    const float floorY =
+                        ground.surfaceAt(glm::vec2(pose.position.x, pose.position.z)) +
+                        rig.followClearance;
+                    // Raised, never lowered. A clearance is a floor; a camera legitimately above
+                    // the hill it is crossing must not be dragged down onto it.
+                    pose.position.y = std::max(pose.position.y, floorY);
+                }
+            }
         }
     }
     if (!rig.aimNode.empty()) {

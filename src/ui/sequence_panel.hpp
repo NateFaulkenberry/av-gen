@@ -116,6 +116,9 @@ private:
     // Unresolved bake targets, analysis progress, the last error: under the strip, because they
     // come and go and a toolbar that changes height moves the strip out from under the pointer.
     void drawStripStatus(app::Engine& engine);
+    // The drag handle under the lanes: pull it down for taller lanes. Sets the same `laneZoom_` the
+    // toolbar's slider does; see the note at the definition for why both exist.
+    void drawLaneZoomGrip();
     void drawInspector(app::Engine& engine);
     void drawShotInspector(app::Engine& engine, seq::Shot& shot);
     void drawActorInspector(app::Engine& engine, seq::Actor& actor);
@@ -224,6 +227,9 @@ private:
     // so the strip keeps its proportions and the lanes stay comparable.
     float laneZoom_ = 1.0f;
     double view_ = 0.0; // leftmost second shown
+    // The transport clock as of the last frame, so a seek can be told from playback. See the note
+    // in `drawStrip`.
+    double lastClock_ = 0.0;
     Drag drag_ = Drag::None;
     int dragIndex_ = -1;
     double dragGrab_ = 0.0;

@@ -322,6 +322,24 @@ struct CompositionNode {
 // hero stood when the keys were written, so the offset is zero at the moment of the cut and grows
 // only as far as the hero actually walks: a shot of something standing still is bit-identical to
 // what it was before this existed.
+// Where a followed node has been, so a chase camera can stand where its subject *was*.
+//
+// One per node any rig follows with a lag. Sampled once a frame after the parameters are applied,
+// which is the only moment at which "where the subject is" is a settled fact -- the same moment
+// `syncHeroesToNodes` reads, and for the same reason.
+//
+// A ring rather than a growing list: the longest lag any rig asks for, plus a margin, is all that
+// can ever be read. A composition that plays for an hour holds a couple of hundred samples.
+struct FollowTrail {
+    struct Sample {
+        double seconds = 0.0;
+        glm::vec3 position{0.0f};
+        glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+    };
+    std::string node;
+    std::vector<Sample> samples; // ordered by time, oldest first
+};
+
 struct AimFollow {
     double startSeconds = 0.0;
     double endSeconds = 0.0;
@@ -1021,6 +1039,12 @@ private:
     // state: a hero may name an assembly of several nodes rather than one object.
     std::vector<std::optional<glm::vec3>> heroAnchors_;
     std::vector<AimFollow> aimFollow_;  // ADR-158; empty unless a director cut this camera
+    // One trail per node some rig chases. Empty -- and costing nothing -- until a rig asks for a
+    // lag, which is what keeps every existing camera bit-identical.
+    std::vector<FollowTrail> followTrails_;
+    // Set once when a chase asks for a time the trail does not reach, so the limit is reported
+    // rather than silently producing an un-lagged camera that looks like a working one.
+    mutable bool followTrailShortReported_ = false;
     // ADR-245: the filtered aim-follow delta, and whether it has a value yet. Reset by
     // `clearAimFollowState` (a seek) and whenever the active shot changes -- at a cut the delta is
     // zero by definition, and inheriting the previous shot's would start the new one off-centre.
@@ -1037,6 +1061,13 @@ private:
     double heroSettleAt_ = 0.0;
     double heroSettleSeconds_ = 0.25;
     void syncHeroesToNodes();
+    // Appends this frame's sample to every trail some rig chases, and drops what no rig can reach.
+    void recordFollowTrails();
+    // Where `node` was at `seconds`, interpolated. `fallback` when there is no trail, or when the
+    // time asked for is outside the one there is -- which is the head of a render and the first
+    // `lag` seconds after a seek.
+    [[nodiscard]] FollowTrail::Sample followTrailAt(const std::string& node, double seconds,
+                                                    const FollowTrail::Sample& fallback) const;
     void markHeroesMoved();
     void settleHeroes();
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"

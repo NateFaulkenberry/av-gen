@@ -247,6 +247,17 @@ json CameraDirection::toJson() const {
             if (!rig.followNode.empty()) {
                 c["followNode"] = rig.followNode;
                 c["followOffset"] = writeVec3(rig.followOffset);
+                // Written only when set, so a rig that follows the way every existing rig follows
+                // serialises byte-identically to before.
+                if (rig.followLocal) {
+                    c["followLocal"] = true;
+                }
+                if (rig.followLagSeconds > 0.0) {
+                    c["followLagSeconds"] = rig.followLagSeconds;
+                }
+                if (rig.followClearance > 0.0f) {
+                    c["followClearance"] = rig.followClearance;
+                }
             }
             if (rig.focalLength > 0.0f) {
                 c["focalLength"] = rig.focalLength;
@@ -334,6 +345,9 @@ Result<CameraDirection> CameraDirection::fromJson(const json& doc) {
                 rig.aimOffset = readVec3(c, "aimOffset", rig.aimOffset);
                 rig.followNode = c.value("followNode", std::string());
                 rig.followOffset = readVec3(c, "followOffset", rig.followOffset);
+                rig.followLocal = c.value("followLocal", rig.followLocal);
+                rig.followLagSeconds = c.value("followLagSeconds", rig.followLagSeconds);
+                rig.followClearance = c.value("followClearance", rig.followClearance);
                 rig.focalLength = c.value("focalLength", rig.focalLength);
                 rig.spline = c.value("spline", rig.spline);
                 rig.splineT = c.value("splineT", rig.splineT);

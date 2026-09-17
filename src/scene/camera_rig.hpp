@@ -132,6 +132,49 @@ struct CameraRig {
     std::string followNode;
     glm::vec3 followOffset{0.0f};
 
+    // ---- chase: the three things a follow needs before it is a shot -----------------------------
+    //
+    // `followNode` on its own is a camera welded to its subject: it arrives everywhere the subject
+    // arrives, at the same instant, at a fixed world-axes offset. That is right for a camera riding
+    // a saucer and wrong for one chasing something -- a chase reads as a chase because it is
+    // *behind*, because it *trails*, and because it does not go through the hill.
+    //
+    // **`followLocal`** turns the offset from world axes into the subject's own frame, so "eight
+    // metres behind and three above" stays behind when the subject turns. The default is off, which
+    // is the behaviour every existing rig has.
+    bool followLocal = false;
+
+    // **`followLagSeconds`** puts the camera where the subject *was*, not where it is. Lag in time
+    // rather than a spring, and that choice is the whole reason this is safe to render:
+    //
+    //   * A spring integrates. Its position at t = 30 s depends on the path taken to reach 30 s, so
+    //     a scrub and a play-through disagree, a re-render is not the same film, and the sequence
+    //     hash -- which is this project's proof that a deliverable is the deliverable -- moves for
+    //     no authored reason. The engine has one camera like this already (`cameraAngle_ +=
+    //     orbitSpeed * dt`) and the benchmark rules refuse it by name.
+    //   * A time lag reads a *fact*: where the subject stood at t - lag. Two runs that agree about
+    //     the subject agree about the camera.
+    //
+    // What it cannot do is overshoot and settle, because that is what integration buys. A chase
+    // camera here trails and catches up; it does not swing past and come back.
+    //
+    // The honest limit, stated where it is set rather than in a release note: the trail is *seen*
+    // rather than re-derived, so a time the composition has not played through is not in it. At the
+    // head of a render, and for `lag` seconds after a seek, the camera runs un-lagged and closes to
+    // its lag over that interval. Deterministic for a given start, because a render always plays
+    // forward from `startSeconds` -- but it does mean a render from 10 s and the same frame inside
+    // a render from 0 s are not the same frame, and that is worth knowing before rendering a range.
+    double followLagSeconds = 0.0;
+
+    // **`followClearance`** is metres above the terrain the eye is kept, 0 to leave it alone. The
+    // surface rather than the ground, so the camera does not dive through a lake either.
+    //
+    // This is the whole of camera collision in this engine, and the scope is deliberate: the ground
+    // is the thing a chase camera actually hits, it is exactly queryable from `TerrainQuery`, and it
+    // cannot jitter. Trunks and rocks are not covered -- a camera squeezing between scattered
+    // instances pops, and a popping camera is worse than one that clips a tree.
+    float followClearance = 0.0f;
+
     // Spline placement only.
     std::string spline;
     float splineT = 0.0f;

@@ -72,12 +72,27 @@ constexpr double kMinSectionSeconds = 0.25;
 constexpr const char* kStripContextId = "strip-context";
 // How much of the panel is kept back for the inspector under the strip, so that compressing the
 // lanes to fit never squeezes the thing they are inspected in down to nothing.
-constexpr float kStripBottomReserve = 46.0f;
+constexpr float kStripBottomReserve = 46.0f + 12.0f; // + the lane-zoom grip under the lanes
 // What the toolbar's second column needs before it is worth putting beside the buttons rather than
 // under them. Two combos, two sliders and two buttons at their set widths, plus the spacing between
 // them and the labels to their right -- measured from the row rather than guessed, and deliberately
 // a little generous so the column is never drawn touching the panel's edge.
 constexpr float kStripControlsWidth = 960.0f;
+// The drag handle under the lanes. Tall enough to hit without aiming, short enough that it is not a
+// lane of its own -- and its height is reserved out of the strip, so adding it did not push the
+// shots lane back below the fold it was rescued from.
+constexpr float kLaneZoomGripHeight = 12.0f;
+// How much a point of vertical drag is worth. 1/160th means the full range is a drag of about 560
+// points, which is a deliberate, controllable gesture rather than a flick.
+constexpr float kLaneZoomPerPoint = 1.0f / 160.0f;
+constexpr float kLaneZoomMin = 0.5f;
+constexpr float kLaneZoomMax = 4.0f;
+// How far the clock has to move in one frame before it counts as a seek rather than as playback.
+// Several frames at 30 fps, so a stutter is never read as a jump.
+constexpr double kSeekJumpSeconds = 0.25;
+// Where in the view a seeked-to position lands, as a fraction from the left. An eighth in, so the
+// moment before it is visible too.
+constexpr double kSeekLead = 0.125;
 // The floor the lanes compress to. Two thirds still reads as lanes; below that the panel's own
 // scrollbar is the better answer, because a lane a few points high is a line rather than a lane.
 constexpr float kMinLaneScale = 0.66f;
@@ -139,6 +154,7 @@ void SequencePanel::draw(app::Engine& engine) {
     drawToolbar(engine);
     ImGui::Separator();
     drawStrip(engine);
+    drawLaneZoomGrip();
     drawStripStatus(engine);
     ImGui::Separator();
     drawInspector(engine);
@@ -451,6 +467,48 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
 
 }
 
+// The grip under the lanes: drag it to make them taller.
+//
+// The slider in the toolbar sets the same number and stays, because a slider is how you get to a
+// value you can name. This is how you get to the one that looks right, and it is where the hand
+// already is -- at the bottom edge of the thing being resized, which is where every other resize
+// handle in every other editor lives.
+//
+// Down is taller, matching the direction of the edge being pulled. The rate is per point of drag
+// rather than per frame, so the result is the same whether the drag took six frames or sixty.
+void SequencePanel::drawLaneZoomGrip() {
+    const float width = std::max(ImGui::GetContentRegionAvail().x, 40.0f);
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    ImGui::InvisibleButton("lane-zoom-grip", ImVec2(width, kLaneZoomGripHeight));
+    const bool hovered = ImGui::IsItemHovered();
+    const bool active = ImGui::IsItemActive();
+    if (hovered || active) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+    }
+    if (active) {
+        const float dy = ImGui::GetIO().MouseDelta.y;
+        if (dy != 0.0f) {
+            laneZoom_ = std::clamp(laneZoom_ + dy * kLaneZoomPerPoint, kLaneZoomMin, kLaneZoomMax);
+        }
+    }
+
+    // Three short rules rather than a bar: a filled bar across the whole panel reads as a divider
+    // between two things, and this is a handle on one of them.
+    const Palette& pal = palette();
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    const ImU32 tint = active ? pal.accent : (hovered ? pal.borderStrong : pal.border);
+    const float midY = origin.y + kLaneZoomGripHeight * 0.5f;
+    const float midX = origin.x + width * 0.5f;
+    for (int i = -1; i <= 1; ++i) {
+        const float y = midY + static_cast<float>(i) * 3.0f;
+        draw->AddLine(ImVec2(midX - 18.0f, y), ImVec2(midX + 18.0f, y), tint, 1.0f);
+    }
+    if (hovered || active) {
+        ImGui::SetTooltip("Drag down for taller lanes, up for shorter. (%.2fx)",
+                          static_cast<double>(laneZoom_));
+    }
+}
+
 // What the panel has to say for itself: a bake that bound to nothing, an analysis still running, the
 // last thing that went wrong. Drawn *under* the strip rather than in the toolbar, because all three
 // are transient and a toolbar that changes height as they come and go moves the strip under the
@@ -560,7 +618,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                      .hasOverlays = !piece.overlays.empty(),
                      .rulerHeight = kRulerHeight,
                      .markerHeight = kMarkerHeight,
-                     .laneHeight = kLaneHeight * laneZoom_,
+                     .laneHeight = lanes.laneHeight * laneZoom_,
                      .audioLaneHeight = kAudioLaneHeight * laneZoom_,
                      // **Not scaled by the vertical zoom, deliberately.** Vertical zoom exists to
                      // read a waveform or fit a long cast; a section block is a label on a span and
@@ -610,6 +668,36 @@ void SequencePanel::drawStrip(app::Engine& engine) {
 
     // Time axis. `view_` is the leftmost second; `zoom_` how many screens the piece takes.
     const double span = duration / static_cast<double>(std::max(zoom_, 0.01f));
+
+    // ---- the view follows a seek ---------------------------------------------------------------
+    //
+    // Return sends the playhead to 0:00. Zoomed in at 2:14 that used to leave the strip exactly
+    // where it was, showing two minutes of timeline with no playhead anywhere in it, and the only
+    // way back was to drag -- so the one key whose whole job is "go to the start" did not take you
+    // there.
+    //
+    // A *seek*, not playback. Time advancing by about a frame is the transport doing its job and
+    // must not drag the strip around under a pointer that is mid-edit; time jumping is somebody
+    // asking to be somewhere else. `kSeekJumpSeconds` is a generous several frames, so a stutter or
+    // a slow frame is never mistaken for a seek.
+    //
+    // And only when the playhead is *off screen*. A seek to somewhere already visible leaves the
+    // view alone, because scrolling under a person who can already see where they landed is motion
+    // for its own sake.
+    //
+    // Zoom is untouched by all of this -- the request was to follow the playhead, not to reframe.
+    {
+        const double now = engine.timelineClock().seconds;
+        const bool seeked = std::abs(now - lastClock_) > kSeekJumpSeconds;
+        lastClock_ = now;
+        if (seeked && (now < view_ || now > view_ + span)) {
+            // Landed a little in from the left edge rather than hard against it, so what comes
+            // immediately before the new position is visible too -- which is what you want after
+            // seeking to a section boundary or a cut.
+            view_ = now - span * kSeekLead;
+        }
+    }
+
     view_ = std::clamp(view_, 0.0, std::max(0.0, duration - span));
     const auto toX = [&](double seconds) {
         return axisX + static_cast<float>((seconds - view_) / span) * width;
@@ -920,13 +1008,13 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     // The one lane whose blocks move and resize, so it is the one lane that has to *say* so. The
     // grips are drawn only under the pointer: two vertical pips on every shot edge at rest would be
     // a picket fence, and the affordance is needed at the moment somebody reaches for it.
-    laneBackground(lanes.shotsTop(), kLaneHeight, true);
-    laneHeader(lanes.shotsTop(), kLaneHeight, "Shots", selection_ == Selection::Shot);
+    laneBackground(lanes.shotsTop(), lanes.laneHeight, true);
+    laneHeader(lanes.shotsTop(), lanes.laneHeight, "Shots", selection_ == Selection::Shot);
     const double now = engine.timelineClock().seconds;
     for (std::size_t i = 0; i < piece.shots.size(); ++i) {
         const seq::Shot& shot = piece.shots[i];
         ImVec2 a(toX(shot.startSeconds), laneY);
-        ImVec2 b(toX(shot.endSeconds()), laneY + kLaneHeight);
+        ImVec2 b(toX(shot.endSeconds()), laneY + lanes.laneHeight);
         if (b.x < axisX || a.x > axisRight) {
             continue;
         }
@@ -980,17 +1068,17 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     // ---- one lane per actor, showing its clip cues (spec 13) ----
     for (std::size_t ai = 0; ai < piece.actors.size(); ++ai) {
         const seq::Actor& actor = piece.actors[ai];
-        const float laneTop = lanes.actorsTop() + static_cast<float>(ai) * (kLaneHeight + kLaneGap);
+        const float laneTop = lanes.actorsTop() + static_cast<float>(ai) * (lanes.laneHeight + lanes.gap);
         const bool isSelected = selection_ == Selection::Actor && selected_ == static_cast<int>(ai);
-        laneBackground(laneTop, kLaneHeight, ai % 2 == 1);
+        laneBackground(laneTop, lanes.laneHeight, ai % 2 == 1);
         // The actor's own header: its id, and a dot that says whether it is visible. `Actor::visible`
         // is real state the bake reads, so the dot is a control rather than a decoration -- which is
         // why it is here and why there is no mute dot on the shots lane, where there is nothing for
         // one to mean.
-        if (hovered && localY >= laneTop && localY < laneTop + kLaneHeight && hoverActorRow < 0) {
+        if (hovered && localY >= laneTop && localY < laneTop + lanes.laneHeight && hoverActorRow < 0) {
             hoverActorRow = static_cast<int>(ai);
         }
-        const auto [ha, hb] = laneHeader(laneTop, kLaneHeight, actor.id.c_str(), isSelected);
+        const auto [ha, hb] = laneHeader(laneTop, lanes.laneHeight, actor.id.c_str(), isSelected);
         if (lanes.gutter > 0.0f) {
             const ImVec2 dot(hb.x - 12.0f, (ha.y + hb.y) * 0.5f);
             draw->AddCircleFilled(dot, 4.0f, actor.visible ? pal.success : pal.textDisabled, 12);
@@ -1006,14 +1094,14 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                 continue;
             }
             ImVec2 a(toX(cue.timeSeconds), origin.y + laneTop);
-            ImVec2 b(toX(to), origin.y + laneTop + kLaneHeight);
+            ImVec2 b(toX(to), origin.y + laneTop + lanes.laneHeight);
             if (b.x < axisX || a.x > axisRight) {
                 continue;
             }
             a.x = std::max(a.x, axisX);
             b.x = std::min(b.x, axisRight);
             const bool over = overAxis && hoverLane == StripLane::Actors && mouse.x >= a.x &&
-                              mouse.x <= b.x && localY >= laneTop && localY < laneTop + kLaneHeight;
+                              mouse.x <= b.x && localY >= laneTop && localY < laneTop + lanes.laneHeight;
             if (over) {
                 hoverBlock = static_cast<int>(c);
                 hoverActorRow = static_cast<int>(ai);
@@ -1035,12 +1123,12 @@ void SequencePanel::drawStrip(app::Engine& engine) {
 
     // ---- the overlay lane (spec 23, 26) ----
     if (!piece.overlays.empty()) {
-        laneBackground(lanes.overlaysTop(), kLaneHeight, false);
-        laneHeader(lanes.overlaysTop(), kLaneHeight, "Overlays", selection_ == Selection::Overlay);
+        laneBackground(lanes.overlaysTop(), lanes.laneHeight, false);
+        laneHeader(lanes.overlaysTop(), lanes.laneHeight, "Overlays", selection_ == Selection::Overlay);
         for (std::size_t i = 0; i < piece.overlays.size(); ++i) {
             const seq::OverlayCue& cue = piece.overlays[i];
             ImVec2 a(toX(cue.startSeconds), origin.y + lanes.overlaysTop());
-            ImVec2 b(toX(cue.endSeconds), origin.y + lanes.overlaysTop() + kLaneHeight);
+            ImVec2 b(toX(cue.endSeconds), origin.y + lanes.overlaysTop() + lanes.laneHeight);
             if (b.x < axisX || a.x > axisRight) {
                 continue;
             }
@@ -1192,7 +1280,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             // the headers are outside the time axis rather than floating over it.
             hitBlock = true;
             if (lane == StripLane::Actors) {
-                const int row = static_cast<int>((localY - lanes.actorsTop()) / (kLaneHeight + kLaneGap));
+                const int row = static_cast<int>((localY - lanes.actorsTop()) / (lanes.laneHeight + lanes.gap));
                 if (row >= 0 && row < static_cast<int>(piece.actors.size())) {
                     selection_ = Selection::Actor;
                     selected_ = row;
@@ -1304,7 +1392,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                 break;
             }
         } else if (lane == StripLane::Actors) {
-            const int row = static_cast<int>((localY - lanes.actorsTop()) / (kLaneHeight + kLaneGap));
+            const int row = static_cast<int>((localY - lanes.actorsTop()) / (lanes.laneHeight + lanes.gap));
             if (row >= 0 && row < static_cast<int>(piece.actors.size())) {
                 selection_ = Selection::Actor;
                 selected_ = row;
