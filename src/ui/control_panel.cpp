@@ -909,7 +909,7 @@ void ControlPanel::drawPreviewToolbar(app::Engine& engine, const CanvasRect& rec
 
             if (preview.showsOutputFrame()) {
                 ImGui::SameLine();
-                drawPreviewFrameControls();
+                drawPreviewFrameControls(engine);
             } else {
                 ImGui::SameLine();
                 ImGui::TextDisabled("the canvas's own shape, not the output's");
@@ -926,7 +926,7 @@ void ControlPanel::drawPreviewToolbar(app::Engine& engine, const CanvasRect& rec
 
 // The half of the toolbar that only means anything while a frame is on screen. Split out so the
 // mode selector above stays readable, not because it is a different concern.
-void ControlPanel::drawPreviewFrameControls() {
+void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
     app::RenderSettings* out = renderSettings;
     if (out == nullptr) {
         ImGui::TextDisabled("no render settings");
@@ -1054,6 +1054,61 @@ void ControlPanel::drawPreviewFrameControls() {
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("What the canvas outside the frame looks like. An editor overlay: it is\n"
                           "painted after the picture and reaches nothing but this window.");
+    }
+
+    // ---- who owns the viewport ------------------------------------------------------------------
+    //
+    // **The state has to be visible, and leaving it must not be a gesture you have to know about.**
+    // The viewport and the director's camera are two concepts; this is the one control that says
+    // which of them owns what is on screen, and it is in the canvas toolbar because that is where a
+    // person is looking when they wonder why they cannot fly.
+    //
+    // Only shown when there is a director to stand down: on a one-camera project the viewport has
+    // always been free and a toggle offering to free it would be a question about nothing.
+    if (scene::Composition* comp = engine.composition(); comp != nullptr) {
+        const bool multi = comp->cameraDirection().cameras.size() > 1 ||
+                           !comp->cameraDirection().shots.empty();
+        if (multi) {
+            ImGui::SameLine();
+            const bool free = comp->viewportFreeRoam();
+            const scene::ActiveCameraState& live = comp->activeCamera();
+            if (free) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.85f, 0.65f, 1.0f));
+            }
+            if (ImGui::SmallButton(free ? "free roam" : "following director")) {
+                if (free) {
+                    // Back to the film: the director's answer takes the frame again.
+                    comp->setViewportFreeRoam(false);
+                    setStatus("viewport is following the director");
+                } else if (onFreeCamera) {
+                    // Through the host, because taking the camera back is more than a flag -- a
+                    // directed *main* camera also has timeline tracks that would overwrite the next
+                    // drag, and `ensureFreeCamera` is the one place that knows both halves.
+                    onFreeCamera();
+                }
+            }
+            if (free) {
+                ImGui::PopStyleColor();
+            }
+            if (ImGui::IsItemHovered()) {
+                // Two separate calls rather than a ternary inside one: only the following branch
+                // has a substitution, and a format string chosen at runtime whose arguments do not
+                // match every branch is the shape of bug that waits for the other branch.
+                if (free) {
+                    ImGui::SetTooltip(
+                        "The viewport is yours. Fly anywhere; the director still owns the film,\n"
+                        "and switching shots or cameras will not move you.\n\n"
+                        "Click to look through the director's camera again.");
+                } else {
+                    ImGui::SetTooltip(
+                        "The canvas is showing '%s' -- whichever camera the director has live,\n"
+                        "so changing shots changes what you see.\n\n"
+                        "Click to take the viewport back and fly freely. Nothing about the film\n"
+                        "changes; you just stop riding its camera.",
+                        live.name.empty() ? "the main camera" : live.name.c_str());
+                }
+            }
+        }
     }
 
     // ---- fullscreen (spec §11) ----

@@ -1080,6 +1080,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // Import Audio... button. The menu item and the shortcut are *not* duplicates of each other
         // -- one is discoverable and one is fast -- and the button is where a person looking at a
         // timeline goes to put a song on it. All three are this callback.
+        panel_->onFreeCamera = [this]() { ensureFreeCamera(); };
         panel_->onOpenAudio = dialog(platform::Window::DialogKind::Audio);
         panel_->sequence.onOpenAudio = panel_->onOpenAudio;
         panel_->onOpenScene = dialog(platform::Window::DialogKind::Scene);
@@ -1801,6 +1802,40 @@ void Application::setViewportPose(const CameraPose& pose) {
 void Application::ensureFreeCamera() {
     if (engine_ == nullptr) {
         return;
+    }
+    // **Stand the director's camera down, if one of its rigs has the frame.**
+    //
+    // This function's original job was to stop the *timeline* replacing `camera/position` on the
+    // next frame -- correct when there was one camera and the only way to be "directed" was to have
+    // tracks baked onto it. Under ADR-245 a shot can put an authored *rig* on screen instead, and
+    // then removing the main camera's tracks achieves nothing at all: the viewport's drag moves a
+    // camera that is not the one being displayed, so the mouse appears dead and there is no gesture
+    // that recovers. Reported as "there is no reliable way to leave the director camera and freely
+    // navigate the world", which is exactly right.
+    //
+    // Reaching for the camera is asking for it back, and now that means both halves.
+    if (scene::Composition* comp = engine_->composition();
+        comp != nullptr && !comp->viewportFreeRoam()) {
+        // Where the frame is *now* becomes where free-roam starts, so taking the camera back does
+        // not teleport: you carry on from the shot you were looking at.
+        if (comp->activeCamera().camera != scene::kMainCamera) {
+            const scene::Camera& live = engine_->scene().camera;
+            if (auto* p = engine_->params().find("camera/position")) {
+                for (std::size_t c = 0; c < 3; ++c) {
+                    p->setBaseComponent(c, live.position[c]);
+                }
+            }
+            if (auto* t = engine_->params().find("camera/target")) {
+                for (std::size_t c = 0; c < 3; ++c) {
+                    t->setBaseComponent(c, live.target[c]);
+                }
+            }
+            log::info("viewport: free roam, taking over from '{}'", comp->activeCamera().name);
+            if (panel_ != nullptr) {
+                panel_->setStatus("viewport is free-roaming -- the director still owns the film");
+            }
+        }
+        comp->setViewportFreeRoam(true);
     }
     // The viewport is about to move the camera by hand, so whoever else was driving it stops now.
     //

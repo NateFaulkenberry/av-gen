@@ -4858,6 +4858,31 @@ void Composition::applyParameters() {
     // parameters and nothing else -- no spline sample, no arithmetic, no draw.
     const CameraId cameraWas = activeCamera_.camera;
     activeCamera_ = resolveActiveCamera(cameraDirection_, cameraEvents_, currentTime_);
+    // ---- the viewport may stand the director down ------------------------------------------------
+    //
+    // **Applied to the resolver's answer, never inside it.** `resolveActiveCamera` is a pure
+    // function of (cameras, shots, events, time) and ADR-091 rests on that: it is what makes a cut
+    // scrubbable and an offline render identical to the live one. Feeding an editor's navigation
+    // state into it would make the film depend on where somebody had flown the viewport, which is
+    // the opposite of the property it exists to have.
+    //
+    // So free-roam is expressed as an override *on the result*: the director still decides what the
+    // film does, `activeCamera_` still reports it truthfully -- the Cameras panel keeps saying which
+    // camera is live and why -- and only the pose written into `scene_.camera` is taken from the
+    // main camera instead. An offline render never sets this, so the deliverable is unchanged.
+    //
+    // Why the *main* camera rather than a fourth kind of pose: it already is the free-roam camera.
+    // Before ADR-245 there was one camera and flying the viewport moved it; `camera/position` is
+    // still what `W`/`A`/`S`/`D` and every viewport drag write. Pointing free-roam back at it gets
+    // the old behaviour exactly rather than a reimplementation of it.
+    if (viewportFreeRoam_ && activeCamera_.camera != kMainCamera) {
+        activeCamera_.camera = kMainCamera;
+        activeCamera_.previous = kNoCamera;   // a blend from a camera the viewport is not showing
+        activeCamera_.blend = 0.0f;           // would slide the free-roam view across the screen
+        activeCamera_.reason = ActiveCameraReason::Default;
+        activeCamera_.name = "Viewport";
+        activeCamera_.eventName.clear();
+    }
     // What the director just did and why, once per change (multicam-demo section 21). Cheap enough
     // to leave on: a camera that changes sixty times a second is a bug worth hearing about.
     if (activeCamera_.camera != cameraWas && cameraDirection_.directing()) {

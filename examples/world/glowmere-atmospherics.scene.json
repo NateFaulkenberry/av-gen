@@ -8868,7 +8868,7 @@
           },
           {
             "name": "liftHeight",
-            "value": -3.4,
+            "value": -7.5,
             "min": -40.0,
             "max": 0.0
           },
@@ -8880,7 +8880,7 @@
           },
           {
             "name": "animalWobble",
-            "value": 0.4,
+            "value": 0.0,
             "min": 0.0,
             "max": 10.0
           },

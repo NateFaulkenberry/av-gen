@@ -84,6 +84,10 @@ public:
     // item asks `canExecute` to decide whether to grey itself and calls `execute` to act, so the
     // menu and the keyboard cannot come to disagree about what is available or what it does.
     app::EditSystem* edits = nullptr;
+    // Take the camera back for the viewport. Through the host because it is more than a flag: a
+    // directed *main* camera also carries timeline tracks that would overwrite the next drag, and
+    // `Application::ensureFreeCamera` is the one place that knows both halves.
+    std::function<void()> onFreeCamera;
     std::function<void()> onOpenAudio;
     std::function<void()> onOpenScene;
     std::function<void()> onOpenEnvironment;
@@ -358,7 +362,9 @@ private:
     // Last frame's measured width of the floating preview toolbar, which is what bottom-centring it
     // needs and what an auto-sizing child cannot report until after it is drawn.
     float previewToolbarWidth_ = 0.0f;
-    void drawPreviewFrameControls();
+    // Takes the engine because the viewport-ownership control lives here: it has to ask the
+    // composition which camera is live and be able to hand the viewport back.
+    void drawPreviewFrameControls(app::Engine& engine);
     void drawPreviewGuides(const PreviewFrame& frame);
     // The output resolution editor (presets + custom), shared by the toolbar and the Render panel
     // so the two cannot come to offer different sizes. Returns true when it changed the settings.

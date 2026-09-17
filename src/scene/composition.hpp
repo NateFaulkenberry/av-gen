@@ -611,6 +611,21 @@ public:
     // the engine decides this, and a consumer that wants the pose reads `Scene::camera` as it
     // always has. Updated once per frame inside `applyParameters`.
     [[nodiscard]] const ActiveCameraState& activeCamera() const { return activeCamera_; }
+    // ---- who owns the viewport (the canvas-camera separation) ----------------------------------
+    //
+    // The editor viewport and the director's active camera are two concepts, and conflating them is
+    // what made an artist unable to fly around their own world: the director switching cameras took
+    // the viewport with it, and there was no way back because the gesture that takes the camera
+    // back (`Application::ensureFreeCamera`) only ever released the *main* camera's tracks -- which
+    // does nothing when the thing on screen is an authored rig.
+    //
+    // Free-roam pins the frame to the main camera, which is the camera the viewport has always
+    // flown. It changes nothing the director decided: `activeCamera()` still answers with the shot
+    // that owns the film, and an offline render -- which never turns this on -- renders it.
+    //
+    // Off by default, so nothing that does not ask is affected, including every render.
+    void setViewportFreeRoam(bool on) { viewportFreeRoam_ = on; }
+    [[nodiscard]] bool viewportFreeRoam() const { return viewportFreeRoam_; }
     // Whether the timeline drives any of a camera's own channels -- which is the whole of the
     // difference between a "static" camera and an "animated" one. There is no mode for it because
     // there is no state for it: a camera is animated exactly when somebody keyed it.
@@ -970,6 +985,7 @@ private:
     };
     std::vector<CameraChannels> cameraChannels_;
     ActiveCameraState activeCamera_;
+    bool viewportFreeRoam_ = false;
     // What the director has seen happen, as spans. A scenario's run is live state (ADR-210: it is
     // started by `autoStart` or by a signal edge, not by a second on the timeline), so the only
     // honest span for one is "it began when this composition first saw it begin". An entry whose
