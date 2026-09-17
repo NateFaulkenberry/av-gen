@@ -428,3 +428,117 @@ TEST_CASE("Clearance lifts the camera over the ground, and only upwards", "[came
     }
     CHECK(warned);
 }
+
+// ---- the visual fixture, checked numerically ---------------------------------------------------
+//
+// `examples/camera/behaviors` is the permanent scene the mandate's section 23 asks for: six shots,
+// six seconds each, one per behaviour, so a render puts the differences side by side in time.
+//
+// A scene meant to make differences *visually* obvious is worth nothing if the differences are not
+// there, and nobody watches a fixture on every commit. So the distinctions it exists to show are
+// asserted here, in the terms a viewer would use: this camera does not move, that one travels with
+// the performer, that one circles a subject that stands still, that one is standing where they are.
+
+TEST_CASE("The camera-behaviour fixture shows what it claims to", "[camera][behavior][fixture]") {
+    const auto fixture = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "camera" /
+                         "behaviors.json";
+    if (!std::filesystem::exists(fixture)) {
+        SKIP("the camera behaviour fixture is not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    auto loaded = engine.loadProject(fixture);
+    INFO((loaded ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+    scene::Composition* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+    const seq::Sequence& piece = engine.sequence();
+    REQUIRE(piece.shots.size() == 6);
+    const seq::Actor* walker = piece.actorNamed("walker");
+    REQUIRE(walker != nullptr);
+
+    // Where the camera and the performer are at a given second, through the real evaluation path.
+    struct Sample {
+        glm::vec3 eye{0.0f};
+        glm::vec3 aim{0.0f};
+        glm::vec3 them{0.0f};
+    };
+    const auto at = [&](double seconds) {
+        engine.update(FrameTime{.renderTime = seconds, .deltaTime = 1.0 / 30.0, .frameIndex = 1});
+        return Sample{.eye = comp->scene().camera.position,
+                      .aim = comp->scene().camera.target,
+                      .them = walker->positionAt(seconds)};
+    };
+    // Sampled inside each shot rather than at its edges: a cut lands one key a millisecond early
+    // (see `kCutSeconds`), and a sample on a boundary would be asking which side of it won.
+    const auto span = [&](std::size_t shot) {
+        const seq::Shot& s = piece.shots[shot];
+        return std::pair{at(s.startSeconds + 0.4), at(s.endSeconds() - 0.4)};
+    };
+
+    // 1. FOLLOW -- the eye is authored and static while the performer walks away from it.
+    {
+        const auto [a, b] = span(0);
+        const float eye = glm::length(b.eye - a.eye);
+        const float them = glm::length(b.them - a.them);
+        INFO("follow: eye moved " << eye << " m, the performer moved " << them << " m");
+        CHECK(them > 8.0f);                 // they really did walk; the shot is not vacuous
+        CHECK_THAT(eye, Catch::Matchers::WithinAbs(0.0, 0.05));
+        // And the aim went with them, or a camera that does nothing would pass the line above.
+        CHECK(glm::length(b.aim - a.aim) > 5.0f);
+    }
+
+    // 2. CHASE -- the eye travels with them, and stays behind and above.
+    {
+        const auto [a, b] = span(1);
+        const float eye = glm::length(b.eye - a.eye);
+        const float them = glm::length(b.them - a.them);
+        INFO("chase: eye moved " << eye << " m, the performer moved " << them << " m");
+        CHECK(them > 4.0f);
+        CHECK(eye > them * 0.5f);   // it went with them rather than watching them go
+        CHECK(a.eye.y > a.them.y);  // and from above
+        CHECK(b.eye.y > b.them.y);
+    }
+
+    // 3. ORBIT -- the camera circles. The performer is walking during this shot, so what is asserted
+    //    is the property that makes an orbit an orbit: the distance to the subject is held while the
+    //    direction to it changes.
+    {
+        const auto [a, b] = span(2);
+        const float da = glm::length(glm::vec2(a.eye.x - a.them.x, a.eye.z - a.them.z));
+        const float db = glm::length(glm::vec2(b.eye.x - b.them.x, b.eye.z - b.them.z));
+        INFO("orbit: radius " << da << " m -> " << db << " m");
+        CHECK_THAT(da, Catch::Matchers::WithinAbs(9.0, 0.6));
+        CHECK_THAT(db, Catch::Matchers::WithinAbs(9.0, 0.6));
+        // Gone round: the bearing to the subject has changed a long way.
+        const glm::vec2 va = glm::normalize(glm::vec2(a.eye.x - a.them.x, a.eye.z - a.them.z));
+        const glm::vec2 vb = glm::normalize(glm::vec2(b.eye.x - b.them.x, b.eye.z - b.them.z));
+        CHECK(glm::dot(va, vb) < 0.6f);
+    }
+
+    // 4. POV -- the camera is standing where the performer is.
+    {
+        const auto [a, b] = span(3);
+        const float gapA = glm::length(glm::vec2(a.eye.x - a.them.x, a.eye.z - a.them.z));
+        const float gapB = glm::length(glm::vec2(b.eye.x - b.them.x, b.eye.z - b.them.z));
+        INFO("pov: the eye is " << gapA << " m / " << gapB << " m from the performer, horizontally");
+        CHECK(gapA < 0.5f);
+        CHECK(gapB < 0.5f);
+        CHECK(a.eye.y > a.them.y); // at their eyes, not their feet
+        // Looking outward rather than at themselves: the aim is metres away, not on the eye.
+        CHECK(glm::length(b.aim - b.eye) > 3.0f);
+    }
+
+    // 5 and 6 are moves rather than behaviours, and they are here so the fixture cannot quietly lose
+    // them: Tracking travels, and Reveal ends further away than it began.
+    {
+        const auto [a, b] = span(4);
+        CHECK(glm::length(b.eye - a.eye) > 2.0f);
+    }
+    {
+        const auto [a, b] = span(5);
+        const float near = glm::length(a.eye - a.them);
+        const float far = glm::length(b.eye - b.them);
+        INFO("reveal: " << near << " m -> " << far << " m");
+        CHECK(far > near * 1.5f);
+    }
+}

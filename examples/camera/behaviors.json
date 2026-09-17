@@ -1,0 +1,289 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "_note": "The permanent visual fixture for the shot-level camera presets. Six shots, six seconds each, one per behaviour, in the order the handbook explains them -- so `--render` produces a single clip in which the differences are side by side in time. Render it and the distinctions are not arguable: shot 1 the camera does not move, shot 2 it travels with the performer, shot 3 the performer stands still and the camera circles, shot 4 the camera IS the performer.",
+  "app": {
+    "name": "Camera behaviours"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "behaviors.scene.json"
+    }
+  },
+  "parameters": {
+    "post/bloom/enabled": false,
+    "post/output/grain": 0.0,
+    "post/output/antialias": 0.75
+  },
+  "sources": [],
+  "routes": [],
+  "presets": [],
+  "sequence": {
+    "name": "camera behaviours",
+    "scenes": [],
+    "shots": [
+      {
+        "name": "1 follow -- the camera holds still",
+        "camera": {
+          "kind": "move",
+          "samples": 2,
+          "move": {
+            "kind": "track",
+            "subject": {
+              "position": [
+                0.0,
+                1.0,
+                0.0
+              ],
+              "radius": 2.0,
+              "name": "walker"
+            },
+            "distance": [
+              5.0,
+              5.0
+            ],
+            "azimuth": [
+              0.9,
+              0.9
+            ],
+            "elevation": [
+              0.42,
+              0.42
+            ],
+            "composition": {
+              "focalLength": 42.0
+            },
+            "look": "subject",
+            "easeIn": true,
+            "easeOut": true
+          },
+          "lookAtActor": "walker",
+          "lookAtHeight": 1.2,
+          "lookAtWeight": 1.0
+        },
+        "start": 0.0,
+        "duration": 6.0
+      },
+      {
+        "name": "2 chase -- the camera travels with them",
+        "camera": {
+          "kind": "behavior",
+          "samples": 64,
+          "behavior": {
+            "kind": "chase",
+            "actor": "walker",
+            "aim": "subject",
+            "aimOffset": [
+              0.0,
+              1.2,
+              0.0
+            ],
+            "offset": [
+              0.0,
+              2.2,
+              -5.0
+            ],
+            "actorSpace": true,
+            "lagSeconds": 0.3,
+            "clearance": 1.2
+          }
+        },
+        "start": 6.0,
+        "duration": 6.0
+      },
+      {
+        "name": "3 orbit -- the subject stands still",
+        "camera": {
+          "kind": "behavior",
+          "samples": 64,
+          "behavior": {
+            "kind": "orbit",
+            "actor": "walker",
+            "aim": "subject",
+            "aimOffset": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "radius": 9.0,
+            "height": 3.5,
+            "startDegrees": 0.0,
+            "endDegrees": 300.0,
+            "easeInOut": true,
+            "clearance": 1.0
+          }
+        },
+        "start": 12.0,
+        "duration": 6.0
+      },
+      {
+        "name": "4 pov -- the camera becomes them",
+        "camera": {
+          "kind": "behavior",
+          "samples": 64,
+          "behavior": {
+            "kind": "pov",
+            "actor": "walker",
+            "aim": "travel",
+            "aimOffset": [
+              0.0,
+              1.6,
+              0.0
+            ],
+            "eyeOffset": [
+              0.0,
+              1.7,
+              0.0
+            ]
+          }
+        },
+        "start": 18.0,
+        "duration": 6.0
+      },
+      {
+        "name": "5 tracking -- lateral travel, aim held",
+        "camera": {
+          "kind": "move",
+          "samples": 48,
+          "move": {
+            "kind": "drift",
+            "subject": {
+              "position": [
+                0.0,
+                1.0,
+                0.0
+              ],
+              "radius": 2.0,
+              "name": "walker"
+            },
+            "easeIn": true,
+            "easeOut": true,
+            "distance": [
+              6.0,
+              6.0
+            ],
+            "azimuth": [
+              1.25,
+              0.25
+            ],
+            "elevation": [
+              0.3,
+              0.3
+            ],
+            "curve": "straight",
+            "composition": {
+              "focalLength": 45.0
+            }
+          },
+          "lookAtActor": "walker",
+          "lookAtHeight": 1.2,
+          "lookAtWeight": 1.0
+        },
+        "start": 24.0,
+        "duration": 6.0
+      },
+      {
+        "name": "6 reveal -- pull back until it reads",
+        "camera": {
+          "kind": "move",
+          "samples": 48,
+          "move": {
+            "kind": "reveal",
+            "subject": {
+              "position": [
+                0.0,
+                1.0,
+                0.0
+              ],
+              "radius": 2.0,
+              "name": "walker"
+            },
+            "easeIn": true,
+            "easeOut": true,
+            "distance": [
+              3.0,
+              16.0
+            ],
+            "azimuth": [
+              0.5,
+              0.95
+            ],
+            "elevation": [
+              0.15,
+              0.6
+            ],
+            "composition": {
+              "focalLength": 35.0
+            }
+          },
+          "lookAtActor": "walker",
+          "lookAtHeight": 1.2,
+          "lookAtWeight": 1.0
+        },
+        "start": 30.0,
+        "duration": 6.0
+      }
+    ],
+    "actors": [
+      {
+        "id": "walker",
+        "node": "walker",
+        "_note": "Walks the length of the scene and turns a corner in the middle, so 'the offset turns with the performer' has a turn to survive.",
+        "keys": [
+          {
+            "time": 0.0,
+            "position": [
+              -20.0,
+              0.9,
+              0.0
+            ]
+          },
+          {
+            "time": 9.0,
+            "position": [
+              0.0,
+              0.9,
+              0.0
+            ]
+          },
+          {
+            "time": 14.0,
+            "position": [
+              6.0,
+              0.9,
+              -8.0
+            ]
+          },
+          {
+            "time": 24.0,
+            "position": [
+              20.0,
+              0.9,
+              -8.0
+            ]
+          },
+          {
+            "time": 36.0,
+            "position": [
+              20.0,
+              0.9,
+              10.0
+            ]
+          }
+        ]
+      }
+    ],
+    "duration": 36.0
+  },
+  "render": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "startSeconds": 0.0,
+    "endSeconds": 36.0,
+    "output": "video",
+    "tier": "high",
+    "limits": "unlimited"
+  }
+}

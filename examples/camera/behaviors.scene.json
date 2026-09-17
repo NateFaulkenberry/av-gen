@@ -1,0 +1,315 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "Camera behaviours",
+  "_note": "The permanent fixture for the shot-level camera presets. Deliberately plain: the job of this scene is to make the difference between Follow, Chase, Orbit, POV, Tracking and Reveal unmistakable, and a rich world makes that harder rather than easier. What it does have is the three things the differences are read against -- a performer to be about, landmarks at a spread of distances so parallax is visible, and ground that is not flat so a chase's clearance has something to clear.",
+  "camera": {
+    "mode": 1,
+    "position": [
+      -14.0,
+      6.0,
+      16.0
+    ],
+    "target": [
+      0.0,
+      1.2,
+      0.0
+    ],
+    "fov": 46.0,
+    "orbitSpeed": 0.0
+  },
+  "environment": {
+    "background": [
+      0.05,
+      0.07,
+      0.11
+    ],
+    "intensity": 1.0,
+    "fogDensity": 0.004,
+    "sky": {
+      "enabled": true,
+      "background": true,
+      "sunIntensity": 2.4,
+      "haze": 0.25
+    }
+  },
+  "nodes": [
+    {
+      "name": "ground",
+      "kind": "procedural",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "_note": "A wide flat plate the performer walks on. Flat on purpose: the hill below is the only relief, so when a chase camera rises it is unambiguous which thing lifted it.",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            120.0,
+            0.2,
+            120.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "variation": {
+          "seed": 1
+        },
+        "material": {
+          "baseColor": [
+            0.2,
+            0.23,
+            0.26
+          ],
+          "roughness": 0.9
+        }
+      }
+    },
+    {
+      "name": "hill",
+      "kind": "procedural",
+      "position": [
+        16.0,
+        0.0,
+        0.0
+      ],
+      "_note": "The obstacle a chase has to be lifted over. Sited on the second half of the walk, so a clearance test has a before and an after inside one shot.",
+      "procedural": {
+        "source": {
+          "kind": "sphere",
+          "radius": 9.0,
+          "subdivisions": 3
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "variation": {
+          "seed": 2
+        },
+        "material": {
+          "baseColor": [
+            0.24,
+            0.27,
+            0.24
+          ],
+          "roughness": 0.95
+        }
+      }
+    },
+    {
+      "name": "walker",
+      "kind": "procedural",
+      "position": [
+        -20.0,
+        0.9,
+        0.0
+      ],
+      "_note": "The performer. A tall thin marker rather than a character: what these shots demonstrate is the CAMERA's relationship to a moving thing, and a rig with its own animation would put a second kind of motion in frame. The sequence's actor drives this node's transform.",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            0.5,
+            1.8,
+            0.5
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "variation": {
+          "seed": 3
+        },
+        "material": {
+          "baseColor": [
+            0.92,
+            0.55,
+            0.22
+          ],
+          "roughness": 0.4,
+          "emissiveColor": [
+            0.9,
+            0.45,
+            0.1
+          ],
+          "emissiveIntensity": 0.6
+        }
+      }
+    },
+    {
+      "name": "walker-nose",
+      "kind": "procedural",
+      "parent": "walker",
+      "position": [
+        0.0,
+        0.45,
+        0.6
+      ],
+      "_note": "A small block on the performer's +Z face, which is their forward axis. Without it a box has no visible heading and 'the offset turns with the performer' cannot be seen to be doing anything.",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            0.22,
+            0.22,
+            0.4
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "variation": {
+          "seed": 4
+        },
+        "material": {
+          "baseColor": [
+            0.95,
+            0.93,
+            0.85
+          ],
+          "roughness": 0.3
+        }
+      }
+    },
+    {
+      "name": "markers",
+      "kind": "procedural",
+      "position": [
+        0.0,
+        3.0,
+        -18.0
+      ],
+      "_note": "Landmarks at a spread of distances. Parallax is the only cue that separates a camera that TRAVELS from one that turns in place, so a scene meant to show that difference has to give the eye something to measure it against.",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            0.8,
+            6.0,
+            0.8
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 11,
+          "start": [
+            -34.0,
+            0.0,
+            0.0
+          ],
+          "end": [
+            34.0,
+            0.0,
+            0.0
+          ]
+        },
+        "variation": {
+          "seed": 5,
+          "scale": [
+            0.25,
+            0.25,
+            0.25
+          ]
+        },
+        "material": {
+          "baseColor": [
+            0.55,
+            0.6,
+            0.72
+          ],
+          "roughness": 0.6
+        }
+      }
+    },
+    {
+      "name": "near-posts",
+      "kind": "procedural",
+      "position": [
+        0.0,
+        1.5,
+        9.0
+      ],
+      "_note": "A second row much closer to the camera. Two rows at different depths is what makes parallax read as parallax rather than as the whole picture sliding.",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            0.4,
+            3.0,
+            0.4
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 9,
+          "start": [
+            -26.0,
+            0.0,
+            0.0
+          ],
+          "end": [
+            26.0,
+            0.0,
+            0.0
+          ]
+        },
+        "variation": {
+          "seed": 6,
+          "scale": [
+            0.3,
+            0.3,
+            0.3
+          ]
+        },
+        "material": {
+          "baseColor": [
+            0.42,
+            0.44,
+            0.5
+          ],
+          "roughness": 0.7
+        }
+      }
+    },
+    {
+      "name": "statue",
+      "kind": "procedural",
+      "position": [
+        0.0,
+        1.6,
+        -6.0
+      ],
+      "_note": "Something that never moves, for Orbit -- the behaviour whose whole point is that the camera travels while the subject does not.",
+      "procedural": {
+        "source": {
+          "kind": "sphere",
+          "radius": 1.6,
+          "subdivisions": 3
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "variation": {
+          "seed": 7
+        },
+        "material": {
+          "baseColor": [
+            0.7,
+            0.72,
+            0.8
+          ],
+          "roughness": 0.25,
+          "metallic": 0.4
+        }
+      }
+    }
+  ]
+}
