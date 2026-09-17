@@ -74,6 +74,9 @@ constexpr float kStripBottomReserve = 46.0f + 12.0f; // + the lane-zoom grip und
 // them and the labels to their right -- measured from the row rather than guessed, and deliberately
 // a little generous so the column is never drawn touching the panel's edge.
 constexpr float kStripControlsWidth = 960.0f;
+// A selected audio clip's outline. Amber rather than the shared accent: the waveform is drawn in the
+// same blue family the accent belongs to, so the accent vanished into it.
+constexpr ImU32 kClipSelected = IM_COL32(255, 196, 64, 255);
 // The drag handle under the lanes. Tall enough to hit without aiming, short enough that it is not a
 // lane of its own -- and its height is reserved out of the strip, so adding it did not push the
 // shots lane back below the fold it was rescued from.
@@ -977,8 +980,15 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             }
             draw->PopClipRect();
 
-            if (const ImU32 outline = interactionOutline(over, chosen, false); outline != 0) {
-                draw->AddRect(lo, hi, outline, 3.0f, 0, chosen ? 2.0f : 1.0f);
+            if (chosen) {
+                // **Yellow, and thicker.** The shared `interactionOutline` accent is a blue that
+                // reads well against the shot lane's blues and disappears against the waveform,
+                // which is the same blue family -- a selected clip was indistinguishable from an
+                // unselected one. This is the one lane whose content is a picture rather than a
+                // label, so its selection has to be a colour the picture does not contain.
+                draw->AddRect(lo, hi, kClipSelected, 3.0f, 0, 2.5f);
+            } else if (const ImU32 outline = interactionOutline(over, false, false); outline != 0) {
+                draw->AddRect(lo, hi, outline, 3.0f, 0, 1.0f);
             } else {
                 draw->AddRect(lo, hi, pal.border, 3.0f);
             }
@@ -1171,8 +1181,10 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                        origin.y + std::min(marqueeFromY_, marqueeToY_));
         const ImVec2 b(origin.x + std::max(marqueeFromX_, marqueeToX_),
                        origin.y + std::max(marqueeFromY_, marqueeToY_));
-        draw->AddRectFilled(a, b, mixColour(pal.accent, pal.lane, 0.75f), 2.0f);
-        draw->AddRect(a, b, pal.accent, 2.0f, 0, 1.0f);
+        // Half transparent, so what the band is over stays readable while it is being dragged --
+        // the point of the gesture is seeing what you are about to catch.
+        draw->AddRectFilled(a, b, withAlpha(pal.accent, 0.25f), 2.0f);
+        draw->AddRect(a, b, withAlpha(pal.accent, 0.9f), 2.0f, 0, 1.0f);
     }
 
     // ---- the playhead (spec 30, and the brief's section 10) --------------------------------------
@@ -1269,6 +1281,12 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         drag_ = Drag::None;
         dragIndex_ = -1;
         bool hitBlock = false;
+        // Did the press land on something selectable? Separate from `hitBlock`, which means "this
+        // press was consumed". The audio lane sets one and not the other on purpose: clicking a clip
+        // selects it *and* still scrubs, because this lane's promise is that clicking a moment in
+        // the music plays it. Conflating the two is what made a clip click select a clip and then
+        // immediately start a rubber band over the top of it, clearing what it had just selected.
+        bool selectedSomething = false;
         // **A press replaces the selection.** Cleared here, once, rather than in each of the eight
         // branches below that set `selection_` -- a click on a shot is a single selection whether or
         // not a rubber band was up a moment ago, and an invariant enforced in one place cannot be
@@ -1347,6 +1365,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                     // false -- because this lane's promise is that clicking a moment plays it.
                     selection_ = Selection::Clip;
                     selected_ = static_cast<int>(i);
+                    selectedSomething = true;
                     break;
                 }
             }
@@ -1400,7 +1419,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                 hitBlock = true;
             }
         }
-        if (!hitBlock) {
+        if (!hitBlock && !selectedSomething) {
             // **A press on empty lane space starts a rubber band; it does not scrub.**
             //
             // It used to scrub. The ruler branch above scrubs deliberately, and this fall-through
@@ -2099,7 +2118,10 @@ std::vector<SequencePanel::SelectedItem> SequencePanel::itemsIn(
     if (lanes.hasAudio) {
         const auto& clips = engine.audioClips();
         for (std::size_t i = 0; i < clips.size(); ++i) {
-            const double end = clips[i].startSeconds + clips[i].durationSeconds;
+            // `durationSeconds == 0` means "the rest of the file", so the arithmetic spelling of a
+            // clip's end is a zero-length span for almost every clip there is -- and a band that
+            // tests it catches nothing. The same call the lane draws with.
+            const double end = audio::clipEndSeconds(clips[i], engine.clipSource(clips[i].file).get());
             if (rowHit(lanes.audioTop(), lanes.audioLaneHeight, clips[i].startSeconds, end)) {
                 out.push_back({Selection::Clip, static_cast<int>(i)});
             }

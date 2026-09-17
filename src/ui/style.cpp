@@ -35,6 +35,16 @@ ImU32 mixColour(ImU32 under, ImU32 over, float alpha) {
                                      a.z + (b.z - a.z) * alpha, a.w + (b.w - a.w) * alpha));
 }
 
+ImU32 withAlpha(ImU32 colour, float alpha) {
+    const float a = std::clamp(alpha, 0.0f, 1.0f);
+    const ImU32 rgb = colour & ~IM_COL32_A_MASK;
+    const auto original = static_cast<float>((colour >> IM_COL32_A_SHIFT) & 0xFF) / 255.0f;
+    // Scaled by what the colour already had rather than replacing it, so asking for half of a
+    // colour that was already half gives a quarter and not a half.
+    const auto out = static_cast<ImU32>(std::lround(a * original * 255.0f));
+    return rgb | (out << IM_COL32_A_SHIFT);
+}
+
 ImU32 interactionFill(ImU32 base, bool hovered, bool selected, bool active) {
     const Palette& p = palette();
     // The order is what stops a selected row appearing to deselect itself as the pointer crosses

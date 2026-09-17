@@ -561,6 +561,12 @@ private:
     void releaseClaims(const Run& run);
     [[nodiscard]] bool claimed(std::string_view entity) const;
     [[nodiscard]] bool isRetired(std::string_view entity) const;
+    // An actor, or one of an actor's parts -- never a target, and exempt from the visibility rule
+    // below because Glowmere's beam is authored invisible on purpose.
+    [[nodiscard]] bool isDirectorsOwn(std::string_view name) const;
+    // Hidden by something that stuck: a query never offers one. See the note at the definition for
+    // why this reads the base rather than the final.
+    [[nodiscard]] bool hiddenForGood(const entity::Entity& e, const StageContext& ctx) const;
     void emit(StageEventKind kind, const Run& run, const StageContext& ctx, std::string step,
               std::string role, std::string detail);
 

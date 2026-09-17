@@ -696,6 +696,51 @@ bool Staging::claimed(std::string_view entity) const {
                        [&](const Claim& c) { return c.entity == entity; });
 }
 
+// Is this body one the director owns -- an actor, or one of an actor's parts?
+//
+// Glowmere's tractor beam is authored *invisible* and shown for the four seconds it fires, so a rule
+// about invisibility that does not except the director's own bodies retires the beam. That cost two
+// tests: the saucer beamed at nothing, and a camera test lost the precondition it was built around.
+bool Staging::isDirectorsOwn(std::string_view name) const {
+    for (const ActorDesc& a : desc_.actors) {
+        if (a.driven() == name) {
+            return true;
+        }
+        for (const ActorPart& p : a.parts) {
+            if (p.entity == name || p.name == name) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Would anybody see this body if the camera looked at it?
+//
+// Reported as "once that animal has been abducted it becomes invisible; the UFO should never target
+// invisible animals". Within one session `isRetired` already covered it. What it did not survive is
+// a **reload**: `retired_` is runtime state and `visible` is saved, so reopening a project whose
+// cows had all been abducted gave a fresh scenario an empty retired list and a farm of invisible
+// animals it was perfectly willing to fly to, hover over and beam at nothing.
+//
+// The **base**, not the final, and that is the whole reason this is safe to ask per query. A `hide`
+// step writes the base (`writeParameter` ends in `setBaseComponent`) and the base is what a project
+// file carries, so this reads "somebody hid this and it stayed hidden". The final additionally
+// carries whatever a modulation route is doing this instant, and filtering on that would make the
+// director's choice of subject depend on the frame it happened to ask on.
+bool Staging::hiddenForGood(const entity::Entity& e, const StageContext& ctx) const {
+    if (ctx.params == nullptr || ctx.world == nullptr || isDirectorsOwn(e.name())) {
+        return false;
+    }
+    std::vector<std::string> tried;
+    const std::string path = ctx.world->resolveTarget(e, "visible", "entity/", &tried);
+    if (path.empty()) {
+        return false; // nothing can hide it, so it is not hidden
+    }
+    const params::IParameter* p = ctx.params->find(path);
+    return p != nullptr && p->baseComponent(0) <= 0.5f;
+}
+
 bool Staging::isRetired(std::string_view entity) const {
     return std::find(retired_.begin(), retired_.end(), entity) != retired_.end();
 }
@@ -824,6 +869,9 @@ bool Staging::runQuery(Run& run, const QueryDesc& query, const StageContext& ctx
         const entity::Entity* e = ctx.world->entities()[c.entity].get();
         if (e == nullptr || e->name() != c.name) {
             continue; // the entity set changed under the index; it rebuilds next interval
+        }
+        if (hiddenForGood(*e, ctx)) {
+            continue; // nobody can see it; it is not a thing to make a shot about
         }
         if (!query.tag.empty()) {
             const auto& tags = e->desc().tags;

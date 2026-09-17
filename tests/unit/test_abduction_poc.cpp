@@ -477,12 +477,21 @@ TEST_CASE("the UFO abducts several animals, choosing each one from the scene",
     CHECK(run.beamRest < 1200.0);
 
     // An animal actually rose, a long way, rather than being hidden where it stood -- and it
-    // arrived: `liftHeight` is -3.4, so the top of the lift is 3.4 m under the saucer's belly, and
-    // anything much further than that never made it up the beam.
+    // stopped **short of the craft**, which is the half that changed.
+    //
+    // `liftHeight` was -3.4: the top of the lift sat 3.4 m under the saucer's origin, and the widest
+    // animal in the farm reaches 5.80 m from its own origin, so a bull's back arrived 2.4 m *inside*
+    // the saucer. Reported as "the animal clips through the UFO once it reaches the top". The lift
+    // now ends at -7.5, clear of the widest reach with margin, so the two never intersect.
+    //
+    // The lower bound is what stops this passing on an animal that never left the ground; the upper
+    // bound is the anti-clipping guarantee. Both are needed: the old test had only the first half of
+    // each and asserted the animal got *close*, which is the defect written down as a requirement.
     INFO(fmt::format("highest lift {:.1f} m, closest to the craft {:.2f} m", run.highestLift,
                      run.reachedCraft));
     CHECK(run.highestLift > 10.0f);
-    CHECK(run.reachedCraft < 5.0f);
+    CHECK(run.reachedCraft > 5.9f);   // clear of the widest animal's 5.80 m reach
+    CHECK(run.reachedCraft < 12.0f);  // but still plainly *at* the craft, not stalled below it
 
     // If it stopped early, say why rather than leaving it a mystery: for every animal still on the
     // ground, the three things the query asks about it.
@@ -809,4 +818,59 @@ TEST_CASE("Where the stall happens and what the navigator says there", "[.report
                          nav.navigable(from) ? "yes" : "NO ", picked, steerable, tooClose,
                          e.state().radius));
     }
+}
+
+
+// The UFO does not fly to animals nobody can see.
+//
+// Reported as: "once that animal has been abducted it becomes invisible; the UFO should never
+// target invisible animals." Within one session `isRetired` already handled it -- a `retire` step
+// hides the body and adds it to the list, and nothing offers it again.
+//
+// **It did not survive a reload**, and that is what was being seen. `retired_` is runtime state and
+// `visible` is saved as a parameter, so reopening a project whose cows had already been abducted
+// gave a fresh scenario an empty retired list and a farm full of invisible animals it was perfectly
+// willing to fly to, hover over and beam at nothing. `examples/world/glowmere-valley-2.json` was
+// carrying exactly that: **seven animals saved invisible** by an earlier run, which is how this was
+// found -- the fix changed which animals the saucer chose, and a camera test lost the precondition
+// it was written around.
+//
+// The fix is a seed rather than a filter, and that distinction earned itself. A filter inside the
+// query's candidate loop reads live parameters while the scenario is choosing, so the choice would
+// depend on the frame it was asked on. A seed is a fact about the world as it was found, decided
+// once, and nothing downstream can watch it change.
+
+TEST_CASE("An animal that is already hidden is never abducted again", "[poc][ufo][stage][abduction]") {
+    if (!farmAssetsPresent()) {
+        SKIP("assets/farm is not present");
+    }
+    Run run(sceneFile());
+
+    // Hide two animals the way a previous session's abduction leaves them: the saved *base* value
+    // of the visibility parameter, which is what a project file carries.
+    std::vector<std::string> hidden;
+    for (const auto& e : run.comp->entityWorld().entities()) {
+        if (e == nullptr || !isAnimal(*e) || hidden.size() >= 2) {
+            continue;
+        }
+        if (params::IParameter* p = run.params.find("nodes/" + std::string(e->name()) + "/visible")) {
+            p->setBaseComponent(0, 0.0f);
+            hidden.push_back(std::string(e->name()));
+        }
+    }
+    REQUIRE(hidden.size() == 2);
+    INFO("hidden before the director ran: " << hidden[0] << " and " << hidden[1]);
+
+    run.play(220.0);
+    INFO(fmt::format("abducted {}: {}", run.abducted.size(), fmt::join(run.abducted, ", ")));
+
+    // Neither of the two is among what it took. A count would not do -- there are sixteen animals
+    // and the scenario would probably miss any given pair by luck.
+    for (const std::string& name : hidden) {
+        CHECK(std::find(run.abducted.begin(), run.abducted.end(), name) == run.abducted.end());
+    }
+
+    // The control, without which the check above passes on a director that did nothing at all: it
+    // still abducted animals, and they are ones that were visible.
+    CHECK(run.abducted.size() >= 3);
 }

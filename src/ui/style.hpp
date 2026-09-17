@@ -57,6 +57,10 @@ void setHoverCursor(ImGuiMouseCursor cursor);
 // of lighter everywhere rather than a different literal per panel.
 [[nodiscard]] ImU32 mixColour(ImU32 under, ImU32 over, float alpha);
 
+// The same colour at a different opacity. `mixColour` blends two opaque colours and cannot make
+// anything see-through; this is what a fill that has to let the thing underneath show through wants.
+[[nodiscard]] ImU32 withAlpha(ImU32 colour, float alpha);
+
 // ---- the processing indicator (the brief's section 4) -------------------------------------------
 //
 // Drawn over the canvas while the world is catching up with the interface. Deliberately small,
