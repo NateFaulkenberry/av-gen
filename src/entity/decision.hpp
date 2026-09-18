@@ -37,6 +37,7 @@
 
 #include "entity/action.hpp"
 #include "entity/character_ai.hpp"
+#include "entity/nav_grid.hpp"
 #include "params/parameter_set.hpp"
 
 #include <glm/glm.hpp>
@@ -381,6 +382,142 @@ private:
     mutable std::vector<ActionDesc> actions_;
     mutable std::vector<GoalCandidate> scratch_;
     mutable std::vector<std::string> names_;
+};
+
+// Price the *way*, not the place (ADR-336).
+//
+// The other four score a destination. `holdPost` and `investigate` score where a thing is;
+// `interest` scores taste times nearness, and nearness is a straight line -- so a character with a
+// river between it and a glow patch scores it exactly as it scores one on the same bank, and the
+// choice a viewer is waiting to see, between wading and walking round, is not a choice any of them
+// can express. That is what this one is for and it is the whole of what it is for.
+//
+// **The two requests.** For each destination it asks `Navigator::requestPath` twice with the same
+// `PathRequest` and two different `NavPathCost::wadePenalty`:
+//
+//   * `fordPenalty` (0 by default) -- water is free, so the answer is the shortest way there,
+//     through the river if the river is in the way. Call it the **ford**.
+//   * `detourPenalty` (40 by default) -- water is ruinous, so the answer is the driest way there,
+//     round the end of the river if there is a way round. Call it the **detour**.
+//
+// Neither penalty is this character's opinion; they are the two probes that *find* the two ways.
+// The opinion is `wadePenalty`, and both ways are then scored with it: `length + wadePenalty x the
+// metres of the route that are in water`. Measured on the lab's river fixture: a ford of 54.15 m
+// with 11.26 weighted wet metres against a detour of 84.56 m with 1.61. At `wadePenalty` 0.4 the
+// ford costs 58.65 and wins; at 12.0 it costs 189.29 and loses to the detour's 103.83. **One knob, two options, and the crossover
+// is arithmetic rather than a rule.**
+//
+// Which is also why `wadePenalty` is a registered parameter and the two probes are not (ADR-225):
+// the taste is the thing an author tunes and an overlay drives, and the probes are how the
+// question is asked.
+//
+// **Two options, not one, and only when there are two.** When the two requests come back as the
+// same way -- which is every destination on this bank, and every destination at all in a world
+// with no water -- one option is appended and it is named for the destination. A second option
+// identical to the first would put the selector's margin between a route and itself, and would
+// print two lines in the overlay that say the same thing.
+//
+// **The route is the option.** The winner's actions are a `Move` per waypoint of *that* route,
+// because `ActionKind::Move` plans its own way to a point and would plan it at the default price:
+// an option called "go round" whose single action is "walk to the far bank" is a body that wades
+// anyway, and the overlay would say it chose the detour while the film showed the ford.
+//
+// **Which position (R1).** `ctx.state->position()` for the start, `EntityWorld::pointOfInterest`
+// for a named destination, `Percept::position` for a noticed one -- simulation positions, all
+// three, because a route is navigation's and navigation reasons in simulation space.
+//
+// **Determinism.** `Navigator::requestPath` is a pure function of the world and the request, A*
+// breaks its ties on cell index, and nothing here draws from a stream or reads a clock (D1, D2).
+class RouteConsiderer final : public StockConsiderer {
+public:
+    // One way to one place, and what it is made of. The overlay prints `score`; a test that only
+    // saw the score could not tell a route that got longer from one that got wetter, and the two
+    // are the two halves of the thing this class exists to weigh.
+    struct Priced {
+        std::string_view destination; // the place's name; empty for a derived point
+        glm::vec3 at{0.0f};           // where the place is
+        bool detour = false;      // the high-penalty answer, rather than the low-penalty one
+        float length = 0.0f;      // metres of route
+        // Metres of the route that are in water, each weighted by that water's depth over this
+        // walker's wade band -- the same 0..1 `NavCell::wade` holds, which is the number `NavGrid`
+        // itself prices a ford with. Zero in any world whose walker does not wade.
+        float wadeMetres = 0.0f;
+        float cost = 0.0f;        // length + wadePenalty * wadeMetres
+        float score = 0.0f;       // weight * destination weight / (1 + cost / falloff)
+        PathStatus status = PathStatus::NoGraph;
+        // Where the route actually ends -- `PathResult::goal`, which is not always the place: a
+        // destination inside a solid or under water is answered with the nearest standable point,
+        // and the last `Move` is aimed at that rather than at the thing.
+        glm::vec2 goal{0.0f};
+        // The route itself, by value. Two A* searches cost 50 us and copying a dozen waypoints
+        // costs nothing measurable, so this is owned rather than a span into the considerer --
+        // which also means a caller may hold a priced route across another `price` call, and the
+        // lab's case 9 does exactly that when it compares the same two ways at two tastes.
+        std::vector<glm::vec2> waypoints;
+    };
+
+    explicit RouteConsiderer(const nlohmann::json* settings = nullptr);
+    [[nodiscard]] std::string_view kind() const override { return "route"; }
+    void registerParameters(params::ParameterSet& params, const std::string& prefix) override;
+    void collectParameterPaths(std::vector<std::string>& out) const override;
+    void consider(const DecisionContext& ctx, std::vector<Option>& out) const override;
+
+    // Every way to every destination, priced, without the `Option` wrapping. What the lab's case 9
+    // asserts on and what a considerer's own test can read without going through a selector.
+    // Appends; does not clear, the way `scoreGoals` does not.
+    std::size_t price(const DecisionContext& ctx, std::vector<Priced>& out) const;
+
+    // The character's own price on a wet metre. Reads the registered parameter when there is one,
+    // so a test and an overlay drive the same number.
+    [[nodiscard]] float wadePenalty() const;
+
+private:
+    // A place this character will price a way to, resolved for this tick.
+    struct Destination {
+        std::string_view name;
+        glm::vec3 position{0.0f};
+        float weight = 1.0f;  // the goal model's, or 1 for an authored destination
+    };
+    std::size_t destinationsFor(const DecisionContext& ctx, std::vector<Destination>& out) const;
+
+    // An authored destination: a point, or the name of something `pointOfInterest` can find.
+    struct Authored {
+        std::string name;
+        glm::vec3 point{0.0f};
+        bool hasPoint = false;
+    };
+    std::vector<Authored> authored_;
+
+    GoalTaste taste_{};
+    InterestConsiderer::Source source_ = InterestConsiderer::Source::Perceived;
+    // How many destinations may be priced in one tick. A hard cap and not a hint: each one costs
+    // two A* searches (24.969 us each, ADR-268), so an explorer that priced all twenty of its
+    // percepts would spend a millisecond of every decision tick on routes it was never going to
+    // take. The goal model ranks them and this takes the top few.
+    std::uint16_t maxDestinations_ = 4;
+    float fordPenalty_ = 0.0f;
+    float detourPenalty_ = 40.0f;
+    float wadePenaltyDefault_ = 1.2f; // `NavPathCost::wadePenalty`'s own default (ADR-195)
+    // Metres of cost at which an option is worth half what a free one is. The same shape
+    // `goalWeight`'s distance damping has, in the same units, so the two scores compose.
+    float falloff_ = 40.0f;
+    float goalTolerance_ = 2.0f;
+    // How near a *middle* waypoint counts as reached. Wider than an arrival and narrower than a
+    // cell: too tight and a body oscillates on a corner the steering cannot hold, too loose and it
+    // cuts the corner -- and cutting the corner of a detour is walking into the river the detour
+    // was chosen to avoid.
+    float legTolerance_ = 1.5f;
+    float approach_ = 0.0f;
+    double dwell_ = 0.0;
+    std::string activity_;
+    params::Parameter<float>* wadePenalty_ = nullptr;
+    std::string wadePenaltyPath_;
+
+    mutable std::vector<ActionDesc> actions_;
+    mutable std::vector<std::string> names_;
+    mutable std::vector<Destination> places_;
+    mutable std::vector<GoalCandidate> scratch_;
+    mutable std::vector<Priced> priced_;
 };
 
 [[nodiscard]] std::vector<std::string_view> considererKinds();

@@ -4,16 +4,17 @@
 
 Registry entry: `LabId::Character`, key `character` (`src/labs/lab.cpp`).
 Fixtures: `examples/labs/character/character-intelligence-lab.scene.json` (the explorers, frozen —
-see §2), `examples/labs/character/guard-post.scene.json` (the decided characters) and
+see §2), `examples/labs/character/guard-post.scene.json` (the decided characters),
+`examples/labs/character/river-crossing.scene.json` (case 9's ford and detour) and
 `examples/labs/character/perception-crowd.scene.json` (the occlusion budget).
 Cases: `examples/labs/character/cases.json`, reachable as `avgen --lab-case character:<n>`.
 Tests: `tests/unit/test_character_intelligence_lab.cpp`, `tests/unit/test_character_lab_sockets.cpp`,
 `tests/unit/test_entity_perception.cpp`, `tests/unit/test_entity_decision.cpp`,
-`tests/unit/test_decision_extraction.cpp`.
+`tests/unit/test_decision_extraction.cpp`, `tests/unit/test_route_pricing.cpp`.
 
 Companion reading, in this order: `docs/character-ai-research.md` (what already exists),
 `docs/character-ai-plan.md` (the units and who owns which file), ADR-266 to ADR-275, then ADR-290
-(perception, built) and ADR-333 (the decision layer, built).
+(perception, built), ADR-333 (the decision layer, built) and ADR-336 (route pricing, built).
 
 ---
 
@@ -34,7 +35,7 @@ is now `src/entity/decision.cpp:Selector` (ADR-333). `Explore` still *has* a goa
 
 ---
 
-## 1. One of the six scenarios cannot be run, and says so
+## 1. One of the fifteen cases cannot be run, and says so
 
 The owner's brief asked for six: basic wandering, investigating a mushroom, crossing a river, a
 social interaction, a dense environment, a long-running simulation.
@@ -49,7 +50,7 @@ social interaction, a dense environment, a long-running simulation.
 | 6 | every character *used to* see everything, and nothing scored an option | runnable — the before-arm, kept |
 | 7 | investigating a mushroom | runnable — *unblocked by ADR-333* |
 | 8 | a social interaction | runnable — *unblocked by ADR-333* |
-| 9 | crossing a river | blocked on **P11 route pricing** |
+| 9 | crossing a river | runnable — *unblocked by ADR-336* |
 | 10 | two characters, two ranges, two different worlds | runnable — the after-arm (ADR-290) |
 | 11 | the occlusion budget, and the arm at zero | runnable (ADR-290) |
 | 12 | a head that turns while the legs keep walking | runnable — *unblocked by ADR-300* |
@@ -61,12 +62,16 @@ Cases 7 and 8 were blocked on *two* units, then on one, and are now runnable. Th
 `blockedBy` is for: the day a unit lands, the cases that were waiting on it are a list rather than a
 memory, and unblocking half of one is deleting half of a string.
 
-**Case 9 is the one that did not unblock, and its blocker was rewritten rather than deleted.** P3
-landed a selector, an `Option` list and four stock considerers, so "there is nothing that scores" is
-no longer true — but none of the four prices a *route*, and preferring a longer dry way to a short
-wet one is exactly that. A case whose `blockedBy` is removed on the grounds that the unit it named
-finished is a case that passes by asserting nothing, which is the failure ADR-275 exists to prevent.
-`docs/character-ai-plan.md` §P11 was added by P3 for it.
+**Case 9 did not unblock when P3 landed, and its blocker was rewritten rather than deleted.** P3
+landed a selector, an `Option` list and four stock considerers, so "there is nothing that scores"
+stopped being true — but none of the four priced a *route*, and preferring a longer dry way to a
+short wet one is exactly that. A case whose `blockedBy` is removed on the grounds that the unit it
+named finished is a case that passes by asserting nothing, which is the failure ADR-275 exists to
+prevent, so `docs/character-ai-plan.md` §P11 was added by P3 and the case waited for it. **P11
+landed as ADR-336** and case 9 is now runnable: a fifth stock considerer, `route`, that asks
+`Navigator::requestPath` twice at two `NavPathCost::wadePenalty` and scores both answers with the
+character's own price on a wet metre. Thirteen of the fifteen cases were runnable before it and
+fourteen are now; case 13 and P9's root motion are what is left.
 
 A blocked case carries `blockedBy` naming the unit of `docs/character-ai-plan.md` that unblocks it
 (ADR-275). Case 11 is the first blocked on something other than perception or a decider, and the
@@ -75,23 +80,41 @@ the two that happened to exist on the day it was written. `--lab-case character:
 person who came to watch a character investigate something would otherwise be shown a scene in which
 that is not happening, and left to work out why.
 
-Case 9 is split on purpose. The *route* half of crossing a river is answerable today — `NavGrid`
-already prices a ford and `NavSample::waterDepth` is carried for exactly that. The *choice* half is
-not, because preferring a longer dry route to a short wet one is a score and nothing scores. So it
-was blocked on P3 and not on P7, and when P7 made the route observable the first half unblocked
-without the second — exactly as the split predicted. P3 then landed the scoring machinery and the
-second half still did not unblock, which is why §P11 exists.
+Case 9 was split on purpose and the split held all the way through. The *route* half of crossing a
+river was answerable as soon as P7 landed — `NavGrid` prices a ford and `NavSample::waterDepth` is
+carried for exactly that. The *choice* half was not, because preferring a longer dry route to a
+short wet one is a score and nothing scored. So it was blocked on P3 and not on P7, and when P7 made
+the route observable the first half unblocked without the second — exactly as the split predicted.
+P3 then landed the scoring machinery and the second half *still* did not unblock, because scoring a
+place is not scoring a way. That is three units the split kept honest, and §P11 is what it cost to
+say so rather than to quietly let the case pass.
 
 ---
 
 ## 2. The fixtures
 
-**There are two, and the reason is the golden trace.** `character-intelligence-lab.scene.json` is
+**Three of the four exist because the first one is frozen, and the reason it is frozen is the
+golden trace.** `character-intelligence-lab.scene.json` is
 frozen: `tests/data/explore-position-trace.txt` is 3,600 samples of its five bodies taken from the
 build before ADR-333's extraction, and a sixth body in that scene changes what the other five
 perceive and score. So the decided characters live in `guard-post.scene.json` — a flat world, four
 cairns, a guard at a post, a courier patrolling a line under authored `move` actions, and an
-explorer far enough away to be out of everybody's senses.
+explorer far enough away to be out of everybody's senses — and case 9's river crossing lives in
+`river-crossing.scene.json`.
+
+**How frozen the first fixture actually is, measured** (ADR-336 §5). The claim "a body added to it
+changes what the other five perceive and score" is half true, and the half that is false is worth
+knowing before the next case writes a fourth fixture:
+
+| one hero stone added to the lab fixture | of the golden's 3,600 samples |
+|---|---|
+| at (−40, 92), 90 m away across the river | **0 differ**, worst 0.000 m |
+| at (6, 10), 6 m from `scout` | **1,779 differ**, worst 13.685 m |
+
+`goalWeight` rejects a point outside the taste's `maxRange` — 26 to 30 m for these bodies — before
+it is ever weighed, and the explorers keep to a `homeRadius` of 28 to 34. So the fixture is frozen
+against a body they can *reach*, and only against that. It is still the right call for case 9,
+because a river case needs banks somebody walks on and a character standing on one of them.
 
 The cost of the split is worth naming: guard-post has no ecology and therefore no `Glow` interest
 point (its 8 points are 5 landmark and 3 character; the lab fixture's 141 are 28 landmark, 5
@@ -142,12 +165,42 @@ a control.
   omitted `world` block, because an omitted one keeps the shipped world's designed landscape
   (`world_map.cpp:671`). Everything this lab measures is about what a body knows and chooses, and a
   procedural landscape would make every number a measurement of the terrain as well. The one feature
-  is a 14 m river with 1.6 m of water, which is what case 9 will need.
+  is a 14 m river with 1.6 m of water. Case 9 ended up with a river of its own rather than this one
+  — see §2.2 — but this one is why the world block is authored rather than omitted.
 
 All four bodies run `explore` rather than `wander`, and that is not cosmetic: `wander` implements no
 `navDebug`, so a fixture built on it can say nothing at all about why a character is going where it
 is going. `Explore` is also the only autonomous mind in the engine, which makes it the thing the lab
 is for.
+
+### 2.2 The river-crossing fixture (case 9)
+
+`river-crossing.scene.json`, added by ADR-336. The same flat 240 m world and the same authored
+`world` block, with one difference that is the whole fixture: **the river ends inside the map**, at
+x = −50, so there is a ford and there is a way round and the choice between them exists.
+
+* **The channel** — 14 m wide (7 m half-width, which is the number case 9 has always quoted),
+  **1.40 m deep** at the centre, tapering to nothing over about ten metres either side. Shallower
+  than the original fixture's, deliberately: at 1.6 m of water over a 2.2 m channel the bed is
+  3.80 m down, which is deeper than any plausible `navWadeDepth` and means there is *no* ford. A
+  river a body cannot cross is a river the case cannot be about.
+* **`navWadeDepth: 1.8`** — what makes the channel walkable at all. At the default of 0 every water
+  cell is unwalkable, `NavCell::wade` is 0 everywhere, and both requests come back with the same dry
+  detour.
+* **`wader`** and **`drylander`** — the same C++ class, the same `decide` behaviour, the same
+  destination and the same two considerers. One number differs: `route/wadePenalty`, 0.4 against
+  12.0. That is the arm and the control in one run of one world, and it is also the shape the
+  Glowmere Valley 3 showcase needs — a jetpack alien crossing the river while a walking-only one
+  routes around it.
+* **`plodder`** — the third body, 26 m west of the other two and out of their way. No decider at
+  all: one authored `move` action straight at the far bank, which is exactly what an option whose
+  single action named the destination would have emitted. Its deepest water is **1.40 m**, the full
+  channel, against the drylander's 0.27 m. That is the control for a design decision rather than
+  for a taste — it is why the winning option's actions are a `Move` per waypoint.
+* **`north-cairn`, `south-cairn`, `ford-marker`** — three heroes, which are also the interest points
+  the arm that names no destination scores. With `minRange` at 45 m they are the three nearest
+  things worth walking to and all three are across the water, which is what makes that arm a probe
+  that could have failed.
 
 ---
 
@@ -265,6 +318,11 @@ ADR-182, applied here:
 | the feet move 0.000000 while the head turns | the identical layer masked onto the **feet** moves `foot.r` 0.1447 and the head 0.0000° |
 | a flinch moves the chest 0.0088 and the neck 0.0334 | the feet and toes move 0.000000 through the same flinch |
 | a mask that names a joint answers `Applied` | one naming `Head01` on an alien answers `NoJoints`, not `Inactive` |
+| the detour wins at `wadePenalty` 12.0 (0.2781 against the ford's 0.1745) | the identical pair of routes at 0.4 has the ford win (0.4055 against 0.3195) |
+| a world with a river publishes two ways to a place | the same considerer over `guard-post.scene.json`, which has no water, publishes one |
+| the dear body's deepest water is 0.27 m | the cheap body's is 1.40 m, in the same run of the same world |
+| a detour expressed as a `Move` per waypoint stays dry | `plodder`, one authored `move` at the far bank and no decider, wades 1.40 m |
+| a stone 6 m from `scout` moves 1,779 of the golden's 3,600 samples | the same stone 90 m away across the river moves **0** |
 
 The determinism case prints its play-vs-seek figures rather than bounding them, and says why: a bound
 that passes today would be loose enough to assert nothing, and P1 owns the fix. This is where the

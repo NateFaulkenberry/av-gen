@@ -1,0 +1,451 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "River Crossing",
+ "camera": {
+  "mode": 1,
+  "position": [
+   -30.0,
+   72.0,
+   -40.0
+  ],
+  "target": [
+   -66.0,
+   0.0,
+   20.0
+  ],
+  "fov": 52.0,
+  "orbitSpeed": 0.0
+ },
+ "lightRig": "../../lightrigs/bioluminescent.rig.json",
+ "environment": {
+  "stylized": true,
+  "intensity": 0.16,
+  "skyIntensity": 0.32,
+  "background": [
+   0.006,
+   0.01,
+   0.02
+  ],
+  "fogColor": [
+   0.02,
+   0.038,
+   0.07
+  ],
+  "fogDensity": 0.008,
+  "fogHeight": 16.0,
+  "fogHeightFalloff": 0.05
+ },
+ "heroes": [
+  {
+   "name": "north-cairn",
+   "position": [
+    -66.0,
+    0.0,
+    50.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 1.2,
+   "height": 3.0,
+   "importance": 0.4,
+   "focalWeight": 0.6,
+   "preferredCameraDistance": 30.0,
+   "preferredCameraElevation": 10.0,
+   "activationRadius": 160.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "south-cairn",
+   "position": [
+    -70.0,
+    0.0,
+    -12.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 1.2,
+   "height": 3.0,
+   "importance": 0.2,
+   "focalWeight": 0.3,
+   "preferredCameraDistance": 30.0,
+   "preferredCameraElevation": 10.0,
+   "activationRadius": 160.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "ford-marker",
+   "position": [
+    -44.0,
+    0.0,
+    32.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 1.0,
+   "height": 2.5,
+   "importance": 0.15,
+   "focalWeight": 0.2,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  }
+ ],
+ "navBodyRadius": 0.7,
+ "navWadeDepth": 1.8,
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "terrain",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "world": {
+    "name": "river-crossing-flat",
+    "seed": 20260918,
+    "size": [
+     240.0,
+     240.0
+    ],
+    "baseHeight": 0.0,
+    "erosion": 0.0,
+    "seaLevel": -100.0,
+    "layers": [],
+    "features": [
+     {
+      "kind": "river",
+      "name": "the-run",
+      "path": [
+       [
+        -108.0,
+        -1.6,
+        20.0
+       ],
+       [
+        -50.0,
+        -1.6,
+        20.0
+       ]
+      ],
+      "width": 14.0,
+      "amplitude": 0.5,
+      "falloff": 1.0,
+      "flatten": 0.9,
+      "roughness": 0.0,
+      "water": true,
+      "waterDepth": 0.9
+     }
+    ]
+   },
+   "terrain": {
+    "chunkSize": 40.0,
+    "resolution": 24,
+    "lodLevels": 3,
+    "lodDistance": 70.0,
+    "viewDistance": 260.0,
+    "skirtDepth": 1.2,
+    "groundMottle": true,
+    "groundGlow": 0.08,
+    "groundGlowScale": 0.06,
+    "groundGlowCoverage": 0.26,
+    "groundGlowColor": [
+     0.1,
+     1.0,
+     0.7
+    ]
+   },
+   "material": {
+    "baseColor": [
+     0.02,
+     0.07,
+     0.05
+    ],
+    "roughness": 0.9,
+    "metallic": 0.0,
+    "emissiveIntensity": 0.0
+   }
+  },
+  {
+   "name": "wader",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-diver.glb",
+   "position": [
+    -72.0,
+    0.0,
+    -8.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    3.601,
+    3.601,
+    3.601
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0
+   }
+  },
+  {
+   "name": "drylander",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-ranger.glb",
+   "position": [
+    -64.0,
+    0.0,
+    -8.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    3.344,
+    3.344,
+    3.344
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0
+   }
+  },
+  {
+   "name": "plodder",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-scout.glb",
+   "position": [
+    -96.0,
+    0.0,
+    -8.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    3.61,
+    3.61,
+    3.61
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0
+   }
+  }
+ ],
+ "entities": [
+  {
+   "name": "wader",
+   "node": "wader",
+   "seed": 7331,
+   "cullDistance": 600.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Idle",
+    "fall": "Fall_loop"
+   },
+   "gait": {
+    "walkSpeed": 1.6,
+    "runSpeed": 3.2
+   },
+   "behaviors": [
+    {
+     "kind": "decide",
+     "hertz": 1.0,
+     "dwellTicks": 2.0,
+     "margin": 0.01,
+     "memorySeconds": 0.0,
+     "visitedCapacity": 0,
+     "considerers": [
+      {
+       "kind": "route",
+       "name": "cross",
+       "weight": 1.0,
+       "wadePenalty": 0.4,
+       "fordPenalty": 0.0,
+       "detourPenalty": 40.0,
+       "falloff": 40.0,
+       "goalTolerance": 2.0,
+       "destinations": [
+        {
+         "name": "north-bank",
+         "point": [
+          -66.0,
+          0.0,
+          46.0
+         ]
+        }
+       ]
+      },
+      {
+       "kind": "idle",
+       "name": "idle",
+       "weight": 0.05
+      }
+     ]
+    },
+    {
+     "kind": "ground",
+     "slopeAlign": 0.55,
+     "footprint": 0.8
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 12,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 0.0
+   }
+  },
+  {
+   "name": "drylander",
+   "node": "drylander",
+   "seed": 7332,
+   "cullDistance": 600.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Idle",
+    "fall": "Fall_loop"
+   },
+   "gait": {
+    "walkSpeed": 1.6,
+    "runSpeed": 3.2
+   },
+   "behaviors": [
+    {
+     "kind": "decide",
+     "hertz": 1.0,
+     "dwellTicks": 2.0,
+     "margin": 0.01,
+     "memorySeconds": 0.0,
+     "visitedCapacity": 0,
+     "considerers": [
+      {
+       "kind": "route",
+       "name": "cross",
+       "weight": 1.0,
+       "wadePenalty": 12.0,
+       "fordPenalty": 0.0,
+       "detourPenalty": 40.0,
+       "falloff": 40.0,
+       "goalTolerance": 2.0,
+       "destinations": [
+        {
+         "name": "north-bank",
+         "point": [
+          -66.0,
+          0.0,
+          46.0
+         ]
+        }
+       ]
+      },
+      {
+       "kind": "idle",
+       "name": "idle",
+       "weight": 0.05
+      }
+     ]
+    },
+    {
+     "kind": "ground",
+     "slopeAlign": 0.55,
+     "footprint": 0.8
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 12,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 0.0
+   }
+  },
+  {
+   "name": "plodder",
+   "node": "plodder",
+   "seed": 7333,
+   "cullDistance": 600.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Idle",
+    "fall": "Fall_loop"
+   },
+   "gait": {
+    "walkSpeed": 1.6,
+    "runSpeed": 3.2
+   },
+   "actions": [
+    {
+     "kind": "move",
+     "name": "straight-across",
+     "target": [
+      -96.0,
+      0.0,
+      46.0
+     ],
+     "speed": 1.6,
+     "tolerance": 1.5
+    }
+   ],
+   "behaviors": [
+    {
+     "kind": "ground",
+     "slopeAlign": 0.55,
+     "footprint": 0.8
+    }
+   ]
+  }
+ ],
+ "post": {
+  "tonemap": 1,
+  "bloomEnabled": true,
+  "bloomIntensity": 0.05,
+  "bloomThreshold": 1.05,
+  "bloomKnee": 0.6
+ }
+}

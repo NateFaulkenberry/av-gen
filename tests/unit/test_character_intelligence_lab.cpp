@@ -221,7 +221,11 @@ TEST_CASE("the Character Intelligence Lab is registered and its cases resolve",
     }
     INFO(fmt::format("{} runnable, {} blocked", runnable, blocked));
     CHECK(runnable >= 4);
-    CHECK(blocked >= 2);
+    // Lowered from 2 when ADR-335 unblocked case 9 and left P9's root motion as the only case
+    // still waiting. The assertion that matters is that a lab in which *every* case were blocked
+    // cannot pass the pair, and one blocked case still carries that; a floor that outlives the
+    // cases it was counting is a floor that fails for the good news.
+    CHECK(blocked >= 1);
 
     // The control on `resolveCaseSpec`: a lab that exists with a number that does not is a
     // different failure from a lab that does not exist, and both are failures rather than silence.

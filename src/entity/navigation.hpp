@@ -147,6 +147,7 @@ struct NavSample {
 class NavGrid;
 struct PathRequest;
 struct PathResult;
+struct NavPathCost;
 
 class Navigator {
 public:
@@ -244,6 +245,16 @@ public:
     // give the same waypoints, every time, with no seed and no clock involved. A baked actor's
     // route survives a re-bake unchanged.
     [[nodiscard]] PathResult requestPath(const PathRequest& request) const;
+
+    // The same request at a price the *caller* sets, rather than at the planner's default one
+    // (ADR-336). Two of these, differing only in `NavPathCost::wadePenalty`, are the two ways
+    // across a world with a river in it: the low-penalty answer fords and the high-penalty answer
+    // goes round, and the difference between them is the only thing in this engine that can tell a
+    // destination across the water from one on the same bank.
+    //
+    // Deterministic in exactly the sense the one-argument form is, and the one-argument form is
+    // written as a call to this with `NavPathCost{}`, so there is one search and not two.
+    [[nodiscard]] PathResult requestPath(const PathRequest& request, const NavPathCost& cost) const;
 
     // Whether a route already in hand is still walkable from where the mover now is, checking from
     // `nextLeg` onwards. This is the replanning trigger: cheap enough to run every second or two,
