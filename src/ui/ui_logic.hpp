@@ -621,4 +621,48 @@ inline std::pair<float, float> routeAmountBounds(const params::ModRoute& /*route
 // Replaces NaN/inf (e.g. from a hand-edited project file) so widgets never see them.
 inline float sanitiseFinite(float value, float fallback = 0.0f) { return std::isfinite(value) ? value : fallback; }
 
+// ---- catching the playhead (Logic's "catch") -------------------------------------------------
+//
+// Two small pieces of arithmetic, here rather than inline in the panel because the panel cannot be
+// tested and these are the whole of the behaviour. `stripLanesFor` is next door for the same reason,
+// and for the reason it was extracted: a bulk rename once turned lane heights into zero and the
+// entire suite stayed green, because nothing could see the number.
+
+// Where the strip should be scrolled to so the playhead stays on screen while time advances.
+//
+// Deliberately NOT "keep the playhead centred". Centring scrolls the strip every single frame,
+// which makes the waveform crawl continuously under a still pointer and is exhausting to watch;
+// Logic pages instead, and so does this. The view moves only when the playhead reaches `edge` of
+// the way across, and then it jumps so the playhead lands `lead` of the way in -- giving most of a
+// screen of what is coming next, which is what the view is for.
+//
+// Returns `view` unchanged when the playhead is comfortably inside, which is most frames.
+[[nodiscard]] inline double caughtView(double view, double span, double now, double duration,
+                                       double edge = 0.9, double lead = 0.1) {
+    if (!(span > 0.0)) {
+        return view;
+    }
+    const double maxView = std::max(0.0, duration - span);
+    // Behind the left edge is a backwards seek, and paging backwards by a screen is the same idea.
+    if (now < view || now > view + span * edge) {
+        return std::clamp(now - span * lead, 0.0, maxView);
+    }
+    return std::clamp(view, 0.0, maxView);
+}
+
+// Where the strip should be scrolled to after a zoom, so `anchor` stays at the same place on screen.
+//
+// Without this a zoom grows or shrinks the window around its *left edge*, so the thing being looked
+// at slides away exactly when somebody zooms in to look at it more closely. With it, the anchor --
+// the playhead, when catch is on -- is the one point that does not move.
+[[nodiscard]] inline double viewAfterZoom(double view, double oldSpan, double newSpan, double anchor,
+                                          double duration) {
+    if (!(oldSpan > 0.0) || !(newSpan > 0.0)) {
+        return view;
+    }
+    // The anchor's position across the window, kept: view' = anchor - fraction * newSpan.
+    const double fraction = (anchor - view) / oldSpan;
+    return std::clamp(anchor - fraction * newSpan, 0.0, std::max(0.0, duration - newSpan));
+}
+
 } // namespace avgen::ui
