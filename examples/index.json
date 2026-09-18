@@ -152,6 +152,12 @@
     },
     {
       "category": "Showcase",
+      "description": "Glowmere Valley 3, the autonomous-character showcase (ADR-340). Five aliens, no script: every one of them is a `decide` behaviour over stock considerers, with no actions list, no timeline and no staging scenario anywhere in the file. A scout that wanders by curiosity and stops to look at what it noticed; two aliens with one number between them, of which the cheaper-on-wet-metres fords the backwater and the other walks 231 m round its end; one alien that notices another and goes to watch it. Eight tree species carry the hills, which valley 2 banded off on purpose. The project carries four parameters.",
+      "name": "Glowmere Valley 3 - The Autonomous Cast",
+      "project": "world/glowmere-valley-3.json"
+    },
+    {
+      "category": "Showcase",
       "description": "Glowmere at night with ADR-230's atmospheric effects: an audio-reactive aurora rising from the horizon, and bioluminescent comets crossing the sky -- one hero, one rainbow, and a three-comet burst, all launched by sequencer events.",
       "name": "Glowmere Atmospherics",
       "project": "world/glowmere-atmospherics.json"

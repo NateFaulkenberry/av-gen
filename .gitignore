@@ -88,3 +88,9 @@ cmake-build-*/
 # Python bytecode from the tools/ scripts
 __pycache__/
 *.pyc
+
+# Scratch scenes the Glowmere Valley 3 arms and tools write beside their originals (ADR-340).
+# They have to live here because a scene resolves its assets relative to itself, and a copy in
+# the system temp resolves none of them; they are removed by whatever wrote them, and this is the
+# guard for a run that was interrupted between the two.
+/examples/world/_v3*
