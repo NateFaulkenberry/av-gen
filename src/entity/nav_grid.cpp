@@ -224,8 +224,10 @@ void NavGrid::build(const Navigator& nav, float cellSize) {
                   "{} sampled walks agreed with the world exactly",
                   stats_.trustChecks);
     } else {
-        log::info("nav grid: the grid will NOT answer for this world's terrain -- it disagreed with "
-                  "the world after {} sampled walk(s); every walkability query stays analytic",
+        log::info("nav grid: the grid will NOT answer for this world's terrain -- {} after {} "
+                  "sampled walk(s); every walkability query stays analytic",
+                  stats_.trustFailures > 0 ? "it disagreed with the world"
+                                           : "there was not enough of it to trust",
                   stats_.trustChecks);
     }
     if (stats_.regions > 1) {
@@ -731,7 +733,12 @@ void NavGrid::checkTrust(const Navigator& nav) {
             return;
         }
     }
-    stats_.trusted = stats_.trustChecks > 0;
+    // Enough of them to mean anything. A world so broken up that the grid is only ever asked a
+    // handful of times would otherwise "pass" on two answers and then be trusted for the rest of its
+    // life -- measured: a terrain of 8 m humps at a 3 m period vouched on two checks. Silence is not
+    // agreement (ADR-182).
+    constexpr std::size_t kMinimumEvidence = 16;
+    stats_.trusted = stats_.trustChecks >= kMinimumEvidence;
 }
 
 std::uint8_t NavGrid::terrainRoom(glm::ivec2 c) const {

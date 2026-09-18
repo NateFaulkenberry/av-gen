@@ -117,6 +117,18 @@ struct NavDebug {
     glm::vec3 destination{0.0f};       // where it settled on going; world
     bool hasDestination = false;
     PathStatus status = PathStatus::Ok; // why the last plan came back as it did
+    // Seconds this body has been unable to find anywhere at all to go, and seconds it has been
+    // walking without getting closer. Both are 0 for a character that is simply pausing between
+    // errands, and that is the point of them existing (ADR-296).
+    //
+    // `status` cannot carry either, because neither is a path request: a body sealed inside a ring
+    // of stones never reaches `requestPath` -- every destination it could pick is outside the wall,
+    // `pickDestination` rejects all of them, and the last status it published is still the `Ok` of
+    // whatever it did before it was penned. The Character Intelligence Lab measured exactly that
+    // and recorded the consequence: **being stuck and being idle produced the same frame and the
+    // same log.** These two fields are the difference.
+    float confinedFor = 0.0f;
+    float stuckFor = 0.0f;
     std::string_view phase;             // idle / select / navigate / walk / arrive / observe
     std::string_view goalName;          // what it is going to, when the destination has a name
     std::string_view goalKind;          // landmark / character / glow / water / vista
