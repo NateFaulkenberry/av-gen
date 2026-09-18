@@ -151,6 +151,13 @@ is the whole of the exception.
   composition holds it, and the editor does not rebase on add the way `saveComposition` does. A
   project moved to another machine would lose such a node's mesh, and `bundleProject` does not walk
   `sceneNodes`. Rebasing on save is the fix, and it wants a case that moves a project.
+- **The World Builder, and anything else that adds nodes wholesale.** `app::WorldBuilder` composes a
+  world by calling `Composition::addNode` for every ecology layer and hero it places. Save the
+  *project* without saving the scene and every one of those lands in `added` — which is correct, and
+  is the same defect pointing the other way if it did not, but it puts a scene-sized node list in a
+  project file. The intended workflow is "Save Scene As..." after a generate, and that empties the
+  record by construction. If generated worlds start arriving in projects, the answer is to make the
+  generate offer to write a scene rather than to make this record smarter.
 - **Anything that makes the editor write a scene file.** Then re-authoring becomes reachable and
   ADR-271's question is open again, with this record as the thing to delete rather than extend.
 - **A node edit inside a nested composition.** Deliberately out of reach today. If the editor ever
