@@ -77,11 +77,28 @@ draws nothing at all. So:
   colour journey comes from the map swap, `skyIntensity`, fog, water and light colour. That is a
   real reduction against the brief's §19 and it is not hidden: the curves exist, are tested, and
   do nothing here.
-* **The map swap is a swap, not a blend.** The renderer holds one environment cube. `hdriBlend` is
-  shaped to cross 0.5 where `hdriIntensity` is at its lowest, so the change lands where it is least
-  visible; the test asserts exactly two crossings per cycle and that the contribution at each is
-  under 45% of the noon peak. A true crossfade needs two IBL chains and a blend in shading, which
-  is renderer work this pass did not do.
+* **The map swap is a swap, not a blend, and it costs a third of a second.** The renderer holds one
+  environment cube. `hdriBlend` is shaped to cross 0.5 where `hdriIntensity` is at its lowest, so
+  the change lands where it is least visible; the test asserts exactly two crossings per cycle and
+  that the contribution at each is under 45% of the noon peak. A true crossfade needs two IBL
+  chains and a blend in shading, which is renderer work this pass did not do.
+
+  **The cost, measured, because "cheap here" will stop being true in a bigger world.**
+  `setEnvironmentMap` marks the composition dirty, and `dirty_` has no granularity — so each swap
+  pays a **full flatten**, not an environment reload. On this scene:
+
+  | | measured |
+  |---|---|
+  | composition flatten (14 nodes -> 557 entities, 1,069 meshes) | **273-293 ms** |
+  | IBL chain for the new map (2048x1024 -> cube 256, irradiance 32, prefiltered 128 x 6) | **36-55 ms** |
+  | terrain rebuild inside the flatten (256 chunks, 32,768 tris) | 2 ms |
+  | **total stall, twice per cycle** | **~310-350 ms** |
+
+  At a 240-second cycle that is two ~1/3-second stutters every four minutes. It is survivable here
+  and it is **not** survivable in a Glowmere-sized world, whose terrain alone flattens in ~390 ms.
+  Anyone raising the cycle speed, or putting this system in a larger scene, meets this. The fix is
+  either the two-cube crossfade or making an environment-map change not imply a full re-flatten;
+  the second is much the smaller and does not need the blend.
 
 ## What the cycle measures
 
