@@ -228,6 +228,7 @@ void WorldEditor::updateNavigation(app::Engine& engine, const scene::Camera& cam
             std::size_t leg = entity->actions().routeLeg();
             std::string phase;
             std::string status;
+            std::string confinement;
             bool failed = false;
             bool hasDestination = false;
             glm::vec3 destination{0.0f};
@@ -263,6 +264,17 @@ void WorldEditor::updateNavigation(app::Engine& engine, const scene::Camera& cam
                     // is on the other side of a lake looks exactly like one that is idling.
                     failed = nav.status != entity::PathStatus::Ok &&
                              nav.status != entity::PathStatus::AlreadyThere;
+                    // And the case a `PathStatus` cannot reach at all (ADR-296). A body that can
+                    // find nowhere to go never asks for a path, so its status is whatever its last
+                    // errand left behind -- usually `ok`. Half a second of it is a character
+                    // pausing; twelve seconds of it is a character in a pen, and until now the two
+                    // produced the same frame and the same log.
+                    if (nav.confinedFor > 0.5f) {
+                        confinement = fmt::format("nowhere to go for {:.1f} s", nav.confinedFor);
+                        failed = true;
+                    } else if (nav.stuckFor > 0.5f) {
+                        confinement = fmt::format("no progress for {:.1f} s", nav.stuckFor);
+                    }
                     hasDestination = nav.hasDestination;
                     destination = nav.destination;
                     break;
@@ -292,6 +304,27 @@ void WorldEditor::updateNavigation(app::Engine& engine, const scene::Camera& cam
             out.label = out.entity + "  " + phase;
             if (!status.empty()) {
                 out.label += fmt::format("  [{}]", status);
+            }
+            if (!confinement.empty()) {
+                out.label += fmt::format("  [{}]", confinement);
+            }
+            // Which piece of the walkable ground this body is standing on, and whether the place it
+            // is heading for is on the same one. The grid has known this since it was built and
+            // nothing had ever asked it (ADR-296): `regionAt` and `connected` are lookups, not
+            // searches, and an unreachable destination is the difference between a character that
+            // is thinking and one that will never arrive.
+            if (grid != nullptr && grid->valid()) {
+                const glm::vec2 here(out.position.x, out.position.z);
+                const std::uint16_t region = grid->regionAt(here);
+                if (region != 0 && grid->stats().regions > 1) {
+                    out.label += fmt::format("  region {}/{} ({} cells)", region,
+                                             grid->stats().regions, grid->regionSize(region));
+                    if (out.hasDestination &&
+                        !grid->connected(here, glm::vec2(out.destination.x, out.destination.z))) {
+                        out.label += "  destination is NOT reachable from here";
+                        out.failed = true;
+                    }
+                }
             }
             if (!out.waypoints.empty()) {
                 out.label += fmt::format("  leg {}/{}", std::min(leg + 1, out.waypoints.size()),
@@ -368,6 +401,26 @@ void WorldEditor::updateNavigation(app::Engine& engine, const scene::Camera& cam
                                  stats.width, stats.height, stats.cellSize, stats.walkable,
                                  stats.water, stats.blocked, stats.regions, stats.largestRegion,
                                  stats.buildMs);
+        // The region *count* is a fact about the graph; how much ground is on the wrong side of it
+        // is the fact an author acts on, and it is the one nothing said (ADR-296). Glowmere's
+        // shipped valley: 28 regions, and 9,646 of 19,584 walkable cells -- 49% of the ground a
+        // character can stand on -- unreachable from the half the characters are standing in.
+        if (stats.stranded > 0) {
+            navStatus_ += fmt::format(
+                "\n{} of {} walkable cells ({:.0f}%) cannot be reached from the largest region",
+                stats.stranded, stats.walkable,
+                100.0 * static_cast<double>(stats.stranded) / static_cast<double>(stats.walkable));
+        }
+        // What the grid is allowed to answer for, said where the person looking at the overlay is
+        // (ADR-295). A walkability query that is analytic in one world and grid-assisted in the next
+        // is exactly the kind of silent difference this panel exists to stop.
+        navStatus_ += stats.trusted
+                          ? fmt::format("\nthe grid answers walkability for this world ({} sampled "
+                                        "walks agreed with it exactly)",
+                                        stats.trustChecks)
+                          : fmt::format("\nthe grid does NOT answer walkability here: it disagreed "
+                                        "with the world after {} sampled walk(s)",
+                                        stats.trustChecks);
         if (showNavGrid) {
             navStatus_ += fmt::format("\ndrawing {} cell(s) within {:.0f} m of the view", drawn,
                                       navGridRadius);

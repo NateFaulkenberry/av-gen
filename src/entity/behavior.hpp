@@ -81,6 +81,29 @@ struct EntityState {
     [[nodiscard]] glm::vec3 position() const { return anchor + travel; }
 };
 
+// A place worth walking to (ADR-093, §6). §6 lists what a character should find interesting --
+// glowing plants, water, the UFO, terrain features, scenic locations -- and this is that list, as
+// data, so a behaviour can choose among them without knowing where any of them came from.
+//
+// The kinds exist so a character can have *taste*: one drawn to water and one drawn to high ground
+// are the same behaviour with different weights, and the difference is what stops two characters in
+// the same world walking the same route.
+enum class InterestKind : std::uint8_t {
+    Landmark,  // a hero or an authored node: the elder, the monument, the arch
+    Character, // another entity, which moves
+    Glow,      // a patch of luminous ecology
+    Water,     // a point on a shoreline
+    Vista,     // a walkable local high point
+};
+[[nodiscard]] const char* interestKindName(InterestKind kind);
+
+struct InterestPoint {
+    glm::vec3 position{0.0f};
+    std::string name;   // empty for a derived point; a landmark or entity name otherwise
+    InterestKind kind = InterestKind::Landmark;
+    float weight = 1.0f;
+};
+
 struct BehaviorContext {
     double time = 0.0;   // seconds on the engine timeline
     double dt = 0.0;     // seconds since this entity was last updated (not necessarily the frame's)
@@ -117,6 +140,18 @@ struct NavDebug {
     glm::vec3 destination{0.0f};       // where it settled on going; world
     bool hasDestination = false;
     PathStatus status = PathStatus::Ok; // why the last plan came back as it did
+    // Seconds this body has been unable to find anywhere at all to go, and seconds it has been
+    // walking without getting closer. Both are 0 for a character that is simply pausing between
+    // errands, and that is the point of them existing (ADR-296).
+    //
+    // `status` cannot carry either, because neither is a path request: a body sealed inside a ring
+    // of stones never reaches `requestPath` -- every destination it could pick is outside the wall,
+    // `pickDestination` rejects all of them, and the last status it published is still the `Ok` of
+    // whatever it did before it was penned. The Character Intelligence Lab measured exactly that
+    // and recorded the consequence: **being stuck and being idle produced the same frame and the
+    // same log.** These two fields are the difference.
+    float confinedFor = 0.0f;
+    float stuckFor = 0.0f;
     std::string_view phase;             // idle / select / navigate / walk / arrive / observe
     std::string_view goalName;          // what it is going to, when the destination has a name
     std::string_view goalKind;          // landmark / character / glow / water / vista

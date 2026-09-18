@@ -167,10 +167,15 @@ existing `spatial::ObstacleField`, which is 300 lines, not a navmesh dependency.
 
 ### A.4 What navigation still owes
 
-- **Dynamic obstacles.** `ObstacleField` is built once at load. A door that closes, a craft that
-  lands, a fallen tree -- none can be added at runtime, and the grid would need a partial rebuild.
-  This is the one Recast/TileCache feature with a real analogue here, and it is a rebuild-a-rect
-  problem on a 23,716-cell grid, not a library problem.
+**Updated 2026-09-18 by P7 (ADR-295 / ADR-296 / ADR-297).** Three of the four below are done and are
+struck through with what they cost; the two things this section got *wrong* are called out where
+they occur, because a correction is worth more than a tick.
+
+- ~~**Dynamic obstacles.**~~ **Done, ADR-297.** `NavGrid::rebuildRect(nav, lo, hi)`: 2.05 ms over a
+  24 m rectangle against a 287 ms whole build. It was a rebuild-a-rect problem, as this section said,
+  with one thing this section did not say -- the *region labels* cannot be partial, because a wall
+  dropped across a corridor divides a region that reaches the far side of the world. The graph half
+  is done; nothing yet *authors* a dynamic obstacle from a scene or an action.
 - **Path smoothing.** Routes are cell centres. `Navigator::steer` hides this at walking speed; it
   will not hide it for anything that banks or turns on a radius.
 - **Off-mesh links.** `NavSettings::jumpOver` and `NavCell::vault` (ADR-196) exist, are priced into
@@ -178,8 +183,14 @@ existing `spatial::ObstacleField`, which is 300 lines, not a navmesh dependency.
   every cell is 0 and the cost term it feeds is exactly 0. Not to be confused with
   `explore/jumpRange` (ADR-194), which *is* authored -- `ember` carries 7.0 in the Glowmere scenes.
   The difference matters: a character can hop, and the *planner* still cannot route it across a gap.
-- **Reachability reporting.** 28 regions and nothing says so. `NavGridStats::regions` is computed
-  at build and read by no UI.
+- ~~**Reachability reporting.**~~ **Done, ADR-296, and this line was already half wrong when it was
+  written.** ADR-197 landed the route overlay: `NavGridStats::regions` *is* read by the world panel,
+  and `PathStatus::Unreachable` *is* printed in the selected walker's label. What was missing is the
+  arithmetic -- **9,646 of 19,584 walkable cells, 49%, are stranded from the largest region** -- and
+  the case no `PathStatus` can reach: a body that finds nowhere to go never asks for a path, so it
+  publishes the `Ok` of its last errand and looks exactly like one that is idling. `NavDebug` now
+  carries `confinedFor` and `stuckFor`. Measured: penned 18.77 s confined and 0.00 m travelled, free
+  0.00 s and 11.70 m, **with identical path statuses**.
 
 ---
 
@@ -483,6 +494,17 @@ Control: max travel at N=50 was 0.00 m for `nil`, 1.03 m for `wander`, 3.08 m fo
 The per-character figures are the slope of the upper half, not the ratio at one point; the arm is
 noisy at small N because a single route plan (25 us) dominates a 10-body frame.
 
+**Updated 2026-09-18 (ADR-295).** Two corrections to the table above, both from the decomposition
+this section never did. `Navigator::sample` at 10.325 us is measured on a lattice of points across
+the world, most of which are rejected by the first or second rule; **on walkable ground, where a
+walker actually asks, it was 15.9 us**. And half of that was the same question asked twice --
+`TerrainQuery::at` took a `WorldMap::sample` and then called `canopyHeight`, which took another at
+the same point. Handing the sample across, with no other change and no route moved:
+`Navigator::sample` 10.461 -> 5.564 us, `steer` 59.754 -> 34.853, `pathValid` 75.026 -> 41.726, the
+grid build 244.3 -> 148.0 ms. A third correction, from the arm's own control: `pathValid`'s 74.481 us
+is the cost of a *false* answer -- the probe validated a route from a start it was never planned
+from, so it returned on the first blocked leg. A true answer walks every leg and costs more.
+
 **Read against a 16.7 ms frame:** the harness floor is free. A `wander` population costs about
 1% of a frame at 100 and 56% at 500. An **`explore` population costs 47% of a frame at 100 and
 exceeds the whole frame somewhere around 180**. That is the honest ceiling on the current
@@ -551,6 +573,18 @@ answer 400x cheaper for the questions being asked. The optimisation with the mos
 whole document is: *steer and validate against `NavGrid`, and reserve the analytic world for the
 final ground snap.* That is not part of the character AI work, but it is what decides whether the
 cast can be 100 or 500, so the plan sequences it explicitly (Phase 6).
+
+**Done, partly, and the part that could not be done is the finding (ADR-295).** The cheap half was
+not a grid at all: the analytic query was sampling the world twice, and stopping that is 1.9x on
+every walkability question with every route bit-identical. The grid half was built -- solids stay
+exact and swept, only the terrain is asked of the grid, and only where a distance transform says
+there are eight metres of standable ground round the line -- and then **measured, and refused for
+this world**: 18 wrong answers in 20,000 segments, enough to put four of twenty-four bodies somewhere
+else within one second. A finer grid does not fix it (1 m: sixteen times the cells, twelve times the
+build, still wrong), because the canopy term is a thresholded biome weight and no lattice is sound
+for a step function. The grid now tests its own rule against the world at build time and refuses to
+answer for a world it got wrong; the flat lab fixture passes and runs its cast 3.97x faster at
+0.000000 m of divergence over ninety seconds.
 
 ### E.4 The scrub budget
 

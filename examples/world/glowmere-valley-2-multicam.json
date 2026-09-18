@@ -1165,9 +1165,9 @@
       "importance": 0.20000000298023224,
       "name": "visitor",
       "position": [
-        10.006035804748535,
-        31.039295196533203,
-        240.0403594970703
+        6.874741554260254,
+        20.02712059020996,
+        247.17926025390625
       ],
       "preferredCameraDistance": 34.0,
       "preferredCameraElevation": -4.0,
@@ -6016,7 +6016,7 @@
       0.12999999523162842
     ],
     "particles/visitor-beam/drag": 0.05000000074505806,
-    "particles/visitor-beam/emissive": 0.44999998807907104,
+    "particles/visitor-beam/emissive": 1.5499999523162842,
     "particles/visitor-beam/enabled": true,
     "particles/visitor-beam/extent": [
       0.41999998688697815,
@@ -6036,7 +6036,7 @@
       0.0
     ],
     "particles/visitor-beam/size": 1.0,
-    "particles/visitor-beam/spawnRate": 0.0,
+    "particles/visitor-beam/spawnRate": 6100.0,
     "particles/visitor-beam/speed": 1.0,
     "particles/visitor-beam/spread": 0.12800000607967377,
     "particles/visitor-beam/stretch": 4.5,

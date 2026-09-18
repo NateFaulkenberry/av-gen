@@ -31,6 +31,8 @@
 #include "entity/behavior.hpp"
 #include "entity/gait.hpp"
 #include "entity/field.hpp"
+#include "entity/character_ai.hpp"
+#include "entity/perception.hpp"
 #include "entity/locomotion.hpp"
 #include "entity/navigation.hpp"
 #include "params/modulation.hpp"
@@ -123,6 +125,20 @@ struct EntityDesc {
     // from walking to running at different speeds.
     GaitSettings gait;
 
+    // ---- the senses (ADR-270, ADR-290) ----
+    //
+    // What this body can notice, and whether it notices anything at all. `perceives` is the whole
+    // of the opt-in: it is set by the presence of the scene file's `"perception"` key and by
+    // nothing else, so a craft that hovers, a rock that spins and the nine farm animals of
+    // Glowmere pay exactly nothing for a stage they were never going to read.
+    //
+    // A flag rather than `range <= 0` as the sentinel, because a character whose range an author
+    // has keyframed down to zero for a shot is a character that has been *blinded*, and that is a
+    // different fact from one that has no senses. `perceptionFromJson` refuses a range of zero for
+    // the same reason.
+    PerceptionSettings perception;
+    bool perceives = false;
+
     // The profile this entity was built from, as written. Round-tripped so saving a scene does not
     // inline what the author deliberately shared -- `profileCount` records how many of each list
     // came from it, so the writer emits only what this entity added. Runtime, never serialised.
@@ -172,28 +188,11 @@ struct NodeBinding {
     float facing = 0.0f;
 };
 
-// A place worth walking to (ADR-093, §6). §6 lists what a character should find interesting --
-// glowing plants, water, the UFO, terrain features, scenic locations -- and this is that list, as
-// data, so a behaviour can choose among them without knowing where any of them came from.
-//
-// The kinds exist so a character can have *taste*: one drawn to water and one drawn to high ground
-// are the same behaviour with different weights, and the difference is what stops two characters in
-// the same world walking the same route.
-enum class InterestKind : std::uint8_t {
-    Landmark,  // a hero or an authored node: the elder, the monument, the arch
-    Character, // another entity, which moves
-    Glow,      // a patch of luminous ecology
-    Water,     // a point on a shoreline
-    Vista,     // a walkable local high point
-};
-[[nodiscard]] const char* interestKindName(InterestKind kind);
-
-struct InterestPoint {
-    glm::vec3 position{0.0f};
-    std::string name;   // empty for a derived point; a landmark or entity name otherwise
-    InterestKind kind = InterestKind::Landmark;
-    float weight = 1.0f;
-};
+// `InterestKind`, `InterestPoint` and `interestKindName` used to be declared here and are now in
+// `entity/behavior.hpp` (ADR-290). They moved because `entity/character_ai.hpp` §2 declares a
+// `Percept` carrying an `InterestKind`, and that header has to be includable by *this* one now that
+// `EntityDesc` carries a `PerceptionSettings`. Nothing about them changed and every name still
+// resolves through this header, which includes `behavior.hpp`.
 
 // ---- runtime ---------------------------------------------------------------------------------
 
@@ -316,6 +315,34 @@ public:
 
     // The entity's behaviours, in declaration order.
     [[nodiscard]] const std::vector<std::unique_ptr<IBehavior>>& behaviors() const { return behaviors_; }
+
+    // ---- the senses (ADR-270, ADR-290) -------------------------------------------------------
+
+    // What this body noticed at its last sense tick, best first. Empty for a body that declared no
+    // `perception` block, and empty for one that has not been ticked yet.
+    //
+    // A span over storage the entity owns and reuses, so reading it costs nothing and producing it
+    // allocates nothing in steady state -- the same arrangement `actionEvents` has. It is
+    // deliberately **not** a memory: it holds what the last tick found, and nothing accumulates
+    // across ticks. ADR-267's D4 is what decides that -- anything a character remembers must be
+    // recoverable by re-simulating from `t - maxSeconds`, and a working set rebuilt from scratch
+    // every tick is recoverable by construction.
+    [[nodiscard]] std::span<const Percept> percepts() const {
+        return std::span<const Percept>(percepts_.data(), perceptCount_);
+    }
+    // The settings this body senses with **as the parameters currently read**, not as the scene
+    // file wrote them (ADR-225). `desc().perception` is the author's value; this is the one the
+    // last update used, after any keyframe, preset or panel edit.
+    [[nodiscard]] const PerceptionSettings& perception() const { return perceptionLive_; }
+    [[nodiscard]] bool perceives() const { return desc_.perceives; }
+    // Sense ticks are not consecutive. A cadence above the step rate skips them, a cadence of zero
+    // means "every step" and advances the index by a whole frame of microseconds, and a dropped
+    // frame skips them at any cadence -- so the tick a body last sensed at is the only thing that
+    // says how much of a per-second budget this tick is owed. `IPerception::perceive` reads it
+    // through here, and `EntityWorld::perceiveOne` writes it *after* the call for exactly that
+    // reason. Cleared by `reset`, so a replay rebuilds it rather than inheriting it (D4).
+    static constexpr std::uint64_t kNoSenseTick = 0xFFFFFFFFFFFFFFFFull;
+    [[nodiscard]] std::uint64_t lastSenseTick() const { return senseTick_; }
 
     // ---- intent (ADR-096) ------------------------------------------------------------------
 
@@ -451,6 +478,31 @@ private:
     Activity arcActivity_ = Activity::React;
     double arcCooldownUntil_ = -1.0e30;
     double fieldAccum_ = 0.0;
+
+    // ---- the senses (ADR-270, ADR-290) -------------------------------------------------------
+    //
+    // Sized once at bind to the hard maximum a `capacity` parameter may be raised to, so the
+    // working set never reallocates however the timeline drives the knob. `perceptCount_` is how
+    // many of them the last tick actually wrote.
+    std::vector<Percept> percepts_;
+    std::size_t perceptCount_ = 0;
+    // The sense tick the working set belongs to (`entity::senseTick`), and a sentinel meaning
+    // "never sensed". Not an accumulator: an accumulator drifts with the frame rate, so a replayed
+    // sense tick would land on a different instant from the played one and a character's working
+    // set would depend on how the frames happened to fall (D1).
+    std::uint64_t senseTick_ = kNoSenseTick;
+    PerceptionSettings perceptionLive_{};
+    // The live knobs, resolved at registerParameters(). Null until then; `bind` fixes them up.
+    struct PerceptionParams {
+        params::Parameter<float>* range = nullptr;
+        params::Parameter<float>* fieldOfView = nullptr;
+        params::Parameter<float>* proximityRange = nullptr;
+        params::Parameter<float>* capacity = nullptr;
+        params::Parameter<float>* hertz = nullptr;
+        params::Parameter<float>* occlusionTestsPerSecond = nullptr;
+        params::Parameter<float>* weight[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+    };
+    PerceptionParams perceptionParams_{};
 
     IPoseSink* pose_ = nullptr;
     const ISkeletonQuery* skeleton_ = nullptr;
@@ -598,6 +650,40 @@ public:
     // Recomputes the list. Called by setLandmarks and setNavigator, so a host that uses those gets
     // interests without asking; call it directly after moving something that is one.
     void refreshInterestPoints();
+
+    // ---- perception (ADR-270, ADR-290) -------------------------------------------------------
+
+    // The sense stage every perceiving body in this world runs. Defaults to the grid-backed one
+    // below, which is everything that exists today; a test installs a `ScriptedPerception` here so
+    // a decision layer can be asserted without a world, exactly as `setPathProvider` lets an action
+    // be. The pointer is borrowed: the caller keeps it alive.
+    void setPerception(const IPerception* perception) { perception_ = perception; }
+    [[nodiscard]] const IPerception& perception() const {
+        return perception_ != nullptr ? *perception_ : gridPerception_;
+    }
+    // Whether any entity in this world declared a `perception` block. False is the ordinary answer
+    // and it is what makes the stage free: the grids are not built, the loop is not entered, and a
+    // scene of hovering craft is bit-for-bit what it was before perception existed.
+    [[nodiscard]] bool perceiving() const { return perceiving_; }
+
+    // What the last update's sense stage actually did. Structural quantities rather than
+    // milliseconds (ADR-170): "eleven bodies sensed, 274 candidates scanned, 2 occlusion tests"
+    // survives a change of machine, and it is what the acceptance arms assert on -- the control at
+    // `occlusionTestsPerSecond = 0` is exactly `occlusionTests == 0`.
+    struct PerceptionCounts {
+        std::size_t perceivers = 0;     // entities that declared a perception block and were ticked
+        std::size_t sensed = 0;         // ...of those, the ones whose sense tick fired this update
+        std::size_t candidates = 0;     // points the grid queries returned, before any filter
+        std::size_t percepts = 0;       // percepts produced
+        std::size_t dropped = 0;        // candidates the capacity cut discarded
+        std::size_t occlusionTests = 0; // `world::heroSightline` calls performed
+        std::size_t occlusionDeferred = 0; // percepts left `tested == false` by a spent budget
+    };
+    [[nodiscard]] PerceptionCounts perceptionCounts() const { return perceptionCounts_; }
+    // The snapshot indices the sense stage scans. Public because a `IPerception` written outside
+    // this file needs them and because a test that wants to price a scan needs to be able to run
+    // one; rebuilt at the top of every update in which anything perceives.
+    [[nodiscard]] PerceptionIndex perceptionIndex() const;
 
     // Characters not walking through each other (§11 of the world-authoring brief).
     //
@@ -751,6 +837,30 @@ private:
     std::vector<std::string> registered_;
     std::string prefix_ = "entity/";
     Counts counts_{};
+
+    // ---- perception (ADR-270, ADR-290) -------------------------------------------------------
+    //
+    // Two indices, both snapshots taken before anything in the step moves -- the same rule the
+    // crowd field follows, for the same reason: building them as the bodies go would make what a
+    // character notices depend on the order the entities happen to be stored in.
+    //
+    // The interest grid is rebuilt with the list, which is rare. The body grid is rebuilt every
+    // update in which anything perceives, because bodies move.
+    GridPerception gridPerception_;
+    const IPerception* perception_ = nullptr;
+    spatial::PointGrid interestGrid_;
+    std::vector<glm::vec3> interestGridPoints_;
+    std::vector<std::uint32_t> interestGridSource_; // grid point -> interests_ index
+    spatial::PointGrid bodyGrid_;
+    std::vector<glm::vec3> bodyPoints_;             // entity index -> its snapshot position
+    std::vector<Percept> perceptScratch_;
+    PerceptionCounts perceptionCounts_{};
+    bool perceiving_ = false;
+    // Rebuilds `bodyGrid_` and `bodyPoints_` from where every entity's simulation stands now, and
+    // runs one sense tick for `entityIndex` when its cadence says it is due. Shared by `update` and
+    // `seek` so a scrubbed character's working set is built by the same code as a played one's.
+    void buildBodyIndex();
+    void perceiveOne(std::size_t entityIndex, double time);
 
     // ---- fields (ADR-097) --------------------------------------------------------------------
     std::vector<FieldDesc> fields_;

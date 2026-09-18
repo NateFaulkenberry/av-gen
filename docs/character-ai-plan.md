@@ -177,6 +177,14 @@ flinch, an aim — needs somewhere to be put, and a single cross-fade between tw
 **Done when** the `explore` scaling arm of `tools/charai_probe.cpp` moves. It is the instrument; it
 is already built; it has controls.
 
+**Landed 2026-09-18: ADR-295, ADR-296, ADR-297.** Item 1 is half done and the other half is a
+measured refusal: the analytic query was sampling the world twice (1.9x, every route bit-identical),
+and the grid substitution is exactly route-preserving on flat ground and wrong 18 times in 20,000 on
+Glowmere -- so `NavGrid` tests its own rule against the world at build and refuses to answer for a
+world it got wrong. Item 2 corrects this list: `regions` *is* read by a UI and `Unreachable` *is*
+surfaced, both since ADR-197; what was missing is the stranded count (9,646 of 19,584 cells) and the
+body that never asks for a path at all. Item 3 is `NavGrid::rebuildRect`, 2.05 ms over 24 m.
+
 ### P8 — Scrub latency  ·  needs P1  ·  one agent
 
 **Delivers**, in this order and stopping as soon as the editor is usable:

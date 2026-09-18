@@ -1076,6 +1076,8 @@ public:
         out.destination = goal_;
         out.hasDestination = hasGoal_;
         out.status = lastStatus_;
+        out.confinedFor = confinedFor_;
+        out.stuckFor = stuckFor_;
         out.phase = phaseName();
         out.goalName = goalName_;
         out.goalKind = interestKindName(goalKind_);
@@ -1146,6 +1148,8 @@ public:
         bestProgress_ = std::numeric_limits<float>::max();
         failures_ = 0;
         running_ = false;
+        confined_ = false;
+        confinedFor_ = 0.0f;
         lastStatus_ = PathStatus::Ok;
         recent_.clear();
         ground_.reset();
@@ -1169,6 +1173,9 @@ public:
         // The phases are a chain, not a list: selecting a goal should plan a route in the same
         // frame, and planning one should start walking in it. The guard is what keeps a bug in a
         // transition from becoming an infinite loop inside one frame.
+        if (confined_) {
+            confinedFor_ += static_cast<float>(ctx.dt);
+        }
         for (int guard = 0; guard < 5; ++guard) {
             if (!step(ctx, state, motion)) {
                 break;
@@ -1290,10 +1297,18 @@ private:
         if (!pickGoal(ctx, state)) {
             // Nowhere to go. Stand a moment and ask again rather than burning the frame on
             // rejection sampling, which is what the previous navigation did and why it never moved.
+            //
+            // And say so, because standing a moment and standing forever look identical from
+            // outside (ADR-296). A body with nowhere to go never reaches `requestPath`, so no
+            // `PathStatus` is ever published and the overlay reads whatever the last errand left
+            // there. `confined_` is that fact, and `confinedFor_` is how long it has been true.
+            confined_ = true;
             timer_ = sample(ctx, 0.8f, 2.0f);
             phase_ = Phase::Idle;
             return false;
         }
+        confined_ = false;
+        confinedFor_ = 0.0f;
         // Whether this trip is a walk or a run is decided once, on departure, rather than per
         // frame -- a character that re-rolled its gait every frame would flicker between them.
         running_ = ctx.rng != nullptr && ctx.rng->nextFloat() < param(runChance_, runChanceDefault_);
@@ -1872,6 +1887,10 @@ private:
     EscapeMemory escape_;
     float bestProgress_ = 0.0f;
     int failures_ = 0;
+    // Whether the last attempt to choose a destination found nowhere to go, and for how long that
+    // has been the answer. See the note on `NavDebug::confinedFor`.
+    bool confined_ = false;
+    float confinedFor_ = 0.0f;
     PathStatus lastStatus_ = PathStatus::Ok;
     std::vector<glm::vec3> recent_;
     GroundFollower ground_;

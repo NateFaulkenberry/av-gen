@@ -525,6 +525,64 @@
    }
   },
   {
+   "name": "watcher",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-scout.glb",
+   "position": [
+    -10.0,
+    0.0,
+    -14.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    3.61,
+    3.61,
+    3.61
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0,
+    "layers": [
+     {
+      "name": "look",
+      "kind": "aim",
+      "drive": "look",
+      "joints": [
+       "head.x",
+       "Eye_L",
+       "Eye_R",
+       "Mouth",
+       "Antenna"
+      ],
+      "pivot": "head.x",
+      "maxYaw": 75.0,
+      "maxPitch": 30.0
+     },
+     {
+      "name": "startle",
+      "kind": "additive",
+      "drive": "reaction",
+      "clip": "Fight_head_hit",
+      "joints": [
+       "spine_02.x",
+       "spine_03.x",
+       "spine_04.x",
+       "spine_05.x",
+       "neck.x",
+       "head.x"
+      ],
+      "descendants": true
+     }
+    ]
+   }
+  },
+  {
    "name": "penned",
    "kind": "gltf",
    "asset": "../../../assets/aliens/alien-pilot.glb",
@@ -1225,7 +1283,15 @@
      "node": "lantern",
      "socket": "hand"
     }
-   ]
+   ],
+   "perception": {
+    "range": 60.0,
+    "fieldOfView": 200.0,
+    "proximityRange": 4.0,
+    "capacity": 24,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 0.0
+   }
   },
   {
    "name": "rover",
@@ -1261,7 +1327,15 @@
      "repathSeconds": 6.0,
      "stuckSeconds": 2.5
     }
-   ]
+   ],
+   "perception": {
+    "range": 12.0,
+    "fieldOfView": 200.0,
+    "proximityRange": 4.0,
+    "capacity": 24,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 0.0
+   }
   },
   {
    "name": "diver",
@@ -1296,6 +1370,64 @@
      "waypointRadius": 2.2,
      "repathSeconds": 6.0,
      "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 60.0,
+    "fieldOfView": 90.0,
+    "proximityRange": 4.0,
+    "capacity": 24,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 0.0
+   }
+  },
+  {
+   "name": "watcher",
+   "node": "watcher",
+   "seed": 8081,
+   "cullDistance": 600.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Idle",
+    "fall": "Fall_loop"
+   },
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 1.1,
+     "runSpeed": 2.42,
+     "turnRate": 150.0,
+     "arrive": 1.6,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "observeMin": 1.5,
+     "observeMax": 4.0,
+     "minRange": 8.0,
+     "maxRange": 22.0,
+     "homeRadius": 26.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 2.2,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    },
+    {
+     "kind": "lookAt",
+     "target": "boulder-b",
+     "turnRate": 70.0,
+     "weight": 1.0
+    },
+    {
+     "kind": "interest",
+     "signal": "music.impact",
+     "observeChance": 0.0,
+     "alertThreshold": 0.45,
+     "reactionDecay": 1.4,
+     "reactionCooldown": 3.0
     }
    ]
   },
@@ -1333,7 +1465,15 @@
      "repathSeconds": 6.0,
      "stuckSeconds": 2.5
     }
-   ]
+   ],
+   "perception": {
+    "range": 60.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 24,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 2.0
+   }
   }
  ],
  "post": {

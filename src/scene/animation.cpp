@@ -357,19 +357,21 @@ void AnimationPlayer::evaluate(const std::vector<AnimationClip>& clips, const Sk
 
 // ---- SkinnedRig --------------------------------------------------------------------------------
 
-int SkinnedRig::findClip(std::string_view clipName) const {
+int findClip(const std::vector<AnimationClip>& clips, std::string_view name) {
     for (std::size_t i = 0; i < clips.size(); ++i) {
-        if (clips[i].name == clipName) {
+        if (clips[i].name == name) {
             return static_cast<int>(i);
         }
     }
     for (std::size_t i = 0; i < clips.size(); ++i) {
-        if (shortName(clips[i].name) == clipName) {
+        if (shortName(clips[i].name) == name) {
             return static_cast<int>(i);
         }
     }
     return -1;
 }
+
+int SkinnedRig::findClip(std::string_view clipName) const { return scene::findClip(clips, clipName); }
 
 void SkinnedRig::addDefaultStates(float blendSeconds) {
     for (std::size_t i = 0; i < clips.size(); ++i) {
@@ -427,6 +429,15 @@ bool SkinnedRig::evaluate(double now, float hz) {
         previousPalette = palette;
     }
     player.evaluate(clips, skeleton, t, pose, scratchPose);
+    // ADR-300, and the order is the whole of it: the player first, the layers on top of what it
+    // produced, and only then the palette. `t` rather than `now`, so a rate-limited rig's layers
+    // move on the same fixed grid its clips do -- a look that updated every frame on a rig posed at
+    // 20 Hz would be a head sliding against a body that steps.
+    //
+    // ADR-260: this writes `pose`, which becomes `palette`, which the renderer draws. It does not
+    // write the simulation position, the motion offset or the node transform, and cannot: the layer
+    // module has no way to reach any of them.
+    layerStats = layers.apply(skeleton, clips, t, pose);
     skinningPalette(skeleton, pose, scratchModel, palette);
     if (reseed || previousPalette.size() != palette.size()) {
         // A discontinuity, or the first evaluation: nothing moved to get here.
@@ -478,6 +489,8 @@ RigStats updateRigs(Scene& scene, const FrameTime& time) {
         if (rig.evaluate(time.renderTime, hz)) {
             ++stats.posed;
             stats.joints += static_cast<std::uint32_t>(rig.skeleton.jointCount());
+            stats.layers += rig.layerStats.applied;
+            stats.layerJoints += rig.layerStats.joints;
         } else {
             ++stats.rateLimited;
         }

@@ -93,8 +93,14 @@
 // a character remembers must be recoverable by re-simulating from `t - maxSeconds`. A memory that
 // only a saved file could restore is a memory that makes a scrub differ from a play.
 
+// ADR-290 changed exactly one thing here and changed nothing it says: `entity/entity.hpp` was
+// included and is now `entity/action.hpp`, with `EntityWorld` left to the forward declaration
+// `entity/behavior.hpp` already carries. Nothing below needs `EntityWorld` to be complete -- every
+// use of it is a reference or a pointer -- and `entity.hpp` has to be able to include *this*, now
+// that `EntityDesc` carries a `PerceptionSettings`. A normative header the thing it describes
+// cannot include is a header that stays inert, which is what it was.
+#include "entity/action.hpp"
 #include "entity/behavior.hpp"
-#include "entity/entity.hpp"
 #include "entity/locomotion.hpp"
 #include "entity/navigation.hpp"
 
@@ -103,6 +109,7 @@
 #include <cstdint>
 #include <span>
 #include <string_view>
+#include <vector>
 
 namespace avgen::entity {
 

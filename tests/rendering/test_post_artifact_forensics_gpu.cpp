@@ -51,6 +51,7 @@
 #include "scene/composition.hpp"
 #include "scene/post_settings.hpp"
 #include "scene/scene.hpp"
+#include "support/post_bench.hpp"
 
 #include <fmt/format.h>
 
@@ -71,18 +72,13 @@ namespace fs = std::filesystem;
 
 namespace {
 
-std::unique_ptr<gpu::Context> makeContext() {
-    static bool logInit = false;
-    if (!logInit) {
-        log::init(log::Level::Warn);
-        logInit = true;
-    }
-    auto ctx = gpu::Context::create(gpu::ContextDesc{});
-    if (!ctx) {
-        SKIP("no GPU adapter available: " << ctx.error().message);
-    }
-    return std::move(*ctx);
-}
+using testsupport::Canvas;
+using testsupport::CapturedStage;
+using testsupport::makeHdr;
+using testsupport::PostBench;
+using testsupport::SyntheticHdr;
+
+std::unique_ptr<gpu::Context> makeContext() { return testsupport::gpuContextOrSkip(); }
 
 // ---- the detector -------------------------------------------------------------------------------
 //
@@ -330,60 +326,11 @@ std::string describe(const char* name, const Field& f) {
 }
 
 // ---- synthetic inputs ---------------------------------------------------------------------------
-
-// An RGBA16Float texture the CPU wrote, standing in for the scene's HDR colour.
-struct SyntheticHdr {
-    wgpu::Texture texture;
-    wgpu::TextureView view;
-    std::uint32_t width = 0;
-    std::uint32_t height = 0;
-};
-
-SyntheticHdr makeHdr(gpu::Context& ctx, std::uint32_t width, std::uint32_t height,
-                     const std::vector<float>& rgba) {
-    SyntheticHdr out;
-    out.width = width;
-    out.height = height;
-    wgpu::TextureDescriptor desc{};
-    desc.label = "synthetic-hdr";
-    desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::CopySrc;
-    desc.dimension = wgpu::TextureDimension::e2D;
-    desc.size = {width, height, 1};
-    desc.format = rendering::PostProcessor::kHdrFormat;
-    out.texture = ctx.device().CreateTexture(&desc);
-    out.view = out.texture.CreateView();
-
-    std::vector<std::uint16_t> halves(rgba.size());
-    for (std::size_t i = 0; i < rgba.size(); ++i) {
-        halves[i] = gpu::floatToHalf(rgba[i]);
-    }
-    wgpu::TexelCopyTextureInfo dst{};
-    dst.texture = out.texture;
-    wgpu::TexelCopyBufferLayout layout{};
-    layout.bytesPerRow = width * 8;
-    layout.rowsPerImage = height;
-    wgpu::Extent3D extent{width, height, 1};
-    ctx.queue().WriteTexture(&dst, halves.data(), halves.size() * sizeof(std::uint16_t), &layout, &extent);
-    return out;
-}
-
-// A blank HDR frame with a plotting helper, so each pattern below reads as what it is.
-struct Canvas {
-    std::uint32_t width, height;
-    std::vector<float> rgba;
-    Canvas(std::uint32_t w, std::uint32_t h) : width(w), height(h), rgba(static_cast<std::size_t>(w) * h * 4, 0.0f) {
-        for (std::size_t i = 3; i < rgba.size(); i += 4) {
-            rgba[i] = 1.0f;
-        }
-    }
-    void set(std::uint32_t x, std::uint32_t y, float value) {
-        if (x >= width || y >= height) {
-            return;
-        }
-        float* px = rgba.data() + (static_cast<std::size_t>(y) * width + x) * 4;
-        px[0] = px[1] = px[2] = value;
-    }
-};
+//
+// `SyntheticHdr`, `makeHdr`, `Canvas` and `PostBench` now live in tests/support/post_bench.hpp,
+// because the HDR Lab drives the same chain with the same kind of input and a second copy of a
+// harness is a second thing that can disagree about what the chain did. The `using` declarations
+// above keep every name below spelled the way this investigation wrote it.
 
 // The Glowmere post settings, as authored in the user's project (`glowmere-edit.json`) with
 // `post/anamorphic/enabled` turned on -- which is the state the artifact was reported in. Only the
@@ -415,60 +362,20 @@ scene::PostSettings glowmerePost() {
     return s;
 }
 
-// The post chain on its own: no scene renderer, no camera, no clock. One synthetic HDR frame in,
-// every intermediate the chain rendered out.
-struct PostBench {
-    std::unique_ptr<gpu::Context> ctx;
-    std::unique_ptr<gpu::ShaderLibrary> shaders;
-    std::unique_ptr<rendering::PostProcessor> post;
-    std::unique_ptr<gpu::TransientPool> pool;
-
-    static PostBench make() {
-        PostBench b;
-        b.ctx = makeContext();
-        b.shaders = std::make_unique<gpu::ShaderLibrary>(*b.ctx, std::vector{fs::path(AVGEN_SHADER_SOURCE_DIR)});
-        b.post = std::make_unique<rendering::PostProcessor>(*b.ctx, *b.shaders);
-        REQUIRE(b.post->init().has_value());
-        b.pool = std::make_unique<gpu::TransientPool>(*b.ctx);
-        return b;
+// The chain, with every intermediate decoded into the luminance field the detector reads. The
+// harness hands back RGBA floats; this is the one place they become the scalar the measurements
+// are defined on.
+std::vector<std::pair<std::string, Field>> fields(const std::vector<CapturedStage>& stages) {
+    std::vector<std::pair<std::string, Field>> out;
+    out.reserve(stages.size());
+    for (const CapturedStage& s : stages) {
+        out.emplace_back(s.name, toField(s.image));
     }
+    return out;
+}
 
-    // Runs the chain over `hdr` and reads back every captured stage. The readback happens before
-    // anything else renders, which is what keeps the transient-pool handles meaningful.
-    std::vector<std::pair<std::string, Field>> run(const SyntheticHdr& hdr, const scene::PostSettings& settings) {
-        post->armCapture();
-        wgpu::CommandEncoder encoder = ctx->device().CreateCommandEncoder();
-        rendering::PostFrameInputs in;
-        in.sceneHdr = hdr.view;
-        in.width = hdr.width;
-        in.height = hdr.height;
-        in.settings = &settings;
-        post->run(encoder, in, *pool);
-        wgpu::CommandBuffer commands = encoder.Finish();
-        ctx->queue().Submit(1, &commands);
-        ctx->waitForQueue();
-
-        rendering::PostCapture capture = post->takeCapture();
-        std::vector<std::pair<std::string, Field>> out;
-        // The input itself, so a stage-to-stage comparison starts where the chain does.
-        auto source = gpu::readTextureF16(*ctx, hdr.texture, hdr.width, hdr.height);
-        REQUIRE(source.has_value());
-        out.emplace_back("scene-hdr", toField(*source));
-        for (const rendering::PostCaptureStage& stage : capture.stages) {
-            auto image = gpu::readTextureF16(*ctx, stage.texture.texture, stage.texture.width, stage.texture.height);
-            REQUIRE(image.has_value());
-            out.emplace_back(stage.name, toField(*image));
-        }
-        pool->endFrame();
-        return out;
-    }
-};
-
-// Named `stageNamed` rather than `stage`, which it used to be: `avgen::stage` is now a namespace
-// (ADR-210's director decision layer), and with `using namespace avgen;` at the top of this file a
-// bare `stage` is ambiguous between the two. The namespace is the public name and a test-local
-// helper should not squat on it. This built cleanly until the director landed, and broke only
-// `avgen_render_tests`, which is why `--target avgen avgen_tests` kept passing.
+// Named `stageNamed` rather than `stage`: `avgen::stage` is a namespace (ADR-210's director
+// decision layer) and with `using namespace avgen;` a bare `stage` is ambiguous between the two.
 const Field& stageNamed(const std::vector<std::pair<std::string, Field>>& stages, std::string_view name) {
     for (const auto& [key, field] : stages) {
         if (key == name) {
@@ -510,7 +417,7 @@ TEST_CASE("an impulse through the anamorphic chain comes out as a streak, not a 
     SyntheticHdr hdr = makeHdr(*bench.ctx, kSynthW, kSynthH, canvas.rgba);
 
     const scene::PostSettings settings = glowmerePost();
-    const auto stages = bench.run(hdr, settings);
+    const auto stages = fields(bench.run(hdr, settings));
     report("impulse: one texel at 40", stages);
     CHECK(bench.ctx->errorCount() == 0);
 
@@ -562,9 +469,9 @@ TEST_CASE("the ghosts were never what turned an impulse into a row of copies",
 
     scene::PostSettings settings = glowmerePost();
     settings.anamorphicGhosts = 0.0f;
-    const Field noGhosts = stageNamed(bench.run(hdr, settings), "wide");
+    const Field noGhosts = stageNamed(fields(bench.run(hdr, settings)), "wide");
     settings.anamorphicGhosts = 0.223f;
-    const Field withGhosts = stageNamed(bench.run(hdr, settings), "wide");
+    const Field withGhosts = stageNamed(fields(bench.run(hdr, settings)), "wide");
     CHECK(bench.ctx->errorCount() == 0);
 
     const Periodicity a = horizontalPeriodicity(noGhosts);
@@ -599,7 +506,7 @@ TEST_CASE("a sparse point field keeps its own spacing and acquires none from the
         }
     }
     SyntheticHdr hdr = makeHdr(*bench.ctx, kSynthW, kSynthH, canvas.rgba);
-    const auto stages = bench.run(hdr, glowmerePost());
+    const auto stages = fields(bench.run(hdr, glowmerePost()));
     report("sparse grid: spacing 23 px, value 30", stages);
     CHECK(bench.ctx->errorCount() == 0);
 
@@ -628,7 +535,7 @@ TEST_CASE("a compact bright rectangle does not acquire a comb",
         }
     }
     SyntheticHdr hdr = makeHdr(*bench.ctx, kSynthW, kSynthH, canvas.rgba);
-    const auto stages = bench.run(hdr, glowmerePost());
+    const auto stages = fields(bench.run(hdr, glowmerePost()));
     report("rectangle: 48x24 at 8.0", stages);
     CHECK(bench.ctx->errorCount() == 0);
 }
@@ -646,9 +553,9 @@ TEST_CASE("the ghosts place energy far from the source, and undersample it getti
 
     scene::PostSettings settings = glowmerePost();
     settings.anamorphicGhosts = 0.0f;
-    const Field off = stageNamed(bench.run(hdr, settings), "wide");
+    const Field off = stageNamed(fields(bench.run(hdr, settings)), "wide");
     settings.anamorphicGhosts = 0.223f;
-    const Field on = stageNamed(bench.run(hdr, settings), "wide");
+    const Field on = stageNamed(fields(bench.run(hdr, settings)), "wide");
     CHECK(bench.ctx->errorCount() == 0);
 
     // The ghost contribution is the difference of two runs that differ in one parameter.
@@ -692,7 +599,7 @@ TEST_CASE("the streak no longer prints a copy of its input at every tap step",
     fmt::print("\n== correlation at the old comb period (impulse, ghosts off) ==\n");
     for (const float stretch : {4.0f, 6.0f, 8.0f, 10.386f, 14.0f, 20.0f}) {
         settings.anamorphicStretch = stretch;
-        const Field wide = stageNamed(bench.run(hdr, settings), "wide");
+        const Field wide = stageNamed(fields(bench.run(hdr, settings)), "wide");
         const auto oldPeriod = static_cast<std::uint32_t>(std::lround(stretch));
         const double prominence = combProminence(wide, oldPeriod);
         fmt::print("  stretch {:>6.3f} -> prominence at lag {:>3} = {:+.4f}; correlation {:.3f}; "
