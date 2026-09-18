@@ -660,7 +660,11 @@ void HelpPanel::drawDocument(const help::HelpDocument& doc) {
     ImGui::Spacing();
 
     std::string followed;
-    const float wrap = std::max(ImGui::GetContentRegionAvail().x - 8.0f, 120.0f);
+    // Three wrap widths in this function, all of them "the space available, less something", and
+    // all of them therefore one narrow panel away from going negative -- which ImGui reads as "do
+    // not wrap", the opposite of what each one is for. `wrapWidthFor` is where that floor lives,
+    // with the test.
+    const float wrap = wrapWidthFor(ImGui::GetContentRegionAvail().x, 8.0f, 120.0f);
     int blockId = 0;
 
     for (const help::HelpBlock& block : doc.body) {
@@ -690,7 +694,7 @@ void HelpPanel::drawDocument(const help::HelpDocument& doc) {
             ImGui::Indent(indent);
             ImGui::Bullet();
             ImGui::SameLine(0.0f, 0.0f);
-            const std::string clicked = drawSpans(block.spans, std::max(wrap - indent - 20.0f, 80.0f));
+            const std::string clicked = drawSpans(block.spans, wrapWidthFor(wrap, indent + 20.0f, 80.0f));
             if (!clicked.empty()) {
                 followed = clicked;
             }
@@ -738,7 +742,7 @@ void HelpPanel::drawDocument(const help::HelpDocument& doc) {
                     for (std::size_t c = 0; c < cells; ++c) {
                         const std::vector<help::InlineSpan>& cell = block.rows[r].cells[c];
                         ImGui::TableNextColumn();
-                        const float cellWrap = std::max(ImGui::GetContentRegionAvail().x, 40.0f);
+                        const float cellWrap = wrapWidthFor(ImGui::GetContentRegionAvail().x, 0.0f, 40.0f);
                         const std::string clicked = drawSpans(cell, cellWrap);
                         if (!clicked.empty()) {
                             followed = clicked;
