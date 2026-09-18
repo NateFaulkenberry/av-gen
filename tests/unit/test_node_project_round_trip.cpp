@@ -20,7 +20,10 @@
 //   B  removal           delete, save, reload -> gone, and the survivor is the right one
 //   C  addition          add, save, reload -> there, with its own numbers
 //   D  add then delete   **no key at all** -- a record that is a copy of the live list would write
-//                        eighty nodes here and still pass B and C
+//                        eighty nodes here and still pass B and C. It cannot fail against main
+//                        either, by construction: main writes no record at all. It is here to
+//                        forbid an implementation rather than to catch the report, and it is
+//                        listed as such rather than counted among the arms that failed.
 //   E  reparenting       deleting a parent moves its child to the grandparent in the session, and
 //                        the reload has to agree; a splice that only dropped the entry would leave
 //                        the child naming a parent that is gone
@@ -28,6 +31,12 @@
 //   G  the pure function on documents alone, including the direction that must fail safe: a scene
 //      document this build cannot read produces **no record**, because "I could not read the file"
 //      is not evidence that eighty nodes were added.
+//
+// ADR-182, with the one line that writes the record put back the way main has it -- three of the
+// five cases fail:
+//
+//   REQUIRE( doc.contains("sceneNodes") )  ->  false      (B and C)
+//   REQUIRE( back.names().size() == 2 )    ->  3 == 2     (E)
 
 #include "app/engine.hpp"
 #include "scene/composition.hpp"
