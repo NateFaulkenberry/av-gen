@@ -1,0 +1,150 @@
+{
+ "tree_of_life_day": {
+  "source": "Blendkit",
+  "asset_base_id": "54789825-1f23-4e1c-b04e-fd695f21c690",
+  "asset_type": "hdr",
+  "assetName": "Clouds",
+  "license": "CC0",
+  "licenseSource": "Stated by the project owner on 2026-09-18. NOT independently verified: the BlenderKit client log carries no licence field and has since been truncated past the point where either asset ID appeared, neither EXR header carries a licence attribute, and there is no sidecar or saved .blend to read. Recorded as the owner's statement, in the same way the day asset's download chain is recorded as an observation that can no longer be re-verified.",
+  "licenseImplication": "CC0 waives attribution, so nothing blocks distribution. `author` is kept present and empty rather than deleted: crediting an HDRI author is courtesy and costs nothing if the name is ever recovered from the asset page.",
+  "author": "",
+  "identification": {
+   "method": "byte-exact size match against the Content-Length the BlenderKit client log recorded -- NOT a match on the asset_base_id",
+   "assetBaseIdFoundOnDisk": false,
+   "note": "The asset_base_id appears in no filename and no directory name. Each asset's two files are identified by their sizes matching the two Content-Lengths its download session recorded.",
+   "logCaveat": "~/blenderkit_data/client/default.log is TRUNCATED ON CLIENT RESTART. The client restarted at 18:38:52 for the second asset and the first session's log is gone; at import time grep found 0 occurrences of either asset_base_id anywhere on disk. The day asset's chain -- exactly one AssetID in 16,851 lines, two downloads of 6,480,347 and 440,097,648, one asset name 'Clouds' -- was read from that log earlier in the session that produced this file, and is an observation that can no longer be re-verified.",
+   "licenceNote": "No licence or author field exists in the client log, in either EXR header, in any sidecar under ~/blenderkit_data, or in a saved .blend. The licence above is the owner's statement, not a reading of any of those. The asset titles -- 'Clouds' and 'Moon star' -- are the only human-readable handles that survive, since neither asset_base_id appears anywhere on disk any more.",
+   "requestedResolution": "the request header said resolution_4K; the client's actual targets were resolution_2K and blend, so no 4K file was fetched and none is missing"
+  },
+  "original": {
+   "role": "preserved, not used at runtime",
+   "path": "/Users/natefaulkenberry/blenderkit_data/hdrs/clouds_c854a031-b294-4493-91d9-aea89686256f/clouds_9daa6770-a4a8-4860-ab32-a2209409c271.exr",
+   "present": true,
+   "fileType": "blend (BlenderKit's name for the full original of an HDR asset)",
+   "bytes": 440097648,
+   "sha256_first_64MiB": "8b6887a261775676f061b3df7bd409b2c96be4ddfa8e21bfd5e4691810d22e72",
+   "etag": "f4ce0142cbff1e77b4c352ff50d89169",
+   "lastModified": "Fri, 18 Sep 2026 08:53:03 GMT",
+   "pixels": "18000 x 9000",
+   "compression": "PIZ",
+   "channels": "R,G,B half",
+   "whyNotUsed": "too large for a runtime environment map; 2.6 GB as RGBA32Float."
+  },
+  "decodeSource": {
+   "role": "what the runtime file was derived from",
+   "path": "/Users/natefaulkenberry/blenderkit_data/hdrs/clouds_c854a031-b294-4493-91d9-aea89686256f/clouds_2K_8c62d55c-ad98-4d3f-ab5f-7a81abf7821e.exr",
+   "fileType": "resolution_2K",
+   "bytes": 6480347,
+   "sha256": "c94a85d6f165d32172de11f7c808df69e8269f16a55aed67db6a5765056bf8cb",
+   "etag": "cb48104e6ef57197a470617e4a1823bc",
+   "lastModified": "Fri, 18 Sep 2026 11:16:41 GMT",
+   "pixels": "4500 x 2250",
+   "compression": "DWAA",
+   "channels": "R,G,B half",
+   "whyNotUsedDirectly": "tinyexr, this engine's EXR reader, rejects DWAA: 'Unknown compression type. (tinyexr -8)'."
+  },
+  "runtime": {
+   "path": "assets/environments/tree_of_life_day.exr",
+   "derivation": "decoded with Blender, resampled 4500x2250 -> 2048x1024, re-encoded EXR half + ZIP via save_render with a Raw view transform.",
+   "bytes": 5674504,
+   "sha256": "3a6a8dcadd5dd8187a0ec8d95d782c8562470c2365c20a7595315110d010983d",
+   "pixels": "2048 x 1024",
+   "compression": "ZIP",
+   "channels": "R,G,B half",
+   "colorspace": "Linear Rec.709 (as Blender reports the source)",
+   "linearityCheck": {
+    "measuredAfterResample": true,
+    "sourceMeans": [
+     0.29381126165390015,
+     0.3431583046913147,
+     0.4430474042892456
+    ],
+    "derivedMeans": [
+     0.2938089966773987,
+     0.34316539764404297,
+     0.44304853677749634
+    ],
+    "sourceMax": 29520.736328125,
+    "derivedMax": 29520.0,
+    "tolerance": "each channel mean within 8%"
+   },
+   "depicts": "open ocean under a blue sky with scattered cumulus and a low sun; water fills the lower hemisphere to the horizon in every direction. No beach and no shoreline, so the spec's shoreline-contradiction concern does not arise.",
+   "celestialBodies": "a bright sun glare region near the horizon with a specular path on the water; the disc itself is largely occluded by a cloud bank."
+  },
+  "regenerate": "/Applications/Blender.app/Contents/MacOS/Blender --background --python tools/import_hdri.py -- --cache ~/blenderkit_data/hdrs --out assets/environments"
+ },
+ "tree_of_life_night": {
+  "source": "Blendkit",
+  "asset_base_id": "2dd36e2c-47ea-4d0a-8431-aa2c2dd9f362",
+  "asset_type": "hdr",
+  "assetName": "Moon star",
+  "license": "CC0",
+  "licenseSource": "Stated by the project owner on 2026-09-18. NOT independently verified: the BlenderKit client log carries no licence field and has since been truncated past the point where either asset ID appeared, neither EXR header carries a licence attribute, and there is no sidecar or saved .blend to read. Recorded as the owner's statement, in the same way the day asset's download chain is recorded as an observation that can no longer be re-verified.",
+  "licenseImplication": "CC0 waives attribution, so nothing blocks distribution. `author` is kept present and empty rather than deleted: crediting an HDRI author is courtesy and costs nothing if the name is ever recovered from the asset page.",
+  "author": "",
+  "identification": {
+   "method": "byte-exact size match against the Content-Length the BlenderKit client log recorded -- NOT a match on the asset_base_id",
+   "assetBaseIdFoundOnDisk": false,
+   "note": "The asset_base_id appears in no filename and no directory name. Each asset's two files are identified by their sizes matching the two Content-Lengths its download session recorded.",
+   "logCaveat": "~/blenderkit_data/client/default.log is TRUNCATED ON CLIENT RESTART. The client restarted at 18:38:52 for the second asset and the first session's log is gone; at import time grep found 0 occurrences of either asset_base_id anywhere on disk. The day asset's chain -- exactly one AssetID in 16,851 lines, two downloads of 6,480,347 and 440,097,648, one asset name 'Clouds' -- was read from that log earlier in the session that produced this file, and is an observation that can no longer be re-verified.",
+   "licenceNote": "No licence or author field exists in the client log, in either EXR header, in any sidecar under ~/blenderkit_data, or in a saved .blend. The licence above is the owner's statement, not a reading of any of those. The asset titles -- 'Clouds' and 'Moon star' -- are the only human-readable handles that survive, since neither asset_base_id appears anywhere on disk any more.",
+   "requestedResolution": "the request header said resolution_4K; the client's actual targets were resolution_2K and blend, so no 4K file was fetched and none is missing"
+  },
+  "original": {
+   "role": "preserved, not used at runtime",
+   "path": "/Users/natefaulkenberry/blenderkit_data/hdrs/moon-star_158063fa-a7ab-486d-accf-c48aee30a776/moon-star_b12f2935-9c60-4cea-bd32-c89464a2988f.exr",
+   "present": true,
+   "fileType": "blend (BlenderKit's name for the full original of an HDR asset)",
+   "bytes": 1756344947,
+   "sha256_first_64MiB": "a78e0baa96897339b23947227c3cff215fce6cfb5f445b6591958c45e4da4cfa",
+   "etag": null,
+   "lastModified": null,
+   "pixels": "18000 x 9000",
+   "compression": "PIZ",
+   "channels": "R,G,B half",
+   "whyNotUsed": "too large for a runtime environment map; 2.6 GB as RGBA32Float."
+  },
+  "decodeSource": {
+   "role": "what the runtime file was derived from",
+   "path": "/Users/natefaulkenberry/blenderkit_data/hdrs/moon-star_158063fa-a7ab-486d-accf-c48aee30a776/moon-star_2K_be053078-f5eb-442d-95f6-05a8f782205b.exr",
+   "fileType": "resolution_2K",
+   "bytes": 2942170,
+   "sha256": "514b8c061a0030b9b06c38a603e87c87e0f7c6c135467b41934a497f156e3a63",
+   "etag": null,
+   "lastModified": null,
+   "pixels": "4500 x 2250",
+   "compression": "DWAA",
+   "channels": "R,G,B half",
+   "whyNotUsedDirectly": "tinyexr, this engine's EXR reader, rejects DWAA: 'Unknown compression type. (tinyexr -8)'."
+  },
+  "runtime": {
+   "path": "assets/environments/tree_of_life_night.exr",
+   "derivation": "decoded with Blender, resampled 4500x2250 -> 2048x1024, re-encoded EXR half + ZIP via save_render with a Raw view transform.",
+   "bytes": 4151808,
+   "sha256": "aa72526791008ebb5b95c504ae6018344f481f709154f28485ccb2fdb729b2d0",
+   "pixels": "2048 x 1024",
+   "compression": "ZIP",
+   "channels": "R,G,B half",
+   "colorspace": "Linear Rec.709 (as Blender reports the source)",
+   "linearityCheck": {
+    "measuredAfterResample": true,
+    "sourceMeans": [
+     0.23893485963344574,
+     0.21688750386238098,
+     0.21778921782970428
+    ],
+    "derivedMeans": [
+     0.23893797397613525,
+     0.21688711643218994,
+     0.21779000759124756
+    ],
+    "sourceMax": 33032.4296875,
+    "derivedMax": 33024.0,
+    "tolerance": "each channel mean within 8%"
+   },
+   "depicts": "open ocean at night under a deep blue sky with the Milky Way and high cirrus; a moon path runs across the water. No beach and no shoreline.",
+   "celestialBodies": "A LARGE, PROMINENT CRESCENT MOON with a bright halo. This is exactly the double-moon hazard the spec warns about, and it is why neither HDRI is ever drawn as the visible sky."
+  },
+  "regenerate": "/Applications/Blender.app/Contents/MacOS/Blender --background --python tools/import_hdri.py -- --cache ~/blenderkit_data/hdrs --out assets/environments"
+ }
+}

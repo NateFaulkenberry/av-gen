@@ -42,6 +42,7 @@ constexpr std::string_view kSceneKeys[] = {
     "staging",    "graph",          "grids",          "materialPrograms", "nodes"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "fogDensity", "stylized", "rotation", "skyIntensity",
+    "dayNight",
     "skyBloom", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "skybox",
     "lightFromEnvironment", "fogColor", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
@@ -5293,6 +5294,13 @@ void Composition::observeCameraEvents(double seconds) {
 }
 
 void Composition::applyParameters() {
+    // ADR-343. Resolved first because the node loop below needs `glowScale` and `starBrightness`,
+    // and written last (at the end of this function) because the sky and the lights it owns are
+    // set by the blocks in between. One phase, one state, one frame.
+    if (dayNight_.enabled) {
+        dayNightState_ = resolveDayNight(dayNight_, phaseAt(dayNight_, currentTime_));
+    }
+
     // Root: uniform scale about the bounds centre and rotation about +Y, as a Transform so it
     // composes with the node and rest transforms.
     const float rootScale = (rootScale_ != nullptr ? rootScale_->value() : 1.0f) +
@@ -5328,9 +5336,31 @@ void Composition::applyParameters() {
         }
 
         const Transform nodeT = nodeWorldTransform(node);
-        const bool visible = nodeVisible(node);
-        const float emissiveBoost =
+        bool visible = nodeVisible(node);
+        bool dayNightVisibleOverride = true;
+        float emissiveBoost =
             node.emissiveParam != nullptr ? node.emissiveParam->value() : node.emissiveBoost;
+        // ADR-343: the cycle scales the nodes the scene named as stars and as Glowmere layers.
+        // Multiplying the boost rather than replacing it is what keeps the authored per-layer
+        // intensities independently controllable, which the brief asks for explicitly.
+        if (dayNight_.enabled) {
+            const auto named = [&node](const std::vector<std::string>& names) {
+                return std::find(names.begin(), names.end(), node.name) != names.end();
+            };
+            if (named(dayNight_.starNodes)) {
+                emissiveBoost *= dayNightState_.starBrightness;
+                // A star that has been faded to zero emission is not gone -- it is still geometry,
+                // and its base colour is black, so at noon the sky filled with small DARK squares
+                // instead of with nothing. Scaling emission is how a star dims; hiding it is how a
+                // star sets. Seen in a frame; no number in the cycle table showed it.
+                if (dayNightState_.starBrightness <= 1e-3f) {
+                    dayNightVisibleOverride = false;
+                }
+            } else if (named(dayNight_.glowNodes)) {
+                emissiveBoost *= dayNightState_.glowScale;
+            }
+            visible = visible && dayNightVisibleOverride;
+        }
         const float roughnessScale =
             node.roughnessParam != nullptr ? node.roughnessParam->value() : node.roughnessScale;
         const Transform full = compose(root, nodeT);
@@ -5871,6 +5901,74 @@ void Composition::applyParameters() {
         sky.sunAngularRadius = f(skySunSize_, sky.sunAngularRadius);
         sky.sunGlowWidth = f(skySunGlow_, sky.sunGlowWidth);
         sky.intensity = f(skyIntensity_, sky.intensity);
+    }
+    applyDayNight();
+}
+
+// ADR-343: the cycle has the last word on the fields it owns. It runs after the sky block and the
+// environment block above deliberately -- an author's static sky colour is the value the cycle
+// starts from when it is off, and is overwritten when it is on, rather than the two fighting.
+void Composition::applyDayNight() {
+    if (!dayNight_.enabled) {
+        return;
+    }
+    const DayNightState& s = dayNightState_;
+    Environment& env = scene_.environment;
+    env.environmentIntensity *= s.hdriIntensity;
+    env.fogDensity = s.fogDensity;
+    env.fogColor = s.fogColor;
+    // ADR-049 splits these two and the distinction bites here: `Environment::skyIntensity` scales
+    // the *visible background pass*, `SkySettings::intensity` scales the sky as an IBL source.
+    // Driving only the latter left the night sky rendering at full daylight brightness -- 102/110/
+    // 125 sRGB at midnight -- which is a bright sky at midnight and the end of the Glowmere
+    // contrast the night depends on.
+    env.skyIntensity = s.skyIntensity;
+    SkySettings& sky = env.sky;
+    sky.zenithColor = s.zenithColor;
+    sky.horizonColor = s.horizonColor;
+    sky.groundColor = s.groundColor;
+    sky.hazeWidth = s.haze;
+    sky.intensity = s.skyIntensity;
+    // The sun and the moon are two directionals the scene named. The sun travels; the moon does
+    // not, because its disc is a feature of the night environment map and the map does not move
+    // unless `environmentRotation` moves all of it together.
+    // The day/night map swap. The renderer holds one environment cube, so the two maps cannot be
+    // blended in shading -- this binds whichever the curve selects. `setEnvironmentMap` marks the
+    // composition dirty and the rebuild lands at the top of the next update(), so there is no
+    // re-entrancy here; it also guards against redundant sets, so this is a no-op on all but the
+    // two frames per cycle where the curve crosses. Those two frames pay a full rebuild, which is
+    // why `hdriBlend` is shaped to cross where `hdriIntensity` is lowest.
+    if (s.useNightMap != dayNightNightMap_) {
+        const std::string& want = s.useNightMap ? dayNight_.nightMap : dayNight_.dayMap;
+        if (!want.empty()) {
+            dayNightNightMap_ = s.useNightMap;
+            setEnvironmentMap(want);
+        }
+    }
+    for (PunctualLight& light : scene_.lights) {
+        if (!dayNight_.sunLight.empty() && light.name == dayNight_.sunLight) {
+            light.direction = s.sunDirection;
+            light.color = s.sunColor;
+            light.intensity = s.sunIntensity;
+            light.enabled = s.sunIntensity > 1e-3f;
+        } else if (!dayNight_.moonLight.empty() && light.name == dayNight_.moonLight) {
+            light.intensity = s.moonIntensity;
+            light.enabled = s.moonIntensity > 1e-3f;
+            // Aim the moon light at the night map's brightest feature -- its moon -- and rotate it
+            // with the map. `lightFromEnvironment` does this too, but it aims `skyKeyLight`, which
+            // is "the first enabled directional with role Key, else the first enabled directional
+            // of any role". At night the sun is disabled and the first enabled directional is
+            // whatever fill the scene happens to list first, so it aimed the wrong light and the
+            // moonlight silently stopped agreeing with the visible moon the moment the map was
+            // rotated. Naming the light and rotating its direction here cannot pick the wrong one.
+            if (envDominantDirection_.has_value()) {
+                const float a = scene_.environment.environmentRotation;
+                const glm::vec3& m = *envDominantDirection_;
+                const glm::vec3 towards(std::cos(a) * m.x - std::sin(a) * m.z, m.y,
+                                        std::sin(a) * m.x + std::cos(a) * m.z);
+                light.direction = -glm::normalize(towards);
+            }
+        }
     }
 }
 
@@ -7045,6 +7143,59 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(map.error());
         }
         comp->environmentPath_ = *map;
+        // ADR-343: the day/night cycle. Absent or `enabled: false` leaves the environment exactly
+        // as it was, so every existing scene is untouched by this.
+        if (e.contains("dayNight") && e.at("dayNight").is_object()) {
+            const json& d = e.at("dayNight");
+            DayNightSettings& dn = comp->dayNight_;
+            const auto rf = [&d](const char* key, float& out) {
+                if (d.contains(key) && d.at(key).is_number()) {
+                    out = d.at(key).get<float>();
+                }
+            };
+            const auto rb = [&d](const char* key, bool& out) {
+                if (d.contains(key) && d.at(key).is_boolean()) {
+                    out = d.at(key).get<bool>();
+                }
+            };
+            const auto rs = [&d](const char* key, std::string& out) {
+                if (d.contains(key) && d.at(key).is_string()) {
+                    out = d.at(key).get<std::string>();
+                }
+            };
+            const auto rl = [&d](const char* key, std::vector<std::string>& out) {
+                if (d.contains(key) && d.at(key).is_array()) {
+                    out.clear();
+                    for (const json& item : d.at(key)) {
+                        if (item.is_string()) {
+                            out.push_back(item.get<std::string>());
+                        }
+                    }
+                }
+            };
+            rb("enabled", dn.enabled);
+            rb("paused", dn.paused);
+            rf("cycleSeconds", dn.cycleSeconds);
+            rf("phaseOffset", dn.phaseOffset);
+            rf("dayPhase", dn.manualPhase);
+            rf("sunPeakElevation", dn.sunPeakElevation);
+            rf("sunAzimuthAtDawn", dn.sunAzimuthAtDawn);
+            rf("sunAzimuthSweep", dn.sunAzimuthSweep);
+            rf("sunIntensityScale", dn.sunIntensityScale);
+            rf("moonIntensityScale", dn.moonIntensityScale);
+            rf("starBrightnessScale", dn.starBrightnessScale);
+            rf("hdriIntensityScale", dn.hdriIntensityScale);
+            rf("glowInfluence", dn.glowInfluence);
+            rs("sunLight", dn.sunLight);
+            rs("moonLight", dn.moonLight);
+            rs("dayMap", dn.dayMap);
+            rs("nightMap", dn.nightMap);
+            rl("starNodes", dn.starNodes);
+            rl("glowNodes", dn.glowNodes);
+            // Curves the scene did not override get the Tree of Life defaults, so `enabled: true`
+            // on its own is a complete cycle rather than a black world.
+            dn.applyDefaults();
+        }
         // Either a path to a rig file or the rig itself. Generated worlds write the latter, because
         // their rig comes from an art-direction profile rather than from a file somebody authored.
         if (e.contains("lightRig") && e.at("lightRig").is_object()) {

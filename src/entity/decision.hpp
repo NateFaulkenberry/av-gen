@@ -125,6 +125,16 @@ public:
 
     void reset();
 
+    // Forget the commitment, keep the counts (ADR-344).
+    //
+    // A decider whose plan has failed needs the *next* tick to be free to choose anything, which
+    // `reset()` also gives it -- and `reset()` throws away `Counts`, which is the instrument an
+    // overlay and every arm of the decision tests read. So a stall breaker that used `reset()`
+    // would erase the evidence that it had fired. This clears the incumbent and nothing else, so
+    // the next `select` reports a change, hands the queue a fresh action list, and the decision
+    // count goes up by one -- which is the fact worth seeing.
+    void forget();
+
 private:
     SelectorSettings settings_{};
     std::vector<Option> options_;

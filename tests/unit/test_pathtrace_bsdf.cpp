@@ -1,4 +1,4 @@
-// The glTF metallic-roughness BSDF and texture sampling (ADR-340 Phase 2, spec sections 18, 19).
+// The glTF metallic-roughness BSDF and texture sampling (ADR-344 Phase 2, spec sections 18, 19).
 //
 // These are the checks that catch a BRDF which is wrong by a constant -- the kind of error that
 // makes a render "look a bit dark" and never gets found, because nothing about the image says
@@ -215,7 +215,7 @@ TEST_CASE("a dielectric conserves energy except where the glTF model is known no
     //
     // The spec (section 19) asks for glTF metallic-roughness as the BRDF baseline, so this is kept
     // faithful rather than quietly "fixed". It is pinned here as a BAND so that a change which made
-    // it worse, or a change which silently altered the model, both show up. See ADR-341.
+    // it worse, or a change which silently altered the model, both show up. See ADR-345.
     const double worst = directionalAlbedo(mat(0.1f, 0.0f, glm::vec3(1.0f)), 0.05f);
     INFO("white smooth dielectric at grazing: " << worst);
     REQUIRE(worst > 1.5);   // it really does gain; if this fails the model changed

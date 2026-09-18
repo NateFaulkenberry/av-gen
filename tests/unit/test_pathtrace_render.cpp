@@ -1,4 +1,4 @@
-// Phase 1 of the path tracer, end to end (ADR-340): snapshot, BVH, primary rays, Lambertian direct
+// Phase 1 of the path tracer, end to end (ADR-344): snapshot, BVH, primary rays, Lambertian direct
 // lighting, shadow rays, accumulation, EXR.
 //
 // The scene is the spec's section 69 first visual target rather than Glowmere: a dark environment,

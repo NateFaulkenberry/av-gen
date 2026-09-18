@@ -1,8 +1,8 @@
-# ADR-341: The glTF BRDF is kept faithful, and it gains 68% of its energy at grazing
+# ADR-345: The glTF BRDF is kept faithful, and it gains 68% of its energy at grazing
 
 **Status:** Accepted (a finding plus a decision not to change the model)
 **Date:** 2026-09-18
-**Relates to:** ADR-340 (the path tracer), spec sections 18 and 19
+**Relates to:** ADR-344 (the path tracer), spec sections 18 and 19
 **Note:** main is at 339 and two other branches hold 340; expect this to be renumbered at merge.
 
 ## What was checked

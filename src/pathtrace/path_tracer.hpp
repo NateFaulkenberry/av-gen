@@ -1,6 +1,6 @@
 #pragma once
 
-// The CPU path tracer (ADR-340).
+// The CPU path tracer (ADR-344).
 //
 // Phase 1 scope, deliberately small and deliberately correct before it is fast (spec section 76):
 // primary rays, a Lambertian BSDF, direct lighting from the scene's lights with shadow rays, the

@@ -1,4 +1,4 @@
-# ADR-340: A path tracer is not what this codebase has always called "offline"
+# ADR-344: A path tracer is not what this codebase has always called "offline"
 
 **Status:** Accepted (Phase 0 of the Embree path tracer; the later phases revise this file)
 **Date:** 2026-09-18

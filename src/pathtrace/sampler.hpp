@@ -1,6 +1,6 @@
 #pragma once
 
-// The path tracer's sampler (ADR-340, spec section 26).
+// The path tracer's sampler (ADR-344, spec section 26).
 //
 // Seeded from (seed, pixel, sample, dimension) so any pixel of any frame can be regenerated in
 // isolation and two runs of the same render agree exactly. `std::random_device`, `rand()` and the
