@@ -131,6 +131,22 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         // inside one session.
         static const bool noSeekDeferral = std::getenv("AVGEN_NO_SEEK_DEFERRAL") != nullptr;
         setInteractiveSeekBudget(noSeekDeferral ? 0.0 : 2.0);
+        // And the ceiling on what one seek's re-simulation may cost, in the unit it is paid in:
+        // steps x bodies (ADR-272). Live only, for the same reason -- a deterministic render wants
+        // the whole ninety seconds whatever it costs, because nobody is sitting waiting for it.
+        //
+        // 120,000 is 90 s of history for a cast of twenty-two and shrinks from there, which is what
+        // keeps the ceiling from being another literal in the wrong currency. Chosen from the
+        // measurement rather than from a round number: ADR-272 priced one body-step of the
+        // authored Glowmere population at 4.6 us, so this is a ~550 ms worst case for a scene big
+        // enough to hit it, against the 2,437 ms a timeline click used to answer in.
+        // AVGEN_SEEK_BODY_STEPS overrides it (0 = no ceiling) so the before and after stay runnable
+        // out of one binary.
+        if (const char* budget = std::getenv("AVGEN_SEEK_BODY_STEPS")) {
+            seekBodyStepBudget_ = std::strtoull(budget, nullptr, 10);
+        } else {
+            seekBodyStepBudget_ = 120000;
+        }
     }
     // AVGEN_LEGACY_PROCGEN=1 restores the pre-ADR-233 double generation, in *any* mode, for one
     // purpose: so that a headless capture can be taken both ways out of the same binary and the
@@ -2493,9 +2509,13 @@ void Engine::seekSeconds(double seconds) {
         // seek has just abolished; carrying it over would cut to an event camera for an event that
         // is no longer happening.
         composition->clearCameraEventState();
-        composition->entityWorld().seek(seconds, &params_, nullptr,
-                                        composition->scene().camera.position, 1.0 / 60.0, 90.0,
-                                        composition->scene().detailLimits.entityDistanceCull);
+        // No camera position and no distance-detail flag: a seek that culled by distance was a
+        // function of where the camera happened to be, and ADR-267 measured that at 50.263 m over
+        // eight explorers at thirty seconds. What used to be saved by skipping distant bodies is
+        // bounded here instead, in the unit the cost is actually paid in (ADR-272).
+        composition->entityWorld().seek(seconds, &params_, nullptr, 1.0 / 60.0,
+                                        entity::SeekBudget{.maxSeconds = 90.0,
+                                                           .maxBodySteps = seekBodyStepBudget_});
         // Skinning has its own "a frame ago", and a seek makes that sentence false: the joints were
         // not anywhere a frame ago. Left alone, the first frame after every scrub carries joint
         // motion vectors for a jump nobody made and the character smears. Told here rather than

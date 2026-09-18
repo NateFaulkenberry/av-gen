@@ -712,37 +712,148 @@ void EntityWorld::reset() {
 }
 
 void EntityWorld::seek(double time, params::ParameterSet* params, const signals::SignalBus* bus,
-                       glm::vec3 viewPosition, double step, double maxSeconds, bool distanceDetail) {
+                       double step, SeekBudget budget) {
     if (params != nullptr) {
         params->resetFinals();
     }
     reset();
+    navPath_.setNavigator(&nav_);
     const double target = std::max(time, 0.0);
     const double dt = std::max(step, 1e-3);
-    const double span = std::min(target, std::max(maxSeconds, 0.0));
+
+    // ---- what each body actually needs (ADR-272) --------------------------------------------
+    //
+    // A body's requirement is the deepest of its behaviours', and the tiers above them are all
+    // accumulations: an action queue holds a part-finished walk, a schedule holds which entry it
+    // has reached. So an entity carrying either is replayed in full whatever its behaviours say.
+    // `IBehavior::historySteps` defaults to "all of it", so this only ever shortens a replay for a
+    // behaviour that has been looked at and can defend the shorter answer.
+    seekFirstStep_.assign(entities_.size(), 0);
+    std::uint64_t deepBodies = 0;
+    std::vector<std::uint64_t> needSteps(entities_.size(), 0);
+    for (std::size_t i = 0; i < entities_.size(); ++i) {
+        const Entity& entity = *entities_[i];
+        bool deep = !entity.desc_.actions.empty() || !entity.schedule_.desc().entries.empty();
+        std::uint64_t need = 1; // every body integrates the step it lands on
+        if (!deep) {
+            for (const auto& behavior : entity.behaviors_) {
+                const int steps = behavior->historySteps();
+                if (steps < 0) {
+                    deep = true;
+                    break;
+                }
+                need = std::max(need, static_cast<std::uint64_t>(steps));
+            }
+        }
+        needSteps[i] = deep ? 0 : need; // 0 means "the whole window"
+        deepBodies += deep ? 1u : 0u;
+    }
+
+    // ---- how far back to start ----------------------------------------------------------------
+    //
+    // The policy ceiling first, then the price cap, and the smaller wins. The cap is spent on the
+    // bodies that need the window; the rest cost a step or two each and are not charged against it.
+    double span = std::min(target, std::max(budget.maxSeconds, 0.0));
+    bool budgetBound = false;
+    if (budget.maxBodySteps > 0 && deepBodies > 0) {
+        const auto affordable = static_cast<double>(budget.maxBodySteps / deepBodies) * dt;
+        if (affordable < span) {
+            span = affordable;
+            budgetBound = true;
+        }
+    }
     const auto steps = static_cast<std::uint64_t>(span / dt);
+    for (std::size_t i = 0; i < entities_.size(); ++i) {
+        seekFirstStep_[i] = needSteps[i] == 0 || needSteps[i] >= steps ? 0 : steps - needSteps[i];
+    }
+
+    seekWork_ = SeekWork{};
+    seekWork_.spanSeconds = static_cast<double>(steps) * dt;
+    seekWork_.steps = steps;
+    seekWork_.fullBodySteps = steps * static_cast<std::uint64_t>(entities_.size());
+    seekWork_.deepBodies = deepBodies;
+    seekWork_.shallowBodies = entities_.size() - deepBodies;
+    seekWork_.budgetBound = budgetBound;
+    for (std::size_t i = 0; i < entities_.size(); ++i) {
+        seekWork_.bodySteps += steps - seekFirstStep_[i];
+    }
     // TEMPORARY (ui-responsiveness phase 2): what the re-simulation actually integrated.
     probe2::frame().entitySimSteps += steps;
-    probe2::frame().entitySimBodies += steps * static_cast<std::uint64_t>(entities_.size());
+    probe2::frame().entitySimBodies += seekWork_.bodySteps;
     const probe2::Add probeEntitySeek(probe2::frame().entitySeekMs);
+
     // A fixed step, not the frame's. That is what makes the answer a function of `time` alone: a
     // seek that integrated whatever dt the last frame happened to take would land somewhere that
     // depended on the machine it ran on.
+    //
+    // And the *last* step lands exactly on `target`, which it did not before this. The old loop ran
+    // `now = target - span + i * dt`, so its final integrated instant was `target - dt` -- one step
+    // short of the second being asked for, against a play whose final step is `target` itself. That
+    // one step is where ADR-267's residual 0.000022 m came from. Counting backwards from the target
+    // makes the replayed sequence the same sequence of instants a play from zero produces, and the
+    // residual goes to zero; tests/unit/test_entity_seek.cpp holds it there with a 30 Hz arm beside
+    // it that must disagree.
     for (std::uint64_t i = 0; i < steps; ++i) {
-        const double now = target - span + static_cast<double>(i) * dt;
-        for (auto& entityPtr : entities_) {
-            Entity& entity = *entityPtr;
-            const float distance = glm::length(entity.state_.position() - viewPosition);
-            if (distanceDetail && entity.desc_.cullDistance > 0.0f &&
-                distance > entity.desc_.cullDistance && entity.everUpdated_) {
+        const double now = target - static_cast<double>(steps - 1 - i) * dt;
+
+        // The crowd, as it was at the end of the previous step, built before anything moves so
+        // every body separates against the same snapshot. `update` has done this since crowd
+        // separation existed and `seek` never did, so a scrub separated against whatever the last
+        // *played* frame happened to leave behind -- state surviving across the one call whose
+        // whole job is to remove state (ADR-267 defect 2).
+        crowd_.clear();
+        crowdOwner_.clear();
+        for (std::size_t e = 0; e < entities_.size(); ++e) {
+            const Entity& entity = *entities_[e];
+            if (!entity.active_ || entity.state_.radius <= 0.0f) {
                 continue;
             }
+            const glm::vec3 at = entity.state_.position();
+            spatial::NavigationObstacle body;
+            body.center = glm::vec2(at.x, at.z);
+            body.radius = entity.state_.radius;
+            body.base = at.y;
+            body.height = std::max(entity.state_.radius * 2.0f, 1.0f);
+            body.type = spatial::ObstacleType::Creature;
+            crowd_.add(body);
+            crowdOwner_.push_back(e);
+        }
+        crowd_.build();
+
+        for (std::size_t entityIndex = 0; entityIndex < entities_.size(); ++entityIndex) {
+            if (i < seekFirstStep_[entityIndex]) {
+                continue; // its answer at `target` cannot depend on this step
+            }
+            Entity& entity = *entities_[entityIndex];
             entity.motion_ = MotionOffset{};
             entity.state_.hasLookTarget = false;
             entity.state_.reaction = 0.0f;
             entity.state_.activity = Activity::Idle;
             entity.state_.detail = 1.0f;
+            entity.state_.driven = false;
+            entity.state_.airborne = false;
+            entity.active_ = true;
             entity.everUpdated_ = true;
+
+            // ---- intent, before behaviour (ADR-091) ----
+            // Not replayed at all before this: `reset()` put the authored action list back and then
+            // nothing integrated it, so ADR-091's Cinematic Action tier was the one tier a scrub
+            // could not reproduce (ADR-267 defect 3). The events it raises are collected and thrown
+            // away -- they belong to the moment they happened, and the moment is eighty seconds ago.
+            entity.schedule_.update(now, entity.actions_);
+            if (entity.actions_.pending() > 0) {
+                seekEvents_.clear();
+                ActionContext ac;
+                ac.time = now;
+                ac.dt = dt;
+                ac.rng = &entity.rng_;
+                ac.self = &entity;
+                ac.world = this;
+                ac.path = &pathProvider();
+                ac.gait = &entity.desc_.gait;
+                ac.events = &seekEvents_;
+                (void)entity.actions_.update(ac, entity.state_);
+            }
 
             BehaviorContext bc;
             bc.time = now;
@@ -750,16 +861,40 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             bc.bus = bus;
             bc.nav = &nav_;
             bc.world = this;
+            // Which body this is. Omitted here and present in `update`, so every character
+            // separated from entity 0 instead of from itself (ADR-267 defect 1) -- which for the
+            // body that *is* entity 0 meant it pushed itself, and for everything else meant one
+            // neighbour was invisible and one phantom was not.
+            bc.self = entityIndex;
             bc.rng = &entity.rng_;
             for (auto& behavior : entity.behaviors_) {
                 behavior->update(bc, entity.state_, entity.motion_);
             }
+            // The facing, canonicalised once after everything that steers has had its turn --
+            // exactly where `update` does it. Without it a replayed yaw is the total a body has
+            // turned rather than the direction it faces, and `angleDelta` against it is a different
+            // number after 5,400 steps than after 1.
+            entity.state_.yaw = wrapAngle(entity.state_.yaw, 3.14159265358979323846f);
+            if (entity.state_.activity == Activity::Idle && entity.state_.reaction > 0.4f) {
+                entity.state_.activity = Activity::React;
+            }
+            // The gait, with its hysteresis, because the hysteresis is state: a seek that published
+            // the raw activity landed on a different clip from the play it is supposed to match,
+            // on exactly the frames where the speed is sitting on a threshold.
+            entity.locomotion_.activity =
+                entity.gait_.select(entity.desc_.gait, entity.state_.activity, entity.state_.speed,
+                                    entity.state_.turnRate, dt);
         }
     }
     // Publish the state the next frame will build on, without touching the parameter set.
     for (auto& entityPtr : entities_) {
         Entity& entity = *entityPtr;
-        entity.locomotion_.activity = entity.state_.activity;
+        if (steps == 0) {
+            entity.locomotion_.activity = entity.state_.activity;
+        }
+        entity.locomotion_.playbackRate =
+            Gait::playbackRate(entity.desc_.gait, entity.locomotion_.activity, entity.state_.speed);
+        entity.locomotion_.blend = entity.desc_.gait.blend;
         entity.locomotion_.time = target;
         entity.locomotion_.position = entity.state_.position() + entity.motion_.position;
         entity.locomotion_.yaw = entity.state_.yaw;

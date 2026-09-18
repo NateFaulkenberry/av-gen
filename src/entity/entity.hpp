@@ -432,6 +432,28 @@ private:
     const ISkeletonQuery* skeleton_ = nullptr;
 };
 
+// How much of the past one `EntityWorld::seek` may replay, and what that replay is allowed to cost.
+//
+// It replaces a bare `maxSeconds = 90.0` default argument, and the reason is the unit. Ninety
+// seconds is not an amount of work: a replay costs steps x bodies, so the same literal buys 8,100
+// body-steps in a fifteen-body scene and 1,350,000 in the cast the character-intelligence plan
+// asks for. ADR-267 priced that second one at 161 s for a hundred explorers and 594 s for two
+// hundred and fifty -- a ten-minute stall for one timeline click -- and the cause is not that the
+// simulation is slow, it is that the ceiling was written in the wrong currency. A scene does not
+// get to take longer because it is bigger. It gets less history.
+//
+// `maxSeconds` is the policy: the longest stretch of timeline anybody thinks a character's past is
+// worth. `maxBodySteps` is the price cap, and the *smaller* of the two wins, so a big cast keeps
+// what it can afford and a small one keeps the lot.
+//
+// **Zero means no cap**, and that is deliberate: an offline render, a test and the command hub all
+// want the whole window whatever it costs, because none of them is waiting for a person. Only the
+// live editor sets a ceiling, and it sets it explicitly (see `Engine::seekSeconds`).
+struct SeekBudget {
+    double maxSeconds = 90.0;
+    std::uint64_t maxBodySteps = 0;
+};
+
 class EntityWorld {
 public:
     EntityWorld() = default;
@@ -620,16 +642,35 @@ public:
     // exactly would need the analysis replayed too; an offline render plays from zero and never
     // seeks, so it is exact either way.
     //
-    // `maxSeconds` bounds the work: seeking an hour into a piece must not stall for a minute.
-    // Beyond it the simulation starts from `time - maxSeconds`, which costs a character its
-    // accumulated history and keeps the editor responsive.
-    // `params`, when given, is put back to its authored values first: behaviours read parameter
-    // *finals*, and a final still holding the last played frame's modulation would make the answer
-    // depend on where the playhead came from -- which is the whole thing being fixed. The next
-    // ordinary frame recomputes them.
+    // `budget` bounds the work; see `SeekBudget`. `params`, when given, is put back to its authored
+    // values first: behaviours read parameter *finals*, and a final still holding the last played
+    // frame's modulation would make the answer depend on where the playhead came from -- which is
+    // the whole thing being fixed. The next ordinary frame recomputes them.
+    //
+    // **There is no `viewPosition` and no `distanceDetail`.** There was, and the culling test inside
+    // the loop read them, which made a scrubbed frame a function of (time, where the camera
+    // happened to be). ADR-267 measured what that is worth in a *played* frame -- 50.263 m over
+    // eight explorers at thirty seconds between a camera at the origin and one 200 m away -- and a
+    // seek has no business inheriting it, because the whole promise of a seek is that the same
+    // second gives the same frame. What used to be saved by skipping distant bodies is now bounded
+    // by `SeekBudget::maxBodySteps` instead, which does it without consulting a camera.
     void seek(double time, params::ParameterSet* params = nullptr,
-              const signals::SignalBus* bus = nullptr, glm::vec3 viewPosition = {},
-              double step = 1.0 / 60.0, double maxSeconds = 90.0, bool distanceDetail = true);
+              const signals::SignalBus* bus = nullptr, double step = 1.0 / 60.0,
+              SeekBudget budget = {});
+
+    // What the last `seek` actually integrated. Structural quantities rather than milliseconds
+    // (ADR-170): "it replayed 5,400 steps over 23 bodies" survives a change of machine in a way
+    // that "it took 2,437 ms" does not, and it is what a test can assert on.
+    struct SeekWork {
+        double spanSeconds = 0.0;      // how far back the replay actually started
+        std::uint64_t steps = 0;       // fixed steps in the deep window
+        std::uint64_t bodySteps = 0;   // steps x bodies: the inner-loop count that was paid
+        std::uint64_t fullBodySteps = 0; // ...and what it would have been with no classification
+        std::size_t deepBodies = 0;    // bodies that needed the whole window
+        std::size_t shallowBodies = 0; // ...and bodies whose answer is a function of the target
+        bool budgetBound = false;      // true when the step budget, not the policy, chose the span
+    };
+    [[nodiscard]] SeekWork lastSeekWork() const { return seekWork_; }
 
     // Everything that could not be resolved, for the editor and the log. Never silently empty
     // because a problem was swallowed.
@@ -650,6 +691,15 @@ public:
 
 private:
     void applyAttachments(const Entity& entity, params::ParameterSet& params) const;
+
+    SeekWork seekWork_{};
+    // Scratch reused across the steps of one seek, so a 5,400-step replay allocates once rather
+    // than 5,400 times: what each body needs (in steps ending at the target) and the events the
+    // action tier raises while it is being replayed. The events are *discarded* -- a seek must not
+    // re-fire a door opening that happened eighty seconds ago into an application that has already
+    // seen it -- but the queue still has to be given somewhere to put them or it cannot run.
+    std::vector<std::uint64_t> seekFirstStep_;
+    std::vector<ActionEvent> seekEvents_;
 
     std::vector<std::unique_ptr<Entity>> entities_;
     std::vector<NodeBinding> bindings_;

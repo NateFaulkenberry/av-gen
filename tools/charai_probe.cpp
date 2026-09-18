@@ -403,7 +403,7 @@ void seekCost(const entity::Navigator& nav, int repeats) {
                 params::ParameterSet params;
                 buildWorld(world, params, n, profile, nav);
                 const auto start = Clock::now();
-                world.seek(90.0, &params, nullptr, glm::vec3(0.0f), 1.0 / 60.0, 90.0, false);
+                world.seek(90.0, &params, nullptr, 1.0 / 60.0, entity::SeekBudget{});
                 best = std::min(best, msSince(start));
             }
             std::printf(" %8.0fms", best);
@@ -438,7 +438,7 @@ void determinism(const entity::Navigator& nav, double target) {
         entity::EntityWorld world;
         params::ParameterSet params;
         buildWorld(world, params, 8, "explore", nav);
-        world.seek(target, &params, nullptr, glm::vec3(0.0f), step, 90.0, false);
+        world.seek(target, &params, nullptr, step, entity::SeekBudget{});
         std::vector<glm::vec3> out;
         for (const auto& e : world.entities()) {
             out.push_back(e->state().position());
