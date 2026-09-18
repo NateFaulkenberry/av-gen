@@ -39,6 +39,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <fmt/format.h>
 
 #include <glm/gtc/quaternion.hpp>
@@ -280,6 +282,54 @@ TEST_CASE("a joint mask resolves against a real skeleton and reports the names i
     CHECK(w.at(static_cast<std::size_t>(sk.find("head.x"))) == 1.0f);
     CHECK(w.at(static_cast<std::size_t>(sk.find("Antenna"))) == 0.4f);
     CHECK(w.at(static_cast<std::size_t>(sk.find("foot.l"))) == 0.0f);
+}
+
+// ------------------------------------------------------------------------------------------------
+// A layer survives a save (ADR-225)
+// ------------------------------------------------------------------------------------------------
+
+TEST_CASE("an authored layer stack round-trips through the scene file", "[labs][character][layers]") {
+    if (!assetsPresent()) {
+        WARN("assets/aliens is not present");
+        return;
+    }
+    // A setting the application does not keep is not a setting, and this whole unit exists because
+    // four fields were written every frame and read by nobody. A layer stack that could be authored
+    // and not saved would be the same defect one level up.
+    assets::AssetRegistry registry(fixture().parent_path());
+    auto loaded = scene::Composition::loadFile(fixture(), registry);
+    REQUIRE(loaded.has_value());
+    const nlohmann::json written = (*loaded)->toJson();
+    auto again = scene::Composition::fromJson(written, registry);
+    INFO((again.has_value() ? std::string() : again.error().message));
+    REQUIRE(again.has_value());
+
+    const scene::CompositionNode* before = (*loaded)->findNode("watcher");
+    const scene::CompositionNode* after = (*again)->findNode("watcher");
+    REQUIRE(before != nullptr);
+    REQUIRE(after != nullptr);
+    REQUIRE(before->animation.layers.size() == 2);
+    REQUIRE(after->animation.layers.size() == before->animation.layers.size());
+    for (std::size_t i = 0; i < before->animation.layers.size(); ++i) {
+        const scene::PoseLayer& a = before->animation.layers[i];
+        const scene::PoseLayer& b = after->animation.layers[i];
+        INFO(fmt::format("layer {} '{}'", i, a.name));
+        CHECK(b.name == a.name);
+        CHECK(b.kind == a.kind);
+        CHECK(b.drive == a.drive);
+        CHECK(b.mask.joints == a.mask.joints);
+        CHECK(b.mask.descendants == a.mask.descendants);
+        CHECK(b.pivot == a.pivot);
+        CHECK(b.clip == a.clip);
+        CHECK(b.maxYawDegrees == a.maxYawDegrees);
+        CHECK(b.maxPitchDegrees == a.maxPitchDegrees);
+        CHECK(b.forward == a.forward);
+    }
+    // The control: a node that authored no layers must not gain one on the way through, or "it
+    // round-trips" would be a statement about a default rather than about what was written.
+    const scene::CompositionNode* plain = (*again)->findNode("scout");
+    REQUIRE(plain != nullptr);
+    CHECK(plain->animation.layers.empty());
 }
 
 // ------------------------------------------------------------------------------------------------
