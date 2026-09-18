@@ -201,6 +201,26 @@ cameras.
   next scenario a 3.6x beam.
 - `glowmere-stylized` is deliberately untouched, for the reasons ADR-334 gives.
 
+### The song scene's sixteen farm animals point at a worktree that does not exist
+
+Found because this pass loads all four scenes and reads the warnings.
+`examples/world/glowmere-valley-2-song.scene.json` names every farm animal by an **absolute
+path** into another agent's worktree:
+
+```
+  "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/bull.glb"
+  scene 'glowmere-valley-2-song': node 'bull-1' skipped: glTF file not found
+```
+
+Sixteen of them, the whole farm. The five aliens next to them use `../../assets/aliens/...` and
+load. So the song film has been running with five of its twenty-one bodies since whenever that
+scene was last saved from a worktree, and the scale in it -- correct in the file, and what
+`test_glowmere_scale.cpp` reads -- reaches no render.
+
+It predates ADR-334 and is on `main` today. Not fixed here: it is a one-`sed` change but it puts
+sixteen animals back into a shipped film, and somebody should watch that happen rather than have a
+scale pass do it silently.
+
 ### The five aliens' `explore` body metrics are still at 3.6x, and were left there
 
 Found while re-deriving the list, reported rather than fixed. Each alien's `explore` behaviour --
