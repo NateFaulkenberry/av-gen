@@ -9283,13 +9283,13 @@
         "followNode": "visitor",
         "followOffset": [
           24.8,
-          2.6,
+          4.0,
           24.8
         ],
         "aimNode": "visitor",
         "aimOffset": [
           0.0,
-          -7.0,
+          -5.6,
           0.0
         ],
         "eventScenario": "abduction",

@@ -114,13 +114,18 @@ CAMERAS = [
         # saucer; aiming seven metres under it gives a shot of an abduction -- the beam, the ground
         # and whatever is being lifted are what make the event readable. Forty-four metres out, which
         # was chosen by rendering it: at sixty-six the thing in the beam was three pixels tall --
-        # and now 36 m, a fifth closer again, on the same instruction as everything else here. The
-        # offset is scaled about the *aim* point rather than about the saucer, so the elevation the
-        # shot looks down at the beam from is the one it was composed with.
+        # and now 36 m, a fifth closer again, on the same instruction as everything else here.
+        #
+        # *Both* offsets are scaled, by the same 0.8, about the saucer they are offsets from. That
+        # is what makes it a dolly and not a re-composition: the angle the shot looks down at the
+        # beam from is unchanged, the saucer and the ground sit exactly where they sat in frame, and
+        # the only thing that differs is that everything is 1.25x bigger. Scaling the camera alone
+        # was tried first and rendered: it lifts the saucer 1.25x further up the frame and clips the
+        # top of the dome, which is the whole argument for scaling the aim with it.
         "followNode": "visitor",
-        "followOffset": [24.8, 2.6, 24.8],
+        "followOffset": [24.8, 4.0, 24.8],
         "aimNode": "visitor",
-        "aimOffset": [0.0, -7.0, 0.0],
+        "aimOffset": [0.0, -5.6, 0.0],
         # The event it answers, by name. The engine does not know what an abduction is.
         "eventScenario": "abduction",
         "eventLead": 0.3,
