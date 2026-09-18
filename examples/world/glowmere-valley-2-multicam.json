@@ -5238,7 +5238,6 @@
       1.0,
       1.0
     ],
-    "nodes/visitor-beam/visible": true,
     "nodes/visitor/emissiveBoost": 1.0,
     "nodes/visitor/lightColor": [
       1.0,
@@ -5813,7 +5812,7 @@
     "particles/visitor-beam/drag": 0.05000000074505806,
     "particles/visitor-beam/emissive": 1.5499999523162842,
     "particles/visitor-beam/enabled": true,
-    "particles/visitor-beam/extent": 0.053846150636672974,
+    "particles/visitor-beam/extent": 1.0,
     "particles/visitor-beam/gravity": [
       0.0,
       -0.3499999940395355,
