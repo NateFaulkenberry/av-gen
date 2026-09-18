@@ -45,6 +45,7 @@ social interaction, a dense environment, a long-running simulation.
 | 7 | investigating a mushroom | blocked on **P2 perception, P3 decision** |
 | 8 | a social interaction | blocked on **P2 perception, P3 decision** |
 | 9 | crossing a river | blocked on **P3 decision** |
+| 10 | a head that turns while the legs keep walking | runnable — *unblocked by ADR-300* |
 
 A blocked case carries `blockedBy` naming the unit of `docs/character-ai-plan.md` that unblocks it
 (ADR-275). `--lab-case character:7` refuses and prints the unit rather than opening the fixture: a
@@ -61,7 +62,7 @@ without the second.
 
 ## 2. The fixture
 
-Nineteen nodes, four entities, thirteen heroes, and every element in it earns its place as an arm or
+Twenty nodes, five entities, thirteen heroes, and every element in it earns its place as an arm or
 a control.
 
 * **`scout`** — `alien-scout.glb` at **3.61×**, the scale Glowmere draws its aliens at. Carries four
@@ -78,6 +79,14 @@ a control.
 * **`penned`** — the same `explore` behaviour, standing inside ten hero stones on a 6 m ring whose
   solids overlap by 0.26 m, with a home radius five times the pen. The stuck arm; `rover` is its
   control.
+* **`watcher`** — the animation-layer arm (ADR-300). The same alien, walking, carrying two layers on
+  top of whatever clip the gait machine picked: an **aim** layer masked to the five joints that are
+  this rig's head, driven by `LocomotionState::lookTarget`; and an **additive** layer masked to the
+  upper body playing `Fight_head_hit`, driven by `LocomotionState::reaction`. It runs `lookAt` at
+  `boulder-b`, which while travelling publishes a look target and deliberately does not turn the
+  body — the case the seam was written for and that nothing consumed until now. Five names rather
+  than one because `head.x` has **zero children** on this asset and the eyes, mouth and antenna are
+  its siblings: the mask "head.x and its descendants" covers 1 joint of 90.
 * **`boulder-a/b/c`** — solids in the open, so a route has something to plan around.
 * **A flat world, authored explicitly.** `layers: []` and `features: [<one river>]` rather than an
   omitted `world` block, because an omitted one keeps the shipped world's designed landscape
@@ -166,6 +175,10 @@ ADR-182, applied here:
 | play at 60 Hz | the same simulation at 30 Hz **must** disagree — 1.247820 m |
 | a jointed socket is metres from the body | a jointless socket is not, with the skeleton installed |
 | a socket naming a real joint answers `Joint` | one naming a missing joint answers `EntityFrame` |
+| the head group turns +32.71° while walking | the same layer with its weight pinned to 0 turns it 0.000° |
+| the feet move 0.000000 while the head turns | the identical layer masked onto the **feet** moves `foot.r` 0.1447 and the head 0.0000° |
+| a flinch moves the chest 0.0088 and the neck 0.0334 | the feet and toes move 0.000000 through the same flinch |
+| a mask that names a joint answers `Applied` | one naming `Head01` on an alien answers `NoJoints`, not `Inactive` |
 
 The determinism case prints its play-vs-seek figures rather than bounding them, and says why: a bound
 that passes today would be loose enough to assert nothing, and P1 owns the fix. This is where the
