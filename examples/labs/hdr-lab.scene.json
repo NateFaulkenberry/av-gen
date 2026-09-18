@@ -1,0 +1,754 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "HDR / Exposure / Bloom Lab",
+ "_note": "Every surface here is UNLIT (pbr_shade.wgsl's object.flags.z branch), there is no fog and no sky, so a patch's scene-linear radiance is exactly baseColor + emissiveColor * emissiveIntensity -- the number written in this file and nothing else. That is the whole point of the fixture: this lab owns what the chain DOES with a radiance, and a fixture whose radiance came out of a BRDF would make every reading a joint measurement of the Lighting Lab's code and this one's. The camera sits 20 m back with a 40 degree vertical field of view, so the visible plane at z = 0 is 25.8824 x 14.5589 m and the 4 x 4 wedge fills it one patch per sixteenth of the frame: a case samples the centre of cell (col,row) at ((col+0.5)/4, (row+0.5)/4) in normalised screen coordinates and needs no projection of its own. Row 0 is the wedge up to scene white, row 1 above it to the extreme this engine can actually author -- 50, which is the hard maximum of the material/emissive parameter (procedural.cpp), and a scene file that writes 256 is silently given 50, row 2 is one channel at a time at radiance 2 with the neutral control beside them, row 3 is the two hues Glowmere is made of plus a second control pair at 8. The bright sources for the bloom arms are 100 m to the right on the same black ground, as a second page the case's camera selects: 0.3 m across (14.8 px of a 720-line frame, smaller than one texel of bloom level 4) and 4.0 m across (198 px, thirty of them). Nothing in this file authors post settings -- a case sets those through the post/* parameters, which is what the application writes. One key this file deliberately does NOT carry: `environment.brightness`. The second exposure the tonemap pass applies (`TonemapUniforms::exposure`) is `scene.environment.brightness`, and that field comes from the `scene/brightness` PARAMETER (`Composition::applyParameters`) and not from any key in a scene file -- an `\"environment\": {\"brightness\": 1.0}` here would be read by nothing. Its default is 1.0, which is what the readings in docs/hdr-lab/README.md section 2 were taken at.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   0.0,
+   20.0
+  ],
+  "target": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "fov": 40.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "skyIntensity": 0.0,
+  "lightFromEnvironment": false,
+  "fogDensity": 0.0,
+  "volumeDensity": 0.0
+ },
+ "nodes": [
+  {
+   "name": "grey-000",
+   "kind": "procedural",
+   "position": [
+    -9.7059,
+    5.4596,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "grey-018",
+   "kind": "procedural",
+   "position": [
+    -3.2353,
+    5.4596,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 0.18,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "grey-050",
+   "kind": "procedural",
+   "position": [
+    3.2353,
+    5.4596,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "grey-100",
+   "kind": "procedural",
+   "position": [
+    9.7059,
+    5.4596,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "grey-200",
+   "kind": "procedural",
+   "position": [
+    -9.7059,
+    1.8199,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 2.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "grey-400",
+   "kind": "procedural",
+   "position": [
+    -3.2353,
+    1.8199,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 4.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "grey-1600",
+   "kind": "procedural",
+   "position": [
+    3.2353,
+    1.8199,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 16.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "grey-5000",
+   "kind": "procedural",
+   "position": [
+    9.7059,
+    1.8199,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 50.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "hue-red-200",
+   "kind": "procedural",
+   "position": [
+    -9.7059,
+    -1.8199,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 2.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "hue-green-200",
+   "kind": "procedural",
+   "position": [
+    -3.2353,
+    -1.8199,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0,
+      1.0,
+      0
+     ],
+     "emissiveIntensity": 2.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "hue-blue-200",
+   "kind": "procedural",
+   "position": [
+    3.2353,
+    -1.8199,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      1.0
+     ],
+     "emissiveIntensity": 2.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "hue-neutral-200",
+   "kind": "procedural",
+   "position": [
+    9.7059,
+    -1.8199,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 2.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "hue-cyan-200",
+   "kind": "procedural",
+   "position": [
+    -9.7059,
+    -5.4596,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 2.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "hue-violet-200",
+   "kind": "procedural",
+   "position": [
+    -3.2353,
+    -5.4596,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.0,
+      1.0
+     ],
+     "emissiveIntensity": 2.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "hue-blue-800",
+   "kind": "procedural",
+   "position": [
+    3.2353,
+    -5.4596,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      1.0
+     ],
+     "emissiveIntensity": 8.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "hue-neutral-800",
+   "kind": "procedural",
+   "position": [
+    9.7059,
+    -5.4596,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6941,
+      2.9846,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 8.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "source-small",
+   "kind": "procedural",
+   "position": [
+    94.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      0.3,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 64.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "source-large",
+   "kind": "procedural",
+   "position": [
+    105.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      4.0,
+      4.0,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 64.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  }
+ ]
+}

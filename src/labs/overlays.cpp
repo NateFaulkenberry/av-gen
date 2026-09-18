@@ -74,10 +74,22 @@ rendering::DebugViewOptions overlaysFor(LabId id) {
         o.worldAxes = true;
         break;
     case LabId::Hdr:
+        // Nothing, and it stays nothing. Every question this lab asks is about a VALUE at a pixel
+        // -- what radiance arrived, what the bright pass kept, what the curve did with it -- and a
+        // line drawn over that pixel is a value somebody then measures. The Rendering Lab draws
+        // nothing because an overlay in a frame it grades becomes an artifact it reports; this lab
+        // draws nothing for the sharper version of the same reason: its overlay would be *inside*
+        // the measurement rather than beside it, and a debug line above the bloom threshold would
+        // bloom.
+        //
+        // The instruments are elsewhere and they are not overlays: `--post-stages` writes every
+        // intermediate the chain rendered (ADR-277), `--debug-target emission` shows the mask the
+        // bright pass is weighted by, `--aov emission` exports it, and `--disable post` is the
+        // boundary the Lighting Lab drew in code. See docs/hdr-lab/README.md.
+        break;
     case LabId::Volumetric:
-        // Nothing. These two are judged on the frame, not on geometry drawn over it, and an
-        // overlay switched on because the profile had to say something would be a line across the
-        // image being measured. `--debug-target` and `--aov` are their instruments.
+        // Nothing. Judged on the frame, not on geometry drawn over it; `--debug-target` and
+        // `--aov` are its instruments.
         break;
     case LabId::Particle:
         o.points = true;

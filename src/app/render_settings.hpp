@@ -119,6 +119,23 @@ struct RenderSettings {
     // better file and a bigger change; it is recorded as not done rather than half-built.
     std::string aovs;
 
+    // ---- post-stage capture (ADR-277) ----------------------------------------------------------
+    //
+    // A directory, empty by default. When set, every frame the job renders also writes every
+    // intermediate target the post chain rendered -- `exposure`, `bloom/prefilter`, `bloom/down3`,
+    // `bloom/up0`, `halation/up0`, `wide`, `composite`, `fxaa`, `sharpen` -- as its own
+    // scene-linear EXR, at the resolution the chain chose, plus a `stages.json` naming them with
+    // their extents and their peak and mean luminance.
+    //
+    // `PostProcessor::armCapture` has existed since the water-lattice investigation and nothing
+    // outside a GPU test could reach it, which made "every intermediate stage should be
+    // inspectable" true of the class and false of the program. This is the consumer.
+    //
+    // It is a diagnostic and it says so: the readback is synchronous, one blocking map per stage
+    // per frame, so a sequence rendered with it on is not a sequence whose timings mean anything.
+    // Use it with `--range t:t`.
+    std::filesystem::path postStages;
+
     // Frame count for a resolved end time (endSeconds >= startSeconds); the last frame is the one
     // whose time is < end (end exclusive), at least 1.
     [[nodiscard]] std::uint64_t frameCount(double resolvedEndSeconds) const;

@@ -197,6 +197,16 @@ Two things changed from the pre-ADR-039 version:
 Because the upsample no longer multiplies, the same visual weight needs a larger
 `post/bloom/intensity` than it did — roughly double. The shipped examples were re-tuned for this.
 
+**The threshold is on luminance**, and the tone curve compresses each channel on its own, so the two
+disagree about what "bright" means by the ratio of the luminance weights. Measured (HDR Lab §5.1):
+against a neutral highlight, a pure blue needs **13.93x** the radiance to cross the same threshold
+and a violet 5.79x -- which is `1 / luminance` in both cases, to within 1%. A neutral highlight
+starts to bloom at scene-linear 0.55, before it reaches 204 on screen; a pure blue one does not
+start until 7.6, by which point its blue channel is at the top of the display range. That is the
+technique as written, not a fault, and it is why `post/output/chromaRetention` exists -- but it is
+worth knowing before tuning an emissive palette, and it is the reason two species of the
+bioluminescence ladder at the same authored intensity can sit 4.6 stops apart in the bright pass.
+
 **Selective bloom** (`post/bloom/emissionWeight`, 0..1) weights the prefilter by the emission target
 from ADR-035, so a lit-but-not-emissive highlight stops glowing like a light source. At 0 the
 prefilter is the plain threshold; at 1 a pixel's bloom weight is scaled by how much of its radiance
@@ -315,7 +325,9 @@ follow:
 | the passes themselves | `shaders/post.wgsl` |
 | tone map, vignette, grain, sRGB encode | `shaders/tonemap.wgsl` |
 | lens/focus/exposure applied to the live camera each frame | `src/app/engine.cpp` (`Engine::update`) |
-| tests | `tests/unit/test_camera.cpp`, `tests/rendering/test_image_formation_gpu.cpp` |
+| tests | `tests/unit/test_camera.cpp`, `tests/rendering/test_image_formation_gpu.cpp`, `tests/rendering/test_hdr_lab_gpu.cpp` |
+| the chain measured stage by stage, and the fixture that calibrates it | [`docs/hdr-lab/README.md`](hdr-lab/README.md) |
+| every intermediate the chain rendered, from the command line | `--post-stages <dir>` (ADR-277) |
 | measured cost | `docs/performance/image-formation.md` |
 
 ## Motion blur

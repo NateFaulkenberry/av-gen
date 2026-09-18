@@ -167,6 +167,10 @@ private:
     // path. A video with AOVs beside it is a real request -- the passes are for the compositor,
     // and the movie is for everyone else -- so the directory is resolved once, here.
     std::filesystem::path aovDir_;
+    // ADR-277: the post chain's intermediates for the frame just submitted, read back and written
+    // as scene-linear EXRs beside a manifest. Synchronous, and only when --post-stages named a
+    // directory.
+    [[nodiscard]] Result<void> writePostStages();
     // ADR-256: what `materials.json` said at `start()`. Kept so `finish()` can re-derive it and
     // say so if the scene's object set moved under the render -- a mapping that ships with the
     // frames can only be trusted if the frames it shipped with are the frames it described.
