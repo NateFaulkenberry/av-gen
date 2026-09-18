@@ -532,30 +532,51 @@ def perception(range_m, capacity=14, hertz=4.0, fov=200.0, proximity=6.0):
 
 
 def considerers_for(name):
-    """Every character's taste, in one place, so the five can be read against one another."""
+    """Every character's taste, in one place, so the five can be read against one another.
+
+    **Why `interest` and not `investigate` does the approaching.** Both score percepts and both
+    can carry an `activity`, an `approach` and a `dwell`, so either looks like the right tool for
+    "go and look at that". They differ in one thing that decides it: `interest` scores through
+    `goalWeight`, which reads the decider's `visited_` memory and discounts a place this body has
+    just been by `noveltyPenalty`; `investigate` has no such term, on purpose -- ADR-333 §5 keeps
+    the two memories on the behaviour and only `goalWeight` consumes them.
+
+    On a *transient* subject that is right. On a **stationary** one it locks: salience rises as
+    the body approaches, so the option it is executing keeps getting better and the body never
+    leaves. Measured, on the first cut of this file: a `watcher` with
+    `investigate kinds:["character"]` at weight 1.7 walked 36.8 m to the `elder`, stopped 8.2 m
+    off, and spent **6,183 of 7,200 frames idle** there. It noticed, it approached, and it never
+    resumed -- which is two thirds of the demonstration.
+
+    `minRange` does not fix it, it converts it: the option's score goes to zero inside `minRange`,
+    so a body whose `approach` is inside that radius arrives, loses the option, walks off, regains
+    it and comes back, on a cycle the size of the selector's dwell.
+
+    So the showcase's approach-and-resume is `interest`, whose novelty memory is exactly the
+    "resume" half, and `investigate` is not used on any of the five. That is recorded in ADR-338
+    as a finding about the considerer rather than worked around here.
+    """
     if name == "scout":
         # DEMONSTRATION 1 -- environmental awareness.
         #
-        # `interest` over the *percepts* is the wander: it appends one option per thing this body
-        # has actually noticed, so where it goes next is a consequence of what it saw rather than
-        # of a random heading. `investigate` is the stop-and-look, and it wins over `interest` for
-        # the same subject because its weight is higher -- which is what turns "go there" into "go
-        # there, face it, and attend to it for a while".
+        # One considerer and an idle. `interest` over the *percepts* appends one option per thing
+        # this body has actually noticed, so the whole itinerary is a consequence of what it saw:
+        # wander (whatever scores best now), perceive (the percept list is the candidate list),
+        # approach (the option's `Move`), orient (`lookAt` publishes the target and the `look`
+        # pose layer aims the head at it), inspect (`activity` observe for `dwell` seconds), and
+        # resume (the place is now in `visited_` and worth a tenth of a fresh one).
         #
-        # The memory is what makes it resume rather than loop: `visitedCapacity` 6 and
-        # `noveltyPenalty` 0.10 make a place it has just inspected worth a tenth of a fresh one.
+        # `minRange` 12 is what stops it choosing the thing it is standing next to and then
+        # spinning on the spot to face it -- measured at 7,070 of 7,200 frames in `Turn` before
+        # this was set.
         return [
             OD([("kind", "interest"), ("name", "roam"), ("weight", 1.0),
                 ("source", "perceived"),
-                ("weights", OD([("glow", 1.9), ("landmark", 1.5), ("vista", 1.0),
-                                ("water", 0.8), ("character", 0.6)])),
-                ("minRange", 9.0), ("maxRange", 150.0),
+                ("weights", OD([("glow", 1.9), ("landmark", 1.5), ("vista", 1.1),
+                                ("water", 0.7), ("character", 0.6)])),
+                ("activity", "observe"), ("approach", 8.0), ("dwell", 5.0),
+                ("minRange", 12.0), ("maxRange", 150.0),
                 ("noveltyRadius", 26.0), ("noveltyPenalty", 0.10)]),
-            OD([("kind", "investigate"), ("name", "inspect"), ("weight", 1.45),
-                ("kinds", ["glow", "landmark"]),
-                ("activity", "observe"), ("approach", 4.5), ("dwell", 6.0),
-                ("staleSeconds", 5.0), ("maxRange", 90.0),
-                ("weights", OD([("glow", 2.0), ("landmark", 1.4)]))]),
             idle_considerer(),
         ]
     if name in ("wader", "drylander"):
@@ -563,9 +584,14 @@ def considerers_for(name):
         #
         # Identical but for one number. `wadePenalty` is the character's own price on a metre of
         # water; `fordPenalty` 0 and `detourPenalty` 40 are not opinions, they are the two probes
-        # that find the two ways. The crossover is arithmetic and the two values below bracket it
-        # with room on each side -- the measured crossover for this geography is printed by the
-        # river probe, and these were chosen from it rather than from the lab's.
+        # that find the two ways. Measured on this geography, from these two bodies' own start to
+        # their own destination:
+        #
+        #     ford    104.15 m, 17.10 weighted wet metres
+        #     detour  231.31 m,  0.00 weighted wet metres
+        #
+        # so the crossover is at `wadePenalty` 7.44 and the two values below bracket it by 4.6x
+        # and 2.2x. Neither is near the edge and neither was tuned until a render looked right.
         wade = 1.6 if name == "wader" else 16.0
         return [
             OD([("kind", "route"), ("name", "cross"), ("weight", 1.0),
@@ -574,51 +600,54 @@ def considerers_for(name):
                 ("falloff", 90.0), ("goalTolerance", 3.0),
                 ("destinations", [OD([("name", "east-bank"), ("point", FAR_SIDE)])])]),
             # A second errand, so that "cross the river" is a thing it chose over something else
-            # rather than the only line in the overlay. Weighted below the route on purpose.
+            # rather than the only line in the overlay. Weighted below the route on purpose: the
+            # best roam option either of them ever scores is 0.44 against the route's 0.97.
             OD([("kind", "interest"), ("name", "roam"), ("weight", 0.42),
                 ("source", "perceived"),
                 ("weights", OD([("glow", 1.4), ("landmark", 1.1), ("character", 0.7)])),
-                ("minRange", 12.0), ("maxRange", 70.0),
+                ("activity", "observe"), ("approach", 8.0), ("dwell", 3.0),
+                ("minRange", 14.0), ("maxRange", 70.0),
                 ("noveltyRadius", 22.0), ("noveltyPenalty", 0.15)]),
             idle_considerer(),
         ]
     if name == "elder":
-        # The one that is observed. It keeps to its ground, which is what gives `watcher` something
-        # that stays findable, and it is the control for demonstration 3: a body that wandered off
-        # would make "it went and looked at the other one" indistinguishable from "they both
-        # happened to walk the same way".
+        # The one that is observed, and the only `holdPost` in the cast.
+        #
+        # The weight is 0.42 and not 1.0, and that is the whole difference between a character and
+        # a bollard: `holdPost`'s score is flat while the body is inside `tolerance`, so at weight
+        # 1.0 nothing else can ever beat it and the body never moves -- measured, 7,200 frames of
+        # `Idle` and 0.0 m travelled. At 0.42 the best `graze` option (0.55 x a glow patch) wins
+        # sometimes, the elder strays, and `pull` 0.18 per metre beyond `tolerance` brings it back
+        # without a second option to express the returning.
         return [
-            OD([("kind", "holdPost"), ("name", "grove"), ("weight", 1.0),
-                ("post", ""), ("tolerance", 7.0), ("pull", 0.18), ("activity", "observe")]),
-            OD([("kind", "interest"), ("name", "graze"), ("weight", 0.55),
+            OD([("kind", "holdPost"), ("name", "grove"), ("weight", 0.42),
+                ("post", ""), ("tolerance", 9.0), ("pull", 0.18), ("activity", "observe")]),
+            OD([("kind", "interest"), ("name", "graze"), ("weight", 0.62),
                 ("source", "perceived"),
                 ("weights", OD([("glow", 1.6), ("landmark", 0.9), ("character", 0.5)])),
-                ("minRange", 6.0), ("maxRange", 34.0), ("homeRadius", 26.0),
-                ("noveltyRadius", 12.0), ("noveltyPenalty", 0.3)]),
+                ("activity", "observe"), ("approach", 6.0), ("dwell", 6.0),
+                ("minRange", 10.0), ("maxRange", 42.0), ("homeRadius", 30.0),
+                ("noveltyRadius", 14.0), ("noveltyPenalty", 0.3)]),
             idle_considerer(),
         ]
     if name == "watcher":
         # DEMONSTRATION 3 -- character awareness.
         #
-        # `investigate` with `kinds: ["character"]` is the whole of it. A percept of kind Character
-        # is another entity this body has actually seen (`perception.cpp` publishes them from the
-        # body index), so this scores bodies and nothing else; `interest` underneath gives it
-        # somewhere to be when it has not noticed anyone.
+        # The same considerer the scout has, with the taste table turned round: `character` at 2.6
+        # against `glow` at 0.7. A percept of kind Character is another entity this body has
+        # actually seen -- `perception.cpp` publishes them out of the body index -- so what this
+        # scores is bodies, and the mushrooms it walks past are worth a quarter of one.
         #
-        # `dwell` 7 s is the observation, `approach` 6 m is how close it goes. Neither says *who*
-        # and neither says *when*.
+        # Nothing here names the elder. It is not a destination, a post or a subject list; it is
+        # whichever body this one happens to notice, and there are four to notice.
         return [
-            OD([("kind", "investigate"), ("name", "watch"), ("weight", 1.7),
-                ("kinds", ["character"]),
-                ("activity", "observe"), ("approach", 6.0), ("dwell", 7.0),
-                ("staleSeconds", 6.0), ("maxRange", 110.0),
-                ("weights", OD([("character", 2.4)]))]),
-            OD([("kind", "interest"), ("name", "roam"), ("weight", 0.9),
+            OD([("kind", "interest"), ("name", "watch"), ("weight", 1.25),
                 ("source", "perceived"),
-                ("weights", OD([("glow", 1.3), ("landmark", 1.2), ("vista", 1.1),
-                                ("character", 0.4)])),
-                ("minRange", 10.0), ("maxRange", 120.0),
-                ("noveltyRadius", 24.0), ("noveltyPenalty", 0.12)]),
+                ("weights", OD([("character", 4.8), ("glow", 0.38), ("landmark", 0.34),
+                                ("vista", 0.3), ("water", 0.2)])),
+                ("activity", "observe"), ("approach", 7.0), ("dwell", 8.0),
+                ("minRange", 11.0), ("maxRange", 130.0),
+                ("noveltyRadius", 20.0), ("noveltyPenalty", 0.14)]),
             idle_considerer(),
         ]
     raise KeyError(name)
@@ -656,7 +685,11 @@ for (name, asset, x, gy, z, seed, walk, run, turn) in CAST_SITES:
             # 0.35 s, the v2 scene's own. ADR-337 §8 records what a blend costs a measurement that
             # reads the first frames of a clip; it costs nothing to a body that is looked at.
             ("blend", 0.35), ("speed", 1.0),
-            ("updateHz", 30), ("nearDistance", 25.0), ("farHz", 20.0), ("cullDistance", 360.0),
+            # 640 m, the map's own diagonal reach, and the same number as the entity's
+            # `cullDistance` below. Valley 2 carried 360 against an entity cull of 620 and
+            # `Composition` warns by name: "the rig stops being posed at 360 m but the entity
+            # keeps simulating to 620 m; between them the character travels in a frozen pose".
+            ("updateHz", 30), ("nearDistance", 25.0), ("farHz", 20.0), ("cullDistance", 640.0),
             ("layers", POSE_LAYERS),
         ])),
         ("visible", True),
@@ -664,7 +697,7 @@ for (name, asset, x, gy, z, seed, walk, run, turn) in CAST_SITES:
     hz, dwell, margin = DECIDE[name]
     cast_entities.append(OD([
         ("name", name), ("node", name), ("seed", seed),
-        ("fullDetailDistance", 60.0), ("coarseInterval", 0.2), ("cullDistance", 620.0),
+        ("fullDetailDistance", 60.0), ("coarseInterval", 0.2), ("cullDistance", 640.0),
         ("gait", OD([
             ("walkSpeed", walk), ("runSpeed", run),
             # Rate matching on: the clip's stride is authored for one speed and the body travels at
@@ -682,7 +715,7 @@ for (name, asset, x, gy, z, seed, walk, run, turn) in CAST_SITES:
                 ("considerers", considerers_for(name))]),
             # Look-at publishes the target the `look` pose layer aims at. It is what turns
             # "standing near a mushroom" into "looking at a mushroom".
-            OD([("kind", "lookAt"), ("turnRate", turn * 0.7), ("weight", 1.0)]),
+            OD([("kind", "lookAt"), ("turnRate", turn * 0.45), ("weight", 1.0)]),
             # Breathing, sway and a head nod, scaled per body. Not animation: a sine on the
             # transform, under the clip.
             OD([("kind", "liveliness"), ("bounce", 0.19), ("stride", 5.6),
@@ -746,21 +779,31 @@ d["composition"] = OD([("focalPoints", [
 # 268 m the multicam film's Valley Wide stands off at. ADR-334's closing note says so in as many
 # words -- "a native-scale cast is not legible from either [fixed camera] ... the cast now belongs
 # to the shots the director composes for it" -- so valley 3 composes for it.
+# Eyes are a measured ground height plus a stand-off; targets are what the shot is about.
+# Distances are set from the subject: a 3.48 m alien filmed as a character wants 25 to 55 m, not
+# the 268 m the multicam film's Valley Wide stands off at. ADR-334's closing note says so in as
+# many words -- "a native-scale cast is not legible from either [fixed camera] ... the cast now
+# belongs to the shots the director composes for it" -- so valley 3 composes for it.
 CAMERAS = [
     # id, name, eye, target, fov
     (1, "Director", None, None, None),  # autoDirector
-    (2, "The Hollow", [-92.0, 14.0, -40.0], [-70.0, 8.6, -16.0], 42.0),
-    (3, "The Ford", [-4.0, 12.5, -30.0], [-18.0, 3.4, 2.0], 38.0),
-    (4, "The Causeway", [-2.0, 14.0, 112.0], [-31.0, 1.0, 96.0], 40.0),
-    (5, "The Grove", [-4.0, 10.5, 74.0], [-22.0, 5.0, 54.0], 44.0),
+    # The scout's ground: the hollow, from the shoulder above it.
+    (2, "The Hollow", [-100.0, 24.0, -46.0], [-70.0, 8.6, -16.0], 42.0),
+    # The crossing decision. The backwater runs away to the south-west out of this eye, so the
+    # ford and the first leg of the detour are both in frame from the moment they diverge.
+    (3, "The Backwater", [132.0, 20.0, -82.0], [84.0, 9.0, -36.0], 44.0),
+    # The main channel's one ford.
+    (4, "The Ford", [20.0, 17.0, -18.0], [-20.0, 3.4, 2.0], 40.0),
+    # The elder fungus, the elder alien standing under it, and whatever comes to look.
+    (5, "The Grove", [34.0, 17.0, 40.0], [2.0, 6.5, 62.0], 44.0),
 ]
 SHOTS = [
     # camera, start, end, label
-    (2, 0.0, 22.0, "awareness: the scout in the hollow"),
-    (3, 22.0, 52.0, "navigation: the ford"),
-    (4, 52.0, 78.0, "navigation: the causeway"),
-    (5, 78.0, 104.0, "character awareness: the watcher and the elder"),
-    (1, 104.0, 140.0, "the director, on whatever it finds"),
+    (5, 0.0, 40.0, "character awareness: the watcher crosses to the elder"),
+    (3, 40.0, 95.0, "navigation: one wades the backwater, one walks round it"),
+    (2, 95.0, 140.0, "environmental awareness: the scout works the west floodplain"),
+    (4, 140.0, 175.0, "the ford"),
+    (1, 175.0, 210.0, "the director, on whatever it finds"),
 ]
 
 cameras = []
@@ -782,13 +825,48 @@ d["cameraDirection"] = OD([
     ("cameras", cameras),
     ("shots", [OD([("camera", c), ("start", s), ("end", e), ("transition", "cut"),
                    ("locked", True), ("label", label)]) for c, s, e, label in SHOTS]),
-    ("default", 2),
+    ("default", 5),
     ("nextId", len(CAMERAS) + 1),
 ])
 # The scene's own camera is shot 1's, so a bare `Composition::loadFile` with no project opens on
 # something composed rather than on wherever the last session left the viewport.
-d["camera"] = OD([("mode", 1), ("position", CAMERAS[1][2]), ("target", CAMERAS[1][3]),
-                  ("fov", CAMERAS[1][4]), ("orbitSpeed", 0.0)])
+d["camera"] = OD([("mode", 1), ("position", CAMERAS[4][2]), ("target", CAMERAS[4][3]),
+                  ("fov", CAMERAS[4][4]), ("orbitSpeed", 0.0)])
+
+# =================================================================================================
+# 4b. THE DEAD KEYS THE ENGINE ITSELF NAMES
+# =================================================================================================
+#
+# Three serialized values the runtime does not represent, every one of them found by loading the
+# scene and reading what `Composition` said out loud rather than by inspection. This is the
+# "serialized values the runtime no longer represents" half of the clean-state rule, and the
+# instrument was the log.
+#
+# 1. `procedural.lod.lodCount` on the three floating-dressing nodes:
+#        procedural 'procedural': lod: unknown setting 'lodCount' ignored
+#    The LOD block reads `maxDistance` and `minScreenRadius`; `lodCount` is not a setting and has
+#    never been one. Carried since the original Glowmere.
+#
+# 2. The terrain's `groundGlow` family:
+#        terrain 'valley': groundGlow 0.08 is carried by the generated ground material, and this
+#        terrain draws with the authored program 'paintedGround2' instead -- so the glow, its
+#        scale, its coverage, its colour and groundMottle all do nothing.
+#    Five keys and a bool, describing a ground that this world has not drawn since ADR's
+#    `paintedGround2` replaced the generated material. They are dropped rather than authored into
+#    the program, because nothing has asked for the glow and a value nobody can see is not a
+#    setting (ADR-225's rule, from the other side).
+#
+# 3. The animation cull, above.
+dead = 0
+for n in d["nodes"]:
+    pr = n.get("procedural")
+    if isinstance(pr, dict) and isinstance(pr.get("lod"), dict) and "lodCount" in pr["lod"]:
+        pr["lod"].pop("lodCount")
+        dead += 1
+for key in ("groundMottle", "groundGlow", "groundGlowScale", "groundGlowCoverage",
+            "groundGlowColor"):
+    dead += 1 if terrain["terrain"].pop(key, None) is not None else 0
+print("dropped %d serialized values the runtime does not represent" % dead)
 
 json.dump(d, open(SCENE, "w"), indent=1)
 scene_bytes = open(SCENE, "rb").read()
@@ -835,7 +913,7 @@ project = OD([
     ("render", OD([
         ("backend", "gpu"), ("path", "renders/glowmere-valley-3"),
         ("pattern", "frame_%05d.png"), ("width", 1600), ("height", 900),
-        ("fps", 30.0), ("start", 0.0), ("end", 140.0),
+        ("fps", 30.0), ("start", 0.0), ("end", 210.0),
         ("supersample", 1), ("quality", 1),
     ])),
     # Empty and present, so the shape of the document is the shape the application writes and a

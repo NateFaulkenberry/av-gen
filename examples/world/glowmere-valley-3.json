@@ -9,8 +9,8 @@
    "kind": "composition",
    "path": {
     "path": "glowmere-valley-3.scene.json",
-    "sha256": "b3b9df52066dc5d9fe89310cb018a82512ad0ba5c2dbf47cf1b94423aa994fff",
-    "size": 140676
+    "sha256": "aac462e230ee5eb869ac2a7c1b11f24fde9f7dbecb891b39faf7cbde65a6f499",
+    "size": 140191
    }
   }
  },
@@ -28,7 +28,7 @@
   "height": 900,
   "fps": 30.0,
   "start": 0.0,
-  "end": 140.0,
+  "end": 210.0,
   "supersample": 1,
   "quality": 1
  },

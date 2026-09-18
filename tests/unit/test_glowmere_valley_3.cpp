@@ -12,9 +12,12 @@
 #include "entity/entity.hpp"
 #include "entity/nav_grid.hpp"
 #include "entity/navigation.hpp"
+#include "core/time.hpp"
+#include "entity/locomotion.hpp"
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
+#include "signals/signal_bus.hpp"
 #include "spatial/point_cloud.hpp"
 #include "world/world_map.hpp"
 
@@ -474,4 +477,200 @@ TEST_CASE("probe: Glowmere Valley 3 staging sites", "[.probe][glowmere3]") {
                     s.submerged ? fmt::format("WET {:.2f} m", surface - s.height).c_str() : "dry");
     }
     std::fflush(stdout);
+}
+
+// =================================================================================================
+// The four demonstrations, run
+// =================================================================================================
+//
+// Everything above this line is geometry. Everything below it is the world actually running, and
+// the rule it is written to is the owner's: numerical agreement is not proof of anything visual,
+// and a probe that cannot fail proves nothing. So every arm here has a control that must come out
+// differently, and every bound is a band rather than a floor.
+//
+// **Seeds.** The showcase's claim is that the behaviour is emergent, not authored, so it has to
+// vary. `EntityDesc::seed` is the per-body stream and the decision cadence's phase; running the
+// same world at a second set of seeds and getting the same trace to the metre would mean the
+// bodies were following the geometry and nothing else. `kSeedOffsets` below is applied to every
+// entity, and the arms assert both that the *kind* of thing that happens survives the change and
+// that the detail does not.
+
+namespace {
+
+struct Track {
+    glm::vec3 start{0.0f};
+    glm::vec3 end{0.0f};
+    float travelled = 0.0f;
+    float deepest = 0.0f;       // the deepest water this body stood in
+    float wetSeconds = 0.0f;    // seconds spent in water at all
+    float nearestTo = 1e9f;     // closest approach to a named other body
+    std::size_t decisions = 0;
+    std::size_t remembered = 0;
+    std::size_t percepts = 0;
+    std::size_t optionsSeen = 0;
+    std::map<std::string, int> chosen;  // option name -> decision ticks it held
+    std::map<std::string, int> activity;
+    std::map<std::string, float> bestScore; // option name -> the best score it ever scored
+};
+
+struct Run {
+    std::map<std::string, Track> tracks;
+};
+
+fs::path v3Scene() { return worldDir() / "glowmere-valley-3.scene.json"; }
+
+bool v3Ready() {
+    return fs::exists(v3Scene()) &&
+           fs::exists(fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens" / "alien-scout.glb");
+}
+
+// One run of the world. `seedShift` is added to every entity's seed before the composition is
+// built, which is the only thing that differs between the two arms.
+Run play(double seconds, std::uint32_t seedShift, std::uint32_t ecologyShift = 0,
+         double hz = 40.0) {
+    std::ifstream in(v3Scene());
+    REQUIRE(in.good());
+    json doc;
+    in >> doc;
+    if (seedShift != 0) {
+        for (json& e : doc.at("entities")) {
+            e["seed"] = e.at("seed").get<std::uint64_t>() + seedShift;
+        }
+    }
+    if (ecologyShift != 0) {
+        // The world the bodies perceive, re-rolled. Every scatter layer's seed moves, so every
+        // glow patch, every trunk and every interest point the ecology publishes is somewhere
+        // else -- on the same terrain, with the same heroes, and with the cast's authored config
+        // unchanged to the byte. If the itinerary survives that, the itinerary was not a
+        // consequence of what the bodies saw.
+        for (json& n : doc.at("nodes")) {
+            if (!n.contains("scatter")) {
+                continue;
+            }
+            for (json& l : n.at("scatter")) {
+                l["seed"] = l.value("seed", 0u) + ecologyShift;
+            }
+        }
+    }
+    assets::AssetRegistry registry(v3Scene().parent_path());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    signals::SignalBus bus;
+    auto loaded = scene::Composition::fromJson(doc, registry);
+    INFO((loaded.has_value() ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+    std::unique_ptr<scene::Composition> comp = std::move(*loaded);
+    comp->attach(params, modulator);
+    comp->setViewport(1600, 900);
+    // ADR-186's offline setting. With the distance cull on, "it took the dry way" would be a
+    // measurement of which level-of-detail band the camera happened to put the body in.
+    comp->scene().detailLimits.entityDistanceCull = false;
+
+    Run out;
+    const entity::Navigator& nav = comp->entityWorld().navigator();
+    const double step = 1.0 / hz;
+    const auto frames = static_cast<int>(std::llround(seconds * hz));
+    FrameTime time;
+    std::map<std::string, glm::vec3> last;
+    for (int i = 0; i < frames; ++i) {
+        time.renderTime = static_cast<double>(i) * step;
+        time.deltaTime = i == 0 ? 0.0 : step;
+        time.frameIndex = static_cast<std::uint64_t>(i);
+        params.resetFinals();
+        comp->updateFields(time, bus, modulator);
+        modulator.applyRoutes(bus, params, time.deltaTime);
+        comp->updateBehaviour(time, bus);
+        comp->update(time);
+
+        for (const auto& e : comp->entityWorld().entities()) {
+            const std::string name(e->name());
+            Track& t = out.tracks[name];
+            const glm::vec3 p = e->state().position();
+            if (i == 0) {
+                t.start = p;
+                last[name] = p;
+            }
+            t.travelled += glm::length(glm::vec2(p.x - last[name].x, p.z - last[name].z));
+            last[name] = p;
+            t.end = p;
+            const float depth = nav.sample(glm::vec2(p.x, p.z)).waterDepth;
+            t.deepest = std::max(t.deepest, depth);
+            t.wetSeconds += depth > 0.05f ? static_cast<float>(step) : 0.0f;
+            t.activity[entity::activityName(e->locomotion().activity)] += 1;
+            t.percepts = std::max(t.percepts, e->percepts().size());
+            for (const auto& behavior : e->behaviors()) {
+                entity::DecisionDebug dbg;
+                if (!behavior->decisionDebug(dbg)) {
+                    continue;
+                }
+                t.decisions = dbg.decisions;
+                t.remembered = std::max(t.remembered, dbg.remembered);
+                t.optionsSeen = std::max(t.optionsSeen, dbg.options.size());
+                for (const entity::ScoredOption& o : dbg.options) {
+                    float& best = t.bestScore[std::string(o.name)];
+                    best = std::max(best, o.score);
+                }
+                if (!dbg.chosen.empty()) {
+                    t.chosen[std::string(dbg.chosen)] += 1;
+                }
+            }
+        }
+        // Closest approach of the watcher to the elder, sampled every frame rather than at the
+        // end: "it went and looked" is a minimum over the run, not a final position.
+        const entity::Entity* w = comp->entityWorld().find("watcher");
+        const entity::Entity* el = comp->entityWorld().find("elder");
+        if (w != nullptr && el != nullptr) {
+            const glm::vec3 a = w->state().position();
+            const glm::vec3 b = el->state().position();
+            out.tracks["watcher"].nearestTo =
+                std::min(out.tracks["watcher"].nearestTo,
+                         glm::length(glm::vec2(a.x - b.x, a.z - b.z)));
+        }
+    }
+    return out;
+}
+
+void report(const char* label, const Run& run) {
+    std::printf("\n--- %s ---\n", label);
+    for (const auto& [name, t] : run.tracks) {
+        std::string top;
+        int best = 0;
+        for (const auto& [option, n] : t.chosen) {
+            if (n > best) {
+                best = n;
+                top = option;
+            }
+        }
+        std::string acts;
+        for (const auto& [a, n] : t.activity) {
+            acts += fmt::format(" {}:{}", a, n);
+        }
+        std::string opts;
+        for (const auto& [o, sc] : t.bestScore) {
+            opts += fmt::format(" {}={:.3f}", o, sc);
+        }
+        std::printf("  %-10s travelled %7.1f m  net %6.1f m  deepest %5.2f m  wet %5.1f s  "
+                    "decisions %3zu  mostly '%s'  end (%.0f, %.0f)\n"
+                    "              percepts<=%zu remembered<=%zu options<=%zu\n"
+                    "              best:%s\n              act:%s\n",
+                    name.c_str(), t.travelled,
+                    glm::length(glm::vec2(t.end.x - t.start.x, t.end.z - t.start.z)), t.deepest,
+                    t.wetSeconds, t.decisions, top.c_str(), t.end.x, t.end.z,
+                    t.percepts, t.remembered, t.optionsSeen, opts.c_str(), acts.c_str());
+    }
+    std::fflush(stdout);
+}
+
+constexpr std::uint32_t kSeedShift = 900001u;
+
+} // namespace
+
+TEST_CASE("probe: Glowmere Valley 3, the four demonstrations run", "[.probe][glowmere3]") {
+    if (!v3Ready()) {
+        SKIP("glowmere-valley-3 or assets/aliens is not present");
+    }
+    report("A: as shipped, 180 s", play(180.0, 0));
+    report("B: entity seeds +900001", play(180.0, kSeedShift));
+    report("C: ecology seeds +101 (a different world to perceive)", play(180.0, 0, 101));
+    report("D: entity seeds +900001 AND ecology seeds +101", play(180.0, kSeedShift, 101));
 }
