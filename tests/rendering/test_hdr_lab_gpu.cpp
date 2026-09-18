@@ -492,15 +492,25 @@ TEST_CASE("the fixture delivers the radiance it authors", "[hdr][lab][gpu][.prob
 // can still separate" is read off this table and nothing else.
 TEST_CASE("the transfer curve, measured on both sides of one frame", "[hdr][lab][gpu][.probe]") {
     HdrBench bench = HdrBench::make();
-    const gpu::ImageF linear = bench.hdr();
-    const gpu::Image8 shown = bench.display();
-    fmt::print("\n== AgX, the default operator, chromaRetention 0 ==\n");
-    fmt::print("  {:16} {:>10} {:>26} {:>22}\n", "patch", "authored", "scene-linear into tonemap", "display bytes");
-    for (const Patch& p : kWedge) {
-        const glm::vec3 lin = sampleF(linear, cellU(p.col), cellV(p.row));
-        const glm::vec3 out = sample8(shown, cellU(p.col), cellV(p.row));
-        fmt::print("  {:16} {:10.3f}   ({:9.4f} {:9.4f} {:9.4f})   ({:5.0f} {:5.0f} {:5.0f})\n", p.name,
-                   std::max({p.authored.r, p.authored.g, p.authored.b}), lin.r, lin.g, lin.b, out.r, out.g, out.b);
+    // Both arms, because they are different measurements and the difference is the point. With the
+    // chain's DEFAULT bloom on (enabled, intensity 0.2, threshold 1.0) every patch above the
+    // threshold arrives at the tonemap lifted, so a table taken through the defaults is a table of
+    // the curve AND the pyramid. Bloom off isolates the operator.
+    for (bool bloom : {true, false}) {
+        bench.setBool("post/bloom/enabled", bloom);
+        bench.apply();
+        const gpu::ImageF linear = bench.hdr();
+        const gpu::Image8 shown = bench.display();
+        fmt::print("\n== AgX, chromaRetention 0, bloom {} ==\n", bloom ? "ON (the shipped default)" : "OFF");
+        fmt::print("  {:16} {:>10} {:>26} {:>22}\n", "patch", "authored", "scene-linear into tonemap",
+                   "display bytes");
+        for (const Patch& p : kWedge) {
+            const glm::vec3 lin = sampleF(linear, cellU(p.col), cellV(p.row));
+            const glm::vec3 out = sample8(shown, cellU(p.col), cellV(p.row));
+            fmt::print("  {:16} {:10.3f}   ({:9.4f} {:9.4f} {:9.4f})   ({:5.0f} {:5.0f} {:5.0f})\n", p.name,
+                       std::max({p.authored.r, p.authored.g, p.authored.b}), lin.r, lin.g, lin.b, out.r, out.g,
+                       out.b);
+        }
     }
     CHECK(bench.ctx->errorCount() == 0);
 }

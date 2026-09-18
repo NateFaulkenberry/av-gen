@@ -121,44 +121,65 @@ twice — `renderToImageFloat` (the scene-linear HDR the tonemap pass was handed
 model of AgX sitting beside it. ADR-182: an instrument that cannot disagree with the thing it
 measures has measured nothing.
 
-AgX, the default, `chromaRetention` 0, exposure scale 1, **bloom off**:
+AgX, the default, `chromaRetention` 0, exposure scale 1, **bloom off** — the operator alone:
 
 | authored radiance | into the tonemap | display byte | Δ from the row above |
 |---|---|---|---|
-| 0.18 | 0.1799 | 128 | — |
-| 0.5 | 0.5000 | 175 | +47 |
-| 1.0 | 1.0000 | 204 | +29 |
-| 2.0 | 2.0000 | 226 | +22 |
-| 4.0 | 4.0000 | 241 | +15 |
-| 16.0 | 16.0000 | 255 | +14 |
-| 50.0 | 50.0000 | 255 | **0** |
+| 0.18 | 0.1798 | 128 | — |
+| 0.5 | 0.4998 | 174 | +46 |
+| 1.0 | 0.9995 | 202 | +28 |
+| 2.0 | 1.9990 | 224 | +22 |
+| 4.0 | 3.9980 | 239 | +15 |
+| 16.0 | 15.9922 | 254 | +15 |
+| 50.0 | 49.9688 | 255 | **+1** |
 
-Read it as three regions. Below scene white a stop is worth twenty to fifty display levels. Between
-1 and 4 a stop is worth fifteen to twenty-two. **Above about sixteen a factor of three is worth
-nothing at all** — 16 and 50 are the same byte.
+Read it as three regions. Below scene white a stop is worth twenty-eight to forty-six display
+levels. Between 1 and 16 a *doubling* is worth fifteen to twenty-two. **Past sixteen a factor of
+3.1 in radiance is worth one display level**, and that is where a measurement stops being a
+measurement.
 
-That last row is the Lighting Lab's boundary as a number, and it is why its GPU reach probe disables
-post: a 0.76 step in scene-linear radiance became 0.08 of display luminance there, and the table
-above says where on the curve that happens. `test_hdr_lab_gpu.cpp`'s *"where AgX stops being able to
-tell two radiances apart"* asserts both ends, with the scene-linear side as the control — so a
-failure is the curve and not the fixture, the exposure or the composite.
+And with the chain's **shipped defaults** — bloom enabled, intensity 0.2, threshold 1.0 — the same
+patches, because bloom is added to the picture before the curve and not layered over it afterwards:
 
-With the chain's **default** bloom on (enabled, intensity 0.2, threshold 1.0) the same patches
-arrive at the tonemap lifted: 0.18 → 0.1816, 1.0 → 1.0576, 16.0 → 18.9531. Bloom is not a separate
-layer over the picture; it is added to the picture before the curve, and a measurement of "the
-curve" taken through the shipped defaults is a measurement of the curve *and* the pyramid.
+| authored | into the tonemap | display |
+|---|---|---|
+| 0.18 | 0.1816 | 128 |
+| 1.0 | 1.0576 | 204 |
+| 4.0 | 4.5898 | 241 |
+| 16.0 | **18.9531** | 255 |
+| 50.0 | 59.6250 | 255 |
+
+Under the shipped chain 16 and 50 are **the same byte**, because the bloom lift carries 16 past the
+operator's clamp. Two consequences worth separating: a measurement of "the curve" taken through the
+defaults is a measurement of the curve *and* the pyramid, and the resolution the curve still has at
+16 is spent by the default bloom.
+
+That last row of the first table is the Lighting Lab's boundary as a number, and it is why its GPU
+reach probe disables post: a 0.76 step in scene-linear radiance became 0.08 of display luminance
+there, and these tables say where on the curve that happens.
+`test_hdr_lab_gpu.cpp`'s *"where AgX stops being able to tell two radiances apart"* asserts both
+ends, with the scene-linear side as the control — so a failure is the curve and not the fixture, the
+exposure or the composite.
+
+**One number in the left column is the composite's, not the operator's.** Post disabled, the patches
+read 0.1799 / 0.5000 / 1.0000 / 2.0000 / 4.0000 / 16.0000 / 50.0000 — exact. Through the chain with
+every stage off they read 0.05% low, because the composite always runs and its grade is
+`grey * pow(max(c, 1e-5) / grey, contrast)`: arithmetically the identity at contrast 1, numerically
+a round trip through a power. The same expression is why the composite's output floor is exactly
+1e-5 rather than zero. Neither is visible; both are worth knowing before treating a 0.05%
+difference between two arms as a finding.
 
 ### 2.1 Hue, and why it is not a footnote
 
-Per-channel, the same frame, AgX:
+Per-channel, the same frame, AgX, **bloom off**:
 
 | patch | authored | display |
 |---|---|---|
-| neutral | (2, 2, 2) | (226, 227, 227) |
+| neutral | (2, 2, 2) | (224, 224, 224) |
 | red | (2, 0, 0) | (243, 86, 86) |
-| green | (0, 2, 0) | (115, 236, 115) |
-| blue | (0, 0, 2) | (114, 114, 234) |
-| cyan | (0, 2, 2) | (143, 228, 228) |
+| green | (0, 2, 0) | (111, 235, 111) |
+| blue | (0, 0, 2) | (112, 112, 235) |
+| cyan | (0, 2, 2) | (140, 226, 226) |
 | violet | (1, 0, 2) | (207, 120, 230) |
 | blue | (0, 0, 8) | (178, 178, 255) |
 
