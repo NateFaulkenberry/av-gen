@@ -287,6 +287,11 @@ private:
     // the case the overlays were previously unreachable in.
     [[nodiscard]] const rendering::DebugViewOptions& debugOptions() const;
     [[nodiscard]] Result<void> ensureFinalTexture(std::uint32_t width, std::uint32_t height);
+    // ADR-320. Collects the newest frame the running render has tapped and puts it on the Render
+    // panel. Called once per UI frame beside the job's step, and does nothing at all when the
+    // toggle is off -- which is the default, and which is why a render with the panel closed is
+    // the same render it always was.
+    void serviceRenderPreview();
     rendering::DebugViewOptions cliDebug_{}; // `--debug-draw`, for the windowless path
     void applyOutputsFromProject();
     void storeOutputsToProject();
@@ -308,6 +313,16 @@ private:
     std::deque<std::pair<std::filesystem::path, RenderSettings>> uiQueue_;
     std::filesystem::path renderProjectTemp_;
     RenderProgress lastRender_;
+    // ADR-320's upload target: ONE 512x512 RGBA8 texture, created on the first frame that needs it
+    // and then written into in place for the life of the process. Not resized per render and not
+    // recreated per frame: ImGui's WGPU backend caches a bind group per texture id, and the only
+    // way to release those is `ImGui_ImplWGPU_InvalidateDeviceObjects`, which throws away the
+    // pipeline and the font atlas too. A preview caps at 480 px on its long axis, so every frame
+    // any output shape can produce fits in one corner of this and the panel is given the uv.
+    wgpu::Texture renderPreviewTexture_;
+    wgpu::TextureView renderPreviewView_;
+    RenderJob::FramePreview renderPreviewFrame_;
+    const RenderJob* renderPreviewJob_ = nullptr; // which job the panel's frame came from
     std::unique_ptr<rendering::OutputMapper> mapper_;
     OutputManager outputs_;
     share::TextureShare share_;

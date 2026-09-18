@@ -2982,6 +2982,57 @@ void ControlPanel::drawRender(app::Engine& engine) {
             }
         }
     }
+    // ---- ADR-320: the frames the render is actually writing -------------------------------------
+    //
+    // One contiguous block on purpose. Everything it needs is in `renderPreview`, which the host
+    // fills from `RenderJob::takePreview`; the panel owns none of the GPU work and none of the
+    // threading.
+    ImGui::Separator();
+    ImGui::Checkbox("Show output frames", &renderPreview.enabled);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("The frames this render is writing to the file -- the encoder's own pixels,\n"
+                          "read where they are hashed, not a second render of the same moment.\n"
+                          "Point-sampled down to at most 480 px, so fine detail aliases here and\n"
+                          "not in the file. Only the newest frame is kept.");
+    }
+    if (renderPreview.enabled) {
+        if (renderPreview.hasFrame()) {
+            const float avail = std::max(ImGui::GetContentRegionAvail().x, 64.0f);
+            const float shown = std::min(avail, static_cast<float>(renderPreview.width));
+            const float tall = shown * static_cast<float>(renderPreview.height) /
+                               static_cast<float>(std::max<std::uint32_t>(renderPreview.width, 1));
+            ImGui::Image(static_cast<ImTextureID>(renderPreview.texture), ImVec2(shown, tall),
+                         ImVec2(0.0f, 0.0f), ImVec2(renderPreview.u1, renderPreview.v1));
+            // The hash is the point of printing it: it is the frame's own hash as written to the
+            // file, so what is on screen can be tied to a specific frame of the deliverable rather
+            // than being taken on trust (ADR-182).
+            ImGui::TextDisabled("frame %llu of %ux%u, hash %016llx",
+                                static_cast<unsigned long long>(renderPreview.index),
+                                renderPreview.sourceWidth, renderPreview.sourceHeight,
+                                static_cast<unsigned long long>(renderPreview.hash));
+            if (!renderPreview.live) {
+                // A finished, failed or cancelled render leaves its last frame on screen, and a
+                // still picture cannot tell you which of those happened. Saying so is the whole
+                // difference between a record and a lie.
+                ImGui::TextColored(ImVec4(0.85f, 0.70f, 0.30f, 1.0f),
+                                   "this render has ended -- the last frame it wrote");
+            }
+            if (renderPreview.linearSource) {
+                ImGui::TextWrapped("EXR is scene-linear, so it has no display appearance of its own. "
+                                   "Shown clamped to 0-1 and sRGB-encoded. The project's tone map, "
+                                   "exposure, vignette and grain are NOT applied: this shows what is "
+                                   "in the file, not what a graded view of it looks like.");
+            }
+            if (renderPreview.dropped > 0) {
+                ImGui::TextDisabled("%llu frames went by unshown (the newest always wins)",
+                                    static_cast<unsigned long long>(renderPreview.dropped));
+            }
+        } else if (renderPreview.live) {
+            ImGui::TextDisabled("waiting for the first frame to come back");
+        } else {
+            ImGui::TextDisabled("frames appear here once a render starts");
+        }
+    }
     ImGui::TextDisabled("renders load the saved project; the live view keeps playing");
 }
 

@@ -84,6 +84,47 @@ public:
     // Per-frame hashes of the frames read back so far, in frame order (determinism checks).
     [[nodiscard]] const std::vector<std::uint64_t>& frameHashes() const { return frameHashes_; }
 
+    // ---- watching the frames go out (ADR-320) --------------------------------------------------
+    //
+    // A downscaled copy of the frame that was just hashed, held until the next one replaces it.
+    // The point of the feature is that these are *the deliverable's own pixels* -- the ones the
+    // encoder is about to write -- and not a second render of the same moment, so the copy is
+    // taken from the same buffer the hash was taken from and carries that hash with it. If the
+    // hash here is not the hash `frameHashes()[index]` reports, the preview is showing something
+    // else and says so (ADR-182: the probe has to be able to fail).
+    struct FramePreview {
+        std::uint32_t width = 0;        // the copy's size, <= kPreviewMaxDimension in each axis
+        std::uint32_t height = 0;
+        std::uint32_t sourceWidth = 0;  // the deliverable's size this was point-sampled from
+        std::uint32_t sourceHeight = 0;
+        std::uint32_t step = 1;         // source pixels per preview pixel, in each axis
+        std::uint64_t index = 0;        // the frame's number in the sequence
+        std::uint64_t hash = 0;         // the deliverable's own frame hash for that frame
+        // The source was scene-linear RGBA16F (an EXR render), so `rgba` is not a copy of the
+        // file's bytes: it is the file's floats clamped to 0-1 and sRGB-encoded. The project's
+        // tone map is a GPU shader and is not applied. The UI has to say so.
+        bool linearSource = false;
+        std::vector<std::uint8_t> rgba;  // width * height * 4, top-left origin, display-encoded
+        [[nodiscard]] bool valid() const { return width > 0 && height > 0 && !rgba.empty(); }
+    };
+    // The long axis of the copy. A preview is a convenience and the render is the deliverable, so
+    // this is small on purpose: 480 is more than the Render panel has room for and it is what
+    // makes the per-frame cost a rounding error rather than a second full-resolution image.
+    static constexpr std::uint32_t kPreviewMaxDimension = 480;
+
+    // Off is the default and off is free: `handleFrame` does one relaxed load and nothing else.
+    // Safe to call from another thread while the render runs.
+    void setPreviewEnabled(bool on) { previewEnabled_.store(on, std::memory_order_relaxed); }
+    [[nodiscard]] bool previewEnabled() const { return previewEnabled_.load(std::memory_order_relaxed); }
+    // Moves the most recent frame out, if one has arrived since the last call. False means nothing
+    // new -- the caller keeps whatever it already had rather than being handed a repeat. Never
+    // blocks for longer than a pointer swap.
+    [[nodiscard]] bool takePreview(FramePreview& out);
+    // Frames copied, and frames that were copied and then replaced before anyone came for them.
+    // The second number is the drop policy working, not a fault: the UI cannot show 60 a second.
+    [[nodiscard]] std::uint64_t previewTapped() const;
+    [[nodiscard]] std::uint64_t previewDropped() const;
+
 private:
     struct Pending {
         std::uint64_t index = 0;
@@ -117,6 +158,10 @@ private:
     // ADR-251: box-average a supersampled HDR frame down to the output size. Not static: it needs
     // `settings_.width`/`height` to know what it is resolving to.
     void resolveToOutput(gpu::ImageF& image);
+    // ADR-320's tap. `frame` is **const** on purpose: the one way a preview could reach the
+    // deliverable is by converting the float image in place to save an allocation, and a const
+    // reference makes that a compile error rather than a code review.
+    void capturePreview(const gpu::ReadbackRing::Frame& frame);
     [[nodiscard]] Result<void> renderOne();
     // Hands completed readbacks to the encoders; `all` waits for every frame in flight first.
     [[nodiscard]] Result<void> drain(bool all);
@@ -183,6 +228,17 @@ private:
     std::uint64_t sequenceHash_ = 14695981039346656037ull;
     std::uint64_t lastHash_ = 0;
     std::vector<std::uint64_t> frameHashes_;
+    // ADR-320. `previewScratch_` is where the copy is built, outside the lock and reusing last
+    // frame's allocation; `preview_` is what a caller takes. One frame of each, because the drop
+    // policy is "keep the newest" -- a queue would grow whenever the UI is slower than the render,
+    // which is every render.
+    std::atomic<bool> previewEnabled_{false};
+    mutable std::mutex previewMutex_;
+    FramePreview preview_;
+    FramePreview previewScratch_;
+    bool previewFresh_ = false;
+    std::uint64_t previewTapped_ = 0;
+    std::uint64_t previewDropped_ = 0;
     std::chrono::steady_clock::time_point startedAt_;
     bool started_ = false;
     bool done_ = false;

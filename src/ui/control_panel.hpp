@@ -138,6 +138,31 @@ public:
     std::string shareStatus;                // describe() + live stats from the host
     std::function<void(const std::string&, const std::string&)> onShare; // kind ("syphon"/"ndi"/"off"), name
     std::function<app::RenderProgress()> renderProgress; // empty when no job is running
+
+    // ---- watching the deliverable's own frames (ADR-320) ---------------------------------------
+    //
+    // Not a second render of the same moment: these are the pixels `RenderJob` hashed and handed to
+    // the encoder, downscaled and uploaded by the host into one fixed 512x512 texture that is
+    // created once and written into in place -- recreating it per frame would make ImGui cache a
+    // new bind group per frame, and the only way to clear that cache in this backend is to
+    // invalidate the whole device object set.
+    struct RenderFramePreview {
+        bool enabled = false;            // the toggle; persisted in AppSettings (ADR-225)
+        std::uint64_t texture = 0;       // ImTextureID of the host's upload target; 0 = nothing yet
+        float u1 = 0.0f;                 // the corner of it the frame occupies
+        float v1 = 0.0f;
+        std::uint32_t width = 0;         // the copy's size
+        std::uint32_t height = 0;
+        std::uint32_t sourceWidth = 0;   // the deliverable's size it was sampled from
+        std::uint32_t sourceHeight = 0;
+        std::uint64_t index = 0;         // which frame of the sequence this is
+        std::uint64_t hash = 0;          // that frame's own hash, as written to the file
+        bool linearSource = false;       // an EXR render: the panel must say the tone map is not applied
+        bool live = false;               // a render is running; false = the last frame of one that ended
+        std::uint64_t dropped = 0;       // frames the UI was too slow to collect (the drop policy working)
+        [[nodiscard]] bool hasFrame() const { return texture != 0 && width > 0 && height > 0; }
+    };
+    RenderFramePreview renderPreview;
     std::size_t queuedRenders = 0;
     std::string videoBackends; // describeVideoBackends()
 
