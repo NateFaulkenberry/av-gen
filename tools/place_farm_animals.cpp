@@ -1,6 +1,7 @@
 // Scatter the farm animals through a world, as nodes a director can move (ADR-209, Part 1).
 //
-// A build target rather than a Python script, for the reason `make_tree_of_life.cpp` gives: this
+// A build target rather than a Python script, and the reason is the same one every emitter here
+// gives: this
 // asks the *engine's* questions -- is this walkable, how deep is the water, how tall is the canopy
 // here, is there a trunk inside this disc -- against the real `WorldMap`, the real ecology scatter
 // and the real per-instance obstacle field the scene builds at load. A script would hold a second

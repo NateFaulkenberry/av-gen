@@ -218,9 +218,9 @@
     },
     {
       "category": "Showcase",
-      "description": "One generated tree, chosen from ninety-six candidates by a person after the evaluator ranked their architecture. Eight nodes carry one parameter vector: the scene regenerates the tree rather than storing it.",
-      "name": "The Tree of Life",
-      "project": "tree/tree.json"
+      "description": "The authored Tree of Life hero export -- 3.16 M triangles, seven meshes -- standing on a floating island in cosmic space, the island turning once every three minutes and breathing on a forty-second swell. The tree is a child of the island's transform and never moves of its own accord. Bare landmass, one overhead key, a shell of 1,700 points for stars; nothing else in frame.",
+      "name": "Tree of Life - Floating Island",
+      "project": "treeisland/tree-of-life-floating-island.json"
     },
     {
       "category": "Showcase",
