@@ -196,6 +196,18 @@ struct AppOptions {
     std::optional<double> rangeStart, rangeEnd;
     std::optional<std::string> codec;
     std::optional<RenderOutput> renderOutput; // --output png|exr|video
+    // `--render-in-app <dir|file>`: start the project's render as an in-app job, in the window,
+    // the way the Render button does -- rather than as the headless job `--render` runs. The whole
+    // mid-render state of the Render panel (the progress rows, the estimate, Cancel, and ADR-320's
+    // frame preview) was reachable only by clicking that button, which means it could not be
+    // photographed, profiled or captured by anything. ADR-262's shape exactly: the one state
+    // everybody diagnoses from was the one state no tool could reach.
+    std::optional<std::filesystem::path> renderInApp;
+    // `--render-preview`: force ADR-320's frame preview on for this session, whatever the settings
+    // file remembers. Same reason `--preview-mode` exists and is written the same way -- a capture
+    // or a benchmark has to be able to say which state it is photographing rather than depending
+    // on how this machine's settings happen to be left.
+    bool renderPreview = false;
     std::optional<int> quality;
     std::optional<std::uint32_t> renderWidth, renderHeight;
     // Live control (1.1): --input [device], --osc-port <n>, --list-audio-devices, --list-midi
@@ -277,6 +289,7 @@ private:
                                                                    RenderSettings settings);
     int runQueue(const std::filesystem::path& queueFile);
     void startRenderFromUi();
+    bool renderInAppStarted_ = false; // `--render-in-app` fires once
     // Outputs (1.2): keeps the offscreen final texture sized to the main window, (re)opens the
     // output windows from the engine's project block, and stores them back before saves.
     // `--debug-draw`'s list onto the World panel's own switches, which is where the overlays live
@@ -289,6 +302,11 @@ private:
     // the case the overlays were previously unreachable in.
     [[nodiscard]] const rendering::DebugViewOptions& debugOptions() const;
     [[nodiscard]] Result<void> ensureFinalTexture(std::uint32_t width, std::uint32_t height);
+    // ADR-320. Collects the newest frame the running render has tapped and puts it on the Render
+    // panel. Called once per UI frame beside the job's step, and does nothing at all when the
+    // toggle is off -- which is the default, and which is why a render with the panel closed is
+    // the same render it always was.
+    void serviceRenderPreview();
     rendering::DebugViewOptions cliDebug_{}; // `--debug-draw`, for the windowless path
     void applyOutputsFromProject();
     void storeOutputsToProject();
@@ -310,6 +328,16 @@ private:
     std::deque<std::pair<std::filesystem::path, RenderSettings>> uiQueue_;
     std::filesystem::path renderProjectTemp_;
     RenderProgress lastRender_;
+    // ADR-320's upload target: ONE 512x512 RGBA8 texture, created on the first frame that needs it
+    // and then written into in place for the life of the process. Not resized per render and not
+    // recreated per frame: ImGui's WGPU backend caches a bind group per texture id, and the only
+    // way to release those is `ImGui_ImplWGPU_InvalidateDeviceObjects`, which throws away the
+    // pipeline and the font atlas too. A preview caps at 480 px on its long axis, so every frame
+    // any output shape can produce fits in one corner of this and the panel is given the uv.
+    wgpu::Texture renderPreviewTexture_;
+    wgpu::TextureView renderPreviewView_;
+    RenderJob::FramePreview renderPreviewFrame_;
+    std::uint64_t renderPreviewJobId_ = 0; // which job the panel's frame came from (never an address)
     std::unique_ptr<rendering::OutputMapper> mapper_;
     OutputManager outputs_;
     share::TextureShare share_;

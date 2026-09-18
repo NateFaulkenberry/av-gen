@@ -21,6 +21,22 @@ namespace avgen::app {
 
 namespace {
 
+// ADR-320. Never reused within a process, which is the whole point: an address is.
+std::uint64_t nextJobId() {
+    static std::atomic<std::uint64_t> counter{0};
+    return ++counter;
+}
+
+// The sRGB transfer function, on a value already clamped to 0-1. The same curve `linearToSrgb` in
+// shaders/tonemap.wgsl applies as the last thing it does before writing the RGBA8 target -- so for
+// a PNG or video render the preview copies bytes that already went through it, and this is used
+// only for the EXR path, where the file is scene-linear and has no display encoding at all.
+std::uint8_t encodeSrgb(float linear) {
+    const float c = std::clamp(linear, 0.0f, 1.0f);
+    const float s = c <= 0.0031308f ? c * 12.92f : 1.055f * std::pow(c, 1.0f / 2.4f) - 0.055f;
+    return static_cast<std::uint8_t>(std::lround(s * 255.0f));
+}
+
 // ADR-256: the mapping from what the identifier AOV actually carries to what a surface IS, written
 // by the run that produced the frames.
 //
@@ -73,7 +89,7 @@ nlohmann::ordered_json materialManifest(const scene::Scene& scene) {
 
 RenderJob::RenderJob(gpu::Context& context, gpu::ShaderLibrary& shaders, std::unique_ptr<Engine> engine,
                      RenderSettings settings, std::filesystem::path baseDir)
-    : context_(context), shaders_(shaders), engine_(std::move(engine)), settings_(std::move(settings)),
+    : id_(nextJobId()), context_(context), shaders_(shaders), engine_(std::move(engine)), settings_(std::move(settings)),
       baseDir_(std::move(baseDir)) {}
 
 RenderJob::~RenderJob() {
@@ -733,6 +749,14 @@ void RenderJob::handleFrame(gpu::ReadbackRing::Frame frame) {
     frameHashes_.push_back(lastHash_);
     ++readBack_;
     log::debug("render frame {} hash={:016x}", frame.index, lastHash_);
+    // ADR-320, and it has to be HERE: after `resolveToOutput` (so a supersampled EXR frame is the
+    // resolved one that gets written, not the 2x intermediate) and after the hash (so the copy can
+    // carry the hash of the frame it is a copy of), but before the `std::move` below hands the
+    // image to the encoder queue and leaves `frame` empty. There is no other point in this
+    // function where both the final pixels and their hash exist.
+    if (previewEnabled_.load(std::memory_order_relaxed)) {
+        capturePreview(frame);
+    }
     {
         std::unique_lock lock(mutex_);
         // Frames already on the GPU when a cancel arrives are still written (partial output is
@@ -747,6 +771,105 @@ void RenderJob::handleFrame(gpu::ReadbackRing::Frame frame) {
         }
     }
     cv_.notify_one();
+}
+
+void RenderJob::capturePreview(const gpu::ReadbackRing::Frame& frame) {
+    const auto began = std::chrono::steady_clock::now();
+    const bool linear = frame.format == gpu::ReadbackRing::Format::Rgba16Float;
+    const std::uint32_t sw = linear ? frame.imageF.width : frame.image.width;
+    const std::uint32_t sh = linear ? frame.imageF.height : frame.image.height;
+    if (sw == 0 || sh == 0 || (linear ? frame.imageF.rgba.empty() : frame.image.rgba.empty())) {
+        return;
+    }
+    // Point-sampled on an integer stride, not box-filtered, and that is the whole of why this is
+    // cheap enough to leave on. A box filter reads every source pixel -- 2.07 M of them at 1080p,
+    // per frame, on the thread the render is stepped from. This reads one per *output* pixel:
+    // 129,600 at 1080p, a factor of 16 fewer, and the factor grows with the resolution because the
+    // output is capped. The cost is aliasing on fine detail, which the panel says out loud rather
+    // than letting somebody read a shimmer in a 480-pixel thumbnail as a defect in the render.
+    const std::uint32_t longest = std::max(sw, sh);
+    const std::uint32_t step = std::max<std::uint32_t>(1, (longest + kPreviewMaxDimension - 1) / kPreviewMaxDimension);
+    FramePreview& out = previewScratch_;
+    out.width = (sw + step - 1) / step;
+    out.height = (sh + step - 1) / step;
+    out.sourceWidth = sw;
+    out.sourceHeight = sh;
+    out.step = step;
+    out.index = frame.index;
+    out.hash = lastHash_;
+    out.linearSource = linear;
+    out.rgba.resize(static_cast<std::size_t>(out.width) * out.height * 4);
+    std::uint8_t* dst = out.rgba.data();
+    if (linear) {
+        // Scene-linear floats clamped to 0-1 and sRGB-encoded: the "clamp" operator at exposure 1,
+        // with no chroma retention, no vignette and no grain. That is a real, nameable view of the
+        // file's own numbers and it is NOT the project's tone map -- ACES, AgX, Reinhard and
+        // Khronos Neutral live in shaders/tonemap.wgsl, on the GPU, and a second CPU copy of them
+        // here would be a preview free to drift from the picture it claims to be of. The panel
+        // states which of the two it is showing; see ADR-320.
+        for (std::uint32_t y = 0; y < out.height; ++y) {
+            const float* row = frame.imageF.pixel(0, y * step);
+            for (std::uint32_t x = 0; x < out.width; ++x) {
+                const float* p = row + static_cast<std::size_t>(x) * step * 4;
+                *dst++ = encodeSrgb(p[0]);
+                *dst++ = encodeSrgb(p[1]);
+                *dst++ = encodeSrgb(p[2]);
+                *dst++ = 0xFF;
+            }
+        }
+    } else {
+        // A straight byte copy. The RGBA8 target is what tonemap.wgsl wrote, sRGB-encoded already,
+        // and it is what `writePng` and the video writer are handed unaltered -- so every pixel
+        // here is bit-identical to a pixel of the file.
+        for (std::uint32_t y = 0; y < out.height; ++y) {
+            const std::uint8_t* row = frame.image.pixel(0, y * step);
+            for (std::uint32_t x = 0; x < out.width; ++x) {
+                const std::uint8_t* p = row + static_cast<std::size_t>(x) * step * 4;
+                *dst++ = p[0];
+                *dst++ = p[1];
+                *dst++ = p[2];
+                *dst++ = 0xFF;
+            }
+        }
+    }
+    // Everything above happened outside the lock, on this frame's own scratch buffer. The lock
+    // covers a swap of two vectors and four scalars, so a UI thread polling at 60 Hz and a render
+    // producing at whatever rate it manages never wait on each other for longer than that.
+    {
+        std::lock_guard lock(previewMutex_);
+        if (previewFresh_) {
+            ++previewDropped_; // nobody came for the last one; the newest wins
+        }
+        std::swap(preview_, previewScratch_);
+        previewFresh_ = true;
+        ++previewTapped_;
+        previewSeconds_ += std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count();
+    }
+}
+
+bool RenderJob::takePreview(FramePreview& out) {
+    std::lock_guard lock(previewMutex_);
+    if (!previewFresh_) {
+        return false;
+    }
+    std::swap(out, preview_);
+    previewFresh_ = false;
+    return true;
+}
+
+std::uint64_t RenderJob::previewTapped() const {
+    std::lock_guard lock(previewMutex_);
+    return previewTapped_;
+}
+
+std::uint64_t RenderJob::previewDropped() const {
+    std::lock_guard lock(previewMutex_);
+    return previewDropped_;
+}
+
+double RenderJob::previewSeconds() const {
+    std::lock_guard lock(previewMutex_);
+    return previewSeconds_;
 }
 
 Result<void> RenderJob::drain(bool all) {

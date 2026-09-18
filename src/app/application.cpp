@@ -62,6 +62,12 @@
 
 namespace avgen::app {
 
+// ADR-320: the side of the one texture the Render panel's frame preview is uploaded into. 512
+// rather than a number per render, because `RenderJob::kPreviewMaxDimension` is 480 and every
+// output shape's downscale therefore fits in one corner of this whatever the aspect ratio -- so
+// the texture is created once and never replaced, and ImGui caches exactly one bind group for it.
+constexpr std::uint32_t kRenderPreviewAtlas = 512;
+
 namespace {
 // "a:b:c" -> {"a","b","c"}. Empty tokens are dropped so a trailing separator is not an arm.
 std::vector<std::string> splitList(std::string_view spec, char sep) {
@@ -217,6 +223,11 @@ std::string usageText() {
            "                      harness detects it (ADR-182). Its records are excluded from\n"
            "                      every distribution.\n"
            "  --capture <file>    write the last frame as a PPM image\n"
+           "  --render-preview    show the frames a render is writing in the Render panel, whatever\n"
+           "                      the settings file remembers (ADR-320)\n"
+           "  --render-in-app <p> start the project's render in the window, as the Render button\n"
+           "                      does, instead of headlessly. The only way to reach the Render\n"
+           "                      panel's mid-render state from a script or a capture\n"
            "  --capture-ui <f>    write the editor, ImGui and all, as a PNG\n"
            "  --capture-ui-frame <n>  which frame to grab (default 90)\n"
            "  --capture-ui-panel <a,b>  open and raise these panels first, so a closed or\n"
@@ -448,6 +459,13 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--capture");
             if (!v) return std::unexpected(v.error());
             options.capture = *v;
+            ++i;
+        } else if (arg == "--render-preview") {
+            options.renderPreview = true;
+        } else if (arg == "--render-in-app") {
+            auto v = need(i, "--render-in-app");
+            if (!v) return std::unexpected(v.error());
+            options.renderInApp = *v;
             ++i;
         } else if (arg == "--capture-ui") {
             auto v = need(i, "--capture-ui");
@@ -906,6 +924,16 @@ void Application::saveSettings() {
         // for the same reason the render scale is: ImGui writes these flags directly and there is
         // no hook to set a dirty bit in.
         settings_.preview = panel_->preview;
+        // ADR-320/ADR-225. Same shape and same reason as the two above: the Render panel writes
+        // this bool through directly, so it is read back here rather than hooked at the widget.
+        //
+        // Not written back when `--render-preview` forced it on. A flag owns the session it was
+        // given and nothing beyond it: a capture or a benchmark arm that leaves the machine's
+        // remembered state different from how it found it is a measurement that changes its own
+        // conditions, and the next person's editor opens with an instrument they did not ask for.
+        if (!options_.renderPreview) {
+            settings_.renderFramePreview = panel_->renderPreview.enabled;
+        }
     }
     if (auto r = settings_.save(settingsPath_); !r) {
         log::warn("settings: {}", r.error().message);
@@ -1171,6 +1199,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->canvasRenderScale =
             options_.canvasScale != 1.0f ? options_.canvasScale : settings_.canvasRenderScale;
         panel_->preview = settings_.preview;
+        panel_->renderPreview.enabled = settings_.renderFramePreview || options_.renderPreview; // ADR-320
         // The flag outranks the remembered state, and only when it was given: a benchmark arm has
         // to be able to say which mode it is measuring without depending on how this machine's
         // settings file happens to be left.
@@ -1889,6 +1918,82 @@ Result<void> Application::ensureFinalTexture(std::uint32_t width, std::uint32_t 
     finalWidth_ = width;
     finalHeight_ = height;
     return {};
+}
+
+void Application::serviceRenderPreview() {
+    if (panel_ == nullptr) {
+        return;
+    }
+    ui::ControlPanel::RenderFramePreview& view = panel_->renderPreview;
+    // A new job -- or the same panel after the last one was released -- starts from nothing. The
+    // alternative is the previous render's last frame sitting under a running progress bar as
+    // though it were this render's first, which is the exact failure a preview exists to not have.
+    //
+    // Compared by `RenderJob::id()` and not by the pointer. Running a queue starts the next job in
+    // the same UI frame the last one finished, inside the `if (complete)` branch and *after* this
+    // function has already recorded the old job -- so the address can be reused and the comparison
+    // below would say "same job" about a different render.
+    const std::uint64_t id = job_ != nullptr ? job_->id() : 0;
+    if (id != renderPreviewJobId_) {
+        renderPreviewJobId_ = id;
+        if (job_ != nullptr) {
+            view.width = 0;
+            view.height = 0;
+            view.index = 0;
+            view.hash = 0;
+            view.dropped = 0;
+        }
+    }
+    view.live = job_ != nullptr;
+    if (job_ == nullptr) {
+        return;
+    }
+    // The toggle is pushed every frame rather than on its edge: the panel writes the bool straight
+    // through (there is no hook to set a dirty bit in), and a render started while it was off has
+    // to pick it up when it is turned on mid-render.
+    job_->setPreviewEnabled(view.enabled);
+    if (!view.enabled || !job_->takePreview(renderPreviewFrame_)) {
+        return;
+    }
+    const RenderJob::FramePreview& f = renderPreviewFrame_;
+    if (!f.valid() || f.width > kRenderPreviewAtlas || f.height > kRenderPreviewAtlas) {
+        return;
+    }
+    if (!renderPreviewTexture_) {
+        wgpu::TextureDescriptor desc{};
+        desc.label = "render-frame-preview";
+        desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+        desc.dimension = wgpu::TextureDimension::e2D;
+        desc.size = {kRenderPreviewAtlas, kRenderPreviewAtlas, 1};
+        desc.format = wgpu::TextureFormat::RGBA8Unorm;
+        renderPreviewTexture_ = context_->device().CreateTexture(&desc);
+        if (!renderPreviewTexture_) {
+            log::warn("render preview: cannot create the {0}x{0} preview texture; the Render panel "
+                      "will not show frames", kRenderPreviewAtlas);
+            view.enabled = false;
+            return;
+        }
+        renderPreviewView_ = renderPreviewTexture_.CreateView();
+    }
+    wgpu::TexelCopyTextureInfo dst{};
+    dst.texture = renderPreviewTexture_;
+    dst.origin = {0, 0, 0};
+    wgpu::TexelCopyBufferLayout layout{};
+    layout.bytesPerRow = f.width * 4;
+    layout.rowsPerImage = f.height;
+    const wgpu::Extent3D extent{f.width, f.height, 1};
+    context_->queue().WriteTexture(&dst, f.rgba.data(), f.rgba.size(), &layout, &extent);
+    view.texture = reinterpret_cast<std::uint64_t>(renderPreviewView_.Get());
+    view.u1 = static_cast<float>(f.width) / static_cast<float>(kRenderPreviewAtlas);
+    view.v1 = static_cast<float>(f.height) / static_cast<float>(kRenderPreviewAtlas);
+    view.width = f.width;
+    view.height = f.height;
+    view.sourceWidth = f.sourceWidth;
+    view.sourceHeight = f.sourceHeight;
+    view.index = f.index;
+    view.hash = f.hash;
+    view.linearSource = f.linearSource;
+    view.dropped = job_->previewDropped();
 }
 
 void Application::applyOutputsFromProject() {
@@ -3356,7 +3461,9 @@ int Application::runLive() {
         // reason as `ControlPanel::serviceLayoutStore`: ImGui writes these flags straight through,
         // so there is no hook to set a dirty bit in and the honest thing is to compare.
         if (panel_ != nullptr && !settingsPath_.empty()) {
-            const bool moved = !(panel_->preview == settings_.preview);
+            const bool moved = !(panel_->preview == settings_.preview) ||
+                               (!options_.renderPreview &&
+                                panel_->renderPreview.enabled != settings_.renderFramePreview);
             const double now = ImGui::GetTime();
             if (moved && now - lastPreviewSave_ > 2.0) {
                 lastPreviewSave_ = now;
@@ -3564,10 +3671,23 @@ int Application::runLive() {
         engine_->setDetailLimits(liftViewportLimits_ ? scene::DetailLimits::unlimited()
                                                       : scene::DetailLimits{});
 
+        // `--render-in-app`: the Render button, pressed once, on the first frame that has a
+        // window, a project and a panel. Here rather than in `init()` because the job renders
+        // between UI frames and there is no frame loop to render between until this one.
+        if (options_.renderInApp && !renderInAppStarted_) {
+            renderInAppStarted_ = true;
+            uiRender_.outputPath = *options_.renderInApp;
+            uiRender_.normalisePattern();
+            startRenderFromUi();
+        }
         // Background render: a few frames per UI frame, then the next queued job.
         if (job_) {
             core::PhaseProfiler::Scope scope(prof, kPhJob);
-            if (job_->step(4, 0.010)) {
+            const bool complete = job_->step(4, 0.010);
+            // Collected before the job is released, so the final frame of a render is the one left
+            // on the panel rather than whatever the last UI poll happened to catch (ADR-320).
+            serviceRenderPreview();
+            if (complete) {
                 const auto p = job_->progress();
                 lastRender_ = p;
                 panel_->setStatus(p.error.empty() ? fmt::format("render done: {} frames, hash {:016x}", p.framesRendered,
@@ -3579,6 +3699,10 @@ int Application::runLive() {
                 }
             }
         }
+        // Again, and outside the branch: the call above cannot run on a frame where there is no
+        // job, so without this the panel would still be saying "live" about the last frame of a
+        // render that ended, failed or was cancelled several minutes ago.
+        serviceRenderPreview();
         // Input diagnostics (AVGEN_UI_SELFTEST=1): logs what ImGui and SDL each see of the
         // pointer, plus the raw event counts, so "the UI does not react to clicks" can be traced
         // to the event routing rather than the widgets.

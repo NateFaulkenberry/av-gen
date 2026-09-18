@@ -52,6 +52,13 @@ struct AppSettings {
     // the project: the same project on a laptop and on a workstation wants different answers.
     float canvasRenderScale = 1.0f;
     AppearanceTheme appearance = AppearanceTheme::System;
+    // ADR-320/ADR-225: the Render panel shows the frames a render is writing. Off by default --
+    // it is an instrument, and an instrument is never the reason a deliverable costs more -- but a
+    // person who turns it on has turned it on, and a toggle the application forgets between
+    // sessions is not a setting. Here rather than in the project for the same reason
+    // `canvasRenderScale` is: opening someone else's project must not change how you are watching
+    // your own render.
+    bool renderFramePreview = false;
 
     // ---- output preview (ADR-246) ----
     // The editor-local half of the output preview: which of the three view modes the canvas is in,

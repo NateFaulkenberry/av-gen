@@ -23,6 +23,8 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <chrono>
+#include <tuple>
 #include <memory>
 #include <set>
 
@@ -732,4 +734,405 @@ TEST_CASE("a supersampled EXR is the whole frame, not a corner of it", "[gpu][re
     CHECK(shift < cropShift / 4.0);
 
     CHECK(ctx->errorCount() == 0);
+}
+
+// ---- ADR-320: the frames the render is writing, shown while it writes them ----------------------
+//
+// The whole value of this feature is that the picture in the panel is the deliverable's own pixels
+// rather than a second render of the same moment, so "the preview exists" is not a claim worth
+// testing (ADR-182). What these check is the thing that would make the feature a lie: that the
+// bytes handed to the UI are the bytes in the file, that the frame they came from is the frame
+// they say they came from, and -- ADR-250 -- that the file is not one byte different for having
+// been watched.
+
+namespace {
+
+// The preview's own downscale rule, restated here on purpose. If `capturePreview` changes which
+// source pixel a preview pixel comes from, these tests have to disagree with it rather than follow
+// it: a helper shared with the implementation would make every comparison below tautological.
+std::uint32_t previewStep(std::uint32_t width, std::uint32_t height) {
+    const std::uint32_t longest = std::max(width, height);
+    return std::max<std::uint32_t>(1, (longest + app::RenderJob::kPreviewMaxDimension - 1) /
+                                          app::RenderJob::kPreviewMaxDimension);
+}
+
+} // namespace
+
+TEST_CASE("The previewed pixels are the pixels in the file", "[gpu][render][preview]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+    const auto out = f.dir / "watched";
+    auto settings = smallSettings(out);
+
+    app::RenderJob job(*ctx, shaders, loadOffline(f.project), settings, f.dir);
+    job.setPreviewEnabled(true);
+    REQUIRE(job.start().has_value());
+
+    // Collected while the render runs, exactly as the editor collects them: one frame at a time,
+    // whatever happens to be newest when the caller comes back. Some frames will be missed -- that
+    // is the drop policy -- and every one that is caught has to be right.
+    std::map<std::uint64_t, app::RenderJob::FramePreview> caught;
+    app::RenderJob::FramePreview frame;
+    while (!job.step(1)) {
+        if (job.takePreview(frame)) {
+            caught[frame.index] = frame;
+        }
+    }
+    if (job.takePreview(frame)) {
+        caught[frame.index] = frame;
+    }
+    const auto progress = job.progress();
+    REQUIRE(progress.error.empty());
+    REQUIRE(progress.framesWritten == 10);
+    // A render of ten frames stepped one at a time must have produced previews; zero here would
+    // mean the tap never fired and every check below would pass vacuously.
+    REQUIRE(caught.size() >= 3);
+    INFO("previews caught: " << caught.size() << " of 10");
+
+    const auto& hashes = job.frameHashes();
+    for (const auto& [index, preview] : caught) {
+        INFO("frame " << index);
+        // The frame says which frame of the sequence it is, and the hash it carries is the hash the
+        // job recorded for that frame. A preview built from a re-render, from a stale buffer, or
+        // from the frame before this one fails here.
+        REQUIRE(index < hashes.size());
+        CHECK(preview.hash == hashes[index]);
+        CHECK(preview.sourceWidth == 96);
+        CHECK(preview.sourceHeight == 64);
+        CHECK_FALSE(preview.linearSource);
+        CHECK(preview.step == previewStep(96, 64));
+        CHECK(preview.width == 96 / preview.step);
+        CHECK(preview.height == 64 / preview.step);
+
+        auto file = assets::loadImage(settings.frameFile(out, index), false);
+        REQUIRE(file.has_value());
+        REQUIRE(file->width == 96);
+        REQUIRE(file->height == 64);
+        // Every preview pixel against the pixel of the PNG it was point-sampled from. Not a
+        // tolerance and not a statistic: the RGBA8 path is a byte copy of what tonemap.wgsl wrote
+        // and what `writePng` was handed, so anything but equality means the preview is of
+        // something else.
+        std::size_t differing = 0;
+        for (std::uint32_t y = 0; y < preview.height; ++y) {
+            for (std::uint32_t x = 0; x < preview.width; ++x) {
+                const std::uint8_t* got = preview.rgba.data() +
+                                          (static_cast<std::size_t>(y) * preview.width + x) * 4;
+                const std::uint8_t* want =
+                    file->data.data() + (static_cast<std::size_t>(y * preview.step) * 96 +
+                                         x * preview.step) * 4;
+                if (got[0] != want[0] || got[1] != want[1] || got[2] != want[2]) {
+                    ++differing;
+                }
+            }
+        }
+        CHECK(differing == 0);
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Watching a render does not change it", "[gpu][render][preview]") {
+    // ADR-250: the instrument is not the engine. This is not a formality -- the obvious way to
+    // build the EXR preview without an allocation is to clamp and encode `frame.imageF` in place,
+    // and that image is the one the encoder is about to write. An in-place conversion would pass
+    // every other test in this file and silently ruin every EXR the editor ever produced with the
+    // panel open, which is why the EXR arm is here and not just the PNG one.
+    //
+    // **And the hash comparison below is not what catches it.** That was measured, by writing the
+    // in-place conversion and running this: 20 assertions failed and every one of them was the
+    // file comparison; `sequenceHash` and `frameHashes` matched exactly. They have to -- the hash
+    // is taken in `handleFrame` BEFORE the tap runs, so a tap that corrupts the image afterwards
+    // corrupts the file and the hash agrees with it. A determinism check that runs upstream of the
+    // thing it is checking proves nothing about it. The bytes on disk are the evidence.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+
+    for (const bool exr : {false, true}) {
+        INFO(std::string(exr ? "exr" : "png"));
+        const auto blind = f.dir / (exr ? "blind_exr" : "blind_png");
+        const auto watched = f.dir / (exr ? "watched_exr" : "watched_png");
+        auto settingsA = exr ? smallSettingsExr(blind) : smallSettings(blind);
+        auto settingsB = exr ? smallSettingsExr(watched) : smallSettings(watched);
+        // `start()` does this to the job's own copy; these are the test's copies and it has to be
+        // done to them too, or `frameFile` names a .png beside a directory full of .exr.
+        settingsA.normalisePattern();
+        settingsB.normalisePattern();
+
+        app::RenderJob unwatched(*ctx, shaders, loadOffline(f.project), settingsA, f.dir);
+        REQUIRE(unwatched.run().has_value());
+        CHECK(unwatched.previewTapped() == 0); // off by default, and off means nothing happened
+
+        app::RenderJob observed(*ctx, shaders, loadOffline(f.project), settingsB, f.dir);
+        observed.setPreviewEnabled(true);
+        REQUIRE(observed.run().has_value());
+        CHECK(observed.previewTapped() == 10);
+
+        CHECK(observed.progress().sequenceHash == unwatched.progress().sequenceHash);
+        CHECK(observed.frameHashes() == unwatched.frameHashes());
+        // The hashes are over the images in memory; this is over the bytes on disk, which is the
+        // thing the owner receives.
+        for (std::uint64_t i = 0; i < 10; ++i) {
+            const auto a = settingsA.frameFile(blind, i);
+            const auto b = settingsB.frameFile(watched, i);
+            INFO(a.string() << " vs " << b.string());
+            REQUIRE(fs::exists(a));
+            REQUIRE(fs::exists(b));
+            std::ifstream fa(a, std::ios::binary), fb(b, std::ios::binary);
+            const std::string sa((std::istreambuf_iterator<char>(fa)), {});
+            const std::string sb((std::istreambuf_iterator<char>(fb)), {});
+            CHECK(sa == sb);
+        }
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("A render nobody is watching keeps one frame and drops the rest", "[gpu][render][preview]") {
+    // The UI polls at its own rate and the render produces at its own, so the interesting case is
+    // the one where nobody comes for a frame at all: a closed panel, a stalled editor, a headless
+    // `--render`. Nothing may accumulate, and what is finally handed over must be the newest frame
+    // rather than the oldest one still queued.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+    app::RenderJob job(*ctx, shaders, loadOffline(f.project), smallSettings(f.dir / "unwatched"), f.dir);
+    job.setPreviewEnabled(true);
+    REQUIRE(job.run().has_value());
+
+    CHECK(job.previewTapped() == 10);
+    CHECK(job.previewDropped() == 9);
+    app::RenderJob::FramePreview frame;
+    REQUIRE(job.takePreview(frame));
+    CHECK(frame.index == 9); // the newest, not the first one that arrived
+    CHECK(frame.hash == job.frameHashes().back());
+    CHECK_FALSE(job.takePreview(frame)); // and nothing behind it
+}
+
+TEST_CASE("The EXR preview is the file's own numbers, said plainly", "[gpu][render][preview]") {
+    // An EXR is scene-linear and has no display appearance, so the preview cannot be a byte copy
+    // the way the PNG one is: something has to map it. What it must not do is apply a *different*
+    // map from the file's and let that pass as the file. This pins the map to the one the panel
+    // claims -- clamp to 0-1, sRGB encode, nothing else -- against the floats actually written.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+    const auto out = f.dir / "exr_watched";
+    auto settings = smallSettingsExr(out);
+    settings.normalisePattern();
+    app::RenderJob job(*ctx, shaders, loadOffline(f.project), settings, f.dir);
+    job.setPreviewEnabled(true);
+    REQUIRE(job.run().has_value());
+
+    app::RenderJob::FramePreview frame;
+    REQUIRE(job.takePreview(frame));
+    CHECK(frame.linearSource); // the panel branches on this to say the tone map is not applied
+    CHECK(frame.hash == job.frameHashes().back());
+
+    auto file = assets::readExr(settings.frameFile(out, frame.index));
+    REQUIRE(file.has_value());
+    REQUIRE(file->format == scene::TextureFormat::Rgba32Float);
+    REQUIRE(file->width == 96);
+    const float* pixels = reinterpret_cast<const float*>(file->data.data());
+
+    std::size_t differing = 0;
+    float brightest = 0.0f;
+    for (std::uint32_t y = 0; y < frame.height; ++y) {
+        for (std::uint32_t x = 0; x < frame.width; ++x) {
+            const std::uint8_t* got = frame.rgba.data() +
+                                      (static_cast<std::size_t>(y) * frame.width + x) * 4;
+            const float* want = pixels + (static_cast<std::size_t>(y * frame.step) * 96 +
+                                          x * frame.step) * 4;
+            for (int c = 0; c < 3; ++c) {
+                brightest = std::max(brightest, want[c]);
+                const float v = std::clamp(want[c], 0.0f, 1.0f);
+                const float s = v <= 0.0031308f ? v * 12.92f
+                                                : 1.055f * std::pow(v, 1.0f / 2.4f) - 0.055f;
+                if (got[c] != static_cast<std::uint8_t>(std::lround(s * 255.0f))) {
+                    ++differing;
+                }
+            }
+        }
+    }
+    CHECK(differing == 0);
+    // The fixture's orb is deliberately emissive past 1.0, so this render really does contain
+    // values the preview has to clamp. Without that, "clamped and encoded" would be untested and
+    // a preview that merely multiplied by 255 would pass.
+    CHECK(brightest > 1.0f);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("What watching a render costs it", "[.perf][render][preview]") {
+    // ADR-170: minima over repeats, and structural quantities before wall times. The arms are
+    // interleaved rather than run in two blocks, so a machine that gets busier partway through
+    // loads both of them and not just the second.
+    //
+    //   avgen_render_tests "[.perf][preview]"
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+    constexpr int kRepeats = 3;
+    constexpr std::uint32_t kW = 1920;
+    constexpr std::uint32_t kH = 1080;
+
+    auto arm = [&](bool watched, int run) {
+        auto settings = smallSettings(f.dir / fmt::format("perf_{}_{}", watched ? "on" : "off", run));
+        settings.width = kW;
+        settings.height = kH;
+        settings.endSeconds = 2.9; // 24 frames at 10 fps
+        app::RenderJob job(*ctx, shaders, loadOffline(f.project), settings, f.dir);
+        job.setPreviewEnabled(watched);
+        REQUIRE(job.start().has_value());
+        const auto began = std::chrono::steady_clock::now();
+        REQUIRE(job.run().has_value());
+        const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count();
+        return std::tuple{seconds, job.previewSeconds(), job.progress(), job.previewTapped(),
+                          job.previewDropped()};
+    };
+
+    double offMin = 1e9;
+    double onMin = 1e9;
+    double tapMin = 1e9;
+    std::uint64_t offHash = 0;
+    std::uint64_t onHash = 0;
+    std::uint64_t tapped = 0;
+    std::uint64_t dropped = 0;
+    std::uint64_t frames = 0;
+    for (int i = 0; i < kRepeats; ++i) {
+        {
+            auto [seconds, tap, p, t, d] = arm(false, i);
+            offMin = std::min(offMin, seconds);
+            offHash = p.sequenceHash;
+            frames = p.framesRendered;
+            CHECK(t == 0); // off is off: the tap did not run at all
+            CHECK(tap == 0.0);
+        }
+        {
+            auto [seconds, tap, p, t, d] = arm(true, i);
+            onMin = std::min(onMin, seconds);
+            tapMin = std::min(tapMin, tap);
+            onHash = p.sequenceHash;
+            tapped = t;
+            dropped = d;
+        }
+    }
+
+    // The structural half, which does not move with the load average.
+    const std::uint32_t step = previewStep(kW, kH);
+    const std::uint64_t framePixels = static_cast<std::uint64_t>(kW) * kH;
+    const std::uint64_t readPixels = static_cast<std::uint64_t>(kW / step) * (kH / step);
+    std::printf("\n-- ADR-320: what the preview costs (%llu frames at %ux%u, min of %d) --\n",
+                static_cast<unsigned long long>(frames), kW, kH, kRepeats);
+    std::printf("  source pixels per frame   %llu\n", static_cast<unsigned long long>(framePixels));
+    std::printf("  pixels the tap reads      %llu  (1 in %llu; stride %u)\n",
+                static_cast<unsigned long long>(readPixels),
+                static_cast<unsigned long long>(framePixels / readPixels), step);
+    std::printf("  bytes copied per frame    %llu  (of %llu in the frame)\n",
+                static_cast<unsigned long long>(readPixels * 4),
+                static_cast<unsigned long long>(framePixels * 4));
+    std::printf("  frames tapped / dropped   %llu / %llu\n", static_cast<unsigned long long>(tapped),
+                static_cast<unsigned long long>(dropped));
+    std::printf("  render  preview off       %.3f s\n", offMin);
+    std::printf("  render  preview on        %.3f s  (%+.2f%%)\n", onMin,
+                100.0 * (onMin - offMin) / offMin);
+    std::printf("  inside the tap            %.4f s total, %.3f ms per frame\n", tapMin,
+                1000.0 * tapMin / static_cast<double>(std::max<std::uint64_t>(frames, 1)));
+    std::printf("  tap as a share of render  %.3f%%\n", 100.0 * tapMin / offMin);
+
+    // ADR-250, asserted rather than printed: the deliverable is the same either way.
+    CHECK(onHash == offHash);
+    CHECK(tapped == frames);
+    // Nothing accumulates when nobody collects: every frame but the one still in hand was dropped.
+    CHECK(dropped == frames - 1);
+}
+
+TEST_CASE("A supersampled EXR previews the frame that is written, not the one it was resolved from",
+          "[gpu][render][preview]") {
+    // The one thing the tap's *position* is load-bearing for, and the only case that can catch it
+    // being moved up a line. Under ADR-212 supersampling the HDR readback is twice the output in
+    // each axis, and `resolveToOutput` box-averages it down to the size that goes in the file. A
+    // tap above that call would show a frame of the right shape, the right content and the wrong
+    // pixels -- the 2x intermediate, which is a real picture of the same moment and is not the
+    // deliverable. Everything else in this file uses supersample 1, where the resolve is a no-op
+    // and cannot tell the two placements apart.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+    const auto out = f.dir / "exr_super";
+    auto settings = smallSettingsExr(out);
+    settings.supersample = 2.0f;
+    settings.endSeconds = 0.8; // three frames is enough; these are 4x the pixels
+    settings.normalisePattern();
+    app::RenderJob job(*ctx, shaders, loadOffline(f.project), settings, f.dir);
+    job.setPreviewEnabled(true);
+    REQUIRE(job.run().has_value());
+    REQUIRE(job.progress().error.empty());
+
+    app::RenderJob::FramePreview frame;
+    REQUIRE(job.takePreview(frame));
+    // The output is 96x64, the HDR target is 192x128. Either number is a plausible-looking preview
+    // and only one of them is the file's.
+    CHECK(frame.sourceWidth == 96);
+    CHECK(frame.sourceHeight == 64);
+    CHECK(frame.step == 1);
+
+    auto file = assets::readExr(settings.frameFile(out, frame.index));
+    REQUIRE(file.has_value());
+    REQUIRE(file->width == 96);
+    const float* pixels = reinterpret_cast<const float*>(file->data.data());
+    // Not equality here, and the reason is the resolve itself. `writeExr` stores half, and
+    // everywhere else in this file the floats came straight off an RGBA16F readback and so ARE
+    // halves -- the round trip is exact and the comparison can be byte-for-byte. A box average of
+    // four halves is not a half, so the file rounds it, and a value sitting on an 8-bit boundary
+    // lands one code either side. Measured: 112 of 18,432 channels, every one of them by exactly 1.
+    //
+    // So the tolerance is 1 code and the assertion is on the WORST difference rather than on how
+    // many differ. A preview of the unresolved 2x intermediate is not one code away from this: the
+    // shape check above already refuses it, and a whole-frame difference would put `worst` in the
+    // tens or hundreds.
+    int worst = 0;
+    std::size_t differing = 0;
+    for (std::uint32_t i = 0; i < frame.width * frame.height; ++i) {
+        for (int c = 0; c < 3; ++c) {
+            const float v = std::clamp(pixels[static_cast<std::size_t>(i) * 4 + c], 0.0f, 1.0f);
+            const float s = v <= 0.0031308f ? v * 12.92f : 1.055f * std::pow(v, 1.0f / 2.4f) - 0.055f;
+            const int got = frame.rgba[static_cast<std::size_t>(i) * 4 + c];
+            const int want = static_cast<int>(std::lround(s * 255.0f));
+            if (got != want) {
+                ++differing;
+                worst = std::max(worst, std::abs(got - want));
+            }
+        }
+    }
+    INFO(differing << " of " << frame.width * frame.height * 3 << " channels differ, worst " << worst);
+    CHECK(worst <= 1);
+    CHECK(differing * 100 < static_cast<std::size_t>(frame.width) * frame.height * 3); // under 1%
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("A job identifies itself by something an address cannot fake", "[gpu][render][preview]") {
+    // The editor decides "is the frame on the panel still this render's?" by comparing what it
+    // showed last against the running job. Running a queue starts the next job in the same UI frame
+    // the last one finished, and `new` may hand back the address the destroyed one was at -- so a
+    // pointer comparison can say "same job" about a different render and leave the previous one's
+    // last frame on screen, under a running progress bar, labelled live. This is the check that
+    // makes that impossible; it is deliberately written as the queue does it.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+    std::uint64_t firstId = 0;
+    const app::RenderJob* firstAddress = nullptr;
+    {
+        app::RenderJob one(*ctx, shaders, loadOffline(f.project), smallSettings(f.dir / "id_one"), f.dir);
+        firstId = one.id();
+        firstAddress = &one;
+    }
+    app::RenderJob two(*ctx, shaders, loadOffline(f.project), smallSettings(f.dir / "id_two"), f.dir);
+    CHECK(two.id() != firstId);
+    CHECK(two.id() > firstId);
+    // Not an assertion about the allocator -- it is free to place the second job anywhere. It says
+    // what the identity is NOT allowed to depend on: if this ever prints "reused", the pointer
+    // comparison this replaced was already wrong on this machine.
+    INFO(std::string(&two == firstAddress ? "the allocator reused the address"
+                                          : "the allocator did not reuse it"));
+    CHECK(two.id() != 0);
 }

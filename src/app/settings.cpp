@@ -34,7 +34,9 @@ json AppSettings::toJson() const {
     json doc;
     doc["format"] = kFormatName;
     doc["version"] = kFormatVersion;
-    doc["general"] = json{{"canvasRenderScale", canvasRenderScale}, {"appearance", appearanceThemeName(appearance)}};
+    doc["general"] = json{{"canvasRenderScale", canvasRenderScale},
+                          {"appearance", appearanceThemeName(appearance)},
+                          {"renderFramePreview", renderFramePreview}};
     doc["outputPreview"] = json{
         {"mode", ui::previewViewModeName(preview.mode)},
         {"outside", ui::outsideFrameName(preview.outside)},
@@ -68,6 +70,7 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
     AppSettings out;
     if (const auto general = doc.find("general"); general != doc.end() && general->is_object()) {
         out.canvasRenderScale = std::clamp(general->value("canvasRenderScale", 1.0f), 0.25f, 2.0f);
+        out.renderFramePreview = general->value("renderFramePreview", out.renderFramePreview);
         if (const auto appearance = general->find("appearance"); appearance != general->end()) {
             if (!appearance->is_string() || !appearanceThemeFromName(appearance->get<std::string>(), out.appearance)) {
                 return fail("general.appearance must be System, Dark or Light");
