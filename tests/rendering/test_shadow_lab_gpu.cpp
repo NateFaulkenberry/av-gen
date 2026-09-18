@@ -340,19 +340,19 @@ TEST_CASE("the cascade overlay draws the volume the renderer uploaded", "[gpu][s
     // whatever it is given.
     options.shadowCascades = true;
     options.shadowCascadeSlices = true;
-    rendering::buildDebugGeometry(draw, s, options, 0.0, nullptr, {});
+    rendering::buildDebugGeometry(draw, s, options, 0.0, nullptr, nullptr, {});
     CHECK(draw.empty());
 
     // ...and the other control: views, and the switches off.
     draw.clear();
     options.shadowCascades = false;
     options.shadowCascadeSlices = false;
-    rendering::buildDebugGeometry(draw, s, options, 0.0, nullptr, views);
+    rendering::buildDebugGeometry(draw, s, options, 0.0, nullptr, nullptr, views);
     CHECK(draw.empty());
 
     draw.clear();
     options.shadowCascades = true;
-    rendering::buildDebugGeometry(draw, s, options, 0.0, nullptr, views);
+    rendering::buildDebugGeometry(draw, s, options, 0.0, nullptr, nullptr, views);
     CHECK(draw.lineVertexCount() == 2 * 24);  // twelve edges, two vertices each, per view
     CHECK(draw.pointVertexCount() == 2);      // the texel-snapped centre of each
 
@@ -384,7 +384,7 @@ TEST_CASE("the cascade overlay draws the volume the renderer uploaded", "[gpu][s
     draw.clear();
     options.shadowCascades = false;
     options.shadowCascadeSlices = true;
-    rendering::buildDebugGeometry(draw, s, options, 0.0, nullptr, views);
+    rendering::buildDebugGeometry(draw, s, options, 0.0, nullptr, nullptr, views);
     CHECK(draw.lineVertexCount() == 2 * 24);
     CHECK(draw.pointVertexCount() == 0);
     bool anyOutsideTheLightBoxes = false;
@@ -402,7 +402,7 @@ TEST_CASE("the cascade overlay draws the volume the renderer uploaded", "[gpu][s
     options.shadowCascades = true;
     options.shadowCascadeSlices = false;
     options.shadowCascade = 1;
-    rendering::buildDebugGeometry(draw, s, options, 0.0, nullptr, views);
+    rendering::buildDebugGeometry(draw, s, options, 0.0, nullptr, nullptr, views);
     CHECK(draw.lineVertexCount() == 24);
     CHECK(draw.pointVertexCount() == 1);
     CHECK(glm::length(draw.pointVertices()[0].position - views[1].center) < 1e-3f);
@@ -441,7 +441,7 @@ TEST_CASE("the caster overlay colours by what the frame did, not by what the cam
     rendering::DebugViewOptions options;
     options.shadowCasters = true;
     options.submittedOnly = true; // deliberately: the overlay must ignore it
-    rendering::buildDebugGeometry(draw, s, options, 0.0, nullptr, views);
+    rendering::buildDebugGeometry(draw, s, options, 0.0, nullptr, nullptr, views);
     CHECK(draw.lineVertexCount() == 2 * 24); // a box for each entity, the culled one included
 
     // The colours are the verdict, so they have to differ. Amber for the caster the camera rejected,
