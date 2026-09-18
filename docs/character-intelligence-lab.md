@@ -4,16 +4,17 @@
 
 Registry entry: `LabId::Character`, key `character` (`src/labs/lab.cpp`).
 Fixtures: `examples/labs/character/character-intelligence-lab.scene.json` (the explorers, frozen —
-see §2), `examples/labs/character/guard-post.scene.json` (the decided characters) and
+see §2), `examples/labs/character/guard-post.scene.json` (the decided characters),
+`examples/labs/character/river-crossing.scene.json` (case 9's ford and detour) and
 `examples/labs/character/perception-crowd.scene.json` (the occlusion budget).
 Cases: `examples/labs/character/cases.json`, reachable as `avgen --lab-case character:<n>`.
 Tests: `tests/unit/test_character_intelligence_lab.cpp`, `tests/unit/test_character_lab_sockets.cpp`,
 `tests/unit/test_entity_perception.cpp`, `tests/unit/test_entity_decision.cpp`,
-`tests/unit/test_decision_extraction.cpp`.
+`tests/unit/test_decision_extraction.cpp`, `tests/unit/test_route_pricing.cpp`.
 
 Companion reading, in this order: `docs/character-ai-research.md` (what already exists),
 `docs/character-ai-plan.md` (the units and who owns which file), ADR-266 to ADR-275, then ADR-290
-(perception, built) and ADR-333 (the decision layer, built).
+(perception, built), ADR-333 (the decision layer, built) and ADR-335 (route pricing, built).
 
 ---
 
@@ -92,7 +93,8 @@ say so rather than to quietly let the case pass.
 
 ## 2. The fixtures
 
-**There are three, and the reason is the golden trace.** `character-intelligence-lab.scene.json` is
+**Three of the four exist because the first one is frozen, and the reason it is frozen is the
+golden trace.** `character-intelligence-lab.scene.json` is
 frozen: `tests/data/explore-position-trace.txt` is 3,600 samples of its five bodies taken from the
 build before ADR-333's extraction, and a sixth body in that scene changes what the other five
 perceive and score. So the decided characters live in `guard-post.scene.json` — a flat world, four

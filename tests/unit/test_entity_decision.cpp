@@ -530,7 +530,10 @@ TEST_CASE("a misspelled considerer is refused by name", "[entity][decision][adr3
         CHECK(made->kind() == kind);
         CHECK(made->name() == kind); // the default name, so a scene that names none still compares
     }
-    CHECK(considererKinds().size() == 4);
+    // Four in ADR-333, five since ADR-335 added `route`. The count is asserted rather than the
+    // list because the loop above already checks every name; this catches a kind added to the
+    // factory and not to the vocabulary, which is the direction the failure actually goes.
+    CHECK(considererKinds().size() == 5);
 }
 
 // ---- the guard ---------------------------------------------------------------------------------
