@@ -34,6 +34,7 @@
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
+#include "spatial/point_grid.hpp"
 #include "world/camera_clearance.hpp"
 
 #include <nlohmann/json.hpp>
@@ -315,6 +316,64 @@ void primitives(const entity::Navigator& nav, int repeats) {
     }
 }
 
+// What a perception candidate scan would cost. The one number the Phase 0 performance model left
+// extrapolated: a sense tick is a radius query over the world's interest points plus a cheap test
+// per candidate, and the radius query was the part nobody had priced.
+//
+// Built over the real 505 interest points of the real scene, at the cell size a 60 m sense range
+// wants, and queried at three ranges -- because a query radius larger than the cell size touches
+// more than 27 cells and the header says so.
+void perceptionScan(const entity::EntityWorld& world, const entity::Navigator& nav, int repeats) {
+    std::vector<glm::vec3> points;
+    for (const entity::InterestPoint& p : world.interestPoints()) {
+        points.push_back(p.position);
+    }
+    std::printf("\n== perception candidate scan over %zu real interest points ==\n", points.size());
+    if (points.empty()) {
+        std::printf("  no interest points; nothing to scan\n");
+        return;
+    }
+    const glm::vec2 lo = nav.worldMin();
+    const glm::vec2 hi = nav.worldMax();
+    std::vector<glm::vec3> eyes;
+    for (int i = 0; i < 64; ++i) {
+        const float a = static_cast<float>(i) / 64.0f;
+        const float b = static_cast<float>((i * 37) % 64) / 64.0f;
+        const glm::vec2 p = lo + (hi - lo) * glm::vec2(a, b);
+        eyes.emplace_back(p.x, nav.groundHeight(p), p.y);
+    }
+    for (const float range : {20.0f, 60.0f, 120.0f}) {
+        spatial::PointGrid grid;
+        const auto buildStart = Clock::now();
+        grid.build(points, range);
+        const double buildMs = msSince(buildStart);
+        std::vector<std::uint32_t> hits;
+        double bestUs = std::numeric_limits<double>::max();
+        long long found = 0;
+        for (int r = 0; r < repeats; ++r) {
+            const auto start = Clock::now();
+            long long acc = 0;
+            for (int i = 0; i < 4096; ++i) {
+                grid.query(eyes[static_cast<std::size_t>(i % 64)], range, hits);
+                // The distance test a sense tick does per candidate. Counted, so the compiler
+                // cannot drop the loop. It deliberately does **not** include the per-candidate
+                // `clearanceAt`: that is priced separately in the primitives table at 0.024 us, and
+                // folding it in here would hide which half of a sense tick costs what.
+                for (const std::uint32_t h : hits) {
+                    const glm::vec3 d = points[h] - eyes[static_cast<std::size_t>(i % 64)];
+                    if (glm::dot(d, d) <= range * range) {
+                        ++acc;
+                    }
+                }
+            }
+            bestUs = std::min(bestUs, msSince(start) * 1000.0 / 4096.0);
+            found = acc;
+        }
+        std::printf("  range %3.0f m: build %5.2f ms, one scan %7.3f us, %lld candidates per 4096 scans\n",
+                    static_cast<double>(range), buildMs, bestUs, found);
+    }
+}
+
 void gridStats(const entity::Navigator& nav) {
     const entity::NavGrid* grid = nav.grid();
     std::printf("\n== navigation graph ==\n");
@@ -458,6 +517,12 @@ int main(int argc, char** argv) {
         argc > 1 ? fs::path(argv[1]) : fs::path("examples/world/glowmere-valley-2.scene.json");
     const int frames = argc > 2 ? std::atoi(argv[2]) : 120;
     const int repeats = argc > 3 ? std::atoi(argv[3]) : 3;
+    // Which sections to run, as letters: g grid, p perception scan, r primitives, s scaling,
+    // k scrub cost, d determinism. A selector rather than an all-or-nothing run because the scrub
+    // arm at 250 explorers takes ten minutes by itself and nobody wants to pay that to re-check a
+    // microsecond.
+    const std::string sections = argc > 4 ? std::string(argv[4]) : std::string("gprskd");
+    const auto want = [&](char c) { return sections.find(c) != std::string::npos; };
 
     log::setLevel(log::Level::Error);
     assets::AssetRegistry registry{scenePath.parent_path()};
@@ -483,10 +548,11 @@ int main(int argc, char** argv) {
                     nav.obstacles()->blockingCount());
     }
     std::printf("interest points: %zu\n", comp.entityWorld().interestPoints().size());
-    gridStats(nav);
-    primitives(nav, repeats);
-    scaling(nav, frames, repeats);
-    seekCost(nav, repeats);
-    determinism(nav, 30.0);
+    if (want('g')) { gridStats(nav); }
+    if (want('p')) { perceptionScan(comp.entityWorld(), nav, repeats); }
+    if (want('r')) { primitives(nav, repeats); }
+    if (want('s')) { scaling(nav, frames, repeats); }
+    if (want('k')) { seekCost(nav, repeats); }
+    if (want('d')) { determinism(nav, 30.0); }
     return 0;
 }

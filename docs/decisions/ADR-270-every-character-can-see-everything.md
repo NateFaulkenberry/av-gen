@@ -86,16 +86,35 @@ Glowmere's saucer carries a `drift` of radius 2.4 m; perceived from its visual p
 noticed somewhere it is not standing, and a character sent to meet it would walk to the wrong place
 by up to 2.4 m for reasons nothing could explain.
 
-## 4. What it costs
+## 4. What it costs, and why the cadence is not for the reason I first wrote
 
-Extrapolated, and labelled as such. A candidate scan at 60 m over 505 interest points selects order
-1% of them — eight to twenty candidates — each costing a distance test and a `clearanceAt` at
-0.024 µs. Estimate **2–4 µs per character per sense tick**, which at 4 Hz is **0.13–0.27 µs per
-character per frame**: under 1% of the 89 µs an `explore` character already costs.
+I estimated a candidate scan at 2–4 µs, dominated by a `spatial::PointGrid` radius query I had not
+isolated, and said that was the number to measure before the first line of implementation. It took
+one probe arm. Measured over the real 505 interest points of the real scene, under a load average
+of 42:
 
-The estimate is dominated by the `spatial::PointGrid` radius query, which was not isolated. That is
-the one number to measure before the first line of the implementation is written, and it is one
-probe arm.
+```
+range  20 m: grid build 0.01 ms, one scan 0.059 µs,  1.7 candidates per scan
+range  60 m: grid build 0.01 ms, one scan 0.098 µs, 14.8 candidates per scan
+range 120 m: grid build 0.02 ms, one scan 0.241 µs, 55.5 candidates per scan
+```
+
+The candidate *count* guess was right — eight to twenty at 60 m, measured 14.8. The *cost* guess
+was twenty to forty times too high. Adding the per-candidate `clearanceAt` at 0.024 µs gives about
+**0.45 µs per sense tick at 60 m**: 0.03 µs per character per frame at 4 Hz, and still only
+0.45 µs per character per frame at a full 60.
+
+**So the 4 Hz default is not there for cost, and this ADR was drafted as though it were.** It is
+there for two better reasons, and they should be the ones written on it:
+
+* a character that re-senses every frame reacts instantaneously, which reads as a machine rather
+  than as a creature;
+* `Percept::seenAt` is meaningless if it is always now, and staleness is the only thing that lets a
+  character be *wrong* about where something is — which is most of what makes perception worth
+  having over the omniscient list it replaces.
+
+The budget argument still holds for **occlusion**, where it holds by four orders of magnitude, and
+that is the knob `occlusionTestsPerSecond` exists for. It does not hold for the scan.
 
 ## 5. What is out of reach, and why
 

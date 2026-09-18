@@ -484,13 +484,28 @@ architecture, and it is a *behaviour* cost, before any perception or decision la
 
 Labelled as extrapolation, with the basis stated.
 
-- **Perception, grid-backed, 4 Hz, 8 percepts, no occlusion.** Basis: a candidate scan is a radius
-  query over the existing `spatial::PointGrid` plus one `clearanceAt` (0.024 us) and one distance
-  test per candidate. At 505 interest points, a 60 m radius on a 600 m world selects order 1% of
-  them, call it 8-20 candidates. Estimate **2-4 us per character per sense tick**, which at 4 Hz is
-  **0.13-0.27 us per character per frame** -- amortised, under 1% of the `explore` cost. Perception
-  is affordable. This estimate is dominated by the radius query, which I did not isolate; it is the
-  one number here I would want measured before committing to a 60 Hz variant.
+- **Perception, grid-backed, no occlusion. Estimated at 2-4 us, then measured at 0.098 us.**
+  I estimated a candidate scan at 2-4 us per sense tick, dominated by a `spatial::PointGrid` radius
+  query I had not isolated. Measured over the real 505 interest points of the real scene, under a
+  load average of 42:
+
+  ```
+  range  20 m: grid build 0.01 ms, one scan 0.059 us,  1.7 candidates per scan
+  range  60 m: grid build 0.01 ms, one scan 0.098 us, 14.8 candidates per scan
+  range 120 m: grid build 0.02 ms, one scan 0.241 us, 55.5 candidates per scan
+  ```
+
+  The candidate *count* guess was right (8-20 at 60 m; 14.8). The *cost* guess was 20-40x too
+  high: the radius query is an open-addressed grid lookup over 27 cells and it is nearly free.
+  Adding the per-candidate `clearanceAt` at 0.024 us gives **about 0.45 us per sense tick at 60 m**,
+  which is **0.03 us per character per frame at 4 Hz** -- and, notably, only 0.45 us per character
+  per frame even at a full 60 Hz.
+
+  **Consequence for the design: the 4 Hz cadence in `PerceptionSettings` is not there for cost.**
+  It is there so that a character does not react instantaneously, and because a sense tick that
+  ran every frame would make `Percept::seenAt` meaningless. That is a better reason, and it is a
+  different reason from the one ADR-270 was written with.
+
 - **Perception with occlusion, measured directly.** `world::heroSightline` is 1720.779 us at 20 m,
   5391.917 us at 60 m, 16907.755 us at 200 m -- it marches at a fixed step in metres, so cost is
   linear in range. **One test per character per frame at 100 characters is 172 ms a frame.** This
@@ -510,14 +525,14 @@ Labelled as extrapolation, with the basis stated.
 | entity bookkeeping | 0.03 us | measured |
 | `wander`-class behaviour | 19 us | measured |
 | `explore`-class behaviour | 89 us | measured |
-| perception, 4 Hz, no occlusion | 0.13-0.27 us | extrapolated from grid query costs |
+| perception, 4 Hz, no occlusion | 0.03 us | **measured** scan + priced `clearanceAt` |
 | perception with occlusion, 1 test/char/frame @ 20 m | 1720 us | measured; **rejected as unaffordable** |
 | decision, 2 Hz | 0.03-0.1 us | extrapolated |
 | replanning, 1 Hz | 0.42 us | measured `requestPath` / 60 |
 
 At 10/25/50/100/250/500 characters, `explore`-class, with perception and decision on and occlusion
 off: **0.90 / 2.2 / 4.5 / 9.0 / 22.4 / 44.8 ms per frame** -- which is the measured behaviour cost
-plus under 1%. **The new layers are not the cost. The existing behaviour is.**
+plus about a tenth of a percent. **The new layers are not the cost. The existing behaviour is.**
 
 ### E.3 Where the 89 us actually goes, and what to do about it
 
@@ -701,9 +716,10 @@ Stated plainly, with what each would take.
 - **Whether Detour's pathfinding is bit-reproducible across builds.** Adopting it to find out is
   building the thing. Recorded as an unretired risk in §A.3; the recommendation does not depend on
   it, because four other arguments are decisive on their own.
-- **The cost of the radius query in a perception scan.** §E.2's 2-4 us estimate is dominated by a
-  `spatial::PointGrid` query I did not isolate. It is the one extrapolated number I would measure
-  before Phase 2 starts, and it is one probe arm.
+- **Answered after the fact.** The radius-query cost was the one number I left extrapolated, and
+  measuring it took one probe arm: 0.098 us at 60 m, against a 2-4 us estimate. Both of this
+  document's extrapolations turned out wrong in opposite directions -- the scrub cost low by 2-5x,
+  the sense scan high by 20-40x -- which is the argument for measuring rather than a footnote to it.
 - **What the numbers are on a quiet machine.** Every timing here was taken at a load average
   between 3.75 and 4.85. They are upper bounds; the ratios are sound and no decision in this
   document turns on a factor smaller than two.
