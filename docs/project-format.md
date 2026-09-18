@@ -202,11 +202,11 @@ which is what every scene written before ADR-245 has.
   "cameras": [
     { "id": 1, "name": "Hero Free Roam", "autoDirector": true },
     { "id": 2, "name": "Valley Wide", "slug": "valleywide", "placement": "free",
-      "position": [-168, 96, -150], "target": [-8, 6, 46], "fov": 52,
+      "position": [-88, 51, -52], "target": [-8, 6, 46], "fov": 52,
       "focalLength": 24, "autoDirector": false },
     { "id": 3, "name": "UFO Watch", "slug": "ufowatch", "placement": "free",
       "fov": 40, "focalLength": 35,
-      "followNode": "visitor", "followOffset": [31, 5, 31],
+      "followNode": "visitor", "followOffset": [24.8, 2.6, 24.8],
       "aimNode": "visitor", "aimOffset": [0, -7, 0],
       "eventScenario": "abduction", "eventLead": 0.3, "eventTail": 1.4,
       "eventBlend": 0.0, "eventBeats": ["aim", "beam", "abduct", "depart"],

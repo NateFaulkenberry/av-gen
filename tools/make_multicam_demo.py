@@ -19,6 +19,20 @@ ordinary parameters. Point the same three fields at a different world and the sa
 
 writes `examples/world/glowmere-valley-2-multicam.scene.json` and `.json` beside the originals and
 leaves the originals untouched.
+
+**This generator no longer reproduces the checked-in demo.** Two things it copies have since been
+changed in the files themselves and cannot be expressed here:
+
+  * the render range and output path, which were re-saved from the app;
+  * the cut itself -- `glowmere-valley-2.json` now carries a 39-shot bake where the demo carries
+    41, so copying its `camera/*` tracks today would replace the film, not just re-place it; and
+  * the Hero Free Roam camera's 20% dolly-in -- 328 baked keys on `camera/position`,
+    `camera/target` and `camera/lens/focusDistance`, each scaled about the subject of the shot it
+    belongs to. Those keys are copied wholesale from `glowmere-valley-2.json`, which was *not*
+    given the same treatment, so a regeneration would put the hero camera back where it was.
+
+What this file is still good for is the three cameras and the shot track. Re-run it only if you
+mean to rebuild those, and expect to redo the dolly afterwards.
 """
 
 from __future__ import annotations
@@ -74,7 +88,12 @@ CAMERAS = [
         "placement": "free",
         # The authored base. The timeline keys below move it; these are what it is without them,
         # which is also what a scrub before the first key gives.
-        "position": [-168.0, 96.0, -150.0],
+        #
+        # Halfway in along its own look-at axis, from the 268 m it was first placed at. The owner
+        # asked for the wide shots 50% closer and this is the film's wide shot: a 24 mm view of the
+        # whole valley, where every creature in it read as a speck. The *aim* does not move -- a
+        # dolly is a change of distance, not of subject.
+        "position": [-88.0, 51.0, -52.0],
         "target": [-8.0, 6.0, 46.0],
         "fov": 52.0,
         # A wide lens, because this camera *is* the wide lens. That used to be an Auto-director
@@ -94,11 +113,19 @@ CAMERAS = [
         # It rides the saucer and looks *below* it. Aiming at the saucer's centre gives a shot of a
         # saucer; aiming seven metres under it gives a shot of an abduction -- the beam, the ground
         # and whatever is being lifted are what make the event readable. Forty-four metres out, which
-        # was chosen by rendering it: at sixty-six the thing in the beam was three pixels tall.
+        # was chosen by rendering it: at sixty-six the thing in the beam was three pixels tall --
+        # and now 36 m, a fifth closer again, on the same instruction as everything else here.
+        #
+        # *Both* offsets are scaled, by the same 0.8, about the saucer they are offsets from. That
+        # is what makes it a dolly and not a re-composition: the angle the shot looks down at the
+        # beam from is unchanged, the saucer and the ground sit exactly where they sat in frame, and
+        # the only thing that differs is that everything is 1.25x bigger. Scaling the camera alone
+        # was tried first and rendered: it lifts the saucer 1.25x further up the frame and clips the
+        # top of the dome, which is the whole argument for scaling the aim with it.
         "followNode": "visitor",
-        "followOffset": [31.0, 5.0, 31.0],
+        "followOffset": [24.8, 4.0, 24.8],
         "aimNode": "visitor",
-        "aimOffset": [0.0, -7.0, 0.0],
+        "aimOffset": [0.0, -5.6, 0.0],
         # The event it answers, by name. The engine does not know what an abduction is.
         "eventScenario": "abduction",
         "eventLead": 0.3,
@@ -117,8 +144,10 @@ CAMERAS = [
 # Ordinary timeline tracks on ordinary parameters. There is no camera animation system: `Valley Wide`
 # is keyframed exactly the way `orb/scale` is, which is the point.
 #
-# A slow lateral drift with a small rise, twenty-two metres over the seven seconds it is on screen,
-# ending on more of the river and more sky. Subtle on purpose (multicam-demo section 9).
+# A slow lateral drift with a small rise, over the seven seconds it is on screen, ending on more of
+# the river and more sky. Subtle on purpose (multicam-demo section 9). Each key is the one it was
+# authored with, dollied halfway in along the aim of the same instant -- so the move is the same
+# move, half the stand-off.
 VALLEY_TRACKS = [
     {
         "target": "cameras/valleywide/position",
@@ -128,12 +157,12 @@ VALLEY_TRACKS = [
         "loopLength": 0.0,
         "enabled": True,
         "keys": [
-            {"time": 0.0, "value": [-168.0, 96.0, -150.0], "interp": "easeInOut"},
-            {"time": 7.0, "value": [-150.0, 101.0, -163.0], "interp": "easeInOut"},
+            {"time": 0.0, "value": [-88.0, 51.0, -52.0], "interp": "easeInOut"},
+            {"time": 7.0, "value": [-74.0, 55.0, -53.5], "interp": "easeInOut"},
             # The return at 26 s picks the move up again from where it left off rather than
             # snapping back, so the second appearance reads as the same camera.
-            {"time": 26.0, "value": [-150.0, 101.0, -163.0], "interp": "easeInOut"},
-            {"time": 31.0, "value": [-137.0, 104.0, -172.0], "interp": "easeInOut"},
+            {"time": 26.0, "value": [-74.0, 55.0, -53.5], "interp": "easeInOut"},
+            {"time": 31.0, "value": [-63.5, 58.0, -54.0], "interp": "easeInOut"},
         ],
     },
     {
