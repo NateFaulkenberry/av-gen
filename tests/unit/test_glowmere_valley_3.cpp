@@ -15,12 +15,14 @@
 #include "core/time.hpp"
 #include "entity/locomotion.hpp"
 #include "params/modulation.hpp"
+#include "params/serialization.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
 #include "signals/signal_bus.hpp"
 #include "spatial/point_cloud.hpp"
 #include "world/world_map.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <fmt/format.h>
@@ -1239,4 +1241,89 @@ TEST_CASE("Glowmere Valley 3's hills are wooded, and the tree line is where ADR-
         // And the one thing the control must *share*: the tree line did not move.
         CHECK(before.treeLine == now.treeLine);
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// 7. The world that runs is the world the scene describes.
+//
+// ADR-264 §0: "every test in this repository loads `Composition::loadFile(scene)` and stops
+// there. The owner opens the project. `--render` is pointed at the project." That is how a beam
+// ran at 3.07 m against an authored 7.8 and a saucer sat 28.661 m from where its scene put it,
+// for as long as those files existed, with the whole suite green.
+//
+// Every other arm in this file loads the scene. This one loads the **project**, applies it exactly
+// where `Engine::loadProject` does, re-installs the entity layer for exactly the reason ADR-264
+// gives, and then asserts that nothing moved: the bodies are where the scene put them, the
+// emitters are the size the scene authored, and the two engine-level opt-ins ADR-338 added are
+// actually on. Its control is valley-2-multicam, where the same walk finds 248 overrides.
+TEST_CASE("Glowmere Valley 3 runs the world its scene describes, loaded as a project",
+          "[glowmere3][project]") {
+    if (!v3Ready()) {
+        SKIP("glowmere-valley-3 or assets/aliens is not present");
+    }
+    const fs::path projectPath = worldDir() / "glowmere-valley-3.json";
+    REQUIRE(fs::exists(projectPath));
+
+    assets::AssetRegistry registry(worldDir());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    auto loaded = scene::Composition::loadFile(v3Scene(), registry);
+    INFO((loaded.has_value() ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+    std::unique_ptr<scene::Composition> comp = std::move(*loaded);
+    comp->attach(params, modulator);
+    auto applied = params::loadProjectFile(projectPath, params, modulator);
+    INFO((applied.has_value() ? std::string() : applied.error().message));
+    REQUIRE(applied.has_value());
+    comp->installEntities();
+
+    // Every body is where its scene node is, in the parameter stack the project has had its say
+    // over. 1e-4 m rather than exact, because `position` is a float vec3 round-tripped through
+    // JSON, and the number this arm exists to catch is 28.661 m.
+    const json scene = readJson(v3Scene());
+    int bodies = 0;
+    for (const json& n : scene.at("nodes")) {
+        if (n.value("kind", std::string()) != "gltf") {
+            continue;
+        }
+        const std::string name = n.value("name", std::string());
+        const params::IParameter* p = params.find(fmt::format("nodes/{}/position", name));
+        INFO("nodes/" << name << "/position");
+        REQUIRE(p != nullptr);
+        for (int axis = 0; axis < 3; ++axis) {
+            CHECK(static_cast<double>(p->baseComponent(axis)) ==
+                  Catch::Approx(n.at("position")[axis].get<double>()).margin(1e-4));
+        }
+        ++bodies;
+    }
+    INFO(bodies << " bodies checked against the scene through the parameter stack");
+    CHECK(bodies == 5);
+
+    // The two opt-ins ADR-338 added are registered and on, which is the difference between a
+    // setting and a decoration (ADR-225). They are also the two knobs an overlay would drive.
+    for (const char* who : {"scout", "wader", "drylander", "elder", "watcher"}) {
+        const params::IParameter* stall =
+            params.find(fmt::format("entity/{}/decide/stallSeconds", who));
+        INFO("entity/" << who << "/decide/stallSeconds");
+        REQUIRE(stall != nullptr);
+        CHECK(stall->baseComponent(0) == Catch::Approx(12.0f));
+        const params::IParameter* body =
+            params.find(fmt::format("entity/{}/ground/bodyRadius", who));
+        INFO("entity/" << who << "/ground/bodyRadius");
+        REQUIRE(body != nullptr);
+        CHECK(body->baseComponent(0) == Catch::Approx(0.9f));
+    }
+
+    // And the route considerer's taste, which is the one number the second demonstration turns on
+    // and therefore the one an author will reach for first.
+    const params::IParameter* wet = params.find("entity/wader/decide/cross/wadePenalty");
+    const params::IParameter* dry = params.find("entity/drylander/decide/cross/wadePenalty");
+    REQUIRE(wet != nullptr);
+    REQUIRE(dry != nullptr);
+    INFO("wader " << wet->baseComponent(0) << " vs drylander " << dry->baseComponent(0));
+    CHECK(wet->baseComponent(0) < dry->baseComponent(0));
+    // Bracketing the 7.44 crossover this geography measures, with room on both sides. A band, so
+    // a change that moved either across it fails here rather than in a render nobody took.
+    CHECK(wet->baseComponent(0) < 7.44f * 0.6f);
+    CHECK(dry->baseComponent(0) > 7.44f * 1.6f);
 }
