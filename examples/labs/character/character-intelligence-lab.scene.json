@@ -1225,7 +1225,15 @@
      "node": "lantern",
      "socket": "hand"
     }
-   ]
+   ],
+   "perception": {
+    "range": 60.0,
+    "fieldOfView": 200.0,
+    "proximityRange": 4.0,
+    "capacity": 24,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 0.0
+   }
   },
   {
    "name": "rover",
@@ -1261,7 +1269,15 @@
      "repathSeconds": 6.0,
      "stuckSeconds": 2.5
     }
-   ]
+   ],
+   "perception": {
+    "range": 12.0,
+    "fieldOfView": 200.0,
+    "proximityRange": 4.0,
+    "capacity": 24,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 0.0
+   }
   },
   {
    "name": "diver",
@@ -1297,7 +1313,15 @@
      "repathSeconds": 6.0,
      "stuckSeconds": 2.5
     }
-   ]
+   ],
+   "perception": {
+    "range": 60.0,
+    "fieldOfView": 90.0,
+    "proximityRange": 4.0,
+    "capacity": 24,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 0.0
+   }
   },
   {
    "name": "penned",
@@ -1333,7 +1357,15 @@
      "repathSeconds": 6.0,
      "stuckSeconds": 2.5
     }
-   ]
+   ],
+   "perception": {
+    "range": 60.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 24,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 2.0
+   }
   }
  ],
  "post": {

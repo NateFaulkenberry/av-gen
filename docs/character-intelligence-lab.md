@@ -41,10 +41,17 @@ social interaction, a dense environment, a long-running simulation.
 | 3 | a route round what is in the way | runnable |
 | 4 | a penned character is stuck and nothing says so | runnable |
 | 5 | two minutes, and the scrub against the play | runnable |
-| 6 | every character sees everything | runnable — *the answer is the absence* |
-| 7 | investigating a mushroom | blocked on **P2 perception, P3 decision** |
-| 8 | a social interaction | blocked on **P2 perception, P3 decision** |
+| 6 | every character *used to* see everything | runnable — the before-arm, kept |
+| 10 | two characters, two ranges, two different worlds | runnable — the after-arm (ADR-290) |
+| 11 | the occlusion budget, and the arm at zero | runnable (ADR-290) |
+| 7 | investigating a mushroom | blocked on **P3 decision** |
+| 8 | a social interaction | blocked on **P3 decision** |
 | 9 | crossing a river | blocked on **P3 decision** |
+
+Cases 7 and 8 were blocked on *two* units and are now blocked on one. That is what a `blockedBy` is
+for: the day a unit lands, the cases that were waiting on it are a list rather than a memory, and
+unblocking half of one is deleting half of a string. All three remaining blocks are the same block —
+**nobody decides** (ADR-269) — and `Option` and `IConsiderer` still have no implementations.
 
 A blocked case carries `blockedBy` naming the unit of `docs/character-ai-plan.md` that unblocks it
 (ADR-275). `--lab-case character:7` refuses and prints the unit rather than opening the fixture: a
@@ -79,6 +86,18 @@ a control.
   solids overlap by 0.26 m, with a home radius five times the pen. The stuck arm; `rover` is its
   control.
 * **`boulder-a/b/c`** — solids in the open, so a route has something to plan around.
+* **Four sets of senses, one per body** (ADR-290). Every entity declares a `perception` block and
+  no two are the same, because the question case 10 asks is whether what a character notices depends
+  on the numbers its author wrote:
+  * `scout` — 60 m, 200°. The far-sighted arm.
+  * `rover` — **12 m**, 200°, the same capacity and the same cadence. The short-sighted arm; the
+    only difference from `scout` is the range.
+  * `diver` — 60 m, **90°**. The blinkered arm; its own control is the same body driven to 360°.
+  * `penned` — 60 m, 360°, and the only body that pays for occlusion (2 tests a second). Ten
+    seven-metre stones on a 6 m ring is the one place in this fixture where a sightline has
+    something to be blocked by.
+  Capacity is 24 rather than the default 8 on all four, deliberately: at 8 both `scout` and `rover`
+  would hold full working sets and "different ranges" would be two lists of eight.
 * **A flat world, authored explicitly.** `layers: []` and `features: [<one river>]` rather than an
   omitted `world` block, because an omitted one keeps the shipped world's designed landscape
   (`world_map.cpp:671`). Everything this lab measures is about what a body knows and chooses, and a
@@ -128,6 +147,19 @@ just outside returns `Ok` with 2. The status is correct and is surfaced to no UI
 walk — every destination it could pick is outside the wall, `pickDestination` rejects all of them, and
 it idles for two minutes. **Being stuck and being idle produce the same frame and the same log.**
 
+**A percept is stale, and that is the feature.** The first version of the perception arm asserted
+that a Character percept sits exactly on the body it names. It failed by **0.225 m** — one 4 Hz
+cadence period of `rover` walking at 1.5 m/s — and the assertion was wrong rather than the engine.
+Staleness is the only thing that lets a character be *wrong* about where something is, which is most
+of what a sense model buys over the omniscient list it replaces (ADR-270 §4).
+
+**The cost of a sightline is a property of the world function, not of the nine rays.** ADR-270 priced
+`world::heroSightline` at 1720.779 µs at 20 m and built the whole occlusion budget on it. Measured
+again here: **1800.6 µs at 20 m and 5876.0 µs at 60 m on `glowmere-valley-2`**, which confirms it —
+and **0.008 ms on this lab's flat fixture**, two hundred times cheaper, because a flat world with no
+ecology makes the march's per-sample world lookup nearly free. The budget is justified by the shipped
+world and **a fixture cannot prove it**. Load average 6.6–7.9, minima of 5.
+
 **The scrub does not match the play for an explorer.** 1.360136 m at 30 s, inside the 90 s replay
 window where ADR-091 demands they agree and where ADR-267 measured 0.000022 m. Not a regression and
 not a contradiction: `EntityWorld::seek` (`entity.cpp:739`) re-simulates a strict *subset* of
@@ -143,7 +175,9 @@ same second lands in the same place.
 
 `labs::overlaysFor(LabId::Character)` turns on entity origins, entity bounds, the transform trail and
 the skeletons. What it cannot turn on is **the losing option scores beside the winner**, because
-there are no options. `NavDebug` already carries route, leg, destination, status, phase, goal name
+there are no options. What it *could* now turn on, and does not yet, is a body's working set:
+`Entity::percepts()` carries what each character noticed, with a distance, a salience, a `seenAt`
+and an honest `tested` flag (ADR-290), and nothing draws it. `NavDebug` already carries route, leg, destination, status, phase, goal name
 and goal kind through `IBehavior::navDebug`; drawing them is this lab's, and drawing a score beside
 them waits on P3.
 
@@ -166,6 +200,11 @@ ADR-182, applied here:
 | play at 60 Hz | the same simulation at 30 Hz **must** disagree — 1.247820 m |
 | a jointed socket is metres from the body | a jointless socket is not, with the skeleton installed |
 | a socket naming a real joint answers `Joint` | one naming a missing joint answers `EntityFrame` |
+| two bodies at 60 m and 12 m notice different things | the *same* body driven to 12 m notices a strict subset, from the same place to a micrometre |
+| a 90° body misses what is behind it | the same body at 360° holds a strict superset |
+| a crowd performs exactly 144 occlusion tests | the same crowd at `occlusionTestsPerSecond = 0` performs **0**, and reports `tested == false` on every percept of every body on every frame |
+| 144 tests were performed | 405 of them came back genuinely occluded — without which "tested" would be consistent with a sightline that can only answer 1 |
+| a 60 Hz replay senses 43,200 times | the same replay at 4 Hz senses 2,903 times, and the −1 from 2,904 is the per-body phase |
 
 The determinism case prints its play-vs-seek figures rather than bounding them, and says why: a bound
 that passes today would be loose enough to assert nothing, and P1 owns the fix. This is where the

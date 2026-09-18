@@ -2,7 +2,7 @@
  "format": "avgen-lab-cases",
  "version": 1,
  "lab": "character",
- "_note": "The Character Intelligence Lab's reproducible configurations (ADR-275). Cases 1-6 can be run today. Cases 7-9 are three of the six scenarios the owner's brief asked for, and they name the unit of docs/character-ai-plan.md that has to land before they mean anything: nine of the twelve proposed layers already existed, and the three that did not are exactly perception, a decider and an animation layer stack. A case that asserted a decider this engine does not have would pass by asserting nothing, which is the failure the suite was built to prevent; `--lab-case character:7` refuses and names what it is waiting for.",
+ "_note": "The Character Intelligence Lab's reproducible configurations (ADR-275, ADR-290). Cases 1-6, 10 and 11 can be run today. Cases 7-9 are three of the six scenarios the owner's brief asked for, and they name the unit of docs/character-ai-plan.md that has to land before they mean anything. P2 perception landed and 7 and 8 lost that half of their block; all three now wait only on P3, the decider. A case that asserted a decider this engine does not have would pass by asserting nothing, which is the failure the suite was built to prevent; `--lab-case character:7` refuses and names what it is waiting for.",
  "cases": [
   {
    "lab": "character",
@@ -87,9 +87,9 @@
   {
    "lab": "character",
    "number": 6,
-   "title": "Every character sees everything",
+   "title": "Every character used to see everything",
    "question": "What does one character know that another does not?",
-   "expectation": "Nothing. `EntityWorld::interestPoints()` is one global list -- 140 entries in this fixture -- with no range, no facing, no occlusion and no notion of having noticed something, and every one of the four characters scores all of it every time it picks a goal. All four navigating behaviours report a destination through `NavDebug`; **none reports a score it beat**, because `Option` and `IConsiderer` have no implementations. This is the state of the engine, not a defect of the fixture (ADR-269, ADR-270), and the case exists so the day it stops being true there is a before to compare against.",
+   "expectation": "Nothing, until P2. `EntityWorld::interestPoints()` is one global list -- 140 entries in this fixture -- with no range, no facing, no occlusion and no notion of having noticed something, and every one of the four characters scored all of it every time it picked a goal. That is still true of `Explore`, which is why this case is not retired: what changed is that a **percept** now exists beside it. At 2 s, `scout` (range 60 m) holds 20 percepts reaching 39.23 m and `rover` (range 12 m) holds 2 reaching 11.59 m, out of the same 140-entry list -- so the answer to \"what does one character know that another does not\" is no longer \"nothing\". The four navigating behaviours still report a destination through `NavDebug` and **none reports a score it beat**, because `Option` and `IConsiderer` still have no implementations (ADR-269): perception landed and the decider has not.",
    "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
    "timeSeconds": 0.0,
    "size": [
@@ -98,14 +98,46 @@
    ],
    "fps": 60.0,
    "seed": 0,
-   "notes": "Runnable today, and the answer is the absence. When P2 lands, this case becomes the before arm of 'two characters with different PerceptionSettings::range notice different things'."
+   "notes": "The before-arm, kept. The 140-entry omniscient list is still what `Explore` reads; the percepts beside it are what P3 will read instead. Case 10 is the after-arm and it carries the numbers."
+  },
+  {
+   "lab": "character",
+   "number": 10,
+   "title": "Two characters, two ranges, two different worlds",
+   "question": "Does what a character notices depend on the numbers its author wrote, and is the range the thing that made the difference?",
+   "expectation": "At 2 s on the shared 140-entry interest list, `scout` (range 60 m, 200 deg) holds **20 percepts reaching 39.23 m** and `rover` (range 12 m, same capacity, same cadence) holds **2 reaching 11.59 m**. Neither working set is full, so \"fewer\" means noticed fewer and not allowed to hold fewer. The control that isolates the range is the *same body twice*: `scout` at 60 m holds 20 percepts and `scout` with its `entity/scout/perception/range` parameter driven to 12 holds **4, a strict subset**, from the same position to within a micrometre -- so the difference is the number and not the place the body was standing. Facing is the second arm: `diver` at 90 deg holds **10** percepts and the same body at 360 holds **24**, again a strict superset. A percept is stale by design: the stalest Character percept at 4 Hz is **0.150 s old and 0.225 m behind the body it names**, which is one cadence period of a 1.5 m/s walk.",
+   "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+   "timeSeconds": 2.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Asserted by tests/unit/test_entity_perception.cpp. The first version of the staleness arm asserted the opposite -- that a Character percept sits exactly on its body -- and failed by 0.225 m. The assertion was wrong and the engine was right: being wrong about where something is is most of what perception buys over the omniscient list it replaces (ADR-270 section 4)."
+  },
+  {
+   "lab": "character",
+   "number": 11,
+   "title": "The occlusion budget, and the arm at zero",
+   "question": "How many sightlines does a crowd spend, and does a percept that was never tested say so?",
+   "expectation": "Twenty-four bodies either side of an eleven-stone wall, six seconds, one occlusion test per body per second. **Exactly 144 tests are performed** -- `floor(T x testsPerSecond)` per body, not \"about that on average\", because the schedule is a pure function of the sense tick index rather than an accumulator. 600 sense ticks produce 4,800 percepts from 24,471 candidates; the 4,656 percepts the budget could not reach are left with `tested == false` and **are not dropped** (ADR-270), because a percept discarded when a budget runs out is a character whose behaviour depends on how many other characters exist. 405 frame-observations come back with a tested percept genuinely occluded, which is the arm that says `heroSightline` is measuring something rather than returning 1 the way it does when its `ClearanceField::map` is null. The control is the same crowd with `occlusionTestsPerSecond` driven to 0: **0 tests, `tested == false` on every percept of every body on every one of 360 frames**, and percepts still produced.",
+   "fixture": "examples/labs/character/perception-crowd.scene.json",
+   "timeSeconds": 6.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "The wall is not decoration. `world::heroSightline` knows the ground and the heroes exactly and nothing else, so a crowd over flat ground with no heroes between the bodies would measure a function that can only ever answer 1 -- which is the shape of probe this repository has been caught by twice this week. And the cost of a sightline is a property of the world function, not of the nine rays: 0.008 ms on this flat fixture against 1800.6 us at 20 m on glowmere-valley-2, measured. The budget is justified by the shipped world and a fixture cannot prove it."
   },
   {
    "lab": "character",
    "number": 7,
    "title": "Investigating a mushroom",
    "question": "Does a character notice a glowing thing it was not already going to, approach it, and attend to it while it is there?",
-   "expectation": "A character within perception range of a glow point with no other business should raise it as a percept, score an 'investigate' option above its idle, walk to it and hold a look target on it -- and a second character out of range, in the same frame, should not have the percept at all. Neither half can be run: there is no percept, and there is nothing that scores an option.",
+   "expectation": "A character within perception range of a glow point with no other business should raise it as a percept, score an 'investigate' option above its idle, walk to it and hold a look target on it -- and a second character out of range, in the same frame, should not have the percept at all. **The percept half is built** (ADR-290): a body declares a `perception` block, holds a bounded working set of `InterestKind::Glow` and the rest, and two bodies with different ranges demonstrably hold different sets. What cannot be run is the other half -- there is still nothing that scores an option.",
    "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
    "timeSeconds": 0.0,
    "size": [
@@ -114,15 +146,15 @@
    ],
    "fps": 60.0,
    "seed": 0,
-   "notes": "The brief's second scenario. Needs IPerception (ADR-270) and IConsiderer (ADR-269); character_ai.hpp declares both and nothing implements either.",
-   "blockedBy": "P2 perception, P3 decision"
+   "notes": "The brief's second scenario. `IPerception` (ADR-270) landed as P2; `IConsiderer` (ADR-269) has not. `character_ai.hpp` declares both and now one of them has an implementation.",
+   "blockedBy": "P3 decision"
   },
   {
    "lab": "character",
    "number": 8,
    "title": "A social interaction",
    "question": "Do two characters notice each other, and does one change what it was doing because of the other?",
-   "expectation": "Two bodies within perception range should each carry the other as an `InterestKind::Character` percept with a distance and a `seenAt`, and one of them should abandon a routine-tier action for a higher-scoring social one -- with the losing option's score visible beside the winner, which is the overlay this lab owes. Today a character can already reach another body (`interestPoints` includes characters) but cannot *notice* one, and there is no second option for a social one to beat.",
+   "expectation": "Two bodies within perception range should each carry the other as an `InterestKind::Character` percept with a distance and a `seenAt`, and one of them should abandon a routine-tier action for a higher-scoring social one -- with the losing option's score visible beside the winner, which is the overlay this lab owes. **The noticing is built** (ADR-290): a Character percept carries the other body's simulation position, its distance, and a `seenAt` that is genuinely stale -- 0.150 s and 0.225 m behind the body at 4 Hz, measured. What is missing is above it: there is no second option for a social one to beat.",
    "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
    "timeSeconds": 0.0,
    "size": [
@@ -132,7 +164,7 @@
    "fps": 60.0,
    "seed": 0,
    "notes": "The brief's fourth scenario. `ActionQueue` already has the authority tiers, preemption and resumption this needs; what is missing is above it.",
-   "blockedBy": "P2 perception, P3 decision"
+   "blockedBy": "P3 decision"
   },
   {
    "lab": "character",
