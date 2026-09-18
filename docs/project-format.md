@@ -704,6 +704,36 @@ references, the name alone) decides. A hit is used and reported as a warning
 (the new location is written on the next save); otherwise the usual missing-asset warning
 stands and the rest of the document still applies.
 
+### `"sceneNodes"` — the objects this project added to, and removed from, its scene (ADR-330)
+
+```json
+"sceneNodes": {
+  "removed": ["chicken-17"],
+  "added": [ { "name": "beacon", "kind": "gltf", "asset": "props/beacon.glb", "position": [−9, 1.5, 2] } ]
+}
+```
+
+Written only when the session's node set differs from the one the scene file holds, and only when
+the scene came from a **file**: `assets.scene.inline` is `Composition::toJson` and already carries
+the live node list. A project nobody edited has no such key, and that is the point — the record is a
+*difference*, so the shared scene file stays the source of truth for everything else in it, and a
+node added and then deleted in one session writes nothing at all.
+
+The difference is taken **by name**. Where a node is lives in `parameters` as `nodes/<name>/position`
+and friends (ADR-271); what this block owes is the set, which objects there are. Moving a node
+produces no entry here.
+
+On load it is spliced into the scene document *before* it is parsed, so the composition the engine
+builds is exactly the one the parser would build from a scene file with those edits made. A removal
+reparents the removed node's children to its parent, which is what `Composition::detachNode` does in
+the editor. The record reaches the root scene only; a nested scene file is another document with its
+own authorship.
+
+`added` entries are nodes in the scene format (see **Scene composition files** above). Their `asset`
+paths are resolved against the *scene* file's folder, like any authored node's — and
+`--export-bundle` does **not** walk them, so an added node's mesh is one thing a bundle can still
+miss (ADR-330's first revisit trigger).
+
 `avgen --export-bundle <dir>` (or File > Export Bundle) copies every referenced file into
 `<dir>/assets/` (scene files are rewritten so their node assets point into the bundle, glTF
 sidecar `.bin`/image files next to a `.gltf` come along) and writes `<dir>/project.json`.

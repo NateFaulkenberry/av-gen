@@ -49,7 +49,8 @@ casts a shadow" is a description of `defaultKeyLight()` and passes on the bug (A
 
 The other half of ADR-278 is that a key nobody reads is no longer silent: `core/json_keys.hpp`
 warns by name, and its first run over 56 scenes found that **fifteen** of them write
-`"volumeNoiseAmount"` where the parser reads `"volumeNoise"`.
+`"volumeNoiseAmount"` where the parser reads `"volumeNoise"`. All fifteen are corrected in ADR-332,
+where the sweep's expectation is now zero.
 
 It is also why the reach fix of §3.1 **cannot change a shipped frame**. Every non-directional light
 in this repository comes from a rig or from the ecology, and both set an explicit range; no asset

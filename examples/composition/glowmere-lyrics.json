@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "../world/glowmere-stylized.scene.json",
-        "sha256": "ea57738c449cefd753628774204520a88021eeeed7915299900b8e6638346c1e",
-        "size": 40778
+        "sha256": "2dc88fd785c5f2fce577c31b4a4e314502c14d7205ee43cf71dc72d872e490c9",
+        "size": 40772
       }
     }
   },
@@ -1931,7 +1931,6 @@
     "scene/volumeAnisotropy": 0.11999999731779099,
     "scene/volumeDensity": 0.006000000052154064,
     "scene/volumeEmission": 0.0,
-    "scene/volumeNoise": 0.0,
     "scene/volumeNoiseScale": 0.019999999552965164,
     "scene/volumeNoiseSpeed": 0.10000000149011612,
     "scene/volumeScattering": 0.5,

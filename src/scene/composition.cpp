@@ -7872,7 +7872,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
 
 Result<std::unique_ptr<Composition>> Composition::loadNested(const std::filesystem::path& path,
                                                              assets::AssetRegistry& registry, int depth,
-                                                             std::vector<std::filesystem::path> ancestors) {
+                                                             std::vector<std::filesystem::path> ancestors,
+                                                             const nlohmann::json& nodeEdits) {
     std::error_code ec;
     if (!std::filesystem::is_regular_file(path, ec)) {
         return fail("scene file not found: '{}'", path.string());
@@ -7881,21 +7882,148 @@ Result<std::unique_ptr<Composition>> Composition::loadNested(const std::filesyst
     if (!in) {
         return fail("cannot open scene file '{}'", path.string());
     }
-    const json j = json::parse(in, nullptr, /*allow_exceptions*/ false);
+    json j = json::parse(in, nullptr, /*allow_exceptions*/ false);
     if (j.is_discarded()) {
         return fail("scene file '{}': invalid JSON", path.string());
     }
+    // ADR-330: the project's node edits, over the document, before it is parsed. A no-op for every
+    // load but a project's, and for a project whose session never added or removed an object.
+    const std::size_t authored = j.contains("nodes") && j["nodes"].is_array() ? j["nodes"].size() : 0;
+    applyNodeEdits(j, nodeEdits);
+    const std::size_t edited = j.contains("nodes") && j["nodes"].is_array() ? j["nodes"].size() : 0;
     auto comp = fromJsonImpl(j, registry, depth, std::move(ancestors), path);
     if (!comp) {
         return fail("scene file '{}': {}", path.filename().string(), comp.error().message);
     }
-    log::info("loaded scene '{}': {} node(s)", path.filename().string(), (*comp)->nodeCount());
+    if (edited != authored) {
+        // Said out loud, because "the file has 80 objects and the window has 79" is the question
+        // this whole mechanism exists to answer and the load is the only place that knows both.
+        log::info("loaded scene '{}': {} node(s) ({} authored, {} after the project's edits)",
+                  path.filename().string(), (*comp)->nodeCount(), authored, edited);
+    } else {
+        log::info("loaded scene '{}': {} node(s)", path.filename().string(), (*comp)->nodeCount());
+    }
     return comp;
 }
 
 Result<std::unique_ptr<Composition>> Composition::loadFile(const std::filesystem::path& path,
                                                            assets::AssetRegistry& registry, int depth) {
-    return loadNested(registry.resolve(path), registry, depth, {});
+    return loadNested(registry.resolve(path), registry, depth, {}, json());
+}
+
+Result<std::unique_ptr<Composition>> Composition::loadFile(const std::filesystem::path& path,
+                                                           assets::AssetRegistry& registry,
+                                                           const nlohmann::json& nodeEdits, int depth) {
+    return loadNested(registry.resolve(path), registry, depth, {}, nodeEdits);
+}
+
+// ---- ADR-330: a project's node edits over the scene file it saves by reference -----------------
+
+nlohmann::json nodeEditsAgainst(const nlohmann::json& liveNodes, const nlohmann::json& sceneDoc) {
+    // A scene document this build could not read is not evidence that the session's node set is an
+    // edit -- it is no evidence at all. Writing the difference against an empty list would record
+    // every node in the world as an addition and bake a copy of the scene into the project, which
+    // is the one outcome worse than the defect. So: no document, no record.
+    if (!sceneDoc.is_object() || !liveNodes.is_array()) {
+        return json();
+    }
+    const auto names = [](const json& nodes) {
+        std::vector<std::string> out;
+        if (nodes.is_array()) {
+            for (const json& n : nodes) {
+                if (n.is_object() && n.contains("name") && n["name"].is_string()) {
+                    out.push_back(n["name"].get<std::string>());
+                }
+            }
+        }
+        return out;
+    };
+    const json& sceneNodes = sceneDoc.contains("nodes") ? sceneDoc.at("nodes") : json::array();
+    const std::vector<std::string> onDisk = names(sceneNodes);
+    const std::vector<std::string> live = names(liveNodes);
+    const auto has = [](const std::vector<std::string>& v, const std::string& n) {
+        return std::find(v.begin(), v.end(), n) != v.end();
+    };
+
+    json removed = json::array();
+    for (const std::string& name : onDisk) {
+        if (!has(live, name)) {
+            removed.push_back(name);
+        }
+    }
+    json added = json::array();
+    for (const json& n : liveNodes) {
+        if (!n.is_object() || !n.contains("name") || !n["name"].is_string()) {
+            continue;
+        }
+        if (!has(onDisk, n["name"].get<std::string>())) {
+            added.push_back(n);
+        }
+    }
+    if (removed.empty() && added.empty()) {
+        return json();
+    }
+    json edits = json::object();
+    if (!removed.empty()) {
+        edits["removed"] = std::move(removed);
+    }
+    if (!added.empty()) {
+        edits["added"] = std::move(added);
+    }
+    return edits;
+}
+
+void applyNodeEdits(nlohmann::json& sceneDoc, const nlohmann::json& edits) {
+    if (!edits.is_object() || edits.empty() || !sceneDoc.is_object()) {
+        return;
+    }
+    if (!sceneDoc.contains("nodes") || !sceneDoc["nodes"].is_array()) {
+        sceneDoc["nodes"] = json::array();
+    }
+    json& nodes = sceneDoc["nodes"];
+    if (const auto it = edits.find("removed"); it != edits.end() && it->is_array()) {
+        for (const json& entry : *it) {
+            if (!entry.is_string()) {
+                continue;
+            }
+            const std::string name = entry.get<std::string>();
+            // `detachNode`'s own rule, reproduced: a child of the removed node keeps its local
+            // transform under the grandparent. Dropping the entry and leaving the child naming a
+            // parent that is gone would move it, and "delete a group and its contents jump" is a
+            // worse bug than the one this fixes.
+            std::string grandParent;
+            for (const json& n : nodes) {
+                if (n.is_object() && n.value("name", std::string{}) == name) {
+                    grandParent = n.value("parent", std::string{});
+                    break;
+                }
+            }
+            json kept = json::array();
+            for (json& n : nodes) {
+                if (n.is_object() && n.value("name", std::string{}) == name) {
+                    continue;
+                }
+                if (n.is_object() && n.value("parent", std::string{}) == name) {
+                    if (grandParent.empty()) {
+                        n.erase("parent");
+                    } else {
+                        n["parent"] = grandParent;
+                    }
+                }
+                kept.push_back(std::move(n));
+            }
+            nodes = std::move(kept);
+        }
+    }
+    // Additions after removals, so a name the session deleted and then reused is the session's
+    // node and not the scene's.
+    if (const auto it = edits.find("added"); it != edits.end() && it->is_array()) {
+        for (const json& entry : *it) {
+            if (entry.is_object()) {
+                nodes.push_back(entry);
+            }
+        }
+    }
 }
 
 Result<void> Composition::saveFile(const std::filesystem::path& path) const {

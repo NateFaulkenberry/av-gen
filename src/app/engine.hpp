@@ -106,6 +106,10 @@ public:
     // file, saving the current composition, and node editing.
     void newComposition();
     [[nodiscard]] Result<void> loadComposition(const std::filesystem::path& path);
+    // The same, with a project's record of the objects its session added to and removed from that
+    // scene (ADR-330) spliced into the document before it is parsed. Only `loadProject` has such a
+    // record; everything else opens a scene file as the file says it is.
+    [[nodiscard]] Result<void> loadComposition(const std::filesystem::path& path, const nlohmann::json& nodeEdits);
     // The same install from a document already in memory. Exists for the assistant's transaction:
     // rolling back a created node means putting the previous composition back, and going through a
     // temporary file to do it would make a rollback depend on the disk.

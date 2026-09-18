@@ -887,6 +887,12 @@ public:
     [[nodiscard]] Result<void> saveFile(const std::filesystem::path& path) const;
     static Result<std::unique_ptr<Composition>> loadFile(const std::filesystem::path& path, assets::AssetRegistry& registry,
                                                          int depth = 0);
+    // The same load with a project's node edits (ADR-330) spliced into the document first. The
+    // edits reach the root scene only: a nested scene file is another document with its own
+    // authorship, and a project that could reach into one would be editing a file it never opened.
+    static Result<std::unique_ptr<Composition>> loadFile(const std::filesystem::path& path,
+                                                         assets::AssetRegistry& registry,
+                                                         const nlohmann::json& nodeEdits, int depth = 0);
     static constexpr int kMaxNestingDepth = 4;
     static constexpr const char* kFormatName = "avgen-scene";
     static constexpr int kFormatVersion = 1;
@@ -961,9 +967,12 @@ private:
                                                              assets::AssetRegistry& registry, int depth,
                                                              std::vector<std::filesystem::path> ancestors,
                                                              std::filesystem::path sourcePath);
+    // `nodeEdits` is null for every nested load and for every plain `loadFile`; see the public
+    // overload above for why it stops at the root.
     static Result<std::unique_ptr<Composition>> loadNested(const std::filesystem::path& path,
                                                            assets::AssetRegistry& registry, int depth,
-                                                           std::vector<std::filesystem::path> ancestors);
+                                                           std::vector<std::filesystem::path> ancestors,
+                                                           const nlohmann::json& nodeEdits = nlohmann::json());
 
     assets::AssetRegistry& registry_;
     std::string name_;
@@ -1343,6 +1352,50 @@ private:
     float rootAngle_ = 0.0f;
 };
 
+// ---- a project's record of the nodes its session added to, and removed from, its scene ----------
+//
+// ADR-330, and it is ADR-207 / ADR-230 / ADR-276's family a fourth time. A project whose scene came
+// from a file saves that scene **by reference** -- `assets.scene.path` plus a hash of bytes already
+// on disk -- so an object deleted in the world editor lived in the window the person was looking at
+// and in no document any render reads. Measured on the owner's own project: 80 nodes, 79 after a
+// delete, **80 again after a save and a reload**.
+//
+// The record is a *difference* against the scene file rather than a copy of the live list, and the
+// difference is taken **by name**:
+//
+//  * By name, because a node's numbers are already the project's `parameters` block -- ADR-271's
+//    boundary -- and a second copy of a moved node's position would be a second answer to one
+//    question. What the project owes is the *set*: which objects there are.
+//  * A difference rather than a copy, because a copy makes the scene file dead for the project that
+//    holds it: the next correction anybody makes to a shared scene would never reach it again. It
+//    is also what makes "added, then deleted" write nothing at all, rather than eighty nodes that
+//    happen to match.
+//
+// `removed` is what makes it work at all, and it is the half that has no natural home: a removal is
+// a negative fact, so there is no node left to carry it and the only thing that can record it is
+// the absence, measured against the file.
 
+// The record, or null when the session's node set is the scene file's. Null rather than an empty
+// object, so a project nobody edited is byte-stable through a save -- the control that makes the
+// positive arms mean something (ADR-182).
+//
+// `liveNodes` is `Composition::toJson()["nodes"]`: the same serialisation a scene file gets, so an
+// added node is written exactly as an authored one -- and graph-installed nodes are already left
+// out of it, because the graph re-emits them on load and recording them would double them.
+[[nodiscard]] nlohmann::json nodeEditsAgainst(const nlohmann::json& liveNodes, const nlohmann::json& sceneDoc);
+
+// Splices the record into a scene document before it is parsed. A null or empty record is a no-op.
+//
+// Before the parse, rather than onto the composition afterwards, for one reason worth its ten
+// lines: the composition the engine ends up with is then *exactly* the one the parser would build
+// from a scene file with those edits made. One code path for bringing a node into being, with its
+// parent, its nested scene and its asset resolved against the scene's own folder. A second
+// construction path for "the nodes that came from the project" would be a second set of rules to
+// keep in step with a five-hundred-line parser.
+//
+// A removal reproduces `Composition::detachNode` rather than merely dropping the entry: a child of
+// a removed node keeps its local transform under the grandparent. That is the editor's own
+// semantics, and a reload that orphaned the child instead would move it.
+void applyNodeEdits(nlohmann::json& sceneDoc, const nlohmann::json& edits);
 
 } // namespace avgen::scene

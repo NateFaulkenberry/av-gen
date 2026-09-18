@@ -34,7 +34,7 @@
   "volumeDensity": 0.02,
   "volumeScattering": 1.4,
   "volumeAnisotropy": 0.62,
-  "volumeNoiseAmount": 0.5,
+  "volumeNoise": 0.5,
   "volumeNoiseScale": 0.035,
   "volumeSteps": 40,
   "volumeMaxDistance": 140.0,

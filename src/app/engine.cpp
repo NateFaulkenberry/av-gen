@@ -1079,6 +1079,34 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
             })) {
             doc["heroes"] = std::move(liveHeroes);
         }
+        // ADR-330, and it is the same defect a fourth time -- the one the owner reported first and
+        // the one that survived ADR-276. Deleting an object in the world editor calls
+        // `Composition::detachNode`; the composition is saved by reference; so the deletion lived in
+        // the window and in no document any render reads. Measured on the owner's own project
+        // (`glowmere-valley-2-multicam.json`): **80 nodes, 79 after the delete, 80 again after a
+        // save and a reload**. The object came back, so it was in every frame of every export.
+        //
+        // Not the three keys above's shape, and the difference is the whole of why this one is
+        // harder. `worldEffects`, `atmosphericEffects` and `heroes` are small lists the project can
+        // simply hold a copy of. The nodes are the scene: a copy would be 80 objects, would make the
+        // shared scene file dead for this project the moment anybody corrected it, and would be a
+        // second answer to every question the `parameters` block already answers about where a node
+        // is. So what is written is the **difference, by name** -- and `removed` is a negative fact
+        // with nothing left to carry it, which is why it needed a record at all.
+        //
+        // `scene::nodeEditsAgainst` is the whole of the decision and is pure, so a test can assert
+        // what a given pair of documents produces without an engine (ADR-278's argument for
+        // `unknownKeys`, applied again). It returns null when the session's node set is the file's,
+        // which is what keeps a save of an untouched project byte-stable -- the control that makes
+        // the positive arms mean anything.
+        //
+        // `comp->toJson()` rather than a bespoke walk of `nodes()`: an added node then reaches the
+        // project in exactly the serialisation a scene file would have given it, and graph-installed
+        // nodes are left out by the one piece of code that already knows which those are.
+        if (nlohmann::json edits = scene::nodeEditsAgainst(comp->toJson().value("nodes", nlohmann::json()), sceneDoc);
+            !edits.is_null()) {
+            doc["sceneNodes"] = std::move(edits);
+        }
     }
     if (!states_.empty()) {
         doc["states"] = states_.toJson();
@@ -1473,13 +1501,24 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                 const auto scenePath = resolveAsset(sceneRef["path"], "scene").value_or(std::filesystem::path());
                 const auto previousEnvironment = environmentPath_;
                 environmentPath_.clear();
-                if (auto r = loadComposition(scenePath); !r) {
+                // ADR-330: the objects this session added to, and removed from, the scene it saves
+                // by reference. Passed *into* the load rather than applied after it, so the
+                // composition the engine ends up with is the one the parser would have built from a
+                // scene file with those edits made -- and so it is in place before anything reads
+                // the node list. That ordering is not taste: the `parameters` block further down
+                // carries `nodes/<name>/...` values, a hero names a node, and the world effects name
+                // a hero. Nodes are the most structural thing a project can say, so they go first.
+                if (auto r = loadComposition(scenePath, doc.value("sceneNodes", nlohmann::json())); !r) {
                     environmentPath_ = previousEnvironment;
                     warn("scene: " + r.error().message);
                 } else {
                     sceneEnvironment = environmentPath_;
                 }
             } else if (kind == "composition" && sceneRef.contains("inline")) {
+                // No node edits here, deliberately: `assets.scene.inline` *is* `Composition::toJson`
+                // and already carries the live node list. A difference beside it would be a second
+                // answer -- the same reason `heroes` and the two effect lists are not written for an
+                // inlined composition either.
                 registry_.setBaseDirectory(dir);
                 auto comp = scene::Composition::fromJson(sceneRef["inline"], registry_);
                 if (!comp) {
@@ -2186,9 +2225,13 @@ void Engine::newComposition() {
 }
 
 Result<void> Engine::loadComposition(const std::filesystem::path& rawPath) {
+    return loadComposition(rawPath, nlohmann::json());
+}
+
+Result<void> Engine::loadComposition(const std::filesystem::path& rawPath, const nlohmann::json& nodeEdits) {
     const auto path = std::filesystem::absolute(rawPath).lexically_normal();
     registry_.setBaseDirectory(path.parent_path());
-    auto comp = scene::Composition::loadFile(path, registry_);
+    auto comp = scene::Composition::loadFile(path, registry_, nodeEdits);
     if (!comp) {
         return std::unexpected(comp.error());
     }
