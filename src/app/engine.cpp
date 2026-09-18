@@ -999,6 +999,72 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
             }
         }
     }
+    // The same argument, for the bodies a staging scenario moves (ADR-264).
+    //
+    // A scenario hides an animal once it has abducted it and shows the beam while it fires, so the
+    // `visible` and the transform such a node has at the instant somebody presses save are a
+    // photograph of a run. A project's `parameters` are applied *over* its scene at load, so saving
+    // them means the next load opens with an invisible goat and a beam that never switches off --
+    // and the beam's saved scale once ran it at 3.07 m against the 7.8 m the scene authors, which is
+    // narrower than the animals it lifts.
+    //
+    // Four consecutive saves of Glowmere re-introduced exactly this while the fix for the last one
+    // was being written, which is what moved it from a cleanup script to the save itself. A script
+    // that has to be run after every save is a script somebody will forget to run.
+    //
+    // The scene keeps saying where these bodies start and whether they are visible; that is
+    // authorship and it is not touched. What goes is only the project's copy of where the run left
+    // them.
+    if (doc.contains("parameters") && doc["parameters"].is_object()) {
+        if (const scene::Composition* comp = composition(); comp != nullptr && !comp->staging().empty()) {
+            const std::vector<entity::EntityDesc>& descs = comp->entities();
+            std::vector<std::string> names;
+            names.reserve(descs.size());
+            for (const entity::EntityDesc& d : descs) {
+                names.push_back(d.name);
+            }
+            const auto nodeOf = [&](const std::string& name) {
+                for (const entity::EntityDesc& d : descs) {
+                    if (d.name == name) {
+                        return d.node.empty() ? d.name : d.node;
+                    }
+                }
+                return name;
+            };
+            const auto tagsOf = [&](const std::string& name) {
+                for (const entity::EntityDesc& d : descs) {
+                    if (d.name == name) {
+                        return d.tags;
+                    }
+                }
+                return std::vector<std::string>{};
+            };
+            const std::set<std::string> owned =
+                stage::scenarioOwnedNodes(comp->staging(), nodeOf, tagsOf, names);
+            std::vector<std::string> doomed;
+            for (const auto& [path, value] : doc["parameters"].items()) {
+                const std::size_t first = path.find('/');
+                const std::size_t second = path.find('/', first + 1);
+                if (first == std::string::npos || second == std::string::npos) {
+                    continue;
+                }
+                if (path.compare(0, first, "nodes") != 0) {
+                    continue;
+                }
+                const std::string body = path.substr(first + 1, second - first - 1);
+                const std::string field = path.substr(second + 1);
+                if (owned.count(body) == 0) {
+                    continue;
+                }
+                if (field == "visible" || field == "position" || field == "rotation" || field == "scale") {
+                    doomed.push_back(path);
+                }
+            }
+            for (const std::string& path : doomed) {
+                doc["parameters"].erase(path);
+            }
+        }
+    }
     if (hasSequence()) {
         doc["sequence"] = sequence_.toJson();
     }

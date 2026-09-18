@@ -82,6 +82,8 @@
 
 #include <cstdint>
 #include <optional>
+#include <functional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -397,6 +399,24 @@ struct StagingDesc {
     std::vector<ScenarioDesc> scenarios;
     [[nodiscard]] bool empty() const { return scenarios.empty(); }
 };
+
+// Every composition node a scenario can move: its actors, their parts, and everything its queries
+// can bind -- by name, or by a tag any entity carries.
+//
+// This exists so a *save* can leave those nodes alone (ADR-264). A scenario hides an animal it has
+// abducted and shows a beam while it fires, so the value such a node has at the moment somebody
+// presses save is a photograph of a run rather than anything an author wrote -- and a project's
+// `parameters` block is applied over its scene, so saving it means the next load starts with an
+// invisible goat and a beam that is always on. That is not hypothetical: it is what four
+// consecutive saves of Glowmere did while this was being written.
+//
+// `tagsOf` is a callback rather than a container because the two callers hold their entity
+// descriptors differently, and copying every tag list to ask one question is a poor trade.
+[[nodiscard]] std::set<std::string> scenarioOwnedNodes(
+    const StagingDesc& staging,
+    const std::function<std::string(const std::string&)>& nodeOf,
+    const std::function<std::vector<std::string>(const std::string&)>& tagsOf,
+    const std::vector<std::string>& everyEntity);
 
 // ---- runtime ------------------------------------------------------------------------------------
 
