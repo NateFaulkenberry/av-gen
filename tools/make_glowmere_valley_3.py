@@ -59,8 +59,17 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
 
 SRC = "examples/world/glowmere-valley-2.scene.json"
-SCENE = "examples/world/glowmere-valley-3.scene.json"
-PROJECT = "examples/world/glowmere-valley-3.json"
+
+# The A/B arm for the vegetation work. `AVGEN_V3_TREES=legacy` writes
+# `glowmere-valley-3-legacytrees.{scene.json,json}`: the same world, the same cast, the same
+# cameras and the same everything else, with valley 2's three tree layers put back. It is the only
+# honest way to photograph what the trees changed -- rendering valley 2 against valley 3 would be
+# a frame in which the water, the cast and the cameras all differ too, and this project has
+# already shipped one "before" frame that was the empty sky's own hash.
+LEGACY_TREES = os.environ.get("AVGEN_V3_TREES") == "legacy"
+NAME = "glowmere-valley-3-legacytrees" if LEGACY_TREES else "glowmere-valley-3"
+SCENE = "examples/world/%s.scene.json" % NAME
+PROJECT = "examples/world/%s.json" % NAME
 
 OD = collections.OrderedDict
 
@@ -70,7 +79,7 @@ def load(path):
 
 
 d = load(SRC)
-d["name"] = "Glowmere Valley 3"
+d["name"] = "Glowmere Valley 3" + (" (legacy trees)" if LEGACY_TREES else "")
 
 terrain = next(n for n in d["nodes"] if n.get("kind") == "terrain")
 
@@ -430,8 +439,15 @@ UNDERGROWTH = ["bushes", "ferns", "grass", "fan-plants", "flowers", "fungi", "sh
 carried = {l["name"]: l for l in terrain["scatter"]}
 missing = [n for n in UNDERGROWTH if n not in carried]
 assert not missing, "the source scene no longer carries %s" % missing
-terrain["scatter"] = [tree_layer(row) for row in TREE_LAYERS] + \
-                     [carried[n] for n in UNDERGROWTH]
+LEGACY_TREE_NAMES = ["canopy", "pines", "deadwood"]
+if LEGACY_TREES:
+    src_scatter = {l["name"]: l for l in
+                   next(n for n in load(SRC)["nodes"] if n.get("kind") == "terrain")["scatter"]}
+    terrain["scatter"] = [src_scatter[n] for n in LEGACY_TREE_NAMES] + \
+                         [carried[n] for n in UNDERGROWTH]
+else:
+    terrain["scatter"] = [tree_layer(row) for row in TREE_LAYERS] + \
+                         [carried[n] for n in UNDERGROWTH]
 
 # The glades. Carried from valley 2 -- they are composition, and `minHeight` clears the canopy and
 # leaves the ground growing -- plus one at each crossing, because a ford nobody can see is a ford
@@ -796,6 +812,10 @@ CAMERAS = [
     (4, "The Ford", [20.0, 17.0, -18.0], [-20.0, 3.4, 2.0], 40.0),
     # The elder fungus, the elder alien standing under it, and whatever comes to look.
     (5, "The Grove", [34.0, 17.0, 40.0], [2.0, 6.5, 62.0], 44.0),
+    # The west wall from the valley floor: the one shot that is about the hills rather than about
+    # a body. It is the A/B frame for the vegetation work, which is why it exists as a camera
+    # rather than as a position somebody types into a render command once.
+    (6, "The West Wall", [-20.0, 16.0, -60.0], [-170.0, 44.0, -30.0], 46.0),
 ]
 SHOTS = [
     # camera, start, end, label
@@ -803,7 +823,8 @@ SHOTS = [
     (3, 40.0, 95.0, "navigation: one wades the backwater, one walks round it"),
     (2, 95.0, 140.0, "environmental awareness: the scout works the west floodplain"),
     (4, 140.0, 175.0, "the ford"),
-    (1, 175.0, 210.0, "the director, on whatever it finds"),
+    (6, 175.0, 195.0, "the wooded west wall"),
+    (1, 195.0, 230.0, "the director, on whatever it finds"),
 ]
 
 cameras = []
@@ -902,18 +923,19 @@ PARAMETERS = OD([
 project = OD([
     ("format", "avgen-project"),
     ("version", 4),
-    ("app", OD([("name", "Glowmere Valley 3 - the autonomous cast")])),
+    ("app", OD([("name", "Glowmere Valley 3 - the autonomous cast" +
+                                (" - LEGACY TREES ARM" if LEGACY_TREES else ""))])),
     ("assets", OD([("scene", OD([
         ("kind", "composition"),
-        ("path", OD([("path", "glowmere-valley-3.scene.json"),
+        ("path", OD([("path", "%s.scene.json" % NAME),
                      ("sha256", hashlib.sha256(scene_bytes).hexdigest()),
                      ("size", len(scene_bytes))])),
     ]))])),
     ("parameters", PARAMETERS),
     ("render", OD([
-        ("backend", "gpu"), ("path", "renders/glowmere-valley-3"),
-        ("pattern", "frame_%05d.png"), ("width", 1600), ("height", 900),
-        ("fps", 30.0), ("start", 0.0), ("end", 210.0),
+        ("backend", "gpu"), ("path", "../../renders/" + NAME),
+        ("pattern", "frame_{:05d}.png"), ("width", 1600), ("height", 900),
+        ("fps", 30.0), ("start", 0.0), ("end", 230.0),
         ("supersample", 1), ("quality", 1),
     ])),
     # Empty and present, so the shape of the document is the shape the application writes and a

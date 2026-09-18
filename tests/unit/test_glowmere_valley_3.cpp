@@ -34,7 +34,10 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <iterator>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -673,4 +676,484 @@ TEST_CASE("probe: Glowmere Valley 3, the four demonstrations run", "[.probe][glo
     report("B: entity seeds +900001", play(180.0, kSeedShift));
     report("C: ecology seeds +101 (a different world to perceive)", play(180.0, 0, 101));
     report("D: entity seeds +900001 AND ecology seeds +101", play(180.0, kSeedShift, 101));
+}
+
+// =================================================================================================
+// The arms
+// =================================================================================================
+//
+// ADR-182: a probe that cannot fail proves nothing. Every arm below has a control that must come
+// out the other way, and every bound is a band. A floor is not used anywhere in this file, because
+// a floor outlives what it counted -- two branches lowered the same floor on one day in this
+// repository and together took it to zero.
+
+// ---------------------------------------------------------------------------------------------
+// 1. The crossing is a decision, and `wadePenalty` is what makes it.
+//
+// The two bodies are identical to the byte except for one number. So the arm is not "the wader got
+// wet" -- that could be a consequence of where it starts, which way it faces, or which of the two
+// the placer happened to put nearer the water. It is that **swapping the one number swaps the
+// outcome**, which nothing about the geometry can do.
+TEST_CASE("Glowmere Valley 3: one alien fords the water and the other walks round it",
+          "[glowmere3][entity][route]") {
+    if (!v3Ready()) {
+        SKIP("glowmere-valley-3 or assets/aliens is not present");
+    }
+    const Run run = play(170.0, 0);
+    const Track& wader = run.tracks.at("wader");
+    const Track& dry = run.tracks.at("drylander");
+
+    INFO("wader: " << wader.travelled << " m, deepest " << wader.deepest << " m, wet "
+                   << wader.wetSeconds << " s; drylander: " << dry.travelled << " m, deepest "
+                   << dry.deepest << " m, wet " << dry.wetSeconds << " s");
+
+    // Bands. The backwater is 0.70 m at the channel and `navWadeDepth` is 0.8536, so a body that
+    // crossed it stood in 0.55 to 0.86 m -- the lower bound is "it crossed rather than clipped the
+    // shoulder" and the upper is the wade depth, past which the cell is not walkable at all.
+    CHECK(wader.deepest > 0.55f);
+    CHECK(wader.deepest < 0.86f);
+    // And the drylander's ankles. Not zero and not asserted to be: the route's own waypoints may
+    // clip a shoulder, exactly as ADR-336 §6 records for the lab's detour.
+    CHECK(dry.deepest < 0.12f);
+    // Seven times as wet is the claim, not a zero somebody had to engineer.
+    CHECK(wader.deepest > dry.deepest * 5.0f);
+
+    // The dry way is the long way, and both of them get there.
+    CHECK(dry.travelled > wader.travelled * 1.7f);
+    CHECK(dry.travelled < wader.travelled * 3.5f);
+    const glm::vec2 goal(38.0f, -46.0f);
+    for (const Track* t : {&wader, &dry}) {
+        CHECK(glm::length(glm::vec2(t->end.x, t->end.z) - goal) < 9.0f);
+    }
+
+    // **The control, and it is the arm.** The same world with the two tastes exchanged. If the
+    // wetness followed the geometry rather than the number, this comes out the same way round.
+    std::ifstream in(v3Scene());
+    REQUIRE(in.good());
+    json doc;
+    in >> doc;
+    float swapped = 0;
+    for (json& e : doc.at("entities")) {
+        const std::string name = e.at("name").get<std::string>();
+        if (name != "wader" && name != "drylander") {
+            continue;
+        }
+        for (json& b : e.at("behaviors")) {
+            if (b.value("kind", std::string()) != "decide") {
+                continue;
+            }
+            for (json& c : b.at("considerers")) {
+                if (c.value("kind", std::string()) == "route") {
+                    c["wadePenalty"] = name == "wader" ? 16.0f : 1.6f;
+                    swapped += 1.0f;
+                }
+            }
+        }
+    }
+    REQUIRE(swapped == 2.0f);
+    {
+        // The same harness, on the edited document.
+        const fs::path tmp = fs::temp_directory_path() / "glowmere-valley-3-swapped.scene.json";
+        std::ofstream out(tmp);
+        REQUIRE(out.good());
+        // Written into `examples/world` rather than the system temp, because a scene's asset paths
+        // are relative to the scene file and a copy somewhere else resolves none of them.
+        out.close();
+        fs::remove(tmp);
+    }
+    const fs::path swappedPath = worldDir() / "_v3-swapped.scene.json";
+    {
+        std::ofstream out(swappedPath);
+        REQUIRE(out.good());
+        out << doc.dump(1);
+    }
+    Run control;
+    {
+        assets::AssetRegistry registry(worldDir());
+        params::ParameterSet params;
+        params::Modulator modulator;
+        signals::SignalBus bus;
+        auto loaded = scene::Composition::loadFile(swappedPath, registry);
+        INFO((loaded.has_value() ? std::string() : loaded.error().message));
+        REQUIRE(loaded.has_value());
+        std::unique_ptr<scene::Composition> comp = std::move(*loaded);
+        comp->attach(params, modulator);
+        comp->setViewport(1600, 900);
+        comp->scene().detailLimits.entityDistanceCull = false;
+        const entity::Navigator& nav = comp->entityWorld().navigator();
+        FrameTime time;
+        const double step = 1.0 / 40.0;
+        for (int i = 0; i < 6800; ++i) {
+            time.renderTime = static_cast<double>(i) * step;
+            time.deltaTime = i == 0 ? 0.0 : step;
+            time.frameIndex = static_cast<std::uint64_t>(i);
+            params.resetFinals();
+            comp->updateFields(time, bus, modulator);
+            modulator.applyRoutes(bus, params, time.deltaTime);
+            comp->updateBehaviour(time, bus);
+            comp->update(time);
+            for (const char* who : {"wader", "drylander"}) {
+                const entity::Entity* e = comp->entityWorld().find(who);
+                REQUIRE(e != nullptr);
+                const glm::vec3 p = e->state().position();
+                Track& t = control.tracks[who];
+                t.deepest = std::max(t.deepest, nav.sample(glm::vec2(p.x, p.z)).waterDepth);
+            }
+        }
+    }
+    fs::remove(swappedPath);
+    INFO("control (tastes exchanged): wader deepest " << control.tracks.at("wader").deepest
+         << " m, drylander deepest " << control.tracks.at("drylander").deepest << " m");
+    // Exchanged: now the body called `wader` stays dry and the one called `drylander` wades.
+    CHECK(control.tracks.at("drylander").deepest > 0.55f);
+    CHECK(control.tracks.at("wader").deepest < 0.12f);
+}
+
+// ---------------------------------------------------------------------------------------------
+// 2. Nothing is scripted: the same authored config in a re-rolled world goes somewhere else.
+//
+// This is the arm the whole showcase rests on, and it has two halves that fail differently.
+//
+// The **negative** half is the surprise and it is asserted rather than hidden: changing every
+// entity's seed changes almost nothing. That is not a defect, it is ADR-333's D1 and D2 -- a
+// considerer is a pure function of its context and draws from no stream -- so a `decide`
+// character's itinerary is a function of the world and its start, and the seed only moves the
+// decision tick's phase. Asserting it keeps the *other* half honest: if the ecology arm's
+// difference were noise, this arm would show the same size of difference.
+TEST_CASE("Glowmere Valley 3: the itinerary is a consequence of the world, not of the file",
+          "[glowmere3][entity][decide]") {
+    if (!v3Ready()) {
+        SKIP("glowmere-valley-3 or assets/aliens is not present");
+    }
+    const Run a = play(150.0, 0);
+    const Run b = play(150.0, kSeedShift);
+    const Run c = play(150.0, 0, 101);
+
+    for (const char* who : {"scout", "watcher"}) {
+        const Track& ta = a.tracks.at(who);
+        const Track& tb = b.tracks.at(who);
+        const Track& tc = c.tracks.at(who);
+        // How different an itinerary is: where it ended plus how far it walked to get there.
+        // Endpoint alone is the wrong instrument and the measurement said so -- the watcher
+        // attends to the `elder`, which does not move, so in the re-rolled world it still ends
+        // beside it (12.0 m away) after walking 190 m instead of 35. That is a completely
+        // different errand with nearly the same address, and an arm that read only the address
+        // would have called it unchanged.
+        const auto itinerary = [](const Track& x, const Track& y) {
+            return glm::length(glm::vec2(x.end.x - y.end.x, x.end.z - y.end.z)) +
+                   std::fabs(x.travelled - y.travelled);
+        };
+        const float ab = itinerary(ta, tb);
+        const float ac = itinerary(ta, tc);
+        INFO(who << ": A walked " << ta.travelled << " m and ended (" << ta.end.x << ", "
+                 << ta.end.z << "); B differs by " << ab << " (walked " << tb.travelled
+                 << "); C differs by " << ac << " (walked " << tc.travelled << ")");
+        // The entity seed moves the decision phase and nothing else.
+        CHECK(ab < 6.0f);
+        // The world it perceives moves the errand. A band: an order of magnitude more than the
+        // seed arm, and less than the map, because a body that had gone 900 m would mean the
+        // measurement had found a different body.
+        CHECK(ac > 30.0f);
+        CHECK(ac < 700.0f);
+        // And it is still deciding rather than executing one long plan.
+        CHECK(ta.decisions >= 2);
+        CHECK(tc.decisions >= 2);
+    }
+
+    // The *demonstration* survives what the itinerary does not. The crossing is a property of the
+    // geography and the taste, so a re-rolled ecology must not change who gets wet -- an arm that
+    // showed everything changing would be an arm that had broken the world rather than varied it.
+    for (const Run* r : {&a, &c}) {
+        CHECK(r->tracks.at("wader").deepest > 0.55f);
+        CHECK(r->tracks.at("drylander").deepest < 0.12f);
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// 3. One body notices another.
+//
+// Nothing in the scene names the elder to the watcher. There is no subject list, no destination
+// and no post; the option the watcher commits to is the *name of a percept*, and a percept of kind
+// Character is another entity this body has seen. The control is the scout, which has the same
+// considerer with `character` weighted at 0.6 instead of 4.8 and the same five bodies in its
+// world.
+TEST_CASE("Glowmere Valley 3: the watcher attends to another character", "[glowmere3][entity]") {
+    if (!v3Ready()) {
+        SKIP("glowmere-valley-3 or assets/aliens is not present");
+    }
+    const Run run = play(150.0, 0);
+    const Track& w = run.tracks.at("watcher");
+    std::string top;
+    int best = 0;
+    for (const auto& [option, n] : w.chosen) {
+        if (n > best) {
+            best = n;
+            top = option;
+        }
+    }
+    INFO("watcher committed most often to '" << top << "'; closest approach to the elder "
+                                             << w.nearestTo << " m after " << w.travelled << " m");
+    // It went to a body, and that body is one of the four others by name.
+    const std::set<std::string> cast{"scout", "wader", "drylander", "elder"};
+    CHECK(cast.count(top) == 1);
+    // And it got there. `approach` is 7 m and the two bodies have radii, so a band rather than a
+    // point: nearer than 14 m is arrival and nearer than 2 m would be standing inside it.
+    CHECK(w.nearestTo > 1.0f);
+    CHECK(w.nearestTo < 14.0f);
+
+    // The control. The scout's taste is the same considerer with `character` at 0.6, and it never
+    // commits to a body -- so the watcher's choice is the weight and not the geometry.
+    int scoutChoseABody = 0;
+    for (const auto& [option, n] : run.tracks.at("scout").chosen) {
+        scoutChoseABody += cast.count(option) != 0 ? n : 0;
+    }
+    INFO("control: the scout committed to a body on " << scoutChoseABody << " frames");
+    CHECK(scoutChoseABody == 0);
+}
+
+// ---------------------------------------------------------------------------------------------
+// 4. A small authored library.
+//
+// The claim of the fourth demonstration is that the expression comes from look-at, blending,
+// locomotion adaptation and grounding rather than from a big clip list. An arm that only counted
+// clips would pass on a world where nothing moved, so this counts both ends: the library is small
+// **and** the bodies reach several activities out of it.
+TEST_CASE("Glowmere Valley 3: a small clip library, made expressive by the layers above it",
+          "[glowmere3][animation]") {
+    if (!v3Ready()) {
+        SKIP("glowmere-valley-3 or assets/aliens is not present");
+    }
+    const json doc = readJson(v3Scene());
+    std::set<std::string> distinctClips;
+    int bodies = 0;
+    for (const json& e : doc.at("entities")) {
+        if (!e.contains("clips")) {
+            continue;
+        }
+        ++bodies;
+        for (const auto& [role, clip] : e.at("clips").items()) {
+            distinctClips.insert(clip.get<std::string>());
+        }
+    }
+    int aimLayers = 0;
+    int additiveLayers = 0;
+    for (const json& n : doc.at("nodes")) {
+        if (!n.contains("animation") || !n.at("animation").contains("layers")) {
+            continue;
+        }
+        for (const json& l : n.at("animation").at("layers")) {
+            aimLayers += l.value("kind", std::string()) == "aim" ? 1 : 0;
+            additiveLayers += l.value("kind", std::string()) == "additive" ? 1 : 0;
+        }
+    }
+    INFO(bodies << " bodies, " << distinctClips.size() << " distinct clips, " << aimLayers
+                << " aim layers, " << additiveLayers << " additive layers");
+    CHECK(bodies == 5);
+    // Small. Each alien GLB ships 26 clips; a band rather than a ceiling, because a library of one
+    // would pass a ceiling and would not be a library.
+    CHECK(distinctClips.size() >= 6);
+    CHECK(distinctClips.size() <= 10);
+    // And the layers that are supposed to be doing the work exist on every body.
+    CHECK(aimLayers == bodies);
+    CHECK(additiveLayers == bodies);
+
+    // The other end: what the bodies actually play. A world whose cast only ever idles would pass
+    // every assertion above.
+    const Run run = play(150.0, 0);
+    for (const auto& [name, t] : run.tracks) {
+        int reached = 0;
+        for (const auto& [a, n] : t.activity) {
+            reached += n > 20 ? 1 : 0; // half a second at 40 Hz, so a single frame does not count
+        }
+        INFO(name << " reached " << reached << " activities");
+        CHECK(reached >= 2);
+    }
+    // And rate matching is on, which is the locomotion-adaptation half.
+    for (const json& e : doc.at("entities")) {
+        INFO(e.at("name").get<std::string>());
+        CHECK(e.at("gait").value("matchRate", false));
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// 5. The project does not contradict its scene, and there is almost nothing in it to contradict
+//    it with.
+//
+// ADR-264's cheap arm, narrowed to one project. The residue it caught was a saved node transform;
+// valley 3 carries no node parameter at all, so the arm is that the *class* is empty rather than
+// that its members agree. The control is valley-2-multicam, where the same computation finds 41.
+TEST_CASE("Glowmere Valley 3's project is small and states nothing its scene states",
+          "[glowmere3][project]") {
+    const fs::path project = worldDir() / "glowmere-valley-3.json";
+    if (!fs::exists(project)) {
+        SKIP("glowmere-valley-3 has not been generated");
+    }
+    const json p = readJson(project);
+    const json s = readJson(v3Scene());
+
+    // The fingerprint. A project carries a hash of the scene bytes it was written against, and a
+    // stale one relinks a render to a file that has moved on (ADR-264).
+    std::ifstream bytes(v3Scene(), std::ios::binary);
+    const std::string raw((std::istreambuf_iterator<char>(bytes)),
+                          std::istreambuf_iterator<char>());
+    const json& ref = p.at("assets").at("scene").at("path");
+    INFO("scene reference: " << ref.dump());
+    CHECK(ref.at("size").get<std::size_t>() == raw.size());
+
+    const json& params = p.at("parameters");
+    std::vector<std::string> nodeParams;
+    for (const auto& [k, v] : params.items()) {
+        if (k.rfind("nodes/", 0) == 0 || k.rfind("procedural/", 0) == 0) {
+            nodeParams.push_back(k);
+        }
+    }
+    INFO(params.size() << " parameters, of which " << nodeParams.size() << " name a node");
+    // A band. Zero would also be met by a project that had lost its parameters block; the upper
+    // bound is the one that bites, and it is two orders of magnitude under what it replaces.
+    CHECK(params.size() >= 1);
+    CHECK(params.size() <= 24);
+    CHECK(nodeParams.empty());
+    // No film machinery. Each of these is a whole subsystem the multicam project carries and this
+    // one has no use for; an empty list and an absent key mean the same thing to the loader.
+    for (const char* key : {"sequence", "songPlan", "timeline", "cameraShotSpans",
+                            "cameraAimFollow", "autoDirector", "atmosphericEffects"}) {
+        INFO("project key '" << key << "'");
+        CHECK(!p.contains(key));
+    }
+
+    // Every asset the scene names resolves, relative to the scene, and none is absolute.
+    // `glowmere-valley-2-song.scene.json` names sixteen farm animals by absolute path into a
+    // worktree that no longer exists and the loader skips them in silence -- that film has been
+    // running with five of its twenty-one bodies. This is the arm that would have caught it.
+    int assets = 0;
+    std::function<void(const json&)> walk = [&](const json& node) {
+        if (node.is_object()) {
+            for (const auto& [k, v] : node.items()) {
+                if ((k == "asset" || k == "path") && v.is_string()) {
+                    const std::string a = v.get<std::string>();
+                    if (a.empty() || a.rfind("renders/", 0) == 0) {
+                        continue;
+                    }
+                    INFO("asset '" << a << "'");
+                    CHECK(a.front() != '/');
+                    CHECK(fs::exists(worldDir() / a));
+                    ++assets;
+                } else {
+                    walk(v);
+                }
+            }
+        } else if (node.is_array()) {
+            for (const json& e : node) {
+                walk(e);
+            }
+        }
+    };
+    walk(s);
+    INFO(assets << " asset references");
+    // A band with a live lower bound: eight tree models, ten undergrowth, five aliens, the light
+    // rig and the material programs. If this collapses, the walk stopped walking.
+    CHECK(assets >= 25);
+
+    // The control, on the file this one replaces: the same computation there is not empty.
+    const fs::path v2 = worldDir() / "glowmere-valley-2-multicam.json";
+    if (fs::exists(v2)) {
+        const json p2 = readJson(v2);
+        std::size_t v2NodeParams = 0;
+        for (const auto& [k, v] : p2.at("parameters").items()) {
+            v2NodeParams += k.rfind("nodes/", 0) == 0 ? 1 : 0;
+        }
+        INFO("control: glowmere-valley-2-multicam carries " << p2.at("parameters").size()
+             << " parameters, " << v2NodeParams << " of them node transforms");
+        CHECK(v2NodeParams > 100);
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// 6. The hills are wooded, with species variety, and the tree line has not moved.
+//
+// The control is `glowmere-valley-3-legacytrees.scene.json` -- the same world, the same cast, the
+// same cameras, with valley 2's three tree layers put back. It is generated by the same script
+// under `AVGEN_V3_TREES=legacy` and it exists so that the A/B render is a frame in which only the
+// trees differ, which is a thing this project has got wrong before.
+TEST_CASE("Glowmere Valley 3's hills are wooded, and the tree line is where ADR-334 put it",
+          "[glowmere3][scatter]") {
+    if (!fs::exists(v3Scene())) {
+        SKIP("glowmere-valley-3 has not been generated");
+    }
+    struct Arm {
+        std::size_t trees = 0;
+        std::size_t onHills = 0;
+        std::size_t species = 0;
+        float treeLine = 0.0f;
+        std::size_t atCap = 0;
+    };
+    const auto measure = [](const fs::path& path) {
+        const json doc = readJson(path);
+        const world::WorldMap map = loadWorld(path);
+        auto ecology = world::ecologyFromJson(terrainNode(doc).at("scatter"));
+        REQUIRE(ecology.has_value());
+        std::vector<world::ScatterClearance> clearances;
+        if (terrainNode(doc).contains("clearings")) {
+            auto c = world::clearancesFromJson(terrainNode(doc).at("clearings"));
+            REQUIRE(c.has_value());
+            clearances = std::move(*c);
+        }
+        const float mid = 0.5f * (map.sampledMinHeight + map.sampledMaxHeight);
+        std::set<std::string> assets;
+        Arm arm;
+        for (const world::ScatterLayer& l : ecology->layers) {
+            // A tree is a layer that places something at least five metres tall. Structural, and
+            // not a list of three names: a name list is a floor that outlives what it counted,
+            // and the tree line it computes would silently miss a species added tomorrow.
+            if (l.height < 5.0f) {
+                continue;
+            }
+            assets.insert(l.asset);
+            arm.treeLine = std::max(arm.treeLine, l.height * l.maxScale);
+            const spatial::PointCloud cloud = world::scatter(map, l, {}, clearances);
+            arm.trees += cloud.positions().size();
+            arm.atCap += static_cast<int>(cloud.positions().size()) >= l.maxInstances ? 1 : 0;
+            for (const glm::vec3& p : cloud.positions()) {
+                arm.onHills += p.y > mid ? 1 : 0;
+            }
+        }
+        arm.species = assets.size();
+        return arm;
+    };
+
+    const Arm now = measure(v3Scene());
+    INFO("valley 3: " << now.trees << " trees of " << now.species << " species, " << now.onHills
+                      << " on the hills, tree line " << now.treeLine << " m, " << now.atCap
+                      << " layers at their cap");
+
+    // Variety means several species actually placed, not one model swapped for another.
+    CHECK(now.species >= 6);
+    // Denser, in a band. The upper bound is not decoration: 2,000 tree-sized instances is about
+    // where the frame stops being a valley and starts being a hedge, and the caps in the file are
+    // what hold it.
+    CHECK(now.trees > 2000);
+    CHECK(now.trees < 8000);
+    CHECK(now.onHills > 900);
+    // **The tree line, which is not negotiable.** ADR-334 measured 11.2 m and ADR-335 re-derived
+    // the cast's 1.94x from it; the 16 m elder must stand a fifth again above it, so the ceiling
+    // is 13.33 m. Both bounds: a tree line that *fell* would mean the hills got shrubs.
+    CHECK(now.treeLine > 10.0f);
+    CHECK(now.treeLine <= 16.0f / 1.2f);
+    // No layer may be sitting on its cap, or the density in the file is a fiction and the next
+    // person to raise it will get nothing.
+    CHECK(now.atCap == 0);
+
+    // The control: the same world with valley 2's three layers. It must fail the density arms.
+    const fs::path legacy = worldDir() / "glowmere-valley-3-legacytrees.scene.json";
+    if (fs::exists(legacy)) {
+        const Arm before = measure(legacy);
+        INFO("control (valley 2's three layers in the same world): " << before.trees << " trees of "
+             << before.species << " species, " << before.onHills << " on the hills, tree line "
+             << before.treeLine << " m");
+        CHECK(before.species < 6);
+        CHECK(before.trees < 2000);
+        CHECK(before.onHills < 900);
+        // And the one thing the control must *share*: the tree line did not move.
+        CHECK(before.treeLine == now.treeLine);
+    }
 }

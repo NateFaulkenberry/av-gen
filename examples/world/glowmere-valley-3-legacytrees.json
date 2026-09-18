@@ -2,15 +2,15 @@
  "format": "avgen-project",
  "version": 4,
  "app": {
-  "name": "Glowmere Valley 3 - the autonomous cast"
+  "name": "Glowmere Valley 3 - the autonomous cast - LEGACY TREES ARM"
  },
  "assets": {
   "scene": {
    "kind": "composition",
    "path": {
-    "path": "glowmere-valley-3.scene.json",
-    "sha256": "1c4b18f084ca9fa2174f00aee5cfb64653b76d091e225df5ed4259a2f8d855a1",
-    "size": 140603
+    "path": "glowmere-valley-3-legacytrees.scene.json",
+    "sha256": "d0d958bacf12dafdfd263d4f6e20c847bb63d14a9b7d28f11c9655cb5f609149",
+    "size": 134111
    }
   }
  },
@@ -22,7 +22,7 @@
  },
  "render": {
   "backend": "gpu",
-  "path": "../../renders/glowmere-valley-3",
+  "path": "../../renders/glowmere-valley-3-legacytrees",
   "pattern": "frame_{:05d}.png",
   "width": 1600,
   "height": 900,
