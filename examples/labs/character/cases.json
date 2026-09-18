@@ -1,0 +1,155 @@
+{
+ "format": "avgen-lab-cases",
+ "version": 1,
+ "lab": "character",
+ "_note": "The Character Intelligence Lab's reproducible configurations (ADR-273). Cases 1-6 can be run today. Cases 7-9 are three of the six scenarios the owner's brief asked for, and they name the unit of docs/character-ai-plan.md that has to land before they mean anything: nine of the twelve proposed layers already existed, and the three that did not are exactly perception, a decider and an animation layer stack. A case that asserted a decider this engine does not have would pass by asserting nothing, which is the failure the suite was built to prevent; `--lab-case character:7` refuses and names what it is waiting for.",
+ "cases": [
+  {
+   "lab": "character",
+   "number": 1,
+   "title": "A socket on a hand is on the hand",
+   "question": "Does a prop attached to a character's hand socket go where the hand is, and can the engine tell that answer from its own fallback?",
+   "expectation": "`scout` carries four sockets. `hand` names the joint `hand.r` and resolves 2.878 m from the body's own frame; `head` names `head.x` and resolves 4.218 m from it and 1.8 m from the hand. `chest` names no joint and resolves against the entity frame with the skeleton installed, and `tail` names a joint no rig here carries and does the same -- both reported as `SocketResolution::EntityFrame` rather than as success. The lantern node is attached to `hand` and is drawn there. Before ADR-272 every one of the four gave the same answer and all four returned true.",
+   "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+   "timeSeconds": 0.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Asserted by tests/unit/test_character_lab_sockets.cpp. Watch the lantern: if it sits inside the alien's chest, `Entity::setSkeleton` is not being called and the socket has silently fallen back."
+  },
+  {
+   "lab": "character",
+   "number": 2,
+   "title": "Three wanderers, three seeds, three routes",
+   "question": "Do characters with different seeds in the same world take different routes, and does the same world twice produce the same routes?",
+   "expectation": "Over 60 s each of `scout`, `rover` and `diver` walks more than 10 m and stands in at least three distinct 4 m navigation cells (measured: 62.9 m / 11 cells, 72.4 m / 22 cells, 50.8 m / 14 cells), and the three routes separate by up to 28.0 m. Two runs of the identical world agree to 0.000000000 m -- the control, without which 'three routes' would be three samples of noise rather than three characters.",
+   "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+   "timeSeconds": 30.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "The separation here is the seed's, not taste's: ADR-270 records that every character scores the same global list of interest points -- 140 of them in this fixture, visible to all four bodies -- which is why two Glowmere characters walk the same route."
+  },
+  {
+   "lab": "character",
+   "number": 3,
+   "title": "A route round what is in the way",
+   "question": "Does the planner route around a solid, and does it leave a clear line alone?",
+   "expectation": "The grid is 54x54 at 4 m: 2,916 cells, 2,517 walkable, 380 water, **19 blocked** by the thirteen solids the heroes contribute, falling into **3 regions** whose largest holds 2,300. `NavGridStats::regions` is computed at build and read by no UI (ADR-268); this is the first thing in the repository that asserts on it. A cross-world request returns a route at least as long as the straight line; a 12 m hop over open ground returns exactly its 12.00 m line; a goal outside the map is refused with a `PathStatus` other than `Ok` rather than with a route somewhere else.",
+   "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+   "timeSeconds": 0.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "The trap this case cost a wrong conclusion to find: a hero's `position.y` is the obstacle's BASE (`entity::obstaclesFromHeroes`). The first version of this fixture authored heroes at y = 0 over the shipped procedural world, whose ground there is -7.46 m. Thirteen blocking solids were indexed, the log said so, and every one floated 7.46 m above the walker's head -- `penned` strolled out of a sealed pen and 137.86 m across the map, and the measurement read as 'obstacles do not contain a character', which is false. The fixture is a flat world now for exactly that reason."
+  },
+  {
+   "lab": "character",
+   "number": 4,
+   "title": "A penned character is stuck and nothing says so",
+   "question": "What does being stuck look like in the numbers, and is there anything in the engine that reports it?",
+   "expectation": "`penned` stands inside ten hero stones on a 6 m ring, whose solids overlap by 0.26 m so the wall has no gap a 0.7 m body could take. Over 120 s it walks **0.00 m** and stands in **1 cell**, while `rover` -- the same behaviour, the same clips, no pen -- walks 72.4 m across 22 cells. `Navigator::requestPath` from the middle of the pen to the open world returns **`PathStatus::Unreachable` with 0 waypoints**, and the control -- the same request from just outside the pen -- returns `Ok` with 2. So the engine knows, exactly, and **says nothing**: the status is surfaced to no UI (ADR-268), `Explore`'s `stuckSeconds` watchdog replans silently, and a body whose every goal is behind a wall is indistinguishable, on screen and in the logs, from one that has decided to stand still.",
+   "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+   "timeSeconds": 45.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "It does not even walk: every destination `Explore` could pick is outside the wall, `pickDestination` rejects them all, and the body idles for two minutes. That is the sharpest form of the defect -- being stuck and being idle produce the same frame."
+  },
+  {
+   "lab": "character",
+   "number": 5,
+   "title": "Two minutes, and the scrub against the play",
+   "question": "Does the world still hold after a long run, and does seeking to a second land where playing to it did?",
+   "expectation": "After 120 s every body is finite and inside the map. Play-vs-seek measures **1.360136 m at 30 s** -- inside the 90 s replay window, where a scrub is supposed to equal a play -- and 26.365337 m at 120 s, where it is not: a seek past the window starts from `t - 90 s` and costs a body its accumulated history. The 30 s figure is **not** the 0.000022 m ADR-267 recorded, and the reason is ADR-267's own defect list rather than a regression: `EntityWorld::seek` re-simulates a strict subset of `update` -- behaviours only, no interest points, no crowd field, no gait, no action queue, no `applyOffsets` -- and leaves `BehaviorContext::self` at 0. `Explore` reads all of those. What *is* asserted is that seeking twice to the same second lands in the same place, which is what seek's own comment promises and what nothing had checked. The control is the same simulation at 30 Hz, which must disagree: 1.247820 m.",
+   "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+   "timeSeconds": 120.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "P1 owns the fixed step and the four seek defects. This case is where the before-number lives, deliberately not in the unit that will move it."
+  },
+  {
+   "lab": "character",
+   "number": 6,
+   "title": "Every character sees everything",
+   "question": "What does one character know that another does not?",
+   "expectation": "Nothing. `EntityWorld::interestPoints()` is one global list -- 140 entries in this fixture -- with no range, no facing, no occlusion and no notion of having noticed something, and every one of the four characters scores all of it every time it picks a goal. All four navigating behaviours report a destination through `NavDebug`; **none reports a score it beat**, because `Option` and `IConsiderer` have no implementations. This is the state of the engine, not a defect of the fixture (ADR-269, ADR-270), and the case exists so the day it stops being true there is a before to compare against.",
+   "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+   "timeSeconds": 0.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Runnable today, and the answer is the absence. When P2 lands, this case becomes the before arm of 'two characters with different PerceptionSettings::range notice different things'."
+  },
+  {
+   "lab": "character",
+   "number": 7,
+   "title": "Investigating a mushroom",
+   "question": "Does a character notice a glowing thing it was not already going to, approach it, and attend to it while it is there?",
+   "expectation": "A character within perception range of a glow point with no other business should raise it as a percept, score an 'investigate' option above its idle, walk to it and hold a look target on it -- and a second character out of range, in the same frame, should not have the percept at all. Neither half can be run: there is no percept, and there is nothing that scores an option.",
+   "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+   "timeSeconds": 0.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "The brief's second scenario. Needs IPerception (ADR-270) and IConsiderer (ADR-269); character_ai.hpp declares both and nothing implements either.",
+   "blockedBy": "P2 perception, P3 decision"
+  },
+  {
+   "lab": "character",
+   "number": 8,
+   "title": "A social interaction",
+   "question": "Do two characters notice each other, and does one change what it was doing because of the other?",
+   "expectation": "Two bodies within perception range should each carry the other as an `InterestKind::Character` percept with a distance and a `seenAt`, and one of them should abandon a routine-tier action for a higher-scoring social one -- with the losing option's score visible beside the winner, which is the overlay this lab owes. Today a character can already reach another body (`interestPoints` includes characters) but cannot *notice* one, and there is no second option for a social one to beat.",
+   "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+   "timeSeconds": 0.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "The brief's fourth scenario. `ActionQueue` already has the authority tiers, preemption and resumption this needs; what is missing is above it.",
+   "blockedBy": "P2 perception, P3 decision"
+  },
+  {
+   "lab": "character",
+   "number": 9,
+   "title": "Crossing a river",
+   "question": "Does a character choose between fording a river and walking round it, and can it say why?",
+   "expectation": "The fixture's world carries a 516 m river with a 7 m half-width and a 0.91 m/s flow. `NavGrid` already prices a ford -- `NavSample::waterDepth` is carried for exactly this -- so the route half of this is answerable today. The half that is not is the *choice*: preferring a longer dry route to a short wet one is a score, and there is nothing that scores. Blocked on the decider rather than on the navigation.",
+   "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+   "timeSeconds": 60.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "The brief's third scenario. Splitting it this way is deliberate: P7 could make the route observable without P3, and then this case's first half unblocks and the second does not.",
+   "blockedBy": "P3 decision"
+  }
+ ]
+}

@@ -80,6 +80,24 @@ struct LabCase {
     std::vector<std::string> aovs;
 
     std::string notes;
+
+    // The unit that has to land before this case can be run at all, or empty when it can be run
+    // today. `"P2 perception"`, `"P3 decision"`.
+    //
+    // ADR-273. The Character Intelligence Lab was asked for six scenarios and three of them --
+    // investigating a thing it noticed, reacting to another character, choosing between two urges
+    // -- require a perception layer and a decider, neither of which exists. §37 is the rule that a
+    // lab must not pretend: a case asserting a decider that does not exist would pass by asserting
+    // nothing and would read, to whoever came next, as a decider that works.
+    //
+    // So the case is still written down -- the question and the expectation are the useful half and
+    // they are the half that is ready now -- and it says what it is waiting for. `--lab-case`
+    // refuses to run it and names the unit; the registry test requires that every blocked case name
+    // something; and the day the unit lands, the cases that were waiting for it are a list rather
+    // than a memory. A blocked case is a commitment, not a placeholder.
+    std::string blockedBy;
+
+    [[nodiscard]] bool runnable() const { return blockedBy.empty(); }
 };
 
 // The file a lab's cases live in, relative to the repository root:
