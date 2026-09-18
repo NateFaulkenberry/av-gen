@@ -23,6 +23,8 @@ namespace avgen::rendering {
 // frame. It also lets the overlay be honest about not knowing: an object absent from the map is
 // drawn in the "no decision available" colour rather than in rung 0's, which is what an overlay
 // that silently defaulted would do -- and rung 0 is the most reassuring answer it could give.
+class ProceduralRenderer;
+
 using ProceduralLodLevels = std::unordered_map<std::string, std::vector<int>>;
 
 // Appends the enabled visualisations. `cameraPosition` scales screen-relative sizes.
@@ -39,5 +41,17 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
                         const TransformHistory* history = nullptr,
                         const ProceduralLodLevels* lodLevels = nullptr,
                         std::span<const ShadowView> shadowViews = {});
+
+// Reads each visible procedural's rung buffer back, for `options.lod`. Empty when the overlay is
+// off, which is what makes calling it unconditionally cheap.
+//
+// Free rather than a member of whoever owns the frame, because there are two such owners -- the
+// live window and `RenderJob` -- and while this lived as a private method of the first, the second
+// called `buildDebugGeometry` with four arguments and got no rung overlay at all. `--debug-draw`
+// is reached from the command line, which is the offline path by definition, so the overlay that
+// most needed to be reachable from a file was the one that was not.
+[[nodiscard]] ProceduralLodLevels readProceduralLodLevels(ProceduralRenderer& procedurals,
+                                                          const scene::Scene& scene,
+                                                          const DebugViewOptions& options);
 
 } // namespace avgen::rendering

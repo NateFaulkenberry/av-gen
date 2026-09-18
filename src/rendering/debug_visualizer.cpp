@@ -1,5 +1,7 @@
 #include "rendering/debug_visualizer.hpp"
 
+#include "rendering/procedural_renderer.hpp"
+
 #include "rendering/visibility.hpp"
 #include "spatial/field.hpp"
 
@@ -135,6 +137,32 @@ constexpr std::array<glm::vec4, 4> kLodColours{{
 }};
 constexpr glm::vec4 kLodCulledColour{0.45f, 0.10f, 0.55f, 0.9f}; // rejected by the cull
 constexpr glm::vec4 kLodUnknownColour{0.55f, 0.55f, 0.55f, 0.6f}; // the pass did not run for it
+
+ProceduralLodLevels readProceduralLodLevels(ProceduralRenderer& procedurals,
+                                            const scene::Scene& scene,
+                                            const DebugViewOptions& options) {
+    ProceduralLodLevels out;
+    if (!options.lod) {
+        return out;
+    }
+    for (const scene::ProceduralGeometry& pg : scene.procedurals) {
+        if (!pg.visible || pg.instances.empty()) {
+            continue;
+        }
+        // ADR-108: a material part shares its lead's decision and owns no buffer of its own, so the
+        // lead is asked and the part is coloured from the same answer.
+        const std::string& owner = pg.partOf.empty() ? pg.name : pg.partOf;
+        auto levels = procedurals.readLodLevels(owner);
+        // Not `fresh` means the cull dispatches were not encoded this frame, so the buffer holds
+        // the last frame that ran them. Dropped rather than drawn: an overlay that shows history
+        // while claiming to show this frame is worse than one that shows nothing (spec 37).
+        if (!levels || !levels->fresh || levels->level.size() != pg.instances.size()) {
+            continue;
+        }
+        out.emplace(pg.name, std::move(levels->level));
+    }
+    return out;
+}
 
 void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugViewOptions& options, double time,
                         const TransformHistory* history, const ProceduralLodLevels* lodLevels,

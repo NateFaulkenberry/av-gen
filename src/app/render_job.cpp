@@ -569,7 +569,15 @@ Result<void> RenderJob::renderOne() {
     // to be drawn from, so the lines are the same frame's as the pixels. An empty option set builds
     // nothing and costs a handful of branches, which is what a deliverable render pays.
     renderer_->setDebugDepthTest(debug_.depthTest);
-    rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), debug_, time.renderTime);
+    // Both extra spans, which this call did not pass and so drew neither the rung overlay nor the
+    // cascades -- on the one path `--debug-draw` can actually be reached from. The shadow views are
+    // the previous frame's, as they are for the live window: this runs before `render()` fits the
+    // new ones, and a box one frame stale is the honest option (the alternative, fitting a second
+    // set here, is a diagnostic that agrees with the renderer by construction).
+    const rendering::ProceduralLodLevels lodLevels =
+        rendering::readProceduralLodLevels(renderer_->procedurals(), engine_->scene(), debug_);
+    rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), debug_, time.renderTime,
+                                  nullptr, &lodLevels, renderer_->shadows().views());
     // The same clock the live path uses, so frame f lands in the same place either way.
     // The frame's passes and its readback copy go into one command buffer; the ring submits it
     // and starts the map, and only blocks when all its slots are still on the GPU.

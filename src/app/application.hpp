@@ -431,8 +431,6 @@ private:
     // The per-instance LOD rung behind `DebugViewOptions::lod`, read from the cull pass's own
     // `lodIndex` buffer. Empty unless the overlay is on: it is a blocking readback per scattered
     // object and it belongs to the frame owner to decide when that is worth paying for.
-    [[nodiscard]] rendering::ProceduralLodLevels
-    readProceduralLodLevels(const rendering::DebugViewOptions& options);
     void initControlPlane();
     // Runs `--ai-prompt` / `--ai-script` to completion on this thread, servicing the control
     // plane's queue the way the frame loop would. Returns a process exit code.

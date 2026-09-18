@@ -205,7 +205,9 @@ std::string usageText() {
            "  --debug-draw <list> debug overlays, comma separated: beams (every particle\n"
            "                      emitter's disc, its column's axis and where the column ends),\n"
            "                      entityOrigins, entityBounds, entityIds, skeletons, worldAxes,\n"
-           "                      frustum, transformTrail, points, bounds, normals, splines.\n"
+           "                      frustum, transformTrail, points, bounds, normals, splines,\n"
+           "                      lod (the rung each instance drew at), shadowCascades,\n"
+           "                      shadowCascadeSlices, shadowCasters.\n"
            "                      Works in --render, where there is no panel to switch them on\n"
            "  --debug-target <t>  display an auxiliary render target: normal|roughness|velocity|\n"
            "                      emission|ids|occlusion|depth|linear depth|depth edges|\n"
@@ -1712,6 +1714,18 @@ Result<void> Application::applyDebugDraw() {
         {"bounds", &d.bounds},
         {"normals", &d.normals},
         {"splines", &d.splines},
+        // The three labs' own overlays. Absent until now, which meant the switches the LOD and
+        // Shadow Labs added were reachable only from an ImGui checkbox -- and a headless render is
+        // the one context where a checkbox does not exist. An overlay a file cannot ask for is an
+        // overlay nobody diagnosing from a rendered frame can use.
+        //
+        // `culling` is deliberately NOT here. It is still a field nothing reads (ADR-225), and a
+        // command-line name for an inert flag is a promise the application does not keep -- worse
+        // on a CLI than in a panel, because a script cannot see that nothing happened.
+        {"lod", &d.lod},
+        {"shadowCascades", &d.shadowCascades},
+        {"shadowCascadeSlices", &d.shadowCascadeSlices},
+        {"shadowCasters", &d.shadowCasters},
     };
     std::string enabled;
     std::stringstream stream(options_.debugDraw);
@@ -1805,31 +1819,6 @@ void Application::startRenderFromUi() {
     }
     job_ = std::move(*job);
     panel_->setStatus("rendering...");
-}
-
-rendering::ProceduralLodLevels
-Application::readProceduralLodLevels(const rendering::DebugViewOptions& options) {
-    rendering::ProceduralLodLevels out;
-    if (!options.lod || !renderer_ || !engine_) {
-        return out;
-    }
-    for (const scene::ProceduralGeometry& pg : engine_->scene().procedurals) {
-        if (!pg.visible || pg.instances.empty()) {
-            continue;
-        }
-        // ADR-108: a material part shares its lead's decision and owns no buffer of its own, so the
-        // lead is asked and the part is coloured from the same answer.
-        const std::string& owner = pg.partOf.empty() ? pg.name : pg.partOf;
-        auto levels = renderer_->procedurals().readLodLevels(owner);
-        // Not `fresh` means the cull dispatches were not encoded this frame, so the buffer holds
-        // the last frame that ran them. Dropped rather than drawn: an overlay that shows history
-        // while claiming to show this frame is worse than one that shows nothing (spec §37).
-        if (!levels || !levels->fresh || levels->level.size() != pg.instances.size()) {
-            continue;
-        }
-        out.emplace(pg.name, std::move(levels->level));
-    }
-    return out;
 }
 
 void Application::rememberProject(const std::filesystem::path& path) {
@@ -3514,7 +3503,8 @@ int Application::runLive() {
             // frame's. Drawing a cascade one frame stale is the honest option and the note is here
             // so nobody reads a lagging box as a fitting bug -- the alternative, fitting a second
             // set here to draw, is the §37 trap the span exists to avoid.
-            const rendering::ProceduralLodLevels lodLevels = readProceduralLodLevels(options);
+            const rendering::ProceduralLodLevels lodLevels =
+                rendering::readProceduralLodLevels(renderer_->procedurals(), engine_->scene(), options);
             rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime,
                                           &transformHistory_, &lodLevels, renderer_->shadows().views());
         }
@@ -4242,7 +4232,8 @@ int Application::runHeadless() {
                 // diagnosis done from a rendered frame.
                 const rendering::DebugViewOptions& options = debugOptions();
                 renderer_->setDebugDepthTest(options.depthTest);
-                const rendering::ProceduralLodLevels lodLevels = readProceduralLodLevels(options);
+                const rendering::ProceduralLodLevels lodLevels =
+                rendering::readProceduralLodLevels(renderer_->procedurals(), engine_->scene(), options);
                 rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime,
                                               nullptr, &lodLevels, renderer_->shadows().views());
             }
