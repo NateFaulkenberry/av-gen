@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-2-song.scene.json",
-        "sha256": "a86a62274d06850dbdbbb09196d3b31adbe4f7b276ea0bfc1ced406f95704b96",
-        "size": 524636
+        "sha256": "29d7422c0186ac5d37718e68e7feba38630df051a49576a6dd007f98b3b52f86",
+        "size": 524638
       }
     }
   },
@@ -12091,7 +12091,7 @@
     "scene/windSpeed": 0.7400000095367432,
     "staging/abduction/abductSeconds": 4.599999904632568,
     "staging/abduction/aimSeconds": 0.800000011920929,
-    "staging/abduction/animalGait": 1.2999999523162842,
+    "staging/abduction/animalGait": 0.3610000014305115,
     "staging/abduction/animalSpin": 230.0,
     "staging/abduction/animalWobble": 0.0,
     "staging/abduction/animalWobbleRate": 1.350000023841858,

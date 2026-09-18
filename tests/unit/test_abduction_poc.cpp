@@ -495,11 +495,22 @@ TEST_CASE("the UFO abducts several animals, choosing each one from the scene",
     // The lower bound is what stops this passing on an animal that never left the ground; the upper
     // bound is the anti-clipping guarantee. Both are needed: the old test had only the first half of
     // each and asserted the animal got *close*, which is the defect written down as a requirement.
-    INFO(fmt::format("highest lift {:.1f} m, closest to the craft {:.2f} m", run.highestLift,
-                     run.reachedCraft));
+    // **The lower bound is the widest animal's reach, and the reach is a property of the cast.**
+    // ADR-218 measured it as 5.80 m with the farm at ADR-213's 3.6x, so the quantity that does not
+    // move is 1.611 m per unit of node scale -- and ADR-330 put the cast back at 1.0, where 5.9 m
+    // of clearance is the bull's reach three and a half times over and the arm fails on a lift that
+    // is perfectly clear. So the bound is read off the scene instead of written down: an anti-
+    // clipping claim has to be a claim about the body doing the clipping.
+    const scene::CompositionNode* widest = run.comp->findNode("bull-1");
+    REQUIRE(widest != nullptr);
+    const float castScale = run.comp->nodeWorldTransform(*widest).scale.x;
+    const float reach = 1.611f * castScale;
+    INFO(fmt::format("highest lift {:.1f} m, closest to the craft {:.2f} m; the widest animal is at "
+                     "{:.3f}x and reaches {:.2f} m from its own origin",
+                     run.highestLift, run.reachedCraft, castScale, reach));
     CHECK(run.highestLift > 10.0f);
-    CHECK(run.reachedCraft > 5.9f);   // clear of the widest animal's 5.80 m reach
-    CHECK(run.reachedCraft < 12.0f);  // but still plainly *at* the craft, not stalled below it
+    CHECK(run.reachedCraft > reach + 0.1f); // clear of the widest animal's reach, with margin
+    CHECK(run.reachedCraft < 12.0f);        // but still plainly *at* the craft, not stalled below it
 
     // If it stopped early, say why rather than leaving it a mystery: for every animal still on the
     // ground, the three things the query asks about it.

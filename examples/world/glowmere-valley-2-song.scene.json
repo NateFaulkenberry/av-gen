@@ -21495,7 +21495,7 @@
           },
           {
             "name": "animalGait",
-            "value": 1.3,
+            "value": 0.361,
             "min": 0.0,
             "max": 10.0
           },
