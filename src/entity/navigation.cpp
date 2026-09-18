@@ -131,11 +131,19 @@ void Navigator::buildGrid(float cellSize) {
 }
 
 PathResult Navigator::requestPath(const PathRequest& request) const {
+    return requestPath(request, NavPathCost{});
+}
+
+PathResult Navigator::requestPath(const PathRequest& request, const NavPathCost& cost) const {
     if (grid_ != nullptr && grid_->valid()) {
-        return grid_->path(request);
+        return grid_->path(request, cost);
     }
     // No graph. A straight line is the only thing that can be checked, and saying so by name is
     // what lets a caller distinguish "this world has no navigation" from "there is no way there".
+    // The price is not applied here and cannot be: there is no graph to spend it on, so a caller
+    // that asked twice at two prices gets the straight line twice. That is honest and it is also
+    // why the route considerer requires a grid before it scores anything -- two identical answers
+    // from a world with no graph are not evidence that there is no water between here and there.
     PathResult out;
     out.goal = request.to;
     if (glm::length(request.to - request.from) <= std::max(request.goalTolerance, 0.01f)) {
