@@ -862,7 +862,7 @@ TEST_CASE("The shipped Glowmere project abducts the way its scene says it does",
     REQUIRE(fs::is_regular_file(project));
 
     // What the scene authors for the beam, read straight out of the file. Reported rather than
-    // asserted against, and that change of role is the subject of ADR-268.
+    // asserted against, and that change of role is the subject of ADR-271.
     //
     // This used to be the assertion: "the beam's runtime radius equals the radius the scene file
     // authors". It caught the ADR-264 residue on its first live encounter, which is the most a
