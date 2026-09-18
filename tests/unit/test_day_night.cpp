@@ -1,4 +1,4 @@
-// The day/night cycle's three contracts (ADR-341), each of which the brief states as a
+// The day/night cycle's three contracts (ADR-343), each of which the brief states as a
 // requirement and each of which is cheap to break silently:
 //
 //   determinism   same phase in, same state out, with no history

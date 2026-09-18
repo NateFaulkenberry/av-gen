@@ -47,6 +47,7 @@
 #include <cmath>
 #include <filesystem>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <map>
 #include <string>
@@ -120,8 +121,13 @@ const std::map<std::string, float>& beforeFungi() {
 fs::path sourceDir() { return fs::path(AVGEN_SOURCE_DIR); }
 fs::path worldDir() { return sourceDir() / "examples" / "world"; }
 
-constexpr std::array<const char*, 4> kScenes{{"glowmere-valley-2", "glowmere-valley-2-multicam",
-                                              "glowmere-valley-2-song", "glowmere-atmospherics"}};
+// The four valley-2-family scenes plus valley 3 (ADR-340). Valley 3 has no farm in it, so its
+// `cast` is the five aliens and the tallest of them is the same `alien-ranger` at the same 1.94x
+// -- which is the point of adding it: a new Glowmere is exactly where a scale ladder goes wrong,
+// and it is where ADR-213's 3.6x reached four files without anything failing.
+constexpr std::array<const char*, 5> kScenes{{"glowmere-valley-2", "glowmere-valley-2-multicam",
+                                              "glowmere-valley-2-song", "glowmere-atmospherics",
+                                              "glowmere-valley-3"}};
 
 // The ten hero organisms, in the order `tools/make_glowmere_valley_2.py` lists them.
 constexpr std::array<const char*, 10> kHeroes{{"elder-2", "lantern", "spire", "bloom", "veil",
@@ -299,7 +305,7 @@ TEST_CASE("Glowmere's cast stands in its undergrowth", "[glowmere][scale]") {
         INFO("control: the same body at " << kBeforeCast << "x stands " << before << " m");
         CHECK(before > tallestPlant);
     }
-    CHECK(scenesChecked == 4);
+    CHECK(scenesChecked == 5);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -386,7 +392,7 @@ TEST_CASE("Glowmere's cast stands inside the fungal ladder", "[glowmere][scale]"
                          << groundedAt334 << " grounded");
         CHECK(groundedAt334 < kGroundedMin);
     }
-    CHECK(scenesChecked == 4);
+    CHECK(scenesChecked == 5);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -408,18 +414,25 @@ TEST_CASE("Glowmere's signature organism is monumental and stands above the tree
     }
     const auto farm = farmNaturalHeights();
     const auto aliens = alienNaturalHeights();
-    // The three layers that place a tree. Everything else the valley scatters is undergrowth, and
-    // arm 1 is the one that measures the cast against that.
-    constexpr std::array<const char*, 3> kTreeLayers{{"pines", "canopy", "deadwood"}};
-    // What those layers carried at bc79a51, for the control.
+    // **A tree is a layer that places something at least five metres tall.** Structural, and not a
+    // list of three names, because a name list is a floor that outlives what it counted: valley 3
+    // has eight tree layers of which exactly one is still called `canopy`, and a `kTreeLayers` of
+    // {"pines", "canopy", "deadwood"} would have computed that world's tree line off one layer and
+    // thrown on the two names it no longer has.
+    constexpr float kTreeMetres = 5.0f;
+    // What those layers carried at bc79a51, for the control. 15.0 -- `pines`, the tallest -- is
+    // the stand-in for a layer that did not exist then, because what the control asks is "would
+    // this arm have passed in the world where Glowmere's trees were as tall as Glowmere ever made
+    // them", and 15 m is that number.
     const std::map<std::string, float> kBeforeTrees{
         {"pines", 15.0f}, {"canopy", 14.0f}, {"deadwood", 12.0f}};
+    constexpr float kTallestTreeBefore = 15.0f;
 
     for (const char* name : kScenes) {
         const json doc = readJson(worldDir() / fmt::format("{}.scene.json", name));
         const auto cast = castOf(doc, farm, aliens);
         const auto layers = scatterOf(doc);
-        if (cast.empty() || layers.find("pines") == layers.end()) {
+        if (cast.empty()) {
             continue;
         }
         const Body& tallest = tallestOf(cast);
@@ -436,11 +449,22 @@ TEST_CASE("Glowmere's signature organism is monumental and stands above the tree
 
         float treeLine = 0.0f;
         float beforeTreeLine = 0.0f;
-        for (const char* layer : kTreeLayers) {
-            const Layer& l = layers.at(layer);
+        int treeLayers = 0;
+        for (const auto& [layerName, l] : layers) {
+            if (l.height < kTreeMetres) {
+                continue;
+            }
+            ++treeLayers;
             treeLine = std::max(treeLine, l.height * l.maxScale);
-            beforeTreeLine = std::max(beforeTreeLine, kBeforeTrees.at(layer) * l.maxScale);
+            const auto before = kBeforeTrees.find(layerName);
+            beforeTreeLine = std::max(
+                beforeTreeLine,
+                (before != kBeforeTrees.end() ? before->second : kTallestTreeBefore) * l.maxScale);
         }
+        INFO(name << " has " << treeLayers << " tree layer(s)");
+        // A liveness check on the derivation above: a world with no tree layers has a tree line of
+        // zero and would clear the arm below without measuring anything.
+        CHECK(treeLayers >= 3);
         INFO(name << ": the tree line is " << treeLine
                   << " m (the tallest instance the tree layers will place)");
         CHECK(signature >= treeLine * kAboveTreeLine);
@@ -481,6 +505,13 @@ TEST_CASE("Glowmere's signature organism is monumental and stands above the tree
 // 3.585 m/s authored for a 6.38 m one, in every render anybody made, and this arm passed. The
 // speeds are in it now, and so is the alien `explore` spelling of the same two keys.
 TEST_CASE("the Glowmere projects do not undo their scenes", "[glowmere][scale]") {
+    // Counted across the scenes rather than within each, because the liveness check and the
+    // agreement check are different questions and a per-scene floor conflated them. Valley 3's
+    // project copies **no** behaviour speed at all -- four parameters, none of them naming an
+    // entity -- and a project that carries no copy cannot disagree with its scene, which is the
+    // strictly safer state and not the vacuous one. What would be vacuous is the whole arm finding
+    // nothing anywhere, and that is what the total below asserts.
+    int speedsCheckedTotal = 0;
     for (const char* name : kScenes) {
         const json scene = readJson(worldDir() / fmt::format("{}.scene.json", name));
         const fs::path projectPath = worldDir() / fmt::format("{}.json", name);
@@ -550,10 +581,8 @@ TEST_CASE("the Glowmere projects do not undo their scenes", "[glowmere][scale]")
                 }
             }
         }
-        // And the arm is not vacuous on the scenes that have them: three of the four Glowmere
-        // projects carry all forty-two, and the atmospherics demonstration carries eight.
         INFO(name << ": " << speedsChecked << " behaviour speeds copied into the project");
-        CHECK(speedsChecked >= 8);
+        speedsCheckedTotal += speedsChecked;
 
         // And the hero table, when the project carries one: a hero's `height` and `radius` are how
         // far the camera stands off (camera_director.cpp), so a stale copy reframes every shot.
@@ -576,6 +605,10 @@ TEST_CASE("the Glowmere projects do not undo their scenes", "[glowmere][scale]")
             }
         }
     }
+    // Three of the four valley-2-family projects carry all forty-two speeds and the atmospherics
+    // demonstration carries eight, so a total under eight means the walk above stopped walking.
+    INFO(speedsCheckedTotal << " behaviour speeds checked across " << kScenes.size() << " scenes");
+    CHECK(speedsCheckedTotal >= 8);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -587,7 +620,10 @@ TEST_CASE("probe: the Glowmere scale ladder", "[.probe][glowmere-scale]") {
     if (!assetsPresent()) {
         SKIP("assets/farm or assets/aliens is not present");
     }
-    const json doc = readJson(worldDir() / "glowmere-valley-2-multicam.scene.json");
+    const char* which = std::getenv("AVGEN_LADDER_SCENE");
+    const json doc = readJson(worldDir() / fmt::format("{}.scene.json",
+                                                       which != nullptr ? which
+                                                                        : "glowmere-valley-2-multicam"));
     const auto cast = castOf(doc, farmNaturalHeights(), alienNaturalHeights());
     const Body& tallest = tallestOf(cast);
 

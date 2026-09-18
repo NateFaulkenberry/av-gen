@@ -1,8 +1,8 @@
-# ADR-341: One dayPhase, and the sky you cannot have
+# ADR-343: One dayPhase, and the sky you cannot have
 
 Status: accepted
 Date: 2026-09-18
-Supersedes ADR-340's "the HDRI is never the visible sky", by the owner's decision. See §4.
+Supersedes ADR-342's "the HDRI is never the visible sky", by the owner's decision. See §4.
 
 ## Context
 
@@ -62,7 +62,7 @@ painting the sky — while every number still looked plausible.
 ### 4. The HDRI is the visible sky, and the procedural sky colours are therefore inert
 
 The owner chose to use the night HDRI's moon as *the* moon, which requires the map to be visible.
-This supersedes ADR-340's "neither HDRI is ever drawn as the visible sky".
+This supersedes ADR-342's "neither HDRI is ever drawn as the visible sky".
 
 **The engine ties the IBL source to the skybox.** `drawSky = ibl && (!ibl_.fromSky || sky.showBackground)`:
 with a map bound, `ibl_.fromSky` is false and the skybox drawn is the map's cube. There is no
@@ -70,7 +70,7 @@ configuration that gives HDRI *lighting* with a procedural *visible sky* — `sh
 draws nothing at all. So:
 
 * The visible sky is the HDRI. The day map's clouds and the night map's moon and Milky Way are the
-  sky, and the double-moon question is settled the other way from ADR-340: there is one moon, and
+  sky, and the double-moon question is settled the other way from ADR-342: there is one moon, and
   it is the map's, because no procedural moon was built.
 * **`zenithColor`, `horizonColor` and `groundColor` are consequently inert in this scene.** They
   remain in `DayNightSettings` and still drive any scene with no map bound, but here the sky's

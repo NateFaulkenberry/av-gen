@@ -937,7 +937,7 @@ private:
     void rebuild();          // flattens nodes into scene_ (meshes/textures/entities/particles)
     void ensureBuilt();      // rebuild() when dirty
     void applyParameters();
-    void applyDayNight();  // ADR-341; the tail of applyParameters // node finals -> transforms/materials/particles; camera; environment
+    void applyDayNight();  // ADR-343; the tail of applyParameters // node finals -> transforms/materials/particles; camera; environment
     // Nudges the camera's aim onto the hero the active directed shot was cut for (ADR-158).
     // After `syncHeroesToNodes`, not inside `applyParameters`, so it reads where the hero is
     // *this* frame rather than where it was last one.
@@ -1023,7 +1023,7 @@ private:
     std::optional<glm::vec3> envDominantDirection_;
     // Procedural sky (ADR-036): the scene-file values behind the env/sky/* parameters.
     scene::SkySettings skySetting_;
-    // ADR-341: the day/night cycle. Inert unless the scene enables it; when it is on it
+    // ADR-343: the day/night cycle. Inert unless the scene enables it; when it is on it
     // becomes the authority for the fields it owns and writes them after every other
     // parameter, so "one environment changing state" is true by ordering rather than by care.
     scene::DayNightSettings dayNight_;

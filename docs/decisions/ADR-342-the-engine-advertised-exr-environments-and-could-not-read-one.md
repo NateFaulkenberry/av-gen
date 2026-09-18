@@ -1,4 +1,4 @@
-# ADR-340: The engine advertised EXR environments and could not read one
+# ADR-342: The engine advertised EXR environments and could not read one
 
 Status: accepted
 Date: 2026-09-18

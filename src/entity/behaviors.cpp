@@ -13,6 +13,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 
 namespace avgen::entity {
@@ -558,6 +559,44 @@ private:
 // Pick somewhere navigable, walk there, pause, repeat. The navigation layer answers "may I stand
 // here" and "which way do I go"; this decides when to ask. Seeded throughout: the same scene, the
 // same seed and the same frame produce the same walk, which is what an offline render needs.
+// **Walking out of a crowd, for anything that stands on the ground (ADR-240, ADR-340).**
+//
+// Lifted out of `Explore` verbatim -- the same expressions in the same order, with the same
+// constant -- because `Explore` was the only thing in the engine that did it, and ADR-333 moved
+// the decider out of `Explore` without moving the body. A `decide` character declared no radius
+// and was pushed by nobody, so two of them walked through each other: measured on
+// `glowmere-valley-3`, the `watcher` and the `elder` closed to 0.238 m with a combined width of
+// 1.8 m.
+//
+// Separation rather than avoidance: a body that planned around everyone else would replan every
+// time anyone walked past, and two bodies that each waited for the other would deadlock.
+//
+// A *speed*, not a step. `crowdSeparation` returns half the overlap and moving the body that far
+// in one frame is frame-rate dependent and enormous -- ADR-240 measured two bodies travelling
+// against their own facing on a fifth of their moving frames, every one of them a crowd overlap.
+// Each body walks out of its own half of the overlap over half a second, integrated against the
+// real dt, and never faster than it walks.
+//
+// Costs nothing and does nothing where `state.radius` is 0, which is every body in this
+// repository that does not ask for it.
+void separateFromCrowd(const BehaviorContext& ctx, EntityState& state, float speed, float dt) {
+    if (ctx.world == nullptr || state.radius <= 0.0f || dt <= 0.0f) {
+        return;
+    }
+    const glm::vec3 among = state.position();
+    const glm::vec2 apart =
+        ctx.world->crowdSeparation(ctx.self, glm::vec2(among.x, among.z), state.radius);
+    const float distance = glm::length(apart);
+    if (distance <= 1e-4f) {
+        return;
+    }
+    constexpr float kSeparationSeconds = 0.5f;
+    const float apartSpeed = std::min(distance / kSeparationSeconds, std::max(speed, 1.0f));
+    const float limit = std::min(distance, apartSpeed * dt);
+    state.travel.x += apart.x / distance * limit;
+    state.travel.z += apart.y / distance * limit;
+}
+
 class Wander final : public IBehavior {
 public:
     explicit Wander(const nlohmann::json* s)
@@ -1565,52 +1604,9 @@ private:
         state.travel.x += move.x;
         state.travel.z += move.y;
 
-        // Other characters. Separation rather than avoidance: a body that planned around everyone
-        // else would replan every time anyone walked past, and two bodies that each waited for the
-        // other would deadlock. A gentle push out of an overlap is what reads as people making room.
-        if (ctx.world != nullptr && state.radius > 0.0f) {
-            const glm::vec3 among = state.position();
-            const glm::vec2 apart =
-                ctx.world->crowdSeparation(ctx.self, glm::vec2(among.x, among.z), state.radius);
-            const float distance = glm::length(apart);
-            if (distance > 1e-4f) {
-                // **A push may correct a walk; it may not replace one** (ADR-240).
-                //
-                // `crowdSeparation` returns half the overlap, and this used to move the body that
-                // whole distance in a single frame, capped only at the body's own full walking
-                // step. Two consequences, and the second is the visible one.
-                //
-                // It is frame-rate dependent: half the overlap per frame is twice the separation
-                // speed at 120 Hz that it is at 60, which is exactly what ADR-161 says a
-                // behaviour's motion must never be.
-                //
-                // And it is enormous. A fifth of a metre of overlap between two six-metre aliens
-                // produces a tenth of a metre of push, which at 60 Hz is six metres a second --
-                // more than `rook` walks at. So whenever the walk itself was slow (a turn, an
-                // arrival) the push was the *whole* step, and the body was drawn walking forwards
-                // while travelling sideways. Measured over ten simulated minutes of the shipped
-                // scene with nothing culled: `rook` and `tide` travelled against their own facing
-                // on 25.6% and 20.6% of their moving frames, and **every one of those steps was a
-                // crowd overlap** -- not one was a solid, and not one was the body's own travel.
-                //
-                // So separation is a *speed* now, and the speed is the one that says what the
-                // mechanism is for: **each body walks out of its own half of the overlap over half
-                // a second**, integrated against the real dt, and never faster than it walks. Deep
-                // overlaps still resolve at a walk -- two bodies placed inside each other have to
-                // get out and be seen to -- and a brush in passing becomes a nudge of a few
-                // centimetres a second instead of a shove at cruising speed.
-                //
-                // Not applied to the penetration resolve below, which is a different kind of
-                // statement: a body may not end a frame inside a solid, and that is a guarantee
-                // rather than a preference.
-                constexpr float kSeparationSeconds = 0.5f;
-                const float apartSpeed =
-                    std::min(distance / kSeparationSeconds, std::max(speed, 1.0f));
-                const float limit = std::min(distance, apartSpeed * dt);
-                state.travel.x += apart.x / distance * limit;
-                state.travel.z += apart.y / distance * limit;
-            }
-        }
+        // Other characters. The arithmetic is `separateFromCrowd` above, which this used to hold
+        // inline; it is shared with `ground` so that a `decide` character is a body too.
+        separateFromCrowd(ctx, state, speed, dt);
 
         // Whatever the steering did not prevent, the field corrects. This is the guarantee rather
         // than the effort: a body may not end a frame inside a solid, however it got there --
@@ -1935,7 +1931,8 @@ public:
         : alignDefault_(readFloat(s, "slopeAlign", 0.55f)),
           smoothDefault_(readFloat(s, "smoothingMs", 85.0f)),
           floatDefault_(readFloat(s, "maxFloat", 0.22f)),
-          tiltDefault_(readFloat(s, "maxTilt", 34.0f)) {}
+          tiltDefault_(readFloat(s, "maxTilt", 34.0f)),
+          bodyRadiusDefault_(readFloat(s, "bodyRadius", 0.0f)) {}
 
     [[nodiscard]] std::string_view kind() const override { return "ground"; }
 
@@ -1944,15 +1941,49 @@ public:
         smooth_ = &params.add(floatDesc(prefix + "smoothingMs", smoothDefault_, 0.0f, 4000.0f));
         float_ = &params.add(floatDesc(prefix + "maxFloat", floatDefault_, 0.0f, 20.0f));
         tilt_ = &params.add(floatDesc(prefix + "maxTilt", tiltDefault_, 0.0f, 90.0f));
+        bodyRadius_ = &params.add(floatDesc(prefix + "bodyRadius", bodyRadiusDefault_, 0.0f, 20.0f));
         paths_ = {prefix + "slopeAlign", prefix + "smoothingMs", prefix + "maxFloat",
-                  prefix + "maxTilt"};
+                  prefix + "maxTilt", prefix + "bodyRadius"};
     }
     void collectParameterPaths(std::vector<std::string>& out) const override {
         out.insert(out.end(), paths_.begin(), paths_.end());
     }
-    void reset(Rng&) override { follower_.reset(); }
+    void reset(Rng&) override {
+        follower_.reset();
+        ownsBody_.reset();
+    }
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
+        // **How wide this body is (ADR-340).**
+        //
+        // `EntityState::radius` is what `EntityWorld` collects into the crowd field, and 0 means
+        // "not a body: takes part in nothing that separates crowds". Before this, the only
+        // behaviour that ever wrote it was `Explore` -- so ADR-333 moved the decider out of
+        // `Explore` and left the body behind, and a `decide` character was invisible to every
+        // other character. Measured on `glowmere-valley-3`: two aliens closed to **0.238 m** with
+        // a combined width of about 1.4 m, which is one standing inside the other.
+        //
+        // It belongs on `ground` because grounding is what a thing that stands on the floor has:
+        // a craft that flies declares no `ground` behaviour and is correctly not a body. The
+        // default is 0, so no scene in this repository changes.
+        const float declared = bodyRadius_ != nullptr ? bodyRadius_->value() : bodyRadiusDefault_;
+        // Only when nothing above has already declared one. An entity carrying both `explore` and
+        // `ground` would otherwise be pushed out of a crowd twice in a frame, at twice the speed
+        // ADR-240 measured and argued for -- and "nobody authors both today" is not a guarantee,
+        // it is a fact about today.
+        //
+        // **Decided once, on the first update, and kept.** `EntityState::radius` persists across
+        // frames, so testing it every frame answers "did anything ever declare a body" rather
+        // than "did anything declare it *this* frame" -- and the first cut of this did exactly
+        // that, declared the radius on frame one and then never separated again. The measurement
+        // was bit-identical to the run before the change, which is the tell.
+        if (!ownsBody_.has_value()) {
+            ownsBody_ = declared > 0.0f && state.radius <= 0.0f;
+        }
+        const bool mine = *ownsBody_;
+        if (mine) {
+            state.radius = declared;
+        }
         if (ctx.nav == nullptr) {
             return;
         }
@@ -1974,10 +2005,18 @@ public:
         state.travel.y = ground.height - state.anchor.y;
         motion.rotation.x += ground.pitch;
         motion.rotation.z += ground.roll;
+        // And out of anybody this body is standing in. After the height, so a push can never
+        // leave a body off its ground -- `travel.y` is assigned above and the push is horizontal.
+        if (mine) {
+            separateFromCrowd(ctx, state, state.speed, static_cast<float>(ctx.dt));
+        }
     }
 
 private:
-    float alignDefault_, smoothDefault_, floatDefault_, tiltDefault_;
+    float alignDefault_, smoothDefault_, floatDefault_, tiltDefault_, bodyRadiusDefault_;
+    // Unset until the first update has seen whether anything above declared a body.
+    std::optional<bool> ownsBody_;
+    params::Parameter<float>* bodyRadius_ = nullptr;
     params::Parameter<float>* align_ = nullptr;
     params::Parameter<float>* smooth_ = nullptr;
     params::Parameter<float>* float_ = nullptr;
@@ -2030,7 +2069,9 @@ public:
           memoryCapacity_(static_cast<std::uint16_t>(
               std::clamp(readFloat(s, "memoryCapacity", 8.0f), 0.0f, 64.0f))),
           visitedCapacity_(static_cast<std::size_t>(
-              std::clamp(readFloat(s, "visitedCapacity", 5.0f), 0.0f, 64.0f))) {
+              std::clamp(readFloat(s, "visitedCapacity", 5.0f), 0.0f, 64.0f))),
+          stallSecondsDefault_(readFloat(s, "stallSeconds", 0.0f)),
+          stallDistance_(std::max(0.01f, readFloat(s, "stallDistance", 1.5f))) {
         if (s != nullptr && s->is_object() && s->contains("considerers") &&
             (*s)["considerers"].is_array()) {
             for (const auto& entry : (*s)["considerers"]) {
@@ -2072,8 +2113,13 @@ public:
         margin_ = &params.add(floatDesc(prefix + "margin", marginDefault_, 0.0f, 100.0f));
         memorySeconds_ =
             &params.add(floatDesc(prefix + "memorySeconds", memorySecondsDefault_, 0.0f, 600.0f));
+        // ADR-225: an authored number the engine reads once from the JSON is a decoration. This
+        // one in particular wants to be drivable, because "how long before a character gives up"
+        // is the first thing anybody watching will want to turn.
+        stallSeconds_ =
+            &params.add(floatDesc(prefix + "stallSeconds", stallSecondsDefault_, 0.0f, 600.0f));
         paths_ = {prefix + "hertz", prefix + "dwellTicks", prefix + "margin",
-                  prefix + "memorySeconds"};
+                  prefix + "memorySeconds", prefix + "stallSeconds"};
         // Every considerer's knobs, under its own name. ADR-225: a weight an author wrote in a
         // scene file and the engine then read once from the JSON would be a decoration, not a
         // setting -- it could not be keyframed, modulated, saved or driven by a signal, which is
@@ -2092,9 +2138,13 @@ public:
         selector_.reset();
         memory_.reset();
         visited_.clear();
+        stallFrom_ = glm::vec3(0.0f);
+        stallSince_ = 0.0;
+        stallStarted_ = false;
         scored_.clear();
         queue_ = nullptr;
         lastMargin_ = 0.0f;
+        stalls_ = 0;
     }
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
@@ -2133,6 +2183,72 @@ public:
         // one, whose tick index may legitimately be the same 0 the selector starts at. Testing the
         // index alone left the first decision's options invisible, which is the one decision a
         // person watching a character start up is most likely to be looking at.
+        // **The stall breaker (ADR-340), off unless a scene asks for it.**
+        //
+        // `Selector::select` hands the queue new actions only when the committed option
+        // *changes*, and `remember` is likewise called only on a change -- both for good reasons
+        // recorded where they are written. Together they close a loop that a body cannot get out
+        // of on its own:
+        //
+        //     the committed goal becomes unreachable, so the body stops moving
+        //     -> its position stops changing, so every option's score stops changing
+        //     -> the same option keeps winning, so `select` returns false
+        //     -> nothing is pushed and nothing is remembered, and the body never moves again.
+        //
+        // Measured on `glowmere-valley-3`: the `scout` committed to a glow patch 31 m away at
+        // t = 78 s with a score of 1.338 and reported **1.338 at every ten-second sample from
+        // t = 80 to t = 180**, standing still the whole time. Four of five bodies had stopped by
+        // t = 90 in a 180-second run.
+        //
+        // The break is: a body that has not moved `stallDistance` in `stallSeconds` **remembers
+        // where its plan was taking it** and forgets its commitment. Remembering the *goal* is
+        // the opposite of what `remember` does on a change, and deliberately: recording a
+        // destination on departure devalues the errand you have just set out on (the comment on
+        // `remember` says what that cost), while recording one you have failed to reach is
+        // exactly the fact the goal model wants -- `goalWeight` then discounts it to
+        // `noveltyPenalty` of its weight and something else wins.
+        //
+        // Off by default (`stallSeconds` 0) because no scene in this repository asked for it
+        // before valley 3 and a behaviour that changes under everyone is not a fix.
+        const float stallSeconds = stallSeconds_ != nullptr ? stallSeconds_->value()
+                                                            : stallSecondsDefault_;
+        if (stallSeconds > 0.0f) {
+            const glm::vec3 here = state.position();
+            if (!stallStarted_) {
+                stallFrom_ = here;
+                stallSince_ = ctx.time;
+                stallStarted_ = true;
+            } else if (glm::length(glm::vec2(here.x - stallFrom_.x, here.z - stallFrom_.z)) >=
+                       stallDistance_) {
+                stallFrom_ = here;
+                stallSince_ = ctx.time;
+            } else if (ctx.time - stallSince_ >= static_cast<double>(stallSeconds)) {
+                // Where the plan was going: the first Move in the committed option's action list.
+                // A committed option with no Move in it is a body that chose to stand still --
+                // `idle`, or a `holdPost` already on its post -- and standing still is then not a
+                // stall, so only the body's own position is recorded.
+                const std::size_t chosen = selector_.chosen();
+                bool rememberedGoal = false;
+                if (chosen < selector_.options().size()) {
+                    for (const ActionDesc& a : selector_.options()[chosen].actions) {
+                        if (a.kind == ActionKind::Move && a.target.kind == TargetKind::Point) {
+                            remember(a.target.point);
+                            rememberedGoal = true;
+                            break;
+                        }
+                    }
+                }
+                if (!rememberedGoal) {
+                    remember(here);
+                }
+                ++stalls_;
+                selector_.forget();
+                stallFrom_ = here;
+                stallSince_ = ctx.time;
+                dctx.visited = visited_; // the discount applies on this tick, not the next
+            }
+        }
+
         const std::uint64_t before = selector_.tick();
         const bool startedBefore = selector_.started();
         const bool changed = selector_.select(dctx, views_);
@@ -2171,6 +2287,7 @@ public:
         out.dwellRejections = counts.dwellRejections;
         out.marginRejections = counts.marginRejections;
         out.remembered = memory_.remembered();
+        out.stalls = stalls_;
         return true;
     }
 
@@ -2235,6 +2352,13 @@ private:
     }
 
     float hertzDefault_, dwellDefault_, marginDefault_, memorySecondsDefault_;
+    float stallSecondsDefault_ = 0.0f;
+    float stallDistance_ = 1.5f;
+    params::Parameter<float>* stallSeconds_ = nullptr;
+    glm::vec3 stallFrom_{0.0f};
+    double stallSince_ = 0.0;
+    bool stallStarted_ = false;
+    std::size_t stalls_ = 0;
     std::uint16_t memoryCapacity_ = 8;
     std::size_t visitedCapacity_ = 5;
     params::Parameter<float>* hertz_ = nullptr;

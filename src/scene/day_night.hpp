@@ -1,6 +1,6 @@
 #pragma once
 
-// One authoritative time of day, and everything the environment derives from it (ADR-341).
+// One authoritative time of day, and everything the environment derives from it (ADR-343).
 //
 // The brief's requirement is that a single normalised `dayPhase` drives the sky, the sun, the
 // moonlight, the stars, the atmosphere, the environment maps, the water and the tree's

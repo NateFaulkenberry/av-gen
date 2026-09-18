@@ -5294,7 +5294,7 @@ void Composition::observeCameraEvents(double seconds) {
 }
 
 void Composition::applyParameters() {
-    // ADR-341. Resolved first because the node loop below needs `glowScale` and `starBrightness`,
+    // ADR-343. Resolved first because the node loop below needs `glowScale` and `starBrightness`,
     // and written last (at the end of this function) because the sky and the lights it owns are
     // set by the blocks in between. One phase, one state, one frame.
     if (dayNight_.enabled) {
@@ -5339,7 +5339,7 @@ void Composition::applyParameters() {
         const bool visible = nodeVisible(node);
         float emissiveBoost =
             node.emissiveParam != nullptr ? node.emissiveParam->value() : node.emissiveBoost;
-        // ADR-341: the cycle scales the nodes the scene named as stars and as Glowmere layers.
+        // ADR-343: the cycle scales the nodes the scene named as stars and as Glowmere layers.
         // Multiplying the boost rather than replacing it is what keeps the authored per-layer
         // intensities independently controllable, which the brief asks for explicitly.
         if (dayNight_.enabled) {
@@ -5896,7 +5896,7 @@ void Composition::applyParameters() {
     applyDayNight();
 }
 
-// ADR-341: the cycle has the last word on the fields it owns. It runs after the sky block and the
+// ADR-343: the cycle has the last word on the fields it owns. It runs after the sky block and the
 // environment block above deliberately -- an author's static sky colour is the value the cycle
 // starts from when it is off, and is overwritten when it is on, rather than the two fighting.
 void Composition::applyDayNight() {
@@ -7120,7 +7120,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(map.error());
         }
         comp->environmentPath_ = *map;
-        // ADR-341: the day/night cycle. Absent or `enabled: false` leaves the environment exactly
+        // ADR-343: the day/night cycle. Absent or `enabled: false` leaves the environment exactly
         // as it was, so every existing scene is untouched by this.
         if (e.contains("dayNight") && e.at("dayNight").is_object()) {
             const json& d = e.at("dayNight");
