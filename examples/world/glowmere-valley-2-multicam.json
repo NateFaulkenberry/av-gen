@@ -3700,7 +3700,6 @@
       3.5999999046325684,
       3.5999999046325684
     ],
-    "nodes/goat-14/visible": false,
     "nodes/goat-5/emissiveBoost": 0.0,
     "nodes/goat-5/lightColor": [
       1.0,
@@ -4879,7 +4878,6 @@
       1.0,
       1.0
     ],
-    "nodes/visitor-beam/visible": true,
     "nodes/visitor/emissiveBoost": 1.0,
     "nodes/visitor/lightColor": [
       1.0,
@@ -5454,7 +5452,7 @@
     "particles/visitor-beam/drag": 0.05000000074505806,
     "particles/visitor-beam/emissive": 0.44999998807907104,
     "particles/visitor-beam/enabled": true,
-    "particles/visitor-beam/extent": 0.053846150636672974,
+    "particles/visitor-beam/extent": 1.0,
     "particles/visitor-beam/gravity": [
       0.0,
       -0.3499999940395355,
@@ -5470,7 +5468,7 @@
     "particles/visitor-beam/size": 1.0,
     "particles/visitor-beam/spawnRate": 0.0,
     "particles/visitor-beam/speed": 1.0,
-    "particles/visitor-beam/spread": 0.12800000607967377,
+    "particles/visitor-beam/spread": 0.041999999433755875,
     "particles/visitor-beam/stretch": 4.5,
     "particles/visitor-beam/trailWidth": 1.0,
     "particles/visitor-beam/turbulence": 0.1599999964237213,
