@@ -1,11 +1,16 @@
 #include "assets/image.hpp"
 
+#include "assets/exr.hpp"
+
 #include <stb_image.h>
 #include <stb_image_write.h>
 
+#include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <string>
 #include <utility>
 
 namespace avgen::assets {
@@ -19,6 +24,16 @@ struct StbiFree {
 };
 template <typename T>
 using StbiPtr = std::unique_ptr<T, StbiFree>;
+
+// Case-insensitive ".exr" test on the extension. An HDRI can arrive with any capitalisation and
+// the one that prompted this arrived lower-case; matching only lower-case would have worked today
+// and failed on the next asset.
+bool isExrPath(const std::filesystem::path& path) {
+    std::string ext = path.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return ext == ".exr";
+}
 
 // stb_image reports failure reasons through a global string; snapshot it immediately after a failed call.
 std::string failureReason() {
@@ -121,6 +136,20 @@ Result<scene::TextureData> loadImage(const std::filesystem::path& path, bool srg
         return fail("image file not found: '{}'", path.string());
     }
     std::string name = path.filename().string();
+    // EXR goes to tinyexr, which this module already links for `writeExr`. stb_image has no EXR
+    // decoder at all, so before this an `.exr` fell through to `decodeLdrFile` and came back
+    // "unknown image type" -- which is what an `--env foo.exr` or a scene `environment.map`
+    // pointing at an EXR did, and it failed *initialisation* rather than degrading. The asset
+    // catalogue has classified `.exr` as an "environment" the whole time (asset_catalog.cpp),
+    // so the format was advertised and not readable.
+    if (isExrPath(path)) {
+        auto exr = readExr(path);
+        if (!exr) {
+            return std::unexpected(exr.error());
+        }
+        exr->name = std::move(name);
+        return exr;
+    }
     if (stbi_is_hdr(path.string().c_str()) != 0) {
         return decodeHdrFile(path, std::move(name));
     }

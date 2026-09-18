@@ -20,6 +20,12 @@ cmake-build-*/
 # Skies (ADR-049): the .hdr files are hundreds of megabytes; assets/hdri/manifest.json records
 # which ones and at what resolution, and the fetcher restores them.
 /assets/hdri/*.hdr
+# Environment maps (ADR-340): the BlenderKit HDRIs and the runtime copies derived from
+# them. assets/environments.manifest.json records the provenance and
+# tools/import_hdri.py regenerates the derived files from the BlenderKit cache.
+/assets/environments/*.exr
+/assets/environments/*.hdr
+
 
 # Generated benchmark scene variants (tools/make_bench_scenes.py); derived from
 # examples/world/terrain.scene.json
