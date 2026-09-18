@@ -3071,3 +3071,83 @@ TEST_CASE("the wade depth is authorable and defaults to the old rule", "[scene][
     bad["navWadeDepth"] = 40.0;
     CHECK_FALSE(scene::Composition::fromJson(bad, registry).has_value());
 }
+
+// ---- the texture version (ADR-272) ------------------------------------------------------------
+
+TEST_CASE("a flatten bumps the texture version only when a texture changed",
+          "[scene][composition][textures]") {
+    // `Scene::textureVersion` is the renderer's "destroy and re-create every GPU texture" signal,
+    // and a flatten used to bump it whichever edit caused the flatten. Measured on Glowmere: 528
+    // texture uploads over 12 flattens for starring a hero and 704 over 16 for a brush edit -- 44 a
+    // flatten in both, because the number was a property of flattening and not of the edit. Neither
+    // edit touches an image.
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(tempDir());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "tex");
+    comp.attach(params, modulator);
+
+    const auto addOrb = [&](const char* name) {
+        scene::CompositionNode node;
+        node.name = name;
+        node.kind = scene::NodeKind::Orb;
+        REQUIRE(comp.addNode(std::move(node)).has_value());
+    };
+
+    addOrb("orb1");
+    comp.update(FrameTime{}); // flattens
+    const std::uint64_t afterFirst = comp.scene().textureVersion;
+    const std::uint64_t meshesAfterFirst = comp.scene().meshVersion;
+
+    // A second structural edit, a second flatten, and no texture anywhere near it.
+    addOrb("orb2");
+    comp.update(FrameTime{});
+    CHECK(comp.scene().textureVersion == afterFirst);
+
+    SECTION("control: the mesh version still moves, so the flatten really happened") {
+        CHECK(comp.scene().meshVersion != meshesAfterFirst);
+    }
+
+    SECTION("control: adding a texture directly still moves it") {
+        // The other half of the contract, unchanged: `Scene::addTexture` is what "a texture
+        // changed" means, and it has always said so.
+        scene::TextureData t;
+        t.name = "one";
+        t.width = 1;
+        t.height = 1;
+        t.data = {1, 2, 3, 4};
+        const std::uint64_t before = comp.scene().textureVersion;
+        comp.scene().addTexture(t);
+        CHECK(comp.scene().textureVersion != before);
+    }
+}
+
+TEST_CASE("the texture digest answers to a single texel", "[scene][composition][textures]") {
+    // The arm that fails if the digest above ever hashes nothing. Without it "the version did not
+    // move" is indistinguishable from "the version can never move", which is the defect the
+    // conditional bump would introduce rather than the one it removes (ADR-182).
+    const auto table = [](std::uint8_t last) {
+        scene::TextureData t;
+        t.name = "albedo";
+        t.width = 4;
+        t.height = 4;
+        t.format = scene::TextureFormat::Rgba8Srgb;
+        t.data.assign(4 * 4 * 4, 0u);
+        t.data.back() = last;
+        return std::vector<scene::TextureData>{t};
+    };
+    CHECK(scene::textureTableDigest(table(7)) == scene::textureTableDigest(table(7)));
+    CHECK(scene::textureTableDigest(table(7)) != scene::textureTableDigest(table(8)));
+
+    // ...and to the metadata, so two images that differ only in size or name are not one image.
+    std::vector<scene::TextureData> renamed = table(7);
+    renamed.front().name = "normal";
+    CHECK(scene::textureTableDigest(table(7)) != scene::textureTableDigest(renamed));
+    std::vector<scene::TextureData> resized = table(7);
+    resized.front().width = 2;
+    resized.front().height = 8;
+    CHECK(scene::textureTableDigest(table(7)) != scene::textureTableDigest(resized));
+    // An empty table is a legal state and is not confused with a one-texture one.
+    CHECK(scene::textureTableDigest({}) != scene::textureTableDigest(table(0)));
+}
