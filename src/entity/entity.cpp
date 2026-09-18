@@ -255,7 +255,7 @@ SocketResolution Entity::socketTransform(std::string_view socket, scene::Transfo
     base.position = state_.position() + motion_.position;
     base.rotation = quatFromEulerDegrees(glm::vec3(motion_.rotation.x, motion_.rotation.y + state_.yaw * kDegrees,
                                                    motion_.rotation.z));
-    // ADR-272. The node's scale, which this read for as long as sockets existed and never included,
+    // ADR-274. The node's scale, which this read for as long as sockets existed and never included,
     // and which was invisible for exactly as long as no socket resolved through a joint: a joint
     // offset is in the *asset's* units, and the four aliens in `glowmere-valley-2` are drawn at
     // 3.344x to 3.610x. Ignoring it put a hand-mounted prop at 28% of the distance out from the
@@ -273,7 +273,7 @@ SocketResolution Entity::socketTransform(std::string_view socket, scene::Transfo
     // A joint, when there is a skeleton to ask and it has the joint. Until the animation layer
     // installs one, a socket rides the entity's own frame: an approximate place is the right
     // failure for a prop that has to be somewhere, and it means a scene can be authored before the
-    // skeleton exists. What changed in ADR-272 is that the caller is now told which of the two
+    // skeleton exists. What changed in ADR-274 is that the caller is now told which of the two
     // happened -- the approximation is still offered, and it no longer passes for the answer.
     SocketResolution how = SocketResolution::EntityFrame;
     if (skeleton_ != nullptr && !it->joint.empty()) {

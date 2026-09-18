@@ -98,7 +98,7 @@ public:
 // character -- approximate being the right failure for a prop that has to be somewhere.
 //
 // **The frame this answers in is the rig's model space, which is the entity's own frame, and not
-// the world** (ADR-272). The method used to be called `jointWorldTransform` and its only consumer,
+// the world** (ADR-274). The method used to be called `jointWorldTransform` and its only consumer,
 // `Entity::socketTransform`, composed the answer *onto* the entity's frame -- so the name promised
 // world space and the one use demanded entity space, and nothing implemented it, so nothing ever
 // had to choose. Three facts decide it against the name:

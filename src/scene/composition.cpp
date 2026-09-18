@@ -1733,7 +1733,7 @@ void Composition::installEntities() {
         }
         animationSinks_.push_back(std::make_unique<AnimationSink>(*this, desc.driven(), *live));
         live->setPoseSink(animationSinks_.back().get());
-        // ADR-272: and the other half of the same seam. `setSkeleton` had zero call sites for as
+        // ADR-274: and the other half of the same seam. `setSkeleton` had zero call sites for as
         // long as it existed, which is why every socket in this engine silently rode the entity's
         // own frame. One line, and it is the line between the engine and every socket, attachment,
         // carried prop and aim.
@@ -1910,7 +1910,7 @@ void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& st
     owner_.setNodeAnimation(node_, want, state.time, state.blend, state.playbackRate);
 }
 
-// ADR-272. The first implementation of `entity::ISkeletonQuery` this engine has had, and therefore
+// ADR-274. The first implementation of `entity::ISkeletonQuery` this engine has had, and therefore
 // the first frame in which a socket has ever been able to mean a joint.
 //
 // **Model space, not the palette.** `SkinnedRig::palette` entry k is `model[palette[k]] *

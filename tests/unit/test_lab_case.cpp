@@ -74,7 +74,7 @@ TEST_CASE("a lab case round-trips through JSON", "[labs][case]") {
 
 TEST_CASE("a blocked case says what it is waiting for, and an ordinary one says nothing",
           "[labs][case]") {
-    // ADR-273. `blockedBy` is what stops a lab pretending: a case that asserted a decider this
+    // ADR-275. `blockedBy` is what stops a lab pretending: a case that asserted a decider this
     // engine does not have would pass by asserting nothing. It has to survive the round trip, and
     // -- the control -- it has to stay absent on a case that never set it, or every case in the
     // suite would come back carrying an empty reason and `runnable()` would be meaningless.

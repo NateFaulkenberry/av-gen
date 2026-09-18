@@ -1,4 +1,4 @@
-// Starring an object did not survive a save, so no hero ever reached a deliverable (ADR-274).
+// Starring an object did not survive a save, so no hero ever reached a deliverable (ADR-276).
 //
 // The shape is ADR-207's and ADR-230's, for a third family. A project whose scene came from a file
 // saves that scene **by reference** -- `assets.scene.path` plus a hash of the bytes already on disk

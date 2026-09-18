@@ -253,7 +253,7 @@ struct DirectorMotion {
     bool hasSpeed = false;
 };
 
-// What answered a `socketTransform` call (ADR-272). Three outcomes, because the two that used to
+// What answered a `socketTransform` call (ADR-274). Three outcomes, because the two that used to
 // share `true` are different facts about the frame a prop is about to be put in.
 enum class SocketResolution : std::uint8_t {
     // This entity declares no socket of that name. `out` is untouched.
@@ -301,7 +301,7 @@ public:
 
     // Where an attached prop should sit, and -- the half that was missing -- *what answered*.
     //
-    // ADR-272. This used to return a bare `bool`, and it returned `true` for a socket resolved
+    // ADR-274. This used to return a bare `bool`, and it returned `true` for a socket resolved
     // against a real posed joint and `true` for one that fell back to the entity's own frame
     // because nothing had installed an `ISkeletonQuery`. Since nothing ever did, every socket in
     // this engine took the fallback and said it had not: a beam authored onto a hand was drawn at

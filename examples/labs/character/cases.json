@@ -2,14 +2,14 @@
  "format": "avgen-lab-cases",
  "version": 1,
  "lab": "character",
- "_note": "The Character Intelligence Lab's reproducible configurations (ADR-273). Cases 1-6 can be run today. Cases 7-9 are three of the six scenarios the owner's brief asked for, and they name the unit of docs/character-ai-plan.md that has to land before they mean anything: nine of the twelve proposed layers already existed, and the three that did not are exactly perception, a decider and an animation layer stack. A case that asserted a decider this engine does not have would pass by asserting nothing, which is the failure the suite was built to prevent; `--lab-case character:7` refuses and names what it is waiting for.",
+ "_note": "The Character Intelligence Lab's reproducible configurations (ADR-275). Cases 1-6 can be run today. Cases 7-9 are three of the six scenarios the owner's brief asked for, and they name the unit of docs/character-ai-plan.md that has to land before they mean anything: nine of the twelve proposed layers already existed, and the three that did not are exactly perception, a decider and an animation layer stack. A case that asserted a decider this engine does not have would pass by asserting nothing, which is the failure the suite was built to prevent; `--lab-case character:7` refuses and names what it is waiting for.",
  "cases": [
   {
    "lab": "character",
    "number": 1,
    "title": "A socket on a hand is on the hand",
    "question": "Does a prop attached to a character's hand socket go where the hand is, and can the engine tell that answer from its own fallback?",
-   "expectation": "`scout` carries four sockets. `hand` names the joint `hand.r` and resolves 2.878 m from the body's own frame; `head` names `head.x` and resolves 4.218 m from it and 1.8 m from the hand. `chest` names no joint and resolves against the entity frame with the skeleton installed, and `tail` names a joint no rig here carries and does the same -- both reported as `SocketResolution::EntityFrame` rather than as success. The lantern node is attached to `hand` and is drawn there. Before ADR-272 every one of the four gave the same answer and all four returned true.",
+   "expectation": "`scout` carries four sockets. `hand` names the joint `hand.r` and resolves 2.878 m from the body's own frame; `head` names `head.x` and resolves 4.218 m from it and 1.8 m from the hand. `chest` names no joint and resolves against the entity frame with the skeleton installed, and `tail` names a joint no rig here carries and does the same -- both reported as `SocketResolution::EntityFrame` rather than as success. The lantern node is attached to `hand` and is drawn there. Before ADR-274 every one of the four gave the same answer and all four returned true.",
    "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
    "timeSeconds": 0.0,
    "size": [

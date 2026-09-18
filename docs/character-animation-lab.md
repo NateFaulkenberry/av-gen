@@ -126,7 +126,7 @@ a character's height would depend on where the camera is, and a scrub would stop
 * **Authored slopes** — ground comes only from `WorldMap`, an analytic noise field. A clean 10°/20°/
   30°/40° ramp cannot be authored; the slope tests instead *search* the real map for points at those
   angles, which has the advantage of testing the production terrain path.
-* **Joint attachment** — *was* the gap here, and is closed (ADR-272). `ISkeletonQuery` is implemented
+* **Joint attachment** — *was* the gap here, and is closed (ADR-274). `ISkeletonQuery` is implemented
   by `Composition::AnimationSink` over `SkinnedRig::pose`, `Entity::setSkeleton` is called for every
   entity that drives a node, and the method is now `jointTransform` because it answers in the rig's
   **model space, which is the entity's own frame** — not world. See below.
@@ -142,7 +142,7 @@ it is simply not wired.
 * It resolves through `Entity::setSkeleton(const ISkeletonQuery*)`, which
   `Composition::installEntities` now calls. It returns `entity::SocketResolution` — `None`,
   `EntityFrame` or `Joint` — so a consumer can tell a real joint answer from the fallback, which it
-  could not before ADR-272: every socket in the engine took the fallback and returned `true` on it.
+  could not before ADR-274: every socket in the engine took the fallback and returned `true` on it.
   The fallback is still offered, because a prop has to be somewhere and a scene must be authorable
   before its skeleton exists; `resolved()` is the predicate the old `bool` meant.
 * The node's **scale** is part of the answer. A joint offset is in the asset's own units and Glowmere

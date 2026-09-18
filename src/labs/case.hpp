@@ -84,7 +84,7 @@ struct LabCase {
     // The unit that has to land before this case can be run at all, or empty when it can be run
     // today. `"P2 perception"`, `"P3 decision"`.
     //
-    // ADR-273. The Character Intelligence Lab was asked for six scenarios and three of them --
+    // ADR-275. The Character Intelligence Lab was asked for six scenarios and three of them --
     // investigating a thing it noticed, reacting to another character, choosing between two urges
     // -- require a perception layer and a decider, neither of which exists. §37 is the rule that a
     // lab must not pretend: a case asserting a decider that does not exist would pass by asserting

@@ -1,4 +1,4 @@
-# ADR-273: A lab case that cannot be run says what it is waiting for
+# ADR-275: A lab case that cannot be run says what it is waiting for
 
 **Status:** Accepted
 **Date:** 2026-09-18

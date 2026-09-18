@@ -1,4 +1,4 @@
-// The Character Intelligence Lab (ADR-273): what the fixture can answer today, and the arms that
+// The Character Intelligence Lab (ADR-275): what the fixture can answer today, and the arms that
 // make each answer mean something.
 //
 // The owner's brief asked for six scenarios -- wandering, investigating a mushroom, crossing a
@@ -189,7 +189,7 @@ TEST_CASE("the Character Intelligence Lab is registered and its cases resolve",
     REQUIRE(cases.has_value());
     CHECK(cases->size() >= 6);
 
-    // ADR-273: a case that cannot be run says what it is waiting for, and one that can says
+    // ADR-275: a case that cannot be run says what it is waiting for, and one that can says
     // nothing. Both halves are asserted, because a file in which every case were blocked would
     // satisfy the first check alone and would be a lab that does nothing.
     std::size_t runnable = 0;

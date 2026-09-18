@@ -1,4 +1,4 @@
-// Character Intelligence Lab -- sockets, and the skeleton query underneath them (ADR-272).
+// Character Intelligence Lab -- sockets, and the skeleton query underneath them (ADR-274).
 //
 // The defect this file exists because of is not that sockets were wrong. It is that they were
 // wrong and said they were right. `Entity::socketTransform` resolved a socket against the entity's
@@ -147,7 +147,7 @@ TEST_CASE("a socket on a joint resolves to the joint, and one without a joint sa
     CHECK(chestHow == entity::SocketResolution::EntityFrame);
 
     // ---- arm D: a socket naming a joint the rig does not carry ----
-    // Before ADR-272 this was indistinguishable from arm B: both returned `true` and both put the
+    // Before ADR-274 this was indistinguishable from arm B: both returned `true` and both put the
     // prop at the body. A typo in a scene file was a silent 1.2 m error.
     CHECK(tailHow == entity::SocketResolution::EntityFrame);
 
@@ -184,7 +184,7 @@ TEST_CASE("without a skeleton every socket is the entity frame, and says so",
         WARN("assets/aliens is not present; the socket arms need a real rig");
         return;
     }
-    // Arm A. The engine as it stood before ADR-272, reproduced by taking the skeleton back off the
+    // Arm A. The engine as it stood before ADR-274, reproduced by taking the skeleton back off the
     // one entity that has one. Every socket then gives the same answer -- and the old `bool` return
     // called that answer success.
     Fixture fx;
@@ -290,7 +290,7 @@ TEST_CASE("the socket agrees with the joint position computed from first princip
     // The independent arm. Every check above asks `socketTransform` what it thinks; this one
     // re-derives the answer without it -- read the rig's pose, run `poseToModel` (the method
     // `tests/support/stride_speed.hpp::jointPositionAt` uses, and the only working model-space joint
-    // query this repository had, test-only, before ADR-272), then place it by hand: scale by the
+    // query this repository had, test-only, before ADR-274), then place it by hand: scale by the
     // node's scale, rotate by the body's yaw, translate to the body.
     //
     // If `AnimationSink::jointTransform` read the GPU palette instead of the pose, or if
@@ -337,7 +337,7 @@ TEST_CASE("the socket agrees with the joint position computed from first princip
     CHECK(gap < 1.0e-3f);
 
     // The control: the same re-derivation with the scale left out, which is what the engine did
-    // before ADR-272, must *not* agree. An arm that passed either way would be checking nothing.
+    // before ADR-274, must *not* agree. An arm that passed either way would be checking nothing.
     const glm::vec3 unscaled(local.x * c + local.z * sn, local.y, -local.x * sn + local.z * c);
     const float unscaledGap = glm::length(hand.position - (scout->visualPosition() + unscaled));
     INFO(fmt::format("the scale-blind re-derivation is {:.4f} m away", unscaledGap));
@@ -389,7 +389,7 @@ TEST_CASE("the attachment lands on the socket", "[labs][character][sockets]") {
     }
     // The end of the chain the lab exists to check: a node declared as an attachment on a socket is
     // written by `EntityWorld::applyAttachments` into that node's transform parameters. Before
-    // ADR-272 the lantern below sat at the body's origin, on every frame, and reported success.
+    // ADR-274 the lantern below sat at the body's origin, on every frame, and reported success.
     //
     // **One frame of lag, stated rather than hidden.** `applyAttachments` runs inside
     // `updateBehaviour`; the rigs are posed later, in `Composition::update`. So the pose an

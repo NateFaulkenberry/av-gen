@@ -1,4 +1,4 @@
-# ADR-272: A joint transform is entity-local, and until something implemented it nothing had to choose
+# ADR-274: A joint transform is entity-local, and until something implemented it nothing had to choose
 
 **Status:** Accepted
 **Date:** 2026-09-18

@@ -1,4 +1,4 @@
-# ADR-274: A star is project data, and until now it never reached a render
+# ADR-276: A star is project data, and until now it never reached a render
 
 **Status:** Accepted
 **Date:** 2026-09-18

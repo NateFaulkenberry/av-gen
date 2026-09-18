@@ -1022,7 +1022,7 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
             })) {
             doc["atmosphericEffects"] = std::move(liveAtmos);
         }
-        // ADR-274, and it is the same defect a third time. Starring an object in the world editor
+        // ADR-276, and it is the same defect a third time. Starring an object in the world editor
         // calls `Composition::setHeroes`; the composition is saved **by reference**; so the star
         // lived in the window and in no document any render reads. Measured on the owner's own
         // session: one hero starred, one hero in the composition, **zero** after a save and a
@@ -1524,7 +1524,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     // Over rather than instead of: the scene file is still the state that runs first (ADR-264), and
     // an absent key changes nothing. A present one is the session's answer, including an empty array,
     // which is how a deleted effect stays deleted.
-    // ADR-274: the session's heroes, over the ones its scene authors. **Before** the world effects,
+    // ADR-276: the session's heroes, over the ones its scene authors. **Before** the world effects,
     // and not by taste: a `WorldEffect` may name a hero as its source, and `Composition::setHeroes`
     // is what decides whether that name is real. The scene file's own reader orders them the same
     // way and says so (`composition.cpp`, "read after the heroes").

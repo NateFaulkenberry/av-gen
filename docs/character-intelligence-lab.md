@@ -8,7 +8,7 @@ Cases: `examples/labs/character/cases.json`, reachable as `avgen --lab-case char
 Tests: `tests/unit/test_character_intelligence_lab.cpp`, `tests/unit/test_character_lab_sockets.cpp`.
 
 Companion reading, in this order: `docs/character-ai-research.md` (what already exists),
-`docs/character-ai-plan.md` (the units and who owns which file), ADR-266 to ADR-273.
+`docs/character-ai-plan.md` (the units and who owns which file), ADR-266 to ADR-275.
 
 ---
 
@@ -47,7 +47,7 @@ social interaction, a dense environment, a long-running simulation.
 | 9 | crossing a river | blocked on **P3 decision** |
 
 A blocked case carries `blockedBy` naming the unit of `docs/character-ai-plan.md` that unblocks it
-(ADR-273). `--lab-case character:7` refuses and prints the unit rather than opening the fixture: a
+(ADR-275). `--lab-case character:7` refuses and prints the unit rather than opening the fixture: a
 person who came to watch a character investigate something would otherwise be shown a scene in which
 that is not happening, and left to work out why.
 
@@ -95,7 +95,7 @@ is for.
 ## 3. What the fixture measured that nothing had
 
 **A socket answered the body's origin and called it a joint.** `Entity::setSkeleton` had zero call
-sites, so every socket in this engine took the fallback and returned `true` on it. ADR-272. The hand
+sites, so every socket in this engine took the fallback and returned `true` on it. ADR-274. The hand
 socket sits 2.878 m from the body's frame with the skeleton installed and 0.000 m from it without;
 the two jointed sockets agree bit-for-bit when the skeleton is removed, which is the signature of a
 fallback and is what the good arm must not have.

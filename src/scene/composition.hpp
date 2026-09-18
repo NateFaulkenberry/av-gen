@@ -1060,7 +1060,7 @@ private:
     void cullEntityNodes();
 
     // Turns a behaviour's Activity into an animation state on the node it drives (ADR-086/087),
-    // and answers where that node's joints are (ADR-272).
+    // and answers where that node's joints are (ADR-274).
     //
     // Both halves of the seam in one object because both need the same one fact and nothing else:
     // which node this entity drives. Only the composition knows which node holds which rig, so the
