@@ -69,6 +69,48 @@ int cullLodLevel(const scene::LodSettings& lod, const FrustumPlanes& planes, con
     return level;
 }
 
+int shadowCullLodLevel(const scene::LodSettings& lod, std::span<const FrustumPlanes> views,
+                       const CullCamera& camera, glm::vec3 center, float radius, float lodRadius) {
+    // One term different from `cullLodLevel`: the camera frustum test becomes "some shadow view
+    // contains this sphere". Everything else -- the distance limit, the screen-size limit and the
+    // ladder -- is evaluated identically and from the same camera, which is what makes the rung an
+    // instance casts at the rung it draws at.
+    if (lod.cull) {
+        bool seen = false;
+        for (const FrustumPlanes& planes : views) {
+            bool inside = true;
+            for (const glm::vec4& plane : planes) {
+                if (glm::dot(glm::vec3(plane), center) + plane.w < -radius) {
+                    inside = false;
+                    break;
+                }
+            }
+            seen = seen || inside;
+            if (seen) {
+                break;
+            }
+        }
+        if (!seen) {
+            return -1;
+        }
+        const float distance = glm::length(center - camera.position);
+        if (lod.maxDistance > 0.0f && distance - radius > lod.maxDistance) {
+            return -1;
+        }
+        if (lod.minScreenRadius > 0.0f &&
+            radius / std::max(distance, 1e-4f) * camera.projScale < lod.minScreenRadius) {
+            return -1;
+        }
+    }
+    // The ladder is the camera's, so an instance in both lists is on one rung. Reached through
+    // `cullLodLevel` with its rejection block switched off -- the tests above are the shadow list's
+    // versions of exactly those three -- rather than by copying the loop, because a ladder written
+    // twice is a ladder that disagrees with itself the first time somebody edits a copy (§37).
+    scene::LodSettings ladder = lod;
+    ladder.cull = false;
+    return cullLodLevel(ladder, FrustumPlanes{}, camera, center, radius, lodRadius);
+}
+
 InstanceBounds instanceBounds(const std::vector<scene::InstanceRecord>& records) {
     InstanceBounds bounds;
     if (records.empty()) {
@@ -149,6 +191,28 @@ bool objectFullyCulled(const scene::LodSettings& lod, const FrustumPlanes& plane
         return true;
     }
     return false;
+}
+
+bool objectFullyCulledForShadows(const scene::LodSettings& lod, std::span<const FrustumPlanes> views,
+                                 const CullCamera& camera, const glm::mat4& objectToWorld,
+                                 const InstanceBounds& bounds, float sourceRadius, bool limitDistance) {
+    if (!bounds.valid || !lod.cull) {
+        return false;
+    }
+    // No views is no maps: there is nothing for this object to be drawn into, and the shadow half
+    // of its cull is skipped entirely.
+    if (views.empty()) {
+        return true;
+    }
+    // Every view has to reject the whole object. `objectFullyCulled` is reused per view rather than
+    // reimplemented: its distance and screen-size terms are the same ones the shadow classification
+    // applies, and its frustum term is the only one that differs between views.
+    for (const FrustumPlanes& planes : views) {
+        if (!objectFullyCulled(lod, planes, camera, objectToWorld, bounds, sourceRadius, limitDistance)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 

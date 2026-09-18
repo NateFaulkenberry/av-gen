@@ -2932,6 +2932,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // is rung 0 and is untouched.
         procedurals_->setFlatTierFromRung(qualitySettings_.materialTiers ? qualitySettings_.flatTierFromRung
                                                                         : -1);
+        // ADR-287: the frame's shadow views, for the ecology's own caster list. The same plane sets
+        // the entity second cull above is built from -- handed over rather than fitted again, so
+        // the two caster rules cannot disagree about a volume (§37). An empty span (shadows off, or
+        // no light that casts) is how the renderer says there is nothing to cast into, and the
+        // ecology's shadow indirect draws are then not recorded at all.
+        procedurals_->setShadowViews(viewPlanes);
         procedurals_->update(encoder, scene, identity, time, fields_.get(), splines_.get());
         stats_.procedural = procedurals_->stats();
     }
@@ -3669,7 +3675,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         log::info("submitted: camera {} tris / {} inst / {} draws ({} estimated, {} unmeasured); "
                   "depth {} / {} / {}; shadow {} / {} / {} over {} casters; logical {} tris / {} inst; "
                   "binds {}pipe {}group {}vb {}ib ({} redundant avoided); passes {}render {}compute "
-                  "{}unclassified; shadow split: ecology {} tris / {} inst, entities {} tris / {} inst",
+                  "{}unclassified; shadow split: ecology {} tris / {} inst, entities {} tris / {} inst; "
+                  "ecology cull: {} records, {} visible, {} casting",
                   g.camera.triangles, g.camera.instances, g.camera.draws, g.camera.estimatedDraws,
                   g.camera.unmeasuredDraws, g.depth.triangles, g.depth.instances, g.depth.draws,
                   g.shadow.triangles, g.shadow.instances, g.shadow.draws, stats_.shadowCasters,
@@ -3685,7 +3692,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                   // camera's geometry" cannot be turned into a decision about what to change.
                   procShadow.triangles, procShadow.instances,
                   g.shadow.triangles - procShadow.triangles,
-                  g.shadow.instances - procShadow.instances);
+                  g.shadow.instances - procShadow.instances,
+                  // ADR-287. The three numbers the ecology's caster gap was invisible in: how many
+                  // instances the cull looked at, how many the camera kept, and how many the shadow
+                  // maps are drawn from. The last two were ONE number until the second list existed
+                  // -- 496 and 496 on this scene -- and nothing printed could have said so.
+                  stats_.procedural.culledInstances + stats_.procedural.visibleInstances,
+                  stats_.procedural.visibleInstances, stats_.procedural.shadowInstances);
     }
     // AVGEN_SHADOW_STATS=1 prints everything §15 asks a shadow diagnostic to expose, per frame and
     // per view: the cascade id, the depths it covers, the volume it covers them with, its texel,

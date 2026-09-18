@@ -30,6 +30,12 @@ namespace avgen::rendering {
 namespace {
 
 constexpr std::uint32_t kMaxProceduralObjects = 256; // 256-byte slots in one uniform buffer
+// ADR-287: the shadow caster list's indirect-args and stats slots live in the same two buffers as
+// the camera list's, offset by this. One buffer rather than two, because ADR-051 measured the cost
+// per distinct indirect buffer a pass reads and this frame reads one in five passes; the slot is an
+// offset and costs nothing per draw.
+constexpr std::uint32_t kShadowSlotBase = kMaxProceduralObjects;
+constexpr std::uint32_t kCullSlots = kMaxProceduralObjects * 2;
 constexpr std::uint32_t kObjectStride = SceneRenderer::kObjectStride; // dynamic-offset alignment
 constexpr std::uint32_t kInstanceStride = sizeof(scene::InstanceRecord); // 96
 constexpr std::uint32_t kEffectorWorkgroup = 64;     // points.wgsl cs_effectors
@@ -45,6 +51,9 @@ constexpr std::uint32_t kDeformerSlotStride = ((sizeof(ProceduralUniforms) + 255
 // aligned, so each level's slice is a whole number of 64 u32 blocks.
 constexpr std::uint32_t kVisibleAlign = 64;
 static_assert(kInstanceStride == 96);
+static_assert(kMaxShadowCullViews == kMaxShadowViews,
+              "the cull pass tests every shadow view the atlas can hold; shaders/cull.wgsl "
+              "kMaxShadowCullViews sizes the array");
 static_assert(sizeof(ObjectUniforms) <= kObjectStride);
 static_assert(kDeformerSlotStride % 256 == 0);
 
@@ -169,6 +178,11 @@ struct ProceduralRenderer::Impl {
         // culling is exactly the pre-culling group (visible list = the shared inert placeholder).
         std::array<wgpu::BindGroup, scene::kMaxLodLevels> groups{};
         std::array<wgpu::BindGroup, scene::kMaxLodLevels> groupsLive{};
+        // ADR-287: the same groups over the shadow caster list's slices of `visible`. A draw group
+        // binds ONE level's slice, so the second list needs its own -- this is the "bind groups per
+        // object" half of the cost the Shadow Lab priced.
+        std::array<wgpu::BindGroup, scene::kMaxLodLevels> shadowGroups{};
+        std::array<wgpu::BindGroup, scene::kMaxLodLevels> shadowGroupsLive{};
         wgpu::BindGroup computeGroup;           // effector pass
         bool usesLive = false;                  // this frame's draw reads the live buffer
         // Culling / LOD (ADR-029); allocated only for objects that use it.
@@ -183,7 +197,13 @@ struct ProceduralRenderer::Impl {
         // encoding anything, that the cull pass would reject every record (see objectFullyCulled).
         InstanceBounds bounds;
         std::uint32_t cullCapacity = 0;         // records the cull buffers are sized for
-        std::uint32_t cullLodCount = 0;         // levels the cull buffers are sized for
+        std::uint32_t cullLodCapacity = 0;      // levels the cull buffers are SIZED for (grow-only)
+        std::uint32_t cullLodCount = 0;
+        // Levels this frame's cull pass actually uses, which is where the shadow caster list's
+        // slices begin (shaders/cull.wgsl `sliceOf` reads it out of `counts.y`). Kept apart from
+        // the capacity above because the allocation is grow-only and this is not: an object that
+        // loses a rung would otherwise have the shader writing its caster list at one slice base
+        // while the draw groups read another, and its ecology shadows would quietly stop.
         std::uint32_t visibleStride = 0;        // elements per level in `visible`
         std::uint32_t statsSlot = 0;            // slot in the shared stats buffer
         // ADR-108. The visible lists the draw groups were built against: this object's own, or the
@@ -221,6 +241,11 @@ struct ProceduralRenderer::Impl {
         // The cull pass would have zeroed every level's instance count, so nothing is recorded in
         // any pass. Provable on the CPU from the object's whole-record bounds (objectFullyCulled).
         bool fullyCulled = false;
+        // The same proof for the shadow caster list, and it is a *different* proof: an object the
+        // camera cannot see may still be inside a cascade, and an object the camera sees at 200 m
+        // is past every cascade. Before ADR-265 there was one flag, which is exactly the bug -- the
+        // camera's verdict standing in for a question nobody asked.
+        bool shadowFullyCulled = true;
         // The levels the cull pass could possibly have put a record on, from the same bounds
         // (rendering::objectLevelRange). Levels outside it are provably empty and their indirect
         // draws are not recorded; every level inside it is recorded whether or not the last
@@ -236,6 +261,9 @@ struct ProceduralRenderer::Impl {
         const ObjectState* state;
         std::uint32_t count;
         std::uint32_t lodCount;
+        // The compaction's level axis: `lodCount`, or twice it when this object also builds the
+        // shadow caster list. One dispatch chain, two lists.
+        std::uint32_t levels;
         std::uint32_t blocks;
         bool usesLive;
     };
@@ -251,7 +279,7 @@ struct ProceduralRenderer::Impl {
 
     Impl(gpu::Context& c, gpu::ShaderLibrary& s) : context(c), shaders(s) {
         staging.resize(static_cast<std::size_t>(kMaxProceduralObjects) * kObjectStride);
-        statsSnapshot.assign(static_cast<std::size_t>(kMaxProceduralObjects) * kCullStatsStride, 0u);
+        statsSnapshot.assign(static_cast<std::size_t>(kCullSlots) * kCullStatsStride, 0u);
     }
     ~Impl() {
         // A MapAsync callback carries a raw StatsSlot pointer; let every pending one complete
@@ -322,6 +350,10 @@ struct ProceduralRenderer::Impl {
     // same both ways. Whatever the backend does per distinct indirect buffer, it does it in every
     // pass that reads one, and this frame has five.
     wgpu::Buffer indirectArgs;
+    // ADR-287: this frame's shadow views, as world-space plane sets, and the uniform the cull pass
+    // reads them out of. Set by `setShadowViews` before update(); empty means no shadow maps.
+    wgpu::Buffer shadowVolumes;
+    std::vector<FrustumPlanes> shadowViewPlanes;
     gpu::FrameTimeline* timeline = nullptr;
     std::vector<std::uint8_t> staging;
     // Reused between objects: the object's LOD uniform slots, laid out contiguously for one write.
@@ -495,8 +527,9 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
     }
     {
         // Cull pass (ADR-029): 0 = params, 1 = records, 2 = lod index, 3 = block sums,
-        // 4 = visible lists, 5 = indirect args, 6 = the shared stats buffer.
-        std::array<wgpu::BindGroupLayoutEntry, 7> entries{};
+        // 4 = visible lists, 5 = indirect args, 6 = the shared stats buffer, 7 = the frame's shadow
+        // volumes (ADR-287).
+        std::array<wgpu::BindGroupLayoutEntry, 8> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Compute;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -505,7 +538,11 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         entries[1].visibility = wgpu::ShaderStage::Compute;
         entries[1].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         entries[1].buffer.minBindingSize = kInstanceStride;
-        for (std::size_t i = 2; i < entries.size(); ++i) {
+        entries[7].binding = 7;
+        entries[7].visibility = wgpu::ShaderStage::Compute;
+        entries[7].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[7].buffer.minBindingSize = sizeof(ShadowVolumeUniforms);
+        for (std::size_t i = 2; i < 7; ++i) {
             entries[i].binding = static_cast<std::uint32_t>(i);
             entries[i].visibility = wgpu::ShaderStage::Compute;
             entries[i].buffer.type = wgpu::BufferBindingType::Storage;
@@ -543,14 +580,24 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         wgpu::BufferDescriptor desc{};
         desc.label = "procedural-cull-stats";
         desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
-        desc.size = static_cast<std::uint64_t>(kMaxProceduralObjects) * kCullStatsStride * sizeof(std::uint32_t);
+        desc.size = static_cast<std::uint64_t>(kCullSlots) * kCullStatsStride * sizeof(std::uint32_t);
         im.cullStats = device.CreateBuffer(&desc);
         wgpu::BufferDescriptor idesc{};
         idesc.label = "procedural-cull-indirect";
         idesc.usage = wgpu::BufferUsage::Indirect | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst |
                       wgpu::BufferUsage::CopySrc;
-        idesc.size = static_cast<std::uint64_t>(kMaxProceduralObjects) * scene::kMaxLodLevels * kIndirectStride;
+        idesc.size = static_cast<std::uint64_t>(kCullSlots) * scene::kMaxLodLevels * kIndirectStride;
         im.indirectArgs = device.CreateBuffer(&idesc);
+        wgpu::BufferDescriptor sdesc{};
+        sdesc.label = "procedural-cull-shadow-volumes";
+        sdesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+        sdesc.size = sizeof(ShadowVolumeUniforms);
+        im.shadowVolumes = device.CreateBuffer(&sdesc);
+        // Zeroed: a frame that never calls setShadowViews has no shadow views, and an object whose
+        // cull group is built before the first write must read "no views" rather than whatever the
+        // driver left there.
+        const ShadowVolumeUniforms empty{};
+        im.context.queue().WriteBuffer(im.shadowVolumes, 0, &empty, sizeof(empty));
         for (Impl::StatsSlot& slot : im.statsSlots) {
             wgpu::BufferDescriptor readDesc{};
             readDesc.label = "procedural-cull-stats-read";
@@ -609,6 +656,14 @@ Result<void> ProceduralRenderer::reload() {
 void ProceduralRenderer::setViewport(std::uint32_t width, std::uint32_t height) {
     impl_->viewportWidth = std::max(width, 1u);
     impl_->viewportHeight = std::max(height, 1u);
+}
+
+void ProceduralRenderer::setShadowViews(std::span<const FrustumPlanes> views) {
+    // Kept rather than uploaded here: update() has to know the count before it decides which
+    // objects build a shadow list at all, and the upload is one write it can make beside the rest.
+    impl_->shadowViewPlanes.assign(views.begin(),
+                                   views.begin() + static_cast<std::ptrdiff_t>(
+                                                       std::min<std::size_t>(views.size(), kMaxShadowCullViews)));
 }
 
 Result<void> ProceduralRenderer::Impl::createPipelines(const wgpu::ShaderModule& module) {
@@ -899,7 +954,11 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
         // One draw group per (record buffer, LOD level): the level picks its deformer/time slot
         // and its slice of the visible list. Uncalled objects bind the inert placeholder, which
         // the vertex shader never reads (ProceduralUniforms::fieldInfo.w is 0).
-        auto drawGroup = [&](const wgpu::Buffer& records, std::uint64_t bytes, std::uint32_t level, const char* label) {
+        // `listLevel` is the slice of `visible` this group reads: `level` for the camera list and
+        // `visibleLevels + level` for the shadow caster list, which is the same layout the cull
+        // pass's doubled level axis writes (shaders/cull.wgsl `sliceOf`).
+        auto drawGroup = [&](const wgpu::Buffer& records, std::uint64_t bytes, std::uint32_t level,
+                             std::uint32_t listLevel, const char* label) {
             std::array<wgpu::BindGroupEntry, 8> entries{};
             entries[0].binding = 0;
             entries[0].buffer = objectUniforms;
@@ -920,7 +979,7 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
             entries[5].binding = 5;
             if (cullActive && visibleBuffer && level < visibleLevels) {
                 entries[5].buffer = visibleBuffer;
-                entries[5].offset = static_cast<std::uint64_t>(level) * visibleStride * sizeof(std::uint32_t);
+                entries[5].offset = static_cast<std::uint64_t>(listLevel) * visibleStride * sizeof(std::uint32_t);
                 entries[5].size = static_cast<std::uint64_t>(visibleStride) * sizeof(std::uint32_t);
             } else {
                 entries[5].buffer = emptyVisible;
@@ -949,11 +1008,26 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
         };
         state.groups = {};
         state.groupsLive = {};
+        state.shadowGroups = {};
+        state.shadowGroupsLive = {};
         for (std::uint32_t level = 0; level < levels; ++level) {
-            state.groups[level] = drawGroup(state.instances, state.instanceBytes, level, "procedural-object-group");
+            state.groups[level] =
+                drawGroup(state.instances, state.instanceBytes, level, level, "procedural-object-group");
             if (state.live) {
                 state.groupsLive[level] =
-                    drawGroup(state.live, state.liveBytes, level, "procedural-object-group-live");
+                    drawGroup(state.live, state.liveBytes, level, level, "procedural-object-group-live");
+            }
+            // ADR-287's second list. Built unconditionally for a culled object: whether it casts is
+            // a per-frame property and these are cached across frames, so building them only for a
+            // caster would rebuild every group the frame a light is switched on.
+            if (cullActive && visibleBuffer && level < visibleLevels) {
+                state.shadowGroups[level] = drawGroup(state.instances, state.instanceBytes, level,
+                                                      visibleLevels + level, "procedural-object-group-shadow");
+                if (state.live) {
+                    state.shadowGroupsLive[level] =
+                        drawGroup(state.live, state.liveBytes, level, visibleLevels + level,
+                                  "procedural-object-group-shadow-live");
+                }
             }
         }
         state.computeGroup = nullptr;
@@ -992,7 +1066,7 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
         return;
     }
     auto cullGroup = [&](const wgpu::Buffer& records, std::uint64_t bytes, const char* label) {
-        std::array<wgpu::BindGroupEntry, 7> entries{};
+        std::array<wgpu::BindGroupEntry, 8> entries{};
         entries[0].binding = 0;
         entries[0].buffer = state.cullUniforms;
         entries[0].size = sizeof(CullPassUniforms);
@@ -1014,6 +1088,11 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
         entries[6].binding = 6;
         entries[6].buffer = cullStats;
         entries[6].size = cullStats.GetSize();
+        // The frame's shadow volumes: one buffer, bound by every object's cull group, rewritten
+        // once per frame. Nothing here has to be invalidated when the views move.
+        entries[7].binding = 7;
+        entries[7].buffer = shadowVolumes;
+        entries[7].size = sizeof(ShadowVolumeUniforms);
         wgpu::BindGroupDescriptor desc{};
         desc.label = label;
         desc.layout = cullLayout;
@@ -1036,34 +1115,46 @@ bool ProceduralRenderer::Impl::ensureCullBuffers(ObjectState& state, std::uint32
     const auto& device = context.device();
     const std::uint32_t stride = alignUp(std::max(count, 1u), kVisibleAlign);
     const std::uint32_t blocks = std::max((count + kCullScanBlock - 1) / kCullScanBlock, 1u);
+    // ADR-287: every one of these holds two lists. `lodIndex` carries the camera classification at
+    // [0, count) and the shadow one at [count, 2 * count); `blockSums` and `visible` are indexed by
+    // a level axis that runs 0..2 * lodCount - 1. Allocated for both whether or not this frame's
+    // object casts, because whether it does is a per-frame question and these buffers are grow-only
+    // -- a scatter that starts casting must not cost a reallocation and a frame of empty lists.
     bool grew = false;
-    if (count > state.cullCapacity || lodCount > state.cullLodCount || !state.visible) {
+    if (count > state.cullCapacity || lodCount > state.cullLodCapacity || !state.visible) {
+        const std::uint32_t levels = std::max(lodCount, state.cullLodCapacity);
         const auto storage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
         wgpu::BufferDescriptor desc{};
         desc.usage = storage;
         desc.label = "procedural-lod-index";
-        desc.size = static_cast<std::uint64_t>(stride) * sizeof(std::uint32_t);
+        desc.size = static_cast<std::uint64_t>(stride) * 2 * sizeof(std::uint32_t);
         state.lodIndex = device.CreateBuffer(&desc);
         // Zeroed, because classification now reads last frame's level out of this buffer before
         // overwriting it (ADR-082) and a fresh allocation otherwise holds whatever the driver left
         // there -- which would be read as "this instance was already at level 4 billion" and drop
         // the whole object to its coarsest mesh for one frame after every grow.
         {
-            const std::vector<std::uint32_t> zeros(stride, 0u);
+            const std::vector<std::uint32_t> zeros(static_cast<std::size_t>(stride) * 2, 0u);
             context.queue().WriteBuffer(state.lodIndex, 0, zeros.data(),
-                                        static_cast<std::size_t>(stride) * sizeof(std::uint32_t));
+                                        static_cast<std::size_t>(stride) * 2 * sizeof(std::uint32_t));
         }
         desc.label = "procedural-cull-blocksums";
-        desc.size = static_cast<std::uint64_t>(blocks) * lodCount * sizeof(std::uint32_t);
+        desc.size = static_cast<std::uint64_t>(blocks) * levels * 2 * sizeof(std::uint32_t);
         state.blockSums = device.CreateBuffer(&desc);
         desc.label = "procedural-visible";
-        desc.size = static_cast<std::uint64_t>(stride) * lodCount * sizeof(std::uint32_t);
+        desc.size = static_cast<std::uint64_t>(stride) * levels * 2 * sizeof(std::uint32_t);
         state.visible = device.CreateBuffer(&desc);
         state.cullCapacity = count;
-        state.cullLodCount = lodCount;
+        state.cullLodCapacity = levels;
         state.visibleStride = stride;
         state.cullGroup = nullptr;
         state.cullGroupLive = nullptr;
+        grew = true;
+    }
+    // Not grow-only, and deliberately: this is the number the shader lays its two lists out with,
+    // so the draw groups have to be rebuilt against it whenever it moves in either direction.
+    if (state.cullLodCount != lodCount) {
+        state.cullLodCount = lodCount;
         grew = true;
     }
     if (!state.cullUniforms) {
@@ -1176,6 +1267,20 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     CullCamera cullCamera;
     cullCamera.position = scene.camera.position;
     cullCamera.projScale = cullProjScale(scene.camera.effectiveFovY(), im.viewportHeight);
+    // ADR-287: this frame's shadow views, uploaded once for every object's cull. `SceneRenderer`
+    // hands over the plane sets it built for the entity second cull, so the two caster rules are
+    // asking about the same volumes and not about two fits of them (§37).
+    const std::span<const FrustumPlanes> shadowViewPlanes(im.shadowViewPlanes);
+    {
+        ShadowVolumeUniforms volumes{};
+        volumes.info.x = static_cast<std::uint32_t>(shadowViewPlanes.size());
+        for (std::size_t v = 0; v < shadowViewPlanes.size(); ++v) {
+            for (std::size_t k = 0; k < 6; ++k) {
+                volumes.planes[v * 6 + k] = shadowViewPlanes[v][k];
+            }
+        }
+        queue.WriteBuffer(im.shadowVolumes, 0, &volumes, sizeof(volumes));
+    }
 
     // ---- ADR-056: the wind field, the disturbance set and the frame's simulation budget ----
     const wind::WindUniforms frameWind = wind::packWind(scene.environment.wind);
@@ -1275,6 +1380,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     std::vector<Impl::ObjectState*> stateOf(objectCount, nullptr);
     std::vector<std::size_t> cullItemOf(objectCount, kNoLead);
     std::vector<char> fullyCulledOf(objectCount, 0);
+    std::vector<char> shadowFullyCulledOf(objectCount, 1);
     std::vector<LevelRange> levelRangeOf(objectCount);
     // ADR-038's depth bands move the ladder per band; `objectLevelRange` needs the extremes over
     // every band the scene declares. 1.0 seeds them because it is the value a scene with no bands
@@ -1432,6 +1538,22 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         if (fullyCulled) {
             ++stats_.culledObjects;
         }
+        // ADR-287: does any shadow view reach this object at all? A separate question from the one
+        // above and answered separately -- an object behind the camera can be inside a cascade, and
+        // an object the camera sees at 200 m is past every cascade, because the cascades stop at the
+        // shadow range. An object with effectors can prove nothing (the GPU moves its records after
+        // these bounds were taken), so it builds the list rather than skipping it.
+        const bool casts = object.castsShadow && !shadowViewPlanes.empty();
+        const bool shadowFullyCulled =
+            !casts || (isPart ? shadowFullyCulledOf[leadIndex] != 0
+                              : (cullActive && !usesLive &&
+                                 objectFullyCulledForShadows(lodSettings, shadowViewPlanes, cullCamera, model,
+                                                             state.bounds, cullRadius,
+                                                             scene.detailLimits.proceduralDistanceCull)));
+        // The pass runs when EITHER list has something to say. An object the camera cannot see but
+        // a cascade can now costs a cull dispatch it did not used to cost -- that is the price of
+        // the second list and it is the whole of it on the CPU side.
+        const bool needsCull = cullActive && (!fullyCulled || !shadowFullyCulled);
         // Which rungs this object's records could be on. A part shares its lead's decision
         // (ADR-108), so it shares the range; an object whose records the GPU moves after these
         // bounds were taken can prove nothing and records every level.
@@ -1643,7 +1765,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             ++stats_.pointObjects;
         }
 
-        if (cullActive && !fullyCulled && sharesCull) {
+        if (needsCull && sharesCull) {
             // The lead classifies these records; this part needs only its own indirect args
             // written from the lead's per-level counts, with its own mesh's index counts. It is
             // appended to the lead's uniform, which is uploaded after this loop precisely so a
@@ -1652,14 +1774,15 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             const std::uint32_t used = lead.fanoutInfo.x;
             if (used < kMaxCullFanout) {
                 CullFanout& entry = lead.fanout[used];
-                entry.slot = glm::uvec4(slot, 0u, 0u, 0u);
+                // x = the part's camera slot, y = its shadow caster list's (ADR-287).
+                entry.slot = glm::uvec4(slot, kShadowSlotBase + slot, 0u, 0u);
                 entry.indexCounts = glm::uvec4(0u);
                 for (std::uint32_t level = 0; level < lodCount; ++level) {
                     entry.indexCounts[static_cast<int>(level)] = lodMeshes[level]->indexCount;
                 }
                 lead.fanoutInfo.x = used + 1;
             }
-        } else if (cullActive && !fullyCulled) {
+        } else if (needsCull) {
             CullPassUniforms cull{};
             cull.objectToWorld = model;
             for (std::size_t k = 0; k < planes.size(); ++k) {
@@ -1704,15 +1827,23 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                 cull.depthLayers[bandCount++] = glm::vec4(layer.start, layer.end, layer.density, layer.detail);
             }
             cull.flags = glm::uvec4(lodSettings.cull ? 1u : 0u, lodSettings.lodByScreenSize ? 1u : 0u, slot, bandCount);
+            // ADR-287. The shadow half of the pass runs only for an object some shadow view can
+            // reach: a scatter the cascades cannot see pays exactly what it paid before, which is
+            // most of an outdoor frame's ecology, because the cascades stop at 77 m.
+            cull.shadowInfo = glm::uvec4(shadowFullyCulled ? 0u : 1u, kShadowSlotBase + slot, 0u, 0u);
             cull.indexCounts = glm::uvec4(0u);
             for (std::uint32_t level = 0; level < lodCount; ++level) {
                 cull.indexCounts[static_cast<int>(level)] = lodMeshes[level]->indexCount;
             }
             cullItemOf[i] = im.cullItems.size();
             im.cullUniformStaging.push_back(cull);
-            im.cullItems.push_back(Impl::CullItem{&state, instanceCount, lodCount, blocks, usesLive});
+            const std::uint32_t levelAxis = shadowFullyCulled ? lodCount : lodCount * 2;
+            im.cullItems.push_back(Impl::CullItem{&state, instanceCount, lodCount, levelAxis, blocks, usesLive});
             state.lastCullFrame = im.frame;
             ++stats_.cullObjects;
+            if (!shadowFullyCulled) {
+                ++stats_.shadowCullObjects;
+            }
         }
 
         // ---- object slot: exactly the entity ObjectUniforms fields ----
@@ -1748,9 +1879,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         const std::uint32_t offset = slot * kObjectStride;
         std::memcpy(im.staging.data() + offset, &obj, sizeof(obj));
 
-        im.items.push_back(
-            Impl::DrawItem{i, lodMeshes, &state, offset, instanceCount, lodCount, cullActive, fullyCulled,
-                           levels});
+        im.items.push_back(Impl::DrawItem{i, lodMeshes, &state, offset, instanceCount, lodCount, cullActive,
+                                          fullyCulled, shadowFullyCulled, levels});
         ++stats_.objects;
         stats_.sourceVertices += mesh->vertexCount;
         stats_.sourceTriangles += mesh->indexCount / 3;
@@ -1766,6 +1896,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         stats_.deformers += enabled;
         stateOf[i] = &state;
         fullyCulledOf[i] = fullyCulled ? 1 : 0;
+        shadowFullyCulledOf[i] = shadowFullyCulled ? 1 : 0;
         ++slot;
     }
     // ADR-108: the cull uniforms, once every material part that joins a lead has been seen.
@@ -1804,6 +1935,13 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         if (statsBytes > 0) {
             im.statsZero.assign(static_cast<std::size_t>(slot) * kCullStatsStride, 0u);
             queue.WriteBuffer(im.cullStats, 0, im.statsZero.data(), statsBytes);
+            // ADR-287: and the shadow caster list's prefix, which is the same slots offset by
+            // kShadowSlotBase. An object that stopped casting between frames must not leave its
+            // last caster count sitting where a reader will add it up.
+            queue.WriteBuffer(im.cullStats,
+                              static_cast<std::uint64_t>(kShadowSlotBase) * kCullStatsStride *
+                                  sizeof(std::uint32_t),
+                              im.statsZero.data(), statsBytes);
         }
         wgpu::ComputePassDescriptor desc{};
         desc.label = "procedural-cull";
@@ -1818,7 +1956,10 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             cp.SetPipeline(pipeline);
             for (const auto& item : im.cullItems) {
                 cp.SetBindGroup(0, item.usesLive ? item.state->cullGroupLive : item.state->cullGroup);
-                cp.DispatchWorkgroups(oneBlock ? 1u : item.blocks, item.lodCount);
+                // `levels` is the doubled axis when this object builds a shadow caster list too
+                // (ADR-287): the compaction runs once per list per rung, and the classification --
+                // the per-record half -- still runs once.
+                cp.DispatchWorkgroups(oneBlock ? 1u : item.blocks, item.levels);
             }
         };
         scanStage(im.cullReducePipeline, false);
@@ -1853,6 +1994,18 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         const std::uint64_t records = im.statsSnapshot[base + 4];
         stats_.visibleInstances += visible;
         stats_.culledInstances += records > visible ? records - visible : 0;
+        // ADR-287: the caster list, from its own slot. Counted separately and never folded into
+        // the line above, because the two being one number is the defect this fixed.
+        const std::size_t shadowBase =
+            (static_cast<std::size_t>(item.state->statsSlot) + kShadowSlotBase) * kCullStatsStride;
+        if (shadowBase + kCullStatsStride > im.statsSnapshot.size() || im.statsSnapshot[shadowBase + 5] == 0) {
+            continue;
+        }
+        for (std::size_t level = 0; level < 4; ++level) {
+            const std::uint32_t count = im.statsSnapshot[shadowBase + level];
+            stats_.shadowLodCounts[level] += count;
+            stats_.shadowInstances += count;
+        }
     }
 
     // ---- drop GPU state nobody used for cacheFrames_ frames ----
@@ -1945,19 +2098,32 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             continue;
         }
         // Nothing survived this object's cull, and the CPU knew it before the pass was encoded.
-        if (item.fullyCulled) {
+        // ADR-287: the shadow passes ask the shadow list's proof, which is a different one. This
+        // used to be `item.fullyCulled` in every pass, and that single line is what made a tree the
+        // camera cannot see stop casting.
+        if (shadowPass ? item.shadowFullyCulled : item.fullyCulled) {
             stats_.skippedIndirectDraws += item.lodCount;
             continue;
         }
         const auto& material = object.material;
         // Point billboards face the camera by construction: never cull them.
         const bool twoSided = material.doubleSided || object.source.kind == scene::PrimitiveKind::Point;
-        const auto& groups = item.state->usesLive ? item.state->groupsLive : item.state->groups;
+        // Which of the two compacted lists this pass draws: the camera's, or the shadow caster
+        // list's own slices of the same `visible` buffer.
+        const auto& groups = shadowPass
+                                 ? (item.state->usesLive ? item.state->shadowGroupsLive : item.state->shadowGroups)
+                                 : (item.state->usesLive ? item.state->groupsLive : item.state->groups);
+        const std::uint32_t argsSlot =
+            item.state->statsSlot + (shadowPass ? kShadowSlotBase : 0u);
         // One lookup per object: every LOD level of it draws the same material.
         const wgpu::BindGroup materialGroup = materialBindGroup(material);
         if (!item.indirect) {
+            // An object with no cull pass has one list and one group: the visible-list binding is
+            // the inert placeholder the vertex stage never reads, so the shadow pass draws the same
+            // group the camera does. There is no second list here because there is no first one.
             setPipeline(depthOnly ? im.pipelineDepth : (twoSided ? im.pipelineNoCull : im.pipelineCull));
-            pass.SetBindGroup(1, groups[0], 1, &item.offset);
+            const auto& direct = item.state->usesLive ? item.state->groupsLive : item.state->groups;
+            pass.SetBindGroup(1, direct[0], 1, &item.offset);
             ++stats_.state.bindGroupBinds;
             setMaterial(materialGroup);
             setMesh(*item.meshes[0]);
@@ -1999,10 +2165,10 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             setMaterial(materialGroup);
             setMesh(*mesh);
             const std::uint64_t argsOffset =
-                (static_cast<std::uint64_t>(item.state->statsSlot) * scene::kMaxLodLevels + level) * kIndirectStride;
+                (static_cast<std::uint64_t>(argsSlot) * scene::kMaxLodLevels + level) * kIndirectStride;
             pass.DrawIndexedIndirect(im.indirectArgs, argsOffset);
             ++stats_.indirectDraws; // every pass, because every pass pays for it
-            const std::size_t base = static_cast<std::size_t>(item.state->statsSlot) * kCullStatsStride;
+            const std::size_t base = static_cast<std::size_t>(argsSlot) * kCullStatsStride;
             const bool haveCounts = base + kCullStatsStride <= im.statsSnapshot.size() &&
                                     im.statsSnapshot[base + 5] != 0;
             if (haveCounts && im.statsSnapshot[base + level] == 0) {
@@ -2051,24 +2217,43 @@ Result<CullCounts> ProceduralRenderer::readCullCounts(const std::string& name) {
     if (it == im.objects.end() || !it->second.groupVisible) {
         return fail("procedural object '{}' has no cull state", name);
     }
-    const std::uint64_t offset = static_cast<std::uint64_t>(it->second.statsSlot) * kCullStatsStride * sizeof(std::uint32_t);
-    auto data = gpu::readBuffer(im.context, im.cullStats, offset, kCullStatsStride * sizeof(std::uint32_t));
-    if (!data) {
-        return std::unexpected(data.error());
+    const auto slotAt = [&](std::uint32_t slot) -> Result<std::array<std::uint32_t, kCullStatsStride>> {
+        const std::uint64_t offset =
+            static_cast<std::uint64_t>(slot) * kCullStatsStride * sizeof(std::uint32_t);
+        auto data = gpu::readBuffer(im.context, im.cullStats, offset, kCullStatsStride * sizeof(std::uint32_t));
+        if (!data) {
+            return std::unexpected(data.error());
+        }
+        std::array<std::uint32_t, kCullStatsStride> raw{};
+        std::memcpy(raw.data(), data->data(), raw.size() * sizeof(std::uint32_t));
+        return raw;
+    };
+    auto raw = slotAt(it->second.statsSlot);
+    if (!raw) {
+        return std::unexpected(raw.error());
     }
-    std::array<std::uint32_t, kCullStatsStride> raw{};
-    std::memcpy(raw.data(), data->data(), raw.size() * sizeof(std::uint32_t));
     CullCounts counts;
-    counts.records = raw[4];
+    counts.records = (*raw)[4];
     for (std::size_t level = 0; level < counts.lod.size(); ++level) {
-        counts.lod[level] = raw[level];
-        counts.visible += raw[level];
+        counts.lod[level] = (*raw)[level];
+        counts.visible += (*raw)[level];
     }
     counts.culled = counts.records > counts.visible ? counts.records - counts.visible : 0;
+    // ADR-287's second list, from its own slot. The zeroing sweep in update() clears both prefixes
+    // each frame, so an object that is not casting reads zero here rather than reading history.
+    auto shadowRaw = slotAt(it->second.statsSlot + kShadowSlotBase);
+    if (!shadowRaw) {
+        return std::unexpected(shadowRaw.error());
+    }
+    for (std::size_t level = 0; level < counts.shadowLod.size(); ++level) {
+        counts.shadowLod[level] = (*shadowRaw)[level];
+        counts.shadowVisible += (*shadowRaw)[level];
+    }
     return counts;
 }
 
-Result<std::array<std::uint32_t, 5>> ProceduralRenderer::readIndirectArgs(const std::string& name, int level) {
+Result<std::array<std::uint32_t, 5>> ProceduralRenderer::readIndirectArgs(const std::string& name, int level,
+                                                                         bool shadowList) {
     Impl& im = *impl_;
     const auto it = im.objects.find(name);
     // A material part has its own args slot -- written by its lead's cull (ADR-108) -- but no
@@ -2080,9 +2265,9 @@ Result<std::array<std::uint32_t, 5>> ProceduralRenderer::readIndirectArgs(const 
     if (level < 0 || static_cast<std::uint32_t>(level) >= state.groupVisibleLevels) {
         return fail("procedural object '{}' has no LOD level {}", name, level);
     }
+    const std::uint64_t argsSlot = static_cast<std::uint64_t>(state.statsSlot) + (shadowList ? kShadowSlotBase : 0u);
     const std::uint64_t offset =
-        (static_cast<std::uint64_t>(state.statsSlot) * scene::kMaxLodLevels + static_cast<std::uint64_t>(level)) *
-        kIndirectStride;
+        (argsSlot * scene::kMaxLodLevels + static_cast<std::uint64_t>(level)) * kIndirectStride;
     auto data = gpu::readBuffer(im.context, im.indirectArgs, offset, kIndirectStride);
     if (!data) {
         return std::unexpected(data.error());
@@ -2121,7 +2306,8 @@ Result<ProceduralRenderer::InstanceLevels> ProceduralRenderer::readLodLevels(con
     return out;
 }
 
-Result<std::vector<std::uint32_t>> ProceduralRenderer::readVisibleIndices(const std::string& name, int level) {
+Result<std::vector<std::uint32_t>> ProceduralRenderer::readVisibleIndices(const std::string& name, int level,
+                                                                         bool shadowList) {
     Impl& im = *impl_;
     const auto it = im.objects.find(name);
     // The list the object's draws read: its own, or its lead's when it is a material part.
@@ -2136,11 +2322,16 @@ Result<std::vector<std::uint32_t>> ProceduralRenderer::readVisibleIndices(const 
     if (!counts) {
         return std::unexpected(counts.error());
     }
-    const std::uint32_t count = counts->lod[static_cast<std::size_t>(level)];
+    const std::uint32_t count = shadowList ? counts->shadowLod[static_cast<std::size_t>(level)]
+                                          : counts->lod[static_cast<std::size_t>(level)];
     if (count == 0) {
         return std::vector<std::uint32_t>{};
     }
-    const std::uint64_t offset = static_cast<std::uint64_t>(level) * state.groupVisibleStride * sizeof(std::uint32_t);
+    // ADR-287: the shadow caster list's slices sit above the camera's in the same buffer, at
+    // `groupVisibleLevels + level` -- the layout shaders/cull.wgsl's doubled level axis writes.
+    const std::uint64_t listLevel =
+        static_cast<std::uint64_t>(level) + (shadowList ? state.groupVisibleLevels : 0u);
+    const std::uint64_t offset = listLevel * state.groupVisibleStride * sizeof(std::uint32_t);
     auto data = gpu::readBuffer(im.context, state.groupVisible, offset,
                                 static_cast<std::uint64_t>(count) * sizeof(std::uint32_t));
     if (!data) {

@@ -8,12 +8,13 @@
 //                        against the six frustum planes, then maxDistance and minScreenRadius;
 //                        survivors get a LOD level 0..lodCount-1, rejects get kCulled.
 //                        Writes lodIndex[i].
-//   2. cs_cull_reduce    (blocks, lodCount) workgroups: blockSums[level * blocks + b] = how many
+//   2. cs_cull_reduce    (blocks, levels) workgroups -- `levels` is lodCount, or 2 * lodCount when
+//                        the shadow caster list is being built too: blockSums[level * blocks + b] = how many
 //                        of block b's records are at `level`.
-//   3. cs_cull_top       (1, lodCount) workgroups: exclusive scan of that level's blockSums in
+//   3. cs_cull_top       (1, levels) workgroups: exclusive scan of that level's blockSums in
 //                        place; thread 0 writes the level's drawIndexedIndirect args and the
 //                        object's stats slot.
-//   4. cs_cull_scatter   (blocks, lodCount) workgroups: local exclusive scan + blockSums gives
+//   4. cs_cull_scatter   (blocks, levels) workgroups: local exclusive scan + blockSums gives
 //                        every record at `level` its rank r; visibleIndices[level * stride + r] = i.
 //
 // Determinism: exactly the structure of the particle compaction (particles.wgsl) - prefix sums,
@@ -28,7 +29,25 @@
 //
 // Bindings (group 0): 0 CullParams, 1 records (read), 2 lodIndex (read_write), 3 blockSums
 // (read_write), 4 visibleIndices (read_write), 5 indirect args (read_write), 6 stats
-// (read_write). Mirrors rendering/procedural_renderer.hpp CullPassUniforms.
+// (read_write), 7 ShadowVolumes (uniform, frame-global). Mirrors
+// rendering/procedural_renderer.hpp CullPassUniforms.
+//
+// ---- the second list: shadow casters (ADR-265 found it, ADR-287 built it) --------------------------------------------------
+//
+// A shadow caster list is a second cull, and this pass used to build one list that three passes
+// read: the camera's, the depth prepass's and every cascade's. So an instance the camera could not
+// see cast nothing, however plainly its shadow fell into shot -- 62,284 procedural instances on
+// Glowmere multicam, 496 surviving the camera cull, and 496 drawn into the shadow maps.
+//
+// The two lists are built by ONE classify dispatch and ONE compaction, by doubling the level axis.
+// Levels [0, lodCount) are the camera's list and levels [lodCount, 2 * lodCount) are the shadow
+// caster list; `lodIndex` holds the camera classification at [0, count) and the shadow one at
+// [count, 2 * count). The rung is computed once and shared, so an instance in both lists is on the
+// same rung in both, and the two classifications differ in exactly one term: the camera frustum
+// test becomes "some shadow view's frustum contains this sphere".
+//
+// Widening the single cull's frustum instead was considered and is wrong: it makes the *camera*
+// pass draw everything the light can see, and the camera pass is the triangle-bound one.
 
 struct InstanceRecord {
     position: vec4<f32>,  // xyz, w = density
@@ -67,6 +86,20 @@ struct CullParams {
     // ADR-108. x = how many entries of `fanout` are live (0 = this cull serves only itself).
     fanoutInfo: vec4<u32>,
     fanout: array<CullFanout, 7>,
+    // x = 1 when this dispatch also builds the shadow caster list (0 = camera list only, which is
+    // every object in a frame with no shadow views and every object that does not cast).
+    // y = the indirect-args / stats slot the shadow list's levels are written to.
+    shadowInfo: vec4<u32>,
+};
+
+// The frame's shadow views as plane sets, world space. Frame-global rather than per object --
+// every object's cull tests the same volumes -- so it is one buffer written once per frame instead
+// of 768 bytes appended to every object's uniform.
+const kMaxShadowCullViews: u32 = 8u; // rendering::kMaxShadowViews
+
+struct ShadowVolumes {
+    info: vec4<u32>,                    // x = live view count (0 = no shadow maps this frame)
+    planes: array<vec4<f32>, 48>,       // kMaxShadowCullViews * 6, same convention as `planes`
 };
 
 @group(0) @binding(0) var<uniform> cullParams: CullParams;
@@ -76,6 +109,7 @@ struct CullParams {
 @group(0) @binding(4) var<storage, read_write> visibleIndices: array<u32>;
 @group(0) @binding(5) var<storage, read_write> indirectArgs: array<u32>;
 @group(0) @binding(6) var<storage, read_write> cullStats: array<u32>;
+@group(0) @binding(7) var<uniform> shadowVolumes: ShadowVolumes;
 
 const kCulled: u32 = 0xFFFFFFFFu;
 const kStatsStride: u32 = 8u; // per object: [0..3] per-level counts, [4] records, [5] used marker
@@ -236,14 +270,20 @@ fn cs_cull_classify(@builtin(global_invocation_id) gid: vec3<u32>) {
     let hysteresis = clamp(cullParams.stability.y, 0.0, 0.5);
     let spread = 1.0 + (ladderHash(i) - 0.5) * spreadAmount;
 
-    var culled = false;
+    // Three rejections, kept apart because two lists are being built from them. `limitsCulled` is
+    // the distance / screen-size / density half, which is the same question for the camera and for
+    // a shadow view; `cameraOutside` and `shadowOutside` are the two volume tests, and they are the
+    // only thing the lists differ by.
+    var limitsCulled = false;
+    var cameraOutside = false;
+    var shadowOutside = false;
     if (cullParams.flags.x != 0u) {
         for (var k = 0u; k < 6u; k = k + 1u) {
             let p = cullParams.planes[k];
-            if (dot(p.xyz, center) + p.w < -radius) { culled = true; }
+            if (dot(p.xyz, center) + p.w < -radius) { cameraOutside = true; }
         }
         let maxDist = cullParams.limits.x;
-        if (maxDist > 0.0 && dist - radius > maxDist) { culled = true; }
+        if (maxDist > 0.0 && dist - radius > maxDist) { limitsCulled = true; }
         let minRadius = cullParams.limits.y;
         if (minRadius > 0.0) {
             // It takes a larger radius to come back than it does to disappear, so an instance
@@ -251,14 +291,34 @@ fn cs_cull_classify(@builtin(global_invocation_id) gid: vec3<u32>) {
             let bar = minRadius * spread;
             let wasCulled = previous == kCulled;
             let limit = select(bar * (1.0 - hysteresis), bar * (1.0 + hysteresis), wasCulled);
-            if (screenRadius < limit) { culled = true; }
+            if (screenRadius < limit) { limitsCulled = true; }
+        }
+        // ADR-287's second list. A caster is kept when SOME shadow view's frustum contains it: the
+        // shadow passes draw one list into every view and each view rejects what it cannot see on
+        // its own, so the union is the right question here. No views is no maps, and the loop then
+        // leaves `seen` false and rejects everything, which is what a frame with shadows switched
+        // off wants.
+        if (cullParams.shadowInfo.x != 0u) {
+            let views = min(shadowVolumes.info.x, kMaxShadowCullViews);
+            var seen = false;
+            for (var v = 0u; v < kMaxShadowCullViews; v = v + 1u) {
+                if (v >= views) { break; }
+                var inside = true;
+                for (var k = 0u; k < 6u; k = k + 1u) {
+                    let p = shadowVolumes.planes[v * 6u + k];
+                    if (dot(p.xyz, center) + p.w < -radius) { inside = false; }
+                }
+                seen = seen || inside;
+            }
+            shadowOutside = !seen;
         }
     }
 
     // The composition's depth bands: `density` thins this band, `detail` moves the LOD ladder.
     let band = depthBand(dist);
-    if (band.x < 1.0 && instanceHash(i) >= max(band.x, 0.0)) { culled = true; }
+    if (band.x < 1.0 && instanceHash(i) >= max(band.x, 0.0)) { limitsCulled = true; }
     let detail = max(band.y, 1e-3);
+    let culled = limitsCulled || cameraOutside;
 
     // LOD ladder: a threshold of 0 ends it, so an unconfigured object stays at LOD0.
     var level = 0u;
@@ -286,6 +346,12 @@ fn cs_cull_classify(@builtin(global_invocation_id) gid: vec3<u32>) {
         level = k + 1u;
     }
     lodIndex[i] = select(level, kCulled, culled);
+    // The shadow half, at [count, 2 * count). The level is the one computed above -- the ladder is
+    // the camera's for both lists, so a caster is rasterised at the mesh the frame draws, and the
+    // hysteresis memory the ladder reads stays the single history at [0, count).
+    if (cullParams.shadowInfo.x != 0u) {
+        lodIndex[cullParams.counts.x + i] = select(level, kCulled, limitsCulled || shadowOutside);
+    }
 }
 
 // ---- stable stream compaction (the structure of particles.wgsl) ---------------------------------
@@ -314,13 +380,34 @@ fn workgroupScan(tid: u32, value: u32) -> vec2<u32> {
     return vec2<u32>(inclusive - value, total);
 }
 
+// Which half of `lodIndex` a compaction level reads, and which rung it is looking for there.
+// Levels [0, lodCount) are the camera's list at [0, count); levels [lodCount, 2 * lodCount) are the
+// shadow caster list at [count, 2 * count).
+struct ListSlice {
+    base: u32,  // offset into lodIndex
+    rung: u32,  // the value a member carries
+};
+
+fn sliceOf(level: u32) -> ListSlice {
+    let lodCount = max(cullParams.counts.y, 1u);
+    var out: ListSlice;
+    out.base = 0u;
+    out.rung = level;
+    if (level >= lodCount) {
+        out.base = cullParams.counts.x;
+        out.rung = level - lodCount;
+    }
+    return out;
+}
+
 // This thread's kScanElems membership flags for `level` (0 beyond the record count) and their sum.
 fn loadFlags(base: u32, level: u32, out: ptr<function, array<u32, 4>>) -> u32 {
+    let slice = sliceOf(level);
     var sum = 0u;
     for (var k = 0u; k < kScanElems; k++) {
         let i = base + k;
         var f = 0u;
-        if (i < cullParams.counts.x && lodIndex[i] == level) { f = 1u; }
+        if (i < cullParams.counts.x && lodIndex[slice.base + i] == slice.rung) { f = 1u; }
         (*out)[k] = f;
         sum += f;
     }
@@ -366,15 +453,23 @@ fn cs_cull_top(@builtin(local_invocation_id) lid: vec3<u32>, @builtin(workgroup_
     if (tid == 0u) {
         let count = min(carry, cullParams.counts.x);
         // One indirect buffer holds every object's args, kMaxLodLevels slots of five u32 each,
-        // indexed by the object's slot (flags.z, the same slot it writes its stats to).
-        writeLevel(cullParams.flags.z, level, indexCountAt(level), count, cullParams.counts.x);
+        // indexed by the object's slot (flags.z, the same slot it writes its stats to). The shadow
+        // caster list's levels go to a second slot (shadowInfo.y) in the same buffer rather than to
+        // a buffer of their own: ADR-051 measured the cost per distinct indirect *buffer* a pass
+        // reads, not per draw, and this frame already reads one in five passes.
+        let slice = sliceOf(level);
+        let shadowHalf = slice.rung != level;
+        let slot = select(cullParams.flags.z, cullParams.shadowInfo.y, shadowHalf);
+        writeLevel(slot, slice.rung, indexCountAt(slice.rung), count, cullParams.counts.x);
         // ADR-108: the same decision, emitted for every material part of this asset. One spatial
-        // instance, culled once; the parts differ only in which mesh the draw reads.
+        // instance, culled once; the parts differ only in which mesh the draw reads. A part's
+        // shadow slot is `slot.y`, filled in beside its camera slot.
         let fanoutCount = cullParams.fanoutInfo.x;
         for (var f = 0u; f < kMaxCullFanout; f = f + 1u) {
             if (f >= fanoutCount) { break; }
             let part = cullParams.fanout[f];
-            writeLevel(part.slot.x, level, componentAt(part.indexCounts, level), count,
+            let partSlot = select(part.slot.x, part.slot.y, shadowHalf);
+            writeLevel(partSlot, slice.rung, componentAt(part.indexCounts, slice.rung), count,
                        cullParams.counts.x);
         }
     }
