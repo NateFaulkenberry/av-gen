@@ -322,7 +322,7 @@ each one starts, what it can perceive, what it likes, and how much it minds gett
 | 1 environmental awareness | `scout`: `interest` over its percepts with an `activity`, an `approach` and a `dwell` | 199.6 m, 21 decisions, every committed option the name of a perceived glow patch |
 | 2 environmental navigation | `wader` / `drylander`: one `route` considerer, `wadePenalty` 1.6 against 16.0 | 100.4 m through 0.77 m of water against 251.0 m through 0.01 m; both arrive |
 | 3 character awareness | `watcher`: the same considerer as the scout with `character` at 4.8 instead of 0.6 | commits to the name of another **body**, closes to under 14 m, dwells, leaves, returns |
-| 4 animation intelligence | 7 distinct clips of the 26 each GLB ships, plus ADR-300's `aim` and `additive` pose layers, `matchRate`, `slopeAlign` | every body reaches ≥ 2 activities for half a second or more |
+| 4 animation intelligence | 8 distinct clips of the 26 each GLB ships, plus ADR-300's `aim` and `additive` pose layers, `matchRate`, `slopeAlign` | every body reaches ≥ 2 activities for half a second or more |
 
 **`investigate` is used by nobody, and that is a finding.** It was the obvious considerer for
 demonstrations 1 and 3 and both locked. Salience rises as a body approaches, and `investigate` has
@@ -339,7 +339,7 @@ thing to do with a new showcase is to use it. Its own negative result says not t
 displacement is 96% vertical, `applyGrounding` *assigns* `travel.y` so a grounded body keeps none
 of it, and what is left is 0.022 m of horizontal shuffle. The clip root motion earns its keep on is
 `Dying_forward`, which travels 0.985 m across the ground — and nobody dies in this showcase, so it
-is not one of the seven clips bound. `animation.rootMotion` is absent from valley 3 for the same
+is not one of the eight clips bound. `animation.rootMotion` is absent from valley 3 for the same
 reason it is absent from valley 2, and the reason is now written down twice.
 
 **There is no IK in this engine.** The brief's fourth demonstration names it. `scene::PoseLayerKind`
@@ -507,8 +507,8 @@ under that spread is a lower bound on nothing. A second pass at load 5.0 is repo
   channel apart for the river to still read as a river between them, which puts them 150 m apart
   and makes the detour a 3.2x walk nobody can film.
 * **`investigate` for demonstrations 1 and 3.** Measured: it locks on a stationary subject.
-* **Fabricating more animation clips.** The demonstration is that a small library is enough. Seven
-  of twenty-six are bound.
+* **Fabricating more animation clips.** The demonstration is that a small library is enough. Eight
+  of the twenty-six each GLB ships are bound, under nine role names.
 * **Reporting a frame-time delta from the twelve-round bench.** §5.
 
 ## Revisit triggers
