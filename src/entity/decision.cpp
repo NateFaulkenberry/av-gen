@@ -78,6 +78,35 @@ std::uint32_t hash32(std::uint32_t x) {
     return x;
 }
 
+
+// Where a body should actually walk to, when the thing it is going to is a *thing*.
+//
+// A landmark's interest point is at the landmark, and a landmark is usually solid: the lab's cairns
+// are heroes with a radius, and `obstaclesFromHeroes` turns every one of them into a cylinder the
+// navigator refuses to stand in. `NavigatorPath::route` -- which is the provider `ActionQueue`'s
+// `move` runs through -- returns `Unreachable` for a goal that is not navigable, so an option that
+// named the landmark itself failed the instant it won. Measured on the guard fixture before this:
+// the explorer scored six options, committed to one every tick, and travelled **0.00 m in 75 s**
+// while its action queue reported `unreachable` and drained.
+//
+// `Explore` never hit this because it goes through `Navigator::requestPath`, which carries a
+// `goalTolerance` and snaps; the action tier has no such thing. So the stand-off is the considerer's
+// job and `approach` is the knob: walk to a point `approach` metres this side of it, which is also
+// what "approach" has always meant to an author. 0 keeps the old behaviour of naming the point
+// itself, which is right for a percept of a body -- a body is not a wall.
+glm::vec3 standOff(glm::vec3 from, glm::vec3 to, float approach) {
+    if (!(approach > 0.0f)) {
+        return to;
+    }
+    const glm::vec2 delta(to.x - from.x, to.z - from.z);
+    const float distance = glm::length(delta);
+    if (distance <= approach) {
+        return from; // already inside it: the option is "stay where you are and look"
+    }
+    const glm::vec2 at = glm::vec2(to.x, to.z) - delta / distance * approach;
+    return glm::vec3(at.x, to.y, at.y);
+}
+
 } // namespace
 
 // ---- the cadence -------------------------------------------------------------------------------
@@ -551,8 +580,9 @@ void InvestigateConsiderer::consider(const DecisionContext& ctx, std::vector<Opt
     // R1 again, and it is the whole reason this is safe: a percept's position is the perceived
     // body's `state().position()` and never its `visualPosition()`, so a guard sent to meet a
     // hovering saucer walks to where the saucer is rather than to where it is drawn.
-    walk.target.point = target.position;
-    walk.tolerance = std::max(approach_, 0.25f);
+    walk.target.point = standOff(ctx.state != nullptr ? ctx.state->position() : glm::vec3(0.0f),
+                                 target.position, approach_);
+    walk.tolerance = std::max(approach_ * 0.5f, 0.75f);
     actions_.push_back(std::move(walk));
 
     ActionDesc look;
@@ -621,15 +651,16 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
     std::vector<std::pair<std::size_t, std::size_t>> ranges;
     ranges.reserve(scratch_.size());
     const float w = weight();
+    const glm::vec3 here = ctx.state != nullptr ? ctx.state->position() : glm::vec3(0.0f);
     for (const GoalCandidate& candidate : scratch_) {
         const std::size_t first = actions_.size();
         ActionDesc walk;
         walk.kind = ActionKind::Move;
         walk.name = std::string(candidate.name);
         walk.target.kind = TargetKind::Point;
-        walk.target.point = candidate.position;
+        walk.target.point = standOff(here, candidate.position, approach_);
         if (approach_ > 0.0f) {
-            walk.tolerance = approach_;
+            walk.tolerance = std::max(approach_ * 0.5f, 0.75f);
         }
         actions_.push_back(std::move(walk));
         if (dwell_ > 0.0) {

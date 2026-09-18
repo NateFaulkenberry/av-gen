@@ -2127,7 +2127,7 @@ public:
         // it afterwards.
         ctx.actions->override(std::vector<ActionDesc>(winner.actions.begin(), winner.actions.end()),
                               Authority::Routine, ctx.time);
-        remember(winner);
+        remember(state.position());
     }
 
     [[nodiscard]] bool decisionDebug(DecisionDebug& out) const override {
@@ -2181,21 +2181,26 @@ private:
         lastMargin_ = best - runnerUp;
     }
 
-    // Where the committed option was going, so the goal model's novelty term has something to
-    // suppress. Bounded at `visitedCapacity_`, oldest out first -- the same shape and the same
-    // five entries `Explore::remember` has always kept.
-    void remember(const Option& winner) {
+    // **Where the body was when it changed its mind** -- not where it was going.
+    //
+    // The distinction cost a measurement to find. Recording the destination is the obvious thing
+    // and it is wrong: the goal model suppresses a place in `visited_` to 0.12 of its weight, so a
+    // body that recorded its errand on departure devalued the errand it had just set out on, and
+    // the option it was walking to fell behind the three it was not. Measured on the guard fixture:
+    // the explorer scored six options, changed its mind at every decision tick, and travelled
+    // **0.00 m in 75 seconds**, with the winner in the overlay never being the highest score.
+    //
+    // `Explore` never had this, because `remember(goal_)` is called in `stepArrive` -- on arrival,
+    // not on departure. The position is the same fact seen from the other end and it needs no
+    // arrival event: a body that walked to a cairn is standing at the cairn when it decides what to
+    // do next, and a body that gave up halfway records the halfway point, which is honest.
+    void remember(const glm::vec3& place) {
         if (visitedCapacity_ == 0) {
             return;
         }
-        for (const ActionDesc& action : winner.actions) {
-            if (action.kind == ActionKind::Move && action.target.kind == TargetKind::Point) {
-                visited_.push_back(action.target.point);
-                while (visited_.size() > visitedCapacity_) {
-                    visited_.erase(visited_.begin());
-                }
-                return;
-            }
+        visited_.push_back(place);
+        while (visited_.size() > visitedCapacity_) {
+            visited_.erase(visited_.begin());
         }
     }
 
