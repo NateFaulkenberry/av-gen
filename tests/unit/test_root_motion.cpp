@@ -119,8 +119,8 @@ glm::vec3 jointAt(const scene::SkinnedRig& rig, const scene::AnimationClip& clip
 // produced it. The grounded arm asserts exactly that, because it is the finding an author needs
 // and not a defect to be hidden.
 std::string sceneJson(bool optIn, bool grounded, float scale) {
-    json layers = json::array();
     json node;
+
     node["name"] = "subject";
     node["kind"] = "gltf";
     node["asset"] = scoutPath().string();
