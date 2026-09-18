@@ -22,27 +22,34 @@ and the BRDF it drives. Whether it is occluded is `docs/shadow-lab/README.md`.
 
 ### 1.0 Where a light comes from — and the first surprise
 
-**A scene file cannot author a light.** `Composition::fromJson` (`src/scene/composition.cpp`)
-reads `camera`, `cameraDirection`, `lightRig`, `environment`, `composition`, `nodes`, `entities`,
-`fields`, `grids`, `heroes`, `staging`, `graph`, `worldEffects`, `atmosphericEffects`,
-`materialPrograms`, `post`, `wind` and the `nav*` keys. `lights` is not among them, there is no
-`NodeKind::Light`, and unknown top-level keys are **ignored rather than refused**. There are
-exactly four routes into `scene::Scene::lights`:
+**A scene file can author a light — since ADR-278, and it could not when this lab mapped the
+pipeline.** `Composition::fromJson` (`src/scene/composition.cpp`) reads `camera`, `cameraDirection`,
+`lightRig`, `lights`, `environment`, `composition`, `nodes`, `entities`, `fields`, `grids`,
+`heroes`, `staging`, `graph`, `worldEffects`, `atmosphericEffects`, `materialPrograms`, `post`,
+`wind` and the `nav*` keys. There are now **five** routes into `scene::Scene::lights`, in the order
+`rebuild` and `applyParameters` add them:
 
 | route | where | note |
 |---|---|---|
-| a light rig | `Composition::applyParameters` → `LightRig::expand` (`src/scene/light_rig.cpp`) | re-expanded **every frame**, after the camera is final, so `followCamera` is live |
 | a glTF asset's own lights | `importLight` (`src/assets/gltf_loader.cpp`) | KHR_lights_punctual; Directional, Point and Spot only. **No asset in this repository carries one.** |
+| the scene file's `"lights"` | `Composition::fromJson` → `rebuild` (ADR-278) | every `PunctualLight` field; `"node"` makes the light ride a composition node's world transform |
+| the default key | `defaultKeyLight()` (`src/scene/composition.cpp`) | added only when the scene has no rig **and** no light from either route above |
+| a light rig | `Composition::applyParameters` → `LightRig::expand` (`src/scene/light_rig.cpp`) | re-expanded **every frame**, after the camera is final, so `followCamera` is live. Appended *alongside* the authored lights, not instead of them |
 | procedural ecology lights | `Composition::updateEcologyLights` | ADR-053; glow clusters near the camera become Point lights, capped by `kMaxEcologyLights` |
-| the default key | `defaultKeyLight()` (`src/scene/composition.cpp`) | added only when the scene has no rig **and** no lights |
 
-The practical consequence, and it cost a fixture design to find: **two** lab fixtures —
-`examples/labs/lod-geometry-lab.scene.json` and `examples/labs/visibility-culling-lab.scene.json` —
-carry a top-level `"lights"` array with an authored directional key in it. Nothing reads either.
-Both scenes are lit by `defaultKeyLight()`, at a different direction, a different colour and a
-different intensity from the one written in the file. It is ADR-225's defect in a scene file, it
-belongs to those two labs to decide about, and it is why `tests/unit/test_lighting_lab.cpp` asserts
-that *this* lab's fixture delivers the lights it claims rather than assuming it.
+**What this section used to say, and what it cost.** Until ADR-278 the first route did not exist,
+and unknown top-level keys were ignored rather than refused — so **two** lab fixtures,
+`examples/labs/lod-geometry-lab.scene.json` and `examples/labs/visibility-culling-lab.scene.json`,
+carried a top-level `"lights"` array that nothing read, and both were lit by `defaultKeyLight()` at
+a **19.2-degree** different direction, intensity 3 rather than the 4 they wrote, and 5600 K rather
+than the neutral 6500 K. It was ADR-225's defect in a scene file. Both now obey their own files;
+`tests/unit/test_scene_authored_lights.cpp` is the guard, and it is paired with the same fixture
+with its `"lights"` key removed because an assertion that the fixture has "a directional key that
+casts a shadow" is a description of `defaultKeyLight()` and passes on the bug (ADR-182).
+
+The other half of ADR-278 is that a key nobody reads is no longer silent: `core/json_keys.hpp`
+warns by name, and its first run over 56 scenes found that **fifteen** of them write
+`"volumeNoiseAmount"` where the parser reads `"volumeNoise"`.
 
 It is also why the reach fix of §3.1 **cannot change a shipped frame**. Every non-directional light
 in this repository comes from a rig or from the ecology, and both set an explicit range; no asset
@@ -332,12 +339,17 @@ light as the control.
 
 ### 3.3 A rig light's `cone` was authorable under a name the parser ignores
 
-Not fixed — reported. `LightRig::fromJson` reads the spot angle from `"cone"`; a file that writes
-`"coneDegrees"` gets the 45-degree default and no error, because the rig parser ignores unknown
-keys rather than refusing them. This lab's own fixture was written with the wrong key first and the
-only thing that caught it was reading the parser. It is ADR-225's defect in an authoring format,
-it applies to every key in a `.rig.json`, and the fix is a known-key check in `LightRig::fromJson`
-— the same shape as the refusals `labs::loadCases` already makes.
+Reported here, **fixed in ADR-278**. `LightRig::fromJson` reads the spot angle from `"cone"`; a
+file that wrote `"coneDegrees"` got the 45-degree default and no error, because the rig parser
+ignored unknown keys. This lab's own fixture was written with the wrong key first and the only
+thing that caught it was reading the parser. It is ADR-225's defect in an authoring format and it
+applies to every key in a `.rig.json`.
+
+The key is still ignored — that is what "unknown" means — but it is no longer silent:
+`json_keys::warnUnknownKeys` names the key, the light and the rig, at the rig's root and in each of
+its lights, and `scene::rigFileKeys()` / `scene::rigLightKeys()` are public so a test can hold the
+list against all 21 rigs that ship. The same check covers a scene file's top level, its
+`environment`, its `environment.sky`, a `"lights"` entry and a node's `animation` block.
 
 ---
 

@@ -176,6 +176,32 @@ and level looking down 640 m of flat ground — for the reason the Visibility La
 anything that changes an object's appearance with distance makes "it changed" ambiguous, and a rung
 change is exactly a change with distance.
 
+**Its light changed on 2026-09-18, and this is what that moved.** The fixture always carried a
+top-level `"lights"` array and nothing read it (ADR-278); the scene was lit by `defaultKeyLight()`
+instead. It now obeys its own file. Measured, one frame at 1920x1080, t = 1/60 s, arm and control
+rendered by the same binary with `--disable post` and the control being this same file with the
+`"lights"` key removed:
+
+| | default key (what it got) | the file's key (what it gets) |
+|---|---|---|
+| direction | (-0.353209, -0.883022, -0.309058) | (-0.349843, -0.719676, -0.599730) — **19.2 degrees** apart |
+| intensity | 3.0 | 4.0 |
+| temperature | 5600 K | 6500 K |
+| frame mean | 0.0629 | 0.0633 |
+| rms contrast | 0.0343 | 0.0340 |
+| p99 | 0.1073 | 0.1076 |
+| bright centroid y | 0.4938 | 0.4941 |
+
+**1,000,000 of 2,073,600 pixels differ (48.2%), worst channel 158 of 255.** The frame means barely
+move because this fixture is mostly unlit sky and ground; what moved is where the shadows fall.
+
+**No LOD measurement in this document moved, and that is measured rather than assumed**: the
+identifier AOV (`--aov id`, which instance drew in which pixel, and therefore which rung) is
+**byte-identical** before and after, on both frames, while the colour frames differ. The lit-pixel
+counts and threshold measurements in §2 and §3 come from `tests/rendering/test_lod_gpu.cpp`, which
+builds its scene in code and never loads this fixture.
+
+
 Six layers of production assets, chosen to separate hypotheses rather than to look like a world:
 
 | layer | asset | why |

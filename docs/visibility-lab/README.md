@@ -152,6 +152,34 @@ no volumetrics — anything that can fade an object out with distance makes "it 
 ambiguous. Six scatter layers of real production assets (§29), each carrying the cull parameters
 Glowmere gives it:
 
+**Its light changed on 2026-09-18, and this is what that moved.** The fixture always carried a
+top-level `"lights"` array and nothing read it (ADR-278); the scene was lit by `defaultKeyLight()`
+instead. It now obeys its own file. Measured, one frame at 1920x1080, t = 1/60 s, arm and control
+rendered by the same binary with `--disable post` and the control being this same file with the
+`"lights"` key removed:
+
+| | default key (what it got) | the file's key (what it gets) |
+|---|---|---|
+| direction | (-0.353209, -0.883022, -0.309058) | (-0.349843, -0.719676, -0.599730) — **19.2 degrees** apart |
+| intensity | 3.0 | 4.0 |
+| temperature | 5600 K | 6500 K |
+| frame mean | 0.2112 | 0.2183 |
+| rms contrast | 0.0790 | 0.0886 |
+| p99 | 0.4187 | 0.4886 |
+| bright centroid y | 0.5264 | 0.5345 |
+
+**752,202 of 2,073,600 pixels differ (36.3%), worst channel 192 of 255**, and the difference's
+bounding box is (0, 574)-(1919, 1079) -- the ground plane and everything standing on it, which is
+the half of the frame a key light reaches. The p99 moving 0.4187 to 0.4886 is the extra stop.
+
+**No culling measurement in this document moved, and that is measured rather than assumed**: the
+identifier AOV (`--aov id`, which instance drew in which pixel) is **byte-identical** before and
+after, on both frames, while the colour frames differ. Which objects survived the cull, and where
+they landed, is exactly what that buffer is. The radius and threshold numbers in §6 come from
+`tests/rendering/test_visibility_gpu.cpp` and `tests/unit/test_visibility_culling.cpp`, which build
+their scenes in code and never load this fixture.
+
+
 | Layer | Asset | Covers |
 |---|---|---|
 | `large-tree` | CommonTree_1 @ 14 m | Glowmere's `canopy`, verbatim — the popping case |
