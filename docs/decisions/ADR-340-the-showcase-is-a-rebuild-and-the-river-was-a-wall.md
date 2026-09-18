@@ -22,7 +22,7 @@ computation ADR-264 wrote finds **248** of them naming a node transform, of whic
 the scene outright**. Counted here rather than quoted: 36 of the 41 are the four parts of nine hero
 fungi turned together, which ADR-264 §4 adjudicated as *authoring* — somebody turned the mushrooms
 in the editor. The other five are a stem nudged 0.60 m off its own cap, a spore emitter switched
-invisible, an alien 68 m from where its scene puts it, a spore volume, and a sixth alien's yaw —
+invisible, an alien 68 m from where its scene puts it, a spore volume, and a second alien's yaw —
 and ADR-264 called three of those residue. It reached that verdict with `git log -S` over a
 7,114-line whole-file re-save. ADR-271 then found that two agents had got the same class of
 judgement wrong on two separate nights, on sound reasoning, because **from inside the project file
