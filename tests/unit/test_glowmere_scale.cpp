@@ -1,4 +1,4 @@
-// The Glowmere scale invariants (ADR-330).
+// The Glowmere scale invariants (ADR-330, ADR-335).
 //
 // ## Why every arm here is a ratio
 //
@@ -25,8 +25,8 @@
 //   scatter height    the valley's own scatter layers, whose `height` is the metres one instance of
 //                     that species occupies and whose `maxScale` is the largest it will place.
 //
-// The three numbers this file *does* write down -- 1.25, 4.0, 8.0 -- are the art direction, and
-// they are argued for in ADR-330 rather than tuned until a screenshot passed.
+// The numbers this file *does* write down -- 1.25, 3, 4.0, 1.2 -- are the art direction, and they
+// are argued for in ADR-330 and ADR-335 rather than tuned until a screenshot passed.
 //
 // GPU-free: the generator, the anchors and the JSON are all CPU.
 
@@ -61,8 +61,32 @@ namespace {
 // ---- the art direction, and the only authored numbers in this file -------------------------
 
 // A canopy you have to duck under is a canopy you cannot be filmed standing under: the gill line
-// clears the tallest body in the cast by a quarter of that body again.
+// clears the tallest body in the cast by a quarter of that body again. This is the *definition* of
+// a canopy and it has not moved. What moved is the claim built on it -- see arm 2.
 constexpr float kCanopyHeadroom = 1.25f;
+
+// And of the ten signature organisms, at least three are canopies and at least three are not.
+//
+// ADR-330's arm said all ten were canopies. That was true of the world it shipped and it is the
+// arm ADR-335 had to rewrite, because the owner looked at that world and said the cast was too
+// small. Replacing the claim rather than widening the constant is the same move ADR-330 itself
+// made on its third arm, and for the same reason: the number was not wrong, the sentence was.
+//
+// The sentence that is true of the world the owner asked for is that **the cast stands inside its
+// own ladder**. The ten hero fungi are a ladder produced by a search, and a ladder every rung of
+// which is over your head is a ceiling: the elder reads as monumental because a veil in the same
+// world is at the cast's own height. So the claim is two-sided and the count is the instrument.
+//
+//   3.6x (ADR-213)   1 canopy, 9 grounded -- the cast was the top of its own ladder
+//   1.0x (ADR-330)  10 canopies, 0 grounded -- nothing in the signature set was creature-sized
+//   1.94x (ADR-335)  5 canopies, 5 grounded
+//
+// Both bounds bite. Holding the flora still, they pin the cast between 1.749x (below which umbra
+// becomes a canopy and there are eight) and 2.449x (above which cairn stops being one and there
+// are two) -- a window 1.4x wide that 1.94 sits near the middle of. An arm that passes on any
+// world is worthless; this one refuses both worlds Glowmere has actually shipped.
+constexpr int kCanopiesMin = 3;
+constexpr int kGroundedMin = 3;
 
 // The signature organism is monumental: at least four of the cast's tallest body, or it is a big
 // plant and the world has no landmark.
@@ -81,6 +105,11 @@ constexpr float kAboveTreeLine = 1.2f;
 // ---- the control: the world as it was ------------------------------------------------------
 
 constexpr float kBeforeCast = 3.6f; // every farm animal; the four named aliens were 3.344 to 3.61
+// And the second control, which is a world this repository shipped for one afternoon: the cast at
+// the metres its GLBs occupy at rest, with the flora where ADR-330 left it. The owner rejected it
+// in those words -- "they are too small now that the world scale is corrected" -- so it is not a
+// hypothetical either.
+constexpr float kCastAt330 = 1.0f;
 const std::map<std::string, float>& beforeFungi() {
     static const std::map<std::string, float> kBefore{
         {"elder-2", 16.0f}, {"lantern", 6.5f}, {"spire", 4.2f}, {"bloom", 9.0f}, {"veil", 3.4f},
@@ -274,19 +303,34 @@ TEST_CASE("Glowmere's cast stands in its undergrowth", "[glowmere][scale]") {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 2. Every hero fungus is a canopy.
+// 2. The cast stands inside the fungal ladder: some of the ten are canopies and some are not.
 //
 // The gill line -- the underside of the cap, measured off the vertices -- is what a body walks
-// under, and it is about three quarters of an organism's height for every one of the ten. If it
-// sits below the cast's own height then the smaller hero organisms are hats rather than landmarks.
-// Four of the ten were, which is why the cast looked wrong beside them and not only beside the big
-// ones.
-TEST_CASE("every Glowmere hero fungus is a canopy the cast walks under", "[glowmere][scale]") {
+// under, and it is about three quarters of an organism's height for every one of the ten. An
+// organism whose gill line clears the tallest body by a quarter of that body again is a **canopy**:
+// a figure can be filmed standing under it. One whose gill line does not is **grounded**: a figure
+// stands beside it, at something like its own height.
+//
+// ADR-330's arm here was `CHECK(gillLine > tallest * 1.25)` for all ten, and it was written to
+// catch a cast that had grown until it was the top of its own ladder. It is not the arm this
+// world wants, and the replacement is ADR-335's whole argument:
+//
+//   * At ADR-213's 3.6x exactly one of the ten -- the elder -- was a canopy. Nine were hats.
+//   * At ADR-330's 1.0x all ten were canopies, and the owner looked at that and said the cast was
+//     too small for the world. What they were looking at is a world with nothing creature-sized in
+//     its signature set: the elder's 16 m had no small mushroom to be sixteen metres *against*.
+//   * At 1.94x the ladder brackets the cast. Five canopies, five grounded.
+//
+// So the assertion is a band on the count, not a floor on every organism, and the two halves fail
+// on the two different worlds. This is the same shape ADR-330 gave its own third arm after three
+// renders contradicted the sentence it was written with.
+TEST_CASE("Glowmere's cast stands inside the fungal ladder", "[glowmere][scale]") {
     if (!assetsPresent()) {
         SKIP("assets/farm or assets/aliens is not present");
     }
     const auto farm = farmNaturalHeights();
     const auto aliens = alienNaturalHeights();
+    int scenesChecked = 0;
 
     for (const char* name : kScenes) {
         const json doc = readJson(worldDir() / fmt::format("{}.scene.json", name));
@@ -294,30 +338,55 @@ TEST_CASE("every Glowmere hero fungus is a canopy the cast walks under", "[glowm
         if (cast.empty()) {
             continue;
         }
+        ++scenesChecked;
         const Body& tallest = tallestOf(cast);
-        const float beforeCast = tallest.height / tallest.scale * kBeforeCast;
-        int failedBefore = 0;
+        const float native = tallest.height / tallest.scale;
 
-        for (const Fungus& f : fungiOf(doc)) {
-            INFO(name << " / " << f.name << ": gills at " << f.gillLine << " m of a " << f.height
-                      << " m organism, cast tallest " << tallest.height << " m");
-            CHECK(f.gillLine > tallest.height * kCanopyHeadroom);
-
-            // The gill line is a fixed fraction of an organism's height, so the same organism at
-            // the height it used to be has its gills at that fraction of the old height.
-            const auto it = beforeFungi().find(f.name);
-            REQUIRE(it != beforeFungi().end());
-            if (f.gillLine / f.height * it->second <= beforeCast * kCanopyHeadroom) {
-                ++failedBefore;
+        // A closure rather than three copies: the same count over the same gill lines, against a
+        // cast of whatever size, is exactly what makes the controls controls.
+        const auto fungi = fungiOf(doc);
+        const auto canopiesAgainst = [&fungi](float body) {
+            int n = 0;
+            for (const Fungus& f : fungi) {
+                n += f.gillLine > body * kCanopyHeadroom ? 1 : 0;
             }
+            return n;
+        };
+
+        const int canopies = canopiesAgainst(tallest.height);
+        const int grounded = static_cast<int>(fungi.size()) - canopies;
+        std::string ladder;
+        for (const Fungus& f : fungi) {
+            ladder += fmt::format("\n    {:<9} gills {:6.3f} m  {}", f.name, f.gillLine,
+                                  f.gillLine > tallest.height * kCanopyHeadroom ? "canopy"
+                                                                                : "grounded");
         }
-        // The control, counted rather than asserted per organism, because the claim is about the
-        // *set*: on the world as it was, a substantial part of the hero cast was below the cast's
-        // own head height. Four of the ten, at bc79a51.
-        INFO(name << ": " << failedBefore
-                  << " of the ten heroes were below head height on the old world");
-        CHECK(failedBefore >= 4);
+        INFO(name << ": the tallest body is " << tallest.node << " at " << tallest.height
+                  << " m (node scale " << tallest.scale << "), so a canopy needs its gills above "
+                  << tallest.height * kCanopyHeadroom << " m." << ladder);
+        // Enough of the ten can be filmed with a figure under them that "walk under a mushroom" is
+        // a shot this world has, rather than one shot it has once.
+        CHECK(canopies >= kCanopiesMin);
+        // And enough of them are at the cast's own height that the big ones have something in
+        // their own species to be big against.
+        CHECK(grounded >= kGroundedMin);
+
+        // Control one: ADR-213's 3.6x. One canopy, so the canopy floor fails.
+        const int canopiesBefore = canopiesAgainst(native * kBeforeCast);
+        INFO("control (" << kBeforeCast << "x, ADR-213): " << canopiesBefore << " canopies, "
+                         << static_cast<int>(fungi.size()) - canopiesBefore << " grounded");
+        CHECK(canopiesBefore < kCanopiesMin);
+
+        // Control two: ADR-330's 1.0x, the world the owner rejected. Ten canopies, so the grounded
+        // floor fails -- and it fails on the *other* half of the band, which is the point. An arm
+        // whose two controls fail the same way is one bound wearing two hats.
+        const int canopiesAt330 = canopiesAgainst(native * kCastAt330);
+        const int groundedAt330 = static_cast<int>(fungi.size()) - canopiesAt330;
+        INFO("control (" << kCastAt330 << "x, ADR-330): " << canopiesAt330 << " canopies, "
+                         << groundedAt330 << " grounded");
+        CHECK(groundedAt330 < kGroundedMin);
     }
+    CHECK(scenesChecked == 4);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -404,6 +473,13 @@ TEST_CASE("Glowmere's signature organism is monumental and stands above the tree
 // This arm has no "before" control because it is not a claim about scale: it is the claim that
 // whatever the scale is, one file cannot silently disagree with the other. Its control is that it
 // fails on any half-applied edit, which is the failure it was written for.
+//
+// **It had a hole and the hole was used.** Written against `nodes/*/scale` and the hero table, it
+// said nothing about `entity/<name>/wander/speed`, and every Glowmere project carries one of those
+// per animal plus a `runSpeed` beside it -- forty-two per project. ADR-330 moved those speeds in
+// the scene and not in the project, so between that merge and ADR-335 a 1.77 m bull walked at the
+// 3.585 m/s authored for a 6.38 m one, in every render anybody made, and this arm passed. The
+// speeds are in it now, and so is the alien `explore` spelling of the same two keys.
 TEST_CASE("the Glowmere projects do not undo their scenes", "[glowmere][scale]") {
     for (const char* name : kScenes) {
         const json scene = readJson(worldDir() / fmt::format("{}.scene.json", name));
@@ -442,6 +518,42 @@ TEST_CASE("the Glowmere projects do not undo their scenes", "[glowmere][scale]")
             CHECK(params.at(key)[0].get<float>() ==
                   Catch::Approx(n.at("scale")[0].get<float>()).epsilon(1e-4));
         }
+
+        // Every behaviour speed the project carries a copy of. A `wander`'s `speed` is metres per
+        // second and scales with the body exactly as `gait.walkSpeed` does, so a project copy left
+        // behind is a body walking at another cast's speed -- which is what happened.
+        int speedsChecked = 0;
+        for (const json& e : scene.at("entities")) {
+            const std::string entityName = e.value("name", std::string());
+            if (!e.contains("behaviors")) {
+                continue;
+            }
+            for (const json& b : e.at("behaviors")) {
+                const std::string kind = b.value("kind", std::string());
+                if (kind != "wander" && kind != "explore") {
+                    continue;
+                }
+                for (const char* field : {"speed", "runSpeed"}) {
+                    if (!b.contains(field)) {
+                        continue;
+                    }
+                    const std::string key =
+                        fmt::format("entity/{}/{}/{}", entityName, kind, field);
+                    if (!params.contains(key)) {
+                        continue;
+                    }
+                    ++speedsChecked;
+                    INFO(name << ": " << key << " overrides the scene's "
+                              << b.at(field).get<float>());
+                    CHECK(params.at(key).get<float>() ==
+                          Catch::Approx(b.at(field).get<float>()).epsilon(1e-4));
+                }
+            }
+        }
+        // And the arm is not vacuous on the scenes that have them: three of the four Glowmere
+        // projects carry all forty-two, and the atmospherics demonstration carries eight.
+        INFO(name << ": " << speedsChecked << " behaviour speeds copied into the project");
+        CHECK(speedsChecked >= 8);
 
         // And the hero table, when the project carries one: a hero's `height` and `radius` are how
         // far the camera stands off (camera_director.cpp), so a stale copy reframes every shot.
