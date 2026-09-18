@@ -447,6 +447,15 @@ TEST_CASE("The scene parser's key list matches what it reads", "[scene][lights][
         if (!entry.is_regular_file() || !entry.path().filename().string().ends_with(".scene.json")) {
             continue;
         }
+        // Generated output is not authorship, and sweeping it makes this test answer differently
+        // on different machines. `examples/world/_bench/` is gitignored (`.gitignore:26`) and built
+        // by `tools/make_bench_scenes.py` from the scenes beside it, so its fourteen copies inherit
+        // whatever the source wrote -- including the `volumeNoiseAmount` this case is pinning. The
+        // agent that wrote this test measured 15 in a fresh worktree that had never run the
+        // generator; the same test found 29 here, where it had. The number was never the disagreement.
+        if (entry.path().string().find("/_bench/") != std::string::npos) {
+            continue;
+        }
         std::ifstream in(entry.path());
         const json doc = json::parse(in, nullptr, false);
         if (doc.is_discarded() || !doc.is_object()) {
