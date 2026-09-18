@@ -80,7 +80,7 @@ bool iconToggle(const char* id, bool on, Icon icon, const char* tooltip) {
     const bool clicked = ImGui::InvisibleButton(id, ImVec2(side, side));
     const bool hovered = ImGui::IsItemHovered();
     if (hovered && tooltip != nullptr) {
-        ImGui::SetTooltip("%s", tooltip);
+        tooltipUnformatted(tooltip);
     }
     // Off is dim rather than absent: an empty cell reads as "this row has no eye", and the artist
     // then cannot find the thing they hid.
@@ -134,7 +134,7 @@ void helpMarker(const char* text) {
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", text);
+        tooltip("%s", text);
     }
 }
 
@@ -174,7 +174,7 @@ void WorldEditPanel::drawModeBar(app::Engine& engine, WorldEditor& editor) {
             ImGui::PopStyleColor(2);
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s", shortcut);
+            tooltip("%s", shortcut);
         }
     };
     modeButton("Select", EditorMode::Select, "Q -- click objects, move them, group them");
@@ -246,6 +246,7 @@ void WorldEditPanel::drawPalette(WorldEditor& editor, const assets::AssetLibrary
 
     const float side = 46.0f;
     ImGui::BeginChild("##palette", ImVec2(0.0f, 200.0f), ImGuiChildFlags_Borders);
+    const WrapText wrapChildText;
     const float available = ImGui::GetContentRegionAvail().x;
     const auto perRow = std::max(1, static_cast<int>(available / (side + ImGui::GetStyle().ItemSpacing.x)));
     int column = 0;
@@ -489,7 +490,7 @@ void WorldEditPanel::drawSelection(app::Engine& engine, WorldEditor& editor) {
     };
     act(app::EditAction::Duplicate, "Duplicate", ImVec2(third, 0.0f));
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Cmd+D");
+        tooltip("Cmd+D");
     }
     ImGui::SameLine();
     ImGui::BeginDisabled(selection.size() < 2);
@@ -498,7 +499,7 @@ void WorldEditPanel::drawSelection(app::Engine& engine, WorldEditor& editor) {
     }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Cmd+G -- the group moves as one and stays editable inside");
+        tooltip("Cmd+G -- the group moves as one and stays editable inside");
     }
     ImGui::SameLine();
     if (ImGui::Button("Ungroup", ImVec2(third, 0.0f))) {
@@ -579,7 +580,7 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
         if (ImGui::TreeNodeEx("##heroes", ImGuiTreeNodeFlags_DefaultOpen,
                               "Heroes with no object (%zu)", heroCount)) {
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Heroes whose object is gone -- renamed, deleted, or never in "
+                tooltip("Heroes whose object is gone -- renamed, deleted, or never in "
                                   "this scene. The Auto-director still travels to them and no row "
                                   "below can take them back, so they are listed here to be "
                                   "unstarred. Heroes that do have an object are starred on their "
@@ -603,7 +604,7 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
                 // same act and one fewer concept (ADR-201).
                 ImGui::TextUnformatted(hero.name.c_str());
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("importance %.2f, %.0f m tall, camera stands off %.0f m%s",
+                    tooltip("importance %.2f, %.0f m tall, camera stands off %.0f m%s",
                                       static_cast<double>(hero.importance),
                                       static_cast<double>(hero.height),
                                       static_cast<double>(hero.preferredCameraDistance),
@@ -666,7 +667,7 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
                 }
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("what this object is worth to the Auto-director");
+                tooltip("what this object is worth to the Auto-director");
             }
             ImGui::SameLine();
             const bool visible = node.visibleParam != nullptr ? node.visibleParam->base() : node.visible;
@@ -821,7 +822,7 @@ void WorldEditPanel::drawParentOffset(app::Engine& engine, WorldEditor& editor, 
     ImGui::SetNextItemWidth(-90.0f);
     const bool edited = ImGui::DragFloat3("offset", &local.x, 0.01f, -1000.0f, 1000.0f, "%.3f m");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("where this sits relative to %s, in the parent's own frame.\n\n"
+        tooltip("where this sits relative to %s, in the parent's own frame.\n\n"
                           "This is the offset parenting exists for: move the parent and this stays "
                           "put against it. The line and cross in the viewport are the same tie -- "
                           "the cross marks the point these numbers are measured from.",
@@ -881,7 +882,7 @@ void WorldEditPanel::drawParticleSettings(app::Engine& engine, WorldEditor& edit
         float v = value;
         const bool edited = ImGui::DragFloat(label, &v, (hi - lo) * 0.002f, lo, hi, fmt);
         if (ImGui::IsItemHovered() && tip != nullptr) {
-            ImGui::SetTooltip("%s", tip);
+            tooltip("%s", tip);
         }
         if (ImGui::IsItemActivated()) {
             editor.history().beginDrag(engine, fmt::format("{} {}", label, node),
@@ -1005,7 +1006,7 @@ void WorldEditPanel::drawObjectSettings(app::Engine& engine, WorldEditor& editor
     beginDrag();
     const bool subject = !heroes.empty() && heroes.front().name == node;
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s\nthe most important hero is the subject: it gets the builds and the "
+        tooltip("%s\nthe most important hero is the subject: it gets the builds and the "
                           "drops, and the rest of the cast gets the passages",
                           subject ? "this is the subject of the film" : "not the subject");
     }
@@ -1016,7 +1017,7 @@ void WorldEditPanel::drawObjectSettings(app::Engine& engine, WorldEditor& editor
     changed |= ImGui::DragFloat3("aim offset", &offset.x, 0.05f, -1000.0f, 1000.0f, "%.2f m");
     beginDrag();
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("where on the object the camera looks, relative to its origin. The mark in "
+        tooltip("where on the object the camera looks, relative to its origin. The mark in "
                           "the viewport is this point; it shows while the object is selected.");
     }
     endDrag();
@@ -1026,7 +1027,7 @@ void WorldEditPanel::drawObjectSettings(app::Engine& engine, WorldEditor& editor
     changed |= ImGui::DragFloat("stand-off", &hero.preferredCameraDistance, 0.25f, 0.5f, 5000.0f, "%.1f m");
     beginDrag();
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("how far the camera stops from it. Raise it if a shot ends up inside the "
+        tooltip("how far the camera stops from it. Raise it if a shot ends up inside the "
                           "object; shot distances are otherwise in multiples of its own size.");
     }
     endDrag();
@@ -1046,7 +1047,7 @@ void WorldEditPanel::drawObjectSettings(app::Engine& engine, WorldEditor& editor
     ImGui::TextDisabled("%.0f m tall, %.0f m across", static_cast<double>(hero.height),
                         static_cast<double>(hero.radius * 2.0f));
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("measured from the object when it was starred, and used to size every "
+        tooltip("measured from the object when it was starred, and used to size every "
                           "shot. Unstar and star it again to re-measure a scaled object.");
     }
     ImGui::Unindent(18.0f);
@@ -1102,7 +1103,7 @@ void WorldEditPanel::drawHistory(app::Engine& engine, WorldEditor& editor) {
             }
             ImGui::PopStyleColor();
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Redo forward to here");
+                tooltip("Redo forward to here");
             }
             ImGui::PopID();
         }
@@ -1122,7 +1123,7 @@ void WorldEditPanel::drawHistory(app::Engine& engine, WorldEditor& editor) {
                 ImGui::PopStyleColor();
             }
             if (ImGui::IsItemHovered() && !current) {
-                ImGui::SetTooltip("Undo back to here");
+                tooltip("Undo back to here");
             }
             ImGui::PopID();
         }

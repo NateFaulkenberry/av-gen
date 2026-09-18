@@ -1,5 +1,6 @@
 #include "ui/settings_panel.hpp"
 
+#include "ui/style.hpp"
 #include "ai/control_plane.hpp"
 #include "app/engine.hpp"
 #include "app/settings.hpp"
@@ -35,11 +36,17 @@ void sectionHeading(const char* title, const char* detail = nullptr) {
 void propertyLabel(const char* label, const char* detail = nullptr) {
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(label);
+    float labelEnd = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
     if (detail != nullptr) {
         ImGui::SameLine();
         ImGui::TextDisabled("%s", detail);
+        labelEnd = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
     }
-    ImGui::SameLine(190.0f);
+    // 190 points is the column, not a promise. "Theme" plus "System follows macOS" is wider than
+    // that, and `SameLine(190.0f)` put the combo box *on top of* the hint -- two strings in the
+    // same pixels, neither readable, which is worse than one of them being cut. The column holds
+    // wherever the label fits and yields where it does not.
+    ImGui::SameLine(labelColumnX(190.0f, labelEnd, ImGui::GetStyle().ItemSpacing.x));
 }
 
 } // namespace
@@ -63,6 +70,7 @@ void SettingsPanel::draw(app::Engine& engine) {
 
     ImGui::SameLine();
     if (ImGui::BeginChild("settings-content", ImVec2(0, 0), ImGuiChildFlags_None)) {
+        const WrapText wrapChildText;
         switch (section_) {
         case Section::General: drawGeneral(); break;
         case Section::Rendering: drawRendering(); break;

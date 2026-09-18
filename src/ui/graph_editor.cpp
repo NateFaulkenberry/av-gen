@@ -96,6 +96,7 @@ void GraphEditor::draw(graph::Graph* graph) {
     ImGui::EndChild();
     ImGui::SameLine();
     ImGui::BeginChild("inspector", ImVec2(0, 0), ImGuiChildFlags_Borders);
+    const WrapText wrapChildText;
     drawNodeInspector(*graph);
     ImGui::EndChild();
 }
@@ -335,7 +336,7 @@ void GraphEditor::drawAddMenu(graph::Graph& graph) {
             ImGui::CloseCurrentPopup();
         }
         if (ImGui::IsItemHovered() && !info->description.empty()) {
-            ImGui::SetTooltip("%s", info->description.c_str());
+            tooltip("%s", info->description.c_str());
         }
     }
     ImGui::EndChild();

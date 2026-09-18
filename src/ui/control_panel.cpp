@@ -262,7 +262,7 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
                     onOpenExample(ex);
                 }
                 if (ImGui::IsItemHovered() && !ex.description.empty()) {
-                    ImGui::SetTooltip("%s", ex.description.c_str());
+                    tooltip("%s", ex.description.c_str());
                 }
             }
             ImGui::EndMenu();
@@ -288,7 +288,7 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
                     onOpenLab(lab);
                 }
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    ImGui::SetTooltip("%s\n\nOwns: %s\nNot its: %s\nDecided in: %s%s",
+                    tooltip("%s\n\nOwns: %s\nNot its: %s\nDecided in: %s%s",
                                       std::string(lab.question).c_str(),
                                       std::string(lab.owns).c_str(),
                                       std::string(lab.doesNotOwn).c_str(),
@@ -316,7 +316,7 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
                     onOpenRecent(recent);
                 }
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("%s", recent.string().c_str());
+                    tooltip("%s", recent.string().c_str());
                 }
                 ImGui::PopID();
             }
@@ -367,7 +367,7 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
         }
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-            ImGui::SetTooltip(!haveAudio
+            tooltip(!haveAudio
                                   ? "load audio first: the camera is cut to the track's structure, "
                                     "so there has to be a track"
                               : !haveHeroes
@@ -382,7 +382,7 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
         }
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-            ImGui::SetTooltip("removes the camera's automation. While the timeline drives the "
+            tooltip("removes the camera's automation. While the timeline drives the "
                               "camera, a viewport drag writes a value the timeline replaces on the "
                               "next frame, so the mouse appears to do nothing.");
         }
@@ -470,7 +470,7 @@ void ControlPanel::drawViewMenu() {
         first = false;
         ImGui::MenuItem(panel.label.data(), nullptr, layout_.slot(panel.id));
         if (ImGui::IsItemHovered() && !panel.hint.empty()) {
-            ImGui::SetTooltip("%s\n(%s)", panel.hint.data(), dockRegionName(panel.region));
+            tooltip("%s\n(%s)", panel.hint.data(), dockRegionName(panel.region));
         }
     }
     ImGui::Separator();
@@ -478,7 +478,7 @@ void ControlPanel::drawViewMenu() {
         restoreDefaultLayout();
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("rebuilds the dock tree and reopens the panels this editor ships with");
+        tooltip("rebuilds the dock tree and reopens the panels this editor ships with");
     }
     if (ImGui::MenuItem("Save Layout Now")) {
         if (const char* ini = ImGui::GetIO().IniFilename; ini != nullptr) {
@@ -523,7 +523,7 @@ void ControlPanel::drawStatusBar(app::Engine& engine, const FrameStats& stats) {
             ImGui::TextDisabled("%s", transport.format(snapshot, snapshot.positionSeconds).c_str());
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s%s", app::transportStateName(snapshot.state),
+            tooltip("%s%s", app::transportStateName(snapshot.state),
                               snapshot.loop.usable() ? ", looping" : "");
         }
     }
@@ -590,6 +590,17 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
         }
         ImGui::SetNextWindowSize(floatingSize, ImGuiCond_FirstUseEver);
         if (ImGui::Begin(id.data(), open)) {
+            // Every panel in the editor wraps its prose, declared once, here, because this lambda
+            // is the only place a panel window is begun. Before it there was exactly one
+            // `PushTextWrapPos` in the whole of `src/ui` and every explanatory line in the
+            // application ran off the side of its panel and stopped mid-sentence -- the Control
+            // panel's project warnings ended at "unknown target parameter 'atmos/", which is
+            // information the application drew and nobody could read.
+            //
+            // It does NOT reach into child windows: ImGui resets the wrap position per window, so
+            // each `BeginChild` that holds prose carries its own guard (Help's article, Settings'
+            // content, the AI conversation, the graph inspector).
+            const WrapText wrapPanelText;
             // Reserve a column for labels. ImGui draws a widget's label to its *right*, and these
             // panels are full of sliders at the default item width -- which is most of the window --
             // so every label ran off the edge and was clipped: "Foreground" read as "Foregroun",
@@ -657,6 +668,7 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
         }
         ImGui::SetNextWindowSize(ImVec2(560, 720), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Help", open)) {
+            const WrapText wrapPanelText;
             help.draw();
         }
         ImGui::End();
@@ -846,7 +858,7 @@ bool ControlPanel::drawOutputResolutionControls(app::RenderSettings& output) {
     ImGui::SameLine();
     ImGui::TextDisabled("%s", aspectLabel(output.width, output.height).c_str());
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("The output's aspect ratio, derived from its width and height.\nIt is not "
+        tooltip("The output's aspect ratio, derived from its width and height.\nIt is not "
                           "separately editable: an aspect that could disagree with the pixel\n"
                           "dimensions is an aspect that will.");
     }
@@ -916,7 +928,7 @@ void ControlPanel::drawPreviewToolbar(app::Engine& engine, const CanvasRect& rec
             preview.toolbar = !preview.toolbar;
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Show or hide the output preview controls.");
+            tooltip("Show or hide the output preview controls.");
         }
         if (preview.toolbar) {
             ImGui::SameLine();
@@ -931,7 +943,7 @@ void ControlPanel::drawPreviewToolbar(app::Engine& engine, const CanvasRect& rec
                 ImGui::EndCombo();
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(
+                tooltip(
                     "Workspace -- the world fills the canvas, at the canvas's own shape.\n"
                     "Output Frame -- the world is rendered at the output's shape and placed in the\n"
                     "  canvas. This is the deliverable's framing: same camera, same projection.\n"
@@ -971,7 +983,7 @@ void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
         ImGui::EndCombo();
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("The output resolution -- the same setting the Render panel edits and the\n"
+        tooltip("The output resolution -- the same setting the Render panel edits and the\n"
                           "one the deliverable is rendered at. It is the project's, not the editor's.");
     }
 
@@ -996,7 +1008,7 @@ void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
         ImGui::EndCombo();
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("How large the frame is *displayed*. 100%% is one output pixel per screen\n"
+        tooltip("How large the frame is *displayed*. 100%% is one output pixel per screen\n"
                           "pixel. Zoom changes nothing about the output resolution, the camera or\n"
                           "the scene -- for that, use the size and the quality controls beside it.");
     }
@@ -1013,7 +1025,7 @@ void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
         ImGui::EndCombo();
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("How many pixels the frame is *rendered* at, which is a different question\n"
+        tooltip("How many pixels the frame is *rendered* at, which is a different question\n"
                           "from how large it is shown. Every rung here is a real render-target\n"
                           "extent at the output's aspect ratio -- none of them is a label.");
     }
@@ -1034,7 +1046,7 @@ void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
         ImGui::TextUnformatted(what.c_str());
         ImGui::PopStyleColor();
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
+            tooltip(
                 "What the frame on screen was actually rendered at.\n\n"
                 "The framing is the deliverable's exactly -- the projection is built from this\n"
                 "extent's aspect ratio, which is the output's. What differs is how finely it is\n"
@@ -1051,7 +1063,7 @@ void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
         ImGui::TextUnformatted("framing differs");
         ImGui::PopStyleColor();
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("The output is larger than this device will allocate, so the preview\n"
+            tooltip("The output is larger than this device will allocate, so the preview\n"
                               "could not be given the output's exact shape. It is NOT showing the\n"
                               "deliverable's framing. Lower the output resolution to fix it.");
         }
@@ -1063,7 +1075,7 @@ void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
     ImGui::SameLine();
     ImGui::Checkbox("safe", &preview.guides.safeAreas);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Title-safe (%.0f%%) and action-safe (%.0f%%) areas, SMPTE ST 2046-1 /\n"
+        tooltip("Title-safe (%.0f%%) and action-safe (%.0f%%) areas, SMPTE ST 2046-1 /\n"
                           "EBU R 95. Editor guides: they cannot reach a render.",
                           static_cast<double>(preview.guides.safe.titleFraction) * 100.0,
                           static_cast<double>(preview.guides.safe.actionFraction) * 100.0);
@@ -1083,7 +1095,7 @@ void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
         ImGui::EndCombo();
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("What the canvas outside the frame looks like. An editor overlay: it is\n"
+        tooltip("What the canvas outside the frame looks like. An editor overlay: it is\n"
                           "painted after the picture and reaches nothing but this window.");
     }
 
@@ -1126,12 +1138,12 @@ void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
                 // has a substitution, and a format string chosen at runtime whose arguments do not
                 // match every branch is the shape of bug that waits for the other branch.
                 if (free) {
-                    ImGui::SetTooltip(
+                    tooltip(
                         "The viewport is yours. Fly anywhere; the director still owns the film,\n"
                         "and switching shots or cameras will not move you.\n\n"
                         "Click to look through the director's camera again.");
                 } else {
-                    ImGui::SetTooltip(
+                    tooltip(
                         "The canvas is showing '%s' -- whichever camera the director has live,\n"
                         "so changing shots changes what you see.\n\n"
                         "Click to take the viewport back and fly freely. Nothing about the film\n"
@@ -1148,7 +1160,7 @@ void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
         setFullscreenPreview(!preview.fullscreen);
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Close the panels and leave the canvas the whole window. Everything that\n"
+        tooltip("Close the panels and leave the canvas the whole window. Everything that\n"
                           "was open comes back when you leave. Esc also leaves.");
     }
     if (preview.fullscreen && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
@@ -1161,7 +1173,7 @@ void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
     ImGui::SameLine();
     ImGui::TextDisabled("%s", previewCameraLabel.c_str());
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Which camera this frame was rendered through. There is one camera in this\n"
+        tooltip("Which camera this frame was rendered through. There is one camera in this\n"
                           "engine -- the scene's -- and the shot system writes it by keying\n"
                           "camera/position and camera/target on the timeline. So the preview,\n"
                           "the viewport and the deliverable cannot be looking through different\n"
@@ -1348,7 +1360,7 @@ void ControlPanel::drawAssetsWindow() {
                 // with a tooltip.
                 setHoverCursor(ImGuiMouseCursor_Hand);
                 if (!a->description.empty()) {
-                    ImGui::SetTooltip("%s\n%s", a->description.c_str(), a->path.string().c_str());
+                    tooltip("%s\n%s", a->description.c_str(), a->path.string().c_str());
                 }
             }
             // ---- the asset row's menu (the addendum's section 5) ---------------------------
@@ -1408,9 +1420,9 @@ void ControlPanel::drawAssetsWindow() {
                 const std::string haystack = asset.name + " " + asset.id + " " + asset.type;
                 if (haystack.find(assetSearch_) == std::string::npos) continue;
             }
-            ImGui::BulletText("[%s] %s  %s", sourceName, asset.name.c_str(), asset.type.c_str());
+            bulletWrapped("[%s] %s  %s", sourceName, asset.name.c_str(), asset.type.c_str());
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("%s\n%s", asset.id.c_str(), asset.path.string().c_str());
+                tooltip("%s\n%s", asset.id.c_str(), asset.path.string().c_str());
             }
         }
         ImGui::TreePop();
@@ -1751,7 +1763,7 @@ void ControlPanel::drawTransport(app::Engine& engine) {
                 for (const auto& w : engine.projectWarnings()) {
                     all += w + "\n";
                 }
-                ImGui::SetTooltip("%s", all.c_str());
+                tooltip("%s", all.c_str());
             }
         }
     }
@@ -1783,7 +1795,10 @@ void ControlPanel::drawTransport(app::Engine& engine) {
     }
     ImGui::BeginDisabled(!engine.hasAudio());
     float volume = engine.volume();
-    ImGui::SetNextItemWidth(-1);
+    // Not `-1`. ImGui draws a widget's label *after* the widget, so "fill to the right edge" puts
+    // the label past the edge, where it is clipped: this slider was drawn as an unlabelled bar with
+    // a stray "V" against the border.
+    ImGui::SetNextItemWidth(itemWidthForLabel("Volume"));
     if (ImGui::SliderFloat("Volume", &volume, 0.0f, 1.0f)) {
         engine.setVolume(volume);
     }
@@ -1798,7 +1813,7 @@ void ControlPanel::drawResponse(app::Engine& engine) {
     }
     ImGui::TextUnformatted("Audio response (modulation routes)");
     auto& modulator = engine.modulator();
-    ImGui::SetNextItemWidth(-1);
+    ImGui::SetNextItemWidth(itemWidthForLabel("Master gain"));
     ImGui::SliderFloat("Master gain", &modulator.masterGain, 0.0f, 3.0f);
     int id = 0;
     for (auto& route : modulator.routes()) {
@@ -1808,7 +1823,13 @@ void ControlPanel::drawResponse(app::Engine& engine) {
         const std::string label = route.source + " -> " + route.target;
         route.amount = sanitiseFinite(route.amount);
         const auto [lo, hi] = routeAmountBounds(route);
-        ImGui::SetNextItemWidth(-90);
+        // A route's label is a source and a target path joined by an arrow --
+        // "audio.bass -> particles/emission" -- and the 90 points this used to reserve held none of
+        // it. Every slider in the list was drawn with its label outside the window, so the panel
+        // was a column of identical bars with nothing to say which route each one was. Measured
+        // rather than guessed, with room kept for the live readout that follows on the same line.
+        const float readout = ImGui::CalcTextSize("-0.00").x + ImGui::GetStyle().ItemSpacing.x;
+        ImGui::SetNextItemWidth(itemWidthForLabel(label.c_str(), readout));
         // Ctrl+click still allows typing values beyond the slider range.
         ImGui::SliderFloat(label.c_str(), &route.amount, lo, hi);
         ImGui::SameLine();
@@ -1920,7 +1941,7 @@ void ControlPanel::drawParameters(app::Engine& engine) {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "[A]");
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("automated by the timeline; the slider is the base value");
+                tooltip("automated by the timeline; the slider is the base value");
             }
         }
         // Not reaching the picture in the state the scene is in. Said next to the slider, in the
@@ -1931,7 +1952,7 @@ void ControlPanel::drawParameters(app::Engine& engine) {
             ImGui::SameLine();
             ImGui::TextDisabled("[ignored]");
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("%.*s, and this belongs to %.*s. The value is kept and saved; "
+                tooltip("%.*s, and this belongs to %.*s. The value is kept and saved; "
                                   "right-click to switch.",
                                   static_cast<int>(inert.because.size()), inert.because.data(),
                                   static_cast<int>(inert.belongsTo.size()), inert.belongsTo.data());
@@ -2077,7 +2098,7 @@ void ControlPanel::drawForensicArms() {
                 changed = true;
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("%s", tip);
+                tooltip("%s", tip);
             }
         };
         arm("no shadows", toggles.shadows, "the cascade and spot depth passes");
@@ -2197,7 +2218,7 @@ void ControlPanel::drawPerformanceDashboard(app::Engine& engine, const FrameStat
     ImGui::TextColored(ImVec4(0.65f, 0.65f, 0.7f, 1.0f),
                        "a timing taken while the editor is drawing is not a measurement");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("ADR-170: tools/gpu-lock.sh serialises agents, not the device. Anything\n"
+        tooltip("ADR-170: tools/gpu-lock.sh serialises agents, not the device. Anything\n"
                           "else using the GPU -- including this window -- is invisible to it, and a\n"
                           "17%% confounder survives it. For a number worth quoting use\n"
                           "--headless --bench-json, or --ab to compare two arms interleaved inside\n"
@@ -2407,7 +2428,7 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
     // the sizes the renderer is benchmarked at, and nothing in the interface said so.
     ImGui::SliderFloat("Canvas scale", &canvasRenderScale, 0.25f, 1.0f, "%.2f");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Render the world at a fraction of the canvas's pixels and show it "
+        tooltip("Render the world at a fraction of the canvas's pixels and show it "
                           "stretched. 1.00 is every pixel. Lower is softer and much faster; it "
                           "changes nothing about the picture itself, and nothing about a render.");
     }
@@ -2798,7 +2819,7 @@ void ControlPanel::drawRender(app::Engine& engine) {
         if (liftViewportLimits != nullptr) {
             ImGui::Checkbox("viewport matches the render", liftViewportLimits);
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(
+                tooltip(
                     "Lift the distance limits in the VIEWPORT, so it shows what a render will.\n\n"
                     "A render already lifts them (ADR-186): distant characters keep simulating and\n"
                     "stay posed. Live playback does not, so past the scene's thresholds a far body\n"
@@ -2809,7 +2830,7 @@ void ControlPanel::drawRender(app::Engine& engine) {
             }
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
+            tooltip(
                 "The quality tier this render is made at -- not the viewport's.\n\n"
                 "offline  every shadow tap, AO and the shadow mask at full resolution,\n"
                 "         volumetrics per pixel, no LOD or material demotion, no\n"
@@ -2832,7 +2853,7 @@ void ControlPanel::drawRender(app::Engine& engine) {
             s.limits = kLimitNames[limits];
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
+            tooltip(
                 "Distance limits the live path applies so a frame fits in a frame.\n\n"
                 "tier      the tier decides: offline lifts them, anything else keeps them.\n"
                 "live      keep them -- a fast proof that matches the viewport.\n"
@@ -2902,7 +2923,7 @@ void ControlPanel::drawRender(app::Engine& engine) {
         }
         ImGui::SliderInt("encoder quality", &s.quality, 0, 100);
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("How many bits the video encoder spends. Unrelated to the render tier\n"
+            tooltip("How many bits the video encoder spends. Unrelated to the render tier\n"
                               "above, which is how much work the renderer does per frame.");
         }
         ImGui::Checkbox("mux audio", &s.muxAudio);
@@ -2947,7 +2968,7 @@ void ControlPanel::drawRender(app::Engine& engine) {
                     remaining.c_str(),
                     static_cast<unsigned long long>(current.framesWritten));
         if (!remaining.empty() && ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("An estimate from the average rate so far. It settles as the render\n"
+            tooltip("An estimate from the average rate so far. It settles as the render\n"
                               "goes on; early frames are slower because shaders are still\n"
                               "compiling and assets are still uploading.");
         }
@@ -3533,7 +3554,7 @@ void ControlPanel::drawCameras(app::Engine& engine) {
                 engine.seekSeconds(shot.startSeconds);
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Go to %.2fs, where this camera becomes live.\n"
+                tooltip("Go to %.2fs, where this camera becomes live.\n"
                                   "That is this cut's own start, which need not be a sequencer\n"
                                   "shot's start -- the two lists are different things.",
                                   shot.startSeconds);
@@ -3605,7 +3626,7 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
     // person uses, and the tooltip carries the fact that it only ever reduces.
     ImGui::TextUnformatted("Director freedom");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
+        tooltip(
             "The most freedom any section gets. A section may ask for less; none gets more,\n"
             "so lowering this can always be trusted to make the film more faithful to what\n"
             "you authored.\n\n"
@@ -3650,7 +3671,7 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
                         : authored  ? "from this project's saved song plan"
                                     : "derived from the analyzed structure");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
+        tooltip(
             fromFilm ? "Cut from the sections in the Sequencer, through each one's type and\n"
                        "treatment. Change a section's Type or Shot there and the film re-cuts."
             : authored ? "Cut from the song plan saved in this project. Add sections in the\n"
@@ -3692,7 +3713,7 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
             const bool retyped = ImGui::Combo("##autonomy", &rowAutonomy, names, IM_ARRAYSIZE(names));
             ImGui::EndDisabled();
             if (fromFilm && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                ImGui::SetTooltip(
+                tooltip(
                     "These sections come from the Sequencer, and a section there does not carry a\n"
                     "freedom of its own -- only a type and a treatment. Use Director freedom above,\n"
                     "which applies to the whole film.");
@@ -3702,7 +3723,7 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
                         section.label.empty() ? "(unnamed)" : section.label.c_str(),
                         section.intent.id.c_str());
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("%s\n\nhero %.0f%%  distance %.0f%%  movement %.0f%%\n"
+                tooltip("%s\n\nhero %.0f%%  distance %.0f%%  movement %.0f%%\n"
                                   "variation %.0f%%  cut rate %.0f%%  cameras %d\n"
                                   "measured: energy %.0f%%, density %.0f%%\n"
                                   "pass %d over this material",
@@ -3766,7 +3787,7 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
     ImGui::EndDisabled();
     if (!canDirect && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         // Stated rather than hidden: an absent control reads as a missing feature.
-        ImGui::SetTooltip(songMode
+        tooltip(songMode
                               ? "Song Mode directs a song's own sections; analyze a track in the "
                                 "Sequence panel, or load a song plan, first."
                               : "Directing cuts to the music; load a track first.");
@@ -3787,7 +3808,7 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                 s.mode = app::DirectorMode::ContinuousShot;
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("One uninterrupted take. The camera travels through the world "
+                tooltip("One uninterrupted take. The camera travels through the world "
                                   "and around its subjects without editorial cuts: each move "
                                   "begins where the last ended and at the speed it ended with.");
             }
@@ -3795,7 +3816,7 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                 s.mode = app::DirectorMode::EditedSequence;
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("A cut list. Each shot is composed independently and the "
+                tooltip("A cut list. Each shot is composed independently and the "
                                   "camera cuts between compositions and subjects, which is what "
                                   "a piece with distinct sections wants.");
             }
@@ -3805,7 +3826,7 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                 s.mode = app::DirectorMode::Song;
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(
+                tooltip(
                     "The song's own sections are the script, and the director decides what\n"
                     "happens inside each one: which camera, how it is framed, how it moves,\n"
                     "and when to cut.\n\n"
@@ -3832,7 +3853,7 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
             // one unbroken move in a continuous take.
             ImGui::TextUnformatted(continuous ? "Shot timing (moves, not cuts)" : "Shot timing");
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(
+                tooltip(
                     continuous
                         ? "A continuous take does not cut, so these do not set cut lengths.\n"
                           "They set how often the camera changes what it is doing and who it\n"
@@ -3846,7 +3867,7 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                     v = static_cast<double>(f);
                 }
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("%s", tip);
+                    tooltip("%s", tip);
                 }
             };
             seconds("shortest shot", s.minShotSeconds, 1.0, 30.0,
@@ -3863,7 +3884,7 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                     "how short it may get.");
             ImGui::EndDisabled();
             if (song && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                ImGui::SetTooltip("Song Mode has no builds to exempt: a section's own cut rate sets "
+                tooltip("Song Mode has no builds to exempt: a section's own cut rate sets "
                                   "its shot length, and 'shortest shot' is the floor it stops at.");
             }
             seconds("longest shot", s.maxShotSeconds, 4.0, 60.0,
@@ -3888,12 +3909,12 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
             }
             ImGui::EndDisabled();
             if (song && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                ImGui::SetTooltip("In Song Mode each section decides this for itself, from its shot "
+                tooltip("In Song Mode each section decides this for itself, from its shot "
                                   "intent's variation: a section that wants one setup held keeps its "
                                   "subject, and one that wants coverage moves on every shot.");
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(
+                tooltip(
                     "How many shots in a row one subject keeps before the film moves on.\n\n"
                     "Importance decides how often a subject's turn comes round; this decides\n"
                     "how long a turn lasts. They are two questions, and with a cast of eleven\n"
@@ -3913,7 +3934,7 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
             ImGui::SliderFloat("max speed", &s.maxCameraSpeed, 0.0f, 120.0f,
                                s.maxCameraSpeed > 0.0f ? "%.1f m/s" : "off");
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(
+                tooltip(
                     "The fastest the camera may travel. Off leaves the cut exactly as the\n"
                     "director built it.\n\n"
                     "What gives way is the distance, never the timing: every cut here lands on\n"
@@ -3927,7 +3948,7 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
             ImGui::SliderFloat("max swing", &s.maxViewRate, 0.0f, 180.0f,
                                s.maxViewRate > 0.0f ? "%.0f deg/s" : "off");
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(
+                tooltip(
                     "The fastest the view may swing. This is usually the one you want.\n\n"
                     "Measured on a reference cut: capping the camera to 1 m/s took its travel\n"
                     "from 23.2 down to 1.0 and left the view rotating at 63.7 deg/s -- faster\n"
@@ -3952,7 +3973,7 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                 s.seed = static_cast<std::uint32_t>(std::max(0, seed));
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(
+                tooltip(
                     song ? "Same seed, same heroes, same plan, same world, same film. Change it "
                            "to ask for a different edit of the same piece -- in Song Mode it "
                            "picks the cameras, the subjects and the framing inside every "
@@ -3966,7 +3987,7 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                 ImGui::Separator();
                 ImGui::TextWrapped("%s", directorSummary.c_str());
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip(
+                    tooltip(
                         "What the cut this panel produced actually does, rather than what was\n"
                         "asked of it.\n\n"
                         "The two caps are requests, and a continuous take can refuse them: the\n"

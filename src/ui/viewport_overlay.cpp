@@ -1,5 +1,6 @@
 #include "ui/viewport_overlay.hpp"
 
+#include "ui/style.hpp"
 #include "ui/ui_logic.hpp"
 
 #include "entity/nav_grid.hpp"

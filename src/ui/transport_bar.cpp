@@ -104,7 +104,7 @@ bool glyphButton(const char* id, Glyph glyph, const char* tooltip, bool enabled 
     ImGui::EndDisabled();
     const bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
     if (hovered && tooltip != nullptr) {
-        ImGui::SetTooltip("%s", tooltip);
+        tooltipUnformatted(tooltip);
     }
     // A button says it is a button. These are the controls a person reaches for most often in the
     // application and the pointer was an arrow over every one of them.
@@ -213,7 +213,7 @@ void TransportBar::drawTimeDisplay(app::Engine& engine, const app::TransportSnap
     }
     ImGui::PopStyleColor();
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s -- click to change: seconds, timecode, frames, bars",
+        tooltip("%s -- click to change: seconds, timecode, frames, bars",
                           snapshot.durationSeconds > 0.0 ? "position / length"
                                                          : "position (this project has no stated length)");
     }
@@ -275,14 +275,14 @@ void TransportBar::draw(app::Engine& engine, bool compact) {
         // Said plainly rather than hidden: `AudioPlayer` has no rate control, and a device left
         // running at 1x under a 2x transport drifts a second out every second. Silence is the honest
         // answer, and the user has to be told which one they are getting.
-        ImGui::SetTooltip("Playback speed.\nAudio plays at 1x only; at any other speed it is silent "
+        tooltip("Playback speed.\nAudio plays at 1x only; at any other speed it is silent "
                           "and the picture runs alone.\nOffline renders are not affected.");
     }
 
     ImGui::SameLine(0.0f, 10.0f);
     ImGui::TextDisabled("%.6g fps", snapshot.frameRate.fps());
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("The project's frame rate: what a frame step moves by and what timecode "
+        tooltip("The project's frame rate: what a frame step moves by and what timecode "
                           "counts in.\nSet it in Render.");
     }
     if (snapshot.tempoBpm > 0.0) {

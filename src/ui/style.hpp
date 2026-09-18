@@ -175,6 +175,11 @@ public:
     WrapText& operator=(const WrapText&) = delete;
 };
 
+// A bullet whose text wraps. `ImGui::BulletText` renders through `RenderText` and ignores the wrap
+// position entirely, so a bulleted parameter path or effector name -- which is what every bullet in
+// this editor holds -- simply ran off the side. Same signature, so the call sites read the same.
+void bulletWrapped(const char* fmt, ...) IM_FMTARGS(1);
+
 // The width to give the next item so its label still fits beside it, measured in the current font.
 //
 // `ImGui::SetNextItemWidth(itemWidthForLabel("Volume"))` instead of `SetNextItemWidth(-1)`, which

@@ -1,5 +1,6 @@
 #include "ui/ai_panel.hpp"
 
+#include "ui/style.hpp"
 #include "ai/control_plane.hpp"
 #include "app/engine.hpp"
 
@@ -98,6 +99,7 @@ void AiPanel::draw(app::Engine& engine) {
 void AiPanel::drawConversation(app::Engine& engine) {
     const auto& history = plane->history();
     const float composerHeight = ImGui::GetTextLineHeightWithSpacing() * 5.0f;
+    const WrapText wrapChildText;
     if (!ImGui::BeginChild("ai-conversation", ImVec2(0, -composerHeight), ImGuiChildFlags_None)) {
         ImGui::EndChild();
         return;
@@ -166,7 +168,7 @@ void AiPanel::drawConversation(app::Engine& engine) {
                 ImGui::TextDisabled("%zu value(s) changed", outcome.changedTargets.size());
                 if (ImGui::TreeNode("what changed")) {
                     for (const std::string& target : outcome.changedTargets) {
-                        ImGui::BulletText("%s", target.c_str());
+                        bulletWrapped("%s", target.c_str());
                     }
                     ImGui::TreePop();
                 }

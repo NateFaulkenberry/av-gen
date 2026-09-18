@@ -251,7 +251,7 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
         ImGui::OpenPopup("add-actor");
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Take over a node in the scene: its transform becomes keyframes and, if it\n"
+        tooltip("Take over a node in the scene: its transform becomes keyframes and, if it\n"
                           "carries a rig, its animation states become cues.");
     }
     if (ImGui::BeginPopup("add-actor")) {
@@ -327,7 +327,7 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
     }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("Find the song's sections and lay them on the timeline, and draw its beats.\n"
+        tooltip("Find the song's sections and lay them on the timeline, and draw its beats.\n"
                           "Runs in the background. Anything you have edited is kept.\n"
                           "Needs audio.");
     }
@@ -337,7 +337,7 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
         ImGui::OpenPopup("import-audio");
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Bring a song in. Also on the File menu, and on O.");
+        tooltip("Bring a song in. Also on the File menu, and on O.");
     }
 
     ImGui::SameLine();
@@ -345,7 +345,7 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
         ImGui::OpenPopup("audio-clips");
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("The files this piece is made of. Several are allowed: they are mixed into "
+        tooltip("The files this piece is made of. Several are allowed: they are mixed into "
                           "one, and the strip shows where each one starts.");
     }
     ImGui::SameLine();
@@ -442,7 +442,7 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
     ImGui::SetNextItemWidth(90);
     ImGui::Combo("sections", &sectionSnap_, kSectionSnapNames, IM_ARRAYSIZE(kSectionSnapNames));
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("What a section boundary snaps to while you drag it.\n"
+        tooltip("What a section boundary snaps to while you drag it.\n"
                           "`free` keeps whatever you land on, to the millisecond.\n"
                           "A snapped boundary takes the beat's own time, not a rounded one.");
     }
@@ -450,7 +450,7 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
     ImGui::SetNextItemWidth(110);
     ImGui::SliderFloat("horizontal zoom", &zoom_, 0.25f, 8.0f, "%.2fx");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("How much of the piece fits across the strip.");
+        tooltip("How much of the piece fits across the strip.");
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(110);
@@ -458,7 +458,7 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
     // taller waveform does not come at the cost of the lanes beside it.
     ImGui::SliderFloat("vertical zoom", &laneZoom_, 0.5f, 4.0f, "%.2fx");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("How tall the lanes are. Useful for reading the waveform, or for fitting\n"
+        tooltip("How tall the lanes are. Useful for reading the waveform, or for fitting\n"
                           "a long cast on screen at once.");
     }
     ImGui::SameLine();
@@ -472,7 +472,7 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
         dirty_ = true;
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Bake the sequence onto the timeline again.\n"
+        tooltip("Bake the sequence onto the timeline again.\n"
                           "Happens on its own after an edit; this is for after a scene change.");
     }
     ImGui::SameLine();
@@ -498,7 +498,7 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
         }
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Keep the playhead on screen while it plays, and zoom about it rather\n"
+        tooltip("Keep the playhead on screen while it plays, and zoom about it rather\n"
                           "than about the left edge.\n\n"
                           "The view pages when the playhead reaches the right-hand edge rather than\n"
                           "scrolling every frame -- a strip that slides continuously under a still\n"
@@ -606,7 +606,7 @@ void SequencePanel::drawLaneZoomGrip() {
         draw->AddLine(ImVec2(midX - 18.0f, y), ImVec2(midX + 18.0f, y), tint, 1.0f);
     }
     if (hovered || active) {
-        ImGui::SetTooltip("Drag down for taller lanes, up for shorter. (%.2fx)",
+        tooltip("Drag down for taller lanes, up for shorter. (%.2fx)",
                           static_cast<double>(laneZoom_));
     }
 }
@@ -627,7 +627,7 @@ void SequencePanel::drawStripStatus(app::Engine& engine) {
             for (const std::string& target : report.unresolved) {
                 all += target + "\n";
             }
-            ImGui::SetTooltip("%s", all.c_str());
+            tooltip("%s", all.c_str());
         }
     }
     if (work_ != nullptr) {
@@ -650,7 +650,7 @@ void SequencePanel::drawImportPopup(app::Engine& engine) {
     ImGui::Separator();
     ImGui::Checkbox("Analyze song structure", &analyzeOnImport_);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Find the sections -- intro, verse, chorus -- and lay them on the\n"
+        tooltip("Find the sections -- intro, verse, chorus -- and lay them on the\n"
                           "timeline, where you can move and rename them.");
     }
     // **Two systems, and they are not a chain.** Analysis above feeds the Song Director -- sections,
@@ -671,14 +671,14 @@ void SequencePanel::drawImportPopup(app::Engine& engine) {
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         if (performerRows == 0) {
-            ImGui::SetTooltip(
+            tooltip(
                 "Makes characters move, pose and react on section boundaries.\n\n"
                 "This project has no performer rules yet, so there is nothing to generate. Rules\n"
                 "say what a kind of section should make happen -- \"on a Drop, the alien reacts\"\n"
                 "-- and live in the project's `sectionPerformance`.\n\n"
                 "Song Mode does not use these. Analyze above is all the Auto-director needs.");
         } else {
-            ImGui::SetTooltip("Makes characters move, pose and react on section boundaries, using\n"
+            tooltip("Makes characters move, pose and react on section boundaries, using\n"
                               "this project's %zu rule(s). Sections whose kind the rules do not\n"
                               "name are skipped, and the panel says which.\n\n"
                               "Independent of Song Mode, which directs cameras rather than cast.",
@@ -2472,7 +2472,7 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
         }
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("What events call this section. Leave it empty to use the type's name.");
+        tooltip("What events call this section. Leave it empty to use the type's name.");
     }
 
     // The type, from the `ShotLanguage` -- which is the person's vocabulary, built-ins and their own
@@ -2503,7 +2503,7 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
             }
         }
         if (ImGui::IsItemHovered() && current < static_cast<int>(types.size())) {
-            ImGui::SetTooltip("%s", types[static_cast<std::size_t>(current)]->description.c_str());
+            tooltip("%s", types[static_cast<std::size_t>(current)]->description.c_str());
         }
     }
 
@@ -2543,7 +2543,7 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
             }
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("What this section should look like. 'default' follows the type, so "
+            tooltip("What this section should look like. 'default' follows the type, so "
                               "changing the type changes the treatment too.");
         }
     }
@@ -2565,7 +2565,7 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
         ImGui::OpenPopup("new-section-type");
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Add a section type of your own -- \"Ocean Ambience\", \"Dream "
+        tooltip("Add a section type of your own -- \"Ocean Ambience\", \"Dream "
                           "Sequence\" -- and give it a default treatment.");
     }
     if (ImGui::BeginPopup("new-section-type")) {
@@ -2683,7 +2683,7 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
     }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("Its time goes to the section before it, so the song stays covered.");
+        tooltip("Its time goes to the section before it, so the song stays covered.");
     }
 }
 
@@ -2954,7 +2954,7 @@ void SequencePanel::drawBehaviorInspector(app::Engine& engine, seq::Shot& shot) 
             touch();
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Negative is behind the performer, positive is in front of them.");
+            tooltip("Negative is behind the performer, positive is in front of them.");
         }
         if (ImGui::DragFloat("above", &b.offset.y, 0.1f, -200.0f, 200.0f, "%.2f m")) {
             touch();
@@ -2963,13 +2963,13 @@ void SequencePanel::drawBehaviorInspector(app::Engine& engine, seq::Shot& shot) 
             touch();
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Positive is the performer's right.");
+            tooltip("Positive is the performer's right.");
         }
         if (ImGui::Checkbox("offset turns with the performer", &b.actorSpace)) {
             touch();
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("On: \"behind\" stays behind through a turn.\n"
+            tooltip("On: \"behind\" stays behind through a turn.\n"
                               "Off: the offset is world axes, so the camera holds a compass bearing\n"
                               "while the performer turns under it.");
         }
@@ -2980,7 +2980,7 @@ void SequencePanel::drawBehaviorInspector(app::Engine& engine, seq::Shot& shot) 
                 touch();
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Stand where the performer WAS, this long ago.\n"
+                tooltip("Stand where the performer WAS, this long ago.\n"
                                   "A time lag, not a spring -- so scrubbing to a frame and playing\n"
                                   "to it give the same camera. It trails and catches up; it does\n"
                                   "not overshoot and settle.");
@@ -3001,7 +3001,7 @@ void SequencePanel::drawBehaviorInspector(app::Engine& engine, seq::Shot& shot) 
             touch();
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("The arc travelled over the shot. A full circle is 360 degrees\n"
+            tooltip("The arc travelled over the shot. A full circle is 360 degrees\n"
                               "further than the start; the direction is the sign.\n"
                               "Evaluated from shot time, so the same frame is the same pose.");
         }
@@ -3043,7 +3043,7 @@ void SequencePanel::drawBehaviorInspector(app::Engine& engine, seq::Shot& shot) 
             touch();
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Aim at where the performer will be, this far ahead.\n"
+            tooltip("Aim at where the performer will be, this far ahead.\n"
                               "Leads them into a turn instead of following them round it.");
         }
     }
@@ -3052,7 +3052,7 @@ void SequencePanel::drawBehaviorInspector(app::Engine& engine, seq::Shot& shot) 
         touch();
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Keep the camera at least this far above the ground.\n"
+        tooltip("Keep the camera at least this far above the ground.\n"
                           "0 leaves it alone. Applied at bake, where the whole path is known, so a\n"
                           "chase that would cross a hill is lifted over it before anything renders.\n"
                           "The ground only -- not trunks or rocks.");
@@ -3061,7 +3061,7 @@ void SequencePanel::drawBehaviorInspector(app::Engine& engine, seq::Shot& shot) 
         touch();
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("How many camera keys this shot bakes. A behaviour follows something that\n"
+        tooltip("How many camera keys this shot bakes. A behaviour follows something that\n"
                           "moves, so it wants more than a move does.");
     }
 }
@@ -3209,7 +3209,7 @@ void SequencePanel::drawShotInspector(app::Engine& engine, seq::Shot& shot) {
                 touch();
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(
+                tooltip(
                     "How far the camera swings around the subject over the shot.\n"
                     "0 holds the viewpoint still -- the aim can still follow a performer.\n"
                     "The eye moves at a constant distance and height, so a small drift is\n"
@@ -3490,7 +3490,7 @@ void SequencePanel::drawOverlayInspector(app::Engine& engine, seq::OverlayCue& c
         touch();
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Lower draws first, under everything above it.");
+        tooltip("Lower draws first, under everything above it.");
     }
     if (ImGui::Button("Delete")) {
         piece.overlays.erase(piece.overlays.begin() + selected_);
@@ -3789,7 +3789,7 @@ void SequencePanel::drawAudioClips(app::Engine& engine) {
                     changed = true;
                 }
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("%s", tip);
+                    tooltip("%s", tip);
                 }
             };
             seconds("start", clip.startSeconds, 0.0, "Where it sits on the timeline.");

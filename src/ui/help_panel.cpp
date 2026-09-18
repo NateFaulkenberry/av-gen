@@ -1,5 +1,6 @@
 #include "ui/help_panel.hpp"
 
+#include "ui/style.hpp"
 #include "core/log.hpp"
 #include "help/markdown.hpp"
 #include "ui/editor_layout.hpp"
@@ -123,7 +124,7 @@ std::string drawSpans(const std::vector<help::InlineSpan>& spans, float wrapWidt
                                                     ImGui::GetColorU32(kLinkColor), 1.0f);
                 if (ImGui::IsItemHovered()) {
                     ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-                    ImGui::SetTooltip("%s", span.target.c_str());
+                    tooltip("%s", span.target.c_str());
                 }
                 if (ImGui::IsItemClicked()) {
                     clicked = span.target;
@@ -152,7 +153,7 @@ bool helpLink(const char* label, std::string_view documentId) {
     const bool pressed = ImGui::SmallButton(label);
     ImGui::PopStyleColor();
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Help: %.*s", static_cast<int>(documentId.size()), documentId.data());
+        tooltip("Help: %.*s", static_cast<int>(documentId.size()), documentId.data());
     }
     if (pressed) {
         helpOpen(documentId);
@@ -410,7 +411,7 @@ void HelpPanel::draw() {
         ImGui::TextWrapped("Help reads markdown topics from a directory. Set AVGEN_HELP_DIR, or "
                            "keep docs/help beside the source tree. Directories tried:");
         for (const auto& dir : db_.report().searched) {
-            ImGui::BulletText("%s", dir.string().c_str());
+            bulletWrapped("%s", dir.string().c_str());
         }
         return;
     }
@@ -419,11 +420,13 @@ void HelpPanel::draw() {
     // and a splitter inside a splitter is a way to lose the article entirely.
     const float sidebar = std::min(240.0f, ImGui::GetContentRegionAvail().x * 0.42f);
     if (ImGui::BeginChild("help-sidebar", ImVec2(sidebar, 0.0f), ImGuiChildFlags_Borders)) {
+        const WrapText wrapChildText;
         drawSidebar();
     }
     ImGui::EndChild();
     ImGui::SameLine();
     if (ImGui::BeginChild("help-article", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
+        const WrapText wrapChildText;
         drawArticle();
     }
     ImGui::EndChild();
@@ -436,7 +439,7 @@ void HelpPanel::drawToolbar() {
     }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("back");
+        tooltip("back");
     }
     ImGui::SameLine();
     ImGui::BeginDisabled(historyPos_ >= history_.size());
@@ -445,7 +448,7 @@ void HelpPanel::drawToolbar() {
     }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("forward");
+        tooltip("forward");
     }
     ImGui::SameLine();
     if (ImGui::Button("Home")) {
@@ -520,7 +523,7 @@ void HelpPanel::drawSidebar() {
                 ImGui::PopStyleColor();
             }
             if (ImGui::IsItemHovered() && !doc->summary.empty()) {
-                ImGui::SetTooltip("%s", doc->summary.c_str());
+                tooltip("%s", doc->summary.c_str());
             }
             ImGui::PopID();
         }
@@ -554,7 +557,7 @@ void HelpPanel::drawSearchResults() {
         }
         ImGui::PopStyleColor();
         if (ImGui::IsItemHovered() && !result.excerpt.empty()) {
-            ImGui::SetTooltip("%s", result.excerpt.c_str());
+            tooltip("%s", result.excerpt.c_str());
         }
         // §7: results say which terms matched, so a result never appears by magic.
         if (!result.matchedTerms.empty()) {
@@ -791,7 +794,7 @@ void HelpPanel::drawDocument(const help::HelpDocument& doc) {
                 followed = other->id;
             }
             if (ImGui::IsItemHovered() && !other->summary.empty()) {
-                ImGui::SetTooltip("%s", other->summary.c_str());
+                tooltip("%s", other->summary.c_str());
             }
             ImGui::PopID();
         }
