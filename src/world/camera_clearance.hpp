@@ -66,6 +66,16 @@ struct ClearanceField {
 
     // The tallest vegetation that grows at `p`, in metres above the ground. Zero where nothing does.
     [[nodiscard]] float canopyHeight(glm::vec2 p) const;
+    // The same answer, from a sample of the map the caller has already taken at `p`.
+    //
+    // The canopy is a function of the biome and the biome is a function of altitude, slope and
+    // moisture -- three numbers that come out of `WorldMap::sample` and nowhere else. The one-argument
+    // form above takes that sample itself, which is correct and is why a walkability query used to
+    // evaluate the world **twice at the same point**: `TerrainQuery::at` sampled the map, then called
+    // the canopy, which sampled the map again. Measured on Glowmere: `WorldMap::sample` 7.810 us,
+    // `canopyHeight` 8.136 us, `TerrainQuery::at` 15.923 us -- the sum, because the second sample is
+    // the first one done over. Handing the sample across is the same arithmetic on the same point.
+    [[nodiscard]] float canopyHeight(glm::vec2 p, const Sample& sample) const;
     // The lowest world-space y a camera may occupy at `p`.
     [[nodiscard]] float minimumHeight(glm::vec2 p) const;
     // How far inside a hero `p` is, in metres. Zero when it is outside all of them.

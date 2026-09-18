@@ -79,6 +79,34 @@ struct NavSettings {
     // proportions, and putting one there adds a parameter to every project in the repository --
     // a change that wants its own proof, not a free ride on this one.
     float jumpOver = 0.0f;
+    // How many metres of standable ground the navigation grid must hold around a line before the
+    // grid is allowed to answer for it instead of the world (ADR-295).
+    //
+    // This is the dial on the one optimisation that decides whether a cast is a hundred or five
+    // hundred. `pathClear` used to sample the analytic world every 2.5 m -- 5.6 us a sample, three
+    // samples for a walker's lookahead -- where a four-metre grid already held the answer at a
+    // fortieth of a microsecond. The objection to using it is real and is the reason for the dial:
+    // a grid that answers 300x faster at 16x coarser resolution is not a drop-in substitute, and a
+    // walker routed by one takes a different line past a trunk.
+    //
+    // Half of the gap is closed by splitting the question rather than by making the grid finer.
+    // **Solids are never asked of the grid**: a trunk is answered by `ObstacleField::segmentBlocked`,
+    // which is swept, exact and continuous, and costs 0.018 us. Only the *terrain* half -- bounds,
+    // slope, water, thicket, hero -- is answered by the grid, and only where `NavGrid::terrainRoom`
+    // says the nearest rejected ground is this far away.
+    //
+    // In metres and not in cells, because the margin is a fact about the ground and the cell size is
+    // a fact about the graph. Expressed in cells, a finer grid quietly bought a *smaller* margin,
+    // which is how the first version of the finer-grid experiment measured the wrong thing.
+    //
+    // The other half of the gap does not close, and `NavGrid::vouches` is what is done about it: a
+    // four-metre rule about an analytic height field is not sound at any margin, so the grid tests
+    // itself against the world at build and refuses to answer for a world it got wrong. This dial
+    // sets the margin; the grid decides whether the margin is enough.
+    //
+    // **0 disables it** and restores the analytic path exactly, which is what the probe's control
+    // arm runs and what a scene that does not want this can set.
+    float gridTrustMetres = 8.0f;
 
     // The six shared rules, as the terrain query surface wants them.
     [[nodiscard]] world::WalkRules walkRules() const {
@@ -181,6 +209,13 @@ public:
     // Returns false and leaves `out` untouched when no attempt succeeded.
     [[nodiscard]] bool pickDestination(Rng& rng, glm::vec2 from, float minRadius, float maxRadius,
                                        glm::vec2& out, int attempts = 24) const;
+
+    // How many cells of margin `gridTrustMetres` asks for on this grid. At least 1.
+    [[nodiscard]] int gridTrustCells(const NavGrid& grid) const;
+    // The steepest cell the navigation grid may answer for, in `NavCell::slope`'s quantised units,
+    // when the fine check samples every `spacing` metres. Public because the probe that calibrated
+    // the rule has to be able to re-take the measurement it was calibrated from (ADR-295).
+    [[nodiscard]] std::uint8_t gridSlopeGate(float spacing = 2.5f) const;
 
     // Whether a straight walk from a to b stays navigable, sampled every `spacing` metres and
     // rejecting a rise greater than `stepHeight` between consecutive samples.

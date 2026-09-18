@@ -31,11 +31,14 @@
 #include "entity/entity.hpp"
 #include "entity/nav_grid.hpp"
 #include "entity/navigation.hpp"
+#include "core/rng.hpp"
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
 #include "spatial/point_grid.hpp"
 #include "world/camera_clearance.hpp"
+#include "world/terrain_query.hpp"
+#include "world/world_map.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -48,6 +51,7 @@
 #include <fstream>
 #include <limits>
 #include <string>
+#include <tuple>
 #include <vector>
 
 using namespace avgen;
@@ -374,6 +378,310 @@ void perceptionScan(const entity::EntityWorld& world, const entity::Navigator& n
     }
 }
 
+// What a navigation query is actually made of (P7 item 1).
+//
+// `Navigator::sample` is 10.3 us and `Navigator::groundHeight` is 0.97 us, so the sample is ten
+// height evaluations' worth of work and nobody had asked which ten. This decomposes it, because
+// "steer against the grid instead" is only the right answer if the analytic query is irreducible --
+// and the first thing this arm found is that it is not.
+//
+// The control is the bottom of the table: every composite must cost at least the sum of the parts
+// it is built from. A part that reads as more expensive than the whole is a mistimed arm.
+void navCost(const entity::Navigator& nav, int repeats) {
+    const world::TerrainQuery query = nav.terrain();
+    const world::WorldMap* map = query.map;
+    if (map == nullptr) {
+        std::printf("\n== navigation decomposition ==\n  this scene has no world map\n");
+        return;
+    }
+    const glm::vec2 lo = nav.worldMin();
+    const glm::vec2 hi = nav.worldMax();
+    // Points on walkable ground, so the rule ladder runs to the end rather than bailing at rule one.
+    // A table measured on rejected points prices the cheapest path through the function and calls it
+    // the cost of the function.
+    std::vector<glm::vec2> pts;
+    std::vector<glm::vec2> far6;
+    std::vector<glm::vec2> far30;
+    Rng rng(20250918u);
+    while (pts.size() < 64) {
+        const glm::vec2 p = lo + (hi - lo) * glm::vec2(rng.nextFloat(), rng.nextFloat());
+        if (!nav.sample(p).navigable) {
+            continue;
+        }
+        const float a = rng.range(0.0f, 6.2831853f);
+        const glm::vec2 d(std::cos(a), std::sin(a));
+        pts.push_back(p);
+        far6.push_back(p + d * 6.0f);
+        far30.push_back(p + d * 30.0f);
+    }
+
+    const auto best = [&](const char* name, auto&& fn, int inner) {
+        double bestUs = std::numeric_limits<double>::max();
+        long long acc = 0;
+        for (int r = 0; r < repeats; ++r) {
+            const auto start = Clock::now();
+            for (int i = 0; i < inner; ++i) {
+                acc += fn(i);
+            }
+            bestUs = std::min(bestUs, msSince(start) * 1000.0 / static_cast<double>(inner));
+        }
+        std::printf("  %-34s %9.3f us   (sink %lld)\n", name, bestUs, acc);
+    };
+
+    std::printf("\n== navigation decomposition, minimum of %d runs, on walkable ground ==\n", repeats);
+    best("WorldMap::height", [&](int i) { return static_cast<int>(map->height(pts[i % 64])); }, 4096);
+    best("WorldMap::normal (4 heights)",
+         [&](int i) { return static_cast<int>(map->normal(pts[i % 64], 0.5f).y * 100.0f); }, 4096);
+    best("WorldMap::waterSurface",
+         [&](int i) { const float w = map->waterSurface(pts[i % 64]);
+                      return std::isfinite(w) ? 1 : 0; }, 4096);
+    best("WorldMap::sample (the lot)",
+         [&](int i) { return static_cast<int>(map->sample(pts[i % 64], 0.5f).height); }, 4096);
+    best("ClearanceField::canopyHeight",
+         [&](int i) { return static_cast<int>(query.clearance.canopyHeight(pts[i % 64])); }, 4096);
+    best("TerrainQuery::at", [&](int i) { return query.at(pts[i % 64]).walkable ? 1 : 0; }, 4096);
+    best("Navigator::sample", [&](int i) { return nav.sample(pts[i % 64]).navigable ? 1 : 0; }, 4096);
+    best("ObstacleField::segmentBlocked 6 m",
+         [&](int i) {
+             return nav.obstacles() != nullptr &&
+                            nav.obstacles()->segmentBlocked(pts[i % 64], far6[i % 64], nav.filter(0.0f))
+                        ? 1
+                        : 0;
+         },
+         4096);
+    best("Navigator::pathClear 6 m",
+         [&](int i) { return nav.pathClear(pts[i % 64], far6[i % 64]) ? 1 : 0; }, 2048);
+    best("Navigator::pathClear 30 m",
+         [&](int i) { return nav.pathClear(pts[i % 64], far30[i % 64]) ? 1 : 0; }, 1024);
+    best("Navigator::steer 6 m lookahead",
+         [&](int i) { return nav.steer(pts[i % 64], far30[i % 64], 6.0f).x != 0.0f ? 1 : 0; }, 1024);
+    std::printf("  control: every composite must cost at least the parts under it\n");
+}
+
+// Does the grid answer the same question the world does, and do characters walk the same line?
+// (P7 item 1, ADR-295.)
+//
+// A faster route that is a different route is not a faster route. `Navigator::pathClear` may now
+// accept a segment on the grid's word instead of the world's, and the only thing that makes that
+// legitimate is that it never accepts one the world would have refused. So this counts, over a
+// great many segments of the two shapes a walker actually asks about:
+//
+//   * how often the grid can answer at all -- the hit rate, which is what the speed-up is worth;
+//   * how often it answers **clear** where the world says **blocked** -- the only dangerous
+//     direction, and the one that must be zero;
+//   * and, as the control that must fail (ADR-182), the naive substitution the seek agent looked at
+//     and refused: trust any walkable cell, no room margin, no gradient test. If that row reports
+//     zero unsafe answers too, this arm is measuring nothing.
+void gridAgreement(const entity::Navigator& nav, int samples) {
+    const entity::NavGrid* grid = nav.grid();
+    if (grid == nullptr || !grid->valid()) {
+        std::printf("\n== grid vs world ==\n  this scene has no navigation graph\n");
+        return;
+    }
+    entity::Navigator world = nav; // the control: the analytic path, exactly as it was
+    entity::NavSettings off = world.settings();
+    off.gridTrustMetres = 0.0f;
+    world.setSettings(off);
+
+    const glm::vec2 lo = nav.worldMin();
+    const glm::vec2 hi = nav.worldMax();
+    std::printf("\n== grid vs world: %d segments of each shape ==\n", samples);
+    std::printf("  the grid %s for this world (build-time self-check)\n",
+                grid->vouches() ? "vouches" : "does NOT vouch");
+    std::printf("  the shipped rule is trust %d, slope gate %u/255, rise %.3f m/m\n",
+                nav.gridTrustCells(*grid), world.gridSlopeGate(2.5f),
+                static_cast<double>(world.settings().stepHeight / 2.5f * 0.667f));
+    std::printf("  %-8s %-18s %8s %8s %9s %9s\n", "reach", "rule", "grid ok", "world ok", "unsafe",
+                "missed");
+    for (const float reach : {6.0f, 40.0f}) {
+        struct Rule {
+            const char* name;
+            int trust;
+            float rise;     // 0 = the shipped rule, derived from the step height
+            int slopeGate;  // -1 = the shipped gate; 255 = no gate at all
+        };
+        // The last row is the control. `1e9` disables the gradient test and a trust of 1 asks only
+        // that the cell itself and its neighbours be standable -- which is exactly "use the grid
+        // instead of the world", the thing that was refused, measured rather than asserted.
+        const Rule rules[] = { // NOLINT{"trust 1", 1, 0.0f, -1},
+                              {"trust 2", 2, 0.0f, -1},
+                              {"trust 3", 3, 0.0f, -1},
+                              {"trust 2, no slope", 2, 0.0f, 255},
+                              {"naive (control)", 1, 1e9f, 255}};
+        for (const Rule& rule : rules) {
+            Rng rng(77000u + static_cast<std::uint32_t>(reach)); // the same segments for every rule
+            const float rise = rule.rise > 0.0f ? rule.rise
+                                                : world.settings().stepHeight / 2.5f * 0.667f;
+            const auto gate = rule.slopeGate < 0
+                                  ? world.gridSlopeGate(2.5f)
+                                  : static_cast<std::uint8_t>(rule.slopeGate);
+            long long gridOk = 0;
+            long long worldOk = 0;
+            long long unsafe = 0;
+            long long missed = 0;
+            long long reasons[9] = {};
+            int taken = 0;
+            while (taken < samples) {
+                const glm::vec2 a = lo + (hi - lo) * glm::vec2(rng.nextFloat(), rng.nextFloat());
+                if (!world.sample(a).navigable) {
+                    continue; // a walker asks from where it is standing, and it is standing somewhere
+                }
+                ++taken;
+                const float angle = rng.range(0.0f, 6.2831853f);
+                const glm::vec2 b = a + glm::vec2(std::cos(angle), std::sin(angle)) * reach;
+                const bool truth = world.pathClear(a, b);
+                // The grid's half of the answer, under this rule, with the solids settled the way
+                // `pathClear` settles them -- swept, exact, and never asked of the grid.
+                const bool solid = nav.obstacles() != nullptr &&
+                                   nav.obstacles()->segmentBlocked(a, b, nav.filter(nav.groundHeight(a)));
+                bool fast = !solid && grid->segmentTerrainClear(a, b, rule.trust, rise, gate);
+                if (fast && rule.rise <= 0.0f) {
+                    // The point obstacle test the fast path also runs. Off for the control row, so
+                    // the control stays the naive substitution it is there to represent.
+                    const int steps = std::max(1, static_cast<int>(std::ceil(reach / 2.5f)));
+                    for (int k = 1; k <= steps && fast; ++k) {
+                        const glm::vec2 q =
+                            a + (b - a) * (static_cast<float>(k) / static_cast<float>(steps));
+                        fast = !nav.obstructed(q, grid->groundAt(q));
+                    }
+                }
+                worldOk += truth ? 1 : 0;
+                gridOk += fast ? 1 : 0;
+                if (fast && !truth) {
+                    ++unsafe; // the grid said walk and the world said no. Must be 0.
+                    // *Why* the world said no, walked exactly the way `pathClear` walks it. A count
+                    // of disagreements says the rule is wrong; this says which rule, and the two
+                    // lead to completely different fixes.
+                    const float stepLen = 2.5f;
+                    const int steps = std::max(1, static_cast<int>(std::ceil(reach / stepLen)));
+                    float previous = world.sample(a).ground;
+                    for (int k = 1; k <= steps; ++k) {
+                        const float t = static_cast<float>(k) / static_cast<float>(steps);
+                        const entity::NavSample sm = world.sample(a + (b - a) * t);
+                        if (!sm.navigable) {
+                            ++reasons[static_cast<int>(sm.reject)];
+                            break;
+                        }
+                        if (std::abs(sm.ground - previous) > world.settings().stepHeight) {
+                            ++reasons[8]; // the step test
+                            break;
+                        }
+                        previous = sm.ground;
+                    }
+                }
+                if (!fast && truth) {
+                    ++missed; // a clear line the grid could not settle: work, not a wrong answer.
+                }
+            }
+            std::printf("  %-8.0f %-18s %8lld %8lld %9lld %9lld", static_cast<double>(reach),
+                        rule.name, gridOk, worldOk, unsafe, missed);
+            if (unsafe > 0) {
+                std::printf("   why:");
+                for (int k = 0; k < 8; ++k) {
+                    if (reasons[k] > 0) {
+                        std::printf(" %s=%lld",
+                                    entity::navRejectName(static_cast<entity::NavReject>(k)),
+                                    reasons[k]);
+                    }
+                }
+                if (reasons[8] > 0) {
+                    std::printf(" step=%lld", reasons[8]);
+                }
+            }
+            std::printf("\n");
+        }
+    }
+    std::printf("  unsafe must be 0 for every rule but the control, and the control must not be\n");
+    std::printf("  grid ok / world ok is the hit rate: how much of the analytic work it removes\n");
+}
+
+// The acceptance bar, stated as a measurement: do the characters walk the same line? (ADR-295.)
+//
+// One thing this arm does *not* have to prove, because the code makes it true by construction: the
+// planned routes are identical. `NavGrid::findPath` -- A*, the string pull, the tie-break on cell
+// index -- never calls `pathClear`. Only `steer` and `pathValid` do. So what a grid-assisted walker
+// can differ in is the metre in front of it and the moment it decides its held route has gone
+// stale, and those are what this measures.
+//
+// Reported over a rising horizon rather than at one time, because a walking simulation is chaotic:
+// one differing steering decision at second three puts a body somewhere else at second ninety, and
+// a single ninety-second number cannot tell "the line past that trunk moved by a centimetre" from
+// "it took the other side of the lake". The control is the same configuration run twice, which must
+// be exactly zero at every horizon -- without it a harness that quietly ran one configuration twice
+// would report perfect agreement and mean nothing (ADR-182).
+void routeDivergence(const entity::Navigator& nav, int count, const char* label) {
+    constexpr double kHorizons[] = {1.0, 5.0, 15.0, 30.0, 60.0, 90.0};
+    constexpr std::size_t kCount = sizeof(kHorizons) / sizeof(kHorizons[0]);
+    struct Run {
+        std::vector<std::vector<glm::vec3>> at; // positions at each horizon
+        double ms = 0.0;
+        double travel = 0.0;
+    };
+    const auto walk = [&](float trust) {
+        entity::Navigator tuned = nav;
+        entity::NavSettings settings = tuned.settings();
+        settings.gridTrustMetres = trust;
+        tuned.setSettings(settings);
+        entity::EntityWorld world;
+        params::ParameterSet params;
+        buildWorld(world, params, count, "explore", tuned);
+        entity::EntityUpdate u;
+        u.dt = 1.0 / 60.0;
+        u.distanceDetail = false;
+        u.viewPosition = glm::vec3(0.0f);
+        Run run;
+        run.at.resize(kCount);
+        std::size_t next = 0;
+        const auto steps = static_cast<int>(kHorizons[kCount - 1] * 60.0);
+        const auto start = Clock::now();
+        for (int f = 1; f <= steps; ++f) {
+            u.time = static_cast<double>(f) / 60.0;
+            world.update(u, params);
+            while (next < kCount && u.time >= kHorizons[next] - 1e-9) {
+                for (const auto& e : world.entities()) {
+                    run.at[next].push_back(e->state().position());
+                }
+                ++next;
+            }
+        }
+        run.ms = msSince(start);
+        for (const auto& e : world.entities()) {
+            run.travel = std::max(run.travel, static_cast<double>(glm::length(e->state().travel)));
+        }
+        return run;
+    };
+    const auto worst = [](const std::vector<glm::vec3>& a, const std::vector<glm::vec3>& b) {
+        double d = 0.0;
+        for (std::size_t i = 0; i < std::min(a.size(), b.size()); ++i) {
+            d = std::max(d, static_cast<double>(glm::length(a[i] - b[i])));
+        }
+        return d;
+    };
+    const auto moved = [](const std::vector<glm::vec3>& a, const std::vector<glm::vec3>& b) {
+        int n = 0;
+        for (std::size_t i = 0; i < std::min(a.size(), b.size()); ++i) {
+            n += glm::length(a[i] - b[i]) > 1e-4f ? 1 : 0;
+        }
+        return n;
+    };
+
+    std::printf("\n== do the routes change: %d explorers on %s ==\n", count, label);
+    const Run off = walk(0.0f);
+    const Run offAgain = walk(0.0f);
+    const Run on = walk(nav.settings().gridTrustMetres);
+    std::printf("  analytic only   %8.0f ms of simulation, furthest body %7.2f m\n", off.ms, off.travel);
+    std::printf("  grid-assisted   %8.0f ms of simulation, furthest body %7.2f m   (%.2fx)\n", on.ms,
+                on.travel, on.ms > 0.0 ? off.ms / on.ms : 0.0);
+    std::printf("  %6s %14s %14s %10s\n", "t", "control |dx|", "grid |dx|", "bodies moved");
+    for (std::size_t i = 0; i < kCount; ++i) {
+        std::printf("  %5.0fs %13.6f m %13.6f m %6d / %zu\n", kHorizons[i],
+                    worst(off.at[i], offAgain.at[i]), worst(off.at[i], on.at[i]),
+                    moved(off.at[i], on.at[i]), off.at[i].size());
+    }
+    std::printf("  control must be 0.000000 m at every horizon; the furthest-body column must not\n"
+                "  be 0 m, or the arm simulated nothing and two of nothing agree perfectly\n");
+}
+
 void gridStats(const entity::Navigator& nav) {
     const entity::NavGrid* grid = nav.grid();
     std::printf("\n== navigation graph ==\n");
@@ -384,7 +692,10 @@ void gridStats(const entity::Navigator& nav) {
     const entity::NavGridStats s = grid->stats();
     std::printf("  %d x %d cells at %.2f m = %zu cells; walkable %zu, water %zu, blocked %zu\n",
                 s.width, s.height, s.cellSize, s.cells, s.walkable, s.water, s.blocked);
-    std::printf("  regions %zu, largest %zu; build %.1f ms\n", s.regions, s.largestRegion, s.buildMs);
+    std::printf("  regions %zu, largest %zu, stranded %zu; terrain-standable %zu; build %.1f ms\n",
+                s.regions, s.largestRegion, s.stranded, s.terrain, s.buildMs);
+    std::printf("  grid vouches for this world's terrain: %s (%zu sampled walks checked, %zu wrong)\n",
+                s.trusted ? "yes" : "NO", s.trustChecks, s.trustFailures);
 }
 
 // Does play(t) equal seek(t)? And does the coarse LOD band change the answer?
@@ -517,7 +828,8 @@ int main(int argc, char** argv) {
         argc > 1 ? fs::path(argv[1]) : fs::path("examples/world/glowmere-valley-2.scene.json");
     const int frames = argc > 2 ? std::atoi(argv[2]) : 120;
     const int repeats = argc > 3 ? std::atoi(argv[3]) : 3;
-    // Which sections to run, as letters: g grid, p perception scan, r primitives, s scaling,
+    // Which sections to run, as letters: g grid, n navigation decomposition, a grid-vs-world
+    // agreement, v route divergence, p perception scan, r primitives, s scaling,
     // k scrub cost, d determinism. A selector rather than an all-or-nothing run because the scrub
     // arm at 250 explorers takes ten minutes by itself and nobody wants to pay that to re-check a
     // microsecond.
@@ -549,6 +861,9 @@ int main(int argc, char** argv) {
     }
     std::printf("interest points: %zu\n", comp.entityWorld().interestPoints().size());
     if (want('g')) { gridStats(nav); }
+    if (want('n')) { navCost(nav, repeats); }
+    if (want('a')) { gridAgreement(nav, 20000); }
+    if (want('v')) { routeDivergence(nav, 24, scenePath.filename().string().c_str()); }
     if (want('p')) { perceptionScan(comp.entityWorld(), nav, repeats); }
     if (want('r')) { primitives(nav, repeats); }
     if (want('s')) { scaling(nav, frames, repeats); }

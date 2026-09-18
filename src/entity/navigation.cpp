@@ -211,8 +211,46 @@ bool Navigator::pathClear(glm::vec2 a, glm::vec2 b, float spacing) const {
             return false;
         }
     }
-    const float distance = glm::length(b - a);
     const float step = std::max(spacing, 0.25f);
+    // Then the grid, where the grid can prove it (ADR-295). The solids are already settled above,
+    // exactly and continuously; what is left is the terrain, and the terrain is a smooth height
+    // field whose rejected ground the grid maps at four metres. `segmentTerrainClear` answers only
+    // when the line runs `gridTrustCells` cells clear of any of it and the cell-to-cell gradient
+    // cannot trip the step test below -- and answers false, meaning "ask the world", for everything
+    // else. It can skip work; it can never decide against it, which is why this is an early accept
+    // and not a branch.
+    //
+    // `stepHeight` is a rise between two samples `step` metres apart, so the gradient that matters
+    // is `stepHeight / step`. Two thirds of it, because the grid knows the ground at cell centres
+    // and the fine check looks between them: the margin is what pays for the difference, and it was
+    // calibrated against the world rather than chosen -- see the `agree` arm of tools/charai_probe.
+    if (settings_.gridTrustMetres > 0.0f && grid_ != nullptr && grid_->valid() && grid_->vouches() &&
+        grid_->segmentTerrainClear(a, b, gridTrustCells(*grid_),
+                                   settings_.stepHeight / step * 0.667f,
+                                   gridSlopeGate(step))) {
+        // The terrain is settled; the solids are not quite. The swept test above ran with the
+        // walker's foot at `a`'s height for the whole line, and a solid is stepped over or ducked
+        // under according to where the foot *is*: over forty metres of Glowmere the ground moves by
+        // metres and the two disagree. Measured, when this test was not here: of 876 segments in
+        // 20,000 where the grid said clear and the world said blocked, **807 were this** -- and
+        // only 47 were the step test and 13 the slope. The terrain was never the problem.
+        //
+        // So the point test runs, at the same spacing the fine loop uses, on the grid's own
+        // interpolated ground rather than on a fresh `WorldMap::height`: a foot height feeds a
+        // threshold against a solid's base and top, and inside terrain this smooth the two agree to
+        // centimetres. 0.013 us a point against 5.6.
+        const float distance = glm::length(b - a);
+        const int steps = std::max(1, static_cast<int>(std::ceil(distance / step)));
+        bool clear = true;
+        for (int i = 1; i <= steps && clear; ++i) {
+            const glm::vec2 p = a + (b - a) * (static_cast<float>(i) / static_cast<float>(steps));
+            clear = !obstructed(p, grid_->groundAt(p));
+        }
+        if (clear) {
+            return true;
+        }
+    }
+    const float distance = glm::length(b - a);
     const int steps = std::max(1, static_cast<int>(std::ceil(distance / step)));
     float previousGround = sample(a).ground;
     for (int i = 1; i <= steps; ++i) {
@@ -227,6 +265,30 @@ bool Navigator::pathClear(glm::vec2 a, glm::vec2 b, float spacing) const {
         previousGround = s.ground;
     }
     return true;
+}
+
+int Navigator::gridTrustCells(const NavGrid& grid) const {
+    // At least one cell whatever the margin asks for: a rule that trusted a cell sitting against
+    // unstandable ground would be the naive substitution, and that one is measured and refused.
+    const float cell = std::max(grid.cellSize(), 1e-3f);
+    return std::max(1, static_cast<int>(std::ceil(settings_.gridTrustMetres / cell)));
+}
+
+std::uint8_t Navigator::gridSlopeGate(float spacing) const {
+    // The steepest ground the grid may vouch for, in the cell's own quantised slope units.
+    //
+    // Slope and the step test are two different limits and the step is far the tighter one: a cell
+    // at the walkable limit of 0.55 is a 63-degree face, a gradient of 1.99, and 2.5 m of it rises
+    // five metres against a step height of 1.4. So a route over ground that is *walkable* can fail
+    // the fine check on every second sample, and the grid must not vouch for any of it. The gate is
+    // the slope at which a straight `spacing` of ground exactly consumes the step height --
+    // gradient `stepHeight / spacing`, converted back through `slope = 1 - 1/sqrt(1 + g^2)` -- and
+    // then quantised the way the cell was.
+    const float gradient = settings_.stepHeight / std::max(spacing, 0.25f);
+    const float slope = 1.0f - 1.0f / std::sqrt(1.0f + gradient * gradient);
+    const float range = std::max(settings_.maxSlope, 1e-3f);
+    return static_cast<std::uint8_t>(
+        std::clamp(slope / range, 0.0f, 1.0f) * 255.0f + 0.5f);
 }
 
 glm::vec2 Navigator::steer(glm::vec2 from, glm::vec2 to, float lookahead) const {

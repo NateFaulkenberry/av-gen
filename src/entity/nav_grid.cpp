@@ -68,7 +68,9 @@ void NavGrid::clear() {
     cellPath_.clear();
     regions_.clear();
     regionSizes_.clear();
+    largestRegion_ = 0;
     floodStack_.clear();
+    terrainRoom_.clear();
     stamp_ = 0;
     lastExpansions_ = 0;
     stats_ = {};
@@ -137,6 +139,16 @@ void NavGrid::build(const Navigator& nav, float cellSize) {
             case NavReject::InsideHero: c.flags |= NavBlocked; break;
             default: break;
             }
+            // The ground on its own, before anything standing on it (ADR-295). `Navigator::sample`
+            // runs the terrain rules first and asks the obstacle field last, so a point that got as
+            // far as `Obstructed` passed every terrain rule -- which is exactly the distinction this
+            // flag needs and the reason it can be read off the reject reason rather than re-derived.
+            // `InsideHero` is a terrain reject and stays one: a hero is a landmark, not scatter, and
+            // the obstacle field it is also in is the swept half of the same fact.
+            if (s.reject == NavReject::None || s.reject == NavReject::Obstructed) {
+                c.flags |= NavTerrain;
+                ++stats_.terrain;
+            }
             if (obstacles != nullptr) {
                 // Area-weighted rather than counted: three saplings and one boulder should not
                 // score the same, and a cell a walker can still thread should not score as full.
@@ -194,6 +206,8 @@ void NavGrid::build(const Navigator& nav, float cellSize) {
     cameFrom_.assign(total, -1);
     visitStamp_.assign(total, 0u);
     buildRegions();
+    buildTerrainRoom();
+    checkTrust(nav);
     extractInterestPoints();
 
     stats_.buildMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count();
@@ -202,12 +216,29 @@ void NavGrid::build(const Navigator& nav, float cellSize) {
               width, height, cell, total, stats_.walkable, stats_.water, stats_.blocked,
               stats_.regions, stats_.regions == 1 ? "" : "s", stats_.largestRegion, shore_.size(),
               vistas_.size(), stats_.buildMs);
+    // What the grid is allowed to answer for, and why, said out loud at the moment it is decided.
+    // A silent optimisation that is on in one world and off in the next is indistinguishable from
+    // one that never ran (ADR-182).
+    if (stats_.trusted) {
+        log::info("nav grid: the grid answers the terrain half of a straight walk for this world; "
+                  "{} sampled walks agreed with the world exactly",
+                  stats_.trustChecks);
+    } else {
+        log::info("nav grid: the grid will NOT answer for this world's terrain -- it disagreed with "
+                  "the world after {} sampled walk(s); every walkability query stays analytic",
+                  stats_.trustChecks);
+    }
     if (stats_.regions > 1) {
-        // Worth saying out loud. An archipelago is a legitimate world and a character stranded on
-        // an islet in one is not, and the difference is invisible until something fails to path.
-        log::info("nav grid: the walkable ground is in {} disconnected pieces; {} of {} cells are "
-                  "in the largest",
-                  stats_.regions, stats_.largestRegion, stats_.walkable);
+        // Worth saying out loud, and worth saying at `warn` rather than `info`. An archipelago is a
+        // legitimate world; a character stranded on an islet in one is not, and the difference is
+        // invisible until something fails to path. What an author acts on is not the region count,
+        // it is how much ground is on the wrong side of it -- so that is what this says (ADR-296).
+        log::warn("nav grid: the walkable ground is in {} disconnected pieces; {} of {} walkable "
+                  "cells ({:.0f}%) cannot be reached from the largest",
+                  stats_.regions, stats_.stranded, stats_.walkable,
+                  stats_.walkable > 0 ? 100.0 * static_cast<double>(stats_.stranded) /
+                                            static_cast<double>(stats_.walkable)
+                                      : 0.0);
     }
 }
 
@@ -518,6 +549,8 @@ void NavGrid::buildRegions() {
     regionSizes_.assign(1, stats_.cells - stats_.walkable); // region 0 is everything unwalkable
     stats_.regions = 0;
     stats_.largestRegion = 0;
+    stats_.stranded = 0;
+    largestRegion_ = 0;
     if (cells_.empty()) {
         return;
     }
@@ -567,11 +600,225 @@ void NavGrid::buildRegions() {
                 }
             }
             regionSizes_.push_back(size);
-            stats_.largestRegion = std::max(stats_.largestRegion, size);
+            if (size > stats_.largestRegion) {
+                stats_.largestRegion = size;
+                largestRegion_ = next;
+            }
             ++stats_.regions;
             ++next;
         }
     }
+    stats_.stranded = stats_.walkable - std::min(stats_.largestRegion, stats_.walkable);
+}
+
+// The Chebyshev distance transform over the terrain mask: two passes, forward then backward, each
+// taking the minimum of the neighbours already settled plus one. Exact for the Chebyshev metric --
+// this is not an approximation of a Euclidean distance, it is the right answer to a different and
+// cheaper question, and a square neighbourhood is the shape the segment walk below actually needs.
+//
+// Outside the grid counts as unstandable, so the border saturates at 1 rather than at 255 and the
+// world's edge is never trusted. 6.6 ms on Glowmere's 23,716 cells against a 148 ms build.
+void NavGrid::buildTerrainRoom() {
+    constexpr std::uint8_t kMax = 255;
+    terrainRoom_.assign(stats_.cells, 0u);
+    if (cells_.empty()) {
+        return;
+    }
+    const int w = stats_.width;
+    const int h = stats_.height;
+    const auto terrain = [&](int x, int y) {
+        return (cells_[index(glm::ivec2(x, y))].flags & NavTerrain) != 0;
+    };
+    const auto room = [&](int x, int y) -> std::uint8_t {
+        return x < 0 || y < 0 || x >= w || y >= h ? 0u : terrainRoom_[index(glm::ivec2(x, y))];
+    };
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            if (!terrain(x, y)) {
+                continue;
+            }
+            const std::uint8_t best =
+                std::min({room(x - 1, y - 1), room(x, y - 1), room(x + 1, y - 1), room(x - 1, y)});
+            terrainRoom_[index(glm::ivec2(x, y))] =
+                best >= kMax - 1 ? kMax : static_cast<std::uint8_t>(best + 1);
+        }
+    }
+    for (int y = h - 1; y >= 0; --y) {
+        for (int x = w - 1; x >= 0; --x) {
+            const std::size_t i = index(glm::ivec2(x, y));
+            if (terrainRoom_[i] == 0) {
+                continue;
+            }
+            const std::uint8_t best =
+                std::min({room(x + 1, y + 1), room(x, y + 1), room(x - 1, y + 1), room(x + 1, y)});
+            const std::uint8_t candidate =
+                best >= kMax - 1 ? kMax : static_cast<std::uint8_t>(best + 1);
+            terrainRoom_[i] = std::min(terrainRoom_[i], candidate);
+        }
+    }
+}
+
+void NavGrid::checkTrust(const Navigator& nav) {
+    stats_.trustChecks = 0;
+    stats_.trustFailures = 0;
+    stats_.trusted = false;
+    if (stats_.walkable == 0 || terrainRoom_.empty()) {
+        return;
+    }
+    // The world's own answer, with this grid -- and any grid the navigator was already holding --
+    // taken out of the loop. Checking the rule against something that already uses the rule would be
+    // the probe that reads the right answer out of the wrong place, and the first version of this
+    // function was a smaller version of the same mistake: it left out `pathClear`'s swept solid test
+    // and then blamed the terrain for the eleven segments a tree was standing in.
+    Navigator world = nav;
+    NavSettings settings = world.settings();
+    const float cell = std::max(stats_.cellSize, 1e-3f);
+    const int trustCells =
+        std::max(1, static_cast<int>(std::ceil(settings.gridTrustMetres / cell)));
+    settings.gridTrustMetres = 0.0f;
+    world.setSettings(settings);
+    world.setGrid(nullptr);
+    const std::uint8_t slopeGate = world.gridSlopeGate(2.5f);
+    const float rise = world.settings().stepHeight / 2.5f * 0.667f;
+    const spatial::ObstacleField* solids = world.obstacles();
+
+    // A stride over the walkable set rather than a random sample. Coverage that scales with the
+    // world and reaches all of it beats a fixed number of dice: a rule that is wrong on one hillside
+    // is wrong on a lattice that crosses the hillside, and may never be wrong on 512 throws. The
+    // stride, the angle sequence and the two reaches are fixed, so two builds of one world from one
+    // seed reach the same verdict on any machine -- a verdict that varied would make a bake
+    // irreproducible (ADR-091).
+    constexpr std::size_t kStride = 8;
+    constexpr float kGoldenAngle = 2.39996323f;
+    float angle = 0.0f;
+    bool longLeg = false;
+    for (std::size_t i = 0; i < cells_.size(); i += kStride) {
+        if ((cells_[i].flags & NavWalkable) == 0) {
+            continue;
+        }
+        angle += kGoldenAngle;
+        longLeg = !longLeg;
+        // Both shapes a walker asks about: the lookahead of a steering fan, and a leg of a planned
+        // route. The long one is where a coarse rule goes wrong most often and it would be
+        // convenient to leave out.
+        const float reach = longLeg ? 40.0f : 6.0f;
+        const glm::vec2 a = centerOf(glm::ivec2(static_cast<int>(i % static_cast<std::size_t>(stats_.width)),
+                                                static_cast<int>(i / static_cast<std::size_t>(stats_.width))));
+        const glm::vec2 b = a + glm::vec2(std::cos(angle), std::sin(angle)) * reach;
+        if (!segmentTerrainClear(a, b, trustCells, rise, slopeGate)) {
+            continue; // the grid declined to answer; there is nothing for it to be wrong about
+        }
+        // Everything else `pathClear`'s fast path does before it returns true, in the same order.
+        if (solids != nullptr &&
+            solids->segmentBlocked(a, b, world.filter(world.groundHeight(a)))) {
+            continue;
+        }
+        bool clear = true;
+        const int steps = std::max(1, static_cast<int>(std::ceil(reach / 2.5f)));
+        for (int k = 1; k <= steps && clear; ++k) {
+            const glm::vec2 q = a + (b - a) * (static_cast<float>(k) / static_cast<float>(steps));
+            clear = !world.obstructed(q, groundAt(q));
+        }
+        if (!clear) {
+            continue;
+        }
+        ++stats_.trustChecks;
+        if (!world.pathClear(a, b)) {
+            // One is enough. The grid said walk and the world said no, and a walker that takes that
+            // line is somewhere else a second later -- measured: four of twenty-four bodies inside
+            // one second on Glowmere.
+            ++stats_.trustFailures;
+            return;
+        }
+    }
+    stats_.trusted = stats_.trustChecks > 0;
+}
+
+std::uint8_t NavGrid::terrainRoom(glm::ivec2 c) const {
+    return inside(c) && !terrainRoom_.empty() ? terrainRoom_[index(c)] : 0u;
+}
+
+std::uint8_t NavGrid::terrainRoom(glm::vec2 p) const { return terrainRoom(cellOf(p)); }
+
+float NavGrid::groundAt(glm::vec2 p) const {
+    if (cells_.empty()) {
+        return 0.0f;
+    }
+    const float cell = std::max(stats_.cellSize, 1e-3f);
+    // In units of cell centres, so the integer part is the lower-left of the four that surround p.
+    const glm::vec2 u = (p - origin_) / cell - 0.5f;
+    const glm::ivec2 c(static_cast<int>(std::floor(u.x)), static_cast<int>(std::floor(u.y)));
+    const glm::vec2 f = u - glm::vec2(c);
+    const auto ground = [&](int x, int y) {
+        return cells_[index(glm::ivec2(std::clamp(x, 0, stats_.width - 1),
+                                       std::clamp(y, 0, stats_.height - 1)))]
+            .ground;
+    };
+    const float a = glm::mix(ground(c.x, c.y), ground(c.x + 1, c.y), f.x);
+    const float b = glm::mix(ground(c.x, c.y + 1), ground(c.x + 1, c.y + 1), f.x);
+    return glm::mix(a, b, f.y);
+}
+
+bool NavGrid::segmentTerrainClear(glm::vec2 a, glm::vec2 b, int trustCells,
+                                  float maxRisePerMetre, std::uint8_t maxSlope) const {
+    if (terrainRoom_.empty() || trustCells <= 0) {
+        return false;
+    }
+    const glm::ivec2 from = cellOf(a);
+    const glm::ivec2 to = cellOf(b);
+    if (!inside(from) || !inside(to)) {
+        return false;
+    }
+    const auto trusted = [&](glm::ivec2 c) {
+        return inside(c) && terrainRoom_[index(c)] >= trustCells &&
+               cells_[index(c)].slope <= maxSlope;
+    };
+    if (!trusted(from)) {
+        return false;
+    }
+    // The same supercover walk the string pull uses, for the same reason: a thin line through a
+    // corner would skip the cell that mattered. No diagonal-corner test here, because `trustCells`
+    // is at least one -- every neighbour of a trusted cell is standable by construction, so there
+    // is no corner to squeeze through.
+    int x = from.x;
+    int y = from.y;
+    const int dx = std::abs(to.x - from.x);
+    const int dy = std::abs(to.y - from.y);
+    const int sx = to.x > from.x ? 1 : -1;
+    const int sy = to.y > from.y ? 1 : -1;
+    int err = dx - dy;
+    float previousGround = cells_[index(from)].ground;
+    const float cell = std::max(stats_.cellSize, 1e-3f);
+    for (int guard = 0; guard <= dx + dy + 2; ++guard) {
+        if (x == to.x && y == to.y) {
+            return true;
+        }
+        const int e2 = err * 2;
+        const bool stepX = e2 > -dy;
+        const bool stepY = e2 < dx;
+        if (stepX) {
+            err -= dy;
+            x += sx;
+        }
+        if (stepY) {
+            err += dx;
+            y += sy;
+        }
+        const glm::ivec2 at(x, y);
+        if (!trusted(at)) {
+            return false;
+        }
+        // The step test, priced per metre so it survives a caller that samples at a different
+        // spacing. Two cell centres are four metres apart (or 5.66 on a diagonal) and the fine
+        // check tests every 2.5 m, so a gradient is the only thing that transfers between them.
+        const float ground = cells_[index(at)].ground;
+        const float span = (stepX && stepY ? kSqrt2 : 1.0f) * cell;
+        if (std::abs(ground - previousGround) > maxRisePerMetre * span) {
+            return false;
+        }
+        previousGround = ground;
+    }
+    return false;
 }
 
 std::uint16_t NavGrid::regionAt(glm::vec2 p) const {
