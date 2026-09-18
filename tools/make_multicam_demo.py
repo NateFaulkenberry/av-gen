@@ -23,7 +23,9 @@ leaves the originals untouched.
 **This generator no longer reproduces the checked-in demo.** Two things it copies have since been
 changed in the files themselves and cannot be expressed here:
 
-  * the render range and output path, which were re-saved from the app; and
+  * the render range and output path, which were re-saved from the app;
+  * the cut itself -- `glowmere-valley-2.json` now carries a 39-shot bake where the demo carries
+    41, so copying its `camera/*` tracks today would replace the film, not just re-place it; and
   * the Hero Free Roam camera's 20% dolly-in -- 328 baked keys on `camera/position`,
     `camera/target` and `camera/lens/focusDistance`, each scaled about the subject of the shot it
     belongs to. Those keys are copied wholesale from `glowmere-valley-2.json`, which was *not*
