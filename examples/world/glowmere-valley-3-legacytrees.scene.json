@@ -5,16 +5,16 @@
  "camera": {
   "mode": 1,
   "position": [
-   34.0,
+   20.0,
    17.0,
-   40.0
+   -18.0
   ],
   "target": [
-   2.0,
-   6.5,
-   62.0
+   -20.0,
+   3.4,
+   2.0
   ],
-  "fov": 44.0,
+  "fov": 40.0,
   "orbitSpeed": 0.0
  },
  "lightRig": "../lightrigs/glowmere-valley.rig.json",
@@ -6992,6 +6992,8 @@
      "memorySeconds": 9.0,
      "memoryCapacity": 16.0,
      "visitedCapacity": 6.0,
+     "stallSeconds": 12.0,
+     "stallDistance": 1.5,
      "considerers": [
       {
        "kind": "interest",
@@ -7012,6 +7014,14 @@
        "maxRange": 150.0,
        "noveltyRadius": 26.0,
        "noveltyPenalty": 0.1
+      },
+      {
+       "kind": "holdPost",
+       "name": "range",
+       "weight": 0.12,
+       "post": "",
+       "tolerance": 26.0,
+       "pull": 0.5
       },
       {
        "kind": "idle",
@@ -7035,7 +7045,7 @@
     {
      "kind": "ground",
      "slopeAlign": 0.5,
-     "footprint": 1.6
+     "bodyRadius": 0.9
     }
    ],
    "perception": {
@@ -7080,6 +7090,8 @@
      "memorySeconds": 9.0,
      "memoryCapacity": 16.0,
      "visitedCapacity": 6.0,
+     "stallSeconds": 12.0,
+     "stallDistance": 1.5,
      "considerers": [
       {
        "kind": "route",
@@ -7089,7 +7101,7 @@
        "fordPenalty": 0.0,
        "detourPenalty": 40.0,
        "falloff": 90.0,
-       "goalTolerance": 3.0,
+       "goalTolerance": 6.0,
        "destinations": [
         {
          "name": "east-bank",
@@ -7141,7 +7153,7 @@
     {
      "kind": "ground",
      "slopeAlign": 0.5,
-     "footprint": 1.6
+     "bodyRadius": 0.9
     }
    ],
    "perception": {
@@ -7186,6 +7198,8 @@
      "memorySeconds": 9.0,
      "memoryCapacity": 16.0,
      "visitedCapacity": 6.0,
+     "stallSeconds": 12.0,
+     "stallDistance": 1.5,
      "considerers": [
       {
        "kind": "route",
@@ -7195,7 +7209,7 @@
        "fordPenalty": 0.0,
        "detourPenalty": 40.0,
        "falloff": 90.0,
-       "goalTolerance": 3.0,
+       "goalTolerance": 6.0,
        "destinations": [
         {
          "name": "east-bank",
@@ -7247,7 +7261,7 @@
     {
      "kind": "ground",
      "slopeAlign": 0.5,
-     "footprint": 1.6
+     "bodyRadius": 0.9
     }
    ],
    "perception": {
@@ -7292,6 +7306,8 @@
      "memorySeconds": 9.0,
      "memoryCapacity": 16.0,
      "visitedCapacity": 6.0,
+     "stallSeconds": 12.0,
+     "stallDistance": 1.5,
      "considerers": [
       {
        "kind": "holdPost",
@@ -7343,7 +7359,7 @@
     {
      "kind": "ground",
      "slopeAlign": 0.5,
-     "footprint": 1.6
+     "bodyRadius": 0.9
     }
    ],
    "perception": {
@@ -7388,6 +7404,8 @@
      "memorySeconds": 9.0,
      "memoryCapacity": 16.0,
      "visitedCapacity": 6.0,
+     "stallSeconds": 12.0,
+     "stallDistance": 1.5,
      "considerers": [
       {
        "kind": "interest",
@@ -7408,6 +7426,14 @@
        "maxRange": 130.0,
        "noveltyRadius": 20.0,
        "noveltyPenalty": 0.14
+      },
+      {
+       "kind": "holdPost",
+       "name": "range",
+       "weight": 0.09,
+       "post": "",
+       "tolerance": 40.0,
+       "pull": 0.28
       },
       {
        "kind": "idle",
@@ -7431,7 +7457,7 @@
     {
      "kind": "ground",
      "slopeAlign": 0.5,
-     "footprint": 1.6
+     "bodyRadius": 0.9
     }
    ],
    "perception": {
@@ -7477,14 +7503,32 @@
     "slug": "thebackwater",
     "placement": "free",
     "position": [
-     132.0,
-     20.0,
-     -82.0
+     110.0,
+     16.5,
+     -58.0
     ],
     "target": [
-     84.0,
+     78.0,
+     8.2,
+     -28.0
+    ],
+    "fov": 46.0,
+    "autoDirector": false
+   },
+   {
+    "id": 7,
+    "name": "The Detour",
+    "slug": "thedetour",
+    "placement": "free",
+    "position": [
+     152.0,
+     19.0,
+     24.0
+    ],
+    "target": [
+     114.0,
      9.0,
-     -36.0
+     18.0
     ],
     "fov": 44.0,
     "autoDirector": false
@@ -7548,46 +7592,54 @@
    {
     "camera": 3,
     "start": 0.0,
-    "end": 58.0,
+    "end": 44.0,
     "transition": "cut",
     "locked": true,
-    "label": "navigation: one wades the backwater, one walks round it"
+    "label": "navigation: the wader crosses the backwater"
+   },
+   {
+    "camera": 7,
+    "start": 44.0,
+    "end": 78.0,
+    "transition": "cut",
+    "locked": true,
+    "label": "navigation: the drylander walks round its northern end"
    },
    {
     "camera": 5,
-    "start": 58.0,
-    "end": 96.0,
+    "start": 78.0,
+    "end": 112.0,
     "transition": "cut",
     "locked": true,
     "label": "character awareness: the watcher attends to the elder"
    },
    {
     "camera": 2,
-    "start": 96.0,
-    "end": 142.0,
+    "start": 112.0,
+    "end": 152.0,
     "transition": "cut",
     "locked": true,
     "label": "environmental awareness: the scout works the west floodplain"
    },
    {
     "camera": 4,
-    "start": 142.0,
-    "end": 172.0,
+    "start": 152.0,
+    "end": 178.0,
     "transition": "cut",
     "locked": true,
     "label": "the ford"
    },
    {
     "camera": 6,
-    "start": 172.0,
-    "end": 196.0,
+    "start": 178.0,
+    "end": 202.0,
     "transition": "cut",
     "locked": true,
     "label": "the wooded west wall"
    },
    {
     "camera": 1,
-    "start": 196.0,
+    "start": 202.0,
     "end": 230.0,
     "transition": "cut",
     "locked": true,
@@ -7595,6 +7647,6 @@
    }
   ],
   "default": 3,
-  "nextId": 7
+  "nextId": 8
  }
 }

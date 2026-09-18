@@ -857,9 +857,14 @@ CAMERAS = [
     (1, "Director", None, None, None),  # autoDirector
     # The scout's ground: the hollow, from the shoulder above it.
     (2, "The Hollow", [-100.0, 24.0, -46.0], [-70.0, 8.6, -16.0], 42.0),
-    # The crossing decision. The backwater runs away to the south-west out of this eye, so the
-    # ford and the first leg of the detour are both in frame from the moment they diverge.
-    (3, "The Backwater", [132.0, 20.0, -82.0], [84.0, 9.0, -36.0], 44.0),
+    # The crossing itself, from 42 m south-east of it. The first siting stood 65 m off and the
+    # frame came back with the wader 30 px tall and half the picture water, which is what a
+    # measurement of a body's position cannot tell you and a render can.
+    (3, "The Backwater", [110.0, 16.5, -58.0], [78.0, 8.2, -28.0], 46.0),
+    # The other half of the same decision: the dry way, which loops north round the end of the
+    # backwater. Two cameras because the two bodies are 50 m apart by the time the choice is
+    # legible, and a single wide shot that held both held neither.
+    (7, "The Detour", [152.0, 19.0, 24.0], [114.0, 9.0, 18.0], 44.0),
     # The main channel's one ford.
     (4, "The Ford", [20.0, 17.0, -18.0], [-20.0, 3.4, 2.0], 40.0),
     # The elder fungus, the elder alien standing under it, and whatever comes to look.
@@ -878,12 +883,13 @@ SHOTS = [
     # the approach -- which is why the deliverable still of the approach is taken with the camera
     # overridden rather than off this list. One fixed cut cannot be in two places at once, and
     # saying so is cheaper than pretending the cast waits its turn.
-    (3, 0.0, 58.0, "navigation: one wades the backwater, one walks round it"),
-    (5, 58.0, 96.0, "character awareness: the watcher attends to the elder"),
-    (2, 96.0, 142.0, "environmental awareness: the scout works the west floodplain"),
-    (4, 142.0, 172.0, "the ford"),
-    (6, 172.0, 196.0, "the wooded west wall"),
-    (1, 196.0, 230.0, "the director, on whatever it finds"),
+    (3, 0.0, 44.0, "navigation: the wader crosses the backwater"),
+    (7, 44.0, 78.0, "navigation: the drylander walks round its northern end"),
+    (5, 78.0, 112.0, "character awareness: the watcher attends to the elder"),
+    (2, 112.0, 152.0, "environmental awareness: the scout works the west floodplain"),
+    (4, 152.0, 178.0, "the ford"),
+    (6, 178.0, 202.0, "the wooded west wall"),
+    (1, 202.0, 230.0, "the director, on whatever it finds"),
 ]
 
 cameras = []
