@@ -1343,9 +1343,15 @@ void ControlPanel::drawAssetsWindow() {
     ImGui::TextDisabled("%zu of %zu", shown.size(), assets.size());
     ImGui::Separator();
     if (ImGui::BeginTable("assets", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable)) {
-        ImGui::TableSetupColumn("name");
-        ImGui::TableSetupColumn("kind", ImGuiTableColumnFlags_WidthFixed, 90.0f);
-        ImGui::TableSetupColumn("category", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+        // All three text columns stretch, and the name stretches hardest. With "kind" and
+        // "category" fixed at 90 and 120 the two of them plus the thumbnail claimed 260 points, and
+        // the name -- the only column that identifies the row -- got whatever was left. Docked in
+        // the left column at 1440x900 that was about two characters: the list read "el / be / be /
+        // Ca", and its header was an ellipsis. Proportional, the name keeps the largest share at
+        // every width, and the columns stay draggable for anyone who wants a different split.
+        ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthStretch, 3.0f);
+        ImGui::TableSetupColumn("kind", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        ImGui::TableSetupColumn("category", ImGuiTableColumnFlags_WidthStretch, 1.4f);
         ImGui::TableSetupColumn("thumb", ImGuiTableColumnFlags_WidthFixed, 50.0f);
         ImGui::TableHeadersRow();
         for (const app::AssetEntry* a : shown) {
