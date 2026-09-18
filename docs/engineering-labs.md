@@ -500,7 +500,7 @@ the debug flag. `[gpu]` tests take `tools/gpu-lock.sh`.
    `procedural.cpp`'s parameter table** — not a lab.
 7. **The bloom pyramid's reach is a pixel count, not a fraction of the frame**, so `--supersample 2`
    halves a small highlight's glow across the delivered picture. Measured, with two controls, in
-   ADR-278; deliberately not changed, because the fix is an art-direction decision. **Owner: the
+   ADR-279; deliberately not changed, because the fix is an art-direction decision. **Owner: the
    owner.**
 8. **`indtune.cpp` at the repository root is a 0-byte file** referenced by no CMakeLists, and
    `avgen_bench_flatten` is marked temporary and slated for deletion with its investigation.

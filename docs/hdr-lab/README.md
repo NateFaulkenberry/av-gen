@@ -320,7 +320,7 @@ It also bears directly on Bioluminescence Phases B–E: the species brightness l
 *hues*, and two species at the same authored intensity in cyan and violet cross the bloom threshold
 4.6 stops apart.
 
-### 5.2 The bloom pyramid's reach is a pixel count, so supersampling halves it
+### 5.2 The bloom pyramid's reach is a pixel count, so supersampling halves it (ADR-279)
 
 Six levels from half resolution means the coarsest level's texel is 2⁶ = **64 output pixels
 whatever the frame's size**. The reach is measured in pixels, not in fractions of the picture.

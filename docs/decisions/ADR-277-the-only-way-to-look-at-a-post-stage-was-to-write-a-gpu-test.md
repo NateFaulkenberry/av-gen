@@ -4,7 +4,7 @@
 **Date:** 2026-09-18
 
 The HDR / Exposure / Bloom Lab (lab #8 of ADR-261's suite; `docs/hdr-lab/README.md`). One
-instrument, two fixes, and one finding recorded in ADR-278 rather than acted on.
+instrument, two fixes, and one finding recorded in ADR-279 rather than acted on.
 
 ---
 
@@ -117,7 +117,7 @@ Three things this lab measured and deliberately left alone, each with the measur
   one-line change that reconciles it moves every frame ever graded on this engine. The lab
   contributes the number and a test that pins the *current* rule, so a change of basis is
   deliberate.
-* **The bloom pyramid's reach is a pixel count.** ADR-278.
+* **The bloom pyramid's reach is a pixel count.** ADR-279.
 * **A scene file cannot author an emissive above 50.** `material/emissive` is registered with a
   hard maximum of 50 and the parameter clamps an authored 256 with no warning; `baseColor` and
   `emissiveColor` are clamped to [0, 1], so this is the only route above unit radiance from a scene

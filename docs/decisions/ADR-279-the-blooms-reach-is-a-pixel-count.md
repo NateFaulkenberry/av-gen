@@ -1,4 +1,4 @@
-# ADR-278: The bloom's reach is a pixel count, so supersampling halves it — measured, and not changed
+# ADR-279: The bloom's reach is a pixel count, so supersampling halves it — measured, and not changed
 
 **Status:** Accepted (as a finding; no code change)
 **Date:** 2026-09-18
