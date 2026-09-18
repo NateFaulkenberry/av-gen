@@ -26,6 +26,7 @@
 // by `LocomotionState::reaction`, with the same feet control.
 
 #include "assets/asset_registry.hpp"
+#include "assets/gltf_loader.hpp"
 #include "core/time.hpp"
 #include "entity/entity.hpp"
 #include "params/modulation.hpp"
@@ -46,6 +47,7 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <filesystem>
 #include <memory>
@@ -348,6 +350,129 @@ TEST_CASE("an authored layer stack round-trips through the scene file", "[labs][
     const scene::CompositionNode* plain = (*again)->findNode("scout");
     REQUIRE(plain != nullptr);
     CHECK(plain->animation.layers.empty());
+}
+
+TEST_CASE("the same mask expression means different things on three rigs, and each one says which",
+          "[labs][character][layers]") {
+    // The claim the whole design rests on: a mask is per-asset because the content is. Three rig
+    // families ship here and no two of them share a single joint name for a head. If this were
+    // wrong -- if `descendants` covered a head everywhere, or if one name worked on all three --
+    // the right design would have been a compiled-in head mask and a `lookAt` that just worked.
+    const fs::path farm = fs::path(AVGEN_SOURCE_DIR) / "assets" / "farm";
+    const fs::path aliens = fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens";
+    if (!fs::exists(farm / "bull.glb") || !fs::exists(aliens / "alien-scout.glb")) {
+        WARN("assets/farm or assets/aliens is not present");
+        return;
+    }
+    struct Rig {
+        const char* file;
+        const char* head;     // this asset's own name for a head
+        std::uint32_t alone;  // joints the name covers on its own
+        std::uint32_t subtree; // joints it covers with `descendants`
+    };
+    // Measured, not assumed. The alien's head is a leaf: `descendants` adds nothing, and the four
+    // joints that make up the rest of its head are siblings that have to be named.
+    const std::array<Rig, 3> rigs{{
+        {"../aliens/alien-scout.glb", "head.x", 1, 1},
+        {"bull.glb", "Head01", 1, 2},
+        {"chicken.glb", "Head", 1, 2},
+    }};
+    for (const Rig& r : rigs) {
+        INFO(fmt::format("{} -> '{}'", r.file, r.head));
+        scene::Scene s;
+        const auto summary = assets::loadGltf(farm / r.file, s, {});
+        REQUIRE(summary.has_value());
+        REQUIRE(s.rigs.size() == 1);
+        const scene::Skeleton& sk = s.rigs.front().skeleton;
+
+        scene::JointMaskSpec named;
+        named.joints = {r.head};
+        const scene::JointMask alone = scene::resolveJointMask(sk, named);
+        named.descendants = true;
+        const scene::JointMask subtree = scene::resolveJointMask(sk, named);
+        INFO(fmt::format("{} joints; '{}' alone covers {}, with descendants {}", sk.jointCount(), r.head,
+                         alone.joints, subtree.joints));
+        CHECK(alone.joints == r.alone);
+        CHECK(subtree.joints == r.subtree);
+
+        // And each of the other two rigs' names misses here, reported rather than silent. This is
+        // the arm that would fail if any single name worked everywhere.
+        for (const Rig& other : rigs) {
+            if (std::string_view(other.head) == std::string_view(r.head)) {
+                continue;
+            }
+            scene::JointMaskSpec foreign;
+            foreign.joints = {other.head};
+            const scene::JointMask missed = scene::resolveJointMask(sk, foreign);
+            INFO(fmt::format("'{}' on {}", other.head, r.file));
+            CHECK(missed.joints == 0);
+            REQUIRE(missed.missing.size() == 1);
+            CHECK(missed.missing[0] == other.head);
+        }
+    }
+}
+
+TEST_CASE("a bad joint name authored in a scene file reaches the rig as an empty mask",
+          "[labs][character][layers]") {
+    if (!assetsPresent()) {
+        WARN("assets/aliens is not present");
+        return;
+    }
+    // The arms above reach `bind` through `rebind`, which is the test's own door. This one goes in
+    // through the front: a scene file, `fromJson`, the flatten that copies a rig per node, and the
+    // `bind` the flatten calls. Without it "a bad name is reported" would be a statement about a
+    // function nothing in the application necessarily calls.
+    assets::AssetRegistry registry(fixture().parent_path());
+    auto loaded = scene::Composition::loadFile(fixture(), registry);
+    REQUIRE(loaded.has_value());
+    nlohmann::json doc = (*loaded)->toJson();
+    bool patched = false;
+    for (nlohmann::json& node : doc.at("nodes")) {
+        // `fromJson` has no file to be relative to, and every asset path in this fixture is written
+        // relative to it. Absolute here, or the rigs never load and the assertion below would be
+        // reading an empty scene and calling it a mask that missed -- which is the exact class of
+        // vacuous pass this file exists to refuse.
+        if (node.contains("asset")) {
+            node["asset"] = (fixture().parent_path() / node.at("asset").get<std::string>())
+                                .lexically_normal()
+                                .string();
+        }
+        if (node.value("name", std::string()) != "watcher") {
+            continue;
+        }
+        // The bull's name for a head, on an alien.
+        node.at("animation").at("layers")[0].at("joints") = nlohmann::json::array({"Head01"});
+        node.at("animation").at("layers")[0]["pivot"] = "Head01";
+        patched = true;
+    }
+    REQUIRE(patched);
+
+    auto broken = scene::Composition::fromJson(doc, registry);
+    INFO((broken.has_value() ? std::string() : broken.error().message));
+    REQUIRE(broken.has_value());
+    // Attached and ticked once, because `scene().rigs` is the *flattened* scene and the flatten is
+    // what copies a rig per node and calls `bind` on it. Reading `rigs` off a composition that has
+    // never updated is reading an empty vector.
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*broken)->attach(params, modulator);
+    (*broken)->setViewport(1280, 720);
+    FrameTime time;
+    (*broken)->update(time);
+    const scene::SkinnedRig* rig = nullptr;
+    for (const scene::SkinnedRig& r : (*broken)->scene().rigs) {
+        if (r.name.rfind("watcher/", 0) == 0) {
+            rig = &r;
+        }
+    }
+    REQUIRE(rig != nullptr);
+    REQUIRE(rig->layers.size() == 2);
+    // The mask resolved to nothing, through the real authoring path, and the composition logged the
+    // three complaints on its way past. The control is the layer beside it, whose names this rig does
+    // carry: if the flatten had simply failed to bind anything, both would be empty.
+    CHECK(rig->layers.masks()[0].joints == 0);
+    CHECK(rig->layers.masks()[0].missing.size() == 1);
+    CHECK(rig->layers.masks()[1].joints > 0);
 }
 
 // ------------------------------------------------------------------------------------------------
