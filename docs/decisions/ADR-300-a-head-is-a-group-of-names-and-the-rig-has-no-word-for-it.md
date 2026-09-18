@@ -98,13 +98,18 @@ of 90**, and a look-at built on it would turn a head mesh and leave the eyes and
 pointing the old way, on a character six metres tall. That number is asserted in
 `tests/unit/test_character_lab_layers.cpp`, not left in this document.
 
-Three rig families, three vocabularies, no overlap:
+Three rig families, three vocabularies, no overlap. `joints` is `Skeleton::jointCount()` — the skin's
+own joints plus every ancestor of one, which is one armature node more than the skin declares:
 
-| asset | joints | the head |
-|---|---:|---|
-| `assets/aliens/*.glb` (6 files) | 89–90 | `head.x`, with `Eye_L`, `Eye_R`, `Mouth`, `Antenna` beside it |
-| `assets/farm/bull.glb` | 27 | `Head01` -> `Head02`, properly nested under `Neck01` -> `Neck02` |
-| `assets/farm/chicken.glb` | 17 | `Head` -> `Beak` |
+| asset | joints | the head | alone | + descendants |
+|---|---:|---|---:|---:|
+| `assets/aliens/alien-scout.glb` | 90 | `head.x`, with `Eye_L`, `Eye_R`, `Mouth`, `Antenna` **beside** it | 1 | **1** |
+| `assets/farm/bull.glb` | 28 | `Head01` -> `Head02`, nested under `Neck01` -> `Neck02` | 1 | 2 |
+| `assets/farm/chicken.glb` | 18 | `Head` -> `Beak` | 1 | 2 |
+
+Each family's name for a head resolves to **nothing** on each of the other two, reported by name.
+That is the arm that would have failed if any single name worked everywhere — in which case the
+right design would have been a compiled-in head mask and a `lookAt` that simply worked.
 
 So:
 
