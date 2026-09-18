@@ -39,7 +39,7 @@ bool CompositionPanel::keyDot(app::Engine& engine, const std::string& path) {
     const bool clicked = ImGui::RadioButton("##key", automated);
     ImGui::PopStyleColor(2);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s\nkey at the playhead (%.2f s)%s", path.c_str(), engine.timelineClock().seconds,
+        tooltip("%s\nkey at the playhead (%.2f s)%s", path.c_str(), engine.timelineClock().seconds,
                           automated ? "\nalready automated -- the slider is the base value" : "");
     }
     if (clicked) {
@@ -125,6 +125,7 @@ void CompositionPanel::drawList(app::Engine& engine) {
     ImGui::TextDisabled("Layers (top of the list draws last)");
     const float listHeight = std::min(190.0f, std::max(60.0f, static_cast<float>(count) * 22.0f + 8.0f));
     if (ImGui::BeginChild("layers", ImVec2(0, listHeight), ImGuiChildFlags_Borders)) {
+        const WrapText wrapChildText;
         for (std::size_t row = 0; row < count; ++row) {
             const std::size_t index = count - 1 - row;
             comp::Layer* layer = stack.at(index);
@@ -135,7 +136,7 @@ void CompositionPanel::drawList(app::Engine& engine) {
             // Nothing to do on a change: the stack skips a disabled layer when it builds the frame.
             ImGui::Checkbox("##on", &layer->enabled);
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("visible");
+                tooltip("visible");
             }
             ImGui::SameLine();
             char label[160];
@@ -253,7 +254,7 @@ void CompositionPanel::drawInspector(app::Engine& engine, comp::Layer& layer) {
         rowLabel("position");
         ImGui::DragFloat2("##position", &layer.position.x, 0.002f, -4.0f, 5.0f, "%.3f");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("fraction of the frame, origin bottom left. (0.5, 0.5) is the centre "
+            tooltip("fraction of the frame, origin bottom left. (0.5, 0.5) is the centre "
                               "at every resolution.");
         }
         keyDot(engine, layer.parameterPath("scale"));
@@ -266,7 +267,7 @@ void CompositionPanel::drawInspector(app::Engine& engine, comp::Layer& layer) {
         rowLabel("anchor");
         ImGui::DragFloat2("##anchor", &layer.anchor.x, 0.005f, -2.0f, 3.0f, "%.3f");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("what the layer turns and scales about, as a fraction of its own box");
+            tooltip("what the layer turns and scales about, as a fraction of its own box");
         }
     }
 

@@ -622,6 +622,115 @@ inline std::pair<float, float> routeAmountBounds(const params::ModRoute& /*route
 // Replaces NaN/inf (e.g. from a hand-edited project file) so widgets never see them.
 inline float sanitiseFinite(float value, float fallback = 0.0f) { return std::isfinite(value) ? value : fallback; }
 
+// ---- how wide text is allowed to be ------------------------------------------------------------
+//
+// Dear ImGui reads a *negative* wrap position as "do not wrap at all": `CalcWrapWidthForPos`
+// returns 0 below zero and `TextEx` only wraps when `wrap_pos_x >= 0`. Every wrap width in this
+// application is a subtraction -- the space available, less an inset, less an indent -- and a
+// subtraction goes negative as soon as somebody drags the panel narrow enough. At that point
+// wrapping switches *off*, silently, on the panel that needed it most, and the sentence walks out
+// of the window with nothing on screen to say so.
+//
+// So the arithmetic lives here with a test, where a wrong answer is a number rather than an
+// appearance. `minimum` is a floor and not a clamp to zero because zero is its own unreadable
+// answer: ImGui treats 0.0f as "wrap at the window's right edge" when it is a *wrap position*, but
+// as a *width* it would break after every character.
+inline constexpr float kMinWrapWidth = 96.0f;
+
+[[nodiscard]] inline float wrapWidthFor(float available, float inset = 0.0f,
+                                        float minimum = kMinWrapWidth) {
+    if (!std::isfinite(available) || !std::isfinite(inset) || !std::isfinite(minimum)) {
+        return kMinWrapWidth;
+    }
+    return std::max(available - inset, std::max(minimum, 1.0f));
+}
+
+// How wide a tooltip may get before it wraps.
+//
+// A tooltip is an auto-resizing window, so the trick every panel uses -- `PushTextWrapPos(0.0f)`,
+// "wrap at the window's right edge" -- is circular inside one: the right edge is wherever the text
+// has already put it, so nothing wraps and the window simply grows. A tooltip needs a number.
+//
+// This repository writes three- and four-sentence tooltips. Laid out on one line at the editor's
+// 15-point font they are over a thousand points wide, which is wider than the window the editor
+// opens at (1440x900), and ImGui then pushes the tooltip back against the viewport edge and clips
+// the far end off. The sentence is drawn and cannot be read, which is the whole defect.
+//
+// Two bounds, and the smaller wins. `kTooltipWrapEms` is the comfortable measure -- roughly the
+// forty characters a line of prose wants -- and the viewport fraction is what keeps a tooltip from
+// being wider than the screen it has to fit on when somebody runs the editor in a small window.
+inline constexpr float kTooltipWrapEms = 40.0f;
+inline constexpr float kTooltipViewportFraction = 0.45f;
+
+[[nodiscard]] inline float tooltipWrapWidth(float fontSize, float viewportWidth) {
+    if (!std::isfinite(fontSize) || fontSize <= 0.0f) {
+        fontSize = 15.0f; // the editor's font; a tooltip still has to be drawn if this is nonsense
+    }
+    const float comfortable = fontSize * kTooltipWrapEms;
+    if (!std::isfinite(viewportWidth) || viewportWidth <= 0.0f) {
+        return comfortable;
+    }
+    return std::max(std::min(comfortable, viewportWidth * kTooltipViewportFraction), kMinWrapWidth);
+}
+
+// The width to give a widget so that its own label still fits beside it.
+//
+// Dear ImGui draws a widget's label *after* the widget, on the same line, and
+// `SetNextItemWidth(-1)` means "take everything to the right edge". The two together put the label
+// past the right edge of the window, where it is clipped away entirely -- so a slider labelled
+// "Volume" is drawn as an unlabelled bar with a stray "V" at the border, and a modulation route's
+// slider says nothing at all about which route it is. `SetNextItemWidth(-90)` is the same mistake
+// with a guess in place of the measurement: ninety points holds "gain" and loses
+// "audio.bass -> particles/emission".
+//
+// The measurement belongs at the call site (only ImGui can measure a string in the current font);
+// the arithmetic belongs here. `minItem` is what stops the widget itself collapsing to nothing on a
+// panel too narrow to hold both -- past that point something has to give, and a draggable bar with
+// no width is less useful than a label that overflows.
+inline constexpr float kMinItemWidth = 60.0f;
+
+[[nodiscard]] inline float itemWidthBesideLabel(float available, float labelWidth, float spacing,
+                                                float trailing = 0.0f,
+                                                float minItem = kMinItemWidth) {
+    if (!std::isfinite(available) || !std::isfinite(labelWidth) || !std::isfinite(spacing) ||
+        !std::isfinite(trailing)) {
+        return minItem;
+    }
+    const float room = available - labelWidth - spacing - trailing;
+    return std::max(room, std::max(minItem, 1.0f));
+}
+
+// Whether the next item on a toolbar row still fits before the window's right edge.
+//
+// A toolbar built from `SameLine()` is a row until it is wider than the panel, and then the tail of
+// it is drawn outside the window -- where ImGui clips it and, because a panel has no horizontal
+// scrollbar, there is no way to reach it at all. The Sequence panel's row ended in "Catch playhead"
+// and at 1000 points wide the button read "Catcl" and could not be pressed.
+//
+// All four values are in the same space (screen x, or window-local x -- the caller picks, and the
+// comparison does not care which as long as they agree).
+[[nodiscard]] inline bool toolbarItemFits(float lastItemRight, float nextItemWidth, float spacing,
+                                          float rightEdge) {
+    if (!std::isfinite(lastItemRight) || !std::isfinite(nextItemWidth) || !std::isfinite(spacing) ||
+        !std::isfinite(rightEdge)) {
+        return true; // nonsense in: keep the row rather than scatter it down the panel
+    }
+    return lastItemRight + spacing + nextItemWidth <= rightEdge;
+}
+
+// Where a two-column row's second column starts, given a fixed column the label may be too long for.
+//
+// A hard-coded `SameLine(190.0f)` is a column until somebody writes a label wider than 190 points,
+// and then the widget is drawn *on top of* the text. Both are then unreadable, which is worse than
+// either alone. This keeps the column where it is whenever the label fits and pushes it out only
+// when it does not.
+[[nodiscard]] inline float labelColumnX(float column, float labelEndX, float spacing) {
+    if (!std::isfinite(column) || !std::isfinite(labelEndX) || !std::isfinite(spacing)) {
+        return std::isfinite(column) ? column : 0.0f;
+    }
+    return std::max(column, labelEndX + spacing);
+}
+
 // ---- catching the playhead (Logic's "catch") -------------------------------------------------
 //
 // Two small pieces of arithmetic, here rather than inline in the panel because the panel cannot be

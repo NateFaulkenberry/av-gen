@@ -1,5 +1,6 @@
 #include "ui/world_panel.hpp"
 
+#include "ui/style.hpp"
 #include "params/preset.hpp"
 #include "scene/composition.hpp"
 #include "ui/world_editor.hpp"
@@ -244,7 +245,7 @@ void WorldPanel::drawLayerSelector() {
         layer = static_cast<AuthoringLayer>(std::clamp(current, 0, 2));
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Beginner: world macros, atmosphere, camera.\n"
+        tooltip("Beginner: world macros, atmosphere, camera.\n"
                           "Intermediate: + generators, fields, materials, deformers.\n"
                           "Advanced: every parameter.");
     }
@@ -343,7 +344,7 @@ void WorldPanel::drawInspector(app::Engine& engine) {
                         static_cast<double>(pg.boundsMax.z));
             if (!pg.effectors.empty() && ImGui::TreeNodeEx("Effectors", ImGuiTreeNodeFlags_DefaultOpen)) {
                 for (const spatial::Effector& e : pg.effectors) {
-                    ImGui::BulletText("%s -> %s (%s, strength %.2f)%s", e.field.c_str(), spatial::effectorOpName(e.op),
+                    bulletWrapped("%s -> %s (%s, strength %.2f)%s", e.field.c_str(), spatial::effectorOpName(e.op),
                                       spatial::effectorBlendName(e.blend), static_cast<double>(e.strength),
                                       e.enabled ? "" : " [off]");
                 }
@@ -352,7 +353,7 @@ void WorldPanel::drawInspector(app::Engine& engine) {
             if (!pg.cloud.attributes.buffers().empty() && ImGui::TreeNode("Attributes")) {
                 for (const spatial::AttributeBuffer& b : pg.cloud.attributes.buffers()) {
                     const spatial::AttributeStats st = spatial::attributeStats(b);
-                    ImGui::BulletText("%s (%s): min %.3f max %.3f mean %.3f", b.name.c_str(),
+                    bulletWrapped("%s (%s): min %.3f max %.3f mean %.3f", b.name.c_str(),
                                       spatial::attributeTypeName(b.type), static_cast<double>(st.min.x),
                                       static_cast<double>(st.max.x), static_cast<double>(st.mean.x));
                 }
@@ -401,7 +402,7 @@ void WorldPanel::drawInspector(app::Engine& engine) {
                         : fmt::format("via {} -- {}: {} ({}) {}", i.via, kind, i.source, i.detail,
                                       value);
                 if (i.kind != Influence::Kind::Route) {
-                    ImGui::BulletText("%s", text.c_str());
+                    bulletWrapped("%s", text.c_str());
                     continue;
                 }
                 // A route is clickable: it takes you to the thing you would have gone looking for
@@ -415,7 +416,7 @@ void WorldPanel::drawInspector(app::Engine& engine) {
                     focusRouteTarget = i.routeTarget;
                 }
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("Open this route in the Modulation panel.");
+                    tooltip("Open this route in the Modulation panel.");
                 }
                 ImGui::PopID();
             }
@@ -529,7 +530,7 @@ void WorldPanel::drawMacros(app::Engine& engine) {
         }
         if (ImGui::TreeNode("targets")) {
             for (const app::WorldMacroTarget& t : m.targets) {
-                ImGui::BulletText("%s  %.2f .. %.2f", t.path.c_str(), static_cast<double>(t.min),
+                bulletWrapped("%s  %.2f .. %.2f", t.path.c_str(), static_cast<double>(t.min),
                                   static_cast<double>(t.max));
             }
             ImGui::InputText("path", macroTargetPath_, sizeof(macroTargetPath_));
@@ -588,11 +589,11 @@ void WorldPanel::drawDirector(app::Engine& engine) {
                 knob->setBaseComponent(0, value);
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("%s", app::directorKnobDescription(mapping.knob));
+                tooltip("%s", app::directorKnobDescription(mapping.knob));
             }
             if (ImGui::TreeNode("targets")) {
                 for (const app::WorldMacroTarget& t : mapping.targets) {
-                    ImGui::BulletText("%s  %.2f .. %.2f", t.path.c_str(), static_cast<double>(t.min),
+                    bulletWrapped("%s  %.2f .. %.2f", t.path.c_str(), static_cast<double>(t.min),
                                       static_cast<double>(t.max));
                 }
                 ImGui::TreePop();
@@ -661,7 +662,7 @@ void WorldPanel::drawDebugOptions(app::Engine& engine, WorldEditor* editor) {
     ImGui::SameLine();
     ImGui::Checkbox("LOD", &debug.lod);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Colour every scattered instance by the LOD rung the cull pass gave it:\n"
+        tooltip("Colour every scattered instance by the LOD rung the cull pass gave it:\n"
                           "green 0 (full mesh), yellow 1, orange 2, red 3, purple culled.\n"
                           "Grey means the pass did not run for that object this frame, so there is\n"
                           "no decision to show. Costs one buffer readback per scattered object.");
@@ -674,34 +675,34 @@ void WorldPanel::drawDebugOptions(app::Engine& engine, WorldEditor* editor) {
     ImGui::SameLine();
     ImGui::Checkbox("Entity ids", &debug.entityIds);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Colour each entity's bounds by the pick id the identifier target writes.");
+        tooltip("Colour each entity's bounds by the pick id the identifier target writes.");
     }
     ImGui::Checkbox("Submitted only", &debug.submittedOnly);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Draw entity diagnostics only for what survived the camera cull.");
+        tooltip("Draw entity diagnostics only for what survived the camera cull.");
     }
     ImGui::SameLine();
     ImGui::Checkbox("World axes", &debug.worldAxes);
     ImGui::SameLine();
     ImGui::Checkbox("Frustum", &debug.frustum);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("The camera's own frustum and basis. On a live camera this is the screen edge;\n"
+        tooltip("The camera's own frustum and basis. On a live camera this is the screen edge;\n"
                           "it is worth seeing while the view is frozen, when it is the volume the cull used.");
     }
     ImGui::SameLine();
     ImGui::Checkbox("Transform trail", &debug.transformTrail);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("The recorded world path of the selected entity, over the last few seconds.");
+        tooltip("The recorded world path of the selected entity, over the last few seconds.");
     }
     ImGui::SameLine();
     ImGui::Checkbox("Skeletons", &debug.skeletons);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Every skinned entity's joints and bones, in world space.");
+        tooltip("Every skinned entity's joints and bones, in world space.");
     }
     ImGui::SameLine();
     ImGui::Checkbox("Beam axes", &debug.beams);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Every particle emitter's disc, the axis its column actually fires\n"
+        tooltip("Every particle emitter's disc, the axis its column actually fires\n"
                           "along, and a second ring where the column ends -- its own speed and\n"
                           "lifetime, integrated. The end ring is the point: a beam treated as an\n"
                           "axis is a line of infinite length, and the tractor beam was stopping\n"
@@ -711,27 +712,27 @@ void WorldPanel::drawDebugOptions(app::Engine& engine, WorldEditor* editor) {
     // actually ask: an entity's box coloured by what the shadow passes did with it.
     ImGui::Checkbox("Cascade volumes", &debug.shadowCascades);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("The orthographic box each cascade rasterises into, drawn from the matrix the\n"
+        tooltip("The orthographic box each cascade rasterises into, drawn from the matrix the\n"
                           "renderer uploaded -- not from a second fit. The dot is the texel-snapped centre:\n"
                           "it moves in whole texels or not at all, so a crawling cascade can be watched crawl.");
     }
     ImGui::SameLine();
     ImGui::Checkbox("Cascade slices", &debug.shadowCascadeSlices);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("The part of the camera frustum whose pixels select each cascade, in the same\n"
+        tooltip("The part of the camera frustum whose pixels select each cascade, in the same\n"
                           "colour as its volume. Like Frustum, this is the screen edge on a live camera and\n"
                           "is worth seeing from a second view or while frozen.");
     }
     ImGui::SameLine();
     ImGui::Checkbox("Shadow casters", &debug.shadowCasters);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Green casts. Amber casts although the camera cannot see it -- the second cull\n"
+        tooltip("Green casts. Amber casts although the camera cannot see it -- the second cull\n"
                           "kept it (ADR-046). Red does not cast: not drawable, castsShadow off, a style the\n"
                           "shadow passes skip, or outside every cascade.");
     }
     ImGui::SliderInt("Cascade shown", &debug.shadowCascade, -1, 7);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("-1 draws every shadow view; 0..7 restricts both cascade overlays to one layer.");
+        tooltip("-1 draws every shadow view; 0..7 restricts both cascade overlays to one layer.");
     }
     if (ImGui::InputText("Selected entity", selectedEntity, sizeof(selectedEntity))) {
         debug.selectedEntity = selectedEntity;
@@ -766,14 +767,14 @@ void WorldPanel::drawNavigationOptions(WorldEditor* editor) {
     }
     ImGui::Checkbox("Route", &editor->showNavRoute);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("The selected entity's planned waypoints, the leg it is walking, its\n"
+        tooltip("The selected entity's planned waypoints, the leg it is walking, its\n"
                           "destination, and its phase and path status as a label. Drawn from the\n"
                           "selection: select the node an entity drives to see its route.");
     }
     ImGui::SameLine();
     ImGui::Checkbox("Nav grid", &editor->showNavGrid);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Walkable / water / steep / blocked cells near the view.\n"
+        tooltip("Walkable / water / steep / blocked cells near the view.\n"
                           "Green is standable, brighter green is a walkable cell against an edge.");
     }
     ImGui::SameLine();
@@ -784,14 +785,14 @@ void WorldPanel::drawNavigationOptions(WorldEditor* editor) {
     ImGui::Checkbox("Regions", &editor->navGridRegions);
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Colour walkable cells by connected region instead of by flag. Two cells\n"
+        tooltip("Colour walkable cells by connected region instead of by flag. Two cells\n"
                           "the same colour are reachable from each other; two different colours are\n"
                           "not, whatever the distance between them. Needs 'Nav grid'.");
     }
     ImGui::SameLine();
     ImGui::Checkbox("Shore / vista", &editor->showNavPoints);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("The interest points the grid extracts while it builds: rings where\n"
+        tooltip("The interest points the grid extracts while it builds: rings where\n"
                           "walkable ground meets water, stalks on walkable local maxima. These are\n"
                           "what `explore` picks destinations from.");
     }
@@ -800,7 +801,7 @@ void WorldPanel::drawNavigationOptions(WorldEditor* editor) {
     ImGui::SliderFloat("grid radius", &editor->navGridRadius, 10.0f, 400.0f, "%.0f m");
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("How far around the point the view is aimed at the grid is drawn.\n"
+        tooltip("How far around the point the view is aimed at the grid is drawn.\n"
                           "Every cell is four world points projected on the CPU, so this is the\n"
                           "whole cost of the overlay -- see the line below for what it is drawing.");
     }

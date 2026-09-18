@@ -1,5 +1,6 @@
 #include "ui/world_effects_panel.hpp"
 
+#include "ui/style.hpp"
 #include "app/engine.hpp"
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
@@ -181,7 +182,7 @@ void WorldEffectsPanel::draw(app::Engine& engine) {
         }
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("A ripple that spreads from whichever hero the directed camera is holding.\n"
+        tooltip("A ripple that spreads from whichever hero the directed camera is holding.\n"
                           "It needs a directed camera: with none, there is no cut to gate it on.");
     }
 
@@ -203,7 +204,7 @@ void WorldEffectsPanel::draw(app::Engine& engine) {
         if (gated) {
             ImGui::TextColored(kWarning, "No directed camera: effects gated on the cut cannot fire.");
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Camera > Enable Auto-director, or set the activation to Always or a window.");
+                tooltip("Camera > Enable Auto-director, or set the activation to Always or a window.");
             }
         }
     }
@@ -238,7 +239,7 @@ void WorldEffectsPanel::drawEffect(app::Engine& engine, const world::WorldEffect
         pendingRemove_ = static_cast<int>(index);
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Remove this effect and its parameters");
+        tooltip("Remove this effect and its parameters");
     }
     if (!open) {
         return;
@@ -274,7 +275,7 @@ void WorldEffectsPanel::drawEffect(app::Engine& engine, const world::WorldEffect
         return; // the parameters below have just been re-registered; draw them next frame
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Sets colour, intensity, sparkle and the wave's shape.\n"
+        tooltip("Sets colour, intensity, sparkle and the wave's shape.\n"
                           "Every one of them stays editable below.");
     }
 
@@ -282,7 +283,7 @@ void WorldEffectsPanel::drawEffect(app::Engine& engine, const world::WorldEffect
     paramColor(engine, prefix, "color", "Colour");
     paramCheckbox(engine, prefix, "rainbow", "Rainbow");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Replaces the hue with a procedural ramp travelling through the wave.\n"
+        tooltip("Replaces the hue with a procedural ramp travelling through the wave.\n"
                           "The colour above still sets how bright it is.");
     }
     paramSlider(engine, prefix, "intensity", "Intensity");
@@ -326,7 +327,7 @@ void WorldEffectsPanel::drawEffect(app::Engine& engine, const world::WorldEffect
             }
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Writes a beat.pulse -> %s route.\nEdit or delete it in the Modulation panel "
+            tooltip("Writes a beat.pulse -> %s route.\nEdit or delete it in the Modulation panel "
                               "like any other.",
                               target.c_str());
         }
@@ -386,7 +387,7 @@ void WorldEffectsPanel::drawAdvanced(app::Engine& engine, const world::WorldEffe
             commit(engine, index, [offset](world::WorldEffect& e) { e.source.groundOffset = offset; });
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Metres to drop the resolved origin, for a source whose transform is\n"
+            tooltip("Metres to drop the resolved origin, for a source whose transform is\n"
                               "somewhere up its stem.");
         }
         int activation = static_cast<int>(authored.activation);
@@ -429,7 +430,7 @@ void WorldEffectsPanel::drawAdvanced(app::Engine& engine, const world::WorldEffe
     paramSlider(engine, prefix, "ringCount", "Secondary ripples", "%.1f");
     paramSlider(engine, prefix, "beamRadius", "Beam radius", "%.0f m");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("0 makes a directional wave a moving plane; above 0 it is a beam this wide.");
+        tooltip("0 makes a directional wave a moving plane; above 0 it is a beam this wide.");
     }
 
     ImGui::SeparatorText("Appearance");
@@ -451,7 +452,7 @@ void WorldEffectsPanel::drawAdvanced(app::Engine& engine, const world::WorldEffe
     paramSlider(engine, prefix, "response/surface", "Props and characters");
     paramSlider(engine, prefix, "response/emissive", "Existing glow");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("How much the wave amplifies emission a surface already had.");
+        tooltip("How much the wave amplifies emission a surface already had.");
     }
 
     ImGui::SeparatorText("Timing");
@@ -460,11 +461,11 @@ void WorldEffectsPanel::drawAdvanced(app::Engine& engine, const world::WorldEffe
     paramSlider(engine, prefix, "fadeOut", "Fade out", "%.2f s");
     paramSlider(engine, prefix, "lifetime", "Lifetime", "%.2f s");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("0 means the effect lasts as long as its activation does.");
+        tooltip("0 means the effect lasts as long as its activation does.");
     }
     paramSlider(engine, prefix, "repeat", "Repeat every", "%.2f s");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Restarts the wave front. 0 is one pass.\nThis is the knob a bar-length ripple "
+        tooltip("Restarts the wave front. 0 is one pass.\nThis is the knob a bar-length ripple "
                           "is made of.");
     }
 
@@ -539,7 +540,7 @@ void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
         append(world::bioluminescentComet(unique("Bioluminescent Comet")));
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("A celestial object on a great-circle arc across the sky.\n"
+        tooltip("A celestial object on a great-circle arc across the sky.\n"
                           "It arrives as an event with an authored window, so it launches once;\n"
                           "give it a repeat interval to make it a shower.");
     }
@@ -548,7 +549,7 @@ void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
         append(world::glowmereAurora(unique("Aurora")));
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Curtains rising from the horizon, shaped by the audio spectrum.\n"
+        tooltip("Curtains rising from the horizon, shaped by the audio spectrum.\n"
                           "Always on and fading up: an aurora is scenery that breathes.");
     }
 
@@ -739,7 +740,7 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
             return;
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("A world anchor gives the comet real parallax: it slides against the\n"
+            tooltip("A world anchor gives the comet real parallax: it slides against the\n"
                               "stars as the camera travels, and it can leave frame. A camera anchor\n"
                               "keeps its bearing however far the camera goes.");
         }

@@ -1,5 +1,6 @@
 #include "ui/world_builder_panel.hpp"
 
+#include "ui/style.hpp"
 #include "app/engine.hpp"
 #include "core/log.hpp"
 
@@ -26,7 +27,7 @@ std::string clockText(double seconds) {
 void weightSlider(const char* label, float& value, const char* tooltip) {
     ImGui::SliderFloat(label, &value, 0.0f, 1.0f, "%.2f");
     if (tooltip != nullptr && ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", tooltip);
+        tooltipUnformatted(tooltip);
     }
 }
 } // namespace
@@ -65,7 +66,7 @@ void WorldBuilderPanel::draw(app::Engine& engine, app::JobSystem& jobs, app::Wor
     if (libraryCount_ > 0) {
         ImGui::TextDisabled("Library: %zu assets (%s)", libraryCount_, libraryLabel_.c_str());
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s", libraryPath_.string().c_str());
+            tooltip("%s", libraryPath_.string().c_str());
         }
     } else {
         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "No asset library found");

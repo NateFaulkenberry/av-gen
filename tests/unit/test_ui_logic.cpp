@@ -685,3 +685,98 @@ TEST_CASE("A band reaches across lanes", "[ui][strip][marquee]") {
     CHECK_FALSE(spansOverlap(bandTop, bandBottom, lanes.sectionsTop(),
                              lanes.sectionsTop() + lanes.sectionLaneHeight));
 }
+
+// ---- text that has to be readable ---------------------------------------------------------------
+//
+// The pass these came from was driven by screenshots, and a screenshot cannot be asserted. What can
+// be asserted is the number underneath it, which is the reason the number is here at all.
+
+TEST_CASE("A wrap width never comes back as 'do not wrap'", "[ui][wrap]") {
+    using avgen::ui::kMinWrapWidth;
+    using avgen::ui::wrapWidthFor;
+
+    // The ordinary case: a panel with room, less the inset the caller wants.
+    CHECK(wrapWidthFor(400.0f, 8.0f) == 392.0f);
+
+    // The case this exists for. Dear ImGui reads a negative wrap position as "do not wrap at all"
+    // (`CalcWrapWidthForPos` returns 0 below zero), so a panel dragged narrower than the inset used
+    // to switch wrapping *off* -- silently, on the panel that needed it most. Every answer must
+    // stay positive, whatever the panel is dragged to.
+    for (float available = 0.0f; available <= 200.0f; available += 1.0f) {
+        CHECK(wrapWidthFor(available, 24.0f) > 0.0f);
+        CHECK(wrapWidthFor(available, 24.0f) >= kMinWrapWidth);
+    }
+    CHECK(wrapWidthFor(-50.0f, 8.0f) >= kMinWrapWidth); // a collapsed dock node reports this
+
+    // Nonsense in, something drawable out: a NaN region must not become a NaN wrap position, which
+    // ImGui compares against and would treat as "no wrap".
+    CHECK(wrapWidthFor(std::numeric_limits<float>::quiet_NaN(), 8.0f) == kMinWrapWidth);
+    CHECK(wrapWidthFor(400.0f, std::numeric_limits<float>::infinity()) == kMinWrapWidth);
+}
+
+TEST_CASE("A widget leaves room for its own label", "[ui][wrap]") {
+    using avgen::ui::itemWidthBesideLabel;
+    using avgen::ui::kMinItemWidth;
+
+    // 300 points of panel, a 90-point label, 4 points of spacing: the slider gets the rest, and the
+    // label is therefore drawn inside the window rather than past its right edge.
+    CHECK(itemWidthBesideLabel(300.0f, 90.0f, 4.0f) == 206.0f);
+    // ...and with a readout the caller means to SameLine after the label.
+    CHECK(itemWidthBesideLabel(300.0f, 90.0f, 4.0f, 50.0f) == 156.0f);
+
+    // A modulation route's label is a source and a target path joined by an arrow, which is what
+    // the Control panel's hard-coded 90-point reservation was losing. Long label, narrow panel: the
+    // widget shrinks to its floor rather than to nothing or to a negative width (ImGui asserts on
+    // a negative item width in a debug build and lays out garbage in a release one).
+    CHECK(itemWidthBesideLabel(300.0f, 420.0f, 4.0f) == kMinItemWidth);
+    CHECK(itemWidthBesideLabel(0.0f, 0.0f, 0.0f) == kMinItemWidth);
+    for (float available = 0.0f; available <= 600.0f; available += 5.0f) {
+        CHECK(itemWidthBesideLabel(available, 420.0f, 4.0f) > 0.0f);
+    }
+}
+
+TEST_CASE("A fixed label column yields rather than letting a widget land on the text",
+          "[ui][wrap]") {
+    using avgen::ui::labelColumnX;
+
+    // The label fits: the column stays where it was put, so a settings page keeps its alignment.
+    CHECK(labelColumnX(190.0f, 60.0f, 8.0f) == 190.0f);
+    // The label does not fit: the column moves out of its way. Before this, "Theme  System follows
+    // macOS" ran under the combo that `SameLine(190.0f)` placed on top of it, and both were
+    // unreadable -- which is worse than either one being cut.
+    CHECK(labelColumnX(190.0f, 240.0f, 8.0f) == 248.0f);
+}
+
+TEST_CASE("A tooltip wraps before it is wider than the screen", "[ui][wrap]") {
+    using avgen::ui::kMinWrapWidth;
+    using avgen::ui::tooltipWrapWidth;
+
+    // A tooltip is an auto-resizing window, so "wrap at the window's right edge" is circular inside
+    // one and it needs a number. On a roomy display that number is the comfortable measure.
+    CHECK(tooltipWrapWidth(15.0f, 2560.0f) == 15.0f * avgen::ui::kTooltipWrapEms);
+    // On a small window the viewport is what bounds it, or the tooltip is wider than the thing it
+    // has to be drawn inside and ImGui clips its far end against the viewport edge.
+    CHECK(tooltipWrapWidth(15.0f, 800.0f) < 800.0f);
+    CHECK(tooltipWrapWidth(15.0f, 800.0f) == 800.0f * avgen::ui::kTooltipViewportFraction);
+    // Never zero, never negative, whatever it is handed: a headless or half-initialised context
+    // reports a zero viewport, and a tooltip still has to be readable when it does.
+    CHECK(tooltipWrapWidth(15.0f, 0.0f) > 0.0f);
+    CHECK(tooltipWrapWidth(0.0f, 0.0f) > 0.0f);
+    CHECK(tooltipWrapWidth(15.0f, 10.0f) >= kMinWrapWidth);
+}
+
+TEST_CASE("A toolbar row knows when the next control will not fit", "[ui][wrap]") {
+    using avgen::ui::toolbarItemFits;
+
+    // Room for it: 400 wide, the last control ends at 300, the next is 80 with 8 of spacing.
+    CHECK(toolbarItemFits(300.0f, 80.0f, 8.0f, 400.0f));
+    // Exactly to the edge still counts -- the item's last pixel is the window's last pixel.
+    CHECK(toolbarItemFits(300.0f, 92.0f, 8.0f, 400.0f));
+    // One point over is not a near miss: ImGui clips it, and a docked panel has no horizontal
+    // scrollbar, so the control is not reachable by any means.
+    CHECK_FALSE(toolbarItemFits(300.0f, 93.0f, 8.0f, 400.0f));
+
+    // The Sequence panel's row at 1000 points, which is where this was found: the last control
+    // before "Catch playhead" ended past the edge already.
+    CHECK_FALSE(toolbarItemFits(930.0f, 120.0f, 8.0f, 980.0f));
+}

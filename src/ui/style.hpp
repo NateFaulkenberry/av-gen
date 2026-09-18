@@ -138,6 +138,83 @@ void menuSubject(const std::string& text);
 // says not to do, so the transport keeps its own and it now takes its colours from `palette()`
 // like everything else. Promote it here the day something outside the transport needs one.
 
+// ---- text that has to be readable ---------------------------------------------------------------
+//
+// The rule, and the second one this file exists to enforce: **a sentence the application draws is a
+// sentence somebody can read.** Before this, one `PushTextWrapPos` existed in the whole of `src/ui`
+// -- around a shader compile error in the Control panel -- and every other explanatory line in the
+// editor ran off the side of its panel and stopped. A truncated label with a tooltip behind it is a
+// cosmetic problem; a sentence whose second half is simply not drawn is information the application
+// does not have (ADR-225's cousin).
+//
+// `WrapText` is a guard rather than a pair of calls because `PushTextWrapPos` has to be popped on
+// the *same window* it was pushed on, and an early `return` out of a panel body is the normal way
+// these functions end.
+//
+// Two things it deliberately does NOT reach:
+//
+//  * A child window. ImGui resets `DC.TextWrapPos` per window, so `BeginChild` starts unwrapped
+//    however the parent was set up. Every child that holds prose needs its own guard, and the ones
+//    in this application do.
+//  * `BulletText` and `LabelText`, which render through `RenderText` rather than `TextEx` and
+//    ignore the wrap position entirely. A long bullet still overflows; use `Bullet()` plus
+//    `SameLine()` plus `TextUnformatted` when the text can be long.
+//
+// `TextWrapped` keeps an outer wrap position if one is already set, so a panel-wide guard composes
+// with the calls that were already wrapping rather than fighting them.
+class WrapText {
+public:
+    // Wrap at the window's content right edge -- ImGui's meaning for a wrap position of zero.
+    WrapText();
+    // Wrap at an explicit window-local x. For an auto-resizing window (a popup, a tooltip) where
+    // "the right edge" is wherever the text has already pushed it.
+    explicit WrapText(float wrapPosX);
+    ~WrapText();
+
+    WrapText(const WrapText&) = delete;
+    WrapText& operator=(const WrapText&) = delete;
+};
+
+// A bullet whose text wraps. `ImGui::BulletText` renders through `RenderText` and ignores the wrap
+// position entirely, so a bulleted parameter path or effector name -- which is what every bullet in
+// this editor holds -- simply ran off the side. Same signature, so the call sites read the same.
+void bulletWrapped(const char* fmt, ...) IM_FMTARGS(1);
+
+// The width to give the next item so its label still fits beside it, measured in the current font.
+//
+// `ImGui::SetNextItemWidth(itemWidthForLabel("Volume"))` instead of `SetNextItemWidth(-1)`, which
+// puts the label off the side of the window. `trailing` reserves room for whatever the call site
+// intends to `SameLine` after the label -- a readout, a button. The arithmetic is
+// `ui_logic.hpp`'s `itemWidthBesideLabel`, which is where its test lives.
+[[nodiscard]] float itemWidthForLabel(const char* label, float trailing = 0.0f);
+
+// ---- toolbars that do not run off the side ------------------------------------------------------
+//
+// `ImGui::SameLine()` unconditionally, which is how every toolbar in this application was built,
+// keeps a row together until the panel is narrower than the row -- after which the remaining
+// controls are drawn outside the window, clipped, and unreachable, because a docked panel has no
+// horizontal scrollbar to bring them back.
+//
+// Call `sameLineOrWrap` where `SameLine()` was, with the width of the item about to be submitted.
+// `rowStartX` is the window-local x a wrapped row restarts at, so a toolbar under an indented
+// heading stays under it.
+void sameLineOrWrap(float nextItemWidth, float rowStartX = 0.0f);
+
+// Widths for the two shapes `sameLineOrWrap` is given, measured in the current font and style so a
+// call site never has to guess at padding.
+[[nodiscard]] float buttonWidth(const char* label);
+// An item of `itemWidth` followed by its own label, which is how ImGui lays a combo or slider out.
+[[nodiscard]] float labelledItemWidth(float itemWidth, const char* label);
+
+// A tooltip whose text wraps instead of growing a window wider than the screen.
+//
+// This repository writes three- and four-sentence tooltips. A tooltip is an auto-resizing window,
+// so an unwrapped one simply grows until ImGui pushes it back against the viewport edge and clips
+// the far end -- which is where several of this editor's longest explanations were going. Use this
+// in place of `ImGui::SetTooltip` everywhere; the width comes from `ui::tooltipWrapWidth`.
+void tooltip(const char* fmt, ...) IM_FMTARGS(1);
+void tooltipUnformatted(const char* text);
+
 // A tooltip that only appears after the pointer has settled, and that is styled like the rest of the
 // application. ImGui's own delay is per-context and this is per-call, so a dense toolbar can be
 // slower to speak than a sparse panel.

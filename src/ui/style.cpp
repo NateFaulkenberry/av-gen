@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdarg>
 
 namespace avgen::ui {
 namespace {
@@ -197,6 +198,89 @@ void menuSubject(const std::string& text) {
 
 // ---- small shared widgets ------------------------------------------------------------------------
 
+WrapText::WrapText() { ImGui::PushTextWrapPos(0.0f); }
+
+WrapText::WrapText(float wrapPosX) { ImGui::PushTextWrapPos(wrapPosX); }
+
+WrapText::~WrapText() { ImGui::PopTextWrapPos(); }
+
+float itemWidthForLabel(const char* label, float trailing) {
+    // ImGui hides everything from the first "##" onwards, so a label of "##id" occupies no width
+    // and this correctly returns the whole region -- which is what `SetNextItemWidth(-1)` was
+    // already right about for the unlabelled widgets.
+    const float labelWidth = (label == nullptr) ? 0.0f : ImGui::CalcTextSize(label, nullptr, true).x;
+    const float spacing = labelWidth > 0.0f ? ImGui::GetStyle().ItemInnerSpacing.x : 0.0f;
+    return itemWidthBesideLabel(ImGui::GetContentRegionAvail().x, labelWidth, spacing, trailing);
+}
+
+namespace {
+// The wrap width a tooltip opened right now should use. Read from the *viewport* rather than from
+// the tooltip window, which does not exist yet and whose width is the thing being decided.
+float currentTooltipWrap() {
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const float viewportWidth = viewport != nullptr ? viewport->WorkSize.x : 0.0f;
+    return tooltipWrapWidth(ImGui::GetFontSize(), viewportWidth);
+}
+} // namespace
+
+void bulletWrapped(const char* fmt, ...) {
+    ImGui::Bullet();
+    ImGui::SameLine(0.0f, 0.0f);
+    va_list args;
+    va_start(args, fmt);
+    // `TextWrappedV` keeps an outer wrap position when one is already set, which is the panel-wide
+    // guard's, and falls back to the window edge when it is not.
+    ImGui::TextWrappedV(fmt, args);
+    va_end(args);
+}
+
+float buttonWidth(const char* label) {
+    const float text = (label == nullptr) ? 0.0f : ImGui::CalcTextSize(label, nullptr, true).x;
+    return text + ImGui::GetStyle().FramePadding.x * 2.0f;
+}
+
+float labelledItemWidth(float itemWidth, const char* label) {
+    const float text = (label == nullptr) ? 0.0f : ImGui::CalcTextSize(label, nullptr, true).x;
+    return itemWidth + (text > 0.0f ? ImGui::GetStyle().ItemInnerSpacing.x + text : 0.0f);
+}
+
+void sameLineOrWrap(float nextItemWidth, float rowStartX) {
+    const ImGuiStyle& style = ImGui::GetStyle();
+    // Screen space on both sides of the comparison. `GetItemRectMax` is where the item that was
+    // just submitted ends; the content region's right edge is where the window stops drawing.
+    const float lastRight = ImGui::GetItemRectMax().x;
+    const float edge = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+    if (toolbarItemFits(lastRight, nextItemWidth, style.ItemSpacing.x, edge)) {
+        ImGui::SameLine();
+        return;
+    }
+    // No `SameLine`, so the cursor has already dropped to the next row; only the column is set.
+    ImGui::SetCursorPosX(rowStartX);
+}
+
+void tooltip(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 6.0f));
+    ImGui::BeginTooltip();
+    ImGui::PushTextWrapPos(currentTooltipWrap());
+    ImGui::TextV(fmt, args);
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+    ImGui::PopStyleVar();
+    va_end(args);
+}
+
+void tooltipUnformatted(const char* text) {
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 6.0f));
+    ImGui::BeginTooltip();
+    ImGui::PushTextWrapPos(currentTooltipWrap());
+    ImGui::TextUnformatted(text);
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+    ImGui::PopStyleVar();
+}
+
 void hoverTip(const char* text, bool shortDelay) {
     if (text == nullptr || *text == '\0') {
         return;
@@ -211,11 +295,7 @@ void hoverTip(const char* text, bool shortDelay) {
     if (!ImGui::IsItemHovered(flags)) {
         return;
     }
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 6.0f));
-    ImGui::BeginTooltip();
-    ImGui::TextUnformatted(text);
-    ImGui::EndTooltip();
-    ImGui::PopStyleVar();
+    tooltipUnformatted(text);
 }
 
 } // namespace avgen::ui
