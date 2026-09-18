@@ -221,11 +221,22 @@ TEST_CASE("the Character Intelligence Lab is registered and its cases resolve",
     }
     INFO(fmt::format("{} runnable, {} blocked", runnable, blocked));
     CHECK(runnable >= 4);
-    // Lowered from 2 when ADR-335 unblocked case 9 and left P9's root motion as the only case
-    // still waiting. The assertion that matters is that a lab in which *every* case were blocked
-    // cannot pass the pair, and one blocked case still carries that; a floor that outlives the
-    // cases it was counting is a floor that fails for the good news.
-    CHECK(blocked >= 1);
+    CHECK(runnable + blocked == cases->size());
+
+    // Every case is runnable. ADR-336 (route pricing) answered case 9 and ADR-337 (root motion)
+    // answered case 13, the last two, and they landed within an hour of each other -- each branch
+    // lowered the old `blocked >= 2` floor to 1 for its own case without seeing the other, and
+    // together they took it to 0.
+    //
+    // The floor is deleted rather than lowered again. It was never a requirement that the lab have
+    // unfinished work in it; it was the liveness control on the `namesAUnit` arm above, which
+    // asserts nothing when no case is blocked. At zero blocked cases no value of that floor can
+    // revive the arm, so writing `>= 0` would be the vacuous probe ADR-182 exists to forbid.
+    //
+    // What replaces it states where the lab actually is, and can fail: a case that arrives blocked
+    // breaks this line. That is the moment to decide deliberately whether `namesAUnit` is earning
+    // its place again -- not a number to quietly adjust.
+    CHECK(runnable == cases->size());
 
     // The control on `resolveCaseSpec`: a lab that exists with a number that does not is a
     // different failure from a lab that does not exist, and both are failures rather than silence.

@@ -18,6 +18,7 @@
 
 #include "core/time.hpp"
 #include "scene/pose_layers.hpp"
+#include "scene/root_motion.hpp"
 #include "scene/skeleton.hpp"
 
 #include <glm/glm.hpp>
@@ -137,6 +138,15 @@ public:
     // ---- reading: pure functions of (the above, now) ----
     [[nodiscard]] bool active() const { return current_.state >= 0; }
     [[nodiscard]] std::string_view currentState() const;
+    // Index of the state being played, or -1. The name is what a person asks with; an index is
+    // what a clip lookup needs, and resolving the name back through `stateIndex` every frame is a
+    // string compare per state for an answer the player already has.
+    [[nodiscard]] int currentStateIndex() const { return current_.state; }
+    // The timeline second the current state was entered at. Not "how long it has been running":
+    // this player stores *when*, which is what makes a scrubbed frame reproduce (ADR-086). Root
+    // motion reads it to tell "the same clip, later" from "the clip was restarted", which are the
+    // same clip index and must not be the same displacement.
+    [[nodiscard]] double currentStart() const { return current_.start; }
     // The state being faded out, or "" when the player has settled.
     [[nodiscard]] std::string_view fadingState() const;
     // 0 at the instant of the change, 1 once the cross-fade is over.
@@ -211,6 +221,22 @@ struct SkinnedRig {
     // (ADR-170): a layer that reported 0 joints is a layer whose mask missed.
     PoseLayerStats layerStats;
 
+    // ---- root motion (ADR-337) -------------------------------------------------------------
+    // Which of this rig's clips hand their root displacement to the simulation instead of drawing
+    // it. Empty on every rig that does not author one, and an empty set is checked with one
+    // `bindings_.empty()` before anything else happens -- which is how the other 163 clips stay
+    // bit-identical rather than being told they are.
+    //
+    // The seam runs the *opposite* way to the layer stack (ADR-300 §8). A layer writes the pose
+    // and can reach nothing else; root motion writes the pose **and** is read back out into the
+    // entity, which adds it to `EntityState::travel`. That is `MotionAuthority::Simulation`, and
+    // it is the only place in the animation system that has it.
+    RootMotionSet rootMotion;
+    // Whether the last `evaluate()` actually took a displacement out of the pose. False on a rig
+    // with an opt-in that is playing something else, which is the case worth being able to tell
+    // apart from "no opt-in at all" -- the same distinction `SocketResolution` exists for.
+    bool rootMotionApplied = false;
+
     // ---- evaluated -------------------------------------------------------------------------
     Pose pose;                              // the local pose the player produced, then layered
     std::vector<glm::mat4> palette;         // paletteSize() joint matrices; what the GPU reads
@@ -235,11 +261,26 @@ struct SkinnedRig {
     // Scratch, kept so a per-frame evaluation allocates nothing.
     Pose scratchPose;
     std::vector<glm::mat4> scratchModel;
+    // And root motion's, which is `mutable` because `rootMotionAt` is a question about the clips
+    // rather than about the rig's current pose and has to be answerable through a `const&` -- the
+    // animation sink holds the scene const while an entity asks it where its own body went.
+    mutable Pose rootMotionScratch;
 
     // Index of the clip called `name`, or -1. Exporters routinely prefix a clip with the rig it
     // came off ("Alien_Low_Green|Walk"), so the part after the last '|' matches too: the file keeps
     // its own name and a scene may ask for "Walk".
     [[nodiscard]] int findClip(std::string_view clipName) const;
+    // The root displacement this rig's current clip has produced by timeline second `now`,
+    // measured from that clip's own first key, in the rig's model space (ADR-274: that is the
+    // entity's own frame, and the entity composes its placement and its scale on).
+    //
+    // A **pure function of (the player, the clips, now)** and deliberately not a read of `pose`.
+    // That is what dissolves the ordering problem ADR-300 §8 left for this unit: `EntityWorld::
+    // update` runs one whole stage before `Composition::updateCharacters` poses the rigs, so an
+    // entity that had to read a posed rig would always be reading last frame's. It does not have
+    // to. The pose is derived from the clip; so is this; both can be taken at the same second from
+    // opposite sides of the frame and agree exactly.
+    [[nodiscard]] RootMotionSample rootMotionAt(double now) const;
     [[nodiscard]] bool valid() const { return skeleton.valid(); }
     // Gives the rig one state per clip, named after the clip's short name, and makes the first the
     // current one. What an imported file gets before anybody says otherwise.
@@ -269,6 +310,10 @@ struct RigStats {
     std::uint32_t joints = 0;    // joint matrices recomputed this frame
     std::uint32_t layers = 0;      // ADR-300: layers evaluated this frame, over every posed rig
     std::uint32_t layerJoints = 0; // joints those layers wrote
+    // ADR-337: posed rigs whose current clip was opted in to root motion and had its displacement
+    // taken out of the pose this frame. Zero on every scene in this repository but the Character
+    // Intelligence Lab, which is the number that says the opt-in is an opt-in.
+    std::uint32_t rootMotion = 0;
     double cpuMs = 0.0;          // wall time spent posing (this is the only clock in here, and it
                                  // reports, it never drives)
 };

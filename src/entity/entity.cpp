@@ -849,6 +849,14 @@ void EntityWorld::reset() {
         // resets alongside this and re-issues whatever the scenario is doing at the new second.
         entity->director_ = DirectorMotion{};
         entity->locomotion_ = LocomotionState{};
+        // ADR-337 / ADR-267 D4: the previous root-motion sample is recoverable by replaying the
+        // steps, so a reset must forget it. Keeping it would make the first step of a seek a
+        // difference between two unrelated clips -- the whole of `Landing` backwards, in one
+        // step, as a teleport, which is exactly the class of thing `reset` exists to remove.
+        entity->rootMotionLast_ = glm::vec3(0.0f);
+        entity->rootMotionGeneration_ = 0;
+        entity->rootMotionHeld_ = false;
+        entity->rootMotionStep_ = glm::vec3(0.0f);
         entity->coarseAccum_ = 0.0;
         entity->everUpdated_ = false;
         // The working set, and the tick it belonged to. D4: what a character knows is reconstructed
@@ -1436,6 +1444,63 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // `tests/unit/test_entity_perception.cpp` holds rather than an assurance.
         if (perceiving_) {
             perceiveOne(entityIndex, ctx.time);
+        }
+
+        // ---- root motion, before the behaviours (ADR-337) ----
+        //
+        // **Which position (ADR-260).** It writes `state_.travel` -- the *simulation* position,
+        // `MotionAuthority::Simulation`. Everything else in the animation seam is `PoseOnly` and
+        // `scene::PoseLayerStack` is structurally unable to be anything else; this is the one
+        // place a clip is allowed to move the body, and it is the reason the opt-in exists. It
+        // reads the node's scale parameter and `state_.yaw`, and it reads nothing of the pose.
+        //
+        // **Before the behaviours, not after.** Root motion is displacement, and every behaviour
+        // that has an opinion about where a body may be -- grounding, crowd separation, the
+        // obstacle push -- gets to have it about this displacement too, on the same frame, exactly
+        // as it does about navigation's. Running afterwards would have made an animation clip
+        // outrank the terrain, which is the shape of four defects in this repository rather than
+        // a feature. The visible consequence is that a *grounded* body keeps no vertical root
+        // motion at all: `applyGrounding` assigns `state.travel.y = ground.height - anchor.y`, so
+        // the y component is overwritten within the same update that produced it. That is correct
+        // -- a body standing on terrain has its height decided by the terrain -- and it is why
+        // `RootMotionAxes` exists and why ADR-337 §5 recommends `xz` for `Landing` in a world with
+        // ground in it.
+        entity.rootMotionStep_ = glm::vec3(0.0f);
+        if (entity.rootMotion_ != nullptr) {
+            const RootMotionSample sample = entity.rootMotion_->rootMotion(ctx.time);
+            if (!sample.active) {
+                entity.rootMotionHeld_ = false;
+            } else {
+                if (!entity.rootMotionHeld_ || sample.generation != entity.rootMotionGeneration_) {
+                    // A different clip, or the same clip restarted. The displacement is measured
+                    // from the clip's first key, so there is no step across the boundary: the new
+                    // run begins where the body already is.
+                    entity.rootMotionLast_ = glm::vec3(0.0f);
+                    entity.rootMotionGeneration_ = sample.generation;
+                    entity.rootMotionHeld_ = true;
+                }
+                const glm::vec3 local = sample.displacement - entity.rootMotionLast_;
+                entity.rootMotionLast_ = sample.displacement;
+                // Asset units into world metres, then the body's facing. The scale is read from
+                // the node parameter rather than remembered, for the reason ADR-274 §5 paid to
+                // learn: Glowmere draws its aliens at 3.344x to 3.610x, a joint offset is in the
+                // asset's own units, and a scale-blind read would deliver 28% of the movement.
+                glm::vec3 scale(1.0f);
+                if (entity.scaleParam_ != nullptr) {
+                    for (std::size_t c = 0; c < 3; ++c) {
+                        scale[static_cast<int>(c)] = entity.scaleParam_->finalComponent(c);
+                    }
+                }
+                const glm::vec3 scaled = local * scale;
+                // Yaw about +Y, the same convention `socketTransform` composes with: the clip's
+                // forward is the rig's +Z and the body's facing is where that points now.
+                const float cy = std::cos(entity.state_.yaw);
+                const float sy = std::sin(entity.state_.yaw);
+                const glm::vec3 world(scaled.x * cy + scaled.z * sy, scaled.y,
+                                      -scaled.x * sy + scaled.z * cy);
+                entity.state_.travel += world;
+                entity.rootMotionStep_ = world;
+            }
         }
 
         BehaviorContext bc;

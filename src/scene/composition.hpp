@@ -30,6 +30,7 @@
 #include "scene/floaters.hpp"
 #include "scene/particles.hpp"
 #include "scene/pose_layers.hpp"
+#include "scene/root_motion.hpp"
 #include "entity/entity.hpp"
 #include "entity/obstacles.hpp"
 #include "scene/scene_controller.hpp"
@@ -167,9 +168,19 @@ struct NodeAnimation {
     // fields reach a pose; without one authored on the node they go on reaching nothing, which is
     // the honest behaviour -- there is no joint name this engine may assume.
     std::vector<PoseLayer> layers;
+    // ---- root motion (ADR-337) -----------------------------------------------------------------
+    // Which of this character's clips hand their root displacement to the simulation instead of
+    // drawing it. Per clip and per node, because it is an art decision twice over: whether a clip
+    // means to travel is a property of the take, and whether *this* body should be moved by it is
+    // a property of the scene. Glowmere's aliens and the lab's `watcher` load the same 26 clips
+    // and want different answers.
+    //
+    // Empty is the default and 163 of the 168 clips this project loads will keep it.
+    std::vector<RootMotionSpec> rootMotion;
     [[nodiscard]] bool authored() const {
         return !state.empty() || blend >= 0.0f || speed != 1.0f || updateHz != 0.0f ||
-               nearDistance != 15.0f || farHz != 20.0f || cullDistance != 120.0f || !layers.empty();
+               nearDistance != 15.0f || farHz != 20.0f || cullDistance != 120.0f ||
+               !layers.empty() || !rootMotion.empty();
     }
 };
 
@@ -1141,7 +1152,9 @@ private:
     // which node this entity drives. Only the composition knows which node holds which rig, so the
     // pose sink lives here; the skeleton query needs the identical lookup, and a second class
     // beside this one would be a second copy of it kept in step by hand.
-    class AnimationSink final : public entity::IPoseSink, public entity::ISkeletonQuery {
+    class AnimationSink final : public entity::IPoseSink,
+                               public entity::ISkeletonQuery,
+                               public entity::IRootMotionSource {
     public:
         AnimationSink(Composition& owner, std::string node, const entity::Entity& entity)
             : owner_(owner), node_(std::move(node)), entity_(entity) {}
@@ -1153,6 +1166,10 @@ private:
         // The joint's transform in the entity's own frame -- the rig's model space. False when
         // this node carries no rig, no rig of its carries the joint, or the rig has not been posed.
         [[nodiscard]] bool jointTransform(std::string_view joint, scene::Transform& out) const override;
+        // ADR-337. The only method on this object that answers a question about the *simulation*
+        // rather than about the drawing, and it does not write it: it reports, and the entity
+        // decides. Entity-local, in the asset's own units, exactly like `jointTransform`.
+        [[nodiscard]] entity::RootMotionSample rootMotion(double now) const override;
 
     private:
         Composition& owner_;
