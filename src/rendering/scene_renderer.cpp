@@ -3873,7 +3873,15 @@ Result<gpu::ImageF> SceneRenderer::renderToImageFloat(const scene::Scene& scene,
     if (hdrOutput_ == nullptr) {
         return fail("no HDR output texture after render");
     }
-    return gpu::readTextureF16(context_, hdrOutput_, width, height);
+    // ADR-277, and ADR-251 again at the call site it did not reach. `width`/`height` are the
+    // OUTPUT size; `hdrOutput_` is the scene target, which `resize()` sizes to `output *
+    // renderScale`. Reading the output's extent out of it returned the top-left corner of a
+    // supersampled frame -- the right size, the right format, scene-linear, and the wrong part of
+    // the picture, which is ADR-251's sentence about the same mistake in `RenderJob::renderOne`.
+    // The caller gets the scene target's own extent and is told nothing it has to correct for: a
+    // measurement in normalised coordinates is comparable across render scales as it stands, and
+    // one in pixels was already a measurement of the scene target rather than of the output.
+    return gpu::readTextureF16(context_, hdrOutput_, hdrOutput_.GetWidth(), hdrOutput_.GetHeight());
 }
 
 } // namespace avgen::rendering

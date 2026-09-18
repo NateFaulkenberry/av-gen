@@ -61,6 +61,14 @@ void PostProcessor::resetExposure() {
     exposureState_.reset();
     haveMeasurement_ = false;
     measuredLuminance_ = 0.0f;
+    // ADR-277. A copy of the PREVIOUS frame's metered luminance may still be in flight to
+    // `meterReadback_`, and `takeMeasurement` maps whatever is pending at the top of the next
+    // run(). Leaving the flag set makes the first frame after a scene swap or a seek adopt the
+    // measurement the reset exists to discard -- the reading is the old scene's, and this call
+    // is documented as the one that makes an offline render reproduce a live one exactly.
+    // Dropping the flag drops the copy: the buffer is written again before it is ever read, and
+    // an unmapped buffer with a completed copy in it is not a hazard.
+    meterPending_ = false;
 }
 
 Result<void> PostProcessor::init() {
