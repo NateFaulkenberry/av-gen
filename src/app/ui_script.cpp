@@ -1,3 +1,4 @@
+#include "core/interaction_latency.hpp"
 #include "app/ui_script.hpp"
 
 #include "app/engine.hpp"
@@ -215,6 +216,12 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
         }
         const std::vector<params::IParameter*>& ordered = sliderTargets_;
         if (!ordered.empty()) {
+            // The arm writes the parameter directly, which is exactly what a widget's own `changed`
+            // branch does, so it opens the record that branch would. Without an input event there
+            // is no T0, and `input->ack` reports unavailable rather than a number -- which is the
+            // honest answer for a value arm and not a hole in the table.
+            core::interactions().beginWithoutInput(core::Interaction::PropertyDrag);
+            core::interactions().markCommand();
             for (int i = 0; i < 2; ++i) { // two per frame: a drag crosses several widgets
                 params::IParameter* p = ordered[paramCursor_ % ordered.size()];
                 ++paramCursor_;
@@ -230,6 +237,10 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
                     }
                 }
             }
+            // T3: the parameter set holds the new base values. Everything downstream -- resetFinals,
+            // the timeline, the modulation routes, `controller_->update()` -- happens in the next
+            // frame's `Engine::update`, which is where T4 lands.
+            core::interactions().markModel();
         }
     }
 
@@ -248,17 +259,26 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
                                                     Kind::Environment, Kind::Procedural};
         const auto* composition = engine.composition();
         if (composition != nullptr && (frame % 7) == 0) {
+            core::interactions().beginWithoutInput(core::Interaction::Selection);
+            core::interactions().markCommand();
             panel->world.selection.kind = kKinds[(frame / 7) % kKinds.size()];
             const auto& nodes = composition->nodes();
             if (!nodes.empty()) {
                 panel->world.selection.name = nodes[(frame / 7) % nodes.size()]->name;
             }
+            // Selection is panel state and nothing else; there is no engine call to make, so the
+            // model change is the assignment above. That it is the same instant as the command is
+            // the finding, not a gap in the instrument.
+            core::interactions().markModel();
         }
     }
 
     if (has(arms_, UiScriptArm::Tabs)) {
         if ((frame % 11) == 0) {
+            core::interactions().beginWithoutInput(core::Interaction::TabSwitch);
+            core::interactions().markCommand();
             panel->world.layer = static_cast<ui::AuthoringLayer>(static_cast<int>((frame / 11) % 3));
+            core::interactions().markModel();
         }
     }
 
@@ -294,7 +314,10 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
         if (!panels.empty() && (frame % 20) == 0) {
             const ui::EditorPanel& target = panels[(frame / 20) % panels.size()];
             if (bool* slot = panel->layout().slot(target.id); slot != nullptr) {
+                core::interactions().beginWithoutInput(core::Interaction::PanelToggle);
+                core::interactions().markCommand();
                 *slot = !*slot;
+                core::interactions().markModel();
             }
         }
     }

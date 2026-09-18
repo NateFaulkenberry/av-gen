@@ -44,6 +44,13 @@ enum class LabId {
     Aov,
     Rendering,
     Integration,
+    // The fifteenth, and the only one whose subject is not a pixel. Every lab above asks why the
+    // renderer produced the frame it produced; this one asks how long after a person acted the
+    // application answered, which is a property of the editor's architecture rather than of any
+    // pass. It is in this registry rather than beside it because a lab suite that cannot hold the
+    // question "why does the editor feel slow" sends people to build a harness of their own, and
+    // this repository has already paid for one of those (`src/core/phase2_probe.hpp`).
+    Interaction,
 };
 
 // How much of the lab exists today. This field is the reason the registry can ship complete while

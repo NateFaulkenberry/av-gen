@@ -1,3 +1,4 @@
+#include "core/interaction_latency.hpp"
 #include "ui/edit_history.hpp"
 
 #include "app/engine.hpp"
@@ -96,6 +97,16 @@ bool heroNamesNode(const world::HeroPoint& hero, const std::string& node) {
 
 EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
     EditApply out;
+    // Every structural edit the editor makes goes through here -- a brush stroke, a delete, a
+    // re-parent, an undo, a redo -- so this is the one hook that covers them all. Opened only when
+    // nothing is open: `setNodesHero` opens a `HeroStar` record before calling this, and a star
+    // relabelled as a generic world edit would put two different interactions in one distribution.
+    const bool ownsRecord = !core::interactions().open();
+    if (ownsRecord) {
+        core::interactions().beginWithoutInput(core::Interaction::WorldEdit);
+        core::interactions().markCommand();
+        core::applyInjectedDelayForOpenInteraction();
+    }
 
     // The sequencer's half, first and on its own terms. It is settled before the composition is
     // even looked for, because a sequence edit does not need one -- and because `setSequence`
@@ -123,6 +134,12 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
         if (command.timeline == nullptr || !command.params.empty() || !command.added.empty() ||
             !command.removed.empty() || !command.parents.empty() || !command.heroes.empty()) {
             out.problems.push_back("there is no composition to edit");
+        }
+        if (ownsRecord) {
+            // Nothing was edited, so there is no latency to book. Abandoned rather than filed: a
+            // refused edit filed at its own speed is the fastest interaction in the table and the
+            // one that never happened.
+            core::interactions().abandon();
         }
         return out;
     }
@@ -233,6 +250,11 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
     // Once, at the end. A node that came back brings its parameter paths with it, and the routes
     // and timeline tracks aimed at those paths were dropped when it left.
     engine.rebind();
+    // T3: the authoritative state has taken the edit. Note what is *not* done here -- the flatten
+    // the edit asked for is paid by the next `Engine::update`, which is where T4 lands, so a
+    // structural edit's model change and its evaluated consequence are a frame apart by
+    // construction. The log reports that frame rather than hiding it inside T3.
+    core::interactions().markModel();
     return out;
 }
 

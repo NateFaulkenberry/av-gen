@@ -146,7 +146,7 @@ TEST_CASE("lab keys are unique, lowercase and resolvable", "[labs][registry]") {
         // descriptor and nothing else would notice.
         CHECK(labs::lab(d.id).key == d.key);
     }
-    CHECK(labs::labs().size() == 14);
+    CHECK(labs::labs().size() == 15);
     CHECK_FALSE(labs::findLab("shadows").has_value()); // the lab is "shadow"
     CHECK_FALSE(labs::findLab("").has_value());
 }
