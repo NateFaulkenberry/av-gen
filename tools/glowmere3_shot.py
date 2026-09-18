@@ -21,6 +21,11 @@ OD = collections.OrderedDict
 
 camera_name, second, label = sys.argv[1], float(sys.argv[2]), sys.argv[3]
 source = sys.argv[4] if len(sys.argv) > 4 else "glowmere-valley-3"
+# An optional shift applied to every scatter layer's seed: a different world for the cast to
+# perceive, on the same terrain, with their authored config unchanged to the byte. This is the
+# picture half of ADR-338 §4's variation arm -- the numbers say the itinerary moves, and a frame
+# from the same camera at the same second is what shows it.
+ecology_shift = int(sys.argv[5]) if len(sys.argv) > 5 else 0
 
 d = json.load(open("examples/world/%s.scene.json" % source), object_pairs_hook=OD)
 cam = next(c for c in d["cameraDirection"]["cameras"] if c.get("name") == camera_name)
@@ -31,6 +36,10 @@ d["cameraDirection"]["shots"] = [OD([("camera", cam["id"]), ("start", 0.0), ("en
                                      ("transition", "cut"), ("locked", True),
                                      ("label", label)])]
 d["cameraDirection"]["default"] = cam["id"]
+if ecology_shift:
+    for n in d["nodes"]:
+        for layer in n.get("scatter", []):
+            layer["seed"] = layer.get("seed", 0) + ecology_shift
 tmp_scene = "examples/world/_v3shot.scene.json"
 json.dump(d, open(tmp_scene, "w"), indent=1)
 
@@ -43,7 +52,8 @@ try:
     subprocess.run(["tools/gpu-lock.sh", "./build/release/src/avgen", "--project", tmp_project,
                     "--render", out, "--range", "%f:%f" % (second, second + 0.034)],
                    check=True, stdout=subprocess.DEVNULL)
-    print("wrote examples/world/%s (camera '%s', t = %.2f s)" % (out, camera_name, second))
+    print("wrote examples/world/%s (camera '%s', t = %.2f s, ecology seed shift %d)"
+          % (out, camera_name, second, ecology_shift))
 finally:
     for f in (tmp_scene, tmp_project):
         if os.path.exists(f):

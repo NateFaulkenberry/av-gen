@@ -35,12 +35,21 @@ Carried, byte for byte, out of `glowmere-valley-2.scene.json`:
 
 Authored here, not carried:
 
-    two new world features -- a ford and a causeway (see THE CROSSING below)
+    the river re-cut in three segments with a wadeable ford in the middle of it, and a flood
+    channel with two open ends, which are the only two changes to the landform (see THE CROSSING)
     the scatter layers (see THE TREES below)
     the cast: five autonomous characters, their considerers and their pose layers
     the cameras and the shot list
-    `composition.focalPoints`
+    `composition.focalPoints`, whose one entry named an "elder" at a position no node has occupied
+    since the original Glowmere's elder was replaced
     the whole project
+
+Carried out of valley 2's *project* rather than its scene, and there is exactly one such thing:
+
+    the 36 hero rotations the owner turned by hand in the editor, which ADR-264 §4 adjudicated as
+    authoring. They are taken only where all four parts of an organism agree -- a transform not
+    shared by all four is a patch -- and they land in valley 3's *scene*, because a yaw a
+    generator writes is authoring and the project stays at four parameters.
 
 Dropped, deliberately (ADR-338 names each one):
 
@@ -52,7 +61,6 @@ Dropped, deliberately (ADR-338 names each one):
 import collections
 import hashlib
 import json
-import math
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
