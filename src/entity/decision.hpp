@@ -402,9 +402,9 @@ private:
 //
 // Neither penalty is this character's opinion; they are the two probes that *find* the two ways.
 // The opinion is `wadePenalty`, and both ways are then scored with it: `length + wadePenalty x the
-// metres of the route that are in water`. A body that does not mind getting wet prices the ford's
-// fourteen wet metres at nothing and takes the short way; a body that does prices them above the
-// hundred dry metres the long way costs and goes round. **One knob, two options, and the crossover
+// metres of the route that are in water`. Measured on the lab's river fixture: a ford of 54.15 m
+// with 11.26 weighted wet metres against a detour of 84.56 m with 1.61. At `wadePenalty` 0.4 the
+// ford costs 58.65 and wins; at 12.0 it costs 189.29 and loses to the detour's 103.83. **One knob, two options, and the crossover
 // is arithmetic rather than a rule.**
 //
 // Which is also why `wadePenalty` is a registered parameter and the two probes are not (ADR-225):
