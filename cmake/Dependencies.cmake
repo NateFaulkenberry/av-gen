@@ -112,6 +112,34 @@ if(NOT MSVC)
 endif()
 add_library(tinyexr::tinyexr ALIAS tinyexr)
 
+# ---- Embree (ray/geometry intersection and BVH for the path tracer) ---------------------------
+# ADR-339. Embree owns intersection and acceleration only; the integrator, materials, sampling and
+# output are AV Gen's (spec section 74). Apache-2.0; it vendors sse2neon.h (MIT) for the NEON path.
+#
+# EMBREE_TASKING_SYSTEM=INTERNAL keeps oneTBB out of the build. The path tracer additionally
+# configures the device with an explicit thread count and commits with `rtcJoinCommitScene` from
+# AV Gen-owned threads, so Embree starts no pool of its own (spec section 36).
+#
+# The CMAKE_CXX_STANDARD dance is not optional and not cosmetic. Embree appends `-std=c++11` to
+# CMAKE_CXX_FLAGS, but a globally-set CMAKE_CXX_STANDARD (CMakeLists.txt sets 23) emits its own
+# `-std=` flag LATER on the same command line and wins. Embree 4.4.0 does not compile as C++23
+# under Apple clang 21: twenty errors in kernels/builders/priminfo_mb.h about PrimInfoMB "not a
+# direct or virtual base of embree::SetMB". Engine targets carry the standard themselves.
+set(_avgen_saved_cxx_standard "${CMAKE_CXX_STANDARD}")
+unset(CMAKE_CXX_STANDARD)
+unset(CMAKE_CXX_STANDARD CACHE)
+CPMAddPackage(
+    NAME embree
+    GITHUB_REPOSITORY RenderKit/embree
+    GIT_TAG v4.4.0
+    SYSTEM YES EXCLUDE_FROM_ALL YES
+    OPTIONS "EMBREE_TASKING_SYSTEM INTERNAL" "EMBREE_ISPC_SUPPORT OFF" "EMBREE_TUTORIALS OFF"
+            "EMBREE_STATIC_LIB ON" "EMBREE_MAX_ISA NEON"
+            "EMBREE_GEOMETRY_QUAD OFF" "EMBREE_GEOMETRY_CURVE OFF" "EMBREE_GEOMETRY_SUBDIVISION OFF"
+            "EMBREE_GEOMETRY_POINT OFF" "EMBREE_GEOMETRY_GRID OFF")
+set(CMAKE_CXX_STANDARD "${_avgen_saved_cxx_standard}")
+unset(_avgen_saved_cxx_standard)
+
 # ---- Catch2 (tests) ---------------------------------------------------------------------------
 if(AVGEN_BUILD_TESTS)
     CPMAddPackage(
