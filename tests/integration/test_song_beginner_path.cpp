@@ -251,7 +251,7 @@ TEST_CASE("Song Mode bakes a film without touching the Shots lane", "[integratio
 // So the two tests below are a measurement and its control: what this song actually produces, and
 // proof that the mechanism fires when a song asks it to.
 
-TEST_CASE("Song Mode publishes spans, and this song's are all holds",
+TEST_CASE("Song Mode publishes spans, and this song now has one the beam fires on",
           "[integration][song][effects]") {
 #ifndef AVGEN_SOURCE_DIR
     SKIP("AVGEN_SOURCE_DIR not defined");
@@ -283,11 +283,25 @@ TEST_CASE("Song Mode publishes spans, and this song's are all holds",
         std::count_if(spans.begin(), spans.end(), [](const world::ShotSpan& s) { return s.spotlight; }));
     INFO(spans.size() << " span(s): " << travelling << " travelling, " << holding << " holding");
 
-    // The half that is not broken: on THIS song every shot is about somebody, so a camera-travel
-    // effect has nothing to fire on and is correctly inert. Asserted rather than merely noted,
-    // because if this ever changes the explanation above stops being true and should be revisited.
+    // This assertion used to read `travelling == 0`, with an explanation attached: on this song
+    // every shot was about somebody, so a camera-travel effect had nothing to fire on and was
+    // correctly inert. The comment said that if it ever changed the explanation stopped being true
+    // and should be revisited. It changed, and this is the revision.
+    //
+    // What changed it: ADR-249's autonomy is `min(section, film)`, and every cue-derived section
+    // was being left at `Guided`, so the film-wide ceiling could not be raised to its own top value
+    // and `Expressive` had never once been reached. With it reachable the director picks a
+    // `Transition` for one section of this song, which is a shot that is about a move rather than
+    // about a body -- and a move is precisely what a camera-travel effect fires on.
+    //
+    // So the reported "the camera travel beam does not work in Song Mode" had two halves, and this
+    // is the second one going away: the mechanism was always fine (the control below proves it),
+    // and the films simply never contained a span for it. Now one does.
     CHECK(holding > 0);
-    CHECK(travelling == 0);
+    // Not `== 1`. The exact count is a property of this song, this seed and these cameras, and
+    // pinning it would make an unrelated retune of the director look like a regression here. What
+    // matters is that a travelling span can now occur at all on a real film.
+    CHECK(travelling >= 1);
 #endif
 }
 
