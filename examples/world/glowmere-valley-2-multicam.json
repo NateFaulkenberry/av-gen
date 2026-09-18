@@ -3677,7 +3677,7 @@
       1.0
     ],
     "nodes/foreground-leaves/visible": true,
-    "nodes/goat-14/emissiveBoost": 1.7669792175292969,
+    "nodes/goat-14/emissiveBoost": 0.0,
     "nodes/goat-14/lightColor": [
       1.0,
       1.0,
@@ -3700,7 +3700,7 @@
       3.5999999046325684,
       3.5999999046325684
     ],
-    "nodes/goat-14/visible": true,
+    "nodes/goat-14/visible": false,
     "nodes/goat-5/emissiveBoost": 0.0,
     "nodes/goat-5/lightColor": [
       1.0,
@@ -5452,7 +5452,7 @@
       0.12999999523162842
     ],
     "particles/visitor-beam/drag": 0.05000000074505806,
-    "particles/visitor-beam/emissive": 1.5499999523162842,
+    "particles/visitor-beam/emissive": 0.44999998807907104,
     "particles/visitor-beam/enabled": true,
     "particles/visitor-beam/extent": 0.053846150636672974,
     "particles/visitor-beam/gravity": [
@@ -5468,7 +5468,7 @@
       0.0
     ],
     "particles/visitor-beam/size": 1.0,
-    "particles/visitor-beam/spawnRate": 6100.0,
+    "particles/visitor-beam/spawnRate": 0.0,
     "particles/visitor-beam/speed": 1.0,
     "particles/visitor-beam/spread": 0.12800000607967377,
     "particles/visitor-beam/stretch": 4.5,
@@ -12491,7 +12491,7 @@
       0.18000000715255737,
       0.3199999928474426
     ],
-    "scene/fogDensity": 0.005499999970197678,
+    "scene/fogDensity": 0.026000000536441803,
     "scene/fogHeight": 4.0,
     "scene/fogHeightFalloff": 0.10000000149011612,
     "scene/gridIntensity": 0.6000000238418579,
@@ -12548,23 +12548,23 @@
     "staging/abduction/travelSpeed": 30.0,
     "worldfx/Camera Travel Beam/beamRadius": 0.0,
     "worldfx/Camera Travel Beam/color": [
-      0.07000000029802322,
-      0.7799999713897705,
-      1.0
+      1.0,
+      0.6200000047683716,
+      0.25999999046325684
     ],
     "worldfx/Camera Travel Beam/delay": 0.15000000596046448,
     "worldfx/Camera Travel Beam/edgeColor": [
-      0.7200000286102295,
       1.0,
-      0.9200000166893005
+      0.9399999976158142,
+      0.7799999713897705
     ],
-    "worldfx/Camera Travel Beam/edgeIntensity": 3.200000047683716,
+    "worldfx/Camera Travel Beam/edgeIntensity": 6.0,
     "worldfx/Camera Travel Beam/enabled": true,
     "worldfx/Camera Travel Beam/fadeIn": 0.5,
     "worldfx/Camera Travel Beam/fadeOut": 1.100000023841858,
-    "worldfx/Camera Travel Beam/falloff": 2.200000047683716,
-    "worldfx/Camera Travel Beam/frontWidth": 10.0,
-    "worldfx/Camera Travel Beam/intensity": 1.0,
+    "worldfx/Camera Travel Beam/falloff": 2.799999952316284,
+    "worldfx/Camera Travel Beam/frontWidth": 1.399999976158142,
+    "worldfx/Camera Travel Beam/intensity": 2.5999999046325684,
     "worldfx/Camera Travel Beam/lifetime": 0.0,
     "worldfx/Camera Travel Beam/rainbow": false,
     "worldfx/Camera Travel Beam/rainbowBrightness": 1.0,
@@ -12572,20 +12572,20 @@
     "worldfx/Camera Travel Beam/rainbowScale": 0.012000000104308128,
     "worldfx/Camera Travel Beam/rainbowSpeed": 0.3499999940395355,
     "worldfx/Camera Travel Beam/range": 300.0,
-    "worldfx/Camera Travel Beam/repeat": 2.5999999046325684,
+    "worldfx/Camera Travel Beam/repeat": 9.239999771118164,
     "worldfx/Camera Travel Beam/response/emissive": 1.2000000476837158,
     "worldfx/Camera Travel Beam/response/foliage": 1.100000023841858,
-    "worldfx/Camera Travel Beam/response/ground": 0.44999998807907104,
+    "worldfx/Camera Travel Beam/response/ground": 0.6899999976158142,
     "worldfx/Camera Travel Beam/response/surface": 0.699999988079071,
     "worldfx/Camera Travel Beam/ringCount": 0.0,
-    "worldfx/Camera Travel Beam/sparkle": true,
-    "worldfx/Camera Travel Beam/sparkleDensity": 1.100000023841858,
-    "worldfx/Camera Travel Beam/sparkleIntensity": 2.4000000953674316,
-    "worldfx/Camera Travel Beam/sparkleSize": 0.2199999988079071,
+    "worldfx/Camera Travel Beam/sparkle": false,
+    "worldfx/Camera Travel Beam/sparkleDensity": 0.699999988079071,
+    "worldfx/Camera Travel Beam/sparkleIntensity": 2.0,
+    "worldfx/Camera Travel Beam/sparkleSize": 0.3799999952316284,
     "worldfx/Camera Travel Beam/sparkleSpeed": 0.6000000238418579,
     "worldfx/Camera Travel Beam/speed": 110.0,
     "worldfx/Camera Travel Beam/startOffset": 10.0,
-    "worldfx/Camera Travel Beam/trailLength": 30.0,
+    "worldfx/Camera Travel Beam/trailLength": 7.0,
     "worldfx/Camera Travel Beam/verticalExtent": 40.0,
     "worldfx/Camera Travel Beam/width": 1.0,
     "worldfx/Hero Mushroom Pulse/beamRadius": 0.0,
@@ -12637,15 +12637,15 @@
     "backend": "auto",
     "codec": "h264",
     "encoderThreads": 0,
-    "end": 30.0,
+    "end": 90.0,
     "fps": 60.0,
     "height": 1080,
     "limits": "unlimited",
     "muxAudio": true,
     "output": "video",
-    "path": "glowmere-valley-2-multicam.mov",
+    "path": "bad.mov",
     "pattern": "frame_{:06d}.png",
-    "quality": 100,
+    "quality": 80,
     "start": 0.0,
     "supersample": 2.0,
     "tier": "offline",
@@ -13343,7 +13343,7 @@
       "target": "worldfx/Hero Mushroom Pulse/intensity"
     },
     {
-      "amount": 6.559999942779541,
+      "amount": 8.0,
       "chain": {
         "attackMs": 10.0,
         "clampEnabled": false,
