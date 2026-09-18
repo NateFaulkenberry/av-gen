@@ -186,6 +186,37 @@ the ratio is the part that travels.
 **All of this is part 1.** Glowmere's grid refuses to vouch, so not one of these microseconds comes
 from the grid.
 
+### 3b. Taken again on a quiet machine, with the control that cannot move
+
+Everything above was measured at load averages between 8 and 25. The machine went quiet later the
+same day and the whole A/B was re-taken at **5.8 to 12.1**, alternating, minima of 3:
+
+```
+                         before    after
+Navigator::sample         9.984    5.417   1.84x
+Navigator::steer         58.575   32.215   1.82x
+Navigator::pathValid     75.110   39.792   1.89x
+Navigator::requestPath   24.360   24.337   1.00x   <- the control that must not move
+
+explore     10      25      50     100     250     500
+before  0.7319  3.7970  4.9934 14.9457 41.2525 72.7220
+after   0.4452  2.1811  2.9252  8.7840 23.2881 40.7975
+        1.64x   1.74x   1.71x   1.70x   1.77x   1.78x
+```
+
+Two things in that block are worth more than the speed-up.
+
+**`requestPath` is the control and it did not move.** A\* and the string pull never call `pathClear` —
+they walk the grid's own `lineOfSight` — so the one primitive this change cannot reach must read the
+same, and it does, to within 0.1%. Everything that got faster is a caller of `pathClear`; nothing else
+did.
+
+**The before-column reproduces §E's published table**, taken months earlier on a different day at load
+3.75: `sample` 10.325 against 9.984, `steer` 59.135 against 58.575, `requestPath` 24.969 against
+24.360, `pathValid` 74.481 against 75.110. Every one inside 4%. That is the closest thing available to
+a check that the A/B harness measures the change and not the afternoon — and the ratios from the loaded
+session (1.68–1.81×) and the quiet one (1.64–1.78×) agree, which is the reproduction ADR-170 asks for.
+
 ## 4. What this means, plainly — including a number this ADR had wrong
 
 * **Glowmere gets part 1 and nothing else.** Its walkability queries are 1.9× cheaper and every route
