@@ -778,9 +778,9 @@
     ],
     "nodes/ember/roughnessScale": 1.0,
     "nodes/ember/scale": [
-      3.3440001010894775,
-      3.3440001010894775,
-      3.3440001010894775
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/ember/visible": true,
     "nodes/foreground-leaves/emissiveBoost": 1.0,
@@ -1138,9 +1138,9 @@
     ],
     "nodes/rook/roughnessScale": 1.0,
     "nodes/rook/scale": [
-      3.609999895095825,
-      3.609999895095825,
-      3.609999895095825
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/rook/visible": true,
     "nodes/sage/emissiveBoost": 1.0,
@@ -1162,9 +1162,9 @@
     ],
     "nodes/sage/roughnessScale": 1.0,
     "nodes/sage/scale": [
-      3.5759999752044678,
-      3.5759999752044678,
-      3.5759999752044678
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/sage/visible": true,
     "nodes/scree-cap/emissiveBoost": 1.0,
@@ -1474,9 +1474,9 @@
     ],
     "nodes/tide/roughnessScale": 1.0,
     "nodes/tide/scale": [
-      3.6010000705718994,
-      3.6010000705718994,
-      3.6010000705718994
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/tide/visible": true,
     "nodes/umbra-cap/emissiveBoost": 1.0,

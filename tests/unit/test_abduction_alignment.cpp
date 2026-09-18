@@ -343,6 +343,16 @@ TEST_CASE("An abducted animal is inside the beam for the whole lift", "[stage][b
     run.play(110.0);
 
     REQUIRE(run.lifts.size() >= 5);
+    // "Large" is half the widest animal the scene actually holds, not four metres.
+    //
+    // Four metres was the reach of a big farm animal at ADR-213's 3.6x, and at ADR-330's authored
+    // scale the widest body in the whole cast reaches 1.61 m -- so the guard could never be
+    // satisfied and failed on a run that had lifted a bull, a horse and a cow. The thing it is
+    // guarding against is a run made entirely of poultry, and that is a statement about this cast's
+    // own range rather than about metres: a chick reaches a twentieth of what a bull does at any
+    // scale you like.
+    const float largeEnough = run.widestAnimal().second * 0.5f;
+    REQUIRE(largeEnough > 0.0f);
     float worstOrigin = 0.0f;
     bool sawALargeOne = false;
     for (const Lift& l : run.lifts) {
@@ -354,10 +364,12 @@ TEST_CASE("An abducted animal is inside the beam for the whole lift", "[stage][b
         REQUIRE(l.beamRadius > 0.0f);
         CHECK(l.worstCorner <= l.beamRadius);
         worstOrigin = std::max(worstOrigin, l.worstOrigin);
-        sawALargeOne = sawALargeOne || l.bodyReach > 4.0f;
+        sawALargeOne = sawALargeOne || l.bodyReach > largeEnough;
     }
     // Without one of the big animals in the run the assertion above is satisfied by a chick, and a
     // chick fits in any beam anybody would ever author (ADR-182).
+    INFO("a lift counts as large at " << largeEnough << " m of reach, half the widest animal "
+                                      << run.widestAnimal().first << " in the scene");
     CHECK(sawALargeOne);
 
     // And the animals the run did not happen to pick. The query filters on a tag, so every one of
