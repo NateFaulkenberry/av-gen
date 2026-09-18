@@ -135,17 +135,26 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         // steps x bodies (ADR-272). Live only, for the same reason -- a deterministic render wants
         // the whole ninety seconds whatever it costs, because nobody is sitting waiting for it.
         //
-        // 120,000 is 90 s of history for a cast of twenty-two and shrinks from there, which is what
-        // keeps the ceiling from being another literal in the wrong currency. Chosen from the
-        // measurement rather than from a round number: ADR-272 priced one body-step of the
-        // authored Glowmere population at 4.6 us, so this is a ~550 ms worst case for a scene big
-        // enough to hit it, against the 2,437 ms a timeline click used to answer in.
+        // **It is a cast-size ceiling, not a latency dial, and the measurement is why.** Shortening
+        // Glowmere's window does not cost a character a little accumulated history; it puts the
+        // cast somewhere else entirely. Measured, at t = 90 s on the authored scene: a 45 s window
+        // moves a body 195.4 m from where the full replay puts it, and a 22 s window 240.7 m. A
+        // faster seek that draws a different frame is not a faster seek (ADR-182), so this may not
+        // be set low enough to bite on a scene that is currently getting a correct answer.
+        //
+        // 180,000 is the whole ninety seconds for any scene with up to thirty-three bodies that
+        // need it -- Glowmere's twenty-two deep bodies cost 118,801, so it keeps its exact frame --
+        // and it shrinks from there. What it is actually for is the case ADR-267 called the
+        // blocker: two hundred and fifty autonomous characters, where one timeline click took
+        // 402 s measured here and 594 s in ADR-267, and where the alternative to a shorter window
+        // is not a better frame but an editor nobody can use.
+        //
         // AVGEN_SEEK_BODY_STEPS overrides it (0 = no ceiling) so the before and after stay runnable
         // out of one binary.
         if (const char* budget = std::getenv("AVGEN_SEEK_BODY_STEPS")) {
             seekBodyStepBudget_ = std::strtoull(budget, nullptr, 10);
         } else {
-            seekBodyStepBudget_ = 120000;
+            seekBodyStepBudget_ = 180000;
         }
     }
     // AVGEN_LEGACY_PROCGEN=1 restores the pre-ADR-233 double generation, in *any* mode, for one
