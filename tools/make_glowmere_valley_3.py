@@ -1063,7 +1063,13 @@ project = OD([
     ("routes", []),
     ("shaders", []),
     ("sources", []),
-    ("worldEffects", d["worldEffects"]),
+    # **No `worldEffects`, and that is the engine's own rule rather than a preference.**
+    # `Engine::loadProject` clears the list and refills it from the composition, and only then
+    # reads the project's copy if there is one; `Engine::saveProject` writes that copy **only when
+    # the live list differs from what the project already holds**. So a project whose
+    # `worldEffects` duplicates its scene's is a second copy of the same four hundred numbers that
+    # can go stale and that nothing needs -- the first draft of this file carried one, and it was
+    # exactly the class of thing this rebuild exists to remove.
 ])
 json.dump(project, open(PROJECT, "w"), indent=1)
 print("wrote %s: %d parameters, %d routes, no timeline, no sequence, no staging"
