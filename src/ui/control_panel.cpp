@@ -2984,6 +2984,10 @@ void ControlPanel::drawRender(app::Engine& engine) {
     }
     // ---- ADR-320: the frames the render is actually writing -------------------------------------
     //
+    // The tallest the thumbnail is allowed to be, in ImGui points. A 16:9 frame comes out 320x180
+    // and a 9:16 one 101x180, so a portrait output cannot push the caption off the panel either.
+    constexpr float kRenderPreviewMaxPoints = 180.0f;
+    //
     // One contiguous block on purpose. Everything it needs is in `renderPreview`, which the host
     // fills from `RenderJob::takePreview`; the panel owns none of the GPU work and none of the
     // threading.
@@ -2997,10 +3001,19 @@ void ControlPanel::drawRender(app::Engine& engine) {
     }
     if (renderPreview.enabled) {
         if (renderPreview.hasFrame()) {
+            // Fitted into a box, not given the width it would like. The first version took the
+            // panel's full content width, and on a docked Render panel that pushed the caption
+            // below the fold -- a preview whose only guarantee is that it says which frame it is
+            // showing, with the line that says so scrolled out of sight.
             const float avail = std::max(ImGui::GetContentRegionAvail().x, 64.0f);
-            const float shown = std::min(avail, static_cast<float>(renderPreview.width));
-            const float tall = shown * static_cast<float>(renderPreview.height) /
-                               static_cast<float>(std::max<std::uint32_t>(renderPreview.width, 1));
+            const float aspect = static_cast<float>(renderPreview.height) /
+                                 static_cast<float>(std::max<std::uint32_t>(renderPreview.width, 1));
+            float shown = std::min(avail, static_cast<float>(renderPreview.width));
+            float tall = shown * aspect;
+            if (tall > kRenderPreviewMaxPoints) {
+                tall = kRenderPreviewMaxPoints;
+                shown = tall / std::max(aspect, 0.01f);
+            }
             ImGui::Image(static_cast<ImTextureID>(renderPreview.texture), ImVec2(shown, tall),
                          ImVec2(0.0f, 0.0f), ImVec2(renderPreview.u1, renderPreview.v1));
             // The hash is the point of printing it: it is the frame's own hash as written to the

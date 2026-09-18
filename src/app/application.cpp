@@ -217,6 +217,11 @@ std::string usageText() {
            "                      harness detects it (ADR-182). Its records are excluded from\n"
            "                      every distribution.\n"
            "  --capture <file>    write the last frame as a PPM image\n"
+           "  --render-preview    show the frames a render is writing in the Render panel, whatever\n"
+           "                      the settings file remembers (ADR-320)\n"
+           "  --render-in-app <p> start the project's render in the window, as the Render button\n"
+           "                      does, instead of headlessly. The only way to reach the Render\n"
+           "                      panel's mid-render state from a script or a capture\n"
            "  --capture-ui <f>    write the editor, ImGui and all, as a PNG\n"
            "  --capture-ui-frame <n>  which frame to grab (default 90)\n"
            "  --capture-ui-panel <a,b>  open and raise these panels first, so a closed or\n"
@@ -448,6 +453,13 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--capture");
             if (!v) return std::unexpected(v.error());
             options.capture = *v;
+            ++i;
+        } else if (arg == "--render-preview") {
+            options.renderPreview = true;
+        } else if (arg == "--render-in-app") {
+            auto v = need(i, "--render-in-app");
+            if (!v) return std::unexpected(v.error());
+            options.renderInApp = *v;
             ++i;
         } else if (arg == "--capture-ui") {
             auto v = need(i, "--capture-ui");
@@ -1160,7 +1172,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->canvasRenderScale =
             options_.canvasScale != 1.0f ? options_.canvasScale : settings_.canvasRenderScale;
         panel_->preview = settings_.preview;
-        panel_->renderPreview.enabled = settings_.renderFramePreview; // ADR-320
+        panel_->renderPreview.enabled = settings_.renderFramePreview || options_.renderPreview; // ADR-320
         // The flag outranks the remembered state, and only when it was given: a benchmark arm has
         // to be able to say which mode it is measuring without depending on how this machine's
         // settings file happens to be left.
@@ -3625,6 +3637,15 @@ int Application::runLive() {
         engine_->setDetailLimits(liftViewportLimits_ ? scene::DetailLimits::unlimited()
                                                       : scene::DetailLimits{});
 
+        // `--render-in-app`: the Render button, pressed once, on the first frame that has a
+        // window, a project and a panel. Here rather than in `init()` because the job renders
+        // between UI frames and there is no frame loop to render between until this one.
+        if (options_.renderInApp && !renderInAppStarted_) {
+            renderInAppStarted_ = true;
+            uiRender_.outputPath = *options_.renderInApp;
+            uiRender_.normalisePattern();
+            startRenderFromUi();
+        }
         // Background render: a few frames per UI frame, then the next queued job.
         if (job_) {
             core::PhaseProfiler::Scope scope(prof, kPhJob);

@@ -194,6 +194,18 @@ struct AppOptions {
     std::optional<double> rangeStart, rangeEnd;
     std::optional<std::string> codec;
     std::optional<RenderOutput> renderOutput; // --output png|exr|video
+    // `--render-in-app <dir|file>`: start the project's render as an in-app job, in the window,
+    // the way the Render button does -- rather than as the headless job `--render` runs. The whole
+    // mid-render state of the Render panel (the progress rows, the estimate, Cancel, and ADR-320's
+    // frame preview) was reachable only by clicking that button, which means it could not be
+    // photographed, profiled or captured by anything. ADR-262's shape exactly: the one state
+    // everybody diagnoses from was the one state no tool could reach.
+    std::optional<std::filesystem::path> renderInApp;
+    // `--render-preview`: force ADR-320's frame preview on for this session, whatever the settings
+    // file remembers. Same reason `--preview-mode` exists and is written the same way -- a capture
+    // or a benchmark has to be able to say which state it is photographing rather than depending
+    // on how this machine's settings happen to be left.
+    bool renderPreview = false;
     std::optional<int> quality;
     std::optional<std::uint32_t> renderWidth, renderHeight;
     // Live control (1.1): --input [device], --osc-port <n>, --list-audio-devices, --list-midi
@@ -275,6 +287,7 @@ private:
                                                                    RenderSettings settings);
     int runQueue(const std::filesystem::path& queueFile);
     void startRenderFromUi();
+    bool renderInAppStarted_ = false; // `--render-in-app` fires once
     // Outputs (1.2): keeps the offscreen final texture sized to the main window, (re)opens the
     // output windows from the engine's project block, and stores them back before saves.
     // `--debug-draw`'s list onto the World panel's own switches, which is where the overlays live

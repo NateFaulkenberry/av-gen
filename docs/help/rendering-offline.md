@@ -47,6 +47,32 @@ The panel validates live and shows any problem in red before you can start.
 grading. It does **not** include composition layers, and AV Gen warns you when a render starts with
 both, rather than letting you discover it in a grade.
 
+## Watching the frames go out
+
+**Show output frames**, under the progress bar, puts the frame the render just wrote into the
+panel. It is not a second render of the same moment: it is the encoder's own pixels, read where the
+render hashes them, and the caption under it gives the frame number and that frame's hash so a
+picture can be tied to a specific frame of the deliverable.
+
+It is off by default and it is remembered between sessions. From the command line,
+`--render-preview` forces it on for one session whatever the settings file says, and
+`--render-in-app <path>` starts a render *in the window* rather than headless, which is the only way
+to reach this state from a script or a capture.
+
+What it costs: the frame is point-sampled down to at most 480 px on its long axis, which at
+1920 × 1080 reads 1 pixel in 16 and copies 518 KB instead of 8.3 MB. Measured over 24 frames at
+1920 × 1080, that is 0.19 ms a frame — under 1% of the render. Only the newest frame is kept; the
+panel says how many went by unshown.
+
+Two things it is honest about rather than hiding:
+
+- **It aliases.** Point-sampling a 1920-wide frame to 480 shimmers on fine detail. The file does
+  not.
+- **An EXR is scene-linear**, so it has no display appearance of its own. The preview clamps it to
+  0–1 and sRGB-encodes it, and says so on the panel. The project's tone map, exposure, vignette and
+  grain are **not** applied — those live in the GPU's tone-mapping shader, and a second CPU copy of
+  them would be free to drift from the picture it claims to be of.
+
 ## The queue
 
 **Add to queue** requires a saved project: it saves first, then queues the project path together
