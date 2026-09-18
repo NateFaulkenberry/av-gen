@@ -512,6 +512,27 @@ TEST_CASE("the same goal model over two sources is two different characters",
     CHECK(suppressed[1].weight == omniscient[1].weight);
 }
 
+TEST_CASE("a misspelled considerer is refused by name", "[entity][decision][adr330]") {
+    // `makeConsiderer` is the whole vocabulary, and a kind it does not know comes back null so the
+    // caller can say so. A silently skipped considerer is a character that loses one of the things
+    // it was meant to want, and a guard whose `investigate` never loaded stands still for the
+    // right-looking reason.
+    CHECK(makeConsiderer("investigate", nullptr) != nullptr);
+    CHECK(makeConsiderer("Investigate", nullptr) == nullptr); // kinds are case-sensitive, like behaviours
+    CHECK(makeConsiderer("guard", nullptr) == nullptr);
+    CHECK(makeConsiderer("", nullptr) == nullptr);
+    // Every kind the vocabulary advertises can actually be made. A list that named something the
+    // factory refuses would send an author to a kind that does not exist.
+    for (const std::string_view kind : considererKinds()) {
+        INFO("kind: " << kind);
+        auto made = makeConsiderer(kind, nullptr);
+        REQUIRE(made != nullptr);
+        CHECK(made->kind() == kind);
+        CHECK(made->name() == kind); // the default name, so a scene that names none still compares
+    }
+    CHECK(considererKinds().size() == 4);
+}
+
 // ---- the guard ---------------------------------------------------------------------------------
 
 TEST_CASE("a guard is scene data, and it leaves its post for what it notices",

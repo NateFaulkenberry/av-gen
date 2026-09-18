@@ -2037,10 +2037,25 @@ public:
                 if (!entry.is_object() || !entry.contains("kind") || !entry["kind"].is_string()) {
                     continue;
                 }
-                auto made = makeConsiderer(entry["kind"].get<std::string>(), &entry);
+                const std::string kind = entry["kind"].get<std::string>();
+                auto made = makeConsiderer(kind, &entry);
                 if (made != nullptr) {
                     considerers_.push_back(std::move(made));
+                    continue;
                 }
+                // Loud, by name, with the vocabulary. A misspelled considerer is a character that
+                // silently loses one of the things it was meant to want, and a guard whose
+                // `investigate` never loads is a guard that stands still for the right-looking
+                // reason -- which is the shape of defect this repository has shipped five of
+                // (entity.cpp does exactly this for a misspelled behaviour kind).
+                std::string known;
+                for (const std::string_view k : considererKinds()) {
+                    if (!known.empty()) {
+                        known += ", ";
+                    }
+                    known += k;
+                }
+                log::warn("decide: unknown considerer kind '{}' (known: {})", kind, known);
             }
         }
         views_.reserve(considerers_.size());

@@ -99,6 +99,13 @@
 // use of it is a reference or a pointer -- and `entity.hpp` has to be able to include *this*, now
 // that `EntityDesc` carries a `PerceptionSettings`. A normative header the thing it describes
 // cannot include is a header that stays inert, which is what it was.
+// ADR-330 changed exactly one thing here and changed nothing it says: `DecisionContext` gained
+// `visited`, the bounded list of places this character has recently been. It is a field rather than
+// a member of a considerer because §3's rule -- one instance per *kind* of character, holding no
+// per-character state -- is what makes D4 free, and a novelty memory living inside a shared scorer
+// would break it for every character of that kind at once. The caller bounds it, a replay
+// reconstructs it, and nothing persists it.
+
 #include "entity/action.hpp"
 #include "entity/behavior.hpp"
 #include "entity/locomotion.hpp"
