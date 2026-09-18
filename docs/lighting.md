@@ -310,6 +310,57 @@ turns the backdrop on.
 `scene::skyIrradiance` is the CPU reference for the irradiance cube — a fixed Fibonacci-hemisphere
 quadrature, so it is bit-deterministic and can be compared against the GPU's result in tests.
 
+## Authoring a light in a scene file (ADR-278)
+
+A scene file's top-level `"lights"` array. Until ADR-278 this key did not exist, two lab fixtures
+had written one anyway, and both were lit by `defaultKeyLight()` at a different angle, colour and
+intensity than their own files stated.
+
+```json
+"lights": [
+  { "name": "key", "type": "directional", "direction": [-0.35, -0.72, -0.6],
+    "color": [1.0, 0.97, 0.92], "intensity": 4.0, "castsShadow": true },
+  { "name": "headlamp", "type": "spot", "node": "rover",
+    "position": [0, 1.2, -2], "direction": [0, 0, -1],
+    "outerCone": 22, "innerCone": 14, "range": 40, "intensity": 900 }
+]
+```
+
+Every `PunctualLight` field is authorable. The key names are the struct's, except where a light rig
+already had a name for the same quantity -- `color`, `temperature`, `tint`, `intensity`,
+`castsShadow`, `contactShadow`, `shadowStrength`, `softness`, `volumetric` -- which are spelled the
+rig's way, so a person moving between the two formats is not learning two vocabularies. **Cone
+angles are `innerCone` and `outerCone`, in degrees**, like every other angle a person writes here.
+`direction` is normalised on load. `name` is required; a light's name is how `packLight` reports it
+when it refuses one, what the `lights` overlay labels, and half of any parameter path it ever gets.
+
+**`"node"`** names a composition node. The light is then authored in that node's local frame and
+re-placed from the node's world transform every frame -- so a lamp on a moving thing moves with it,
+and hiding the node puts the light out. This is what a `NodeKind::Light` would have been for;
+ADR-278 §2 has why it is a string on a light instead.
+
+A malformed light **fails the whole file** rather than being dropped, for the reason a malformed
+hero does and with more force: a light that quietly did not load looks exactly like a light nobody
+wrote, which is the state this key was in for weeks. Unknown keys are warned about by name
+(`core/json_keys.hpp`); `_`-prefixed keys are exempt.
+
+### Where an authored light sits among the others
+
+Five things can put a light into `scene::Scene::lights`, and they are added in this order:
+
+1. a glTF asset's own KHR_lights_punctual lights, per node;
+2. the scene file's `"lights"`;
+3. `defaultKeyLight()` -- **only** when there is no rig *and* 1 and 2 produced nothing, so
+   authoring one light turns the default off and authoring none keeps it;
+4. `LightRig::expand`, every frame, **alongside** the authored lights rather than instead of them:
+   a rig lights the subject relative to the camera, an authored light lights the world at a fixed
+   place, and a scene that wants only its own simply has no rig;
+5. the procedural ecology (ADR-053), capped by `kMaxEcologyLights`.
+
+`Composition::toJson` writes the array back, so a save cannot silently delete it. An authored light
+has **no registered parameter**, so unlike a rig light it cannot be keyed, modulated or dragged;
+ADR-271's boundary is why, and its revisit trigger is what to do about it.
+
 ## Light rigs
 
 A rig is a named lighting setup expressed relative to the subject and the camera, so the same rig
@@ -425,6 +476,8 @@ if a world needs the milliseconds back.
 |---|---|
 | `src/scene/scene_types.hpp` | `PunctualLight`, the light types and roles |
 | `src/scene/light_rig.{hpp,cpp}` | rigs, their JSON, their parameters, colour temperature |
+| `src/scene/composition.{hpp,cpp}` | a scene file's `"lights"` (ADR-278): `AuthoredLight`, the parse, the round trip, the node attachment |
+| `src/core/json_keys.{hpp,cpp}` | the unknown-key report both formats use (ADR-278) |
 | `src/rendering/light_data.{hpp,cpp}` | light packing, the froxel grid and its CPU reference, the LTC fit, polygon irradiance |
 | `src/rendering/shadow_math.{hpp,cpp}` | the cascade maths, GPU-free and tested against the frustum it covers |
 | `src/rendering/shadow_renderer.{hpp,cpp}` | the atlas, the per-view uniforms, the view selection |

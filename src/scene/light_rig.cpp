@@ -4,6 +4,7 @@
 
 #include "scene/light_rig.hpp"
 
+#include "core/json_keys.hpp"
 #include "core/log.hpp"
 #include "scene/struct_hash.hpp"
 
@@ -13,9 +14,27 @@
 #include <cmath>
 #include <fstream>
 #include <numbers>
+#include <span>
+#include <string_view>
 #include <unordered_set>
 
 namespace avgen::scene {
+
+// ADR-278. Every key `LightRig::fromJson` reads, at the rig's root and in one of its lights.
+// This lab's own fixture was written with `"coneDegrees"` first and silently got the 45-degree
+// default; reading the parser is what caught it, which is not a check. `core/json_keys.hpp` carries
+// the reasoning for warning rather than refusing, and the `_`-prefix exemption.
+constexpr std::string_view kRigKeys[] = {"format",           "version",          "name",
+                                         "description",      "keyIntensity",     "ambientIntensity",
+                                         "ambientColor",     "ambientTemperature", "lights"};
+constexpr std::string_view kRigLightKeys[] = {
+    "name",     "type",       "role",     "azimuth",        "elevation", "distance",
+    "intensity", "color",     "temperature", "tint",        "size",      "aspect",
+    "castsShadow", "contactShadow", "shadowStrength", "softness", "volumetric", "cone",
+    "followCamera"};
+
+std::span<const std::string_view> rigFileKeys() { return kRigKeys; }
+std::span<const std::string_view> rigLightKeys() { return kRigLightKeys; }
 
 namespace {
 
@@ -421,6 +440,7 @@ Result<LightRig> LightRig::fromJson(const nlohmann::json& j) {
         return std::unexpected(name.error());
     }
     rig.name = *name;
+    json_keys::warnUnknownKeys(j, kRigKeys, "light rig '" + rig.name + "'");
     auto description = readString(j, "description", "");
     if (!description) {
         return std::unexpected(description.error());
@@ -521,6 +541,8 @@ Result<LightRig> LightRig::fromJson(const nlohmann::json& j) {
             return std::unexpected(follow.error());
         }
         l.followCamera = *follow;
+        json_keys::warnUnknownKeys(e, kRigLightKeys,
+                                   "light rig '" + rig.name + "': light '" + l.name + "'");
         rig.lights.push_back(std::move(l));
     }
     if (auto r = rig.validate(); !r) {

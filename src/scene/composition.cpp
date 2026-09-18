@@ -2,6 +2,7 @@
 
 #include "params/timeline.hpp"
 
+#include "core/json_keys.hpp"
 #include "core/log.hpp"
 #include "assets/asset_library.hpp"
 #include "entity/obstacles.hpp"
@@ -22,10 +23,51 @@
 #include <limits>
 #include <map>
 #include <nlohmann/json.hpp>
+#include <span>
 #include <string_view>
 #include <utility>
 
 namespace avgen::scene {
+
+// Every key `Composition::fromJsonImpl` reads, in the three objects a scene file is mostly made of.
+// Kept beside the parser rather than derived from it because there is no way to derive it: the
+// parser reads a key wherever it happens to need it, and a list that is generated from the code is
+// a list that agrees with the code about a typo. Adding a key to the parser and not to this list
+// costs one spurious warning; the reverse costs what ADR-278 is about.
+constexpr std::string_view kSceneKeys[] = {
+    "format",     "version",        "name",           "camera",        "cameraDirection",
+    "lightRig",   "lights",         "navBodyRadius",  "navCellSize",   "navWadeDepth",
+    "wind",       "post",           "environment",    "composition",   "heroes",
+    "worldEffects", "atmosphericEffects", "entityProfiles", "entities", "fields",
+    "staging",    "graph",          "grids",          "materialPrograms", "nodes"};
+constexpr std::string_view kEnvironmentKeys[] = {
+    "map", "lightRig", "intensity", "fogDensity", "stylized", "rotation", "skyIntensity",
+    "skyBloom", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "skybox",
+    "lightFromEnvironment", "fogColor", "background", "fogHeightAmount", "styledSkyAmbient",
+    "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
+    "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
+    "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
+    "shadowCascades", "volumeSteps", "volumeDensityField", "volumeColorField", "sky"};
+constexpr std::string_view kSkyKeys[] = {
+    "enabled", "background", "useKeyLight", "zenithColor", "horizonColor", "groundColor",
+    "sunColor", "sunDirection", "haze", "sunIntensity", "sunSize", "sunGlow", "intensity"};
+
+// Every key a `"lights"` entry may carry. Named after the `PunctualLight` field it sets, except
+// where `LightRig`'s file format already had a name for the same quantity -- `color`, `temperature`,
+// `tint`, `intensity`, `castsShadow`, `contactShadow`, `shadowStrength`, `softness`, `volumetric` --
+// which are spelled the rig's way. Two spellings for one quantity across two lighting formats is
+// how `coneDegrees` happened, one format over.
+constexpr std::string_view kAuthoredLightKeys[] = {
+    "name",        "type",          "role",           "node",       "position",   "direction",
+    "up",          "color",         "intensity",      "temperature", "tint",      "range",
+    "innerCone",   "outerCone",     "width",          "height",     "radius",     "castsShadow",
+    "contactShadow", "shadowStrength", "shadowBias",  "softness",   "volumetric", "diffuseOnly",
+    "specularOnly", "enabled"};
+
+std::span<const std::string_view> sceneFileKeys() { return kSceneKeys; }
+std::span<const std::string_view> sceneEnvironmentKeys() { return kEnvironmentKeys; }
+std::span<const std::string_view> sceneSkyKeys() { return kSkyKeys; }
+std::span<const std::string_view> sceneLightKeys() { return kAuthoredLightKeys; }
 
 namespace {
 // Ecology lights are rebuilt every frame and identified by name, because the rig removes its own
@@ -635,6 +677,176 @@ PunctualLight defaultKeyLight() {
     key.softness = 1.0f;
     key.temperature = 5600.0f;
     return key;
+}
+
+// ---- authored lights (ADR-278) -----------------------------------------------------------------
+
+// Angles are **degrees** here and radians in `PunctualLight`, deliberately: every other angle a
+// person writes in this repository is in degrees -- a node's `rotation`, a rig's `azimuth`,
+// `elevation` and `cone` -- and a format that is radians in one file and degrees in its sibling is
+// a format somebody will get wrong exactly once, in the dark.
+Result<Composition::AuthoredLight> authoredLightFromJson(const json& e, std::string_view where) {
+    if (!e.is_object()) {
+        return fail("light must be an object");
+    }
+    Composition::AuthoredLight out;
+    PunctualLight& l = out.light;
+    auto name = readString(e, "name", "");
+    if (!name) {
+        return std::unexpected(name.error());
+    }
+    if (name->empty()) {
+        // Required rather than defaulted. A light's name is how it is reported when `packLight`
+        // refuses it, how the `lights` overlay labels it, and half of any parameter path it ever
+        // gets; a light nobody can name is a light nobody can find in a frame that has thirty.
+        return fail("light: 'name' is required");
+    }
+    l.name = *name;
+    auto node = readString(e, "node", "");
+    if (!node) {
+        return std::unexpected(node.error());
+    }
+    out.node = *node;
+    auto type = readString(e, "type", lightTypeName(l.type));
+    if (!type) {
+        return std::unexpected(type.error());
+    }
+    if (auto parsed = lightTypeFromName(*type)) {
+        l.type = *parsed;
+    } else {
+        return fail("light '{}': unknown type '{}'", l.name, *type);
+    }
+    auto role = readString(e, "role", lightRoleName(l.role));
+    if (!role) {
+        return std::unexpected(role.error());
+    }
+    if (auto parsed = lightRoleFromName(*role)) {
+        l.role = *parsed;
+    } else {
+        return fail("light '{}': unknown role '{}'", l.name, *role);
+    }
+    float innerDegrees = glm::degrees(l.innerConeAngle);
+    float outerDegrees = glm::degrees(l.outerConeAngle);
+    struct FloatField {
+        const char* key;
+        float* target;
+    };
+    for (const FloatField f : {FloatField{"intensity", &l.intensity},
+                               FloatField{"temperature", &l.temperature},
+                               FloatField{"tint", &l.tint},
+                               FloatField{"range", &l.range},
+                               FloatField{"innerCone", &innerDegrees},
+                               FloatField{"outerCone", &outerDegrees},
+                               FloatField{"width", &l.width},
+                               FloatField{"height", &l.height},
+                               FloatField{"radius", &l.radius},
+                               FloatField{"shadowStrength", &l.shadowStrength},
+                               FloatField{"shadowBias", &l.shadowBias},
+                               FloatField{"softness", &l.softness},
+                               FloatField{"volumetric", &l.volumetricStrength}}) {
+        auto v = readFloat(e, f.key, *f.target);
+        if (!v) {
+            return fail("light '{}': {}", l.name, v.error().message);
+        }
+        *f.target = *v;
+    }
+    l.innerConeAngle = glm::radians(innerDegrees);
+    l.outerConeAngle = glm::radians(outerDegrees);
+    struct VecField {
+        const char* key;
+        glm::vec3* target;
+    };
+    for (const VecField v : {VecField{"position", &l.position}, VecField{"direction", &l.direction},
+                             VecField{"up", &l.up}, VecField{"color", &l.color}}) {
+        auto value = readVec<3>(e, v.key, *v.target);
+        if (!value) {
+            return fail("light '{}': {}", l.name, value.error().message);
+        }
+        *v.target = *value;
+    }
+    struct BoolField {
+        const char* key;
+        bool* target;
+    };
+    for (const BoolField b : {BoolField{"castsShadow", &l.castsShadow},
+                              BoolField{"contactShadow", &l.contactShadow},
+                              BoolField{"diffuseOnly", &l.diffuseOnly},
+                              BoolField{"specularOnly", &l.specularOnly},
+                              BoolField{"enabled", &l.enabled}}) {
+        auto value = readBool(e, b.key, *b.target);
+        if (!value) {
+            return fail("light '{}': {}", l.name, value.error().message);
+        }
+        *b.target = *value;
+    }
+
+    // ADR-272 §2 one level up. `packLight` drops a light whose position, colour, intensity or range
+    // is not finite and uploads it black, on purpose -- but a light that is black because its file
+    // has a typo in it is a light somebody will look for in the renderer. Refused here, with the
+    // file, the light and the value in the message.
+    const auto finite3 = [](const glm::vec3& v) {
+        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+    };
+    if (!finite3(l.position) || !finite3(l.direction) || !finite3(l.color) ||
+        !std::isfinite(l.intensity) || !std::isfinite(l.range)) {
+        return fail("light '{}': position, direction, colour, intensity and range must be finite", l.name);
+    }
+    if (l.intensity < 0.0f) {
+        return fail("light '{}': intensity {} is negative", l.name, l.intensity);
+    }
+    const bool aimed = l.type == PunctualLight::Type::Directional || l.type == PunctualLight::Type::Spot;
+    if (aimed && glm::length(l.direction) < 1e-6f) {
+        return fail("light '{}': a {} light needs a non-zero 'direction'", l.name, lightTypeName(l.type));
+    }
+    if (glm::length(l.direction) > 1e-6f) {
+        // The struct's comment says "normalised by users" and every producer in the engine obliges.
+        // A file is a user who cannot be asked, so it is obliged here rather than trusted: the two
+        // fixtures' [-0.35, -0.72, -0.6] is 1.00045 long, which is the shader's falloff off by a
+        // factor nobody would ever find by looking.
+        l.direction = glm::normalize(l.direction);
+    }
+    json_keys::warnUnknownKeys(e, kAuthoredLightKeys,
+                               std::string(where) + ": light '" + l.name + "'");
+    return out;
+}
+
+json authoredLightToJson(const Composition::AuthoredLight& a) {
+    // `name` and `type` always, because they are the light's identity and a file that has to be
+    // read by a person should say what kind of light it is even when it is the default kind.
+    // Everything else only when it is not the default, so a scene round-trips to what it authored
+    // rather than to a 26-key dump of a struct.
+    const PunctualLight def;
+    const PunctualLight& l = a.light;
+    json e = json::object();
+    e["name"] = l.name;
+    e["type"] = lightTypeName(l.type);
+    if (!a.node.empty()) {
+        e["node"] = a.node;
+    }
+    if (l.role != def.role) e["role"] = lightRoleName(l.role);
+    if (l.position != def.position) e["position"] = vecToJson(l.position);
+    if (l.direction != def.direction) e["direction"] = vecToJson(l.direction);
+    if (l.up != def.up) e["up"] = vecToJson(l.up);
+    if (l.color != def.color) e["color"] = vecToJson(l.color);
+    if (l.intensity != def.intensity) e["intensity"] = l.intensity;
+    if (l.temperature != def.temperature) e["temperature"] = l.temperature;
+    if (l.tint != def.tint) e["tint"] = l.tint;
+    if (l.range != def.range) e["range"] = l.range;
+    if (l.innerConeAngle != def.innerConeAngle) e["innerCone"] = glm::degrees(l.innerConeAngle);
+    if (l.outerConeAngle != def.outerConeAngle) e["outerCone"] = glm::degrees(l.outerConeAngle);
+    if (l.width != def.width) e["width"] = l.width;
+    if (l.height != def.height) e["height"] = l.height;
+    if (l.radius != def.radius) e["radius"] = l.radius;
+    if (l.castsShadow != def.castsShadow) e["castsShadow"] = l.castsShadow;
+    if (l.contactShadow != def.contactShadow) e["contactShadow"] = l.contactShadow;
+    if (l.shadowStrength != def.shadowStrength) e["shadowStrength"] = l.shadowStrength;
+    if (l.shadowBias != def.shadowBias) e["shadowBias"] = l.shadowBias;
+    if (l.softness != def.softness) e["softness"] = l.softness;
+    if (l.volumetricStrength != def.volumetricStrength) e["volumetric"] = l.volumetricStrength;
+    if (l.diffuseOnly != def.diffuseOnly) e["diffuseOnly"] = l.diffuseOnly;
+    if (l.specularOnly != def.specularOnly) e["specularOnly"] = l.specularOnly;
+    if (l.enabled != def.enabled) e["enabled"] = l.enabled;
+    return e;
 }
 
 void offsetTextureRef(TextureRef& ref, TextureId offset) {
@@ -1346,6 +1558,26 @@ Result<void> Composition::setAtmosphericEffects(std::vector<world::AtmosphericEf
         return ok;
     }
     atmosphericEffects_ = std::move(effects);
+    return {};
+}
+
+// ADR-278. The whole set or none of it, for the reason `setWorldEffects` states: a duplicate name is
+// two lights that cannot be told apart in a warning, in an overlay or in a parameter path. Unlike
+// the effects this *is* dirty -- a light is part of the picture, and `rebuild` is where the picture
+// is assembled.
+Result<void> Composition::setAuthoredLights(std::vector<AuthoredLight> lights) {
+    for (std::size_t i = 0; i < lights.size(); ++i) {
+        if (lights[i].light.name.empty()) {
+            return fail("lights[{}]: a light needs a name", i);
+        }
+        for (std::size_t k = 0; k < i; ++k) {
+            if (lights[k].light.name == lights[i].light.name) {
+                return fail("lights[{}]: duplicate light name '{}'", i, lights[i].light.name);
+            }
+        }
+    }
+    authoredLights_ = std::move(lights);
+    dirty_ = true;
     return {};
 }
 
@@ -4362,8 +4594,42 @@ void Composition::rebuild() {
     rebuildProcedurals();
     rebuildSdfs();
 
+    // ADR-278: the lights the scene file itself authored, added after the node assets' own lights
+    // and before the default key, which is the whole of the precedence. A light naming a node is
+    // authored in that node's local frame; its world placement is composed here and refreshed every
+    // frame in `applyParameters`, so a lamp on a moving thing moves with it.
+    authoredLightFirst_ = scene_.lights.size();
+    authoredLightNodeIndex_.assign(authoredLights_.size(), kNoNode);
+    for (std::size_t i = 0; i < authoredLights_.size(); ++i) {
+        const AuthoredLight& a = authoredLights_[i];
+        PunctualLight light = a.light;
+        light.name = sanitise(prefix_) + light.name;
+        if (!a.node.empty()) {
+            const auto it = std::find_if(nodes_.begin(), nodes_.end(), [&](const auto& n) {
+                return n->name == a.node;
+            });
+            if (it == nodes_.end()) {
+                // A warning rather than a refusal, on the same terms a node's missing parent gets:
+                // the light still exists, where the file placed it, and the name is in the log.
+                log::warn("composition '{}': light '{}' names node '{}', which does not exist; the "
+                          "light stays where it was authored",
+                          name_, a.light.name, a.node);
+            } else {
+                const std::size_t index = static_cast<std::size_t>(std::distance(nodes_.begin(), it));
+                authoredLightNodeIndex_[i] = index;
+                const Transform nodeT = nodeWorldTransform(**it);
+                light.position = transformPoint(nodeT, a.light.position);
+                light.direction = transformDirection(nodeT, a.light.direction);
+                light.up = transformDirection(nodeT, a.light.up);
+            }
+        }
+        scene_.addLight(std::move(light));
+    }
+
     // A rig supplies the lighting; without one, a world with no authored lights still gets a key
-    // so it is not lit by ambient alone (ADR-033/034).
+    // so it is not lit by ambient alone (ADR-033/034). ADR-278: a scene that authors its own lights
+    // reaches here with `scene_.lights` non-empty, so authoring one light is what turns the default
+    // off -- which is the behaviour the two lab fixtures believed they already had.
     rigLightCount_ = 0;
     addedKeyLight_ = !lightRig_ && scene_.lights.empty();
     if (addedKeyLight_) {
@@ -5152,6 +5418,38 @@ void Composition::applyParameters() {
                 f.enabled = src.enabled && visible;
             }
         }
+    }
+
+    // ADR-278: an authored light that rides a node. Here rather than in `rebuild` for the reason
+    // the node's *own* asset lights are scaled here -- `rebuild` runs when the scene changes and a
+    // node moves every frame -- and before the ecology erase and the rig's resize-from-the-back, so
+    // these indices are the ones `rebuild` handed out and not a frame's worth of appended lights
+    // later.
+    //
+    // Position **and** direction, which is the half the glTF path does not do: the loop above
+    // refreshes an asset light's intensity and colour and its comment claims "a moved lamp lights
+    // where it now is", but nothing re-places it, so an imported lamp's beam stays at the rebuild's
+    // transform for ever. No asset in this repository carries a KHR_lights_punctual light, so that
+    // has never shown up in a frame; it is recorded in ADR-278 rather than fixed here, because
+    // fixing it means storing a rest transform per asset light and there is nothing to test it on.
+    for (std::size_t i = 0; i < authoredLights_.size() && i < authoredLightNodeIndex_.size(); ++i) {
+        const std::size_t nodeIndex = authoredLightNodeIndex_[i];
+        if (nodeIndex == kNoNode || nodeIndex >= ranges_.size() || !ranges_[nodeIndex].worldValid) {
+            continue;
+        }
+        const std::size_t lightIndex = authoredLightFirst_ + i;
+        if (lightIndex >= scene_.lights.size()) {
+            continue;
+        }
+        const AuthoredLight& a = authoredLights_[i];
+        PunctualLight& light = scene_.lights[lightIndex];
+        const Transform& world = ranges_[nodeIndex].world;
+        light.position = transformPoint(world, a.light.position);
+        light.direction = transformDirection(world, a.light.direction);
+        light.up = transformDirection(world, a.light.up);
+        // A hidden node's light goes out with it, which is what hiding a lamp means -- the same
+        // rule, in the same words, as the asset lights ten lines up.
+        light.intensity = nodeVisible(*nodes_[nodeIndex]) ? a.light.intensity : 0.0f;
     }
 
     // Own material programs: finals into the scene copies.
@@ -6039,6 +6337,17 @@ nlohmann::json Composition::toJson() const {
         }
     }
     j["environment"] = std::move(environment);
+    // ADR-278: the lights the scene authored, written back so a save cannot silently delete them --
+    // which is ADR-207/230's world-effects bug, and the reason `environment["lightRig"]` twenty
+    // lines up writes an in-memory rig out in full. Emitted only when there are any, so a scene that
+    // authors none is byte-identical to one written before this key was read.
+    if (!authoredLights_.empty()) {
+        json lights = json::array();
+        for (const AuthoredLight& a : authoredLights_) {
+            lights.push_back(authoredLightToJson(a));
+        }
+        j["lights"] = std::move(lights);
+    }
     // ADR-059: written back as it was read. The live values are parameters and belong to the
     // project; what the scene owns is the look it was authored with.
     if (!postJson_.is_null() && !postJson_.empty()) {
@@ -6341,6 +6650,21 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
     // `sourcePath` is moved-from above: everything below uses the composition's copy.
     const std::filesystem::path& scenePath = comp->sourcePath_;
 
+    // ADR-278. Before this, a top-level key the parser did not read was walked past in silence --
+    // which is how `"lights"` sat in two lab fixtures for weeks while both scenes were lit by
+    // `defaultKeyLight()` at a different angle, colour and intensity than their own files stated.
+    // A warning rather than a refusal; `core/json_keys.hpp` gives the reasons and the `_` exemption.
+    const std::string where =
+        scenePath.empty() ? ("scene '" + comp->name_ + "'") : ("scene file '" + scenePath.string() + "'");
+    json_keys::warnUnknownKeys(j, kSceneKeys, where);
+    if (j.contains("environment") && j.at("environment").is_object()) {
+        json_keys::warnUnknownKeys(j.at("environment"), kEnvironmentKeys, where + ": environment");
+        const json& envJson = j.at("environment");
+        if (envJson.contains("sky") && envJson.at("sky").is_object()) {
+            json_keys::warnUnknownKeys(envJson.at("sky"), kSkyKeys, where + ": environment.sky");
+        }
+    }
+
     if (j.contains("camera")) {
         const json& c = j.at("camera");
         if (!c.is_object()) {
@@ -6414,6 +6738,28 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     log::warn("composition '{}': light rig: {}", comp->name_, r.error().message);
                 }
             }
+        }
+    }
+    // ADR-278: the lights the scene file authors. A malformed one fails the whole file rather than
+    // being dropped, for the reason a malformed hero does and with more force: a light that quietly
+    // did not load looks exactly like a light nobody wrote, which is the state this key was in.
+    if (j.contains("lights")) {
+        const json& lightsJson = j.at("lights");
+        if (!lightsJson.is_array()) {
+            return fail("scene file '{}': 'lights' must be an array", scenePath.string());
+        }
+        std::vector<AuthoredLight> lights;
+        lights.reserve(lightsJson.size());
+        for (std::size_t i = 0; i < lightsJson.size(); ++i) {
+            auto light = authoredLightFromJson(lightsJson[i], where);
+            if (!light) {
+                return fail("scene file '{}': lights[{}]: {}", scenePath.string(), i,
+                            light.error().message);
+            }
+            lights.push_back(std::move(*light));
+        }
+        if (auto ok = comp->setAuthoredLights(std::move(lights)); !ok) {
+            return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
     }
     // ADR-055: the wind is a top-level block, a sibling of `environment` rather than a member of
@@ -6961,14 +7307,11 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 // A key this block does not know is named rather than ignored. `"lodCount"` was
                 // silently accepted for months against a parser that reads `"count"`, and the
                 // ladder read as configured in the file while being a single rung in the engine.
-                for (const auto& entry : anim.items()) {
-                    static constexpr std::array<std::string_view, 7> kKnown{
-                        "state", "blend", "speed", "updateHz", "nearDistance", "farHz", "cullDistance"};
-                    if (std::find(kKnown.begin(), kKnown.end(), entry.key()) == kKnown.end()) {
-                        log::warn("scene file '{}': node '{}': animation key '{}' is not one this "
-                                  "build reads and was ignored", scenePath.string(), node.name, entry.key());
-                    }
-                }
+                // ADR-278 generalised this loop out of here; what is left is the key list.
+                static constexpr std::string_view kAnimationKeys[] = {
+                    "state", "blend", "speed", "updateHz", "nearDistance", "farHz", "cullDistance"};
+                json_keys::warnUnknownKeys(anim, kAnimationKeys,
+                                           where + ": node '" + node.name + "': animation");
                 node.animation.state = *state;
                 node.animation.blend = *blend;
                 node.animation.speed = *speed;

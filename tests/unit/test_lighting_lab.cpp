@@ -437,17 +437,17 @@ TEST_CASE("the per-light assignment report agrees with the lists it is a summary
 // ---- the fixture ---------------------------------------------------------------------------------
 
 TEST_CASE("the lab's fixture delivers every light kind to the renderer", "[lighting][lab][fixture]") {
-    // This is not ceremony. **A scene file cannot author a light** -- `Composition::fromJson` reads
-    // `camera`, `environment`, `lightRig`, `nodes` and eleven other keys, and `lights` is not one
-    // of them; there is no `NodeKind::Light`; and unknown top-level keys are ignored rather than
-    // refused. So the only routes into `scene::Scene::lights` are a light rig, a glTF asset that
-    // carries KHR_lights_punctual (no asset in this repository does), the procedural ecology lights
-    // and the single default key `Composition` adds when a scene has neither. A lighting fixture is
-    // therefore its rig, and the thing most worth asserting about it is that the rig arrived.
+    // This is not ceremony. When this test was written **a scene file could not author a light**:
+    // `Composition::fromJson` read `camera`, `environment`, `lightRig`, `nodes` and eleven other
+    // keys and `lights` was not one of them, so the only routes into `scene::Scene::lights` were a
+    // light rig, a glTF asset carrying KHR_lights_punctual (no asset in this repository does), the
+    // procedural ecology lights and the single default key. This lab's fixture is a rig, and the
+    // thing most worth asserting about it is that the rig arrived.
     //
-    // `examples/labs/lod-geometry-lab.scene.json` carries a top-level "lights" array that is read
-    // by nothing; that scene is lit by `defaultKeyLight()` instead. That is what this test would
-    // have caught, and it is why it is here rather than in a comment.
+    // `examples/labs/lod-geometry-lab.scene.json` carried a top-level "lights" array that was read
+    // by nothing and was lit by `defaultKeyLight()` instead. That is what this test would have
+    // caught, it is why it is here rather than in a comment, and ADR-278 has since made the key
+    // real -- `tests/unit/test_scene_authored_lights.cpp` is the guard on the other side of it.
     const fs::path file = repoRoot() / "examples/labs/lighting-lab.scene.json";
     REQUIRE(fs::is_regular_file(file));
     assets::AssetRegistry registry(file.parent_path());

@@ -143,11 +143,16 @@ Named by file and symbol, because a category is not an address.
   froxels 16×8×24, 32 lights per cluster, 256 scene lights. `assignClusters` is the CPU reference
   for the grid's **build**, `shaders/clusters.wgsl` the pass; `ClusterGrid::clusterOf` is the
   reference for its **look-up** (`clusterIndexFor`), which is a different half and had none.
-* **A scene file cannot author a light.** `Composition::fromJson` has no `lights` key and there is
-  no `NodeKind::Light`; the four routes into `scene::Scene::lights` are a light rig, a glTF asset's
-  own KHR_lights_punctual lights (no asset here has any), the procedural ecology and the one
-  default key. The `"lights"` arrays in `lod-geometry-lab.scene.json` and
-  `visibility-culling-lab.scene.json` are read by nothing. See `docs/lighting-lab/README.md` §1.0.
+* **A scene file authors a light with a top-level `"lights"` array** (ADR-278). Five routes into
+  `scene::Scene::lights`: a glTF asset's own KHR_lights_punctual lights (no asset here has any),
+  the scene file's own array, the one default key — added only when there is no rig and no light
+  from either of the first two — a light rig, and the procedural ecology. A rig is appended
+  *alongside* the authored lights rather than instead of them. An entry's `"node"` makes the light
+  ride that node's world transform, which is what a `NodeKind::Light` would have been for. Until
+  ADR-278 there was no such key and the `"lights"` arrays in `lod-geometry-lab.scene.json` and
+  `visibility-culling-lab.scene.json` were read by nothing. See `docs/lighting-lab/README.md` §1.0.
+* **A key a file writes and the parser does not read is warned about by name**, not ignored
+  (`core/json_keys.hpp`, ADR-278); `_`-prefixed keys are exempt, because `_note` is deliberate.
 * A local light's reach (`lightInfluenceRadius`) is a **hard** edge, not a fade: past it the froxel
   pass does not assign the light at all. ADR-272.
 * Area lights: LTC. `directLighting` in `shaders/lighting.wgsl` is roughly 75% of the scene pass.

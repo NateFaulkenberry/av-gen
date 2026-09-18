@@ -49,7 +49,9 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace avgen::params {
@@ -99,6 +101,15 @@ struct WorldBounds {
 };
 
 enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedural, Field, Spline, Sdf, Terrain, Group, City };
+// ADR-278: the keys `Composition::fromJson` reads, in each of the objects a scene file is made of.
+// Public so a test can hold the list against every scene file that ships -- a key list that has
+// drifted from the parser warns about a correct file, and the first spurious warning is the one
+// that gets the whole check switched off.
+[[nodiscard]] std::span<const std::string_view> sceneFileKeys();
+[[nodiscard]] std::span<const std::string_view> sceneEnvironmentKeys();
+[[nodiscard]] std::span<const std::string_view> sceneSkyKeys();
+[[nodiscard]] std::span<const std::string_view> sceneLightKeys();
+
 const char* nodeKindName(NodeKind kind);
 Result<NodeKind> nodeKindFromName(const std::string& name);
 
@@ -572,6 +583,39 @@ public:
         return atmosphericEffects_;
     }
     Result<void> setAtmosphericEffects(std::vector<world::AtmosphericEffect> effects);
+
+    // ---- authored lights (ADR-278) ---------------------------------------------------------------
+    //
+    // A light a scene file wrote down, round-tripped as a top-level `"lights"` array. Before this
+    // there were four ways a light could come into existence -- a rig, a glTF asset's own
+    // KHR_lights_punctual, the procedural ecology, and the one default key -- and none of them was
+    // a scene file, so a scene could describe every other thing in the world and not the light
+    // on it.
+    //
+    // **Precedence**, written down here because four sources with no stated order is how the defect
+    // went unnoticed. `rebuild` adds these after a node's asset lights and before the default key,
+    // and `defaultKeyLight()` is added only when there is no rig and no light at all -- so
+    // authoring one light replaces the default and authoring none keeps it. A rig is *not*
+    // replaced: rig lights are appended every frame alongside these, the same way a glTF lamp and
+    // a rig already coexist, because a rig lights the subject and an authored light lights the
+    // world, and a scene that wants only its own simply has no rig.
+    //
+    // `node` is the answer to the question a `NodeKind::Light` would have answered. An authored
+    // light naming a node is expressed in that node's local frame and rides its world transform
+    // every frame -- so a lamp on a moving vehicle moves, and hiding the node puts the light out --
+    // without a thirteenth case in a `NodeKind` switch that `nodeKindName`, the editor, the brush,
+    // the context menu and the graph would each have to decide what "a node that is not geometry"
+    // means for. An empty `node` is a world light, positioned where the file says.
+    struct AuthoredLight {
+        PunctualLight light;  // world space, or the node's local space when `node` is set
+        std::string node;     // the composition node this light rides, or empty
+    };
+    [[nodiscard]] const std::vector<AuthoredLight>& authoredLights() const { return authoredLights_; }
+    // Rejects the whole set on a duplicate or empty name, and names it, for the reason
+    // `setWorldEffects` does: a name is half of an identity, and a light nobody can name is a light
+    // nobody can find in a frame that has thirty of them.
+    Result<void> setAuthoredLights(std::vector<AuthoredLight> lights);
+
     // Bumped by every accepted `setHeroes`. A counter rather than a comparison of the lists,
     // because what reads it is asking "is the shot I cut still the shot these heroes describe" --
     // a question about *when*, not about which fields differ -- and because comparing two vectors
@@ -1107,6 +1151,15 @@ private:
     std::vector<world::WorldEffect> worldEffects_; // ADR-207: authored, round-tripped as "worldEffects"
     // ADR-230: authored, round-tripped as "atmosphericEffects"
     std::vector<world::AtmosphericEffect> atmosphericEffects_;
+    // ADR-278: authored, round-tripped as the top-level "lights".
+    std::vector<AuthoredLight> authoredLights_;
+    // Where `rebuild` put them in `scene_.lights`, and the node index each one rides (or npos).
+    // Resolved once at rebuild rather than by name every frame: the name is the author's handle on
+    // the light and the index is the engine's, and looking a string up 60 times a second to move a
+    // lamp is the kind of cost that is invisible until a world has three hundred of them.
+    static constexpr std::size_t kNoNode = static_cast<std::size_t>(-1);
+    std::size_t authoredLightFirst_ = 0;
+    std::vector<std::size_t> authoredLightNodeIndex_;
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
     std::uint64_t heroRevision_ = 1;
     std::uint64_t heroPlacementRevision_ = 1;
