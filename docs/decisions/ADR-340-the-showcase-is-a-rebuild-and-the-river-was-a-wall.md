@@ -75,7 +75,18 @@ v2 aliens (their bodies return under new names with new minds, and keeping the n
 
 None names a node, so `nodes/*/position` cannot drift from the scene because it is not there to
 drift. `tests/unit/test_glowmere_valley_3.cpp` asserts the class is empty and uses
-valley-2-multicam's 248 as its control.
+valley-2-multicam's 248 as its control. **The whole project is 781 bytes.**
+
+It also carries no `worldEffects`, and that is the engine's own rule rather than a preference:
+`Engine::loadProject` clears the list and refills it from the composition before it reads the
+project's copy, and `Engine::saveProject` writes that copy **only when the live list differs from
+what the project already holds**. The first draft of this file duplicated the scene's four hundred
+numbers there, which is exactly the class of thing being removed.
+
+And the generator **does not read `glowmere-valley-2-multicam.json`**. It did, for the hand-turned
+rotations below, and that made valley 3's output depend on a file another unit of work is editing
+today — a save over there would have silently changed this world at the next regeneration. The ten
+values are written down in the script at the float32 spellings that file holds them in.
 
 **What this does not fix.** ADR-271's boundary is unchanged and correct: a UI edit still lands in
 the project. So this file will grow the first time anybody saves from the application. The
