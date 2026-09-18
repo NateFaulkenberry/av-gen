@@ -278,6 +278,14 @@ EditCommand placeNodes(app::Engine& engine, std::vector<scene::CompositionNode> 
     if (composition == nullptr) {
         return command;
     }
+    // T2. Placing does *not* go through `applyEdit` -- it applies its own nodes and rebinds once --
+    // so the hook there does not cover it, and the Interaction Latency Lab's first run of the
+    // `edit` arm recorded nothing at all while the arm's own log showed it had painted 156 nodes.
+    // The instrument said "nothing here measured anything" rather than reporting a plausible
+    // number, which is the property it was built for; this is the gap that said so being closed.
+    core::interactions().beginWithoutInput(core::Interaction::WorldEdit);
+    core::interactions().markCommand();
+    core::applyInjectedDelayForOpenInteraction();
     for (scene::CompositionNode& node : nodes) {
         auto added = composition->addNode(std::move(node));
         if (!added) {
@@ -292,6 +300,9 @@ EditCommand placeNodes(app::Engine& engine, std::vector<scene::CompositionNode> 
     // Once. Engine::addNode rebinds per call, which for a brush stroke is one full pass over every
     // route and every timeline track per plant.
     engine.rebind();
+    // T3. `addNode` set `dirty_`, so the flatten this asked for is paid by the next
+    // `Engine::update` -- which is where T4 lands, one frame later, by construction.
+    core::interactions().markModel();
     return command;
 }
 

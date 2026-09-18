@@ -166,7 +166,9 @@ returns a `WorldBounds` by value, and can flatten the entire world.** It is call
 Eraser/Replace mode or `avoidCollisions` is on. Whether it actually flattens depends on whether
 `dirty_` is set at that moment — and `engine.update` runs before `ui.build` and clears it, so
 normally it is not. The hazard is a UI edit that sets `dirty_` *during* `ui.build`: every subsequent
-`nodeBounds` in that same pass then flattens inside the UI draw. §5.4 measures whether that fires.
+`nodeBounds` in that same pass then flattens inside the UI draw. **§5.5 measured it and it does not
+fire**: over a stroke placing 156 nodes plus an undo and a redo, no frame ever recorded more than one
+flatten. The hazard is real by construction and latent in practice.
 
 ---
 
@@ -215,13 +217,13 @@ the world"*.
 
 | interaction | reaches a full evaluation? | via | measured |
 |---|---|---|---|
-| hover, panel open/close, tab switch | **no** | — | §5.2 |
-| object selection | **no** | — | §5.2 |
-| camera orbit, gizmo drag, selection-box drag | **no** | — | §5.2 |
-| property drag (a slider held) | **no** — `dirty_` is set by no parameter write; procedural regeneration is hash-guarded per object and budgeted (ADR-084) | — | §5.2 |
-| **timeline click / scrub** | **no flatten — and it is the most expensive interaction in the editor anyway** | `Engine::seekSeconds` → `EntityWorld::seek`, an O(second-you-clicked) integration | §5.1 |
-| **hero star** | **yes** | `setNodesHero` → `applyEdit` → `Composition::setHeroes` → `dirty_` → `rebuild()` → `++textureVersion` → the renderer re-uploads **every texture in the scene** | §5.3 |
-| place / delete an object (brush) | **yes** | `Engine::addNode`/`removeNode` → `dirty_` **and** `rebind()` | §5.4 |
+| hover, panel open/close, tab switch | **no** | — | §5.1 |
+| object selection | **no** | — | §5.1 |
+| camera orbit, gizmo drag, selection-box drag | **no** | — | §5.1 |
+| property drag (a slider held) | **no** — `dirty_` is set by no parameter write; procedural regeneration is hash-guarded per object and budgeted (ADR-084) | — | §5.1 |
+| **timeline click / scrub** | **no flatten — and it is the most expensive interaction in the editor anyway** | `Engine::seekSeconds` → `EntityWorld::seek`, an O(second-you-clicked) integration | §5.1–5.3 |
+| **hero star** | **yes** | `setNodesHero` → `applyEdit` → `Composition::setHeroes` → `dirty_` → `rebuild()` → `++textureVersion` → the renderer re-uploads **every texture in the scene** | §5.1 |
+| place / delete an object (brush) | **yes** | `Engine::addNode`/`removeNode` → `dirty_` **and** `rebind()` | §5.5 |
 | re-parent in the hierarchy | **yes** | `setParent` → `dirty_` | not measured; same path as the star |
 | change the environment map | **yes** | `setEnvironmentMap` → `dirty_` | guarded since ADR-084 §9.3 |
 
@@ -446,7 +448,39 @@ interaction name is refused at the command line rather than defaulting — witho
 `--latency-inject timeline-clik:250` would have calibrated the harness against an interaction nobody
 asked about and the null result would have looked like a clean one.
 
-### 5.5 The regression baseline
+### 5.5 The world edit, and a hazard that did not fire
+
+`--ui-script edit` — arm a brush, paint a stroke, undo it, redo it — on the same project,
+**load average 1.58**, the quietest run here. 200 frames.
+
+| interaction | records | CPU med | flattens | **textures** |
+|---|---:|---:|---:|---:|
+| world-edit | 16 | **1,435.2 ms** | **16** | **704** |
+
+**704 texture uploads over 16 edits is 44 per edit — the same 44 as a hero star.** So the whole-scene
+texture re-upload is not a property of *starring*; it is a property of **any flatten**, and it is
+therefore attached to placing an object, deleting one, re-parenting one and changing the light rig
+just as firmly. That makes R1 in §7 considerably more valuable than the star measurement alone
+suggested, and it costs nothing more to fix.
+
+**And the hazard named in the audit did not fire.** §1.4 flagged `Composition::nodeBounds` as a
+getter that calls `ensureBuilt()`, called per selected node every frame from `WorldEditor::update`
+and per *every* node from `src/ui/brush.cpp:81,157`. The worry was a UI edit setting `dirty_` early
+in `ui.build` and a later `nodeBounds` in the same pass flattening inside the UI draw. Over a stroke
+that placed 156 nodes, plus an undo and a redo, **`# scene flattens` never exceeded 1.000 in any
+frame** — p99 1.000, maximum 1.000. One flatten per edit, paid by the next `Engine::update`, which
+is where it belongs. The hazard is real by construction and does not fire on this path today; it is
+recorded as a latent trap rather than a defect.
+
+**This measurement also caught a hole in the instrument, which is the whole point of running it.**
+Its first run reported *"no interactions were recorded — nothing here measured anything"* while the
+arm's own log showed it had painted 156 nodes, undone them and redone them. `ui::placeNodes` does
+not go through `applyEdit`: it applies its own nodes and calls `engine.rebind()` once, so the hook
+in `applyEdit` covered the undo and the redo and not the stroke. The instrument refused to report
+rather than reporting a plausible number for an interaction it had not seen, which is the property
+it was built for — and it is the property that made the gap findable at all.
+
+### 5.6 The regression baseline
 
 The full CPU suite was run at this branch's merge-base (`74f9c0e`) and on this branch, on the same
 machine, with the same binary target:
@@ -487,8 +521,10 @@ be right.
 ### Recommended, in the order the numbers put them
 
 **R1 — Delete the unconditional `++scene_.textureVersion` behind a content check.** One condition in
-`Composition::rebuild()` (`composition.cpp:4136`). Measured here: **44 texture uploads per hero
-star**, 528 over twelve edits, on a flatten that changed no texture at all. The prior investigation
+`Composition::rebuild()` (`composition.cpp:4136`). Measured here: **44 texture uploads per structural
+edit** — 528 over twelve hero stars and 704 over sixteen brush edits, the same 44 each time, on
+flattens that changed no texture at all. It is attached to the *flatten*, not to starring, so it is
+paid by placing an object, deleting one, re-parenting one and changing the light rig equally. The prior investigation
 attributed 1,125 ms of a 1,454 ms star to this and its prediction is falsifiable — `# textures
 uploaded` should read 0 on a star's flatten frame. This is the highest ratio of latency removed to
 risk taken anywhere in this work, and a missed invalidation fails visibly and immediately, which is
@@ -565,13 +601,11 @@ strongest candidate and it lives inside an 0.28 ms `ui.build`.
   events immediately before the poll that consumes them, so it cannot produce a backlog. The loop's
   shape makes it structurally certain that no event is drained for the length of the call; the
   magnitude is unmeasured, and the previous investigation could not measure it either.
-* **Whether `nodeBounds`'s flatten ever actually fires from the UI.** The hazard is proven by
-  reading — it calls `ensureBuilt()`, it is called per selected node every frame from
-  `WorldEditor::update` and per *every* node from `brush.cpp` — but `engine.update` runs before
-  `ui.build` and normally clears `dirty_`, so it should only fire when a UI edit sets `dirty_`
-  earlier in the same `ui.build`. The `edit` arm was not run under the latency instrument and this
-  is the single most valuable unrun measurement left. **If `# scene flattens` ever exceeds 1 on a
-  brush-stroke frame, that is a flatten inside the UI draw and a defect of its own.**
+* **Latency for a world edit.** §5.5 measures its CPU cost and its counters but not its latency: a
+  brush stroke is applied through the editor's own API from a scripted arm, so there is again no
+  SDL event to age. A person's stroke does have one, and the hook is in the right place to catch it;
+  nothing in this work drove the brush through a real pointer event *and* the latency instrument at
+  once.
 * **Why a single texture upload costs ~25 ms.** Mipmap generation is the obvious candidate and it is
   one level deeper than this work went. R1 makes it moot for the star; it would still matter for a
   flatten that genuinely changed a texture.
