@@ -496,13 +496,17 @@ the debug flag. `[gpu]` tests take `tools/gpu-lock.sh`.
    `tools/link-worktree-assets.sh`. **This is §37 with the sign flipped**: a test environment that
    silently lacks its data produces failures that are not about the code, and a lab suite whose
    fixtures use production assets (§29 asks for exactly that) inherits the trap.
-6. **A scene file cannot author an emissive above 50.** `material/emissive` is registered with a
-   hard maximum of 50 (`src/scene/procedural.cpp`) and the parameter clamps an authored 256 with no
-   warning; `baseColor` and `emissiveColor` clamp to [0, 1], so `emissiveIntensity` is the only
-   route above unit radiance from a scene file and 50 is its ceiling. ADR-225's defect in an
-   authoring format, the same shape as the Lighting Lab's `coneDegrees` in a different parser.
-   Found by the HDR Lab's fixture, which asked for 256 and got 50. **Owner: whoever owns
-   `procedural.cpp`'s parameter table** — not a lab.
+6. ~~**A scene file cannot author an emissive above 50.**~~ **Closed by ADR-321.**
+   `material/emissive` was registered with a hard maximum of 50 (`src/scene/procedural.cpp`) and the
+   parameter clamped an authored 256 with no warning; `baseColor` and `emissiveColor` clamp to
+   [0, 1], so `emissiveIntensity` is the only route above unit radiance from a scene file and 50 was
+   its ceiling. ADR-225's defect in an authoring format, the same shape as the Lighting Lab's
+   `coneDegrees` in a different parser. Found by the HDR Lab's fixture, which asked for 256 and got
+   50. The ceiling is now a floor under the hard maximum — an object authoring more than 50 gets a
+   range that holds it, every other object keeps exactly the range it had, and the soft range the
+   panel draws is unchanged at 0..8. Separately and more usefully, every range in that table now
+   **reports** the authored values it overrules, by name and with the number the engine runs; the
+   whole CPU suite, which loads every scene in `examples/`, emits zero of them.
 7. **The bloom pyramid's reach is a pixel count, not a fraction of the frame**, so `--supersample 2`
    halves a small highlight's glow across the delivered picture. Measured, with two controls, in
    ADR-279; deliberately not changed, because the fix is an art-direction decision. **Owner: the

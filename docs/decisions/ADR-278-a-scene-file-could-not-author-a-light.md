@@ -282,5 +282,7 @@ for the wrong reason looks exactly like an arm that works.
 * **A light that wants to ride a skeleton joint.** ADR-274 settled that `jointTransform` is
   entity-local, not world; `"node"` resolves to a composition node, and a joint is one level below
   that. It is a natural extension and it is not this.
-* **The `volumeNoiseAmount` fifteen.** Correcting the key is one `sed` and fifteen changed films.
-  When somebody decides to, the test's `== 15` is the thing that has to move with it.
+* ~~**The `volumeNoiseAmount` fifteen.**~~ **Closed by ADR-322.** Correcting the key was one `sed`
+  and fifteen changed films, and the test's `== 15` was the thing that moved with it. It was not the
+  whole of it: five projects carried `"scene/volumeNoise": 0.0` over those scenes, so the `sed` alone
+  would have changed nothing anybody could see.
