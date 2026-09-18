@@ -2984,13 +2984,14 @@ void ControlPanel::drawRender(app::Engine& engine) {
     }
     // ---- ADR-320: the frames the render is actually writing -------------------------------------
     //
-    // The tallest the thumbnail is allowed to be, in ImGui points. A 16:9 frame comes out 320x180
-    // and a 9:16 one 101x180, so a portrait output cannot push the caption off the panel either.
-    constexpr float kRenderPreviewMaxPoints = 180.0f;
-    //
     // One contiguous block on purpose. Everything it needs is in `renderPreview`, which the host
     // fills from `RenderJob::takePreview`; the panel owns none of the GPU work and none of the
     // threading.
+    //
+    // `kRenderPreviewMaxPoints` is the tallest the thumbnail is allowed to be, in ImGui points. A
+    // 16:9 frame comes out 320x180 and a 9:16 one 101x180, so a portrait output cannot push the
+    // caption off the panel either.
+    constexpr float kRenderPreviewMaxPoints = 180.0f;
     ImGui::Separator();
     ImGui::Checkbox("Show output frames", &renderPreview.enabled);
     if (ImGui::IsItemHovered()) {
