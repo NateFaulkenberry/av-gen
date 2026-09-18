@@ -317,12 +317,24 @@ All four are `decide` behaviours over ADR-333's stock considerers. There is no `
 any of the five bodies, no timeline, no staging scenario and no trigger. What is authored is where
 each one starts, what it can perceive, what it likes, and how much it minds getting wet.
 
-| | what it is | measured over 180 s |
+| | what it is | measured over 180 s of the shipped scene |
 |---|---|---|
-| 1 environmental awareness | `scout`: `interest` over its percepts with an `activity`, an `approach` and a `dwell` | 199.6 m, 21 decisions, every committed option the name of a perceived glow patch |
-| 2 environmental navigation | `wader` / `drylander`: one `route` considerer, `wadePenalty` 1.6 against 16.0 | 100.4 m through 0.77 m of water against 251.0 m through 0.01 m; both arrive |
-| 3 character awareness | `watcher`: the same considerer as the scout with `character` at 4.8 instead of 0.6 | commits to the name of another **body**, closes to under 14 m, dwells, leaves, returns |
-| 4 animation intelligence | 8 distinct clips of the 26 each GLB ships, plus ADR-300's `aim` and `additive` pose layers, `matchRate`, `slopeAlign` | every body reaches ≥ 2 activities for half a second or more |
+| 1 environmental awareness | `scout`: `interest` over its percepts with an `activity`, an `approach` and a `dwell`, plus a low-weight `holdPost` for a territory | **243.9 m walked, 21 decisions, 11.4 m net** -- it circulates rather than departs, and every committed option is the name of a perceived glow patch |
+| 2 environmental navigation | `wader` / `drylander`: one `route` considerer, `wadePenalty` 1.6 against 16.0, identical otherwise | **97.4 m through 0.77 m of water, 19.4 s wet** against **248.0 m through 0.01 m, 0.0 s wet**. Both arrive within 9 m of the same point |
+| 3 character awareness | `watcher`: the same considerer as the scout with `character` at 4.8 instead of 0.6 | **215.7 m, 23 decisions**, committed most often to `elder` -- the name of another **body** -- closes to under 14 m, dwells, leaves and comes back |
+| 4 animation intelligence | 8 distinct clips of the 26 each GLB ships, under nine role names, plus ADR-300's `aim` and `additive` pose layers, `matchRate` and `slopeAlign` | every body reaches at least two activities for half a second or more |
+
+A fifth body earns its place by not being a demonstration: the `elder` holds its ground by the
+elder fungus (76.5 m, 14 decisions, 9.0 m net) so that "the watcher went and looked at it" is
+distinguishable from "they both happened to walk the same way".
+
+**One observation this does not claim to have chased.** The `watcher` records a deepest water of
+1.58 m in the first arm and 0.00 in the second, and 1.58 m is past `navWadeDepth`. It is not
+route-driven and it is not a defect in the crossing: the nav grid is 4 m and its `wade` is a cell
+sample, while the probe reads `Navigator::sample`'s analytic depth at the body's exact position, so
+a body crossing near the edge of a walkable cell can stand in water the cell did not know about.
+ADR-295 is the record of that gap being real and deliberate; the grid is honest enough to price a
+route with and not to stand a body on.
 
 **`investigate` is used by nobody, and that is a finding.** It was the obvious considerer for
 demonstrations 1 and 3 and both locked. Salience rises as a body approaches, and `investigate` has
