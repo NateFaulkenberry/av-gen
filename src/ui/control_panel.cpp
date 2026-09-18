@@ -2940,9 +2940,10 @@ void ControlPanel::drawRender(app::Engine& engine) {
                             ? fmt::format(", about {:.0f} min left", left / 60.0)
                             : fmt::format(", about {:.0f} s left", left);
         }
-        ImGui::Text("%llu / %llu frames, %.1f fps, %.0f s elapsed%s, written %llu",
+        ImGui::Text("%llu / %llu frames, %.1f fps, %s elapsed%s, written %llu",
                     static_cast<unsigned long long>(current.framesRendered),
-                    static_cast<unsigned long long>(current.framesTotal), current.renderFps, current.elapsedSeconds,
+                    static_cast<unsigned long long>(current.framesTotal), current.renderFps,
+                    elapsedClock(current.elapsedSeconds).c_str(),
                     remaining.c_str(),
                     static_cast<unsigned long long>(current.framesWritten));
         if (!remaining.empty() && ImGui::IsItemHovered()) {
@@ -2973,8 +2974,9 @@ void ControlPanel::drawRender(app::Engine& engine) {
             if (!current.error.empty()) {
                 ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "last render failed: %s", current.error.c_str());
             } else if (current.framesTotal > 0) {
-                ImGui::TextDisabled("last render: %llu frames in %.1f s, sequence hash %016llx%s",
-                                    static_cast<unsigned long long>(current.framesRendered), current.elapsedSeconds,
+                ImGui::TextDisabled("last render: %llu frames in %s, sequence hash %016llx%s",
+                                    static_cast<unsigned long long>(current.framesRendered),
+                                    elapsedClock(current.elapsedSeconds).c_str(),
                                     static_cast<unsigned long long>(current.sequenceHash),
                                     current.cancelled ? " (cancelled)" : "");
             }

@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdint>
 #include <iterator>
 #include <filesystem>
@@ -754,6 +755,33 @@ inline constexpr float kMinItemWidth = 60.0f;
     // The anchor's position across the window, kept: view' = anchor - fraction * newSpan.
     const double fraction = (anchor - view) / oldSpan;
     return std::clamp(anchor - fraction * newSpan, 0.0, std::max(0.0, duration - newSpan));
+}
+
+// A duration a person reads off a progress line, as h:mm:ss or m:ss.
+//
+// Seconds alone stop being a duration somewhere around a minute: "4231 s elapsed" is a number you
+// have to do arithmetic on before it means anything, and a render that long is exactly when you
+// want to know at a glance. Hours appear only when there are any, so a short render is not padded
+// with a leading zero that never changes.
+//
+// Here rather than beside a panel because two panels already format a duration and had drifted to
+// different answers -- `world_builder_panel`'s own helper is m:ss with no hours, so a ninety-minute
+// build reads "125:30" rather than "2:05:30".
+[[nodiscard]] inline std::string elapsedClock(double seconds) {
+    if (!(seconds >= 0.0) || !std::isfinite(seconds)) {
+        return "--:--";
+    }
+    const long long total = static_cast<long long>(seconds);
+    const long long h = total / 3600;
+    const long long m = (total % 3600) / 60;
+    const long long sec = total % 60;
+    char buffer[32];
+    if (h > 0) {
+        std::snprintf(buffer, sizeof(buffer), "%lld:%02lld:%02lld", h, m, sec);
+    } else {
+        std::snprintf(buffer, sizeof(buffer), "%lld:%02lld", m, sec);
+    }
+    return buffer;
 }
 
 } // namespace avgen::ui
