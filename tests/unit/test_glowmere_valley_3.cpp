@@ -88,7 +88,8 @@ world::WorldMap loadWorld(const fs::path& scenePath) {
 // so "the hills are scree and rim" stops being a reading of biome.cpp and becomes a measurement of
 // this world.
 TEST_CASE("probe: what Glowmere's hills are made of", "[.probe][glowmere3]") {
-    for (const char* file : {"glowmere-valley-2-multicam.scene.json", "glowmere-valley-3.scene.json"}) {
+    for (const char* file : {"glowmere-valley-2-multicam.scene.json", "glowmere-valley-3-legacytrees.scene.json",
+                          "glowmere-valley-3.scene.json"}) {
         const fs::path path = worldDir() / file;
         if (!fs::exists(path)) {
             continue;
@@ -200,7 +201,8 @@ TEST_CASE("probe: what Glowmere's hills are made of", "[.probe][glowmere3]") {
 // A layer forbidden on the hills reads here as a zero in the `hills` column, which is a different
 // fact from a small number and is the fact the owner's request turns on.
 TEST_CASE("probe: where each scatter layer may grow", "[.probe][glowmere3]") {
-    for (const char* file : {"glowmere-valley-2-multicam.scene.json", "glowmere-valley-3.scene.json"}) {
+    for (const char* file : {"glowmere-valley-2-multicam.scene.json", "glowmere-valley-3-legacytrees.scene.json",
+                          "glowmere-valley-3.scene.json"}) {
         const fs::path path = worldDir() / file;
         if (!fs::exists(path)) {
             continue;
@@ -284,7 +286,8 @@ TEST_CASE("probe: where each scatter layer may grow", "[.probe][glowmere3]") {
 // `scatter()` is the production placer, so these are the counts the renderer is handed -- before
 // any view culling, which is the number a density change moves.
 TEST_CASE("probe: Glowmere scatter instance counts", "[.probe][glowmere3]") {
-    for (const char* file : {"glowmere-valley-2-multicam.scene.json", "glowmere-valley-3.scene.json"}) {
+    for (const char* file : {"glowmere-valley-2-multicam.scene.json", "glowmere-valley-3-legacytrees.scene.json",
+                          "glowmere-valley-3.scene.json"}) {
         const fs::path path = worldDir() / file;
         if (!fs::exists(path)) {
             continue;
@@ -341,7 +344,8 @@ TEST_CASE("probe: is Glowmere's river a crossing decision", "[.probe][glowmere3]
     if (!fs::exists(fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens" / "alien-scout.glb")) {
         SKIP("assets/aliens is not present");
     }
-    for (const char* file : {"glowmere-valley-2-multicam.scene.json", "glowmere-valley-3.scene.json"}) {
+    for (const char* file : {"glowmere-valley-2-multicam.scene.json", "glowmere-valley-3-legacytrees.scene.json",
+                          "glowmere-valley-3.scene.json"}) {
         const fs::path path = worldDir() / file;
         if (!fs::exists(path)) {
             continue;

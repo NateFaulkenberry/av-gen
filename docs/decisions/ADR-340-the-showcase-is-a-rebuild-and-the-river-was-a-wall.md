@@ -262,13 +262,21 @@ the upland read as a treeline rather than as scrub.
 
 ### What it comes to, measured
 
-| | valley 2's three layers | valley 3's eight |
+Like for like -- the same world, the same clearings, the same cast -- against
+`glowmere-valley-3-legacytrees`, which is valley 2's three layers dropped into valley 3:
+
+| | the three layers | valley 3's eight |
 |---|---:|---:|
-| tree-sized instances placed | 638 | **2,853** |
-| of those, on the hills | 152 | **1,351** |
+| tree-sized instances placed | 545 | **2,593** (4.8x) |
+| of those, on the hills | 150 | **1,344** (9.0x) |
 | distinct tree models | 3 | **8** |
 | layers sitting on their `maxInstances` cap | 0 | **0** |
-| tree line (`height × maxScale`) | 11.20 m | **11.20 m** |
+| tree line (`height x maxScale`) | 11.20 m | **11.20 m** |
+| every scatter instance, including the grass | 56,716 | 58,764 |
+
+(`glowmere-valley-2-multicam` as shipped places 638 trees, 152 of them on the hills. It is not the
+A/B, because its world has no ford, no backwater and two fewer glades; it is the number the owner
+was looking at when they asked.)
 
 **No cap binds, before or after.** The reconnaissance expected `maxInstances` and `meshBudget` to
 bind; they do not. Valley 2's densest tree layer placed 306 of an allowed 2,000. The caps were
