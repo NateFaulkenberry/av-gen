@@ -262,6 +262,26 @@ public:
     // world instead of the engine deciding once.
     [[nodiscard]] bool vouches() const { return stats_.trusted; }
 
+    // Re-sample the cells inside an XZ rectangle, then relabel the whole graph (ADR-297).
+    //
+    // This is what a door that closes, a craft that lands or a tree that falls needs: the obstacle
+    // field gains a solid, and the graph has to agree, without paying the 148 ms a whole world
+    // costs. Measured on Glowmere: a 24 m rectangle is 49 cells re-sampled and the rest is the two
+    // whole-grid passes below, which is why the figure is a couple of milliseconds rather than a
+    // couple of microseconds.
+    //
+    // The rectangle is grown by one cell before sampling and by two before edge marking, because a
+    // cell's obstruction is measured over a disc of half its diagonal and a cell's edge flag is a
+    // fact about its neighbours. Regions and the terrain-room field are recomputed over the whole
+    // grid on purpose: a wall dropped across a corridor divides a region that reaches the other side
+    // of the world, and a flood fill that stopped at the rectangle would call two halves of one
+    // island connected -- the single error a reachability structure must never make.
+    //
+    // **Call it after the obstacle field has been rebuilt**, not before: the grid reads the field,
+    // and `spatial::ObstacleField::add` invalidates its index until `build()` is called again.
+    // Returns the milliseconds it took.
+    double rebuildRect(const Navigator& nav, glm::vec2 lo, glm::vec2 hi);
+
     // The nearest walkable cell centre to `p` within `maxRange` metres, by a spiral outward so the
     // answer is the closest one and not merely a close one.
     [[nodiscard]] bool nearestWalkable(glm::vec2 p, float maxRange, glm::vec2& out) const;
@@ -309,6 +329,11 @@ private:
     // world whose walker does not wade, so the check below it never fires there.
     [[nodiscard]] bool lineOfSight(glm::ivec2 a, glm::ivec2 b,
                                    std::uint8_t* deepestWade = nullptr) const;
+    // One cell, sampled from the world: everything a build does per cell, so a partial rebuild
+    // cannot drift from a full one.
+    void fillCell(const Navigator& nav, glm::ivec2 at, std::vector<std::uint32_t>& hits);
+    void recount();
+    void markEdges(glm::ivec2 lo, glm::ivec2 hi);
     void extractInterestPoints();
     void buildRegions();
     void buildTerrainRoom();

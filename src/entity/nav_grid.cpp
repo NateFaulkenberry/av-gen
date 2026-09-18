@@ -106,101 +106,19 @@ void NavGrid::build(const Navigator& nav, float cellSize) {
     stats_.cells = total;
     cells_.assign(total, NavCell{});
 
-    const float maxSlope = std::max(nav.settings().maxSlope, 1e-3f);
-    const float wadeDepth = nav.settings().wadeDepth;
-    // How much of a cell a solid covers, as the fraction of the cell's area its footprint claims.
-    // Sampled from the obstacle field rather than from the point test, because a trunk half a metre
-    // off the cell centre obstructs the cell and a point test at the centre says it does not.
-    const spatial::ObstacleField* obstacles = nav.obstacles();
-    const float cellArea = cell * cell;
     std::vector<std::uint32_t> hits; // hoisted: one allocation for the build, not one per cell
 
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
-            const glm::vec2 p = centerOf(glm::ivec2(x, y));
-            const NavSample s = nav.sample(p);
-            NavCell& c = cells_[index(glm::ivec2(x, y))];
-            c.ground = s.ground;
-            c.slope = quantise(s.slope / maxSlope);
-            // How deep the water over this cell is, as a fraction of the deepest this walker will
-            // enter. The grid has to agree with `Navigator::sample` about the walkable set or the
-            // planner routes round a ford the mover would have crossed -- and it has to agree
-            // about *how deep* it is, or it prices every ford the same. Both come off the sample
-            // already taken above. Exactly 0 for every cell when the walker does not wade.
-            c.wade = wadeDepth > 0.0f ? quantise(s.waterDepth / wadeDepth) : 0;
-            if (std::isfinite(s.waterSurface) && s.ground < s.waterSurface) {
-                c.flags |= NavWater;
-                ++stats_.water;
-            }
-            switch (s.reject) {
-            case NavReject::TooSteep: c.flags |= NavSteep; break;
-            case NavReject::Submerged: c.flags |= NavWater; break;
-            case NavReject::Obstructed:
-            case NavReject::InsideHero: c.flags |= NavBlocked; break;
-            default: break;
-            }
-            // The ground on its own, before anything standing on it (ADR-295). `Navigator::sample`
-            // runs the terrain rules first and asks the obstacle field last, so a point that got as
-            // far as `Obstructed` passed every terrain rule -- which is exactly the distinction this
-            // flag needs and the reason it can be read off the reject reason rather than re-derived.
-            // `InsideHero` is a terrain reject and stays one: a hero is a landmark, not scatter, and
-            // the obstacle field it is also in is the swept half of the same fact.
-            if (s.reject == NavReject::None || s.reject == NavReject::Obstructed) {
-                c.flags |= NavTerrain;
-                ++stats_.terrain;
-            }
-            if (obstacles != nullptr) {
-                // Area-weighted rather than counted: three saplings and one boulder should not
-                // score the same, and a cell a walker can still thread should not score as full.
-                float covered = 0.0f;
-                float vaulted = 0.0f;
-                const spatial::ObstacleFilter body = nav.filter(s.ground);
-                obstacles->query(p, cell * 0.7071f, hits);
-                for (const std::uint32_t i : hits) {
-                    const spatial::NavigationObstacle& o = obstacles->obstacles()[i];
-                    const float r = o.radius + nav.settings().bodyRadius;
-                    const float area = 3.14159265f * r * r;
-                    // Only what this body actually gets past by jumping leaves the obstruction
-                    // total (ADR-196). Everything else -- including a solid it merely steps over,
-                    // which this sum has always counted -- stays where it was, so a body that
-                    // cannot jump scores every cell exactly as it did.
-                    if (spatial::traversalFor(o, body) == spatial::Traversal::Jumpable) {
-                        vaulted += area;
-                    } else {
-                        covered += area;
-                    }
-                }
-                c.obstruction = quantise(covered / cellArea);
-                c.vault = quantise(vaulted / cellArea);
-                if (c.obstruction > 200) {
-                    c.flags |= NavBlocked;
-                }
-            }
-            if (s.navigable) {
-                c.flags |= NavWalkable;
-                ++stats_.walkable;
-            } else if ((c.flags & NavBlocked) != 0) {
-                ++stats_.blocked;
-            }
+            fillCell(nav, glm::ivec2(x, y), hits);
         }
     }
+    recount();
 
     // Edge cells: walkable, and next to something that is not. Used by the interest extraction
     // below and useful on its own -- a character that only ever walks through the middle of open
     // ground never goes anywhere with a view.
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            const glm::ivec2 c(x, y);
-            if (!walkable(c)) {
-                continue;
-            }
-            const bool edge = !walkable(glm::ivec2(x - 1, y)) || !walkable(glm::ivec2(x + 1, y)) ||
-                              !walkable(glm::ivec2(x, y - 1)) || !walkable(glm::ivec2(x, y + 1));
-            if (edge) {
-                cells_[index(c)].flags |= NavEdge;
-            }
-        }
-    }
+    markEdges(glm::ivec2(0, 0), glm::ivec2(width - 1, height - 1));
 
     gScore_.assign(total, 0.0f);
     cameFrom_.assign(total, -1);
@@ -242,6 +160,162 @@ void NavGrid::build(const Navigator& nav, float cellSize) {
                                             static_cast<double>(stats_.walkable)
                                       : 0.0);
     }
+}
+
+// One cell, from the world. The whole of what a build does per cell, in one place, because
+// `rebuildRect` does exactly this to a few hundred cells and a second copy of it would be two
+// walkable sets that agree until somebody edits one of them (ADR-297).
+void NavGrid::fillCell(const Navigator& nav, glm::ivec2 at, std::vector<std::uint32_t>& hits) {
+    const float cell = std::max(stats_.cellSize, 1e-3f);
+    const float maxSlope = std::max(nav.settings().maxSlope, 1e-3f);
+    const float wadeDepth = nav.settings().wadeDepth;
+    const spatial::ObstacleField* obstacles = nav.obstacles();
+    const float cellArea = cell * cell;
+    const glm::vec2 p = centerOf(at);
+    const NavSample s = nav.sample(p);
+    NavCell& c = cells_[index(at)];
+    c = NavCell{}; // a rebuild must not inherit a flag from what used to be here
+    c.ground = s.ground;
+    c.slope = quantise(s.slope / maxSlope);
+    // How deep the water over this cell is, as a fraction of the deepest this walker will enter. The
+    // grid has to agree with `Navigator::sample` about the walkable set or the planner routes round
+    // a ford the mover would have crossed -- and it has to agree about *how deep* it is, or it
+    // prices every ford the same. Both come off the sample already taken above. Exactly 0 for every
+    // cell when the walker does not wade.
+    c.wade = wadeDepth > 0.0f ? quantise(s.waterDepth / wadeDepth) : 0;
+    if (std::isfinite(s.waterSurface) && s.ground < s.waterSurface) {
+        c.flags |= NavWater;
+    }
+    switch (s.reject) {
+    case NavReject::TooSteep: c.flags |= NavSteep; break;
+    case NavReject::Submerged: c.flags |= NavWater; break;
+    case NavReject::Obstructed:
+    case NavReject::InsideHero: c.flags |= NavBlocked; break;
+    default: break;
+    }
+    // The ground on its own, before anything standing on it (ADR-295). `Navigator::sample` runs the
+    // terrain rules first and asks the obstacle field last, so a point that got as far as
+    // `Obstructed` passed every terrain rule -- which is exactly the distinction this flag needs and
+    // the reason it can be read off the reject reason rather than re-derived. `InsideHero` is a
+    // terrain reject and stays one: a hero is a landmark, not scatter, and the obstacle field it is
+    // also in is the swept half of the same fact.
+    if (s.reject == NavReject::None || s.reject == NavReject::Obstructed) {
+        c.flags |= NavTerrain;
+    }
+    if (obstacles != nullptr) {
+        // Area-weighted rather than counted: three saplings and one boulder should not score the
+        // same, and a cell a walker can still thread should not score as full.
+        float covered = 0.0f;
+        float vaulted = 0.0f;
+        const spatial::ObstacleFilter body = nav.filter(s.ground);
+        obstacles->query(p, cell * 0.7071f, hits);
+        for (const std::uint32_t i : hits) {
+            const spatial::NavigationObstacle& o = obstacles->obstacles()[i];
+            const float r = o.radius + nav.settings().bodyRadius;
+            const float area = 3.14159265f * r * r;
+            // Only what this body actually gets past by jumping leaves the obstruction total
+            // (ADR-196). Everything else -- including a solid it merely steps over, which this sum
+            // has always counted -- stays where it was, so a body that cannot jump scores every cell
+            // exactly as it did.
+            if (spatial::traversalFor(o, body) == spatial::Traversal::Jumpable) {
+                vaulted += area;
+            } else {
+                covered += area;
+            }
+        }
+        c.obstruction = quantise(covered / cellArea);
+        c.vault = quantise(vaulted / cellArea);
+        if (c.obstruction > 200) {
+            c.flags |= NavBlocked;
+        }
+    }
+    if (s.navigable) {
+        c.flags |= NavWalkable;
+    }
+}
+
+// The totals, counted rather than accumulated. A partial rebuild that tried to add and subtract its
+// own deltas would be four counters and four chances to leak one; twenty-four thousand increments
+// is 0.02 ms and cannot drift.
+void NavGrid::recount() {
+    stats_.walkable = 0;
+    stats_.water = 0;
+    stats_.blocked = 0;
+    stats_.terrain = 0;
+    for (const NavCell& c : cells_) {
+        stats_.walkable += (c.flags & NavWalkable) != 0 ? 1 : 0;
+        stats_.water += (c.flags & NavWater) != 0 ? 1 : 0;
+        stats_.terrain += (c.flags & NavTerrain) != 0 ? 1 : 0;
+        stats_.blocked += ((c.flags & NavWalkable) == 0 && (c.flags & NavBlocked) != 0) ? 1 : 0;
+    }
+}
+
+void NavGrid::markEdges(glm::ivec2 lo, glm::ivec2 hi) {
+    for (int y = std::max(lo.y, 0); y <= std::min(hi.y, stats_.height - 1); ++y) {
+        for (int x = std::max(lo.x, 0); x <= std::min(hi.x, stats_.width - 1); ++x) {
+            const glm::ivec2 c(x, y);
+            NavCell& cellRef = cells_[index(c)];
+            cellRef.flags &= static_cast<std::uint8_t>(~NavEdge);
+            if ((cellRef.flags & NavWalkable) == 0) {
+                continue;
+            }
+            const bool edge = !walkable(glm::ivec2(x - 1, y)) || !walkable(glm::ivec2(x + 1, y)) ||
+                              !walkable(glm::ivec2(x, y - 1)) || !walkable(glm::ivec2(x, y + 1));
+            if (edge) {
+                cellRef.flags |= NavEdge;
+            }
+        }
+    }
+}
+
+double NavGrid::rebuildRect(const Navigator& nav, glm::vec2 lo, glm::vec2 hi) {
+    if (!valid()) {
+        return 0.0;
+    }
+    const auto begin = std::chrono::steady_clock::now();
+    // A cell's obstruction is sampled over a disc of half its diagonal, so a solid just outside the
+    // rect still changes a cell just inside it. One cell of skirt is what makes the rebuilt set a
+    // superset of the changed set, and leaving it off is how a partial rebuild leaves a seam that
+    // only shows up as a route that clips the corner of a new wall.
+    const glm::ivec2 a = cellOf(lo) - 1;
+    const glm::ivec2 b = cellOf(hi) + 1;
+    std::vector<std::uint32_t> hits;
+    std::size_t touched = 0;
+    for (int y = std::max(a.y, 0); y <= std::min(b.y, stats_.height - 1); ++y) {
+        for (int x = std::max(a.x, 0); x <= std::min(b.x, stats_.width - 1); ++x) {
+            fillCell(nav, glm::ivec2(x, y), hits);
+            ++touched;
+        }
+    }
+    if (touched == 0) {
+        return 0.0;
+    }
+    recount();
+    // Edges need one more ring than the cells did: a cell outside the rect is an edge cell because
+    // of a cell inside it.
+    markEdges(a - 1, b + 1);
+    // Regions and terrain room are whole-grid by nature and cheap enough not to be worth splitting.
+    // A wall dropped across a corridor divides a region that reaches the far side of the world, and
+    // a flood fill that stopped at the rect would report two halves of one island as connected --
+    // which is the one error this whole structure exists to make impossible.
+    buildRegions();
+    buildTerrainRoom();
+    // The trust verdict is deliberately *not* re-taken. It is a statement about this world's
+    // terrain, and a solid that lands on it is not terrain: `NavTerrain` is read off the terrain
+    // rules, which a new obstacle cannot reach. Re-running it would cost more than the rebuild and
+    // could only ever return the same answer.
+    //
+    // Interest points are deliberately not re-extracted either, and that is a limitation rather than
+    // a decision: `shorePoints` and `vistaPoints` are handed out as spans and `EntityWorld` copies
+    // them at load, so moving them here would change nothing a character reads and would invalidate
+    // a span somebody else is holding. A shore point under a newly landed craft stays a shore point.
+    const double ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count();
+    log::info("nav grid: rebuilt {} cell(s) over [{:.0f},{:.0f}]..[{:.0f},{:.0f}] in {:.2f} ms; "
+              "{} walkable, {} blocked, {} region(s), {} stranded",
+              touched, lo.x, lo.y, hi.x, hi.y, ms, stats_.walkable, stats_.blocked, stats_.regions,
+              stats_.stranded);
+    return ms;
 }
 
 std::size_t NavGrid::index(glm::ivec2 c) const {

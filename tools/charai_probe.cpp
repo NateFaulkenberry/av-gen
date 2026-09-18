@@ -682,6 +682,29 @@ void routeDivergence(const entity::Navigator& nav, int count, const char* label)
                 "  be 0 m, or the arm simulated nothing and two of nothing agree perfectly\n");
 }
 
+// What a door that closes costs (ADR-297). A rect rebuild against a whole one, on the real grid.
+void dynamicRebuild(const entity::Navigator& nav, int repeats) {
+    const entity::NavGrid* grid = nav.grid();
+    std::printf("\n== a partial rebuild against a whole one ==\n");
+    if (grid == nullptr || !grid->valid()) {
+        std::printf("  this scene has no navigation graph\n");
+        return;
+    }
+    auto& mutable_grid = const_cast<entity::NavGrid&>(*grid);
+    const glm::vec2 middle = (nav.worldMin() + nav.worldMax()) * 0.5f;
+    for (const float half : {4.0f, 12.0f, 40.0f}) {
+        double best = std::numeric_limits<double>::max();
+        for (int r = 0; r < repeats; ++r) {
+            best = std::min(best, mutable_grid.rebuildRect(nav, middle - half, middle + half));
+        }
+        std::printf("  %5.0f m rect: %8.3f ms   (a whole build is %.1f ms)\n",
+                    static_cast<double>(half * 2.0f), best, grid->stats().buildMs);
+    }
+    std::printf("  the control: every rebuild above added no solids, so the graph must be unchanged"
+                " -- %zu walkable, %zu region(s)\n",
+                grid->stats().walkable, grid->stats().regions);
+}
+
 void gridStats(const entity::Navigator& nav) {
     const entity::NavGrid* grid = nav.grid();
     std::printf("\n== navigation graph ==\n");
@@ -862,6 +885,7 @@ int main(int argc, char** argv) {
     std::printf("interest points: %zu\n", comp.entityWorld().interestPoints().size());
     if (want('g')) { gridStats(nav); }
     if (want('n')) { navCost(nav, repeats); }
+    if (want('y')) { dynamicRebuild(nav, repeats); }
     if (want('a')) { gridAgreement(nav, 20000); }
     if (want('v')) { routeDivergence(nav, 24, scenePath.filename().string().c_str()); }
     if (want('p')) { perceptionScan(comp.entityWorld(), nav, repeats); }

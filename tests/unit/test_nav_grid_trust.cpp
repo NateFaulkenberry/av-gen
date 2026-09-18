@@ -478,3 +478,83 @@ TEST_CASE("a body with nowhere to go says so, and one between errands does not",
     // That is the reason `confinedFor` exists rather than another `PathStatus` value.
     CHECK(penned.status == free.status);
 }
+
+// ---- a door that closes ------------------------------------------------------------------------
+
+TEST_CASE("a solid dropped at runtime closes the route through a rectangle", "[navigation][grid][dynamic]") {
+    // §A.4 of the research: `ObstacleField` is built once at load, so a door that closes, a craft
+    // that lands or a fallen tree cannot exist. The grid half of that is a rebuild over an XZ rect
+    // (ADR-297), and this is the shape it has to handle -- a corridor that is the only way through.
+    Flat flat;
+    auto obstacles = std::make_shared<spatial::ObstacleField>();
+    // Two walls with a 12 m gap between them, spanning the world.
+    for (float z = -110.0f; z <= 110.0f; z += 2.0f) {
+        if (z > -6.0f && z < 6.0f) {
+            continue; // the doorway
+        }
+        obstacles->add(solid(0.0f, z, 1.6f, 7.0f));
+    }
+    obstacles->build();
+    entity::Navigator nav(&flat.map, flat.clearance);
+    nav.setObstacles(obstacles);
+    nav.buildGrid(4.0f);
+    entity::NavGrid& grid = const_cast<entity::NavGrid&>(*nav.grid());
+
+    const glm::vec2 west(-40.0f, 0.0f);
+    const glm::vec2 east(40.0f, 0.0f);
+    entity::PathRequest request;
+    request.from = west;
+    request.to = east;
+
+    const std::size_t regionsOpen = grid.stats().regions;
+    const std::size_t walkableOpen = grid.stats().walkable;
+    INFO("open: " << regionsOpen << " region(s), " << walkableOpen << " walkable");
+    REQUIRE(grid.path(request).status == entity::PathStatus::Ok);
+    REQUIRE(grid.connected(west, east));
+
+    SECTION("the control: rebuilding the same rectangle with nothing added changes nothing") {
+        // Without this the section below proves only that `rebuildRect` breaks things.
+        const std::vector<entity::NavCell> before(grid.cells().begin(), grid.cells().end());
+        const double ms = grid.rebuildRect(nav, glm::vec2(-12.0f, -12.0f), glm::vec2(12.0f, 12.0f));
+        INFO("rebuild took " << ms << " ms against a full build of " << grid.stats().buildMs);
+        CHECK(ms >= 0.0);
+        REQUIRE(grid.cells().size() == before.size());
+        std::size_t differed = 0;
+        for (std::size_t i = 0; i < before.size(); ++i) {
+            differed += grid.cells()[i].flags != before[i].flags ||
+                                grid.cells()[i].obstruction != before[i].obstruction
+                            ? 1
+                            : 0;
+        }
+        CHECK(differed == 0);
+        CHECK(grid.stats().regions == regionsOpen);
+        CHECK(grid.stats().walkable == walkableOpen);
+        CHECK(grid.path(request).status == entity::PathStatus::Ok);
+    }
+
+    SECTION("the door closes and the far side becomes a different region") {
+        for (float z = -6.0f; z <= 6.0f; z += 2.0f) {
+            obstacles->add(solid(0.0f, z, 1.6f, 7.0f));
+        }
+        obstacles->build(); // the index is invalidated by `add`; the grid reads the field
+        const double ms = grid.rebuildRect(nav, glm::vec2(-10.0f, -10.0f), glm::vec2(10.0f, 10.0f));
+        INFO("closed: " << grid.stats().regions << " region(s), " << grid.stats().walkable
+                        << " walkable, " << grid.stats().stranded << " stranded, rebuilt in " << ms
+                        << " ms against a full build of " << grid.stats().buildMs << " ms");
+        CHECK(grid.stats().walkable < walkableOpen);
+        CHECK(grid.stats().regions > regionsOpen);
+        CHECK(grid.stats().stranded > 0);
+        // The two claims that matter: the lookup and the search agree, and they agree that there is
+        // no way through.
+        CHECK_FALSE(grid.connected(west, east));
+        const entity::PathResult blocked = grid.path(request);
+        CHECK(blocked.status == entity::PathStatus::Unreachable);
+        CHECK(blocked.waypoints.empty());
+        // And a route that never needed the doorway is untouched, so this is a door and not a wall
+        // across the world.
+        entity::PathRequest local;
+        local.from = glm::vec2(-40.0f, 0.0f);
+        local.to = glm::vec2(-40.0f, 60.0f);
+        CHECK(grid.path(local).status == entity::PathStatus::Ok);
+    }
+}
