@@ -665,6 +665,11 @@ void EntityWorld::reset() {
         entity->locomotion_ = LocomotionState{};
         entity->coarseAccum_ = 0.0;
         entity->everUpdated_ = false;
+        // And back into the crowd. `update` clears this for a body it culled by distance, and
+        // nothing put it back -- so a reset inherited "entity 7 is not a body" from whatever frame
+        // last played, and a seek that rebuilds the crowd field (which `seek` now does) would build
+        // its first step's field out of that. Reset means reset.
+        entity->active_ = true;
         // Field state is live-tier state and it resets with the rest of it (ADR-091). An arc that
         // was half-way through when the playhead jumped is gone, and the entity is outside every
         // field until the next pass says otherwise -- which is the same honest answer a behaviour

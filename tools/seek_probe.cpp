@@ -308,6 +308,63 @@ void windowScaling(const entity::Navigator& nav, int n, const char* kind, int re
                 "re-simulation)\n");
 }
 
+// The scene's *own* entity world, seeked, at a range of price caps.
+//
+// The one table the whole change turns on, because it is the only arm whose population is the one an
+// editor actually has. Latency in one column and fidelity in the next, so the budget is chosen from
+// a trade somebody looked at rather than from a round number -- the caps are not free, they buy
+// less history, and the right-hand column is how much less in metres.
+//
+// The reference is the uncapped ninety-second replay, which is what the editor did before. Not a
+// play: this is asking "how much does the cap move the answer", not "does the replay match a play",
+// which §3 of the ADR asks separately and answers exactly.
+void authoredScene(scene::Composition& comp, params::ParameterSet& params, double target,
+                   int repeats) {
+    std::printf("\n== the authored scene's own entity world, seeked to t = %.0f s ==\n", target);
+    entity::EntityWorld& world = comp.entityWorld();
+    const auto run = [&](std::uint64_t cap) {
+        double best = std::numeric_limits<double>::max();
+        for (int r = 0; r < repeats; ++r) {
+            const auto start = Clock::now();
+            world.seek(target, &params, nullptr, 1.0 / 60.0,
+                       entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = cap});
+            best = std::min(best, msSince(start));
+        }
+        std::vector<glm::vec3> pose;
+        for (const auto& e : world.entities()) {
+            pose.push_back(e->visualPosition());
+        }
+        return std::pair{best, pose};
+    };
+    const auto [fullMs, fullPose] = run(0);
+    const entity::EntityWorld::SeekWork fullWork = world.lastSeekWork();
+    std::printf("  %zu entities; %llu deep, %llu shallow; the uncapped window is %llu steps = "
+                "%llu body-steps\n",
+                world.size(), static_cast<unsigned long long>(fullWork.deepBodies),
+                static_cast<unsigned long long>(fullWork.shallowBodies),
+                static_cast<unsigned long long>(fullWork.steps),
+                static_cast<unsigned long long>(fullWork.bodySteps));
+    std::printf("  %12s %10s %12s %10s   %s\n", "cap", "history s", "body-steps", "seek ms",
+                "worst move vs the full replay");
+    std::printf("  %12s %10.1f %12llu %10.1f   %s\n", "none (before)",
+                fullWork.spanSeconds, static_cast<unsigned long long>(fullWork.bodySteps), fullMs,
+                "0.000 m (it is the reference)");
+    for (const std::uint64_t cap : {120000ull, 60000ull, 30000ull, 15000ull, 6000ull}) {
+        const auto [ms, pose] = run(cap);
+        const entity::EntityWorld::SeekWork work = world.lastSeekWork();
+        double moved = 0.0;
+        for (std::size_t i = 0; i < pose.size() && i < fullPose.size(); ++i) {
+            moved = std::max(moved, static_cast<double>(glm::length(pose[i] - fullPose[i])));
+        }
+        std::printf("  %12llu %10.1f %12llu %10.1f   %.3f m\n",
+                    static_cast<unsigned long long>(cap), work.spanSeconds,
+                    static_cast<unsigned long long>(work.bodySteps), ms, moved);
+        std::fflush(stdout);
+    }
+    std::printf("  (the right-hand column is the control: a cap that moves nothing is a cap that is "
+                "not biting)\n");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -315,7 +372,7 @@ int main(int argc, char** argv) {
         argc > 1 ? fs::path(argv[1]) : fs::path("examples/world/glowmere-valley-2.scene.json");
     const int n = argc > 2 ? std::atoi(argv[2]) : 25;
     const int repeats = argc > 3 ? std::atoi(argv[3]) : 2;
-    const std::string sections = argc > 4 ? std::string(argv[4]) : std::string("pkwh");
+    const std::string sections = argc > 4 ? std::string(argv[4]) : std::string("pakwh");
     const auto want = [&](char c) { return sections.find(c) != std::string::npos; };
 
     log::setLevel(log::Level::Error);
@@ -338,5 +395,6 @@ int main(int argc, char** argv) {
     if (want('k')) { perKind(nav, n, 90.0, repeats); }
     if (want('w')) { windowScaling(nav, n, "explore", repeats); }
     if (want('h')) { historyDepth(nav, 30.0); }
+    if (want('a')) { authoredScene(comp, params, 90.0, repeats); }
     return 0;
 }
