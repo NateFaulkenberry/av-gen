@@ -102,9 +102,12 @@ to carry two heights per cell is a navmesh that nobody decided to write.
 * **Dynamic obstacles.** `ObstacleField` is built once at load. A door that closes, a craft that
   lands, a felled tree — none can be added. This is the one place TileCache has a real analogue, and
   it is a partial rebuild over an XZ rect on a 23,716-cell grid.
-* **Off-mesh links.** `NavSettings::jumpOver` and `NavCell::vault` exist, are priced into A*'s cost
-  term, and are **zero in every scene**. The vocabulary for crossing a gap by jumping is built and
-  nothing uses it.
+* **Off-mesh links.** `NavSettings::jumpOver` and `NavCell::vault` (ADR-196) exist, are priced into
+  A*'s cost term, and are **zero in every scene**: nothing sets `jumpOver`, so every cell's vault
+  column is 0 and the cost term it feeds is exactly 0. This is not the same thing as
+  `explore/jumpRange` (ADR-194), which *is* authored — `ember` carries 7.0 — so a character can hop
+  and the planner still cannot route it across a gap. The vocabulary for crossing a gap by jumping
+  is built on the planner side and nothing uses it.
 * **Reachability reporting.** 28 regions, largest 9,938 of 19,584 walkable cells — half the walkable
   ground is not reachable from the other half — and nothing tells an author. `NavGridStats::regions`
   is computed at build and read by no UI. `PathStatus::Unreachable` exists precisely for this and

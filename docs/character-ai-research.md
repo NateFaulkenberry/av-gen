@@ -173,9 +173,11 @@ existing `spatial::ObstacleField`, which is 300 lines, not a navmesh dependency.
   problem on a 23,716-cell grid, not a library problem.
 - **Path smoothing.** Routes are cell centres. `Navigator::steer` hides this at walking speed; it
   will not hide it for anything that banks or turns on a radius.
-- **Off-mesh links.** `NavSettings::jumpOver` and `NavCell::vault` exist and are zero everywhere
-  (no scene sets `jumpOver`). The vocabulary for "get across this gap by jumping" is built and
-  nothing uses it.
+- **Off-mesh links.** `NavSettings::jumpOver` and `NavCell::vault` (ADR-196) exist, are priced into
+  A*'s cost term, and are **zero everywhere** -- no scene sets `jumpOver`, so the vault column of
+  every cell is 0 and the cost term it feeds is exactly 0. Not to be confused with
+  `explore/jumpRange` (ADR-194), which *is* authored -- `ember` carries 7.0 in the Glowmere scenes.
+  The difference matters: a character can hop, and the *planner* still cannot route it across a gap.
 - **Reachability reporting.** 28 regions and nothing says so. `NavGridStats::regions` is computed
   at build and read by no UI.
 
