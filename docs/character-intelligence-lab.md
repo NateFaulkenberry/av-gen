@@ -128,6 +128,14 @@ just outside returns `Ok` with 2. The status is correct and is surfaced to no UI
 walk — every destination it could pick is outside the wall, `pickDestination` rejects all of them, and
 it idles for two minutes. **Being stuck and being idle produce the same frame and the same log.**
 
+**Fixed 2026-09-18, ADR-296.** `NavDebug` now carries `confinedFor` and `stuckFor` and the route
+overlay prints them; the selected walker's label also says which region it is standing in and whether
+its destination is reachable from there. One line above needs correcting: "the status is correct and
+is surfaced to no UI" was already out of date when it was written — ADR-197's route overlay prints
+`PathStatus` in the label and flags the route failed. So a penned body that *plans* was visible. The
+body that was invisible is the one that never plans, which is what the two new fields are for; the
+stranded-cell count (`NavGridStats::stranded`) is in the panel beside the region count.
+
 **The scrub does not match the play for an explorer.** 1.360136 m at 30 s, inside the 90 s replay
 window where ADR-091 demands they agree and where ADR-267 measured 0.000022 m. Not a regression and
 not a contradiction: `EntityWorld::seek` (`entity.cpp:739`) re-simulates a strict *subset* of
