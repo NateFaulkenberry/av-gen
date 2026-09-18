@@ -350,6 +350,19 @@ def copy_tree(tree_dir: Path, out_dir: Path) -> dict:
     return stats
 
 
+def glowmere_tree(hero: Path) -> dict:
+    """The Glowmere material variant, via the sibling tool that owns the palette."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import glowmere_tree_materials as gtm  # noqa: E402  (deliberately late; stdlib only)
+
+    variant = hero.with_name("tree-of-life-hero-glowmere.glb")
+    gtm.main(["--in", str(hero), "--out", str(variant)])
+    stats = glb_stats(variant)
+    if stats["triangles"] != glb_stats(hero)["triangles"]:
+        raise SystemExit("the Glowmere variant's triangle count moved; it must not")
+    return stats
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(prog="import_tree_isle")
     ap.add_argument("--island", default="~/Desktop/Island")
@@ -364,6 +377,7 @@ def main(argv: list[str]) -> int:
     manifest_path = Path(args.manifest).resolve() if args.manifest else out_dir.parent / "treeisle.manifest.json"
 
     tree = copy_tree(tree_dir, out_dir)
+    glowmere = glowmere_tree(out_dir / "tree-of-life-hero.glb")
     island = convert_island(island_dir, out_dir)
 
     manifest = {
@@ -379,7 +393,7 @@ def main(argv: list[str]) -> int:
         "regenerate": (
             "/Applications/Blender.app/Contents/MacOS/Blender --background --python "
             "tools/import_tree_isle.py -- --island ~/Desktop/Island --tree ~/Desktop/tree_mdl/hero_pass "
-            "--out assets/treeisle"
+            "--out assets/treeisle   (it calls tools/glowmere_tree_materials.py for the tree variant)"
         ),
         "importedOn": str(date.today()),
         "assets": [
@@ -403,6 +417,30 @@ def main(argv: list[str]) -> int:
                     "docs/decisions/ADR-337."
                 ),
                 **tree,
+            },
+            {
+                "name": "tree-of-life-hero-glowmere",
+                "file": "treeisle/tree-of-life-hero-glowmere.glb",
+                "sourcePath": str(out_dir / "tree-of-life-hero.glb"),
+                "sourceFile": "tree-of-life-hero.glb",
+                "sourceFormat": "glb",
+                "importedFormat": "glb",
+                "conversion": (
+                    "tools/glowmere_tree_materials.py rewrites the GLB's seven material "
+                    "definitions to the Glowmere palette read off hero_pass/renders/Glowmere.png, "
+                    "and copies the binary chunk through unchanged -- it verifies the copy's "
+                    "SHA-256 against the hero's and refuses to write if it moved. The vertex data "
+                    "of this file is not merely equivalent to the hero's, it is the same bytes."
+                ),
+                "upAxis": "Y",
+                "note": (
+                    "The variant the scene actually loads. A `material` block on a `kind: \"gltf\"` "
+                    "node is parsed and then dropped with a warning, so a scene cannot restore a "
+                    "palette the export dropped; the only levers it has on a glTF node are "
+                    "`emissiveBoost` and `roughnessScale`, and boosting emission on leaves that "
+                    "emit nothing multiplies zero. Brief §15's 'minimum required conversion'."
+                ),
+                **glowmere,
             },
             {
                 "name": "floating-isle",

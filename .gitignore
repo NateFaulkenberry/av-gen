@@ -84,3 +84,7 @@ cmake-build-*/
 # keeps -- both provenance chains, the Unity-mask-map-to-glTF-ORM mapping, the geometry counts and
 # the one command that rebuilds all three (tools/import_tree_isle.py).
 /assets/treeisle/*.glb
+
+# Python bytecode from the tools/ scripts
+__pycache__/
+*.pyc
