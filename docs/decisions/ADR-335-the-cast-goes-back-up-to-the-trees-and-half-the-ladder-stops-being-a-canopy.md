@@ -149,9 +149,9 @@ above: at 2.23x the elder drops below four bodies.
 
 ## What the renders show, including where they are worse
 
-Nine frames, three arms, same build, same camera set, only the scene data differing. Absolute
-paths under `renders/castscale/` (gitignored); the arms are `at100` (ADR-334), `at194` (this) and
-`bodiesonly` (a diagnostic).
+Twenty-one frames at eight times across three arms, same build, same camera set, only the scene
+data differing. Under `renders/castscale/` (gitignored); the arms are `at100` (ADR-334), `at194`
+(this) and `bodiesonly` (a diagnostic).
 
 **t = 42.0 s, the clearest pair.** The director's subject is `cairn-cap`, a hero fungus, so the
 camera solution is *identical* in both arms and the two frames are directly comparable. At 1.0 the
@@ -160,9 +160,9 @@ middle distance -- are three- and four-pixel specks. At 1.94 the cow reads as a 
 reads as a standing figure, *in* the undergrowth rather than lost in it. **This is the owner's
 request, granted, and it is visible.**
 
-**t = 3.0 s, the 268 m `Valley Wide` establishing shot.** Softened, not fixed. A handful of pale
-pixels appear where there were none; the cast is still not legible from there. ADR-334's consequence
-stands and its answer is still the camera, not the cast.
+**t = 3.0 s and t = 28.0 s, the two locked `Valley Wide` shots at 268 m.** Softened, not fixed.
+A handful of pale pixels appear where there were none; the cast is still not legible from there.
+ADR-334's consequence stands and its answer is still the camera, not the cast.
 
 **t = 79.8 s, the `veil` shot.** The two frames are **byte-identical**. ADR-334 named t=42 / the
 veil as its clearest pair, and that was a claim about the mushroom against the trees: the veil's
@@ -189,9 +189,12 @@ cameras.
   `glowmere-atmospherics.scene.json` and the four projects beside them. Fingerprints refreshed.
 - `tests/unit/test_glowmere_scale.cpp`: arm 2 replaced, arm 4 widened. 876 assertions, was 801.
 - `tests/unit/test_farm_locomotion.cpp`, `test_abduction_poc.cpp` and `test_abduction_alignment.cpp`
-  needed **no change**. ADR-334's commits `c7d115b` and `d8ac4a2` had already replaced every
-  absolute metre in them with a quantity read off the cast, and those read correctly at 1.94 --
-  which is the return on having done it that way rather than editing three constants.
+  needed **not one number changed**. ADR-334's commits `c7d115b` and `d8ac4a2` had already replaced
+  every absolute metre in them with a quantity read off the cast, and those read correctly at 1.94
+  -- which is the return on having done it that way rather than editing three constants. The only
+  edit they take here is a stale ADR number: all three say ADR-330, which is the node-removal ADR.
+- **The fifth Glowmere scene is `glowmere-stylized.scene.json` and it holds none of this cast**:
+  one `wanderer` at 0.08x of `assets/imported/alien.gltf`, no farm. Confirmed rather than assumed.
 - `tools/make_abduction_scenario.py` still emits `liftHeight -6.6` and `animalGait 1.30`, the 3.6x
   defaults. ADR-334 did not update it either. It is a generator for new scenarios rather than a
   regenerator of these, so re-running it has never been part of this pass, but it will hand the
