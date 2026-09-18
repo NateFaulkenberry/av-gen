@@ -67,6 +67,21 @@ public:
     // would have got the *order* wrong: delete a shot, move a rock, press Cmd+Z, and the two stacks
     // cannot agree on which edit was last.
     app::EditSystem* edits = nullptr;
+    // **Re-cut the film, because the sections just changed.**
+    //
+    // Song Mode is cut from `seq::Sequence::sectionTimeline` (ADR-247, and `songPlanForEngine`
+    // since the film outranked the saved plan), and this panel is the only place that timeline is
+    // edited. Without this callback a person could retype eight sections, watch nothing happen, and
+    // conclude the section types were not wired to anything -- which is exactly how this was
+    // reported. The Auto-director panel has re-cut on its own settings changes since the
+    // "select Continuous shot and nothing changes" bug; this is the same rule for the other half of
+    // the director's inputs, which happen to live in a different window.
+    //
+    // The host decides whether a re-cut is warranted -- it owns the mode and knows whether the
+    // camera is directed -- so this is called on every settled section edit and may do nothing.
+    // Called only for edits that change the *film*: a type, a treatment. Not on a boundary drag,
+    // which fires every frame the pointer moves.
+    std::function<void()> onSectionsEdited;
 
     void draw(app::Engine& engine);
 
@@ -189,6 +204,12 @@ private:
 
     // Marks the sequence as edited. The bake runs at the end of the frame the edit settled in.
     void touch() { dirty_ = true; }
+    // Tells the host the section timeline changed, if anybody asked to be told.
+    void sectionsEdited() const {
+        if (onSectionsEdited) {
+            onSectionsEdited();
+        }
+    }
 
     // ---- recording an edit for the undo stack --------------------------------------------------
     //

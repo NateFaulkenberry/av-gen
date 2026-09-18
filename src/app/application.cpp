@@ -1143,6 +1143,34 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                 panel_->setStatus("camera cut to the track -- it re-cuts as you star and unstar");
             }
         };
+        // **A section edit is a director input** (ADR-247, ADR-249).
+        //
+        // Song Mode is cut from the section timeline, and the section timeline is edited in the
+        // Sequencer -- a different window from the one that holds the Enable button. So retyping a
+        // section, or changing its treatment, changed the film's script and left the film alone
+        // until somebody thought to press Enable again. Reported as "I set eight Build sections to
+        // Rapid Multi-Shot Coverage and when I change this to anything I still get the same shot",
+        // and half of that report was this: nothing had re-cut.
+        //
+        // The gate is here rather than in the panel because the two facts it needs are here. The
+        // other two director modes fold the *audio* and never read a section type, so a re-cut for
+        // them would be work with no possible effect on the picture.
+        panel_->sequence.onSectionsEdited = [this] {
+            if (engine_ == nullptr || cameraDirection_.settings.mode != DirectorMode::Song) {
+                return;
+            }
+            if (!engine_->timeline().isAutomated("camera/position")) {
+                return; // the camera is with the viewport; nothing to re-cut
+            }
+            if (auto r = directCameraFromTrack(); !r) {
+                log::warn("direct: {}", r.error().message);
+                if (panel_ != nullptr) {
+                    panel_->setStatus(r.error().message);
+                }
+            } else if (renderer_ != nullptr) {
+                renderer_->resetTemporalHistory();
+            }
+        };
         // The panel edits the Auto-director's settings in place; the host owns them so a re-cut uses
         // what the user last chose (section 9).
         panel_->autoDirector = &cameraDirection_.settings;
