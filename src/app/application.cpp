@@ -322,6 +322,14 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             if (!v) return std::unexpected(v.error());
             auto resolved = labs::resolveCaseSpec(*v, labs::repositoryRoot());
             if (!resolved) return std::unexpected(resolved.error());
+            // ADR-275. A case may be written down before the unit that makes it answerable exists.
+            // Refusing here, by name, is the point: opening the fixture anyway would show somebody
+            // a scene in which the thing they came to look at is not happening, and leave them to
+            // work out why.
+            if (!resolved->runnable()) {
+                return fail("{} case {} ({}) cannot be run yet: it is waiting on {}", resolved->lab,
+                            resolved->number, resolved->title, resolved->blockedBy);
+            }
             options.labCase = *resolved;
             ++i;
         } else if (arg == "--list-midi") {

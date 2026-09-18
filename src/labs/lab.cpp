@@ -27,19 +27,31 @@ namespace {
 //   * The LOD Lab's `decides` is `cs_cull_classify` and not `composition.cpp`'s thresholds,
 //     because the thresholds are data the shader reads and the rung is the shader's decision. The
 //     quantity it compares them against turned out to be the thing worth owning.
+//   * The Character Intelligence Lab's `decides` is `behaviors.cpp:Explore` and not any file with
+//     "decision" or "ai" in its name, because **nobody decides** (ADR-269). The only autonomous
+//     mind in this engine is hardcoded inside one 700-line behaviour class, which is why every
+//     autonomous character in Glowmere is an explorer. Naming a decision layer that does not exist
+//     would be the registry telling somebody where to go and sending them nowhere; naming `Explore`
+//     sends them to the code that is actually making the choice today, and it will be renamed when
+//     P3 extracts the goal model out of it -- at which point this test fails, which is the point.
 constexpr std::array<LabDescriptor, 15> kLabs{{
     {LabId::Animation, "animation", "Animation Lab", LabStatus::InProgress,
      "Is this pose the one the clip asked for at this time?",
      "clip sampling, blending and the joint palette a frame is skinned with",
      "where the character stands while it plays -- that is the Character Lab",
-     "src/scene/animation.cpp", "docs/engineering-labs.md", "examples/characters/alien.json", ""},
+     "src/scene/animation.cpp:updateRigs", "docs/character-animation-lab.md",
+     "examples/lab/character-animation-lab.json", ""},
 
-    {LabId::Character, "character", "Character Runtime Lab", LabStatus::InProgress,
-     "Why is this character here, facing this way, with its feet at this height?",
-     "root motion, grounding, steering and the navigation decisions behind them",
-     "what the joints do once the entity is placed -- that is the Animation Lab",
-     "src/entity/entity.cpp", "docs/engineering-labs.md",
-     "examples/characters/alien-wander.json", ""},
+    {LabId::Character, "character", "Character Intelligence Lab", LabStatus::InProgress,
+     "Why is this character here, facing this way, and why did it decide to be?",
+     "what a body knows, what it chooses, where it walks, and where its sockets are: perception, "
+     "the decision layer above the action queue, navigation and stuck-detection, and the joint a "
+     "socket resolves to",
+     "what the joints do once the entity is placed -- that is the Animation Lab; and whether the "
+     "body reached a draw call -- that is the Visibility Lab",
+     "src/entity/behaviors.cpp:Explore", "docs/character-intelligence-lab.md",
+     "examples/labs/character/character-intelligence-lab.scene.json",
+     "examples/labs/character/cases.json"},
 
     {LabId::Visibility, "visibility", "Visibility Lab", LabStatus::InProgress,
      "Why was this object not submitted?",

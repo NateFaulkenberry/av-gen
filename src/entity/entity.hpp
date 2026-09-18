@@ -253,6 +253,22 @@ struct DirectorMotion {
     bool hasSpeed = false;
 };
 
+// What answered a `socketTransform` call (ADR-274). Three outcomes, because the two that used to
+// share `true` are different facts about the frame a prop is about to be put in.
+enum class SocketResolution : std::uint8_t {
+    // This entity declares no socket of that name. `out` is untouched.
+    None,
+    // The socket resolved against the entity's own frame: no skeleton is installed, the socket
+    // named no joint, or the skeleton has no joint of that name / is not posed yet. Correct for a
+    // craft, approximate for a character, and now sayable.
+    EntityFrame,
+    // The socket resolved against a posed joint of an installed skeleton.
+    Joint,
+};
+// True when `out` was written -- the predicate the old `bool` return meant, for the callers that
+// only need to know whether there is a place to put something.
+[[nodiscard]] constexpr bool resolved(SocketResolution r) { return r != SocketResolution::None; }
+
 class Entity {
 public:
     Entity(EntityDesc desc, std::uint32_t sceneSeed);
@@ -283,8 +299,16 @@ public:
     [[nodiscard]] glm::vec3 visualPosition() const { return state_.position() + motion_.position; }
     [[nodiscard]] std::uint32_t seed() const { return seed_; }
 
-    // Where an attached prop should sit. False when this entity has no such socket.
-    [[nodiscard]] bool socketTransform(std::string_view socket, scene::Transform& out) const;
+    // Where an attached prop should sit, and -- the half that was missing -- *what answered*.
+    //
+    // ADR-274. This used to return a bare `bool`, and it returned `true` for a socket resolved
+    // against a real posed joint and `true` for one that fell back to the entity's own frame
+    // because nothing had installed an `ISkeletonQuery`. Since nothing ever did, every socket in
+    // this engine took the fallback and said it had not: a beam authored onto a hand was drawn at
+    // the body's origin and reported success (ADR-262 is what that costs). A caller that cannot
+    // tell an approximation from an answer cannot choose to refuse the approximation, which is the
+    // whole of why the return type changed rather than gaining an optional out-parameter.
+    [[nodiscard]] SocketResolution socketTransform(std::string_view socket, scene::Transform& out) const;
 
     // Installed by the animation layer; both may stay null forever (see locomotion.hpp).
     void setPoseSink(IPoseSink* sink) { pose_ = sink; }

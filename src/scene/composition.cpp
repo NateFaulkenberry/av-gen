@@ -1783,6 +1783,11 @@ void Composition::installEntities() {
         }
         animationSinks_.push_back(std::make_unique<AnimationSink>(*this, desc.driven(), *live));
         live->setPoseSink(animationSinks_.back().get());
+        // ADR-274: and the other half of the same seam. `setSkeleton` had zero call sites for as
+        // long as it existed, which is why every socket in this engine silently rode the entity's
+        // own frame. One line, and it is the line between the engine and every socket, attachment,
+        // carried prop and aim.
+        live->setSkeleton(animationSinks_.back().get());
     }
 
     fieldRoutesChecked_ = false; // the "a route cannot drive a field knob" scan runs again
@@ -1953,6 +1958,53 @@ void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& st
     // has to know. The timeline second rather than a wall clock is what keeps an offline render
     // reproducible (ADR-086).
     owner_.setNodeAnimation(node_, want, state.time, state.blend, state.playbackRate);
+}
+
+// ADR-274. The first implementation of `entity::ISkeletonQuery` this engine has had, and therefore
+// the first frame in which a socket has ever been able to mean a joint.
+//
+// **Model space, not the palette.** `SkinnedRig::palette` entry k is `model[palette[k]] *
+// inverseBind[k]` -- what the GPU multiplies a bind-pose vertex by -- and its translation is not
+// where the joint is. Reading a bone position out of it is the plausible-looking mistake ADR-260
+// warns about, and it is off by the bind pose, which for a T-posed arm is most of the arm. So this
+// re-derives the model-space matrices from `SkinnedRig::pose`, which is the local pose the player
+// produced, through the same `poseToModel` that `skinningPalette` runs before it multiplies the
+// inverse binds in.
+//
+// **Entity space, which is what model space is.** glTF bakes the file's chain from its scene root
+// into the joints, so these matrices are already in the frame the entity's own transform places --
+// and they have to be, because a rig is shared: `updateRigs` poses each rig once however many
+// bodies carry it. `Entity::socketTransform` composes the placement on.
+bool Composition::AnimationSink::jointTransform(std::string_view joint, scene::Transform& out) const {
+    const CompositionNode* node = owner_.findNode(node_);
+    if (node == nullptr || node->rigs.empty()) {
+        return false;
+    }
+    for (const RigId id : node->rigs) {
+        if (id >= owner_.scene_.rigs.size()) {
+            continue;
+        }
+        const SkinnedRig& rig = owner_.scene_.rigs[id];
+        const int index = rig.skeleton.find(joint);
+        if (index < 0) {
+            continue; // a rig that does not carry this joint is not this socket's rig
+        }
+        if (rig.pose.size() != rig.skeleton.jointCount()) {
+            // Never posed -- a rig culled since the scene was built, or one whose player has not
+            // run yet. Reporting false here is what makes `SocketResolution::EntityFrame` honest:
+            // the answer is the entity frame and it says so, rather than a rest pose nobody is in.
+            return false;
+        }
+        if (!modelValid_ || modelRig_ != id || modelVersion_ != rig.paletteVersion) {
+            poseToModel(rig.skeleton, rig.pose, model_);
+            modelRig_ = id;
+            modelVersion_ = rig.paletteVersion;
+            modelValid_ = true;
+        }
+        out = Transform::fromMatrix(model_[static_cast<std::size_t>(index)]);
+        return true;
+    }
+    return false;
 }
 
 void Composition::cullEntityNodes() {

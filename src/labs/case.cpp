@@ -80,6 +80,9 @@ json toJson(const LabCase& c) {
     if (!c.notes.empty()) {
         j["notes"] = c.notes;
     }
+    if (!c.blockedBy.empty()) {
+        j["blockedBy"] = c.blockedBy;
+    }
     return j;
 }
 
@@ -146,6 +149,9 @@ Result<LabCase> caseFromJson(const json& doc) {
     c.qualityArms = readStrings(doc, "qualityArms");
     c.aovs = readStrings(doc, "aovs");
     c.notes = doc.value("notes", std::string());
+    // ADR-275. A case may declare the unit it is waiting for; an empty string is the ordinary state
+    // and means it can be run now.
+    c.blockedBy = doc.value("blockedBy", std::string());
     return c;
 }
 

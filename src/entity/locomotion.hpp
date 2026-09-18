@@ -96,12 +96,41 @@ public:
 // Implemented by the animation layer so sockets can follow joints. Until one exists, a socket
 // resolves against the entity's own transform, which is correct for a craft and approximate for a
 // character -- approximate being the right failure for a prop that has to be somewhere.
+//
+// **The frame this answers in is the rig's model space, which is the entity's own frame, and not
+// the world** (ADR-274). The method used to be called `jointWorldTransform` and its only consumer,
+// `Entity::socketTransform`, composed the answer *onto* the entity's frame -- so the name promised
+// world space and the one use demanded entity space, and nothing implemented it, so nothing ever
+// had to choose. Three facts decide it against the name:
+//
+//   1. **A rig is shared.** `scene::Scene::rigs` is a flat list and several `scene::Entity` records
+//      may name the same `RigId` -- `scene::updateRigs` poses each rig once and picks the *nearest*
+//      entity to rate it. A posed rig therefore cannot have a world position, because it stands in
+//      as many places as there are bodies carrying it.
+//   2. **glTF says so.** `scene/skeleton.hpp`: the file's whole chain from its scene root is baked
+//      into the joints, so "the model space these matrices land in *is* the file's scene space, and
+//      the entity that carries the skin contributes only its placement in the world". The placement
+//      is the entity's, and the entity is the only thing that holds it.
+//   3. **The GPU agrees.** The skinned vertex stage multiplies the entity's own model matrix by the
+//      palette. If the palette were world-space the entity transform would be applied twice.
+//
+// So the name moved to meet the use, rather than the use moving to meet the name. The caller
+// composes: `world = entityTransform * jointTransform(joint)`.
+//
+// And the matrix to read is the **model-space** one -- `scene::poseToModel`, joint by joint -- not
+// the GPU palette, whose entry k is `model[palette[k]] * inverseBind[k]` and whose translation is
+// therefore not where the joint is (ADR-260). That mistake is what a skeleton overlay exists to
+// catch; `tests/unit/test_character_lab_sockets.cpp` measures the gap so nobody makes it silently.
 class ISkeletonQuery {
 public:
     virtual ~ISkeletonQuery() = default;
-    // False when this skeleton has no such joint; `out` is then left alone.
-    [[nodiscard]] virtual bool jointWorldTransform(std::string_view joint,
-                                                   scene::Transform& out) const = 0;
+    // The joint's transform **in the entity's own frame** (the rig's model space): the pose this
+    // rig is currently holding, including whatever the animation player last evaluated.
+    //
+    // False when this skeleton has no such joint, or has not been posed yet; `out` is then left
+    // alone, and the caller is expected to say that it fell back rather than to pretend it did not.
+    [[nodiscard]] virtual bool jointTransform(std::string_view joint,
+                                              scene::Transform& out) const = 0;
 };
 
 } // namespace avgen::entity
