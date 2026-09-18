@@ -315,6 +315,14 @@ spent **6,183 of 7,200 frames idle** there. `minRange` does not fix it, it conve
 oscillation the size of the selector's dwell. So the approaching is `interest`, whose novelty
 memory is the "resume" half.
 
+**No clip is opted into root motion, and ADR-337 is why.** P9 landed the same day and the obvious
+thing to do with a new showcase is to use it. Its own negative result says not to: `Landing`'s
+displacement is 96% vertical, `applyGrounding` *assigns* `travel.y` so a grounded body keeps none
+of it, and what is left is 0.022 m of horizontal shuffle. The clip root motion earns its keep on is
+`Dying_forward`, which travels 0.985 m across the ground — and nobody dies in this showcase, so it
+is not one of the seven clips bound. `animation.rootMotion` is absent from valley 3 for the same
+reason it is absent from valley 2, and the reason is now written down twice.
+
 **There is no IK in this engine.** The brief's fourth demonstration names it. `scene::PoseLayerKind`
 is `Aim` and `Additive`; what valley 3 has is head/eye look-at, an additive reaction masked to the
 spine, gait rate-matching and `ground`'s `slopeAlign`. Recorded as absent rather than claimed.
