@@ -78,3 +78,7 @@ add_subdirectory(quality-lab)
 # TEMPORARY (docs/character-ai-research.md, Phase 0). Delete with the file.
 add_executable(avgen_charai_probe charai_probe.cpp)
 target_link_libraries(avgen_charai_probe PRIVATE avgen_core)
+
+# TEMPORARY (ADR-273). Delete with the phase it priced.
+add_executable(avgen_seek_probe seek_probe.cpp)
+target_link_libraries(avgen_seek_probe PRIVATE avgen_core)

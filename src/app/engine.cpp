@@ -131,6 +131,31 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         // inside one session.
         static const bool noSeekDeferral = std::getenv("AVGEN_NO_SEEK_DEFERRAL") != nullptr;
         setInteractiveSeekBudget(noSeekDeferral ? 0.0 : 2.0);
+        // And the ceiling on what one seek's re-simulation may cost, in the unit it is paid in:
+        // steps x bodies (ADR-273). Live only, for the same reason -- a deterministic render wants
+        // the whole ninety seconds whatever it costs, because nobody is sitting waiting for it.
+        //
+        // **It is a cast-size ceiling, not a latency dial, and the measurement is why.** Shortening
+        // Glowmere's window does not cost a character a little accumulated history; it puts the
+        // cast somewhere else entirely. Measured, at t = 90 s on the authored scene: a 45 s window
+        // moves a body 195.4 m from where the full replay puts it, and a 22 s window 240.7 m. A
+        // faster seek that draws a different frame is not a faster seek (ADR-182), so this may not
+        // be set low enough to bite on a scene that is currently getting a correct answer.
+        //
+        // 180,000 is the whole ninety seconds for any scene with up to thirty-three bodies that
+        // need it -- Glowmere's twenty-two deep bodies cost 118,801, so it keeps its exact frame --
+        // and it shrinks from there. What it is actually for is the case ADR-267 called the
+        // blocker: two hundred and fifty autonomous characters, where one timeline click took
+        // 402 s measured here and 594 s in ADR-267, and where the alternative to a shorter window
+        // is not a better frame but an editor nobody can use.
+        //
+        // AVGEN_SEEK_BODY_STEPS overrides it (0 = no ceiling) so the before and after stay runnable
+        // out of one binary.
+        if (const char* budget = std::getenv("AVGEN_SEEK_BODY_STEPS")) {
+            seekBodyStepBudget_ = std::strtoull(budget, nullptr, 10);
+        } else {
+            seekBodyStepBudget_ = 180000;
+        }
     }
     // AVGEN_LEGACY_PROCGEN=1 restores the pre-ADR-233 double generation, in *any* mode, for one
     // purpose: so that a headless capture can be taken both ways out of the same binary and the
@@ -2493,9 +2518,13 @@ void Engine::seekSeconds(double seconds) {
         // seek has just abolished; carrying it over would cut to an event camera for an event that
         // is no longer happening.
         composition->clearCameraEventState();
-        composition->entityWorld().seek(seconds, &params_, nullptr,
-                                        composition->scene().camera.position, 1.0 / 60.0, 90.0,
-                                        composition->scene().detailLimits.entityDistanceCull);
+        // No camera position and no distance-detail flag: a seek that culled by distance was a
+        // function of where the camera happened to be, and ADR-267 measured that at 50.263 m over
+        // eight explorers at thirty seconds. What used to be saved by skipping distant bodies is
+        // bounded here instead, in the unit the cost is actually paid in (ADR-273).
+        composition->entityWorld().seek(seconds, &params_, nullptr, 1.0 / 60.0,
+                                        entity::SeekBudget{.maxSeconds = 90.0,
+                                                           .maxBodySteps = seekBodyStepBudget_});
         // Skinning has its own "a frame ago", and a seek makes that sentence false: the joints were
         // not anywhere a frame ago. Left alone, the first frame after every scrub carries joint
         // motion vectors for a jump nobody made and the character smears. Told here rather than

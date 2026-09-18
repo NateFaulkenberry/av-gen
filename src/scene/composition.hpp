@@ -208,6 +208,7 @@ struct CompositionNode {
     double animationAppliedAt = 0.0; // the timeline second the request was made (kept across rebuilds)
     bool animationPushed = false;  // cleared by a rebuild: push the same request at the same second
     bool animationRebase = false;  // ADR-089: force the phase origin, even re-entering the same state
+
     std::unique_ptr<class Composition> child;              // Scene (nested)
     params::Parameter<glm::vec3>* positionParam = nullptr;
     params::Parameter<glm::vec3>* rotationParam = nullptr; // Euler degrees
@@ -347,6 +348,14 @@ struct AimFollow {
     glm::vec3 heroAtCut{0.0f};   // where that hero stood when the shot was cut
 };
 
+
+// A 64-bit digest of a scene's texture table -- name, dimensions, format and every pixel.
+//
+// Exposed because it is the whole of the decision `Composition::rebuild` makes about
+// `Scene::textureVersion`, and a decision that cannot be tested on its own is a decision tested by
+// whatever happens to call it. tests/unit/test_composition.cpp changes one texel and requires the
+// answer to move, which is the arm that fails if this ever hashes nothing (ADR-182).
+[[nodiscard]] std::uint64_t textureTableDigest(const std::vector<TextureData>& textures);
 
 class Composition final : public SceneController, public stage::IVisualPlacement {
 public:
@@ -943,6 +952,10 @@ private:
     std::vector<std::unique_ptr<CompositionNode>> nodes_;
     bool dirty_ = true;
     std::uint64_t flattens_ = 0;
+    // The texture table as the last rebuild left it, as a digest. What makes a flatten's bump of
+    // `Scene::textureVersion` conditional on a texture having actually changed rather than on a
+    // flatten having happened (ADR-273).
+    std::uint64_t textureDigest_ = 0;
     bool legacyProceduralGeneration_ = false;
     glm::vec3 center_{0.0f};
     float radius_ = 1.0f;

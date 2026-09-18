@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <cstring>
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -34,6 +35,55 @@ constexpr std::string_view kEcologyLightPrefix = "ecology.glow.";
 constexpr std::size_t kMaxEcologyLights = 224;
 constexpr int kMaxTerrainLodIndex = world::kMaxTerrainLods - 1;
 } // namespace
+
+// A 64-bit digest of the scene's texture table: name, dimensions, format and every pixel.
+//
+// What it is for. `Scene::textureVersion` is the renderer's "re-upload everything" signal, and a
+// flatten used to bump it unconditionally -- so every structural edit re-uploaded the whole table
+// whether or not a single texel had changed. Measured on Glowmere: 528 uploads over 12 flattens for
+// starring a hero and 704 over 16 for a brush edit, which is 44 a flatten in both, because the
+// count is a property of *any* flatten and not of what the edit was. Neither of those edits touches
+// a texture.
+//
+// Word-wise rather than the byte-at-a-time FNV-1a the rest of this file hashes structure with. The
+// structure hashes run over a few hundred floats; this runs over megabytes of pixels, and a digest
+// that costs more than the upload it is avoiding is not a saving. The metadata still goes in, so
+// two different images that happen to share a pixel buffer length are not confused for each other.
+//
+// A 64-bit digest can in principle collide, and a collision here is a stale texture on the GPU. The
+// alternative -- keeping the previous table alive and comparing it byte for byte -- doubles the
+// resident texture memory of every flatten to remove a probability of about 2^-64 per edit, which
+// is the wrong trade. tests/unit/test_composition.cpp changes one texel and requires the version to
+// move, which is the arm that would fail if this were hashing nothing (ADR-182).
+std::uint64_t textureTableDigest(const std::vector<TextureData>& textures) {
+    std::uint64_t h = 0xcbf29ce484222325ULL;
+    const auto mix = [&h](std::uint64_t v) {
+        h ^= v;
+        h *= 0x9e3779b97f4a7c15ULL;
+        h = (h << 31) | (h >> 33);
+    };
+    mix(textures.size());
+    for (const TextureData& texture : textures) {
+        mix(texture.width);
+        mix(texture.height);
+        mix(static_cast<std::uint64_t>(texture.format));
+        mix(texture.data.size());
+        for (const char c : texture.name) {
+            mix(static_cast<std::uint8_t>(c));
+        }
+        const std::size_t words = texture.data.size() / 8;
+        const std::uint8_t* bytes = texture.data.data();
+        for (std::size_t i = 0; i < words; ++i) {
+            std::uint64_t word = 0;
+            std::memcpy(&word, bytes + i * 8, 8);
+            mix(word);
+        }
+        for (std::size_t i = words * 8; i < texture.data.size(); ++i) {
+            mix(bytes[i]);
+        }
+    }
+    return h;
+}
 
 namespace {
 
@@ -3176,6 +3226,9 @@ void Composition::ensureBuilt() {
 
 void Composition::rebuild() {
     ++flattens_;
+    // Captured before anything clears the table, because `Scene::addTexture` moves the counter on
+    // its own and the decision below is about the whole of this rebuild, not about the last writer.
+    const std::uint64_t textureVersionBefore = scene_.textureVersion;
     // A flatten is the single most expensive thing the editor does on the main thread, it is
     // triggered by structural edits an artist makes constantly, and until ADR-092 nothing said what
     // it cost. One line per rebuild, so "why did that stutter" has an answer in the log of the run
@@ -4316,7 +4369,28 @@ void Composition::rebuild() {
     }
 
     ++scene_.meshVersion;
-    ++scene_.textureVersion;
+    // And the textures, **only if a texture actually changed**. This used to be unconditional, and
+    // it is the renderer's signal to destroy and re-create every GPU texture in the scene: 44 of
+    // them per flatten on Glowmere, for edits -- starring a hero, moving a brush -- that do not
+    // touch an image. The table above is rebuilt from the same cached assets every time, so the
+    // usual answer is that nothing changed and the digests agree.
+    //
+    // Restored rather than left alone when they do agree: `Scene::addTexture` bumps the version
+    // itself, and this function calls it for the environment map and for imported materials, so a
+    // rebuild that re-adds the same images has already moved the counter by the time we get here.
+    // Putting it back is what makes "no texture changed" mean "no re-upload" rather than "one fewer
+    // re-upload than before".
+    const auto textureDigestStart = std::chrono::steady_clock::now();
+    const std::uint64_t textureDigest = textureTableDigest(scene_.textures);
+    const double textureDigestMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - textureDigestStart)
+            .count();
+    if (textureDigest == textureDigest_ && flattens_ > 1) {
+        scene_.textureVersion = textureVersionBefore;
+    } else {
+        scene_.textureVersion = textureVersionBefore + 1;
+    }
+    textureDigest_ = textureDigest;
     // The procedural vector has just been rebuilt from the node list, so every index into it is
     // new. Costs measured against the old one describe objects that no longer exist.
     proceduralRebuild_.clear();
@@ -4335,11 +4409,15 @@ void Composition::rebuild() {
     if (!entityWorld_.empty()) {
         entityWorld_.setNavigator(buildNavigator());
     }
-    log::info("composition '{}': flattened {} node(s) -> {} entities, {} meshes, {} procedurals in {:.1f} ms",
+    log::info("composition '{}': flattened {} node(s) -> {} entities, {} meshes, {} procedurals in {:.1f} ms"
+              " ({} texture(s), digest {:.2f} ms, {})",
               name_, nodes_.size(), scene_.entities.size(), scene_.meshes.size(),
               scene_.procedurals.size(),
               std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - rebuildStart)
-                  .count());
+                  .count(),
+              scene_.textures.size(), textureDigestMs,
+              scene_.textureVersion == textureVersionBefore ? "unchanged, no re-upload"
+                                                            : "changed, re-uploading");
     // A material program that nothing carries is skipped silently and the surface keeps its authored
     // material, which is indistinguishable from a program that ran and did nothing. Said out loud
     // once per rebuild (ADR-176's dangling-name rule): it costs a string compare per material and it

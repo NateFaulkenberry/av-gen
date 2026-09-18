@@ -763,6 +763,9 @@ private:
     bool seekPending_ = false;
     bool seekGestureHeld_ = false;
     double interactiveSeekBudgetMs_ = 0.0;
+    // The ceiling on one seek's re-simulation, in body-steps (`entity::SeekBudget`). 0 = none,
+    // which is what every non-live mode keeps.
+    std::uint64_t seekBodyStepBudget_ = 0;
     scene::RebuildDeferral seekDeferral_;
     // What the audio player was last told to do, so the engine can tell whether the device needs
     // starting, stopping or seeking this frame without asking it every frame.
