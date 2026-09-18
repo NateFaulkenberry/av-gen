@@ -96,6 +96,9 @@ TEST_CASE("The showcase scene names only relative, in-repository assets", "[tree
     REQUIRE(scene.contains("nodes"));
 
     int assetNodes = 0;
+    std::vector<std::string> missing;
+    int presentCount = 0;
+    int missingCount = 0;
     for (const json& node : scene.at("nodes")) {
         if (!node.contains("asset")) {
             continue;
@@ -112,11 +115,36 @@ TEST_CASE("The showcase scene names only relative, in-repository assets", "[tree
         const fs::path resolved = (dir / kSceneRel).parent_path() / asset;
         // The GLBs are gitignored for their 194 MB (assets/treeisle.manifest.json says how to
         // rebuild them), so their absence is a worktree state and not a fault. Their *path* being
-        // wrong is a fault, and that is what is checked when they are present.
-        if (fs::exists(resolved.parent_path())) {
-            INFO("resolved " << resolved.string());
-            CHECK(fs::exists(resolved));
+        // wrong is a fault.
+        //
+        // This was `if (fs::exists(resolved.parent_path()))` -- the directory standing in for "the
+        // assets were generated here". That proxy fails on a *partial* set, which is exactly what
+        // `tools/link-worktree-assets.sh` leaves behind: it links the gitignored files main had at
+        // the moment it ran, so a worktree cut before main gained the ADR-339 layers has the
+        // directory and only some of the files. Two agents hit it, and it cannot pass in CI.
+        //
+        // The rule that distinguishes the two cases: if *none* of them resolve, this is a worktree
+        // without generated assets and there is nothing to check. If *some* resolve and others do
+        // not, a path is wrong -- a set that is half-present is not a worktree state.
+        if (fs::exists(resolved)) {
+            ++presentCount;
+        } else {
+            ++missingCount;
+            missing.push_back(resolved.string());
         }
+    }
+    {
+        INFO(presentCount << " of " << (presentCount + missingCount) << " asset(s) resolve");
+        for (const std::string& m : missing) {
+            UNSCOPED_INFO("missing: " << m);
+        }
+        if (presentCount == 0) {
+            UNSCOPED_INFO("no treeisle GLB resolves -- regenerate with the command in "
+                          "assets/treeisle.manifest.json, or ignore on a worktree that never had them");
+        }
+        // Falsifiable either way: a wrong path in a populated worktree fails here, and so does a
+        // scene that names six assets of which five were generated.
+        CHECK((presentCount == 0 || missingCount == 0));
     }
     // The island, plus the tree's five Glowmere emission layers (ADR-339), and nothing else
     // reaches outside the repo.
