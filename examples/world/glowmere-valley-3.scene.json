@@ -7281,6 +7281,8 @@
      "memorySeconds": 9.0,
      "memoryCapacity": 16.0,
      "visitedCapacity": 6.0,
+     "stallSeconds": 12.0,
+     "stallDistance": 1.5,
      "considerers": [
       {
        "kind": "interest",
@@ -7301,6 +7303,14 @@
        "maxRange": 150.0,
        "noveltyRadius": 26.0,
        "noveltyPenalty": 0.1
+      },
+      {
+       "kind": "holdPost",
+       "name": "range",
+       "weight": 0.12,
+       "post": "",
+       "tolerance": 26.0,
+       "pull": 0.5
       },
       {
        "kind": "idle",
@@ -7324,7 +7334,7 @@
     {
      "kind": "ground",
      "slopeAlign": 0.5,
-     "footprint": 1.6
+     "bodyRadius": 0.9
     }
    ],
    "perception": {
@@ -7369,6 +7379,8 @@
      "memorySeconds": 9.0,
      "memoryCapacity": 16.0,
      "visitedCapacity": 6.0,
+     "stallSeconds": 12.0,
+     "stallDistance": 1.5,
      "considerers": [
       {
        "kind": "route",
@@ -7378,7 +7390,7 @@
        "fordPenalty": 0.0,
        "detourPenalty": 40.0,
        "falloff": 90.0,
-       "goalTolerance": 3.0,
+       "goalTolerance": 6.0,
        "destinations": [
         {
          "name": "east-bank",
@@ -7430,7 +7442,7 @@
     {
      "kind": "ground",
      "slopeAlign": 0.5,
-     "footprint": 1.6
+     "bodyRadius": 0.9
     }
    ],
    "perception": {
@@ -7475,6 +7487,8 @@
      "memorySeconds": 9.0,
      "memoryCapacity": 16.0,
      "visitedCapacity": 6.0,
+     "stallSeconds": 12.0,
+     "stallDistance": 1.5,
      "considerers": [
       {
        "kind": "route",
@@ -7484,7 +7498,7 @@
        "fordPenalty": 0.0,
        "detourPenalty": 40.0,
        "falloff": 90.0,
-       "goalTolerance": 3.0,
+       "goalTolerance": 6.0,
        "destinations": [
         {
          "name": "east-bank",
@@ -7536,7 +7550,7 @@
     {
      "kind": "ground",
      "slopeAlign": 0.5,
-     "footprint": 1.6
+     "bodyRadius": 0.9
     }
    ],
    "perception": {
@@ -7581,6 +7595,8 @@
      "memorySeconds": 9.0,
      "memoryCapacity": 16.0,
      "visitedCapacity": 6.0,
+     "stallSeconds": 12.0,
+     "stallDistance": 1.5,
      "considerers": [
       {
        "kind": "holdPost",
@@ -7632,7 +7648,7 @@
     {
      "kind": "ground",
      "slopeAlign": 0.5,
-     "footprint": 1.6
+     "bodyRadius": 0.9
     }
    ],
    "perception": {
@@ -7677,6 +7693,8 @@
      "memorySeconds": 9.0,
      "memoryCapacity": 16.0,
      "visitedCapacity": 6.0,
+     "stallSeconds": 12.0,
+     "stallDistance": 1.5,
      "considerers": [
       {
        "kind": "interest",
@@ -7697,6 +7715,14 @@
        "maxRange": 130.0,
        "noveltyRadius": 20.0,
        "noveltyPenalty": 0.14
+      },
+      {
+       "kind": "holdPost",
+       "name": "range",
+       "weight": 0.09,
+       "post": "",
+       "tolerance": 40.0,
+       "pull": 0.28
       },
       {
        "kind": "idle",
@@ -7720,7 +7746,7 @@
     {
      "kind": "ground",
      "slopeAlign": 0.5,
-     "footprint": 1.6
+     "bodyRadius": 0.9
     }
    ],
    "perception": {
@@ -7835,55 +7861,55 @@
   ],
   "shots": [
    {
-    "camera": 5,
-    "start": 0.0,
-    "end": 40.0,
-    "transition": "cut",
-    "locked": true,
-    "label": "character awareness: the watcher crosses to the elder"
-   },
-   {
     "camera": 3,
-    "start": 40.0,
-    "end": 95.0,
+    "start": 0.0,
+    "end": 58.0,
     "transition": "cut",
     "locked": true,
     "label": "navigation: one wades the backwater, one walks round it"
    },
    {
+    "camera": 5,
+    "start": 58.0,
+    "end": 96.0,
+    "transition": "cut",
+    "locked": true,
+    "label": "character awareness: the watcher attends to the elder"
+   },
+   {
     "camera": 2,
-    "start": 95.0,
-    "end": 140.0,
+    "start": 96.0,
+    "end": 142.0,
     "transition": "cut",
     "locked": true,
     "label": "environmental awareness: the scout works the west floodplain"
    },
    {
     "camera": 4,
-    "start": 140.0,
-    "end": 175.0,
+    "start": 142.0,
+    "end": 172.0,
     "transition": "cut",
     "locked": true,
     "label": "the ford"
    },
    {
     "camera": 6,
-    "start": 175.0,
-    "end": 195.0,
+    "start": 172.0,
+    "end": 196.0,
     "transition": "cut",
     "locked": true,
     "label": "the wooded west wall"
    },
    {
     "camera": 1,
-    "start": 195.0,
+    "start": 196.0,
     "end": 230.0,
     "transition": "cut",
     "locked": true,
     "label": "the director, on whatever it finds"
    }
   ],
-  "default": 5,
+  "default": 3,
   "nextId": 7
  }
 }

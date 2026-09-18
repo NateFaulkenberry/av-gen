@@ -126,6 +126,12 @@ std::uint64_t decideTick(double time, float hertz, std::uint32_t seed) {
 
 // ---- the selector ------------------------------------------------------------------------------
 
+void Selector::forget() {
+    current_.clear();
+    chosen_ = kNone;
+    started_ = false;
+}
+
 void Selector::reset() {
     options_.clear();
     current_.clear();

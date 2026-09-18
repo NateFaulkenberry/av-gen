@@ -547,6 +547,42 @@ def perception(range_m, capacity=14, hertz=4.0, fov=200.0, proximity=6.0):
                ("capacity", capacity), ("hertz", hertz), ("occlusionTestsPerSecond", 0.0)])
 
 
+def territory(weight, tolerance, pull):
+    """A home, and the thing that breaks a stall.
+
+    **The stall, measured.** `Selector::select` returns true -- and the queue is handed new
+    actions -- only when the committed option *changes*. `Decide::remember` is likewise called
+    only on a change: the comment above it says so and gives the reason (recording the
+    destination on departure devalues the errand you just set out on, and cost a fixture 0.00 m
+    in 75 s). Both are right on their own and together they close a loop:
+
+        a body whose committed goal has become unreachable stops moving
+        -> its position stops changing, so every option's score stops changing
+        -> the same option keeps winning, so `select` returns false
+        -> no new actions are pushed and nothing is remembered
+        -> the body never moves again.
+
+    Measured on the first cut of this file, over 180 s: the scout committed to `glow@-41,-5` at
+    t = 78 s with a score of 1.338, and that score was **1.338 at every ten-second sample from
+    t = 80 to t = 180** while the body stood at (-27, -33), 31 m short of it. Four of the five
+    bodies had stopped by t = 90.
+
+    `holdPost`'s score is `weight x (1 + pull x metres beyond tolerance)`, which is the one stock
+    score that **rises as the body stays away from somewhere**. So a body that has stalled far
+    from home eventually has this beat the frozen option, changes its mind, is handed new actions
+    and remembers where it had been -- and the loop is open again.
+
+    This is a mitigation in data and it is not a fix. The fix is a stall term in the selector, and
+    ADR-338 records it as a revisit trigger rather than pretending a territory is one.
+
+    It is also, on its own terms, the right thing for these two characters: an explorer with no
+    home walks off the map, and `GoalTaste::homeRadius` cannot express the pull back because it
+    only filters candidates.
+    """
+    return OD([("kind", "holdPost"), ("name", "range"), ("weight", weight),
+               ("post", ""), ("tolerance", tolerance), ("pull", pull)])
+
+
 def considerers_for(name):
     """Every character's taste, in one place, so the five can be read against one another.
 
@@ -593,6 +629,9 @@ def considerers_for(name):
                 ("activity", "observe"), ("approach", 8.0), ("dwell", 5.0),
                 ("minRange", 12.0), ("maxRange", 150.0),
                 ("noveltyRadius", 26.0), ("noveltyPenalty", 0.10)]),
+            # Beats the best roam option (about 1.6) at roughly 55 m from the hollow, so the scout
+            # ranges freely over the west floodplain and is pulled back from the valley walls.
+            territory(0.12, 26.0, 0.50),
             idle_considerer(),
         ]
     if name in ("wader", "drylander"):
@@ -613,7 +652,7 @@ def considerers_for(name):
             OD([("kind", "route"), ("name", "cross"), ("weight", 1.0),
                 ("wadePenalty", wade),
                 ("fordPenalty", 0.0), ("detourPenalty", 40.0),
-                ("falloff", 90.0), ("goalTolerance", 3.0),
+                ("falloff", 90.0), ("goalTolerance", 6.0),
                 ("destinations", [OD([("name", "east-bank"), ("point", FAR_SIDE)])])]),
             # A second errand, so that "cross the river" is a thing it chose over something else
             # rather than the only line in the overlay. Weighted below the route on purpose: the
@@ -664,6 +703,8 @@ def considerers_for(name):
                 ("activity", "observe"), ("approach", 7.0), ("dwell", 8.0),
                 ("minRange", 11.0), ("maxRange", 130.0),
                 ("noveltyRadius", 20.0), ("noveltyPenalty", 0.14)]),
+            # A wider range than the scout's: this one is meant to cross the valley after a body.
+            territory(0.09, 40.0, 0.28),
             idle_considerer(),
         ]
     raise KeyError(name)
@@ -728,6 +769,12 @@ for (name, asset, x, gy, z, seed, walk, run, turn) in CAST_SITES:
                 # anything, and how many places it remembers having been. Both bounded, both
                 # rebuilt by a replay.
                 ("memorySeconds", 9.0), ("memoryCapacity", 16.0), ("visitedCapacity", 6.0),
+                # ADR-338's stall breaker, opted into here and nowhere else in the repository.
+                # A body that has not moved 1.5 m in 12 s remembers where its plan was taking it
+                # and drops the commitment, so `goalWeight` discounts the errand that is not
+                # working and something else wins. Twelve seconds is longer than any `dwell` in
+                # this file (8 s, the watcher's), so attending to something is not a stall.
+                ("stallSeconds", 12.0), ("stallDistance", 1.5),
                 ("considerers", considerers_for(name))]),
             # Look-at publishes the target the `look` pose layer aims at. It is what turns
             # "standing near a mushroom" into "looking at a mushroom".
@@ -739,7 +786,12 @@ for (name, asset, x, gy, z, seed, walk, run, turn) in CAST_SITES:
             # Last, so the terrain has the final word on height and tilt. ADR-337 §5: grounding
             # *assigns* `travel.y`, so anything that wrote a vertical before this is overwritten,
             # which is correct and is why no clip here is opted into root motion.
-            OD([("kind", "ground"), ("slopeAlign", 0.5), ("footprint", 1.6)]),
+            # `bodyRadius` is what puts this character into the crowd field. 0.9 m for a body
+            # 1.94 x 1.7 m tall and about 0.9 m across the shoulders at that scale, so two of
+            # them stand 1.8 m apart. `footprint` is deliberately *not* here: `Ground` does not
+            # read it and never has -- valley 2 and two lab fixtures carry it and it does
+            # nothing, which is the same class of dead key as `lodCount` above.
+            OD([("kind", "ground"), ("slopeAlign", 0.5), ("bodyRadius", 0.9)]),
         ]),
         ("perception", PERCEPTION[name]),
     ]))
@@ -819,12 +871,19 @@ CAMERAS = [
 ]
 SHOTS = [
     # camera, start, end, label
-    (5, 0.0, 40.0, "character awareness: the watcher crosses to the elder"),
-    (3, 40.0, 95.0, "navigation: one wades the backwater, one walks round it"),
-    (2, 95.0, 140.0, "environmental awareness: the scout works the west floodplain"),
-    (4, 140.0, 175.0, "the ford"),
-    (6, 175.0, 195.0, "the wooded west wall"),
-    (1, 195.0, 230.0, "the director, on whatever it finds"),
+    #
+    # The two route-takers diverge in the first ten seconds and the wader is across the backwater
+    # by about forty, so the crossing goes first. The watcher reaches the elder at about
+    # twenty-five seconds and dwells eight, so `The Grove` at 58 s is the observation rather than
+    # the approach -- which is why the deliverable still of the approach is taken with the camera
+    # overridden rather than off this list. One fixed cut cannot be in two places at once, and
+    # saying so is cheaper than pretending the cast waits its turn.
+    (3, 0.0, 58.0, "navigation: one wades the backwater, one walks round it"),
+    (5, 58.0, 96.0, "character awareness: the watcher attends to the elder"),
+    (2, 96.0, 142.0, "environmental awareness: the scout works the west floodplain"),
+    (4, 142.0, 172.0, "the ford"),
+    (6, 172.0, 196.0, "the wooded west wall"),
+    (1, 196.0, 230.0, "the director, on whatever it finds"),
 ]
 
 cameras = []
@@ -846,7 +905,7 @@ d["cameraDirection"] = OD([
     ("cameras", cameras),
     ("shots", [OD([("camera", c), ("start", s), ("end", e), ("transition", "cut"),
                    ("locked", True), ("label", label)]) for c, s, e, label in SHOTS]),
-    ("default", 5),
+    ("default", 3),
     ("nextId", len(CAMERAS) + 1),
 ])
 # The scene's own camera is shot 1's, so a bare `Composition::loadFile` with no project opens on

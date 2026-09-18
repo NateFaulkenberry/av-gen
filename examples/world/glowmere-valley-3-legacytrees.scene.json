@@ -7546,55 +7546,55 @@
   ],
   "shots": [
    {
-    "camera": 5,
-    "start": 0.0,
-    "end": 40.0,
-    "transition": "cut",
-    "locked": true,
-    "label": "character awareness: the watcher crosses to the elder"
-   },
-   {
     "camera": 3,
-    "start": 40.0,
-    "end": 95.0,
+    "start": 0.0,
+    "end": 58.0,
     "transition": "cut",
     "locked": true,
     "label": "navigation: one wades the backwater, one walks round it"
    },
    {
+    "camera": 5,
+    "start": 58.0,
+    "end": 96.0,
+    "transition": "cut",
+    "locked": true,
+    "label": "character awareness: the watcher attends to the elder"
+   },
+   {
     "camera": 2,
-    "start": 95.0,
-    "end": 140.0,
+    "start": 96.0,
+    "end": 142.0,
     "transition": "cut",
     "locked": true,
     "label": "environmental awareness: the scout works the west floodplain"
    },
    {
     "camera": 4,
-    "start": 140.0,
-    "end": 175.0,
+    "start": 142.0,
+    "end": 172.0,
     "transition": "cut",
     "locked": true,
     "label": "the ford"
    },
    {
     "camera": 6,
-    "start": 175.0,
-    "end": 195.0,
+    "start": 172.0,
+    "end": 196.0,
     "transition": "cut",
     "locked": true,
     "label": "the wooded west wall"
    },
    {
     "camera": 1,
-    "start": 195.0,
+    "start": 196.0,
     "end": 230.0,
     "transition": "cut",
     "locked": true,
     "label": "the director, on whatever it finds"
    }
   ],
-  "default": 5,
+  "default": 3,
   "nextId": 7
  }
 }

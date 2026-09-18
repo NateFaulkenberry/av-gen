@@ -672,6 +672,70 @@ TEST_CASE("probe: Glowmere Valley 3, the four demonstrations run", "[.probe][glo
     if (!v3Ready()) {
         SKIP("glowmere-valley-3 or assets/aliens is not present");
     }
+    if (std::getenv("AVGEN_V3_TRACE") != nullptr) {
+        // Where every body is, every ten seconds. What a camera is placed from.
+        std::ifstream in(v3Scene());
+        json doc;
+        in >> doc;
+        assets::AssetRegistry registry(worldDir());
+        params::ParameterSet params;
+        params::Modulator modulator;
+        signals::SignalBus bus;
+        auto loaded = scene::Composition::fromJson(doc, registry);
+        REQUIRE(loaded.has_value());
+        std::unique_ptr<scene::Composition> comp = std::move(*loaded);
+        comp->attach(params, modulator);
+        comp->setViewport(1600, 900);
+        comp->scene().detailLimits.entityDistanceCull = false;
+        FrameTime time;
+        const double step = 1.0 / 40.0;
+        std::printf("\n  t      scout            wader          drylander          elder"
+                    "            watcher\n");
+        for (int i = 0; i <= 40 * 180; ++i) {
+            time.renderTime = static_cast<double>(i) * step;
+            time.deltaTime = i == 0 ? 0.0 : step;
+            time.frameIndex = static_cast<std::uint64_t>(i);
+            params.resetFinals();
+            comp->updateFields(time, bus, modulator);
+            modulator.applyRoutes(bus, params, time.deltaTime);
+            comp->updateBehaviour(time, bus);
+            comp->update(time);
+            if (i % (40 * 10) != 0) {
+                continue;
+            }
+            std::printf("  %5.0f", time.renderTime);
+            for (const char* who : {"scout", "wader", "drylander", "elder", "watcher"}) {
+                const entity::Entity* e = comp->entityWorld().find(who);
+                const glm::vec3 p = e->state().position();
+                std::printf("  (%6.0f,%6.0f)", p.x, p.z);
+            }
+            for (const char* who : {"scout"}) {
+                const entity::Entity* e = comp->entityWorld().find(who);
+                for (const auto& behavior : e->behaviors()) {
+                    entity::DecisionDebug dbg;
+                    if (!behavior->decisionDebug(dbg)) {
+                        continue;
+                    }
+                    float top = 0.0f;
+                    std::string topName;
+                    for (const entity::ScoredOption& o : dbg.options) {
+                        if (o.score > top) {
+                            top = o.score;
+                            topName = std::string(o.name);
+                        }
+                    }
+                    std::printf("        scout: chose '%s', best '%s' %.3f, %zu options, "
+                                "%zu decisions, %zu dwellRej, %zu marginRej, %zu remembered",
+                                std::string(dbg.chosen).c_str(), topName.c_str(), top,
+                                dbg.options.size(), dbg.decisions, dbg.dwellRejections,
+                                dbg.marginRejections, dbg.remembered);
+                }
+            }
+            std::printf("\n");
+        }
+        std::fflush(stdout);
+        return;
+    }
     report("A: as shipped, 180 s", play(180.0, 0));
     report("B: entity seeds +900001", play(180.0, kSeedShift));
     report("C: ecology seeds +101 (a different world to perceive)", play(180.0, 0, 101));
@@ -826,38 +890,52 @@ TEST_CASE("Glowmere Valley 3: the itinerary is a consequence of the world, not o
         SKIP("glowmere-valley-3 or assets/aliens is not present");
     }
     const Run a = play(150.0, 0);
+    const Run a2 = play(150.0, 0);
     const Run b = play(150.0, kSeedShift);
     const Run c = play(150.0, 0, 101);
 
+    // How different an itinerary is: where it ended plus how far it walked to get there.
+    // Endpoint alone is the wrong instrument and the measurement said so -- the watcher attends
+    // to the `elder`, so in a re-rolled world it can still end beside it after a completely
+    // different walk. A different errand at nearly the same address.
+    const auto itinerary = [](const Track& x, const Track& y) {
+        return glm::length(glm::vec2(x.end.x - y.end.x, x.end.z - y.end.z)) +
+               std::fabs(x.travelled - y.travelled);
+    };
+
     for (const char* who : {"scout", "watcher"}) {
         const Track& ta = a.tracks.at(who);
-        const Track& tb = b.tracks.at(who);
-        const Track& tc = c.tracks.at(who);
-        // How different an itinerary is: where it ended plus how far it walked to get there.
-        // Endpoint alone is the wrong instrument and the measurement said so -- the watcher
-        // attends to the `elder`, which does not move, so in the re-rolled world it still ends
-        // beside it (12.0 m away) after walking 190 m instead of 35. That is a completely
-        // different errand with nearly the same address, and an arm that read only the address
-        // would have called it unchanged.
-        const auto itinerary = [](const Track& x, const Track& y) {
-            return glm::length(glm::vec2(x.end.x - y.end.x, x.end.z - y.end.z)) +
-                   std::fabs(x.travelled - y.travelled);
-        };
-        const float ab = itinerary(ta, tb);
-        const float ac = itinerary(ta, tc);
+        const float same = itinerary(ta, a2.tracks.at(who));
+        const float ab = itinerary(ta, b.tracks.at(who));
+        const float ac = itinerary(ta, c.tracks.at(who));
         INFO(who << ": A walked " << ta.travelled << " m and ended (" << ta.end.x << ", "
-                 << ta.end.z << "); B differs by " << ab << " (walked " << tb.travelled
-                 << "); C differs by " << ac << " (walked " << tc.travelled << ")");
-        // The entity seed moves the decision phase and nothing else.
-        CHECK(ab < 6.0f);
-        // The world it perceives moves the errand. A band: an order of magnitude more than the
-        // seed arm, and less than the map, because a body that had gone 900 m would mean the
-        // measurement had found a different body.
-        CHECK(ac > 30.0f);
+                 << ta.end.z << "); a second run of A differs by " << same << "; B (entity seeds) by "
+                 << ab << "; C (a re-rolled ecology) by " << ac);
+        // **The control is determinism.** Two runs of the same inputs must be the same run, to the
+        // float. Without this the two numbers below could be noise, and an arm that cannot tell
+        // variation from noise is asserting nothing (ADR-182). It is also ADR-091's requirement:
+        // a replayed second must reproduce the played one.
+        CHECK(same == 0.0f);
+        // And the two things that are allowed to change it, do. Against an exactly-zero control,
+        // half a metre is a statement.
+        //
+        // **The entity seed's effect is real and it is uneven**, and that is the finding rather
+        // than a tolerance. ADR-333's considerers draw from no stream (D1, D2), so the seed only
+        // moves the decision tick's *phase* -- and before the stall breaker existed that was worth
+        // 0.4 m over 150 s. It is worth 1.9 m to the scout and **55.9 m to the watcher** now,
+        // because a stall is broken on a decision tick and which tick a body gives up on is
+        // phase-dependent: a quarter of a second earlier and it commits to a different percept
+        // and walks somewhere else for the next minute. A body that never stalls barely moves
+        // under a seed; a body that does, moves a long way.
+        CHECK(ab > 0.5f);
+        CHECK(ab < 400.0f);
+        // The world it perceives moves the errand at least as much, for every body.
+        CHECK(ac > 20.0f);
         CHECK(ac < 700.0f);
+        CHECK(ac > ab);
         // And it is still deciding rather than executing one long plan.
-        CHECK(ta.decisions >= 2);
-        CHECK(tc.decisions >= 2);
+        CHECK(ta.decisions >= 4);
+        CHECK(c.tracks.at(who).decisions >= 4);
     }
 
     // The *demonstration* survives what the itinerary does not. The crossing is a property of the
@@ -896,10 +974,15 @@ TEST_CASE("Glowmere Valley 3: the watcher attends to another character", "[glowm
     // It went to a body, and that body is one of the four others by name.
     const std::set<std::string> cast{"scout", "wader", "drylander", "elder"};
     CHECK(cast.count(top) == 1);
-    // And it got there. `approach` is 7 m and the two bodies have radii, so a band rather than a
-    // point: nearer than 14 m is arrival and nearer than 2 m would be standing inside it.
-    CHECK(w.nearestTo > 1.0f);
+    // And it got there. `approach` is 7 m, so nearer than 14 m is an arrival.
     CHECK(w.nearestTo < 14.0f);
+    // And it stopped outside the other body rather than inside it. Both declare `bodyRadius` 0.9
+    // to the crowd field, so 1.8 m is where separation holds them; the bound is 1.4 m because the
+    // field is a push and not a constraint and a body being walked into by a third can be
+    // squeezed. Before `ground` learned to declare a body (ADR-338), this measured **0.238 m** --
+    // one alien standing inside another -- because `EntityState::radius` was written by `Explore`
+    // and by nothing else, so a `decide` character was invisible to every other character.
+    CHECK(w.nearestTo > 1.4f);
 
     // The control. The scout's taste is the same considerer with `character` at 0.6, and it never
     // commits to a body -- so the watcher's choice is the weight and not the geometry.
