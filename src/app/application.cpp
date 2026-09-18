@@ -906,7 +906,14 @@ void Application::saveSettings() {
         settings_.preview = panel_->preview;
         // ADR-320/ADR-225. Same shape and same reason as the two above: the Render panel writes
         // this bool through directly, so it is read back here rather than hooked at the widget.
-        settings_.renderFramePreview = panel_->renderPreview.enabled;
+        //
+        // Not written back when `--render-preview` forced it on. A flag owns the session it was
+        // given and nothing beyond it: a capture or a benchmark arm that leaves the machine's
+        // remembered state different from how it found it is a measurement that changes its own
+        // conditions, and the next person's editor opens with an instrument they did not ask for.
+        if (!options_.renderPreview) {
+            settings_.renderFramePreview = panel_->renderPreview.enabled;
+        }
     }
     if (auto r = settings_.save(settingsPath_); !r) {
         log::warn("settings: {}", r.error().message);
@@ -3435,7 +3442,8 @@ int Application::runLive() {
         // so there is no hook to set a dirty bit in and the honest thing is to compare.
         if (panel_ != nullptr && !settingsPath_.empty()) {
             const bool moved = !(panel_->preview == settings_.preview) ||
-                               panel_->renderPreview.enabled != settings_.renderFramePreview;
+                               (!options_.renderPreview &&
+                                panel_->renderPreview.enabled != settings_.renderFramePreview);
             const double now = ImGui::GetTime();
             if (moved && now - lastPreviewSave_ > 2.0) {
                 lastPreviewSave_ = now;
