@@ -74,3 +74,7 @@ target_link_libraries(avgen_bench_flatten PRIVATE avgen_core)
 
 # The Quality Lab (ADR-250): a measurement instrument for the renderer, kept out of the engine.
 add_subdirectory(quality-lab)
+
+# TEMPORARY (docs/character-ai-research.md, Phase 0). Delete with the file.
+add_executable(avgen_charai_probe charai_probe.cpp)
+target_link_libraries(avgen_charai_probe PRIVATE avgen_core)
