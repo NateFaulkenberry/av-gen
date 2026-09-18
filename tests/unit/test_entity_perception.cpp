@@ -657,3 +657,38 @@ TEST_CASE("what the cadence costs a replay", "[entity][perception]") {
     CHECK(fastTicks > slowTicks * 14u);
     CHECK(fastTicks < slowTicks * 16u);
 }
+
+TEST_CASE("the occlusion rate is a rate, whatever the cadence is", "[entity][perception][occlusion]") {
+    // The budget divides the tests by the *tick rate*, and `hertz <= 0` means "sense every step",
+    // where `senseTick` counts microseconds rather than sense ticks. A budget that assumed the tick
+    // rate was the cadence would grant such a body sixteen thousand times its rate, which is the
+    // shape of bug that would never show up at the default and would be catastrophic the first time
+    // somebody turned the cadence off to see what it was buying.
+    World w(crowdFixture());
+    for (const auto& e : w.comp->entityWorld().entities()) {
+        w.setKnob(e->name().c_str(), "hertz", 0.0f);
+        w.setKnob(e->name().c_str(), "occlusionTestsPerSecond", 2.0f);
+    }
+    std::size_t tests = 0;
+    std::size_t sensed = 0;
+    FrameTime time;
+    for (int i = 0; i < 180; ++i) {
+        time.renderTime = static_cast<double>(i) / 60.0;
+        time.deltaTime = i == 0 ? 0.0 : 1.0 / 60.0;
+        time.frameIndex = static_cast<std::uint64_t>(i);
+        w.params.resetFinals();
+        w.comp->updateFields(time, w.bus, w.modulator);
+        w.modulator.applyRoutes(w.bus, w.params, time.deltaTime);
+        w.comp->updateBehaviour(time, w.bus);
+        w.comp->update(time);
+        tests += w.comp->entityWorld().perceptionCounts().occlusionTests;
+        sensed += w.comp->entityWorld().perceptionCounts().sensed;
+    }
+    INFO(fmt::format("hertz 0: {} sense ticks over 180 frames x 24 bodies, {} occlusion tests",
+                     sensed, tests));
+    // Every body on every frame: the cadence really is off.
+    CHECK(sensed == 24u * 180u);
+    // And the rate is still the rate. The last frame is at 179/60 = 2.9833 s, so each body is owed
+    // floor(2.9833 x 2) = 5 tests and the crowd is owed 120.
+    CHECK(tests == 120u);
+}

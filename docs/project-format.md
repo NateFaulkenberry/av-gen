@@ -286,7 +286,10 @@ rock or a skinned character.
         "chain": { "envelope": "peakhold", "envelopeHoldMs": 8, "envelopeFallPerSecond": 6 } }
     ],
     "sockets": [ { "name": "RightHand", "joint": "mixamorig:RightHand", "position": [0, 0, 0] } ],
-    "attachments": [ { "node": "lantern", "socket": "RightHand" } ]
+    "attachments": [ { "node": "lantern", "socket": "RightHand" } ],
+    "perception": { "range": 60.0, "fieldOfView": 200.0, "proximityRange": 4.0,
+                    "capacity": 8, "hertz": 4.0, "occlusionTestsPerSecond": 0.0,
+                    "weights": { "glow": 2.0 } }
   }
 ]
 ```
@@ -318,6 +321,27 @@ goes for a walk instead of somewhere; `waypointRadius`, `repathSeconds`, `stuckS
 heroes, entities, luminous patches of ecology, shoreline and high ground — assembled by the
 composition; `bodyRadius`, `headroom` and `footprint` are the character's own size, and 0 on any of
 them takes the world's default.
+
+**Perception** is what a body can notice, and **the key's presence is the whole of the opt-in**
+(ADR-270, ADR-290). An entity without one perceives nothing and costs nothing: no spatial index is
+built, no stage is entered, and every scene written before this existed is bit-for-bit what it was.
+An entity with one holds a bounded working set of `Percept`s — what it noticed, how far away, how
+salient, how stale, and whether the visibility was measured or assumed — rebuilt at `hertz` times a
+second from two grid queries over the world's interest points and its bodies.
+
+| Key | What it does |
+|---|---|
+| `range` | metres. Nothing beyond this is ever a percept. Must be above zero: a body with no senses says so by omitting the block |
+| `fieldOfView` | degrees, centred on the body's facing. 360 is a herd animal; a narrow one is a character an author wants to be able to surprise |
+| `proximityRange` | metres within which the field of view does not apply, so a body cannot be walked into without knowing |
+| `capacity` | 1 to 64. A hard cap: sort by salience, keep the top `capacity` |
+| `hertz` | sense updates per second. 4 is fifteen frames of staleness at 60, which is less than the time a character takes to turn its head. **Not a quality knob**: `Percept::seenAt` is meaningless if it is always now, and a 90 s scrub of a hundred perceiving bodies costs fifteen times more at 60 Hz than at 4 |
+| `occlusionTestsPerSecond` | per body, 0 by default. A test is `world::heroSightline` and costs 1.8 ms a look on the shipped world. At 0 the visibility is 1 and `tested` is **false**, which is honest and free; when a budget runs out the percept is kept and left untested rather than dropped |
+| `weights` | per interest kind — `landmark`, `character`, `glow`, `water`, `vista` — the taste model `explore` already carries as `landmarkAffinity` and the rest, lifted out so two layers can share one character's taste |
+
+Every one of them is registered at `entity/<entity>/perception/<key>` (the weights at
+`.../perception/weight/<kind>`) and read back on every sense tick, so a keyframed `range` is a
+character whose senses narrow on cue rather than a knob that draws and does nothing (ADR-225).
 
 **Reactions** are `property <- signal`, declared in data. Each compiles to an ordinary modulation
 route with an ordinary `chain` (every field of `docs/control.md`'s route chain applies). What the

@@ -86,8 +86,7 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
     // bodies first in entity order, then interest points in list order. A tie broken on the lower
     // index is the same rule `NavGrid`'s A* breaks a tie on cell index with, and it is what stops
     // the answer depending on the order the grid happened to visit its cells.
-    const auto add = [&](InterestKind kind, std::size_t source, std::size_t scanIndex,
-                         const glm::vec3& at) {
+    const auto add = [&](InterestKind kind, std::size_t scanIndex, const glm::vec3& at) {
         const glm::vec3 delta = at - eye;
         const glm::vec2 flat(delta.x, delta.z);
         const float distance = glm::length(delta);
@@ -108,7 +107,6 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
         }
         Percept p;
         p.kind = kind;
-        p.source = source;
         p.position = at;
         p.distance = distance;
         p.visibility = 1.0f;
@@ -123,10 +121,10 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
         // That is precisely the failure ADR-270's budget rule exists to prevent, arriving through
         // the back door. What was seen is reported; what it is worth is the decider's to weigh.
         p.salience = std::clamp(weight * invWeight * (1.0f - distance * invRange), 0.0f, 1.0f);
+        // The scan index rides in `source` while the percept is a candidate -- it is the tie-break
+        // key -- and the copy-out below turns it back into the real `source`.
+        p.source = scanIndex;
         candidates_.push_back(p);
-        // Reused as the tie-break key while the percept is a candidate; overwritten with the real
-        // `source` in the copy-out below.
-        candidates_.back().source = scanIndex;
     };
 
     if (index_.bodies != nullptr && !index_.bodyPositions.empty()) {
@@ -137,7 +135,7 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
             if (body == self || body >= index_.bodyPositions.size()) {
                 continue; // a character does not perceive itself
             }
-            add(InterestKind::Character, body, body, index_.bodyPositions[body]);
+            add(InterestKind::Character, body, index_.bodyPositions[body]);
         }
     }
     const std::span<const InterestPoint> interests = world.interestPoints();
@@ -153,7 +151,7 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
             if (source >= interests.size()) {
                 continue;
             }
-            add(interests[source].kind, source, bodyCount + source, interests[source].position);
+            add(interests[source].kind, bodyCount + source, interests[source].position);
         }
     }
 
@@ -177,9 +175,15 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
 
     // ---- the occlusion budget (ADR-270 §3) ---------------------------------------------------
     //
-    // `world::heroSightline` is 1.7 ms at 20 m and 5.4 ms at 60. One per character per frame at a
-    // hundred characters is 172 ms a frame -- four orders of magnitude off, which is why this is a
-    // budget rather than a tuning knob.
+    // `world::heroSightline` measures **1800.6 us at 20 m and 5876.0 us at 60 m** on
+    // `glowmere-valley-2` (minima of 5, load average 6.6-7.9), which confirms ADR-270's 1720.779.
+    // One per character per frame at a hundred characters is 180 ms a frame -- four orders of
+    // magnitude off, which is why this is a budget rather than a tuning knob.
+    //
+    // And the cost is a property of the **world function**, not of the nine rays: the same call on
+    // the Character Intelligence Lab's flat fixture is 8 us, two hundred times cheaper, because a
+    // world with no ecology makes the march's per-sample lookup nearly free. A fixture cannot prove
+    // this budget is necessary; the shipped world is what justifies it (ADR-290 section 5.1).
     //
     // How many tests this tick is a **pure function of the tick index**, not an accumulator:
     //
@@ -201,8 +205,11 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
         counts_.occlusionDeferred += settings.occlusionTestsPerSecond > 0.0f ? kept : 0;
         return kept;
     }
-    const double hertz = settings.hertz > 0.0f ? static_cast<double>(settings.hertz) : 60.0;
-    const double perTick = static_cast<double>(settings.occlusionTestsPerSecond) / hertz;
+    // Ticks per second, which is `hertz` except at `hertz <= 0` -- "sense every step" -- where
+    // `senseTick` counts microseconds. The budget divides by whatever the tick rate actually is, or
+    // a body told to sense every step would be granted sixteen thousand times its rate.
+    const double tickRate = settings.hertz > 0.0f ? static_cast<double>(settings.hertz) : 1.0e6;
+    const double perTick = static_cast<double>(settings.occlusionTestsPerSecond) / tickRate;
     const auto tick = senseTick(time, settings.hertz, seed);
     const auto before = static_cast<std::uint64_t>(static_cast<double>(tick) * perTick);
     const auto after = static_cast<std::uint64_t>(static_cast<double>(tick + 1) * perTick);
