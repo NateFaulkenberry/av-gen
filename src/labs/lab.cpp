@@ -27,7 +27,7 @@ namespace {
 //   * The LOD Lab's `decides` is `cs_cull_classify` and not `composition.cpp`'s thresholds,
 //     because the thresholds are data the shader reads and the rung is the shader's decision. The
 //     quantity it compares them against turned out to be the thing worth owning.
-constexpr std::array<LabDescriptor, 14> kLabs{{
+constexpr std::array<LabDescriptor, 15> kLabs{{
     {LabId::Animation, "animation", "Animation Lab", LabStatus::InProgress,
      "Is this pose the one the clip asked for at this time?",
      "clip sampling, blending and the joint palette a frame is skinned with",
@@ -135,6 +135,17 @@ constexpr std::array<LabDescriptor, 14> kLabs{{
      "any single subsystem's behaviour -- isolate it in that subsystem's lab first",
      "tests/rendering/test_phase_g_certification.cpp", "docs/engineering-labs.md",
      "examples/stress/stress.json", ""},
+
+    {LabId::Interaction, "interaction", "Interaction Latency Lab", LabStatus::Built,
+     "How long after a person acts does the application answer?",
+     "the seven stamps between an input event and the frame that shows its evaluated result, which "
+     "interactions require a synchronous whole-scene evaluation, and the distributions -- not the "
+     "minima -- of the three latencies a product is judged by",
+     "how long the GPU took to draw the frame once it was asked for -- that is the Rendering Lab; "
+     "and why a frame costs what it costs, which is `core::PhaseProfiler` and a different question",
+     "src/core/interaction_latency.cpp:summarise",
+     "docs/investigations/interaction-latency-lab.md",
+     "examples/world/glowmere-valley-2-multicam.json", "examples/labs/interaction/cases.json"},
 }};
 
 } // namespace

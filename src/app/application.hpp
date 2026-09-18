@@ -129,6 +129,14 @@ struct AppOptions {
 
     bool profileCpu = false;
     std::optional<std::filesystem::path> profileCsv; // --profile-csv <file>: one row per frame
+    // --latency: the interaction-latency report on exit. One record per interaction, not per frame;
+    // see `src/core/interaction_latency.hpp` for why that is a different instrument rather than a
+    // different view of the same one.
+    bool latencyReport = false;
+    std::optional<std::filesystem::path> latencyCsv; // --latency-csv <file>: one row per interaction
+    // --latency-inject <kind>:<ms>. ADR-182's control: make a named interaction deliberately slower
+    // by a known amount, inside the engine work it performs, and require the harness to see it.
+    std::vector<std::pair<std::string, double>> latencyInject;
     bool headless = false;
     double offlineFps = 60.0;
     bool fpsGiven = false;

@@ -1,0 +1,73 @@
+{
+ "format": "avgen-lab-cases",
+ "version": 1,
+ "lab": "interaction",
+ "_note": "The Interaction Latency Lab's reproducible configurations. Every case opens the production project rather than a toy scene, deliberately: this lab's subject is what a person doing real work experiences, and the costs it exists to find are all proportional to something a minimal fixture does not have -- entities to re-simulate, textures to re-upload, nodes to flatten. `glowmere-valley-2-multicam` has 80 nodes, 256 entities, 860 meshes, 44 textures and a 90-second piece. Cases 1-4 are the measurement; case 5 is the control, and a run of case 5 that does not move the number is a run of a harness that is not measuring the thing it names.",
+ "cases": [
+  {
+   "lab": "interaction",
+   "number": 1,
+   "title": "A press on the sequencer ruler, at eight positions across the piece",
+   "question": "How long after clicking the timeline does the editor answer, and what does the answer cost?",
+   "expectation": "The cost is proportional to the second clicked, because `Engine::seekSeconds` re-simulates the entity world forward from `target - 90 s` at a fixed 1/60 s step. A flat distribution would mean the re-simulation has been bounded and this case has become a regression test rather than a reproduction. `# scene flattens` must be 0 on every seek frame: a seek is not a structural edit and a flatten appearing here is a different defect.",
+   "fixture": "examples/world/glowmere-valley-2-multicam.json",
+   "timeSeconds": 0.0,
+   "size": [1600, 1000],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Run with --ui-script click --latency. The arm parks the pointer for four frames before the press because ImGui computes HoveredWindow from the previous frame's pointer, and it says so in its own log if the playhead did not move."
+  },
+  {
+   "lab": "interaction",
+   "number": 2,
+   "title": "A scrub along the ruler, one seek per frame",
+   "question": "Does a drag coalesce, and what does a one-second gesture cost?",
+   "expectation": "One seek per frame of the gesture and nothing cancels the obsolete ones, so a 52-frame drag is 52 full evaluations of which 51 were superseded before they finished. The number that decides whether coalescing is worth building is not the count -- it is already 1 per frame -- but whether a seek is cheap enough that several could queue.",
+   "fixture": "examples/world/glowmere-valley-2-multicam.json",
+   "timeSeconds": 0.0,
+   "size": [1600, 1000],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Run with --ui-script strip --latency. `strip` is one-shot and keyed on the absolute frame number, so inside --ui-ab it acts only during the block covering its window."
+  },
+  {
+   "lab": "interaction",
+   "number": 3,
+   "title": "Starring and unstarring a hero",
+   "question": "What does a structural edit cost, and where does the cost actually sit?",
+   "expectation": "A full scene flatten, plus -- and this is the larger half -- the renderer destroying and re-creating every texture in the scene, because `Composition::rebuild()` ends with an unconditional `++scene_.textureVersion` and the renderer's only invalidation granularity is that one counter. Any plan that ends at the flatten leaves most of this interaction's latency in place.",
+   "fixture": "examples/world/glowmere-valley-2-multicam.json",
+   "timeSeconds": 0.0,
+   "size": [1600, 1000],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Run with --ui-script star --latency. The arm alternates star/unstar on a 40-frame cycle and refuses to report a number when every node is already a hero."
+  },
+  {
+   "lab": "interaction",
+   "number": 4,
+   "title": "The interactions that do not touch the world",
+   "question": "Is there a general UI-thread responsiveness problem, or are there specific expensive paths?",
+   "expectation": "Hover, panel open/close, a held property drag, selection, tab switching, a camera orbit, a gizmo drag and a selection-box drag all cost the idle frame, with 0 flattens and 0 seeks. This is the control for cases 1-3: if these were also slow the answer would be architectural, and if they are not the answer is two named call sites.",
+   "fixture": "examples/world/glowmere-valley-2-multicam.json",
+   "timeSeconds": 0.0,
+   "size": [1600, 1000],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Run with --ui-ab hover:panels:sliders:select:tabs:camera:gizmo:box --latency. Interleaved in one process, because comparing a frame time from one run against another is forbidden here and the load average on this machine ranges from 3 to 44 within a session."
+  },
+  {
+   "lab": "interaction",
+   "number": 5,
+   "title": "The control: a deliberately slowed timeline click",
+   "question": "Does this harness detect a slowdown it was not told about in advance?",
+   "expectation": "The click's `input->final visual` distribution moves by at least the injected amount against case 1's, and the injected records appear in the report's calibration line rather than in any distribution. A harness that reports plausible numbers for an interaction it never performed is the worst possible outcome, because it will be trusted -- so this case is not optional and a result from cases 1-3 taken without it is not evidence.",
+   "fixture": "examples/world/glowmere-valley-2-multicam.json",
+   "timeSeconds": 0.0,
+   "size": [1600, 1000],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Run with --ui-script click --latency-inject timeline-click:250. The delay is spent inside `Engine::seekSeconds`, i.e. inside the work the interaction performs, not inside the instrument -- an instrument that slowed itself would only prove it can add."
+  }
+ ]
+}

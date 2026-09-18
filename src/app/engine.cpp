@@ -7,6 +7,7 @@
 #include "seq/section_actions.hpp"
 
 #include "core/phase_profiler.hpp"
+#include "core/interaction_latency.hpp"
 #include "core/phase2_probe.hpp" // TEMPORARY: ui-responsiveness phase 2
 #include <optional>
 
@@ -121,6 +122,15 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         if (auto* comp = composition()) {
             comp->setInteractiveRebuildBudget(2.0);
         }
+        // The same decision for the playhead, for the same reason and with the same restriction to
+        // Live. `AVGEN_NO_SEEK_DEFERRAL=1` turns it off, so the before and after stay runnable out
+        // of one binary rather than out of two builds that no longer both exist -- the same reason
+        // AVGEN_LEGACY_PROCGEN, AVGEN_SCATTER_WORKERS and AVGEN_NO_TERRAIN_CACHE exist. Without
+        // that switch an A/B of this change would have to compare two process runs, which §3 of
+        // docs/application-performance.md forbids on a machine whose load average moves from 3 to 44
+        // inside one session.
+        static const bool noSeekDeferral = std::getenv("AVGEN_NO_SEEK_DEFERRAL") != nullptr;
+        setInteractiveSeekBudget(noSeekDeferral ? 0.0 : 2.0);
     }
     // AVGEN_LEGACY_PROCGEN=1 restores the pre-ADR-233 double generation, in *any* mode, for one
     // purpose: so that a headless capture can be taken both ways out of the same binary and the
@@ -2427,6 +2437,10 @@ void Engine::stop() {
 }
 
 void Engine::seekSeconds(double seconds) {
+    // ADR-182's control, and it is here rather than in the instrument on purpose: this is inside the
+    // work a seek performs, so a calibration run slows the *pipeline* by a known amount and the
+    // latency harness either sees it or is not a latency harness. Zero unless --latency-inject asked.
+    core::applyInjectedDelayForOpenInteraction();
     // TEMPORARY (ui-responsiveness phase 2): every seek, wherever it came from.
     ++probe2::frame().seeks;
     const probe2::Add probeSeek(probe2::frame().seekMs);
@@ -2501,6 +2515,58 @@ void Engine::seekSeconds(double seconds) {
     // and the next frame -- a panel drawing the playhead, a script asserting where it landed, a tool
     // reporting the position -- sees the second the playhead has left.
     timelineClock_.seconds = seconds;
+    // Any seek by any route settles the interactive request too. Without this a `stop()` or a
+    // frame step would leave `seekEvaluatedSeconds_` naming a second the world is no longer at, and
+    // the next drag's first frame would compare against a lie.
+    seekRequestSeconds_ = seconds;
+    seekEvaluatedSeconds_ = seconds;
+    seekPending_ = false;
+    // T3 for the interaction log: the authoritative state has changed. Everything above this line
+    // is what a scrub costs, and the log's `input->ack` minus this is where it went.
+    core::interactions().markModel();
+}
+
+// ---- the interactive seek -------------------------------------------------------------------
+
+void Engine::requestSeek(double seconds, bool gestureHeld) {
+    // The cheap half, now. This is what draws the playhead and what every readout in the
+    // application means by "where are we": the transport's own arithmetic plus the timeline clock.
+    // Both were already set inside `seekSeconds`; taking them out of it and doing them here is the
+    // whole of the immediate response, and it costs nothing measurable.
+    const double target = transport_.seek(seconds);
+    if (player_) {
+        player_->seekSeconds(target);
+    }
+    timelineClock_.seconds = target;
+    seekRequestSeconds_ = target;
+    seekGestureHeld_ = gestureHeld;
+    seekPending_ = true;
+    if (interactiveSeekBudgetMs_ <= 0.0) {
+        // The budget is zero everywhere except the live editor, so every other caller -- an offline
+        // render, a test, the control hub -- gets exactly what it got before: the whole seek, on
+        // this frame, in this call. A deferral that could reach a deterministic render would make
+        // what the render contains a function of a wall clock.
+        seekSeconds(target);
+        seekEvaluatedSeconds_ = target;
+        seekPending_ = false;
+    }
+}
+
+bool Engine::serviceSeekRequest(double elapsedMs) {
+    if (!seekPending_) {
+        return false;
+    }
+    if (!scene::advanceSeekDeferral(seekDeferral_, seekRequestSeconds_, seekEvaluatedSeconds_,
+                                    seekGestureHeld_, elapsedMs)) {
+        return false;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    seekSeconds(seekRequestSeconds_);
+    seekDeferral_.lastMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    seekEvaluatedSeconds_ = seekRequestSeconds_;
+    seekPending_ = false;
+    return true;
 }
 
 bool Engine::isPlaying() const { return transport_.isPlaying(); }
@@ -3410,6 +3476,17 @@ void Engine::update(const FrameTime& time) {
     probeStage(probe2::frame().updOtherMs); // TEMPORARY: phase 2
     stats_.allocsOther = (allocsNow() - allocsAtStart) - stats_.allocsControl - stats_.allocsSignals -
                          stats_.allocsModulation - stats_.allocsController;
+    // T4 for the interaction log -- but not while a seek is still outstanding. The scene this
+    // update derived is the scene at the *evaluated* second, and a deferred request has not reached
+    // that second yet. Marking presentation here regardless would file every deferred drag frame as
+    // a twenty-millisecond interaction, which is the single most flattering lie available to a
+    // deferral and exactly what this instrument exists to refuse.
+    // Note what this implies and do not paper over it: a UI edit happens inside `ui.build`, which
+    // runs after this, so the evaluated consequence of an edit is always one frame later than the
+    // edit. That one frame is real and belongs in `input->final visual`.
+    if (!seekPending_) {
+        core::interactions().markPresentation();
+    }
     const auto end = std::chrono::steady_clock::now();
     const double micros = std::chrono::duration<double, std::micro>(end - start).count();
     stats_.modulationMicros = stats_.modulationMicros * 0.9 + micros * 0.1;

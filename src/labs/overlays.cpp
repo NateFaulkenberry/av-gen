@@ -89,6 +89,12 @@ rendering::DebugViewOptions overlaysFor(LabId id) {
     case LabId::Integration:
         o.worldAxes = true;
         break;
+    case LabId::Interaction:
+        // Nothing, and for the same reason the Rendering Lab draws nothing, one step earlier in the
+        // chain: this lab measures how long a frame takes to appear, and an overlay is work added
+        // to every frame it times. The Rendering Lab must not draw into a frame it grades; this one
+        // must not draw into a frame it clocks.
+        break;
     }
     return o;
 }

@@ -81,6 +81,13 @@ enum class UiScriptArm : std::uint32_t {
     // motion between the clicks is deliberate: it makes `input->ui.build ms` sample only the frames
     // that carried a click.
     Click = 1u << 12,
+    // A *repeating* scrub gesture: press on the ruler, drag along it for forty frames, release.
+    // `Strip` already does this once -- it is keyed on the absolute frame number, so inside
+    // `--ui-ab` it acts only during whichever block happens to cover its window, and its column in
+    // every other block is an idle editor. This one counts from its own first step, so it repeats
+    // in every block it is given and can be put beside another arm in one process. A drag and a
+    // click are different measurements and only this arm measures the drag.
+    Drag = 1u << 13,
 };
 
 [[nodiscard]] constexpr UiScriptArm operator|(UiScriptArm a, UiScriptArm b) {
@@ -131,6 +138,7 @@ private:
     void stepBox(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
     void stepStar(Engine& engine, ui::ControlPanel& panel, std::uint64_t frame);
     void stepClick(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepDrag(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
 
     std::vector<std::string> editLog_;
     std::size_t editNodesBefore_ = 0;
@@ -151,6 +159,9 @@ private:
     std::size_t clicks_ = 0;           // completed ruler clicks
     std::size_t clickSteps_ = 0;       // steps since this arm started, not the global frame number
     double clickLastSeconds_ = -1.0;   // where the playhead was left by the last click
+    std::size_t dragSteps_ = 0;        // steps since the drag arm started
+    std::size_t drags_ = 0;            // completed scrub gestures
+    double dragStartSeconds_ = -1.0;   // where the playhead was when the gesture began
     glm::vec3 boxCamera_{0.0f}; // camera pose at the start of the box drag, for the report
     float phase_ = 0.0f;
 };

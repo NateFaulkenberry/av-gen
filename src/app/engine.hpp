@@ -12,6 +12,7 @@
 #include "app/render_settings.hpp"
 #include "app/scene_states.hpp"
 #include "app/transport.hpp"
+#include "scene/rebuild_deferral.hpp"
 #include "app/world_director.hpp"
 #include "audio/audio_input.hpp"
 #include "analysis/analysis_track.hpp"
@@ -506,6 +507,48 @@ public:
     void togglePlay();
     void stop();
     void seekSeconds(double seconds);
+
+    // ---- the interactive seek (ADR-084's policy, applied to the playhead) ---------------------
+    //
+    // `seekSeconds` is the whole of it: the transport, the audio player, the modulator, the music
+    // classifier, the director, the camera state, **the entity world re-simulated from
+    // `target - 90 s` at a fixed 1/60 s step**, every rig reseeded, the event scheduler rebased.
+    // On `glowmere-valley-2-multicam` that last item is 99.999% of the call and runs to seconds.
+    //
+    // A panel calling it from inside its own draw therefore holds the whole application for the
+    // length of the re-simulation, and a drag asks for one per frame of the gesture -- of which
+    // every one but the last is superseded before it finishes.
+    //
+    // `requestSeek` splits the two halves that were never actually one. The *cheap* half -- the
+    // transport position and the timeline clock, which is what draws the playhead and what every
+    // readout in the application means by "where are we" -- is applied immediately, on the calling
+    // frame. The *expensive* half is recorded as outstanding and performed by
+    // `serviceSeekRequest`, once, in a known place in the frame loop, at most once per frame and
+    // deferred while the gesture is still moving.
+    //
+    // **What the UI reads while the work is outstanding**: the transport, exactly as it does now.
+    // There is no second copy of the position, no snapshot, and nothing to keep in step -- the
+    // requested position was already the authoritative answer to "where is the playhead" and the
+    // re-simulation was always downstream of it. `seekPending()` says whether the world has caught
+    // up, so an indicator can be honest about it rather than the editor pretending it has.
+    //
+    // No thread. The composition is not thread-safe, all GPU work in this application is the main
+    // thread's, and ADR-084 §2 rejected threading a far smaller piece of this for those reasons.
+    // Deferring work is not the same thing as moving it, and only one of the two needs a lock.
+    void requestSeek(double seconds, bool gestureHeld);
+    // Honours at most one outstanding request. `elapsedMs` is the frame's wall time, passed in
+    // rather than read here so the policy stays a pure function of its inputs. Returns true when a
+    // seek was performed.
+    bool serviceSeekRequest(double elapsedMs);
+    // True while a request has been taken and not yet evaluated: the playhead has moved and the
+    // world has not. ADR-231's canvas indicator is the place this belongs.
+    [[nodiscard]] bool seekPending() const { return seekPending_; }
+    // Milliseconds. Zero means evaluate on the frame the request arrives, which is what this did
+    // before and is what every non-live mode keeps. Set only by `installController` in
+    // `EngineMode::Live`, exactly as `setInteractiveRebuildBudget` is -- a wall clock has no
+    // business deciding what a deterministic render contains.
+    void setInteractiveSeekBudget(double ms) { interactiveSeekBudgetMs_ = ms; }
+
     [[nodiscard]] bool isPlaying() const;
     [[nodiscard]] double positionSeconds() const;
     // The project's length: the longest of the audio, the baked sequence and the timeline. Not the
@@ -714,6 +757,13 @@ private:
     audio::ClipSources clipSources_;
     audio::MixReport audioMix_;
     Transport transport_;
+    // The interactive seek's outstanding request. See `requestSeek`.
+    double seekRequestSeconds_ = 0.0;
+    double seekEvaluatedSeconds_ = 0.0;
+    bool seekPending_ = false;
+    bool seekGestureHeld_ = false;
+    double interactiveSeekBudgetMs_ = 0.0;
+    scene::RebuildDeferral seekDeferral_;
     // What the audio player was last told to do, so the engine can tell whether the device needs
     // starting, stopping or seeking this frame without asking it every frame.
     bool audioFollowing_ = false;
