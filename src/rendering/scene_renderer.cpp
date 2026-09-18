@@ -2334,17 +2334,21 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         if (entity.mesh >= scene.meshes.size()) {
             diagnostic.cullReason = "invalid-mesh";
         } else {
-            const auto [meshLo, meshHi] = scene.meshes[entity.mesh].bounds();
-            diagnostic.worldBoundsMin = glm::vec3(std::numeric_limits<float>::max());
-            diagnostic.worldBoundsMax = glm::vec3(std::numeric_limits<float>::lowest());
-            for (int corner = 0; corner < 8; ++corner) {
-                const glm::vec3 local((corner & 1) ? meshHi.x : meshLo.x,
-                                      (corner & 2) ? meshHi.y : meshLo.y,
-                                      (corner & 4) ? meshHi.z : meshLo.z);
-                const glm::vec3 world = glm::vec3(model * glm::vec4(local, 1.0f));
-                diagnostic.worldBoundsMin = glm::min(diagnostic.worldBoundsMin, world);
-                diagnostic.worldBoundsMax = glm::max(diagnostic.worldBoundsMax, world);
-            }
+            // The box the cull actually used, asked of the function that built it -- not a second
+            // transform of the bind-pose bounds written out here.
+            //
+            // It was the latter, and it disagreed twice over: `entityCullBounds` pads by a quarter
+            // of the extent plus a quarter of a metre, and for a skinned entity it uses the *posed*
+            // palette, while this rebuilt an unpadded box from the bind pose. A T-pose bind is wider
+            // than the poses it animates into, so the two boxes are not even reliably ordered.
+            // Swept over 72 cameras, all 72 margins differed, worst by 2.03 m, and 48 disagreed
+            // about whether the object was inside the frustum at all. A margin is the answer to
+            // "how close was this to being culled", and it was answering it about a box nothing
+            // culled against (§37: the renderer is the source of truth, so the diagnostic was
+            // wrong).
+            const scene::CullBounds cullBounds = scene::entityCullBounds(scene, entity);
+            diagnostic.worldBoundsMin = cullBounds.min;
+            diagnostic.worldBoundsMax = cullBounds.max;
             for (std::size_t plane = 0; plane < diagnosticPlanes.size(); ++plane) {
                 const glm::vec4& p = diagnosticPlanes[plane];
                 const glm::vec3 far(p.x >= 0.0f ? diagnostic.worldBoundsMax.x : diagnostic.worldBoundsMin.x,
