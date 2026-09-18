@@ -121,9 +121,25 @@ ADR-091 reserved checkpointing as future work for the live tier, and
 still right about the *latency*; neither is needed for *correctness*, because §1 shows the replay is
 already exact.
 
-What it would buy, from the measured per-character costs: one `EntityWorld::seek(90 s)` is 5,400
-steps, so at 89 µs per `explore` character that is **4.8 s at 10 characters, 24 s at 50, 48 s at
-100**. That is what caps the cast size in an editor — not the frame cost, which is 9 ms at 100.
+What it would buy was extrapolated from the per-character frame cost first, and then measured, and
+the extrapolation was low by a factor of two to five. One `EntityWorld::seek(90 s)`, 5,400 steps,
+minima of 2 runs:
+
+| cast | `wander` measured | `explore` measured | (`explore` extrapolated) |
+|---|---|---|---|
+| 10 | 1.45 s | **9.10 s** | 4.8 s |
+| 50 | 11.08 s | **64.63 s** | 24 s |
+| 100 | 19.38 s | **161.51 s** | 48 s |
+| 250 | 60.79 s | **594.66 s** | 120 s |
+
+The extrapolation used the *steady-state* per-frame cost, measured after a warm-up step with every
+character already holding a route. A seek starts from `reset()`: over 5,400 steps every character
+plans from scratch, arrives, re-selects and replans repeatedly, each cycle costing a `requestPath`
+at 24.969 µs and repeated `pathValid` at 74.481 µs. **Per-frame steady-state cost is the wrong unit
+for a cold ninety-second replay**, and that is the lesson worth keeping from this measurement.
+
+At 100 `explore` characters the frame cost is 9 ms and the scrub cost is 161 seconds — a ratio of
+about eighteen thousand. The scrub, not the frame, is what caps the cast size in an editor.
 
 Two cheaper things to try first, in this order:
 

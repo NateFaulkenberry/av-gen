@@ -534,17 +534,31 @@ back, synchronously, on the main thread (`app/engine.cpp:2298-2300`). At 23 enti
 behaviour updates per click and `docs/investigations/ui-responsiveness.md` measured 165 ms to 5,003
 ms per timeline click, with the re-simulation being **99.999%** of the seek.
 
-Applying §E.1's per-character figures, one seek of 5,400 steps costs approximately:
+I extrapolated this from §E.1's per-character figures first, then measured it, and the extrapolation
+was wrong by a factor of two to five. Both are shown, because the gap is the finding.
 
-| cast | `wander` | `explore` |
-|---|---|---|
-| 10 | 1.0 s | 4.8 s |
-| 50 | 5.1 s | 24 s |
-| 100 | 10 s | 48 s |
-| 250 | 26 s | 120 s |
+One `EntityWorld::seek(90 s)` -- 5,400 fixed steps -- minima of 2 runs, load average ~4:
 
-**This, not the frame cost, is what caps the cast size in an editor.** A 100-character autonomous
-scene is a 48-second stall per timeline click. Three mitigations, in order of value:
+| cast | `wander` extrapolated | `wander` **measured** | `explore` extrapolated | `explore` **measured** |
+|---|---|---|---|---|
+| 10 | 1.0 s | **1.45 s** | 4.8 s | **9.10 s** |
+| 50 | 5.1 s | **11.08 s** | 24 s | **64.63 s** |
+| 100 | 10 s | **19.38 s** | 48 s | **161.51 s** |
+| 250 | 26 s | **60.79 s** | 120 s | **594.66 s** |
+
+**Why the extrapolation was low.** §E.1 measures a *warm steady state*: one untimed step is taken
+first, so every character already holds a route, and the 60 measured frames are mostly steering
+along it. A seek starts from `reset()` and covers 5,400 steps, during which every character plans
+from scratch, arrives, re-selects a goal and replans many times over -- each cycle costing a
+`requestPath` at 24.969 us and repeated `pathValid` at 74.481 us. Per-frame steady-state cost is
+the wrong unit for a cold 90-second replay, and using it understates by 2-5x.
+
+**Two hundred and fifty explorers is a ten-minute stall for one timeline click.** One hundred is
+two minutes and forty seconds.
+
+**This, not the frame cost, is what caps the cast size in an editor.** At 100 `explore`
+characters the frame cost is 9 ms and the scrub cost is 161 seconds: a ratio of about eighteen
+thousand. Three mitigations, in order of value:
 
 1. **Cap the re-simulation by work, not by seconds.** `maxSeconds = 90.0` is a literal, and it is
    the wrong unit: it should be a budget in entity-steps, so a 23-body scene keeps its 90 s of
@@ -691,5 +705,10 @@ Stated plainly, with what each would take.
 - **What the numbers are on a quiet machine.** Every timing here was taken at a load average
   between 3.75 and 4.85. They are upper bounds; the ratios are sound and no decision in this
   document turns on a factor smaller than two.
+- **Nothing here about the scrub cost is still extrapolated** -- it was, and the measurement
+  corrected it by a factor of two to five (§E.4). Treat §E.2's perception and decision estimates
+  with the same suspicion until somebody measures them; they are steady-state estimates of the same
+  kind that was wrong once already, although they are estimates of arithmetic rather than of
+  planning, which is the part that turned out to be underweighted.
 - **Whether the 0.000022 m residual between play and seek is float ordering or a real divergence.**
   It is below the scale of anything visible and is not worth a phase, but it is not explained.

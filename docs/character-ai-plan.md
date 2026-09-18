@@ -187,9 +187,11 @@ is already built; it has controls.
 3. **Checkpointing, only if 1 and 2 are not enough.** ADR-267 §5: the replay is already exact, so
    this is latency work, not correctness work, and it is the most expensive of the three.
 
-Why it matters: at the measured 89 µs per `explore` character, one 5,400-step seek costs about
-**4.8 s at 10 characters, 24 s at 50, 48 s at 100**. The frame cost at 100 is 9 ms. The scrub, not
-the frame, is what caps the cast size in an editor.
+Why it matters, measured rather than extrapolated (the extrapolation was low by 2–5×, see ADR-267
+§5): one `EntityWorld::seek(90 s)` costs **9.10 s at 10 `explore` characters, 64.63 s at 50,
+161.51 s at 100, 594.66 s at 250**. The frame cost at 100 is 9 ms. **Two hundred and fifty
+explorers is a ten-minute stall for one timeline click.** The scrub, not the frame, is what caps
+the cast size in an editor.
 
 ### P9 — Root motion  ·  needs P5 and P6  ·  one agent
 
