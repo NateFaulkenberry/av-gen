@@ -2028,6 +2028,27 @@ void Composition::installEntities() {
         live->setRootMotionSource(animationSinks_.back().get());
     }
 
+    // ADR-335: a root-motion opt-in on a node **no entity drives** deletes motion instead of
+    // transferring it. There is nothing to hand the displacement to, so the compensation lands on
+    // the pose and the clip's travel simply disappears -- a body that used to descend stands
+    // still. It is precisely the class of silent wrongness ADR-274 charged a metre for, so it is
+    // named at load rather than discovered in a render.
+    for (const auto& nodePtr : nodes_) {
+        if (nodePtr->animation.rootMotion.empty()) {
+            continue;
+        }
+        const bool driven = std::any_of(entityDescs_.begin(), entityDescs_.end(),
+                                        [&](const entity::EntityDesc& d) {
+                                            return d.driven() == nodePtr->name;
+                                        });
+        if (!driven) {
+            log::warn("node '{}': root motion is opted in for {} clip(s) but no entity drives this "
+                      "node, so the displacement has nowhere to go and is removed from the pose "
+                      "rather than handed to a body",
+                      nodePtr->name, nodePtr->animation.rootMotion.size());
+        }
+    }
+
     fieldRoutesChecked_ = false; // the "a route cannot drive a field knob" scan runs again
     for (const std::string& line : entityWorld_.fieldReport()) {
         // Unconditional, at info. Which determinism guarantee a field has (ADR-091) is a thing an
