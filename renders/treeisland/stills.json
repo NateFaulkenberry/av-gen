@@ -1,0 +1,29 @@
+{
+  "format": "avgen-render-queue", "version": 1,
+  "jobs": [
+    { "project": "../../examples/treeisland/tree-of-life-floating-island.json",
+      "render": { "output": "sequence", "path": "/Users/natefaulkenberry/Documents/GitHub/av-gen-treeisland/renders/treeisland/hero", "pattern": "hero_{:04d}.png",
+                  "width": 1920, "height": 1080, "fps": 1, "start": 0.0, "end": 0.5,
+                  "tier": "offline", "limits": "unlimited", "supersample": 2.0 } },
+
+    { "project": "../../examples/treeisland/_alt-low-angle.json",
+      "render": { "output": "sequence", "path": "/Users/natefaulkenberry/Documents/GitHub/av-gen-treeisland/renders/treeisland/alt-low-angle", "pattern": "alt_{:04d}.png",
+                  "width": 1920, "height": 1080, "fps": 1, "start": 0.0, "end": 0.5,
+                  "tier": "offline", "limits": "unlimited", "supersample": 2.0 } },
+
+    { "project": "../../examples/treeisland/_compare-cottage.json",
+      "render": { "output": "sequence", "path": "/Users/natefaulkenberry/Documents/GitHub/av-gen-treeisland/renders/treeisland/compare-cottage", "pattern": "cottage_{:04d}.png",
+                  "width": 1920, "height": 1080, "fps": 1, "start": 0.0, "end": 0.5,
+                  "tier": "offline", "limits": "unlimited", "supersample": 2.0 } },
+
+    { "project": "../../examples/treeisland/_compare-hero-materials.json",
+      "render": { "output": "sequence", "path": "/Users/natefaulkenberry/Documents/GitHub/av-gen-treeisland/renders/treeisland/compare-hero-materials", "pattern": "asexported_{:04d}.png",
+                  "width": 1920, "height": 1080, "fps": 1, "start": 0.0, "end": 0.5,
+                  "tier": "offline", "limits": "unlimited", "supersample": 2.0 } },
+
+    { "project": "../../examples/treeisland/tree-of-life-floating-island.json",
+      "render": { "output": "sequence", "path": "/Users/natefaulkenberry/Documents/GitHub/av-gen-treeisland/renders/treeisland/rotation-stills", "pattern": "rot_{:04d}.png",
+                  "width": 1280, "height": 720, "fps": 0.027777778, "start": 0.0, "end": 150.0,
+                  "tier": "offline", "limits": "unlimited", "supersample": 1.0 } }
+  ]
+}

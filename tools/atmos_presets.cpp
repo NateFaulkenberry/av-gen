@@ -1,8 +1,7 @@
 // Dumps every atmospheric preset (ADR-230, §10) as JSON, so a scene emitter can use the real preset
 // code rather than a second copy of its numbers.
 //
-// A build target rather than a table in the Python emitter for the reason `make_tree_of_life.cpp`
-// gives: a script that held its own copy of every tuned radiance would drift from
+// A build target rather than a table in the Python emitter, for the usual reason: a script that held its own copy of every tuned radiance would drift from
 // `applyCometStyle` / `applyAuroraStyle` silently, and the first symptom would be a shipped example
 // that no longer matches the preset the UI offers under the same name.
 //

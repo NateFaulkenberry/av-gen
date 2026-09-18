@@ -76,3 +76,15 @@ cmake-build-*/
 
 # Staged sources for the published handbook artifact (regenerate rather than commit)
 .avgen-manual/
+
+# The Tree of Life and the floating island (ADR-337). 194 MB of GLB: a 3.16 M-triangle hero tree
+# copied byte for byte out of the owner's Blender pipeline, and two exports of an island whose
+# source is a 3ds Max FBX with Unity URP material sidecars. Neither source is in this repository
+# and neither is reproducible from it. assets/treeisle.manifest.json is the part the repository
+# keeps -- both provenance chains, the Unity-mask-map-to-glTF-ORM mapping, the geometry counts and
+# the one command that rebuilds all three (tools/import_tree_isle.py).
+/assets/treeisle/*.glb
+
+# Python bytecode from the tools/ scripts
+__pycache__/
+*.pyc
