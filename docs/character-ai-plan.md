@@ -122,7 +122,7 @@ corrections this list did not have: the dwell is counted in decision ticks rathe
 accumulated one drifts 264 ms in four seconds where a tick index drifts 20); the weighted roll
 stayed in `Explore` because moving it changes every route in Glowmere (§4 of the ADR); and percepts
 had to accumulate after all, behind a bounded fade held by the behaviour rather than by a considerer.
-The fifth considerer nobody wrote is §P11.
+The fifth considerer nobody wrote is §P11, and it landed on 2026-09-18 as ADR-335.
 
 ### P4 — Character Intelligence Lab  ·  parallel from day one  ·  one agent
 
@@ -239,6 +239,19 @@ already has the river -- 516 m, 7 m half-width, 0.91 m/s -- and `NavSample::wate
 for exactly this. **It needs a fixture of its own**: adding a body to
 `character-intelligence-lab.scene.json` changes what the other five perceive and score, and case
 15's golden position trace is taken from it.
+
+**Landed 2026-09-18: ADR-335.** `RouteConsiderer` in `src/entity/decision.{hpp,cpp}`, a
+`NavPathCost` overload on `Navigator::requestPath`, and
+`examples/labs/character/river-crossing.scene.json`. The same two routes weighed by one knob: ford
+54.15 m / 11.26 weighted wet metres scores 0.4055 against the detour's 0.3195 at `wadePenalty` 0.4,
+and 0.1745 against 0.2781 at 12.0. Three corrections this section did not have. The option has to
+*be* the route -- a `Move` per waypoint -- because `NavigatorPath::route` answers a move with the
+straight line, so the first version reported the detour and forded. The two probe penalties have to
+*bracket* the taste rather than sit on it, or a character that already minds the water gets one
+option at the moment the choice is interesting. And the fixture constraint above is **half false**:
+a hero stone 90 m away moves 0 of the golden's 3,600 samples where one 6 m from `scout` moves 1,779
+of them, because `goalWeight` rejects a point outside `maxRange` before weighing it. The conclusion
+holds for a narrower reason -- case 9's body would have been a reachable one.
 
 ---
 
