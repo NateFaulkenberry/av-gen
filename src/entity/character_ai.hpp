@@ -121,6 +121,7 @@ namespace avgen::entity {
 //     world::heroSightline, 9 rays @  20 m     1720.779 us
 //     world::heroSightline, 9 rays @  60 m     5391.917 us
 //     Navigator::sample (analytic world)         10.325 us
+//     PointGrid candidate scan @ 60 m             0.098 us   (14.8 candidates, over the real 505)
 //     Navigator::clearanceAt (grid lookup)        0.024 us
 //     Navigator::obstructed  (grid lookup)        0.011 us
 //
@@ -178,8 +179,17 @@ struct PerceptionSettings {
     // salience and keeps the top `capacity`. Bounded working sets are what make D4 possible.
     std::uint16_t capacity = 8;
     // Sense updates per second. 4 Hz is fifteen frames of staleness at 60, which is below the time
-    // it takes a character to turn its head. It is not a quality knob to be raised for realism; it
-    // is the budget, and D3 says it may vary with distance while the integrator may not.
+    // it takes a character to turn its head.
+    //
+    // **This is not the budget.** A candidate scan measures 0.098 us at 60 m over the real 505
+    // interest points -- a `spatial::PointGrid` lookup over 27 cells -- so even at a full 60 Hz it
+    // is 0.45 us a character against the 89 us the character's behaviours already cost. The cadence
+    // exists for two other reasons: a character that re-senses every frame reacts instantaneously
+    // and reads as a machine, and `Percept::seenAt` is meaningless if it is always now. Staleness
+    // is the only thing that lets a character be *wrong* about where something is, and being wrong
+    // is most of what this buys over the omniscient list it replaces.
+    //
+    // D3 permits this to fall with distance. It does not permit the integrator's step to change.
     float hertz = 4.0f;
     // Whether this character's percepts are occlusion-tested at all, and how many tests per second
     // the whole world may spend on it. 0 -- the default -- means `visibility` is always 1 and

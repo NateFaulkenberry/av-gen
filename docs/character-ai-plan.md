@@ -90,9 +90,12 @@ parameters under `entity/<name>/perception/`, a `perception` key on `EntityDesc`
 implementation for tests, and the round-robin occlusion budget with `Percept::tested` reported
 honestly.
 
-**First task, before any implementation:** one probe arm measuring the `spatial::PointGrid` radius
-query. It is the one number in the performance model that is extrapolated rather than measured, and
-the whole cadence argument rests on it.
+**The one number this unit was told to measure first has been measured.** The `spatial::PointGrid`
+radius query is 0.098 µs at 60 m over the real 505 interest points, against a 2–4 µs estimate — so
+the scan is effectively free and the 4 Hz cadence is **not** a budget. Keep it anyway, for the
+reasons ADR-270 §4 now gives: instantaneous reaction reads as a machine, and `Percept::seenAt` is
+meaningless if it is always now. The budget argument applies only to occlusion, where it applies by
+four orders of magnitude.
 
 **Done when** two characters with different `PerceptionSettings::range` in the same scene demonstrably
 notice different things, and the occlusion budget is provably respected under a crowd — with a
