@@ -537,9 +537,10 @@ print("carried %d hand-turned hero rotations into the scene" % CARRIED_ROTATIONS
 # =================================================================================================
 #
 # Five characters, every one of them a `decide` behaviour over stock considerers (ADR-333,
-# ADR-336). No scene in this repository declared one before this file: Glowmere's five aliens were
-# all `explore`, which is the 700-line hardcoded decider ADR-269 was written about. So the cast is
-# rebuilt rather than carried, and that is most of why valley 3 is a rebuild.
+# ADR-336). No *world* in this repository declared one before this file -- only two lab fixtures,
+# `guard-post` and ADR-336's `river-crossing` -- and Glowmere's five aliens were all `explore`,
+# which is the 700-line hardcoded decider ADR-269 was written about. So the cast is rebuilt rather
+# than carried, and that is most of why valley 3 is a rebuild.
 #
 # **What is seeded and what is not.** The brief allows seeding environment, capability, personality
 # and initial conditions so that interesting things are likely. It does not allow scripting the
