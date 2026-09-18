@@ -7,7 +7,7 @@
 # CPU suite can check it.
 file(GLOB_RECURSE AVGEN_CORE_SOURCES CONFIGURE_DEPENDS
     core/*.cpp labs/*.cpp audio/*.cpp analysis/*.cpp signals/*.cpp params/*.cpp scene/*.cpp spatial/*.cpp world/*.cpp graph/*.cpp shaders/*.cpp assets/*.cpp ai/*.cpp entity/*.cpp stage/*.cpp search/*.cpp organism/*.cpp
-    control/*.cpp comp/*.cpp seq/*.cpp song/*.cpp help/*.cpp)
+    control/*.cpp comp/*.cpp seq/*.cpp song/*.cpp help/*.cpp pathtrace/*.cpp)
 # The cinematic shot vocabulary (ADR-062) is pure geometry and JSON, and the sequencer (ADR-089)
 # holds an app::Shot by value in every shot it bakes. It lives in app/ for history's sake; it
 # belongs to the library, or seq/ could not be tested without linking the editor.
@@ -38,7 +38,7 @@ add_library(avgen_core STATIC ${AVGEN_CORE_SOURCES})
 target_include_directories(avgen_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(avgen_core
     PUBLIC fmt::fmt spdlog::spdlog glm::glm nlohmann_json::nlohmann_json Threads::Threads
-    PRIVATE miniaudio::miniaudio kissfft::kissfft fastgltf::fastgltf stb::stb tinyexr::tinyexr meshoptimizer)
+    PRIVATE miniaudio::miniaudio kissfft::kissfft fastgltf::fastgltf stb::stb tinyexr::tinyexr meshoptimizer embree)
 if(NOT MSVC)
     # The tinyexr implementation is third-party code compiled inside avgen_core: no warnings for it.
     set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/assets/exr_impl.cpp" PROPERTIES COMPILE_OPTIONS "-w")

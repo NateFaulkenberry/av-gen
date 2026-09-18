@@ -1,0 +1,229 @@
+#include "pathtrace/snapshot.hpp"
+
+#include "core/log.hpp"
+
+#include <fmt/format.h>
+#include <glm/gtc/matrix_inverse.hpp>
+
+#include <algorithm>
+
+namespace avgen::pathtrace {
+namespace {
+
+// Normals transform by the inverse transpose, not by the matrix. With a uniform scale the two agree
+// and the bug hides; the moment a scene scales an object non-uniformly the shading normals shear and
+// the lighting goes subtly wrong in a way that looks like a BSDF problem. Done once per entity.
+[[nodiscard]] glm::mat3 normalMatrix(const glm::mat4& m) { return glm::inverseTranspose(glm::mat3(m)); }
+
+} // namespace
+
+std::string_view supportName(Support s) {
+    switch (s) {
+    case Support::Full: return "full";
+    case Support::Degraded: return "degraded";
+    case Support::Unsupported: return "unsupported";
+    }
+    return "unknown";
+}
+
+void CapabilityReport::note(std::string feature, Support support, std::string detail, int count) {
+    // Collapse repeats: one row per feature, counting how many were met.
+    for (auto& e : entries) {
+        if (e.feature == feature) {
+            e.count += count;
+            return;
+        }
+    }
+    entries.push_back(Capability{std::move(feature), support, std::move(detail), count});
+}
+
+bool CapabilityReport::anyDegraded() const {
+    return std::any_of(entries.begin(), entries.end(),
+                       [](const Capability& c) { return c.support == Support::Degraded && c.count > 0; });
+}
+
+bool CapabilityReport::anyUnsupported() const {
+    return std::any_of(entries.begin(), entries.end(),
+                       [](const Capability& c) { return c.support == Support::Unsupported && c.count > 0; });
+}
+
+std::string CapabilityReport::format() const {
+    std::string out;
+    for (const auto& e : entries) {
+        out += fmt::format("  [{:<11}] {:<22} x{:<6} {}\n", supportName(e.support), e.feature, e.count, e.detail);
+    }
+    return out;
+}
+
+bool TriangleMesh::valid() const {
+    if (positions.empty() || indices.empty()) return false;
+    if (indices.size() % 3 != 0) return false;
+    if (normals.size() != positions.size()) return false;
+    if (!uvs.empty() && uvs.size() != positions.size()) return false;
+    return std::all_of(indices.begin(), indices.end(),
+                       [&](std::uint32_t i) { return i < positions.size(); });
+}
+
+std::size_t Snapshot::triangleCount() const {
+    std::size_t n = 0;
+    for (const auto& m : meshes) n += m.triangleCount();
+    return n;
+}
+
+Snapshot buildSnapshot(const scene::Scene& scene) {
+    Snapshot snap;
+    snap.camera = scene.camera;
+    snap.backgroundColor = scene.environment.backgroundColor;
+
+    // Environment. The sky is resolved against the scene's own lights by the project's own
+    // resolver, so the sun the tracer sees is the sun the rasteriser sees.
+    snap.skyEnabled = scene.environment.sky.enabled;
+    snap.sky = scene::resolveSky(scene.environment.sky, scene.lights);
+    if (scene.environment.environmentMap != scene::kInvalidTexture) {
+        snap.capabilities.note("environment map", Support::Degraded,
+                               "an HDR environment map is present but image-based lighting is not built yet; "
+                               "the analytic sky (ADR-036) is used instead",
+                               1);
+    } else if (snap.skyEnabled) {
+        snap.capabilities.note("analytic sky", Support::Full,
+                               "scene::skyRadiance, the same model shaders/environment.wgsl draws", 1);
+    }
+
+    snap.lights = scene.lights;
+    int directional = 0;
+    int punctual = 0;
+    int area = 0;
+    for (const auto& l : scene.lights) {
+        if (!l.enabled) continue;
+        switch (l.type) {
+        case scene::PunctualLight::Type::Directional: ++directional; break;
+        case scene::PunctualLight::Type::Point:
+        case scene::PunctualLight::Type::Spot: ++punctual; break;
+        default: ++area; break;
+        }
+    }
+    if (directional > 0) snap.capabilities.note("directional light", Support::Full, "sampled as a delta direction", directional);
+    if (area > 0) snap.capabilities.note("area light", Support::Full, "sampled over the emitter", area);
+    if (punctual > 0) {
+        snap.capabilities.note("point / spot light", Support::Degraded,
+                               "treated as a delta position, so its shadow is hard; the realtime path softens it",
+                               punctual);
+    }
+
+    // ---- geometry -------------------------------------------------------------------------------
+    int skippedInvisible = 0;
+    int skippedNoMesh = 0;
+    int skippedSkinned = 0;
+    int water = 0;
+    int grid = 0;
+    int degenerate = 0;
+
+    for (std::uint32_t ei = 0; ei < scene.entities.size(); ++ei) {
+        const scene::Entity& e = scene.entities[ei];
+
+        if (!e.visible) { ++skippedInvisible; continue; }
+        if (e.mesh == scene::kInvalidMesh || e.mesh >= scene.meshes.size()) { ++skippedNoMesh; continue; }
+
+        // NOTE: `cameraCulled` is deliberately NOT consulted. It means "outside the realtime
+        // camera's frustum", and off-screen geometry still casts shadows and still bounces light
+        // into the frame. Inheriting it would be the ADR-146 mistake in a new place.
+
+        if (e.rig != scene::kInvalidRig) {
+            // CPU skinning is Phase 5. Rendering the bind pose here would put the character in the
+            // wrong place with no warning, which is worse than not drawing it.
+            ++skippedSkinned;
+            continue;
+        }
+
+        const scene::MeshData& src = scene.meshes[e.mesh];
+        if (src.vertices.empty() || src.indices.size() < 3) { ++degenerate; continue; }
+
+        if (e.style == scene::MeshStyle::Water) ++water;
+        if (e.style == scene::MeshStyle::Grid) ++grid;
+
+        TriangleMesh out;
+        out.entityIndex = ei;
+        out.entityName = e.name;
+        out.material = e.material;
+
+        const glm::mat4 m = e.transform.matrix();
+        const glm::mat3 nm = normalMatrix(m);
+
+        out.positions.reserve(src.vertices.size());
+        out.normals.reserve(src.vertices.size());
+        const bool hasUv = true; // scene::Vertex always carries a uv; it is zero when unauthored
+        if (hasUv) out.uvs.reserve(src.vertices.size());
+
+        for (const scene::Vertex& v : src.vertices) {
+            out.positions.push_back(glm::vec3(m * glm::vec4(v.position, 1.0f)));
+            const glm::vec3 n = nm * v.normal;
+            const float len = glm::length(n);
+            out.normals.push_back(len > 1e-12f ? n / len : glm::vec3(0.0f, 1.0f, 0.0f));
+            out.uvs.push_back(v.uv);
+        }
+        out.indices = src.indices;
+
+        if (!out.valid()) { ++degenerate; continue; }
+        snap.meshes.push_back(std::move(out));
+    }
+
+    if (skippedInvisible > 0) {
+        snap.capabilities.note("invisible entity", Support::Full, "not drawn, as the scene asks", skippedInvisible);
+    }
+    if (skippedNoMesh > 0) {
+        snap.capabilities.note("entity with no mesh", Support::Full, "nothing to intersect", skippedNoMesh);
+    }
+    if (skippedSkinned > 0) {
+        snap.capabilities.note("skinned entity", Support::Unsupported,
+                               "CPU skinning is not built yet; drawing the bind pose would place the character "
+                               "wrongly with no warning, so it is omitted and counted here",
+                               skippedSkinned);
+    }
+    if (degenerate > 0) {
+        snap.capabilities.note("degenerate mesh", Support::Unsupported, "empty or malformed index/vertex data", degenerate);
+    }
+    if (water > 0) {
+        snap.capabilities.note("water surface", Support::Degraded,
+                               "the mesh is a flat CPU sheet; ripples, swell, foam and refraction live in "
+                               "shaders/water.wgsl and are not reproduced",
+                               water);
+    }
+    if (grid > 0) {
+        snap.capabilities.note("grid-styled entity", Support::Degraded,
+                               "MeshStyle::Grid is a shader look; shaded as an ordinary surface", grid);
+    }
+
+    // ---- what exists in the scene and cannot be reached at all ------------------------------------
+    if (!scene.particles.empty()) {
+        snap.capabilities.note("particle system", Support::Unsupported,
+                               "GPU-only by construction (src/scene/particles.hpp): the CPU holds settings and the "
+                               "simulation lives in compute shaders, so no positions exist to intersect",
+                               static_cast<int>(scene.particles.size()));
+    }
+    if (!scene.procedurals.empty()) {
+        snap.capabilities.note("procedural / scatter", Support::Unsupported,
+                               "instanced scatter is reachable on the CPU but is not translated yet; it arrives with "
+                               "Embree instancing rather than as baked triangle soup",
+                               static_cast<int>(scene.procedurals.size()));
+    }
+    if (!scene.sdfs.empty()) {
+        int raymarch = 0;
+        for (const auto& s : scene.sdfs) {
+            if (s.renderMode != scene::SdfRenderMode::Mesh) ++raymarch;
+        }
+        if (raymarch > 0) {
+            snap.capabilities.note("SDF object (raymarch)", Support::Unsupported,
+                                   "no triangles exist in Raymarch mode; spatial::SdfTree is CPU-evaluable but "
+                                   "sphere tracing is a separate integrator path",
+                                   raymarch);
+        }
+    }
+    if (scene.environment.volumeDensity > 0.0f) {
+        snap.capabilities.note("volumetrics", Support::Unsupported,
+                               "participating media are a stated non-goal for now (spec section 72)", 1);
+    }
+
+    return snap;
+}
+
+} // namespace avgen::pathtrace
