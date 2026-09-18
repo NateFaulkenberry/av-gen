@@ -188,6 +188,24 @@ void bulletWrapped(const char* fmt, ...) IM_FMTARGS(1);
 // `ui_logic.hpp`'s `itemWidthBesideLabel`, which is where its test lives.
 [[nodiscard]] float itemWidthForLabel(const char* label, float trailing = 0.0f);
 
+// ---- toolbars that do not run off the side ------------------------------------------------------
+//
+// `ImGui::SameLine()` unconditionally, which is how every toolbar in this application was built,
+// keeps a row together until the panel is narrower than the row -- after which the remaining
+// controls are drawn outside the window, clipped, and unreachable, because a docked panel has no
+// horizontal scrollbar to bring them back.
+//
+// Call `sameLineOrWrap` where `SameLine()` was, with the width of the item about to be submitted.
+// `rowStartX` is the window-local x a wrapped row restarts at, so a toolbar under an indented
+// heading stays under it.
+void sameLineOrWrap(float nextItemWidth, float rowStartX = 0.0f);
+
+// Widths for the two shapes `sameLineOrWrap` is given, measured in the current font and style so a
+// call site never has to guess at padding.
+[[nodiscard]] float buttonWidth(const char* label);
+// An item of `itemWidth` followed by its own label, which is how ImGui lays a combo or slider out.
+[[nodiscard]] float labelledItemWidth(float itemWidth, const char* label);
+
 // A tooltip whose text wraps instead of growing a window wider than the screen.
 //
 // This repository writes three- and four-sentence tooltips. A tooltip is an auto-resizing window,

@@ -435,10 +435,14 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
     ImGui::TextDisabled("%d track(s), %d key(s), %d layer(s)", report.trackCount, report.keyCount,
                         report.layersRealised);
 
+    // The row wraps rather than running off the side. At 1000 points wide it used to end in a
+    // "Catch playhead" button drawn half outside the window: clipped, and unreachable, because a
+    // docked panel has no horizontal scrollbar to scroll it back into view. Each step asks whether
+    // the next control fits before committing to the same line.
     ImGui::SetCursorPosX(columnX);
     ImGui::SetNextItemWidth(110);
     ImGui::Combo("snap", &snapMode_, kSnapNames, IM_ARRAYSIZE(kSnapNames));
-    ImGui::SameLine();
+    sameLineOrWrap(labelledItemWidth(90.0f, "sections"), columnX);
     ImGui::SetNextItemWidth(90);
     ImGui::Combo("sections", &sectionSnap_, kSectionSnapNames, IM_ARRAYSIZE(kSectionSnapNames));
     if (ImGui::IsItemHovered()) {
@@ -446,13 +450,13 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
                           "`free` keeps whatever you land on, to the millisecond.\n"
                           "A snapped boundary takes the beat's own time, not a rounded one.");
     }
-    ImGui::SameLine();
+    sameLineOrWrap(labelledItemWidth(110.0f, "horizontal zoom"), columnX);
     ImGui::SetNextItemWidth(110);
     ImGui::SliderFloat("horizontal zoom", &zoom_, 0.25f, 8.0f, "%.2fx");
     if (ImGui::IsItemHovered()) {
         tooltip("How much of the piece fits across the strip.");
     }
-    ImGui::SameLine();
+    sameLineOrWrap(labelledItemWidth(110.0f, "vertical zoom"), columnX);
     ImGui::SetNextItemWidth(110);
     // Scales every lane together rather than one of them, so the strip keeps its proportions and a
     // taller waveform does not come at the cost of the lanes beside it.
@@ -461,13 +465,13 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
         tooltip("How tall the lanes are. Useful for reading the waveform, or for fitting\n"
                           "a long cast on screen at once.");
     }
-    ImGui::SameLine();
+    sameLineOrWrap(buttonWidth("Fit"), columnX);
     if (ImGui::Button("Fit")) {
         zoom_ = 1.0f;
         laneZoom_ = 1.0f;
         view_ = 0.0;
     }
-    ImGui::SameLine();
+    sameLineOrWrap(buttonWidth("Rebuild"), columnX);
     if (ImGui::Button("Rebuild")) {
         dirty_ = true;
     }
@@ -475,7 +479,7 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
         tooltip("Bake the sequence onto the timeline again.\n"
                           "Happens on its own after an edit; this is for after a scene change.");
     }
-    ImGui::SameLine();
+    sameLineOrWrap(buttonWidth("Catch playhead"), columnX);
     // A toggle drawn as a pressed button rather than a checkbox, because it is a mode the strip is
     // in and the strip's behaviour changes while it is on -- and because it sits in a row of
     // buttons, where a checkbox reads as a setting rather than a state.

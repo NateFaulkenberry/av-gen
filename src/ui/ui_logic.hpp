@@ -700,6 +700,24 @@ inline constexpr float kMinItemWidth = 60.0f;
     return std::max(room, std::max(minItem, 1.0f));
 }
 
+// Whether the next item on a toolbar row still fits before the window's right edge.
+//
+// A toolbar built from `SameLine()` is a row until it is wider than the panel, and then the tail of
+// it is drawn outside the window -- where ImGui clips it and, because a panel has no horizontal
+// scrollbar, there is no way to reach it at all. The Sequence panel's row ended in "Catch playhead"
+// and at 1000 points wide the button read "Catcl" and could not be pressed.
+//
+// All four values are in the same space (screen x, or window-local x -- the caller picks, and the
+// comparison does not care which as long as they agree).
+[[nodiscard]] inline bool toolbarItemFits(float lastItemRight, float nextItemWidth, float spacing,
+                                          float rightEdge) {
+    if (!std::isfinite(lastItemRight) || !std::isfinite(nextItemWidth) || !std::isfinite(spacing) ||
+        !std::isfinite(rightEdge)) {
+        return true; // nonsense in: keep the row rather than scatter it down the panel
+    }
+    return lastItemRight + spacing + nextItemWidth <= rightEdge;
+}
+
 // Where a two-column row's second column starts, given a fixed column the label may be too long for.
 //
 // A hard-coded `SameLine(190.0f)` is a column until somebody writes a label wider than 190 points,

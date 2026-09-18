@@ -234,6 +234,30 @@ void bulletWrapped(const char* fmt, ...) {
     va_end(args);
 }
 
+float buttonWidth(const char* label) {
+    const float text = (label == nullptr) ? 0.0f : ImGui::CalcTextSize(label, nullptr, true).x;
+    return text + ImGui::GetStyle().FramePadding.x * 2.0f;
+}
+
+float labelledItemWidth(float itemWidth, const char* label) {
+    const float text = (label == nullptr) ? 0.0f : ImGui::CalcTextSize(label, nullptr, true).x;
+    return itemWidth + (text > 0.0f ? ImGui::GetStyle().ItemInnerSpacing.x + text : 0.0f);
+}
+
+void sameLineOrWrap(float nextItemWidth, float rowStartX) {
+    const ImGuiStyle& style = ImGui::GetStyle();
+    // Screen space on both sides of the comparison. `GetItemRectMax` is where the item that was
+    // just submitted ends; the content region's right edge is where the window stops drawing.
+    const float lastRight = ImGui::GetItemRectMax().x;
+    const float edge = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+    if (toolbarItemFits(lastRight, nextItemWidth, style.ItemSpacing.x, edge)) {
+        ImGui::SameLine();
+        return;
+    }
+    // No `SameLine`, so the cursor has already dropped to the next row; only the column is set.
+    ImGui::SetCursorPosX(rowStartX);
+}
+
 void tooltip(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);

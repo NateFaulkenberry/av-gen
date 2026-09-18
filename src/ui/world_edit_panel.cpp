@@ -189,13 +189,17 @@ void WorldEditPanel::drawModeBar(app::Engine& engine, WorldEditor& editor) {
         }
         ImGui::Checkbox("Local space", &editor.localSpace);
         helpMarker("Move along the object's own axes rather than the world's. X toggles it.");
+        // Three snap fields on one row, which is a row until the left dock is dragged in. At 1000
+        // points the third ("Step", the scale snap) was drawn entirely outside the panel: not
+        // truncated, absent, and with no horizontal scrollbar to reach it. The row wraps instead.
+        const float snapStart = ImGui::GetCursorPosX();
         ImGui::SetNextItemWidth(70.0f);
         ImGui::DragFloat("Grid", &editor.snap.move, 0.05f, 0.0f, 50.0f, "%.2f m");
         helpMarker("0 is off. With a grid set, a move lands on multiples of it.");
-        ImGui::SameLine();
+        sameLineOrWrap(labelledItemWidth(70.0f, "Angle"), snapStart);
         ImGui::SetNextItemWidth(70.0f);
         ImGui::DragFloat("Angle", &editor.snap.rotate, 1.0f, 0.0f, 90.0f, "%.0f deg");
-        ImGui::SameLine();
+        sameLineOrWrap(labelledItemWidth(70.0f, "Step"), snapStart);
         ImGui::SetNextItemWidth(70.0f);
         ImGui::DragFloat("Step", &editor.snap.scale, 0.01f, 0.0f, 1.0f, "%.2fx");
     }

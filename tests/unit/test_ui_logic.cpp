@@ -764,3 +764,19 @@ TEST_CASE("A tooltip wraps before it is wider than the screen", "[ui][wrap]") {
     CHECK(tooltipWrapWidth(0.0f, 0.0f) > 0.0f);
     CHECK(tooltipWrapWidth(15.0f, 10.0f) >= kMinWrapWidth);
 }
+
+TEST_CASE("A toolbar row knows when the next control will not fit", "[ui][wrap]") {
+    using avgen::ui::toolbarItemFits;
+
+    // Room for it: 400 wide, the last control ends at 300, the next is 80 with 8 of spacing.
+    CHECK(toolbarItemFits(300.0f, 80.0f, 8.0f, 400.0f));
+    // Exactly to the edge still counts -- the item's last pixel is the window's last pixel.
+    CHECK(toolbarItemFits(300.0f, 92.0f, 8.0f, 400.0f));
+    // One point over is not a near miss: ImGui clips it, and a docked panel has no horizontal
+    // scrollbar, so the control is not reachable by any means.
+    CHECK_FALSE(toolbarItemFits(300.0f, 93.0f, 8.0f, 400.0f));
+
+    // The Sequence panel's row at 1000 points, which is where this was found: the last control
+    // before "Catch playhead" ended past the edge already.
+    CHECK_FALSE(toolbarItemFits(930.0f, 120.0f, 8.0f, 980.0f));
+}
