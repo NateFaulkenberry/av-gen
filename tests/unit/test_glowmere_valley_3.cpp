@@ -1,4 +1,4 @@
-// Glowmere Valley 3: the autonomous-character showcase (ADR-338).
+// Glowmere Valley 3: the autonomous-character showcase (ADR-340).
 //
 // This file starts as the instrument and becomes the guard. The probes print what the hills
 // actually are -- which biome owns them, and at what slope -- because the vegetation question the
@@ -981,7 +981,7 @@ TEST_CASE("Glowmere Valley 3: the watcher attends to another character", "[glowm
     // And it stopped outside the other body rather than inside it. Both declare `bodyRadius` 0.9
     // to the crowd field, so 1.8 m is where separation holds them; the bound is 1.4 m because the
     // field is a push and not a constraint and a body being walked into by a third can be
-    // squeezed. Before `ground` learned to declare a body (ADR-338), this measured **0.238 m** --
+    // squeezed. Before `ground` learned to declare a body (ADR-340), this measured **0.238 m** --
     // one alien standing inside another -- because `EntityState::radius` was written by `Explore`
     // and by nothing else, so a `decide` character was invisible to every other character.
     CHECK(w.nearestTo > 1.4f);
@@ -1254,7 +1254,7 @@ TEST_CASE("Glowmere Valley 3's hills are wooded, and the tree line is where ADR-
 // Every other arm in this file loads the scene. This one loads the **project**, applies it exactly
 // where `Engine::loadProject` does, re-installs the entity layer for exactly the reason ADR-264
 // gives, and then asserts that nothing moved: the bodies are where the scene put them, the
-// emitters are the size the scene authored, and the two engine-level opt-ins ADR-338 added are
+// emitters are the size the scene authored, and the two engine-level opt-ins ADR-340 added are
 // actually on. Its control is valley-2-multicam, where the same walk finds 248 overrides.
 TEST_CASE("Glowmere Valley 3 runs the world its scene describes, loaded as a project",
           "[glowmere3][project]") {
@@ -1299,7 +1299,7 @@ TEST_CASE("Glowmere Valley 3 runs the world its scene describes, loaded as a pro
     INFO(bodies << " bodies checked against the scene through the parameter stack");
     CHECK(bodies == 5);
 
-    // The two opt-ins ADR-338 added are registered and on, which is the difference between a
+    // The two opt-ins ADR-340 added are registered and on, which is the difference between a
     // setting and a decoration (ADR-225). They are also the two knobs an overlay would drive.
     for (const char* who : {"scout", "wader", "drylander", "elder", "watcher"}) {
         const params::IParameter* stall =

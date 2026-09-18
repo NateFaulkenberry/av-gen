@@ -198,7 +198,7 @@ struct DecisionDebug {
     std::size_t dwellRejections = 0;       // switches the dwell refused
     std::size_t marginRejections = 0;      // switches the margin refused
     std::size_t remembered = 0;            // percepts held past the tick that saw them (ADR-333 §5)
-    // Times this decider gave up on a plan it was not executing (ADR-338). Zero on every body
+    // Times this decider gave up on a plan it was not executing (ADR-340). Zero on every body
     // that does not opt in, and zero on one that does and never stalls -- which is the
     // distinction that makes the number worth printing rather than a decoration.
     std::size_t stalls = 0;

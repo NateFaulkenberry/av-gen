@@ -23,7 +23,7 @@ camera_name, second, label = sys.argv[1], float(sys.argv[2]), sys.argv[3]
 source = sys.argv[4] if len(sys.argv) > 4 else "glowmere-valley-3"
 # An optional shift applied to every scatter layer's seed: a different world for the cast to
 # perceive, on the same terrain, with their authored config unchanged to the byte. This is the
-# picture half of ADR-338 §4's variation arm -- the numbers say the itinerary moves, and a frame
+# picture half of ADR-340 §4's variation arm -- the numbers say the itinerary moves, and a frame
 # from the same camera at the same second is what shows it.
 ecology_shift = int(sys.argv[5]) if len(sys.argv) > 5 else 0
 

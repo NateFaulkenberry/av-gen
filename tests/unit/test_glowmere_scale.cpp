@@ -121,7 +121,7 @@ const std::map<std::string, float>& beforeFungi() {
 fs::path sourceDir() { return fs::path(AVGEN_SOURCE_DIR); }
 fs::path worldDir() { return sourceDir() / "examples" / "world"; }
 
-// The four valley-2-family scenes plus valley 3 (ADR-338). Valley 3 has no farm in it, so its
+// The four valley-2-family scenes plus valley 3 (ADR-340). Valley 3 has no farm in it, so its
 // `cast` is the five aliens and the tallest of them is the same `alien-ranger` at the same 1.94x
 // -- which is the point of adding it: a new Glowmere is exactly where a scale ladder goes wrong,
 // and it is where ADR-213's 3.6x reached four files without anything failing.

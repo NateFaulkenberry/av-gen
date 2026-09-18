@@ -7,7 +7,7 @@
 
 `examples/world/glowmere-valley-3.{scene.json,json}` are **outputs**. Nothing here reads them, so
 there is no rebase branch, no "which half is mine", and no way for a saved session to survive a
-regeneration. That is deliberate and it is the whole hygiene argument of ADR-338:
+regeneration. That is deliberate and it is the whole hygiene argument of ADR-340:
 
 * `tools/make_glowmere_valley_2.py` re-reads its own project (`REBASE = os.path.exists(PDST)`)
   because by the time it was written the project had become edited state -- 3,063 parameters where
@@ -51,7 +51,7 @@ Carried out of valley 2's *project* rather than its scene, and there is exactly 
     shared by all four is a patch -- and they land in valley 3's *scene*, because a yaw a
     generator writes is authoring and the project stays at four parameters.
 
-Dropped, deliberately (ADR-338 names each one):
+Dropped, deliberately (ADR-340 names each one):
 
     the saucer `visitor`, its `visitor-beam`, and the `staging` block that runs the abduction
     the sixteen farm animals
@@ -627,7 +627,7 @@ def territory(weight, tolerance, pull):
     and remembers where it had been -- and the loop is open again.
 
     This is a mitigation in data and it is not a fix. The fix is a stall term in the selector, and
-    ADR-338 records it as a revisit trigger rather than pretending a territory is one.
+    ADR-340 records it as a revisit trigger rather than pretending a territory is one.
 
     It is also, on its own terms, the right thing for these two characters: an explorer with no
     home walks off the map, and `GoalTaste::homeRadius` cannot express the pull back because it
@@ -659,7 +659,7 @@ def considerers_for(name):
     it and comes back, on a cycle the size of the selector's dwell.
 
     So the showcase's approach-and-resume is `interest`, whose novelty memory is exactly the
-    "resume" half, and `investigate` is not used on any of the five. That is recorded in ADR-338
+    "resume" half, and `investigate` is not used on any of the five. That is recorded in ADR-340
     as a finding about the considerer rather than worked around here.
     """
     if name == "scout":
@@ -823,7 +823,7 @@ for (name, asset, x, gy, z, seed, walk, run, turn) in CAST_SITES:
                 # anything, and how many places it remembers having been. Both bounded, both
                 # rebuilt by a replay.
                 ("memorySeconds", 9.0), ("memoryCapacity", 16.0), ("visitedCapacity", 6.0),
-                # ADR-338's stall breaker, opted into here and nowhere else in the repository.
+                # ADR-340's stall breaker, opted into here and nowhere else in the repository.
                 # A body that has not moved 1.5 m in 12 s remembers where its plan was taking it
                 # and drops the commitment, so `goalWeight` discounts the errand that is not
                 # working and something else wins. Twelve seconds is longer than any `dwell` in

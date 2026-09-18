@@ -1,4 +1,4 @@
-# ADR-338: The showcase is a rebuild, the river was a wall, and the hills were banded off on purpose
+# ADR-340: The showcase is a rebuild, the river was a wall, and the hills were banded off on purpose
 
 **Status:** Accepted
 **Date:** 2026-09-18
