@@ -46,6 +46,7 @@
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <cstdio>
 #include <fstream>
 #include <map>
 #include <string>
@@ -429,4 +430,41 @@ TEST_CASE("the Glowmere projects do not undo their scenes", "[glowmere][scale]")
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// A probe, not a test: the whole of Glowmere's scale ladder in one column of metres, so that the
+// question "what stands next to what" is answered by a measurement rather than by four files.
+//
+//   ./build/release/tests/avgen_tests "[.probe][glowmere-scale]"
+TEST_CASE("probe: the Glowmere scale ladder", "[.probe][glowmere-scale]") {
+    if (!assetsPresent()) {
+        SKIP("assets/farm or assets/aliens is not present");
+    }
+    const json doc = readJson(worldDir() / "glowmere-valley-2-multicam.scene.json");
+    const auto cast = castOf(doc, farmNaturalHeights(), alienNaturalHeights());
+    const Body& tallest = tallestOf(cast);
+
+    std::vector<std::pair<std::string, float>> ladder;
+    for (const auto& [name, layer] : scatterOf(doc)) {
+        ladder.emplace_back(fmt::format("{} (scatter, max)", name), layer.height * layer.maxScale);
+    }
+    for (const Fungus& f : fungiOf(doc)) {
+        ladder.emplace_back(fmt::format("{} (hero fungus)", f.name), f.height);
+        ladder.emplace_back(fmt::format("{} gill line", f.name), f.gillLine);
+    }
+    for (const Body& b : cast) {
+        ladder.emplace_back(fmt::format("{} (body)", b.node), b.height);
+    }
+    std::sort(ladder.begin(), ladder.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+
+    std::printf("\n===== Glowmere's scale ladder, metres =====\n");
+    std::printf("  the tallest body is %s at %.3f m (node scale %.4g)\n\n", tallest.node.c_str(),
+                static_cast<double>(tallest.height), static_cast<double>(tallest.scale));
+    for (const auto& [name, metres] : ladder) {
+        std::printf("  %7.3f  %-28s  %6.2f bodies\n", static_cast<double>(metres), name.c_str(),
+                    static_cast<double>(metres / tallest.height));
+    }
+    std::fflush(stdout);
 }
