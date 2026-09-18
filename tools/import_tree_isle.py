@@ -413,8 +413,9 @@ def main(argv: list[str]) -> int:
                     "PBR, no shader baking or growth export', and it means it -- the Glowmere look "
                     "in hero_pass/renders/Glowmere.png is a Blender shading setup that did not "
                     "survive this export. Only one of the seven materials carries any emission at "
-                    "all. The scene restores the palette with material overrides; see "
-                    "docs/decisions/ADR-338."
+                    "all. A scene cannot restore it -- a `material` block on a `kind: \"gltf\"` "
+                    "node is parsed and dropped -- so tree-of-life-hero-glowmere.glb does, and "
+                    "that is what the scene loads. See docs/decisions/ADR-338."
                 ),
                 **tree,
             },
