@@ -456,6 +456,14 @@ running four agents.** Every number below is therefore an *upper* bound: a quiet
 faster, and the ratios between arms are more trustworthy than the absolute milliseconds. Where a
 number is used to make a decision below, the decision survives a 2x error in it.
 
+**The primitives table was measured twice, on separate runs at different loads, and reproduces.**
+Second run against first: scan @60 m 0.097 vs 0.098 us, `sample` 10.160 vs 10.325, `steer` 57.466
+vs 59.135, `requestPath` 23.763 vs 24.969, `pathValid` 72.573 vs 74.481, `clearanceAt` 0.024 vs
+0.024, `heroSightline` @20 m 1666.795 vs 1720.779, grid build 239.4 vs 243.9 ms. Every figure moved
+under 4% and every one moved *down*, which is the direction the load-average bias predicts and is
+the closest thing to a check on it available without a quiet machine. No ratio in this document
+changes, and no conclusion turns on a factor smaller than two.
+
 Every arm has a control. The scaling arms report the furthest distance any body actually walked:
 `nil` must read 0 m and the others must not. Two arms could not fail when first written and both
 are recorded in the commit message, because a probe that cannot fail proves nothing (ADR-182).
