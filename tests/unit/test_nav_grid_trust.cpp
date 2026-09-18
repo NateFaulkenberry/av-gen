@@ -24,6 +24,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <string>
@@ -250,7 +251,8 @@ TEST_CASE("where the grid vouches, it gives the world's answer", "[navigation][g
     CHECK(blocked > 0);
 }
 
-TEST_CASE("the terrain-room field is a distance to unstandable ground", "[navigation][grid]") {
+TEST_CASE("the terrain-room field is a distance to unstandable ground",
+          "[navigation][grid][trust]") {
     Flat flat;
     entity::Navigator nav(&flat.map, flat.clearance);
     nav.buildGrid(4.0f);
@@ -265,22 +267,31 @@ TEST_CASE("the terrain-room field is a distance to unstandable ground", "[naviga
     CHECK(open > 4);
 
     SECTION("and it falls off towards the shore rather than being a boolean") {
-        // A row of samples marching at the water. Room must decrease and reach zero; a field that
-        // was merely "walkable or not" would step from its maximum straight to nothing.
+        // A row of samples marching across the water from the open ground to the far bank. Room
+        // must fall to zero over the lake and climb again on the other side; a field that was merely
+        // "walkable or not" would step from its maximum straight to nothing and back.
+        //
+        // The first version of this section asserted the *last* sample was zero, which is wrong --
+        // the far bank is standable ground, and the row comes out the other side. It passed review
+        // and never ran: the test case carried `[navigation][grid]` and every filter used while it
+        // was being written named `[trust]`, `[reach]` or `[terrain]`. The full suite found it on the
+        // first run that included it. An arm that never runs is the same lie as one that cannot
+        // fail (ADR-182), and this is what that looks like from the inside.
         std::vector<int> room;
-        for (float x = -10.0f; x >= -90.0f; x -= 4.0f) {
+        for (float x = -10.0f; x >= -100.0f; x -= 4.0f) {
             room.push_back(grid.terrainRoom(glm::vec2(x, 0.0f)));
         }
-        REQUIRE(room.size() > 8);
-        CHECK(room.front() > 0);
-        CHECK(room.back() == 0);
+        REQUIRE(room.size() > 16);
+        CHECK(room.front() > 4);
+        CHECK(*std::min_element(room.begin(), room.end()) == 0);
         int descents = 0;
         for (std::size_t i = 1; i < room.size(); ++i) {
             descents += room[i] < room[i - 1] ? 1 : 0;
-            // A Chebyshev distance transform cannot fall by more than one per cell of travel.
-            CHECK(room[i - 1] - room[i] <= 1);
+            // A Chebyshev distance transform cannot change by more than one per cell of travel, in
+            // either direction. This is the property that makes it a distance and not a label.
+            CHECK(std::abs(room[i] - room[i - 1]) <= 1);
         }
-        INFO("room along the row falls " << descents << " times");
+        INFO("room along the row: " << room.front() << " .. 0, falling " << descents << " times");
         CHECK(descents > 2);
     }
 
@@ -497,8 +508,15 @@ TEST_CASE("a solid dropped at runtime closes the route through a rectangle", "[n
     obstacles->build();
     entity::Navigator nav(&flat.map, flat.clearance);
     nav.setObstacles(obstacles);
-    nav.buildGrid(4.0f);
-    entity::NavGrid& grid = const_cast<entity::NavGrid&>(*nav.grid());
+    // Built here rather than through `buildGrid`, because this test is the grid's *owner* and a
+    // navigator's view of one is deliberately const: every walker in a world shares the same graph
+    // and a per-walker copy of the navigator must not be able to rebuild it behind the others'
+    // backs. Whoever built it may rebuild it; that is the host, and today there is no seam for a
+    // scene or an action to reach it (ADR-297).
+    auto grid_ = std::make_shared<entity::NavGrid>();
+    grid_->build(nav, 4.0f);
+    nav.setGrid(grid_);
+    entity::NavGrid& grid = *grid_;
 
     const glm::vec2 west(-40.0f, 0.0f);
     const glm::vec2 east(40.0f, 0.0f);

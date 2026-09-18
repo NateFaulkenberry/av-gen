@@ -22,6 +22,25 @@
 //   det      Determinism. Does play(t) equal seek(t)? Does the coarse behaviour-LOD band change
 //            the answer? Each with an arm that must disagree, so an arm that agrees means something.
 //
+// Added by P7 (ADR-295 / ADR-297), because the plan named this file as the instrument item 1 is
+// finished against and it had no arm that could see inside a walkability query:
+//
+//   n  nav      Decomposes `Navigator::sample` into the world evaluations it is made of, on
+//               *walkable* ground -- the primitives table above samples a lattice most of whose
+//               points are rejected by the first rule, and prices the cheap path through the
+//               function as the cost of the function. Its control is arithmetic: every composite
+//               must cost at least the parts listed under it, and when one does not, the load
+//               average is what the table is measuring.
+//   a  agree    Asks the grid and then the world about twenty thousand segments of each of the two
+//               shapes a walker uses, and counts the answers that differ in the dangerous direction.
+//               Its control is the naive substitution -- trust any walkable cell, no margin, no
+//               gradient test -- which must disagree, and does, 880 times against the rule's 18.
+//   v  verify   Walks two identical populations for ninety seconds, one grid-assisted, and diffs
+//               them at six horizons. Its control is the same configuration against itself, which
+//               must read 0.000000 m, and the furthest-body column, which must not read 0 m.
+//   y  dynamic  Prices a partial grid rebuild against a whole one. Its control is that no solids
+//               were added, so a correct rebuild cannot move a cell.
+//
 // CPU only -- no GPU, no window, no renderer. Minima over repeats (ADR-170).
 //
 // DELETE THIS FILE, and its two lines in tools/CMakeLists.txt, once the plan it priced is built.
@@ -684,25 +703,32 @@ void routeDivergence(const entity::Navigator& nav, int count, const char* label)
 
 // What a door that closes costs (ADR-297). A rect rebuild against a whole one, on the real grid.
 void dynamicRebuild(const entity::Navigator& nav, int repeats) {
-    const entity::NavGrid* grid = nav.grid();
     std::printf("\n== a partial rebuild against a whole one ==\n");
-    if (grid == nullptr || !grid->valid()) {
+    if (nav.grid() == nullptr || !nav.grid()->valid()) {
         std::printf("  this scene has no navigation graph\n");
         return;
     }
-    auto& mutable_grid = const_cast<entity::NavGrid&>(*grid);
+    // This probe's own grid, built from the scene's navigator. A navigator's view of a grid is const
+    // by design -- every walker in a world shares one and a copy must not be able to rebuild it --
+    // so the thing that rebuilds a grid is the thing that owns it (ADR-297).
+    entity::NavGrid grid;
+    grid.build(nav, nav.grid()->cellSize());
+    const std::size_t walkable = grid.stats().walkable;
+    const std::size_t regions = grid.stats().regions;
     const glm::vec2 middle = (nav.worldMin() + nav.worldMax()) * 0.5f;
     for (const float half : {4.0f, 12.0f, 40.0f}) {
         double best = std::numeric_limits<double>::max();
         for (int r = 0; r < repeats; ++r) {
-            best = std::min(best, mutable_grid.rebuildRect(nav, middle - half, middle + half));
+            best = std::min(best, grid.rebuildRect(nav, middle - half, middle + half));
         }
         std::printf("  %5.0f m rect: %8.3f ms   (a whole build is %.1f ms)\n",
-                    static_cast<double>(half * 2.0f), best, grid->stats().buildMs);
+                    static_cast<double>(half * 2.0f), best, grid.stats().buildMs);
     }
-    std::printf("  the control: every rebuild above added no solids, so the graph must be unchanged"
-                " -- %zu walkable, %zu region(s)\n",
-                grid->stats().walkable, grid->stats().regions);
+    // The control: nothing was added to the obstacle field, so a correct rebuild cannot have moved
+    // a single cell. A rebuild that quietly relabelled the world would report the same milliseconds.
+    std::printf("  control: no solids were added, so the graph must be unchanged -- walkable %zu -> "
+                "%zu, regions %zu -> %zu\n",
+                walkable, grid.stats().walkable, regions, grid.stats().regions);
 }
 
 void gridStats(const entity::Navigator& nav) {

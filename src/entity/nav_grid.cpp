@@ -237,6 +237,14 @@ void NavGrid::fillCell(const Navigator& nav, glm::ivec2 at, std::vector<std::uin
 // The totals, counted rather than accumulated. A partial rebuild that tried to add and subtract its
 // own deltas would be four counters and four chances to leak one; twenty-four thousand increments
 // is 0.02 ms and cannot drift.
+//
+// One deliberate difference from the loop this replaced: `water` now counts every cell carrying
+// `NavWater`, where the old loop counted only the cells whose ground is literally beneath a water
+// surface and left out the ones flagged wet by a `Submerged` reject inside the freeboard margin. A
+// statistic that disagrees with the flag it is named after is a trap, and the flag is what the
+// overlay colours. The two agree on every world in this repository -- Glowmere 1,200 and the lab
+// fixture 380, unchanged -- so nothing moved; the difference would only show on a world with a
+// `waterMargin` shelf, and there the new number is the one that matches the picture.
 void NavGrid::recount() {
     stats_.walkable = 0;
     stats_.water = 0;
