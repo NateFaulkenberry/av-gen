@@ -158,7 +158,8 @@ their stand-off down with them: 14.0 m to 3.9 m for `rook`. That is the differen
 this change rather than a side effect.
 
 The **baked** `cameraShotSpans` carry the subject's radius from the day the director baked them, so
-they were re-sized in place -- thirty-five of them in the multicam project. The timings are musical
+they were re-sized in place -- the fifteen creature spans in the multicam project, with all
+forty-one then checked against the hero table. The timings are musical
 and are untouched.
 
 The two **fixed** cameras are not re-aimed. `Valley Wide` stands 268 m off and `UFO Watch` follows
