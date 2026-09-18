@@ -901,6 +901,16 @@ std::size_t RouteConsiderer::price(const DecisionContext& ctx, std::vector<Price
             continue;
         }
         const float wetWade = wadeAlong(*ctx.nav, from, wet.waypoints);
+        // `place.weight` is 1 for an authored destination and the goal model's own weight for one
+        // the goal model chose -- and the goal model's weight already carries a straight-line
+        // distance damping, so a candidate that came from there is damped twice: once by how far
+        // away it is and once by what the route to it costs. **That is a known simplification and
+        // not an oversight.** Undoing it means re-deriving `goalWeight` without its falloff, which
+        // is a second copy of the goal model and the thing ADR-333 §3 went to some trouble to have
+        // exactly one of. The two terms are monotone in the same direction, so the ordering they
+        // produce together is the ordering either produces alone wherever they agree; where they
+        // disagree -- a near place behind a river against a far one on this bank -- the route term
+        // is the larger of the two and wins, which is the case this class exists for.
         Priced first;
         first.destination = place.name;
         first.at = place.position;
@@ -995,7 +1005,14 @@ void RouteConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& 
             // draw of the action's target lands on the thing rather than on the sea floor.
             walk.target.point = glm::vec3(at.x, last ? p.at.y : 0.0f, at.y);
             if (last && approach_ > 0.0f) {
-                walk.target.point = standOff(here, walk.target.point, approach_);
+                // Stand off along the **last leg**, not along the line from where the body is
+                // standing now. On a detour those are different directions -- the body approaches
+                // the far bank from the east and the straight line from its start comes across
+                // the river -- and a stand-off measured from the start would put a body that went
+                // round on the wrong side of the thing it walked round the water to reach.
+                const glm::vec2 previous = k > 0 ? p.waypoints[k - 1] : glm::vec2(here.x, here.z);
+                walk.target.point = standOff(glm::vec3(previous.x, here.y, previous.y),
+                                             walk.target.point, approach_);
             }
             walk.tolerance = last ? std::max(goalTolerance_, 0.75f) : legTolerance_;
             actions_.push_back(std::move(walk));

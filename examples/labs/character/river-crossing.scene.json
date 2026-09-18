@@ -234,6 +234,32 @@
     "updateHz": 0.0,
     "cullDistance": 0.0
    }
+  },
+  {
+   "name": "plodder",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-scout.glb",
+   "position": [
+    -96.0,
+    0.0,
+    -8.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    3.61,
+    3.61,
+    3.61
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0
+   }
   }
  ],
  "entities": [
@@ -374,6 +400,45 @@
     "hertz": 4.0,
     "occlusionTestsPerSecond": 0.0
    }
+  },
+  {
+   "name": "plodder",
+   "node": "plodder",
+   "seed": 7333,
+   "cullDistance": 600.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Idle",
+    "fall": "Fall_loop"
+   },
+   "gait": {
+    "walkSpeed": 1.6,
+    "runSpeed": 3.2
+   },
+   "actions": [
+    {
+     "kind": "move",
+     "name": "straight-across",
+     "target": [
+      -96.0,
+      0.0,
+      46.0
+     ],
+     "speed": 1.6,
+     "tolerance": 1.5
+    }
+   ],
+   "behaviors": [
+    {
+     "kind": "ground",
+     "slopeAlign": 0.55,
+     "footprint": 0.8
+    }
+   ]
   }
  ],
  "post": {

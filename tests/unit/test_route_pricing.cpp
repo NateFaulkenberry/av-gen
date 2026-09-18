@@ -432,6 +432,7 @@ TEST_CASE("the cheap body fords and the dear body goes round", "[entity][route][
     World world(riverFixture());
     float waderDeepest = 0.0f;
     float dryDeepest = 0.0f;
+    float plodderDeepest = 0.0f;
     float waderEast = -1000.0f;
     float dryEast = -1000.0f;
     // The overlay at the moment the choice is live, not at the end of the run. Once a body is
@@ -463,6 +464,11 @@ TEST_CASE("the cheap body fords and the dear body goes round", "[entity][route][
         dryDeepest = std::max(dryDeepest, depthUnder(world.nav(), dry));
         waderEast = std::max(waderEast, wader.x);
         dryEast = std::max(dryEast, dry.x);
+        // `plodder` is the arm for the design decision rather than for the taste: one authored
+        // `move` action straight at the far bank, no decider at all. It is what an option whose
+        // single action named the destination would have produced.
+        plodderDeepest =
+            std::max(plodderDeepest, depthUnder(world.nav(), world.entity("plodder").state().position()));
     });
     const glm::vec3 wader = world.entity("wader").state().position();
     const glm::vec3 dry = world.entity("drylander").state().position();
@@ -479,6 +485,13 @@ TEST_CASE("the cheap body fords and the dear body goes round", "[entity][route][
     CHECK(waderDeepest > 1.2f);
     CHECK(dryDeepest < 0.6f);
     CHECK(waderDeepest > 3.0f * dryDeepest);
+    // **The control for "the option has to be the route".** `plodder` carries one authored `move`
+    // to the far bank and no decider, which is exactly what an option whose single action named
+    // the destination would have emitted. It wades, because `NavigatorPath::route` answers a move
+    // with the straight line and local steering cannot get a body round water -- so a detour
+    // expressed as one `Move` would have reported the detour in the overlay and forded on screen.
+    WARN(fmt::format("plodder, one authored move straight across: deepest {:.2f} m", plodderDeepest));
+    CHECK(plodderDeepest > 1.2f);
     // And the drylander got round by going east, past the end of the channel at x = -50; the wader
     // never left the line between its start and the far bank.
     CHECK(dryEast > -45.0f);

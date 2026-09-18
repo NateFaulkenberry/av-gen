@@ -56,8 +56,10 @@ margin between a route and itself and would print the same line twice in the ove
 `NavGrid::path(request, cost)` has taken a `NavPathCost` since ADR-093. The seam above it,
 `Navigator::requestPath(request)`, did not, so the one call an action layer is told to use was the
 one call that could not ask the question. The one-argument form is now written as a call to the
-two-argument one with `NavPathCost{}` — one search, not two implementations, and every existing
-caller's answer is the same bits it was.
+two-argument one with `NavPathCost{}` — one search, not two implementations. That every existing
+caller's answer is unchanged is not an assertion of taste: `tests/unit/test_decision_extraction.cpp`
+compares 3,600 samples of five `Explore` bodies against a golden taken before any of this, on the
+raw bits, and 0 lines differ.
 
 The gridless branch does not apply the price and cannot: there is no graph to spend it on, so two
 requests at two prices return the same straight line. `price()` therefore refuses to score at all
@@ -68,15 +70,21 @@ is no water between here and there.
 
 ## 3. The option has to *be* the route, or the overlay is lying
 
-The first version emitted one `Move` to the far bank and let the action layer walk it. It reported
-the detour and the body waded.
+`NavigatorPath::route` (`src/entity/action.cpp`) answers a move with **the straight line to the
+goal** and leaves the rest to local steering, which — `navigation.hpp` says so in as many words —
+"gets a walker round a trunk and a boulder, and it cannot get one round a lake". So an option whose
+single action named the far bank would be a body that waded whatever the considerer decided, with
+the overlay reporting the detour and the film showing the ford.
 
-`NavigatorPath::route` (`src/entity/action.cpp`) answers a move with the straight line to the goal
-and leaves the rest to local steering, which — `navigation.hpp` says so in as many words — "gets a
-walker round a trunk and a boulder, and it cannot get one round a lake". So the winning option's
-actions are a **`Move` per waypoint of the route that was priced**, and the middle legs carry a
-`legTolerance` wide enough not to oscillate on a corner and narrow enough not to cut one. Cutting
-the corner of a detour is walking into the river the detour was chosen to avoid.
+That is stated from reading the path provider, and it is also **measured**, because a design
+decision defended only by reading the code is a decision nobody can check. `river-crossing.scene.json`
+carries a third body, `plodder`, with one authored `move` action straight at the far bank and no
+decider at all — precisely what the naive option would have emitted. Its deepest water is
+PLODDER_DEPTH m against the drylander's 0.27 m, in the same run.
+
+So the winning option's actions are a **`Move` per waypoint of the route that was priced**, and the
+middle legs carry a `legTolerance` wide enough not to oscillate on a corner and narrow enough not to
+cut one. Cutting the corner of a detour is walking into the river the detour was chosen to avoid.
 
 ---
 
@@ -174,7 +182,23 @@ measured here because nothing in Glowmere carries one yet.
 
 ---
 
-## 8. Consequences
+## 8. The distance is damped twice when the goal model chose the place
+
+`score` multiplies the destination's own weight by the route's falloff. For an authored
+destination that weight is 1 and the route price is the only term. For one the goal model chose it
+is `goalWeight`'s answer, which already carries a **straight-line** distance damping — so such a
+candidate is damped once by how far away it is and again by what the route costs.
+
+This is a known simplification and it is recorded rather than fixed. Undoing it means re-deriving
+`goalWeight` without its falloff, which is a second copy of the goal model and precisely the thing
+ADR-333 §3 went to some trouble to have exactly one of. The two terms are monotone in the same
+direction, so where they agree the ordering is unchanged; where they disagree — a near place behind
+a river against a far one on this bank — the route term is the larger and wins, which is the case
+this class exists for.
+
+---
+
+## 9. Consequences
 
 * **Nothing that exists changes.** No scene in the repository declares a `route` considerer, and no
   behaviour gained a stage. `Navigator::requestPath`'s one-argument answer is bit-identical.
@@ -211,5 +235,7 @@ measured here because nothing in Glowmere carries one yet.
   publish one option, which is correct and is also silent about why.
 * A second cost term worth bracketing the same way — slope, for a character that will not climb.
   The shape generalises and the two-request structure does not; a third probe is a third A\*.
+* A character for which the double damping in §8 reads wrong -- one whose taste says "anywhere
+  within 150 m" and whose routes are all long. The symptom is a flat option list.
 * `maxDestinations` at 4 meeting a crowd. The cap is per character per decision tick and nothing
   budgets it across the world, which is the shape ADR-290 had to give occlusion.
