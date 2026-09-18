@@ -1023,24 +1023,40 @@ public:
           bodyRadiusDefault_(readFloat(s, "bodyRadius", 0.0f)),
           headroomDefault_(readFloat(s, "headroom", 0.0f)),
           footprintDefault_(readFloat(s, "footprint", 0.55f)),
-          // Taste. Read once and held, rather than registered: an author sets what a character
-          // cares about when they build it, and "how much does it like water" is not a thing
-          // anybody automates on a timeline.
-          landmarkAffinity_(readFloat(s, "landmarkAffinity", 1.0f)),
-          characterAffinity_(readFloat(s, "characterAffinity", 1.3f)),
-          glowAffinity_(readFloat(s, "glowAffinity", 1.2f)),
-          waterAffinity_(readFloat(s, "waterAffinity", 0.9f)),
-          vistaAffinity_(readFloat(s, "vistaAffinity", 0.7f)),
           strollChance_(readFloat(s, "strollChance", 0.3f)),
           waypointRadius_(readFloat(s, "waypointRadius", 2.2f)),
           repathSeconds_(readFloat(s, "repathSeconds", 6.0f)),
           stuckSeconds_(readFloat(s, "stuckSeconds", 2.5f)),
-          noveltyRadius_(readFloat(s, "noveltyRadius", 22.0f)),
           // ADR-194. Read here and held, like the affinities: the *shape* of a hop is a property of
           // the body -- how a particular creature moves -- while how far it will leap is the knob
           // registered above, because that is the one an author might put under a signal.
           jumpRangeDefault_(readFloat(s, "jumpRange", 0.0f)),
           jumpSignal_(readString(s, "jumpSignal", "")) {
+        // Taste, and the novelty radius that goes with it. Read once and held, rather than
+        // registered: an author sets what a character cares about when they build it, and "how
+        // much does it like water" is not a thing anybody automates on a timeline.
+        //
+        // **They live on a considerer now** (ADR-310). The five affinities, the distance falloff
+        // and the visited-place suppression were `Explore`'s goal model, inlined in `pickGoal`;
+        // `entity::goalWeight` is that arithmetic with a name, and this class holds an
+        // `InterestConsiderer` over it the way a character with a `decide` behaviour does. The
+        // three range knobs stay registered parameters and are copied onto the taste each
+        // selection, because those *are* things a scene keyframes.
+        GoalTaste taste;
+        taste.weight[0] = readFloat(s, "landmarkAffinity", 1.0f);
+        taste.weight[1] = readFloat(s, "characterAffinity", 1.3f);
+        taste.weight[2] = readFloat(s, "glowAffinity", 1.2f);
+        taste.weight[3] = readFloat(s, "waterAffinity", 0.9f);
+        taste.weight[4] = readFloat(s, "vistaAffinity", 0.7f);
+        taste.noveltyRadius = readFloat(s, "noveltyRadius", 22.0f);
+        goals_.setTaste(taste);
+        // The omniscient list, deliberately and for now. ADR-270's finding is that reading
+        // `interestPoints()` is why two characters in one world walk the same route, and the
+        // considerer can read percepts instead with one word -- but `Explore` is what five
+        // Glowmere characters are, and changing which list it scores is a changed film. The lab's
+        // case 6 is the before-arm and case 14's explorer is the after; moving `Explore` across is
+        // an owner's decision, not a refactor's.
+        goals_.setSource(InterestConsiderer::Source::Omniscient);
         jump_.gravity = readFloat(s, "jumpGravity", 18.0f);
         jump_.apex = readFloat(s, "jumpApex", 1.1f);
         jump_.landSeconds = readFloat(s, "landSeconds", 0.3f);
@@ -1737,17 +1753,6 @@ private:
         }
     }
 
-    [[nodiscard]] float affinity(InterestKind kind) const {
-        switch (kind) {
-        case InterestKind::Landmark: return landmarkAffinity_;
-        case InterestKind::Character: return characterAffinity_;
-        case InterestKind::Glow: return glowAffinity_;
-        case InterestKind::Water: return waterAffinity_;
-        case InterestKind::Vista: return vistaAffinity_;
-        }
-        return 1.0f;
-    }
-
     // Choose somewhere to go. Weighted over the interest registry, with a chance of simply going
     // for a walk instead -- a character that only ever moved between named places would visit the
     // same five spots forever, which is §6's "looks like a debugging waypoint system" in another
@@ -1762,56 +1767,59 @@ private:
 
         const bool stroll = ctx.rng != nullptr && ctx.rng->nextFloat() < strollChance_;
         if (!stroll && ctx.world != nullptr) {
+            // **The goal model, which now lives in `entity::goalWeight`** (ADR-310 §3). What was
+            // here was the affinity switch, the distance falloff and the visited-place scan, all
+            // inlined; what is here now is the same arithmetic called by name, so a guard and an
+            // explorer weigh a place with one function instead of two copies of one.
+            //
+            // The three registered knobs are copied onto the taste each selection rather than
+            // held, because a scene may drive `maxRange` from a signal and a taste read once would
+            // be the thing ADR-225 calls a decoration.
+            GoalTaste taste = goals_.taste();
+            taste.minRange = lo;
+            taste.maxRange = hi;
+            taste.homeRadius = home;
+            DecisionContext dctx;
+            dctx.time = ctx.time;
+            dctx.dt = ctx.dt;
+            dctx.self = ctx.self;
+            dctx.state = &state;
+            dctx.visited = recent_;
+            dctx.nav = ctx.nav;
+            dctx.world = ctx.world;
+            dctx.bus = ctx.bus;
             candidates_.clear();
-            weights_.clear();
+            goals_.candidates(dctx, taste, candidates_);
             float total = 0.0f;
-            for (const InterestPoint& point : ctx.world->interestPoints()) {
-                const glm::vec2 at(point.position.x, point.position.z);
-                const float distance = glm::length(at - flat);
-                // The near bound is also what keeps a character from choosing *itself*: the host
-                // lists every node an entity drives as a landmark, and this one is standing on its
-                // own. Nothing else is needed for that, and a name comparison would only be a
-                // second rule that could disagree with this one.
-                if (distance < lo || distance > hi) {
-                    continue;
-                }
-                if (home > 0.0f && glm::length(at - anchor) > home) {
-                    continue;
-                }
-                float weight = affinity(point.kind) * std::max(point.weight, 0.0f);
-                // Nearer is likelier, but only mildly: a falloff steep enough to matter is a
-                // character that never crosses its own world.
-                weight *= 1.0f / (1.0f + distance / std::max(hi * 0.5f, 1.0f));
-                for (const glm::vec3& seen : recent_) {
-                    if (glm::length(glm::vec2(seen.x - at.x, seen.z - at.y)) < noveltyRadius_) {
-                        weight *= 0.12f; // been there
-                        break;
-                    }
-                }
-                if (weight <= 0.0f) {
-                    continue;
-                }
-                candidates_.push_back(&point);
-                weights_.push_back(weight);
-                total += weight;
+            for (const GoalCandidate& candidate : candidates_) {
+                total += candidate.weight;
             }
+            // **The weighted roll stays here, and that is not laziness.** ADR-269's selector takes
+            // the highest score subject to a dwell and a margin; `Explore` takes a weighted draw
+            // from `ctx.rng`, which is a *stream*. Replacing the draw with an argmax would change
+            // every route in Glowmere, and moving the draw anywhere that consumed a different
+            // number of values from the stream would re-cast every later choice it makes -- D2 is
+            // the rule that exists because of exactly this. So the extraction is of the model and
+            // not of the choice, and `tests/unit/test_decision_extraction.cpp` is what says the
+            // difference is nothing at all. ADR-310 §4 is the argument for leaving the stream
+            // where it is and what it would cost to unify.
             if (total > 0.0f && ctx.rng != nullptr) {
                 float roll = ctx.rng->nextFloat() * total;
                 for (std::size_t i = 0; i < candidates_.size(); ++i) {
-                    roll -= weights_[i];
+                    roll -= candidates_[i].weight;
                     if (roll <= 0.0f) {
-                        goal_ = candidates_[i]->position;
-                        goalName_ = candidates_[i]->name;
-                        goalKind_ = candidates_[i]->kind;
+                        goal_ = candidates_[i].position;
+                        goalName_ = candidates_[i].name;
+                        goalKind_ = candidates_[i].kind;
                         hasGoal_ = true;
                         return true;
                     }
                 }
                 // Floating point ran out before the list did. Take the last one rather than
                 // reporting failure, which would make a rounding error look like an empty world.
-                goal_ = candidates_.back()->position;
-                goalName_ = candidates_.back()->name;
-                goalKind_ = candidates_.back()->kind;
+                goal_ = candidates_.back().position;
+                goalName_ = candidates_.back().name;
+                goalKind_ = candidates_.back().kind;
                 hasGoal_ = true;
                 return true;
             }
@@ -1844,8 +1852,11 @@ private:
     float idleMinDefault_, idleMaxDefault_, observeDefault_, observeMinDefault_, observeMaxDefault_;
     float minRangeDefault_, maxRangeDefault_, homeDefault_, runChanceDefault_, slopeAlignDefault_;
     float bodyRadiusDefault_, headroomDefault_, footprintDefault_, wadeDragDefault_;
-    float landmarkAffinity_, characterAffinity_, glowAffinity_, waterAffinity_, vistaAffinity_;
-    float strollChance_, waypointRadius_, repathSeconds_, stuckSeconds_, noveltyRadius_;
+    float strollChance_, waypointRadius_, repathSeconds_, stuckSeconds_;
+    // The goal model (ADR-310). Held by value because it is configuration -- one taste, one source
+    // -- and holds no per-character state of its own; the two things that *are* per-character, the
+    // visited list and the live ranges, are handed to it through the `DecisionContext`.
+    InterestConsiderer goals_{nullptr};
 
     params::Parameter<float>* speed_ = nullptr;
     params::Parameter<float>* runSpeed_ = nullptr;
@@ -1909,8 +1920,7 @@ private:
     params::Parameter<float>* jumpRange_ = nullptr;
     float jumpRangeDefault_ = 0.0f;
     // Scratch for the weighted pick, kept so a selection every few seconds does not allocate.
-    std::vector<const InterestPoint*> candidates_;
-    std::vector<float> weights_;
+    std::vector<GoalCandidate> candidates_;
 };
 
 // ---- ground ----------------------------------------------------------------------------------

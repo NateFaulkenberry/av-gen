@@ -247,6 +247,17 @@ writing a second 700-line class.
 
 ### B.3 Recommendation: a utility scorer over the existing queue
 
+**Built 2026-09-18 as ADR-310** (`src/entity/decision.{hpp,cpp}`, the `decide` behaviour, four stock
+considerers). Three things this section did not anticipate and one it got exactly right. The dwell
+had to be counted in **decision ticks** rather than seconds, for the reason ADR-290 gave the sense
+cadence: an accumulator drifts with the frame rate and a replayed decision boundary lands on a
+different step. A decider had to **stand off** from what it walks to, because the action tier's path
+provider refuses a goal that is not navigable and a landmark is usually solid. And the sentence
+below -- "`Explore` minus its hardcoded goal model *is* a considerer" -- is right about the model
+and wrong about the choice: `Explore` takes a **weighted draw from a stream** where the selector
+takes a maximum, and replacing one with the other changes every route in Glowmere. The extraction
+moved the model and left the roll, and a 3,600-sample byte-identical position trace is what says so.
+
 `IConsiderer` and `Option` in `src/entity/character_ai.hpp:§3`.
 
 A considerer is handed a `DecisionContext` -- the character's state, its percepts, the navigator,
@@ -639,7 +650,9 @@ thousand. Three mitigations, in order of value:
 - **Sense** (new, `IPerception`): budgeted, cadenced, grid-backed, occlusion off by default and
   honest about it.
 - **Decide** (new, `IConsiderer`): a scored option list composed from several considerers, a
-  selector with dwell and margin, output is `ActionDesc`s onto `Authority::Routine`.
+  selector with dwell and margin, output is `ActionDesc`s onto `Authority::Routine`. **Built:
+  ADR-310.** Four stock considerers; a guard and an explorer are the same C++ class with different
+  lists. A fifth that prices a route is `docs/character-ai-plan.md` §P11.
 - **Act** (unchanged): `ActionQueue`, the eleven behaviours, `Navigator`, `stage::Staging`.
 - **Express** (extended): `ISkeletonQuery` implemented, sockets made real, a two-slot masked layer
   stack so `reaction` and `lookTarget` stop being published into nothing, root motion behind an

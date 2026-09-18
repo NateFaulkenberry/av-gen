@@ -27,13 +27,15 @@ namespace {
 //   * The LOD Lab's `decides` is `cs_cull_classify` and not `composition.cpp`'s thresholds,
 //     because the thresholds are data the shader reads and the rung is the shader's decision. The
 //     quantity it compares them against turned out to be the thing worth owning.
-//   * The Character Intelligence Lab's `decides` is `behaviors.cpp:Explore` and not any file with
-//     "decision" or "ai" in its name, because **nobody decides** (ADR-269). The only autonomous
-//     mind in this engine is hardcoded inside one 700-line behaviour class, which is why every
-//     autonomous character in Glowmere is an explorer. Naming a decision layer that does not exist
-//     would be the registry telling somebody where to go and sending them nowhere; naming `Explore`
-//     sends them to the code that is actually making the choice today, and it will be renamed when
-//     P3 extracts the goal model out of it -- at which point this test fails, which is the point.
+//   * The Character Intelligence Lab's `decides` was `behaviors.cpp:Explore` for as long as
+//     **nobody decided** (ADR-269): the only autonomous mind in this engine was hardcoded inside
+//     one 700-line behaviour class, which is why every autonomous character in Glowmere is an
+//     explorer, and naming a decision layer that did not exist would have been the registry sending
+//     somebody nowhere. That entry carried its own expiry -- "it will be renamed when P3 extracts
+//     the goal model out of it, at which point this test fails, which is the point." P3 landed
+//     (ADR-310) and this is that rename. `decision.cpp:Selector` is where the choice is made now:
+//     `Explore` still *has* a goal model, but it calls `entity::goalWeight` for it and the class
+//     that decides between courses of action is here.
 constexpr std::array<LabDescriptor, 15> kLabs{{
     {LabId::Animation, "animation", "Animation Lab", LabStatus::InProgress,
      "Is this pose the one the clip asked for at this time?",
@@ -49,7 +51,7 @@ constexpr std::array<LabDescriptor, 15> kLabs{{
      "socket resolves to",
      "what the joints do once the entity is placed -- that is the Animation Lab; and whether the "
      "body reached a draw call -- that is the Visibility Lab",
-     "src/entity/behaviors.cpp:Explore", "docs/character-intelligence-lab.md",
+     "src/entity/decision.cpp:Selector", "docs/character-intelligence-lab.md",
      "examples/labs/character/character-intelligence-lab.scene.json",
      "examples/labs/character/cases.json"},
 
