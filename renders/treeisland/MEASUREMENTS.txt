@@ -311,3 +311,20 @@ and that `nodeWorldTransform(layer) == nodeWorldTransform(tree-of-life)` to 1e-5
 registration property stated as an equation. The existing control still stands -- the island is
 asserted to have actually moved between samples (a band, 3 to 30), because every hierarchy check
 in the file would pass with the hierarchy deleted if the island stood still.
+
+Full CPU suite on this branch, after `cmake -S . -B build/release` and a rebuild:
+
+    ./build/release/tests/avgen_tests "~[gpu]"
+
+    test cases:    2295 |    2290 passed | 4 skipped | 1 failed as expected
+    assertions: 2225088 | 2225087 passed | 1 failed as expected
+
+  Zero failures. Main at the branch point (59b0885c) is 2,295 cases / 2,225,003 assertions, so
+  this branch is the same case count -- no TEST_CASE was added -- and 85 assertions more, which
+  are the five-layer registration loop plus the four extra asset paths the "relative assets" test
+  now walks.
+
+  The run before the test file was updated is worth recording too, because it is the one that
+  found the work: 2295 cases | 2287 passed | 3 failed, 2225048 assertions | 9 failed. All three
+  cases and all nine assertions were this pass's own -- `assetNodes == 2`, `tree->kind == Gltf`,
+  and the seven environment checks in §7 above. Nothing else in the suite noticed the change.
