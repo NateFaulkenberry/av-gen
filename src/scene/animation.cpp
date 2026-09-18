@@ -5,6 +5,7 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <limits>
@@ -414,6 +415,33 @@ void SkinnedRig::hold() {
     }
 }
 
+RootMotionSample SkinnedRig::rootMotionAt(double now) const {
+    RootMotionSample sample;
+    if (rootMotion.empty() || !player.active()) {
+        return sample;
+    }
+    const int stateIndex = player.currentStateIndex();
+    if (stateIndex < 0 || static_cast<std::size_t>(stateIndex) >= player.states().size()) {
+        return sample;
+    }
+    const auto clipIndex = static_cast<int>(player.states()[static_cast<std::size_t>(stateIndex)].clip);
+    const RootMotionBinding* binding = rootMotion.find(clipIndex);
+    if (binding == nullptr) {
+        return sample; // 163 of the 168 clips leave here, having done nothing at all
+    }
+    sample.displacement = rootMotionDisplacement(skeleton, clips, *binding,
+                                                 player.stateTime(clips, now), rootMotionScratch);
+    sample.active = true;
+    // The run this displacement belongs to: which state, entered when. Two samples may only be
+    // subtracted from one another when these agree. Hashed rather than carried as a pair because
+    // the consumer's only question is "is this the same run", and a `double` start second compared
+    // for equality across a seek is the shape of bug this repository has paid for before.
+    const auto bits = static_cast<std::uint64_t>(
+        std::bit_cast<std::uint64_t>(player.currentStart()));
+    sample.generation = (bits * 1099511628211ull) ^ (static_cast<std::uint64_t>(stateIndex) + 1ull);
+    return sample;
+}
+
 bool SkinnedRig::evaluate(double now, float hz) {
     if (!skeleton.valid()) {
         return false;
@@ -437,6 +465,29 @@ bool SkinnedRig::evaluate(double now, float hz) {
     // ADR-260: this writes `pose`, which becomes `palette`, which the renderer draws. It does not
     // write the simulation position, the motion offset or the node transform, and cannot: the layer
     // module has no way to reach any of them.
+    // ADR-335, and it goes *before* the layers rather than after, because it is a statement about
+    // where the body is and they are statements about what parts of it are doing. A head turning
+    // to look at something must turn on top of a body that has already been put where the
+    // simulation now says it is; compensating afterwards would move an aim layer's pivot out from
+    // under the rotation it just computed.
+    //
+    // ADR-260, both halves, said out loud: this writes `pose`, which becomes `palette`, which the
+    // renderer draws -- **and** the same number is read back out through `rootMotionAt` into
+    // `EntityState::travel`, which is `MotionAuthority::Simulation`. It is the only thing in this
+    // file that touches the second one, it can only do it for a clip a scene named, and the two
+    // writes are equal and opposite so the drawn body does not move.
+    if (!rootMotion.empty()) {
+        const RootMotionSample sample = rootMotionAt(t);
+        if (sample.active) {
+            const int stateIndex = player.currentStateIndex();
+            const auto* binding = rootMotion.find(
+                stateIndex >= 0 ? static_cast<int>(player.states()[static_cast<std::size_t>(stateIndex)].clip)
+                                : -1);
+            if (binding != nullptr) {
+                applyRootMotionCompensation(*binding, sample.displacement, pose);
+            }
+        }
+    }
     layerStats = layers.apply(skeleton, clips, t, pose);
     skinningPalette(skeleton, pose, scratchModel, palette);
     if (reseed || previousPalette.size() != palette.size()) {
