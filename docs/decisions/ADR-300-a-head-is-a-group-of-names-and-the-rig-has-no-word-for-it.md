@@ -296,9 +296,14 @@ after `test_tree_gpu` and `test_texture_share`, in the same neighbourhood on eve
 this branch, three crashes.
 
 It is **not this work**. The control is the merge base, `9d5347c`, built in its own worktree and run
-the same way under the same lock: **it crashes too**, with the same signal, in the same region. And
-`[tree]` — the only GPU tag that poses a skinned rig, 239 joints of it — **passes in isolation**,
-134 assertions in 5 test cases.
+the same way under the same lock: **it crashes too**, with the same signal, in the same region.
+
+And every GPU test that could reach a posed skeleton passes on this branch:
+`[skinning],[animation],[character],[motion],[tree],[character5_3]` together are **11,743 assertions
+in 28 test cases, 0 failures**, including the 239-joint skinned tree and its motion-vector arm. The
+layer stack cannot be reached from any of those scenes in any case — no scene in this repository
+authors a layer, and `apply()` returns on its first line when the stack is empty — which is why
+every existing render is byte-identical.
 
 Recorded here rather than fixed, because it belongs to whoever owns the render suite and because the
 honest thing to say about a crash you did not cause is where its control was taken. The CPU suite is
