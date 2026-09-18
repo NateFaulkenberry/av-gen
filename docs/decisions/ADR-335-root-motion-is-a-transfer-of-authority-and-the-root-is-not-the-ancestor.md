@@ -79,8 +79,8 @@ written is why it is known to be wrong rather than shipped.
 
 ```
 [0] rig                       <- the armature wrapper; no clip animates it
-  [1] root.x                  <- children: foot.l, toes… no: foot.l, thigh_twist.l,
-                                 foot.r, thigh_twist.r.  Four joints, all leg.
+  [1] root.x                  <- children: foot.l, thigh_twist.l, foot.r,
+                                 thigh_twist.r.  Four joints, and all of them leg.
   [12] Backpack   [13] spine_05.x   [24..27] spine_04.x .. spine_01.x
   [28] hand.l     [48] hand.r       [68/71] forearm_stretch.l/.r
   [74] Antenna    [78] Eye_L        [80] Eye_R   [82] head.x   [83] Mouth
