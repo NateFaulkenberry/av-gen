@@ -1,0 +1,349 @@
+#include "scene/pose_layers.hpp"
+
+#include "scene/animation.hpp"
+
+#include <fmt/format.h>
+
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+
+#include <algorithm>
+#include <cmath>
+
+namespace avgen::scene {
+namespace {
+
+constexpr float kDegrees = 57.2957795131f;
+constexpr glm::quat kIdentity{1.0f, 0.0f, 0.0f, 0.0f};
+
+[[nodiscard]] glm::vec3 safeNormalize(const glm::vec3& v) {
+    const float len2 = glm::dot(v, v);
+    return len2 > 1e-12f ? v * (1.0f / std::sqrt(len2)) : glm::vec3(0.0f);
+}
+
+[[nodiscard]] float wrapPi(float a) {
+    while (a > 3.14159265358979f) {
+        a -= 6.28318530717959f;
+    }
+    while (a < -3.14159265358979f) {
+        a += 6.28318530717959f;
+    }
+    return a;
+}
+
+// The clip second an additive layer samples at. Wrapped in double and only then narrowed, because
+// a timeline is minutes long and a float loses a millisecond of a walk cycle somewhere past twenty
+// minutes -- which is exactly the sort of drift that shows up as "the offline render does not match
+// the window" and gets blamed on the renderer.
+[[nodiscard]] float additivePhase(const AnimationClip& clip, double now, float rate) {
+    const double span = static_cast<double>(clip.length());
+    if (span <= 0.0) {
+        return clip.start;
+    }
+    double u = std::fmod(now * static_cast<double>(rate), span);
+    if (u < 0.0) {
+        u += span;
+    }
+    return clip.start + static_cast<float>(u);
+}
+
+} // namespace
+
+const char* poseLayerKindName(PoseLayerKind kind) {
+    switch (kind) {
+    case PoseLayerKind::Aim: return "aim";
+    case PoseLayerKind::Additive: return "additive";
+    }
+    return "aim";
+}
+
+bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out) {
+    if (name == "aim") {
+        out = PoseLayerKind::Aim;
+        return true;
+    }
+    if (name == "additive") {
+        out = PoseLayerKind::Additive;
+        return true;
+    }
+    return false;
+}
+
+const char* poseLayerDriveName(PoseLayerDrive drive) {
+    switch (drive) {
+    case PoseLayerDrive::Manual: return "manual";
+    case PoseLayerDrive::Look: return "look";
+    case PoseLayerDrive::Reaction: return "reaction";
+    }
+    return "manual";
+}
+
+bool poseLayerDriveFromName(std::string_view name, PoseLayerDrive& out) {
+    if (name == "manual") {
+        out = PoseLayerDrive::Manual;
+        return true;
+    }
+    if (name == "look") {
+        out = PoseLayerDrive::Look;
+        return true;
+    }
+    if (name == "reaction") {
+        out = PoseLayerDrive::Reaction;
+        return true;
+    }
+    return false;
+}
+
+const char* layerResolutionName(LayerResolution r) {
+    switch (r) {
+    case LayerResolution::Inactive: return "inactive";
+    case LayerResolution::NoJoints: return "no-joints";
+    case LayerResolution::NoPivot: return "no-pivot";
+    case LayerResolution::NoSource: return "no-source";
+    case LayerResolution::NoTarget: return "no-target";
+    case LayerResolution::Applied: return "applied";
+    }
+    return "inactive";
+}
+
+// The aim, as a direction decision rather than an axis decision.
+//
+// Written as "clamp the wanted direction, then take the shortest arc to it" rather than as
+// "decompose the rotation and clamp its components", because the second needs a right-hand axis and
+// a composition order, and this repository has already paid for exactly that mistake once: ADR-260's
+// slope lean resolves pitch in the body frame and roll in the world frame because the Euler triple
+// it writes into composes Rz*Ry*Rx, and a quarter of all headings gimbal-lock. A direction has no
+// composition order to get wrong.
+glm::quat aimRotation(const glm::vec3& from, const glm::vec3& to, float maxYaw, float maxPitch) {
+    const glm::vec3 f = safeNormalize(from);
+    const glm::vec3 t = safeNormalize(to);
+    if (glm::dot(f, f) < 0.5f || glm::dot(t, t) < 0.5f) {
+        return kIdentity;
+    }
+    // Model space is Y-up: glTF says so, and `poseToModel` lands in the file's own scene space.
+    const float e0 = std::asin(std::clamp(f.y, -1.0f, 1.0f));
+    const float e1 = std::asin(std::clamp(t.y, -1.0f, 1.0f));
+    const float a0 = std::atan2(f.x, f.z);
+    const float a1 = std::atan2(t.x, t.z);
+    const float elevation = e0 + std::clamp(e1 - e0, -maxPitch, maxPitch);
+    const float azimuth = a0 + std::clamp(wrapPi(a1 - a0), -maxYaw, maxYaw);
+    const glm::vec3 wanted(std::cos(elevation) * std::sin(azimuth), std::sin(elevation),
+                           std::cos(elevation) * std::cos(azimuth));
+    const float d = std::clamp(glm::dot(f, wanted), -1.0f, 1.0f);
+    if (d > 0.9999999f) {
+        return kIdentity;
+    }
+    const glm::vec3 axis = glm::cross(f, wanted);
+    const float len = glm::length(axis);
+    if (len < 1e-7f) {
+        return kIdentity; // antiparallel is unreachable under any sane clamp; refuse rather than spin
+    }
+    return glm::normalize(glm::angleAxis(std::acos(d), axis * (1.0f / len)));
+}
+
+PoseLayer* PoseLayerStack::find(PoseLayerDrive drive) {
+    for (PoseLayer& layer : layers_) {
+        if (layer.drive == drive) {
+            return &layer;
+        }
+    }
+    return nullptr;
+}
+
+const PoseLayer* PoseLayerStack::find(std::string_view name) const {
+    for (const PoseLayer& layer : layers_) {
+        if (layer.name == name) {
+            return &layer;
+        }
+    }
+    return nullptr;
+}
+
+void PoseLayerStack::clear() {
+    layers_.clear();
+    masks_.clear();
+    results_.clear();
+    clipIndex_.clear();
+    pivotIndex_.clear();
+}
+
+std::vector<std::string> PoseLayerStack::bind(std::vector<PoseLayer> layers, const Skeleton& skeleton,
+                                              const std::vector<AnimationClip>& clips) {
+    layers_ = std::move(layers);
+    return rebind(skeleton, clips);
+}
+
+std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
+                                                const std::vector<AnimationClip>& clips) {
+    std::vector<std::string> problems;
+    masks_.clear();
+    clipIndex_.assign(layers_.size(), -1);
+    pivotIndex_.assign(layers_.size(), -1);
+    results_.assign(layers_.size(), LayerResolution::Inactive);
+    masks_.reserve(layers_.size());
+    for (std::size_t i = 0; i < layers_.size(); ++i) {
+        const PoseLayer& layer = layers_[i];
+        JointMask mask = resolveJointMask(skeleton, layer.mask);
+        for (const std::string& missing : mask.missing) {
+            problems.push_back(fmt::format("layer '{}': this rig has no joint '{}'", layer.name, missing));
+        }
+        if (mask.empty()) {
+            problems.push_back(fmt::format(
+                "layer '{}': its mask named {} joint(s) and this rig carries none of them, so the layer "
+                "can never do anything",
+                layer.name, mask.named));
+        }
+        if (mask.nested > 0 && layer.kind == PoseLayerKind::Aim) {
+            problems.push_back(fmt::format(
+                "layer '{}': {} of its {} masked joints sit inside another masked joint, so an aim "
+                "rotation is applied to them twice",
+                layer.name, mask.nested, mask.joints));
+        }
+        if (layer.kind == PoseLayerKind::Aim) {
+            if (!layer.pivot.empty()) {
+                pivotIndex_[i] = skeleton.find(layer.pivot);
+                if (pivotIndex_[i] < 0) {
+                    problems.push_back(
+                        fmt::format("layer '{}': pivot joint '{}' is not in this rig", layer.name, layer.pivot));
+                }
+            } else {
+                // The first masked joint, in skeleton order. Stated rather than left to chance:
+                // parents precede children, so this is the highest joint of the group.
+                for (std::size_t j = 0; j < mask.weight.size(); ++j) {
+                    if (mask.weight[j] > 0.0f) {
+                        pivotIndex_[i] = static_cast<int>(j);
+                        break;
+                    }
+                }
+            }
+        } else {
+            for (std::size_t c = 0; c < clips.size(); ++c) {
+                const std::string& full = clips[c].name;
+                const std::size_t bar = full.find_last_of('|');
+                const std::string_view shortName =
+                    bar == std::string::npos ? std::string_view(full) : std::string_view(full).substr(bar + 1);
+                if (full == layer.clip || shortName == layer.clip) {
+                    clipIndex_[i] = static_cast<int>(c);
+                    break;
+                }
+            }
+            if (clipIndex_[i] < 0) {
+                problems.push_back(
+                    fmt::format("layer '{}': this rig has no clip '{}'", layer.name, layer.clip));
+            }
+        }
+        masks_.push_back(std::move(mask));
+    }
+    return problems;
+}
+
+PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector<AnimationClip>& clips,
+                                     double now, Pose& pose) {
+    PoseLayerStats stats;
+    stats.layers = static_cast<std::uint32_t>(layers_.size());
+    if (layers_.empty() || masks_.size() != layers_.size() || pose.size() != skeleton.jointCount()) {
+        return stats;
+    }
+    const std::size_t count = skeleton.joints.size();
+    for (std::size_t i = 0; i < layers_.size(); ++i) {
+        PoseLayer& layer = layers_[i];
+        const JointMask& mask = masks_[i];
+        LayerResolution& result = results_[i];
+        if (layer.weight <= 0.0f) {
+            result = LayerResolution::Inactive;
+            continue;
+        }
+        if (mask.empty()) {
+            result = LayerResolution::NoJoints;
+            continue;
+        }
+        if (layer.kind == PoseLayerKind::Aim) {
+            if (pivotIndex_[i] < 0) {
+                result = LayerResolution::NoPivot;
+                continue;
+            }
+            if (!layer.hasTarget) {
+                result = LayerResolution::NoTarget;
+                continue;
+            }
+            // The pivot is read from the pose as the base layers left it, and it stays fixed for the
+            // whole of this layer. When the mask spreads the turn over a chain the pivot therefore
+            // moves under the joints that already turned; the residual that leaves is measured in
+            // tests/unit/test_character_lab_layers.cpp rather than asserted away.
+            poseToModel(skeleton, pose, model_);
+            const glm::vec3 pivot = glm::vec3(model_[static_cast<std::size_t>(pivotIndex_[i])][3]);
+            const glm::vec3 toTarget = layer.target - pivot;
+            if (glm::dot(toTarget, toTarget) < 1e-8f) {
+                result = LayerResolution::NoTarget; // standing inside its own target: no direction exists
+                continue;
+            }
+            const glm::quat full = aimRotation(layer.forward, toTarget, layer.maxYawDegrees / kDegrees,
+                                               layer.maxPitchDegrees / kDegrees);
+            const glm::mat4 toPivot = glm::translate(glm::mat4(1.0f), pivot);
+            const glm::mat4 fromPivot = glm::translate(glm::mat4(1.0f), -pivot);
+            updated_.resize(count);
+            std::uint32_t wrote = 0;
+            // One forward pass, parents before children (Skeleton::valid enforces it). A masked
+            // joint is pre-rotated in *model* space about the shared pivot, which is what makes a
+            // group of siblings turn as one body part -- the case the alien pack forces, where a
+            // head's eyes and mouth are its siblings and not its children.
+            for (std::size_t j = 0; j < count; ++j) {
+                const int parent = skeleton.joints[j].parent;
+                const glm::mat4 parentModel = parent >= 0 && static_cast<std::size_t>(parent) < j
+                                                  ? updated_[static_cast<std::size_t>(parent)]
+                                                  : glm::mat4(1.0f);
+                glm::mat4 world = parentModel * pose.local[j].matrix();
+                const float w = std::min(mask.weight[j] * layer.weight, 1.0f);
+                if (w > 0.0f) {
+                    const glm::quat turn = w >= 1.0f ? full : glm::slerp(kIdentity, full, w);
+                    world = toPivot * glm::mat4_cast(turn) * fromPivot * world;
+                    pose.local[j] = Transform::fromMatrix(glm::inverse(parentModel) * world);
+                    ++wrote;
+                }
+                updated_[j] = world;
+            }
+            result = LayerResolution::Applied;
+            ++stats.applied;
+            stats.joints += wrote;
+            continue;
+        }
+        // Additive.
+        if (clipIndex_[i] < 0 || static_cast<std::size_t>(clipIndex_[i]) >= clips.size()) {
+            result = LayerResolution::NoSource;
+            continue;
+        }
+        const AnimationClip& clip = clips[static_cast<std::size_t>(clipIndex_[i])];
+        // The clip's own first frame is the reference, so what is added is the clip's *displacement*
+        // rather than the clip's pose. Adding the pose would overwrite the gait with a second one at
+        // partial weight, which is a cross-fade -- the thing the engine already had.
+        setRestPose(skeleton, reference_);
+        sampleClip(clip, clip.start, reference_);
+        setRestPose(skeleton, sampled_);
+        sampleClip(clip, additivePhase(clip, now, layer.clipRate), sampled_);
+        std::uint32_t wrote = 0;
+        for (std::size_t j = 0; j < count; ++j) {
+            const float w = std::min(mask.weight[j] * layer.weight, 1.0f);
+            if (w <= 0.0f) {
+                continue;
+            }
+            const Transform& ref = reference_.local[j];
+            const Transform& cur = sampled_.local[j];
+            glm::quat delta = cur.rotation * glm::inverse(ref.rotation);
+            if (delta.w < 0.0f) {
+                delta = -delta; // the short arc, for the same reason blendTransform takes it
+            }
+            pose.local[j].rotation =
+                glm::normalize(glm::slerp(kIdentity, glm::normalize(delta), w) * pose.local[j].rotation);
+            pose.local[j].position += w * (cur.position - ref.position);
+            // Scale is deliberately not added. No clip in the 168 this engine loads animates a joint
+            // scale, and an additive scale has no identity that is not a division.
+            ++wrote;
+        }
+        result = LayerResolution::Applied;
+        ++stats.applied;
+        stats.joints += wrote;
+    }
+    return stats;
+}
+
+} // namespace avgen::scene

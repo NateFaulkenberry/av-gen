@@ -17,6 +17,7 @@
 // `play(state, now)`; everything below that is arithmetic.
 
 #include "core/time.hpp"
+#include "scene/pose_layers.hpp"
 #include "scene/skeleton.hpp"
 
 #include <glm/glm.hpp>
@@ -77,6 +78,12 @@ struct AnimationClip {
 // `time` is clamped to [start, duration]; wrap it yourself for a looping clip. Channels shorter
 // than two keys hold their single value.
 void sampleClip(const AnimationClip& clip, float time, Pose& pose);
+
+// Index of the clip called `name` in `clips`, or -1. Exporters routinely prefix a clip with the rig
+// it came off ("Alien_Low_Green|Walk"), so the part after the last '|' matches too -- an exact match
+// first, across every clip, before any short name is considered. One copy of that rule, because
+// `SkinnedRig::findClip` and the layer stack both have to obey it and two copies drift.
+[[nodiscard]] int findClip(const std::vector<AnimationClip>& clips, std::string_view name);
 
 // ---- the state machine -------------------------------------------------------------------------
 //
@@ -193,8 +200,19 @@ struct SkinnedRig {
     float farHz = 20.0f;          // between nearDistance and cullDistance: this rate
     float cullDistance = 120.0f;  // beyond this, or with no authored-visible entity: not posed
 
+    // ---- layers (ADR-300) ------------------------------------------------------------------
+    // What goes on top of the clip the player is playing: a head turn, a masked additive reaction.
+    // Evaluated inside `evaluate()`, between the player and the palette, so `pose` is always the
+    // *final* pose -- which is what makes `ISkeletonQuery::jointTransform` (ADR-274) answer with a
+    // joint the layers have moved rather than one they have not. A socket on a head that is looking
+    // somewhere follows the look.
+    PoseLayerStack layers;
+    // What the last `evaluate()` spent on them. Structural quantities, never a millisecond
+    // (ADR-170): a layer that reported 0 joints is a layer whose mask missed.
+    PoseLayerStats layerStats;
+
     // ---- evaluated -------------------------------------------------------------------------
-    Pose pose;                              // the local pose the player produced
+    Pose pose;                              // the local pose the player produced, then layered
     std::vector<glm::mat4> palette;         // paletteSize() joint matrices; what the GPU reads
     std::vector<glm::mat4> previousPalette; // the palette this rig was drawn with last frame
     double paletteTime = -1.0;              // the timeline second `palette` was evaluated at
@@ -249,6 +267,8 @@ struct RigStats {
     std::uint32_t rateLimited = 0; // enabled, in range, but not due a new pose this frame
     std::uint32_t culled = 0;    // too far away, or with no authored-visible entity
     std::uint32_t joints = 0;    // joint matrices recomputed this frame
+    std::uint32_t layers = 0;      // ADR-300: layers evaluated this frame, over every posed rig
+    std::uint32_t layerJoints = 0; // joints those layers wrote
     double cpuMs = 0.0;          // wall time spent posing (this is the only clock in here, and it
                                  // reports, it never drives)
 };
