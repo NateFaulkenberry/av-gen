@@ -2,12 +2,12 @@
   "format": "avgen-project",
   "version": 4,
   "app": {
-    "name": "Tree of Life - Floating Island"
+    "name": "Tree of Life - Floating Island (control: no star shells)"
   },
   "assets": {
     "scene": {
       "kind": "composition",
-      "path": "tree-of-life-floating-island.scene.json"
+      "path": "_ctl-no-stars.scene.json"
     }
   },
   "parameters": {

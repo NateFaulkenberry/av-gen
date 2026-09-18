@@ -2,12 +2,12 @@
   "format": "avgen-project",
   "version": 4,
   "app": {
-    "name": "Tree of Life - Floating Island"
+    "name": "Tree of Life - Floating Island (control: no cosmos shader)"
   },
   "assets": {
     "scene": {
       "kind": "composition",
-      "path": "tree-of-life-floating-island.scene.json"
+      "path": "_ctl-no-cosmos-shader.scene.json"
     }
   },
   "parameters": {
@@ -97,12 +97,7 @@
       "chain": {}
     }
   ],
-  "shaders": [
-    {
-      "path": "../../shaders/glowmere-cosmos.wgsl",
-      "stage": "background"
-    }
-  ],
+  "shaders": [],
   "presets": [],
   "timeline": {
     "enabled": false,

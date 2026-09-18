@@ -1,12 +1,12 @@
 {
   "format": "avgen-scene",
   "version": 1,
-  "name": "Tree of Life - Floating Island",
+  "name": "Tree of Life - Floating Island (low angle)",
   "camera": {
     "mode": 1,
-    "position": [158.0, 6.0, 152.0],
-    "target": [0.0, 13.0, 0.0],
-    "fov": 36.0,
+    "position": [132.0, -46.0, 127.0],
+    "target": [0.0, 6.0, 0.0],
+    "fov": 40.0,
     "orbitSpeed": 0.0
   },
   "lights": [
