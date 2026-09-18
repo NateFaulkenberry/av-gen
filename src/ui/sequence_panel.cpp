@@ -81,6 +81,13 @@ constexpr ImU32 kClipSelected = IM_COL32(255, 196, 64, 255);
 // lane of its own -- and its height is reserved out of the strip, so adding it did not push the
 // shots lane back below the fold it was rescued from.
 constexpr float kLaneZoomGripHeight = 12.0f;
+constexpr float kTimeScrollbarHeight = 11.0f;
+// In points, not in fraction: at high zoom a proportional thumb shrinks below the size of the
+// pointer that has to grab it, and the floor has to mean the same thing on a long piece as a short.
+constexpr float kTimeScrollbarMinThumb = 24.0f;
+// One wheel notch moves this fraction of the visible span, so a notch covers the same distance on
+// screen whatever the zoom -- which is what a pan gesture means, unlike a fixed number of seconds.
+constexpr double kWheelPanFraction = 0.12;
 // How much a point of vertical drag is worth. 1/160th means the full range is a drag of about 560
 // points, which is a deliberate, controllable gesture rather than a flick.
 constexpr float kLaneZoomPerPoint = 1.0f / 160.0f;
@@ -153,6 +160,10 @@ void SequencePanel::draw(app::Engine& engine) {
     drawToolbar(engine);
     ImGui::Separator();
     drawStrip(engine);
+    // Under the lanes and above the vertical grip: the scrollbar belongs to the horizontal axis the
+    // lanes sit on, and the grip belongs to their height. Two edges, two handles, each at the edge
+    // it moves.
+    drawTimeScrollbar(lastDuration_, lastSpan_);
     drawLaneZoomGrip();
     drawStripStatus(engine);
     ImGui::Separator();
@@ -463,7 +474,98 @@ void SequencePanel::drawStripControls(app::Engine& engine) {
         ImGui::SetTooltip("Bake the sequence onto the timeline again.\n"
                           "Happens on its own after an edit; this is for after a scene change.");
     }
+    ImGui::SameLine();
+    // A toggle drawn as a pressed button rather than a checkbox, because it is a mode the strip is
+    // in and the strip's behaviour changes while it is on -- and because it sits in a row of
+    // buttons, where a checkbox reads as a setting rather than a state.
+    {
+        const bool on = catchPlayhead_;
+        if (on) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        }
+        if (ImGui::Button("Catch playhead")) {
+            catchPlayhead_ = !catchPlayhead_;
+            // Turning it on catches up immediately rather than waiting for the playhead to next
+            // reach the edge: the request is "follow it", and a mode that visibly does nothing for
+            // the next twenty seconds reads as broken.
+            if (catchPlayhead_) {
+                catchUpNow_ = true;
+            }
+        }
+        if (on) {
+            ImGui::PopStyleColor();
+        }
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Keep the playhead on screen while it plays, and zoom about it rather\n"
+                          "than about the left edge.\n\n"
+                          "The view pages when the playhead reaches the right-hand edge rather than\n"
+                          "scrolling every frame -- a strip that slides continuously under a still\n"
+                          "pointer is much harder to read than one that jumps once a screen.");
+    }
 
+}
+
+// The horizontal scrollbar under the lanes.
+//
+// Until now the only way to move along the piece was a right-drag inside the strip, which is a
+// gesture you have to know about -- there was no *visible* indication that the strip was a window
+// onto something longer, let alone where in it you were. A scrollbar answers both questions
+// without being asked.
+//
+// Driven by `view_` and the visible span rather than by ImGui's own scroll state, because the
+// horizontal axis here is time and its extent is the piece's duration, not a content width ImGui
+// could measure. The thumb's length is therefore the fraction of the piece on screen, which is the
+// same number `zoom_` sets, and the two stay consistent for free.
+//
+// Returns the new leftmost second.
+void SequencePanel::drawTimeScrollbar(double duration, double span) {
+    const float width = std::max(ImGui::GetContentRegionAvail().x, 40.0f);
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    ImGui::InvisibleButton("time-scrollbar", ImVec2(width, kTimeScrollbarHeight));
+    const bool hovered = ImGui::IsItemHovered();
+    const bool active = ImGui::IsItemActive();
+
+    const double maxView = std::max(0.0, duration - span);
+    // A piece that fits entirely on screen has nowhere to scroll, and a full-width thumb that
+    // cannot move is a control that lies about being one. Drawn as a flat rule instead.
+    const bool scrollable = maxView > 1e-6 && duration > 0.0;
+
+    const Palette& pal = palette();
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    const float trackY = origin.y + kTimeScrollbarHeight * 0.5f;
+    draw->AddLine(ImVec2(origin.x, trackY), ImVec2(origin.x + width, trackY), pal.border, 1.0f);
+    if (!scrollable) {
+        return;
+    }
+
+    const float frac = static_cast<float>(std::min(1.0, span / duration));
+    // A thumb that vanishes at high zoom cannot be grabbed, so it has a floor in points rather than
+    // in fraction -- the floor has to mean the same thing on a long piece as on a short one.
+    const float thumbW = std::max(width * frac, kTimeScrollbarMinThumb);
+    const float travel = width - thumbW;
+    const float thumbX = origin.x + travel * static_cast<float>(view_ / maxView);
+
+    if (active) {
+        // Grabbed anywhere on the thumb, the thumb keeps its offset under the pointer; grabbed on
+        // the track, it jumps to the pointer and then drags. Without the offset a grab always
+        // snapped the thumb's left edge to the cursor, which moves the view before the drag starts.
+        const float mouseX = ImGui::GetIO().MousePos.x;
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            scrollGrab_ = (mouseX >= thumbX && mouseX <= thumbX + thumbW) ? mouseX - thumbX
+                                                                         : thumbW * 0.5f;
+        }
+        const float wanted = std::clamp(mouseX - scrollGrab_ - origin.x, 0.0f, std::max(travel, 1.0f));
+        view_ = std::clamp(static_cast<double>(wanted / std::max(travel, 1.0f)) * maxView, 0.0, maxView);
+    }
+
+    const ImU32 tint = active ? pal.accent : (hovered ? pal.borderStrong : pal.border);
+    draw->AddRectFilled(ImVec2(thumbX, origin.y + 2.0f),
+                        ImVec2(thumbX + thumbW, origin.y + kTimeScrollbarHeight - 2.0f), tint,
+                        (kTimeScrollbarHeight - 4.0f) * 0.5f);
+    if (hovered || active) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+    }
 }
 
 // The grip under the lanes: drag it to make them taller.
@@ -655,6 +757,22 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     // Time axis. `view_` is the leftmost second; `zoom_` how many screens the piece takes.
     const double span = duration / static_cast<double>(std::max(zoom_, 0.01f));
 
+    // ---- a zoom keeps the playhead where it is, when catch is on ---------------------------------
+    //
+    // The toolbar's sliders run before this, so by the time the axis is computed the zoom has
+    // already changed and `lastSpan_` still holds the one the current `view_` was chosen for. That
+    // is exactly the pair `viewAfterZoom` needs, and taking it here rather than beside the slider
+    // means the grip under the lanes and any future zoom gesture get the same behaviour without
+    // each having to remember to ask for it.
+    //
+    // Only when catch is on. Zooming about the left edge is the right default for somebody reading
+    // a whole piece; zooming about the playhead is what you want when you are following it.
+    if (catchPlayhead_ && lastSpan_ > 0.0 && std::abs(span - lastSpan_) > 1e-9) {
+        view_ = viewAfterZoom(view_, lastSpan_, span, engine.timelineClock().seconds, duration);
+    }
+    lastSpan_ = span;
+    lastDuration_ = duration;
+
     // ---- the view follows a seek ---------------------------------------------------------------
     //
     // Return sends the playhead to 0:00. Zoomed in at 2:14 that used to leave the strip exactly
@@ -681,7 +799,13 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             // immediately before the new position is visible too -- which is what you want after
             // seeking to a section boundary or a cut.
             view_ = now - span * kSeekLead;
+        } else if (catchPlayhead_ || catchUpNow_) {
+            // Logic's catch: follow while it *plays*, which the rule above deliberately does not,
+            // and page rather than centre. `caughtView` returns the view unchanged for most of a
+            // screen, so this is a comparison and an assignment on the frames where nothing moves.
+            view_ = caughtView(view_, span, now, duration);
         }
+        catchUpNow_ = false;
     }
 
     view_ = std::clamp(view_, 0.0, std::max(0.0, duration - span));
@@ -1721,7 +1845,30 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     if (contextClick_.down && contextClick_.travelled && ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
         view_ -= static_cast<double>(ImGui::GetIO().MouseDelta.x / width) * span;
     }
-    // **The wheel belongs to the panel, not to the strip.**
+    // Horizontal scrolling, by the two gestures that mean it.
+    //
+    // A trackpad's sideways swipe arrives as `MouseWheelH` and a mouse's wheel becomes horizontal
+    // when Shift is held; both are the standard way to say "along" rather than "down", and neither
+    // collides with the vertical wheel the panel keeps. This is the gesture half of the scrollbar
+    // added under the lanes -- until both existed, the only way along the piece was a right-drag
+    // you had to already know about.
+    //
+    // Consumed only while the pointer is over the strip, so the same flick outside it still scrolls
+    // the panel. A screen-fraction step rather than a fixed number of seconds, so one notch covers
+    // the same distance on screen at every zoom.
+    if (hovered) {
+        const ImGuiIO& io = ImGui::GetIO();
+        const float sideways = io.MouseWheelH - (io.KeyShift ? io.MouseWheel : 0.0f);
+        if (sideways != 0.0f) {
+            view_ -= static_cast<double>(sideways) * span * kWheelPanFraction;
+            // A deliberate pan is a statement about where you want to be looking, and catch would
+            // drag it back the moment the playhead reached the edge. Turning catch off here would
+            // be presumptuous; letting it fight the pointer would be worse. It wins on the next
+            // page, which is the frame after the playhead actually needs it.
+        }
+    }
+
+    // **The vertical wheel belongs to the panel, not to the strip.**
     //
     // It used to zoom the time axis, and the strip does not consume the event -- so one flick both
     // zoomed the lanes and scrolled the panel under them, which is two answers to one gesture and

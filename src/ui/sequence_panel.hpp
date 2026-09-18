@@ -143,6 +143,8 @@ private:
     // The drag handle under the lanes: pull it down for taller lanes. Sets the same `laneZoom_` the
     // toolbar's slider does; see the note at the definition for why both exist.
     void drawLaneZoomGrip();
+    // The time scrollbar under the lanes. `span` is the visible duration.
+    void drawTimeScrollbar(double duration, double span);
     void drawInspector(app::Engine& engine);
     void drawShotInspector(app::Engine& engine, seq::Shot& shot);
     // The chase/orbit/POV controls, showing only what the chosen behaviour reads.
@@ -290,6 +292,25 @@ private:
     std::vector<SelectedItem> marqueeKept_;
     bool dirty_ = false;
     int snapMode_ = 2; // Beats
+    // Logic's "catch". When on, the strip follows the playhead during playback -- which the seek
+    // rule deliberately does not do, because dragging the view under a pointer mid-edit is worse
+    // than losing sight of the playhead -- and both zooms keep the playhead where it is on screen
+    // instead of growing the window around its left edge.
+    //
+    // Off by default, and the seek-follow below stays regardless: Return going to 0:00 should take
+    // you there whether or not you have asked to be followed.
+    bool catchPlayhead_ = false;
+    // Set when catch is switched on, so the first frame after catches up instead of waiting for the
+    // playhead to reach the edge of its own accord.
+    bool catchUpNow_ = false;
+    // The visible span the current `view_` was chosen for, so a zoom can be detected after the fact
+    // and the playhead kept where it was on screen.
+    double lastSpan_ = 0.0;
+    // The piece's duration as the strip last computed it, so the scrollbar drawn after it sizes its
+    // thumb from the same number the axis used rather than recomputing one that could differ.
+    double lastDuration_ = 0.0;
+    // Where on the thumb a scrollbar drag was grabbed, so the thumb does not jump under the pointer.
+    float scrollGrab_ = 0.0f;
     float zoom_ = 1.0f;
     // Vertical zoom: a multiplier on every lane's height. One number rather than a height per lane,
     // so the strip keeps its proportions and the lanes stay comparable.
