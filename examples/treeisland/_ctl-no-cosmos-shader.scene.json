@@ -1,7 +1,7 @@
 {
   "format": "avgen-scene",
   "version": 1,
-  "name": "Tree of Life - Floating Island",
+  "name": "Tree of Life - Floating Island (control: no cosmos shader)",
   "camera": {
     "mode": 1,
     "position": [158.0, 6.0, 152.0],

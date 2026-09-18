@@ -113,7 +113,7 @@ endif()
 add_library(tinyexr::tinyexr ALIAS tinyexr)
 
 # ---- Embree (ray/geometry intersection and BVH for the path tracer) ---------------------------
-# ADR-339. Embree owns intersection and acceleration only; the integrator, materials, sampling and
+# ADR-340. Embree owns intersection and acceleration only; the integrator, materials, sampling and
 # output are AV Gen's (spec section 74). Apache-2.0; it vendors sse2neon.h (MIT) for the NEON path.
 #
 # EMBREE_TASKING_SYSTEM=INTERNAL keeps oneTBB out of the build. The path tracer additionally

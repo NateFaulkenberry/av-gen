@@ -1,12 +1,12 @@
 {
   "format": "avgen-scene",
   "version": 1,
-  "name": "Tree of Life - Floating Island",
+  "name": "Tree of Life - Floating Island (root contact)",
   "camera": {
     "mode": 1,
-    "position": [158.0, 6.0, 152.0],
-    "target": [0.0, 13.0, 0.0],
-    "fov": 36.0,
+    "position": [86.0, 18.0, 83.0],
+    "target": [0.0, 2.0, 0.0],
+    "fov": 30.0,
     "orbitSpeed": 0.0
   },
   "lights": [

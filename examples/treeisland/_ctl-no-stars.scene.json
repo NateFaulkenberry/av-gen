@@ -1,7 +1,7 @@
 {
   "format": "avgen-scene",
   "version": 1,
-  "name": "Tree of Life - Floating Island",
+  "name": "Tree of Life - Floating Island (control: no star shells)",
   "camera": {
     "mode": 1,
     "position": [158.0, 6.0, 152.0],
@@ -174,118 +174,6 @@
       "visible": true,
       "roughnessScale": 1.0,
       "emissiveBoost": 1.0
-    },
-    {
-      "name": "cosmos-motes",
-      "kind": "procedural",
-      "parent": "world-root",
-      "position": [0.0, 0.0, 0.0],
-      "procedural": {
-        "source": { "kind": "point", "pointSize": 1.0 },
-        "distribution": {
-          "kind": "grid",
-          "gridCount": [17, 17, 17],
-          "gridSpacing": [66.0, 66.0, 66.0],
-          "center": [0.0, 0.0, 0.0]
-        },
-        "variation": { "seed": 9401, "randomPosition": [44.0, 44.0, 44.0] },
-        "ops": [
-          { "kind": "filterDistance", "pivot": [0.0, 0.0, 0.0], "minDistance": 175.0, "maxDistance": 540.0 },
-          { "kind": "filterProbability", "probability": 0.3, "seed": 9402 }
-        ],
-        "material": {
-          "baseColor": [0.0, 0.0, 0.0],
-          "roughness": 1.0,
-          "metallic": 0.0,
-          "emissiveColor": [0.2, 0.34, 0.5],
-          "emissiveIntensity": 0.55
-        },
-        "materialVariation": { "emissiveRandom": 0.9 }
-      }
-    },
-    {
-      "name": "cosmos-stars-near",
-      "kind": "procedural",
-      "parent": "world-root",
-      "position": [0.0, 0.0, 0.0],
-      "procedural": {
-        "source": { "kind": "point", "pointSize": 1.45 },
-        "distribution": {
-          "kind": "grid",
-          "gridCount": [15, 15, 15],
-          "gridSpacing": [112.0, 112.0, 112.0],
-          "center": [0.0, 0.0, 0.0]
-        },
-        "variation": { "seed": 2201, "randomPosition": [70.0, 70.0, 70.0] },
-        "ops": [
-          { "kind": "filterDistance", "pivot": [0.0, 0.0, 0.0], "minDistance": 480.0, "maxDistance": 830.0 },
-          { "kind": "filterProbability", "probability": 0.11, "seed": 2202 }
-        ],
-        "material": {
-          "baseColor": [0.0, 0.0, 0.0],
-          "roughness": 1.0,
-          "metallic": 0.0,
-          "emissiveColor": [0.88, 0.92, 1.0],
-          "emissiveIntensity": 3.4
-        },
-        "materialVariation": { "emissiveRandom": 0.85 }
-      }
-    },
-    {
-      "name": "cosmos-stars-mid",
-      "kind": "procedural",
-      "parent": "world-root",
-      "position": [0.0, 0.0, 0.0],
-      "procedural": {
-        "source": { "kind": "point", "pointSize": 1.2 },
-        "distribution": {
-          "kind": "grid",
-          "gridCount": [24, 24, 24],
-          "gridSpacing": [95.0, 95.0, 95.0],
-          "center": [0.0, 0.0, 0.0]
-        },
-        "variation": { "seed": 1618, "randomPosition": [46.0, 46.0, 46.0] },
-        "ops": [
-          { "kind": "filterDistance", "pivot": [0.0, 0.0, 0.0], "minDistance": 620.0, "maxDistance": 1090.0 },
-          { "kind": "filterProbability", "probability": 0.3, "seed": 733 }
-        ],
-        "material": {
-          "baseColor": [0.0, 0.0, 0.0],
-          "roughness": 1.0,
-          "metallic": 0.0,
-          "emissiveColor": [0.78, 0.84, 1.0],
-          "emissiveIntensity": 2.0
-        },
-        "materialVariation": { "emissiveRandom": 0.85 }
-      }
-    },
-    {
-      "name": "cosmos-stars-far",
-      "kind": "procedural",
-      "parent": "world-root",
-      "position": [0.0, 0.0, 0.0],
-      "procedural": {
-        "source": { "kind": "point", "pointSize": 1.0 },
-        "distribution": {
-          "kind": "grid",
-          "gridCount": [23, 23, 23],
-          "gridSpacing": [132.0, 132.0, 132.0],
-          "center": [0.0, 0.0, 0.0]
-        },
-        "variation": { "seed": 3301, "randomPosition": [86.0, 86.0, 86.0] },
-        "ops": [
-          { "kind": "filterDistance", "pivot": [0.0, 0.0, 0.0], "minDistance": 1150.0, "maxDistance": 1580.0 },
-          { "kind": "filterProbability", "probability": 0.5, "seed": 3302 }
-        ],
-        "material": {
-          "baseColor": [0.0, 0.0, 0.0],
-          "roughness": 1.0,
-          "metallic": 0.0,
-          "emissiveColor": [0.62, 0.7, 0.96],
-          "emissiveIntensity": 1.3
-        },
-        "materialVariation": { "emissiveRandom": 0.9 }
-      }
     }
   ]
 }

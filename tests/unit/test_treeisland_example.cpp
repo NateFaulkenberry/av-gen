@@ -118,7 +118,9 @@ TEST_CASE("The showcase scene names only relative, in-repository assets", "[tree
             CHECK(fs::exists(resolved));
         }
     }
-    CHECK(assetNodes == 2); // the island and the tree, and nothing else reaches outside the repo
+    // The island, plus the tree's five Glowmere emission layers (ADR-339), and nothing else
+    // reaches outside the repo.
+    CHECK(assetNodes == 6);
 }
 
 TEST_CASE("The tree is carried by the island, not animated beside it", "[treeisland][example]") {
@@ -146,7 +148,39 @@ TEST_CASE("The tree is carried by the island, not animated beside it", "[treeisl
     CHECK(island->parent == "world-root");
     CHECK(surface->parent == "floating-island");
     CHECK(tree->parent == "floating-island");
-    CHECK(tree->kind == scene::NodeKind::Gltf);
+    // ADR-339: the tree is one group carrying five glTF layers, because `emissiveBoost` is
+    // per-node and scalar and the brief's §8 wants five separate emission channels. The group is
+    // what keeps §16's hierarchy a hierarchy -- there is still exactly one transform between the
+    // island and the whole tree.
+    CHECK(tree->kind == scene::NodeKind::Group);
+
+    // The five layers must stay *registered* with each other: they are one model cut into five
+    // files, so any layer carrying a transform of its own would shear the tree apart. Each one is
+    // asserted to be an identity local transform under the group, which is the property that
+    // makes the split safe rather than merely convenient.
+    const char* kLayers[] = {"tree-wood", "tree-twigs", "tree-tracery", "tree-foliage", "tree-lumens"};
+    for (const char* name : kLayers) {
+        const scene::CompositionNode* layer = comp.findNode(name);
+        INFO("layer '" << name << "'");
+        REQUIRE(layer != nullptr);
+        CHECK(layer->kind == scene::NodeKind::Gltf);
+        CHECK(layer->parent == "tree-of-life");
+        CHECK(layer->transform.position == glm::vec3(0.0f));
+        CHECK(layer->transform.scale == glm::vec3(1.0f));
+        CHECK(glm::length(layer->transform.rotation - glm::quat(1.0f, 0.0f, 0.0f, 0.0f))
+              == Approx(0.0f).margin(1e-6));
+        // Every layer's world transform is the group's, exactly -- the registration, stated as an
+        // equation rather than trusted to the identity transforms above.
+        const glm::mat4 groupWorld = comp.nodeWorldTransform(*tree).matrix();
+        const glm::mat4 layerWorld = comp.nodeWorldTransform(*layer).matrix();
+        float worst = 0.0f;
+        for (int c = 0; c < 4; ++c) {
+            for (int r = 0; r < 4; ++r) {
+                worst = std::max(worst, std::abs(groupWorld[c][r] - layerWorld[c][r]));
+            }
+        }
+        CHECK(worst == Approx(0.0f).margin(1e-5));
+    }
 
     const scene::Transform treeLocal = tree->transform;
 
@@ -284,12 +318,21 @@ TEST_CASE("The showcase camera is static and the cosmos is dark", "[treeisland][
     REQUIRE(camera.contains("position"));
     REQUIRE(camera.contains("target"));
 
-    // §12/§13: deep space, dark enough that the tree's emission reads. Every channel of every
-    // background colour is well under a hundredth of a unit of scene-linear radiance.
+    // The cosmos is dark *relative to the tree*, which is the property that actually matters and
+    // is what the original "< 0.01" was reaching for. ADR-339 replaced near-black with a layered
+    // ethereal background (brief §17-§21), so the bound moves -- but it stays a bound, because
+    // the failure mode it guards is real: a background that climbs to the tree's brightness stops
+    // being a background. The tree's lit leaves sit near 0.5 scene-linear and its emissive specks
+    // above 1.0, so 0.05 is still more than an order of magnitude below the subject.
+    //
+    // Note this only constrains the *scene's* colours. The broad haze is a background user-shader
+    // layer (shaders/glowmere-cosmos.wgsl) and is not reachable from here; what keeps that honest
+    // is the rendered control arm `_ctl-no-cosmos-shader`, not an assertion.
+    constexpr float kBackgroundCeiling = 0.05f;
     const json& env = scene.at("environment");
     for (const float c : env.at("background").get<std::vector<float>>()) {
         CHECK(c >= 0.0f);
-        CHECK(c < 0.01f);
+        CHECK(c < kBackgroundCeiling);
     }
     const json& sky = env.at("sky");
     CHECK(sky.value("enabled", false));
@@ -297,16 +340,34 @@ TEST_CASE("The showcase camera is static and the cosmos is dark", "[treeisland][
         for (const float c : sky.at(key).get<std::vector<float>>()) {
             INFO("sky." << key);
             CHECK(c >= 0.0f);
-            CHECK(c < 0.01f);
+            CHECK(c < kBackgroundCeiling);
         }
     }
     // No sun disc: this is space, and §12 forbids giant distracting objects.
     CHECK(sky.value("sunIntensity", 1.0) == Approx(0.0));
 
-    // §14: one light. A rig is what this task was told not to build yet.
+    // Not one light any more, but still not a rig. ADR-339 added a teal rim and an indigo fill
+    // because the reference's cream-white canopy is the .blend's warm *key* and the island's
+    // underside was reading as a black silhouette (§22). The guard that survives is the one that
+    // was meant: a small, hand-countable set, with exactly one key and exactly one shadow caster.
     REQUIRE(scene.contains("lights"));
-    CHECK(scene.at("lights").size() == 1);
-    const json& key = scene.at("lights").at(0);
+    const json& lights = scene.at("lights");
+    CHECK(lights.size() <= 3);
+    int keys = 0;
+    int shadowCasters = 0;
+    for (const json& light : lights) {
+        CHECK(light.value("type", std::string{}) == "directional");
+        if (light.value("role", std::string{}) == "key") {
+            ++keys;
+        }
+        if (light.value("castsShadow", false)) {
+            ++shadowCasters;
+        }
+    }
+    CHECK(keys == 1);
+    CHECK(shadowCasters == 1);
+
+    const json& key = lights.at(0);
     CHECK(key.value("type", std::string{}) == "directional");
     CHECK(key.value("role", std::string{}) == "key");
     // From above: the downward component dominates.
