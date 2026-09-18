@@ -659,7 +659,7 @@
           "seed": 31,
           "meshBudget": 900,
           "maxInstances": 2000,
-          "height": 14.0,
+          "height": 8.0,
           "tint": [
             0.08,
             0.28,
@@ -712,7 +712,7 @@
           "seed": 32,
           "meshBudget": 700,
           "maxInstances": 1600,
-          "height": 15.0,
+          "height": 8.0,
           "tint": [
             0.12,
             0.18,
@@ -765,7 +765,7 @@
           "seed": 33,
           "meshBudget": 800,
           "maxInstances": 600,
-          "height": 12.0,
+          "height": 6.5,
           "tint": [
             0.1946,
             0.1779,

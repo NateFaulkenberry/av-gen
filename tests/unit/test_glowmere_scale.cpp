@@ -64,11 +64,19 @@ namespace {
 // clears the tallest body in the cast by a quarter of that body again.
 constexpr float kCanopyHeadroom = 1.25f;
 
-// The signature organism is monumental, and it stops there. Below four bodies it is a big plant
-// and the world has no landmark; above eight it stops being something a figure has a relationship
-// with and becomes terrain, and a creature at its foot is a scale marker rather than a character.
+// The signature organism is monumental: at least four of the cast's tallest body, or it is a big
+// plant and the world has no landmark.
 constexpr float kSignatureMin = 4.0f;
-constexpr float kSignatureMax = 8.0f;
+
+// And it stands above the tree line, by a fifth again of the tallest instance any tree layer will
+// place. This number replaces an upper bound on bodies -- "no more than eight, or it stops being
+// something a figure has a relationship with" -- which was written first, was contradicted by the
+// renders, and is recorded as contradicted in ADR-330 rather than quietly widened. What the frames
+// showed is that a 16 m elder at 8.9 alien-heights does not read as terrain at all; what it reads
+// as is a mushroom shorter than the trees around it, in a world whose whole subject is mushrooms.
+// The failure was never in the ratio to the cast. It was that Glowmere's signature organisms were
+// not the tallest things in Glowmere.
+constexpr float kAboveTreeLine = 1.2f;
 
 // ---- the control: the world as it was ------------------------------------------------------
 
@@ -313,25 +321,36 @@ TEST_CASE("every Glowmere hero fungus is a canopy the cast walks under", "[glowm
 }
 
 // ---------------------------------------------------------------------------------------------
-// 3. The signature organism is monumental, and it stops there.
+// 3. The signature organism is monumental, and it is the tallest thing in the world.
 //
 // This is the arm with two controls, and it is the one that says what "flora comes down" meant.
-// The old world fails it low -- a 16 m elder against a 6.4 m bull is 2.5 bodies, a mushroom the
-// cast could climb -- and a world where the cast came down and the flora did not fails it high: 16
-// m against a 1.77 m bull is 9 bodies, at which point the organism is terrain and the figure at
-// its foot is a scale marker rather than a character. Neither control is hypothetical; the second
-// is the arm this change was rendered against before the flora was touched at all.
-TEST_CASE("Glowmere's signature organism is monumental and not terrain", "[glowmere][scale]") {
+// It fails on the old world low -- a 16 m elder against a 6.38 m bull is 2.5 bodies, a mushroom the
+// cast could climb -- and it fails on the world where the cast came down and nothing else did,
+// because there the elder is still shorter than the trees: 16 m against a `pines` instance the
+// layer will place at up to 21 m.
+//
+// Neither control is hypothetical. Both were rendered, and the second is what changed this arm:
+// the elder at 8.9 alien-heights does not read as terrain, it reads as a mushroom standing in a
+// forest that is taller than it is. See ADR-330.
+TEST_CASE("Glowmere's signature organism is monumental and stands above the tree line",
+          "[glowmere][scale]") {
     if (!assetsPresent()) {
         SKIP("assets/farm or assets/aliens is not present");
     }
     const auto farm = farmNaturalHeights();
     const auto aliens = alienNaturalHeights();
+    // The three layers that place a tree. Everything else the valley scatters is undergrowth, and
+    // arm 1 is the one that measures the cast against that.
+    constexpr std::array<const char*, 3> kTreeLayers{{"pines", "canopy", "deadwood"}};
+    // What those layers carried at bc79a51, for the control.
+    const std::map<std::string, float> kBeforeTrees{
+        {"pines", 15.0f}, {"canopy", 14.0f}, {"deadwood", 12.0f}};
 
     for (const char* name : kScenes) {
         const json doc = readJson(worldDir() / fmt::format("{}.scene.json", name));
         const auto cast = castOf(doc, farm, aliens);
-        if (cast.empty()) {
+        const auto layers = scatterOf(doc);
+        if (cast.empty() || layers.find("pines") == layers.end()) {
             continue;
         }
         const Body& tallest = tallestOf(cast);
@@ -340,20 +359,35 @@ TEST_CASE("Glowmere's signature organism is monumental and not terrain", "[glowm
             std::max_element(fungi.begin(), fungi.end(), [](const Fungus& a, const Fungus& b) {
                 return a.height < b.height;
             })->height;
+
         const float bodies = signature / tallest.height;
         INFO(name << ": the signature organism is " << signature << " m, the tallest body "
                   << tallest.height << " m -- " << bodies << " bodies");
         CHECK(bodies >= kSignatureMin);
-        CHECK(bodies <= kSignatureMax);
 
+        float treeLine = 0.0f;
+        float beforeTreeLine = 0.0f;
+        for (const char* layer : kTreeLayers) {
+            const Layer& l = layers.at(layer);
+            treeLine = std::max(treeLine, l.height * l.maxScale);
+            beforeTreeLine = std::max(beforeTreeLine, kBeforeTrees.at(layer) * l.maxScale);
+        }
+        INFO(name << ": the tree line is " << treeLine
+                  << " m (the tallest instance the tree layers will place)");
+        CHECK(signature >= treeLine * kAboveTreeLine);
+
+        // Control one: the old world, where the cast was 3.6x and the signature was 2.5 bodies.
         const float native = tallest.height / tallest.scale;
-        const float beforeBoth = signature / (native * kBeforeCast);
-        INFO("control (the old world): " << beforeBoth << " bodies");
-        CHECK(beforeBoth < kSignatureMin);
+        INFO("control (the old world): " << signature / (native * kBeforeCast) << " bodies");
+        CHECK(signature / (native * kBeforeCast) < kSignatureMin);
 
-        const float castOnly = beforeFungi().at("elder-2") / native;
-        INFO("control (the cast comes down and the flora does not): " << castOnly << " bodies");
-        CHECK(castOnly > kSignatureMax);
+        // Control two: the cast comes down and the flora does not. The elder is 16 m and the
+        // `pines` layer places instances to 21 m, so the mushroom world's mushroom is four fifths
+        // of a tree. This is the arm the renders moved.
+        INFO("control (the cast comes down and the flora does not): a "
+             << beforeFungi().at("elder-2") << " m elder against a " << beforeTreeLine
+             << " m tree line");
+        CHECK(beforeFungi().at("elder-2") < beforeTreeLine * kAboveTreeLine);
     }
 }
 
