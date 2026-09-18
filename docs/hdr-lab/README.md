@@ -73,7 +73,8 @@ Two multiplications happen before the operator and they come from different plac
   in §2 was taken at scale 1.0 without asking for it.
 * `TonemapUniforms::exposure` is **`scene.environment.brightness`**
   (`scene_renderer.cpp`, the `TonemapUniforms` block), a second linear scale applied inside
-  `tonemap.wgsl` after the whole post chain. It is not part of `ExposureState`, it is not metered,
+  `tonemap.wgsl` after the whole post chain. It is reachable only through the `scene/brightness`
+  parameter -- there is no scene-file key for it, and a file that writes one is writing to nothing. It is not part of `ExposureState`, it is not metered,
   and it is *after* the bloom threshold — so raising `environment/brightness` brightens the frame
   without moving what blooms, and raising `camera/exposure/compensation` moves both. Anyone
   measuring "the exposure" has to say which one.
@@ -276,8 +277,11 @@ scene means. The fixture's extreme patch is 50 and says so.
 * The scene still gets a `defaultKeyLight()`, because it has no rig and no lights. It illuminates
   nothing, because every surface is unlit. The fixture does not pretend the light is absent; it
   makes it irrelevant.
-* `environment.brightness` is 1.0 and is a *second* exposure (§1.1). The fixture pins it so that
-  the table in §2 is about the operator.
+* The *second* exposure of §1.1 is not pinned by this file, because it cannot be: an
+  `environment.brightness` key in a scene file is read by nothing. `scene.environment.brightness`
+  comes from the `scene/brightness` **parameter**, whose default is 1.0, which is what §2 was
+  measured at. The fixture carried that key for one commit before the check on the next paragraph
+  caught it -- which is the defect of §4.1 in this lab's own fixture, found the same way.
 
 ---
 
