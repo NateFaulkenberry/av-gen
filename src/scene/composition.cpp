@@ -7886,7 +7886,7 @@ Result<std::unique_ptr<Composition>> Composition::loadNested(const std::filesyst
     if (j.is_discarded()) {
         return fail("scene file '{}': invalid JSON", path.string());
     }
-    // ADR-320: the project's node edits, over the document, before it is parsed. A no-op for every
+    // ADR-330: the project's node edits, over the document, before it is parsed. A no-op for every
     // load but a project's, and for a project whose session never added or removed an object.
     const std::size_t authored = j.contains("nodes") && j["nodes"].is_array() ? j["nodes"].size() : 0;
     applyNodeEdits(j, nodeEdits);
@@ -7917,7 +7917,7 @@ Result<std::unique_ptr<Composition>> Composition::loadFile(const std::filesystem
     return loadNested(registry.resolve(path), registry, depth, {}, nodeEdits);
 }
 
-// ---- ADR-320: a project's node edits over the scene file it saves by reference -----------------
+// ---- ADR-330: a project's node edits over the scene file it saves by reference -----------------
 
 nlohmann::json nodeEditsAgainst(const nlohmann::json& liveNodes, const nlohmann::json& sceneDoc) {
     // A scene document this build could not read is not evidence that the session's node set is an

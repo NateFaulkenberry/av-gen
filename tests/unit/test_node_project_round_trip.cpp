@@ -1,4 +1,4 @@
-// Removing an object did not survive a save, so the object was in every render (ADR-320).
+// Removing an object did not survive a save, so the object was in every render (ADR-330).
 //
 // The family's fourth instance, and the one the owner reported first: "my changes to hero
 // selection, removal of objects from the scene, etc" were not reaching the output. A project whose

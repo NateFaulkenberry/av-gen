@@ -704,7 +704,7 @@ references, the name alone) decides. A hit is used and reported as a warning
 (the new location is written on the next save); otherwise the usual missing-asset warning
 stands and the rest of the document still applies.
 
-### `"sceneNodes"` — the objects this project added to, and removed from, its scene (ADR-320)
+### `"sceneNodes"` — the objects this project added to, and removed from, its scene (ADR-330)
 
 ```json
 "sceneNodes": {
@@ -732,7 +732,7 @@ own authorship.
 `added` entries are nodes in the scene format (see **Scene composition files** above). Their `asset`
 paths are resolved against the *scene* file's folder, like any authored node's — and
 `--export-bundle` does **not** walk them, so an added node's mesh is one thing a bundle can still
-miss (ADR-320's first revisit trigger).
+miss (ADR-330's first revisit trigger).
 
 `avgen --export-bundle <dir>` (or File > Export Bundle) copies every referenced file into
 `<dir>/assets/` (scene files are rewritten so their node assets point into the bundle, glTF

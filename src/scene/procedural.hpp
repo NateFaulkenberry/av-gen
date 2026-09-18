@@ -652,7 +652,7 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
 void unregisterProceduralParameters(params::ParameterSet& params, const ProceduralParameters& p);
 
 // An authored value that the parameter table's own range moved, and the number it runs at
-// (ADR-321). `path` is relative to the object's prefix -- "material/emissive",
+// (ADR-331). `path` is relative to the object's prefix -- "material/emissive",
 // "material/baseColor.y" -- so it reads the same in a warning and in a test whatever the node is
 // called.
 struct ClampedAuthoredValue {
@@ -666,7 +666,7 @@ struct ClampedAuthoredValue {
 struct ProceduralParameters {
     std::string prefix;
     std::vector<params::IParameter*> all; // everything registered (for unregister)
-    // ADR-321: every authored value this table's ranges overruled, in registration order.
+    // ADR-331: every authored value this table's ranges overruled, in registration order.
     // `registerProceduralParameters` fills it and warns once per entry.
     //
     // A field rather than a second pass over the same numbers: a second pass is a second copy of an

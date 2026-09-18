@@ -1,4 +1,4 @@
-# ADR-320: A removal is a negative fact, and nothing was left to carry it
+# ADR-330: A removal is a negative fact, and nothing was left to carry it
 
 **Status:** Accepted
 **Date:** 2026-09-18

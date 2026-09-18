@@ -1,4 +1,4 @@
-# ADR-321: A cap on an authored value is a refusal, and this one refused in silence
+# ADR-331: A cap on an authored value is a refusal, and this one refused in silence
 
 **Status:** Accepted
 **Date:** 2026-09-18

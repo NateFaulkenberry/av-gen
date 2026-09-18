@@ -1079,7 +1079,7 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
             })) {
             doc["heroes"] = std::move(liveHeroes);
         }
-        // ADR-320, and it is the same defect a fourth time -- the one the owner reported first and
+        // ADR-330, and it is the same defect a fourth time -- the one the owner reported first and
         // the one that survived ADR-276. Deleting an object in the world editor calls
         // `Composition::detachNode`; the composition is saved by reference; so the deletion lived in
         // the window and in no document any render reads. Measured on the owner's own project
@@ -1501,7 +1501,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                 const auto scenePath = resolveAsset(sceneRef["path"], "scene").value_or(std::filesystem::path());
                 const auto previousEnvironment = environmentPath_;
                 environmentPath_.clear();
-                // ADR-320: the objects this session added to, and removed from, the scene it saves
+                // ADR-330: the objects this session added to, and removed from, the scene it saves
                 // by reference. Passed *into* the load rather than applied after it, so the
                 // composition the engine ends up with is the one the parser would have built from a
                 // scene file with those edits made -- and so it is in place before anything reads

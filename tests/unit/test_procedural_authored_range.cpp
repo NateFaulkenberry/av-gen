@@ -1,4 +1,4 @@
-// A scene file could not author an emissive above 50, and the clamp said nothing (ADR-321).
+// A scene file could not author an emissive above 50, and the clamp said nothing (ADR-331).
 //
 // `material/emissive` was registered with a hard maximum of 50, so a scene asking for 256 ran at 50
 // and the file gave no sign. Found by the HDR Lab, whose own fixture asked for 256 and got 50, and

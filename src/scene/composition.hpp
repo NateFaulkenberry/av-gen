@@ -887,7 +887,7 @@ public:
     [[nodiscard]] Result<void> saveFile(const std::filesystem::path& path) const;
     static Result<std::unique_ptr<Composition>> loadFile(const std::filesystem::path& path, assets::AssetRegistry& registry,
                                                          int depth = 0);
-    // The same load with a project's node edits (ADR-320) spliced into the document first. The
+    // The same load with a project's node edits (ADR-330) spliced into the document first. The
     // edits reach the root scene only: a nested scene file is another document with its own
     // authorship, and a project that could reach into one would be editing a file it never opened.
     static Result<std::unique_ptr<Composition>> loadFile(const std::filesystem::path& path,
@@ -1354,7 +1354,7 @@ private:
 
 // ---- a project's record of the nodes its session added to, and removed from, its scene ----------
 //
-// ADR-320, and it is ADR-207 / ADR-230 / ADR-276's family a fourth time. A project whose scene came
+// ADR-330, and it is ADR-207 / ADR-230 / ADR-276's family a fourth time. A project whose scene came
 // from a file saves that scene **by reference** -- `assets.scene.path` plus a hash of bytes already
 // on disk -- so an object deleted in the world editor lived in the window the person was looking at
 // and in no document any render reads. Measured on the owner's own project: 80 nodes, 79 after a

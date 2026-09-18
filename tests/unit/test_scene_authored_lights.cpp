@@ -436,7 +436,7 @@ TEST_CASE("The scene parser's key list matches what it reads", "[scene][lights][
     const fs::path examples = lightsRepoRoot() / "examples";
     REQUIRE(fs::is_directory(examples));
     // The one genuine finding was kept as an expectation so that fixing it is what changes this
-    // test, and ADR-320 fixed it: fifteen scenes wrote the C++ field name `volumeNoiseAmount` where
+    // test, and ADR-330 fixed it: fifteen scenes wrote the C++ field name `volumeNoiseAmount` where
     // the parser reads `volumeNoise`, all fifteen ran at 0 noise, and the five projects saved over
     // them agreed (`"scene/volumeNoise": 0.0`). The expectation is now **zero**, and the counter
     // stays rather than folding into `otherFindings`, because a named zero is what tells the next

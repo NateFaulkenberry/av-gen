@@ -496,7 +496,7 @@ the debug flag. `[gpu]` tests take `tools/gpu-lock.sh`.
    `tools/link-worktree-assets.sh`. **This is §37 with the sign flipped**: a test environment that
    silently lacks its data produces failures that are not about the code, and a lab suite whose
    fixtures use production assets (§29 asks for exactly that) inherits the trap.
-6. ~~**A scene file cannot author an emissive above 50.**~~ **Closed by ADR-321.**
+6. ~~**A scene file cannot author an emissive above 50.**~~ **Closed by ADR-331.**
    `material/emissive` was registered with a hard maximum of 50 (`src/scene/procedural.cpp`) and the
    parameter clamped an authored 256 with no warning; `baseColor` and `emissiveColor` clamp to
    [0, 1], so `emissiveIntensity` is the only route above unit radiance from a scene file and 50 was

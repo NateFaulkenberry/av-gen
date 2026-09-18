@@ -107,7 +107,7 @@ public:
     void newComposition();
     [[nodiscard]] Result<void> loadComposition(const std::filesystem::path& path);
     // The same, with a project's record of the objects its session added to and removed from that
-    // scene (ADR-320) spliced into the document before it is parsed. Only `loadProject` has such a
+    // scene (ADR-330) spliced into the document before it is parsed. Only `loadProject` has such a
     // record; everything else opens a scene file as the file says it is.
     [[nodiscard]] Result<void> loadComposition(const std::filesystem::path& path, const nlohmann::json& nodeEdits);
     // The same install from a document already in memory. Exists for the assistant's transaction:

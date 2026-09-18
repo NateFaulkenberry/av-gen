@@ -1,4 +1,4 @@
-# ADR-322: Fifteen scenes asked for volumetric noise, and five projects wrote back the zero they got
+# ADR-332: Fifteen scenes asked for volumetric noise, and five projects wrote back the zero they got
 
 **Status:** Accepted
 **Date:** 2026-09-18

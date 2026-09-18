@@ -3149,7 +3149,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
 
 namespace {
 
-// The `material/emissive` slider's ceiling (ADR-321). A floor under the hard maximum rather than
+// The `material/emissive` slider's ceiling (ADR-331). A floor under the hard maximum rather than
 // the maximum itself: an object whose scene authors more than this gets a range that holds what it
 // authored, and every object that does not keeps exactly the range it had.
 constexpr float kAuthoredEmissiveCeiling = 50.0f;
@@ -3159,7 +3159,7 @@ struct Registrar {
     ProceduralParameters& out;
     std::string group;
 
-    // ADR-321: a range that moves an authored value says which value, and what it runs at.
+    // ADR-331: a range that moves an authored value says which value, and what it runs at.
     //
     // A hard range belongs to the *parameter*: it is what keeps a modulation route and a typed
     // entry inside something a person could have meant. A number in a scene file is not a UI
@@ -3481,7 +3481,7 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     const Material& m = rest.material;
     p.baseColor = r.v3("material/baseColor", m.baseColor, 0.0f, 1.0f, 0.0f, 1.0f, true);
     p.emissiveColor = r.v3("material/emissiveColor", m.emissiveColor, 0.0f, 1.0f, 0.0f, 1.0f, true);
-    // ADR-321. The ceiling here was a flat 50, and it clamped an authored 256 in silence.
+    // ADR-331. The ceiling here was a flat 50, and it clamped an authored 256 in silence.
     //
     // A hard range is an affordance -- it keeps a slider and a modulation route inside something
     // somebody meant -- and 50 is a round number that was picked, not a bound the quantity has, the
