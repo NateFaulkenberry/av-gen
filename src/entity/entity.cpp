@@ -241,27 +241,52 @@ const std::string& Entity::clipFor(Activity activity) const {
     return kNone;
 }
 
-bool Entity::socketTransform(std::string_view socket, scene::Transform& out) const {
+SocketResolution Entity::socketTransform(std::string_view socket, scene::Transform& out) const {
     const auto it = std::find_if(desc_.sockets.begin(), desc_.sockets.end(),
                                  [&](const SocketDesc& s) { return s.name == socket; });
     if (it == desc_.sockets.end()) {
-        return false;
+        return SocketResolution::None;
     }
+    // ADR-260's *drawn* position -- `visualPosition()`, the simulation plus the behaviours' offsets
+    // -- because a socket exists to put something where the body is on screen. A prop hung on
+    // `state().position()` would sit 2.4 m from Glowmere's saucer, which is exactly the drift the
+    // saucer's hover writes.
     scene::Transform base;
     base.position = state_.position() + motion_.position;
     base.rotation = quatFromEulerDegrees(glm::vec3(motion_.rotation.x, motion_.rotation.y + state_.yaw * kDegrees,
                                                    motion_.rotation.z));
-    // A joint, when there is a skeleton to ask. Until the animation layer installs one, a socket
-    // rides the entity's own frame: an approximate place is the right failure for a prop that has
-    // to be somewhere, and it means a scene can be authored before the skeleton exists.
+    // ADR-272. The node's scale, which this read for as long as sockets existed and never included,
+    // and which was invisible for exactly as long as no socket resolved through a joint: a joint
+    // offset is in the *asset's* units, and the four aliens in `glowmere-valley-2` are drawn at
+    // 3.344x to 3.610x. Ignoring it put a hand-mounted prop at 28% of the distance out from the
+    // body that the hand actually is. The entity's own offset (`SocketDesc::offset`) is authored in
+    // the same asset units for the same reason, so it is scaled by the same number.
+    //
+    // Read from the node parameter rather than remembered, because a scale is keyframable and
+    // `applyOffsets` -- which ran earlier in this same update -- has already folded `motion_.scale`
+    // into it. This is the number the renderer will draw with.
+    if (scaleParam_ != nullptr) {
+        for (std::size_t c = 0; c < 3; ++c) {
+            base.scale[static_cast<int>(c)] = scaleParam_->finalComponent(c);
+        }
+    }
+    // A joint, when there is a skeleton to ask and it has the joint. Until the animation layer
+    // installs one, a socket rides the entity's own frame: an approximate place is the right
+    // failure for a prop that has to be somewhere, and it means a scene can be authored before the
+    // skeleton exists. What changed in ADR-272 is that the caller is now told which of the two
+    // happened -- the approximation is still offered, and it no longer passes for the answer.
+    SocketResolution how = SocketResolution::EntityFrame;
     if (skeleton_ != nullptr && !it->joint.empty()) {
         scene::Transform joint;
-        if (skeleton_->jointWorldTransform(it->joint, joint)) {
+        // Entity-local, not world (locomotion.hpp): the entity frame is the only thing that knows
+        // where this rig is standing, because one posed rig may carry several bodies.
+        if (skeleton_->jointTransform(it->joint, joint)) {
             base = scene::detail::composeTransforms(base, joint);
+            how = SocketResolution::Joint;
         }
     }
     out = scene::detail::composeTransforms(base, it->offset);
-    return true;
+    return how;
 }
 
 // ---- EntityWorld -----------------------------------------------------------------------------
@@ -1158,7 +1183,11 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
 void EntityWorld::applyAttachments(const Entity& entity, params::ParameterSet& params) const {
     for (const AttachmentDesc& attachment : entity.attachments()) {
         scene::Transform t;
-        if (!entity.socketTransform(attachment.socket, t)) {
+        // The attachment is placed on either answer: `EntityFrame` is an approximation and a prop
+        // still has to be somewhere. Which one it was is reported by `socketTransform` and is what
+        // `tests/unit/test_character_lab_sockets.cpp` asserts on; here only "is there a socket"
+        // decides whether anything is written.
+        if (!resolved(entity.socketTransform(attachment.socket, t))) {
             continue;
         }
         const NodeBinding* b = binding(attachment.node);

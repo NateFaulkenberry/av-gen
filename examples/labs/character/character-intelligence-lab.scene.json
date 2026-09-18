@@ -1,0 +1,861 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Character Intelligence Lab",
+ "camera": {
+  "mode": 1,
+  "position": [
+   18.0,
+   12.0,
+   34.0
+  ],
+  "target": [
+   0.0,
+   1.5,
+   0.0
+  ],
+  "fov": 46.0,
+  "orbitSpeed": 0.0
+ },
+ "lightRig": "../../lightrigs/bioluminescent.rig.json",
+ "environment": {
+  "stylized": true,
+  "intensity": 0.16,
+  "skyIntensity": 0.32,
+  "background": [
+   0.006,
+   0.01,
+   0.02
+  ],
+  "fogColor": [
+   0.02,
+   0.038,
+   0.07
+  ],
+  "fogDensity": 0.014,
+  "fogHeight": 16.0,
+  "fogHeightFalloff": 0.05
+ },
+ "heroes": [
+  {
+   "name": "pen-0",
+   "position": [
+    20.0,
+    3.0,
+    -18.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 4.9,
+   "height": 6.0,
+   "importance": 0.2,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 18.0,
+   "preferredCameraElevation": 6.0,
+   "activationRadius": 120.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "pen-1",
+   "position": [
+    28.0,
+    3.0,
+    -18.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 4.9,
+   "height": 6.0,
+   "importance": 0.2,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 18.0,
+   "preferredCameraElevation": 6.0,
+   "activationRadius": 120.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "pen-2",
+   "position": [
+    24.0,
+    3.0,
+    -22.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 4.9,
+   "height": 6.0,
+   "importance": 0.2,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 18.0,
+   "preferredCameraElevation": 6.0,
+   "activationRadius": 120.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "pen-3",
+   "position": [
+    24.0,
+    3.0,
+    -14.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 4.9,
+   "height": 6.0,
+   "importance": 0.2,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 18.0,
+   "preferredCameraElevation": 6.0,
+   "activationRadius": 120.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "boulder-a",
+   "position": [
+    -6.0,
+    2.5,
+    4.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 2.0,
+   "height": 5.0,
+   "importance": 0.6,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 18.0,
+   "preferredCameraElevation": 6.0,
+   "activationRadius": 120.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "boulder-b",
+   "position": [
+    2.0,
+    3.0,
+    12.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 2.2,
+   "height": 6.0,
+   "importance": 0.55,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 18.0,
+   "preferredCameraElevation": 6.0,
+   "activationRadius": 120.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "boulder-c",
+   "position": [
+    -14.0,
+    2.1,
+    -6.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 2.6,
+   "height": 4.2,
+   "importance": 0.45,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 18.0,
+   "preferredCameraElevation": 6.0,
+   "activationRadius": 120.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  }
+ ],
+ "navBodyRadius": 0.7,
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "terrain",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "terrain": {
+    "chunkSize": 40.0,
+    "resolution": 32,
+    "lodLevels": 3,
+    "lodDistance": 70.0,
+    "viewDistance": 320.0,
+    "skirtDepth": 1.2,
+    "groundMottle": true,
+    "groundGlow": 0.08,
+    "groundGlowScale": 0.06,
+    "groundGlowCoverage": 0.26,
+    "groundGlowColor": [
+     0.1,
+     1.0,
+     0.7
+    ]
+   },
+   "material": {
+    "baseColor": [
+     0.02,
+     0.07,
+     0.05
+    ],
+    "roughness": 0.9,
+    "metallic": 0.0,
+    "emissiveIntensity": 0.0
+   }
+  },
+  {
+   "name": "scout",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-scout.glb",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    3.61,
+    3.61,
+    3.61
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0
+   }
+  },
+  {
+   "name": "lantern",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.18,
+     "segments": 16
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.9,
+      0.85,
+      0.6
+     ],
+     "roughness": 0.4,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.82,
+      0.45
+     ],
+     "emissiveIntensity": 3.0
+    }
+   }
+  },
+  {
+   "name": "rover",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-ranger.glb",
+   "position": [
+    -16.0,
+    0.0,
+    10.0
+   ],
+   "rotation": [
+    0.0,
+    40.0,
+    0.0
+   ],
+   "scale": [
+    3.344,
+    3.344,
+    3.344
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0
+   }
+  },
+  {
+   "name": "diver",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-diver.glb",
+   "position": [
+    12.0,
+    0.0,
+    16.0
+   ],
+   "rotation": [
+    0.0,
+    -70.0,
+    0.0
+   ],
+   "scale": [
+    3.601,
+    3.601,
+    3.601
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0
+   }
+  },
+  {
+   "name": "penned",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-pilot.glb",
+   "position": [
+    24.0,
+    0.0,
+    -18.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    3.5,
+    3.5,
+    3.5
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0
+   }
+  },
+  {
+   "name": "pen-0",
+   "kind": "procedural",
+   "position": [
+    20.0,
+    0.0,
+    -18.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.4,
+      6.0,
+      9.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      3.0,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "pen-1",
+   "kind": "procedural",
+   "position": [
+    28.0,
+    0.0,
+    -18.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.4,
+      6.0,
+      9.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      3.0,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "pen-2",
+   "kind": "procedural",
+   "position": [
+    24.0,
+    0.0,
+    -22.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      9.0,
+      6.0,
+      1.4
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      3.0,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "pen-3",
+   "kind": "procedural",
+   "position": [
+    24.0,
+    0.0,
+    -14.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      9.0,
+      6.0,
+      1.4
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      3.0,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "boulder-a",
+   "kind": "procedural",
+   "position": [
+    -6.0,
+    0.0,
+    4.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.2,
+      5.0,
+      3.2
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      2.5,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "boulder-b",
+   "kind": "procedural",
+   "position": [
+    2.0,
+    0.0,
+    12.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      4.0,
+      6.0,
+      2.6
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      3.0,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "boulder-c",
+   "kind": "procedural",
+   "position": [
+    -14.0,
+    0.0,
+    -6.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      4.2,
+      5.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      2.1,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  }
+ ],
+ "entities": [
+  {
+   "name": "scout",
+   "node": "scout",
+   "seed": 20260918,
+   "cullDistance": 600.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Idle",
+    "fall": "Fall_loop"
+   },
+   "sockets": [
+    {
+     "name": "hand",
+     "joint": "hand.r"
+    },
+    {
+     "name": "head",
+     "joint": "head.x"
+    },
+    {
+     "name": "chest",
+     "position": [
+      0.0,
+      1.1,
+      0.25
+     ]
+    },
+    {
+     "name": "tail",
+     "joint": "tail.x"
+    }
+   ],
+   "attachments": [
+    {
+     "node": "lantern",
+     "socket": "hand"
+    }
+   ],
+   "behaviors": [
+    {
+     "kind": "wander",
+     "speed": 1.1,
+     "runSpeed": 2.6,
+     "turnRate": 150.0,
+     "arrive": 1.0,
+     "minRange": 5.0,
+     "maxRange": 16.0,
+     "pauseMin": 1.2,
+     "pauseMax": 3.4,
+     "homeRadius": 18.0
+    }
+   ]
+  },
+  {
+   "name": "rover",
+   "node": "rover",
+   "seed": 991,
+   "cullDistance": 600.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Idle",
+    "fall": "Fall_loop"
+   },
+   "behaviors": [
+    {
+     "kind": "wander",
+     "speed": 1.4,
+     "runSpeed": 3.36,
+     "turnRate": 150.0,
+     "arrive": 1.0,
+     "minRange": 6.0,
+     "maxRange": 22.0,
+     "pauseMin": 1.0,
+     "pauseMax": 3.0,
+     "homeRadius": 26.0
+    }
+   ]
+  },
+  {
+   "name": "diver",
+   "node": "diver",
+   "seed": 4242,
+   "cullDistance": 600.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Idle",
+    "fall": "Fall_loop"
+   },
+   "behaviors": [
+    {
+     "kind": "wander",
+     "speed": 0.9,
+     "runSpeed": 2.16,
+     "turnRate": 150.0,
+     "arrive": 1.0,
+     "minRange": 6.0,
+     "maxRange": 22.0,
+     "pauseMin": 1.0,
+     "pauseMax": 3.0,
+     "homeRadius": 20.0
+    }
+   ]
+  },
+  {
+   "name": "penned",
+   "node": "penned",
+   "seed": 7,
+   "cullDistance": 600.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Idle",
+    "fall": "Fall_loop"
+   },
+   "behaviors": [
+    {
+     "kind": "wander",
+     "speed": 1.2,
+     "runSpeed": 2.4,
+     "turnRate": 150.0,
+     "arrive": 1.0,
+     "minRange": 14.0,
+     "maxRange": 30.0,
+     "pauseMin": 0.5,
+     "pauseMax": 1.5,
+     "homeRadius": 40.0
+    }
+   ]
+  }
+ ],
+ "post": {
+  "tonemap": 1,
+  "bloomEnabled": true,
+  "bloomIntensity": 0.05,
+  "bloomThreshold": 1.05,
+  "bloomKnee": 0.6
+ }
+}

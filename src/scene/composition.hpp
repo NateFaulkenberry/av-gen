@@ -1059,18 +1059,35 @@ private:
     // and flipping it here would be a rendering change smuggled in as an optimisation.
     void cullEntityNodes();
 
-    // Turns a behaviour's Activity into an animation state on the node it drives (ADR-086/087).
-    // Owned by the composition because only the composition knows which node holds which rig.
-    class AnimationSink final : public entity::IPoseSink {
+    // Turns a behaviour's Activity into an animation state on the node it drives (ADR-086/087),
+    // and answers where that node's joints are (ADR-272).
+    //
+    // Both halves of the seam in one object because both need the same one fact and nothing else:
+    // which node this entity drives. Only the composition knows which node holds which rig, so the
+    // pose sink lives here; the skeleton query needs the identical lookup, and a second class
+    // beside this one would be a second copy of it kept in step by hand.
+    class AnimationSink final : public entity::IPoseSink, public entity::ISkeletonQuery {
     public:
         AnimationSink(Composition& owner, std::string node, const entity::Entity& entity)
             : owner_(owner), node_(std::move(node)), entity_(entity) {}
         void setLocomotion(const entity::LocomotionState& state) override;
+        // The joint's transform in the entity's own frame -- the rig's model space. False when
+        // this node carries no rig, no rig of its carries the joint, or the rig has not been posed.
+        [[nodiscard]] bool jointTransform(std::string_view joint, scene::Transform& out) const override;
 
     private:
         Composition& owner_;
         std::string node_;
         const entity::Entity& entity_;
+        // The model-space matrices the last query derived, and the rig and palette version they
+        // came from. A socket query is `poseToModel` over every joint -- 89 of them on an alien --
+        // and a body may carry several sockets, so the second one in a frame is a lookup. Keyed on
+        // `SkinnedRig::paletteVersion`, which the rig bumps on every re-pose and on nothing else,
+        // so a held or rate-limited rig answers from the cache and a re-posed one never does.
+        mutable std::vector<glm::mat4> model_;
+        mutable RigId modelRig_ = kInvalidRig;
+        mutable std::uint64_t modelVersion_ = 0;
+        mutable bool modelValid_ = false;
     };
     std::vector<std::unique_ptr<AnimationSink>> animationSinks_;
 

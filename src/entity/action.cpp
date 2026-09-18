@@ -429,7 +429,7 @@ bool resolvePoint(const ActionContext& ctx, const ActionTarget& target, glm::vec
         if (!target.member.empty() && target.kind != TargetKind::Interaction) {
             if (const Entity* other = ctx.world->find(target.name)) {
                 scene::Transform t;
-                if (other->socketTransform(target.member, t)) {
+                if (resolved(other->socketTransform(target.member, t))) {
                     out = t.position;
                     return true;
                 }
@@ -439,7 +439,7 @@ bool resolvePoint(const ActionContext& ctx, const ActionTarget& target, glm::vec
             if (const Entity* other = ctx.world->find(target.name)) {
                 if (const InteractionDesc* verb = other->interaction(target.member)) {
                     scene::Transform t;
-                    if (!verb->socket.empty() && other->socketTransform(verb->socket, t)) {
+                    if (!verb->socket.empty() && resolved(other->socketTransform(verb->socket, t))) {
                         out = t.position;
                         return true;
                     }
