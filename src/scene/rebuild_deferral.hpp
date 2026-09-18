@@ -43,4 +43,23 @@ struct RebuildDeferral {
 [[nodiscard]] bool advanceRebuildDeferral(RebuildDeferral& state, std::uint64_t wanted, std::uint64_t built,
                                           double elapsedMs);
 
+// The same arithmetic, for a playhead. A scrub is a person dragging the input to an expensive
+// derived thing -- `EntityWorld::seek` re-integrates every entity from `target - 90 s` -- which is
+// precisely what the header above says this policy is about, so the seek borrows it rather than
+// growing a second copy beside it.
+//
+// One thing a seek needs that a slider does not: **release**. A slider that stops moving might
+// still be held, and there is no way for the arithmetic to tell; a pointer that comes up is an
+// unambiguous end of gesture, and waiting kSettleMs after it would make a single click 90 ms slower
+// for no reason at all. So `held` short-circuits: a request that is not part of a held gesture is
+// evaluated on the frame it arrives, which makes a click behave exactly as it does today and
+// confines the whole change to the drag.
+//
+// The positions are compared bit for bit, via the same "did the input move" test the hash form
+// uses. Two seconds that differ in the last bit are two different requests, which is right: the
+// evaluated state genuinely differs between them and pretending otherwise would be the start of a
+// tolerance nobody could justify a value for.
+[[nodiscard]] bool advanceSeekDeferral(RebuildDeferral& state, double requestedSeconds,
+                                       double evaluatedSeconds, bool held, double elapsedMs);
+
 } // namespace avgen::scene

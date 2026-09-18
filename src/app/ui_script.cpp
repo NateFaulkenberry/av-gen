@@ -34,7 +34,7 @@ struct ArmName {
     std::string_view name;
     UiScriptArm arm;
 };
-constexpr std::array<ArmName, 13> kArms{{
+constexpr std::array<ArmName, 14> kArms{{
     {"hover", UiScriptArm::Hover},
     {"sliders", UiScriptArm::Sliders},
     {"panels", UiScriptArm::Panels},
@@ -48,6 +48,7 @@ constexpr std::array<ArmName, 13> kArms{{
     {"box", UiScriptArm::Box},
     {"star", UiScriptArm::Star},
     {"click", UiScriptArm::Click},
+    {"drag", UiScriptArm::Drag},
 }};
 
 // Pushes a motion event as though the device had produced it. SDL routes it to the window under
@@ -304,6 +305,10 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
 
     if (has(arms_, UiScriptArm::Click)) {
         stepClick(engine, *panel, window, frame);
+    }
+
+    if (has(arms_, UiScriptArm::Drag)) {
+        stepDrag(engine, *panel, window, frame);
     }
 
     if (has(arms_, UiScriptArm::Panels)) {
@@ -1007,6 +1012,69 @@ void UiScript::stepClick(Engine& engine, ui::ControlPanel& panel, platform::Wind
             }
         }
         clickLastSeconds_ = now;
+    }
+}
+
+// ---- drag: a repeating scrub along the ruler ----------------------------------------------------
+//
+// A cycle of 60 arm-steps: park for four, press on 6, drag along the ruler on 7..46, release on 48,
+// stand still until 60. The parking frames are what make the press land -- `HoveredWindow` is
+// computed from the previous frame's pointer -- and the still frames at the end are what let the
+// deferred evaluation land inside the gesture's own cycle rather than inside the next one's.
+//
+// It proves it did something (ADR-182): it reports where the playhead started, where it finished,
+// and says so in its own log when the two are the same, because a scrub that moved nothing is a
+// block of frames that measured an idle editor.
+void UiScript::stepDrag(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                        std::uint64_t frame) {
+    (void)frame;
+    ++dragSteps_;
+    if (dragSteps_ <= 3) {
+        if (bool* slot = panel.layout().slot("Sequence"); slot != nullptr) {
+            *slot = true;
+        }
+        ImGui::SetWindowFocus("Sequence");
+        return;
+    }
+    const ui::SequencePanel::StripRect& strip = panel.sequence.stripRect();
+    if (!strip.valid()) {
+        if (dragSteps_ == 20) {
+            editLog_.emplace_back("drag: the Sequence panel never laid out; this arm measured nothing");
+        }
+        return;
+    }
+    const std::uint64_t inCycle = (dragSteps_ - 4) % 60;
+    const std::uint64_t cycle = (dragSteps_ - 4) / 60;
+    const float y = strip.y + strip.rulerHeight * 0.5f;
+    // Each gesture starts somewhere different and sweeps forward, so no two cycles repeat a
+    // position and the re-simulation's dependence on *where* is inside the measurement rather than
+    // outside it.
+    const float u0 = 0.05f + 0.10f * static_cast<float>(cycle % 6);
+    const auto xAt = [&](float u) {
+        return strip.x + strip.gutter + (strip.width - strip.gutter) * u;
+    };
+    if (inCycle >= 2 && inCycle <= 5) {
+        warpAndMove(window, xAt(u0), y);
+    } else if (inCycle == 6) {
+        dragStartSeconds_ = engine.timelineClock().seconds;
+        warpAndMove(window, xAt(u0), y);
+        pushButton(window, xAt(u0), y, true);
+    } else if (inCycle >= 7 && inCycle <= 46) {
+        const float t = static_cast<float>(inCycle - 7) / 39.0f;
+        warpAndMove(window, xAt(u0 + 0.30f * t), y);
+    } else if (inCycle == 48) {
+        pushButton(window, xAt(u0 + 0.30f), y, false);
+    } else if (inCycle == 55) {
+        ++drags_;
+        const double now = engine.timelineClock().seconds;
+        if (drags_ <= 8) {
+            editLog_.push_back(fmt::format(
+                "drag #{}: u {:.2f} -> {:.2f}, playhead {:.3f} -> {:.3f} s (piece is {:.1f} s)",
+                drags_, u0, u0 + 0.30f, dragStartSeconds_, now, engine.durationSeconds()));
+            if (std::abs(now - dragStartSeconds_) < 1e-6) {
+                editLog_.emplace_back("drag: the playhead did not move -- THIS ARM MEASURED NOTHING");
+            }
+        }
     }
 }
 

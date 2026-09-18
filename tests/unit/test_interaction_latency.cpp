@@ -312,8 +312,68 @@ TEST_CASE("the CSV writes an absent stage as an empty field, never as zero", "[l
     log.markFrameVisible();
     const std::string csv = formatCsv(log);
     INFO(csv);
-    CHECK_THAT(csv, Catch::Matchers::ContainsSubstring("hero-star,3,,,,,"));
-    CHECK_THAT(csv, !Catch::Matchers::ContainsSubstring("hero-star,3,0.0000"));
+    // interaction, group, frame, coalesced, then the four latencies -- of which every one is
+    // absent here, because there was no input event to measure any of them from.
+    CHECK_THAT(csv, Catch::Matchers::ContainsSubstring("hero-star,-1,3,0,,,,,"));
+    CHECK_THAT(csv, !Catch::Matchers::ContainsSubstring("hero-star,-1,3,0,0.0000"));
+}
+
+TEST_CASE("a superseded request is folded into the batch, not counted as a second one", "[latency]") {
+    InteractionLog log;
+    const Stamp t0 = Clock::now();
+    log.begin(Interaction::TimelineDrag, 1, t0, t0);
+    log.markCommand();
+    // Forty more frames of the same held gesture. A record per frame would report forty
+    // interactions where a person made one, and would make a deferral that evaluated twice look
+    // like thirty-eight fast interactions and two slow ones.
+    for (int i = 0; i < 40; ++i) {
+        REQUIRE(log.openKind() == Interaction::TimelineDrag);
+        log.noteSuperseded();
+    }
+    log.markModel();
+    log.markPresentation();
+    log.markFrameVisible();
+    REQUIRE(log.all().size() == 1);
+    CHECK(log.all().front().coalesced == 40);
+    CHECK(log.begun(Interaction::TimelineDrag) == 1);
+    const auto s = summarise(log);
+    REQUIRE(s.size() == 1);
+    CHECK(s.front().coalesced == 40);
+    // T0 is the batch's oldest request, so the reported latency is the pessimistic end. A deferral
+    // measured from its newest request would be measuring the thing it is trying to look good at.
+    REQUIRE(s.front().finalVisual.available());
+}
+
+TEST_CASE("an A/B's two halves are two summaries, never their average", "[latency]") {
+    InteractionLog log;
+    for (int g = 0; g < 2; ++g) {
+        log.setGroup(g);
+        for (int i = 0; i < 4; ++i) {
+            const Stamp t0 = Clock::now();
+            log.begin(Interaction::TimelineDrag, static_cast<std::uint64_t>(i), t0, t0);
+            log.markCommand();
+            if (g == 1) {
+                const Stamp until = Clock::now() + std::chrono::milliseconds(3);
+                while (Clock::now() < until) {
+                }
+            }
+            log.markModel();
+            log.markPresentation();
+            log.markFrameVisible();
+        }
+    }
+    const auto all = summarise(log);
+    const auto arm0 = summarise(log, 0);
+    const auto arm1 = summarise(log, 1);
+    REQUIRE(arm0.size() == 1);
+    REQUIRE(arm1.size() == 1);
+    CHECK(arm0.front().finalVisual.samples == 4);
+    CHECK(arm1.front().finalVisual.samples == 4);
+    CHECK(all.front().finalVisual.samples == 8);
+    CHECK(arm1.front().finalVisual.median > arm0.front().finalVisual.median);
+    // And the pooled view sits between them -- which is exactly why it must never be the one quoted
+    // for an A/B.
+    CHECK(all.front().finalVisual.median >= arm0.front().finalVisual.min);
 }
 
 TEST_CASE("counters are attributed to the interaction that caused them", "[latency]") {

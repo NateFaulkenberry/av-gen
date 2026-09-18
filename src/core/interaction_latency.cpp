@@ -191,8 +191,15 @@ void InteractionLog::begin(Interaction kind, std::uint64_t frame, std::optional<
     current_.frame = frame;
     current_.input = input;
     current_.receipt = receipt;
+    current_.group = group_;
     open_ = true;
     ++begun_[static_cast<std::size_t>(kind)];
+}
+
+void InteractionLog::noteSuperseded() {
+    if (open_) {
+        ++current_.coalesced;
+    }
 }
 
 void InteractionLog::markCommand() {
@@ -344,7 +351,7 @@ void applyInjectedDelayForOpenInteraction() { applyInjectedDelay(interactions().
 
 // ---- the report ---------------------------------------------------------------------------------
 
-std::vector<InteractionSummary> summarise(const InteractionLog& log) {
+std::vector<InteractionSummary> summarise(const InteractionLog& log, int group) {
     std::vector<InteractionSummary> out;
     for (std::size_t k = 0; k < static_cast<std::size_t>(Interaction::Count); ++k) {
         const auto kind = static_cast<Interaction>(k);
@@ -364,6 +371,9 @@ std::vector<InteractionSummary> summarise(const InteractionLog& log) {
             if (r.kind != kind) {
                 continue;
             }
+            if (group != kAllGroups && r.group != group) {
+                continue;
+            }
             if (r.injectedMs > 0.0) {
                 // A calibration sample. Counted so the control can be seen to have run, and kept
                 // out of every distribution so it cannot be quoted as a real latency.
@@ -375,6 +385,7 @@ std::vector<InteractionSummary> summarise(const InteractionLog& log) {
             s.proceduralRegens += r.proceduralRegens;
             s.texturesUploaded += r.texturesUploaded;
             s.entitySimBodies += r.entitySimBodies;
+            s.coalesced += r.coalesced;
             if (auto v = r.inputToAck()) {
                 ack.push_back(*v);
             }
@@ -390,6 +401,14 @@ std::vector<InteractionSummary> summarise(const InteractionLog& log) {
                 gpu.push_back(*r.gpuMs);
             }
         }
+        if (group != kAllGroups) {
+            // The log's counters are session-wide by design -- they must survive the ring rolling
+            // over -- so a per-group view has to count what the ring holds instead, and says so by
+            // reporting `begun` as the number of records rather than the number of attempts.
+            s.completed = static_cast<std::uint64_t>(final.size());
+            s.begun = s.completed + s.injectedSamples;
+            s.abandoned = 0;
+        }
         if (s.begun == 0 && s.completed == 0) {
             continue; // an interaction nobody performed is absent, not a row of zeros.
         }
@@ -404,23 +423,25 @@ std::vector<InteractionSummary> summarise(const InteractionLog& log) {
     return out;
 }
 
-std::string formatReport(const std::vector<InteractionSummary>& summaries, double loadAverage) {
+std::string formatReport(const std::vector<InteractionSummary>& summaries, double loadAverage,
+                         std::string_view title) {
     std::string out;
-    out += fmt::format("\ninteraction latency -- one record per interaction, not per frame\n");
+    out += fmt::format("\ninteraction latency{}{} -- one record per interaction, not per frame\n",
+                       title.empty() ? "" : ", ", title);
     out += fmt::format("one-minute load average {:.2f}; distributions are nearest-rank, no "
                        "interpolation; '--' means the stage did not happen\n",
                        loadAverage);
     out += fmt::format("bands: <50 preferred, <100 interactive, <250 noticed, <1000 defect, "
                        ">=1000 flow-break\n\n");
-    out += fmt::format("{:<16}{:>5}{:>5}{:>5} | {:>28} | {:>28} | {:>17}\n", "interaction", "beg",
+    out += fmt::format("{:<16}{:>5}{:>5}{:>5} | {:>28} | {:>28} | {:>24}\n", "interaction", "beg",
                        "done", "aband", "input->ack ms", "input->final visual ms", "caused");
     out += fmt::format("{:<16}{:>5}{:>5}{:>5} | {:>6}{:>7}{:>7}{:>8} | {:>6}{:>7}{:>7}{:>8} | "
-                       "{:>5}{:>6}{:>6}\n",
+                       "{:>5}{:>6}{:>6}{:>7}\n",
                        "", "", "", "", "min", "med", "p95", "max", "min", "med", "p95", "max",
-                       "flat", "seeks", "tex");
+                       "flat", "seeks", "tex", "coal");
     for (const InteractionSummary& s : summaries) {
         out += fmt::format(
-            "{:<16}{:>5}{:>5}{:>5} | {}{}{}{} | {}{}{}{} | {:>5}{:>6}{:>6}\n",
+            "{:<16}{:>5}{:>5}{:>5} | {}{}{}{} | {}{}{}{} | {:>5}{:>6}{:>6}{:>7}\n",
             interactionName(s.kind), s.begun, s.completed, s.abandoned,
             cell(s.ack, &LatencyDistribution::min, 6), cell(s.ack, &LatencyDistribution::median, 7),
             cell(s.ack, &LatencyDistribution::p95, 7), cell(s.ack, &LatencyDistribution::max, 8),
@@ -428,7 +449,7 @@ std::string formatReport(const std::vector<InteractionSummary>& summaries, doubl
             cell(s.finalVisual, &LatencyDistribution::median, 7),
             cell(s.finalVisual, &LatencyDistribution::p95, 7),
             cell(s.finalVisual, &LatencyDistribution::max, 8), s.flattens, s.seeks,
-            s.texturesUploaded);
+            s.texturesUploaded, s.coalesced);
     }
     out += "\n";
     // The second table is the one that answers the brief's question about deferral: when
@@ -473,15 +494,17 @@ std::string formatReport(const std::vector<InteractionSummary>& summaries, doubl
 
 std::string formatCsv(const InteractionLog& log) {
     std::string out =
-        "interaction,frame,input_to_ack_ms,input_to_model_ms,input_to_first_visual_ms,"
+        "interaction,group,frame,coalesced,input_to_ack_ms,input_to_model_ms,"
+        "input_to_first_visual_ms,"
         "input_to_final_visual_ms,cpu_ms,blocked_ms,gpu_ms,flattens,seeks,procedural_regens,"
         "textures_uploaded,entity_sim_bodies,injected_ms\n";
     const auto f = [](const std::optional<double>& v) {
         return v ? fmt::format("{:.4f}", *v) : std::string{};
     };
     for (const InteractionRecord& r : log.all()) {
-        out += fmt::format("{},{},{},{},{},{},{:.4f},{:.4f},{},{},{},{},{},{},{:.4f}\n",
-                           interactionName(r.kind), r.frame, f(r.inputToAck()), f(r.inputToModel()),
+        out += fmt::format("{},{},{},{},{},{},{},{},{:.4f},{:.4f},{},{},{},{},{},{},{:.4f}\n",
+                           interactionName(r.kind), r.group, r.frame, r.coalesced,
+                           f(r.inputToAck()), f(r.inputToModel()),
                            f(r.inputToFirstVisual()), f(r.inputToFinalVisual()), r.cpuMs,
                            r.blockedMs, f(r.gpuMs), r.flattens, r.seeks, r.proceduralRegens,
                            r.texturesUploaded, r.entitySimBodies, r.injectedMs);

@@ -89,10 +89,12 @@ std::vector<std::string> splitList(std::string_view spec, char sep) {
 //
 //   idle+legacy     the procedural double generation, restored
 //   sliders+skynow  the sky IBL rebuilt inside the frame again, undeferred
+//   strip+seeknow   the playhead's re-simulation back inside the gesture, undeferred
 struct UiAbArm {
     std::string script;
     bool legacyProcGen = false;
     bool eagerSky = false;
+    bool eagerSeek = false;
 };
 UiAbArm parseUiAbArm(std::string_view spec) {
     UiAbArm out;
@@ -109,6 +111,8 @@ UiAbArm parseUiAbArm(std::string_view spec) {
             out.legacyProcGen = true;
         } else if (token == "skynow") {
             out.eagerSky = true;
+        } else if (token == "seeknow") {
+            out.eagerSeek = true;
         } else {
             // An unknown flag must not read as "no flag": it would silently measure the arm twice
             // and report the pair as a null result (ADR-182's vacuous arm, exactly).
@@ -172,6 +176,7 @@ std::string usageText() {
            "                      'turns' array). Deterministic: no key, no network, real tools\n"
            "  --ui-script <arms>  drive the editor with a repeatable interaction: comma-separated from\n"
            "                      hover,sliders,panels,select,scrub,camera,tabs,edit,strip,gizmo,box,\n"
+           "                      star,click,drag,\n"
            "                      star,click\n"
            "                      -- or idle, or all\n"
            "  --ui-ab <a>:<b>..   interleave those --ui-script arms in blocks inside ONE process and\n"
@@ -182,7 +187,8 @@ std::string usageText() {
            "  --ui-ab-blocks <n>  passes over the arm list (default 4)\n"
            "  --ui-ab-settle <n>  frames discarded after each switch (default 12)\n"
            "                      an arm may be suffixed '+legacy' (procedural double-generation\n"
-           "                      restored) and/or '+skynow' (sky IBL rebuilt inside the frame),\n"
+           "                      restored), '+skynow' (sky IBL rebuilt inside the frame) and/or\n"
+           "                      '+seeknow' (the playhead's re-simulation back inside the gesture),\n"
            "                      so each fix has a before arm in the same process\n"
            "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
            "  --supersample <f>   offline render only: render the scene at this multiple of the output\n"
@@ -536,7 +542,7 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             for (const std::string& armSpec : splitList(*v, ':')) {
                 if (!parseUiScript(parseUiAbArm(armSpec).script)) {
                     return fail("--ui-ab arm '{}' is not an arm; expected some of {}, optionally "
-                                "suffixed '+legacy' and/or '+skynow'",
+                                "suffixed '+legacy', '+skynow' and/or '+seeknow'",
                                 armSpec, uiScriptNames());
                 }
             }
@@ -2998,6 +3004,10 @@ int Application::runLive() {
     const int kPhAi = prof.phase("ai.pump");
     const int kPhEvents = prof.phase("events.poll");
     const int kPhEngine = prof.phase("engine.update");
+    // The interactive seek, out of `ui.build` and into a phase of its own. A cost attributed to the
+    // phase that pays it is a cost somebody can budget; one hidden inside the UI build is a cost
+    // that gets described as "the UI is slow".
+    const int kPhSeekService = prof.phase("seek.service");
     const int kPhUi = prof.phase("ui.build");
     const int kPhAcquire = prof.phase("gpu.acquire WAIT");
     const int kPhDebug = prof.phase("debug.geometry");
@@ -3139,9 +3149,22 @@ int Application::runLive() {
                     comp->setLegacyProceduralGeneration(spec.legacyProcGen);
                 }
                 renderer_->setInteractiveEnvironmentBudget(spec.eagerSky ? 0.0 : 2.0);
+                // The seek deferral's before and after, as two blocks of one process. A shell loop
+                // over two builds would compare two runs, which §3 of
+                // docs/application-performance.md forbids, and on a machine whose load average
+                // moved from 6.7 to 51.0 during the previous measurement that is a practical
+                // constraint rather than a pedantic one.
+                engine_->setInteractiveSeekBudget(spec.eagerSeek ? 0.0 : 2.0);
             }
-            prof.setFrameGroup(withinBlock < options_.uiAbSettle ? core::PhaseProfiler::kNoGroup
-                                                                 : abGroups[static_cast<std::size_t>(arm)]);
+            const int group = withinBlock < options_.uiAbSettle
+                                  ? core::PhaseProfiler::kNoGroup
+                                  : abGroups[static_cast<std::size_t>(arm)];
+            prof.setFrameGroup(group);
+            // The same label on the interaction records, so an A/B's two halves stay two halves.
+            // The settling frames belong to no arm here for the same reason they belong to none
+            // there: an arm inherits its predecessor's deferral timers, and this change is *about*
+            // a deferral timer.
+            core::interactions().setGroup(group);
         }
         probe2::frame().clear(); // TEMPORARY: ui-responsiveness phase 2
         // The interaction log's frame boundary. Clearing the input slot here is what stops an
@@ -3416,6 +3439,21 @@ int Application::runLive() {
 
         const FrameTime time = engine_->tick(clock);
         lastTime = time;
+        // The outstanding interactive seek, honoured here and nowhere else: once per frame, in a
+        // named place, *before* the update that derives the scene from it -- so the frame that pays
+        // for a seek also carries its result, instead of showing the previous second's world.
+        //
+        // Deliberately not inside `panel_->draw`. A panel calling `seekSeconds` from inside its own
+        // draw put the cost in `ui.build`, which is the phase every budget in
+        // docs/application-performance.md §11 is written against, and made "the UI is slow" the
+        // only available description of a world evaluation. It is a phase of its own now.
+        {
+            core::PhaseProfiler::Scope scope(prof, kPhSeekService);
+            const bool performed = engine_->serviceSeekRequest(stats.frameIntervalMs);
+            if (performed && slowPhaseMs() > 0.0) {
+                log::debug("seek serviced at frame {}", framesRendered);
+            }
+        }
         const std::uint64_t discontinuity = engine_->transport().discontinuityRevision();
         if (discontinuity != lastTransportDiscontinuity_) {
             renderer_->resetTemporalHistory();
@@ -3933,6 +3971,18 @@ int Application::runLive() {
         std::ofstream out(*options_.profileCsv);
         out << cpuProfile_.csv();
         log::info("frame phases written to {}", options_.profileCsv->string());
+    }
+    if (options_.latencyReport && !abGroups.empty()) {
+        // One table per arm, never one pooled table: a summary that averaged the two halves of an
+        // A/B would report their mean and call it a result.
+        double loads[3] = {0.0, 0.0, 0.0};
+        const double loadAverage = ::getloadavg(loads, 3) > 0 ? loads[0] : -1.0;
+        for (const int g : abGroups) {
+            std::fputs(core::formatReport(core::summarise(core::interactions(), g), loadAverage,
+                                          fmt::format("arm '{}'", cpuProfile_.groupName(g)))
+                           .c_str(),
+                       stderr);
+        }
     }
     if (options_.latencyReport) {
         // The load average is read here rather than quoted from memory: ADR-170 requires a timing

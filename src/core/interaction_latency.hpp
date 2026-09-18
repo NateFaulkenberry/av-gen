@@ -104,6 +104,13 @@ using Stamp = Clock::time_point;
 struct InteractionRecord {
     Interaction kind = Interaction::Count;
     std::uint64_t frame = 0; // the frame on which T2 was taken
+    int group = -1;          // the --ui-ab block this record belongs to; -1 is "not part of an arm"
+    // How many further requests arrived while this one was outstanding and were folded into it.
+    // Zero for every interaction that is evaluated on the frame it arrives, which today is all of
+    // them bar a held scrub. This is the direct measurement of coalescing: a gesture that issues
+    // forty-four requests and evaluates two has coalesced forty-two, and no millisecond figure on a
+    // contended machine says that as clearly as the count does.
+    std::uint64_t coalesced = 0;
 
     std::optional<Stamp> input;        // T0
     std::optional<Stamp> receipt;      // T1
@@ -186,6 +193,10 @@ public:
     // on a frame with no input cannot inherit the previous frame's event and report a latency that
     // spans a gesture nobody made.
     void beginFrame(std::uint64_t frameIndex);
+    // The --ui-ab block a record belongs to. Mirrors `PhaseProfiler::setFrameGroup` and exists for
+    // the same reason: two conditions compared inside one process, because comparing a frame time
+    // from one run against another is forbidden here.
+    void setGroup(int group) { group_ = group; }
 
     // Called by the event handler for every pointer/key event. Keeps the newest. `t0` is the
     // device's own timestamp translated into this clock; `t1` is when the handler saw it.
@@ -210,6 +221,11 @@ public:
     [[nodiscard]] bool open() const { return open_; }
     [[nodiscard]] std::uint64_t overlaps() const { return overlaps_; }
 
+    // Folds a further request into the record already open, rather than opening a second one. A
+    // held drag is one outstanding batch of requests, not one interaction per frame; T0 stays at
+    // the batch's *oldest* request, which is the pessimistic end and the one a deferral must be
+    // measured against.
+    void noteSuperseded();
     void markCommand();
     void markModel();
     // The derived state a panel or the renderer reads now reflects the interaction. For a
@@ -253,6 +269,7 @@ private:
     std::array<std::uint64_t, static_cast<std::size_t>(Interaction::Count)> completed_{};
     std::array<std::uint64_t, static_cast<std::size_t>(Interaction::Count)> abandoned_{};
     std::uint64_t frameIndex_ = 0;
+    int group_ = -1;
     std::optional<Stamp> latestInput_;
     std::optional<Stamp> latestReceipt_;
 };
@@ -308,17 +325,22 @@ struct InteractionSummary {
     std::uint64_t texturesUploaded = 0;
     std::uint64_t entitySimBodies = 0;
     std::uint64_t injectedSamples = 0;
+    std::uint64_t coalesced = 0;
 };
 
 // Summarises every kind present in the log. Records carrying an injection are reported under
 // `injectedSamples` and excluded from every distribution: a calibration sample pooled with real
 // ones would make the instrument lie in exactly the direction that flatters it.
-[[nodiscard]] std::vector<InteractionSummary> summarise(const InteractionLog& log);
+// `group` selects one --ui-ab block; `kAllGroups` is every record. A summary that pooled two arms
+// of an A/B would report their average and call it a result.
+inline constexpr int kAllGroups = -2;
+[[nodiscard]] std::vector<InteractionSummary> summarise(const InteractionLog& log,
+                                                        int group = kAllGroups);
 
 // A fixed-width table. `loadAverage` is printed in the header because ADR-170 requires a timing
 // claim to state the load it was taken under, and a median here walks with contention.
 [[nodiscard]] std::string formatReport(const std::vector<InteractionSummary>& summaries,
-                                       double loadAverage);
+                                       double loadAverage, std::string_view title = {});
 
 // One row per record, for a spreadsheet. Stages that did not happen are written as an empty field,
 // never as 0.

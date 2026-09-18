@@ -1326,7 +1326,10 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             // reports the second as the first.
             core::interactions().beginFromInput(core::Interaction::TimelineClick);
             core::interactions().markCommand();
-            engine.seekSeconds(std::clamp(snap(engine, mouseTime), 0.0, duration));
+            // A press is not yet a held gesture: it is a click until the pointer moves with the
+            // button down. Requesting it unheld means a click evaluates on the frame it arrives,
+            // exactly as it did before this change -- the deferral is confined to the drag.
+            engine.requestSeek(std::clamp(snap(engine, mouseTime), 0.0, duration), false);
         } else if (lane == StripLane::Sections) {
             // A boundary first, because it is a five-point target inside a block and the block is
             // the thing you get when you miss it.
@@ -1591,11 +1594,18 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         };
         switch (drag_) {
         case Drag::Playhead:
-            // One record per frame of the gesture, which is what the gesture actually costs: a
-            // drag issues one full seek per frame and nothing coalesces them.
-            core::interactions().beginFromInput(core::Interaction::TimelineDrag);
-            core::interactions().markCommand();
-            engine.seekSeconds(std::clamp(t, 0.0, duration));
+            // One record per outstanding *batch* of requests, not one per frame. A held drag issues
+            // a request every frame; if one is already outstanding the new one is folded into it
+            // and counted, so T0 stays at the batch's oldest request -- the pessimistic end, which
+            // is the one a deferral has to be measured against. When nothing is outstanding a new
+            // batch opens, which is what happens on the frame after each evaluation.
+            if (core::interactions().openKind() == core::Interaction::TimelineDrag) {
+                core::interactions().noteSuperseded();
+            } else {
+                core::interactions().beginFromInput(core::Interaction::TimelineDrag);
+                core::interactions().markCommand();
+            }
+            engine.requestSeek(std::clamp(t, 0.0, duration), true);
             break;
         case Drag::Marquee: {
             marqueeToX_ = mouse.x - origin.x;
@@ -1684,11 +1694,23 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         }
     } else if (drag_ == Drag::None && hovered && overAxis &&
                ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-        core::interactions().beginFromInput(core::Interaction::TimelineDrag);
-        core::interactions().markCommand();
-        engine.seekSeconds(std::clamp(snap(engine, mouseTime), 0.0, duration));
+        if (core::interactions().openKind() == core::Interaction::TimelineDrag) {
+            core::interactions().noteSuperseded();
+        } else {
+            core::interactions().beginFromInput(core::Interaction::TimelineDrag);
+            core::interactions().markCommand();
+        }
+        engine.requestSeek(std::clamp(snap(engine, mouseTime), 0.0, duration), true);
     }
     if (drag_ != Drag::None && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+        if (drag_ == Drag::Playhead) {
+            // The gesture is over. Re-requesting the same second unheld is what turns the deferral
+            // off for the last one: `advanceSeekDeferral` short-circuits on release, so letting go
+            // of a scrub evaluates on that frame rather than kSettleMs later. Without this the
+            // playhead would land and the world would arrive five frames afterwards, which is
+            // exactly the kind of small lie a deferral makes easy to ship.
+            engine.requestSeek(engine.transport().positionSeconds(), false);
+        }
         // The bake waits for the mouse. A drag is sixty edits a second and a bake rebuilds tracks
         // and layers; doing both together would make a smooth drag feel like a stutter. The
         // arrangement waits for the same reason and costs more: a re-mix is a pass over every
