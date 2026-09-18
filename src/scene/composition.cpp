@@ -2177,6 +2177,11 @@ std::uint32_t Composition::worldSeed() const {
 }
 
 void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& state) {
+    // ADR-300, first, because it is the half that applies to a body with no clips at all: a craft
+    // with an authored aim layer still has somewhere to put a look, and the early return below is
+    // about the *state machine* having nothing to play rather than about the body having nothing to
+    // do.
+    driveLayers(state);
     // An action's activity first, the gait's second (ADR-096). Both are *activity names* that the
     // entity's own `clips` map turns into whatever the asset shipped -- neither the action nor the
     // gait ever names a clip, which is what lets one routine drive an alien, a deer and a robot.
@@ -2190,6 +2195,70 @@ void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& st
     // has to know. The timeline second rather than a wall clock is what keeps an offline render
     // reproducible (ADR-086).
     owner_.setNodeAnimation(node_, want, state.time, state.blend, state.playbackRate);
+}
+
+// ADR-300. The other four fields.
+//
+// `reaction`, `lookTarget` and `hasLookTarget` have been written into `LocomotionState` every frame
+// since it existed and read by nobody, which ADR-225 says is not a seam but a decoration. This is
+// the read. It is a separate method from `setLocomotion` because it does a categorically different
+// thing: `setLocomotion` asks the state machine for a clip, and this writes a weight and a direction
+// onto the layers sitting on top of whatever clip the machine picked.
+//
+// **The frame (ADR-274).** `lookTarget` is a world point; a layer's target is entity-local, because
+// a posed rig has no world position -- it stands in as many places as there are bodies carrying it.
+// The conversion is here, in the one object that knows which node this entity drives, and it goes
+// through the node's own **world** transform rather than through `state.yaw`: the node carries the
+// parent chain, the behaviours' bank and nod, and -- the part ADR-274 §5 found by paying for it --
+// the **scale**. Glowmere draws its aliens at 3.344x to 3.610x, and a joint offset is in the
+// asset's own units, so a look-at that forgot the scale would put the head 28% of the way out from
+// the body and aim from there.
+//
+// **Which position (ADR-260).** It reads the *drawn* transform: the node parameters' finals, which
+// `applyOffsets` wrote earlier in this same `EntityWorld::update` -- so there is no frame of lag
+// here, unlike attachments. It writes `SkinnedRig::layers`, which is pose intent and nothing else.
+void Composition::AnimationSink::driveLayers(const entity::LocomotionState& state) {
+    CompositionNode* node = owner_.findNode(node_);
+    if (node == nullptr || node->rigs.empty()) {
+        return;
+    }
+    bool wanted = false;
+    for (const RigId id : node->rigs) {
+        if (id < owner_.scene_.rigs.size() && !owner_.scene_.rigs[id].layers.empty()) {
+            wanted = true;
+            break;
+        }
+    }
+    if (!wanted) {
+        return; // no node authored a layer: the conversion below is not worth a matrix inverse
+    }
+    glm::vec3 localTarget(0.0f);
+    bool haveTarget = false;
+    if (state.hasLookTarget) {
+        const glm::mat4 inverse = glm::inverse(owner_.nodeWorldTransform(*node).matrix());
+        localTarget = glm::vec3(inverse * glm::vec4(state.lookTarget, 1.0f));
+        haveTarget = true;
+    }
+    const float reaction = std::clamp(state.reaction, 0.0f, 1.0f);
+    for (const RigId id : node->rigs) {
+        if (id >= owner_.scene_.rigs.size()) {
+            continue;
+        }
+        for (PoseLayer& layer : owner_.scene_.rigs[id].layers.layers()) {
+            switch (layer.drive) {
+            case PoseLayerDrive::Manual:
+                break;
+            case PoseLayerDrive::Look:
+                layer.weight = haveTarget ? 1.0f : 0.0f;
+                layer.target = localTarget;
+                layer.hasTarget = haveTarget;
+                break;
+            case PoseLayerDrive::Reaction:
+                layer.weight = reaction;
+                break;
+            }
+        }
+    }
 }
 
 // ADR-274. The first implementation of `entity::ISkeletonQuery` this engine has had, and therefore
@@ -3701,6 +3770,18 @@ void Composition::rebuild() {
                 rig.nearDistance = node.animation.nearDistance;
                 rig.farHz = node.animation.farHz;
                 rig.cullDistance = node.animation.cullDistance;
+                // ADR-300. Bound here, against this rig's own skeleton and clips, because that is
+                // the only place both the authored names and the asset that has to carry them are
+                // in scope. Every problem is logged with the node's name on it: a mask that named a
+                // joint the rig does not have used to be indistinguishable from a mask that did
+                // nothing because nothing asked it to, which is the same failure as a socket
+                // returning `true` on its fallback (ADR-274).
+                if (!node.animation.layers.empty()) {
+                    for (const std::string& problem :
+                         rig.layers.bind(node.animation.layers, rig.skeleton, rig.clips)) {
+                        log::warn("node '{}' rig '{}': {}", node.name, src.name, problem);
+                    }
+                }
                 scene_.rigs.push_back(std::move(rig));
             }
             range.rigCount = scene_.rigs.size() - range.firstRig;
@@ -6432,6 +6513,41 @@ nlohmann::json Composition::toJson() const {
             if (node.animation.cullDistance != 120.0f) {
                 anim["cullDistance"] = node.animation.cullDistance;
             }
+            if (!node.animation.layers.empty()) { // ADR-300
+                json layers = json::array();
+                for (const PoseLayer& layer : node.animation.layers) {
+                    json l = json::object();
+                    l["name"] = layer.name;
+                    l["kind"] = poseLayerKindName(layer.kind);
+                    if (layer.drive != PoseLayerDrive::Manual) {
+                        l["drive"] = poseLayerDriveName(layer.drive);
+                    }
+                    l["joints"] = layer.mask.joints;
+                    if (!layer.mask.weights.empty()) {
+                        l["weights"] = layer.mask.weights;
+                    }
+                    if (layer.mask.descendants) {
+                        l["descendants"] = true;
+                    }
+                    if (!layer.pivot.empty()) {
+                        l["pivot"] = layer.pivot;
+                    }
+                    if (layer.forward != glm::vec3(0.0f, 0.0f, 1.0f)) {
+                        l["forward"] = vecToJson(layer.forward);
+                    }
+                    if (layer.kind == PoseLayerKind::Aim) {
+                        l["maxYaw"] = layer.maxYawDegrees;
+                        l["maxPitch"] = layer.maxPitchDegrees;
+                    } else {
+                        l["clip"] = layer.clip;
+                        if (layer.clipRate != 1.0f) {
+                            l["clipRate"] = layer.clipRate;
+                        }
+                    }
+                    layers.push_back(std::move(l));
+                }
+                anim["layers"] = std::move(layers);
+            }
             n["animation"] = anim;
         }
         if (node.kind == NodeKind::Particles) {
@@ -7309,7 +7425,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 // ladder read as configured in the file while being a single rung in the engine.
                 // ADR-278 generalised this loop out of here; what is left is the key list.
                 static constexpr std::string_view kAnimationKeys[] = {
-                    "state", "blend", "speed", "updateHz", "nearDistance", "farHz", "cullDistance"};
+                    "state", "blend", "speed", "updateHz", "nearDistance", "farHz", "cullDistance", "layers"};
                 json_keys::warnUnknownKeys(anim, kAnimationKeys,
                                            where + ": node '" + node.name + "': animation");
                 node.animation.state = *state;
@@ -7319,6 +7435,119 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 node.animation.nearDistance = *near;
                 node.animation.farHz = *farHz;
                 node.animation.cullDistance = *cull;
+                // ADR-300: the layer stack. Every field of a mask is named by the scene because
+                // every rig names its joints differently -- `head.x` on the alien pack, `Head01` on
+                // the bull, `Head` on the chicken. A name this rig does not carry is warned about
+                // when the rig is built, never silently dropped.
+                if (anim.contains("layers")) {
+                    const json& layers = anim.at("layers");
+                    if (!layers.is_array()) {
+                        return fail("node '{}': animation 'layers' must be an array", node.name);
+                    }
+                    for (const json& entry : layers) {
+                        if (!entry.is_object()) {
+                            return fail("node '{}': every animation layer must be an object", node.name);
+                        }
+                        PoseLayer layer;
+                        auto lname = readString(entry, "name", "");
+                        auto kind = readString(entry, "kind", "aim");
+                        auto drive = readString(entry, "drive", "manual");
+                        auto pivot = readString(entry, "pivot", "");
+                        auto clipName = readString(entry, "clip", "");
+                        auto clipRate = readFloat(entry, "clipRate", 1.0f);
+                        auto maxYaw = readFloat(entry, "maxYaw", 70.0f);
+                        auto maxPitch = readFloat(entry, "maxPitch", 35.0f);
+                        auto weight = readFloat(entry, "weight", 0.0f);
+                        if (!lname) return std::unexpected(lname.error());
+                        if (!kind) return std::unexpected(kind.error());
+                        if (!drive) return std::unexpected(drive.error());
+                        if (!pivot) return std::unexpected(pivot.error());
+                        if (!clipName) return std::unexpected(clipName.error());
+                        if (!clipRate) return std::unexpected(clipRate.error());
+                        if (!maxYaw) return std::unexpected(maxYaw.error());
+                        if (!maxPitch) return std::unexpected(maxPitch.error());
+                        if (!weight) return std::unexpected(weight.error());
+                        layer.name = *lname;
+                        if (!poseLayerKindFromName(*kind, layer.kind)) {
+                            return fail("node '{}': animation layer '{}': unknown kind '{}' (aim, additive)",
+                                        node.name, layer.name, *kind);
+                        }
+                        if (!poseLayerDriveFromName(*drive, layer.drive)) {
+                            return fail("node '{}': animation layer '{}': unknown drive '{}' (manual, look, "
+                                        "reaction)",
+                                        node.name, layer.name, *drive);
+                        }
+                        layer.pivot = *pivot;
+                        layer.clip = *clipName;
+                        layer.clipRate = *clipRate;
+                        layer.maxYawDegrees = *maxYaw;
+                        layer.maxPitchDegrees = *maxPitch;
+                        // A manual layer is one a tool or a test drives, so its authored weight is
+                        // its opening value; a driven layer's weight is written every frame from
+                        // the seam and an authored one would be overwritten before it was read.
+                        layer.weight = layer.drive == PoseLayerDrive::Manual ? *weight : 0.0f;
+                        if (entry.contains("forward")) {
+                            auto fwd = readVec<3>(entry, "forward", layer.forward);
+                            if (!fwd) return std::unexpected(fwd.error());
+                            layer.forward = *fwd;
+                        }
+                        if (entry.contains("joints")) {
+                            const json& joints = entry.at("joints");
+                            if (!joints.is_array()) {
+                                return fail("node '{}': animation layer '{}': 'joints' must be an array of "
+                                            "joint names",
+                                            node.name, layer.name);
+                            }
+                            for (const json& j : joints) {
+                                if (!j.is_string()) {
+                                    return fail("node '{}': animation layer '{}': 'joints' must be an array "
+                                                "of joint names",
+                                                node.name, layer.name);
+                                }
+                                layer.mask.joints.push_back(j.get<std::string>());
+                            }
+                        }
+                        if (entry.contains("weights")) {
+                            const json& weights = entry.at("weights");
+                            if (!weights.is_array()) {
+                                return fail("node '{}': animation layer '{}': 'weights' must be an array",
+                                            node.name, layer.name);
+                            }
+                            for (const json& w : weights) {
+                                if (!w.is_number()) {
+                                    return fail("node '{}': animation layer '{}': 'weights' must be numbers",
+                                                node.name, layer.name);
+                                }
+                                layer.mask.weights.push_back(w.get<float>());
+                            }
+                            if (layer.mask.weights.size() > layer.mask.joints.size()) {
+                                return fail("node '{}': animation layer '{}': {} weights for {} joints",
+                                            node.name, layer.name, layer.mask.weights.size(),
+                                            layer.mask.joints.size());
+                            }
+                        }
+                        auto descendants = readBool(entry, "descendants", false);
+                        if (!descendants) return std::unexpected(descendants.error());
+                        layer.mask.descendants = *descendants;
+                        if (layer.mask.joints.empty()) {
+                            return fail("node '{}': animation layer '{}' masks no joints, so it could only "
+                                        "ever do nothing",
+                                        node.name, layer.name);
+                        }
+                        for (const auto& key : entry.items()) {
+                            static constexpr std::array<std::string_view, 12> kLayerKeys{
+                                "name",  "kind",     "drive",    "joints",   "weights", "descendants",
+                                "pivot", "forward",  "maxYaw",   "maxPitch", "clip",    "clipRate"};
+                            if (std::find(kLayerKeys.begin(), kLayerKeys.end(), key.key()) ==
+                                kLayerKeys.end()) {
+                                log::warn("scene file '{}': node '{}': animation layer key '{}' is not one "
+                                          "this build reads and was ignored",
+                                          scenePath.string(), node.name, key.key());
+                            }
+                        }
+                        node.animation.layers.push_back(std::move(layer));
+                    }
+                }
             }
             if (item.contains("procedural")) {
                 auto pg = ProceduralGeometry::fromJson(item.at("procedural"));

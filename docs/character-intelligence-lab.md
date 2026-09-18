@@ -47,6 +47,8 @@ social interaction, a dense environment, a long-running simulation.
 | 7 | investigating a mushroom | blocked on **P3 decision** |
 | 8 | a social interaction | blocked on **P3 decision** |
 | 9 | crossing a river | blocked on **P3 decision** |
+| 10 | a head that turns while the legs keep walking | runnable — *unblocked by ADR-300* |
+| 11 | half a metre of landing the engine throws away | blocked on **P9 root motion** |
 
 Cases 7 and 8 were blocked on *two* units and are now blocked on one. That is what a `blockedBy` is
 for: the day a unit lands, the cases that were waiting on it are a list rather than a memory, and
@@ -54,7 +56,9 @@ unblocking half of one is deleting half of a string. All three remaining blocks 
 **nobody decides** (ADR-269) — and `Option` and `IConsiderer` still have no implementations.
 
 A blocked case carries `blockedBy` naming the unit of `docs/character-ai-plan.md` that unblocks it
-(ADR-275). `--lab-case character:7` refuses and prints the unit rather than opening the fixture: a
+(ADR-275). Case 11 is the first blocked on something other than perception or a decider, and the
+registry's own check widened with it: it asserts that `blockedBy` names *a* unit rather than one of
+the two that happened to exist on the day it was written. `--lab-case character:7` refuses and prints the unit rather than opening the fixture: a
 person who came to watch a character investigate something would otherwise be shown a scene in which
 that is not happening, and left to work out why.
 
@@ -68,7 +72,7 @@ without the second.
 
 ## 2. The fixture
 
-Nineteen nodes, four entities, thirteen heroes, and every element in it earns its place as an arm or
+Twenty nodes, five entities, thirteen heroes, and every element in it earns its place as an arm or
 a control.
 
 * **`scout`** — `alien-scout.glb` at **3.61×**, the scale Glowmere draws its aliens at. Carries four
@@ -85,6 +89,14 @@ a control.
 * **`penned`** — the same `explore` behaviour, standing inside ten hero stones on a 6 m ring whose
   solids overlap by 0.26 m, with a home radius five times the pen. The stuck arm; `rover` is its
   control.
+* **`watcher`** — the animation-layer arm (ADR-300). The same alien, walking, carrying two layers on
+  top of whatever clip the gait machine picked: an **aim** layer masked to the five joints that are
+  this rig's head, driven by `LocomotionState::lookTarget`; and an **additive** layer masked to the
+  upper body playing `Fight_head_hit`, driven by `LocomotionState::reaction`. It runs `lookAt` at
+  `boulder-b`, which while travelling publishes a look target and deliberately does not turn the
+  body — the case the seam was written for and that nothing consumed until now. Five names rather
+  than one because `head.x` has **zero children** on this asset and the eyes, mouth and antenna are
+  its siblings: the mask "head.x and its descendants" covers 1 joint of 90.
 * **`boulder-a/b/c`** — solids in the open, so a route has something to plan around.
 * **Four sets of senses, one per body** (ADR-290). Every entity declares a `perception` block and
   no two are the same, because the question case 10 asks is whether what a character notices depends
@@ -212,6 +224,10 @@ ADR-182, applied here:
 | a crowd performs exactly 144 occlusion tests | the same crowd at `occlusionTestsPerSecond = 0` performs **0**, and reports `tested == false` on every percept of every body on every frame |
 | 144 tests were performed | 405 of them came back genuinely occluded — without which "tested" would be consistent with a sightline that can only answer 1 |
 | a 60 Hz replay senses 43,200 times | the same replay at 4 Hz senses 2,903 times, and the −1 from 2,904 is the per-body phase |
+| the head group turns +32.71° while walking | the same layer with its weight pinned to 0 turns it 0.000° |
+| the feet move 0.000000 while the head turns | the identical layer masked onto the **feet** moves `foot.r` 0.1447 and the head 0.0000° |
+| a flinch moves the chest 0.0088 and the neck 0.0334 | the feet and toes move 0.000000 through the same flinch |
+| a mask that names a joint answers `Applied` | one naming `Head01` on an alien answers `NoJoints`, not `Inactive` |
 
 The determinism case prints its play-vs-seek figures rather than bounding them, and says why: a bound
 that passes today would be loose enough to assert nothing, and P1 owns the fix. This is where the

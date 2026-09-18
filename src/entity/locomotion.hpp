@@ -62,9 +62,25 @@ struct LocomotionState {
     bool grounded = true;
     // 0..1, decaying. A reaction the animation layer may blend a one-shot over (a flinch, a
     // head snap). The behaviour layer says how strongly and when; the animation layer says what.
+    //
+    // ADR-300: read, at last. It is the weight of any `scene::PoseLayer` whose `drive` is
+    // `Reaction` -- an additive clip masked to whatever part of the body a scene says, played *on*
+    // the gait rather than instead of it, so the shoulders can flinch while the legs keep the
+    // stride. It reaches nothing on a node that authors no such layer, which is the honest default:
+    // there is no joint name this engine may assume across three rig families that share none.
     float reaction = 0.0f;
     // Where the character is attending, when it is attending to anything. An animation layer uses
     // this for head/eye look-at on top of whatever clip is playing.
+    //
+    // ADR-300: read by any `scene::PoseLayer` whose `drive` is `Look`. **World space here**, and
+    // entity-local by the time it reaches a layer -- `Composition::AnimationSink::driveLayers` does
+    // the conversion, through the node's own world transform, because a posed rig has no world
+    // position (ADR-274) and the node is what carries the scale a joint offset is measured in.
+    //
+    // These three fields and the kinematics above them were written every frame and read by nobody
+    // for as long as this struct existed. `LookAt` publishes a target and declines to turn the body
+    // while travelling, on the stated grounds that the head is the animation layer's business; that
+    // sentence was true about the intent and false about the engine until there was a layer.
     glm::vec3 lookTarget{0.0f};
     bool hasLookTarget = false;
 

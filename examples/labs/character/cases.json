@@ -182,6 +182,39 @@
    "seed": 0,
    "notes": "The brief's third scenario. Splitting it this way is deliberate: P7 could make the route observable without P3, and then this case's first half unblocks and the second does not.",
    "blockedBy": "P3 decision"
+  },
+  {
+   "lab": "character",
+   "number": 10,
+   "title": "A head that turns while the legs keep walking",
+   "question": "Can this engine put anything on a character that is not the gait -- a look, a flinch -- and can it put it on one part of the body without touching the rest?",
+   "expectation": "`watcher` is an alien with two animation layers on top of whatever clip the gait machine is playing: an aim layer masked to the five joints that are this rig's head (`head.x`, `Eye_L`, `Eye_R`, `Mouth`, `Antenna`), driven by `LocomotionState::lookTarget`; and an additive layer masked to the upper body playing `Fight_head_hit`, driven by `LocomotionState::reaction`. Walking, with the target at (2, 0, 12), the head group turns **+32.71 deg** and `Eye_L` moves **0.0935** model units while `foot.l`, `foot.r` and `root.x` move **exactly 0.000000** -- the layer wrote 5 joints of 90. Pin the layer's weight to zero and the same second of the same walk has the head **0.000 deg** from where the clip left it; mask the identical layer onto the feet instead and `foot.r` moves **0.1447** while the head moves **0.0000 deg**. On a `music.impact` pulse, `reaction` reads 0.6733, the chest moves 0.0088 and the neck 0.0334, and the feet move 0.000000. Before ADR-300 every one of those numbers was zero, because `lookTarget`, `hasLookTarget` and `reaction` were published every frame and read by nobody.",
+   "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+   "timeSeconds": 8.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Asserted by tests/unit/test_character_lab_layers.cpp. The trap this case is built around: `alien-scout.glb` is nearly flat, `head.x` has zero children, and the eyes, mouth and antenna are its siblings -- so the mask \"head.x and its descendants\" covers 1 joint of 90 and a look-at built on it would turn a head and leave the eyes behind. Three rig families, three names for the head (`head.x`, `Head01`, `Head`), and no joint name is hardcoded anywhere in the engine. Watch the antenna: if it stays pointing the old way while the head turns, the mask has lost a name."
+  },
+  {
+   "lab": "character",
+   "number": 11,
+   "title": "Half a metre of landing the engine throws away",
+   "question": "When a clip moves the character itself -- `Landing` drops the root 0.567 m -- does the body go where the animator put it, or does it play the drop in place?",
+   "expectation": "In place. ADR-161 concluded there was no root motion in this content to extract, from three clips of one Mixamo file, and the two asset packs that arrived afterwards were never re-checked. Five clips per alien translate their root: `Dying_forward` 0.985 m across and -0.674 m down, `Dying_1_backpack` 0.875 / -0.464, `Dying_1_no_backpack` 0.868 / -0.629, `Crazy` 0.071 / +0.069, and **`Landing` 0.022 / -0.567** -- which Glowmere plays, at the moment a jump resolves. The expectation once P9 lands: with extraction opted in for `Landing`, `watcher`'s simulation position falls by 0.567 m times the node scale over the clip and its feet stay under it; with the opt-in off, the other 163 clips are byte-identical to what they are today.",
+   "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+   "timeSeconds": 4.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "blockedBy": "P9 root motion",
+   "notes": "The inventory is in ADR-260 and the layer stack it needed is in ADR-300; what is missing is the half that writes `MotionAuthority::Simulation`, which `src/scene/pose_layers.*` is deliberately unable to do -- it includes nothing from `entity/`. P9's seam runs the opposite way to the layer stack: a value read back out of the rig into the entity. The trap ADR-260 names: `joints[0]` is an armature wrapper no clip animates, so a probe that takes it as the root reports 168 clips with a root that never moved, for the most boring possible reason."
   }
  ]
 }

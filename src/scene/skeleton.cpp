@@ -78,6 +78,56 @@ void skinningPalette(const Skeleton& skeleton, const Pose& pose, std::vector<glm
     jointPalette(skeleton, scratch, out);
 }
 
+JointMask resolveJointMask(const Skeleton& skeleton, const JointMaskSpec& spec) {
+    JointMask mask;
+    mask.weight.assign(skeleton.joints.size(), 0.0f);
+    mask.named = static_cast<std::uint32_t>(spec.joints.size());
+    std::vector<bool> subtree;
+    for (std::size_t n = 0; n < spec.joints.size(); ++n) {
+        const int root = skeleton.find(spec.joints[n]);
+        if (root < 0) {
+            // The honest failure. A name this rig does not carry is not a weight of zero that
+            // happens to look the same; it is a question the mask could not answer, and the caller
+            // gets to say so out loud.
+            mask.missing.push_back(spec.joints[n]);
+            continue;
+        }
+        const float w = n < spec.weights.size() ? std::clamp(spec.weights[n], 0.0f, 1.0f) : 1.0f;
+        mask.weight[static_cast<std::size_t>(root)] = std::max(mask.weight[static_cast<std::size_t>(root)], w);
+        if (!spec.descendants) {
+            continue;
+        }
+        // Parents precede children, so one forward pass carries a named root's weight down its
+        // subtree. Marked per root rather than read back out of `mask.weight`, so two roots with
+        // different weights do not leak into each other's subtrees. On the alien pack this loop
+        // adds nothing at all for a head -- the rig is flat -- which is why the flag is off by
+        // default and why a mask is a group of names first.
+        subtree.assign(skeleton.joints.size(), false);
+        subtree[static_cast<std::size_t>(root)] = true;
+        for (std::size_t i = static_cast<std::size_t>(root) + 1; i < skeleton.joints.size(); ++i) {
+            const int parent = skeleton.joints[i].parent;
+            if (parent < 0 || !subtree[static_cast<std::size_t>(parent)]) {
+                continue;
+            }
+            subtree[i] = true;
+            mask.weight[i] = std::max(mask.weight[i], w);
+        }
+    }
+    for (std::size_t i = 0; i < mask.weight.size(); ++i) {
+        if (mask.weight[i] <= 0.0f) {
+            continue;
+        }
+        ++mask.joints;
+        for (int p = skeleton.joints[i].parent; p >= 0; p = skeleton.joints[static_cast<std::size_t>(p)].parent) {
+            if (mask.weight[static_cast<std::size_t>(p)] > 0.0f) {
+                ++mask.nested;
+                break;
+            }
+        }
+    }
+    return mask;
+}
+
 Transform blendTransform(const Transform& a, const Transform& b, float weight) {
     const float w = std::clamp(weight, 0.0f, 1.0f);
     Transform out;

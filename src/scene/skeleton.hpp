@@ -84,6 +84,52 @@ void jointPalette(const Skeleton& skeleton, const std::vector<glm::mat4>& model,
 void skinningPalette(const Skeleton& skeleton, const Pose& pose, std::vector<glm::mat4>& scratch,
                      std::vector<glm::mat4>& out);
 
+// ---- joint masks (ADR-300) ---------------------------------------------------------------------
+//
+// Which joints a layer is allowed to write, and how strongly. A mask is the only way an animation
+// layer is addressed here, and it is resolved **against the skeleton that will be posed** rather
+// than held as names, because the three rig families in this repository do not agree on a single
+// joint name: the aliens carry 89 joints and call the head `head.x`, the farm pack carries 15-27
+// and calls it `Head01` (bull) or `Head` (chicken), and `assets/imported/alien.gltf` is a third
+// rig again. A hardcoded name list would be a silent no-op on two of the three.
+//
+// **`descendants` is off by default and that default is a measurement.** It is the obvious way to
+// say "the head and everything on it", and on the alien pack it says almost nothing: the rig is
+// nearly flat, `head.x` has **zero children**, and `Eye_L`, `Eye_R`, `Mouth` and `Antenna` are its
+// *siblings* under the armature rather than its descendants. A head mask on that rig is an explicit
+// group of five names; on the farm rigs, which are properly nested, one name and `descendants`
+// covers it. Both have to be sayable, and neither may be assumed. ADR-300 §2 has the counts.
+struct JointMaskSpec {
+    std::vector<std::string> joints;  // the named joints
+    std::vector<float> weights;       // parallel to `joints` as far as it reaches; the rest take 1
+    bool descendants = false;         // and everything beneath each named joint
+};
+
+// A resolved mask: a weight per joint of one particular skeleton, and what the resolution could
+// not find.
+//
+// `missing` is the half that makes this honest. A name a rig does not carry is a typo or an asset
+// swap, and before ADR-274 the engine's answer to exactly that question -- "is this a joint, or did
+// I fall back?" -- was a `bool` that said yes either way, at a cost ADR-262 records in metres. A
+// mask reports the names it dropped and the count it kept, so "this layer did nothing" and "this
+// layer was asked for nothing" are different sentences.
+struct JointMask {
+    std::vector<float> weight;         // one per skeleton joint; 0 = this layer may not touch it
+    std::vector<std::string> missing;  // names asked for that this skeleton does not carry
+    std::uint32_t named = 0;           // names the spec asked for
+    std::uint32_t joints = 0;          // joints with a non-zero weight
+    // Masked joints that have a masked ancestor. Harmless for an additive layer, which writes each
+    // joint's own local; for an aim layer it means the rotation is applied twice on the way down
+    // the chain, so it is counted and reported rather than silently doubled.
+    std::uint32_t nested = 0;
+    [[nodiscard]] bool empty() const { return joints == 0; }
+    [[nodiscard]] float at(std::size_t joint) const { return joint < weight.size() ? weight[joint] : 0.0f; }
+};
+
+// Resolves `spec` against `skeleton`. Always returns a mask sized to the skeleton, even when every
+// name missed: an empty mask that says which names missed is the answer, not a failure.
+[[nodiscard]] JointMask resolveJointMask(const Skeleton& skeleton, const JointMaskSpec& spec);
+
 // `a` moved towards `b` by `weight` (0 = a, 1 = b): positions and scales lerp, rotations slerp
 // along the shorter arc so a cross-fade never takes the long way round.
 [[nodiscard]] Transform blendTransform(const Transform& a, const Transform& b, float weight);
