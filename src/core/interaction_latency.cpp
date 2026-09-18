@@ -367,6 +367,7 @@ std::vector<InteractionSummary> summarise(const InteractionLog& log, int group) 
         std::vector<double> cpu;
         std::vector<double> blocked;
         std::vector<double> gpu;
+        std::vector<double> calibration;
         for (const InteractionRecord& r : log.all()) {
             if (r.kind != kind) {
                 continue;
@@ -378,6 +379,10 @@ std::vector<InteractionSummary> summarise(const InteractionLog& log, int group) 
                 // A calibration sample. Counted so the control can be seen to have run, and kept
                 // out of every distribution so it cannot be quoted as a real latency.
                 ++s.injectedSamples;
+                s.injectedMsTotal += r.injectedMs;
+                if (auto v = r.inputToFinalVisual()) {
+                    calibration.push_back(*v);
+                }
                 continue;
             }
             s.flattens += r.flattens;
@@ -418,6 +423,7 @@ std::vector<InteractionSummary> summarise(const InteractionLog& log, int group) 
         s.cpu = distributionOf(std::move(cpu));
         s.blocked = distributionOf(std::move(blocked));
         s.gpu = distributionOf(std::move(gpu));
+        s.calibration = distributionOf(std::move(calibration));
         out.push_back(s);
     }
     return out;
@@ -477,9 +483,18 @@ std::string formatReport(const std::vector<InteractionSummary>& summaries, doubl
     }
     for (const InteractionSummary& s : summaries) {
         if (s.injectedSamples > 0) {
-            out += fmt::format("\n{} carried {} calibration sample(s) with a deliberate slowdown "
-                               "(ADR-182); they are excluded from every distribution above.\n",
-                               interactionName(s.kind), s.injectedSamples);
+            out += fmt::format(
+                "\n{}: {} calibration sample(s) carrying a deliberate slowdown of {:.1f} ms each "
+                "(ADR-182). Excluded from every distribution above; their own "
+                "input->final visual is min {} med {} p95 {} max {} ms. Compare each against the "
+                "same run without --latency-inject: every quantile must move by about the injected "
+                "amount, or this harness is not measuring what it names.\n",
+                interactionName(s.kind), s.injectedSamples,
+                s.injectedMsTotal / static_cast<double>(s.injectedSamples),
+                cell(s.calibration, &LatencyDistribution::min, 1),
+                cell(s.calibration, &LatencyDistribution::median, 1),
+                cell(s.calibration, &LatencyDistribution::p95, 1),
+                cell(s.calibration, &LatencyDistribution::max, 1));
         }
         if (s.begun > 0 && s.completed == 0) {
             out += fmt::format("\n{}: {} begun, 0 completed -- THIS INTERACTION MEASURED NOTHING.\n",

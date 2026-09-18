@@ -1,7 +1,14 @@
 # The AV Gen Engineering Lab Suite
 
-Status: **Phase 0 (research) and Phase 1 (shared infrastructure) complete.** Eleven of the fourteen
-labs are unbuilt; this document is what they are built on and what each of them owns.
+Status: **Phase 0 (research) and Phase 1 (shared infrastructure) complete.** Ten of the fifteen labs
+are unbuilt; this document is what they are built on and what each of them owns.
+
+The fifteenth arrived after this document was written and is the only one whose subject is not a
+pixel: the **Interaction Latency Lab** asks how long after a person acts the application answers.
+Every other lab asks why the renderer produced the frame it produced. It is in the registry rather
+than beside it because a suite that cannot hold "why does the editor feel slow" sends people off to
+build a harness of their own, and this repository had already paid for one of those. See
+[interaction-latency-lab.md](investigations/interaction-latency-lab.md).
 
 The suite answers a different question from a production scene. Glowmere answers *does the complete
 system produce a beautiful result*. A lab answers *why is the system behaving this way*.
@@ -311,6 +318,7 @@ the copy that a test checks.
 | AOV / Diagnostics | the five targets, linear depth, `--aov`, `--debug-target` | what the numbers mean about quality → Rendering | `src/app/render_job.cpp` |
 | Rendering | measuring a finished frame: the quality vector, the ladder, the detectors, the report | *why* the renderer produced it — every other lab owns a piece | `tools/quality-lab/report/vector.cpp` |
 | Integration / Stress | the scenes where everything runs at once, and their certified counters | any single subsystem — isolate it there first | `test_phase_g_certification.cpp` |
+| Interaction Latency **(built)** | the seven stamps between an input event and the frame showing its evaluated result; which interactions require a synchronous whole-scene evaluation | how long the GPU took once it was asked → Rendering; why a frame costs what it costs → `core::PhaseProfiler`, a different question | `src/core/interaction_latency.cpp:summarise` |
 
 **Glowmere and the demo worlds own authored production composition.** They are where a problem is
 *noticed*, never where it is diagnosed, and never where it is fixed.
@@ -324,12 +332,12 @@ touch CMake), all GPU-free, all checked by the CPU suite.
 
 ### `labs/lab.hpp` — the registry
 
-Fourteen `LabDescriptor`s: key, title, status, question, `owns`, `doesNotOwn`, `decides`
+Fifteen `LabDescriptor`s: key, title, status, question, `owns`, `doesNotOwn`, `decides`
 (`path:symbol`), `doc`, `fixture`, `cases`. `tests/unit/test_lab_registry.cpp` opens every `decides`
 file, greps it for the symbol, and checks every fixture, doc and case file exists — so a rename
 fails the suite instead of quietly making this document wrong.
 
-`LabStatus` is `Built` / `InProgress` / `Planned`, and the launcher shows all fourteen with their
+`LabStatus` is `Built` / `InProgress` / `Planned`, and the launcher shows all fifteen with their
 status. A launcher that hid the unbuilt labs could not be used to hand work out; one that opened
 them silently would teach people the suite is decorative.
 
@@ -410,7 +418,7 @@ Glowmere reproduction  →  the lab that owns the decision  →  minimal fixture
   root cause  →  engine fix  →  lab regression test  →  Glowmere verification
 ```
 
-`avgen --labs` prints the fourteen labs, what each owns, what it does not, and where its decision is
+`avgen --labs` prints the fifteen labs, what each owns, what it does not, and where its decision is
 made. Start at the lab whose *decision* the symptom is about, not the lab whose *name* the symptom
 sounds like. A tree that flickers is not necessarily the Temporal Lab: if it flickers because its
 LOD level alternates, it is the LOD Lab, and the Temporal Lab's instruments will only tell you it

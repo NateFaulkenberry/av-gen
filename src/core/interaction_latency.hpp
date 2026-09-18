@@ -326,6 +326,13 @@ struct InteractionSummary {
     std::uint64_t entitySimBodies = 0;
     std::uint64_t injectedSamples = 0;
     std::uint64_t coalesced = 0;
+    // The calibration records' own `input->final visual`, kept apart from every other distribution
+    // and reported under its own heading. Excluding them is right -- a calibration sample pooled
+    // with real ones would flatter nothing and corrupt everything -- but excluding them and then
+    // printing nothing makes a pure calibration run unreadable, which is how the first version of
+    // this reported a working control as a table of dashes.
+    LatencyDistribution calibration;
+    double injectedMsTotal = 0.0;
 };
 
 // Summarises every kind present in the log. Records carrying an injection are reported under

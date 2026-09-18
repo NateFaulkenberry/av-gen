@@ -1,7 +1,8 @@
 # The Interaction Latency Lab
 
-**Status:** the instrument is built and registered; the audit below is complete; the measurements
-are in §5 and the prototype in §7.
+**Status:** complete. The instrument is built, registered and shown detecting a slowdown it was not
+told about (§5.4); the audit is §1-§2; the measurements are §5; the prototype and its before/after
+are §5.3; the recommendations are §7 and what could not be measured is §8.
 **Subject:** how long after a person acts does the application answer.
 **Not the subject:** how long the GPU took to draw a frame once it was asked for, and why a frame
 costs what it costs. Those are `docs/renderer-2-architecture.md` and `core::PhaseProfiler`.
@@ -299,7 +300,174 @@ behaviour and is zero unless a flag asked for it.
 
 ## 5. Measurements
 
-*(filled in by the run; see the sections below)*
+### 5.0 Conditions
+
+`examples/world/glowmere-valley-2-multicam.json` — 80 nodes, 256 entities, 860 meshes, 44 textures,
+a 226.3 s piece. Window 1600x1000 points, canvas **1914x1256 px = 2.40 Mpx** at backing scale 2.0,
+209,761 triangles, 134 draw calls, `--preview-mode workspace`. Release build, M2 Max, macOS.
+Every run took `tools/gpu-lock.sh`. **Load averages are stated per run and they are not small**:
+three other agents were building and holding the GPU throughout.
+
+Two rules, in tension, resolved as the instrument's header says:
+
+* **Interaction latency is reported as a distribution**, because the tail is the experience. A scrub
+  whose minimum is 165 ms and whose p99 is 5,009 ms is not a 165 ms scrub.
+* **Throughput-style numbers are reported as minima**, and the *counters* are preferred to both,
+  because contention is never negative and "nine seeks where there were four hundred and
+  seventy-four" survives a load average of fifty-one.
+
+### 5.1 The matrix
+
+`--ui-ab click:star:hover:sliders:select:tabs:panels:box:gizmo:camera`, 2 blocks of 120 frames,
+12 settling frames discarded per block, interleaved inside one process. **Load average 6.7 at the
+start of the run and 51.0 at the end** — so the medians below are contended, and the minima and the
+counters are the load-bearing figures.
+
+| interaction | records | `input->ack` min..max | `input->final visual` min / med / p95 | CPU med | flat | seeks | tex |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **timeline-click** | 16 | **3.1 .. 4.2 ms** | **197.8 / 2437.5 / 3737.1 ms** | 2437.6 | 0 | 16 | 0 |
+| **hero-star** | 12 | — (no input event) | — | **2119.5** | **12** | 0 | **528** |
+| selection | 35 | — | — | **8.7** | 0 | 0 | 0 |
+| property-drag | 240 | — | — | **7.7** | 0 | 0 | 0 |
+| panel-toggle | 12 | — | — | **8.8** | 0 | 0 | 0 |
+| tab-switch | 22 | — | — | **8.8** | 0 | 0 | 0 |
+
+**The most important number in this document is the first row's second column.** A timeline click is
+acknowledged as a command in **3.1 ms** and answered on screen in **2,437 ms**. The application knows
+what you asked for almost immediately and then takes two and a half seconds to show it — a ratio of
+about 780. Nothing about that is a frame-rate problem and no frame-rate instrument can see it.
+
+`hero-star`'s **528 texture uploads over 12 edits is 44 per edit — every texture in the scene** — and
+it is a count rather than a duration, so the attribution holds at any load average.
+`Composition::rebuild()` ends with an unconditional `++scene_.textureVersion` and the renderer's only
+invalidation granularity is that one counter.
+
+The bottom four rows are the control, and they settle the brief's §45: **selection, a held property
+drag, opening and closing panels and switching tabs cost 7.7–8.8 ms of CPU and cause no flatten, no
+seek and no texture upload.** There is no general UI-thread responsiveness problem. There are two
+expensive paths.
+
+**What this table cannot say, and why.** The four cheap interactions have no `input->ack` or
+`input->final visual` at all, because they are driven through the editor's own API rather than the
+pointer and produce no SDL event to age. Their CPU column is the measurement; their latency columns
+are honestly blank rather than filled with a plausible number. Comparing `2,437.5 ms` against
+`8.8 ms` is therefore comparing a latency against a CPU cost, and the only thing that makes it a fair
+comparison is that the click's own CPU column reads 2,437.6 — the click's latency *is* its CPU cost,
+because there is nothing else in it.
+
+### 5.2 Where a click's 2,437 ms goes
+
+Every stage but one is free. `Engine::seekSeconds` does the transport, the audio player, the
+modulator, the music classifier, the director reset, the camera state, **`EntityWorld::seek`**, the
+rig reseed and the event rebase; the prior investigation measured everything *except*
+`EntityWorld::seek` at 0.025–0.046 ms in total. The re-simulation integrates every entity forward
+from `target − 90 s` at a fixed 1/60 s step (`src/entity/entity.cpp:714`; both the step and the
+90-second cap are literals passed at `src/app/engine.cpp`), so the cost is a straight line in *where
+you clicked*, flattening at the cap.
+
+**Independent corroboration, from another agent and from the opposite direction.** While this lab was
+being built, the character-intelligence work measured a single `EntityWorld::seek(90 s)` with an
+autonomous cast: **161.51 s at 100 `explore` characters and 594.66 s at 250** (commit `38c01ab`,
+now on main). Ten minutes of stalled editor for one timeline click. That is the same call this lab
+reached from the other end, and it changes the conclusion in §8: the deferral prototyped below is
+necessary and nowhere near sufficient.
+
+### 5.3 The prototype, before and after
+
+`--ui-ab "drag+seeknow:drag"`, 3 blocks of 240 frames, one process, **load average 2.56** — the
+cleanest conditions of any run here. `+seeknow` restores the undeferred seek for the length of its
+block, so these are two halves of one session and not two runs.
+
+| | `drag+seeknow` (before) | `drag` (after) | |
+|---|---:|---:|---|
+| timeline-drag records | 237 | 9 | |
+| **seeks performed** | **474** | **9** | **53x fewer** |
+| requests coalesced into a batch | 237 | 351 | |
+| `input->ack` median | 3.8 ms | 3.8 ms | unchanged, as it must be |
+| **`input->first visual` median** | **2,712.5 ms** | **8.9 ms** | **305x** |
+| `input->first visual` p99 | 3,802.9 ms | **9.1 ms** | |
+| `input->final visual` median | 5,376.6 ms | 4,616.0 ms | −14% |
+| `input->final visual` p95 | 7,521.8 ms | 4,821.4 ms | −36% |
+| CPU median | 5,376.8 ms | 3,886.4 ms | |
+| flattens | 0 | 0 | |
+
+And the press that begins each gesture, which is a *click* and is deliberately not deferred:
+
+| timeline-click | before | after |
+|---|---:|---:|
+| `input->first visual` median | 2,356.9 ms | **8.5 ms** |
+| `input->final visual` median | 2,366.9 ms | 2,347.8 ms |
+
+**Read those two tables together, because either one alone is misleading.**
+
+The playhead now answers in **8.5–8.9 ms — one frame, inside the preferred band** — where it
+previously answered in 2.4 to 2.7 seconds, which is the flow-break band. The gesture became usable:
+a scrub follows the pointer. That is a 305x improvement in the number a person actually perceives,
+and it is what the brief's cheap-immediate-response pattern buys.
+
+**The work did not go away, and the final visual barely moved.** 4,616 ms median against 5,377 — 14%,
+and all of it from evaluating nine times instead of 474. The world is still up to five seconds behind
+the playhead when a gesture ends. **A deferral turns an unusable interaction into a responsive one
+with a lagging result; it does not make the result arrive sooner.** Anybody who quotes the 305x
+without the 14% beside it will conclude the seek problem is solved. It is not.
+
+The `blocked` column moves from 0.1 ms to 725.1 ms between the arms. That is an artefact of the
+measurement and not a cost: a deferred record stays open across more frames, so it accumulates more
+of the swapchain wait. It is named as a wait for exactly this reason.
+
+### 5.4 The control (ADR-182)
+
+A latency harness that reports plausible numbers for an interaction it never performed is worse than
+no harness, because it will be trusted. So the arm is shown detecting a slowdown it was not told
+about: `--latency-inject timeline-click:250` spends 250 ms inside `Engine::seekSeconds` — inside the
+work the interaction performs, not inside the instrument — and the same `click` arm is run twice,
+back to back, under the same lock. **Load average 2.18 and 2.02.**
+
+`input->final visual`, the same rank in each distribution, 13 clicks each:
+
+| rank | no injection | +250 ms injected | difference |
+|---|---:|---:|---:|
+| minimum | 187.4 ms | 443.5 ms | **+256.1** |
+| 2nd | 649.1 ms | 898.2 ms | **+249.0** |
+| 3rd | 1141.8 ms | 1388.3 ms | **+246.5** |
+| maximum | 2797.6 ms | 3039.7 ms | **+242.1** |
+
+Every quantile moved by 242–256 ms against an injection of exactly 250. The minima are the
+load-bearing comparison here rather than the medians — this is a "did the work get bigger" question,
+which is the kind ADR-170's rule is right about, and contention can only ever make the difference
+larger.
+
+**Two things the control caught that nothing else would have.** The first run of it reported an
+entirely empty table: injected records are excluded from every distribution, correctly, and with
+*every* record injected there was nothing left to print. A working control that reports a table of
+dashes is a control nobody can read, so the calibration samples now get their own line with their
+own distribution, labelled as calibration and pooled with nothing. The second is that a mistyped
+interaction name is refused at the command line rather than defaulting — without that,
+`--latency-inject timeline-clik:250` would have calibrated the harness against an interaction nobody
+asked about and the null result would have looked like a clean one.
+
+### 5.5 The regression baseline
+
+The full CPU suite was run at this branch's merge-base (`74f9c0e`) and on this branch, on the same
+machine, with the same binary target:
+
+| | cases | failed | failed as expected | failing assertions |
+|---|---:|---:|---:|---:|
+| merge-base `74f9c0e` | 2,144 | 6 | 3 | 14 |
+| this branch | 2,165 | 6 | 3 | 14 |
+
+The failing *files and line numbers* are identical in both: `test_beam_lab.cpp:831/875/887`,
+`test_character_lab_slopes.cpp:187`, `test_shadow_lab.cpp:404/432`,
+`test_song_beginner_path.cpp:119/207/276/389/392/401`. Twenty-one cases were added and all pass.
+
+This was worth a build cycle rather than an assertion. The four `test_song_beginner_path` failures
+looked like a regression — they pass on current `main` and fail here — and the explanation is that
+**main has advanced 28 commits since this branch point**, two of which (`5e6dfd6` "A fixed 7.5
+seconds was a bet on a fixture, and the owner then edited the fixture" and `6896054` "Two Song Mode
+tests were measuring a JSON field, and the owner changed it") are the fixes for exactly these
+assertions. Reporting them as pre-existing without measuring would have been a guess that happened to
+be right.
+
 
 ---
 
@@ -311,3 +479,102 @@ behaviour and is zero unless a flag asked for it.
   different one.
 * **Whether a background job that was never collected is a defect.** §1.2 found two; ADR-225 owns the
   principle and the panels own the fix.
+
+---
+
+## 7. What is recommended, and what is explicitly rejected
+
+### Recommended, in the order the numbers put them
+
+**R1 — Delete the unconditional `++scene_.textureVersion` behind a content check.** One condition in
+`Composition::rebuild()` (`composition.cpp:4136`). Measured here: **44 texture uploads per hero
+star**, 528 over twelve edits, on a flatten that changed no texture at all. The prior investigation
+attributed 1,125 ms of a 1,454 ms star to this and its prediction is falsifiable — `# textures
+uploaded` should read 0 on a star's flatten frame. This is the highest ratio of latency removed to
+risk taken anywhere in this work, and a missed invalidation fails visibly and immediately, which is
+the good kind of failure. **Under an hour.**
+
+**R2 — Bound the entity re-simulation.** This is the one that matters and this work did not do it.
+`EntityWorld::seek` integrates from `target − 90 s` at 1/60 s every single time; keyframing the
+entity state at intervals and integrating forward from the nearest key below the target reproduces
+the same state for the same input with bounded work, and a *forward* seek could integrate from where
+it already is. The determinism test comes first and must fail before the change and pass after:
+scrub to the same second by two different routes and compare every entity's published state bit for
+bit (ADR-091 is exactly this property and it is the whole value of the re-simulation). The
+character-intelligence measurement of 161–594 s per seek with an autonomous cast is what turns this
+from an optimisation into the thing that decides whether an autonomous cast can be authored at all.
+**A day, and it is the day worth spending.**
+
+**R3 — Keep the deferral prototyped here.** It is small, it reuses ADR-084's tested arithmetic, it
+adds no thread and no second copy of any state, and it converts a scrub from unusable to responsive
+today, without waiting for R2. After R2 it costs nothing and protects against whatever the next
+expensive thing on that path turns out to be. It should not be *mistaken* for R2, which is why §5.3
+prints the 14% beside the 305x.
+
+**R4 — Cache `filterAssets`.** `control_panel.cpp:1330` rebuilds the filtered asset vector every
+frame and, with a search box in use, builds a fresh lowercased `name + category + description` string
+per asset per frame. `help_panel.cpp` already shows the fix — re-run when the `InputText` returns
+true. Unmeasured here (`ui.build` never crossed 0.28 ms on these projects) and recorded because it is
+one line of discipline away from being right.
+
+**R5 — Fix the two background jobs gated on panel visibility** (§1.2). Not latency; correctness.
+
+### Explicitly rejected
+
+**Replacing Dear ImGui.** Nothing measured here is attributable to it. `ui.build` is 0.28 ms against
+a 1.0 ms budget on a project with 3,000 parameters, and the two pathological interactions cost the
+same with the renderer reduced by 79%.
+
+**Putting world evaluation on a worker thread.** No measurement here requires it, and the ones that
+exist argue against it: both expensive interactions are single synchronous calls that are *too
+expensive*, not work that needs to be somewhere else. The composition is not thread-safe, all GPU
+work in this application is the main thread's, and ADR-084 §2 already rejected threading a far
+smaller piece of this. Deferring work is not the same thing as moving it, and only one of the two
+needs a lock. **The prototype in §5.3 is the deferral, not the thread, and the 305x came from the
+deferral.**
+
+**A `UISceneSnapshot`.** The brief proposes one; the measurement does not support it. The thing a
+snapshot would buy — the UI reading a stable copy while the world is evaluated — already exists for
+the one interaction that needs it: `Transport` holds the requested playhead position and the
+re-simulation was always downstream of it. The prototype needed *no* new state, and a second copy of
+the scene would have to be kept in step with the first by something, which is a new class of bug in
+exchange for a problem that has not been demonstrated.
+
+**A general invalidation taxonomy / dirty dependency graph.** `Composition::dirty_` has no
+granularity and that is a real defect, but it is reached by **one** of the nine common interactions
+measured here, and the flatten it triggers is the *smaller* half of that interaction's cost. R1
+changes whether the flatten is 19% or 85% of a star, so R1 must be settled before anybody can price
+this. Starting the granular-invalidation refactor first would be the fourth-best available action and
+the riskiest.
+
+**Virtualizing the lists.** `ImGuiListClipper` is absent from the whole repository and several lists
+are genuinely unbounded (§1.3). Not one of them appeared in any measurement. Recorded as a latent
+scaling risk, not proposed as work: the parameter inspector's 3,000-entry grouping pass is the
+strongest candidate and it lives inside an 0.28 ms `ui.build`.
+
+---
+
+## 8. What could not be measured, and why
+
+* **Latency for the value-driven interactions.** Selection, property drag, panel toggle and tab
+  switch are driven through the editor's own API and produce no SDL event, so they have no T0 and
+  their `input->ack` and `input->final visual` columns read `--`. Their CPU cost is measured;
+  their latency is not. Driving them through the pointer would measure ImGui's hit-testing as well,
+  which is a different question, and the arms' own headers say which of the two they are.
+* **How stale a real device's input gets during a 2.4-second frame.** A scripted arm mints its
+  events immediately before the poll that consumes them, so it cannot produce a backlog. The loop's
+  shape makes it structurally certain that no event is drained for the length of the call; the
+  magnitude is unmeasured, and the previous investigation could not measure it either.
+* **Whether `nodeBounds`'s flatten ever actually fires from the UI.** The hazard is proven by
+  reading — it calls `ensureBuilt()`, it is called per selected node every frame from
+  `WorldEditor::update` and per *every* node from `brush.cpp` — but `engine.update` runs before
+  `ui.build` and normally clears `dirty_`, so it should only fire when a UI edit sets `dirty_`
+  earlier in the same `ui.build`. The `edit` arm was not run under the latency instrument and this
+  is the single most valuable unrun measurement left. **If `# scene flattens` ever exceeds 1 on a
+  brush-stroke frame, that is a flatten inside the UI draw and a defect of its own.**
+* **Why a single texture upload costs ~25 ms.** Mipmap generation is the obvious candidate and it is
+  one level deeper than this work went. R1 makes it moot for the star; it would still matter for a
+  flatten that genuinely changed a texture.
+* **Anything about how the interface looks.** This agent cannot see the UI. Every claim here comes
+  from a counter, a timestamp or a scripted arm's own self-report, and none from reading ImGui code
+  and reasoning about what it would draw.
