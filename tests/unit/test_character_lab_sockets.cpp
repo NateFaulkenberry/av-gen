@@ -281,6 +281,69 @@ TEST_CASE("the joint moves when the clip does, and the palette is not the pose",
     CHECK(gap > 0.01f);
 }
 
+TEST_CASE("the socket agrees with the joint position computed from first principles",
+          "[labs][character][sockets]") {
+    if (!assetsPresent()) {
+        WARN("assets/aliens is not present; the socket arms need a real rig");
+        return;
+    }
+    // The independent arm. Every check above asks `socketTransform` what it thinks; this one
+    // re-derives the answer without it -- read the rig's pose, run `poseToModel` (the method
+    // `tests/support/stride_speed.hpp::jointPositionAt` uses, and the only working model-space joint
+    // query this repository had, test-only, before ADR-272), then place it by hand: scale by the
+    // node's scale, rotate by the body's yaw, translate to the body.
+    //
+    // If `AnimationSink::jointTransform` read the GPU palette instead of the pose, or if
+    // `socketTransform` composed in the wrong order, this would disagree -- and it would disagree by
+    // a plausible-looking amount, which is exactly the failure mode that needs an arm.
+    Fixture fx;
+    fx.play(1.5);
+    entity::Entity* scout = fx.scout();
+    REQUIRE(scout != nullptr);
+
+    const scene::Scene& sc = fx.comp->scene();
+    const scene::SkinnedRig* rig = nullptr;
+    for (const scene::SkinnedRig& r : sc.rigs) {
+        if (r.skeleton.find("hand.r") >= 0 && r.pose.size() == r.skeleton.jointCount()) {
+            rig = &r;
+            break;
+        }
+    }
+    REQUIRE(rig != nullptr);
+    std::vector<glm::mat4> model;
+    scene::poseToModel(rig->skeleton, rig->pose, model);
+    const int joint = rig->skeleton.find("hand.r");
+    REQUIRE(joint >= 0);
+    const glm::vec3 local(model[static_cast<std::size_t>(joint)][3]);
+
+    auto* scaleParam = fx.params.findAs<glm::vec3>("nodes/scout/scale");
+    REQUIRE(scaleParam != nullptr);
+    const float scale = scaleParam->finalComponent(0);
+    const float yaw = scout->state().yaw;
+    const float c = std::cos(yaw);
+    const float sn = std::sin(yaw);
+    const glm::vec3 scaled = local * scale;
+    // +Y rotation by `yaw`, written out rather than borrowed, so this arm shares no arithmetic with
+    // the code under test.
+    const glm::vec3 rotated(scaled.x * c + scaled.z * sn, scaled.y, -scaled.x * sn + scaled.z * c);
+    const glm::vec3 expected = scout->visualPosition() + rotated;
+
+    scene::Transform hand;
+    REQUIRE(scout->socketTransform("hand", hand) == entity::SocketResolution::Joint);
+    const float gap = glm::length(hand.position - expected);
+    INFO(fmt::format("socket ({:.4f},{:.4f},{:.4f}) vs re-derived ({:.4f},{:.4f},{:.4f}): {:.6f} m",
+                     hand.position.x, hand.position.y, hand.position.z, expected.x, expected.y,
+                     expected.z, gap));
+    CHECK(gap < 1.0e-3f);
+
+    // The control: the same re-derivation with the scale left out, which is what the engine did
+    // before ADR-272, must *not* agree. An arm that passed either way would be checking nothing.
+    const glm::vec3 unscaled(local.x * c + local.z * sn, local.y, -local.x * sn + local.z * c);
+    const float unscaledGap = glm::length(hand.position - (scout->visualPosition() + unscaled));
+    INFO(fmt::format("the scale-blind re-derivation is {:.4f} m away", unscaledGap));
+    CHECK(unscaledGap > 1.0f);
+}
+
 TEST_CASE("a socket carries the node's scale", "[labs][character][sockets]") {
     if (!assetsPresent()) {
         WARN("assets/aliens is not present; the socket arms need a real rig");

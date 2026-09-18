@@ -126,9 +126,10 @@ a character's height would depend on where the camera is, and a scrub would stop
 * **Authored slopes** — ground comes only from `WorldMap`, an analytic noise field. A clean 10°/20°/
   30°/40° ramp cannot be authored; the slope tests instead *search* the real map for points at those
   angles, which has the advantage of testing the production terrain path.
-* **Joint attachment** — `ISkeletonQuery::jointWorldTransform` is declared and **has no implementor**.
-  `Entity::setSkeleton` is never called, so `Entity::socketTransform` resolves sockets against the
-  entity's own frame rather than against a bone. See below.
+* **Joint attachment** — *was* the gap here, and is closed (ADR-272). `ISkeletonQuery` is implemented
+  by `Composition::AnimationSink` over `SkinnedRig::pose`, `Entity::setSkeleton` is called for every
+  entity that drives a node, and the method is now `jointTransform` because it answers in the rig's
+  **model space, which is the entity's own frame** — not world. See below.
 
 ## The attachment-point contract (brief §38)
 
@@ -138,16 +139,29 @@ it is simply not wired.
 * `Entity::socketTransform(std::string_view socket, scene::Transform& out)` is the **authoritative
   world-space semantic position** a consumer should ask for. That is the call to use — not a
   reconstruction of the model transform, and not `visualPosition()` directly.
-* It resolves through `Entity::setSkeleton(const ISkeletonQuery*)`. **Nothing implements
-  `ISkeletonQuery` and nothing calls `setSkeleton`**, so today every socket silently falls back to the
-  entity's own frame. A consumer cannot currently tell a real joint answer from the fallback.
+* It resolves through `Entity::setSkeleton(const ISkeletonQuery*)`, which
+  `Composition::installEntities` now calls. It returns `entity::SocketResolution` — `None`,
+  `EntityFrame` or `Joint` — so a consumer can tell a real joint answer from the fallback, which it
+  could not before ADR-272: every socket in the engine took the fallback and returned `true` on it.
+  The fallback is still offered, because a prop has to be somewhere and a scene must be authorable
+  before its skeleton exists; `resolved()` is the predicate the old `bool` meant.
+* The node's **scale** is part of the answer. A joint offset is in the asset's own units and Glowmere
+  draws its aliens at 3.344x–3.610x, so a scale-blind socket put a hand-mounted prop at 28% of the
+  hand's distance from the body. Measured: 2.8785 m at 3.610x, 1.4392 m at 1.805x.
+* **Attachments lag the pose by one frame.** `applyAttachments` runs inside `updateBehaviour`; the
+  rigs are posed in `Composition::update`. 16.7 ms of a walk cycle. Not yet fixed; the fix is an
+  ordering change inside `EntityWorld::update`.
 * If a beam anchors on a position today, the one that matches what is drawn is `visualPosition()` /
   the node `position` parameter — **not** `state().position()`, which omits every behaviour offset
   (Glowmere's saucer carries a `drift` of radius 2.4 m, so the two differ by metres).
 * Whatever the beam needs — a designated attachment point, an animation-space transform, a special
   root-motion policy — belongs in this contract as a named socket, not as a special animation path
-  for abduction. Implementing `ISkeletonQuery` against `SkinnedRig::pose` would make
-  `socketTransform` mean what it says, and is the natural place for that work.
+  for abduction. `socketTransform` now means what it says; the arms are in
+  `tests/unit/test_character_lab_sockets.cpp` and the fixture is
+  `examples/labs/character/character-intelligence-lab.scene.json`.
+* **No scene file in this repository declares a socket.** `sockets` is parsed by
+  `entity::entityFromJson` and appears in no `examples/**` scene except the Character Intelligence
+  Lab's fixture, which was written for these tests. The seam has been correct-shaped and unused.
 
 ## Performance
 
