@@ -1044,3 +1044,52 @@ TEST_CASE("What watching a render costs it", "[.perf][render][preview]") {
     // Nothing accumulates when nobody collects: every frame but the one still in hand was dropped.
     CHECK(dropped == frames - 1);
 }
+
+TEST_CASE("A supersampled EXR previews the frame that is written, not the one it was resolved from",
+          "[gpu][render][preview]") {
+    // The one thing the tap's *position* is load-bearing for, and the only case that can catch it
+    // being moved up a line. Under ADR-212 supersampling the HDR readback is twice the output in
+    // each axis, and `resolveToOutput` box-averages it down to the size that goes in the file. A
+    // tap above that call would show a frame of the right shape, the right content and the wrong
+    // pixels -- the 2x intermediate, which is a real picture of the same moment and is not the
+    // deliverable. Everything else in this file uses supersample 1, where the resolve is a no-op
+    // and cannot tell the two placements apart.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+    const auto out = f.dir / "exr_super";
+    auto settings = smallSettingsExr(out);
+    settings.supersample = 2.0f;
+    settings.endSeconds = 0.8; // three frames is enough; these are 4x the pixels
+    settings.normalisePattern();
+    app::RenderJob job(*ctx, shaders, loadOffline(f.project), settings, f.dir);
+    job.setPreviewEnabled(true);
+    REQUIRE(job.run().has_value());
+    REQUIRE(job.progress().error.empty());
+
+    app::RenderJob::FramePreview frame;
+    REQUIRE(job.takePreview(frame));
+    // The output is 96x64, the HDR target is 192x128. Either number is a plausible-looking preview
+    // and only one of them is the file's.
+    CHECK(frame.sourceWidth == 96);
+    CHECK(frame.sourceHeight == 64);
+    CHECK(frame.step == 1);
+
+    auto file = assets::readExr(settings.frameFile(out, frame.index));
+    REQUIRE(file.has_value());
+    REQUIRE(file->width == 96);
+    const float* pixels = reinterpret_cast<const float*>(file->data.data());
+    std::size_t differing = 0;
+    for (std::uint32_t i = 0; i < frame.width * frame.height; ++i) {
+        for (int c = 0; c < 3; ++c) {
+            const float v = std::clamp(pixels[static_cast<std::size_t>(i) * 4 + c], 0.0f, 1.0f);
+            const float s = v <= 0.0031308f ? v * 12.92f : 1.055f * std::pow(v, 1.0f / 2.4f) - 0.055f;
+            if (frame.rgba[static_cast<std::size_t>(i) * 4 + c] !=
+                static_cast<std::uint8_t>(std::lround(s * 255.0f))) {
+                ++differing;
+            }
+        }
+    }
+    CHECK(differing == 0);
+    CHECK(ctx->errorCount() == 0);
+}
