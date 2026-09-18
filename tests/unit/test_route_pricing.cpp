@@ -520,3 +520,73 @@ TEST_CASE("the cheap body fords and the dear body goes round", "[entity][route][
     CHECK(dryRound > dryFord);
 }
 
+// ------------------------------------------------------------------------------------------------
+// A real character in a real world: nobody named the destinations
+// ------------------------------------------------------------------------------------------------
+
+TEST_CASE("the goal model picks the places and the router picks the ways", "[entity][route][adr335]") {
+    if (!assetsPresent()) {
+        WARN("assets/aliens is not present");
+        return;
+    }
+    // The authored-destination arm above is the lab's, and a considerer that only worked with a
+    // list an author wrote would not serve the Glowmere showcase this unit gates -- a jetpack
+    // alien crossing the river while a walking-only one routes around it, neither of them told
+    // where to go. With no `destinations`, the goal model chooses the places (`goalWeight`, the
+    // same function `Explore` and `interest` weigh with) and this chooses the ways to them.
+    World world(riverFixture());
+    const EntityState state = standingAt(kSouthStart);
+    const DecisionContext ctx = contextIn(world, state);
+    const nlohmann::json settings{{"name", "wander"},
+                                  {"weight", 1.0f},
+                                  {"wadePenalty", 1.2f},
+                                  {"source", "omniscient"},
+                                  {"maxDestinations", 3},
+                                  // Far enough out that the nearest thing worth walking to is on
+                                  // the other bank. Below 40 m every candidate is a shore point of
+                                  // this side of the river, and the arm would be a probe that
+                                  // could not fail.
+                                  {"minRange", 45.0f},
+                                  {"maxRange", 90.0f}};
+    RouteConsiderer considerer(&settings);
+    std::vector<RouteConsiderer::Priced> priced;
+    const std::size_t ways = considerer.price(ctx, priced);
+    std::string report;
+    for (const RouteConsiderer::Priced& p : priced) {
+        report += fmt::format("\n  {}{}  {:.1f} m, {:.2f} wet, score {:.4f}",
+                              p.destination.empty() ? "(unnamed)" : p.destination,
+                              p.detour ? " round" : "", p.length, p.wadeMetres, p.score);
+    }
+    WARN(fmt::format("{} way(s) to {} place(s) nobody named:{}", ways, priced.size(), report));
+
+    // **The cap is a cap.** Three destinations, so at most six ways -- and at least three, because
+    // a destination with no way at all would mean the goal model handed over somewhere unreachable.
+    REQUIRE(ways >= 3);
+    REQUIRE(ways <= 6);
+    CHECK(ways == 6); // three places, two ways each: every one of them is across the water
+    // At least one of them is across the river and has two ways, which is the whole point: an
+    // omniscient list with no water in it would give six identical single options and this arm
+    // would be the probe that cannot fail.
+    std::size_t withTwo = 0;
+    for (const RouteConsiderer::Priced& p : priced) {
+        if (p.detour) {
+            ++withTwo;
+        }
+    }
+    CHECK(withTwo == 3);
+    // And the names came out of the world rather than out of the test: `north-cairn` and
+    // `ford-marker` are heroes this fixture places, and an unnamed one is a shore point the grid
+    // extracted while it was being built.
+    std::size_t named = 0;
+    for (const RouteConsiderer::Priced& p : priced) {
+        named += p.destination.empty() ? 0 : 1;
+    }
+    CHECK(named >= 4);
+    // And every way is a real route with a real price: a zero-length option would be a body
+    // scoring the ground it stands on.
+    for (const RouteConsiderer::Priced& p : priced) {
+        CHECK(p.length > 5.0f);
+        CHECK(p.cost >= p.length);
+        CHECK(p.score > 0.0f);
+    }
+}
