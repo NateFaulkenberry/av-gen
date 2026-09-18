@@ -1088,6 +1088,11 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             // neighbour was invisible and one phantom was not.
             bc.self = entityIndex;
             bc.rng = &entity.rng_;
+            // ADR-310. The same seam the played frame has, and it has to be here or a decider
+            // would be the one tier a scrub could not reproduce -- which is ADR-267 defect 3 again,
+            // one layer up. A decision taken during a replay pushes onto the queue the replay is
+            // already integrating, so the replayed second contains the errand the played one did.
+            bc.actions = &entity.actions_;
             for (auto& behavior : entity.behaviors_) {
                 behavior->update(bc, entity.state_, entity.motion_);
             }
@@ -1441,6 +1446,11 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         bc.world = this;
         bc.self = entityIndex;
         bc.rng = &entity.rng_;
+        // ADR-310: the decider's output is an `ActionDesc` list on this entity's own queue. Handed
+        // in here rather than reached for through the world, because the world is const to a
+        // behaviour and must stay that way -- a behaviour that could reach another body's queue
+        // would be a second writer of somebody else's intentions.
+        bc.actions = &entity.actions_;
         for (auto& behavior : entity.behaviors_) {
             behavior->update(bc, entity.state_, entity.motion_);
         }

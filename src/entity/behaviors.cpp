@@ -5,12 +5,14 @@
 #include "entity/entity.hpp"
 #include "entity/airborne.hpp"
 #include "entity/grounding.hpp"
+#include "entity/decision.hpp"
 #include "entity/nav_grid.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <span>
 
 namespace avgen::entity {
@@ -1974,6 +1976,248 @@ private:
     GroundFollower follower_;
 };
 
+// ---- decide ----------------------------------------------------------------------------------
+//
+// The decider (ADR-269, ADR-310). **A character kind, expressed as scene data.**
+//
+// This is the one behaviour in the vocabulary that has no behaviour of its own. It scores options,
+// commits to one, and pushes that option's `ActionDesc` list onto `Authority::Routine`; the
+// existing queue does everything after that. There is no second interpreter here -- no
+// running/succeeded/failed enum beside `ActionResult`, no tree walker, no per-frame re-evaluation
+// of anything the queue is in the middle of.
+//
+// **The product claim this exists to make good on.** Before it, the only autonomous mind in this
+// engine was `Explore`: 700 lines, one class, one personality, which is why every autonomous
+// character in Glowmere is an explorer and why a guard would have been a second 700-line class. A
+// guard is now this:
+//
+//     { "kind": "decide", "hertz": 2, "considerers": [
+//         { "kind": "holdPost", "post": "gate", "pull": 0.30 },
+//         { "kind": "investigate", "kinds": ["character"], "weight": 2.2 },
+//         { "kind": "idle" } ] }
+//
+// and an explorer that reads its senses instead of the omniscient list is the same behaviour with
+// `interest` in the list instead. Neither is a C++ class.
+//
+// **Two memories, and both live here rather than in a considerer.** ADR-269's rule is that a
+// considerer holds no per-character state, which is what makes ADR-267's D4 free -- there is
+// nothing in a considerer to checkpoint. So the two things a decider genuinely has to remember are
+// held by the behaviour: `PerceptMemory`, the bounded fade over percepts that ADR-290 §7 named as
+// the thing to revisit first, and `visited_`, the places this body has already been, which is the
+// goal model's novelty term. Both are bounded, both are cleared by `reset`, and both are
+// reconstructed by a replay rather than persisted.
+//
+// **R1/R3.** It reads `state().position()` and writes nothing: not `travel`, not `MotionOffset`,
+// not a parameter. Scoring is a read and acting is the queue's job (R3, ADR-210). The only thing it
+// writes anywhere is a list of intentions onto its own entity's queue.
+class Decide final : public IBehavior {
+public:
+    explicit Decide(const nlohmann::json* s)
+        : hertzDefault_(readFloat(s, "hertz", 2.0f)),
+          dwellDefault_(readFloat(s, "dwellTicks", 2.0f)),
+          marginDefault_(readFloat(s, "margin", 0.08f)),
+          memorySecondsDefault_(readFloat(s, "memorySeconds", 0.0f)),
+          memoryCapacity_(static_cast<std::uint16_t>(
+              std::clamp(readFloat(s, "memoryCapacity", 8.0f), 0.0f, 64.0f))),
+          visitedCapacity_(static_cast<std::size_t>(
+              std::clamp(readFloat(s, "visitedCapacity", 5.0f), 0.0f, 64.0f))) {
+        if (s != nullptr && s->is_object() && s->contains("considerers") &&
+            (*s)["considerers"].is_array()) {
+            for (const auto& entry : (*s)["considerers"]) {
+                if (!entry.is_object() || !entry.contains("kind") || !entry["kind"].is_string()) {
+                    continue;
+                }
+                auto made = makeConsiderer(entry["kind"].get<std::string>(), &entry);
+                if (made != nullptr) {
+                    considerers_.push_back(std::move(made));
+                }
+            }
+        }
+        views_.reserve(considerers_.size());
+        for (const auto& considerer : considerers_) {
+            views_.push_back(considerer.get());
+        }
+    }
+
+    [[nodiscard]] std::string_view kind() const override { return "decide"; }
+
+    void registerParameters(params::ParameterSet& params, const std::string& prefix) override {
+        hertz_ = &params.add(floatDesc(prefix + "hertz", hertzDefault_, 0.0f, 60.0f));
+        dwell_ = &params.add(floatDesc(prefix + "dwellTicks", dwellDefault_, 0.0f, 600.0f));
+        margin_ = &params.add(floatDesc(prefix + "margin", marginDefault_, 0.0f, 100.0f));
+        memorySeconds_ =
+            &params.add(floatDesc(prefix + "memorySeconds", memorySecondsDefault_, 0.0f, 600.0f));
+        paths_ = {prefix + "hertz", prefix + "dwellTicks", prefix + "margin",
+                  prefix + "memorySeconds"};
+        // Every considerer's knobs, under its own name. ADR-225: a weight an author wrote in a
+        // scene file and the engine then read once from the JSON would be a decoration, not a
+        // setting -- it could not be keyframed, modulated, saved or driven by a signal, which is
+        // every one of the things this project means by a parameter.
+        for (const auto& considerer : considerers_) {
+            const std::string base = prefix + std::string(considerer->name()) + "/";
+            considerer->registerParameters(params, base);
+            considerer->collectParameterPaths(paths_);
+        }
+    }
+    void collectParameterPaths(std::vector<std::string>& out) const override {
+        out.insert(out.end(), paths_.begin(), paths_.end());
+    }
+
+    void reset(Rng&) override {
+        selector_.reset();
+        memory_.reset();
+        visited_.clear();
+        scored_.clear();
+        queue_ = nullptr;
+        lastMargin_ = 0.0f;
+    }
+
+    void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
+        (void)motion;
+        queue_ = ctx.actions;
+        if (ctx.actions == nullptr || considerers_.empty() || ctx.world == nullptr) {
+            return;
+        }
+        const Entity* self = ctx.self < ctx.world->entities().size()
+                                 ? ctx.world->entities()[ctx.self].get()
+                                 : nullptr;
+
+        SelectorSettings settings;
+        settings.hertz = hertz_ != nullptr ? hertz_->value() : hertzDefault_;
+        settings.dwellTicks = dwell_ != nullptr ? dwell_->value() : dwellDefault_;
+        settings.margin = margin_ != nullptr ? margin_->value() : marginDefault_;
+        selector_.setSettings(settings);
+        memory_.setSettings(PerceptMemory::Settings{
+            memorySeconds_ != nullptr ? memorySeconds_->value() : memorySecondsDefault_,
+            memoryCapacity_});
+
+        DecisionContext dctx;
+        dctx.time = ctx.time;
+        dctx.dt = ctx.dt;
+        dctx.self = ctx.self;
+        dctx.state = &state;
+        dctx.percepts =
+            memory_.merge(self != nullptr ? self->percepts() : std::span<const Percept>(), ctx.time);
+        dctx.visited = visited_;
+        dctx.nav = ctx.nav;
+        dctx.world = ctx.world;
+        dctx.bus = ctx.bus;
+        dctx.seed = self != nullptr ? self->seed() : 0;
+
+        const std::uint64_t before = selector_.tick();
+        const bool changed = selector_.select(dctx, views_);
+        if (selector_.tick() != before || !selector_.started()) {
+            publish();
+        }
+        if (!changed) {
+            return;
+        }
+        const std::size_t chosen = selector_.chosen();
+        if (chosen >= selector_.options().size()) {
+            return;
+        }
+        const Option& winner = selector_.options()[chosen];
+        // `override` rather than `push`: a new decision *replaces* the routine, and whatever the
+        // routine was in the middle of is reported Cancelled rather than dropped in silence. A
+        // push would queue the new errand behind the abandoned one, which is the opposite of
+        // changing your mind.
+        //
+        // The tiers above are untouched, so a director shot or a one-off action still preempts a
+        // decider exactly as it preempts a schedule (ADR-091), and the decision resumes underneath
+        // it afterwards.
+        ctx.actions->override(std::vector<ActionDesc>(winner.actions.begin(), winner.actions.end()),
+                              Authority::Routine, ctx.time);
+        remember(winner);
+    }
+
+    [[nodiscard]] bool decisionDebug(DecisionDebug& out) const override {
+        out.options = scored_;
+        out.chosen = selector_.current();
+        out.tick = selector_.tick();
+        out.committedTick = selector_.committedTick();
+        out.margin = lastMargin_;
+        const Selector::Counts counts = selector_.counts();
+        out.decisions = counts.decisions;
+        out.dwellRejections = counts.dwellRejections;
+        out.marginRejections = counts.marginRejections;
+        out.remembered = memory_.remembered();
+        return true;
+    }
+
+    // The route the winning option is walking, borrowed from the queue that is walking it. A
+    // decider owns no route of its own -- that is the whole point of pushing actions rather than
+    // moving the body -- so the honest answer is the queue's, and the phase is the option's name.
+    [[nodiscard]] bool navDebug(NavDebug& out) const override {
+        if (queue_ == nullptr) {
+            return false;
+        }
+        out.route = queue_->route();
+        out.leg = queue_->routeLeg();
+        out.hasDestination = !out.route.empty();
+        if (out.hasDestination) {
+            out.destination = glm::vec3(out.route.back().x, 0.0f, out.route.back().y);
+        }
+        out.phase = selector_.current();
+        return true;
+    }
+
+private:
+    // The scored list, flattened for the overlay, once per decision tick rather than per frame.
+    void publish() {
+        scored_.clear();
+        const std::span<const Option> options = selector_.options();
+        const std::size_t chosen = selector_.chosen();
+        float best = 0.0f;
+        float runnerUp = 0.0f;
+        for (std::size_t i = 0; i < options.size(); ++i) {
+            scored_.push_back(ScoredOption{options[i].name, options[i].score, i == chosen});
+            if (options[i].score > best) {
+                runnerUp = best;
+                best = options[i].score;
+            } else if (options[i].score > runnerUp) {
+                runnerUp = options[i].score;
+            }
+        }
+        lastMargin_ = best - runnerUp;
+    }
+
+    // Where the committed option was going, so the goal model's novelty term has something to
+    // suppress. Bounded at `visitedCapacity_`, oldest out first -- the same shape and the same
+    // five entries `Explore::remember` has always kept.
+    void remember(const Option& winner) {
+        if (visitedCapacity_ == 0) {
+            return;
+        }
+        for (const ActionDesc& action : winner.actions) {
+            if (action.kind == ActionKind::Move && action.target.kind == TargetKind::Point) {
+                visited_.push_back(action.target.point);
+                while (visited_.size() > visitedCapacity_) {
+                    visited_.erase(visited_.begin());
+                }
+                return;
+            }
+        }
+    }
+
+    float hertzDefault_, dwellDefault_, marginDefault_, memorySecondsDefault_;
+    std::uint16_t memoryCapacity_ = 8;
+    std::size_t visitedCapacity_ = 5;
+    params::Parameter<float>* hertz_ = nullptr;
+    params::Parameter<float>* dwell_ = nullptr;
+    params::Parameter<float>* margin_ = nullptr;
+    params::Parameter<float>* memorySeconds_ = nullptr;
+    std::vector<std::string> paths_;
+
+    std::vector<std::unique_ptr<StockConsiderer>> considerers_;
+    std::vector<const IConsiderer*> views_;
+    Selector selector_;
+    PerceptMemory memory_;
+    std::vector<glm::vec3> visited_;
+    std::vector<ScoredOption> scored_;
+    float lastMargin_ = 0.0f;
+    const ActionQueue* queue_ = nullptr;
+};
+
 // ---- orbit -----------------------------------------------------------------------------------
 //
 // Travel slowly around a named point. Separate from `drift` because a craft holding station over
@@ -2046,7 +2290,7 @@ bool BehaviorContext::event(std::string_view name) const {
 
 std::vector<std::string_view> behaviorKinds() {
     return {"hover",  "drift",  "bank",     "spin",  "wander",
-            "explore", "ground", "liveliness", "lookAt", "interest", "orbit"};
+            "explore", "ground", "liveliness", "lookAt", "interest", "orbit", "decide"};
 }
 
 std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::json* settings) {
@@ -2082,6 +2326,9 @@ std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::j
     }
     if (kind == "liveliness") {
         return std::make_unique<Liveliness>(settings);
+    }
+    if (kind == "decide") {
+        return std::make_unique<Decide>(settings);
     }
     return nullptr;
 }
