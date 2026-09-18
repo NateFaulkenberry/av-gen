@@ -18,8 +18,18 @@
 //   delivered  that session saved to a project and reloaded by a second Engine, as a render does
 //
 // `session` must differ from `none` -- the control. `delivered` must equal `session` -- the
-// invariant. Before the fix `delivered` was bit-identical to `none`: the sky the window drew was
-// not in the file.
+// invariant.
+//
+// Measured, on this machine, against `74f9c0e` (the commit before the fix) and again after it:
+//
+//   arm        hash, before the fix    hash, after
+//   none       3287881903340913539     3287881903340913539
+//   session    6381471283130077767     6381471283130077767
+//   delivered  3287881903340913539     6381471283130077767
+//
+// Before: the exported frame was the *empty sky*, and not approximately -- the same 64-bit image
+// hash, bit for bit. The control held in both runs, which is what makes the third row evidence
+// rather than a coincidence of two blank frames.
 
 #include "app/engine.hpp"
 #include "core/log.hpp"
