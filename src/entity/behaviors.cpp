@@ -209,6 +209,12 @@ public:
     }
     void reset(Rng& rng) override { seed_ = rng.nextU32(); }
 
+    // `slowNoise(ctx.time, ...)` and nothing else: the offset at t is a function of t, the seed the
+    // reset drew, and three parameters. There is no state between one update and the next to
+    // accumulate, so a replay of the preceding ninety seconds produces a value the last step throws
+    // away. The one step is the answer.
+    [[nodiscard]] int historySteps() const override { return 1; }
+
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
         const float amplitude = amplitude_ != nullptr ? amplitude_->value() : amplitudeDefault_;
         const float rate = rate_ != nullptr ? rate_->value() : rateDefault_;
@@ -382,6 +388,13 @@ public:
         previous_ = glm::vec2(0.0f);
         started_ = false;
     }
+
+    // Two, not one. The offset is a pure function of the clock like `hover`'s, but the velocity it
+    // publishes for `bank` is a backward difference against the previous step -- so the step before
+    // the target has to have run, and `started_` has to be true, or a scrubbed frame reports a
+    // stationary craft that a played one reports as moving. The step before is enough: `previous_`
+    // after it holds `offset(t - dt)`, which is exactly what a full replay would have left there.
+    [[nodiscard]] int historySteps() const override { return 2; }
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
         const float radius = radius_ != nullptr ? radius_->value() : radiusDefault_;

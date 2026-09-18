@@ -136,6 +136,26 @@ public:
     virtual void reset(Rng& rng) = 0;
     virtual void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) = 0;
 
+    // How many fixed simulation steps, *ending at the one being asked about*, have to be integrated
+    // for this behaviour to be in the state a play would have left it in. 1 means the answer at `t`
+    // is a function of `t` and nothing else; 2 means it also needs the step before, because it
+    // differences against it. `kAllOfIt` means the state is an accumulation and the only honest
+    // answer is the whole replay.
+    //
+    // This is what lets `EntityWorld::seek` stop paying for history nobody reads. A ninety-second
+    // scrub integrates 5,400 steps per body, and for a craft whose whole motion is a noise function
+    // of the clock, 5,399 of them produce a number that the 5,400th overwrites. Measured on
+    // Glowmere's own population in ADR-272.
+    //
+    // **The default is `kAllOfIt`, and that is the point.** A behaviour opts *out* of history by
+    // saying so, so a new one added tomorrow -- or an existing one that grows a timer -- is
+    // replayed in full until somebody has looked at it and can defend the shorter answer. A wrong
+    // answer here is a scrubbed frame that differs from a played one, which is the defect the seek
+    // exists to prevent; tests/unit/test_entity_seek.cpp checks every kind in the vocabulary
+    // against a full replay, with the accumulating kinds as the control that must disagree.
+    static constexpr int kAllOfIt = -1;
+    [[nodiscard]] virtual int historySteps() const { return kAllOfIt; }
+
     // Fills `out` and returns true when this behaviour navigates. The spans point into the
     // behaviour and are valid until its next update, which is enough for a UI pass that runs in
     // the same frame and is why nothing is copied here.
