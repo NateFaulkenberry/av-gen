@@ -1,3 +1,4 @@
+#include "core/interaction_latency.hpp"
 #include "ui/sequence_panel.hpp"
 
 #include "ui/shortcuts.hpp"
@@ -1319,6 +1320,12 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             // the cursor and the handle's pressed state say so.
             drag_ = Drag::Playhead;
             hitBlock = true;
+            // T2: the press has been read as "move the playhead there". Opened here rather than
+            // inside `seekSeconds`, because the engine cannot tell a person's click from the
+            // transport's own end-of-piece wrap, and an instrument that cannot tell them apart
+            // reports the second as the first.
+            core::interactions().beginFromInput(core::Interaction::TimelineClick);
+            core::interactions().markCommand();
             engine.seekSeconds(std::clamp(snap(engine, mouseTime), 0.0, duration));
         } else if (lane == StripLane::Sections) {
             // A boundary first, because it is a five-point target inside a block and the block is
@@ -1584,6 +1591,10 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         };
         switch (drag_) {
         case Drag::Playhead:
+            // One record per frame of the gesture, which is what the gesture actually costs: a
+            // drag issues one full seek per frame and nothing coalesces them.
+            core::interactions().beginFromInput(core::Interaction::TimelineDrag);
+            core::interactions().markCommand();
             engine.seekSeconds(std::clamp(t, 0.0, duration));
             break;
         case Drag::Marquee: {
@@ -1673,6 +1684,8 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         }
     } else if (drag_ == Drag::None && hovered && overAxis &&
                ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+        core::interactions().beginFromInput(core::Interaction::TimelineDrag);
+        core::interactions().markCommand();
         engine.seekSeconds(std::clamp(snap(engine, mouseTime), 0.0, duration));
     }
     if (drag_ != Drag::None && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {

@@ -19,6 +19,9 @@
 #include "core/rng.hpp"
 #include "scene/procedural.hpp"
 #include "core/time.hpp"
+#include <cstdlib>
+
+#include "core/interaction_latency.hpp"
 #include "core/phase2_probe.hpp" // TEMPORARY: ui-responsiveness phase 2
 #include "gpu/context.hpp"
 #include "gpu/readback.hpp"
@@ -196,6 +199,11 @@ std::string usageText() {
            "                      detail a small output cannot sample.\n"
            "  --profile-cpu       print the main thread's per-phase frame distribution on exit\n"
            "  --profile-csv <f>   write one row per frame (every phase) to <f> on exit\n"
+           "  --latency           interaction-latency report on exit (one record per interaction)\n"
+           "  --latency-csv <f>   write one row per interaction to <f> on exit\n"
+           "  --latency-inject <kind>:<ms>  slow a named interaction deliberately, to show the\n"
+           "                      harness detects it (ADR-182). Its records are excluded from\n"
+           "                      every distribution.\n"
            "  --capture <file>    write the last frame as a PPM image\n"
            "  --capture-ui <f>    write the editor, ImGui and all, as a PNG\n"
            "  --capture-ui-frame <n>  which frame to grab (default 90)\n"
@@ -593,6 +601,43 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             if (!v) return std::unexpected(v.error());
             options.profileCsv = std::filesystem::path(*v);
             options.profileCpu = true;
+            ++i;
+        } else if (arg == "--latency") {
+            options.latencyReport = true;
+        } else if (arg == "--latency-csv") {
+            auto v = need(i, "--latency-csv");
+            if (!v) return std::unexpected(v.error());
+            options.latencyCsv = std::filesystem::path(*v);
+            options.latencyReport = true;
+            ++i;
+        } else if (arg == "--latency-inject") {
+            auto v = need(i, "--latency-inject");
+            if (!v) return std::unexpected(v.error());
+            const std::string spec = *v;
+            const std::size_t colon = spec.rfind(':');
+            if (colon == std::string::npos) {
+                return std::unexpected(
+                    Error{fmt::format("--latency-inject wants <kind>:<ms>, got '{}'", spec)});
+            }
+            const std::string kind = spec.substr(0, colon);
+            // Refused rather than defaulted. A mistyped kind that silently slowed the first
+            // enumerator would produce a calibration run that proves the instrument can see a
+            // slowdown in an interaction nobody asked about -- which is the exact failure the
+            // control exists to rule out.
+            if (!core::interactionFromName(kind)) {
+                return std::unexpected(
+                    Error{fmt::format("--latency-inject: no such interaction '{}'", kind)});
+            }
+            double ms = 0.0;
+            try {
+                ms = std::stod(spec.substr(colon + 1));
+            } catch (const std::exception&) {
+                return std::unexpected(
+                    Error{fmt::format("--latency-inject: '{}' is not a number of milliseconds",
+                                      spec.substr(colon + 1))});
+            }
+            options.latencyInject.emplace_back(kind, ms);
+            options.latencyReport = true;
             ++i;
         } else if (arg == "--frames") {
             auto v = need(i, "--frames");
@@ -2211,15 +2256,31 @@ void Application::handleInputEvent(const SDL_Event& event) {
             // oldest as well as the newest. A timeline click is a BUTTON_DOWN, so the existing
             // `input->present ms` -- motion only -- cannot see the interaction this phase is about.
             ++probe2::frame().inputEvents;
+            std::uint64_t eventNs = 0;
             if (event.type == SDL_EVENT_MOUSE_MOTION) {
-                probe2::frame().note(event.motion.timestamp);
+                eventNs = event.motion.timestamp;
                 ++probe2::frame().pointerEvents;
             } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
                        event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
-                probe2::frame().note(event.button.timestamp);
+                eventNs = event.button.timestamp;
                 ++probe2::frame().pointerEvents;
             } else {
-                probe2::frame().note(event.common.timestamp);
+                eventNs = event.common.timestamp;
+            }
+            probe2::frame().note(eventNs);
+            // T0 and T1 for the interaction log. SDL stamps events on its own `SDL_GetTicksNS`
+            // clock and every stage downstream is on `steady_clock`; rather than carry two
+            // timebases, the event's *age* is measured in SDL's clock and subtracted from the
+            // handler's own `steady_clock` reading. The two clocks need only agree on durations,
+            // which they do, and not on epochs, which they do not.
+            if (eventNs != 0) {
+                const core::Stamp receipt = core::Clock::now();
+                const std::uint64_t nowNs = SDL_GetTicksNS();
+                const std::uint64_t ageNs = nowNs > eventNs ? nowNs - eventNs : 0;
+                core::interactions().noteInput(
+                    receipt - std::chrono::duration_cast<core::Clock::duration>(
+                                  std::chrono::nanoseconds(ageNs)),
+                    receipt);
             }
             if (event.type == SDL_EVENT_MOUSE_MOTION) {
                 ++uiMotionEvents_;
@@ -2997,6 +3058,19 @@ int Application::runLive() {
     // flattens that frame caused rather than the ones opening the project did.
     std::uint64_t lastFlatten =
         engine_->composition() != nullptr ? engine_->composition()->flattenCount() : 0;
+    // The interaction log keeps its own marks rather than sharing the profiler's: the profiler's are
+    // advanced inside a block that is skipped when there is no composition, and a counter that
+    // silently stops advancing attributes the next real flatten to the wrong interaction.
+    std::uint64_t interactionFlattenMark_ = lastFlatten;
+    std::uint64_t interactionProcGenMark_ = lastProcGen;
+    for (const auto& [kindName, ms] : options_.latencyInject) {
+        if (const auto kind = core::interactionFromName(kindName)) {
+            core::setInjectedDelay(*kind, ms);
+            log::info("latency: injecting {:.1f} ms into every '{}' (ADR-182 control; these "
+                      "records are excluded from the distributions)",
+                      ms, kindName);
+        }
+    }
     if (auto arms = parseUiScript(options_.uiScript)) {
         uiScript_ = UiScript(*arms);
     }
@@ -3070,6 +3144,10 @@ int Application::runLive() {
                                                                  : abGroups[static_cast<std::size_t>(arm)]);
         }
         probe2::frame().clear(); // TEMPORARY: ui-responsiveness phase 2
+        // The interaction log's frame boundary. Clearing the input slot here is what stops an
+        // interaction opened on a quiet frame inheriting the previous frame's event and
+        // reporting a latency that spans a gesture nobody made.
+        core::interactions().beginFrame(framesRendered);
         const std::uint64_t allocsAtFrameStart = core::allocCounters().allocations;
         // Last frame's canvas. Events are read before this frame is laid out, so this is the most
         // recent answer there is; on a still window it is the current one.
@@ -3442,6 +3520,9 @@ int Application::runLive() {
                          static_cast<double>(nowNs - probe2::frame().newestInputNs) / 1.0e6);
             }
         }
+        // T5 for the interaction log, and the same instant for the same reason: the frame's UI
+        // state is decided here.
+        core::interactions().markSubmit();
         if (uiSelfTest && (time.frameIndex % 30) == 0) {
             const ImGuiIO& io = ImGui::GetIO();
             int wx = 0;
@@ -3741,6 +3822,36 @@ int Application::runLive() {
                 prof.add(kPhGpuFrame, stats.gpuFrameMs);
             }
         }
+        // ---- the interaction log's end of frame -------------------------------------------------
+        // Everything this frame caused is attributed to whatever interaction is open, then T6 is
+        // taken. The counters are the half contention cannot corrupt: "one flatten and forty-four
+        // texture uploads" is the same fact on an idle machine and on one at load average forty.
+        {
+            const probe2::Frame& pr = probe2::frame();
+            const std::uint64_t flattenNow =
+                engine_->composition() != nullptr ? engine_->composition()->flattenCount() : 0;
+            core::interactions().addCounters(
+                flattenNow >= interactionFlattenMark_ ? flattenNow - interactionFlattenMark_ : 0,
+                pr.seeks, scene::proceduralRebuildCount() >= interactionProcGenMark_
+                              ? scene::proceduralRebuildCount() - interactionProcGenMark_
+                              : 0,
+                pr.texturesUploaded, pr.entitySimBodies);
+            interactionFlattenMark_ = flattenNow;
+            interactionProcGenMark_ = scene::proceduralRebuildCount();
+            core::interactions().addCpuMs(stats.cpuFrameMs);
+            // Named as a wait, never folded into CPU work. `gpu.acquire WAIT` grows when the GPU
+            // falls behind and reading it as the CPU getting slower is the mistake the phase
+            // profiler's own header exists to prevent.
+            core::interactions().addBlockedMs(
+                std::chrono::duration<double, std::milli>(workAfterAcquire - workBeforeAcquire)
+                    .count());
+            if (stats.gpuFrameMs >= 0.0) {
+                core::interactions().setGpuMs(stats.gpuFrameMs);
+            }
+            // ...and nothing is set when it is not, so `gpu` reports unavailable rather than 0.0 on
+            // the first frames, where FrameTimeline genuinely has no completed frame to report.
+            core::interactions().markFrameVisible();
+        }
         prof.endFrame(stats.frameIntervalMs);
         ++fpsFrames;
         fpsAccum = std::chrono::duration<double>(frameEnd - fpsStart).count();
@@ -3822,6 +3933,26 @@ int Application::runLive() {
         std::ofstream out(*options_.profileCsv);
         out << cpuProfile_.csv();
         log::info("frame phases written to {}", options_.profileCsv->string());
+    }
+    if (options_.latencyReport) {
+        // The load average is read here rather than quoted from memory: ADR-170 requires a timing
+        // claim to state the contention it was taken under, and on this machine that ranges from 3
+        // to 44 within one session.
+        double loads[3] = {0.0, 0.0, 0.0};
+        const double loadAverage = ::getloadavg(loads, 3) > 0 ? loads[0] : -1.0;
+        std::fputs(core::formatReport(core::summarise(core::interactions()), loadAverage).c_str(),
+                   stderr);
+        if (core::interactions().overlaps() > 0) {
+            log::warn("latency: {} overlapping interaction(s) -- two were in flight at once, which "
+                      "the main thread's serialisation says cannot happen. The older record of each "
+                      "pair was discarded rather than merged.",
+                      core::interactions().overlaps());
+        }
+    }
+    if (options_.latencyCsv) {
+        std::ofstream out(*options_.latencyCsv);
+        out << core::formatCsv(core::interactions());
+        log::info("interaction records written to {}", options_.latencyCsv->string());
     }
     // What the scripted editor run actually did, in order. This is the only record that survives a
     // run the machine cannot screenshot (ADR-092), so it is printed whether or not anything else is.

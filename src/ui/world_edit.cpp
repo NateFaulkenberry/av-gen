@@ -1,3 +1,4 @@
+#include "core/interaction_latency.hpp"
 #include "ui/world_edit.hpp"
 
 #include "app/engine.hpp"
@@ -643,15 +644,27 @@ EditCommand setNodesHero(app::Engine& engine, std::span<const std::string> names
                                 command.heroes.size() == 1
                                     ? command.heroes.front().node
                                     : std::to_string(command.heroes.size()) + " objects");
+    // T2 for the interaction log, and only here -- after the early returns. A star of something
+    // already starred returns above with an empty command and nothing happens; opening a record
+    // before that point would report a latency for an edit that was refused, which is the shape of
+    // dishonesty this instrument exists to avoid.
+    core::interactions().beginWithoutInput(core::Interaction::HeroStar);
+    core::interactions().markCommand();
+    core::applyInjectedDelay(core::Interaction::HeroStar); // ADR-182's control; zero unless asked
     // Performed by the same code that replays it, rather than here and then again differently.
     // `applyEdit` assembles the whole list and validates it in one go, which is the only way
     // `Composition::setHeroes` can be called -- it rejects a set rather than a member.
     EditApply applied = applyEdit(engine, command, true);
+    // T3: `setHeroes` has taken the new list. The flatten it asked for is paid by the next
+    // `Engine::update`, which is where T4 lands -- so a star's model change and its evaluated
+    // consequence are a frame apart by construction, and the log shows that rather than hiding it.
+    core::interactions().markModel();
     if (!applied.ok()) {
         for (const std::string& problem : applied.problems) {
             log::warn("hero: {}", problem);
         }
         command = EditCommand{};   // nothing changed, so there is nothing to put on the history
+        core::interactions().abandon(); // a refused edit is not a fast one
     }
     return command;
 }

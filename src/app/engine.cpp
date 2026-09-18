@@ -7,6 +7,7 @@
 #include "seq/section_actions.hpp"
 
 #include "core/phase_profiler.hpp"
+#include "core/interaction_latency.hpp"
 #include "core/phase2_probe.hpp" // TEMPORARY: ui-responsiveness phase 2
 #include <optional>
 
@@ -2309,6 +2310,10 @@ void Engine::stop() {
 }
 
 void Engine::seekSeconds(double seconds) {
+    // ADR-182's control, and it is here rather than in the instrument on purpose: this is inside the
+    // work a seek performs, so a calibration run slows the *pipeline* by a known amount and the
+    // latency harness either sees it or is not a latency harness. Zero unless --latency-inject asked.
+    core::applyInjectedDelayForOpenInteraction();
     // TEMPORARY (ui-responsiveness phase 2): every seek, wherever it came from.
     ++probe2::frame().seeks;
     const probe2::Add probeSeek(probe2::frame().seekMs);
@@ -2383,6 +2388,9 @@ void Engine::seekSeconds(double seconds) {
     // and the next frame -- a panel drawing the playhead, a script asserting where it landed, a tool
     // reporting the position -- sees the second the playhead has left.
     timelineClock_.seconds = seconds;
+    // T3 for the interaction log: the authoritative state has changed. Everything above this line
+    // is what a scrub costs, and the log's `input->ack` minus this is where it went.
+    core::interactions().markModel();
 }
 
 bool Engine::isPlaying() const { return transport_.isPlaying(); }
@@ -3292,6 +3300,12 @@ void Engine::update(const FrameTime& time) {
     probeStage(probe2::frame().updOtherMs); // TEMPORARY: phase 2
     stats_.allocsOther = (allocsNow() - allocsAtStart) - stats_.allocsControl - stats_.allocsSignals -
                          stats_.allocsModulation - stats_.allocsController;
+    // T4 for the interaction log. The scene a panel and the renderer read has been re-derived, so
+    // this is the first instant at which the *evaluated* consequence of an interaction exists.
+    // Note what this implies and do not paper over it: a UI edit happens inside `ui.build`, which
+    // runs after this, so the evaluated consequence of an edit is always one frame later than the
+    // edit. That one frame is real and belongs in `input->final visual`.
+    core::interactions().markPresentation();
     const auto end = std::chrono::steady_clock::now();
     const double micros = std::chrono::duration<double, std::micro>(end - start).count();
     stats_.modulationMicros = stats_.modulationMicros * 0.9 + micros * 0.1;
