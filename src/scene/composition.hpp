@@ -19,6 +19,7 @@
 #include "assets/asset_registry.hpp"
 #include "core/error.hpp"
 #include "graph/graph.hpp"
+#include "scene/day_night.hpp"
 #include "scene/field_params.hpp"
 #include "scene/camera_rig.hpp"
 #include "scene/light_rig.hpp"
@@ -935,7 +936,8 @@ public:
 private:
     void rebuild();          // flattens nodes into scene_ (meshes/textures/entities/particles)
     void ensureBuilt();      // rebuild() when dirty
-    void applyParameters(); // node finals -> transforms/materials/particles; camera; environment
+    void applyParameters();
+    void applyDayNight();  // ADR-341; the tail of applyParameters // node finals -> transforms/materials/particles; camera; environment
     // Nudges the camera's aim onto the hero the active directed shot was cut for (ADR-158).
     // After `syncHeroesToNodes`, not inside `applyParameters`, so it reads where the hero is
     // *this* frame rather than where it was last one.
@@ -1021,6 +1023,12 @@ private:
     std::optional<glm::vec3> envDominantDirection_;
     // Procedural sky (ADR-036): the scene-file values behind the env/sky/* parameters.
     scene::SkySettings skySetting_;
+    // ADR-341: the day/night cycle. Inert unless the scene enables it; when it is on it
+    // becomes the authority for the fields it owns and writes them after every other
+    // parameter, so "one environment changing state" is true by ordering rather than by care.
+    scene::DayNightSettings dayNight_;
+    scene::DayNightState dayNightState_;  // this frame's resolved environment
+    bool dayNightNightMap_ = false;       // which map is currently bound
     Scene scene_;
     std::vector<std::unique_ptr<CompositionNode>> nodes_;
     bool dirty_ = true;

@@ -202,7 +202,19 @@ def build(name: str, spec: dict, cache: Path, out: Path, width: int) -> dict:
         "asset_base_id": spec["assetBaseId"],
         "asset_type": "hdr",
         "assetName": spec["assetName"],
-        "license": "NOT RECORDED -- see identification.licenceNote. Nothing is invented here.",
+        "license": "CC0",
+        "licenseSource": ("Stated by the project owner on 2026-09-18. NOT independently verified: "
+                          "the BlenderKit client log carries no licence field and has since been "
+                          "truncated past the point where either asset ID appeared, neither EXR "
+                          "header carries a licence attribute, and there is no sidecar or saved "
+                          ".blend to read. Recorded as the owner's statement, in the same way the "
+                          "day asset's download chain is recorded as an observation that can no "
+                          "longer be re-verified."),
+        "licenseImplication": ("CC0 waives attribution, so nothing blocks distribution. `author` is "
+                               "kept present and empty rather than deleted: crediting an HDRI "
+                               "author is courtesy and costs nothing if the name is ever "
+                               "recovered from the asset page."),
+        "author": "",
         "identification": {
             "method": "byte-exact size match against the Content-Length the BlenderKit client log "
                       "recorded -- NOT a match on the asset_base_id",
@@ -219,10 +231,11 @@ def build(name: str, spec: dict, cache: Path, out: Path, width: int) -> dict:
                           "in the session that produced this file, and is an observation that can "
                           "no longer be re-verified."),
             "licenceNote": ("No licence or author field exists in the client log, in either EXR "
-                            "header, in any sidecar under ~/blenderkit_data, or in a saved .blend, "
-                            "and no Blender session was running whose image datablock could be "
-                            "inspected. Fill this in from the asset's BlenderKit page before this "
-                            "project is distributed."),
+                            "header, in any sidecar under ~/blenderkit_data, or in a saved .blend. "
+                            "The licence above is the owner's statement, not a reading of any of "
+                            "those. The asset titles -- 'Clouds' and 'Moon star' -- are the only "
+                            "human-readable handles that survive, since neither asset_base_id "
+                            "appears anywhere on disk any more."),
             "requestedResolution": ("the request header said resolution_4K; the client's actual "
                                     "targets were resolution_2K and blend, so no 4K file was "
                                     "fetched and none is missing"),

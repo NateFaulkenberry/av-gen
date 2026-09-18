@@ -25,7 +25,9 @@
 #include <glm/glm.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace avgen::scene {
@@ -117,6 +119,16 @@ struct DayNightSettings {
     float starBrightnessScale = 1.0f;
     float hdriIntensityScale = 1.0f;
     float glowInfluence = 1.0f;   // 0 = Glowmere ignores the cycle; 1 = full curve
+
+    // What the cycle drives, named rather than guessed. A system that looked for a light called
+    // "sun" would work on this scene and quietly do nothing on the next one; naming the bindings
+    // in the scene file makes the coupling visible where an author can see and change it.
+    std::string sunLight;               // the directional the sun curve drives; "" = none
+    std::string moonLight;              // the directional the moon curve drives; "" = none
+    std::vector<std::string> starNodes; // procedural nodes whose emission is the starfield
+    std::vector<std::string> glowNodes; // glTF nodes carrying the tree's Glowmere layers
+    std::string dayMap;                 // equirect used while `useNightMap` is false
+    std::string nightMap;               // equirect used while it is true
 
     // Fills every empty curve with the Tree of Life defaults. Called on load so a scene that says
     // only `"dayNight": { "enabled": true }` gets a complete, cinematic cycle.

@@ -106,7 +106,8 @@ void DayNightSettings::applyDefaults() {
         {kNight, {0.0070f, 0.0130f, 0.0250f}},
     });
     fill<float>(skyIntensity, {
-        {kMidnight, 1.00f}, {kSunrise, 1.05f}, {kNoon, 1.15f}, {kSunset, 1.05f}, {kNight, 1.00f},
+        {kMidnight, 0.16f}, {kPreDawn, 0.20f}, {kSunrise, 0.62f}, {kMorning, 1.00f},
+        {kNoon, 1.10f}, {kAfternoon, 1.00f}, {kSunset, 0.66f}, {kTwilight, 0.30f}, {kNight, 0.17f},
     });
     fill<float>(haze, {
         {kMidnight, 0.55f}, {kSunrise, 0.86f}, {kNoon, 0.45f}, {kSunset, 0.90f},
@@ -167,6 +168,18 @@ std::uint64_t DayNightSettings::hash() const {
     h.f32(starBrightnessScale);
     h.f32(hdriIntensityScale);
     h.f32(glowInfluence);
+    const auto hs = [&h](const std::string& v) {
+        for (const char ch : v) {
+            h.u32(static_cast<std::uint32_t>(static_cast<unsigned char>(ch)));
+        }
+        h.u32(0xFFFFFFFFu);
+    };
+    hs(sunLight);
+    hs(moonLight);
+    hs(dayMap);
+    hs(nightMap);
+    for (const std::string& n : starNodes) hs(n);
+    for (const std::string& n : glowNodes) hs(n);
     const auto hf = [&h](const std::vector<PhaseKey<float>>& keys) {
         for (const auto& k : keys) {
             h.f32(k.phase);
