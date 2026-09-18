@@ -8,9 +8,7 @@
   "scene": {
    "kind": "composition",
    "path": {
-    "path": "glowmere-valley-3.scene.json",
-    "sha256": "5f2ea8b505fff57943034e0bd44c0b289edceb5c987d38ccd2c027739cbe4b15",
-    "size": 142140
+    "path": "_v3shot.scene.json"
    }
   }
  },

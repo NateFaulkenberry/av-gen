@@ -466,6 +466,53 @@ clearings.append(glade(BACKWATER_PATH[2][0], BACKWATER_PATH[2][2], 36.0, 24.0, 4
 terrain["clearings"] = clearings
 
 # =================================================================================================
+# 2b. THE ONE PIECE OF LEGACY PROJECT STATE THAT IS CARRIED, AND IT MOVES HOUSE
+# =================================================================================================
+#
+# `glowmere-valley-2-multicam.json` carries 248 `nodes/*` parameters, of which 41 contradict its
+# scene. ADR-264 §4 adjudicated that exact set as **authoring** -- "the forty-one mushroom
+# rotations somebody dragged in the editor are left alone" -- while adjudicating three others in
+# the same file as residue, and it needed `git log -S` over a 7,114-line re-save to tell them
+# apart.
+#
+# A rebuild that ignored them would throw away the owner's work and call it hygiene. So they are
+# carried, and the test that decides which is the one ADR-264 and the valley-2 generator both
+# used: **a mushroom is four nodes, and a transform not shared by all four is a patch rather than
+# a placement.** Only a rotation that cap, under, stem and gills all agree on is taken.
+#
+# That rule excludes, by construction and without anybody judging them:
+#
+#   `nodes/elder-2-stem/position`   the stem nudge the v2 generator already unwound at the other
+#                                   end, by lathing the cap about the stem's leaning top
+#   `nodes/elder-2-spores/visible`  false in the project and true in the scene, on a fifth node
+#                                   that is not one of the four
+#
+# And it **moves house**. The value lands in the scene node, not in valley 3's project. ADR-271 is
+# right that a *live adjustment* belongs in the project and that the editor must keep putting it
+# there; it says nothing about where a generator should put a decision it is authoring. A yaw the
+# generator writes is authoring, so it goes where the generator's other yaws are, and valley 3's
+# project stays at four parameters.
+PART_ROLES = ["cap", "under", "stem", "gills"]
+CARRIED_ROTATIONS = 0
+_v2_project = load("examples/world/glowmere-valley-2-multicam.json")["parameters"]
+for hname in ("elder-2", "lantern", "spire", "bloom", "veil", "umbra",
+              "cairn", "ridge", "scree", "ember"):
+    parts = ["%s-%s" % (hname, part) for part in PART_ROLES]
+    keys = ["nodes/%s/rotation" % part for part in parts]
+    if not all(k in _v2_project for k in keys):
+        continue
+    turned = _v2_project[keys[0]]
+    if any(_v2_project[k] != turned for k in keys[1:]):
+        continue  # not shared by all four: a patch, not a placement
+    for part in parts:
+        node = next(n for n in d["nodes"] if n["name"] == part)
+        if node["rotation"] != turned:
+            node["rotation"] = [float(v) for v in turned]
+            CARRIED_ROTATIONS += 1
+print("carried %d hand-turned hero rotations out of valley 2's project into valley 3's scene"
+      % CARRIED_ROTATIONS)
+
+# =================================================================================================
 # 3. THE CAST
 # =================================================================================================
 #
