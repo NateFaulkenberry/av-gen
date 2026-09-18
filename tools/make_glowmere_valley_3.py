@@ -392,7 +392,6 @@ TREE_LAYERS = [
      [0.2100, 0.1950, 0.2600], 133, 1400, 700, MOTION_SNAG, 0.30, 0.35),
 ]
 
-TREE_NAMES = [row[0] for row in TREE_LAYERS]
 TREE_LINE = max(row[5] * row[7] for row in TREE_LAYERS)
 assert TREE_LINE <= 13.33, "the tree line at %.2f m would put the 16 m elder under 1.2x it" % TREE_LINE
 
