@@ -28,18 +28,6 @@ glm::vec3 safeNormalize(const glm::vec3& v, const glm::vec3& fallback) {
     return len2 > 1e-12f ? v * (1.0f / std::sqrt(len2)) : fallback;
 }
 
-// Emitter area in square metres; drives the conversion from illuminance at the subject to the
-// radiance an area light carries, so a rig reads the same whatever size the emitter is given.
-float emitterArea(PunctualLight::Type type, float width, float height, float radius) {
-    switch (type) {
-    case PunctualLight::Type::Rect: return std::max(width * height, 1e-4f);
-    case PunctualLight::Type::Disk:
-    case PunctualLight::Type::Sphere: return std::max(kPi * radius * radius, 1e-4f);
-    case PunctualLight::Type::Tube: return std::max(2.0f * radius * width, 1e-4f);
-    default: return 1.0f;
-    }
-}
-
 json vecToJson(const glm::vec3& v) {
     return json::array({v.x, v.y, v.z});
 }
@@ -190,6 +178,25 @@ glm::vec3 colorTemperatureToRgb(float kelvin, float tint) {
     const glm::vec3 positive = glm::max(rgb, glm::vec3(0.0f));
     const float luminance = 0.2126f * positive.r + 0.7152f * positive.g + 0.0722f * positive.b;
     return luminance > 1e-4f ? positive / luminance : glm::vec3(1.0f);
+}
+
+// Declared in scene_types.hpp beside `colorTemperatureToRgb`, and implemented here for the same
+// reason that one is: both are the physics of a light rather than of a renderer, and both are
+// needed on either side of the scene/rendering boundary. It used to be private to this file, which
+// meant `rendering::lightInfluenceRadius` had no way to ask how big an emitter was and computed a
+// reach for a light of no extent -- see ADR-272.
+float emitterArea(PunctualLight::Type type, float width, float height, float radius) {
+    switch (type) {
+    case PunctualLight::Type::Rect: return std::max(width * height, 1e-4f);
+    case PunctualLight::Type::Disk:
+    case PunctualLight::Type::Sphere: return std::max(kPi * radius * radius, 1e-4f);
+    case PunctualLight::Type::Tube: return std::max(2.0f * radius * width, 1e-4f);
+    default: return 1.0f;
+    }
+}
+
+float emitterArea(const PunctualLight& light) {
+    return emitterArea(light.type, light.width, light.height, light.radius);
 }
 
 // ---- validation ---------------------------------------------------------------------------------

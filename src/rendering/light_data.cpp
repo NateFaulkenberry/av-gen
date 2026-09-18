@@ -39,12 +39,33 @@ float lightInfluenceRadius(const scene::PunctualLight& light, float cutoff) {
     if (light.type == scene::PunctualLight::Type::Directional) {
         return 0.0f; // infinite; directional lights never enter the cluster grid
     }
+    // The same refusal `packLight` makes, for the same reason and in the same words: a light whose
+    // state is not finite is dropped rather than corrected. It has to be made here too because
+    // `SceneRenderer::updateLights` asks this function for the cluster uniform's radius while
+    // asking `packLight` for the light -- so a light that was dropped there could still write a
+    // NaN radius into the froxel pass, where every comparison against it silently answers false.
+    if (!std::isfinite(light.intensity) || !std::isfinite(light.range) || !std::isfinite(light.color.r) ||
+        !std::isfinite(light.color.g) || !std::isfinite(light.color.b) || !std::isfinite(light.position.x) ||
+        !std::isfinite(light.position.y) || !std::isfinite(light.position.z)) {
+        return 0.0f;
+    }
     if (light.range > 0.0f) {
         return light.range;
     }
-    const glm::vec3 c = light.color * std::max(light.intensity, 0.0f);
-    const float peak = std::max({c.r, c.g, c.b, 0.0f});
-    if (peak <= 0.0f) {
+    // The peak the *shader* sees, which is not the peak the author typed (ADR-272).
+    //
+    // Two factors separate them, and both were missing here. `packLight` folds the colour
+    // temperature into `colorIntensity`, and `colorTemperatureToRgb` is normalised to luminance 1
+    // -- so a 2000 K practical's red channel leaves 1.0 behind and the light reaches further than
+    // its colour alone says. And on an area emitter `intensity` is nits over the emitter, which
+    // `shadeRepresentative` turns into an intensity by multiplying by the emitter's area and
+    // `shadeArea` does the same thing geometrically through the polygon form factor; a 6 x 4 m
+    // softbox therefore throws 24 times the light a reach computed from its radiance alone
+    // expects, and stopped dead at the froxel where that reach ran out.
+    const glm::vec3 tint = scene::colorTemperatureToRgb(light.temperature, light.tint);
+    const glm::vec3 c = light.color * tint * std::max(light.intensity, 0.0f);
+    const float peak = std::max({c.r, c.g, c.b, 0.0f}) * scene::emitterArea(light);
+    if (!(peak > 0.0f)) {
         return 0.0f;
     }
     // Inverse-square falloff: peak / d^2 = cutoff.
@@ -160,6 +181,20 @@ std::uint32_t ClusterGrid::sliceOf(float viewDepth) const {
     return static_cast<std::uint32_t>(std::clamp(slice, 0, static_cast<int>(z) - 1));
 }
 
+std::uint32_t ClusterGrid::clusterOf(const glm::vec2& screenUv, float viewDepth) const {
+    // `clusterIndexFor`, term for term. The clamp to 0.9999 rather than 1.0 is the shader's and is
+    // what keeps a fragment exactly on the right or bottom edge inside the last froxel instead of
+    // one past it.
+    const auto ix = std::min(static_cast<std::uint32_t>(std::clamp(screenUv.x, 0.0f, 0.9999f) *
+                                                        static_cast<float>(x)),
+                             x - 1u);
+    // The grid's rows run bottom-up (NDC order); the render target's run top-down.
+    const auto iy = std::min(static_cast<std::uint32_t>(std::clamp(1.0f - screenUv.y, 0.0f, 0.9999f) *
+                                                        static_cast<float>(y)),
+                             y - 1u);
+    return indexOf(ix, iy, sliceOf(viewDepth));
+}
+
 void ClusterGrid::bounds(std::uint32_t i, std::uint32_t j, std::uint32_t k, glm::vec3& min,
                          glm::vec3& max) const {
     // Screen tile in NDC (y up).
@@ -259,6 +294,39 @@ ClusterOccupancy clusterOccupancy(const ClusterGrid& grid, const std::vector<glm
     out.p50 = at(0.50);
     out.p90 = at(0.90);
     out.p99 = at(0.99);
+    return out;
+}
+
+std::vector<LightClusterAssignment> lightAssignments(const ClusterGrid& grid,
+                                                     const std::vector<glm::vec3>& viewPositions,
+                                                     const std::vector<float>& radii, std::uint32_t cap) {
+    const std::size_t n = std::min(viewPositions.size(), radii.size());
+    std::vector<LightClusterAssignment> out(n);
+    for (std::size_t l = 0; l < n; ++l) {
+        out[l].radius = radii[l];
+    }
+    for (std::uint32_t k = 0; k < grid.z; ++k) {
+        for (std::uint32_t j = 0; j < grid.y; ++j) {
+            for (std::uint32_t i = 0; i < grid.x; ++i) {
+                // Admission in buffer order, exactly as the pass fills the list: the count is what
+                // decides who is still admitted when the next light arrives, so it cannot be
+                // computed per light independently.
+                std::uint32_t admitted = 0;
+                for (std::uint32_t l = 0; l < n; ++l) {
+                    if (!(radii[l] > 0.0f) || !clusterTouchesSphere(grid, i, j, k, viewPositions[l], radii[l])) {
+                        continue;
+                    }
+                    ++out[l].touched;
+                    if (admitted < cap) {
+                        ++out[l].admitted;
+                        ++admitted;
+                    } else {
+                        ++out[l].crowdedOut;
+                    }
+                }
+            }
+        }
+    }
     return out;
 }
 

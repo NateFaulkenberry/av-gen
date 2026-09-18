@@ -38,8 +38,15 @@ enum LightFlagBits : std::uint32_t {
     kLightFlagCube = 1u << 3,     // the shadow view index names the first of six faces around it
 };
 
-// The distance past which a light contributes less than `cutoff` of its peak. Explicit `range`
-// wins; otherwise it comes from the inverse-square falloff of the light's brightest channel.
+// The distance past which the light's radiance at a surface facing it falls below `cutoff`, in the
+// units the punctual path uses. **It is a hard edge, not a fade**: past this distance the froxel
+// pass does not assign the light at all, so whatever it was still contributing stops in one
+// froxel. Explicit `range` wins -- and it is the well-behaved case, because the shader's own range
+// window has already closed to zero there. Everything else comes from the inverse-square falloff
+// of the brightest channel of the light *as the shader sees it*: colour, times the colour
+// temperature tint `packLight` folds in, times intensity, times the emitter's area for the four
+// area kinds, whose `intensity` is nits rather than candela (ADR-272). A non-finite light reaches
+// nothing, matching `packLight`'s refusal to upload one.
 [[nodiscard]] float lightInfluenceRadius(const scene::PunctualLight& light, float cutoff = 0.004f);
 
 // Packs one scene light. `colorTemperatureToRgb` is applied here, so the GPU never sees Kelvin.
@@ -81,6 +88,19 @@ struct ClusterGrid {
     [[nodiscard]] std::uint32_t indexOf(std::uint32_t i, std::uint32_t j, std::uint32_t k) const {
         return (k * y + j) * x + i;
     }
+    // The froxel a *fragment* belongs to: the CPU reference for `clusterIndexFor` in
+    // shaders/lighting.wgsl, which `assignClusters` above is the reference for the other half of.
+    //
+    // It is here because the half that was missing is the half nothing could check. The compute
+    // pass is indexed by its own invocation id, so `tests/rendering/test_shadows_gpu.cpp` comparing
+    // the built lists against `assignClusters` index for index says nothing about which list a
+    // pixel then *reads*. A grid whose y ran the wrong way would pass that comparison exactly, and
+    // lit the wrong half of the screen -- ADR-182's centred-fixture failure, one pass downstream.
+    //
+    // `screenUv` is the render target's, y down from the top-left, which is the convention the
+    // shading pass hands it in; the grid's rows run bottom-up in NDC order, and the flip between
+    // the two is the whole content of this function.
+    [[nodiscard]] std::uint32_t clusterOf(const glm::vec2& screenUv, float viewDepth) const;
     // View-space axis-aligned bounds of one froxel (the camera looks down -Z, so both z values
     // are negative and `min.z <= max.z`).
     void bounds(std::uint32_t i, std::uint32_t j, std::uint32_t k, glm::vec3& min, glm::vec3& max) const;
@@ -116,6 +136,28 @@ struct ClusterGrid {
                                                 const std::vector<glm::vec3>& viewPositions,
                                                 const std::vector<float>& radii,
                                                 std::uint32_t cap = kMaxLightsPerCluster);
+
+// The same measurement taken per *light* rather than per cluster: how far this light was told it
+// reaches, how many froxels that sphere touches, and how many of them actually kept it.
+//
+// `ClusterOccupancy` answers "is the 32-light cap biting"; it cannot answer "which light is paying
+// for it", and in a scene where one light is the problem that is the only question worth asking.
+// The split matters because the cap is resolved in **light-buffer order** -- `assignClusters` and
+// `shaders/clusters.wgsl` both fill a cluster's list in index order and stop -- so a light late in
+// the buffer is the one dropped, whatever its brightness. `crowdedOut` is that, per light.
+struct LightClusterAssignment {
+    float radius = 0.0f;           // the influence radius it was offered to the grid with
+    std::uint32_t touched = 0;     // froxels its sphere of influence reaches
+    std::uint32_t admitted = 0;    // froxels whose capped list actually holds it
+    std::uint32_t crowdedOut = 0;  // touched - admitted: where the cap dropped it
+};
+
+// Indexed like `viewPositions`: entry n describes local light n, which is scene light
+// `directionalCount + n`. Same sphere-against-box test as everything else here.
+[[nodiscard]] std::vector<LightClusterAssignment> lightAssignments(const ClusterGrid& grid,
+                                                                   const std::vector<glm::vec3>& viewPositions,
+                                                                   const std::vector<float>& radii,
+                                                                   std::uint32_t cap = kMaxLightsPerCluster);
 
 // The clamped-cosine irradiance of a quadrilateral emitter of unit radiance at `point` with
 // surface normal `normal` (Heitz et al.'s polygon form factor, which is what `ltcEvaluate` in

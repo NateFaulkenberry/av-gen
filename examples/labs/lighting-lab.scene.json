@@ -1,0 +1,1219 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Lighting Lab",
+ "_note": "Flat, fog-free and fixed-seed, so the only thing that varies across the frame is which lights reach a surface and at what angle. Every light comes from examples/lightrigs/lighting-lab.rig.json and every one of them is placed in WORLD coordinates (followCamera false), because the camera is moved in three of the cases and a rig that followed it would move the whole experiment with it. The focal point below is what sizes the rig: (0, 1.5, 0) with radius 4, so 'distance 2.0' means 8 m and every local light's range is 48 m. Without it the rig would be sized from the whole 256 m terrain and every light would sit hundreds of metres out, which is the failure a lighting fixture on top of a world most easily makes. The geometry answers four of the specification's questions and nothing else: normal-ball and the tilt-NN fan are normal response (one surface with every normal, and seven with normals a number can be read off); the rough-NNN and metal-NNN rows are material response at fixed albedo and fixed size; the post row is falloff read as a sequence rather than inferred from one surface; and far-ball at 40 m is outside every local light's 48 m range only by a margin, with far-ball-control beside it as the pair that says a change there is a change and not noise. The three glTF nodes are the Shadow Lab's own assets at the Shadow Lab's own scales, so a finding about a tree here and a finding about a tree there are about the same tree.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   9.0,
+   26.0
+  ],
+  "target": [
+   0.0,
+   1.0,
+   -8.0
+  ],
+  "fov": 54.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0.015,
+   0.018,
+   0.026
+  ],
+  "skyIntensity": 0.0,
+  "lightFromEnvironment": false,
+  "fogDensity": 0.0,
+  "volumeDensity": 0.0,
+  "shadowCascades": 3
+ },
+ "composition": {
+  "focalPoints": [
+   {
+    "name": "subject",
+    "position": [
+     0.0,
+     1.5,
+     0.0
+    ],
+    "radius": 4.0,
+    "weight": 1.0
+   }
+  ]
+ },
+ "lightRig": "../lightrigs/lighting-lab.rig.json",
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "terrain",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "terrain": {
+    "chunkSize": 32.0,
+    "resolution": 32,
+    "lodLevels": 3,
+    "lodDistance": 120.0,
+    "viewDistance": 260.0,
+    "shadowDistance": 140.0,
+    "skirtDepth": 1.0,
+    "groundMottle": false,
+    "groundGlow": 0.0
+   },
+   "world": {
+    "name": "lighting-lab",
+    "seed": 20260918,
+    "size": [
+     256.0,
+     256.0
+    ],
+    "baseHeight": 0.0,
+    "erosion": 0.0,
+    "seaLevel": -1000.0,
+    "moistureReach": 90.0,
+    "lowlandMoisture": 0.35,
+    "layers": [
+     {
+      "frequency": 0.004,
+      "amplitude": 0.0
+     }
+    ],
+    "features": []
+   }
+  },
+  {
+   "name": "normal-ball",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    1.5,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.5,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.55,
+      0.55
+     ],
+     "roughness": 0.55,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "tilt-00",
+   "kind": "procedural",
+   "position": [
+    -7.5,
+    1.0,
+    -9.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      0.08,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.62,
+      0.6,
+      0.58
+     ],
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "tilt-15",
+   "kind": "procedural",
+   "position": [
+    -5.0,
+    1.0,
+    -9.0
+   ],
+   "rotation": [
+    15.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      0.08,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.62,
+      0.6,
+      0.58
+     ],
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "tilt-30",
+   "kind": "procedural",
+   "position": [
+    -2.5,
+    1.0,
+    -9.0
+   ],
+   "rotation": [
+    30.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      0.08,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.62,
+      0.6,
+      0.58
+     ],
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "tilt-45",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    1.0,
+    -9.0
+   ],
+   "rotation": [
+    45.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      0.08,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.62,
+      0.6,
+      0.58
+     ],
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "tilt-60",
+   "kind": "procedural",
+   "position": [
+    2.5,
+    1.0,
+    -9.0
+   ],
+   "rotation": [
+    60.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      0.08,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.62,
+      0.6,
+      0.58
+     ],
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "tilt-75",
+   "kind": "procedural",
+   "position": [
+    5.0,
+    1.0,
+    -9.0
+   ],
+   "rotation": [
+    75.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      0.08,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.62,
+      0.6,
+      0.58
+     ],
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "tilt-90",
+   "kind": "procedural",
+   "position": [
+    7.5,
+    1.0,
+    -9.0
+   ],
+   "rotation": [
+    90.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      0.08,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.62,
+      0.6,
+      0.58
+     ],
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "rough-005",
+   "kind": "procedural",
+   "position": [
+    10.0,
+    0.7,
+    6.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.7,
+      0.68,
+      0.65
+     ],
+     "roughness": 0.05,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "rough-020",
+   "kind": "procedural",
+   "position": [
+    12.0,
+    0.7,
+    6.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.7,
+      0.68,
+      0.65
+     ],
+     "roughness": 0.2,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "rough-035",
+   "kind": "procedural",
+   "position": [
+    14.0,
+    0.7,
+    6.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.7,
+      0.68,
+      0.65
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "rough-050",
+   "kind": "procedural",
+   "position": [
+    16.0,
+    0.7,
+    6.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.7,
+      0.68,
+      0.65
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "rough-070",
+   "kind": "procedural",
+   "position": [
+    18.0,
+    0.7,
+    6.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.7,
+      0.68,
+      0.65
+     ],
+     "roughness": 0.7,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "rough-100",
+   "kind": "procedural",
+   "position": [
+    20.0,
+    0.7,
+    6.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.7,
+      0.68,
+      0.65
+     ],
+     "roughness": 1.0,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "metal-000",
+   "kind": "procedural",
+   "position": [
+    -18.0,
+    0.7,
+    6.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.72,
+      0.7,
+      0.66
+     ],
+     "roughness": 0.25,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "metal-025",
+   "kind": "procedural",
+   "position": [
+    -16.0,
+    0.7,
+    6.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.72,
+      0.7,
+      0.66
+     ],
+     "roughness": 0.25,
+     "metallic": 0.25
+    }
+   }
+  },
+  {
+   "name": "metal-050",
+   "kind": "procedural",
+   "position": [
+    -14.0,
+    0.7,
+    6.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.72,
+      0.7,
+      0.66
+     ],
+     "roughness": 0.25,
+     "metallic": 0.5
+    }
+   }
+  },
+  {
+   "name": "metal-075",
+   "kind": "procedural",
+   "position": [
+    -12.0,
+    0.7,
+    6.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.72,
+      0.7,
+      0.66
+     ],
+     "roughness": 0.25,
+     "metallic": 0.75
+    }
+   }
+  },
+  {
+   "name": "metal-100",
+   "kind": "procedural",
+   "position": [
+    -10.0,
+    0.7,
+    6.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.72,
+      0.7,
+      0.66
+     ],
+     "roughness": 0.25,
+     "metallic": 1.0
+    }
+   }
+  },
+  {
+   "name": "far-ball",
+   "kind": "procedural",
+   "position": [
+    40.0,
+    1.2,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.2,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.6,
+      0.6,
+      0.6
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "far-ball-control",
+   "kind": "procedural",
+   "position": [
+    40.0,
+    1.2,
+    4.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.2,
+     "segments": 40,
+     "rings": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.6,
+      0.6,
+      0.6
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "tree",
+   "kind": "gltf",
+   "asset": "../../assets/quaternius/glTF/CommonTree_1.gltf",
+   "position": [
+    9.5,
+    0.0,
+    -4.0
+   ],
+   "scale": [
+    1.6,
+    1.6,
+    1.6
+   ]
+  },
+  {
+   "name": "rock",
+   "kind": "gltf",
+   "asset": "../../assets/quaternius/glTF/Rock_Medium_1.gltf",
+   "position": [
+    -9.0,
+    0.0,
+    -3.0
+   ],
+   "scale": [
+    2.2,
+    2.2,
+    2.2
+   ]
+  },
+  {
+   "name": "character",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-scout.glb",
+   "position": [
+    3.6,
+    0.0,
+    2.8
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.25
+   }
+  },
+  {
+   "name": "post-00",
+   "kind": "procedural",
+   "position": [
+    1.5,
+    1.5,
+    -12.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      3.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.75,
+      0.74,
+      0.7
+     ],
+     "roughness": 0.75,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-01",
+   "kind": "procedural",
+   "position": [
+    1.5,
+    1.5,
+    -16.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      3.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.75,
+      0.74,
+      0.7
+     ],
+     "roughness": 0.75,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-02",
+   "kind": "procedural",
+   "position": [
+    1.5,
+    1.5,
+    -20.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      3.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.75,
+      0.74,
+      0.7
+     ],
+     "roughness": 0.75,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-03",
+   "kind": "procedural",
+   "position": [
+    1.5,
+    1.5,
+    -24.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      3.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.75,
+      0.74,
+      0.7
+     ],
+     "roughness": 0.75,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-04",
+   "kind": "procedural",
+   "position": [
+    1.5,
+    1.5,
+    -28.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      3.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.75,
+      0.74,
+      0.7
+     ],
+     "roughness": 0.75,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-05",
+   "kind": "procedural",
+   "position": [
+    1.5,
+    1.5,
+    -32.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      3.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.75,
+      0.74,
+      0.7
+     ],
+     "roughness": 0.75,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-06",
+   "kind": "procedural",
+   "position": [
+    1.5,
+    1.5,
+    -36.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      3.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.75,
+      0.74,
+      0.7
+     ],
+     "roughness": 0.75,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-07",
+   "kind": "procedural",
+   "position": [
+    1.5,
+    1.5,
+    -40.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      3.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.75,
+      0.74,
+      0.7
+     ],
+     "roughness": 0.75,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-08",
+   "kind": "procedural",
+   "position": [
+    1.5,
+    1.5,
+    -44.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      3.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.75,
+      0.74,
+      0.7
+     ],
+     "roughness": 0.75,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-09",
+   "kind": "procedural",
+   "position": [
+    1.5,
+    1.5,
+    -48.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      3.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.75,
+      0.74,
+      0.7
+     ],
+     "roughness": 0.75,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-10",
+   "kind": "procedural",
+   "position": [
+    1.5,
+    1.5,
+    -52.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      3.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.75,
+      0.74,
+      0.7
+     ],
+     "roughness": 0.75,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-11",
+   "kind": "procedural",
+   "position": [
+    1.5,
+    1.5,
+    -56.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      3.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.75,
+      0.74,
+      0.7
+     ],
+     "roughness": 0.75,
+     "metallic": 0.0
+    }
+   }
+  }
+ ],
+ "wind": {
+  "speed": 0.0
+ }
+}
