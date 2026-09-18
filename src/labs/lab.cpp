@@ -75,12 +75,14 @@ constexpr std::array<LabDescriptor, 15> kLabs{{
      "src/rendering/shadow_math.cpp:casterState", "docs/shadow-lab/README.md",
      "examples/labs/shadow-lab.scene.json", "examples/labs/shadow/cases.json"},
 
-    {LabId::Lighting, "lighting", "Lighting Lab", LabStatus::Planned,
+    {LabId::Lighting, "lighting", "Lighting Lab", LabStatus::Built,
      "Which lights reached this pixel, and with how much?",
-     "light packing, the froxel cluster assignment, the area-light LTC path and the IBL",
-     "whether a light is occluded -- that is the Shadow Lab",
-     "src/rendering/light_data.cpp:assignClusters", "docs/engineering-labs.md",
-     "examples/lightrigs", ""},
+     "light packing, the reach a light is given, the froxel assignment and the froxel a fragment "
+     "reads, the area-light LTC path and the IBL",
+     "whether a light is occluded -- that is the Shadow Lab; what the post chain does with the "
+     "radiance afterwards -- that is the HDR Lab",
+     "src/rendering/light_data.cpp:assignClusters", "docs/lighting-lab/README.md",
+     "examples/labs/lighting-lab.scene.json", "examples/labs/lighting/cases.json"},
 
     {LabId::Hdr, "hdr", "HDR / Exposure / Bloom Lab", LabStatus::Planned,
      "Why is this frame this bright, and where did the glow come from?",
