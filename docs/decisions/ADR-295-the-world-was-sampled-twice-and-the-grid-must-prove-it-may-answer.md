@@ -149,6 +149,43 @@ glowmere-valley-2    grid vouches: NO   (315 walks checked, 1 wrong)   build 321
 The stride, the angles and the reaches are fixed, so two builds of one world reach the same verdict
 on any machine — a verdict that varied would make a bake irreproducible (ADR-091).
 
+## 3a. The arm this was to be finished against
+
+§P7's *done when* is the `explore` scaling arm of `tools/charai_probe.cpp`. It moves.
+
+Two binaries — `main` at 9d5347c and this branch — run **alternately**, three rounds each, minima
+elementwise over the three, each round itself a minimum of 3 runs of 120 frames (ADR-170). Alternating
+rather than one after the other because four agents share this machine and the load average moved
+between 12.5 and 23.7 during the twelve minutes this took; a before-block followed by an after-block
+measures the machine as much as the change. Milliseconds per 60 Hz behaviour update for the whole
+population, `glowmere-valley-2`:
+
+| profile | 10 | 25 | 50 | 100 | 250 | 500 |
+|---|---|---|---|---|---|---|
+| `explore` before | 0.7542 | 4.0115 | 5.2484 | 15.7533 | 42.1765 | 75.5423 |
+| `explore` **after** | **0.4501** | **2.2108** | **2.9821** | **8.7278** | **23.3028** | **42.3689** |
+| | 1.68× | 1.81× | 1.76× | 1.80× | 1.81× | 1.78× |
+| `wander` before | 0.2059 | 0.5595 | 1.5391 | 3.8984 | 6.8050 | 15.5175 |
+| `wander` **after** | 0.1533 | 0.4179 | 1.0306 | 2.5405 | 4.8878 | 10.8002 |
+| `nil` before | 0.0003 | 0.0007 | 0.0014 | 0.0033 | 0.0084 | 0.0168 |
+| `nil` after | 0.0003 | 0.0007 | 0.0014 | 0.0033 | 0.0084 | 0.0167 |
+
+**1.8× across the whole range, and every control holds.** `nil` — the harness floor, no behaviours —
+is unchanged to the last digit, which is what says the win is in the behaviour and not in the loop
+around it. `wander` moves 1.4×, less than `explore` and not nothing, which is what says the win is in
+the *shared walkability query* and not in something `explore` does: `wander` reaches it only through
+`pickDestination`. And the arm's own control, the furthest distance any body actually walked at
+N = 50, is **7.26 m for `explore` and 2.14 m for `wander` in both binaries, and 0.00 m for `nil`** —
+identical, which is the scaling arm quietly reporting that the simulation did not move.
+
+Read against a 16.7 ms frame, using the slope of the upper half as §E.1 does: an `explore` population
+crossed a whole frame at about **125** characters and now crosses it at about **219**. Both figures
+are from this session on this loaded machine, and both are lower than a quiet machine would give;
+the ratio is the part that travels.
+
+**All of this is part 1.** Glowmere's grid refuses to vouch, so not one of these microseconds comes
+from the grid.
+
 ## 4. What this means, plainly — including a number this ADR had wrong
 
 * **Glowmere gets part 1 and nothing else.** Its walkability queries are 1.9× cheaper and every route
