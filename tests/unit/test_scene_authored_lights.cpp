@@ -435,11 +435,13 @@ TEST_CASE("The scene parser's key list matches what it reads", "[scene][lights][
     // them writes must be either read, `_`-prefixed, or a genuine finding named here.
     const fs::path examples = lightsRepoRoot() / "examples";
     REQUIRE(fs::is_directory(examples));
-    // The one genuine finding, kept as an expectation so that fixing it is what changes this test.
-    // Fifteen scenes write the C++ field name `volumeNoiseAmount` where the parser reads
-    // `volumeNoise`; all fifteen run at 0 noise, and the projects that were saved over them agree
-    // (`"scene/volumeNoise": 0.0`). Correcting it changes fifteen shipped films, so it is reported
-    // rather than silently repaired.
+    // The one genuine finding was kept as an expectation so that fixing it is what changes this
+    // test, and ADR-320 fixed it: fifteen scenes wrote the C++ field name `volumeNoiseAmount` where
+    // the parser reads `volumeNoise`, all fifteen ran at 0 noise, and the five projects saved over
+    // them agreed (`"scene/volumeNoise": 0.0`). The expectation is now **zero**, and the counter
+    // stays rather than folding into `otherFindings`, because a named zero is what tells the next
+    // reader that this key was the finding and has been closed -- an unnamed one would report the
+    // regression as "some unknown key somewhere".
     int volumeNoiseAmount = 0;
     int otherFindings = 0;
     int scenes = 0;
@@ -450,9 +452,12 @@ TEST_CASE("The scene parser's key list matches what it reads", "[scene][lights][
         // Generated output is not authorship, and sweeping it makes this test answer differently
         // on different machines. `examples/world/_bench/` is gitignored (`.gitignore:26`) and built
         // by `tools/make_bench_scenes.py` from the scenes beside it, so its fourteen copies inherit
-        // whatever the source wrote -- including the `volumeNoiseAmount` this case is pinning. The
+        // whatever the source wrote -- including the `volumeNoiseAmount` this case used to pin. The
         // agent that wrote this test measured 15 in a fresh worktree that had never run the
-        // generator; the same test found 29 here, where it had. The number was never the disagreement.
+        // generator; the same test found 29 here, where it had. The number was never the
+        // disagreement. The exclusion stays now that the count is zero, for the same reason: a
+        // worktree that has run the generator would otherwise report fourteen stale copies as a
+        // regression in files nobody wrote.
         if (entry.path().string().find("/_bench/") != std::string::npos) {
             continue;
         }
@@ -483,7 +488,7 @@ TEST_CASE("The scene parser's key list matches what it reads", "[scene][lights][
     }
     CHECK(scenes >= 50);
     CHECK(otherFindings == 0);
-    CHECK(volumeNoiseAmount == 15);
+    CHECK(volumeNoiseAmount == 0);
 }
 
 TEST_CASE("A light rig's unknown key is reported too", "[scene][lights][json]") {

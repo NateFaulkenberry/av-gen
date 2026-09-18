@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-atmospherics.scene.json",
-        "sha256": "83312ebcae0fbc225707cebc8229f3bb9dc13785e68f492ed896ee1b7e7de16a",
-        "size": 234108
+        "sha256": "9e2e512ef5c958282128b02212525c6290dbb29dcefcc2aba10fd4f07a58f18e",
+        "size": 234102
       }
     }
   },
@@ -9394,7 +9394,6 @@
     "scene/volumeAnisotropy": 0.11999999731779099,
     "scene/volumeDensity": 0.006000000052154064,
     "scene/volumeEmission": 0.0,
-    "scene/volumeNoise": 0.0,
     "scene/volumeNoiseScale": 0.019999999552965164,
     "scene/volumeNoiseSpeed": 0.10000000149011612,
     "scene/volumeScattering": 0.5,

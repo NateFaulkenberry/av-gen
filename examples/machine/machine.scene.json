@@ -37,7 +37,7 @@
   "volumeScattering": 0.8,
   "volumeAbsorption": 0.9,
   "volumeAnisotropy": 0.62,
-  "volumeNoiseAmount": 0.4,
+  "volumeNoise": 0.4,
   "volumeNoiseScale": 0.03,
   "volumeNoiseSpeed": 0.09,
   "volumeEmission": 0.25,

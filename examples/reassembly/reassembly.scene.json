@@ -33,7 +33,7 @@
   "volumeDensity": 0.0016,
   "volumeScattering": 0.8,
   "volumeAnisotropy": 0.45,
-  "volumeNoiseAmount": 0.5,
+  "volumeNoise": 0.5,
   "volumeNoiseScale": 0.08,
   "volumeSteps": 24,
   "volumeAbsorption": 0.8,
