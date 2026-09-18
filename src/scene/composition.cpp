@@ -5336,7 +5336,8 @@ void Composition::applyParameters() {
         }
 
         const Transform nodeT = nodeWorldTransform(node);
-        const bool visible = nodeVisible(node);
+        bool visible = nodeVisible(node);
+        bool dayNightVisibleOverride = true;
         float emissiveBoost =
             node.emissiveParam != nullptr ? node.emissiveParam->value() : node.emissiveBoost;
         // ADR-343: the cycle scales the nodes the scene named as stars and as Glowmere layers.
@@ -5348,9 +5349,17 @@ void Composition::applyParameters() {
             };
             if (named(dayNight_.starNodes)) {
                 emissiveBoost *= dayNightState_.starBrightness;
+                // A star that has been faded to zero emission is not gone -- it is still geometry,
+                // and its base colour is black, so at noon the sky filled with small DARK squares
+                // instead of with nothing. Scaling emission is how a star dims; hiding it is how a
+                // star sets. Seen in a frame; no number in the cycle table showed it.
+                if (dayNightState_.starBrightness <= 1e-3f) {
+                    dayNightVisibleOverride = false;
+                }
             } else if (named(dayNight_.glowNodes)) {
                 emissiveBoost *= dayNightState_.glowScale;
             }
+            visible = visible && dayNightVisibleOverride;
         }
         const float roughnessScale =
             node.roughnessParam != nullptr ? node.roughnessParam->value() : node.roughnessScale;
@@ -5945,6 +5954,20 @@ void Composition::applyDayNight() {
         } else if (!dayNight_.moonLight.empty() && light.name == dayNight_.moonLight) {
             light.intensity = s.moonIntensity;
             light.enabled = s.moonIntensity > 1e-3f;
+            // Aim the moon light at the night map's brightest feature -- its moon -- and rotate it
+            // with the map. `lightFromEnvironment` does this too, but it aims `skyKeyLight`, which
+            // is "the first enabled directional with role Key, else the first enabled directional
+            // of any role". At night the sun is disabled and the first enabled directional is
+            // whatever fill the scene happens to list first, so it aimed the wrong light and the
+            // moonlight silently stopped agreeing with the visible moon the moment the map was
+            // rotated. Naming the light and rotating its direction here cannot pick the wrong one.
+            if (envDominantDirection_.has_value()) {
+                const float a = scene_.environment.environmentRotation;
+                const glm::vec3& m = *envDominantDirection_;
+                const glm::vec3 towards(std::cos(a) * m.x - std::sin(a) * m.z, m.y,
+                                        std::sin(a) * m.x + std::cos(a) * m.z);
+                light.direction = -glm::normalize(towards);
+            }
         }
     }
 }
