@@ -20,7 +20,13 @@ float ClearanceField::canopyHeight(glm::vec2 p) const {
     if (map == nullptr || ecology == nullptr || ecology->layers.empty()) {
         return 0.0f;
     }
-    const Sample s = map->sample(p, 0.5f);
+    return canopyHeight(p, map->sample(p, 0.5f));
+}
+
+float ClearanceField::canopyHeight(glm::vec2 p, const Sample& s) const {
+    if (map == nullptr || ecology == nullptr || ecology->layers.empty()) {
+        return 0.0f;
+    }
     const BiomeWeights w = map->biomes.at(s.altitude, s.slope, s.moisture, p);
 
     float tallest = 0.0f;
@@ -62,7 +68,7 @@ float ClearanceField::minimumHeight(glm::vec2 p) const {
     const Sample s = map->sample(p, 0.5f);
     // Water is a surface a camera should stay above too, and it is above the ground by definition.
     const float ground = std::max(s.height, s.waterSurface);
-    const float canopy = canopyHeight(p);
+    const float canopy = canopyHeight(p, s);
     // Either clear of the bare ground, or clear of whatever grows on it -- whichever is higher.
     return ground + std::max(groundClearance + cameraRadius, canopy * canopyClearance + cameraRadius);
 }

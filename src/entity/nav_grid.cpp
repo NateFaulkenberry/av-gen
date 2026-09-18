@@ -68,7 +68,9 @@ void NavGrid::clear() {
     cellPath_.clear();
     regions_.clear();
     regionSizes_.clear();
+    largestRegion_ = 0;
     floodStack_.clear();
+    terrainRoom_.clear();
     stamp_ = 0;
     lastExpansions_ = 0;
     stats_ = {};
@@ -104,96 +106,26 @@ void NavGrid::build(const Navigator& nav, float cellSize) {
     stats_.cells = total;
     cells_.assign(total, NavCell{});
 
-    const float maxSlope = std::max(nav.settings().maxSlope, 1e-3f);
-    const float wadeDepth = nav.settings().wadeDepth;
-    // How much of a cell a solid covers, as the fraction of the cell's area its footprint claims.
-    // Sampled from the obstacle field rather than from the point test, because a trunk half a metre
-    // off the cell centre obstructs the cell and a point test at the centre says it does not.
-    const spatial::ObstacleField* obstacles = nav.obstacles();
-    const float cellArea = cell * cell;
     std::vector<std::uint32_t> hits; // hoisted: one allocation for the build, not one per cell
 
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
-            const glm::vec2 p = centerOf(glm::ivec2(x, y));
-            const NavSample s = nav.sample(p);
-            NavCell& c = cells_[index(glm::ivec2(x, y))];
-            c.ground = s.ground;
-            c.slope = quantise(s.slope / maxSlope);
-            // How deep the water over this cell is, as a fraction of the deepest this walker will
-            // enter. The grid has to agree with `Navigator::sample` about the walkable set or the
-            // planner routes round a ford the mover would have crossed -- and it has to agree
-            // about *how deep* it is, or it prices every ford the same. Both come off the sample
-            // already taken above. Exactly 0 for every cell when the walker does not wade.
-            c.wade = wadeDepth > 0.0f ? quantise(s.waterDepth / wadeDepth) : 0;
-            if (std::isfinite(s.waterSurface) && s.ground < s.waterSurface) {
-                c.flags |= NavWater;
-                ++stats_.water;
-            }
-            switch (s.reject) {
-            case NavReject::TooSteep: c.flags |= NavSteep; break;
-            case NavReject::Submerged: c.flags |= NavWater; break;
-            case NavReject::Obstructed:
-            case NavReject::InsideHero: c.flags |= NavBlocked; break;
-            default: break;
-            }
-            if (obstacles != nullptr) {
-                // Area-weighted rather than counted: three saplings and one boulder should not
-                // score the same, and a cell a walker can still thread should not score as full.
-                float covered = 0.0f;
-                float vaulted = 0.0f;
-                const spatial::ObstacleFilter body = nav.filter(s.ground);
-                obstacles->query(p, cell * 0.7071f, hits);
-                for (const std::uint32_t i : hits) {
-                    const spatial::NavigationObstacle& o = obstacles->obstacles()[i];
-                    const float r = o.radius + nav.settings().bodyRadius;
-                    const float area = 3.14159265f * r * r;
-                    // Only what this body actually gets past by jumping leaves the obstruction
-                    // total (ADR-196). Everything else -- including a solid it merely steps over,
-                    // which this sum has always counted -- stays where it was, so a body that
-                    // cannot jump scores every cell exactly as it did.
-                    if (spatial::traversalFor(o, body) == spatial::Traversal::Jumpable) {
-                        vaulted += area;
-                    } else {
-                        covered += area;
-                    }
-                }
-                c.obstruction = quantise(covered / cellArea);
-                c.vault = quantise(vaulted / cellArea);
-                if (c.obstruction > 200) {
-                    c.flags |= NavBlocked;
-                }
-            }
-            if (s.navigable) {
-                c.flags |= NavWalkable;
-                ++stats_.walkable;
-            } else if ((c.flags & NavBlocked) != 0) {
-                ++stats_.blocked;
-            }
+            fillCell(nav, glm::ivec2(x, y), hits);
         }
     }
+    recount();
 
     // Edge cells: walkable, and next to something that is not. Used by the interest extraction
     // below and useful on its own -- a character that only ever walks through the middle of open
     // ground never goes anywhere with a view.
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            const glm::ivec2 c(x, y);
-            if (!walkable(c)) {
-                continue;
-            }
-            const bool edge = !walkable(glm::ivec2(x - 1, y)) || !walkable(glm::ivec2(x + 1, y)) ||
-                              !walkable(glm::ivec2(x, y - 1)) || !walkable(glm::ivec2(x, y + 1));
-            if (edge) {
-                cells_[index(c)].flags |= NavEdge;
-            }
-        }
-    }
+    markEdges(glm::ivec2(0, 0), glm::ivec2(width - 1, height - 1));
 
     gScore_.assign(total, 0.0f);
     cameFrom_.assign(total, -1);
     visitStamp_.assign(total, 0u);
     buildRegions();
+    buildTerrainRoom();
+    checkTrust(nav);
     extractInterestPoints();
 
     stats_.buildMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count();
@@ -202,13 +134,196 @@ void NavGrid::build(const Navigator& nav, float cellSize) {
               width, height, cell, total, stats_.walkable, stats_.water, stats_.blocked,
               stats_.regions, stats_.regions == 1 ? "" : "s", stats_.largestRegion, shore_.size(),
               vistas_.size(), stats_.buildMs);
-    if (stats_.regions > 1) {
-        // Worth saying out loud. An archipelago is a legitimate world and a character stranded on
-        // an islet in one is not, and the difference is invisible until something fails to path.
-        log::info("nav grid: the walkable ground is in {} disconnected pieces; {} of {} cells are "
-                  "in the largest",
-                  stats_.regions, stats_.largestRegion, stats_.walkable);
+    // What the grid is allowed to answer for, and why, said out loud at the moment it is decided.
+    // A silent optimisation that is on in one world and off in the next is indistinguishable from
+    // one that never ran (ADR-182).
+    if (stats_.trusted) {
+        log::info("nav grid: the grid answers the terrain half of a straight walk for this world; "
+                  "{} sampled walks agreed with the world exactly",
+                  stats_.trustChecks);
+    } else {
+        log::info("nav grid: the grid will NOT answer for this world's terrain -- {} after {} "
+                  "sampled walk(s); every walkability query stays analytic",
+                  stats_.trustFailures > 0 ? "it disagreed with the world"
+                                           : "there was not enough of it to trust",
+                  stats_.trustChecks);
     }
+    if (stats_.regions > 1) {
+        // Worth saying out loud, and worth saying at `warn` rather than `info`. An archipelago is a
+        // legitimate world; a character stranded on an islet in one is not, and the difference is
+        // invisible until something fails to path. What an author acts on is not the region count,
+        // it is how much ground is on the wrong side of it -- so that is what this says (ADR-296).
+        log::warn("nav grid: the walkable ground is in {} disconnected pieces; {} of {} walkable "
+                  "cells ({:.0f}%) cannot be reached from the largest",
+                  stats_.regions, stats_.stranded, stats_.walkable,
+                  stats_.walkable > 0 ? 100.0 * static_cast<double>(stats_.stranded) /
+                                            static_cast<double>(stats_.walkable)
+                                      : 0.0);
+    }
+}
+
+// One cell, from the world. The whole of what a build does per cell, in one place, because
+// `rebuildRect` does exactly this to a few hundred cells and a second copy of it would be two
+// walkable sets that agree until somebody edits one of them (ADR-297).
+void NavGrid::fillCell(const Navigator& nav, glm::ivec2 at, std::vector<std::uint32_t>& hits) {
+    const float cell = std::max(stats_.cellSize, 1e-3f);
+    const float maxSlope = std::max(nav.settings().maxSlope, 1e-3f);
+    const float wadeDepth = nav.settings().wadeDepth;
+    const spatial::ObstacleField* obstacles = nav.obstacles();
+    const float cellArea = cell * cell;
+    const glm::vec2 p = centerOf(at);
+    const NavSample s = nav.sample(p);
+    NavCell& c = cells_[index(at)];
+    c = NavCell{}; // a rebuild must not inherit a flag from what used to be here
+    c.ground = s.ground;
+    c.slope = quantise(s.slope / maxSlope);
+    // How deep the water over this cell is, as a fraction of the deepest this walker will enter. The
+    // grid has to agree with `Navigator::sample` about the walkable set or the planner routes round
+    // a ford the mover would have crossed -- and it has to agree about *how deep* it is, or it
+    // prices every ford the same. Both come off the sample already taken above. Exactly 0 for every
+    // cell when the walker does not wade.
+    c.wade = wadeDepth > 0.0f ? quantise(s.waterDepth / wadeDepth) : 0;
+    if (std::isfinite(s.waterSurface) && s.ground < s.waterSurface) {
+        c.flags |= NavWater;
+    }
+    switch (s.reject) {
+    case NavReject::TooSteep: c.flags |= NavSteep; break;
+    case NavReject::Submerged: c.flags |= NavWater; break;
+    case NavReject::Obstructed:
+    case NavReject::InsideHero: c.flags |= NavBlocked; break;
+    default: break;
+    }
+    // The ground on its own, before anything standing on it (ADR-295). `Navigator::sample` runs the
+    // terrain rules first and asks the obstacle field last, so a point that got as far as
+    // `Obstructed` passed every terrain rule -- which is exactly the distinction this flag needs and
+    // the reason it can be read off the reject reason rather than re-derived. `InsideHero` is a
+    // terrain reject and stays one: a hero is a landmark, not scatter, and the obstacle field it is
+    // also in is the swept half of the same fact.
+    if (s.reject == NavReject::None || s.reject == NavReject::Obstructed) {
+        c.flags |= NavTerrain;
+    }
+    if (obstacles != nullptr) {
+        // Area-weighted rather than counted: three saplings and one boulder should not score the
+        // same, and a cell a walker can still thread should not score as full.
+        float covered = 0.0f;
+        float vaulted = 0.0f;
+        const spatial::ObstacleFilter body = nav.filter(s.ground);
+        obstacles->query(p, cell * 0.7071f, hits);
+        for (const std::uint32_t i : hits) {
+            const spatial::NavigationObstacle& o = obstacles->obstacles()[i];
+            const float r = o.radius + nav.settings().bodyRadius;
+            const float area = 3.14159265f * r * r;
+            // Only what this body actually gets past by jumping leaves the obstruction total
+            // (ADR-196). Everything else -- including a solid it merely steps over, which this sum
+            // has always counted -- stays where it was, so a body that cannot jump scores every cell
+            // exactly as it did.
+            if (spatial::traversalFor(o, body) == spatial::Traversal::Jumpable) {
+                vaulted += area;
+            } else {
+                covered += area;
+            }
+        }
+        c.obstruction = quantise(covered / cellArea);
+        c.vault = quantise(vaulted / cellArea);
+        if (c.obstruction > 200) {
+            c.flags |= NavBlocked;
+        }
+    }
+    if (s.navigable) {
+        c.flags |= NavWalkable;
+    }
+}
+
+// The totals, counted rather than accumulated. A partial rebuild that tried to add and subtract its
+// own deltas would be four counters and four chances to leak one; twenty-four thousand increments
+// is 0.02 ms and cannot drift.
+//
+// One deliberate difference from the loop this replaced: `water` now counts every cell carrying
+// `NavWater`, where the old loop counted only the cells whose ground is literally beneath a water
+// surface and left out the ones flagged wet by a `Submerged` reject inside the freeboard margin. A
+// statistic that disagrees with the flag it is named after is a trap, and the flag is what the
+// overlay colours. The two agree on every world in this repository -- Glowmere 1,200 and the lab
+// fixture 380, unchanged -- so nothing moved; the difference would only show on a world with a
+// `waterMargin` shelf, and there the new number is the one that matches the picture.
+void NavGrid::recount() {
+    stats_.walkable = 0;
+    stats_.water = 0;
+    stats_.blocked = 0;
+    stats_.terrain = 0;
+    for (const NavCell& c : cells_) {
+        stats_.walkable += (c.flags & NavWalkable) != 0 ? 1 : 0;
+        stats_.water += (c.flags & NavWater) != 0 ? 1 : 0;
+        stats_.terrain += (c.flags & NavTerrain) != 0 ? 1 : 0;
+        stats_.blocked += ((c.flags & NavWalkable) == 0 && (c.flags & NavBlocked) != 0) ? 1 : 0;
+    }
+}
+
+void NavGrid::markEdges(glm::ivec2 lo, glm::ivec2 hi) {
+    for (int y = std::max(lo.y, 0); y <= std::min(hi.y, stats_.height - 1); ++y) {
+        for (int x = std::max(lo.x, 0); x <= std::min(hi.x, stats_.width - 1); ++x) {
+            const glm::ivec2 c(x, y);
+            NavCell& cellRef = cells_[index(c)];
+            cellRef.flags &= static_cast<std::uint8_t>(~NavEdge);
+            if ((cellRef.flags & NavWalkable) == 0) {
+                continue;
+            }
+            const bool edge = !walkable(glm::ivec2(x - 1, y)) || !walkable(glm::ivec2(x + 1, y)) ||
+                              !walkable(glm::ivec2(x, y - 1)) || !walkable(glm::ivec2(x, y + 1));
+            if (edge) {
+                cellRef.flags |= NavEdge;
+            }
+        }
+    }
+}
+
+double NavGrid::rebuildRect(const Navigator& nav, glm::vec2 lo, glm::vec2 hi) {
+    if (!valid()) {
+        return 0.0;
+    }
+    const auto begin = std::chrono::steady_clock::now();
+    // A cell's obstruction is sampled over a disc of half its diagonal, so a solid just outside the
+    // rect still changes a cell just inside it. One cell of skirt is what makes the rebuilt set a
+    // superset of the changed set, and leaving it off is how a partial rebuild leaves a seam that
+    // only shows up as a route that clips the corner of a new wall.
+    const glm::ivec2 a = cellOf(lo) - 1;
+    const glm::ivec2 b = cellOf(hi) + 1;
+    std::vector<std::uint32_t> hits;
+    std::size_t touched = 0;
+    for (int y = std::max(a.y, 0); y <= std::min(b.y, stats_.height - 1); ++y) {
+        for (int x = std::max(a.x, 0); x <= std::min(b.x, stats_.width - 1); ++x) {
+            fillCell(nav, glm::ivec2(x, y), hits);
+            ++touched;
+        }
+    }
+    if (touched == 0) {
+        return 0.0;
+    }
+    recount();
+    // Edges need one more ring than the cells did: a cell outside the rect is an edge cell because
+    // of a cell inside it.
+    markEdges(a - 1, b + 1);
+    // Regions and terrain room are whole-grid by nature and cheap enough not to be worth splitting.
+    // A wall dropped across a corridor divides a region that reaches the far side of the world, and
+    // a flood fill that stopped at the rect would report two halves of one island as connected --
+    // which is the one error this whole structure exists to make impossible.
+    buildRegions();
+    buildTerrainRoom();
+    // The trust verdict is deliberately *not* re-taken. It is a statement about this world's
+    // terrain, and a solid that lands on it is not terrain: `NavTerrain` is read off the terrain
+    // rules, which a new obstacle cannot reach. Re-running it would cost more than the rebuild and
+    // could only ever return the same answer.
+    //
+    // Interest points are deliberately not re-extracted either, and that is a limitation rather than
+    // a decision: `shorePoints` and `vistaPoints` are handed out as spans and `EntityWorld` copies
+    // them at load, so moving them here would change nothing a character reads and would invalidate
+    // a span somebody else is holding. A shore point under a newly landed craft stays a shore point.
+    const double ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count();
+    log::info("nav grid: rebuilt {} cell(s) over [{:.0f},{:.0f}]..[{:.0f},{:.0f}] in {:.2f} ms; "
+              "{} walkable, {} blocked, {} region(s), {} stranded",
+              touched, lo.x, lo.y, hi.x, hi.y, ms, stats_.walkable, stats_.blocked, stats_.regions,
+              stats_.stranded);
+    return ms;
 }
 
 std::size_t NavGrid::index(glm::ivec2 c) const {
@@ -518,6 +633,8 @@ void NavGrid::buildRegions() {
     regionSizes_.assign(1, stats_.cells - stats_.walkable); // region 0 is everything unwalkable
     stats_.regions = 0;
     stats_.largestRegion = 0;
+    stats_.stranded = 0;
+    largestRegion_ = 0;
     if (cells_.empty()) {
         return;
     }
@@ -567,11 +684,230 @@ void NavGrid::buildRegions() {
                 }
             }
             regionSizes_.push_back(size);
-            stats_.largestRegion = std::max(stats_.largestRegion, size);
+            if (size > stats_.largestRegion) {
+                stats_.largestRegion = size;
+                largestRegion_ = next;
+            }
             ++stats_.regions;
             ++next;
         }
     }
+    stats_.stranded = stats_.walkable - std::min(stats_.largestRegion, stats_.walkable);
+}
+
+// The Chebyshev distance transform over the terrain mask: two passes, forward then backward, each
+// taking the minimum of the neighbours already settled plus one. Exact for the Chebyshev metric --
+// this is not an approximation of a Euclidean distance, it is the right answer to a different and
+// cheaper question, and a square neighbourhood is the shape the segment walk below actually needs.
+//
+// Outside the grid counts as unstandable, so the border saturates at 1 rather than at 255 and the
+// world's edge is never trusted. 6.6 ms on Glowmere's 23,716 cells against a 148 ms build.
+void NavGrid::buildTerrainRoom() {
+    constexpr std::uint8_t kMax = 255;
+    terrainRoom_.assign(stats_.cells, 0u);
+    if (cells_.empty()) {
+        return;
+    }
+    const int w = stats_.width;
+    const int h = stats_.height;
+    const auto terrain = [&](int x, int y) {
+        return (cells_[index(glm::ivec2(x, y))].flags & NavTerrain) != 0;
+    };
+    const auto room = [&](int x, int y) -> std::uint8_t {
+        return x < 0 || y < 0 || x >= w || y >= h ? 0u : terrainRoom_[index(glm::ivec2(x, y))];
+    };
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            if (!terrain(x, y)) {
+                continue;
+            }
+            const std::uint8_t best =
+                std::min({room(x - 1, y - 1), room(x, y - 1), room(x + 1, y - 1), room(x - 1, y)});
+            terrainRoom_[index(glm::ivec2(x, y))] =
+                best >= kMax - 1 ? kMax : static_cast<std::uint8_t>(best + 1);
+        }
+    }
+    for (int y = h - 1; y >= 0; --y) {
+        for (int x = w - 1; x >= 0; --x) {
+            const std::size_t i = index(glm::ivec2(x, y));
+            if (terrainRoom_[i] == 0) {
+                continue;
+            }
+            const std::uint8_t best =
+                std::min({room(x + 1, y + 1), room(x, y + 1), room(x - 1, y + 1), room(x + 1, y)});
+            const std::uint8_t candidate =
+                best >= kMax - 1 ? kMax : static_cast<std::uint8_t>(best + 1);
+            terrainRoom_[i] = std::min(terrainRoom_[i], candidate);
+        }
+    }
+}
+
+void NavGrid::checkTrust(const Navigator& nav) {
+    stats_.trustChecks = 0;
+    stats_.trustFailures = 0;
+    stats_.trusted = false;
+    if (stats_.walkable == 0 || terrainRoom_.empty()) {
+        return;
+    }
+    // The world's own answer, with this grid -- and any grid the navigator was already holding --
+    // taken out of the loop. Checking the rule against something that already uses the rule would be
+    // the probe that reads the right answer out of the wrong place, and the first version of this
+    // function was a smaller version of the same mistake: it left out `pathClear`'s swept solid test
+    // and then blamed the terrain for the eleven segments a tree was standing in.
+    Navigator world = nav;
+    NavSettings settings = world.settings();
+    const float cell = std::max(stats_.cellSize, 1e-3f);
+    const int trustCells =
+        std::max(1, static_cast<int>(std::ceil(settings.gridTrustMetres / cell)));
+    settings.gridTrustMetres = 0.0f;
+    world.setSettings(settings);
+    world.setGrid(nullptr);
+    const std::uint8_t slopeGate = world.gridSlopeGate(2.5f);
+    const float rise = world.settings().stepHeight / 2.5f * 0.667f;
+    const spatial::ObstacleField* solids = world.obstacles();
+
+    // A stride over the walkable set rather than a random sample. Coverage that scales with the
+    // world and reaches all of it beats a fixed number of dice: a rule that is wrong on one hillside
+    // is wrong on a lattice that crosses the hillside, and may never be wrong on 512 throws. The
+    // stride, the angle sequence and the two reaches are fixed, so two builds of one world from one
+    // seed reach the same verdict on any machine -- a verdict that varied would make a bake
+    // irreproducible (ADR-091).
+    constexpr std::size_t kStride = 8;
+    constexpr float kGoldenAngle = 2.39996323f;
+    float angle = 0.0f;
+    bool longLeg = false;
+    for (std::size_t i = 0; i < cells_.size(); i += kStride) {
+        if ((cells_[i].flags & NavWalkable) == 0) {
+            continue;
+        }
+        angle += kGoldenAngle;
+        longLeg = !longLeg;
+        // Both shapes a walker asks about: the lookahead of a steering fan, and a leg of a planned
+        // route. The long one is where a coarse rule goes wrong most often and it would be
+        // convenient to leave out.
+        const float reach = longLeg ? 40.0f : 6.0f;
+        const glm::vec2 a = centerOf(glm::ivec2(static_cast<int>(i % static_cast<std::size_t>(stats_.width)),
+                                                static_cast<int>(i / static_cast<std::size_t>(stats_.width))));
+        const glm::vec2 b = a + glm::vec2(std::cos(angle), std::sin(angle)) * reach;
+        if (!segmentTerrainClear(a, b, trustCells, rise, slopeGate)) {
+            continue; // the grid declined to answer; there is nothing for it to be wrong about
+        }
+        // Everything else `pathClear`'s fast path does before it returns true, in the same order.
+        if (solids != nullptr &&
+            solids->segmentBlocked(a, b, world.filter(world.groundHeight(a)))) {
+            continue;
+        }
+        bool clear = true;
+        const int steps = std::max(1, static_cast<int>(std::ceil(reach / 2.5f)));
+        for (int k = 1; k <= steps && clear; ++k) {
+            const glm::vec2 q = a + (b - a) * (static_cast<float>(k) / static_cast<float>(steps));
+            clear = !world.obstructed(q, groundAt(q));
+        }
+        if (!clear) {
+            continue;
+        }
+        ++stats_.trustChecks;
+        if (!world.pathClear(a, b)) {
+            // One is enough. The grid said walk and the world said no, and a walker that takes that
+            // line is somewhere else a second later -- measured: four of twenty-four bodies inside
+            // one second on Glowmere.
+            ++stats_.trustFailures;
+            return;
+        }
+    }
+    // Enough of them to mean anything. A world so broken up that the grid is only ever asked a
+    // handful of times would otherwise "pass" on two answers and then be trusted for the rest of its
+    // life -- measured: a terrain of 8 m humps at a 3 m period vouched on two checks. Silence is not
+    // agreement (ADR-182).
+    constexpr std::size_t kMinimumEvidence = 16;
+    stats_.trusted = stats_.trustChecks >= kMinimumEvidence;
+}
+
+std::uint8_t NavGrid::terrainRoom(glm::ivec2 c) const {
+    return inside(c) && !terrainRoom_.empty() ? terrainRoom_[index(c)] : 0u;
+}
+
+std::uint8_t NavGrid::terrainRoom(glm::vec2 p) const { return terrainRoom(cellOf(p)); }
+
+float NavGrid::groundAt(glm::vec2 p) const {
+    if (cells_.empty()) {
+        return 0.0f;
+    }
+    const float cell = std::max(stats_.cellSize, 1e-3f);
+    // In units of cell centres, so the integer part is the lower-left of the four that surround p.
+    const glm::vec2 u = (p - origin_) / cell - 0.5f;
+    const glm::ivec2 c(static_cast<int>(std::floor(u.x)), static_cast<int>(std::floor(u.y)));
+    const glm::vec2 f = u - glm::vec2(c);
+    const auto ground = [&](int x, int y) {
+        return cells_[index(glm::ivec2(std::clamp(x, 0, stats_.width - 1),
+                                       std::clamp(y, 0, stats_.height - 1)))]
+            .ground;
+    };
+    const float a = glm::mix(ground(c.x, c.y), ground(c.x + 1, c.y), f.x);
+    const float b = glm::mix(ground(c.x, c.y + 1), ground(c.x + 1, c.y + 1), f.x);
+    return glm::mix(a, b, f.y);
+}
+
+bool NavGrid::segmentTerrainClear(glm::vec2 a, glm::vec2 b, int trustCells,
+                                  float maxRisePerMetre, std::uint8_t maxSlope) const {
+    if (terrainRoom_.empty() || trustCells <= 0) {
+        return false;
+    }
+    const glm::ivec2 from = cellOf(a);
+    const glm::ivec2 to = cellOf(b);
+    if (!inside(from) || !inside(to)) {
+        return false;
+    }
+    const auto trusted = [&](glm::ivec2 c) {
+        return inside(c) && terrainRoom_[index(c)] >= trustCells &&
+               cells_[index(c)].slope <= maxSlope;
+    };
+    if (!trusted(from)) {
+        return false;
+    }
+    // The same supercover walk the string pull uses, for the same reason: a thin line through a
+    // corner would skip the cell that mattered. No diagonal-corner test here, because `trustCells`
+    // is at least one -- every neighbour of a trusted cell is standable by construction, so there
+    // is no corner to squeeze through.
+    int x = from.x;
+    int y = from.y;
+    const int dx = std::abs(to.x - from.x);
+    const int dy = std::abs(to.y - from.y);
+    const int sx = to.x > from.x ? 1 : -1;
+    const int sy = to.y > from.y ? 1 : -1;
+    int err = dx - dy;
+    float previousGround = cells_[index(from)].ground;
+    const float cell = std::max(stats_.cellSize, 1e-3f);
+    for (int guard = 0; guard <= dx + dy + 2; ++guard) {
+        if (x == to.x && y == to.y) {
+            return true;
+        }
+        const int e2 = err * 2;
+        const bool stepX = e2 > -dy;
+        const bool stepY = e2 < dx;
+        if (stepX) {
+            err -= dy;
+            x += sx;
+        }
+        if (stepY) {
+            err += dx;
+            y += sy;
+        }
+        const glm::ivec2 at(x, y);
+        if (!trusted(at)) {
+            return false;
+        }
+        // The step test, priced per metre so it survives a caller that samples at a different
+        // spacing. Two cell centres are four metres apart (or 5.66 on a diagonal) and the fine
+        // check tests every 2.5 m, so a gradient is the only thing that transfers between them.
+        const float ground = cells_[index(at)].ground;
+        const float span = (stepX && stepY ? kSqrt2 : 1.0f) * cell;
+        if (std::abs(ground - previousGround) > maxRisePerMetre * span) {
+            return false;
+        }
+        previousGround = ground;
+    }
+    return false;
 }
 
 std::uint16_t NavGrid::regionAt(glm::vec2 p) const {

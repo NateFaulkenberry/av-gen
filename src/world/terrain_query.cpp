@@ -61,6 +61,10 @@ float TerrainQuery::canopyHeightAt(glm::vec2 p) const {
     return clearance.map != nullptr ? clearance.canopyHeight(p) : 0.0f;
 }
 
+float TerrainQuery::canopyHeightAt(glm::vec2 p, const Sample& sample) const {
+    return clearance.map != nullptr ? clearance.canopyHeight(p, sample) : 0.0f;
+}
+
 bool TerrainQuery::inBounds(glm::vec2 p, float margin) const {
     if (map == nullptr) {
         return true;
@@ -87,7 +91,11 @@ TerrainPoint TerrainQuery::at(glm::vec2 p) const {
     out.waterDepth = std::isfinite(s.waterSurface) ? std::max(s.waterSurface - s.height, 0.0f) : 0.0f;
     out.moisture = s.moisture;
     out.altitude = s.altitude;
-    out.canopy = canopyHeightAt(p);
+    // The sample above, not a second one. `epsilon` is this query's rather than the hardcoded 0.5
+    // the one-argument form uses -- identical for every caller in this repository, none of which
+    // moves `epsilon`, and the consistent answer where one does: a point should not be asked about
+    // at two resolutions inside one call.
+    out.canopy = canopyHeightAt(p, s);
 
     // The order is the order the rules fire in, cheapest and most decisive first, and it is the
     // same order `entity::Navigator::sample` uses -- these are one set of rules, written once.

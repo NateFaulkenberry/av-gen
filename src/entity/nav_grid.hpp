@@ -46,6 +46,12 @@ enum NavCellFlag : std::uint8_t {
     NavSteep = 1u << 2,     // rejected for slope: a bank or a cliff
     NavBlocked = 1u << 3,   // rejected for a solid: a rock, a hero, a thicket of trunks
     NavEdge = 1u << 4,      // walkable, and orthogonally adjacent to something that is not
+    // The *ground* here is standable, whatever is standing on it. Set when every terrain rule --
+    // bounds, slope, water, thicket, hero -- passed, including for a cell a tree happens to fill.
+    // `NavWalkable` is this and no solid; this alone is what the terrain-room field below measures,
+    // because solids are answered exactly and continuously by `spatial::ObstacleField` and have no
+    // business being resolved at four metres (ADR-295).
+    NavTerrain = 1u << 5,
 };
 
 // One cell. Eight bytes, so a 640 m world at four-metre cells is 190 KB -- small enough that keeping
@@ -87,6 +93,20 @@ struct NavGridStats {
     // and an author usually wants to know that before a character is stuck on an island in it.
     std::size_t regions = 0;
     std::size_t largestRegion = 0;
+    // Walkable cells that are *not* in the largest region: the ground a body standing in the main
+    // body of the world cannot reach. `regions` says the walkable set is in pieces; this says how
+    // much of it is on the wrong side, which is the number an author acts on. Zero for a world
+    // whose ground is one piece (ADR-296).
+    std::size_t stranded = 0;
+    // Cells whose ground is standable regardless of what is standing on it -- `NavTerrain`. Always
+    // at least `walkable`: the difference is the cells a solid fills on ground that is otherwise fine.
+    std::size_t terrain = 0;
+    // The build-time self-check (ADR-295): how many straight walks the grid's answer was compared
+    // against the world's, and how many it got wrong. `trustFailures` is 0 and `trusted` is true for
+    // a world this grid may answer for; one failure is disqualifying and stops the check.
+    std::size_t trustChecks = 0;
+    std::size_t trustFailures = 0;
+    bool trusted = false;
     double buildMs = 0.0;
 };
 
@@ -188,6 +208,80 @@ public:
     [[nodiscard]] bool walkable(glm::ivec2 c) const;
     [[nodiscard]] bool walkable(glm::vec2 p) const;
 
+    // How far, in cells, the nearest cell whose *terrain* is not standable lies from this one --
+    // Chebyshev, saturating at 255, and 0 for a cell that is itself unstandable ground. Outside the
+    // grid reads 0, so the world's edge behaves like a wall rather than like open country.
+    //
+    // This is the field that lets a four-metre graph answer a quarter-metre question honestly. It
+    // does not claim the grid resolves a trunk; it claims the opposite -- that a cell two cells from
+    // the nearest rejected ground has eight metres of standable terrain around a sample the world
+    // took at its centre, and that a fine check of the terrain along a line through it cannot
+    // disagree. Solids are not in it at all: they are tested exactly, by a swept query, at every
+    // call site that used to sample the world (ADR-295).
+    [[nodiscard]] std::uint8_t terrainRoom(glm::ivec2 c) const;
+    [[nodiscard]] std::uint8_t terrainRoom(glm::vec2 p) const;
+
+    // The ground at `p`, bilinear between the four cell centres around it. An approximation of
+    // `WorldMap::height`, which is the analytic truth and costs 1.14 us against this one's ~0.01.
+    //
+    // It is not offered as a substitute for the ground a body stands on -- that is still sampled --
+    // but as the `footY` an obstacle filter needs, which is a threshold test against a solid's base
+    // and top and tolerates centimetres. Only meaningful where the grid's ground is locally smooth,
+    // which is exactly where `segmentTerrainClear` is willing to answer at all.
+    [[nodiscard]] float groundAt(glm::vec2 p) const;
+
+    // Whether the grid can settle the *terrain* half of a straight walk from `a` to `b` by itself.
+    //
+    // True only when it can prove it: every cell the segment touches is at least `trustCells` cells
+    // clear of anything the terrain rules reject, and no two consecutive cells along it rise or fall
+    // faster than `maxRisePerMetre`, so the fine check's step test cannot fire between them. **False
+    // is not "blocked"** -- it is "ask the world", and every caller must then do exactly what it did
+    // before. That asymmetry is the whole safety argument: the grid can only ever skip work, never
+    // decide against it.
+    // `maxSlope` gates on what each cell's own sample measured rather than on the difference between
+    // two of them: a finite difference over four metres is an average and averages hide the ridge
+    // they cross. It is in the cell's quantised units, 0..255 over the navigator's slope range,
+    // because that is what the cell holds and converting the other way would need a range the grid
+    // does not keep.
+    [[nodiscard]] bool segmentTerrainClear(glm::vec2 a, glm::vec2 b, int trustCells,
+                                           float maxRisePerMetre, std::uint8_t maxSlope) const;
+
+    // Whether this grid proved, against this world, that it may answer for it at all (ADR-295).
+    //
+    // `segmentTerrainClear` above is a *rule*, and a rule about a four-metre lattice cannot be sound
+    // for an analytic height field: the field carries structure finer than the lattice, and the
+    // canopy term is not even continuous -- it steps wherever a biome weight crosses its presence
+    // threshold, on a curve aligned to nothing. So the rule is not asserted, it is **tested**: the
+    // build walks a fixed sample of straight lines, asks the grid and then asks the world, and stops
+    // at the first line the two disagree about.
+    //
+    // Measured, 20,000 segments each: on the flat lab fixture the rule is wrong **0** times and 24
+    // explorers walk bit-identical routes for ninety seconds; on Glowmere's procedural valley it is
+    // wrong 18 times in 20,000, and that is enough to put four of twenty-four bodies somewhere else
+    // within one second. Two worlds, one rule, opposite answers -- which is why the grid decides per
+    // world instead of the engine deciding once.
+    [[nodiscard]] bool vouches() const { return stats_.trusted; }
+
+    // Re-sample the cells inside an XZ rectangle, then relabel the whole graph (ADR-297).
+    //
+    // This is what a door that closes, a craft that lands or a tree that falls needs: the obstacle
+    // field gains a solid, and the graph has to agree, without paying the 148 ms a whole world
+    // costs. Measured on Glowmere: a 24 m rectangle is 49 cells re-sampled and the rest is the two
+    // whole-grid passes below, which is why the figure is a couple of milliseconds rather than a
+    // couple of microseconds.
+    //
+    // The rectangle is grown by one cell before sampling and by two before edge marking, because a
+    // cell's obstruction is measured over a disc of half its diagonal and a cell's edge flag is a
+    // fact about its neighbours. Regions and the terrain-room field are recomputed over the whole
+    // grid on purpose: a wall dropped across a corridor divides a region that reaches the other side
+    // of the world, and a flood fill that stopped at the rectangle would call two halves of one
+    // island connected -- the single error a reachability structure must never make.
+    //
+    // **Call it after the obstacle field has been rebuilt**, not before: the grid reads the field,
+    // and `spatial::ObstacleField::add` invalidates its index until `build()` is called again.
+    // Returns the milliseconds it took.
+    double rebuildRect(const Navigator& nav, glm::vec2 lo, glm::vec2 hi);
+
     // The nearest walkable cell centre to `p` within `maxRange` metres, by a spiral outward so the
     // answer is the closest one and not merely a close one.
     [[nodiscard]] bool nearestWalkable(glm::vec2 p, float maxRange, glm::vec2& out) const;
@@ -200,6 +294,12 @@ public:
     [[nodiscard]] bool connected(glm::vec2 a, glm::vec2 b) const;
     // How many cells a region holds. Region 0 is the unwalkable set.
     [[nodiscard]] std::size_t regionSize(std::uint16_t region) const;
+    // Every region's size, indexed by region id; [0] is the unwalkable set. Read by the reachability
+    // report, which has to say how the walkable ground is divided and not merely that it is
+    // (ADR-296).
+    [[nodiscard]] std::span<const std::size_t> regionSizes() const { return regionSizes_; }
+    // Which region holds the most cells. 0 when nothing is walkable.
+    [[nodiscard]] std::uint16_t largestRegionId() const { return largestRegion_; }
 
     // A* from `from` to `to`, string-pulled. `out` is the waypoints *after* `from`, ending at `to`
     // when it is walkable and at the nearest walkable cell to it otherwise. False when no route
@@ -229,8 +329,15 @@ private:
     // world whose walker does not wade, so the check below it never fires there.
     [[nodiscard]] bool lineOfSight(glm::ivec2 a, glm::ivec2 b,
                                    std::uint8_t* deepestWade = nullptr) const;
+    // One cell, sampled from the world: everything a build does per cell, so a partial rebuild
+    // cannot drift from a full one.
+    void fillCell(const Navigator& nav, glm::ivec2 at, std::vector<std::uint32_t>& hits);
+    void recount();
+    void markEdges(glm::ivec2 lo, glm::ivec2 hi);
     void extractInterestPoints();
     void buildRegions();
+    void buildTerrainRoom();
+    void checkTrust(const Navigator& nav);
 
     std::vector<NavCell> cells_;
     glm::vec2 origin_{0.0f}; // world XZ of cell (0,0)'s lower corner
@@ -253,7 +360,10 @@ private:
     // a fact no amount of searching should have to rediscover.
     std::vector<std::uint16_t> regions_;
     std::vector<std::size_t> regionSizes_; // indexed by region id; [0] is the unwalkable set
+    std::uint16_t largestRegion_ = 0;
     mutable std::vector<std::int32_t> floodStack_;
+    // Cells to the nearest cell whose terrain is not standable. See `terrainRoom` above.
+    std::vector<std::uint8_t> terrainRoom_;
 };
 
 } // namespace avgen::entity

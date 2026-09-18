@@ -159,6 +159,10 @@ struct TerrainQuery {
     [[nodiscard]] float waterDepthAt(glm::vec2 p) const;
     // The tallest thing that grows here, in metres above the ground. Statistical (ADR-080).
     [[nodiscard]] float canopyHeightAt(glm::vec2 p) const;
+    // The same, from a sample this caller already took at `p`. See the note on
+    // `ClearanceField::canopyHeight`: the canopy is a function of the sample, and taking a second
+    // one at the same point was half the cost of every walkability query in the engine.
+    [[nodiscard]] float canopyHeightAt(glm::vec2 p, const Sample& sample) const;
     [[nodiscard]] bool isWalkable(glm::vec2 p) const;
     // Does anything *solid* overlap the disc of `radius` at p: a hero, a registered obstacle, or the
     // world's edge? Deliberately not the canopy -- see the note at the top of this file.
