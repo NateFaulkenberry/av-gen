@@ -29,6 +29,7 @@
 #include "scene/spline_params.hpp"
 #include "scene/floaters.hpp"
 #include "scene/particles.hpp"
+#include "scene/pose_layers.hpp"
 #include "entity/entity.hpp"
 #include "entity/obstacles.hpp"
 #include "scene/scene_controller.hpp"
@@ -147,9 +148,17 @@ struct NodeAnimation {
     float nearDistance = 15.0f;  // nearer than this: posed every frame (subject to updateHz)
     float farHz = 20.0f;         // between nearDistance and cullDistance: this rate
     float cullDistance = 120.0f; // metres beyond which the rig is not posed at all (0 = never cull)
+    // ---- the layer stack (ADR-300) -------------------------------------------------------------
+    // What goes on top of `state`. Authored here rather than compiled in, because a joint mask is
+    // per-asset: the three rig families this repository loads call the head `head.x`, `Head01` and
+    // `Head`, and a hardcoded list would be a silent no-op on two of the three. A layer with a
+    // `drive` of `look` or `reaction` is how `entity::LocomotionState`'s two published-and-ignored
+    // fields reach a pose; without one authored on the node they go on reaching nothing, which is
+    // the honest behaviour -- there is no joint name this engine may assume.
+    std::vector<PoseLayer> layers;
     [[nodiscard]] bool authored() const {
         return !state.empty() || blend >= 0.0f || speed != 1.0f || updateHz != 0.0f ||
-               nearDistance != 15.0f || farHz != 20.0f || cullDistance != 120.0f;
+               nearDistance != 15.0f || farHz != 20.0f || cullDistance != 120.0f || !layers.empty();
     }
 };
 
@@ -1084,6 +1093,10 @@ private:
         AnimationSink(Composition& owner, std::string node, const entity::Entity& entity)
             : owner_(owner), node_(std::move(node)), entity_(entity) {}
         void setLocomotion(const entity::LocomotionState& state) override;
+        // ADR-300. The second half of `setLocomotion`: the fields the first half does not read.
+        // Separate because it does a different thing -- it does not push an animation *state*, it
+        // writes this frame's intent onto the node's layer stack, in the entity's own frame.
+        void driveLayers(const entity::LocomotionState& state);
         // The joint's transform in the entity's own frame -- the rig's model space. False when
         // this node carries no rig, no rig of its carries the joint, or the rig has not been posed.
         [[nodiscard]] bool jointTransform(std::string_view joint, scene::Transform& out) const override;
