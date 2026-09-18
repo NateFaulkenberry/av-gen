@@ -89,6 +89,7 @@ Snapshot buildSnapshot(const scene::Scene& scene) {
                                "scene::skyRadiance, the same model shaders/environment.wgsl draws", 1);
     }
 
+    snap.textures = scene.textures;
     snap.lights = scene.lights;
     int directional = 0;
     int punctual = 0;

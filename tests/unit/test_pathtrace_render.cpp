@@ -21,7 +21,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #include <filesystem>
+#include <thread>
 
 using namespace avgen;
 using Catch::Approx;
@@ -427,7 +429,27 @@ TEST_CASE("a cancelled render stops and keeps what it had", "[unit][pathtrace][r
 // PPM so a human can look at it. Numerical agreement is not proof of visual alignment; this is how
 // the pixel regions the tests above assert on were chosen, rather than guessed.
 TEST_CASE("preview: write the section 69 scene to /tmp", "[.pathtrace-preview]") {
-    const scene::Scene s = buildTargetScene();
+    scene::Scene s = buildTargetScene();
+    // Phase 2: a checkered sRGB base-colour texture on the ground, so the preview exercises UV
+    // interpolation, wrap mode and the sRGB decode at the same time as the metal.
+    scene::TextureData checker;
+    checker.name = "checker";
+    checker.width = 16;
+    checker.height = 16;
+    checker.format = scene::TextureFormat::Rgba8Srgb;
+    checker.data.assign(16 * 16 * 4, 0);
+    for (int y = 0; y < 16; ++y) {
+        for (int x = 0; x < 16; ++x) {
+            const std::uint8_t v = ((x + y) % 2 == 0) ? 230 : 60;
+            auto* p = &checker.data[(static_cast<std::size_t>(y) * 16 + x) * 4];
+            p[0] = v; p[1] = v; p[2] = static_cast<std::uint8_t>(v * 0.9f); p[3] = 255;
+        }
+    }
+    const scene::TextureId checkerId = static_cast<scene::TextureId>(s.textures.size());
+    s.textures.push_back(std::move(checker));
+    s.entities[0].material.baseColorTexture.texture = checkerId;
+    s.entities[0].material.baseColorTexture.wrapU = scene::WrapMode::Repeat;
+    s.entities[0].material.baseColorTexture.wrapV = scene::WrapMode::Repeat;
     const pathtrace::Snapshot snap = pathtrace::buildSnapshot(s);
     pathtrace::TraceSettings t = fastSettings();
     t.width = 480;
@@ -476,4 +498,167 @@ TEST_CASE("diagnose: lit vs unlit region means", "[.pathtrace-diag]") {
     scene::Scene d = buildTargetScene();
     d.lights.clear();
     run(d, "dark ");
+}
+
+// Opportunistic benchmark (hidden). Reports minima over repeats, never means (ADR-170), and prints
+// the conditions so a number can never be read without them. This is NOT the section 86 Step F
+// pass, which wants a quiet machine and the full resolution/sample matrix.
+TEST_CASE("bench: scene build, BVH build, render", "[.pathtrace-bench]") {
+    const scene::Scene s = buildTargetScene();
+
+    double bestSnap = 1e9;
+    for (int i = 0; i < 5; ++i) {
+        const auto t0 = std::chrono::steady_clock::now();
+        const pathtrace::Snapshot sn = pathtrace::buildSnapshot(s);
+        const double dt = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        bestSnap = std::min(bestSnap, dt);
+        REQUIRE(sn.meshes.size() == 4);
+    }
+    const pathtrace::Snapshot snap = pathtrace::buildSnapshot(s);
+    WARN("snapshot build (min of 5): " << bestSnap << " ms, " << snap.triangleCount() << " triangles");
+
+    struct Case { std::uint32_t w, h, spp; };
+    const Case cases[] = {{640, 400, 8}, {640, 400, 32}, {1280, 800, 16}, {1920, 1200, 16}};
+    for (const Case& c : cases) {
+        pathtrace::TraceSettings t;
+        t.width = c.w;
+        t.height = c.h;
+        t.samplesPerPixel = c.spp;
+        t.threads = 0; // all cores
+        double bestBuild = 1e9;
+        double bestRender = 1e9;
+        double meanLum = 0.0;
+        for (int i = 0; i < 3; ++i) {
+            pathtrace::PathTracer tr;
+            pathtrace::Framebuffer fb;
+            REQUIRE(tr.render(snap, t, fb).has_value());
+            bestBuild = std::min(bestBuild, tr.stats().buildSeconds * 1000.0);
+            bestRender = std::min(bestRender, tr.stats().renderSeconds * 1000.0);
+            meanLum = fb.meanLuminance();
+            REQUIRE_FALSE(fb.isBlack()); // a fast black frame is not a fast render
+        }
+        WARN(c.w << "x" << c.h << " @" << c.spp << "spp  bvh " << bestBuild << " ms  render "
+                 << bestRender << " ms  (min of 3, " << std::thread::hardware_concurrency()
+                 << " threads, mean luminance " << meanLum << ")");
+    }
+}
+
+TEST_CASE("a base-colour texture reaches the shading, and its colour space is respected",
+          "[unit][pathtrace][render][texture]") {
+    // Two arms over the same geometry and lighting. Arm A puts a high-contrast checker on the
+    // ground; arm B puts a SOLID texture whose linear value is the checker's linear mean. If the
+    // texture never reached the shading, both would render identically and the variance test below
+    // would fail -- which is the point of pairing them.
+    const auto makeGround = [](bool checker) {
+        scene::Scene s = buildTargetScene();
+        scene::TextureData t;
+        t.width = 8;
+        t.height = 8;
+        t.format = scene::TextureFormat::Rgba8Srgb;
+        t.data.assign(8 * 8 * 4, 0);
+        for (int y = 0; y < 8; ++y) {
+            for (int x = 0; x < 8; ++x) {
+                std::uint8_t v = 0;
+                if (checker) {
+                    v = ((x + y) % 2 == 0) ? 240 : 30;
+                } else {
+                    // The sRGB byte whose LINEAR value is the mean of the two checker linear values.
+                    const float lin = 0.5f * (std::pow(240.0f / 255.0f, 2.2f) + std::pow(30.0f / 255.0f, 2.2f));
+                    v = static_cast<std::uint8_t>(std::pow(lin, 1.0f / 2.2f) * 255.0f + 0.5f);
+                }
+                auto* p = &t.data[(static_cast<std::size_t>(y) * 8 + x) * 4];
+                p[0] = v; p[1] = v; p[2] = v; p[3] = 255;
+            }
+        }
+        const auto id = static_cast<scene::TextureId>(s.textures.size());
+        s.textures.push_back(std::move(t));
+        s.entities[0].material.baseColorTexture.texture = id;
+        s.entities[0].material.baseColorTexture.linearFilter = false; // keep the edges hard
+        return s;
+    };
+
+    // 64 spp, not 16. At 16 the solid arm's row variance is 0.56 -- pure firefly noise from the
+    // emissive sphere's bounce -- against a checker signal of 1.7, which is only 3x and would have
+    // meant lowering the threshold to fit the data. Quadrupling the samples quarters the noise
+    // floor instead, so a strict threshold keeps real headroom. Phase 3's MIS is the actual fix.
+    pathtrace::TraceSettings settings = fastSettings();
+    settings.samplesPerPixel = 64;
+
+    const auto render = [&](const scene::Scene& sc) {
+        pathtrace::PathTracer tr;
+        pathtrace::Framebuffer fb;
+        REQUIRE(tr.render(pathtrace::buildSnapshot(sc), settings, fb).has_value());
+        return fb;
+    };
+
+    const pathtrace::Framebuffer checkered = render(makeGround(true));
+    const pathtrace::Framebuffer solid = render(makeGround(false));
+
+    // Spatial variance along a scanline across the near ground, away from the spheres.
+    const auto rowVariance = [](const pathtrace::Framebuffer& fb, std::uint32_t y) {
+        double sum = 0.0;
+        double sum2 = 0.0;
+        int n = 0;
+        for (std::uint32_t x = 2; x < fb.width - 2; ++x) {
+            const glm::vec3 c = fb.pixel(x, y);
+            const double l = 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z;
+            sum += l;
+            sum2 += l * l;
+            ++n;
+        }
+        const double mean = sum / n;
+        return (sum2 / n) - mean * mean;
+    };
+
+    const double vChecker = rowVariance(checkered, 92);
+    const double vSolid = rowVariance(solid, 92);
+    INFO("checker variance " << vChecker << " solid variance " << vSolid);
+    // The checker must be visibly patterned and the solid must not be. Both carry the same
+    // path-tracing noise, so the difference is the texture and nothing else.
+    REQUIRE(vChecker > vSolid * 4.0);
+    REQUIRE(vSolid >= 0.0);
+
+    // And the two must agree on overall brightness: same linear mean albedo, same illumination.
+    // This is the arm that catches a missing sRGB decode -- without it the checker's mean would
+    // land somewhere else entirely.
+    const auto rowMean = [](const pathtrace::Framebuffer& fb, std::uint32_t y) {
+        double sum = 0.0;
+        int n = 0;
+        for (std::uint32_t x = 2; x < fb.width - 2; ++x) {
+            const glm::vec3 c = fb.pixel(x, y);
+            sum += 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z;
+            ++n;
+        }
+        return sum / n;
+    };
+    REQUIRE(rowMean(checkered, 92) == Catch::Approx(rowMean(solid, 92)).epsilon(0.15));
+}
+
+TEST_CASE("a metal reflects its surroundings and a dielectric does not",
+          "[unit][pathtrace][render][bsdf]") {
+    // The middle sphere is metallic 1.0, roughness 0.15, so at depth >= 1 it must pick up the cyan
+    // emissive sphere beside it. The diffuse blue sphere, at the same distance on the other side,
+    // must not. That asymmetry is the thing that says "metal" rather than "bright grey".
+    scene::Scene s = buildTargetScene();
+    pathtrace::TraceSettings settings = fastSettings();
+    settings.maxDepth = 2;
+    settings.samplesPerPixel = 96;
+
+    pathtrace::PathTracer tr;
+    pathtrace::Framebuffer fb;
+    REQUIRE(tr.render(pathtrace::buildSnapshot(s), settings, fb).has_value());
+
+    // The right-hand limb of the metal sphere faces the cyan emitter.
+    const glm::vec3 metalRight = regionMean(fb, 86, 44, 92, 56);
+    // The left-hand limb of the diffuse blue sphere, the mirror-image position, faces nothing.
+    const glm::vec3 blueLeft = regionMean(fb, 36, 44, 42, 56);
+
+    // "Reflects cyan" means the green and blue channels beat red on the metal's lit limb.
+    INFO("metal right " << metalRight.x << "," << metalRight.y << "," << metalRight.z);
+    REQUIRE(metalRight.z > metalRight.x * 1.5f);
+    REQUIRE(metalRight.y > metalRight.x * 1.3f);
+    // CONTROL: the blue sphere is blue because its ALBEDO is blue, so this alone would not
+    // distinguish them. The discriminating claim is that the metal's cyan is much greener than the
+    // blue sphere's, whose albedo has very little green.
+    REQUIRE(metalRight.y / metalRight.x > blueLeft.y / blueLeft.x);
 }

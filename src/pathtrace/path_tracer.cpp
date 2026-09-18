@@ -2,14 +2,17 @@
 
 #include "assets/exr.hpp"
 #include "core/log.hpp"
+#include "pathtrace/bsdf.hpp"
 #include "pathtrace/camera.hpp"
 #include "pathtrace/sampler.hpp"
+#include "pathtrace/texture.hpp"
 
 #include <fmt/format.h>
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <span>
 #include <thread>
 
 namespace avgen::pathtrace {
@@ -135,6 +138,33 @@ struct LightSample {
     return scene::skyRadiance(snap.sky, dir);
 }
 
+// glTF: every texture MULTIPLIES its factor. Base colour and emissive arrive already linear from
+// `sampleSlot` (it decodes iff the format is sRGB); metallic-roughness and occlusion are linear
+// data and are never decoded. The channel assignment -- roughness in G, metallic in B -- is the
+// glTF spec's, and getting it backwards is a silent, plausible-looking error.
+[[nodiscard]] SurfaceMaterial resolveMaterial(const Snapshot& snap, const scene::Material& mat,
+                                              glm::vec2 uv) {
+    SurfaceMaterial m;
+    const std::span<const scene::TextureData> textures{snap.textures};
+
+    const glm::vec4 base = sampleSlot(textures, mat.baseColorTexture, uv, glm::vec4(1.0f));
+    m.baseColor = mat.baseColor * glm::vec3(base);
+    m.opacity = mat.opacity * base.w;
+
+    const glm::vec4 mr = sampleSlot(textures, mat.metallicRoughnessTexture, uv, glm::vec4(1.0f));
+    m.roughness = glm::clamp(mat.roughness * mr.y, 0.0f, 1.0f);
+    m.metallic = glm::clamp(mat.metallic * mr.z, 0.0f, 1.0f);
+
+    const glm::vec4 em = sampleSlot(textures, mat.emissiveTexture, uv, glm::vec4(1.0f));
+    m.emission = mat.emissiveColor * mat.emissiveIntensity * glm::vec3(em);
+
+    const glm::vec4 ao = sampleSlot(textures, mat.occlusionTexture, uv, glm::vec4(1.0f));
+    // glTF: occlusion applies only to indirect light, and `occlusionStrength` interpolates it in.
+    m.occlusion = glm::mix(1.0f, ao.x, glm::clamp(mat.occlusionStrength, 0.0f, 1.0f));
+
+    return m;
+}
+
 struct Counters {
     std::uint64_t shadowRays = 0;
     std::uint64_t nonFinite = 0;
@@ -143,11 +173,8 @@ struct Counters {
 
 // Direct lighting at a hit, Lambertian only. Returns outgoing radiance toward the ray's origin.
 [[nodiscard]] glm::vec3 directLighting(const Snapshot& snap, const EmbreeScene& embree,
-                                       const SurfaceHit& hit, Sampler& sampler, Counters& counters) {
-    const scene::Material& mat = snap.meshes[hit.meshIndex].material;
-    const glm::vec3 albedo = mat.baseColor;
-    const glm::vec3 brdf = albedo * kInvPi;
-
+                                       const SurfaceHit& hit, const SurfaceMaterial& m,
+                                       const glm::vec3& view, Sampler& sampler, Counters& counters) {
     glm::vec3 sum{0.0f};
     for (const auto& light : snap.lights) {
         const LightSample ls = sampleLight(light, hit.position, sampler);
@@ -155,6 +182,9 @@ struct Counters {
 
         const float nDotL = glm::dot(hit.shadingNormal, ls.direction);
         if (nDotL <= 0.0f) continue;
+
+        const glm::vec3 f = evaluateBsdf(m, hit.shadingNormal, view, ls.direction);
+        if (f.x <= 0.0f && f.y <= 0.0f && f.z <= 0.0f) continue;
 
         if (light.castsShadow) {
             const float eps = shadowEpsilon(hit.t);
@@ -167,7 +197,7 @@ struct Counters {
                 }
             }
         }
-        sum += brdf * ls.radiance * nDotL;
+        sum += f * ls.radiance * nDotL;
     }
     return sum;
 }
@@ -190,25 +220,32 @@ struct Counters {
         }
 
         const scene::Material& mat = snap.meshes[hit.meshIndex].material;
+        const SurfaceMaterial m = resolveMaterial(snap, mat, hit.uv);
+        const glm::vec3 view = -ray.direction;
 
         // Emission. A surface that emits is visible whether or not anything lights it.
-        if (mat.emissiveIntensity > 0.0f) {
-            result += throughput * mat.emissiveColor * mat.emissiveIntensity;
+        if (m.emission.x > 0.0f || m.emission.y > 0.0f || m.emission.z > 0.0f) {
+            result += throughput * m.emission;
         }
 
-        result += throughput * directLighting(snap, embree, hit, sampler, counters);
+        if (mat.unlit) {
+            // An unlit material is its base colour and nothing else -- no lighting, no bounce.
+            result += throughput * m.baseColor;
+            break;
+        }
+
+        result += throughput * directLighting(snap, embree, hit, m, view, sampler, counters);
 
         if (depth == settings.maxDepth) break;
 
-        // Cosine-weighted bounce. f * cos / pdf = (albedo/pi) * cos / (cos/pi) = albedo.
-        const glm::vec3 local = sampleCosineHemisphere(sampler.next2D());
-        const glm::vec3 dir = toWorld(local, hit.shadingNormal);
-        if (glm::dot(dir, hit.geometricNormal) <= 0.0f) break; // below the geometric surface
-        throughput *= mat.baseColor;
+        const BsdfSample bs = sampleBsdf(m, hit.shadingNormal, view, sampler.next2D(), sampler.next1D());
+        if (!bs.valid) break;
+        if (glm::dot(bs.direction, hit.geometricNormal) <= 0.0f) break; // below the geometric surface
+        throughput *= bs.weight;
 
         const float eps = shadowEpsilon(hit.t);
         ray.origin = hit.position + hit.geometricNormal * eps;
-        ray.direction = dir;
+        ray.direction = bs.direction;
 
         const float maxThroughput = std::max({throughput.x, throughput.y, throughput.z});
         if (maxThroughput <= 1e-6f) break; // nothing further can contribute

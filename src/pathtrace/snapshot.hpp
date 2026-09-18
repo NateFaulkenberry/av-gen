@@ -81,6 +81,11 @@ struct Snapshot {
     std::vector<TriangleMesh> meshes;
     std::vector<scene::PunctualLight> lights;
 
+    // Copied from the scene. `scene::Material`'s texture slots are indices into this, so the two
+    // must travel together -- a snapshot that referenced the live scene's texture table would be
+    // exactly the dangling reference the snapshot exists to avoid.
+    std::vector<scene::TextureData> textures;
+
     scene::Camera camera;
 
     // Environment. Phase 1 is analytic only: `scene::SkyRuntime` is the project's own CPU reference

@@ -31,7 +31,7 @@ never reaches into the realtime post chain. Colour management is downstream of t
 |---|---|---|
 | 0 | Recon, Embree spike on Apple Silicon | done |
 | 1 | Primary rays, Lambertian, one area light, shadow rays, accumulation, EXR | **done** |
-| 2 | glTF metallic-roughness BRDF, textures, colour space | not started |
+| 2 | glTF metallic-roughness BRDF, textures, colour space | **done** |
 | 3 | BSDF + light sampling, MIS, Russian roulette, progressive | not started |
 | 4 | OIDN denoising | not started |
 | 5 | Full AV Gen scene integration (skinning, instancing, procedurals) | not started |
@@ -98,14 +98,44 @@ inheriting them would be the ADR-146 mistake in a new place:
   off-screen geometry still casts shadows and still bounces light into the frame;
 * procedural LOD rungs 2 and 3, which are camera-facing billboards.
 
+## Phase 2 in particular
+
+The glTF 2.0 metallic-roughness BSDF (`bsdf.hpp`): Lambertian diffuse plus Cook-Torrance specular
+with GGX, Smith height-correlated visibility and Schlick Fresnel, combined as the glTF spec's
+Appendix B combines them. Metals take F0 from the base colour and have no diffuse lobe; dielectrics
+get F0 = 0.04. `sampleBsdf` picks a lobe by Fresnel weight and returns the *combined* PDF, so the
+estimator stays unbiased whichever lobe it picked -- and a test checks the returned weight against
+`evaluateBsdf(...) * cos / bsdfPdf(...)` recomputed independently, because a disagreement there is a
+bias no image inspection would reveal.
+
+Textures (`texture.hpp`): all five glTF slots, wrap modes, bilinear or nearest.
+
+**The colour-space rule (section 18) is taken from the loader, not guessed.**
+`assets::gltf_loader` already tags base colour and emissive as sRGB and metallic-roughness, normal
+and occlusion as linear, per the glTF spec, and the answer rides in `scene::TextureData::format`.
+The tracer decodes if and only if the format says `Rgba8Srgb`. Two consequences worth stating:
+alpha is coverage and is never decoded, and **filtering happens after the decode**, which is the
+correct order -- blending two sRGB bytes and then decoding is a different number, and the difference
+shows as darkened edges exactly where people look.
+
+**Known: the glTF BRDF gains energy at grazing angles.** A white, smooth, non-metallic surface
+reaches a directional albedo of 1.68. This is the specification's model behaving as specified, not a
+defect in this code -- metals conserve at 0.9988, so GGX/Smith/Fresnel are correct. It is kept
+faithful per section 19 and pinned as a band. **See ADR-341**, and check it first if an interior
+render is ever inexplicably bright.
+
+`docs/pathtrace/phase2-metal-and-texture.png` shows the target scene with a real metal in the middle
+-- reflecting the area light, the ground and the cyan sphere beside it -- and a checkered sRGB
+texture on the floor.
+
 ## Phase 1 in particular
 
 Primary rays, a Lambertian BSDF, direct lighting from the scene's lights with shadow rays, the
 analytic sky as environment and miss colour, a cosine-weighted bounce per extra depth, progressive
 accumulation and linear float EXR out.
 
-Not yet: metallic-roughness (so a metal reads as a bright diffuse), textures, MIS, Russian roulette,
-adaptive sampling, denoising, instancing. Emissive geometry is only found by rays that happen to hit
+Not yet at Phase 2: MIS, Russian roulette, adaptive sampling, denoising, instancing, normal mapping
+(there are no tangents in `scene::Vertex`, so they must be derived first). Emissive geometry is only found by rays that happen to hit
 it, so its bounce light is noisy until MIS lands in Phase 3 -- visible in the target image below as
 speckle on the floor near the cyan sphere.
 
