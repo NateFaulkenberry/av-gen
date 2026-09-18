@@ -1,4 +1,4 @@
-// The Glowmere scale invariants (ADR-330, ADR-335).
+// The Glowmere scale invariants (ADR-334, ADR-335).
 //
 // ## Why every arm here is a ratio
 //
@@ -26,7 +26,7 @@
 //                     that species occupies and whose `maxScale` is the largest it will place.
 //
 // The numbers this file *does* write down -- 1.25, 3, 4.0, 1.2 -- are the art direction, and they
-// are argued for in ADR-330 and ADR-335 rather than tuned until a screenshot passed.
+// are argued for in ADR-334 and ADR-335 rather than tuned until a screenshot passed.
 //
 // GPU-free: the generator, the anchors and the JSON are all CPU.
 
@@ -67,9 +67,9 @@ constexpr float kCanopyHeadroom = 1.25f;
 
 // And of the ten signature organisms, at least three are canopies and at least three are not.
 //
-// ADR-330's arm said all ten were canopies. That was true of the world it shipped and it is the
+// ADR-334's arm said all ten were canopies. That was true of the world it shipped and it is the
 // arm ADR-335 had to rewrite, because the owner looked at that world and said the cast was too
-// small. Replacing the claim rather than widening the constant is the same move ADR-330 itself
+// small. Replacing the claim rather than widening the constant is the same move ADR-334 itself
 // made on its third arm, and for the same reason: the number was not wrong, the sentence was.
 //
 // The sentence that is true of the world the owner asked for is that **the cast stands inside its
@@ -78,7 +78,7 @@ constexpr float kCanopyHeadroom = 1.25f;
 // world is at the cast's own height. So the claim is two-sided and the count is the instrument.
 //
 //   3.6x (ADR-213)   1 canopy, 9 grounded -- the cast was the top of its own ladder
-//   1.0x (ADR-330)  10 canopies, 0 grounded -- nothing in the signature set was creature-sized
+//   1.0x (ADR-334)  10 canopies, 0 grounded -- nothing in the signature set was creature-sized
 //   1.94x (ADR-335)  5 canopies, 5 grounded
 //
 // Both bounds bite. Holding the flora still, they pin the cast between 1.749x (below which umbra
@@ -95,7 +95,7 @@ constexpr float kSignatureMin = 4.0f;
 // And it stands above the tree line, by a fifth again of the tallest instance any tree layer will
 // place. This number replaces an upper bound on bodies -- "no more than eight, or it stops being
 // something a figure has a relationship with" -- which was written first, was contradicted by the
-// renders, and is recorded as contradicted in ADR-330 rather than quietly widened. What the frames
+// renders, and is recorded as contradicted in ADR-334 rather than quietly widened. What the frames
 // showed is that a 16 m elder at 8.9 alien-heights does not read as terrain at all; what it reads
 // as is a mushroom shorter than the trees around it, in a world whose whole subject is mushrooms.
 // The failure was never in the ratio to the cast. It was that Glowmere's signature organisms were
@@ -106,10 +106,10 @@ constexpr float kAboveTreeLine = 1.2f;
 
 constexpr float kBeforeCast = 3.6f; // every farm animal; the four named aliens were 3.344 to 3.61
 // And the second control, which is a world this repository shipped for one afternoon: the cast at
-// the metres its GLBs occupy at rest, with the flora where ADR-330 left it. The owner rejected it
+// the metres its GLBs occupy at rest, with the flora where ADR-334 left it. The owner rejected it
 // in those words -- "they are too small now that the world scale is corrected" -- so it is not a
 // hypothetical either.
-constexpr float kCastAt330 = 1.0f;
+constexpr float kCastAt334 = 1.0f;
 const std::map<std::string, float>& beforeFungi() {
     static const std::map<std::string, float> kBefore{
         {"elder-2", 16.0f}, {"lantern", 6.5f}, {"spire", 4.2f}, {"bloom", 9.0f}, {"veil", 3.4f},
@@ -311,18 +311,18 @@ TEST_CASE("Glowmere's cast stands in its undergrowth", "[glowmere][scale]") {
 // a figure can be filmed standing under it. One whose gill line does not is **grounded**: a figure
 // stands beside it, at something like its own height.
 //
-// ADR-330's arm here was `CHECK(gillLine > tallest * 1.25)` for all ten, and it was written to
+// ADR-334's arm here was `CHECK(gillLine > tallest * 1.25)` for all ten, and it was written to
 // catch a cast that had grown until it was the top of its own ladder. It is not the arm this
 // world wants, and the replacement is ADR-335's whole argument:
 //
 //   * At ADR-213's 3.6x exactly one of the ten -- the elder -- was a canopy. Nine were hats.
-//   * At ADR-330's 1.0x all ten were canopies, and the owner looked at that and said the cast was
+//   * At ADR-334's 1.0x all ten were canopies, and the owner looked at that and said the cast was
 //     too small for the world. What they were looking at is a world with nothing creature-sized in
 //     its signature set: the elder's 16 m had no small mushroom to be sixteen metres *against*.
 //   * At 1.94x the ladder brackets the cast. Five canopies, five grounded.
 //
 // So the assertion is a band on the count, not a floor on every organism, and the two halves fail
-// on the two different worlds. This is the same shape ADR-330 gave its own third arm after three
+// on the two different worlds. This is the same shape ADR-334 gave its own third arm after three
 // renders contradicted the sentence it was written with.
 TEST_CASE("Glowmere's cast stands inside the fungal ladder", "[glowmere][scale]") {
     if (!assetsPresent()) {
@@ -377,14 +377,14 @@ TEST_CASE("Glowmere's cast stands inside the fungal ladder", "[glowmere][scale]"
                          << static_cast<int>(fungi.size()) - canopiesBefore << " grounded");
         CHECK(canopiesBefore < kCanopiesMin);
 
-        // Control two: ADR-330's 1.0x, the world the owner rejected. Ten canopies, so the grounded
+        // Control two: ADR-334's 1.0x, the world the owner rejected. Ten canopies, so the grounded
         // floor fails -- and it fails on the *other* half of the band, which is the point. An arm
         // whose two controls fail the same way is one bound wearing two hats.
-        const int canopiesAt330 = canopiesAgainst(native * kCastAt330);
-        const int groundedAt330 = static_cast<int>(fungi.size()) - canopiesAt330;
-        INFO("control (" << kCastAt330 << "x, ADR-330): " << canopiesAt330 << " canopies, "
-                         << groundedAt330 << " grounded");
-        CHECK(groundedAt330 < kGroundedMin);
+        const int canopiesAt334 = canopiesAgainst(native * kCastAt334);
+        const int groundedAt334 = static_cast<int>(fungi.size()) - canopiesAt334;
+        INFO("control (" << kCastAt334 << "x, ADR-334): " << canopiesAt334 << " canopies, "
+                         << groundedAt334 << " grounded");
+        CHECK(groundedAt334 < kGroundedMin);
     }
     CHECK(scenesChecked == 4);
 }
@@ -400,7 +400,7 @@ TEST_CASE("Glowmere's cast stands inside the fungal ladder", "[glowmere][scale]"
 //
 // Neither control is hypothetical. Both were rendered, and the second is what changed this arm:
 // the elder at 8.9 alien-heights does not read as terrain, it reads as a mushroom standing in a
-// forest that is taller than it is. See ADR-330.
+// forest that is taller than it is. See ADR-334.
 TEST_CASE("Glowmere's signature organism is monumental and stands above the tree line",
           "[glowmere][scale]") {
     if (!assetsPresent()) {
@@ -476,7 +476,7 @@ TEST_CASE("Glowmere's signature organism is monumental and stands above the tree
 //
 // **It had a hole and the hole was used.** Written against `nodes/*/scale` and the hero table, it
 // said nothing about `entity/<name>/wander/speed`, and every Glowmere project carries one of those
-// per animal plus a `runSpeed` beside it -- forty-two per project. ADR-330 moved those speeds in
+// per animal plus a `runSpeed` beside it -- forty-two per project. ADR-334 moved those speeds in
 // the scene and not in the project, so between that merge and ADR-335 a 1.77 m bull walked at the
 // 3.585 m/s authored for a 6.38 m one, in every render anybody made, and this arm passed. The
 // speeds are in it now, and so is the alien `explore` spelling of the same two keys.

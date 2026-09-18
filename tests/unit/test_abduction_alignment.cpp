@@ -345,7 +345,7 @@ TEST_CASE("An abducted animal is inside the beam for the whole lift", "[stage][b
     REQUIRE(run.lifts.size() >= 5);
     // "Large" is half the widest animal the scene actually holds, not four metres.
     //
-    // Four metres was the reach of a big farm animal at ADR-213's 3.6x, and at ADR-330's authored
+    // Four metres was the reach of a big farm animal at ADR-213's 3.6x, and at ADR-334's authored
     // scale the widest body in the whole cast reaches 1.61 m -- so the guard could never be
     // satisfied and failed on a run that had lifted a bull, a horse and a cow. The thing it is
     // guarding against is a run made entirely of poultry, and that is a statement about this cast's

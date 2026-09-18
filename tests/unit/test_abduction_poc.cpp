@@ -497,7 +497,7 @@ TEST_CASE("the UFO abducts several animals, choosing each one from the scene",
     // each and asserted the animal got *close*, which is the defect written down as a requirement.
     // **The lower bound is the widest animal's reach, and the reach is a property of the cast.**
     // ADR-218 measured it as 5.80 m with the farm at ADR-213's 3.6x, so the quantity that does not
-    // move is 1.611 m per unit of node scale -- and ADR-330 put the cast back at 1.0, where 5.9 m
+    // move is 1.611 m per unit of node scale -- and ADR-334 put the cast back at 1.0, where 5.9 m
     // of clearance is the bull's reach three and a half times over and the arm fails on a lift that
     // is perfectly clear. So the bound is read off the scene instead of written down: an anti-
     // clipping claim has to be a claim about the body doing the clipping.

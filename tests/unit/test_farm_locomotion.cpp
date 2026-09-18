@@ -760,7 +760,7 @@ TEST_CASE("the farm animals travel the way they are drawn facing, at the speed t
         //
         // The guard is here so the sample is not degenerate -- a frozen animal has nothing to
         // measure -- and "five metres" said that only for a cast that happened to be 3.6x. At the
-        // authored scale (ADR-330) a goat covers 2.99 m in this window and 5.0 failed, which is a
+        // authored scale (ADR-334) a goat covers 2.99 m in this window and 5.0 failed, which is a
         // fact about the size of the world rather than about locomotion. `clipSpeed` is the
         // species' measured stride speed times the node's own scale, so this reads the same at any
         // scale -- and a body that does not move still fails it.
