@@ -179,6 +179,49 @@ scene::MeshData nonManifoldFins(int count) {
     return m;
 }
 
+// How far a level's bounding box has receded from the source's, face by face, in mesh units. The
+// quantity `buildLodChain`'s guard compares against `boundsTolerance`, written out here rather than
+// read off `LodLevel::boundsError` -- a test that asks the implementation what it measured is a
+// test of nothing (§37).
+float boundsRecession(const scene::MeshData& source, const scene::MeshData& level) {
+    const auto [slo, shi] = source.bounds();
+    const auto [llo, lhi] = level.bounds();
+    float worst = 0.0f;
+    for (int axis = 0; axis < 3; ++axis) {
+        worst = std::max(worst, llo[axis] - slo[axis]);
+        worst = std::max(worst, shi[axis] - lhi[axis]);
+    }
+    return worst;
+}
+
+// A dense canopy standing on a thin trunk, optionally scaled non-uniformly.
+//
+// The shape the defect lives in, and none of its three properties is decoration (ADR-182). It
+// stands **on its own origin**, so its bounds are asymmetric and a level that loses the bottom
+// loses it in one direction only. Its trunk is **thin** -- 8 cm of radius against a 5 m height --
+// so a simplifier quantising onto a grid swallows it whole while the canopy, which carries 97% of
+// the triangles and all of the error, barely moves. And the scale is **non-uniform** in two of the
+// three cases, because a tolerance taken as a fraction of one axis and a tolerance taken as a
+// fraction of the diagonal are the same number on a cube and different numbers here.
+scene::MeshData canopyOnTrunk(glm::vec3 scale) {
+    scene::MeshData m;
+    m.name = "canopy-on-trunk";
+    const auto append = [&m, scale](const scene::MeshData& part, glm::vec3 offset) {
+        const auto base = static_cast<std::uint32_t>(m.vertices.size());
+        for (const scene::Vertex& v : part.vertices) {
+            scene::Vertex moved = v;
+            moved.position = (v.position + offset) * scale;
+            m.vertices.push_back(moved);
+        }
+        for (const std::uint32_t i : part.indices) {
+            m.indices.push_back(base + i);
+        }
+    };
+    append(scene::makeUvSphere(1.2f, 40, 26), {0.0f, 5.0f, 0.0f});
+    append(scene::makeCylinder(0.08f, 5.0f, 8, 3, true), {0.0f, 2.5f, 0.0f});
+    return m;
+}
+
 } // namespace
 
 TEST_CASE("optimiseMesh reorders a mesh without changing its surface", "[assets][lod]") {
@@ -628,4 +671,144 @@ TEST_CASE("makeSourceMesh applies a mesh budget through the simplifier", "[asset
     const auto whole = scene::makeSourceMesh(spec);
     REQUIRE(whole.has_value());
     CHECK(triangles(*whole) == triangles(*spec.assetMesh));
+}
+
+TEST_CASE("A level that lost part of the object is refused, and never understates what it moved",
+          "[assets][lod]") {
+    // The defect: at 2.9% of its triangles CommonTree_1 came back with the bottom 31% of its
+    // bounding box gone -- the trunk -- while reporting a relative error 5.3x smaller than the
+    // deviation it actually had. The header's claim that the error "rises monotonically with
+    // aggressiveness and never understates" was false for exactly that level, and a selector
+    // choosing a rung by projected error would have taken it far too early.
+    //
+    // Two things now stop it, and they are separate on purpose. `boundsTolerance` refuses a level
+    // that has lost a part of the object, the same way ADR-085's guard refuses one larger than its
+    // predecessor. And `LodLevel::error` is floored by the recession, which is a *measured* lower
+    // bound on the deviation -- the source has a vertex out past the level's box and the level's
+    // surface lies inside it -- so the claim above is a property of the number rather than a hope
+    // about the simplifier's estimate.
+    //
+    // Arm and control are the same call with one field different: `boundsTolerance = 0` is the
+    // chain this code built before the guard existed. Same fixture, same settings, same process.
+    assets::LodChainSettings guarded = assets::vegetationLodSettings();
+    // Aggressive enough that the sloppy simplifier is reached, which is what eats the trunk.
+    guarded.ratios = {1.0f, 0.35f, 0.12f, 0.029f};
+    assets::LodChainSettings unguarded = guarded;
+    unguarded.boundsTolerance = 0.0f;
+
+    struct Fixture {
+        const char* what;
+        glm::vec3 scale;
+    };
+    // Upright, squashed flat, and stretched tall: the same topology at three aspect ratios, because
+    // a rule read off one axis and a rule read off the diagonal agree on the first and disagree on
+    // the other two.
+    const std::array<Fixture, 3> fixtures{Fixture{"upright", {1.0f, 1.0f, 1.0f}},
+                                          Fixture{"squashed", {1.0f, 0.25f, 1.0f}},
+                                          Fixture{"stretched", {0.35f, 2.0f, 0.35f}}};
+
+    bool anyControlLostGeometry = false;
+    bool anyControlUnderstated = false;
+    for (const Fixture& f : fixtures) {
+        INFO(f.what);
+        const scene::MeshData source = assets::optimiseMesh(canopyOnTrunk(f.scale));
+        const float diag = diagonal(source);
+        const float limit = guarded.boundsTolerance * diag;
+
+        const auto before = assets::buildLodChain(source, unguarded);
+        const auto after = assets::buildLodChain(source, guarded);
+        REQUIRE(before.has_value());
+        REQUIRE(after.has_value());
+        REQUIRE(before->levels.size() == after->levels.size());
+
+        for (std::size_t level = 0; level < after->levels.size(); ++level) {
+            INFO("level " << level);
+            const assets::LodLevel& B = (*before).levels[level];
+            const assets::LodLevel& A = (*after).levels[level];
+            const float wentBefore = boundsRecession(source, B.mesh);
+            const float wentAfter = boundsRecession(source, A.mesh);
+            INFO("recession before " << wentBefore << ", after " << wentAfter << ", limit " << limit
+                                     << "; error before " << B.error << ", after " << A.error);
+            anyControlLostGeometry = anyControlLostGeometry || wentBefore > limit;
+            anyControlUnderstated = anyControlUnderstated || wentBefore > B.error * 1.001f + 1e-6f;
+
+            // The invariant: no level of the guarded chain has lost a part of the object...
+            CHECK(wentAfter <= limit * 1.001f + 1e-6f);
+            // ...and none of them understates how far it moved.
+            CHECK(A.error >= wentAfter * 0.999f - 1e-6f);
+            // The guard must not have broken the property ADR-085 added: a chain descends.
+            if (level > 0) {
+                CHECK(triangles(A.mesh) <= triangles((*after).levels[level - 1].mesh));
+            }
+            // And no level is ever empty, whatever the guard decided.
+            CHECK(triangles(A.mesh) >= 1);
+        }
+    }
+
+    // The controls. Without them the two CHECKs above would pass on a simplifier that never lost
+    // anything in the first place, which is the failure mode ADR-182 is about: the fixtures have to
+    // be shapes where the wrong answer is actually reachable.
+    CHECK(anyControlLostGeometry);
+    CHECK(anyControlUnderstated);
+}
+
+TEST_CASE("The production tree keeps its trunk at the bottom rung", "[assets][lod]") {
+    // The asset the defect was found on, at the ratios the scatter layers actually ask for. A
+    // synthetic fixture can be tuned until it says what you want; this one cannot (§29).
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    namespace fs = std::filesystem;
+    const fs::path path = fs::path(AVGEN_SOURCE_DIR) / "assets" / "quaternius" / "glTF" / "CommonTree_1.gltf";
+    if (!fs::exists(path)) {
+        SKIP("the Quaternius pack is not present");
+    }
+    scene::Scene scn;
+    assets::GltfLoadOptions options;
+    options.loadImages = false;
+    REQUIRE(assets::loadGltf(path, scn, options));
+    REQUIRE_FALSE(scn.meshes.empty());
+    // The whole tree, not its largest part: the trunk and the canopy are separate meshes and the
+    // thing that went missing was one of them.
+    scene::MeshData whole;
+    whole.name = "CommonTree_1";
+    for (const scene::MeshData& part : scn.meshes) {
+        const auto base = static_cast<std::uint32_t>(whole.vertices.size());
+        whole.vertices.insert(whole.vertices.end(), part.vertices.begin(), part.vertices.end());
+        for (const std::uint32_t i : part.indices) {
+            whole.indices.push_back(base + i);
+        }
+    }
+    const scene::MeshData source = assets::optimiseMesh(whole);
+    const auto [lo, hi] = source.bounds();
+    const float height = hi.y - lo.y;
+
+    assets::LodChainSettings guarded = assets::vegetationLodSettings();
+    assets::LodChainSettings unguarded = guarded;
+    unguarded.boundsTolerance = 0.0f;
+    const auto before = assets::buildLodChain(source, unguarded);
+    const auto after = assets::buildLodChain(source, guarded);
+    REQUIRE(before.has_value());
+    REQUIRE(after.has_value());
+
+    const auto bottomLost = [&](const scene::MeshData& m) {
+        const auto [mlo, mhi] = m.bounds();
+        return (mlo.y - lo.y) / height;
+    };
+    const assets::LodLevel& lastBefore = before->levels.back();
+    const assets::LodLevel& lastAfter = after->levels.back();
+    INFO("bottom lost: before " << 100.0f * bottomLost(lastBefore.mesh) << "%, after "
+                                << 100.0f * bottomLost(lastAfter.mesh) << "%");
+    INFO("triangles: before " << triangles(lastBefore.mesh) << ", after " << triangles(lastAfter.mesh));
+    // The control: the unguarded chain really does lose the trunk, so the arm below is measuring
+    // this fix and not a simplifier that behaves on this asset anyway.
+    CHECK(bottomLost(lastBefore.mesh) > 0.25f);
+    CHECK(lastBefore.error < boundsRecession(source, lastBefore.mesh)); // and it understated it
+    // The arm.
+    CHECK(bottomLost(lastAfter.mesh) < 0.15f);
+    CHECK(lastAfter.error >= boundsRecession(source, lastAfter.mesh) * 0.999f);
+    // It is still a bottom rung: the guard is allowed to cost triangles and is not allowed to cost
+    // the whole ladder.
+    CHECK(triangles(lastAfter.mesh) < triangles(after->levels.front().mesh) / 4);
+#endif
 }

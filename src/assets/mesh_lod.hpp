@@ -100,6 +100,46 @@ struct LodChainSettings {
     // no silhouette left to preserve and the simplifier is being asked to invent an impostor,
     // which is a different job (procedural.hpp's `makeLodMesh` levels 2 and 3 do that one).
     std::uint32_t minTriangles = 8;
+    // How far a level's bounding box may recede from the source's, on any one face, as a fraction
+    // of the source's diagonal. A level that has receded further is refused the same way a level
+    // larger than its predecessor is: retried from the level above, and failing that, replaced by
+    // it.
+    //
+    // The rule exists because the reported error does not catch this. At 2.9% of its triangles
+    // CommonTree_1 comes back with the bottom of its bounding box 31% of its height above the
+    // source's -- the trunk gone -- while reporting a relative error 5.3x smaller than the
+    // deviation it actually has. A selector choosing by projected error would take that level far
+    // too early, and the header's claim that the error "never understates" was false for it.
+    //
+    // A bounding box only ever shrinks under simplification, so this is one-sided by construction:
+    // the level's box is compared against the source's, face by face, and the largest inward move
+    // is the number. That distance is also a *lower bound* on the one-sided Hausdorff distance --
+    // the source has a vertex out there and the level's surface is inside its own box -- which is
+    // why `LodLevel::error` is floored by it below rather than merely warned about.
+    //
+    // 0 disables the guard, and the error floor with it: the chain a caller gets is then exactly
+    // the one this code built before the guard existed, which is what lets the regression test have
+    // an arm and a control in the same function.
+    //
+    // **Where 0.12 comes from.** Measured over every asset the Glowmere scatter layers use, at the
+    // ratios `vegetationLodSettings` asks for -- 39 rungs, printed by `[.analysis][lod]` "What each
+    // rung of the chain draws, against the source". It is the smallest round value that
+    //
+    //   * admits every rung in this repository that keeps at least 90% of the source's height
+    //     (the largest such recession is Bush_Common lod3 at 0.102), and
+    //   * refuses every rung that keeps less than 80% (Grass_Common_Short lod3 at 0.174 and 78%,
+    //     Pebble_Round_2 lod3 at 0.187 and 24%, CommonTree_1 lod3 at 0.257 and 59%).
+    //
+    // The 80..90% band is then decided by the diagonal, which is the right measure for a squat
+    // object and the wrong one for a tall thin one -- said here rather than hidden, because it is
+    // the part of this number that is a judgement and not a measurement.
+    //
+    // Tightening it is cheap to try and expensive to ship: at 0.06 it replaces 11 of those 39 rungs
+    // instead of 3, and takes rungs 2 and 3 off Bush_Common and Grass_Common_Short entirely --
+    // layers whose instances are a few pixels across when they reach those rungs, where a tenth of
+    // a diagonal is a fraction of a pixel. A threshold in *projected* units would separate those
+    // cases properly, and this function knows nothing about the ladder that would need.
+    float boundsTolerance = 0.12f;
 
     [[nodiscard]] Result<void> validate() const;
 };
@@ -120,7 +160,18 @@ struct LodLevel {
     float relativeError = 0.0f;
     // The same error in the mesh's own units, for a caller choosing a level by screen-space size:
     // a level whose error projects to less than a pixel is a level that costs nothing to use.
+    //
+    // Floored by `boundsError` below, so the "never understates" claim above is a property of this
+    // number rather than a hope about the simplifier's.
     float error = 0.0f;
+    // How far this level's bounding box receded from the source's, in the mesh's own units: a
+    // measured lower bound on the deviation, owing nothing to the simplifier's own estimate.
+    //
+    // Reported separately as well as folded into `error` because the two answer different
+    // questions. `error` is what a selector should threshold on; `boundsError` is what says whether
+    // the shape still has the same silhouette, and a level where it dominates `error` is a level
+    // that lost a part of the object rather than smoothed it.
+    float boundsError = 0.0f;
     // False when the simplifier stopped short of `targetRatio` -- topology it would not break, or
     // `maxError` reached. The level is still usable; it is simply larger than it was asked to be.
     bool reachedTarget = true;

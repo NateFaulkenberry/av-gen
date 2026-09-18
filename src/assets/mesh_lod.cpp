@@ -290,6 +290,32 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
     const float errorScale =
         meshopt_simplifyScale(positionData(source), source.vertices.size(), sizeof(scene::Vertex));
 
+    // How far a candidate level's bounding box has receded from the source's, in mesh units: the
+    // largest inward move of any of the six faces. Simplification can only ever shrink a box -- a
+    // simplified vertex is a weighted position of vertices that were inside it -- so a positive
+    // number here is geometry that is gone, and it is a lower bound on the one-sided Hausdorff
+    // distance: the source has a vertex on that face and the level's surface lies inside its own
+    // box, so nothing on the level is nearer to it than the gap.
+    const auto [sourceLo, sourceHi] = source.bounds();
+    const float sourceDiagonal = std::max(glm::length(sourceHi - sourceLo), 1e-6f);
+    const auto boundsRecession = [&](const scene::MeshData& level) {
+        if (level.vertices.empty()) {
+            return sourceDiagonal;
+        }
+        const auto [lo, hi] = level.bounds();
+        float worst = 0.0f;
+        for (int axis = 0; axis < 3; ++axis) {
+            worst = std::max(worst, lo[axis] - sourceLo[axis]);
+            worst = std::max(worst, sourceHi[axis] - hi[axis]);
+        }
+        return worst;
+    };
+    // `boundsTolerance` is a fraction of the diagonal, so it means the same thing on a 14 m tree and
+    // on a 0.4 m pebble. 0 switches the guard and the error floor off together.
+    const float boundsLimit = settings.boundsTolerance > 0.0f
+                                  ? settings.boundsTolerance * sourceDiagonal
+                                  : std::numeric_limits<float>::infinity();
+
     LodChain chain;
     chain.sourceTriangles = sourceTriangles;
     chain.levels.reserve(settings.ratios.size());
@@ -340,21 +366,55 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
         // calibration note on heroLodSettings). The retry does not reach for the sloppy simplifier
         // either -- it runs whatever `settings` already permits -- so a hero is never quietly
         // swapped for an approximation by this path.
+        //
+        // The same guard, applied to *bounds*. A level that has dropped below `boundsTolerance` of
+        // the source's diagonal on any face has not simplified the object, it has lost a part of
+        // it -- and it says nothing about that in the error it reports, so the inversion check
+        // above cannot see it. Measured on CommonTree_1 at 2.9% of its triangles: the bottom 31%
+        // of the bounding box, which is the trunk, against a reported relative error 5.3x smaller
+        // than the deviation. The retry from the level above usually succeeds, because the level
+        // above has already had the geometry the source stalled on removed from it.
+        //
+        // It costs a rung: the far levels of an asset that cannot be simplified without losing its
+        // silhouette now repeat the level above rather than drawing a headless approximation of it.
+        // That is the same trade the inversion guard already made, for the same reason.
         const scene::MeshData* previous = chain.levels.empty() ? nullptr : &chain.levels.back().mesh;
         const auto trianglesOf = [](const scene::MeshData& m) { return m.indices.size() / 3; };
-        if (previous != nullptr &&
-            (best.indices.empty() || best.indices.size() / 3 > trianglesOf(*previous))) {
+        // Built once, because both the acceptance test and the error floor need the candidate's
+        // actual geometry rather than its index list.
+        const auto candidateOf = [&](const scene::MeshData& from, std::vector<std::uint32_t> indices) {
+            if (settings.optimise) {
+                cacheOptimise(indices, from.vertices.size());
+            }
+            return compact(from, std::move(indices), levelName(source.name, level));
+        };
+        scene::MeshData candidate;
+        float candidateRecession = 0.0f;
+        if (!best.indices.empty()) {
+            candidate = candidateOf(source, best.indices);
+            candidateRecession = boundsRecession(candidate);
+        }
+        const bool inverted = previous != nullptr && !best.indices.empty() &&
+                              best.indices.size() / 3 > trianglesOf(*previous);
+        const bool lostGeometry = !best.indices.empty() && candidateRecession > boundsLimit;
+        if (previous != nullptr && (best.indices.empty() || inverted || lostGeometry)) {
             SimplifyAttempt again = simplifyTo(*previous, targetIndices, settings, attributeWeights);
-            if (!again.indices.empty() && again.indices.size() / 3 < trianglesOf(*previous)) {
-                std::vector<std::uint32_t> indices = std::move(again.indices);
-                if (settings.optimise) {
-                    cacheOptimise(indices, previous->vertices.size());
-                }
-                out.mesh = compact(*previous, std::move(indices), levelName(source.name, level));
+            scene::MeshData retry;
+            float retryRecession = 0.0f;
+            if (!again.indices.empty()) {
+                retry = candidateOf(*previous, again.indices);
+                retryRecession = boundsRecession(retry);
+            }
+            if (!retry.indices.empty() && trianglesOf(retry) < trianglesOf(*previous) &&
+                retryRecession <= boundsLimit) {
+                out.mesh = std::move(retry);
                 const auto levelTriangles = static_cast<std::uint32_t>(trianglesOf(out.mesh));
                 out.achievedRatio = static_cast<float>(levelTriangles) / static_cast<float>(sourceTriangles);
-                out.relativeError = again.relativeError;
-                out.error = again.relativeError * errorScale;
+                out.boundsError = retryRecession;
+                out.relativeError = settings.boundsTolerance > 0.0f
+                                        ? std::max(again.relativeError, retryRecession / errorScale)
+                                        : again.relativeError;
+                out.error = out.relativeError * errorScale;
                 out.reachedTarget = levelTriangles <= targetTriangles;
                 out.sloppy = again.sloppy;
                 chain.levels.push_back(std::move(out));
@@ -366,8 +426,18 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
             out.achievedRatio = static_cast<float>(levelTriangles) / static_cast<float>(sourceTriangles);
             out.relativeError = chain.levels.back().relativeError;
             out.error = chain.levels.back().error;
+            out.boundsError = chain.levels.back().boundsError;
             out.reachedTarget = levelTriangles <= targetTriangles;
             out.sloppy = chain.levels.back().sloppy;
+            chain.levels.push_back(std::move(out));
+            continue;
+        }
+        // No level above to fall back to, and the only candidate lost geometry: the source is the
+        // honest answer, exactly as it is for a level that could not be built at all.
+        if (lostGeometry) {
+            out.mesh = source;
+            out.mesh.name = levelName(source.name, level);
+            out.reachedTarget = false;
             chain.levels.push_back(std::move(out));
             continue;
         }
@@ -384,15 +454,17 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
             continue;
         }
 
-        std::vector<std::uint32_t> indices = std::move(best.indices);
-        if (settings.optimise) {
-            cacheOptimise(indices, source.vertices.size());
-        }
-        out.mesh = compact(source, std::move(indices), levelName(source.name, level));
+        out.mesh = std::move(candidate);
         const auto levelTriangles = static_cast<std::uint32_t>(trianglesOf(out.mesh));
         out.achievedRatio = static_cast<float>(levelTriangles) / static_cast<float>(sourceTriangles);
-        out.relativeError = best.relativeError;
-        out.error = best.relativeError * errorScale;
+        out.boundsError = candidateRecession;
+        // The floor. Whatever the simplifier believes, the level cannot be nearer to the source
+        // than the geometry it dropped off the end of the bounding box -- so this is the smaller of
+        // the two claims being discarded, not a new estimate being invented.
+        out.relativeError = settings.boundsTolerance > 0.0f
+                                ? std::max(best.relativeError, candidateRecession / errorScale)
+                                : best.relativeError;
+        out.error = out.relativeError * errorScale;
         out.reachedTarget = levelTriangles <= targetTriangles;
         out.sloppy = best.sloppy;
         chain.levels.push_back(std::move(out));
