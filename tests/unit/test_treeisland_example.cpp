@@ -118,7 +118,9 @@ TEST_CASE("The showcase scene names only relative, in-repository assets", "[tree
             CHECK(fs::exists(resolved));
         }
     }
-    CHECK(assetNodes == 2); // the island and the tree, and nothing else reaches outside the repo
+    // The island, plus the tree's five Glowmere emission layers (ADR-339), and nothing else
+    // reaches outside the repo.
+    CHECK(assetNodes == 6);
 }
 
 TEST_CASE("The tree is carried by the island, not animated beside it", "[treeisland][example]") {
@@ -146,7 +148,39 @@ TEST_CASE("The tree is carried by the island, not animated beside it", "[treeisl
     CHECK(island->parent == "world-root");
     CHECK(surface->parent == "floating-island");
     CHECK(tree->parent == "floating-island");
-    CHECK(tree->kind == scene::NodeKind::Gltf);
+    // ADR-339: the tree is one group carrying five glTF layers, because `emissiveBoost` is
+    // per-node and scalar and the brief's §8 wants five separate emission channels. The group is
+    // what keeps §16's hierarchy a hierarchy -- there is still exactly one transform between the
+    // island and the whole tree.
+    CHECK(tree->kind == scene::NodeKind::Group);
+
+    // The five layers must stay *registered* with each other: they are one model cut into five
+    // files, so any layer carrying a transform of its own would shear the tree apart. Each one is
+    // asserted to be an identity local transform under the group, which is the property that
+    // makes the split safe rather than merely convenient.
+    const char* kLayers[] = {"tree-wood", "tree-twigs", "tree-tracery", "tree-foliage", "tree-lumens"};
+    for (const char* name : kLayers) {
+        const scene::CompositionNode* layer = comp.findNode(name);
+        INFO("layer '" << name << "'");
+        REQUIRE(layer != nullptr);
+        CHECK(layer->kind == scene::NodeKind::Gltf);
+        CHECK(layer->parent == "tree-of-life");
+        CHECK(layer->transform.position == glm::vec3(0.0f));
+        CHECK(layer->transform.scale == glm::vec3(1.0f));
+        CHECK(glm::length(layer->transform.rotation - glm::quat(1.0f, 0.0f, 0.0f, 0.0f))
+              == Approx(0.0f).margin(1e-6));
+        // Every layer's world transform is the group's, exactly -- the registration, stated as an
+        // equation rather than trusted to the identity transforms above.
+        const glm::mat4 groupWorld = comp.nodeWorldTransform(*tree).matrix();
+        const glm::mat4 layerWorld = comp.nodeWorldTransform(*layer).matrix();
+        float worst = 0.0f;
+        for (int c = 0; c < 4; ++c) {
+            for (int r = 0; r < 4; ++r) {
+                worst = std::max(worst, std::abs(groupWorld[c][r] - layerWorld[c][r]));
+            }
+        }
+        CHECK(worst == Approx(0.0f).margin(1e-5));
+    }
 
     const scene::Transform treeLocal = tree->transform;
 

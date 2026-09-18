@@ -1,7 +1,7 @@
 {
  "source": "Two externally authored hero assets, imported 2026-09-18 by tools/import_tree_isle.py for the tree-of-life-floating-island project (ADR-338).",
  "license": "Not recorded for either asset. The Tree of Life was generated for this project by the owner's Blender pipeline; the floating island was supplied by the owner and carries no licence text. Fill this in before either is distributed outside the project.",
- "regenerate": "/Applications/Blender.app/Contents/MacOS/Blender --background --python tools/import_tree_isle.py -- --island ~/Desktop/Island --tree ~/Desktop/tree_mdl/hero_pass --out assets/treeisle   (it calls tools/glowmere_tree_materials.py for the tree variant)",
+ "regenerate": "/Applications/Blender.app/Contents/Resources/5.2/python/bin/python3.13 tools/glowmere_tree_layers.py --in assets/treeisle/tree-of-life-hero.glb --out assets/treeisle   (the five tree-glowmere-*.glb the scene loads). The two older files are made by /Applications/Blender.app/Contents/MacOS/Blender --background --python tools/import_tree_isle.py -- --island ~/Desktop/Island --tree ~/Desktop/tree_mdl/hero_pass --out assets/treeisle",
  "importedOn": "2026-09-18",
  "assets": [
   {
@@ -163,6 +163,229 @@
     "Stairs",
     "Windmill"
    ]
+  },
+  {
+   "name": "tree-glowmere-tracery",
+   "file": "treeisle/tree-glowmere-tracery.glb",
+   "sourcePath": "assets/treeisle/tree-of-life-hero.glb",
+   "sourceFile": "tree-of-life-hero.glb",
+   "sourceFormat": "glb",
+   "importedFormat": "glb",
+   "conversion": "tools/glowmere_tree_layers.py. POSITION and NORMAL are memcpy'd out of the hero's binary chunk and their SHA-256 re-checked against the source after the file is written, so no vertex can move. Index buffers ARE rewritten -- that is how one primitive becomes several -- and the check there is that the triangle count is conserved exactly.",
+   "upAxis": "Y",
+   "note": "Brief \u00a78 'major luminous structures'. The blend's HERO | light beneath fractured bark: base [0.025, 0.10, 0.08], emission strength 1.92 on a 3D-noise mask, emission colour a height ramp from green-cyan at the roots through teal to hot orange at the crown. Split into 4 height bands x {lit, dark}; the lit fraction is 0.470 against Blender's noise(2.6, detail 3) > 0.53.",
+   "role": "major luminous structures (brief \u00a78)",
+   "sourceMeshes": [
+    2
+   ],
+   "triangles": 62826,
+   "meshes": 1,
+   "primitives": 8,
+   "materials": 8,
+   "textures": 0,
+   "images": 0,
+   "boundsMin": [
+    -36.0998,
+    -0.7828,
+    -29.489
+   ],
+   "boundsMax": [
+    32.3822,
+    47.4643,
+    23.9429
+   ],
+   "bytes": 1238952,
+   "sha256": "a9d27ec771491dec1f69e8fbd1ed192309fde28a34fd1684f0f852cfea114d00",
+   "materialNames": [
+    "GLOWMERE | tracery | band 0 dark",
+    "GLOWMERE | tracery | band 0 lit",
+    "GLOWMERE | tracery | band 1 dark",
+    "GLOWMERE | tracery | band 1 lit",
+    "GLOWMERE | tracery | band 2 dark",
+    "GLOWMERE | tracery | band 2 lit",
+    "GLOWMERE | tracery | band 3 dark",
+    "GLOWMERE | tracery | band 3 lit"
+   ]
+  },
+  {
+   "name": "tree-glowmere-twigs",
+   "file": "treeisle/tree-glowmere-twigs.glb",
+   "sourcePath": "assets/treeisle/tree-of-life-hero.glb",
+   "sourceFile": "tree-of-life-hero.glb",
+   "sourceFormat": "glb",
+   "importedFormat": "glb",
+   "conversion": "tools/glowmere_tree_layers.py. POSITION and NORMAL are memcpy'd out of the hero's binary chunk and their SHA-256 re-checked against the source after the file is written, so no vertex can move. Index buffers ARE rewritten -- that is how one primitive becomes several -- and the check there is that the triangle count is conserved exactly.",
+   "upAxis": "Y",
+   "note": "Brief \u00a78 'secondary glow'. The blend gives the twigs the same non-emissive wood material as the trunk, so the faint sapwood glow on 12% of the surface is an AV Gen-native addition, not an extraction -- declared as such in tools/glowmere_tree_layers.py.",
+   "role": "secondary glow (brief \u00a78)",
+   "sourceMeshes": [
+    6
+   ],
+   "triangles": 1446188,
+   "meshes": 1,
+   "primitives": 5,
+   "materials": 5,
+   "textures": 0,
+   "images": 0,
+   "boundsMin": [
+    -59.1914,
+    -0.6085,
+    -50.8598
+   ],
+   "boundsMax": [
+    55.7068,
+    75.0845,
+    41.6876
+   ],
+   "bytes": 36054364,
+   "sha256": "295aafc0f955727746dbb3f37a0e41869ae20952d691cb128a4669295cfe7d22",
+   "materialNames": [
+    "GLOWMERE | twigs | band 0",
+    "GLOWMERE | twigs | band 1",
+    "GLOWMERE | twigs | band 2",
+    "GLOWMERE | twigs | band 3",
+    "GLOWMERE | twigs | sapwood glow"
+   ]
+  },
+  {
+   "name": "tree-glowmere-foliage",
+   "file": "treeisle/tree-glowmere-foliage.glb",
+   "sourcePath": "assets/treeisle/tree-of-life-hero.glb",
+   "sourceFile": "tree-of-life-hero.glb",
+   "sourceFormat": "glb",
+   "importedFormat": "glb",
+   "conversion": "tools/glowmere_tree_layers.py. POSITION and NORMAL are memcpy'd out of the hero's binary chunk and their SHA-256 re-checked against the source after the file is written, so no vertex can move. Index buffers ARE rewritten -- that is how one primitive becomes several -- and the check there is that the triangle count is conserved exactly.",
+   "upAxis": "Y",
+   "note": "Brief \u00a78 'foliage', and the whole reason this split exists. Blender drives both the leaf colour and the leaf emission from ObjectInfo.Random, which is per *instance*; the export preserved the instancing as contiguous 18-vertex blocks, so instance = vertex // 18 recovers it exactly. 51633 + 122767 leaves, of which 5.9% and 6.1% come out lit -- Blender's threshold is Random > 0.94. 6 height bands x {lit, dim} per mesh.",
+   "role": "foliage (brief \u00a78)",
+   "sourceMeshes": [
+    3,
+    4
+   ],
+   "triangles": 1046400,
+   "meshes": 2,
+   "primitives": 22,
+   "materials": 24,
+   "textures": 0,
+   "images": 0,
+   "boundsMin": [
+    -60.0151,
+    19.823,
+    -51.2583
+   ],
+   "boundsMax": [
+    56.2666,
+    75.4907,
+    42.5433
+   ],
+   "bytes": 87908880,
+   "sha256": "71cdc8a5d2bc282d7507f19e41cab579af26dd4d2a33f294cd9f551aba7be151",
+   "materialNames": [
+    "GLOWMERE | leaves 3 | band 0 dim",
+    "GLOWMERE | leaves 3 | band 0 lit",
+    "GLOWMERE | leaves 3 | band 1 dim",
+    "GLOWMERE | leaves 3 | band 1 lit",
+    "GLOWMERE | leaves 3 | band 2 dim",
+    "GLOWMERE | leaves 3 | band 2 lit",
+    "GLOWMERE | leaves 3 | band 3 dim",
+    "GLOWMERE | leaves 3 | band 3 lit",
+    "GLOWMERE | leaves 3 | band 4 dim",
+    "GLOWMERE | leaves 3 | band 4 lit",
+    "GLOWMERE | leaves 3 | band 5 dim",
+    "GLOWMERE | leaves 3 | band 5 lit",
+    "GLOWMERE | leaves 4 | band 0 dim",
+    "GLOWMERE | leaves 4 | band 0 lit",
+    "GLOWMERE | leaves 4 | band 1 dim",
+    "GLOWMERE | leaves 4 | band 1 lit",
+    "GLOWMERE | leaves 4 | band 2 dim",
+    "GLOWMERE | leaves 4 | band 2 lit",
+    "GLOWMERE | leaves 4 | band 3 dim",
+    "GLOWMERE | leaves 4 | band 3 lit",
+    "GLOWMERE | leaves 4 | band 4 dim",
+    "GLOWMERE | leaves 4 | band 4 lit",
+    "GLOWMERE | leaves 4 | band 5 dim",
+    "GLOWMERE | leaves 4 | band 5 lit"
+   ]
+  },
+  {
+   "name": "tree-glowmere-lumens",
+   "file": "treeisle/tree-glowmere-lumens.glb",
+   "sourcePath": "assets/treeisle/tree-of-life-hero.glb",
+   "sourceFile": "tree-of-life-hero.glb",
+   "sourceFormat": "glb",
+   "importedFormat": "glb",
+   "conversion": "tools/glowmere_tree_layers.py. POSITION and NORMAL are memcpy'd out of the hero's binary chunk and their SHA-256 re-checked against the source after the file is written, so no vertex can move. Index buffers ARE rewritten -- that is how one primitive becomes several -- and the check there is that the triangle count is conserved exactly.",
+   "upAxis": "Y",
+   "note": "Brief \u00a78 'special organisms'. HERO | copper caps and pale luminous gills keys both base colour and emission off Geometry.Normal.Z < -0.25 -- the gills glow, the caps do not. Blender's Z is the GLB's Y. 61.2% of the mushroom triangles and 33.3% of the lantern triangles face down.",
+   "role": "special organisms: bark fungi and seed lanterns (brief \u00a78)",
+   "sourceMeshes": [
+    0,
+    1
+   ],
+   "triangles": 29728,
+   "meshes": 2,
+   "primitives": 4,
+   "materials": 4,
+   "textures": 0,
+   "images": 0,
+   "boundsMin": [
+    -29.3173,
+    0.8893,
+    -19.8296
+   ],
+   "boundsMax": [
+    21.8649,
+    28.6367,
+    9.1811
+   ],
+   "bytes": 586772,
+   "sha256": "eae97bfbce164e752bb16aaf246be96a668a93e5e688cfab8215a5c7e645a852",
+   "materialNames": [
+    "GLOWMERE | lumens 0 | cap",
+    "GLOWMERE | lumens 0 | gills",
+    "GLOWMERE | lumens 1 | cap",
+    "GLOWMERE | lumens 1 | gills"
+   ]
+  },
+  {
+   "name": "tree-glowmere-wood",
+   "file": "treeisle/tree-glowmere-wood.glb",
+   "sourcePath": "assets/treeisle/tree-of-life-hero.glb",
+   "sourceFile": "tree-of-life-hero.glb",
+   "sourceFormat": "glb",
+   "importedFormat": "glb",
+   "conversion": "tools/glowmere_tree_layers.py. POSITION and NORMAL are memcpy'd out of the hero's binary chunk and their SHA-256 re-checked against the source after the file is written, so no vertex can move. Index buffers ARE rewritten -- that is how one primitive becomes several -- and the check there is that the triangle count is conserved exactly.",
+   "upAxis": "Y",
+   "note": "Brief \u00a78 'dark areas'. GLOWMERE | mineral charcoal, old plates and sapwood, whose Emission Strength is 0.0 -- the trunk, roots and boughs do not glow, and that is what makes the rest read. 4 noise bands off Color Ramp.001; roughness 0.58 + 0.32 * noise.",
+   "role": "dark structural, non-emissive (brief \u00a78 'dark areas')",
+   "sourceMeshes": [
+    5
+   ],
+   "triangles": 577044,
+   "meshes": 1,
+   "primitives": 4,
+   "materials": 4,
+   "textures": 0,
+   "images": 0,
+   "boundsMin": [
+    -38.7417,
+    -2.134,
+    -32.4155
+   ],
+   "boundsMax": [
+    36.6017,
+    52.3519,
+    24.4552
+   ],
+   "bytes": 13852284,
+   "sha256": "d70a970477d2d9c604d049129ea552ed2330bed921046bf1eae170093bc30edf",
+   "materialNames": [
+    "GLOWMERE | wood | band 0",
+    "GLOWMERE | wood | band 1",
+    "GLOWMERE | wood | band 2",
+    "GLOWMERE | wood | band 3"
+   ]
   }
- ]
+ ],
+ "note": "The scene loads the five tree-glowmere-*.glb layers, not tree-of-life-hero-glowmere.glb. The single-file variant is kept because examples/treeisland/_compare-original.* -- the 'before' arm of this pass -- is ADR-338 unchanged and still loads it."
 }

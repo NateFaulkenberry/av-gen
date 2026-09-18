@@ -1,189 +1,259 @@
-Tree of Life - Floating Island: the import report, the scene statistics, and what it costs
-==========================================================================================
+Tree of Life - Floating Island: the second art pass, and what each claim is measured against
+============================================================================================
 
-Brief §28 and §31. Every number here was measured on this branch on 2026-09-18 with
-build/release. The pixels are not committed (the repository's rule for render evidence);
-stills.json and preview.json beside this file regenerate all of them:
+Everything here was measured on branch agent/treeart on 2026-09-18 with build/release. The pixels
+are not committed (the repository's rule for render evidence); stills.json and preview.json beside
+this file regenerate all of them:
 
     ./build/release/src/avgen --headless --queue renders/treeisland/stills.json
     ./build/release/src/avgen --headless --queue renders/treeisland/preview.json
 
-The design rationale is docs/decisions/ADR-337. The asset provenance is
-assets/treeisle.manifest.json.
+The five tree GLBs the scene loads are gitignored and must be rebuilt first:
+
+    /Applications/Blender.app/Contents/Resources/5.2/python/bin/python3.13 \
+        tools/glowmere_tree_layers.py --in assets/treeisle/tree-of-life-hero.glb --out assets/treeisle
+
+The design rationale is docs/decisions/ADR-339 (materials, placement, cosmos) and ADR-338 (the
+original import). Asset provenance is assets/treeisle.manifest.json. The comparison arms are
+generated from the deliverable by tools/make_treeisland_arms.py, not hand-edited.
 
 
-1. WHAT WAS IMPORTED
+1. WHAT THE .BLEND SAYS, AND THE TWO PLACES THE BRIEF WAS WRONG
 --------------------------------------------------------------------------------
 
-asset                        triangles  meshes  materials  textures  file      bounding size (x,y,z)
----------------------------  ---------  ------  ---------  --------  --------  ---------------------
-tree-of-life-hero            3,162,186       7          7         0  139.6 MB  116.28 x 77.62 x 93.80
-tree-of-life-hero-glowmere   3,162,186       7          7         0  139.6 MB  116.28 x 77.62 x 93.80
-floating-isle                   64,171       9          9        28   42.1 MB    1.44 x  1.86 x  1.66
-floating-isle-bare              32,709       2          2         6   12.3 MB    1.00 x  0.84 x  1.12
+The brief sent us to `Tree_Glowmere.blend` on the theory that the authored Glowmere look lived
+there rather than in `Tree_of_Life_Hero.blend`.
 
-The scene loads `tree-of-life-hero-glowmere` and `floating-isle-bare`: 3,194,895 triangles,
-nine glTF entities, nine materials, six textures, plus one procedural node of ~1,700 star points.
-The engine's flatten reports `4 node(s) -> 9 entities, 9 meshes` for the glTF half and
-`1 procedurals` for the stars.
+  ** The two files are byte-identical in content. ** Dumped with Blender 5.2.1 headless -- every
+  object, mesh, modifier, material, node, unlinked socket default, colour-ramp stop, node group,
+  world and light -- the structural diff of the two dumps is six lines and all six are the
+  filename in the header. `Tree_Mythic.blend` and `Tree_Ancient_Natural.blend` are the same size
+  to within 1 KB. The presets in validation.json are render-time settings of the Value nodes
+  (Magic, Bioluminescence, Natural / Tree of Life, Vein brightness, Root glow), all saved at 1.0,
+  and Timeline growth at 300.0 -- which is the Glowmere state. There is no separate source.
 
-The tree is **wider than it is tall** -- 116.3 across against 77.6 high, a canopy spreading 1.5x
-the tree's height. That is what set the island scale, not the other way round.
+The second correction is mine, not the brief's, and it is in §3.
 
-What was deliberately left out. `FloatingIsleSubstance.spp` is a 214 MB Substance Painter source
-file, not an asset. `Clouds.mat` has no mesh assigned and no textures of its own. The four
-`.blend` files are the tree's source, and the hero GLB is the export the pipeline made from them.
-The 24 reference renders in `hero_pass/renders/` are reference, per §2; `Glowmere.png` is what the
-material palette was read off and nothing was matched to it pixel for pixel.
+The look, transcribed. Blender is Z-up and the export is Y-up, so every `z` below is the GLB's y:
+
+  leaves    (GLB 3, 4)  emission [0.06, 0.45, 0.70] at strength (Random > 0.94)*1.1 + 0.035
+                        base     ramp01( clamp((z-20)/28) + Random*0.23 ), two ramps:
+                                 broadleaf  [0.025,0.17,0.12] -> [0.35,0.46,0.22]  olive
+                                 peripheral [0.025,0.17,0.12] -> [0.60,0.22,0.13]  terracotta
+                        roughness 0.48, subsurface weight 0.08
+  tracery   (GLB 2)     emission ramp(z/43): [0.04,0.65,0.40] -> [0.08,0.36,0.42] -> [0.95,0.29,0.10]
+                        strength 1.6 * 1.2 = 1.92 on noise(pos, 2.6, detail 3) > 0.53
+                        base [0.025, 0.10, 0.08], roughness 0.58
+  fungi     (GLB 0, 1)  emission [0.05, 0.65, 0.32] at strength 1.3 where Normal.z < -0.25
+                        base mix(copper [0.25,0.105,0.075], teal [0.12,0.38,0.30]) on the same test
+                        roughness 0.57
+  wood      (GLB 5, 6)  emission strength 0.0 -- it does not glow
+                        base ramp.001 [0.018,0.026,0.026] -> [0.18,0.16,0.14] on noise(0.32)
+                        roughness 0.58 + 0.32*noise
+
+  `ObjectInfo.Random` is per *instance*, and that is the whole pass. A trap worth recording: the
+  wood material has an earlier chain whose ramp is multiplied by a cool [0.38, 0.46, 0.5], which
+  reads exactly like the source of the reference's mauve-grey bark. Its output socket is not
+  connected to anything. It is dead code.
+
+  The three area lights are NOT decoration. warm canopy key (1.00, 0.85, 0.67) at 43,000 W; cool
+  silhouette rim (0.32, 0.72, 0.66) at 44,000 W; trunk reveal (0.83, 0.86, 0.84) at 8,500 W. The
+  cream-white in renders/Glowmere.png is the warm key. No material change can produce it.
 
 
-2. THE TWO UNITY CONVERSIONS THAT ARE EASY TO GET WRONG
+2. WHAT THE EXPORT PRESERVED BY ACCIDENT
 --------------------------------------------------------------------------------
 
-The island's nine `.mat` files are Unity URP Lit. Measured channel content of the mask maps:
+The hero GLB's meshes were tested for contiguous instance blocking -- do all three indices of
+every triangle fall inside the same block of V vertices?
 
-material   R (metallic)        G (occlusion)       A (smoothness)
----------  ------------------  ------------------  ------------------
-Chimney    0.000 (flat)        mean 0.334          0.337 (flat)
-Decor      mean 0.149          1.000 (flat, none)  mean 0.125
-Fence      0.000               1.000               mean 0.005
-Grass      0.000               mean 0.144          mean 0.091
-House      mean 0.004          1.000               mean 0.110
-Roof       0.000               1.000               mean 0.289
-Stairs     0.000               1.000               mean 0.000
-Stone      0.000               1.000               mean 0.247
-Windmill   0.000               mean 0.448          0.000 (flat)
+  mesh  name                          verts       tris   blocked at V   instances   tris each
+  ----  ----------------------------  ----------  -------  ------------  ----------  ---------
+  0     HERO | Bark and root fungi        14,400   28,480       180              80        356
+  1     HERO | Hanging seed lanterns       2,496    1,248        96              26         48
+  2     HERO | Recessed living tracery    35,744   62,826       --                --         --
+  3     LIFE | Delicate peripheral lvs   929,394  309,798        18          51,633          6
+  4     LIFE | Layered broadleaf canopy 2,209,806  736,602        18         122,767          6
+  5     LIFE | Trunk roots and boughs    288,560  577,044        --                --         --
+  6     LIFE | Twigs and fine branches   779,056 1,446,188        --                --         --
 
-  * The B channel is zero in all nine: Unity's detail mask is unused here.
-  * Only Chimney, Grass and Windmill carry real occlusion; the other six ship a flat white G.
-  * Repacked to glTF ORM as R = 1 + s(G - 1), G = 1 - 0.5 * A, B = R_unity, with s the material's
-    `_OcclusionStrength` (0.755 on Grass, 1.0 elsewhere) and 0.5 the `_Smoothness` scalar every
-    one of the nine carries. Omitting that 0.5 ships the whole island half as rough as Unity
-    renders it, which reads as "slightly too shiny" and as nothing else.
-  * House is the only emissive material: `_EmissionColor` (2.268, 4.867, 0.586), an HDR tint,
-    exported as emissiveFactor (0.466, 1.0, 0.120) with KHR_materials_emissive_strength 4.867.
-    It only appears in the cottage variant.
+`instance = vertex // 18` therefore recovers exactly the grouping Blender randomised over. The
+builder re-checks this at run time and refuses to write if a future export changes it.
+
+Coverage achieved by the baked masks, against what Blender's produce:
+
+  layer     mask                                     achieved   Blender
+  --------  ---------------------------------------  ---------  --------
+  foliage   per-leaf Random > 0.94, mesh 3             5.855%     6%
+  foliage   per-leaf Random > 0.94, mesh 4             6.070%     6%
+  tracery   noise > threshold                         47.0%      47% (calibrated to it)
+  lumens    face normal y < -0.25, mushrooms          61.2%      exact (geometric)
+  lumens    face normal y < -0.25, seed lanterns      33.3%      exact (geometric)
+  twigs     sapwood glow                              12.0%      n/a -- AV Gen-native, see below
+
+  The two noise masks do not reimplement Blender's Perlin; a value noise of the same spatial
+  frequency is thresholded to the same coverage, because coverage is the property the picture
+  depends on. The twig glow has no Blender counterpart at all -- the .blend gives the twigs the
+  same non-emissive wood material as the trunk -- and is the approximation §9 permits for §8's
+  "secondary glow". Declared in the tool and in the manifest rather than passed off as extracted.
 
 
-3. SCALE AND PLACEMENT, AND HOW THEY WERE CHOSEN
+3. PLACEMENT, AND THE MEASUREMENT THAT WAS WRONG BEFORE IT WAS RIGHT
 --------------------------------------------------------------------------------
 
-Measured off the geometry rather than guessed:
+ADR-338's figures reproduce exactly: root footprint x [-20.21, 17.72], z [-14.87, 18.86] about the
+tree's own origin, radius ~20; island 56x; tree at [2.0, 3.2, 1.0].
 
-  tree, glTF Y-up      x [-60.02, 56.27]  y [-2.13, 75.49]  z [-51.26, 42.54]
-  tree ROOT footprint  x [-20.21, 17.72]  y [-2.13,  5.00]  z [-14.87, 18.86]   <- radius ~20
-  bare island          x [ -0.50,  0.51]  y [-0.73,  0.11]  z [ -0.74,  0.38]
-  grass plateau top    y ~ 0.030 to 0.052, flat out to radius ~0.52 from its centre
+  ** My first pass at the contact measurement reported 24.4% of root vertices over no island at
+  all -- a hard §13 violation. It was an artefact. ** It built the island's top surface by binning
+  island *vertices* into cells and taking the max per cell. The grass mesh is 7,467 triangles
+  over a 60-unit plateau, so at a 1-unit cell most cells contain no vertex, and every root above
+  one of those cells was scored "off the island". Rasterising the island's triangles and
+  interpolating the height barycentrically gives 0.0% -- before and after. ** No root was ever
+  off the island. ** The brief's §13 concern, and my first confirmation of it, were both wrong.
 
-The wide x/z extents of the tree's wood mesh at y = 20..40 are its *boughs*, not its roots. Taking
-that 38-unit figure for the root spread would have demanded an island 1.8x larger than the one
-this scene uses, and the tree would have sat on a plate.
+What is real, measured per 2.5-unit cell over the root footprint, taking the *lowest* root point
+in each cell against the island's interpolated top surface there:
 
-  island scale       56x        (recorded here so it can be moved; it is one number in the scene)
-  island position    [0, 0, 9.16]   recentres the rock's bounding box on the rotation axis
-  tree position      [2.0, 3.2, 1.0]  trunk axis over the plateau centre, roots ~1 unit under grass
-  tree scale         1.0        (native; the island moves, not the hero)
+  metric                                         ADR-338    ADR-339    §
+  ---------------------------------------------  ---------  ---------  ----
+  root cells over no island                          0.0%       0.0%   13
+  median gap, lowest root to surface                +0.78      -0.28   12
+  10th / 90th percentile gap                 +0.17/+2.19  -1.01/+1.24  12
+  root cells more than 1 unit clear                 46.0%      15.0%   12
+  root cells embedded (gap <= 0)                     8.0%      57.5%   15
+  canopy overhang (leaf r99 / island r max)          1.64       1.15   §33.2
+  leaf vertices beyond the island's radius          46.3%       8.9%
+  twig vertices beyond the island's radius          38.5%       6.5%
+  island cover radius (full 72-sample ring)          24.0       35.0
+  island max radius / lowest rock                31.0/-38.3  44.3/-54.8
+  trunk base y / crown y                        +1.07/78.7  +0.87/78.5
 
-Which gives, in world units: plateau radius ~29, island 56 wide and 47 deep below the surface,
-canopy 116 wide overhanging the island by ~30 a side, crown at y = 78.7 and the island's lowest
-rock at y = -38.4. A 117-unit subject.
+  The 15% that still stand more than a unit clear are the apexes of the root cathedral, which is
+  what a root cathedral is. renders/treeisland/contact/ is the frame that settles it: the roots
+  visibly enter the soil, and the tracery veins read as cyan glints along them.
+
+Two changes got there, and only two: island scale 56 -> 80 with its recentring translate scaled
+with it (z 9.16 -> 13.086), and the tree lowered y 3.2 -> 3.0.
+
+  ** The island was scaled up, not the tree down. ** §14 forbids shrinking the tree and the
+  previous brief warned against the island reading as "a tiny floating plate"; enlarging the
+  island fixes both at once. The tree's x and z were left alone: sweeping a 3x4 grid of positions
+  at scale 80 moved the overhang only between 1.144 and 1.168 and the floating fraction between
+  14.2% and 18.3%, so moving the tree buys nothing and costs a diff.
 
 
 4. WHAT THE COMPARISON FRAMES MEASURE
 --------------------------------------------------------------------------------
 
-All 1920x1080, tier offline, limits unlimited, supersample 2.0, identical camera, t = 0.
+All 1920x1080, tier offline, limits unlimited, supersample 2.0, t = 0 unless noted.
 
-arm                                        mean sRGB            above black   sha256 (first 12)
------------------------------------------  -------------------  ------------  -----------------
-hero (bare island, Glowmere tree)          0.0254 0.0470 0.0564        12.9%  3743849e423b
-compare-cottage (island as supplied, §8)   0.0296 0.0468 0.0497        13.2%  27a047236b74
-compare-hero-materials (tree as exported)  0.0090 0.0111 0.0156         5.1%  51ee2bb1406c
-alt-low-angle                              0.0305 0.0620 0.0720        17.2%  33008d162eaa
+arm                                          mean sRGB              above black  sha256 (first 12)
+-------------------------------------------  ---------------------  -----------  -----------------
+before-original  (ADR-338, §29 #1)           0.0254 0.0470 0.0564        13.7%   3743849e423b
+glow-off         (§29 #2, §11 structural)    0.0672 0.1053 0.1740        96.5%   146b86cf9846
+glow-low         (§11 low, 0.4x)             0.0700 0.1127 0.1848        96.9%   25425883b720
+hero             (§29 #3/#4, §11 normal)     0.0730 0.1187 0.1926        96.9%   ecc77f8e9ab9
+glow-high        (§11 high, 3x)              0.0798 0.1307 0.2068        97.1%   5729f3cf981b
+alt-rotation     (§29 #5, t = 60 s)          0.0743 0.1192 0.1926        97.8%   24b0ceb61f33
+low-angle        (§29 #6)                    0.0665 0.1130 0.1870        95.4%   3f99d09d6e54
+contact          (§12/§15 close-up)          0.1214 0.1591 0.1878        94.9%   0fe99f2aeeaf
+ctl-no-cosmos    (ADR-182 control)           0.0443 0.0698 0.1514        96.9%   33db2c19710a
+ctl-no-stars     (ADR-182 control)           0.0725 0.1182 0.1921        96.9%   2ae5875299d1
 
-Mean absolute difference per channel on a common 192x108 grid:
+  Ten arms, ten distinct hashes, none black. `before-original` comes back at 3743849e423b, which
+  is bit for bit the hash ADR-338 recorded for its hero frame -- the "before" arm is the previous
+  pass reproduced, not a reconstruction of it.
 
-  hero vs cottage                   0.01136
-  hero vs as-exported tree          0.03127
-  hero vs low angle                 0.03678
+Mean absolute difference per channel, common grid:
 
-Four distinct hashes and four distinct frames; none is black, and the pair that matters most
-(hero vs cottage) differs by 11x the noise floor of a re-render of the same arm.
+  before-original vs hero                     0.11938
+  glow-off vs glow-low / hero / glow-high     0.00702 / 0.01255 / 0.02355   monotonic
+  hero vs ctl-no-cosmos                       0.04348
+  hero vs ctl-no-stars                        0.00062
+  hero vs alt-rotation                        0.03617
+  hero vs low-angle                           0.03060
 
-  The cottage arm settles §8 against §34. At this island scale the house is 57 world units tall
-  against the tree's 78, and it stands at the trunk: in the frame its orange roof and lit yellow
-  windows take the eye and the trunk is not visible at all. Its mean red channel is *higher* than
-  the hero's while its blue is lower -- the house drags the whole frame warm, out of the palette
-  §13 asks for.
+Patch means (sRGB 0..255) on three fixed regions, which is where the whole-frame means hide things:
 
-  The as-exported arm settles §15. Same light, same island, same camera; a dark green tree with no
-  bioluminescence of any kind. 5.1% of pixels above black against the Glowmere variant's 12.9%.
+arm         grass plateau (900-1150, 640-664)   sky (150-400, 150-400)    canopy (820-1200, 200-420)
+----------  ---------------------------------   -----------------------   --------------------------
+hero              74.4  71.3  50.7                 14.6  26.6  50.6          43.1  77.3  87.8
+ctl-no-stars      74.4  71.3  50.7                 14.4  26.5  50.5          43.1  77.3  87.8
+ctl-no-cosmos     74.4  71.3  50.7                  5.1   9.1  35.1          40.4  72.9  83.6
+glow-off          74.4  71.3  50.7                 14.6  26.6  50.6          28.3  42.8  39.6
+
+  ** §11's off/on control. ** The canopy's blue channel goes 39.6 -> 87.8 sRGB, 2.2x, and the
+  green 42.8 -> 77.3, while the plateau does not move at all. The Glowmere layer is doing
+  something, to the thing it is supposed to do it to, and to nothing else.
+
+  ** The star shells do not degrade the shadow cascades. ** ADR-338 checked this at a scene radius
+  of 1090; this pass pushes the outermost shell to 1580, and the far plane with it
+  (max(radius*50, 2000)). The plateau reads 74.4/71.3/50.7 with the stars and 74.4/71.3/50.7
+  without -- identical to the 0.1 sRGB the patch mean resolves. This is a band, not a floor: the
+  same two arms differ by 0.00062 whole-frame MAD and have different hashes, so the control can
+  fail and did not.
+
+  ** The cosmos shader is worth 9.5 / 17.5 / 15.5 sRGB in the sky patch ** and nothing on the
+  plateau -- a background layer, correctly occluded by geometry. It also lifts the canopy by
+  ~3-4 sRGB, which is bloom bleeding the brighter background into the leaves, not lighting.
+
+  ** §11's bloom check. ** At 3x the shipping channels the canopy does not blow out to white
+  blobs -- it washes toward uniform pale cyan and loses the warm tips. Bloom is controlled; the
+  selectivity is what breaks first, which is the right failure mode and the reason the shipping
+  state is 1x and not 3x.
+
+Shipping Glowmere channels (project parameters, brief §10):
+
+  nodes/tree-tracery/emissiveBoost   5.0     major luminous structures   tree.glow.branchIntensity
+  nodes/tree-twigs/emissiveBoost     1.5     secondary glow              tree.glow.secondaryIntensity
+  nodes/tree-foliage/emissiveBoost   2.2     foliage                     tree.glow.foliageIntensity
+  nodes/tree-lumens/emissiveBoost    4.0     special organisms           (fungi and seed lanterns)
+  nodes/tree-wood/emissiveBoost      1.0     inert -- the layer has no emission to boost
 
 
-5. PERFORMANCE BASELINE
+5. WHAT THE SPLIT COSTS
 --------------------------------------------------------------------------------
 
-tools/render_bench.py, 1920x1080, tier realtime, 180 frames per run with the first 12 dropped as
-warm-up, 3 interleaved repeats per arm. One of six runs started while a build was running and is
-excluded; the remaining five are uncontended and the per-run medians spread 1-2%.
+The tree is five glTF files instead of one, and the baked masks are 45 materials instead of 7.
+The flatten reports 13 nodes -> 45 entities, 45 meshes, 4 procedurals, against ADR-338's
+4 nodes -> 9 entities. Same 3,162,186 triangles, same 139.6 MB, five times the draw calls for the
+tree.
 
-preset                         runs   wall     p10     p90   spread     gpu   scene
------------------------------  ----  -----   -----   -----   ------   -----   -----
-tree-of-life-floating-island      2  57.94   53.25   63.23       1%   15.96   13.04
-_compare-hero-materials           3  57.98   53.25   63.21       2%   15.79   12.85
-
-GPU pass medians for the deliverable, in milliseconds:
-
-  scene 12.78   depth 1.25   ao 0.39   shadow 0.26   post/bloom 0.20   tonemap 0.13
-  post/composite 0.07   post/fxaa 0.07   clusters 0.00   background 0.00   shadowmask 0.00
-
-  sum of pass medians / GPU frame median = 0.97. The frame is the passes; nothing is hiding
-  outside them, which on a shared GPU is the check that says the number is the scene's and not
-  somebody else's.
-
-  CPU p50 38.67 ms, p90 43.86, p99 46.69. `wall` is higher than both because it includes readback
-  and PNG/H.264 encoding; the 60-second preview encoded 1800 frames at 1280x720 in 81.5 s (22.1
-  frames per second end to end).
-
-  GPU errors: 0 on every run.
-
-Two things this table says.
-
-  3.16 M triangles is not what costs here. Nine entities, nine draws, no skinning, no instancing,
-  no transparency: it is a draw-call-cheap way to spend a triangle budget, and 15.96 ms at 1080p
-  leaves room for the particles, atmospherics and audio reactivity §28 says are coming.
-
-  The Glowmere material variant is free. 15.96 against 15.79 ms is inside the 1-2% run spread, as
-  it should be -- the two files differ only in seven material definitions.
-
-`visible` and `tris` come back 0 from the harness for this scene. Those counters report the GPU
-instance cull, and this scene's geometry is nine plain glTF entities that do not go through it.
-They are *not reported*, not measured as zero.
-
-The starfield's effect on shadowing was checked against a no-stars control, because the shell
-pushes the scene radius from ~75 to ~1090 and the far plane with it (`max(radius * 50, 2000)`, so
-54,500 rather than 3,750), and the shadow cascades are split across that range. It does not
-degrade them: the plateau reads 53 sRGB with the stars and 47 without -- the difference is the
-stars' own emission reaching the surface -- and the `shadow` pass costs 0.26 ms either way.
+PERFORMANCE_TABLE_PLACEHOLDER
 
 
-6. ANIMATION VALIDATION
+6. WHAT IS NOT MEASURED HERE
 --------------------------------------------------------------------------------
 
-Brief §27. Two halves, one measured in pixels and one in transforms.
+  * The island's grass texture is a saturated yellow-green that is outside the Glowmere palette
+    §19 asks for. It is the supplied asset's own base colour and §5 forbids redesigning the
+    island, so it is left alone and lit rather than repainted. The warm key makes it slightly
+    more noticeable than ADR-338's cool key did. Flagged, not fixed.
+  * The bright/dim ratio on the leaves is Blender's (1.135 : 0.035, 32:1). At the shipping boost
+    the 94% floor still reads as a general cyan wash under the 6% specks. Halving the floor in
+    the asset would sharpen the speckle further; it would also be a departure from the .blend,
+    so it was not done without the owner looking at both.
+  * The five-file split is not free to reason about. If a future edit gives one layer node a
+    transform of its own, the tree shears apart in a way that is obvious in a frame but invisible
+    in a diff. §7 is the assertion that catches it.
 
-In pixels: renders/treeisland/rotation-stills/, five frames at t = 0, 37.5, 75, 112.5 and 150 s,
-five distinct hashes, five clearly different aspects of the same tree. The trunk stays planted at
-the same point on the plateau in every one; the grass patch and the rock silhouette turn with it.
-And renders/treeisland/rotation-preview-60s.mp4, 1800 frames of continuous motion -- 120 degrees
-of the revolution -- at 30 fps.
 
-In transforms: tests/unit/test_treeisland_example.cpp asserts
-`nodeWorldTransform(tree) == nodeWorldTransform(island) * treeLocal` to 1e-4 across four island
-poses, with `treeLocal` checked unchanged at each, and with a control that the island's world
-transform actually moved between samples (a band, 3 to 30 -- every comparison would pass with the
-hierarchy deleted if the island stood still). Reparenting the tree off the island makes it fail at
-three of the four samples; the fourth is the identity pose and correctly still passes.
+7. THE TEST THAT HAD TO CHANGE, AND WHAT WAS ADDED
+--------------------------------------------------------------------------------
 
-There is no drift to measure because there is no state to drift: `LfoSource::update` is
-`renderTime * rate + phase`, evaluated fresh every frame.
+No engine code changed in this pass. One existing test did, because the scene it reads changed
+shape: tests/unit/test_treeisland_example.cpp.
+
+  * `assetNodes == 2` -> `== 6`. The scene now names the island plus five tree layers. The
+    assertion's point is unchanged -- that every asset path is relative and inside the repo, with
+    no `~`, no `/Users/`, no `Desktop` -- and it still checks that for all six.
+  * `tree->kind == Gltf` -> `== Group`. `tree-of-life` is now the group that carries the layers,
+    which is what keeps §16's hierarchy to exactly one transform between island and tree.
+
+Added, because the split creates a failure mode the old test could not see: for each of the five
+layers, that it is a Gltf node parented to `tree-of-life`, that its local transform is identity,
+and that `nodeWorldTransform(layer) == nodeWorldTransform(tree-of-life)` to 1e-5. That is the
+registration property stated as an equation. The existing control still stands -- the island is
+asserted to have actually moved between samples (a band, 3 to 30), because every hierarchy check
+in the file would pass with the hierarchy deleted if the island stood still.
