@@ -688,10 +688,340 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
     }
 }
 
+// ---- route ---------------------------------------------------------------------------------
+
+namespace {
+
+// Metres of a polyline that are in water, each weighted by that water's depth over this walker's
+// wade band. The same 0..1 quantity `NavCell::wade` holds, integrated along the route, so the
+// number this considerer prices a ford with is the number `NavGrid`'s A* priced it with.
+//
+// **Measured off the grid and not off the world, and that is the whole reason it is affordable.**
+// `Navigator::sample` is an analytic evaluation of the world at 10.325 us (ADR-268); a grid lookup
+// is 0.024 us. A 110 m route sampled every two metres is 55 of them -- 0.57 ms against 1.3 us --
+// and this runs twice per destination per decision tick. The grid is four metres coarse and that
+// is fine here in a way it is not for `pathClear` (ADR-295): this is not deciding whether a body
+// may stand somewhere, it is weighing how wet a route already accepted as walkable is, and an
+// error of one cell is an error of four metres in a hundred.
+//
+// The analytic fall-back is for a world with no graph, which `price` refuses to score anyway; it
+// exists so that a test holding a bare `Navigator` gets an answer rather than a zero that looks
+// like dry land.
+float wadeAlong(const Navigator& nav, glm::vec2 from, std::span<const glm::vec2> waypoints) {
+    const NavGrid* grid = nav.grid();
+    const bool gridded = grid != nullptr && grid->valid() && grid->cellSize() > 0.0f;
+    const float band = nav.settings().wadeDepth;
+    const float step = gridded ? grid->cellSize() * 0.5f : 2.0f;
+    float wet = 0.0f;
+    glm::vec2 previous = from;
+    for (const glm::vec2& point : waypoints) {
+        const float span = glm::length(point - previous);
+        if (span > 0.0f) {
+            const int pieces = std::max(1, static_cast<int>(std::ceil(span / step)));
+            const float piece = span / static_cast<float>(pieces);
+            for (int i = 0; i < pieces; ++i) {
+                // The midpoint of each piece. Sampling the ends would count every waypoint twice,
+                // so a route whose legs are short would read wetter than one whose legs are long
+                // -- which is a measurement of the string pull rather than of the water.
+                const float t = (static_cast<float>(i) + 0.5f) / static_cast<float>(pieces);
+                const glm::vec2 at = previous + (point - previous) * t;
+                float fraction = 0.0f;
+                if (gridded) {
+                    const glm::ivec2 cell = grid->cellOf(at);
+                    if (grid->inside(cell)) {
+                        fraction = static_cast<float>(grid->at(cell).wade) / 255.0f;
+                    }
+                } else {
+                    const NavSample s = nav.sample(at);
+                    fraction = band > 0.0f ? std::min(1.0f, s.waterDepth / band)
+                                           : (s.waterDepth > 0.0f ? 1.0f : 0.0f);
+                }
+                wet += fraction * piece;
+            }
+        }
+        previous = point;
+    }
+    return wet;
+}
+
+} // namespace
+
+RouteConsiderer::RouteConsiderer(const nlohmann::json* settings)
+    : fordPenalty_(readFloat(settings, "fordPenalty", 0.0f)),
+      detourPenalty_(readFloat(settings, "detourPenalty", 40.0f)),
+      wadePenaltyDefault_(readFloat(settings, "wadePenalty", 1.2f)),
+      falloff_(readFloat(settings, "falloff", 40.0f)),
+      goalTolerance_(readFloat(settings, "goalTolerance", 2.0f)),
+      approach_(readFloat(settings, "approach", 0.0f)),
+      dwell_(static_cast<double>(readFloat(settings, "dwell", 0.0f))),
+      activity_(readString(settings, "activity", "")) {
+    weightDefault_ = readFloat(settings, "weight", 1.0f);
+    readTaste(settings, taste_);
+    source_ = readString(settings, "source", "perceived") == "omniscient"
+                  ? InterestConsiderer::Source::Omniscient
+                  : InterestConsiderer::Source::Perceived;
+    const float cap = readFloat(settings, "maxDestinations", 4.0f);
+    maxDestinations_ = static_cast<std::uint16_t>(std::clamp(cap, 1.0f, 64.0f));
+    if (settings != nullptr && settings->is_object() && settings->contains("destinations") &&
+        (*settings)["destinations"].is_array()) {
+        for (const auto& entry : (*settings)["destinations"]) {
+            Authored place;
+            if (entry.is_string()) {
+                place.name = entry.get<std::string>();
+            } else if (entry.is_object()) {
+                place.name = readString(&entry, "name", "");
+                if (entry.contains("point") && entry["point"].is_array() &&
+                    entry["point"].size() == 3) {
+                    place.point = glm::vec3(entry["point"][0].get<float>(),
+                                            entry["point"][1].get<float>(),
+                                            entry["point"][2].get<float>());
+                    place.hasPoint = true;
+                }
+            }
+            if (place.name.empty() && !place.hasPoint) {
+                continue;
+            }
+            authored_.push_back(std::move(place));
+        }
+    }
+}
+
+void RouteConsiderer::registerParameters(params::ParameterSet& params, const std::string& prefix) {
+    registerWeight(params, prefix, weightDefault_);
+    // The taste, and the only one of the three water numbers that is a taste. ADR-225: a weight an
+    // author wrote in a scene file and the engine read once is not a setting, and this one is the
+    // knob the lab's case 9 drives from one side of the crossover to the other.
+    wadePenaltyPath_ = prefix + "wadePenalty";
+    wadePenalty_ = &params.add(floatDesc(wadePenaltyPath_, wadePenaltyDefault_, 0.0f, 40.0f));
+}
+
+void RouteConsiderer::collectParameterPaths(std::vector<std::string>& out) const {
+    collectWeightPath(out);
+    if (!wadePenaltyPath_.empty()) {
+        out.push_back(wadePenaltyPath_);
+    }
+}
+
+float RouteConsiderer::wadePenalty() const {
+    return wadePenalty_ != nullptr ? wadePenalty_->value() : wadePenaltyDefault_;
+}
+
+std::size_t RouteConsiderer::destinationsFor(const DecisionContext& ctx,
+                                             std::vector<Destination>& out) const {
+    const std::size_t before = out.size();
+    if (!authored_.empty()) {
+        // An author named the places. Their weight is 1: this considerer is being used to choose a
+        // *way*, and the places have already been chosen.
+        for (const Authored& place : authored_) {
+            glm::vec3 at = place.point;
+            if (!place.hasPoint) {
+                // R1: `pointOfInterest` reports simulation positions for bodies and authored ones
+                // for nodes. A name the world does not have contributes no option at all, which
+                // shows in the overlay as a missing line rather than as a body walking somewhere
+                // nobody asked for.
+                if (ctx.world == nullptr || !ctx.world->pointOfInterest(place.name, at)) {
+                    continue;
+                }
+            }
+            out.push_back(Destination{place.name, at, 1.0f});
+        }
+        return out.size() - before;
+    }
+    // Nobody named anything, so the goal model chooses the places and this chooses the ways to
+    // them. The top few by weight and no more: each destination costs two A* searches, and an
+    // explorer that priced all twenty of its percepts would spend a millisecond of every decision
+    // tick on routes it was never going to take.
+    scratch_.clear();
+    if (source_ == InterestConsiderer::Source::Omniscient) {
+        if (ctx.world != nullptr) {
+            scoreGoals(ctx, taste_, ctx.world->interestPoints(), scratch_);
+        }
+    } else {
+        scoreGoals(ctx, taste_, ctx.percepts, scratch_);
+    }
+    // Highest weight first, ties broken on the position so the order cannot depend on the order
+    // the sense stage happened to write its working set -- the same rule `investigate` breaks a
+    // salience tie with, and for the same reason.
+    std::stable_sort(scratch_.begin(), scratch_.end(),
+                     [](const GoalCandidate& a, const GoalCandidate& b) {
+                         if (a.weight != b.weight) {
+                             return a.weight > b.weight;
+                         }
+                         if (a.position.x != b.position.x) {
+                             return a.position.x < b.position.x;
+                         }
+                         return a.position.z < b.position.z;
+                     });
+    const std::size_t take = std::min<std::size_t>(scratch_.size(), maxDestinations_);
+    for (std::size_t i = 0; i < take; ++i) {
+        out.push_back(Destination{scratch_[i].name, scratch_[i].position, scratch_[i].weight});
+    }
+    return out.size() - before;
+}
+
+std::size_t RouteConsiderer::price(const DecisionContext& ctx, std::vector<Priced>& out) const {
+    if (ctx.nav == nullptr || ctx.state == nullptr) {
+        return 0;
+    }
+    // No graph, no two ways. `Navigator::requestPath` answers a gridless world with the straight
+    // line whatever it is charged for water, so two requests would come back identical and this
+    // would report "there is nothing wet between here and there" about a world it never asked.
+    const NavGrid* grid = ctx.nav->grid();
+    if (grid == nullptr || !grid->valid()) {
+        return 0;
+    }
+    places_.clear();
+    destinationsFor(ctx, places_);
+    if (places_.empty()) {
+        return 0;
+    }
+
+    const std::size_t before = out.size();
+    const glm::vec3 here = ctx.state->position();
+    const glm::vec2 from(here.x, here.z);
+    const float w = wadePenalty();
+    const float falloff = std::max(falloff_, 1.0f);
+    NavPathCost ford;
+    ford.wadePenalty = fordPenalty_;
+    NavPathCost dry;
+    dry.wadePenalty = detourPenalty_;
+
+    for (const Destination& place : places_) {
+        PathRequest request;
+        request.from = from;
+        request.to = glm::vec2(place.position.x, place.position.z);
+        request.goalTolerance = goalTolerance_;
+        // The two requests. Identical but for what a wet cell costs, which is the only way to ask
+        // a planner "what would you do if you minded the water more than you do".
+        const PathResult wet = ctx.nav->requestPath(request, ford);
+        const PathResult round = ctx.nav->requestPath(request, dry);
+        if (wet.status != PathStatus::Ok) {
+            // Unreachable, already there, no standable goal -- none of them is a way, and an
+            // option scoring zero would be a different claim from no option at all.
+            continue;
+        }
+        const float wetWade = wadeAlong(*ctx.nav, from, wet.waypoints);
+        Priced first;
+        first.destination = place.name;
+        first.at = place.position;
+        first.detour = false;
+        first.length = wet.length;
+        first.wadeMetres = wetWade;
+        first.cost = wet.length + w * wetWade;
+        first.score = weight() * place.weight / (1.0f + first.cost / falloff);
+        first.status = wet.status;
+        first.goal = wet.goal;
+        first.waypoints = wet.waypoints;
+        out.push_back(std::move(first));
+
+        if (round.status != PathStatus::Ok) {
+            continue;
+        }
+        const float roundWade = wadeAlong(*ctx.nav, from, round.waypoints);
+        // Two ways or one. A second option identical to the first would put the selector's margin
+        // between a route and itself and would print the same line twice in the overlay, so the
+        // detour is only published when it is genuinely a different way -- which is what "there is
+        // water between this body and that place" means, operationally, in this engine.
+        const float quarter = 0.25f;
+        if (std::abs(round.length - wet.length) <= quarter &&
+            std::abs(roundWade - wetWade) <= quarter) {
+            continue;
+        }
+        Priced second;
+        second.destination = place.name;
+        second.at = place.position;
+        second.detour = true;
+        second.length = round.length;
+        second.wadeMetres = roundWade;
+        second.cost = round.length + w * roundWade;
+        second.score = weight() * place.weight / (1.0f + second.cost / falloff);
+        second.status = round.status;
+        second.goal = round.goal;
+        second.waypoints = round.waypoints;
+        out.push_back(std::move(second));
+    }
+    return out.size() - before;
+}
+
+void RouteConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& out) const {
+    priced_.clear();
+    price(ctx, priced_);
+    if (priced_.empty()) {
+        return;
+    }
+    // Two passes, for the reason `interest` takes two: the spans handed out in `Option::actions`
+    // must survive the whole of this call and a vector that grows moves its storage.
+    actions_.clear();
+    names_.clear();
+    names_.reserve(priced_.size());
+    std::size_t legs = 0;
+    for (const Priced& p : priced_) {
+        legs += p.waypoints.size() + 2;
+    }
+    actions_.reserve(legs);
+    std::vector<std::pair<std::size_t, std::size_t>> ranges;
+    ranges.reserve(priced_.size());
+    const glm::vec3 here = ctx.state != nullptr ? ctx.state->position() : glm::vec3(0.0f);
+
+    for (const Priced& p : priced_) {
+        std::string label(p.destination);
+        if (label.empty()) {
+            label = "route@" + std::to_string(static_cast<int>(std::lround(p.goal.x))) + "," +
+                    std::to_string(static_cast<int>(std::lround(p.goal.y)));
+        }
+        // The detour is the same errand by another way, so it is named for the errand and marked
+        // rather than given an identity of its own. The short way keeps the bare name, which is
+        // what makes it stable: it exists for every destination in every world, and a name that
+        // appeared and vanished with the water would lose the selector its incumbent every time a
+        // body stepped onto the far bank.
+        names_.push_back(p.detour ? label + " round" : label);
+
+        const std::size_t first = actions_.size();
+        // **A `Move` per waypoint, and this is the load-bearing part.** `NavigatorPath::route`
+        // answers a move with the straight line to the goal and leaves the rest to local steering
+        // (`action.cpp:NavigatorPath::route`), which gets a body round a trunk and cannot get one
+        // round a lake. An option called "go round" whose single action was "walk to the far bank"
+        // would be a body that waded anyway, with the overlay reporting the detour and the film
+        // showing the ford.
+        for (std::size_t k = 0; k < p.waypoints.size(); ++k) {
+            const bool last = k + 1 == p.waypoints.size();
+            ActionDesc walk;
+            walk.kind = ActionKind::Move;
+            walk.name = names_.back();
+            walk.target.kind = TargetKind::Point;
+            const glm::vec2 at = last ? p.goal : p.waypoints[k];
+            // y is not read: `ActionKind::Move` flattens its target and the grounding behaviour
+            // owns the height. Carrying the destination's y on the last leg anyway, so a debug
+            // draw of the action's target lands on the thing rather than on the sea floor.
+            walk.target.point = glm::vec3(at.x, last ? p.at.y : 0.0f, at.y);
+            if (last && approach_ > 0.0f) {
+                walk.target.point = standOff(here, walk.target.point, approach_);
+            }
+            walk.tolerance = last ? std::max(goalTolerance_, 0.75f) : legTolerance_;
+            actions_.push_back(std::move(walk));
+        }
+        if (dwell_ > 0.0) {
+            ActionDesc attend;
+            attend.kind = ActionKind::Pose;
+            attend.name = names_.back();
+            attend.activity = activity_;
+            attend.duration = dwell_;
+            actions_.push_back(std::move(attend));
+        }
+        ranges.emplace_back(first, actions_.size() - first);
+    }
+    for (std::size_t i = 0; i < priced_.size(); ++i) {
+        out.push_back(Option{names_[i], priced_[i].score,
+                             std::span<const ActionDesc>(actions_.data() + ranges[i].first,
+                                                         ranges[i].second),
+                             Authority::Routine});
+    }
+}
+
 // ---- the factory -------------------------------------------------------------------------------
 
 std::vector<std::string_view> considererKinds() {
-    return {"idle", "holdPost", "investigate", "interest"};
+    return {"idle", "holdPost", "investigate", "interest", "route"};
 }
 
 std::unique_ptr<StockConsiderer> makeConsiderer(std::string_view kind,
@@ -705,6 +1035,8 @@ std::unique_ptr<StockConsiderer> makeConsiderer(std::string_view kind,
         made = std::make_unique<InvestigateConsiderer>(settings);
     } else if (kind == "interest") {
         made = std::make_unique<InterestConsiderer>(settings);
+    } else if (kind == "route") {
+        made = std::make_unique<RouteConsiderer>(settings);
     }
     if (made != nullptr) {
         made->setName(readString(settings, "name", std::string(kind)));
