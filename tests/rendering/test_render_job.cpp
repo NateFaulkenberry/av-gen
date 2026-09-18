@@ -1079,18 +1079,33 @@ TEST_CASE("A supersampled EXR previews the frame that is written, not the one it
     REQUIRE(file.has_value());
     REQUIRE(file->width == 96);
     const float* pixels = reinterpret_cast<const float*>(file->data.data());
+    // Not equality here, and the reason is the resolve itself. `writeExr` stores half, and
+    // everywhere else in this file the floats came straight off an RGBA16F readback and so ARE
+    // halves -- the round trip is exact and the comparison can be byte-for-byte. A box average of
+    // four halves is not a half, so the file rounds it, and a value sitting on an 8-bit boundary
+    // lands one code either side. Measured: 112 of 18,432 channels, every one of them by exactly 1.
+    //
+    // So the tolerance is 1 code and the assertion is on the WORST difference rather than on how
+    // many differ. A preview of the unresolved 2x intermediate is not one code away from this: the
+    // shape check above already refuses it, and a whole-frame difference would put `worst` in the
+    // tens or hundreds.
+    int worst = 0;
     std::size_t differing = 0;
     for (std::uint32_t i = 0; i < frame.width * frame.height; ++i) {
         for (int c = 0; c < 3; ++c) {
             const float v = std::clamp(pixels[static_cast<std::size_t>(i) * 4 + c], 0.0f, 1.0f);
             const float s = v <= 0.0031308f ? v * 12.92f : 1.055f * std::pow(v, 1.0f / 2.4f) - 0.055f;
-            if (frame.rgba[static_cast<std::size_t>(i) * 4 + c] !=
-                static_cast<std::uint8_t>(std::lround(s * 255.0f))) {
+            const int got = frame.rgba[static_cast<std::size_t>(i) * 4 + c];
+            const int want = static_cast<int>(std::lround(s * 255.0f));
+            if (got != want) {
                 ++differing;
+                worst = std::max(worst, std::abs(got - want));
             }
         }
     }
-    CHECK(differing == 0);
+    INFO(differing << " of " << frame.width * frame.height * 3 << " channels differ, worst " << worst);
+    CHECK(worst <= 1);
+    CHECK(differing * 100 < static_cast<std::size_t>(frame.width) * frame.height * 3); // under 1%
     CHECK(ctx->errorCount() == 0);
 }
 
