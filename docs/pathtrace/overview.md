@@ -1,0 +1,145 @@
+# The path tracer
+
+A CPU path tracer over Embree, written to produce an image that is not constrained by the realtime
+renderer's approximations. It is a **second renderer over one scene contract**, not a mode of the
+first: it reads the same `scene::Scene` the WebGPU rasteriser reads and shares no pass, no resource
+and no frame graph with it.
+
+**It is not what this codebase calls "offline".** That word means `QualityTier::Offline` -- a
+higher-quality configuration of the rasteriser -- and the ADR-020 batch render pipeline. Both keep
+their meaning. This renderer is named for its technique: `avgen::pathtrace`, in `src/pathtrace/`.
+See **ADR-340**, which is the thing to cite when the two vocabularies are confused.
+
+## Where it sits
+
+```
+author -> realtime WebGPU -> compose / animate / scrub -> LOCK SHOT
+                                                              |
+                                                              v
+                                          path trace -> AOVs -> linear HDR EXR
+                                                                      |
+                                                                      v
+                                                          final colour pipeline
+```
+
+The tracer's job **ends at scene-linear radiance**. It never tone maps, never writes 8-bit, and
+never reaches into the realtime post chain. Colour management is downstream of the EXR.
+
+## Status
+
+| Phase | What | State |
+|---|---|---|
+| 0 | Recon, Embree spike on Apple Silicon | done |
+| 1 | Primary rays, Lambertian, one area light, shadow rays, accumulation, EXR | **done** |
+| 2 | glTF metallic-roughness BRDF, textures, colour space | not started |
+| 3 | BSDF + light sampling, MIS, Russian roulette, progressive | not started |
+| 4 | OIDN denoising | not started |
+| 5 | Full AV Gen scene integration (skinning, instancing, procedurals) | not started |
+| 6 | AOVs | not started |
+| 7 | Glowmere | not started |
+| 8 | Production features | not started |
+
+## Design
+
+**`pathtrace::Snapshot`** (`snapshot.hpp`) is the transient render snapshot. `scene::Scene` is
+mutated in place by its controller, so two timeline times cannot coexist and the tracer must never
+hold a reference across an update. `buildSnapshot(scene)` takes a flat, world-space, immutable copy
+of exactly what the tracer can see. It is **not a second scene graph**: no hierarchy, no parameters,
+no update, and nothing reads it back.
+
+Call `Engine::update(FrameTime{t, dt, i})` first. The tracer does no scene evaluation of its own,
+by design.
+
+**`pathtrace::EmbreeScene`** (`embree_scene.hpp`) is the only file that includes Embree, behind a
+pimpl so `<embree4/rtcore.h>` stays out of every translation unit and `embree` stays a PRIVATE link
+dependency. Embree owns intersection, the BVH and occlusion queries; **everything else is AV Gen's**
+-- materials, BSDFs, sampling, the integrator, AOVs, accumulation and output.
+
+**Threading.** Embree is given an explicit thread count and the BVH is committed with
+`rtcJoinCommitScene` from threads this process already owns, so Embree starts no pool of its own.
+`app::JobSystem` is not used and cannot be: it is a two-worker FIFO of whole jobs with no
+parallel-for, and its header forbids waiting on it from a render thread. The render loop uses the
+banded scanline split that `src/world/terrain.cpp` and `src/world/ecology.cpp` already established
+as this repo's CPU-parallelism convention.
+
+**Determinism** (spec section 27). The image is a pure function of the snapshot and the settings.
+`pathtrace::Sampler` wraps `avgen::Rng` (the project's PCG32, mandated by
+`docs/research/offline-rendering.md` section 12.3) and seeds from `(seed, pixelIndex, sampleIndex)`,
+so a pixel can be regenerated in isolation and the image does not depend on the thread count. A test
+asserts bit-identical output at 1 thread and at 6, with a different-seed control so the equality is
+not vacuous.
+
+## Capability report (spec sections 55, 87)
+
+A scene feature the tracer cannot represent is **detected, counted and reported** -- never silently
+dropped and never silently altered in the realtime scene. `Snapshot::capabilities` carries one row
+per feature and `logCapabilities()` prints it at render startup, so the answer arrives before the
+pixels rather than after somebody notices they are wrong.
+
+### Known limitations
+
+| Feature | Status | Why |
+|---|---|---|
+| Particles | **unsupported** | GPU-only by construction (`src/scene/particles.hpp`): the CPU holds settings, the simulation is a compute shader, and no positions exist to intersect at any time |
+| Skinned characters | **unsupported** (Phase 5) | `MeshData` is bind pose; drawing it would place the character wrongly with no warning, so it is omitted and counted |
+| Procedural / scatter | **unsupported** (Phase 5) | CPU-reachable, but it arrives with Embree instancing rather than as baked triangle soup |
+| SDF in `Raymarch` mode | **unsupported** | no triangles exist; `spatial::SdfTree` is CPU-evaluable but sphere tracing is a separate integrator path |
+| Water surface | **degraded** | the mesh is a real CPU sheet, but ripples, swell, foam and refraction live in `shaders/water.wgsl` |
+| Point / spot lights | **degraded** | treated as delta positions, so their shadows are hard; the realtime path softens them |
+| Volumetrics | **unsupported** | a stated non-goal for now (spec section 72) |
+| HDR environment map | **degraded** | the analytic sky (`scene::skyRadiance`, ADR-036) is used; image-based lighting needs section 46 importance sampling |
+| DWAA / DWAB EXR compression | unavailable | tinyexr declares them "not yet supported"; ZIP, PIZ and PXR24 are available |
+
+Three realtime per-frame decisions are deliberately **overridden rather than inherited**, because
+inheriting them would be the ADR-146 mistake in a new place:
+
+* terrain's camera-dependent LOD -- the tracer wants LOD 0;
+* `Entity::cameraCulled`, which means "outside the realtime frustum", not "not in the scene";
+  off-screen geometry still casts shadows and still bounces light into the frame;
+* procedural LOD rungs 2 and 3, which are camera-facing billboards.
+
+## Phase 1 in particular
+
+Primary rays, a Lambertian BSDF, direct lighting from the scene's lights with shadow rays, the
+analytic sky as environment and miss colour, a cosine-weighted bounce per extra depth, progressive
+accumulation and linear float EXR out.
+
+Not yet: metallic-roughness (so a metal reads as a bright diffuse), textures, MIS, Russian roulette,
+adaptive sampling, denoising, instancing. Emissive geometry is only found by rays that happen to hit
+it, so its bounce light is noisy until MIS lands in Phase 3 -- visible in the target image below as
+speckle on the floor near the cyan sphere.
+
+`docs/pathtrace/phase1-target-scene.png` is the spec's section 69 first visual target rendered by
+this code: three spheres on a diffuse ground plane under a 5x5 m area light, soft shadows, an
+emissive sphere bouncing cyan onto the floor, and a dark analytic sky.
+
+## Testing
+
+`tests/unit/test_pathtrace_camera.cpp` and `tests/unit/test_pathtrace_render.cpp`.
+
+Two rules the tests are built on, both learned the hard way on this branch:
+
+**Camera rays are checked against `scene::Camera`'s own projection matrix**, not against a
+hand-derived expectation. A ray generator and a projection that disagree by a sign or a half-pixel
+both look plausible alone; only making them answer the same question catches it. There is a
+wrong-pixel control so a generator that ignored its arguments could not pass.
+
+**Every image arm asserts what is IN the picture**, not only that the arithmetic closed. The Phase 0
+Embree spike passed every numeric check while rendering one triangle instead of two, because the
+second was exactly occluded. So: the blue sphere must read blue, the emissive one must be the
+brightest thing in the frame and must read cyan, and the ground under a sphere must be measurably
+darker than ground beside it.
+
+Two hidden cases (`[.pathtrace-preview]`, `[.pathtrace-diag]`) render the target scene to a PPM and
+print per-region means. They are how the asserted pixel regions were chosen rather than guessed, and
+they are how the first render's all-orange cast was found -- the test scene had set a light's
+`temperature` to 0, which clamps to deep orange, and no numeric assertion in the suite would have
+told anyone.
+
+## Gotchas
+
+* **Do not set `CMAKE_CXX_STANDARD` globally around Embree.** It overrides Embree's own
+  `-std=c++11` and Embree 4.4.0 does not compile as C++23 under Apple clang 21. `Dependencies.cmake`
+  saves, unsets and restores it; the comment there explains why.
+* A new ADR fails `test_repo_hygiene` until it is listed in `docs/decisions/README.md`. The suite
+  reads that directory from disk, so it fails in a binary compiled before the ADR existed.
