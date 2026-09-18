@@ -602,7 +602,6 @@ TEST_CASE("truncated pyramid levels displace the halo they carry", "[hdr][lab][g
                 const double sv = (static_cast<double>(py) + 0.5) / size.h;
                 fmt::print("  {:4}x{:<4} impulse at {:.2f}: du={:+.3f} px  dv={:+.3f} px   ({})\n", size.w, size.h,
                            frac, (c.u - su) * size.w - 0.5, (c.v - sv) * size.h - 0.5, size.why);
-                (void)up0;
                 bench.pool->endFrame();
             }
         }
@@ -1074,5 +1073,64 @@ TEST_CASE("a highlight's bloom does not depend on where in the frame it is", "[h
         CHECK(s.total <= referenceTotal * 1.001);
         bench.pool->endFrame();
     }
+    CHECK(bench.ctx->errorCount() == 0);
+}
+
+// ---- the bloom threshold, which the specification asks to be varied -----------------------------
+//
+// `docs/image-formation.md` makes a claim that is the reason the bloom tier is measurable at all:
+// "at threshold 0 the prefilter is exactly the identity ... that is what makes the bloom tier
+// measurable rather than a look-dependent hard cut". The soft knee's weight is the FRACTION of a
+// pixel's energy that passes, not a subtraction, so at threshold 0 that fraction is 1 everywhere.
+//
+// This is the test of that sentence, with the raised threshold as its control: an assertion that
+// the prefilter carries the frame's energy would pass on a prefilter that carried the frame's
+// energy at every threshold, which would be a different and much worse defect.
+TEST_CASE("at threshold zero the bright pass is the identity", "[hdr][lab][gpu]") {
+    PostBench bench = PostBench::make();
+    constexpr std::uint32_t kW = 256;
+    constexpr std::uint32_t kH = 144;
+    // A ramp, so the frame carries energy on both sides of every threshold in the sweep.
+    Canvas canvas(kW, kH);
+    for (std::uint32_t y = 0; y < kH; ++y) {
+        for (std::uint32_t x = 0; x < kW; ++x) {
+            canvas.set(x, y, 8.0f * static_cast<float>(x) / static_cast<float>(kW - 1));
+        }
+    }
+    SyntheticHdr hdr = makeHdr(*bench.ctx, kW, kH, canvas.rgba);
+
+    double sourceTotal = 0.0;
+    double previous = 0.0;
+    fmt::print("\n== the bright pass over an 0..8 ramp, by threshold ==\n");
+    for (float threshold : {0.0f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f}) {
+        scene::PostSettings settings = neutralPost();
+        settings.bloomEnabled = true;
+        settings.bloomIntensity = 1.0f;
+        settings.bloomThreshold = threshold;
+        settings.bloomKnee = 0.5f;
+        settings.bloomLevels = 6;
+        const auto stages = bench.run(hdr, settings);
+        // The prefilter is half resolution, so its mean is the comparable quantity and not its sum.
+        const double source = statOf(stageNamed(stages, "scene-hdr")).mean;
+        const double kept = statOf(stageNamed(stages, "bloom/prefilter")).mean;
+        sourceTotal = source;
+        fmt::print("  threshold {:5.2f}: source mean {:.5f}  prefilter mean {:.5f}  kept {:6.2f}%\n", threshold,
+                   source, kept, 100.0 * kept / source);
+        if (threshold == 0.0f) {
+            // The identity, to within the prefilter's four-tap box over a ramp and half precision.
+            CHECK(kept > source * 0.995);
+            CHECK(kept < source * 1.005);
+        } else {
+            // Monotone, and strictly: a threshold that kept as much as the one below it would mean
+            // the knee was not doing anything.
+            CHECK(kept < previous * 0.999);
+        }
+        previous = kept;
+        bench.pool->endFrame();
+    }
+    // The control that gives the chain above teeth: the ramp had to carry energy at all, and the
+    // highest threshold in the sweep has to have thrown most of it away.
+    CHECK(sourceTotal > 1.0);
+    CHECK(previous < sourceTotal * 0.25);
     CHECK(bench.ctx->errorCount() == 0);
 }
