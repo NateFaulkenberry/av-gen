@@ -192,6 +192,11 @@ x = −50, so there is a ford and there is a way round and the choice between th
   12.0. That is the arm and the control in one run of one world, and it is also the shape the
   Glowmere Valley 3 showcase needs — a jetpack alien crossing the river while a walking-only one
   routes around it.
+* **`plodder`** — the third body, 26 m west of the other two and out of their way. No decider at
+  all: one authored `move` action straight at the far bank, which is exactly what an option whose
+  single action named the destination would have emitted. Its deepest water is **1.40 m**, the full
+  channel, against the drylander's 0.27 m. That is the control for a design decision rather than
+  for a taste — it is why the winning option's actions are a `Move` per waypoint.
 * **`north-cairn`, `south-cairn`, `ford-marker`** — three heroes, which are also the interest points
   the arm that names no destination scores. With `minRange` at 45 m they are the three nearest
   things worth walking to and all three are across the water, which is what makes that arm a probe
@@ -316,6 +321,7 @@ ADR-182, applied here:
 | the detour wins at `wadePenalty` 12.0 (0.2781 against the ford's 0.1745) | the identical pair of routes at 0.4 has the ford win (0.4055 against 0.3195) |
 | a world with a river publishes two ways to a place | the same considerer over `guard-post.scene.json`, which has no water, publishes one |
 | the dear body's deepest water is 0.27 m | the cheap body's is 1.40 m, in the same run of the same world |
+| a detour expressed as a `Move` per waypoint stays dry | `plodder`, one authored `move` at the far bank and no decider, wades 1.40 m |
 | a stone 6 m from `scout` moves 1,779 of the golden's 3,600 samples | the same stone 90 m away across the river moves **0** |
 
 The determinism case prints its play-vs-seek figures rather than bounding them, and says why: a bound

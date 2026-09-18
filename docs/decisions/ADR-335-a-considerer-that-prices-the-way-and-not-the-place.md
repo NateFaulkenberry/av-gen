@@ -80,7 +80,8 @@ That is stated from reading the path provider, and it is also **measured**, beca
 decision defended only by reading the code is a decision nobody can check. `river-crossing.scene.json`
 carries a third body, `plodder`, with one authored `move` action straight at the far bank and no
 decider at all — precisely what the naive option would have emitted. Its deepest water is
-PLODDER_DEPTH m against the drylander's 0.27 m, in the same run.
+**1.40 m** -- the full depth of the channel, the same as the wader's -- against the
+drylander's 0.27 m, in the same run of the same world.
 
 So the winning option's actions are a **`Move` per waypoint of the route that was priced**, and the
 middle legs carry a `legTolerance` wide enough not to oscillate on a corner and narrow enough not to
