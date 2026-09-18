@@ -4,8 +4,8 @@
   "name": "Tree of Life - Floating Island",
   "camera": {
     "mode": 1,
-    "position": [151.0, 4.0, 145.0],
-    "target": [0.0, 24.0, 0.0],
+    "position": [158.0, 6.0, 152.0],
+    "target": [0.0, 13.0, 0.0],
     "fov": 36.0,
     "orbitSpeed": 0.0
   },
@@ -15,11 +15,22 @@
       "type": "directional",
       "role": "key",
       "direction": [0.387, -0.806, -0.472],
-      "color": [0.8, 0.88, 1.0],
-      "intensity": 2.4,
+      "color": [1.0, 0.92, 0.78],
+      "intensity": 2.45,
       "castsShadow": true,
       "shadowStrength": 0.85,
       "softness": 3.5
+    },
+    {
+      "name": "glowmere-rim",
+      "type": "directional",
+      "role": "rim",
+      "direction": [-0.70, -0.34, 0.63],
+      "color": [0.30, 0.72, 0.68],
+      "intensity": 0.85,
+      "castsShadow": false,
+      "shadowStrength": 0.0,
+      "softness": 3.0
     },
     {
       "name": "cosmic-fill",
@@ -27,7 +38,7 @@
       "role": "fill",
       "direction": [-0.45, 0.62, 0.64],
       "color": [0.30, 0.42, 0.85],
-      "intensity": 0.42,
+      "intensity": 0.30,
       "castsShadow": false,
       "shadowStrength": 0.0,
       "softness": 4.0
