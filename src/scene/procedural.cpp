@@ -3149,10 +3149,37 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
 
 namespace {
 
+// The `material/emissive` slider's ceiling (ADR-321). A floor under the hard maximum rather than
+// the maximum itself: an object whose scene authors more than this gets a range that holds what it
+// authored, and every object that does not keeps exactly the range it had.
+constexpr float kAuthoredEmissiveCeiling = 50.0f;
+
 struct Registrar {
     params::ParameterSet& params;
     ProceduralParameters& out;
     std::string group;
+
+    // ADR-321: a range that moves an authored value says which value, and what it runs at.
+    //
+    // A hard range belongs to the *parameter*: it is what keeps a modulation route and a typed
+    // entry inside something a person could have meant. A number in a scene file is not a UI
+    // gesture, so when the two disagree the file has been overruled -- and until now in silence,
+    // which is ADR-225's defect inside an authoring format. ADR-278 built `warnUnknownKeys` for the
+    // same failure one level up ("a setting the application does not read is not a setting"); this
+    // is that rule for values rather than keys, and it fires on no file in the repository, so a
+    // warning here is a finding rather than noise.
+    //
+    // `Parameter`'s constructor is what actually clamps (`clampComponent` on the base), so the
+    // report has to be taken here, where both numbers still exist.
+    void report(const std::string& path, float value, float lo, float hi) {
+        if (value >= lo && value <= hi) {
+            return;
+        }
+        const float running = std::clamp(value, lo, hi);
+        out.clamped.push_back(ClampedAuthoredValue{path, value, running, lo, hi});
+        log::warn("procedural '{}': {} is {} and runs at {} -- the parameter's range is [{}, {}]",
+                  group, path, value, running, lo, hi);
+    }
 
     template <typename T>
     params::Parameter<T>* add(params::ParamDesc<T> d, const char* rel) {
@@ -3170,6 +3197,7 @@ struct Registrar {
         d.hardMax = hi;
         d.softMin = slo;
         d.softMax = shi;
+        report(rel, def, lo, hi);
         return add(std::move(d), rel);
     }
     params::Parameter<int>* i(const char* rel, int def, int lo, int hi, int slo, int shi) {
@@ -3179,6 +3207,7 @@ struct Registrar {
         d.hardMax = hi;
         d.softMin = slo;
         d.softMax = shi;
+        report(rel, static_cast<float>(def), static_cast<float>(lo), static_cast<float>(hi));
         return add(std::move(d), rel);
     }
     params::Parameter<bool>* b(const char* rel, bool def) {
@@ -3197,6 +3226,12 @@ struct Registrar {
         d.softMin = glm::vec3(slo);
         d.softMax = glm::vec3(shi);
         d.isColor = isColor;
+        // Per component and named: `baseColor` clamps to [0, 1] channel by channel, so "baseColor
+        // was moved" would not say which channel the file lost.
+        static constexpr std::array<const char*, 3> kAxis{".x", ".y", ".z"};
+        for (int c = 0; c < 3; ++c) {
+            report(std::string(rel) + kAxis[static_cast<std::size_t>(c)], def[c], lo, hi);
+        }
         return add(std::move(d), rel);
     }
 };
@@ -3446,7 +3481,25 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     const Material& m = rest.material;
     p.baseColor = r.v3("material/baseColor", m.baseColor, 0.0f, 1.0f, 0.0f, 1.0f, true);
     p.emissiveColor = r.v3("material/emissiveColor", m.emissiveColor, 0.0f, 1.0f, 0.0f, 1.0f, true);
-    p.emissive = r.f("material/emissive", m.emissiveIntensity, 0.0f, 50.0f, 0.0f, 8.0f);
+    // ADR-321. The ceiling here was a flat 50, and it clamped an authored 256 in silence.
+    //
+    // A hard range is an affordance -- it keeps a slider and a modulation route inside something
+    // somebody meant -- and 50 is a round number that was picked, not a bound the quantity has, the
+    // way `roughness`'s 1 and a colour channel's 1 are bounds the quantity has. A scene file is an
+    // authored statement rather than a gesture, so the range is widened to hold what the file says
+    // and the *soft* range stays 0..8, which is the only part of it the panel draws. The cap does
+    // not disappear: with no ceiling at all a modulation route could drive this to infinity and a
+    // typo would be indistinguishable from an intention.
+    //
+    // It matters because `emissive` is the only route above unit radiance a scene file has --
+    // `baseColor` and `emissiveColor` are [0, 1] by the colour they are -- and the HDR Lab measured
+    // a neutral highlight beginning to bloom at scene-linear 0.55 and a pure blue not until 7.6, so
+    // values well above 1 are the working range rather than a pathology.
+    //
+    // No scene in the repository authors above 50, so nothing shipped changes: `std::max` leaves
+    // every existing object's range exactly the 50 it had.
+    p.emissive = r.f("material/emissive", m.emissiveIntensity, 0.0f,
+                     std::max(kAuthoredEmissiveCeiling, m.emissiveIntensity), 0.0f, 8.0f);
     p.roughness = r.f("material/roughness", m.roughness, 0.0f, 1.0f, 0.0f, 1.0f);
     p.metallic = r.f("material/metallic", m.metallic, 0.0f, 1.0f, 0.0f, 1.0f);
 

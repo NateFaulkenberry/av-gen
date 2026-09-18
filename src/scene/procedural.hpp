@@ -651,9 +651,31 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
 bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGeometry& rest, ProceduralGeometry& live);
 void unregisterProceduralParameters(params::ParameterSet& params, const ProceduralParameters& p);
 
+// An authored value that the parameter table's own range moved, and the number it runs at
+// (ADR-321). `path` is relative to the object's prefix -- "material/emissive",
+// "material/baseColor.y" -- so it reads the same in a warning and in a test whatever the node is
+// called.
+struct ClampedAuthoredValue {
+    std::string path;
+    float authored = 0.0f;
+    float running = 0.0f;
+    float low = 0.0f;
+    float high = 0.0f;
+};
+
 struct ProceduralParameters {
     std::string prefix;
     std::vector<params::IParameter*> all; // everything registered (for unregister)
+    // ADR-321: every authored value this table's ranges overruled, in registration order.
+    // `registerProceduralParameters` fills it and warns once per entry.
+    //
+    // A field rather than a second pass over the same numbers: a second pass is a second copy of an
+    // eighty-row table, and the drift between a copy and the thing it copies is exactly the failure
+    // ADR-278 spent its length on one layer up. One traversal produces the parameters and the
+    // report together, so they cannot disagree. Data rather than a log line, because that is what
+    // lets a test assert what would be warned about without capturing spdlog -- ADR-278's own
+    // argument for making `unknownKeys` a pure function.
+    std::vector<ClampedAuthoredValue> clamped;
     // Named handles for the showcase code and tests (nullptr when not registered).
     params::Parameter<float>* sourceRadius = nullptr;
     params::Parameter<float>* sourceHeight = nullptr;
