@@ -2,6 +2,7 @@
 
 #include "rendering/procedural_renderer.hpp"
 
+#include "rendering/light_data.hpp"
 #include "rendering/visibility.hpp"
 #include "spatial/field.hpp"
 
@@ -45,6 +46,18 @@ constexpr glm::vec4 kCascadeColour[4] = {{1.00f, 0.35f, 0.30f, 0.80f},
 constexpr glm::vec4 kCasterColour{0.35f, 1.00f, 0.45f, 0.85f};
 constexpr glm::vec4 kCasterOffScreenColour{1.00f, 0.70f, 0.20f, 0.85f};
 constexpr glm::vec4 kNotCasterColour{1.00f, 0.30f, 0.30f, 0.55f};
+
+// Lighting Lab. A light is drawn in its own colour so overlapping lights can be told apart, and
+// these are the two fixed parts: the influence sphere is dimmer than the emitter because it is a
+// consequence rather than an authored thing, and a disabled light is drawn at all rather than
+// omitted -- "there is no light here" and "the light here is switched off" are different answers.
+constexpr float kEmitterAlpha = 0.95f;
+constexpr float kReachAlpha = 0.18f;
+// `DebugVertex::size` is a **world-space diameter** (shaders/debug.wgsl), not a pixel size, and
+// `DebugViewOptions::pointSize` defaults to 3. A light marker drawn at `pointSize` is a 3 m ball
+// across the middle of the frame; this is the same 0.12 scale `worldAxes` uses for the origin.
+constexpr float kMarkerScale = 0.12f;
+constexpr glm::vec4 kLightOffColour{0.45f, 0.45f, 0.5f, 0.35f};
 
 // Blue to red across a normalised value.
 glm::vec4 heat(float t, float alpha) {
@@ -164,6 +177,104 @@ ProceduralLodLevels readProceduralLodLevels(ProceduralRenderer& procedurals,
     return out;
 }
 
+// A light's own colour, normalised so a 40,000 candela practical and a 0.2 fill draw at the same
+// brightness: the overlay is about *where* the light is, and an intensity-scaled colour would make
+// the dim ones invisible, which is the opposite of what someone looking for a missing light wants.
+glm::vec4 lightColour(const scene::PunctualLight& light, float alpha) {
+    const glm::vec3 c = light.color * scene::colorTemperatureToRgb(light.temperature, light.tint);
+    const float peak = std::max({c.r, c.g, c.b, 1e-4f});
+    return glm::vec4(glm::clamp(c / peak, glm::vec3(0.05f), glm::vec3(1.0f)), alpha);
+}
+
+// Three great circles, which reads as a sphere from any angle and costs 96 lines rather than a
+// tessellated ball.
+void drawSphere(DebugDraw& draw, const glm::vec3& centre, float radius, const glm::vec4& colour,
+                int segments = 32) {
+    if (!(radius > 0.0f) || !std::isfinite(radius)) {
+        return;
+    }
+    draw.circle(centre, glm::vec3(0.0f, 1.0f, 0.0f), radius, colour, segments);
+    draw.circle(centre, glm::vec3(1.0f, 0.0f, 0.0f), radius, colour, segments);
+    draw.circle(centre, glm::vec3(0.0f, 0.0f, 1.0f), radius, colour, segments);
+}
+
+// The emitter the shading pass actually integrates, per kind. Not a generic marker: the difference
+// between a Rect and a Disk of the same nominal size is a factor of pi/4 in the light it throws,
+// and a lab that draws both as a dot cannot show that.
+void drawEmitter(DebugDraw& draw, const scene::PunctualLight& light, const glm::vec4& colour,
+                 float reach) {
+    using Type = scene::PunctualLight::Type;
+    const glm::vec3 dir = glm::dot(light.direction, light.direction) > 1e-12f ? glm::normalize(light.direction)
+                                                                 : glm::vec3(0.0f, -1.0f, 0.0f);
+    switch (light.type) {
+    case Type::Directional:
+        // No position and no extent. Drawn as an arrow through the camera's own target, because a
+        // directional light's only authored quantity is the direction it travels and the only
+        // honest place to draw it is where the frame is looking.
+        break;
+    case Type::Point:
+        draw.arrow(light.position, dir, std::min(reach, 2.0f), colour);
+        break;
+    case Type::Spot: {
+        // The outer cone, out to the reach, with the inner cone inside it: the two angles are what
+        // `packLight` turns into the spot term, and a cone drawn at one angle hides the falloff.
+        const float len = std::max(reach, 0.01f);
+        for (const float angle : {light.outerConeAngle, light.innerConeAngle}) {
+            if (!(angle > 0.0f)) {
+                continue;
+            }
+            const float r = len * std::tan(std::clamp(angle, 0.0f, 1.55f));
+            const glm::vec3 rim = light.position + dir * len;
+            draw.circle(rim, dir, r, colour);
+            glm::vec3 right = glm::cross(dir, glm::vec3(0.0f, 1.0f, 0.0f));
+            if (glm::dot(right, right) < 1e-6f) {
+                right = glm::vec3(1.0f, 0.0f, 0.0f);
+            }
+            right = glm::normalize(right);
+            const glm::vec3 up = glm::cross(right, dir);
+            for (int i = 0; i < 4; ++i) {
+                const float a = static_cast<float>(i) * 1.5707963f;
+                draw.line(light.position, rim + (right * std::cos(a) + up * std::sin(a)) * r, colour);
+            }
+        }
+        break;
+    }
+    case Type::Rect:
+    case Type::Disk: {
+        // Exactly the quad `rendering::areaLightCorners` hands the LTC integration -- a Disk's is
+        // the square of equal area, which is what the shader uses and therefore what is true.
+        glm::vec3 corners[4];
+        rendering::areaLightCorners(light, corners);
+        const std::array<glm::vec3, 4> loop{corners[0], corners[1], corners[2], corners[3]};
+        draw.polyline(loop, colour, true);
+        if (light.type == Type::Disk) {
+            draw.circle(light.position, dir, std::max(light.radius, 1e-3f), colour);
+        }
+        draw.arrow(light.position, dir, std::max(light.radius, std::max(light.width, light.height)) * 0.75f,
+                   colour);
+        break;
+    }
+    case Type::Tube: {
+        glm::vec3 right = glm::cross(dir, glm::vec3(0.0f, 1.0f, 0.0f));
+        if (glm::dot(right, right) < 1e-6f) {
+            right = glm::vec3(1.0f, 0.0f, 0.0f);
+        }
+        right = glm::normalize(right);
+        const float half = std::max(light.width, 1e-3f) * 0.5f;
+        const float r = std::max(light.radius, 1e-3f);
+        const glm::vec3 a = light.position - right * half;
+        const glm::vec3 b = light.position + right * half;
+        draw.line(a, b, colour);
+        draw.circle(a, right, r, colour, 16);
+        draw.circle(b, right, r, colour, 16);
+        break;
+    }
+    case Type::Sphere:
+        drawSphere(draw, light.position, std::max(light.radius, 1e-3f), colour, 20);
+        break;
+    }
+}
+
 void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugViewOptions& options, double time,
                         const TransformHistory* history, const ProceduralLodLevels* lodLevels,
                         std::span<const ShadowView> shadowViews) {
@@ -238,6 +349,95 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
                             cameraSlice(invCamera, scene.camera.nearPlane, scene.camera.farPlane,
                                         view.nearDistance, view.farDistance),
                             colour);
+            }
+        }
+    }
+
+    // ---- the lights, and the froxels they were given to (Lighting Lab) -----------------------
+    if (options.lights) {
+        for (const scene::PunctualLight& light : scene.lights) {
+            const bool on = light.enabled;
+            const glm::vec4 emitter = on ? lightColour(light, kEmitterAlpha) : kLightOffColour;
+            const float reach = rendering::lightInfluenceRadius(light);
+            if (light.type == scene::PunctualLight::Type::Directional) {
+                // Its only authored quantity is a direction, so it is drawn where the frame is
+                // looking rather than at an origin it does not have.
+                const glm::vec3 dir = glm::dot(light.direction, light.direction) > 1e-12f
+                                          ? glm::normalize(light.direction)
+                                          : glm::vec3(0.0f, -1.0f, 0.0f);
+                const float span = std::max(1.0f, glm::length(scene.camera.position - scene.camera.target) * 0.3f);
+                draw.arrow(scene.camera.target - dir * span, dir, span, emitter);
+                continue;
+            }
+            draw.point(light.position, options.pointSize * kMarkerScale, emitter);
+            drawEmitter(draw, light, emitter, reach);
+            // The hard edge. `lightInfluenceRadius` is what the froxel pass is handed, so this ring
+            // is where the light stops being evaluated at all -- not where it becomes dim.
+            if (on) {
+                // The horizontal great circle first and brighter: it is the one that crosses the
+                // ground, which is where a reach edge is actually seen.
+                draw.circle(light.position, glm::vec3(0.0f, 1.0f, 0.0f), reach,
+                            lightColour(light, kReachAlpha * 2.0f), 48);
+                draw.circle(light.position, glm::vec3(1.0f, 0.0f, 0.0f), reach,
+                            lightColour(light, kReachAlpha), 32);
+                draw.circle(light.position, glm::vec3(0.0f, 0.0f, 1.0f), reach,
+                            lightColour(light, kReachAlpha), 32);
+            }
+        }
+    }
+
+    if (options.lightClusters) {
+        // The grid the renderer builds in `SceneRenderer::updateLights`, from the same camera.
+        // `frustumAspect` is the viewport's, for the reason `frustum` takes it: a scene camera does
+        // not carry one, and a grid drawn at the wrong aspect is froxels that do not line up with
+        // the pixels that read them.
+        ClusterGrid grid;
+        grid.zNear = std::max(scene.camera.nearPlane, 0.01f);
+        grid.zFar = std::max(scene.camera.farPlane, grid.zNear * 2.0f);
+        grid.tanHalfFovY = std::tan(scene.camera.effectiveFovY() * 0.5f);
+        grid.aspect = std::max(1e-3f, options.frustumAspect);
+        const glm::mat4 view = scene.camera.view();
+        const glm::mat4 inverseView = glm::inverse(view);
+        std::vector<glm::vec3> viewPositions;
+        std::vector<float> radii;
+        for (const scene::PunctualLight& light : scene.lights) {
+            if (!light.enabled || light.type == scene::PunctualLight::Type::Directional) {
+                continue; // directional lights reach every fragment and never enter the grid
+            }
+            viewPositions.emplace_back(view * glm::vec4(light.position, 1.0f));
+            radii.push_back(rendering::lightInfluenceRadius(light));
+        }
+        const ClusterOccupancy occupancy = clusterOccupancy(grid, viewPositions, radii, kMaxLightsPerCluster);
+        const auto scale = static_cast<float>(std::max(occupancy.max, 1u));
+        const auto lists = assignClusters(grid, viewPositions, radii);
+        for (std::uint32_t k = 0; k < grid.z; ++k) {
+            if (options.lightClusterSlice >= 0 && static_cast<std::uint32_t>(options.lightClusterSlice) != k) {
+                continue;
+            }
+            for (std::uint32_t j = 0; j < grid.y; ++j) {
+                for (std::uint32_t i = 0; i < grid.x; ++i) {
+                    const std::size_t count = lists[grid.indexOf(i, j, k)].size();
+                    if (count == 0) {
+                        continue; // an empty froxel is the common case and drawing it hides the rest
+                    }
+                    glm::vec3 lo;
+                    glm::vec3 hi;
+                    grid.bounds(i, j, k, lo, hi);
+                    // The near face only: a full box per froxel is twelve lines and the picture
+                    // becomes a solid wall before the occupancy is readable.
+                    const std::array<glm::vec3, 4> face{
+                        glm::vec3(inverseView * glm::vec4(lo.x, lo.y, hi.z, 1.0f)),
+                        glm::vec3(inverseView * glm::vec4(hi.x, lo.y, hi.z, 1.0f)),
+                        glm::vec3(inverseView * glm::vec4(hi.x, hi.y, hi.z, 1.0f)),
+                        glm::vec3(inverseView * glm::vec4(lo.x, hi.y, hi.z, 1.0f))};
+                    // Blue is one light, red is the busiest froxel in the frame; a froxel at the
+                    // 32-light cap is drawn white, because that is the one that is losing lights.
+                    const bool capped = count >= kMaxLightsPerCluster;
+                    draw.polyline(face,
+                                  capped ? glm::vec4(1.0f, 1.0f, 1.0f, 0.9f)
+                                         : heat(static_cast<float>(count) / scale, 0.55f),
+                                  true);
+                }
             }
         }
     }

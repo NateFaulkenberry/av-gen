@@ -1,0 +1,165 @@
+{
+ "format": "avgen-lab-cases",
+ "version": 1,
+ "lab": "lighting",
+ "_note": "Every arm here has a control and the controls are named as controls. The fixture is examples/labs/lighting-lab.scene.json and its lights are examples/lightrigs/lighting-lab.rig.json: ten lights, all seven kinds the engine has, every one of them placed in WORLD coordinates so the camera can be moved in a case without moving the experiment. The rig is sized by the fixture's composition.focalPoints entry -- (0, 1.5, 0), radius 4 -- so 'distance 2.0' is 8 m and every local light's range is 48 m, which is the number three of these cases are about. Two of the ten are directional and never enter the froxel grid at all; they are the control that says a measurement of cluster assignment is measuring cluster assignment. The reach heuristic itself has no case here, deliberately: LightRig::expand sets an explicit range on every non-directional light it makes, so no fixture in this repository can reach it -- that defect lives in tests/rendering/test_lighting_lab_gpu.cpp, where a light can be built with range 0. See docs/lighting-lab/README.md.",
+ "cases": [
+  {
+   "lab": "lighting",
+   "number": 1,
+   "title": "The bench: all seven kinds, one frame",
+   "question": "What does each light kind actually put on a surface, and where is each of them?",
+   "expectation": "Nothing asserted. This is the frame docs/lighting-lab/README.md was read from. Ten lights reach the renderer -- two Directional, two Point, one Spot, two Rect, one Disk, one Tube, one Sphere -- and tests/unit/test_lighting_lab.cpp asserts exactly that count by kind, because a scene file cannot author a light and a rig that failed to load would leave the scene lit by defaultKeyLight() with no error. Run it again with --debug-draw lights to see each emitter's real shape and its sphere of influence.",
+   "fixture": "examples/labs/lighting-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "The lab's own overlay profile (labs::overlaysFor) turns on `lights` and `worldAxes`, so --lab-case shows the constellation; a --render of the same case does not, which is what keeps the measured frame clean."
+  },
+  {
+   "lab": "lighting",
+   "number": 2,
+   "title": "Two lights in one froxel, and eight that are not",
+   "question": "Where does the froxel grid actually carry more than one light, and what does the 32-light cap cost here?",
+   "expectation": "point-a and point-b sit 15 degrees apart at 8 m, so their 48 m spheres of influence overlap over most of the frame and the froxels between them carry two local lights where the rest carry one. Eight of the ten lights are local; the two Directional ones are the control -- they must never appear in a cluster count, whatever the camera does. With --cluster-stats the cap must not bite at all: eight lights cannot overflow a list of thirty-two, so `overflowed` is 0 and `dropped` is 0, and a non-zero either would mean the occupancy is counting something other than what the pass was handed.",
+   "fixture": "examples/labs/lighting-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Reproduce with --cluster-stats, which reports through --bench-json: it is CPU work inside the measured frame and off by default (ADR-114), so a timing taken with it on is not comparable with one taken without, and the flag says so in the record itself (`clusterStatsPerturbsWallClock`)."
+  },
+  {
+   "lab": "lighting",
+   "number": 3,
+   "title": "The hard edge at 48 m, seen down the post row",
+   "question": "What does a local light's reach look like on the ground -- a fade, or a line?",
+   "expectation": "A line. The post row runs from z = -12 to z = -56 at 4 m spacing, and every local light's range is 48 m from a position about 8 m from the origin, so the far posts fall outside it. Past that distance the froxel pass does not assign the light at all: the last post inside the reach carries the locals' colour and the first one outside carries only the two directional lights. That edge is correct here, because an authored range closes the shader's own falloff window at the same distance; it is the same edge that was in the wrong place for every light without a range (ADR-272 \u00a71). The near posts are the control -- they must not change between this case and case 1.",
+   "fixture": "examples/labs/lighting-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     14.0,
+     6.0,
+     6.0
+    ],
+    "aim": [
+     0.0,
+     1.5,
+     -34.0
+    ]
+   },
+   "notes": "The camera is moved to see the row side-on; the rig does not move with it, which is what followCamera:false is for."
+  },
+  {
+   "lab": "lighting",
+   "number": 4,
+   "title": "The same light, fifty times the emitter",
+   "question": "What does emitter area change, once the rig has already converted illuminance to radiance for both?",
+   "expectation": "Not the brightness at the subject -- LightRig::expand divides each by its own area, so rect-large (3.0 radii, aspect 2) and rect-small (0.06 radii, square) are matched there by construction. What differs is the shape of the terminator on normal-ball, which is soft under a 12 m panel and nearly punctual under an 8 cm one, and the highlight in the rough-005 sphere, which is a broad band for one and a point for the other. Both sit at the same azimuth and elevation, so the difference is size and nothing else. The Disk beside them is the second control: a Disk is integrated as the square of equal area (side r*sqrt(pi)) on both the CPU and the GPU, so it must read as an area light of that size and not as a point.",
+   "fixture": "examples/labs/lighting-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     0.0,
+     2.6,
+     9.0
+    ],
+    "aim": [
+     0.0,
+     1.4,
+     0.0
+    ]
+   }
+  },
+  {
+   "lab": "lighting",
+   "number": 5,
+   "title": "Normal response: one ball with every normal, and seven with a number on them",
+   "question": "Does the n.L term do what it says across the whole range of incidence, including at grazing?",
+   "expectation": "The tilt-NN fan is seven slabs rotated 0, 15, 30, 45, 60, 75 and 90 degrees about +X, so their normals sweep from straight up to facing -Z. Under the sun alone (azimuth -90, elevation 34) the illumination of each should follow cos of the angle between its normal and the sun, and tilt-90 -- edge-on -- should receive nothing from it at all and be lit only by the ambient directional and whichever locals reach it. tilt-00 is the control: it is the one whose value is predictable without trigonometry. Nothing is asserted about the absolute level, because the post chain owns that; what the case is for is the *ordering*, which the lighting stage owns.",
+   "fixture": "examples/labs/lighting-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     0.0,
+     4.0,
+     2.0
+    ],
+    "aim": [
+     0.0,
+     1.0,
+     -7.0
+    ]
+   }
+  },
+  {
+   "lab": "lighting",
+   "number": 6,
+   "title": "Material response at fixed albedo",
+   "question": "Do the GGX and Smith terms move the highlight the way roughness and metalness say, with nothing else changing?",
+   "expectation": "Six spheres from roughness 0.05 to 1.0 at metallic 0, then five from metallic 0 to 1 at roughness 0.25 -- same albedo, same radius, same row, same lights. The roughness row's highlights must broaden and dim monotonically; the metallic row's diffuse must fall to nothing while its specular takes the albedo's colour, because f0 = mix(0.04, albedo, metallic) and diffuseColor = albedo * (1 - metallic). rough-100 and metal-000 are the controls at either end: a fully rough dielectric has no visible highlight to move, and a fully diffuse one has no tint to take.",
+   "fixture": "examples/labs/lighting-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     14.0,
+     2.4,
+     12.0
+    ],
+    "aim": [
+     14.0,
+     0.7,
+     6.0
+    ]
+   },
+   "notes": "Offline forces the Full material tier (ADR-133 \u00a75.9), so a reading taken at --tier offline is not capped; at preview the flat tier's local-light budget is 1 and a distant sphere is a different measurement."
+  },
+  {
+   "lab": "lighting",
+   "number": 7,
+   "title": "The froxel grid itself",
+   "question": "Which froxels carry lights, and is the grid where the lights are?",
+   "expectation": "Nothing asserted; this is the picture. --debug-draw lightClusters draws the near face of every occupied froxel, coloured blue for one light and red for the busiest in frame, white at the 32-light cap. It is deliberately not in the lab's overlay profile, because it covers exactly the pixels a lighting question is about. The invariant behind the picture is in tests/unit/test_lighting_lab.cpp: the froxel a fragment reads (ClusterGrid::clusterOf) has to be the froxel that point is in (ClusterGrid::bounds), and the sixty samples above the view axis have to land in the grid's upper rows -- the grid's y runs bottom-up and the screen's runs down, and that flip is the half the GPU comparison in test_shadows_gpu.cpp cannot see.",
+   "fixture": "examples/labs/lighting-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0
+  }
+ ]
+}

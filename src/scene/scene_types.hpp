@@ -345,6 +345,19 @@ struct PunctualLight {
 // applied perpendicular to the locus. 6500 K with tint 0 returns white.
 [[nodiscard]] glm::vec3 colorTemperatureToRgb(float kelvin, float tint = 0.0f);
 
+// The emitting area of a light, in square metres: Rect is width x height, Disk and Sphere are
+// pi r^2, Tube is 2 r x its length (`width`), and a Directional, Point or Spot light has no
+// extent and returns 1.
+//
+// This is not a convenience. `intensity` means candela on a punctual light and **nits over the
+// emitter** on an area one, and the number that converts between them is this area -- so
+// `LightRig::expand` divides by it to turn an illuminance at the subject into a radiance, and
+// `rendering::lightInfluenceRadius` multiplies by it to find how far the emitter throws. Those two
+// have to be the same area or a rig's light is packed with a reach computed for a different light,
+// which is why it is here rather than private to either of them.
+[[nodiscard]] float emitterArea(PunctualLight::Type type, float width, float height, float radius);
+[[nodiscard]] float emitterArea(const PunctualLight& light);
+
 // ---- environment ------------------------------------------------------------------------------
 
 // The sky's authored parameters. `enabled` defaults on; the renderer only reaches for the sky when

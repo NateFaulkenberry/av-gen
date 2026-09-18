@@ -92,6 +92,28 @@ struct DebugViewOptions {
     // object, and why not when they did nothing. Green casts, amber casts from off screen, red is
     // one of the four reasons it does not.
     bool shadowCasters = false;
+    // ---- Lighting Lab (§7) --------------------------------------------------------------------
+    //
+    // Two things nothing drew before, and they are the two halves of "which lights reached this
+    // pixel, and with how much": where each light *is and reaches*, and which froxels were told
+    // about it.
+    //
+    // `lights` draws every enabled light in `scene.lights` in its own colour: the position, the
+    // direction it travels, the **emitter** (a spot's cone, an area light's quad or tube, a
+    // sphere's ball -- the shape the shading pass integrates, not a generic marker), and the
+    // sphere of influence `rendering::lightInfluenceRadius` gave it. That last ring is the one
+    // worth having: it is a *hard* edge, because past it the froxel pass does not assign the light
+    // at all, and until it was drawn the only way to see where a light stopped was to find the
+    // line in the image and wonder what made it.
+    bool lights = false;
+    // `lightClusters` draws the froxel grid a fragment reads, coloured by how many lights reach
+    // each froxel: the CPU reference `assignClusters` run over the frame's own camera and lights.
+    // Only occupied froxels are drawn, and only their near face -- 16 x 8 x 24 boxes is 36,864
+    // lines and a picture of nothing.
+    bool lightClusters = false;
+    // Restrict `lightClusters` to one depth slice; -1 draws every occupied one. Twenty-four nested
+    // shells is twenty-four shells, and the question is usually about the depth the subject is at.
+    int lightClusterSlice = -1;
     bool depthTest = true;
     float pointSize = 3.0f;
     int maxPoints = 200000;       // safety cap per frame

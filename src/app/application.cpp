@@ -221,7 +221,10 @@ std::string usageText() {
            "                      entityOrigins, entityBounds, entityIds, skeletons, worldAxes,\n"
            "                      frustum, transformTrail, points, bounds, normals, splines,\n"
            "                      lod (the rung each instance drew at), shadowCascades,\n"
-           "                      shadowCascadeSlices, shadowCasters.\n"
+           "                      shadowCascadeSlices, shadowCasters, lights (each light's\n"
+           "                      emitter, direction and the sphere of influence past which the\n"
+           "                      froxel pass stops evaluating it), lightClusters (the froxel\n"
+           "                      grid, coloured by how many lights reach each occupied froxel).\n"
            "                      Works in --render, where there is no panel to switch them on\n"
            "  --debug-target <t>  display an auxiliary render target: normal|roughness|velocity|\n"
            "                      emission|ids|occlusion|depth|linear depth|depth edges|\n"
@@ -1805,6 +1808,8 @@ Result<void> Application::applyDebugDraw() {
         {"shadowCascades", &d.shadowCascades},
         {"shadowCascadeSlices", &d.shadowCascadeSlices},
         {"shadowCasters", &d.shadowCasters},
+        {"lights", &d.lights},
+        {"lightClusters", &d.lightClusters},
     };
     std::string enabled;
     std::stringstream stream(options_.debugDraw);
