@@ -99,6 +99,13 @@
 // use of it is a reference or a pointer -- and `entity.hpp` has to be able to include *this*, now
 // that `EntityDesc` carries a `PerceptionSettings`. A normative header the thing it describes
 // cannot include is a header that stays inert, which is what it was.
+// ADR-333 changed exactly one thing here and changed nothing it says: `DecisionContext` gained
+// `visited`, the bounded list of places this character has recently been. It is a field rather than
+// a member of a considerer because §3's rule -- one instance per *kind* of character, holding no
+// per-character state -- is what makes D4 free, and a novelty memory living inside a shared scorer
+// would break it for every character of that kind at once. The caller bounds it, a replay
+// reconstructs it, and nothing persists it.
+
 #include "entity/action.hpp"
 #include "entity/behavior.hpp"
 #include "entity/locomotion.hpp"
@@ -285,7 +292,19 @@ struct DecisionContext {
     double dt = 0.0;                // the simulation step since this character last decided
     std::size_t self = 0;
     const EntityState* state = nullptr;   // R1: `position()` is the simulation's answer
+    // What this body knows. ADR-290 builds this fresh every sense tick and deliberately does not
+    // accumulate it; ADR-333 §5 is where the decider folds a bounded fade back in, so what arrives
+    // here may include a percept whose `seenAt` is older than the last tick. That is why `seenAt`
+    // is on a percept at all.
     std::span<const Percept> percepts;
+    // Where this character has recently been. ADR-333 §3: the goal model suppresses a place the
+    // body has already visited, and that history is the one thing in the model that is not a fact
+    // about the world. It is carried **in the context rather than in the considerer** because a
+    // considerer holds no per-character state -- that rule is what makes D4 free, and a novelty
+    // memory living inside a shared scorer would break it for every character at once.
+    //
+    // Bounded by the caller, reconstructed by a replay, never persisted (D4).
+    std::span<const glm::vec3> visited;
     const Navigator* nav = nullptr;
     const EntityWorld* world = nullptr;
     const signals::SignalBus* bus = nullptr;

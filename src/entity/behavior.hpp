@@ -23,6 +23,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
@@ -33,6 +34,7 @@ namespace avgen::entity {
 
 class Entity;
 class EntityWorld;
+class ActionQueue;
 
 // What behaviours add to the node the entity drives. Folded onto the node's transform parameters
 // once per frame, after modulation, so a route and a behaviour compose instead of overwriting.
@@ -114,6 +116,17 @@ struct BehaviorContext {
     // the crowd field to push it away from everyone *except itself* without a name comparison.
     std::size_t self = 0;
     Rng* rng = nullptr;  // this entity's own stream, seeded from the scene seed and the entity name
+    // This entity's own action queue, for a behaviour that *decides* rather than moves (ADR-269,
+    // ADR-333). A decider's whole output is an `ActionDesc` list pushed onto `Authority::Routine`;
+    // without this it would have to move the body itself, which is the second execution engine
+    // ADR-269 exists to refuse. Null for every behaviour that does not need it, and the fourteen
+    // that came before this one do not touch it.
+    //
+    // The queue has already ticked this frame when the behaviours run (ADR-091 reads the hierarchy
+    // top-down), so an action pushed here begins on the next step. That is a frame of latency and
+    // it is deliberate: a decision that took effect inside the frame it was made in would run the
+    // queue twice in one step, and the second run would see a `dt` it had already spent.
+    ActionQueue* actions = nullptr;
 
     // Reads a signal by name, 0 when the bus has no such signal. Behaviours resolve names once and
     // cache the id; this is the slow path for the rare read.
@@ -157,6 +170,36 @@ struct NavDebug {
     std::string_view goalKind;          // landmark / character / glow / water / vista
 };
 
+// One option as a decider scored it, flattened for an overlay (ADR-269 §4, ADR-333).
+//
+// `NavDebug` exists because "why is it going that way" is a question this project has repeatedly
+// been unable to answer about its own characters, and it was published and read by nobody for long
+// enough that the data was true and invisible -- which is the same as absent. This is the same seam
+// for the question one layer up: *what did it turn down to do that?*
+//
+// A flattened copy rather than `entity::Option` itself, because `Option` lives in
+// `character_ai.hpp`, which includes `action.hpp`, which includes this file. An overlay needs the
+// name and the number and nothing else.
+struct ScoredOption {
+    std::string_view name;  // into the considerer; valid until its next `consider`
+    float score = 0.0f;
+    bool chosen = false;    // the one the selector committed to, which is not always the highest:
+                            // a dwell or a margin refusal is exactly the case worth seeing
+};
+
+// What a deciding behaviour is doing, in the terms an overlay draws.
+struct DecisionDebug {
+    std::span<const ScoredOption> options; // every option scored on the last decision tick, in order
+    std::string_view chosen;               // the committed option's name; empty when nothing scored
+    std::uint64_t tick = 0;                // the decision tick the last selection ran at
+    std::uint64_t committedTick = 0;       // the tick the current option was committed on
+    float margin = 0.0f;                   // how far the winner beat the runner-up by, this tick
+    std::size_t decisions = 0;             // times the choice changed, since the last reset
+    std::size_t dwellRejections = 0;       // switches the dwell refused
+    std::size_t marginRejections = 0;      // switches the margin refused
+    std::size_t remembered = 0;            // percepts held past the tick that saw them (ADR-333 §5)
+};
+
 class IBehavior {
 public:
     virtual ~IBehavior() = default;
@@ -195,6 +238,20 @@ public:
     // behaviour and are valid until its next update, which is enough for a UI pass that runs in
     // the same frame and is why nothing is copied here.
     [[nodiscard]] virtual bool navDebug(NavDebug& out) const {
+        (void)out;
+        return false;
+    }
+
+    // Fills `out` and returns true when this behaviour *decides* -- when it scores options and
+    // commits to one. The same shape as `navDebug` and for the same reason: the behaviour classes
+    // live inside `behaviors.cpp` and nothing outside that file can name their types.
+    //
+    // Defaulting to false is what makes the other fourteen behaviours say nothing. `explore` scores
+    // a goal model and does **not** report here, deliberately: what it does with the scores is a
+    // weighted roll over all of them rather than a selection between courses of action, and
+    // reporting a list of 140 interest points as "the options it turned down" would be a true list
+    // that answered a different question.
+    [[nodiscard]] virtual bool decisionDebug(DecisionDebug& out) const {
         (void)out;
         return false;
     }

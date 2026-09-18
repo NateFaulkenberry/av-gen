@@ -2,7 +2,7 @@
   "format": "avgen-lab-cases",
   "version": 1,
   "lab": "character",
-  "_note": "The Character Intelligence Lab's reproducible configurations (ADR-275, ADR-290). Cases 1-6, 10 and 11 can be run today. Cases 7-9 are three of the six scenarios the owner's brief asked for, and they name the unit of docs/character-ai-plan.md that has to land before they mean anything. P2 perception landed and 7 and 8 lost that half of their block; all three now wait only on P3, the decider. A case that asserted a decider this engine does not have would pass by asserting nothing, which is the failure the suite was built to prevent; `--lab-case character:7` refuses and names what it is waiting for.",
+  "_note": "The Character Intelligence Lab's reproducible configurations (ADR-275, ADR-290, ADR-333). Cases 1-8 and 10-15 can be run today. P3 landed the decider, and 7 and 8 lost the half of them that was waiting on it; case 9 did not, and its `blockedBy` says what it is waiting for now rather than being deleted because the unit it named finished -- P3 delivered a selector and an option list, and nobody has yet written the considerer that prices a route. Two fixtures: the original flat world for the explorers, whose every byte matters because case 15's golden trace is taken from it, and `guard-post.scene.json` for the decided characters, which exists *because* of that -- a body added to the first fixture changes what the other five perceive and score.",
   "cases": [
     {
       "lab": "character",
@@ -87,9 +87,9 @@
     {
       "lab": "character",
       "number": 6,
-      "title": "Every character used to see everything",
+      "title": "Every character used to see everything, and nothing scored an option",
       "question": "What does one character know that another does not?",
-      "expectation": "Nothing, until P2. `EntityWorld::interestPoints()` is one global list -- 140 entries in this fixture -- with no range, no facing, no occlusion and no notion of having noticed something, and every one of the four characters scored all of it every time it picked a goal. That is still true of `Explore`, which is why this case is not retired: what changed is that a **percept** now exists beside it. At 2 s, `scout` (range 60 m) holds 20 percepts reaching 39.23 m and `rover` (range 12 m) holds 2 reaching 11.59 m, out of the same 140-entry list -- so the answer to \"what does one character know that another does not\" is no longer \"nothing\". The four navigating behaviours still report a destination through `NavDebug` and **none reports a score it beat**, because `Option` and `IConsiderer` still have no implementations (ADR-269): perception landed and the decider has not.",
+      "expectation": "Nothing, until P2. `EntityWorld::interestPoints()` is one global list -- 141 entries in this fixture (28 landmark, 5 character, 108 water; there is no glow, because this is a flat world with no ecology) -- with no range, no facing, no occlusion and no notion of having noticed something, and every one of the four characters scored all of it every time it picked a goal. **That is still true of `Explore` and it is now a choice rather than the only option**: since ADR-333 its goal model is `entity::goalWeight` behind an `InterestConsiderer` whose `source` is a knob, and it is set to `Omniscient` because five Glowmere characters are explorers and changing which list they score is a changed film. At 2 s, `scout` (range 60 m) holds 20 percepts reaching 39.23 m and `rover` (range 12 m) holds 2 reaching 11.59 m. What has changed since this case was written is the last sentence: the four navigating behaviours still report a destination through `NavDebug` and now something **does** report the score it beat -- `IBehavior::decisionDebug`, which `explore` deliberately does not implement and `decide` does. Case 14 is where the scores are printed.",
       "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
       "timeSeconds": 0.0,
       "size": [
@@ -98,14 +98,14 @@
       ],
       "fps": 60.0,
       "seed": 0,
-      "notes": "The before-arm, kept. The 140-entry omniscient list is still what `Explore` reads; the percepts beside it are what P3 will read instead. Case 10 is the after-arm and it carries the numbers."
+      "notes": "The before-arm, kept. The 141-entry omniscient list is still what `Explore` reads; the percepts beside it are what a `decide` character reads instead, and case 14 is the after-arm. **This fixture is frozen**: case 15's golden position trace is taken from it, and adding one body changes what the other five perceive and score."
     },
     {
       "lab": "character",
       "number": 7,
       "title": "Investigating a mushroom",
       "question": "Does a character notice a glowing thing it was not already going to, approach it, and attend to it while it is there?",
-      "expectation": "A character within perception range of a glow point with no other business should raise it as a percept, score an 'investigate' option above its idle, walk to it and hold a look target on it -- and a second character out of range, in the same frame, should not have the percept at all. **The percept half is built** (ADR-290): a body declares a `perception` block, holds a bounded working set of `InterestKind::Glow` and the rest, and two bodies with different ranges demonstrably hold different sets. What cannot be run is the other half -- there is still nothing that scores an option.",
+      "expectation": "It does. `investigate` (ADR-333) is the first thing in this engine to read a percept: it scores `DecisionContext::percepts` -- never `interestPoints()` -- at `salience x the decider's own taste x staleness`, emits one option carrying a `Move` to a stand-off point, a `Face` at the thing and a `Pose` of the `observe` activity, and the selector pushes that onto `Authority::Routine`. Measured on a hand-written pair of percepts: a `Glow` percept at 2 m with salience 0.95 beside a `Character` percept at 12 m with salience 0.60, through a considerer told `kinds: [\"character\"]`, picks the **character** -- the brighter, nearer, more salient mushroom loses to the filter. The control is the identical percepts through `kinds: [\"glow\"]`, which picks the mushroom. The staleness arm: the same percept four seconds older scores **nothing** at `staleSeconds: 4`, and two seconds older scores between that and the fresh value. `approach` is a stand-off and it is load-bearing -- see case 14.",
       "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
       "timeSeconds": 0.0,
       "size": [
@@ -114,15 +114,14 @@
       ],
       "fps": 60.0,
       "seed": 0,
-      "notes": "The brief's second scenario. `IPerception` (ADR-270) landed as P2; `IConsiderer` (ADR-269) has not. `character_ai.hpp` declares both and now one of them has an implementation.",
-      "blockedBy": "P3 decision"
+      "notes": "The brief's second scenario. Asserted by tests/unit/test_entity_decision.cpp. **The glow percept is scripted, and the reason is a fixture gap rather than an engine one**: a `Glow` interest point comes from a terrain node's `world::GlowCluster` list (composition.cpp:glowInterestPoints) and neither character fixture grows one -- the lab's 141 points are 28 landmark / 5 character / 108 water and guard-post's 8 are 5 landmark / 3 character, because both are flat worlds with no ecology. `ScriptedPerception` is what ADR-290 built for exactly this, and the live arm on the identical code path is case 14's guard, which investigates a `Character` percept the grid produced. A fixture with ecology would close the gap and is the smallest thing this case still wants."
     },
     {
       "lab": "character",
       "number": 8,
       "title": "A social interaction",
       "question": "Do two characters notice each other, and does one change what it was doing because of the other?",
-      "expectation": "Two bodies within perception range should each carry the other as an `InterestKind::Character` percept with a distance and a `seenAt`, and one of them should abandon a routine-tier action for a higher-scoring social one -- with the losing option's score visible beside the winner, which is the overlay this lab owes. **The noticing is built** (ADR-290): a Character percept carries the other body's simulation position, its distance, and a `seenAt` that is genuinely stale -- 0.150 s and 0.225 m behind the body at 4 Hz, measured. What is missing is above it: there is no second option for a social one to beat.",
+      "expectation": "One does. On `guard-post.scene.json`, `sentry` holds a post at (-34, -6) and `courier` patrols the line x = -16 under a list of authored `move` actions; their closest approach is 18 m and the sentry's sense range is 24, so the courier is an `InterestKind::Character` percept for part of each leg and not for the rest. **And the losing scores are beside the winner**, which is the overlay this lab owed: at the moment it commits, `IBehavior::decisionDebug` reports `post = 3.80, investigate = 4.04, idle = 0.10`; ten seconds later, with the courier gone, `post = 1.00, investigate = 0.07, idle = 0.10` and the post has it back. Over 75 s the sentry goes **13.442 m** from its post, is more than 2 m from it on 2,791 frames, takes 9 decisions and refuses one switch on the margin. The control is the same body with `entity/sentry/decide/investigate/weight` driven to 0: **0.000 m**, which is also the ADR-225 arm -- a weight the engine read once from the JSON would not be reachable by that knob.",
       "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
       "timeSeconds": 0.0,
       "size": [
@@ -131,15 +130,14 @@
       ],
       "fps": 60.0,
       "seed": 0,
-      "notes": "The brief's fourth scenario. `ActionQueue` already has the authority tiers, preemption and resumption this needs; what is missing is above it.",
-      "blockedBy": "P3 decision"
+      "notes": "The brief's fourth scenario. Asserted by tests/unit/test_entity_decision.cpp. `ActionQueue` already had the authority tiers, preemption and resumption this needs and it still does all of the doing: the decider's whole output is an `ActionDesc` list pushed onto `Authority::Routine` with `override`, so a director shot still preempts a decision exactly as it preempts a schedule."
     },
     {
       "lab": "character",
       "number": 9,
       "title": "Crossing a river",
       "question": "Does a character choose between fording a river and walking round it, and can it say why?",
-      "expectation": "The fixture's world carries a 516 m river with a 7 m half-width and a 0.91 m/s flow. `NavGrid` already prices a ford -- `NavSample::waterDepth` is carried for exactly this -- so the route half of this is answerable today. The half that is not is the *choice*: preferring a longer dry route to a short wet one is a score, and there is nothing that scores. Blocked on the decider rather than on the navigation.",
+      "expectation": "The fixture's world carries a 516 m river with a 7 m half-width and a 0.91 m/s flow. `NavGrid` already prices a ford -- `NavSample::waterDepth` is carried for exactly this -- so the route half of this is answerable today. **P3 landed and this case is still blocked, which is worth being exact about.** What was missing was named as \"there is nothing that scores\", and now there is: `IConsiderer`, a scored `Option` list and a selector with a dwell and a margin (ADR-333), with four stock considerers over them. None of the four prices a *route*. `holdPost` and `investigate` score a place, `interest` scores taste times nearness, and nearness is a straight line -- so a character with a river between it and a glow patch scores it exactly as it scores one on the same bank. The fifth considerer this wants asks `Navigator::requestPath` twice, once with `NavPathCost::wadePenalty` raised, and scores the difference; that is navigation's arithmetic rather than the decider's, which is why it was left rather than hurried. The expectation once it lands: two options, a ford and a detour, with the detour's longer route winning at a high wade penalty and losing at a low one, and both scores in the overlay.",
       "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
       "timeSeconds": 60.0,
       "size": [
@@ -148,8 +146,8 @@
       ],
       "fps": 60.0,
       "seed": 0,
-      "notes": "The brief's third scenario. Splitting it this way is deliberate: P7 could make the route observable without P3, and then this case's first half unblocks and the second does not.",
-      "blockedBy": "P3 decision"
+      "notes": "The brief's third scenario. Splitting it this way was deliberate and it held: P7 could make the route observable without P3, and P3 landed without making the choice. The blocker is rewritten rather than deleted, because a case whose `blockedBy` is removed on the grounds that the unit it named finished is a case that now passes by asserting nothing -- which is the failure ADR-275 exists to prevent.",
+      "blockedBy": "P11 route pricing"
     },
     {
       "lab": "character",
@@ -215,6 +213,38 @@
       "seed": 0,
       "blockedBy": "P9 root motion",
       "notes": "The inventory is in ADR-260 and the layer stack it needed is in ADR-300; what is missing is the half that writes `MotionAuthority::Simulation`, which `src/scene/pose_layers.*` is deliberately unable to do -- it includes nothing from `entity/`. P9's seam runs the opposite way to the layer stack: a value read back out of the rig into the entity. The trap ADR-260 names: `joints[0]` is an armature wrapper no clip animates, so a probe that takes it as the root reports 168 clips with a root that never moved, for the most boring possible reason."
+    },
+    {
+      "lab": "character",
+      "number": 14,
+      "title": "A guard, and no C++ class called Guard",
+      "question": "Can a character kind that is not an explorer be built out of scene data alone, and can it say what it turned down?",
+      "expectation": "It can. `guard-post.scene.json` carries three characters and the two that decide are the same C++ class: `sentry` is `holdPost + investigate + idle` and `pilgrim` is `interest + idle`, both reported by `IBehavior::kind()` as **`decide`**, and neither has a line of C++ of its own. At 60 s the guard is **12.10 m** from its post and the explorer **12.66 m** from where it started; the guard scores 3 options on every tick and the explorer scores 7, one per thing it noticed. `holdPost` is one term and not two options -- flat inside `tolerance`, rising at `pull` per metre beyond it -- so 'go back' and 'stay' are the same intention at different distances, and a cooldown is a term in the score rather than a flag (ADR-269). The dwell and the margin are counted and visible: 9 decisions, 0 dwell refusals, 1 margin refusal over 75 s. Play-vs-seek on this scene is **0.036667 m at 30 s** over 3 bodies -- the selector carries a committed choice across frames, which is exactly the thing that could have made that worse, and it is counted in decision ticks rather than accumulated seconds so the boundary lands on the same instant at 60 Hz and at 37 Hz (20 ms apart, one frame of the coarser rate; an accumulated half-second would have drifted 264 ms by four seconds).",
+      "fixture": "examples/labs/character/guard-post.scene.json",
+      "timeSeconds": 75.0,
+      "size": [
+        1280,
+        720
+      ],
+      "fps": 60.0,
+      "seed": 0,
+      "notes": "Asserted by tests/unit/test_entity_decision.cpp. Two things this fixture cost a wrong answer to find. **A decider must stand off from what it walks to**: a landmark's interest point is at the landmark and a landmark is usually solid, and `NavigatorPath::route` -- the provider the action tier's `move` runs through -- refuses a goal that is not navigable, so the explorer scored six options, committed to one every tick and travelled 0.00 m in 75 s while its queue drained with `unreachable`. `Explore` never met this because it goes through `requestPath`, which carries a goal tolerance. And **a body remembers where it has been, not where it is going**: recording the destination devalues the errand it has just set out on, because the goal model suppresses a visited place to 0.12, and the winner in the overlay was never the highest score."
+    },
+    {
+      "lab": "character",
+      "number": 15,
+      "title": "Seven hundred lines moved and the route did not",
+      "question": "When the only autonomous mind in the engine is refactored, how would anyone know the film had changed?",
+      "expectation": "By a trace, and not by a walk test. ADR-333 moved `Explore`'s goal model -- five affinities, a distance falloff and a visited-place suppression -- out of the class and into `entity::goalWeight`, where a guard and an explorer weigh a place with one function. `tests/data/explore-position-trace.txt` is **3,600 samples** of the five bodies on this fixture over 60 s at a fixed 60 Hz, every fifth frame, each of x, y, z and yaw as its raw 32 bits, written by the build before the move. After it: **0 lines differ**. Not a tolerance -- bit equality, because the claim is that the arithmetic is the same arithmetic and not that it is close. The control, in the same file and passing before the golden was worth having: one metre on `entity/scout/explore/maxRange` moves **621 of the 3,600 samples**, so the trace is measuring the goal model rather than the fact that characters walk. A second control covers the golden itself -- four of the five bodies must occupy more than one distinct sample, because a golden of five stationary characters would match whatever the extraction did to them.",
+      "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+      "timeSeconds": 60.0,
+      "size": [
+        1280,
+        720
+      ],
+      "fps": 60.0,
+      "seed": 0,
+      "notes": "Asserted by tests/unit/test_decision_extraction.cpp. The weighted roll deliberately did **not** move: it draws from `Entity::rng_`, which is a stream, and D2 exists because one extra draw re-casts every later choice. Replacing it with the selector's argmax would change every route in Glowmere, so the extraction is of the model and not of the choice -- see ADR-333 section 4 for what unifying them would cost. Regenerating the golden is deliberately awkward (`AVGEN_WRITE_EXPLORE_GOLDEN=1`) and is a statement that a route was meant to change."
     }
   ]
 }

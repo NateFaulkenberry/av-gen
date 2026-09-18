@@ -1,0 +1,500 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Guard Post",
+ "camera": {
+  "mode": 1,
+  "position": [
+   -20.0,
+   26.0,
+   30.0
+  ],
+  "target": [
+   -28.0,
+   1.5,
+   -14.0
+  ],
+  "fov": 46.0,
+  "orbitSpeed": 0.0
+ },
+ "lightRig": "../../lightrigs/bioluminescent.rig.json",
+ "environment": {
+  "stylized": true,
+  "intensity": 0.16,
+  "skyIntensity": 0.32,
+  "background": [
+   0.006,
+   0.01,
+   0.02
+  ],
+  "fogColor": [
+   0.02,
+   0.038,
+   0.07
+  ],
+  "fogDensity": 0.01,
+  "fogHeight": 16.0,
+  "fogHeightFalloff": 0.05
+ },
+ "heroes": [
+  {
+   "name": "cairn-0",
+   "position": [
+    30.0,
+    0.0,
+    0.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 1.0,
+   "height": 3.0,
+   "importance": 0.2,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "cairn-1",
+   "position": [
+    70.0,
+    0.0,
+    0.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 1.0,
+   "height": 3.0,
+   "importance": 0.2,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "cairn-2",
+   "position": [
+    50.0,
+    0.0,
+    20.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 1.0,
+   "height": 3.0,
+   "importance": 0.2,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "cairn-3",
+   "position": [
+    50.0,
+    0.0,
+    -20.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 1.0,
+   "height": 3.0,
+   "importance": 0.2,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  }
+ ],
+ "navBodyRadius": 0.7,
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "terrain",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "world": {
+    "name": "guard-post-flat",
+    "seed": 20260918,
+    "size": [
+     240.0,
+     240.0
+    ],
+    "baseHeight": 0.0,
+    "erosion": 0.0,
+    "seaLevel": -100.0,
+    "layers": [],
+    "features": []
+   },
+   "terrain": {
+    "chunkSize": 40.0,
+    "resolution": 24,
+    "lodLevels": 3,
+    "lodDistance": 70.0,
+    "viewDistance": 260.0,
+    "skirtDepth": 1.2
+   },
+   "material": {
+    "baseColor": [
+     0.02,
+     0.07,
+     0.05
+    ],
+    "roughness": 0.9,
+    "metallic": 0.0,
+    "emissiveIntensity": 0.0
+   }
+  },
+  {
+   "name": "sentry",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-pilot.glb",
+   "position": [
+    -34.0,
+    0.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "scale": [
+    3.5,
+    3.5,
+    3.5
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0
+   }
+  },
+  {
+   "name": "courier",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-ranger.glb",
+   "position": [
+    -16.0,
+    0.0,
+    -40.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    3.344,
+    3.344,
+    3.344
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0
+   }
+  },
+  {
+   "name": "pilgrim",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-diver.glb",
+   "position": [
+    50.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    3.601,
+    3.601,
+    3.601
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0
+   }
+  }
+ ],
+ "entities": [
+  {
+   "name": "sentry",
+   "node": "sentry",
+   "seed": 31337,
+   "cullDistance": 600.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Idle",
+    "fall": "Fall_loop"
+   },
+   "behaviors": [
+    {
+     "kind": "decide",
+     "hertz": 2.0,
+     "dwellTicks": 2.0,
+     "margin": 0.08,
+     "memorySeconds": 6.0,
+     "memoryCapacity": 8,
+     "considerers": [
+      {
+       "kind": "holdPost",
+       "name": "post",
+       "weight": 1.0,
+       "pull": 0.25,
+       "tolerance": 1.5,
+       "activity": "observe",
+       "facing": 1.5708
+      },
+      {
+       "kind": "investigate",
+       "name": "investigate",
+       "weight": 6.0,
+       "kinds": [
+        "character"
+       ],
+       "approach": 3.0,
+       "dwell": 3.0,
+       "staleSeconds": 8.0,
+       "activity": "observe"
+      },
+      {
+       "kind": "idle",
+       "name": "idle",
+       "weight": 0.1
+      }
+     ]
+    },
+    {
+     "kind": "ground",
+     "slopeAlign": 0.55,
+     "footprint": 0.8
+    },
+    {
+     "kind": "lookAt",
+     "turnRate": 120.0
+    }
+   ],
+   "gait": {
+    "walkSpeed": 1.6,
+    "runSpeed": 3.4
+   },
+   "perception": {
+    "range": 24.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 12,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 0.0
+   }
+  },
+  {
+   "name": "courier",
+   "node": "courier",
+   "seed": 4711,
+   "cullDistance": 600.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Idle",
+    "fall": "Fall_loop"
+   },
+   "gait": {
+    "walkSpeed": 2.2,
+    "runSpeed": 3.4
+   },
+   "actions": [
+    {
+     "kind": "move",
+     "name": "leg-0",
+     "target": [
+      -16.0,
+      0.0,
+      6.0
+     ],
+     "speed": 2.2,
+     "tolerance": 1.0
+    },
+    {
+     "kind": "move",
+     "name": "leg-1",
+     "target": [
+      -16.0,
+      0.0,
+      -40.0
+     ],
+     "speed": 2.2,
+     "tolerance": 1.0
+    },
+    {
+     "kind": "move",
+     "name": "leg-2",
+     "target": [
+      -16.0,
+      0.0,
+      6.0
+     ],
+     "speed": 2.2,
+     "tolerance": 1.0
+    },
+    {
+     "kind": "move",
+     "name": "leg-3",
+     "target": [
+      -16.0,
+      0.0,
+      -40.0
+     ],
+     "speed": 2.2,
+     "tolerance": 1.0
+    },
+    {
+     "kind": "move",
+     "name": "leg-4",
+     "target": [
+      -16.0,
+      0.0,
+      6.0
+     ],
+     "speed": 2.2,
+     "tolerance": 1.0
+    },
+    {
+     "kind": "move",
+     "name": "leg-5",
+     "target": [
+      -16.0,
+      0.0,
+      -40.0
+     ],
+     "speed": 2.2,
+     "tolerance": 1.0
+    }
+   ],
+   "behaviors": [
+    {
+     "kind": "ground",
+     "slopeAlign": 0.55,
+     "footprint": 0.8
+    }
+   ]
+  },
+  {
+   "name": "pilgrim",
+   "node": "pilgrim",
+   "seed": 8191,
+   "cullDistance": 600.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Idle",
+    "fall": "Fall_loop"
+   },
+   "gait": {
+    "walkSpeed": 1.5,
+    "runSpeed": 3.0
+   },
+   "behaviors": [
+    {
+     "kind": "decide",
+     "hertz": 1.0,
+     "dwellTicks": 3.0,
+     "margin": 0.02,
+     "memorySeconds": 0.0,
+     "visitedCapacity": 3,
+     "considerers": [
+      {
+       "kind": "interest",
+       "name": "errand",
+       "source": "perceived",
+       "weight": 1.0,
+       "minRange": 8.0,
+       "maxRange": 60.0,
+       "noveltyRadius": 12.0,
+       "noveltyPenalty": 0.12,
+       "approach": 5.0,
+       "dwell": 2.5,
+       "activity": "observe",
+       "weights": {
+        "landmark": 1.0,
+        "character": 0.2,
+        "glow": 1.2,
+        "water": 0.9,
+        "vista": 0.7
+       }
+      },
+      {
+       "kind": "idle",
+       "name": "idle",
+       "weight": 0.2
+      }
+     ]
+    },
+    {
+     "kind": "ground",
+     "slopeAlign": 0.55,
+     "footprint": 0.8
+    }
+   ],
+   "perception": {
+    "range": 60.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 16,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 0.0
+   }
+  }
+ ],
+ "post": {
+  "tonemap": 1,
+  "bloomEnabled": true,
+  "bloomIntensity": 0.05,
+  "bloomThreshold": 1.05,
+  "bloomKnee": 0.6
+ }
+}

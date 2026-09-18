@@ -5,12 +5,14 @@
 #include "entity/entity.hpp"
 #include "entity/airborne.hpp"
 #include "entity/grounding.hpp"
+#include "entity/decision.hpp"
 #include "entity/nav_grid.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <span>
 
 namespace avgen::entity {
@@ -1021,24 +1023,40 @@ public:
           bodyRadiusDefault_(readFloat(s, "bodyRadius", 0.0f)),
           headroomDefault_(readFloat(s, "headroom", 0.0f)),
           footprintDefault_(readFloat(s, "footprint", 0.55f)),
-          // Taste. Read once and held, rather than registered: an author sets what a character
-          // cares about when they build it, and "how much does it like water" is not a thing
-          // anybody automates on a timeline.
-          landmarkAffinity_(readFloat(s, "landmarkAffinity", 1.0f)),
-          characterAffinity_(readFloat(s, "characterAffinity", 1.3f)),
-          glowAffinity_(readFloat(s, "glowAffinity", 1.2f)),
-          waterAffinity_(readFloat(s, "waterAffinity", 0.9f)),
-          vistaAffinity_(readFloat(s, "vistaAffinity", 0.7f)),
           strollChance_(readFloat(s, "strollChance", 0.3f)),
           waypointRadius_(readFloat(s, "waypointRadius", 2.2f)),
           repathSeconds_(readFloat(s, "repathSeconds", 6.0f)),
           stuckSeconds_(readFloat(s, "stuckSeconds", 2.5f)),
-          noveltyRadius_(readFloat(s, "noveltyRadius", 22.0f)),
           // ADR-194. Read here and held, like the affinities: the *shape* of a hop is a property of
           // the body -- how a particular creature moves -- while how far it will leap is the knob
           // registered above, because that is the one an author might put under a signal.
           jumpRangeDefault_(readFloat(s, "jumpRange", 0.0f)),
           jumpSignal_(readString(s, "jumpSignal", "")) {
+        // Taste, and the novelty radius that goes with it. Read once and held, rather than
+        // registered: an author sets what a character cares about when they build it, and "how
+        // much does it like water" is not a thing anybody automates on a timeline.
+        //
+        // **They live on a considerer now** (ADR-333). The five affinities, the distance falloff
+        // and the visited-place suppression were `Explore`'s goal model, inlined in `pickGoal`;
+        // `entity::goalWeight` is that arithmetic with a name, and this class holds an
+        // `InterestConsiderer` over it the way a character with a `decide` behaviour does. The
+        // three range knobs stay registered parameters and are copied onto the taste each
+        // selection, because those *are* things a scene keyframes.
+        GoalTaste taste;
+        taste.weight[0] = readFloat(s, "landmarkAffinity", 1.0f);
+        taste.weight[1] = readFloat(s, "characterAffinity", 1.3f);
+        taste.weight[2] = readFloat(s, "glowAffinity", 1.2f);
+        taste.weight[3] = readFloat(s, "waterAffinity", 0.9f);
+        taste.weight[4] = readFloat(s, "vistaAffinity", 0.7f);
+        taste.noveltyRadius = readFloat(s, "noveltyRadius", 22.0f);
+        goals_.setTaste(taste);
+        // The omniscient list, deliberately and for now. ADR-270's finding is that reading
+        // `interestPoints()` is why two characters in one world walk the same route, and the
+        // considerer can read percepts instead with one word -- but `Explore` is what five
+        // Glowmere characters are, and changing which list it scores is a changed film. The lab's
+        // case 6 is the before-arm and case 14's explorer is the after; moving `Explore` across is
+        // an owner's decision, not a refactor's.
+        goals_.setSource(InterestConsiderer::Source::Omniscient);
         jump_.gravity = readFloat(s, "jumpGravity", 18.0f);
         jump_.apex = readFloat(s, "jumpApex", 1.1f);
         jump_.landSeconds = readFloat(s, "landSeconds", 0.3f);
@@ -1735,17 +1753,6 @@ private:
         }
     }
 
-    [[nodiscard]] float affinity(InterestKind kind) const {
-        switch (kind) {
-        case InterestKind::Landmark: return landmarkAffinity_;
-        case InterestKind::Character: return characterAffinity_;
-        case InterestKind::Glow: return glowAffinity_;
-        case InterestKind::Water: return waterAffinity_;
-        case InterestKind::Vista: return vistaAffinity_;
-        }
-        return 1.0f;
-    }
-
     // Choose somewhere to go. Weighted over the interest registry, with a chance of simply going
     // for a walk instead -- a character that only ever moved between named places would visit the
     // same five spots forever, which is §6's "looks like a debugging waypoint system" in another
@@ -1760,56 +1767,59 @@ private:
 
         const bool stroll = ctx.rng != nullptr && ctx.rng->nextFloat() < strollChance_;
         if (!stroll && ctx.world != nullptr) {
+            // **The goal model, which now lives in `entity::goalWeight`** (ADR-333 §3). What was
+            // here was the affinity switch, the distance falloff and the visited-place scan, all
+            // inlined; what is here now is the same arithmetic called by name, so a guard and an
+            // explorer weigh a place with one function instead of two copies of one.
+            //
+            // The three registered knobs are copied onto the taste each selection rather than
+            // held, because a scene may drive `maxRange` from a signal and a taste read once would
+            // be the thing ADR-225 calls a decoration.
+            GoalTaste taste = goals_.taste();
+            taste.minRange = lo;
+            taste.maxRange = hi;
+            taste.homeRadius = home;
+            DecisionContext dctx;
+            dctx.time = ctx.time;
+            dctx.dt = ctx.dt;
+            dctx.self = ctx.self;
+            dctx.state = &state;
+            dctx.visited = recent_;
+            dctx.nav = ctx.nav;
+            dctx.world = ctx.world;
+            dctx.bus = ctx.bus;
             candidates_.clear();
-            weights_.clear();
+            goals_.candidates(dctx, taste, candidates_);
             float total = 0.0f;
-            for (const InterestPoint& point : ctx.world->interestPoints()) {
-                const glm::vec2 at(point.position.x, point.position.z);
-                const float distance = glm::length(at - flat);
-                // The near bound is also what keeps a character from choosing *itself*: the host
-                // lists every node an entity drives as a landmark, and this one is standing on its
-                // own. Nothing else is needed for that, and a name comparison would only be a
-                // second rule that could disagree with this one.
-                if (distance < lo || distance > hi) {
-                    continue;
-                }
-                if (home > 0.0f && glm::length(at - anchor) > home) {
-                    continue;
-                }
-                float weight = affinity(point.kind) * std::max(point.weight, 0.0f);
-                // Nearer is likelier, but only mildly: a falloff steep enough to matter is a
-                // character that never crosses its own world.
-                weight *= 1.0f / (1.0f + distance / std::max(hi * 0.5f, 1.0f));
-                for (const glm::vec3& seen : recent_) {
-                    if (glm::length(glm::vec2(seen.x - at.x, seen.z - at.y)) < noveltyRadius_) {
-                        weight *= 0.12f; // been there
-                        break;
-                    }
-                }
-                if (weight <= 0.0f) {
-                    continue;
-                }
-                candidates_.push_back(&point);
-                weights_.push_back(weight);
-                total += weight;
+            for (const GoalCandidate& candidate : candidates_) {
+                total += candidate.weight;
             }
+            // **The weighted roll stays here, and that is not laziness.** ADR-269's selector takes
+            // the highest score subject to a dwell and a margin; `Explore` takes a weighted draw
+            // from `ctx.rng`, which is a *stream*. Replacing the draw with an argmax would change
+            // every route in Glowmere, and moving the draw anywhere that consumed a different
+            // number of values from the stream would re-cast every later choice it makes -- D2 is
+            // the rule that exists because of exactly this. So the extraction is of the model and
+            // not of the choice, and `tests/unit/test_decision_extraction.cpp` is what says the
+            // difference is nothing at all. ADR-333 §4 is the argument for leaving the stream
+            // where it is and what it would cost to unify.
             if (total > 0.0f && ctx.rng != nullptr) {
                 float roll = ctx.rng->nextFloat() * total;
                 for (std::size_t i = 0; i < candidates_.size(); ++i) {
-                    roll -= weights_[i];
+                    roll -= candidates_[i].weight;
                     if (roll <= 0.0f) {
-                        goal_ = candidates_[i]->position;
-                        goalName_ = candidates_[i]->name;
-                        goalKind_ = candidates_[i]->kind;
+                        goal_ = candidates_[i].position;
+                        goalName_ = candidates_[i].name;
+                        goalKind_ = candidates_[i].kind;
                         hasGoal_ = true;
                         return true;
                     }
                 }
                 // Floating point ran out before the list did. Take the last one rather than
                 // reporting failure, which would make a rounding error look like an empty world.
-                goal_ = candidates_.back()->position;
-                goalName_ = candidates_.back()->name;
-                goalKind_ = candidates_.back()->kind;
+                goal_ = candidates_.back().position;
+                goalName_ = candidates_.back().name;
+                goalKind_ = candidates_.back().kind;
                 hasGoal_ = true;
                 return true;
             }
@@ -1842,8 +1852,11 @@ private:
     float idleMinDefault_, idleMaxDefault_, observeDefault_, observeMinDefault_, observeMaxDefault_;
     float minRangeDefault_, maxRangeDefault_, homeDefault_, runChanceDefault_, slopeAlignDefault_;
     float bodyRadiusDefault_, headroomDefault_, footprintDefault_, wadeDragDefault_;
-    float landmarkAffinity_, characterAffinity_, glowAffinity_, waterAffinity_, vistaAffinity_;
-    float strollChance_, waypointRadius_, repathSeconds_, stuckSeconds_, noveltyRadius_;
+    float strollChance_, waypointRadius_, repathSeconds_, stuckSeconds_;
+    // The goal model (ADR-333). Held by value because it is configuration -- one taste, one source
+    // -- and holds no per-character state of its own; the two things that *are* per-character, the
+    // visited list and the live ranges, are handed to it through the `DecisionContext`.
+    InterestConsiderer goals_{nullptr};
 
     params::Parameter<float>* speed_ = nullptr;
     params::Parameter<float>* runSpeed_ = nullptr;
@@ -1907,8 +1920,7 @@ private:
     params::Parameter<float>* jumpRange_ = nullptr;
     float jumpRangeDefault_ = 0.0f;
     // Scratch for the weighted pick, kept so a selection every few seconds does not allocate.
-    std::vector<const InterestPoint*> candidates_;
-    std::vector<float> weights_;
+    std::vector<GoalCandidate> candidates_;
 };
 
 // ---- ground ----------------------------------------------------------------------------------
@@ -1972,6 +1984,273 @@ private:
     params::Parameter<float>* tilt_ = nullptr;
     std::vector<std::string> paths_;
     GroundFollower follower_;
+};
+
+// ---- decide ----------------------------------------------------------------------------------
+//
+// The decider (ADR-269, ADR-333). **A character kind, expressed as scene data.**
+//
+// This is the one behaviour in the vocabulary that has no behaviour of its own. It scores options,
+// commits to one, and pushes that option's `ActionDesc` list onto `Authority::Routine`; the
+// existing queue does everything after that. There is no second interpreter here -- no
+// running/succeeded/failed enum beside `ActionResult`, no tree walker, no per-frame re-evaluation
+// of anything the queue is in the middle of.
+//
+// **The product claim this exists to make good on.** Before it, the only autonomous mind in this
+// engine was `Explore`: 700 lines, one class, one personality, which is why every autonomous
+// character in Glowmere is an explorer and why a guard would have been a second 700-line class. A
+// guard is now this:
+//
+//     { "kind": "decide", "hertz": 2, "considerers": [
+//         { "kind": "holdPost", "post": "gate", "pull": 0.30 },
+//         { "kind": "investigate", "kinds": ["character"], "weight": 2.2 },
+//         { "kind": "idle" } ] }
+//
+// and an explorer that reads its senses instead of the omniscient list is the same behaviour with
+// `interest` in the list instead. Neither is a C++ class.
+//
+// **Two memories, and both live here rather than in a considerer.** ADR-269's rule is that a
+// considerer holds no per-character state, which is what makes ADR-267's D4 free -- there is
+// nothing in a considerer to checkpoint. So the two things a decider genuinely has to remember are
+// held by the behaviour: `PerceptMemory`, the bounded fade over percepts that ADR-290 §7 named as
+// the thing to revisit first, and `visited_`, the places this body has already been, which is the
+// goal model's novelty term. Both are bounded, both are cleared by `reset`, and both are
+// reconstructed by a replay rather than persisted.
+//
+// **R1/R3.** It reads `state().position()` and writes nothing: not `travel`, not `MotionOffset`,
+// not a parameter. Scoring is a read and acting is the queue's job (R3, ADR-210). The only thing it
+// writes anywhere is a list of intentions onto its own entity's queue.
+class Decide final : public IBehavior {
+public:
+    explicit Decide(const nlohmann::json* s)
+        : hertzDefault_(readFloat(s, "hertz", 2.0f)),
+          dwellDefault_(readFloat(s, "dwellTicks", 2.0f)),
+          marginDefault_(readFloat(s, "margin", 0.08f)),
+          memorySecondsDefault_(readFloat(s, "memorySeconds", 0.0f)),
+          memoryCapacity_(static_cast<std::uint16_t>(
+              std::clamp(readFloat(s, "memoryCapacity", 8.0f), 0.0f, 64.0f))),
+          visitedCapacity_(static_cast<std::size_t>(
+              std::clamp(readFloat(s, "visitedCapacity", 5.0f), 0.0f, 64.0f))) {
+        if (s != nullptr && s->is_object() && s->contains("considerers") &&
+            (*s)["considerers"].is_array()) {
+            for (const auto& entry : (*s)["considerers"]) {
+                if (!entry.is_object() || !entry.contains("kind") || !entry["kind"].is_string()) {
+                    continue;
+                }
+                const std::string kind = entry["kind"].get<std::string>();
+                auto made = makeConsiderer(kind, &entry);
+                if (made != nullptr) {
+                    considerers_.push_back(std::move(made));
+                    continue;
+                }
+                // Loud, by name, with the vocabulary. A misspelled considerer is a character that
+                // silently loses one of the things it was meant to want, and a guard whose
+                // `investigate` never loads is a guard that stands still for the right-looking
+                // reason -- which is the shape of defect this repository has shipped five of
+                // (entity.cpp does exactly this for a misspelled behaviour kind).
+                std::string known;
+                for (const std::string_view k : considererKinds()) {
+                    if (!known.empty()) {
+                        known += ", ";
+                    }
+                    known += k;
+                }
+                log::warn("decide: unknown considerer kind '{}' (known: {})", kind, known);
+            }
+        }
+        views_.reserve(considerers_.size());
+        for (const auto& considerer : considerers_) {
+            views_.push_back(considerer.get());
+        }
+    }
+
+    [[nodiscard]] std::string_view kind() const override { return "decide"; }
+
+    void registerParameters(params::ParameterSet& params, const std::string& prefix) override {
+        hertz_ = &params.add(floatDesc(prefix + "hertz", hertzDefault_, 0.0f, 60.0f));
+        dwell_ = &params.add(floatDesc(prefix + "dwellTicks", dwellDefault_, 0.0f, 600.0f));
+        margin_ = &params.add(floatDesc(prefix + "margin", marginDefault_, 0.0f, 100.0f));
+        memorySeconds_ =
+            &params.add(floatDesc(prefix + "memorySeconds", memorySecondsDefault_, 0.0f, 600.0f));
+        paths_ = {prefix + "hertz", prefix + "dwellTicks", prefix + "margin",
+                  prefix + "memorySeconds"};
+        // Every considerer's knobs, under its own name. ADR-225: a weight an author wrote in a
+        // scene file and the engine then read once from the JSON would be a decoration, not a
+        // setting -- it could not be keyframed, modulated, saved or driven by a signal, which is
+        // every one of the things this project means by a parameter.
+        for (const auto& considerer : considerers_) {
+            const std::string base = prefix + std::string(considerer->name()) + "/";
+            considerer->registerParameters(params, base);
+            considerer->collectParameterPaths(paths_);
+        }
+    }
+    void collectParameterPaths(std::vector<std::string>& out) const override {
+        out.insert(out.end(), paths_.begin(), paths_.end());
+    }
+
+    void reset(Rng&) override {
+        selector_.reset();
+        memory_.reset();
+        visited_.clear();
+        scored_.clear();
+        queue_ = nullptr;
+        lastMargin_ = 0.0f;
+    }
+
+    void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
+        (void)motion;
+        queue_ = ctx.actions;
+        if (ctx.actions == nullptr || considerers_.empty() || ctx.world == nullptr) {
+            return;
+        }
+        const Entity* self = ctx.self < ctx.world->entities().size()
+                                 ? ctx.world->entities()[ctx.self].get()
+                                 : nullptr;
+
+        SelectorSettings settings;
+        settings.hertz = hertz_ != nullptr ? hertz_->value() : hertzDefault_;
+        settings.dwellTicks = dwell_ != nullptr ? dwell_->value() : dwellDefault_;
+        settings.margin = margin_ != nullptr ? margin_->value() : marginDefault_;
+        selector_.setSettings(settings);
+        memory_.setSettings(PerceptMemory::Settings{
+            memorySeconds_ != nullptr ? memorySeconds_->value() : memorySecondsDefault_,
+            memoryCapacity_});
+
+        DecisionContext dctx;
+        dctx.time = ctx.time;
+        dctx.dt = ctx.dt;
+        dctx.self = ctx.self;
+        dctx.state = &state;
+        dctx.percepts =
+            memory_.merge(self != nullptr ? self->percepts() : std::span<const Percept>(), ctx.time);
+        dctx.visited = visited_;
+        dctx.nav = ctx.nav;
+        dctx.world = ctx.world;
+        dctx.bus = ctx.bus;
+        dctx.seed = self != nullptr ? self->seed() : 0;
+
+        // Republish the overlay's list whenever a tick actually fired -- including the very first
+        // one, whose tick index may legitimately be the same 0 the selector starts at. Testing the
+        // index alone left the first decision's options invisible, which is the one decision a
+        // person watching a character start up is most likely to be looking at.
+        const std::uint64_t before = selector_.tick();
+        const bool startedBefore = selector_.started();
+        const bool changed = selector_.select(dctx, views_);
+        if (!startedBefore || selector_.tick() != before) {
+            publish();
+        }
+        if (!changed) {
+            return;
+        }
+        const std::size_t chosen = selector_.chosen();
+        if (chosen >= selector_.options().size()) {
+            return;
+        }
+        const Option& winner = selector_.options()[chosen];
+        // `override` rather than `push`: a new decision *replaces* the routine, and whatever the
+        // routine was in the middle of is reported Cancelled rather than dropped in silence. A
+        // push would queue the new errand behind the abandoned one, which is the opposite of
+        // changing your mind.
+        //
+        // The tiers above are untouched, so a director shot or a one-off action still preempts a
+        // decider exactly as it preempts a schedule (ADR-091), and the decision resumes underneath
+        // it afterwards.
+        ctx.actions->override(std::vector<ActionDesc>(winner.actions.begin(), winner.actions.end()),
+                              Authority::Routine, ctx.time);
+        remember(state.position());
+    }
+
+    [[nodiscard]] bool decisionDebug(DecisionDebug& out) const override {
+        out.options = scored_;
+        out.chosen = selector_.current();
+        out.tick = selector_.tick();
+        out.committedTick = selector_.committedTick();
+        out.margin = lastMargin_;
+        const Selector::Counts counts = selector_.counts();
+        out.decisions = counts.decisions;
+        out.dwellRejections = counts.dwellRejections;
+        out.marginRejections = counts.marginRejections;
+        out.remembered = memory_.remembered();
+        return true;
+    }
+
+    // The route the winning option is walking, borrowed from the queue that is walking it. A
+    // decider owns no route of its own -- that is the whole point of pushing actions rather than
+    // moving the body -- so the honest answer is the queue's, and the phase is the option's name.
+    [[nodiscard]] bool navDebug(NavDebug& out) const override {
+        if (queue_ == nullptr) {
+            return false;
+        }
+        out.route = queue_->route();
+        out.leg = queue_->routeLeg();
+        out.hasDestination = !out.route.empty();
+        if (out.hasDestination) {
+            out.destination = glm::vec3(out.route.back().x, 0.0f, out.route.back().y);
+        }
+        out.phase = selector_.current();
+        return true;
+    }
+
+private:
+    // The scored list, flattened for the overlay, once per decision tick rather than per frame.
+    void publish() {
+        scored_.clear();
+        const std::span<const Option> options = selector_.options();
+        const std::size_t chosen = selector_.chosen();
+        float best = 0.0f;
+        float runnerUp = 0.0f;
+        for (std::size_t i = 0; i < options.size(); ++i) {
+            scored_.push_back(ScoredOption{options[i].name, options[i].score, i == chosen});
+            if (options[i].score > best) {
+                runnerUp = best;
+                best = options[i].score;
+            } else if (options[i].score > runnerUp) {
+                runnerUp = options[i].score;
+            }
+        }
+        lastMargin_ = best - runnerUp;
+    }
+
+    // **Where the body was when it changed its mind** -- not where it was going.
+    //
+    // The distinction cost a measurement to find. Recording the destination is the obvious thing
+    // and it is wrong: the goal model suppresses a place in `visited_` to 0.12 of its weight, so a
+    // body that recorded its errand on departure devalued the errand it had just set out on, and
+    // the option it was walking to fell behind the three it was not. Measured on the guard fixture:
+    // the explorer scored six options, changed its mind at every decision tick, and travelled
+    // **0.00 m in 75 seconds**, with the winner in the overlay never being the highest score.
+    //
+    // `Explore` never had this, because `remember(goal_)` is called in `stepArrive` -- on arrival,
+    // not on departure. The position is the same fact seen from the other end and it needs no
+    // arrival event: a body that walked to a cairn is standing at the cairn when it decides what to
+    // do next, and a body that gave up halfway records the halfway point, which is honest.
+    void remember(const glm::vec3& place) {
+        if (visitedCapacity_ == 0) {
+            return;
+        }
+        visited_.push_back(place);
+        while (visited_.size() > visitedCapacity_) {
+            visited_.erase(visited_.begin());
+        }
+    }
+
+    float hertzDefault_, dwellDefault_, marginDefault_, memorySecondsDefault_;
+    std::uint16_t memoryCapacity_ = 8;
+    std::size_t visitedCapacity_ = 5;
+    params::Parameter<float>* hertz_ = nullptr;
+    params::Parameter<float>* dwell_ = nullptr;
+    params::Parameter<float>* margin_ = nullptr;
+    params::Parameter<float>* memorySeconds_ = nullptr;
+    std::vector<std::string> paths_;
+
+    std::vector<std::unique_ptr<StockConsiderer>> considerers_;
+    std::vector<const IConsiderer*> views_;
+    Selector selector_;
+    PerceptMemory memory_;
+    std::vector<glm::vec3> visited_;
+    std::vector<ScoredOption> scored_;
+    float lastMargin_ = 0.0f;
+    const ActionQueue* queue_ = nullptr;
 };
 
 // ---- orbit -----------------------------------------------------------------------------------
@@ -2046,7 +2325,7 @@ bool BehaviorContext::event(std::string_view name) const {
 
 std::vector<std::string_view> behaviorKinds() {
     return {"hover",  "drift",  "bank",     "spin",  "wander",
-            "explore", "ground", "liveliness", "lookAt", "interest", "orbit"};
+            "explore", "ground", "liveliness", "lookAt", "interest", "orbit", "decide"};
 }
 
 std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::json* settings) {
@@ -2082,6 +2361,9 @@ std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::j
     }
     if (kind == "liveliness") {
         return std::make_unique<Liveliness>(settings);
+    }
+    if (kind == "decide") {
+        return std::make_unique<Decide>(settings);
     }
     return nullptr;
 }

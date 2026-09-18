@@ -3,12 +3,17 @@
 **Question**: *Why is this character here, facing this way, and why did it decide to be?*
 
 Registry entry: `LabId::Character`, key `character` (`src/labs/lab.cpp`).
-Fixture: `examples/labs/character/character-intelligence-lab.scene.json`.
+Fixtures: `examples/labs/character/character-intelligence-lab.scene.json` (the explorers, frozen —
+see §2), `examples/labs/character/guard-post.scene.json` (the decided characters) and
+`examples/labs/character/perception-crowd.scene.json` (the occlusion budget).
 Cases: `examples/labs/character/cases.json`, reachable as `avgen --lab-case character:<n>`.
-Tests: `tests/unit/test_character_intelligence_lab.cpp`, `tests/unit/test_character_lab_sockets.cpp`.
+Tests: `tests/unit/test_character_intelligence_lab.cpp`, `tests/unit/test_character_lab_sockets.cpp`,
+`tests/unit/test_entity_perception.cpp`, `tests/unit/test_entity_decision.cpp`,
+`tests/unit/test_decision_extraction.cpp`.
 
 Companion reading, in this order: `docs/character-ai-research.md` (what already exists),
-`docs/character-ai-plan.md` (the units and who owns which file), ADR-266 to ADR-275.
+`docs/character-ai-plan.md` (the units and who owns which file), ADR-266 to ADR-275, then ADR-290
+(perception, built) and ADR-333 (the decision layer, built).
 
 ---
 
@@ -21,15 +26,15 @@ socket resolves to.
 It does **not** own what the joints do once the entity is placed — that is the Animation Lab — or
 whether the body reached a draw call — that is the Visibility Lab.
 
-`decides` names `src/entity/behaviors.cpp:Explore` and not any file with "decision" in its name,
-because **nobody decides** (ADR-269). The only autonomous mind in this engine is hardcoded inside
-one 700-line behaviour class, which is why every autonomous character in Glowmere is an explorer.
-When P3 extracts the goal model out of `Explore`, the registry test fails and this entry moves. That
-is the intended failure.
+`decides` named `src/entity/behaviors.cpp:Explore` for as long as **nobody decided** (ADR-269), and
+that entry carried its own expiry: "when P3 extracts the goal model out of `Explore`, the registry
+test fails and this entry moves. That is the intended failure." It did, on 2026-09-18, and `decides`
+is now `src/entity/decision.cpp:Selector` (ADR-333). `Explore` still *has* a goal model; it calls
+`entity::goalWeight` for it, and the class that chooses between courses of action is the selector.
 
 ---
 
-## 1. Three of the six scenarios cannot be run, and say so
+## 1. One of the six scenarios cannot be run, and says so
 
 The owner's brief asked for six: basic wandering, investigating a mushroom, crossing a river, a
 social interaction, a dense environment, a long-running simulation.
@@ -41,19 +46,27 @@ social interaction, a dense environment, a long-running simulation.
 | 3 | a route round what is in the way | runnable |
 | 4 | a penned character is stuck and nothing says so | runnable |
 | 5 | two minutes, and the scrub against the play | runnable |
-| 6 | every character *used to* see everything | runnable — the before-arm, kept |
+| 6 | every character *used to* see everything, and nothing scored an option | runnable — the before-arm, kept |
+| 7 | investigating a mushroom | runnable — *unblocked by ADR-333* |
+| 8 | a social interaction | runnable — *unblocked by ADR-333* |
+| 9 | crossing a river | blocked on **P11 route pricing** |
 | 10 | two characters, two ranges, two different worlds | runnable — the after-arm (ADR-290) |
 | 11 | the occlusion budget, and the arm at zero | runnable (ADR-290) |
-| 7 | investigating a mushroom | blocked on **P3 decision** |
-| 8 | a social interaction | blocked on **P3 decision** |
-| 9 | crossing a river | blocked on **P3 decision** |
-| 10 | a head that turns while the legs keep walking | runnable — *unblocked by ADR-300* |
-| 11 | half a metre of landing the engine throws away | blocked on **P9 root motion** |
+| 12 | a head that turns while the legs keep walking | runnable — *unblocked by ADR-300* |
+| 13 | half a metre of landing the engine throws away | blocked on **P9 root motion** |
+| 14 | a guard, and no C++ class called Guard | runnable (ADR-333) |
+| 15 | seven hundred lines moved and the route did not | runnable (ADR-333) |
 
-Cases 7 and 8 were blocked on *two* units and are now blocked on one. That is what a `blockedBy` is
-for: the day a unit lands, the cases that were waiting on it are a list rather than a memory, and
-unblocking half of one is deleting half of a string. All three remaining blocks are the same block —
-**nobody decides** (ADR-269) — and `Option` and `IConsiderer` still have no implementations.
+Cases 7 and 8 were blocked on *two* units, then on one, and are now runnable. That is what a
+`blockedBy` is for: the day a unit lands, the cases that were waiting on it are a list rather than a
+memory, and unblocking half of one is deleting half of a string.
+
+**Case 9 is the one that did not unblock, and its blocker was rewritten rather than deleted.** P3
+landed a selector, an `Option` list and four stock considerers, so "there is nothing that scores" is
+no longer true — but none of the four prices a *route*, and preferring a longer dry way to a short
+wet one is exactly that. A case whose `blockedBy` is removed on the grounds that the unit it named
+finished is a case that passes by asserting nothing, which is the failure ADR-275 exists to prevent.
+`docs/character-ai-plan.md` §P11 was added by P3 for it.
 
 A blocked case carries `blockedBy` naming the unit of `docs/character-ai-plan.md` that unblocks it
 (ADR-275). Case 11 is the first blocked on something other than perception or a decider, and the
@@ -65,12 +78,27 @@ that is not happening, and left to work out why.
 Case 9 is split on purpose. The *route* half of crossing a river is answerable today — `NavGrid`
 already prices a ford and `NavSample::waterDepth` is carried for exactly that. The *choice* half is
 not, because preferring a longer dry route to a short wet one is a score and nothing scores. So it
-is blocked on P3 and not on P7, and when P7 makes the route observable the first half unblocks
-without the second.
+was blocked on P3 and not on P7, and when P7 made the route observable the first half unblocked
+without the second — exactly as the split predicted. P3 then landed the scoring machinery and the
+second half still did not unblock, which is why §P11 exists.
 
 ---
 
-## 2. The fixture
+## 2. The fixtures
+
+**There are two, and the reason is the golden trace.** `character-intelligence-lab.scene.json` is
+frozen: `tests/data/explore-position-trace.txt` is 3,600 samples of its five bodies taken from the
+build before ADR-333's extraction, and a sixth body in that scene changes what the other five
+perceive and score. So the decided characters live in `guard-post.scene.json` — a flat world, four
+cairns, a guard at a post, a courier patrolling a line under authored `move` actions, and an
+explorer far enough away to be out of everybody's senses.
+
+The cost of the split is worth naming: guard-post has no ecology and therefore no `Glow` interest
+point (its 8 points are 5 landmark and 3 character; the lab fixture's 141 are 28 landmark, 5
+character and 108 water). Case 7's mushroom is a scripted percept for that reason, and its live arm
+is a `Character` percept on the identical code path.
+
+### 2.1 The original fixture
 
 Twenty nodes, five entities, thirteen heroes, and every element in it earns its place as an arm or
 a control.
@@ -193,12 +221,17 @@ same second lands in the same place.
 ## 4. The overlay this lab still owes
 
 `labs::overlaysFor(LabId::Character)` turns on entity origins, entity bounds, the transform trail and
-the skeletons. What it cannot turn on is **the losing option scores beside the winner**, because
-there are no options. What it *could* now turn on, and does not yet, is a body's working set:
+the skeletons. What it cannot turn on is **the losing option scores beside the winner** — but the
+reason has changed. There are options now: `IBehavior::decisionDebug` carries every option scored on
+the last decision tick with its name, its score and which one was chosen, plus the tick, the dwell
+and margin refusal counts and how many percepts the fade is holding (ADR-333). It is read by the
+tests and by nothing in `src/ui/`, which is the same shape as the thing this section was written
+about. Drawing it is an afternoon against a seam that exists. What it *could* also turn on, and does
+not yet, is a body's working set:
 `Entity::percepts()` carries what each character noticed, with a distance, a salience, a `seenAt`
 and an honest `tested` flag (ADR-290), and nothing draws it. `NavDebug` already carries route, leg, destination, status, phase, goal name
-and goal kind through `IBehavior::navDebug`; drawing them is this lab's, and drawing a score beside
-them waits on P3.
+and goal kind through `IBehavior::navDebug`; `decide` reports the queue's route through the same
+seam, because a decider owns no route of its own. Drawing any of it is this lab's.
 
 The navigation overlays are the editor's (`WorldEditor::showNavRoute` and friends) and are not part
 of `rendering::DebugViewOptions`, so this profile cannot switch them on and does not pretend to.
@@ -212,6 +245,10 @@ ADR-182, applied here:
 | arm | control |
 |---|---|
 | three seeds take three routes | the same world twice is bit-identical (0.000000 m) |
+| a guard leaves its post for what it notices (13.442 m) | the same body with `investigate`'s registered weight at 0 (0.000 m) |
+| the extraction changed no route (0 of 3,600 samples) | one metre of `maxRange` moves 621 of them |
+| the percept fade keeps a guard walking (8.514 m) | the same guard with `memorySeconds` 0 turns back (1.497 m) |
+| a dwell boundary is the same instant at 60 and 37 Hz (20 ms) | an accumulated half-second drifts 264 ms |
 | a route round a solid is ≥ the straight line | a 12 m hop over open ground is exactly its 12.00 m line |
 | a penned body goes nowhere (0.00 m) | an identical body outside the pen walks 72.4 m across 22 cells |
 | a route out of the pen is `Unreachable` | the same route from outside the pen is `Ok` with 2 waypoints |

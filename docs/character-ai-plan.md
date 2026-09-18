@@ -115,6 +115,15 @@ proves it is a before/after position trace, not a test that both versions "still
 when it perceives something, expressed entirely as considerers and scene data, with no new C++ class
 per character kind.
 
+**Landed 2026-09-18: ADR-333.** `src/entity/decision.{hpp,cpp}`, the `decide` behaviour, four stock
+considerers, and the extraction with 0 of 3,600 trace samples differing. The guard is
+`examples/labs/character/guard-post.scene.json` and there is no `Guard` anywhere in `src/`. Three
+corrections this list did not have: the dwell is counted in decision ticks rather than seconds (an
+accumulated one drifts 264 ms in four seconds where a tick index drifts 20); the weighted roll
+stayed in `Explore` because moving it changes every route in Glowmere (§4 of the ADR); and percepts
+had to accumulate after all, behind a bounded fade held by the behaviour rather than by a considerer.
+The fifth considerer nobody wrote is §P11.
+
 ### P4 — Character Intelligence Lab  ·  parallel from day one  ·  one agent
 
 **Delivers**, per ADR-261 and with zero engine code and zero CMake edits: a `LabId` enumerator, a
@@ -211,6 +220,28 @@ ADR-161 decided root motion was not implemented because the content had none; th
 inventory test now requires that travelling clips exist, and `Landing`'s **−0.567 m** is discarded
 every time Glowmere plays it. The opt-in is what keeps the other 163 clips exactly as they are.
 
+### P11 — Route pricing  ·  independent  ·  needs P3  ·  small
+
+**Added by P3 (ADR-333), because P3 finished without it and the Character Intelligence Lab's case 9
+still says so.** ADR-269's shape is right and four stock considerers are enough for the guard and
+the explorer; the one thing none of them can express is a preference between two *ways* to the same
+place. `holdPost` and `investigate` score a place; `interest` scores taste times nearness, and
+nearness is a straight line -- so a character with a river between it and a glow patch scores it
+exactly as it scores one on the same bank.
+
+**Delivers** a fifth stock considerer that asks `Navigator::requestPath` twice, once with
+`NavPathCost::wadePenalty` raised, and scores the difference; the arithmetic is navigation's rather
+than the decider's, which is why it was left rather than hurried at the end of P3.
+
+**Done when** lab case 9 runs: two options, a ford and a detour, with the detour's longer route
+winning at a high wade penalty and losing at a low one, and both scores in the overlay. The fixture
+already has the river -- 516 m, 7 m half-width, 0.91 m/s -- and `NavSample::waterDepth` is carried
+for exactly this. **It needs a fixture of its own**: adding a body to
+`character-intelligence-lab.scene.json` changes what the other five perceive and score, and case
+15's golden position trace is taken from it.
+
+---
+
 ### P10 — Staging and character tools for the control plane  ·  independent  ·  lowest priority
 
 `src/ai/` has 58 tools and **none of them can reach `stage::Staging`**: `grep -rn "staging|director"`
@@ -233,7 +264,7 @@ P7 touches only `src/entity/navigation*` and `nav_grid*`. **No two of these edit
 P2 needs P1's call site. P6 needs P5's skeleton query. P8 needs P1's fixed step before it changes
 how much re-simulation happens.
 
-**Wave 3** — P3, P9, P10.
+**Wave 3** — P3, P9, P10, and P11 behind P3.
 P3 needs P2. P9 needs P6. P10 needs nothing and is the one to drop if time runs out.
 
 **Merge order within a wave:** P7, then P5, then P4, then P1. P1 last because it is the one whose
