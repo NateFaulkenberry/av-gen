@@ -137,6 +137,47 @@ public:
 // the GPU palette, whose entry k is `model[palette[k]] * inverseBind[k]` and whose translation is
 // therefore not where the joint is (ADR-260). That mistake is what a skeleton overlay exists to
 // catch; `tests/unit/test_character_lab_sockets.cpp` measures the gap so nobody makes it silently.
+// ---- root motion (ADR-335) ----------------------------------------------------------------------
+
+// How far the clip an animation layer is playing has carried the body, and which run of which
+// clip that number belongs to.
+//
+// A plain record rather than `scene::RootMotionSample`, which holds the same three values, because
+// this header's whole point is that it includes nothing from the skinning system (see the top of
+// this file). `Composition::AnimationSink` is the one object that sees both and it copies across:
+// four lines at a seam that is deliberately one-directional, against a `#include` that would make
+// `entity` depend on `scene::Skeleton`.
+struct RootMotionSample {
+    // **Entity-local** -- the rig's model space, in the *asset's* own units -- for the three
+    // reasons ADR-274 gives. The entity composes its yaw and the node's scale on, exactly as
+    // `Entity::socketTransform` does, because the entity is the only thing that knows where this
+    // rig is standing and how big it is being drawn.
+    glm::vec3 displacement{0.0f};
+    // Which run of which clip. Two samples may only be subtracted from one another when these
+    // agree; a cross-fade back out of a travelling clip changes it, and the step across the change
+    // is zero rather than the whole displacement backwards.
+    std::uint64_t generation = 0;
+    bool active = false; // false = whatever is playing here was not opted in, which is the default
+};
+
+// Implemented by the animation layer. The **return half** of the animation seam, and the only one:
+// everything else in this header goes behaviour -> animation, and this goes animation -> behaviour.
+//
+// ADR-300 §8 is the reason it is a separate interface rather than a field on `LocomotionState`.
+// `LocomotionState` is written by the behaviour layer and read by the animation layer; a field on
+// it that the animation layer wrote would be a second direction hidden inside a struct whose
+// header says it has one. And `MotionAuthority::Simulation` is a big enough claim to be asked for
+// by name: this is the only thing in the animation system that has it, and a reader of
+// `entity.cpp` should be able to find out why the body moved by finding one word.
+class IRootMotionSource {
+public:
+    virtual ~IRootMotionSource() = default;
+    // What the clip playing at timeline second `now` has displaced the body by, measured from
+    // that clip's own first key. Pure: asking twice at the same second gives the same answer, and
+    // asking is free of side effects, which is what lets a seek replay it.
+    [[nodiscard]] virtual RootMotionSample rootMotion(double now) const = 0;
+};
+
 class ISkeletonQuery {
 public:
     virtual ~ISkeletonQuery() = default;

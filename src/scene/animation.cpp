@@ -476,6 +476,7 @@ bool SkinnedRig::evaluate(double now, float hz) {
     // `EntityState::travel`, which is `MotionAuthority::Simulation`. It is the only thing in this
     // file that touches the second one, it can only do it for a clip a scene named, and the two
     // writes are equal and opposite so the drawn body does not move.
+    rootMotionApplied = false;
     if (!rootMotion.empty()) {
         const RootMotionSample sample = rootMotionAt(t);
         if (sample.active) {
@@ -485,6 +486,7 @@ bool SkinnedRig::evaluate(double now, float hz) {
                                 : -1);
             if (binding != nullptr) {
                 applyRootMotionCompensation(*binding, sample.displacement, pose);
+                rootMotionApplied = true;
             }
         }
     }
@@ -542,6 +544,7 @@ RigStats updateRigs(Scene& scene, const FrameTime& time) {
             stats.joints += static_cast<std::uint32_t>(rig.skeleton.jointCount());
             stats.layers += rig.layerStats.applied;
             stats.layerJoints += rig.layerStats.joints;
+            stats.rootMotion += rig.rootMotionApplied ? 1u : 0u;
         } else {
             ++stats.rateLimited;
         }

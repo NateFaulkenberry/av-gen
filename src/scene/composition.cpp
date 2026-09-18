@@ -2020,6 +2020,12 @@ void Composition::installEntities() {
         // own frame. One line, and it is the line between the engine and every socket, attachment,
         // carried prop and aim.
         live->setSkeleton(animationSinks_.back().get());
+        // ADR-335: the third. Installed unconditionally, like the other two, because whether a
+        // clip was opted in is a question about the *rig* -- which may not be built yet when this
+        // runs -- and the source answers "nothing" for a body playing a clip nobody named. A
+        // source that were only installed for opted-in bodies would have to be re-installed every
+        // time a scene was edited, and the honest default here is the cheap one.
+        live->setRootMotionSource(animationSinks_.back().get());
     }
 
     fieldRoutesChecked_ = false; // the "a route cannot drive a field knob" scan runs again
@@ -2259,6 +2265,52 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
             }
         }
     }
+}
+
+// ADR-335. The return half of the animation seam: what the clip this node is playing has carried
+// the body by, so the entity can add it to `EntityState::travel` and the simulation can stop
+// disagreeing with the drawing about where the body went.
+//
+// **Not a read of the posed rig**, which is what makes this possible at all. `EntityWorld::update`
+// runs inside `Composition::updateBehaviour`, and the rigs are posed later, in
+// `Composition::update` -- so an attachment reads the previous frame's pose (ADR-274 §5) and a
+// root motion that had to read one would inherit the same 16.7 ms. It does not have to: root
+// motion is a function of the *clip*, and the pose is another function of the same clip, so both
+// can be taken at the same second from opposite sides of the frame and agree exactly.
+//
+// **Which position (ADR-260).** It reads neither. It reads the player and the clips, and reports
+// a displacement in the rig's model space; the entity composes its yaw and the node's scale on,
+// and the entity is what writes `travel`. That split is deliberate: this object can see the node
+// and could have done the conversion, and if it had then `MotionAuthority::Simulation` would be
+// exercised by a file in `scene/` that ADR-300 spent a unit making structurally unable to have it.
+//
+// **A node may carry several rigs.** The first one with an opted-in clip answers. Two rigs on one
+// node both opting the same clip in would be two bodies' worth of displacement for one body, and
+// there is no scene in this repository with more than one rig per character node.
+entity::RootMotionSample Composition::AnimationSink::rootMotion(double now) const {
+    entity::RootMotionSample out;
+    const CompositionNode* node = owner_.findNode(node_);
+    if (node == nullptr || node->rigs.empty()) {
+        return out;
+    }
+    for (const RigId id : node->rigs) {
+        if (id >= owner_.scene_.rigs.size()) {
+            continue;
+        }
+        const SkinnedRig& rig = owner_.scene_.rigs[id];
+        if (rig.rootMotion.empty()) {
+            continue; // every rig in this repository but one leaves here
+        }
+        const RootMotionSample sample = rig.rootMotionAt(now);
+        if (!sample.active) {
+            continue;
+        }
+        out.displacement = sample.displacement;
+        out.generation = sample.generation;
+        out.active = true;
+        return out;
+    }
+    return out;
 }
 
 // ADR-274. The first implementation of `entity::ISkeletonQuery` this engine has had, and therefore
@@ -3779,6 +3831,14 @@ void Composition::rebuild() {
                 if (!node.animation.layers.empty()) {
                     for (const std::string& problem :
                          rig.layers.bind(node.animation.layers, rig.skeleton, rig.clips)) {
+                        log::warn("node '{}' rig '{}': {}", node.name, src.name, problem);
+                    }
+                }
+                // ADR-335, bound in the same place and for the same reason: the authored clip
+                // name and the asset that has to carry it are only both in scope here.
+                if (!node.animation.rootMotion.empty()) {
+                    for (const std::string& problem :
+                         rig.rootMotion.bind(node.animation.rootMotion, rig.skeleton, rig.clips)) {
                         log::warn("node '{}' rig '{}': {}", node.name, src.name, problem);
                     }
                 }
@@ -6548,6 +6608,27 @@ nlohmann::json Composition::toJson() const {
                 }
                 anim["layers"] = std::move(layers);
             }
+            if (!node.animation.rootMotion.empty()) { // ADR-335
+                json rm = json::array();
+                for (const RootMotionSpec& spec : node.animation.rootMotion) {
+                    // The short form round-trips as the short form. A save that rewrote every
+                    // `"Landing"` as `{"clip": "Landing", "axes": "xyz"}` would make a scene file
+                    // a diff nobody wrote every time it was opened (ADR-271).
+                    const bool plain = spec.joint.empty() && spec.axes.x && spec.axes.y && spec.axes.z;
+                    if (plain) {
+                        rm.push_back(spec.clip);
+                        continue;
+                    }
+                    json e = json::object();
+                    e["clip"] = spec.clip;
+                    if (!spec.joint.empty()) {
+                        e["joint"] = spec.joint;
+                    }
+                    e["axes"] = rootMotionAxesName(spec.axes);
+                    rm.push_back(std::move(e));
+                }
+                anim["rootMotion"] = std::move(rm);
+            }
             n["animation"] = anim;
         }
         if (node.kind == NodeKind::Particles) {
@@ -7425,7 +7506,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 // ladder read as configured in the file while being a single rung in the engine.
                 // ADR-278 generalised this loop out of here; what is left is the key list.
                 static constexpr std::string_view kAnimationKeys[] = {
-                    "state", "blend", "speed", "updateHz", "nearDistance", "farHz", "cullDistance", "layers"};
+                    "state", "blend",        "speed",  "updateHz",  "nearDistance",
+                    "farHz", "cullDistance", "layers", "rootMotion"};
                 json_keys::warnUnknownKeys(anim, kAnimationKeys,
                                            where + ": node '" + node.name + "': animation");
                 node.animation.state = *state;
@@ -7546,6 +7628,58 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                             }
                         }
                         node.animation.layers.push_back(std::move(layer));
+                    }
+                }
+                // ADR-335: the per-clip root-motion opt-in. By clip *name*, because the thing
+                // being opted in is a take an animator authored and the engine's own vocabulary
+                // for a take is its name. A clip this rig does not have is warned about when the
+                // rig is built, with the node's name on it -- never silently dropped, which is
+                // the ADR-274 lesson applied to an opt-in that could otherwise look like it was
+                // working while doing nothing.
+                if (anim.contains("rootMotion")) {
+                    const json& rm = anim.at("rootMotion");
+                    if (!rm.is_array()) {
+                        return fail("node '{}': animation 'rootMotion' must be an array", node.name);
+                    }
+                    for (const json& entry : rm) {
+                        RootMotionSpec spec;
+                        if (entry.is_string()) {
+                            // The short form. Every axis, the clip's own root joint: what an
+                            // author means nine times in ten, spelled as `"rootMotion": ["Landing"]`.
+                            spec.clip = entry.get<std::string>();
+                        } else if (entry.is_object()) {
+                            auto clipName = readString(entry, "clip", "");
+                            auto jointName = readString(entry, "joint", "");
+                            auto axes = readString(entry, "axes", "xyz");
+                            if (!clipName) return std::unexpected(clipName.error());
+                            if (!jointName) return std::unexpected(jointName.error());
+                            if (!axes) return std::unexpected(axes.error());
+                            spec.clip = *clipName;
+                            spec.joint = *jointName;
+                            if (!rootMotionAxesFromName(*axes, spec.axes)) {
+                                return fail("node '{}': root motion for clip '{}': unknown axes '{}' "
+                                            "(any of x, y and z, or 'none')",
+                                            node.name, spec.clip, *axes);
+                            }
+                            for (const auto& key : entry.items()) {
+                                static constexpr std::array<std::string_view, 3> kRootKeys{
+                                    "clip", "joint", "axes"};
+                                if (std::find(kRootKeys.begin(), kRootKeys.end(), key.key()) ==
+                                    kRootKeys.end()) {
+                                    log::warn("scene file '{}': node '{}': root motion key '{}' is not "
+                                              "one this build reads and was ignored",
+                                              scenePath.string(), node.name, key.key());
+                                }
+                            }
+                        } else {
+                            return fail("node '{}': every 'rootMotion' entry must be a clip name or "
+                                        "an object",
+                                        node.name);
+                        }
+                        if (spec.clip.empty()) {
+                            return fail("node '{}': a 'rootMotion' entry names no clip", node.name);
+                        }
+                        node.animation.rootMotion.push_back(std::move(spec));
                     }
                 }
             }

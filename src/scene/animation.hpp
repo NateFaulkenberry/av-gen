@@ -232,6 +232,10 @@ struct SkinnedRig {
     // entity, which adds it to `EntityState::travel`. That is `MotionAuthority::Simulation`, and
     // it is the only place in the animation system that has it.
     RootMotionSet rootMotion;
+    // Whether the last `evaluate()` actually took a displacement out of the pose. False on a rig
+    // with an opt-in that is playing something else, which is the case worth being able to tell
+    // apart from "no opt-in at all" -- the same distinction `SocketResolution` exists for.
+    bool rootMotionApplied = false;
 
     // ---- evaluated -------------------------------------------------------------------------
     Pose pose;                              // the local pose the player produced, then layered

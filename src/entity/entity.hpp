@@ -309,9 +309,17 @@ public:
     // whole of why the return type changed rather than gaining an optional out-parameter.
     [[nodiscard]] SocketResolution socketTransform(std::string_view socket, scene::Transform& out) const;
 
-    // Installed by the animation layer; both may stay null forever (see locomotion.hpp).
+    // Installed by the animation layer; all three may stay null forever (see locomotion.hpp).
     void setPoseSink(IPoseSink* sink) { pose_ = sink; }
     void setSkeleton(const ISkeletonQuery* skeleton) { skeleton_ = skeleton; }
+    // ADR-335. The return half of the seam: what the clip has carried the body by, so the
+    // simulation can stop disagreeing with the drawing about where the body went.
+    void setRootMotionSource(const IRootMotionSource* source) { rootMotion_ = source; }
+    // How much root motion this body took from the animation on its last update, in world metres.
+    // Zero for every body playing a clip nobody opted in, which is every body in this repository
+    // outside the Character Intelligence Lab. Reported rather than inferred, because "it did
+    // nothing" and "it was asked for nothing" have to be different sentences (ADR-274).
+    [[nodiscard]] const glm::vec3& rootMotionStep() const { return rootMotionStep_; }
 
     // The entity's behaviours, in declaration order.
     [[nodiscard]] const std::vector<std::unique_ptr<IBehavior>>& behaviors() const { return behaviors_; }
@@ -506,6 +514,20 @@ private:
 
     IPoseSink* pose_ = nullptr;
     const ISkeletonQuery* skeleton_ = nullptr;
+
+    // ---- root motion (ADR-335) ----
+    const IRootMotionSource* rootMotion_ = nullptr;
+    // The previous sample, which is the only state this needs. `IRootMotionSource::rootMotion`
+    // answers "how far from the clip's first key", always, so a step is the difference between
+    // two of those and nothing here is a running total. A running total is the obvious
+    // implementation and it is precisely the one that could not have survived a seek: ADR-267's
+    // D4 says what a body knows must be recoverable by replaying the steps, and `reset()` clears
+    // these two so a replay rebuilds them from the first step it runs.
+    glm::vec3 rootMotionLast_{0.0f};
+    std::uint64_t rootMotionGeneration_ = 0;
+    bool rootMotionHeld_ = false;
+    // What the last update actually added to `travel`, in world metres, for reporting.
+    glm::vec3 rootMotionStep_{0.0f};
 };
 
 // How much of the past one `EntityWorld::seek` may replay, and what that replay is allowed to cost.
