@@ -128,15 +128,20 @@ on/off at a chunk boundary. Noted in §5 as a latent edge.
 `ProceduralRenderer::drawShadow` -> `drawImpl(..., shadowPass = true)`
 (`src/rendering/procedural_renderer.cpp`).
 
-**There is no second cull here at all.** `drawShadow` issues `DrawIndexedIndirect` against
-`im.indirectArgs` -- the *same* buffer the camera pass and the depth prepass read, whose instance
-counts were written by one compute cull run against **the camera frustum**
-(`ProceduralRenderer::update` builds `planes` from `scene.camera.projection(aspect) *
-scene.camera.view()`, one set, once). The only shadow-specific gate is `object.castsShadow`, which
-is per object, not per instance.
+**Fixed by ADR-287; what this section described is the state before it.** There was no second cull
+here at all: `drawShadow` issued `DrawIndexedIndirect` against `im.indirectArgs` -- the *same* buffer
+the camera pass and the depth prepass read, whose instance counts were written by one compute cull
+run against **the camera frustum**. The only shadow-specific gate was `object.castsShadow`, which is
+per object, not per instance. So a tree the camera could not see cast nothing, however plainly its
+shadow fell into shot.
 
-So: **a tree the camera cannot see casts nothing, however plainly its shadow falls into shot.**
-Entities get ADR-046; the ecology does not. Measured in §3.
+There are now two lists. `cs_cull_classify` runs once and writes two verdicts -- the camera
+classification at `lodIndex[0, count)` and the caster one at `[count, 2 * count)` -- and the
+compaction's level axis runs `0..2 * lodCount - 1`, so the shadow passes read their own compacted
+lists and their own indirect-args slots. The two differ in exactly one term: the camera frustum test
+becomes "some shadow view's frustum contains this sphere", against the plane sets `SceneRenderer`
+already built for the entity second cull. The rung is computed once and shared, so an instance in
+both lists is on the same rung in both. See §3.1 for what it moved.
 
 **(d) SDFs** (`SdfRenderer::drawMeshes` and `drawRaymarchDepth`) are drawn into every view with no
 cull of their own; the raymarched ones march at `sdfShadowSteps`.
@@ -237,8 +242,10 @@ surface. `--quality-arm contact` removes it.
 Written down rather than filled in, because an honest map beats a lab that pretends to test stages
 that are not there.
 
-**No per-cascade caster list for procedural instances.** §1.5(c). This is a gap, not an absence by
-design: the architecture has one cull and three consumers.
+**No *per-cascade* caster list for procedural instances.** §1.5(c). There is one caster list, built
+against the union of the views (ADR-287), and each view then rejects what it cannot see on its own
+at rasterisation rather than at submission. Per-view compaction would be four more level slices and
+is not obviously worth it; the gap this line used to describe -- no caster list at all -- is closed.
 
 **No shadow-map readback of any kind.** The atlas is created with
 `RenderAttachment | TextureBinding` and no `CopySrc`, so no tool in this repository can read a
@@ -304,16 +311,27 @@ contained by cascade 2, and the shadow passes draw the camera's verdict.
 device: `drawShadow` and `draw` reach the same `im.indirectArgs` at the same offsets, and
 `ProceduralRenderer::update` builds exactly one `FrustumPlanes`, from `scene.camera`.
 
-**Not fixed here, and the reason is stated rather than implied.** The correct fix is a second
-visible list: another cull dispatch per object against the union of the cascade frusta, its own
-indirect-args region and its own per-level bind groups, consumed by `drawShadow` alone. That is
-roughly 150 lines inside `procedural_renderer.cpp`, which is the Visibility Lab's and the LOD Lab's
-file this week, and it changes the cost of every frame with an ecology in it. The two cheap-looking
-alternatives are both wrong and are recorded so nobody tries them: widening the single cull's
-frustum makes the **camera** pass draw everything the light can see, and it is the camera pass that
-is triangle-bound; and extruding the camera planes toward the light has the same problem for the
-same reason. A regression test carrying the invariant is in place and marked `[!shouldfail]`, so the
-day somebody builds the second list the suite says so.
+**Fixed by ADR-287, and one line of what this lab proposed turned out to be wrong.** The second
+visible list is built, but it is not "another cull dispatch per object": the per-record work -- the
+world sphere, the distance, the projected radius, the ladder -- is identical for both lists and only
+the volume test differs, so the classification runs once and writes two verdicts and only the
+compaction doubles. The two cheap-looking alternatives this lab recorded as wrong are still wrong,
+for the reason it gave.
+
+What it moved, on the same frame this section measured (frame 60, 1280x720, `--tier realtime`):
+**62,284 records, 485 surviving the camera cull, 288 drawn into the shadow maps**, where the last
+two were one number. A shader-only probe that keeps only the casters the camera rejected splits that
+288 into **208 gained and 80 shared** -- so 405 of the camera's 485 were being drawn into every
+cascade and clipped, being past the 77 m the cascades reach. Ecology shadow submissions over three
+cascades go 3,396 instances / 652,659 triangles to 2,070 / 428,601.
+
+The delivered picture does not move: six frames across the multicam run are byte-identical across
+the fix. Nothing that was in the shot is missing, and none of the 208 gained casters throws into
+shot on those frames, because Glowmere's key is steep enough that an off-screen caster's shadow is
+off-screen too. The rendered proof is therefore a built fixture rather than a found one --
+`tests/rendering/test_shadow_lab_gpu.cpp`, a 6 m box 18 m up and 46 m off the left of frame, whose
+shadow runs 26.7 m back into the middle of the picture: 0.7448 before against an open floor of
+0.7440, 0.4255 after.
 
 ### 3.2 A LOD impostor faced the camera while being rasterised from the light
 
@@ -380,7 +398,13 @@ changed nothing in the frame, which is its own loose end.
 
 This is a camera-pass defect that happens to break a shadow experiment, not a shadow defect. It is
 recorded here because it is the reason `impostor-row` in the fixture uses authored thresholds and an
-unscaled asset instead of a scatter layer's own 28/11/4, and it belongs to the LOD Lab.
+unscaled asset instead of a scatter layer's own 28/11/4.
+
+**Fixed by ADR-285**: `makeLodMesh` takes the source transform's scale and sizes the quad through
+it, which is the only place a camera-facing quad can pick step 1 of the chain up. It changes nothing
+on Glowmere and the byte-identical frame is the evidence for why -- every scatter layer there is a
+`Mesh` source with an `assetMesh`, and `lodLevelIsImpostor` is false for all four of its rungs since
+ADR-263, so no Glowmere instance reaches the billboard path at all.
 
 ### 3.4 What the corrected cull radius changed for casters
 

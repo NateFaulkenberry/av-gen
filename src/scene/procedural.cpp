@@ -1627,6 +1627,15 @@ float sourceBoundingRadius(const SourceSpec& spec) {
     return std::max(glm::length(sourceHalfExtent(spec)), 1e-4f);
 }
 
+float sourceBoundingRadius(const SourceSpec& spec, const glm::vec3& sourceScale) {
+    // The scale goes inside the length rather than outside it, so a non-uniform source transform
+    // gives the sphere around the *scaled* box and not the unscaled box's diagonal multiplied by
+    // whichever axis a caller happened to pick. It is the same product `ProceduralGeometry::rebuild`
+    // takes for its instance bounds, which is what keeps the mesh an impostor is built at and the
+    // sphere the cull tests it with talking about one object.
+    return std::max(glm::length(sourceHalfExtent(spec) * glm::abs(sourceScale)), 1e-4f);
+}
+
 // Vertex-clustering decimation. The grid is sized so its occupied cells land near the requested
 // triangle count; each cell collapses to one vertex averaged over its members, and any triangle
 // whose corners fall in fewer than three distinct cells disappears. Deterministic: the grid comes
@@ -1712,7 +1721,8 @@ bool lodLevelIsImpostor(const SourceSpec& spec, int level) {
     return !(spec.kind == PrimitiveKind::Mesh && spec.assetMesh);
 }
 
-Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize) {
+Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize,
+                             const glm::vec3& sourceScale) {
     // An imported mesh has no generator parameters to halve, so its levels are simplifications of
     // whatever the budget already left.
     //
@@ -1784,7 +1794,11 @@ Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSi
     // Only reachable for a source `lodLevelIsImpostor` calls an impostor: the Mesh branch above
     // returns before here, which is the whole content of that predicate.
     assert(lodLevelIsImpostor(spec, level));
-    const float size = 2.0f * std::max(impostorSize, 1e-4f) * sourceBoundingRadius(spec);
+    // Through `sourceScale`, because the billboard branch of shaders/procedural.wgsl scales the
+    // quad by `inst.scale` alone and never applies `proc.sourceMatrix` -- see the note on the
+    // declaration. Rung 0's world size is radius * sourceScale * inst.scale, and this is what makes
+    // the quad's the same.
+    const float size = 2.0f * std::max(impostorSize, 1e-4f) * sourceBoundingRadius(spec, sourceScale);
     MeshData quad = makePointQuad(level == 2 ? size : size * 0.125f);
     quad.name = level == 2 ? "lod-impostor" : "lod-point";
     return quad;

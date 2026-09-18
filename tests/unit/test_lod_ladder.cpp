@@ -377,31 +377,76 @@ TEST_CASE("What 28 px means, per production layer", "[.analysis][lod]") {
 TEST_CASE("What each rung of the chain draws, against the source", "[.analysis][lod]") {
     // `assets/mesh_lod.hpp` says the simplifier's reported error "rises monotonically with
     // aggressiveness and never understates". This prints the reported error beside a deviation that
-    // cannot be argued with -- how much of the source's bounding box the level still occupies --
+    // cannot be argued with -- how far the level's bounding box has receded from the source's --
     // because a level that has lost a third of the object's height while reporting six per cent is
     // a level a selector choosing by projected error would choose far too early.
-    std::printf("\n%-20s %5s %8s %8s %8s %8s %8s\n", "asset", "lod", "tris", "ratio", "relErr", "absErr",
-                "height");
+    //
+    // Both arms, in one process: `boundsTolerance = 0` is the chain this code built before the
+    // guard existed, and the default is the chain it builds now. Two columns of triangles, so what
+    // the guard costs is a number on this page rather than a claim about one.
+    assets::LodChainSettings guarded = assets::vegetationLodSettings();
+    assets::LodChainSettings unguarded = guarded;
+    unguarded.boundsTolerance = 0.0f;
+
+    std::printf("\n%-20s %4s | %8s %8s %8s %7s | %8s %8s %8s %7s | %s\n", "asset", "lod",
+                "tris", "relErr", "bnd/dia", "height", "tris", "relErr", "bnd/dia", "height", "guard");
+    std::printf("%-20s %4s | %35s | %35s |\n", "", "", "  ---- before the guard ----",
+                "  ---- with the guard ----");
+    std::size_t fired = 0;
+    std::size_t understated = 0;
+    long long trisBefore = 0;
+    long long trisAfter = 0;
     for (const Layer& layer : glowmereLayers()) {
         const Asset a = loadAsset(layer.asset);
         if (!a.valid) {
             continue;
         }
-        auto chain = assets::buildLodChain(a.mesh, assets::vegetationLodSettings());
-        if (!chain) {
+        auto before = assets::buildLodChain(a.mesh, unguarded);
+        auto after = assets::buildLodChain(a.mesh, guarded);
+        if (!before || !after) {
             continue;
         }
         const float sourceHeight = std::max(a.hi.y - a.lo.y, 1e-6f);
-        for (std::size_t level = 1; level < chain->levels.size(); ++level) {
-            const assets::LodLevel& L = chain->levels[level];
-            const auto [lo, hi] = L.mesh.bounds();
-            const float lost = std::max(std::fabs(lo.y - a.lo.y), std::fabs(hi.y - a.hi.y));
-            std::printf("%-20s %5zu %8zu %7.1f%% %8.4f %8.4f %7.1f%%%s\n", layer.asset, level,
-                        L.mesh.indices.size() / 3, 100.0 * static_cast<double>(L.achievedRatio),
-                        static_cast<double>(L.relativeError), static_cast<double>(L.error),
-                        100.0 * static_cast<double>((hi.y - lo.y) / sourceHeight),
-                        lost > L.error ? "   <-- moved further than the error it reports" : "");
+        const float diagonal = std::max(glm::length(a.hi - a.lo), 1e-6f);
+        const auto recession = [&](const scene::MeshData& m) {
+            const auto [lo, hi] = m.bounds();
+            float worst = 0.0f;
+            for (int axis = 0; axis < 3; ++axis) {
+                worst = std::max(worst, lo[axis] - a.lo[axis]);
+                worst = std::max(worst, a.hi[axis] - hi[axis]);
+            }
+            return worst;
+        };
+        for (std::size_t level = 1; level < after->levels.size(); ++level) {
+            const assets::LodLevel& B = before->levels[level];
+            const assets::LodLevel& A = after->levels[level];
+            const auto [blo, bhi] = B.mesh.bounds();
+            const auto [alo, ahi] = A.mesh.bounds();
+            const bool guardFired = B.mesh.indices.size() != A.mesh.indices.size();
+            fired += guardFired ? 1 : 0;
+            // The claim the header makes, checked against the deviation that cannot be argued with.
+            understated += recession(B.mesh) > B.error * 1.001f ? 1 : 0;
+            trisBefore += static_cast<long long>(B.mesh.indices.size() / 3);
+            trisAfter += static_cast<long long>(A.mesh.indices.size() / 3);
+            std::printf("%-20s %4zu | %8zu %8.4f %8.4f %6.1f%% | %8zu %8.4f %8.4f %6.1f%% | %s\n",
+                        layer.asset, level, B.mesh.indices.size() / 3,
+                        static_cast<double>(B.relativeError), static_cast<double>(recession(B.mesh) / diagonal),
+                        100.0 * static_cast<double>((bhi.y - blo.y) / sourceHeight),
+                        A.mesh.indices.size() / 3, static_cast<double>(A.relativeError),
+                        static_cast<double>(A.boundsError / diagonal),
+                        100.0 * static_cast<double>((ahi.y - alo.y) / sourceHeight),
+                        guardFired ? "fired" : "");
         }
     }
-    CHECK(true);
+    std::printf("\n  the guard replaced %zu of the rungs printed above; %zu of the unguarded levels\n"
+                "  deviate further than the error they report. Triangles over every rung below 0:\n"
+                "  %lld before, %lld after (%+.1f%%)\n",
+                fired, understated, trisBefore, trisAfter,
+                trisBefore > 0 ? 100.0 * static_cast<double>(trisAfter - trisBefore) /
+                                     static_cast<double>(trisBefore)
+                               : 0.0);
+    // Not `CHECK(true)`: an instrument whose only assertion cannot fail is the thing ADR-182 is
+    // about. The chains have to have been built for any of the above to mean anything.
+    CHECK(trisBefore > 0);
+    CHECK(trisAfter > 0);
 }

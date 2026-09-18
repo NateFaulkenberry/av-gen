@@ -46,6 +46,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -126,6 +127,14 @@ struct ProceduralStats {
     std::uint64_t culledInstances = 0;    // instances rejected by frustum / distance / screen size
     std::uint64_t visibleInstances = 0;   // instances that survived, over all LOD levels
     std::uint64_t lodCounts[4] = {0, 0, 0, 0}; // survivors per LOD level
+    // ADR-287: the same accounting for the **shadow caster list**, which is a different set from
+    // the camera's and must be reported as one. Before the second list existed these were the
+    // camera's numbers by construction -- on Glowmere multicam, 496 visible and 496 casting was one
+    // number printed twice -- so they are counted separately now precisely so nobody can read them
+    // as one again.
+    std::uint64_t shadowInstances = 0;         // instances drawn into the shadow maps, over all rungs
+    std::uint64_t shadowLodCounts[4] = {0, 0, 0, 0};
+    std::uint32_t shadowCullObjects = 0;       // objects that built a shadow caster list this frame
     double cullMs = -1.0;                 // GPU time of the last measured cull pass (-1 = none / unavailable)
 };
 
@@ -135,6 +144,10 @@ struct CullCounts {
     std::uint32_t visible = 0;  // sum of `lod`
     std::uint32_t culled = 0;   // records - visible
     std::array<std::uint32_t, 4> lod{};
+    // ADR-287's second list, read from its own slot in the same stats buffer. Zero for an object
+    // that does not cast, and for every object in a frame with no shadow views.
+    std::uint32_t shadowVisible = 0;
+    std::array<std::uint32_t, 4> shadowLod{};
 };
 
 // The deformer record as the shader sees it (64 bytes, std140-compatible). Mirrors
@@ -202,10 +215,15 @@ inline constexpr std::uint32_t kMaxCullDepthLayers = 6; // shaders/cull.wgsl Cul
 // before this existed.
 inline constexpr std::uint32_t kMaxCullFanout = 7;
 
+// How many shadow views the cull pass may test a caster against (shaders/cull.wgsl
+// kMaxShadowCullViews). The same eight `rendering::kMaxShadowViews` allows, asserted against it in
+// the .cpp so the two cannot drift; a frame never has more, because the atlas has eight layers.
+inline constexpr std::uint32_t kMaxShadowCullViews = 8;
+
 // One material part served by another object's cull (shaders/cull.wgsl `CullFanout`).
 struct CullFanout {
     glm::uvec4 indexCounts; // index count of each LOD level of THIS part's mesh
-    glm::uvec4 slot;        // x = the part's indirect-args / stats slot; yzw unused
+    glm::uvec4 slot;        // x = the part's camera indirect-args / stats slot, y = its shadow slot
 };
 static_assert(sizeof(CullFanout) == 32);
 
@@ -229,8 +247,21 @@ struct CullPassUniforms {
     // only itself, which is the state every object was in before material parts shared one.
     glm::uvec4 fanoutInfo;
     CullFanout fanout[kMaxCullFanout];
+    // ADR-287's second list. x = 1 when this dispatch builds the shadow caster list beside the
+    // camera's, y = the indirect-args / stats slot that list's levels are written to.
+    glm::uvec4 shadowInfo;
 };
-static_assert(sizeof(CullPassUniforms) == 288 + 16 * kMaxCullDepthLayers + 32 * kMaxCullFanout);
+static_assert(sizeof(CullPassUniforms) == 304 + 16 * kMaxCullDepthLayers + 32 * kMaxCullFanout);
+
+// The frame's shadow views as world-space plane sets, shared by every object's cull
+// (shaders/cull.wgsl `ShadowVolumes`). Frame-global because the volumes are a property of the frame
+// and not of the object -- one 784-byte buffer written once per frame, rather than 768 bytes
+// appended to every object's own uniform.
+struct ShadowVolumeUniforms {
+    glm::uvec4 info;   // x = live view count (0 = no shadow maps this frame)
+    glm::vec4 planes[kMaxShadowCullViews * 6];
+};
+static_assert(sizeof(ShadowVolumeUniforms) == 16 + 16 * kMaxShadowCullViews * 6);
 
 class ProceduralRenderer {
 public:
@@ -301,6 +332,16 @@ public:
     // culling or LOD enabled.
     void setViewport(std::uint32_t width, std::uint32_t height);
 
+    // The frame's shadow views, as world-space plane sets, for the shadow caster list (ADR-265 found it, ADR-287 built it).
+    // Call once per frame before update(), with the same planes the depth passes are fitted from --
+    // `SceneRenderer` hands over the set it built for the entity second cull, so the two caster
+    // rules are asking about the same volumes rather than about two fits of them (§37).
+    //
+    // An empty span is how a frame says it has no shadow maps: every object's shadow list comes
+    // back empty, its shadow indirect draws are not recorded, and the frame is exactly the one this
+    // renderer produced before the second list existed.
+    void setShadowViews(std::span<const FrustumPlanes> views);
+
     [[nodiscard]] const ProceduralStats& stats() const { return stats_; }
     // Drops cached meshes not used for `frames` frames (called by update).
     void setMeshCacheLimit(std::size_t frames) { cacheFrames_ = frames; }
@@ -312,7 +353,8 @@ public:
     // Tests and tools only.
     [[nodiscard]] Result<CullCounts> readCullCounts(const std::string& name);
     // Blocking readback of the compacted visible list of one LOD level (ascending record indices).
-    [[nodiscard]] Result<std::vector<std::uint32_t>> readVisibleIndices(const std::string& name, int level);
+    [[nodiscard]] Result<std::vector<std::uint32_t>> readVisibleIndices(const std::string& name, int level,
+                                                                        bool shadowList = false);
     // Blocking readback of the rung the cull pass assigned every record of `name`: 0..lodCount-1,
     // or -1 for a record it rejected. This is `lodIndex`, the buffer cs_cull_classify writes and
     // the compaction reads, so it is the decision itself rather than a second account of it.
@@ -332,7 +374,10 @@ public:
     // addresses, not the counts the cull pass believes it wrote -- since every object's args now
     // share one buffer, those are two different claims and only the first one draws anything.
     // Tests and tools only.
-    [[nodiscard]] Result<std::array<std::uint32_t, 5>> readIndirectArgs(const std::string& name, int level);
+    // `shadowList` reads the shadow caster list's args instead of the camera's (ADR-287) -- the
+    // bytes `drawShadow` addresses, which since the second list exists are different bytes.
+    [[nodiscard]] Result<std::array<std::uint32_t, 5>> readIndirectArgs(const std::string& name, int level,
+                                                                       bool shadowList = false);
 
 private:
     void drawImpl(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,

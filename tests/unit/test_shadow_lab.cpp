@@ -22,8 +22,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <span>
 #include <vector>
 
 using namespace avgen;
@@ -348,32 +350,29 @@ TEST_CASE("a spot and a cube face carry a billboard basis too", "[shadows][lab][
 }
 
 // ================================================================================================
-// The two invariants this lab could not repair
+// The two invariants this lab could not repair, repaired (ADR-285, ADR-287)
 // ================================================================================================
 
 TEST_CASE("a procedural instance a cascade can see is submitted to the shadow passes",
-          "[shadows][lab][casters][!shouldfail]") {
-    // **This is expected to fail, and the day it stops failing is the day somebody fixed it.**
+          "[shadows][lab][casters]") {
+    // Was `[!shouldfail]`. `ProceduralRenderer` ran ONE cull, against the camera frustum, and
+    // `drawShadow` issued its indirect draws against the args that cull wrote -- so an instance the
+    // camera rejected cast nothing, however plainly its shadow fell into shot. Entities have had a
+    // second pass over exactly this case since ADR-046; the ecology had nothing. On Glowmere
+    // multicam that read as 62,284 procedural instances, 496 surviving the camera cull, and 496
+    // drawn into the shadow maps: one number where there should be two.
     //
-    // `ProceduralRenderer` runs ONE cull, against the camera frustum, and `drawShadow` issues its
-    // indirect draws against the args that cull wrote. So an instance the camera rejects casts
-    // nothing, however plainly its shadow falls into shot. Entities get a second pass over exactly
-    // this case (ADR-046, `rendering::casterState`); the ecology does not.
-    //
-    // Expressed as the invariant rather than as the symptom: the set an instance belongs to for the
-    // shadow passes should be decided by a shadow view, and `cullLodLevel` against the camera is
-    // what actually decides it. See docs/shadow-lab/README.md §3.1 for the measurement and for what
-    // the fix would cost.
+    // The invariant, stated as the decision rather than as the symptom: which set an instance
+    // belongs to for the shadow passes is decided by a **shadow view**. `rendering::shadowCullLodLevel`
+    // is that decision and shaders/cull.wgsl mirrors it; the rendered half is in
+    // tests/rendering/test_shadow_lab_gpu.cpp, because a decision function agreeing with itself
+    // proves nothing about a pixel (§37).
     const glm::vec3 light = glm::normalize(glm::vec3(0.829f, -0.559f, 0.0f));
     const glm::mat4 viewProj = cameraViewProj({0.0f, 6.0f, 14.0f}, {0.0f, 3.0f, -80.0f});
     const rendering::FrustumPlanes cameraPlanes = rendering::frustumPlanes(viewProj);
     const auto views = cascadesFor(viewProj, light);
     const auto viewPlanes = planesOf(views);
-
-    // One Glowmere canopy tree, 40 m out and well off to the left of frame: outside the camera
-    // frustum, inside the cascades, and its shadow falls 20 m to +X -- into shot.
-    const glm::vec3 centre(-80.0f, 3.5f, -40.0f);
-    const float radius = rendering::sourceCullRadius(kTreeLo, kTreeHi) * 1.9f;
+    const std::span<const rendering::FrustumPlanes> shadowViews(viewPlanes);
 
     scene::LodSettings lod;
     lod.cull = true;
@@ -383,51 +382,231 @@ TEST_CASE("a procedural instance a cascade can see is submitted to the shadow pa
     cullCamera.position = {0.0f, 6.0f, 14.0f};
     cullCamera.projScale = rendering::cullProjScale(0.96f, 720);
 
-    const int level = rendering::cullLodLevel(lod, cameraPlanes, cullCamera, centre, radius);
-    REQUIRE(level < 0); // the camera really does reject it -- otherwise this proves nothing
+    // **Not a centred cube anywhere in this list** (ADR-182). The cull sphere is centred on the
+    // record position, so a shape that stands on its own origin is the one the radius rules
+    // disagree about, and a thin one is the one a plane test can slip past. Each case names what it
+    // is for, and the last two are controls: things that must NOT become casters.
+    struct Case {
+        const char* what;
+        glm::vec3 center;
+        glm::vec3 lo;        // source bounds, in the source's own space
+        glm::vec3 hi;
+        glm::vec3 scale;     // record scale, non-uniform where it matters
+        bool cameraSees;     // what the camera frustum should say
+        bool castsExpected;  // what the shadow list should say
+    };
+    const std::vector<Case> cases{
+        // The lab's own arm: a Glowmere canopy tree 80 m off to the left, outside the camera
+        // frustum, inside cascade 2, its shadow running 20 m to +X -- into shot.
+        {"a canopy tree off the left of frame", {-80.0f, 3.5f, -40.0f}, kTreeLo, kTreeHi,
+         glm::vec3(1.9f), false, true},
+        // Above the top of the frame, which is the case ADR-046 was written for and the ecology
+        // never got: the thing itself is out of shot and the thing it throws is not.
+        {"a tree above the top of frame", {0.0f, 50.0f, -20.0f}, kTreeLo, kTreeHi, glm::vec3(1.9f),
+         false, true},
+        // Thin: 4 cm of one axis, which is under cascade 2's own texel. A plane test with a radius
+        // taken from the wrong sphere loses this one first.
+        {"a thin upright panel off frame", {-46.0f, 3.0f, -18.0f}, {-3.0f, 0.0f, -0.02f},
+         {3.0f, 6.0f, 0.02f}, glm::vec3(1.0f), false, true},
+        // Off-origin AND non-uniformly scaled: the geometry is authored six metres up its own stem
+        // and then squashed, so the sphere the shader forms is `sourceCullRadius * max|scale|` and
+        // no single axis predicts it.
+        {"an off-origin cap on a non-uniform scale", {-60.0f, 0.0f, -22.0f}, {-0.5f, 5.0f, -0.5f},
+         {0.5f, 7.0f, 0.5f}, {0.4f, 1.6f, 0.4f}, false, true},
+        // The control that says the camera list is not simply being reused: something the camera
+        // DOES see, in the same frame, at the same rung.
+        {"a tree in the middle of frame", {0.0f, 0.0f, -18.0f}, kTreeLo, kTreeHi, glm::vec3(1.9f), true, true},
+        // The two controls that must come back rejected, or "casts" would mean nothing. Past the
+        // shadow range the cascades reach (ADR-112, 77 m here) there is no map to be drawn into --
+        // this one is off frame as well, so neither list keeps it...
+        {"a tree past the cascades, off frame", {-220.0f, 0.0f, -260.0f}, kTreeLo, kTreeHi,
+         glm::vec3(1.9f), false, false},
+        // ...and this one is straight down the lens at 150 m: inside the camera's far plane, past
+        // the 77 m the cascades reach. The camera keeps it and no view can, which is the direction
+        // of asymmetry nobody expects and the reason the caster list is not a superset.
+        {"a tree the camera sees at 150 m", {0.0f, 0.0f, -150.0f}, kTreeLo, kTreeHi, glm::vec3(1.9f),
+         true, false},
+    };
 
-    bool someViewSees = false;
-    for (const auto& planes : viewPlanes) {
-        bool inside = true;
-        for (const glm::vec4& plane : planes) {
-            if (glm::dot(glm::vec3(plane), centre) + plane.w < -radius) {
-                inside = false;
-                break;
+    for (const Case& c : cases) {
+        INFO(c.what);
+        const float radius =
+            rendering::sourceCullRadius(c.lo, c.hi) * std::max({c.scale.x, c.scale.y, c.scale.z});
+        const int cameraLevel = rendering::cullLodLevel(lod, cameraPlanes, cullCamera, c.center, radius);
+        // The control on the fixture itself: the camera really does say what the case claims, or
+        // the arm below is measuring nothing.
+        CHECK((cameraLevel >= 0) == c.cameraSees);
+
+        // And a cascade really can (or cannot) see it, written out rather than taken on trust.
+        bool someViewSees = false;
+        for (const auto& planes : viewPlanes) {
+            bool inside = true;
+            for (const glm::vec4& plane : planes) {
+                if (glm::dot(glm::vec3(plane), c.center) + plane.w < -radius) {
+                    inside = false;
+                    break;
+                }
             }
+            someViewSees = someViewSees || inside;
         }
-        someViewSees = someViewSees || inside;
-    }
-    REQUIRE(someViewSees); // and a cascade really can see it
+        CHECK(someViewSees == c.castsExpected);
 
-    // What the shadow passes actually draw: the camera cull's survivors, and nothing else.
-    const bool drawnIntoShadowMaps = level >= 0;
-    CHECK(drawnIntoShadowMaps);
+        // The invariant.
+        const int shadowLevel =
+            rendering::shadowCullLodLevel(lod, shadowViews, cullCamera, c.center, radius);
+        CHECK((shadowLevel >= 0) == c.castsExpected);
+        // ...and an instance in both lists is on the SAME rung in both, so a caster is rasterised
+        // at the mesh the frame draws. A shadow at a different level of detail from its object is a
+        // shadow that does not line up with it.
+        if (cameraLevel >= 0 && shadowLevel >= 0) {
+            CHECK(shadowLevel == cameraLevel);
+        }
+    }
+
+    SECTION("no shadow views is no caster list") {
+        // How a frame with shadows switched off says so. Every instance is rejected, which is what
+        // keeps the frame this renderer produced before the second list existed.
+        const float radius = rendering::sourceCullRadius(kTreeLo, kTreeHi) * 1.9f;
+        CHECK(rendering::shadowCullLodLevel(lod, {}, cullCamera, {0.0f, 0.0f, -18.0f}, radius) < 0);
+    }
+
+    SECTION("the whole-object proof agrees with the per-instance one") {
+        // `objectFullyCulledForShadows` is what lets the renderer skip an object's shadow dispatches
+        // and draws before encoding them, so it must never claim "nothing casts" about a set that
+        // contains a caster. Checked against the per-instance decision over the same records rather
+        // than against a second copy of its own arithmetic.
+        const auto proofAgrees = [&](const std::vector<glm::vec3>& positions, float scale) {
+            std::vector<scene::InstanceRecord> records;
+            for (const glm::vec3& p : positions) {
+                scene::InstanceRecord r{};
+                r.position = glm::vec4(p, 1.0f);
+                r.rotation = {0.0f, 0.0f, 0.0f, 1.0f};
+                r.scale = {scale, scale, scale, 0.0f};
+                records.push_back(r);
+            }
+            const rendering::InstanceBounds bounds = rendering::instanceBounds(records);
+            const float radius = rendering::sourceCullRadius(kTreeLo, kTreeHi) * scale;
+            bool anyCasts = false;
+            for (const glm::vec3& p : positions) {
+                anyCasts = anyCasts ||
+                           rendering::shadowCullLodLevel(lod, shadowViews, cullCamera, p, radius) >= 0;
+            }
+            const bool proof = rendering::objectFullyCulledForShadows(lod, shadowViews, cullCamera,
+                                                                      glm::mat4(1.0f), bounds,
+                                                                      rendering::sourceCullRadius(kTreeLo, kTreeHi));
+            INFO("proof says fully culled: " << proof << ", instances that cast: " << anyCasts);
+            // The proof may be conservative; it may never be wrong.
+            CHECK_FALSE((proof && anyCasts));
+            return proof;
+        };
+        // An arm the proof must NOT reject: one instance off frame but inside a cascade.
+        CHECK_FALSE(proofAgrees({{-80.0f, 3.5f, -40.0f}}, 1.9f));
+        // And a control it must reject, or it is not proving anything: a cloud 600 m away.
+        CHECK(proofAgrees({{-600.0f, 0.0f, -620.0f}, {-610.0f, 0.0f, -630.0f}}, 1.9f));
+    }
 }
 
 TEST_CASE("a LOD impostor is the size of the object it stands in for",
-          "[shadows][lab][impostor][!shouldfail]") {
-    // **Expected to fail.** Not a shadow defect -- a LOD one, found because it made a shadow
-    // experiment unmeasurable, and recorded here so the day it is fixed is announced.
+          "[shadows][lab][impostor]") {
+    // Was `[!shouldfail]`. `makeLodMesh` sized the rung-2 quad from `sourceBoundingRadius(spec)` --
+    // the RAW asset -- and the billboard branch of shaders/procedural.wgsl scales the quad by
+    // `inst.scale` alone and never applies `proc.sourceMatrix`. Rungs 0 and 1 do go through
+    // `sourceMatrix`. Every terrain scatter layer normalises its asset's height onto
+    // `sourceTransform` ("the layer says how tall the thing should be; the asset says how tall it
+    // is"), so the impostor drew at the asset's authored size in the camera pass as well as in the
+    // shadows: a 0.5 m shrub grid drew as a hedge of 7.3 m trees.
     //
-    // `makeLodMesh` sizes the rung-2 quad from `sourceBoundingRadius(spec)`, the RAW asset, and the
-    // billboard branch of shaders/procedural.wgsl scales it by `inst.scale` alone and never applies
-    // `proc.sourceMatrix`. Rungs 0 and 1 do go through `sourceMatrix`. Every terrain scatter layer
-    // normalises its asset's height onto `sourceTransform`, so every scatter layer's impostors are
-    // drawn at the asset's authored size instead of the layer's. Routed to the LOD Lab.
-    scene::ProceduralGeometry g;
-    g.name = "shrub";
-    g.source.kind = scene::PrimitiveKind::Box;
-    g.source.size = glm::vec3(2.0f);
-    // The layer says how tall the thing should be; the asset says how tall it is.
-    g.sourceTransform.scale = glm::vec3(0.1f);
+    // The size is now taken through `sourceTransform.scale`, which is the one step of the chain a
+    // quad built in the camera's basis cannot pick up for itself.
+    //
+    // Three arms and a control, because the wrong rule and the right one agree on a uniformly
+    // scaled cube and this file exists to stop that happening again (ADR-182).
+    const auto halfExtentOf = [](const scene::MeshData& quad) {
+        float half = 0.0f;
+        for (const scene::Vertex& v : quad.vertices) {
+            half = std::max(half, std::max(std::abs(v.position.x), std::abs(v.position.y)));
+        }
+        return half;
+    };
+    scene::SourceSpec box;
+    box.kind = scene::PrimitiveKind::Box;
+    box.size = glm::vec3(2.0f);
 
-    const auto quad = scene::makeLodMesh(g.source, 2, g.lod.impostorSize);
-    REQUIRE(quad.has_value());
-    float half = 0.0f;
-    for (const scene::Vertex& v : quad->vertices) {
-        half = std::max(half, std::max(std::abs(v.position.x), std::abs(v.position.y)));
+    SECTION("the control: an unscaled source is the size it always was") {
+        // The half that says the fix is not a blanket shrink. A layer that does not normalise its
+        // source gets byte-identical geometry to the one this code shipped with.
+        const auto quad = scene::makeLodMesh(box, 2, 1.0f, glm::vec3(1.0f));
+        REQUIRE(quad.has_value());
+        CHECK_THAT(halfExtentOf(*quad),
+                   Catch::Matchers::WithinRel(scene::sourceBoundingRadius(box), 1e-5f));
     }
-    const float wanted = scene::sourceBoundingRadius(g.source) * g.sourceTransform.scale.x;
-    INFO("impostor half extent " << half << ", the scaled source's radius " << wanted);
-    CHECK_THAT(half, Catch::Matchers::WithinRel(wanted, 0.01f));
+
+    SECTION("a scatter layer's normalisation reaches the quad") {
+        scene::ProceduralGeometry g;
+        g.name = "shrub";
+        g.source = box;
+        g.sourceTransform.scale = glm::vec3(0.1f);
+        const auto quad = scene::makeLodMesh(g.source, 2, g.lod.impostorSize, g.sourceTransform.scale);
+        REQUIRE(quad.has_value());
+        const float wanted = scene::sourceBoundingRadius(g.source) * g.sourceTransform.scale.x;
+        INFO("impostor half extent " << halfExtentOf(*quad) << ", the scaled source's radius " << wanted);
+        CHECK_THAT(halfExtentOf(*quad), Catch::Matchers::WithinRel(wanted, 0.01f));
+    }
+
+    SECTION("a non-uniform normalisation is not read off one axis") {
+        // The shape that separates "multiply the radius by scale.x" from "measure the scaled box".
+        // A source squashed in y has a smaller sphere than scale.x alone would give it, and a
+        // source stretched in y has a larger one, so a rule that picks an axis is wrong in both
+        // directions here and right on the uniform fixture above.
+        scene::SourceSpec slab;
+        slab.kind = scene::PrimitiveKind::Box;
+        slab.size = {2.0f, 2.0f, 2.0f};
+        for (const glm::vec3 scale : {glm::vec3(0.1f, 0.5f, 0.1f), glm::vec3(0.5f, 0.1f, 0.5f)}) {
+            INFO("source scale (" << scale.x << ", " << scale.y << ", " << scale.z << ")");
+            const auto quad = scene::makeLodMesh(slab, 2, 1.0f, scale);
+            REQUIRE(quad.has_value());
+            const float wanted = scene::sourceBoundingRadius(slab, scale);
+            CHECK_THAT(halfExtentOf(*quad), Catch::Matchers::WithinRel(wanted, 1e-4f));
+            // ...and it really is a different number from the one-axis rule, or the check above
+            // would pass whichever rule the code used.
+            CHECK(std::abs(wanted - scene::sourceBoundingRadius(slab) * scale.x) > 1e-3f);
+        }
+    }
+
+    SECTION("a thin source, where the sphere and the tallest axis disagree most") {
+        scene::SourceSpec post;
+        post.kind = scene::PrimitiveKind::Box;
+        post.size = {0.08f, 6.0f, 0.08f};
+        const glm::vec3 scale(1.0f, 0.25f, 1.0f);
+        const auto quad = scene::makeLodMesh(post, 2, 1.0f, scale);
+        REQUIRE(quad.has_value());
+        CHECK_THAT(halfExtentOf(*quad),
+                   Catch::Matchers::WithinRel(scene::sourceBoundingRadius(post, scale), 1e-4f));
+    }
+
+    SECTION("rung 3 is an eighth of rung 2, at the scaled size too") {
+        const glm::vec3 scale(0.1f);
+        const auto quad = scene::makeLodMesh(box, 2, 1.0f, scale);
+        const auto dot = scene::makeLodMesh(box, 3, 1.0f, scale);
+        REQUIRE(quad.has_value());
+        REQUIRE(dot.has_value());
+        CHECK_THAT(halfExtentOf(*dot), Catch::Matchers::WithinRel(halfExtentOf(*quad) * 0.125f, 1e-4f));
+    }
+
+    SECTION("the world size the quad is built at is the world size rung 0 draws at") {
+        // The invariant behind the arithmetic, stated without reference to which function holds the
+        // scale: rung 0 is source geometry through `sourceMatrix`, rung 2 is a quad circumscribing
+        // it, and they must describe one object. Measured off the meshes, not off a formula.
+        const glm::vec3 scale(0.1f, 0.35f, 0.1f);
+        const auto rung0 = scene::makeLodMesh(box, 0);
+        const auto rung2 = scene::makeLodMesh(box, 2, 1.0f, scale);
+        REQUIRE(rung0.has_value());
+        REQUIRE(rung2.has_value());
+        float rung0Radius = 0.0f;
+        for (const scene::Vertex& v : rung0->vertices) {
+            rung0Radius = std::max(rung0Radius, glm::length(v.position * scale));
+        }
+        INFO("rung 0 scaled radius " << rung0Radius << ", rung 2 half extent " << halfExtentOf(*rung2));
+        CHECK_THAT(halfExtentOf(*rung2), Catch::Matchers::WithinRel(rung0Radius, 0.01f));
+    }
 }

@@ -205,15 +205,27 @@ struct SourceSpec {
 //       and box subdivisions halved; floors 3 for radial-style counts, 2 for sphere rings, 1 for
 //       height segments and subdivisions);
 //   2 = a camera-facing billboard quad circumscribing the source's bounding sphere, edge
-//       2 * impostorSize * boundingRadius(spec);
+//       2 * impostorSize * boundingRadius(spec, sourceScale);
 //   3 = a single point quad (edge 2 * impostorSize * boundingRadius / 8) - a dot at distance.
 // **Levels 2 and 3 are impostors only for a generated primitive.** A `Mesh` source has had all
 // three of its levels built by `assets::buildLodChain` since ADR-085, so for every scatter layer,
 // every city piece and every imported asset, levels 1-3 are simplified meshes in the source's own
 // space. `lodLevelIsImpostor` below is the one place that distinction is written down; ask it
 // rather than testing the level index.
-// Pure and deterministic: the same spec/level always gives the same mesh.
-[[nodiscard]] Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize = 1.0f);
+//
+// `sourceScale` is `ProceduralGeometry::sourceTransform.scale` -- step 1 of the transform chain,
+// and the only step an impostor quad cannot pick up for itself. Rungs 0 and 1 are geometry in the
+// source's own space and the vertex stage puts them through `proc.sourceMatrix`; an impostor's
+// corners are offsets in the camera's basis and deliberately skip it, so the size the quad is
+// *built* at is the only place the source transform can reach it. Every terrain scatter layer
+// normalises its asset's height onto `sourceTransform` -- the layer says how tall the thing should
+// be and the asset says how tall it is -- so a quad built without it draws at the asset's authored
+// size: a 0.5 m shrub grid drew as a hedge of 7.3 m trees, in the camera pass as well as in the
+// shadows (found by ADR-265 3.3, fixed by ADR-285).
+//
+// Pure and deterministic: the same spec/level/scale always gives the same mesh.
+[[nodiscard]] Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize = 1.0f,
+                                           const glm::vec3& sourceScale = glm::vec3(1.0f));
 // True when `makeLodMesh(spec, level)` returns a camera-facing impostor quad rather than geometry
 // in the source's own space.
 //
@@ -231,8 +243,11 @@ struct SourceSpec {
 // topology does not; it is the wrong tool for hard-surface geometry with sharp creases.
 [[nodiscard]] MeshData decimateMesh(const MeshData& mesh, int targetTriangles);
 // Half-diagonal of the source's axis-aligned bounds (the bounding-sphere radius the cull pass
-// scales by the instance scale).
+// scales by the instance scale), optionally through the source transform's scale -- the same
+// product `ProceduralGeometry::rebuild` takes for the instance bounds, so a caller sizing something
+// to the source gets the size the frame will draw rather than the size the asset was authored at.
 [[nodiscard]] float sourceBoundingRadius(const SourceSpec& spec);
+[[nodiscard]] float sourceBoundingRadius(const SourceSpec& spec, const glm::vec3& sourceScale);
 
 // ---- distributions ------------------------------------------------------------------------------
 

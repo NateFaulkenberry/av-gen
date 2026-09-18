@@ -20,6 +20,7 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -51,6 +52,38 @@ struct CullCamera {
 [[nodiscard]] int cullLodLevel(const scene::LodSettings& lod, const FrustumPlanes& planes, const CullCamera& camera,
                                glm::vec3 center, float radius, float lodRadius = 0.0f);
 
+// The same decision for the **shadow caster list**: the level this instance is drawn into the
+// shadow maps at, or -1 when no shadow view can see it.
+//
+// A shadow caster list is a second cull, and until ADR-265 named it as a stage this engine had one
+// cull with three consumers: `drawShadow` issued its indirect draws against the args the *camera*
+// cull wrote, so an instance the camera could not see cast nothing however plainly its shadow fell
+// into shot. Entities have had a second pass over exactly this case since ADR-046
+// (`rendering::casterState`); the ecology had nothing, and on Glowmere multicam that read as
+// **62,284 procedural instances, 496 surviving the camera cull, and 496 drawn into the shadow
+// maps** -- one number where there should be two.
+//
+// It differs from `cullLodLevel` in exactly one term, deliberately. The camera frustum test is
+// replaced by "some shadow view's frustum contains this sphere"; the distance limit, the screen-
+// size limit and the whole LOD ladder are the camera's own, unchanged. Two consequences worth
+// stating because both are load-bearing:
+//
+//   * an instance in both lists is on the **same rung** in both, so a caster is never drawn into a
+//     cascade at a different mesh from the one the frame shows -- which is what keeps a shadow the
+//     shadow of the thing that is on screen;
+//   * the shadow list is neither a subset nor a superset of the camera list. An instance behind
+//     the camera that a cascade contains is a caster and not a draw; an instance the camera sees at
+//     200 m is a draw and not a caster, because the cascades stop at the shadow range (ADR-112,
+//     77 m on every scene here) and nothing beyond it can write to a map.
+//
+// `views` is empty when the frame has no shadow views, and every instance is then rejected -- there
+// is no map for it to be drawn into.
+//
+// Mirrored by shaders/cull.wgsl, which builds both lists from one classification pass.
+[[nodiscard]] int shadowCullLodLevel(const scene::LodSettings& lod, std::span<const FrustumPlanes> views,
+                                     const CullCamera& camera, glm::vec3 center, float radius,
+                                     float lodRadius = 0.0f);
+
 // The whole object's records reduced to two numbers that do not change until the record set does:
 // the AABB of the instance positions (record space, before the object matrix) and the largest
 // |scale| any record carries. Cached per object and recomputed on a structureVersion change.
@@ -78,6 +111,16 @@ struct InstanceBounds {
                                      const CullCamera& camera, const glm::mat4& objectToWorld,
                                      const InstanceBounds& bounds, float sourceRadius,
                                      bool limitDistance = true);
+
+// The same proof for the shadow caster list: true when no record of the object can reach any shadow
+// view. `objectFullyCulled` per view would be the obvious spelling and is what this is -- every
+// view has to reject the whole object, because one that does not is a view something casts into --
+// with the empty-`views` case meaning "no shadow maps this frame", which rejects everything.
+[[nodiscard]] bool objectFullyCulledForShadows(const scene::LodSettings& lod,
+                                               std::span<const FrustumPlanes> views,
+                                               const CullCamera& camera, const glm::mat4& objectToWorld,
+                                               const InstanceBounds& bounds, float sourceRadius,
+                                               bool limitDistance = true);
 
 
 // The radius of the sphere **centred on the source's own origin** that contains the source's

@@ -451,3 +451,237 @@ TEST_CASE("the caster overlay colours by what the frame did, not by what the cam
     CHECK(glm::length(first - second) > 0.2f);
     CHECK(rendering::casterState(s.entities[0], s.meshBounds(mesh), {}) == rendering::CasterState::Caster);
 }
+
+// ================================================================================================
+// The ecology's own caster list (ADR-265, ADR-287)
+// ================================================================================================
+
+namespace {
+
+// A floor, one floating box, and the fixture's key travelling +X at 34 degrees -- but photographed
+// from straight down -Z, so "off the left of frame" and "in shot" are two different places on one
+// ground plane and a caster can be put in the first while its shadow lands in the second.
+//
+// 34 degrees runs 1.482 m of shadow per metre of height, so a box 18 m up throws its shadow 26.7 m
+// to +X of itself. That gap is the whole fixture: it is what lets the caster sit far outside the
+// frustum while the thing it casts sits in the middle of the frame. A caster on the ground would
+// have its shadow four metres away and the frame edge would have to fall inside those four metres.
+scene::Scene offScreenCasterScene(float casterX, bool casts) {
+    scene::Scene s;
+    s.environment.backgroundColor = glm::vec3(0.0f);
+    s.environment.showSkybox = false;
+    s.environment.environmentIntensity = 0.0f;
+    s.camera.position = {0.0f, 14.0f, 34.0f};
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+    s.camera.fovYRadians = 0.9f;
+    s.camera.nearPlane = 0.5f;
+    s.camera.farPlane = 200.0f;
+
+    const auto floor = s.addMesh(floorMesh(90.0f));
+    auto& e = s.addEntity("floor", floor);
+    e.material.baseColor = glm::vec3(0.85f);
+    e.material.roughness = 0.95f;
+    e.material.metallic = 0.0f;
+
+    scene::PunctualLight key;
+    key.name = "key";
+    key.type = scene::PunctualLight::Type::Directional;
+    key.direction = glm::normalize(glm::vec3(0.829f, -0.5592f, 0.0f));
+    key.color = glm::vec3(1.0f);
+    key.intensity = 4.0f;
+    key.castsShadow = true;
+    key.contactShadow = false;
+    key.softness = 0.2f;
+    s.addLight(key);
+
+    scene::ProceduralGeometry g = caster("ecology", 1);
+    g.source.size = {6.0f, 6.0f, 6.0f};
+    g.meshHash = specHash(g.source) ^ 0x9E37ull;
+    g.castsShadow = casts;
+    g.instances.clear();
+    g.instances.push_back(recordAt({casterX, 18.0f, 0.0f}, 1.0f));
+    s.procedurals.push_back(g);
+    return s;
+}
+
+// Whether a world point projects inside the frame at all -- the fixture check that says "the camera
+// cannot see this", rather than a pixel coordinate that happens to land off the edge of an array.
+bool insideFrame(const scene::Scene& s, const glm::vec3& world) {
+    const float aspect = static_cast<float>(kWidth) / static_cast<float>(kHeight);
+    const glm::vec4 clip = s.camera.projection(aspect) * s.camera.view() * glm::vec4(world, 1.0f);
+    if (clip.w <= 0.0f) {
+        return false;
+    }
+    const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+    return std::abs(ndc.x) <= 1.0f && std::abs(ndc.y) <= 1.0f && ndc.z >= 0.0f && ndc.z <= 1.0f;
+}
+
+} // namespace
+
+TEST_CASE("a procedural instance the camera cannot see casts into shot",
+          "[gpu][shadows][lab][casters]") {
+    // The rendered half of ADR-287. `ProceduralRenderer` ran one cull against the camera frustum
+    // and `drawShadow` drew the args it wrote, so this box -- 46 m off the left of frame, its
+    // shadow landing in the middle of the picture -- cast nothing at all. Entities have had a
+    // second pass over exactly this case since ADR-046; the ecology had none.
+    //
+    // §37: the assertion is on the pixels, not on a counter. The counters are checked too, at the
+    // end, and where the two disagree the image wins.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    auto renderer = std::make_unique<rendering::SceneRenderer>(*ctx, shaders);
+    REQUIRE(renderer->init().has_value());
+
+    constexpr float kCasterX = -46.0f;
+    // 18 m up, 34 degrees: the shadow lands 26.68 m to +X of the caster.
+    const glm::vec3 shadowGround(kCasterX + 18.0f * 1.4826f, 0.0f, 0.0f);
+    const glm::vec3 openGround(kCasterX + 18.0f * 1.4826f + 16.0f, 0.0f, 0.0f);
+
+    const scene::Scene arm = offScreenCasterScene(kCasterX, true);
+    // The control is the same scene with ONE field different: the object does not cast. Same
+    // camera, same light, same geometry, same tier -- so a difference between the two frames is
+    // that field and nothing else (ADR-182).
+    const scene::Scene control = offScreenCasterScene(kCasterX, false);
+
+    // The fixture's own controls, before either frame is read. If the camera can see the caster
+    // this test proves nothing, and if the shadow falls outside the frame the probe is pointed at
+    // the wrong place -- the mistake ADR-265 records paying for once already.
+    REQUIRE_FALSE(insideFrame(arm, {kCasterX, 18.0f, 0.0f}));
+    REQUIRE(insideFrame(arm, shadowGround));
+    REQUIRE(insideFrame(arm, openGround));
+
+    auto armImage = renderer->renderToImage(arm, frameAt(8), kWidth, kHeight);
+    REQUIRE(armImage.has_value());
+    const auto armCounts = renderer->procedurals().readCullCounts("ecology");
+    auto controlImage = renderer->renderToImage(control, frameAt(8), kWidth, kHeight);
+    REQUIRE(controlImage.has_value());
+
+    const glm::ivec2 shadowPixel = pixelOf(arm, shadowGround);
+    const glm::ivec2 openPixel = pixelOf(arm, openGround);
+    const float armShadow = luminanceAt(*armImage, shadowPixel, 3);
+    const float armOpen = luminanceAt(*armImage, openPixel, 3);
+    const float controlShadow = luminanceAt(*controlImage, shadowPixel, 3);
+    const float controlOpen = luminanceAt(*controlImage, openPixel, 3);
+    INFO("arm: shadow " << armShadow << " open " << armOpen << "; control: shadow " << controlShadow
+                        << " open " << controlOpen);
+
+    // The control first: the ground is lit in both frames, so "darker" below means a shadow and not
+    // a dimmer picture.
+    CHECK(controlOpen > 0.05f);
+    CHECK(armOpen > controlOpen * 0.9f);
+    // And the control really does leave that piece of ground alone -- if it darkened it too, the
+    // arm would be measuring something other than this caster.
+    CHECK(controlShadow > controlOpen * 0.9f);
+
+    // The invariant: before this fix the arm was the control, to the pixel.
+    CHECK(armShadow < armOpen * 0.75f);
+
+    // The counters, checked after the image and never instead of it. This is the number ADR-265
+    // reported as "one number where there should be two": the camera list is empty and the caster
+    // list is not.
+    REQUIRE(armCounts.has_value());
+    INFO("camera list " << armCounts->visible << ", caster list " << armCounts->shadowVisible
+                        << ", records " << armCounts->records);
+    CHECK(armCounts->records == 1);
+    CHECK(armCounts->visible == 0);
+    CHECK(armCounts->shadowVisible == 1);
+}
+
+TEST_CASE("an instance past the cascades is drawn and does not cast", "[gpu][shadows][lab][casters]") {
+    // The other direction of the asymmetry, and the reason the caster list is not simply a superset
+    // of the camera's: the cascades stop at the shadow range (ADR-112, 77 m here), so an instance
+    // the camera sees well beyond it has no map to be drawn into. A second list that kept it would
+    // be spending draws on geometry that cannot write a texel.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    auto renderer = std::make_unique<rendering::SceneRenderer>(*ctx, shaders);
+    REQUIRE(renderer->init().has_value());
+
+    scene::Scene s = offScreenCasterScene(0.0f, true);
+    // Straight down the lens, 150 m out and 18 m up: comfortably inside the frame, comfortably past
+    // the range the cascades reach.
+    s.procedurals[0].instances.clear();
+    s.procedurals[0].instances.push_back(recordAt({0.0f, 18.0f, -150.0f}, 1.0f));
+    ++s.procedurals[0].structureVersion;
+    REQUIRE(insideFrame(s, {0.0f, 18.0f, -150.0f}));
+
+    auto image = renderer->renderToImage(s, frameAt(8), kWidth, kHeight);
+    REQUIRE(image.has_value());
+    const auto counts = renderer->procedurals().readCullCounts("ecology");
+    REQUIRE(counts.has_value());
+    INFO("camera list " << counts->visible << ", caster list " << counts->shadowVisible);
+    // The control: the camera really does keep it, so "does not cast" is a statement about the
+    // caster list and not about an instance that was culled outright.
+    CHECK(counts->visible == 1);
+    CHECK(counts->shadowVisible == 0);
+}
+
+TEST_CASE("an object that loses a rung keeps its caster list", "[gpu][shadows][lab][casters]") {
+    // The caster list lives in the second half of the same `visible` buffer as the camera list, and
+    // where the second half BEGINS is the object's rung count. The cull buffers are grow-only, so a
+    // rung count that goes DOWN leaves the shader laying its two lists out at one base
+    // (`counts.y`, this frame's rung count) while the draw groups read another (`cullLodCount`, the
+    // high-water mark). The shadow draw then reads a slice nobody wrote this frame.
+    //
+    // **The first version of this test could not fail.** It used one instance, and the compacted
+    // list of a one-record object is `[0]` at every slice -- including an untouched one, because the
+    // buffer is zeroed when it is allocated. The probe read the right answer out of the wrong place
+    // and reported no defect. So this one carries two records and makes the right answer `[1]`: a
+    // stale slice then draws the wrong instance, and the wrong instance is a thousand metres away.
+    //
+    // The counters cannot see any of this either -- the cull pass writes its stats correctly
+    // whichever slice the draw goes on to read. Only the pixels can (§37).
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    auto renderer = std::make_unique<rendering::SceneRenderer>(*ctx, shaders);
+    REQUIRE(renderer->init().has_value());
+
+    constexpr float kCasterX = -46.0f;
+    const glm::vec3 shadowGround(kCasterX + 18.0f * 1.4826f, 0.0f, 0.0f);
+    const glm::vec3 openGround(kCasterX + 18.0f * 1.4826f + 16.0f, 0.0f, 0.0f);
+
+    // Record 0 is a thousand metres away and past `maxDistance`, so neither list ever keeps it;
+    // record 1 is the caster. The compacted list is therefore `[1]`, which is a number a zeroed
+    // slice cannot produce.
+    const auto sceneWith = [&](int rungs) {
+        scene::Scene s = offScreenCasterScene(kCasterX, true);
+        s.procedurals[0].lod.lodCount = rungs;
+        s.procedurals[0].instances.clear();
+        s.procedurals[0].instances.push_back(recordAt({0.0f, 18.0f, -1000.0f}, 1.0f));
+        s.procedurals[0].instances.push_back(recordAt({kCasterX, 18.0f, 0.0f}, 1.0f));
+        return s;
+    };
+    const auto darkening = [&](const gpu::Image8& image, const scene::Scene& s) {
+        const float shadow = luminanceAt(image, pixelOf(s, shadowGround), 3);
+        const float open = luminanceAt(image, pixelOf(s, openGround), 3);
+        REQUIRE(open > 0.05f);
+        return 1.0f - shadow / open;
+    };
+
+    // Four rungs first, so the cull buffers are allocated for four and the high-water mark is set.
+    const scene::Scene wide = sceneWith(4);
+    auto first = renderer->renderToImage(wide, frameAt(8), kWidth, kHeight);
+    REQUIRE(first.has_value());
+    const float settled = darkening(*first, wide);
+
+    // The control: a second frame at the SAME rung count. Everything else about this pair is
+    // identical to the arm below, so a difference between them is the rung count and nothing else.
+    auto controlImage = renderer->renderToImage(wide, frameAt(9), kWidth, kHeight);
+    REQUIRE(controlImage.has_value());
+    const float control = darkening(*controlImage, wide);
+
+    // The arm: the same object, by the same name, on two rungs.
+    const scene::Scene narrow = sceneWith(2);
+    auto armImage = renderer->renderToImage(narrow, frameAt(10), kWidth, kHeight);
+    REQUIRE(armImage.has_value());
+    const float arm = darkening(*armImage, narrow);
+
+    INFO("darkening: settled " << settled << ", control (still four rungs) " << control
+                               << ", arm (dropped to two) " << arm);
+    // The controls first, or the arm is a comparison against nothing: four rungs casts, and it
+    // still casts on a second frame.
+    CHECK(settled > 0.15f);
+    CHECK(control > 0.15f);
+    // The invariant: dropping a rung does not drop the shadow.
+    CHECK(arm > 0.15f);
+}
