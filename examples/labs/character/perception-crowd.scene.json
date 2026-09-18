@@ -1,0 +1,2639 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Perception Crowd",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   42.0,
+   62.0
+  ],
+  "target": [
+   0.0,
+   1.5,
+   0.0
+  ],
+  "fov": 46.0,
+  "orbitSpeed": 0.0
+ },
+ "lightRig": "../../lightrigs/bioluminescent.rig.json",
+ "environment": {
+  "stylized": true,
+  "intensity": 0.16,
+  "skyIntensity": 0.32,
+  "background": [
+   0.006,
+   0.01,
+   0.02
+  ],
+  "fogColor": [
+   0.02,
+   0.038,
+   0.07
+  ],
+  "fogDensity": 0.01,
+  "fogHeight": 16.0,
+  "fogHeightFalloff": 0.05
+ },
+ "heroes": [
+  {
+   "name": "wall-00",
+   "position": [
+    -30.0,
+    0.0,
+    0.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 3.25,
+   "height": 9.0,
+   "importance": 0.3,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "wall-01",
+   "position": [
+    -24.0,
+    0.0,
+    0.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 3.25,
+   "height": 9.0,
+   "importance": 0.3,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "wall-02",
+   "position": [
+    -18.0,
+    0.0,
+    0.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 3.25,
+   "height": 9.0,
+   "importance": 0.3,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "wall-03",
+   "position": [
+    -12.0,
+    0.0,
+    0.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 3.25,
+   "height": 9.0,
+   "importance": 0.3,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "wall-04",
+   "position": [
+    -6.0,
+    0.0,
+    0.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 3.25,
+   "height": 9.0,
+   "importance": 0.3,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "wall-05",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 3.25,
+   "height": 9.0,
+   "importance": 0.3,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "wall-06",
+   "position": [
+    6.0,
+    0.0,
+    0.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 3.25,
+   "height": 9.0,
+   "importance": 0.3,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "wall-07",
+   "position": [
+    12.0,
+    0.0,
+    0.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 3.25,
+   "height": 9.0,
+   "importance": 0.3,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "wall-08",
+   "position": [
+    18.0,
+    0.0,
+    0.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 3.25,
+   "height": 9.0,
+   "importance": 0.3,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "wall-09",
+   "position": [
+    24.0,
+    0.0,
+    0.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 3.25,
+   "height": 9.0,
+   "importance": 0.3,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "wall-10",
+   "position": [
+    30.0,
+    0.0,
+    0.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 3.25,
+   "height": 9.0,
+   "importance": 0.3,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  }
+ ],
+ "navBodyRadius": 0.7,
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "terrain",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "world": {
+    "name": "perception-crowd-flat",
+    "seed": 20260918,
+    "size": [
+     240.0,
+     240.0
+    ],
+    "baseHeight": 0.0,
+    "erosion": 0.0,
+    "seaLevel": -100.0,
+    "layers": [],
+    "features": []
+   },
+   "terrain": {
+    "chunkSize": 40.0,
+    "resolution": 24,
+    "lodLevels": 3,
+    "lodDistance": 70.0,
+    "viewDistance": 260.0,
+    "skirtDepth": 1.2
+   },
+   "material": {
+    "baseColor": [
+     0.02,
+     0.07,
+     0.05
+    ],
+    "roughness": 0.9,
+    "metallic": 0.0,
+    "emissiveIntensity": 0.0
+   }
+  },
+  {
+   "name": "wall-00",
+   "kind": "procedural",
+   "position": [
+    -30.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.0,
+      9.0,
+      4.6
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.5,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "wall-01",
+   "kind": "procedural",
+   "position": [
+    -24.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.0,
+      9.0,
+      4.6
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.5,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "wall-02",
+   "kind": "procedural",
+   "position": [
+    -18.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.0,
+      9.0,
+      4.6
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.5,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "wall-03",
+   "kind": "procedural",
+   "position": [
+    -12.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.0,
+      9.0,
+      4.6
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.5,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "wall-04",
+   "kind": "procedural",
+   "position": [
+    -6.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.0,
+      9.0,
+      4.6
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.5,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "wall-05",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.0,
+      9.0,
+      4.6
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.5,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "wall-06",
+   "kind": "procedural",
+   "position": [
+    6.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.0,
+      9.0,
+      4.6
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.5,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "wall-07",
+   "kind": "procedural",
+   "position": [
+    12.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.0,
+      9.0,
+      4.6
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.5,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "wall-08",
+   "kind": "procedural",
+   "position": [
+    18.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.0,
+      9.0,
+      4.6
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.5,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "wall-09",
+   "kind": "procedural",
+   "position": [
+    24.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.0,
+      9.0,
+      4.6
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.5,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "wall-10",
+   "kind": "procedural",
+   "position": [
+    30.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.0,
+      9.0,
+      4.6
+     ],
+     "subdivisions": 1,
+     "bevel": 0.18,
+     "bevelSegments": 2
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.5,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.085,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.72
+     ],
+     "emissiveIntensity": 0.05
+    }
+   }
+  },
+  {
+   "name": "walker-00",
+   "kind": "procedural",
+   "position": [
+    -27.5,
+    0.0,
+    9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-01",
+   "kind": "procedural",
+   "position": [
+    -22.5,
+    0.0,
+    9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-02",
+   "kind": "procedural",
+   "position": [
+    -17.5,
+    0.0,
+    9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-03",
+   "kind": "procedural",
+   "position": [
+    -12.5,
+    0.0,
+    9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-04",
+   "kind": "procedural",
+   "position": [
+    -7.5,
+    0.0,
+    9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-05",
+   "kind": "procedural",
+   "position": [
+    -2.5,
+    0.0,
+    9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-06",
+   "kind": "procedural",
+   "position": [
+    2.5,
+    0.0,
+    9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-07",
+   "kind": "procedural",
+   "position": [
+    7.5,
+    0.0,
+    9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-08",
+   "kind": "procedural",
+   "position": [
+    12.5,
+    0.0,
+    9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-09",
+   "kind": "procedural",
+   "position": [
+    17.5,
+    0.0,
+    9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-10",
+   "kind": "procedural",
+   "position": [
+    22.5,
+    0.0,
+    9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-11",
+   "kind": "procedural",
+   "position": [
+    27.5,
+    0.0,
+    9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-12",
+   "kind": "procedural",
+   "position": [
+    -27.5,
+    0.0,
+    -9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-13",
+   "kind": "procedural",
+   "position": [
+    -22.5,
+    0.0,
+    -9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-14",
+   "kind": "procedural",
+   "position": [
+    -17.5,
+    0.0,
+    -9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-15",
+   "kind": "procedural",
+   "position": [
+    -12.5,
+    0.0,
+    -9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-16",
+   "kind": "procedural",
+   "position": [
+    -7.5,
+    0.0,
+    -9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-17",
+   "kind": "procedural",
+   "position": [
+    -2.5,
+    0.0,
+    -9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-18",
+   "kind": "procedural",
+   "position": [
+    2.5,
+    0.0,
+    -9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-19",
+   "kind": "procedural",
+   "position": [
+    7.5,
+    0.0,
+    -9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-20",
+   "kind": "procedural",
+   "position": [
+    12.5,
+    0.0,
+    -9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-21",
+   "kind": "procedural",
+   "position": [
+    17.5,
+    0.0,
+    -9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-22",
+   "kind": "procedural",
+   "position": [
+    22.5,
+    0.0,
+    -9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  },
+  {
+   "name": "walker-23",
+   "kind": "procedural",
+   "position": [
+    27.5,
+    0.0,
+    -9.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.7,
+     "segments": 12
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.7,
+      0.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.8,
+      0.7
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "emissiveIntensity": 0.4
+    }
+   }
+  }
+ ],
+ "entities": [
+  {
+   "name": "walker-00",
+   "node": "walker-00",
+   "seed": 1009,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-01",
+   "node": "walker-01",
+   "seed": 1046,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-02",
+   "node": "walker-02",
+   "seed": 1083,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-03",
+   "node": "walker-03",
+   "seed": 1120,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-04",
+   "node": "walker-04",
+   "seed": 1157,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-05",
+   "node": "walker-05",
+   "seed": 1194,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-06",
+   "node": "walker-06",
+   "seed": 1231,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-07",
+   "node": "walker-07",
+   "seed": 1268,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-08",
+   "node": "walker-08",
+   "seed": 1305,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-09",
+   "node": "walker-09",
+   "seed": 1342,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-10",
+   "node": "walker-10",
+   "seed": 1379,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-11",
+   "node": "walker-11",
+   "seed": 1416,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-12",
+   "node": "walker-12",
+   "seed": 1453,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-13",
+   "node": "walker-13",
+   "seed": 1490,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-14",
+   "node": "walker-14",
+   "seed": 1527,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-15",
+   "node": "walker-15",
+   "seed": 1564,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-16",
+   "node": "walker-16",
+   "seed": 1601,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-17",
+   "node": "walker-17",
+   "seed": 1638,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-18",
+   "node": "walker-18",
+   "seed": 1675,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-19",
+   "node": "walker-19",
+   "seed": 1712,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-20",
+   "node": "walker-20",
+   "seed": 1749,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-21",
+   "node": "walker-21",
+   "seed": 1786,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-22",
+   "node": "walker-22",
+   "seed": 1823,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  },
+  {
+   "name": "walker-23",
+   "node": "walker-23",
+   "seed": 1860,
+   "cullDistance": 600.0,
+   "behaviors": [
+    {
+     "kind": "explore",
+     "speed": 0.6,
+     "runSpeed": 1.2,
+     "turnRate": 150.0,
+     "arrive": 1.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.0,
+     "minRange": 2.0,
+     "maxRange": 5.0,
+     "homeRadius": 6.0,
+     "bodyRadius": 0.7,
+     "waypointRadius": 1.6,
+     "repathSeconds": 6.0,
+     "stuckSeconds": 2.5
+    }
+   ],
+   "perception": {
+    "range": 40.0,
+    "fieldOfView": 360.0,
+    "proximityRange": 4.0,
+    "capacity": 8,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 1.0
+   }
+  }
+ ],
+ "post": {
+  "tonemap": 1,
+  "bloomEnabled": true,
+  "bloomIntensity": 0.05,
+  "bloomThreshold": 1.05,
+  "bloomKnee": 0.6
+ }
+}

@@ -319,6 +319,14 @@ void EntityWorld::setEntities(std::vector<EntityDesc> descs, std::uint32_t scene
     }
     // The per-entity field state is sized per field, so a new entity set needs a new binding pass.
     fieldsBound_ = false;
+    // Whether the sense stage runs at all in this world. False is the ordinary answer -- Glowmere's
+    // nine farm animals, every craft and every spinning rock declare no `perception` block -- and it
+    // is what makes the stage cost exactly nothing rather than nearly nothing: no grid is built, no
+    // loop is entered, and a scene that had no senses is bit-for-bit what it was before they existed.
+    perceiving_ = false;
+    for (const auto& entity : entities_) {
+        perceiving_ = perceiving_ || entity->desc_.perceives;
+    }
     for (const std::string& problem : problems_) {
         log::warn("{}", problem);
     }
@@ -431,6 +439,98 @@ void EntityWorld::refreshInterestPoints() {
             interests_.push_back(InterestPoint{p, {}, InterestKind::Vista, 1.0f});
         }
     }
+
+    // ---- and the index a sense stage scans it through (ADR-270) -------------------------------
+    //
+    // The entries of kind `Character` are deliberately left out. They are bodies, their positions
+    // in this list are wherever the host last recorded the landmark, and a percept built from one
+    // would report a walking character at where it was when the scene was loaded. They are scanned
+    // through the body grid instead, where they are where they are now.
+    //
+    // 32 m cells: `spatial::PointGrid` is tuned for a query radius no larger than a cell, and 32 m
+    // is a little under the 60 m default range and a little over the ranges an author is likely to
+    // author. A 60 m query over this costs 0.098 us against the real 505-entry list -- four hundred
+    // times cheaper than one `Navigator::sample`, which is the finding that decided the whole shape
+    // of the sense stage (ADR-270 §2).
+    interestGridPoints_.clear();
+    interestGridSource_.clear();
+    for (std::size_t i = 0; i < interests_.size(); ++i) {
+        if (interests_[i].kind == InterestKind::Character) {
+            continue;
+        }
+        interestGridPoints_.push_back(interests_[i].position);
+        interestGridSource_.push_back(static_cast<std::uint32_t>(i));
+    }
+    interestGrid_.build(interestGridPoints_, 32.0f);
+}
+
+PerceptionIndex EntityWorld::perceptionIndex() const {
+    PerceptionIndex index;
+    index.interests = &interestGrid_;
+    index.interestSource = interestGridSource_;
+    index.bodies = &bodyGrid_;
+    index.bodyPositions = bodyPoints_;
+    return index;
+}
+
+void EntityWorld::buildBodyIndex() {
+    // Every entity, in entity order, so a grid point index *is* an index into `entities()` and a
+    // `Percept::source` needs no translation. Bodies with no radius are in it too: a saucer is not
+    // a body the crowd separates against and it is very much a thing a character notices.
+    bodyPoints_.clear();
+    bodyPoints_.reserve(entities_.size());
+    for (const auto& entity : entities_) {
+        // R1 (ADR-260): the simulation's position. `visualPosition()` would fold in the behaviours'
+        // offsets, and Glowmere's saucer carries a 2.4 m drift -- perceived from there, a character
+        // sent to meet it walks to the wrong place by up to 2.4 m for reasons nothing explains.
+        bodyPoints_.push_back(entity->state_.position());
+    }
+    bodyGrid_.build(bodyPoints_, 32.0f);
+}
+
+void EntityWorld::perceiveOne(std::size_t entityIndex, double time) {
+    Entity& entity = *entities_[entityIndex];
+    if (!entity.desc_.perceives) {
+        return;
+    }
+    ++perceptionCounts_.perceivers;
+
+    // ADR-225: a setting the application does not keep is not a setting. The authored value is the
+    // default and the parameter is the answer, read here every tick, so a keyframed `range` is a
+    // character whose senses narrow on cue rather than a knob that draws in a panel and does nothing.
+    PerceptionSettings live = entity.desc_.perception;
+    const Entity::PerceptionParams& p = entity.perceptionParams_;
+    if (p.range != nullptr) {
+        live.range = p.range->value();
+        live.fieldOfView = p.fieldOfView->value();
+        live.proximityRange = p.proximityRange->value();
+        live.capacity = static_cast<std::uint16_t>(std::lround(p.capacity->value()));
+        live.hertz = p.hertz->value();
+        live.occlusionTestsPerSecond = p.occlusionTestsPerSecond->value();
+        for (std::size_t i = 0; i < 5; ++i) {
+            live.weight[i] = p.weight[i]->value();
+        }
+    }
+    live.capacity = static_cast<std::uint16_t>(
+        std::clamp<int>(static_cast<int>(live.capacity), 1, static_cast<int>(kPerceptCapacityMax)));
+    entity.perceptionLive_ = live;
+
+    // The cadence, as a tick index rather than an accumulator. `senseTick` is a pure function of
+    // (time, hertz, seed), so the instants a replay senses at are the instants a play senses at --
+    // which is what lets a character's working set be reconstructed by `seek` rather than persisted
+    // (D4), and it is why nothing here reads a frame index or a wall clock (D1).
+    const std::uint64_t tick = senseTick(time, live.hertz, entity.seed_);
+    if (tick == entity.senseTick_) {
+        return; // still inside the tick the working set already belongs to
+    }
+    entity.senseTick_ = tick;
+    ++perceptionCounts_.sensed;
+    if (entity.percepts_.size() < kPerceptCapacityMax) {
+        entity.percepts_.resize(kPerceptCapacityMax);
+    }
+    entity.perceptCount_ =
+        perception().perceive(*this, entityIndex, live, entity.seed_, time,
+                              std::span<Percept>(entity.percepts_.data(), entity.percepts_.size()));
 }
 
 void EntityWorld::registerParameters(params::ParameterSet& params, const std::string& prefix) {
@@ -463,6 +563,34 @@ void EntityWorld::registerParameters(params::ParameterSet& params, const std::st
             const std::string base = prefix + entity->name() + "/" + name + "/";
             entity->behaviors_[i]->registerParameters(params, base);
             entity->behaviors_[i]->collectParameterPaths(registered_);
+        }
+        // The senses, as ordinary parameters (ADR-225, ADR-290). Registered for every entity that
+        // declared a `perception` block and for no other, so the path set says which bodies have
+        // senses -- and read back in `perceiveOne` every tick, so a keyframed `range` is a
+        // character whose senses narrow on cue. A knob that draws and does nothing is the defect
+        // this repository named ADR-225 after.
+        if (entity->desc_.perceives) {
+            const std::string base = prefix + entity->name() + "/perception/";
+            const auto add = [&](const std::string& name, float value, float lo, float hi) {
+                registered_.push_back(base + name);
+                return &params.add(params::ParamDesc<float>{
+                    .path = base + name, .defaultValue = value, .hardMin = lo, .hardMax = hi});
+            };
+            const PerceptionSettings& settings = entity->desc_.perception;
+            Entity::PerceptionParams& pp = entity->perceptionParams_;
+            pp.range = add("range", settings.range, 0.0f, 500.0f);
+            pp.fieldOfView = add("fieldOfView", settings.fieldOfView, 0.0f, 360.0f);
+            pp.proximityRange = add("proximityRange", settings.proximityRange, 0.0f, 100.0f);
+            pp.capacity = add("capacity", static_cast<float>(settings.capacity), 1.0f,
+                              static_cast<float>(kPerceptCapacityMax));
+            pp.hertz = add("hertz", settings.hertz, 0.0f, 60.0f);
+            pp.occlusionTestsPerSecond =
+                add("occlusionTestsPerSecond", settings.occlusionTestsPerSecond, 0.0f, 120.0f);
+            const std::span<const std::string_view> names = perceptionWeightNames();
+            for (std::size_t w = 0; w < names.size(); ++w) {
+                pp.weight[w] = add("weight/" + std::string(names[w]), settings.weight[w], 0.0f, 8.0f);
+            }
+            entity->percepts_.assign(kPerceptCapacityMax, Percept{});
         }
         // Declared state, as ordinary parameters. This is the whole of what makes "the headphones
         // are on" readable by anything else: a reaction targets "state/headphones", a track
@@ -497,6 +625,9 @@ void EntityWorld::unregisterParameters(params::ParameterSet& params) {
         // Stale pointers into a set that has just been emptied. The state itself lives on in
         // propertyValues_, which is why it survives a scene swap and a rebind.
         std::fill(entity->propertyParams_.begin(), entity->propertyParams_.end(), nullptr);
+        // And the senses'. `desc_.perception` is the authored value and survives; what is dropped
+        // is the live reading of it, which `perceiveOne` falls back off when the pointers are null.
+        entity->perceptionParams_ = Entity::PerceptionParams{};
     }
 }
 
@@ -669,6 +800,34 @@ void EntityWorld::bind(params::ParameterSet& params, const std::string& prefix) 
                 entity->propertyParams_[i]->setBase(entity->propertyValues_[i].second);
             }
         }
+        if (entity->desc_.perceives) {
+            const std::string base = prefix + entity->name() + "/perception/";
+            Entity::PerceptionParams& pp = entity->perceptionParams_;
+            pp.range = params.findAs<float>(base + "range");
+            pp.fieldOfView = params.findAs<float>(base + "fieldOfView");
+            pp.proximityRange = params.findAs<float>(base + "proximityRange");
+            pp.capacity = params.findAs<float>(base + "capacity");
+            pp.hertz = params.findAs<float>(base + "hertz");
+            pp.occlusionTestsPerSecond = params.findAs<float>(base + "occlusionTestsPerSecond");
+            const std::span<const std::string_view> names = perceptionWeightNames();
+            bool complete = pp.range != nullptr && pp.fieldOfView != nullptr &&
+                            pp.proximityRange != nullptr && pp.capacity != nullptr &&
+                            pp.hertz != nullptr && pp.occlusionTestsPerSecond != nullptr;
+            for (std::size_t w = 0; w < names.size() && w < 5; ++w) {
+                pp.weight[w] = params.findAs<float>(base + "weight/" + std::string(names[w]));
+                complete = complete && pp.weight[w] != nullptr;
+            }
+            // All of them or none. `perceiveOne` tests one pointer and then reads the rest, which
+            // is only safe because a partial resolution is turned into no resolution here: a set
+            // that has half the knobs is a scene mid-swap, and falling back to the authored values
+            // is the answer that cannot crash.
+            if (!complete) {
+                pp = Entity::PerceptionParams{};
+            }
+            if (entity->percepts_.size() < kPerceptCapacityMax) {
+                entity->percepts_.assign(kPerceptCapacityMax, Percept{});
+            }
+        }
     }
     navPath_.setNavigator(&nav_);
     // After the anchors, because a field's source may be an entity and an entity's position is its
@@ -690,6 +849,12 @@ void EntityWorld::reset() {
         entity->locomotion_ = LocomotionState{};
         entity->coarseAccum_ = 0.0;
         entity->everUpdated_ = false;
+        // The working set, and the tick it belonged to. D4: what a character knows is reconstructed
+        // by the replay rather than persisted, so a reset must leave it knowing nothing -- a seek
+        // that inherited the last played frame's percepts would be state surviving the one call
+        // whose whole job is to remove state.
+        entity->perceptCount_ = 0;
+        entity->senseTick_ = Entity::kNoSenseTick;
         // And back into the crowd. `update` clears this for a body it culled by distance, and
         // nothing put it back -- so a reset inherited "entity 7 is not a body" from whatever frame
         // last played, and a seek that rebuilds the crowd field (which `seek` now does) would build
@@ -797,6 +962,8 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         seekFirstStep_[i] = needSteps[i] == 0 || needSteps[i] >= steps ? 0 : steps - needSteps[i];
     }
 
+    perceptionCounts_ = PerceptionCounts{};
+    gridPerception_.resetCounts();
     seekWork_ = SeekWork{};
     seekWork_.spanSeconds = static_cast<double>(steps) * dt;
     seekWork_.steps = steps;
@@ -857,6 +1024,16 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             }
             crowd_.build();
         }
+        // And the sense stage's snapshot, on the same terms. A replay that skipped it would leave
+        // every character knowing nothing at the second the scrub landed on, which is a working set
+        // reconstructed wrongly rather than not at all -- and D4 is the promise that the replay
+        // *is* the memory. `senseTick` is a pure function of the instant, so a replayed body senses
+        // at the same instants a played one does and arrives at the same working set.
+        if (perceiving_) {
+            buildBodyIndex();
+            gridPerception_.setIndex(perceptionIndex());
+            gridPerception_.setClearance(nav_.valid() ? &nav_.clearance() : nullptr);
+        }
 
         for (std::size_t entityIndex = 0; entityIndex < entities_.size(); ++entityIndex) {
             if (i < seekFirstStep_[entityIndex]) {
@@ -891,6 +1068,10 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
                 ac.gait = &entity.desc_.gait;
                 ac.events = &seekEvents_;
                 (void)entity.actions_.update(ac, entity.state_);
+            }
+
+            if (perceiving_) {
+                perceiveOne(entityIndex, now);
             }
 
             BehaviorContext bc;
@@ -941,6 +1122,17 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         entity.locomotion_.reaction = entity.state_.reaction;
         entity.locomotion_.lookTarget = entity.state_.lookTarget;
         entity.locomotion_.hasLookTarget = entity.state_.hasLookTarget;
+    }
+    // What the replay's sense stage cost, in the same structural terms an update reports it in.
+    // A seek at 60 Hz over 90 s runs 5,400 steps; at 4 Hz a body senses on 360 of them, and the
+    // difference between those two numbers is the whole of what the cadence buys the replay.
+    if (perceiving_ && perception_ == nullptr) {
+        const GridPerception::Counts counts = gridPerception_.counts();
+        perceptionCounts_.candidates = counts.candidates;
+        perceptionCounts_.percepts = counts.percepts;
+        perceptionCounts_.dropped = counts.dropped;
+        perceptionCounts_.occlusionTests = counts.occlusionTests;
+        perceptionCounts_.occlusionDeferred = counts.occlusionDeferred;
     }
 }
 
@@ -1061,6 +1253,21 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         crowdOwner_.push_back(i);
     }
     crowd_.build();
+
+    // The sense stage's snapshot, built here for exactly the reason the crowd's is: every character
+    // senses the world as it was at the end of the last step, so what one body notices does not
+    // depend on whether the body it noticed had already been updated this frame (ADR-270, ADR-290).
+    perceptionCounts_ = PerceptionCounts{};
+    gridPerception_.resetCounts();
+    if (perceiving_) {
+        buildBodyIndex();
+        gridPerception_.setIndex(perceptionIndex());
+        // The only occlusion this engine owns, and the reason there is a budget at all. A field
+        // with a null map means no test is ever performed and no percept claims to have been
+        // tested -- which is the honest answer for a scene with no terrain, and is not the same
+        // answer as testing and finding nothing in the way.
+        gridPerception_.setClearance(nav_.valid() ? &nav_.clearance() : nullptr);
+    }
 
     // Folding an entity's offsets onto its node's parameter *finals*, which has to happen on every
     // frame whether or not the simulation advanced on it.
@@ -1213,6 +1420,17 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
             entity.state_.activity = entity.arcActivity_;
         }
 
+        // ---- the senses, before the behaviours (ADR-270) ----
+        // Above the behaviours and below the action tier, because a percept is something a body
+        // *knows* and an order is something it was *told*: a character under orders still notices
+        // what is around it, and P3's decider is what will be allowed to act on that. Nothing reads
+        // `Entity::percepts()` yet -- the decider is the next unit -- so this stage currently
+        // changes no character's route by a millimetre, which is a claim
+        // `tests/unit/test_entity_perception.cpp` holds rather than an assurance.
+        if (perceiving_) {
+            perceiveOne(entityIndex, ctx.time);
+        }
+
         BehaviorContext bc;
         bc.time = ctx.time;
         bc.dt = dt;
@@ -1320,6 +1538,14 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         }
 
         applyAttachments(entity, params);
+    }
+    if (perceiving_ && perception_ == nullptr) {
+        const GridPerception::Counts counts = gridPerception_.counts();
+        perceptionCounts_.candidates = counts.candidates;
+        perceptionCounts_.percepts = counts.percepts;
+        perceptionCounts_.dropped = counts.dropped;
+        perceptionCounts_.occlusionTests = counts.occlusionTests;
+        perceptionCounts_.occlusionDeferred = counts.occlusionDeferred;
     }
     if (actionListener_) {
         for (const ActionEvent& event : actionEvents_) {
@@ -2116,6 +2342,18 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
         }
         desc.gait = *gait;
     }
+    // The senses (ADR-270, ADR-290). The presence of the key is the whole of the opt-in: an entity
+    // without one perceives nothing and pays nothing, which is the right answer for every craft,
+    // every rock and the nine farm animals of Glowmere, and it is why this is a flag rather than a
+    // settings block that is always there with a range of zero.
+    if (j.contains("perception")) {
+        auto perception = perceptionFromJson(j["perception"]);
+        if (!perception) {
+            return fail("entity '{}': {}", desc.name, perception.error().message);
+        }
+        desc.perception = *perception;
+        desc.perceives = true;
+    }
     return desc;
 }
 
@@ -2367,6 +2605,12 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
     }
     if (!(entity.gait == GaitSettings{})) {
         j["gait"] = gaitToJson(entity.gait);
+    }
+    // Written when the entity declared senses and never otherwise, because the key's *presence* is
+    // the opt-in: emitting a default block for every entity would give every body in every scene
+    // this repository ships a sense stage it never asked for, on the next save.
+    if (entity.perceives) {
+        j["perception"] = perceptionToJson(entity.perception);
     }
     return j;
 }

@@ -81,6 +81,29 @@ struct EntityState {
     [[nodiscard]] glm::vec3 position() const { return anchor + travel; }
 };
 
+// A place worth walking to (ADR-093, §6). §6 lists what a character should find interesting --
+// glowing plants, water, the UFO, terrain features, scenic locations -- and this is that list, as
+// data, so a behaviour can choose among them without knowing where any of them came from.
+//
+// The kinds exist so a character can have *taste*: one drawn to water and one drawn to high ground
+// are the same behaviour with different weights, and the difference is what stops two characters in
+// the same world walking the same route.
+enum class InterestKind : std::uint8_t {
+    Landmark,  // a hero or an authored node: the elder, the monument, the arch
+    Character, // another entity, which moves
+    Glow,      // a patch of luminous ecology
+    Water,     // a point on a shoreline
+    Vista,     // a walkable local high point
+};
+[[nodiscard]] const char* interestKindName(InterestKind kind);
+
+struct InterestPoint {
+    glm::vec3 position{0.0f};
+    std::string name;   // empty for a derived point; a landmark or entity name otherwise
+    InterestKind kind = InterestKind::Landmark;
+    float weight = 1.0f;
+};
+
 struct BehaviorContext {
     double time = 0.0;   // seconds on the engine timeline
     double dt = 0.0;     // seconds since this entity was last updated (not necessarily the frame's)
