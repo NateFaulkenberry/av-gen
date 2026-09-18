@@ -1786,4 +1786,49 @@ void Staging::reset(entity::EntityWorld* world, params::ParameterSet* params) {
     lastSearch_ = -1.0e30;
 }
 
+
+std::set<std::string> scenarioOwnedNodes(
+    const StagingDesc& staging,
+    const std::function<std::string(const std::string&)>& nodeOf,
+    const std::function<std::vector<std::string>(const std::string&)>& tagsOf,
+    const std::vector<std::string>& everyEntity) {
+    std::set<std::string> owned;
+    std::set<std::string> tags;
+    for (const ActorDesc& actor : staging.actors) {
+        owned.insert(actor.driven());
+        for (const ActorPart& part : actor.parts) {
+            owned.insert(part.entity);
+        }
+    }
+    for (const ScenarioDesc& scenario : staging.scenarios) {
+        for (const BeatDesc& beat : scenario.beats) {
+            for (const QueryDesc& query : beat.find) {
+                if (!query.tag.empty()) {
+                    tags.insert(query.tag);
+                }
+                if (!query.name.empty()) {
+                    owned.insert(query.name);
+                }
+            }
+        }
+    }
+    // A tag names a set rather than a member, so the only way to answer "what could this bind" is
+    // to ask every entity. Cheap, and done once per save rather than per frame.
+    if (!tags.empty()) {
+        for (const std::string& name : everyEntity) {
+            for (const std::string& tag : tagsOf(name)) {
+                if (tags.count(tag) != 0) {
+                    owned.insert(name);
+                    break;
+                }
+            }
+        }
+    }
+    std::set<std::string> nodes;
+    for (const std::string& name : owned) {
+        nodes.insert(nodeOf(name));
+    }
+    return nodes;
+}
+
 } // namespace avgen::stage
