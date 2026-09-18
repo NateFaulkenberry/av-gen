@@ -133,8 +133,34 @@ def clean(project):
             del saved[path]
     if not dropped:
         return None
+    # Removed as TEXT, not by re-dumping the document.
+    #
+    # `json.dump` rewrites every float through Python's repr, which disagrees with whatever wrote
+    # the file about the last digit of roughly 140 of them here -- numerically identical, and enough
+    # to bury a two-key correction in a 250-line diff that nobody can review. Measured on
+    # glowmere-valley-2-multicam.json: 2 keys dropped, 146 lines changed.
+    #
+    # A value is one line when it is scalar and several when it is an array, so a dropped key
+    # consumes lines until its brackets balance.
+    keys = [line.split(" = ")[0] for line in dropped]
+    lines = open(project).read().split("\n")
+    out_lines = []
+    skipping_depth = None
+    for line in lines:
+        if skipping_depth is not None:
+            skipping_depth += line.count("[") - line.count("]")
+            if skipping_depth <= 0:
+                skipping_depth = None
+            continue
+        stripped = line.strip()
+        if any(stripped.startswith('"%s":' % k) for k in keys):
+            depth = line.count("[") - line.count("]")
+            if depth > 0:
+                skipping_depth = depth
+            continue
+        out_lines.append(line)
     with open(project, "w") as out:
-        json.dump(doc, out, indent=width)
+        out.write("\n".join(out_lines))
     return dropped
 
 
