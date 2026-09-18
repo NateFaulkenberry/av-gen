@@ -216,11 +216,65 @@ Shipping Glowmere channels (project parameters, brief §10):
 --------------------------------------------------------------------------------
 
 The tree is five glTF files instead of one, and the baked masks are 45 materials instead of 7.
-The flatten reports 13 nodes -> 45 entities, 45 meshes, 4 procedurals, against ADR-338's
-4 nodes -> 9 entities. Same 3,162,186 triangles, same 139.6 MB, five times the draw calls for the
-tree.
 
-PERFORMANCE_TABLE_PLACEHOLDER
+  layer     meshes  primitives  materials    triangles
+  --------  ------  ----------  ---------  -----------
+  tracery        1           8          8       62,826
+  twigs          1           5          5    1,446,188
+  foliage        2          22         24    1,046,400
+  lumens         2           4          4       29,728
+  wood           1           4          4      577,044
+  --------  ------  ----------  ---------  -----------
+  total          7          43         45    3,162,186   == the hero export, exactly
+
+  Two of the 45 materials have no geometry: at 6 height bands x {lit, dim} per leaf mesh, the
+  top band of each mesh has no *dim* leaves, because `f = clamp((y-20)/28) + random*0.23` puts
+  every leaf that high over the last band boundary. Harmless, and left in rather than special-
+  cased so that the bucket index keeps meaning the same thing in every layer.
+
+The flatten reports 13 nodes -> 45 entities, 45 meshes, 4 procedurals (43 tree primitives plus the
+island's 2), against ADR-338's 4 nodes -> 9 entities. Same 3,162,186 triangles, same 139.6 MB
+total, roughly five times the draw calls for the tree.
+
+** No GPU timing is reported for this pass, deliberately. **
+
+ADR-170 is one GPU, one run, minima over repeats. That was not available today. Throughout the
+window in which this pass could have been benchmarked the machine carried another agent's
+`./build/release/src/avgen` at 45-48% CPU continuously for over an hour, plus its
+`avgen_tests [glowmere3]` runs starting and finishing alongside mine.
+
+One benchmark was started anyway -- four arms, 3 repeats, 180 frames, interleaved -- and is
+**discarded**, because my own `avgen_tests "~[gpu]"` was pinned at 97-100% of a core for its
+entire duration. That is self-inflicted and the number would have been mine to mistrust even
+without the other agent. It is not reported, not partially reported, and not adjusted.
+
+A contended number here is worse than no number, so this is the no number. What to run when the
+machine is idle, which will produce the table this section should hold:
+
+    tools/gpu-lock.sh python3 tools/render_bench.py \
+        examples/treeisland/tree-of-life-floating-island.json \
+        examples/treeisland/_compare-original.json \
+        examples/treeisland/_ctl-no-cosmos-shader.json \
+        examples/treeisland/_ctl-no-stars.json \
+        --repeats 3 --frames 180 --size 1920x1080 --tier realtime --wait-idle 600
+
+The three arms beside the deliverable are chosen so the answer is a decomposition and not a
+single figure: `_compare-original` is ADR-338's 9-entity scene and isolates what the split costs,
+`_ctl-no-cosmos-shader` isolates the background shader pass, `_ctl-no-stars` isolates the point
+shells and the far plane they drag with them.
+
+What can be said without a stopwatch, because it is structural rather than temporal:
+
+  * The triangle count is **identical** -- 3,162,186 before and after. The split moved no
+    geometry; it only changed how the geometry is grouped into draws.
+  * The byte count is identical to within the five JSON chunks: 139.62 MB in one file before,
+    139.64 MB across five after.
+  * The draw calls went 9 -> 45 entities. ADR-338 measured this scene at 15.96 ms GPU at 1080p
+    and noted it was "a draw-call-cheap way to spend a triangle budget"; 45 draws is still a
+    small number, but the claim that the split is free is **not** established and should not be
+    assumed from that sentence.
+  * One new full-screen pass was added (the background shader layer), and four procedural point
+    objects became four rather than one. Neither is measured here.
 
 
 6. WHAT IS NOT MEASURED HERE
