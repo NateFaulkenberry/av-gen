@@ -411,13 +411,19 @@ fixed cut cannot be in two places at once and the cast does not wait its turn �
 `tools/glowmere3_shot.py` writes a temporary scene with the camera pinned, renders one frame, and
 deletes it.
 
-| frame | what it shows |
+| frame (under `examples/world/renders/`) | what it shows |
 |---|---|
-| `renders/v3-crossing-36s` | the `wader` standing mid-channel in the backwater, legs submerged, the wooded hill behind |
-| `renders/v3-detour-60s` | the `drylander` on dry ground, the same water behind it, walking round its northern end |
-| `renders/v3-watcher-28s` | two aliens under the 16 m elder, one walking to the other, clear of each other |
-| `renders/v3-scout-120s` | the scout working the west floodplain between two hero fungi |
-| `renders/v3-westwall-178s` | the wooded west wall |
+| `v3-crossing-36s` | the `wader` standing mid-channel in the backwater, legs submerged, the wooded hill behind |
+| `v3-detour-62s` | the `drylander` on dry ground, the same water behind it, walking round its northern end |
+| `v3-watcher-30s` | two aliens under the 16 m elder, one walking to the other, clear of each other |
+| `v3-scout-118s` | the scout working the west floodplain between two hero fungi |
+| `v3-westwall-new` / `v3-westwall-legacy` | the A/B below |
+| `v3-scout-118s-seedC` | the same camera and second as `v3-scout-118s` with every scatter seed shifted by 101 |
+
+The last pair differs on **89.2%** of pixels, and what that proves is narrow and worth stating: it
+proves arm C really is a different world rather than a no-op, which is the control the itinerary
+numbers rest on. It is not itself evidence about behaviour — every plant moved — and the evidence
+about behaviour is the table in §4.
 
 ### The trees, A against B
 
