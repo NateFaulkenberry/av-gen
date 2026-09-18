@@ -124,6 +124,11 @@ public:
     // The second number is the drop policy working, not a fault: the UI cannot show 60 a second.
     [[nodiscard]] std::uint64_t previewTapped() const;
     [[nodiscard]] std::uint64_t previewDropped() const;
+    // Wall time spent inside the tap, summed over the render. Here because "it does not slow the
+    // render down" is a claim, and a claim about cost that cannot be read off the thing itself is
+    // measured by subtracting two noisy end-to-end timings on a machine five other processes are
+    // using. Only accumulated while the preview is on, so it costs an off render nothing.
+    [[nodiscard]] double previewSeconds() const;
 
 private:
     struct Pending {
@@ -239,6 +244,7 @@ private:
     bool previewFresh_ = false;
     std::uint64_t previewTapped_ = 0;
     std::uint64_t previewDropped_ = 0;
+    double previewSeconds_ = 0.0;
     std::chrono::steady_clock::time_point startedAt_;
     bool started_ = false;
     bool done_ = false;

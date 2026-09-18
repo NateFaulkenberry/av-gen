@@ -682,6 +682,7 @@ void RenderJob::handleFrame(gpu::ReadbackRing::Frame frame) {
 }
 
 void RenderJob::capturePreview(const gpu::ReadbackRing::Frame& frame) {
+    const auto began = std::chrono::steady_clock::now();
     const bool linear = frame.format == gpu::ReadbackRing::Format::Rgba16Float;
     const std::uint32_t sw = linear ? frame.imageF.width : frame.image.width;
     const std::uint32_t sh = linear ? frame.imageF.height : frame.image.height;
@@ -750,6 +751,7 @@ void RenderJob::capturePreview(const gpu::ReadbackRing::Frame& frame) {
         std::swap(preview_, previewScratch_);
         previewFresh_ = true;
         ++previewTapped_;
+        previewSeconds_ += std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count();
     }
 }
 
@@ -771,6 +773,11 @@ std::uint64_t RenderJob::previewTapped() const {
 std::uint64_t RenderJob::previewDropped() const {
     std::lock_guard lock(previewMutex_);
     return previewDropped_;
+}
+
+double RenderJob::previewSeconds() const {
+    std::lock_guard lock(previewMutex_);
+    return previewSeconds_;
 }
 
 Result<void> RenderJob::drain(bool all) {
