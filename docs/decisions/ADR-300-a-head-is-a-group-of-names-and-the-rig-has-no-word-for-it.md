@@ -234,7 +234,17 @@ The additive half, driven by a `music.impact` pulse through `Interest`:
 | flinch | **0.6733** | 0.0088 | 0.0334 | **0.000000** | **0.000000** |
 | control, no impact | 0.0000 | reference | reference | reference | reference |
 
-Two layers applied in the same frame on the same body, neither of them the gait.
+Two layers applied in the same frame on the same body, neither of them the gait, writing **20 of the
+rig's 90 joints** between them: 5 for the head group, 15 for the upper body the flinch masks.
+
+**What it costs, structurally** (ADR-170: joints, not milliseconds). An additive layer is two clip
+samples and one pass over its masked joints. An **aim** layer is two extra forward passes over the
+whole rig on top of the palette's own — one to derive the pivot from the pre-layer pose, one to
+apply — so a posed alien with one aim layer composes 270 joint matrices where it composed 90. The
+pivot pass cannot be folded into the applying pass, because a masked joint earlier in the topological
+order needs the pivot before the pass reaches the joint that defines it. It can be narrowed to the
+pivot's own ancestors and has not been, because nothing here is near a budget yet and a measured
+reason to do it is worth more than a guessed one.
 
 **Three things this file cost to learn, all of them the probe rather than the engine** (ADR-182
 again, and the tally is now eleven for this lab):

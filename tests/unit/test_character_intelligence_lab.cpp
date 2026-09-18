@@ -41,6 +41,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <map>
@@ -202,9 +203,19 @@ TEST_CASE("the Character Intelligence Lab is registered and its cases resolve",
         if (c.runnable()) {
             ++runnable;
         } else {
-            // Not a free-text apology: it names a unit of `docs/character-ai-plan.md`.
-            CHECK((c.blockedBy.find("P2") != std::string::npos ||
-                   c.blockedBy.find("P3") != std::string::npos));
+            // Not a free-text apology: it names a unit of `docs/character-ai-plan.md`, as "P"
+            // followed by its number. Widened from "P2 or P3" when case 11 arrived blocked on P9
+            // (ADR-300): the assertion that mattered was always "it names a unit", and spelling out
+            // the two units that happened to exist on the day made the check unable to notice a
+            // third. It still fails on an empty string and on free text with no unit in it.
+            bool namesAUnit = false;
+            for (std::size_t k = 0; k + 1 < c.blockedBy.size(); ++k) {
+                if (c.blockedBy[k] == 'P' && std::isdigit(static_cast<unsigned char>(c.blockedBy[k + 1]))) {
+                    namesAUnit = true;
+                    break;
+                }
+            }
+            CHECK(namesAUnit);
             ++blocked;
         }
     }

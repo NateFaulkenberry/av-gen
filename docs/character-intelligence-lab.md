@@ -46,9 +46,12 @@ social interaction, a dense environment, a long-running simulation.
 | 8 | a social interaction | blocked on **P2 perception, P3 decision** |
 | 9 | crossing a river | blocked on **P3 decision** |
 | 10 | a head that turns while the legs keep walking | runnable — *unblocked by ADR-300* |
+| 11 | half a metre of landing the engine throws away | blocked on **P9 root motion** |
 
 A blocked case carries `blockedBy` naming the unit of `docs/character-ai-plan.md` that unblocks it
-(ADR-275). `--lab-case character:7` refuses and prints the unit rather than opening the fixture: a
+(ADR-275). Case 11 is the first blocked on something other than perception or a decider, and the
+registry's own check widened with it: it asserts that `blockedBy` names *a* unit rather than one of
+the two that happened to exist on the day it was written. `--lab-case character:7` refuses and prints the unit rather than opening the fixture: a
 person who came to watch a character investigate something would otherwise be shown a scene in which
 that is not happening, and left to work out why.
 

@@ -166,6 +166,23 @@
    "fps": 60.0,
    "seed": 0,
    "notes": "Asserted by tests/unit/test_character_lab_layers.cpp. The trap this case is built around: `alien-scout.glb` is nearly flat, `head.x` has zero children, and the eyes, mouth and antenna are its siblings -- so the mask \"head.x and its descendants\" covers 1 joint of 90 and a look-at built on it would turn a head and leave the eyes behind. Three rig families, three names for the head (`head.x`, `Head01`, `Head`), and no joint name is hardcoded anywhere in the engine. Watch the antenna: if it stays pointing the old way while the head turns, the mask has lost a name."
+  },
+  {
+   "lab": "character",
+   "number": 11,
+   "title": "Half a metre of landing the engine throws away",
+   "question": "When a clip moves the character itself -- `Landing` drops the root 0.567 m -- does the body go where the animator put it, or does it play the drop in place?",
+   "expectation": "In place. ADR-161 concluded there was no root motion in this content to extract, from three clips of one Mixamo file, and the two asset packs that arrived afterwards were never re-checked. Five clips per alien translate their root: `Dying_forward` 0.985 m across and -0.674 m down, `Dying_1_backpack` 0.875 / -0.464, `Dying_1_no_backpack` 0.868 / -0.629, `Crazy` 0.071 / +0.069, and **`Landing` 0.022 / -0.567** -- which Glowmere plays, at the moment a jump resolves. The expectation once P9 lands: with extraction opted in for `Landing`, `watcher`'s simulation position falls by 0.567 m times the node scale over the clip and its feet stay under it; with the opt-in off, the other 163 clips are byte-identical to what they are today.",
+   "fixture": "examples/labs/character/character-intelligence-lab.scene.json",
+   "timeSeconds": 4.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "blockedBy": "P9 root motion",
+   "notes": "The inventory is in ADR-260 and the layer stack it needed is in ADR-300; what is missing is the half that writes `MotionAuthority::Simulation`, which `src/scene/pose_layers.*` is deliberately unable to do -- it includes nothing from `entity/`. P9's seam runs the opposite way to the layer stack: a value read back out of the rig into the entity. The trap ADR-260 names: `joints[0]` is an armature wrapper no clip animates, so a probe that takes it as the root reports 168 clips with a root that never moved, for the most boring possible reason."
   }
  ]
 }

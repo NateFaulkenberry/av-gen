@@ -241,7 +241,12 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                                      double now, Pose& pose) {
     PoseLayerStats stats;
     stats.layers = static_cast<std::uint32_t>(layers_.size());
-    if (layers_.empty() || masks_.size() != layers_.size() || pose.size() != skeleton.jointCount()) {
+    // `layers()` hands out a mutable reference so the seam can write this frame's intent through it.
+    // A caller that adds or removes a layer through it has not re-resolved the masks, and the four
+    // parallel vectors would disagree: refuse rather than index past one of them.
+    if (layers_.empty() || masks_.size() != layers_.size() || results_.size() != layers_.size() ||
+        clipIndex_.size() != layers_.size() || pivotIndex_.size() != layers_.size() ||
+        pose.size() != skeleton.jointCount()) {
         return stats;
     }
     const std::size_t count = skeleton.joints.size();
@@ -297,6 +302,15 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 if (w > 0.0f) {
                     const glm::quat turn = w >= 1.0f ? full : glm::slerp(kIdentity, full, w);
                     world = toPivot * glm::mat4_cast(turn) * fromPivot * world;
+                    // Back to a local transform through the parent this joint actually has, which
+                    // for a masked joint under a masked one is the parent *after* its own turn --
+                    // which is why the pass is a single forward sweep rather than a per-joint fix-up.
+                    //
+                    // `fromMatrix` discards shear, and conjugating a rotation by a parent carrying a
+                    // **non-uniform** scale produces some. Every rig this engine loads has uniformly
+                    // scaled joints and the aim arms land on their asked-for angle to 0.031 degrees,
+                    // so it is a statement of the assumption rather than a known loss; the day a rig
+                    // arrives with squashed bones this is the line that will be quietly wrong.
                     pose.local[j] = Transform::fromMatrix(glm::inverse(parentModel) * world);
                     ++wrote;
                 }
