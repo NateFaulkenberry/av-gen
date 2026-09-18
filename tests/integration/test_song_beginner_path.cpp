@@ -23,6 +23,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <filesystem>
 #include <set>
 
@@ -376,7 +377,13 @@ TEST_CASE("Song Mode's sections follow the sequencer's", "[integration][song][se
     {
         seq::Sequence edited = engine.sequence();
         const double was = edited.sectionTimeline.sections[1].startSeconds;
-        const double now = was + 7.5;
+        // **A quarter of the section's own length, not a fixed 7.5 s.** `moveBoundary` clamps so
+        // neither neighbour falls under the minimum, so a fixed distance is a bet on the fixture
+        // staying roughly as long as it was. It did not: the owner split the opening of
+        // `glowmere-valley-2-multicam` into seven pieces of about 3.7 s each, the 7.5 s move
+        // clamped to 3.44 s, and this test started failing on a data edit rather than on a code
+        // change. A fraction of the span cannot clamp, so it measures what it meant to measure.
+        const double now = was + 0.25 * edited.sectionTimeline.sections[1].durationSeconds();
         REQUIRE(song::moveBoundary(edited.sectionTimeline, 1, now));
         edited.refreshSectionMarkers();
         REQUIRE(engine.setSequence(std::move(edited)).has_value());
@@ -396,8 +403,16 @@ TEST_CASE("Song Mode's sections follow the sequencer's", "[integration][song][se
     {
         seq::Sequence edited = engine.sequence();
         const std::size_t was = edited.sectionTimeline.sections.size();
-        const song::Section& target = edited.sectionTimeline.sections[1];
-        const double at = (target.startSeconds + target.endSeconds) * 0.5;
+        // The longest section, for the same reason: a fixture whose second section happens to be a
+        // quarter of a second long cannot be split, and refusing to split it is `splitSection`
+        // being right rather than this test finding something.
+        const auto& all = edited.sectionTimeline.sections;
+        const auto longest = std::max_element(
+            all.begin(), all.end(), [](const song::Section& a, const song::Section& b) {
+                return a.durationSeconds() < b.durationSeconds();
+            });
+        REQUIRE(longest != all.end());
+        const double at = (longest->startSeconds + longest->endSeconds) * 0.5;
         REQUIRE(song::splitSection(edited.sectionTimeline, at, 0.25));
         edited.refreshSectionMarkers();
         REQUIRE(engine.setSequence(std::move(edited)).has_value());
