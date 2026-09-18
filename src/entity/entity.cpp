@@ -806,24 +806,32 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         // separation existed and `seek` never did, so a scrub separated against whatever the last
         // *played* frame happened to leave behind -- state surviving across the one call whose
         // whole job is to remove state (ADR-267 defect 2).
-        crowd_.clear();
-        crowdOwner_.clear();
-        for (std::size_t e = 0; e < entities_.size(); ++e) {
-            const Entity& entity = *entities_[e];
-            if (!entity.active_ || entity.state_.radius <= 0.0f) {
-                continue;
+        //
+        // Skipped entirely when nothing needs the window. A body is classified shallow because its
+        // answer at the target is a function of the target, and a crowd query is not: `state_.radius`
+        // is written by `explore`, the crowd is read by `explore`, and `explore` is replayed in full.
+        // Without this an all-craft scene pays 5,400 sweeps over its entities to build a field that
+        // is empty every time and that nothing asks.
+        if (deepBodies > 0) {
+            crowd_.clear();
+            crowdOwner_.clear();
+            for (std::size_t e = 0; e < entities_.size(); ++e) {
+                const Entity& entity = *entities_[e];
+                if (!entity.active_ || entity.state_.radius <= 0.0f) {
+                    continue;
+                }
+                const glm::vec3 at = entity.state_.position();
+                spatial::NavigationObstacle body;
+                body.center = glm::vec2(at.x, at.z);
+                body.radius = entity.state_.radius;
+                body.base = at.y;
+                body.height = std::max(entity.state_.radius * 2.0f, 1.0f);
+                body.type = spatial::ObstacleType::Creature;
+                crowd_.add(body);
+                crowdOwner_.push_back(e);
             }
-            const glm::vec3 at = entity.state_.position();
-            spatial::NavigationObstacle body;
-            body.center = glm::vec2(at.x, at.z);
-            body.radius = entity.state_.radius;
-            body.base = at.y;
-            body.height = std::max(entity.state_.radius * 2.0f, 1.0f);
-            body.type = spatial::ObstacleType::Creature;
-            crowd_.add(body);
-            crowdOwner_.push_back(e);
+            crowd_.build();
         }
-        crowd_.build();
 
         for (std::size_t entityIndex = 0; entityIndex < entities_.size(); ++entityIndex) {
             if (i < seekFirstStep_[entityIndex]) {
