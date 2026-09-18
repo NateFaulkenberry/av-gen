@@ -29,6 +29,46 @@
 
 namespace avgen::scene {
 
+// Every key `Composition::fromJsonImpl` reads, in the three objects a scene file is mostly made of.
+// Kept beside the parser rather than derived from it because there is no way to derive it: the
+// parser reads a key wherever it happens to need it, and a list that is generated from the code is
+// a list that agrees with the code about a typo. Adding a key to the parser and not to this list
+// costs one spurious warning; the reverse costs what ADR-278 is about.
+constexpr std::string_view kSceneKeys[] = {
+    "format",     "version",        "name",           "camera",        "cameraDirection",
+    "lightRig",   "lights",         "navBodyRadius",  "navCellSize",   "navWadeDepth",
+    "wind",       "post",           "environment",    "composition",   "heroes",
+    "worldEffects", "atmosphericEffects", "entityProfiles", "entities", "fields",
+    "staging",    "graph",          "grids",          "materialPrograms", "nodes"};
+constexpr std::string_view kEnvironmentKeys[] = {
+    "map", "lightRig", "intensity", "fogDensity", "stylized", "rotation", "skyIntensity",
+    "skyBloom", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "skybox",
+    "lightFromEnvironment", "fogColor", "background", "fogHeightAmount", "styledSkyAmbient",
+    "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
+    "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
+    "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
+    "shadowCascades", "volumeSteps", "volumeDensityField", "volumeColorField", "sky"};
+constexpr std::string_view kSkyKeys[] = {
+    "enabled", "background", "useKeyLight", "zenithColor", "horizonColor", "groundColor",
+    "sunColor", "sunDirection", "haze", "sunIntensity", "sunSize", "sunGlow", "intensity"};
+
+// Every key a `"lights"` entry may carry. Named after the `PunctualLight` field it sets, except
+// where `LightRig`'s file format already had a name for the same quantity -- `color`, `temperature`,
+// `tint`, `intensity`, `castsShadow`, `contactShadow`, `shadowStrength`, `softness`, `volumetric` --
+// which are spelled the rig's way. Two spellings for one quantity across two lighting formats is
+// how `coneDegrees` happened, one format over.
+constexpr std::string_view kAuthoredLightKeys[] = {
+    "name",        "type",          "role",           "node",       "position",   "direction",
+    "up",          "color",         "intensity",      "temperature", "tint",      "range",
+    "innerCone",   "outerCone",     "width",          "height",     "radius",     "castsShadow",
+    "contactShadow", "shadowStrength", "shadowBias",  "softness",   "volumetric", "diffuseOnly",
+    "specularOnly", "enabled"};
+
+std::span<const std::string_view> sceneFileKeys() { return kSceneKeys; }
+std::span<const std::string_view> sceneEnvironmentKeys() { return kEnvironmentKeys; }
+std::span<const std::string_view> sceneSkyKeys() { return kSkyKeys; }
+std::span<const std::string_view> sceneLightKeys() { return kAuthoredLightKeys; }
+
 namespace {
 // Ecology lights are rebuilt every frame and identified by name, because the rig removes its own
 // lights by resizing from the back and the two sets must not be able to eat each other.
@@ -640,41 +680,6 @@ PunctualLight defaultKeyLight() {
 }
 
 // ---- authored lights (ADR-278) -----------------------------------------------------------------
-
-// Every key a `"lights"` entry may carry. Named after the `PunctualLight` field it sets, except
-// where `LightRig`'s file format already had a name for the same quantity -- `color`, `temperature`,
-// `tint`, `intensity`, `castsShadow`, `contactShadow`, `shadowStrength`, `softness`, `volumetric` --
-// which are spelled the rig's way. Two spellings for one quantity across two lighting formats is
-// how `coneDegrees` happened, one format over.
-constexpr std::string_view kAuthoredLightKeys[] = {
-    "name",        "type",          "role",           "node",       "position",   "direction",
-    "up",          "color",         "intensity",      "temperature", "tint",      "range",
-    "innerCone",   "outerCone",     "width",          "height",     "radius",     "castsShadow",
-    "contactShadow", "shadowStrength", "shadowBias",  "softness",   "volumetric", "diffuseOnly",
-    "specularOnly", "enabled"};
-
-// Every key `Composition::fromJsonImpl` reads, in the three objects a scene file is mostly made of.
-// Kept beside the parser rather than derived from it because there is no way to derive it: the
-// parser reads a key wherever it happens to need it, and a list that is generated from the code is
-// a list that agrees with the code about a typo. Adding a key to the parser and not to this list
-// costs one spurious warning; the reverse costs what ADR-278 is about.
-constexpr std::string_view kSceneKeys[] = {
-    "format",     "version",        "name",           "camera",        "cameraDirection",
-    "lightRig",   "lights",         "navBodyRadius",  "navCellSize",   "navWadeDepth",
-    "wind",       "post",           "environment",    "composition",   "heroes",
-    "worldEffects", "atmosphericEffects", "entityProfiles", "entities", "fields",
-    "staging",    "graph",          "grids",          "materialPrograms", "nodes"};
-constexpr std::string_view kEnvironmentKeys[] = {
-    "map", "lightRig", "intensity", "fogDensity", "stylized", "rotation", "skyIntensity",
-    "skyBloom", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "skybox",
-    "lightFromEnvironment", "fogColor", "background", "fogHeightAmount", "styledSkyAmbient",
-    "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
-    "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
-    "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "volumeSteps", "volumeDensityField", "volumeColorField", "sky"};
-constexpr std::string_view kSkyKeys[] = {
-    "enabled", "background", "useKeyLight", "zenithColor", "horizonColor", "groundColor",
-    "sunColor", "sunDirection", "haze", "sunIntensity", "sunSize", "sunGlow", "intensity"};
 
 // Angles are **degrees** here and radians in `PunctualLight`, deliberately: every other angle a
 // person writes in this repository is in degrees -- a node's `rotation`, a rig's `azimuth`,

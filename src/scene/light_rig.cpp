@@ -14,15 +14,11 @@
 #include <cmath>
 #include <fstream>
 #include <numbers>
+#include <span>
+#include <string_view>
 #include <unordered_set>
 
 namespace avgen::scene {
-
-namespace {
-
-using nlohmann::json;
-constexpr float kPi = std::numbers::pi_v<float>;
-constexpr float kDegToRad = kPi / 180.0f;
 
 // ADR-278. Every key `LightRig::fromJson` reads, at the rig's root and in one of its lights.
 // This lab's own fixture was written with `"coneDegrees"` first and silently got the 45-degree
@@ -36,6 +32,15 @@ constexpr std::string_view kRigLightKeys[] = {
     "intensity", "color",     "temperature", "tint",        "size",      "aspect",
     "castsShadow", "contactShadow", "shadowStrength", "softness", "volumetric", "cone",
     "followCamera"};
+
+std::span<const std::string_view> rigFileKeys() { return kRigKeys; }
+std::span<const std::string_view> rigLightKeys() { return kRigLightKeys; }
+
+namespace {
+
+using nlohmann::json;
+constexpr float kPi = std::numbers::pi_v<float>;
+constexpr float kDegToRad = kPi / 180.0f;
 
 glm::vec3 safeNormalize(const glm::vec3& v, const glm::vec3& fallback) {
     const float len2 = glm::dot(v, v);

@@ -49,7 +49,9 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace avgen::params {
@@ -99,6 +101,15 @@ struct WorldBounds {
 };
 
 enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedural, Field, Spline, Sdf, Terrain, Group, City };
+// ADR-278: the keys `Composition::fromJson` reads, in each of the objects a scene file is made of.
+// Public so a test can hold the list against every scene file that ships -- a key list that has
+// drifted from the parser warns about a correct file, and the first spurious warning is the one
+// that gets the whole check switched off.
+[[nodiscard]] std::span<const std::string_view> sceneFileKeys();
+[[nodiscard]] std::span<const std::string_view> sceneEnvironmentKeys();
+[[nodiscard]] std::span<const std::string_view> sceneSkyKeys();
+[[nodiscard]] std::span<const std::string_view> sceneLightKeys();
+
 const char* nodeKindName(NodeKind kind);
 Result<NodeKind> nodeKindFromName(const std::string& name);
 

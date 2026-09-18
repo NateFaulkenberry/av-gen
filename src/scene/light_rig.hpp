@@ -16,10 +16,18 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include <filesystem>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace avgen::scene {
+
+// ADR-278: the keys `LightRig::fromJson` reads, at the rig's root and in one of its lights. Public
+// for the reason `sceneFileKeys` is: the list is hand-maintained, and the test that holds it against
+// every rig that ships is what keeps it honest.
+[[nodiscard]] std::span<const std::string_view> rigFileKeys();
+[[nodiscard]] std::span<const std::string_view> rigLightKeys();
 
 struct RigLight {
     std::string name;
