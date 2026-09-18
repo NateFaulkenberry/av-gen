@@ -87,19 +87,38 @@ for no reason the scene could express. That is the same class of bug as the drop
 ADR-270 wrote the rule against it one paragraph earlier. The world's total is N × the knob, and the
 knob is where an author controls it.
 
-The schedule is a pure function of the tick index rather than an accumulator:
+The schedule is a function of the tick index rather than an accumulator:
 
 ```
-allowed(n) = floor(n * occlusionTestsPerSecond / hertz)      tests in ticks [0, n)
-tests this tick = allowed(tick + 1) - allowed(tick)
-cursor          = allowed(tick) mod perceptCount
+allowed(n) = floor(n * occlusionTestsPerSecond / tickRate)   tests in ticks [0, n)
+tests this tick = allowed(tick + 1) - allowed(lastSensedTick + 1)
+cursor          = allowed(lastSensedTick + 1) mod perceptCount
 ```
 
 so over T seconds a body performs exactly `floor(T * occlusionTestsPerSecond)` tests — not "about
-that on average" — the cursor resumes where the last tick stopped so every percept is tested in
-turn, and a replay reproduces the schedule with no state to carry. Measured: 24 bodies at 1 test a
-second for 6 s perform **exactly 144**. The control at `occlusionTestsPerSecond = 0` performs **0**,
-and reports `tested == false` on every percept of every body on every one of 360 frames.
+that on average" — and the cursor resumes where the last tick stopped, so every percept is tested in
+turn rather than the first one forever. Measured: 24 bodies at 1 test a second for 6 s perform
+**exactly 144**. The control at `occlusionTestsPerSecond = 0` performs **0**, and reports
+`tested == false` on every percept of every body on every one of 360 frames.
+
+### `lastSensedTick + 1`, and the version of this that was wrong
+
+The first implementation priced `tick` against `tick + 1` and carried no state at all, which was
+neater and was wrong: **sense ticks are not consecutive.** They skip whenever a frame is long enough
+to cross two of them — a 60 Hz cadence at a 30 Hz frame rate advances the index by two — and they
+skip by a whole frame of microseconds when `hertz` is zero, which is how a body says "sense every
+step". In both cases the tick and the tick after it are never both sensed, so the difference between
+them was bought and never spent. Measured before the fix: a crowd at `hertz = 0` and two tests a
+second performed **zero** tests in three seconds where it was owed 120; at a 60 Hz cadence and a
+30 Hz frame it would have spent about half.
+
+The fix is one number, and it is one the cadence already had to keep: `Entity::lastSenseTick()`.
+`EntityWorld::perceiveOne` now writes it *after* the call rather than before, so the implementation
+can see the tick it is being priced against. It is state, and it is state D4 permits: `reset()`
+clears it and a replay re-fires the same ticks, exactly as it does for the cadence itself.
+
+`hertz` is capped at 60 in its parameter registration. Sensing more often than the simulation steps
+is not something a cadence can mean, so the knob cannot outrun the ticks; only the frame rate can.
 
 ---
 

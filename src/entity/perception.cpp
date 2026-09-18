@@ -185,16 +185,25 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
     // world with no ecology makes the march's per-sample lookup nearly free. A fixture cannot prove
     // this budget is necessary; the shipped world is what justifies it (ADR-290 section 5.1).
     //
-    // How many tests this tick is a **pure function of the tick index**, not an accumulator:
+    // How many tests this tick is a **function of the tick index**, not an accumulator:
     //
-    //     allowed(n) = floor(n * occlusionTestsPerSecond / hertz)     tests in ticks [0, n)
-    //     tests      = allowed(tick + 1) - allowed(tick)
+    //     allowed(n) = floor(n * occlusionTestsPerSecond / tickRate)   tests in ticks [0, n)
+    //     tests      = allowed(tick + 1) - allowed(lastTick + 1)
     //
     // so over any T seconds exactly floor(T * occlusionTestsPerSecond) tests are performed, the
     // rate is respected to the test rather than on average, and a replay reproduces the same
-    // schedule with no state to carry. `allowed(tick) % kept` is the round-robin cursor: each tick
-    // resumes where the last one stopped, so every percept is tested in turn instead of the first
-    // one being tested forever.
+    // schedule because the only thing carried is the tick the body last sensed at, which the
+    // cadence already had to carry. `allowed(lastTick + 1) % kept` is the round-robin cursor: each
+    // tick resumes where the last one stopped, so every percept is tested in turn instead of the
+    // first one being tested forever.
+    //
+    // **`lastTick + 1` and not `tick`, because sense ticks are not consecutive.** They skip when
+    // the cadence is above the step rate, when a frame is long enough to cross two of them, and by
+    // a whole frame of microseconds when `hertz` is zero and every step senses. Pricing `tick`
+    // against `tick + 1` silently bought nothing in every one of those cases: measured, a crowd at
+    // `hertz = 0` and two tests a second performed **zero** tests in three seconds where it was
+    // owed 120. The first version of this budget was stateless and wrong, and the fix was to use
+    // the one piece of state the cadence already keeps.
     //
     // **When the budget is spent, `tested` stays false and the percept stays.** A percept dropped
     // because a budget ran out is a character whose behaviour depends on how many other characters
@@ -211,9 +220,16 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
     const double tickRate = settings.hertz > 0.0f ? static_cast<double>(settings.hertz) : 1.0e6;
     const double perTick = static_cast<double>(settings.occlusionTestsPerSecond) / tickRate;
     const auto tick = senseTick(time, settings.hertz, seed);
-    const auto before = static_cast<std::uint64_t>(static_cast<double>(tick) * perTick);
-    const auto after = static_cast<std::uint64_t>(static_cast<double>(tick + 1) * perTick);
-    const auto budget = std::min<std::size_t>(static_cast<std::size_t>(after - before), kept);
+    const std::uint64_t last = me.lastSenseTick();
+    const auto allowed = [&](std::uint64_t n) {
+        return static_cast<std::uint64_t>(static_cast<double>(n) * perTick);
+    };
+    // A body that has never sensed is owed this tick's share and not the whole history before it:
+    // it was not sensing, so it did not accrue.
+    const std::uint64_t before = last == Entity::kNoSenseTick ? allowed(tick) : allowed(last + 1);
+    const std::uint64_t after = allowed(tick + 1);
+    const auto budget =
+        std::min<std::size_t>(static_cast<std::size_t>(after > before ? after - before : 0), kept);
     // The eye, and it is a stand-in rather than a measurement: `EntityState` carries a radius and
     // no height, and the crowd field already derives a body height from the radius the same way.
     // ADR-274 made a real joint reachable -- `socketTransform("eye", ...)` now distinguishes a

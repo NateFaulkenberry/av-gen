@@ -335,6 +335,14 @@ public:
     // last update used, after any keyframe, preset or panel edit.
     [[nodiscard]] const PerceptionSettings& perception() const { return perceptionLive_; }
     [[nodiscard]] bool perceives() const { return desc_.perceives; }
+    // Sense ticks are not consecutive. A cadence above the step rate skips them, a cadence of zero
+    // means "every step" and advances the index by a whole frame of microseconds, and a dropped
+    // frame skips them at any cadence -- so the tick a body last sensed at is the only thing that
+    // says how much of a per-second budget this tick is owed. `IPerception::perceive` reads it
+    // through here, and `EntityWorld::perceiveOne` writes it *after* the call for exactly that
+    // reason. Cleared by `reset`, so a replay rebuilds it rather than inheriting it (D4).
+    static constexpr std::uint64_t kNoSenseTick = 0xFFFFFFFFFFFFFFFFull;
+    [[nodiscard]] std::uint64_t lastSenseTick() const { return senseTick_; }
 
     // ---- intent (ADR-096) ------------------------------------------------------------------
 
@@ -482,7 +490,6 @@ private:
     // "never sensed". Not an accumulator: an accumulator drifts with the frame rate, so a replayed
     // sense tick would land on a different instant from the played one and a character's working
     // set would depend on how the frames happened to fall (D1).
-    static constexpr std::uint64_t kNoSenseTick = 0xFFFFFFFFFFFFFFFFull;
     std::uint64_t senseTick_ = kNoSenseTick;
     PerceptionSettings perceptionLive_{};
     // The live knobs, resolved at registerParameters(). Null until then; `bind` fixes them up.

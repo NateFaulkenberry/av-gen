@@ -691,4 +691,36 @@ TEST_CASE("the occlusion rate is a rate, whatever the cadence is", "[entity][per
     // And the rate is still the rate. The last frame is at 179/60 = 2.9833 s, so each body is owed
     // floor(2.9833 x 2) = 5 tests and the crowd is owed 120.
     CHECK(tests == 120u);
+
+    // The same hole in the form that would actually have shipped: a **frame long enough to cross
+    // two sense ticks**. `hertz` is capped at 60 -- sensing more often than the simulation steps is
+    // not a thing a cadence can mean -- so ticks cannot be outrun by the knob; they are outrun by
+    // the frame rate. At a 60 Hz cadence and a 30 Hz step the tick index advances by two a frame,
+    // and a budget priced on `tick` against `tick + 1` would have spent about half of what it was
+    // owed. Three seconds at 30 Hz: the last frame is 89/30 = 2.9667 s, each body is owed
+    // floor(2.9667 x 2) = 5, and the crowd is owed 120 -- the same 120 the 4 Hz arm gets, which is
+    // the point of a rate.
+    World slow(crowdFixture());
+    for (const auto& e : slow.comp->entityWorld().entities()) {
+        slow.setKnob(e->name().c_str(), "hertz", 60.0f);
+        slow.setKnob(e->name().c_str(), "occlusionTestsPerSecond", 2.0f);
+    }
+    std::size_t slowTests = 0;
+    std::size_t slowSensed = 0;
+    for (int i = 0; i < 90; ++i) {
+        time.renderTime = static_cast<double>(i) / 30.0;
+        time.deltaTime = i == 0 ? 0.0 : 1.0 / 30.0;
+        time.frameIndex = static_cast<std::uint64_t>(i);
+        slow.params.resetFinals();
+        slow.comp->updateFields(time, slow.bus, slow.modulator);
+        slow.modulator.applyRoutes(slow.bus, slow.params, time.deltaTime);
+        slow.comp->updateBehaviour(time, slow.bus);
+        slow.comp->update(time);
+        slowTests += slow.comp->entityWorld().perceptionCounts().occlusionTests;
+        slowSensed += slow.comp->entityWorld().perceptionCounts().sensed;
+    }
+    INFO(fmt::format("hertz 60 against a 30 Hz step: {} sense ticks, {} occlusion tests", slowSensed,
+                     slowTests));
+    CHECK(slowSensed == 24u * 90u); // every frame, and every frame skips a tick
+    CHECK(slowTests == 120u);
 }

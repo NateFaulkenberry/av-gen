@@ -523,7 +523,6 @@ void EntityWorld::perceiveOne(std::size_t entityIndex, double time) {
     if (tick == entity.senseTick_) {
         return; // still inside the tick the working set already belongs to
     }
-    entity.senseTick_ = tick;
     ++perceptionCounts_.sensed;
     if (entity.percepts_.size() < kPerceptCapacityMax) {
         entity.percepts_.resize(kPerceptCapacityMax);
@@ -531,6 +530,9 @@ void EntityWorld::perceiveOne(std::size_t entityIndex, double time) {
     entity.perceptCount_ =
         perception().perceive(*this, entityIndex, live, entity.seed_, time,
                               std::span<Percept>(entity.percepts_.data(), entity.percepts_.size()));
+    // *After* the call, not before: the occlusion budget prices this tick against the tick the body
+    // last sensed at, and sense ticks are not consecutive (Entity::lastSenseTick).
+    entity.senseTick_ = tick;
 }
 
 void EntityWorld::registerParameters(params::ParameterSet& params, const std::string& prefix) {
