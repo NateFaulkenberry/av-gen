@@ -473,7 +473,9 @@ Every light in a fragment's froxel is evaluated for every drawable in it. `diffu
                                                      # (it logs `reproduce: avgen --headless ...` as it opens)
     avgen --headless --composition examples/labs/lighting-lab.scene.json \
           --size 1280x720 --range 0.5:0.5 --render out --debug-draw lights
-    avgen ... --cluster-stats                        # froxel occupancy, ADR-114
+    avgen ... --cluster-stats --bench-json out.json  # froxel occupancy, ADR-114 (it reports
+                                                     # through the benchmark record, and the
+                                                     # record says it perturbed the wall clock)
 
     build/release/tests/avgen_tests "[lighting][lab]"
     tools/gpu-lock.sh build/release/tests/avgen_render_tests "[lighting][lab]"

@@ -140,8 +140,16 @@ Named by file and symbol, because a category is not an address.
 ### Lighting and materials
 
 * `scene::PunctualLight` → `rendering::GpuLight` (128 B) via `packLight`; clustered forward,
-  froxels 16×8×24, 32 lights per cluster, 256 scene lights. `assignClusters` is the CPU reference,
-  `shaders/clusters.wgsl` the pass.
+  froxels 16×8×24, 32 lights per cluster, 256 scene lights. `assignClusters` is the CPU reference
+  for the grid's **build**, `shaders/clusters.wgsl` the pass; `ClusterGrid::clusterOf` is the
+  reference for its **look-up** (`clusterIndexFor`), which is a different half and had none.
+* **A scene file cannot author a light.** `Composition::fromJson` has no `lights` key and there is
+  no `NodeKind::Light`; the four routes into `scene::Scene::lights` are a light rig, a glTF asset's
+  own KHR_lights_punctual lights (no asset here has any), the procedural ecology and the one
+  default key. The `"lights"` arrays in `lod-geometry-lab.scene.json` and
+  `visibility-culling-lab.scene.json` are read by nothing. See `docs/lighting-lab/README.md` §1.0.
+* A local light's reach (`lightInfluenceRadius`) is a **hard** edge, not a fade: past it the froxel
+  pass does not assign the light at all. ADR-272.
 * Area lights: LTC. `directLighting` in `shaders/lighting.wgsl` is roughly 75% of the scene pass.
 * Materials bind at `SceneRenderer::materialBindGroup`, group 2, 9 entries.
 * Shading tiers (`MaterialTier::Full / ReducedLights / Flat`) are assigned per draw by
@@ -310,7 +318,7 @@ the copy that a test checks.
 | LOD / Geometry | which level, and whether it holds still | whether it was culled → Visibility | `cull.wgsl:cs_cull_classify` |
 | Camera / Framing **(built)** | camera pose, the frustum handed to the cull, clearance, line of sight, which camera the viewport shows | which objects survive that frustum → Visibility | `src/world/camera_clearance.cpp:heroSightline` |
 | Shadow **(built)** | cascade fitting, the caster list, the atlas, the mask, the contact march | the light's position and intensity → Lighting; which LOD rung an instance draws at → LOD; how the camera frustum is built → Camera | `shadow_math.cpp:casterState` |
-| Lighting | light packing, cluster assignment, LTC, IBL | whether a light is occluded → Shadow | `light_data.cpp:assignClusters` |
+| Lighting **(built)** | light packing, the reach a light is given, cluster assignment and the froxel a fragment reads, LTC, IBL | whether a light is occluded → Shadow; what post does with the radiance → HDR | `light_data.cpp:assignClusters` |
 | HDR / Exposure / Bloom | metering, exposure state, bloom, halation, tonemap | the radiance that entered → Lighting | `post_processor.cpp:PostProcessor::run` |
 | Volumetric / Atmosphere | the march, its scaling, the composite, atmospheric effects | the bloom the in-scatter feeds → HDR | `src/rendering/volume_renderer.cpp` |
 | Particle / VFX | emission, simulation, compaction, indirect draw, velocity writes | the fields that push them — authored data | `src/rendering/particle_renderer.cpp` |
