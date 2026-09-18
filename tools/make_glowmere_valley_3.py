@@ -499,25 +499,38 @@ terrain["clearings"] = clearings
 # there; it says nothing about where a generator should put a decision it is authoring. A yaw the
 # generator writes is authoring, so it goes where the generator's other yaws are, and valley 3's
 # project stays at four parameters.
+# **Written down here rather than read out of `glowmere-valley-2-multicam.json`.** Reading it
+# would make this script's output depend on a file another unit of work owns, so a save over there
+# would silently change valley 3 the next time anybody regenerated it -- which is the shape of
+# coupling this whole rebuild exists to remove. The values below are that file's, transcribed at
+# the float32 precision it holds them in, and the rule that selected them is in the comment above.
+#
+# `cairn` is in the table and contributes nothing: its project value equals its scene value to the
+# digit, so it is a no-op override, and ADR-264's rule for those is that they are left alone.
+# Nine heroes x four parts = 36 node rotations actually change.
 PART_ROLES = ["cap", "under", "stem", "gills"]
+TURNED_BY_HAND = {
+    "elder-2": [0.0, 20.049999237060547, 0.0],
+    "lantern": [180.0, 71.13999938964844, 180.0],
+    "spire"  : [0.0, -45.84000015258789, 0.0],
+    "bloom"  : [180.0, 31.029996871948242, 180.0],
+    "veil"   : [0.0, 54.43000411987305, 0.0],
+    "umbra"  : [180.0, -59.68000030517578, 180.0],
+    "cairn"  : [0.0, 75.0, 0.0],
+    "ridge"  : [180.0, 45.01000213623047, 180.0],
+    "scree"  : [0.0, -29.980012893676758, 0.0],
+    "ember"  : [180.0, -14.979990005493164, 180.0],
+}
 CARRIED_ROTATIONS = 0
-_v2_project = load("examples/world/glowmere-valley-2-multicam.json")["parameters"]
-for hname in ("elder-2", "lantern", "spire", "bloom", "veil", "umbra",
-              "cairn", "ridge", "scree", "ember"):
-    parts = ["%s-%s" % (hname, part) for part in PART_ROLES]
-    keys = ["nodes/%s/rotation" % part for part in parts]
-    if not all(k in _v2_project for k in keys):
-        continue
-    turned = _v2_project[keys[0]]
-    if any(_v2_project[k] != turned for k in keys[1:]):
-        continue  # not shared by all four: a patch, not a placement
-    for part in parts:
-        node = next(n for n in d["nodes"] if n["name"] == part)
+for hname, turned in TURNED_BY_HAND.items():
+    for part in PART_ROLES:
+        node = next(n for n in d["nodes"] if n["name"] == "%s-%s" % (hname, part))
         if node["rotation"] != turned:
-            node["rotation"] = [float(v) for v in turned]
+            node["rotation"] = list(turned)
             CARRIED_ROTATIONS += 1
-print("carried %d hand-turned hero rotations out of valley 2's project into valley 3's scene"
-      % CARRIED_ROTATIONS)
+assert CARRIED_ROTATIONS == 36, \
+    "expected 36 hand-turned rotations to differ from the scene, got %d" % CARRIED_ROTATIONS
+print("carried %d hand-turned hero rotations into the scene" % CARRIED_ROTATIONS)
 
 # =================================================================================================
 # 3. THE CAST
