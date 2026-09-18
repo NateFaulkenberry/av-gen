@@ -83,19 +83,39 @@ TEST_CASE("an object deleted from the owner's own film stays deleted", "[nodes][
         }
     } cleanup{copy};
 
-    // The control, and on a world this size it is the one that matters: an untouched save of a
-    // project whose composition came from a file writes no record. If the composition held a node
-    // the scene file does not list -- an ecology layer, a graph's output, anything generated at
-    // load -- this would record it as an addition and the next load would have two of it.
+    // The control, and on a world this size it is the one that matters: a save must not *invent* a
+    // node record. If the composition held a node the scene file does not list -- an ecology layer,
+    // a graph's output, anything generated at load -- recording it as an addition would give the
+    // next load two of it.
+    //
+    // This was written as `CHECK_FALSE(doc.contains("sceneNodes"))`, which was true only while the
+    // shipped film happened to carry no deletions. The owner then deleted two animals through the
+    // panel and saved, so the film now legitimately records `{"removed": ["rooster-16",
+    // "chicken-17"]}` -- and the control failed for the feature working. Deleting that record to
+    // make this line pass would resurrect both animals, which is the exact bug this case is named
+    // after. So the claim is now round-tripping rather than absence: whatever node record the
+    // project arrived with, an untouched save writes back that and nothing more.
+    json before = json::object();
+    {
+        std::ifstream in(project);
+        const json src = json::parse(in, nullptr, false);
+        REQUIRE_FALSE(src.is_discarded());
+        if (src.contains("sceneNodes")) {
+            before = src["sceneNodes"];
+        }
+    }
     REQUIRE(engine.saveProject(copy).has_value());
     {
         std::ifstream in(copy);
         const json doc = json::parse(in, nullptr, false);
         REQUIRE_FALSE(doc.is_discarded());
+        json after = json::object();
         if (doc.contains("sceneNodes")) {
-            UNSCOPED_INFO("recorded: " << doc["sceneNodes"].dump().substr(0, 400));
+            after = doc["sceneNodes"];
         }
-        CHECK_FALSE(doc.contains("sceneNodes"));
+        UNSCOPED_INFO("arrived with: " << before.dump().substr(0, 400));
+        UNSCOPED_INFO("saved back:   " << after.dump().substr(0, 400));
+        CHECK(after == before);
     }
 
     const std::string doomed = aLeaf(engine);
