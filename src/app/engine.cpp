@@ -945,6 +945,74 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
         }
         doc["cameraShotSpans"] = std::move(spans);
     }
+    // ADR-207 and ADR-230, on the argument `cameraShotSpans` above makes, for the two families it
+    // did not cover -- and this time it is not a derived cut but the effects themselves.
+    //
+    // The world effects and the atmospheric effects belong to the `Composition`, and a project whose
+    // scene came from a file saves that scene **by reference**: `assets.scene.path` plus a hash of
+    // the bytes already on disk. Nothing writes the scene file. So an aurora added through the World
+    // Effects panel lived in the composition the window was drawing and in no document any render
+    // reads -- and a render builds its own `Engine` and loads the project (`startRenderFromUi` saves
+    // the project for you and then renders *that file*). That is the whole of "the sky effects are in
+    // the app and not in the video".
+    //
+    // Measured, on the owner's own project: `glowmere-valley-2-multicam.json` carries **94**
+    // `atmos/Aurora/...` and `atmos/Bioluminescent Comet/...` parameter values, 47 each, and its
+    // scene file authors **no** `atmosphericEffects` at all. Loading it warns 94 times about a
+    // parameter nobody owns. The save kept every number of the aurora and lost the aurora.
+    //
+    // Written only when the session's list is not the one the scene file holds, so a project that
+    // opened a scene and rendered it keeps the file it had -- the rule `autoDirector` and
+    // `cameraShotSpans` are written under. An *emptied* list is a difference like any other and is
+    // written as an empty array: a deletion that only survives while the process does is the same
+    // defect pointing the other way. Both sides are compared after a round trip through the same
+    // `fromJson`/`toJson`, because a hand-typed `0.0055` and the float the engine ran it as are one
+    // authored value and must not read as an edit.
+    //
+    // Nothing is written for an inlined composition: `assets.scene.inline` is `Composition::toJson`,
+    // which already carries both arrays. A second copy beside it would be a second answer.
+    if (const scene::Composition* comp = composition(); comp != nullptr && !compositionPath_.empty()) {
+        nlohmann::json sceneDoc;
+        if (std::ifstream sceneIn(compositionPath_); sceneIn) {
+            sceneDoc = nlohmann::json::parse(sceneIn, nullptr, false);
+        }
+        // The file's own list, put through the parse the engine puts it through. An entry the parser
+        // refuses yields a null, which compares unequal to any array and so records the session's
+        // list -- the safe direction: a scene file this build cannot read is not evidence that the
+        // render already has what the window has.
+        const auto onDisk = [&](const char* key, auto parse) {
+            nlohmann::json out = nlohmann::json::array();
+            if (!sceneDoc.is_object() || !sceneDoc.contains(key) || !sceneDoc[key].is_array()) {
+                return out;
+            }
+            for (const auto& entry : sceneDoc[key]) {
+                auto one = parse(entry);
+                if (!one) {
+                    return nlohmann::json{};
+                }
+                out.push_back(one->toJson());
+            }
+            return out;
+        };
+        nlohmann::json liveWorld = nlohmann::json::array();
+        for (const world::WorldEffect& effect : comp->worldEffects()) {
+            liveWorld.push_back(effect.toJson());
+        }
+        if (liveWorld != onDisk("worldEffects", [](const nlohmann::json& j) {
+                return world::WorldEffect::fromJson(j);
+            })) {
+            doc["worldEffects"] = std::move(liveWorld);
+        }
+        nlohmann::json liveAtmos = nlohmann::json::array();
+        for (const world::AtmosphericEffect& effect : comp->atmosphericEffects()) {
+            liveAtmos.push_back(effect.toJson());
+        }
+        if (liveAtmos != onDisk("atmosphericEffects", [](const nlohmann::json& j) {
+                return world::AtmosphericEffect::fromJson(j);
+            })) {
+            doc["atmosphericEffects"] = std::move(liveAtmos);
+        }
+    }
     if (!states_.empty()) {
         doc["states"] = states_.toJson();
     }
@@ -1402,6 +1470,56 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     }
 
     stage(5);
+    // ---- the session's world and atmospheric effects, over the ones its scene authors ----
+    //
+    // Here, and for the reason the 2D composition below is here: the parameter block a few lines
+    // down carries `worldfx/<name>/...` and `atmos/<name>/...` values, and `setWorldEffects` /
+    // `setAtmosphericEffects` are what *register* those paths. Applied after the parameters, an
+    // effect would arrive with every number back at its default and the project's own values would
+    // already have been refused as unknown -- which is exactly what the 94 warnings this fix was
+    // found by say.
+    //
+    // Over rather than instead of: the scene file is still the state that runs first (ADR-264), and
+    // an absent key changes nothing. A present one is the session's answer, including an empty array,
+    // which is how a deleted effect stays deleted.
+    if (const auto entry = doc.find("worldEffects"); entry != doc.end() && entry->is_array()) {
+        std::vector<world::WorldEffect> effects;
+        effects.reserve(entry->size());
+        bool readable = true;
+        for (std::size_t i = 0; i < entry->size(); ++i) {
+            auto one = world::WorldEffect::fromJson((*entry)[i]);
+            if (!one) {
+                warn(fmt::format("worldEffects[{}]: {}", i, one.error().message));
+                readable = false;
+                break;
+            }
+            effects.push_back(std::move(*one));
+        }
+        if (readable) {
+            if (auto ok = setWorldEffects(std::move(effects)); !ok) {
+                warn("worldEffects: " + ok.error().message);
+            }
+        }
+    }
+    if (const auto entry = doc.find("atmosphericEffects"); entry != doc.end() && entry->is_array()) {
+        std::vector<world::AtmosphericEffect> effects;
+        effects.reserve(entry->size());
+        bool readable = true;
+        for (std::size_t i = 0; i < entry->size(); ++i) {
+            auto one = world::AtmosphericEffect::fromJson((*entry)[i]);
+            if (!one) {
+                warn(fmt::format("atmosphericEffects[{}]: {}", i, one.error().message));
+                readable = false;
+                break;
+            }
+            effects.push_back(std::move(*one));
+        }
+        if (readable) {
+            if (auto ok = setAtmosphericEffects(std::move(effects)); !ok) {
+                warn("atmosphericEffects: " + ok.error().message);
+            }
+        }
+    }
     // ---- the 2D composition (ADR-083) ----
     // Here, and not later: the parameter block below carries "layers/<id>/..." values, and the
     // timeline below carries tracks aimed at them. Both need the parameters to exist first, and a
