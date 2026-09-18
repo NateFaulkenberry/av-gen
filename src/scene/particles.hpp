@@ -177,7 +177,10 @@ struct ParticleParameters {
     params::Parameter<float>* speed = nullptr;         // scales speedMin/Max
     params::Parameter<float>* spread = nullptr;
     params::Parameter<glm::vec3>* position = nullptr;
-    params::Parameter<float>* extent = nullptr;        // scales extent
+    // Absolute, and seeded from the scene -- not a multiplier. See the note on
+    // `particleExtentFromRadius` below for why this one is not in the `lifetime`/`speed`/`size`
+    // family it used to sit in.
+    params::Parameter<glm::vec3>* extent = nullptr;
     params::Parameter<glm::vec3>* gravity = nullptr;
     params::Parameter<float>* drag = nullptr;
     params::Parameter<float>* turbulence = nullptr;
@@ -195,6 +198,18 @@ struct ParticleParameters {
     params::Parameter<float>* trailWidth = nullptr; // scales trailWidth (ADR-040)
     params::Parameter<bool>* enabled = nullptr;
 };
+
+// The extent a radius typed in metres means, keeping the emitter's authored proportions.
+//
+// `extent` is one field with three meanings (sphere radius, disc radius, box half-extents), and a
+// panel offers one number for it. Writing that number into all three components would turn a
+// 30 x 18 x 4 box of dust into a cube the first time anybody touched the slider, so the other two
+// follow `x` in the ratio the scene authored them in. The proportions are authorship; the size is
+// what the person at the slider is changing.
+//
+// Here rather than in the panel because the panel is not testable (ADR-182 wants an arm that can
+// fail, and an ImGui call is not one); this is the whole of what the control does to a number.
+[[nodiscard]] glm::vec3 particleExtentFromRadius(const glm::vec3& authored, float radius);
 
 ParticleParameters registerParticleParameters(params::ParameterSet& params, const ParticleSystem& system);
 // Writes finals into `system` using `rest` (the values at registration) for the scaled fields.

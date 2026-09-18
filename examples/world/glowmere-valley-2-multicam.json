@@ -4924,7 +4924,6 @@
     "particles/bloom-spores/drag": 0.07999999821186066,
     "particles/bloom-spores/emissive": 3.936000108718872,
     "particles/bloom-spores/enabled": true,
-    "particles/bloom-spores/extent": 1.0,
     "particles/bloom-spores/gravity": [
       0.0,
       -0.05000000074505806,
@@ -4968,7 +4967,6 @@
     "particles/cairn-spores/drag": 0.07999999821186066,
     "particles/cairn-spores/emissive": 3.936000108718872,
     "particles/cairn-spores/enabled": true,
-    "particles/cairn-spores/extent": 1.0,
     "particles/cairn-spores/gravity": [
       0.0,
       -0.05000000074505806,
@@ -5012,7 +5010,6 @@
     "particles/elder-2-spores/drag": 0.07999999821186066,
     "particles/elder-2-spores/emissive": 3.936000108718872,
     "particles/elder-2-spores/enabled": true,
-    "particles/elder-2-spores/extent": 1.0,
     "particles/elder-2-spores/gravity": [
       0.0,
       -0.05000000074505806,
@@ -5056,7 +5053,6 @@
     "particles/ember-spores/drag": 0.07999999821186066,
     "particles/ember-spores/emissive": 3.936000108718872,
     "particles/ember-spores/enabled": true,
-    "particles/ember-spores/extent": 1.0,
     "particles/ember-spores/gravity": [
       0.0,
       -0.05000000074505806,
@@ -5100,7 +5096,6 @@
     "particles/lantern-spores/drag": 0.07999999821186066,
     "particles/lantern-spores/emissive": 3.936000108718872,
     "particles/lantern-spores/enabled": true,
-    "particles/lantern-spores/extent": 1.0,
     "particles/lantern-spores/gravity": [
       0.0,
       -0.05000000074505806,
@@ -5144,7 +5139,6 @@
     "particles/ridge-spores/drag": 0.07999999821186066,
     "particles/ridge-spores/emissive": 3.936000108718872,
     "particles/ridge-spores/enabled": true,
-    "particles/ridge-spores/extent": 1.0,
     "particles/ridge-spores/gravity": [
       0.0,
       -0.05000000074505806,
@@ -5188,7 +5182,6 @@
     "particles/river-motes/drag": 0.3499999940395355,
     "particles/river-motes/emissive": 2.5999999046325684,
     "particles/river-motes/enabled": true,
-    "particles/river-motes/extent": 1.0,
     "particles/river-motes/gravity": [
       0.0,
       0.012000000104308128,
@@ -5232,7 +5225,6 @@
     "particles/scree-spores/drag": 0.07999999821186066,
     "particles/scree-spores/emissive": 3.936000108718872,
     "particles/scree-spores/enabled": true,
-    "particles/scree-spores/extent": 1.0,
     "particles/scree-spores/gravity": [
       0.0,
       -0.05000000074505806,
@@ -5276,7 +5268,6 @@
     "particles/spire-spores/drag": 0.07999999821186066,
     "particles/spire-spores/emissive": 3.936000108718872,
     "particles/spire-spores/enabled": true,
-    "particles/spire-spores/extent": 1.0,
     "particles/spire-spores/gravity": [
       0.0,
       -0.05000000074505806,
@@ -5320,7 +5311,6 @@
     "particles/spores/drag": 0.20000000298023224,
     "particles/spores/emissive": 1.7999999523162842,
     "particles/spores/enabled": true,
-    "particles/spores/extent": 1.0,
     "particles/spores/gravity": [
       0.019999999552965164,
       0.012000000104308128,
@@ -5364,7 +5354,6 @@
     "particles/umbra-spores/drag": 0.07999999821186066,
     "particles/umbra-spores/emissive": 3.936000108718872,
     "particles/umbra-spores/enabled": true,
-    "particles/umbra-spores/extent": 1.0,
     "particles/umbra-spores/gravity": [
       0.0,
       -0.05000000074505806,
@@ -5408,7 +5397,6 @@
     "particles/veil-spores/drag": 0.07999999821186066,
     "particles/veil-spores/emissive": 3.936000108718872,
     "particles/veil-spores/enabled": true,
-    "particles/veil-spores/extent": 1.0,
     "particles/veil-spores/gravity": [
       0.0,
       -0.05000000074505806,
@@ -5452,7 +5440,11 @@
     "particles/visitor-beam/drag": 0.05000000074505806,
     "particles/visitor-beam/emissive": 0.44999998807907104,
     "particles/visitor-beam/enabled": true,
-    "particles/visitor-beam/extent": 1.0,
+    "particles/visitor-beam/extent": [
+      0.42,
+      0.42,
+      0.42
+    ],
     "particles/visitor-beam/gravity": [
       0.0,
       -0.3499999940395355,
@@ -5468,7 +5460,7 @@
     "particles/visitor-beam/size": 1.0,
     "particles/visitor-beam/spawnRate": 0.0,
     "particles/visitor-beam/speed": 1.0,
-    "particles/visitor-beam/spread": 0.041999999433755875,
+    "particles/visitor-beam/spread": 0.128,
     "particles/visitor-beam/stretch": 4.5,
     "particles/visitor-beam/trailWidth": 1.0,
     "particles/visitor-beam/turbulence": 0.1599999964237213,
