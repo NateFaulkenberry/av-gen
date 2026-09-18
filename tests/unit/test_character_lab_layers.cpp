@@ -273,6 +273,24 @@ TEST_CASE("a joint mask resolves against a real skeleton and reports the names i
     CHECK(mixed.missing[0] == "Head01");
     CHECK(mixed.missing[1] == "Beak");
 
+    // A joint masked inside another masked joint is counted, because for an aim layer it means the
+    // rotation reaches it twice -- once through its parent and once on its own account. Counted and
+    // reported rather than forbidden: weighted distribution down a chain is a legitimate thing to
+    // want on a rig that has one.
+    scene::JointMaskSpec chain;
+    chain.joints = {"Eye_L", "Eye_ball_L"}; // Eye_ball_L is the only real child in this head group
+    const scene::JointMask nested = scene::resolveJointMask(sk, chain);
+    CHECK(nested.joints == 2);
+    CHECK(nested.nested == 1);
+
+    scene::PoseLayer doubled = rig->layers.layers()[0];
+    doubled.mask = chain;
+    doubled.pivot = "Eye_L";
+    const std::vector<std::string> said = rebindLook(*rig, doubled);
+    REQUIRE(said.size() == 1);
+    INFO(said.front());
+    CHECK(said.front().find("applied to them twice") != std::string::npos);
+
     // A weight per joint, and a mask that names nothing this rig has is empty and says so rather
     // than resolving to "the whole skeleton" or to "nothing was asked".
     scene::JointMaskSpec weighted;
