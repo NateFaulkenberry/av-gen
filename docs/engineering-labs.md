@@ -454,6 +454,9 @@ the debug flag. `[gpu]` tests take `tools/gpu-lock.sh`.
 * Renderer state: `rendering::writeSnapshot(FrameSnapshot{...}, path)`; diff two with
   `compareSnapshots`, which names the object and the field.
 * Pixels and AOVs: `avgen --render out --aov normal,emission,depth,velocity,id,shadow`.
+* Post intermediates: `avgen --render out --post-stages <dir>` — one scene-linear EXR per stage the
+  post chain rendered, at the resolution the chain chose, plus a manifest with each one's extent,
+  peak and mean (ADR-277). Arming it does not change the picture; that is checked, not claimed.
 * The interface: `avgen --capture-ui out.png --capture-ui-panel "World","Performance"`.
 * Counters: `--bench-json`, `--cluster-stats`, `--profile-cpu`.
 * Isolation: `--disable <passArms>` and `--quality-arm <qualityArms>` — one table, reachable

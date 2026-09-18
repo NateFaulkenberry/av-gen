@@ -747,6 +747,13 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             options.supersample = static_cast<float>(c.supersample);
         }
     }
+    // ADR-277, and ADR-225's rule: a flag the program then ignores is worse than one it refuses.
+    // The post-stage capture lives in RenderJob, so without a render there is nothing to arm and
+    // the directory would be created and left empty.
+    if (!options.postStages.empty() && !options.render && !options.queue) {
+        return fail("--post-stages needs --render (or --queue): the capture is part of an offline "
+                    "render job and there is nothing to arm without one");
+    }
     return options;
 }
 
