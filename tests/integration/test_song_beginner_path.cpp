@@ -87,10 +87,19 @@ TEST_CASE("import, analyze, Song Mode: a first film with no performer rules",
     }
 
     // ---- step 4: the director turns the plan into shots --------------------------------------
+    //
+    // **The autonomy is stated, not inherited.** This used to pass `engine.autoDirector()` straight
+    // through, which is whatever freedom the demo project happened to be saved with -- and the
+    // owner saved it as `locked` in commit 5e3637c. Locked is one shot on one camera by definition,
+    // so the "more than one camera was used" assertion below became a claim about a JSON field
+    // rather than about the director, and failed. What this test is for is that the director can
+    // cut a film from an analyzed song, so it says which freedom it is asking for.
     scene::Composition* comp = engine.composition();
     REQUIRE(comp != nullptr);
-    const auto direction = app::directSongFromPlan(comp->heroes(), *plan, comp->cameraDirection(),
-                                                   engine.autoDirector());
+    app::AutoDirectorSettings settings = engine.autoDirector();
+    settings.autonomy = app::Autonomy::Expressive;
+    const auto direction =
+        app::directSongFromPlan(comp->heroes(), *plan, comp->cameraDirection(), settings);
     INFO((direction ? std::string() : direction.error().message));
     REQUIRE(direction.has_value());
 
@@ -120,7 +129,7 @@ TEST_CASE("import, analyze, Song Mode: a first film with no performer rules",
     CHECK(used.size() > 1);
 
     // ---- step 6: and it installs, which is what playback consumes ----------------------------
-    const auto installed = app::installSongDirection(engine, *direction, engine.autoDirector());
+    const auto installed = app::installSongDirection(engine, *direction, settings);
     INFO((installed ? std::string() : installed.error().message));
     REQUIRE(installed.has_value());
     CHECK(*installed > 0);
@@ -182,11 +191,15 @@ TEST_CASE("Song Mode bakes a film without touching the Shots lane", "[integratio
     REQUIRE(plan.has_value());
     scene::Composition* comp = engine.composition();
     REQUIRE(comp != nullptr);
-    const auto direction = app::directSongFromPlan(comp->heroes(), *plan, comp->cameraDirection(),
-                                                   engine.autoDirector());
+    // Stated rather than inherited, for the reason given at the first test's step 4: the demo is
+    // saved Locked, and Locked is one shot on one camera, which is not the thing under test here.
+    app::AutoDirectorSettings settings = engine.autoDirector();
+    settings.autonomy = app::Autonomy::Expressive;
+    const auto direction =
+        app::directSongFromPlan(comp->heroes(), *plan, comp->cameraDirection(), settings);
     REQUIRE(direction.has_value());
     REQUIRE(direction->sequence.shots.size() > 1); // the director really did decide a film
-    REQUIRE(app::installSongDirection(engine, *direction, engine.autoDirector()).has_value());
+    REQUIRE(app::installSongDirection(engine, *direction, settings).has_value());
 
     const seq::Sequence& after = engine.sequence();
 
