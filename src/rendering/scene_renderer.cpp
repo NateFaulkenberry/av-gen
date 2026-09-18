@@ -2346,14 +2346,31 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             // "how close was this to being culled", and it was answering it about a box nothing
             // culled against (§37: the renderer is the source of truth, so the diagnostic was
             // wrong).
-            const scene::CullBounds cullBounds = scene::entityCullBounds(scene, entity);
-            diagnostic.worldBoundsMin = cullBounds.min;
-            diagnostic.worldBoundsMax = cullBounds.max;
+            // Two boxes, because two questions are being asked and they are not the same one.
+            //
+            // `worldBounds` is what this object's bounds *are*, and somebody reading it wants the
+            // object -- so it is asked for with no padding. It still comes from `entityCullBounds`
+            // rather than from a transform of the mesh's corners written out here, because that
+            // function also uses the *posed* palette for a skinned entity, and a T-pose bind box is
+            // not the box the thing occupies.
+            //
+            // `frustumMargins` answers "how close was this to being culled", so it must use the box
+            // the cull actually tested -- padded by a quarter of the extent plus a quarter of a
+            // metre. Measured over 72 cameras when this was one box: all 72 margins differed, worst
+            // by 2.03 m, and 48 disagreed about whether the object was inside the frustum at all.
+            //
+            // Answering both from the padded box is the mistake this comment exists to prevent: it
+            // makes the reported bounds 0.25 m larger than the object in every direction, which a
+            // GPU test caught immediately and a person reading the panel would have believed.
+            const scene::CullBounds trueBounds = scene::entityCullBounds(scene, entity, 0.0f, 0.0f);
+            diagnostic.worldBoundsMin = trueBounds.min;
+            diagnostic.worldBoundsMax = trueBounds.max;
+            const scene::CullBounds culled = scene::entityCullBounds(scene, entity);
             for (std::size_t plane = 0; plane < diagnosticPlanes.size(); ++plane) {
                 const glm::vec4& p = diagnosticPlanes[plane];
-                const glm::vec3 far(p.x >= 0.0f ? diagnostic.worldBoundsMax.x : diagnostic.worldBoundsMin.x,
-                                    p.y >= 0.0f ? diagnostic.worldBoundsMax.y : diagnostic.worldBoundsMin.y,
-                                    p.z >= 0.0f ? diagnostic.worldBoundsMax.z : diagnostic.worldBoundsMin.z);
+                const glm::vec3 far(p.x >= 0.0f ? culled.max.x : culled.min.x,
+                                    p.y >= 0.0f ? culled.max.y : culled.min.y,
+                                    p.z >= 0.0f ? culled.max.z : culled.min.z);
                 diagnostic.frustumMargins[plane] = glm::dot(glm::vec3(p), far) + p.w;
             }
             diagnostic.cullReason = !entity.visible ? "hidden" : entity.cameraCulled ? "camera-frustum" : "eligible";
