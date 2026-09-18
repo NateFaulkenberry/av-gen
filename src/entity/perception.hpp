@@ -11,16 +11,20 @@
 //   * **Grid-backed.** Candidates come from two `spatial::PointGrid` radius queries -- one over the
 //     world's interest points, one over its bodies -- never from a sweep over the 505-entry global
 //     list every character reads today, and never from the analytic world.
-//   * **Cadenced at `hertz`.** Not because the scan is expensive: it is 0.098 us at 60 m over the
-//     real 505 points, four hundred times cheaper than one `Navigator::sample`. Because a character
-//     that re-senses every frame reacts instantaneously and reads as a machine, and because
-//     `Percept::seenAt` is meaningless if it is always now. Staleness is the only thing that lets a
-//     character be *wrong* about where something is, which is most of what this buys over the
-//     omniscient list it replaces.
+//   * **Cadenced at `hertz`.** For two reasons and a third ADR-270 did not have. A character that
+//     re-senses every frame reacts instantaneously and reads as a machine; `Percept::seenAt` is
+//     meaningless if it is always now, and staleness is the only thing that lets a character be
+//     *wrong* about where something is, which is most of what this buys over the omniscient list it
+//     replaces. And -- ADR-290 section 5.2 -- it is a budget after all, not for the frame but for
+//     the **replay**: a whole sense tick is 0.85 us, nine times the isolated grid query ADR-270
+//     priced, and `seek(30 s)` over 24 perceiving bodies goes 20.7 ms at 4 Hz to 54.5 ms at 60
+//     against 16.8 ms with no senses at all. A frame does not notice; a scrub does.
 //   * **Occlusion budgeted, and off by default.** `world::heroSightline` is the only real occlusion
-//     this engine owns and it costs 1.7 ms at 20 m. One per character per frame at a hundred
-//     characters is 172 ms a frame. So `occlusionTestsPerSecond` defaults to 0, `visibility` stays
-//     1, and `tested` stays **false** -- which is honest, free, and says so.
+//     this engine owns and it measures 1800.6 us at 20 m on `glowmere-valley-2`. One per character
+//     per frame at a hundred characters is 180 ms a frame. So `occlusionTestsPerSecond` defaults to
+//     0, `visibility` stays 1, and `tested` stays **false** -- which is honest, free, and says so.
+//     The cost is a property of the world function rather than of the nine rays: the same call on a
+//     flat fixture with no ecology is 8 us, so a fixture cannot prove this budget is needed.
 //
 // **Which position (R1, ADR-260).** Everything here reads and reports `EntityState::position()` --
 // the simulation's answer -- and never `visualPosition()`. Glowmere's saucer carries a 2.4 m drift;
