@@ -724,7 +724,7 @@
     "atmos/Aurora/complexity": 26.0,
     "atmos/Aurora/curtainHeight": 2600.0,
     "atmos/Aurora/curtains": 3.0,
-    "atmos/Aurora/delay": 0.0,
+    "atmos/Aurora/delay": 1.850000023841858,
     "atmos/Aurora/driftSpeed": 0.12999999523162842,
     "atmos/Aurora/edgeBrightness": 2.5999999046325684,
     "atmos/Aurora/emission": 1.0,
@@ -13877,17 +13877,21 @@
           ],
           "end": 132.49066666666667,
           "energy": 0.11635852605104446,
-          "shotIntent": "groove_coverage",
+          "shotIntent": "hero_coverage",
           "start": 111.25333333333333,
           "type": "interlude"
         },
         {
           "density": 0.0,
+          "edited": [
+            "shot-intent"
+          ],
           "end": 151.41333333333333,
           "endConfidence": 0.034832246601581573,
           "energy": 0.10446064919233322,
           "group": 0,
           "labelConfidence": 0.4618978500366211,
+          "shotIntent": "hero_coverage",
           "start": 132.49066666666667,
           "startConfidence": 0.01936209946870804,
           "type": "verse"
