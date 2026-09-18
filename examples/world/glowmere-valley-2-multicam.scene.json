@@ -6593,9 +6593,9 @@
         -18.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "animation": {
         "state": "Idle",
@@ -6618,9 +6618,9 @@
         -46.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "animation": {
         "state": "Idle",
@@ -6643,9 +6643,9 @@
         16.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "animation": {
         "state": "Idle",
@@ -6668,9 +6668,9 @@
         34.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "animation": {
         "state": "Idle",
@@ -6693,9 +6693,9 @@
         -10.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "animation": {
         "state": "Idle",
@@ -6737,9 +6737,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -6767,9 +6767,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -6797,9 +6797,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -6827,9 +6827,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -6857,9 +6857,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -6887,9 +6887,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -6917,9 +6917,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -6947,9 +6947,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -6977,9 +6977,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -7007,9 +7007,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -7037,9 +7037,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -7067,9 +7067,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -7097,9 +7097,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -7127,9 +7127,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -7157,9 +7157,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     },
@@ -7187,9 +7187,9 @@
         0.0
       ],
       "scale": [
-        1.0,
-        1.0,
-        1.0
+        1.94,
+        1.94,
+        1.94
       ],
       "visible": true
     }
@@ -7349,16 +7349,16 @@
       "seed": 11235813,
       "gait": {
         "matchRate": true,
-        "walkSpeed": 1.5817,
-        "runSpeed": 3.8089,
+        "walkSpeed": 3.0685,
+        "runSpeed": 7.3892,
         "rateMin": 0.08,
         "rateMax": 1.75,
-        "runEnter": 2.6454,
-        "runExit": 1.7839,
-        "moveEnter": 0.4654,
-        "moveExit": 0.2327,
-        "accel": 2.482,
-        "decel": 3.4127
+        "runEnter": 5.1321,
+        "runExit": 3.4608,
+        "moveEnter": 0.9028,
+        "moveExit": 0.4514,
+        "accel": 4.8151,
+        "decel": 6.6207
       },
       "fullDetailDistance": 120.0,
       "coarseInterval": 0.1,
@@ -7387,8 +7387,8 @@
           "noveltyRadius": 28.0,
           "minRange": 18.0,
           "maxRange": 220.0,
-          "speed": 1.5512,
-          "runSpeed": 3.7396,
+          "speed": 3.0094,
+          "runSpeed": 7.2548,
           "turnRate": 150.0,
           "runChance": 0.34,
           "strollChance": 0.18,
@@ -7434,16 +7434,16 @@
       "seed": 31415926,
       "gait": {
         "matchRate": true,
-        "walkSpeed": 1.5801,
-        "runSpeed": 3.8073,
+        "walkSpeed": 3.0654,
+        "runSpeed": 7.3861,
         "rateMin": 0.08,
         "rateMax": 1.75,
-        "runEnter": 1.5551,
-        "runExit": 1.0219,
-        "moveEnter": 0.2666,
-        "moveExit": 0.1333,
-        "accel": 1.4218,
-        "decel": 1.955
+        "runEnter": 3.0169,
+        "runExit": 1.9826,
+        "moveEnter": 0.5172,
+        "moveExit": 0.2586,
+        "accel": 2.7583,
+        "decel": 3.7927
       },
       "fullDetailDistance": 120.0,
       "coarseInterval": 0.1,
@@ -7472,8 +7472,8 @@
           "noveltyRadius": 28.0,
           "minRange": 18.0,
           "maxRange": 220.0,
-          "speed": 0.8886,
-          "runSpeed": 2.2216,
+          "speed": 1.724,
+          "runSpeed": 4.3099,
           "turnRate": 110.0,
           "runChance": 0.06,
           "strollChance": 0.55,
@@ -7520,16 +7520,16 @@
       "seed": 27182818,
       "gait": {
         "matchRate": true,
-        "walkSpeed": 1.58,
-        "runSpeed": 3.8087,
+        "walkSpeed": 3.0652,
+        "runSpeed": 7.3889,
         "rateMin": 0.08,
         "rateMax": 1.75,
-        "runEnter": 1.8876,
-        "runExit": 1.2864,
-        "moveEnter": 0.3356,
-        "moveExit": 0.1678,
-        "accel": 1.7897,
-        "decel": 2.4609
+        "runEnter": 3.6619,
+        "runExit": 2.4955,
+        "moveEnter": 0.651,
+        "moveExit": 0.3255,
+        "accel": 3.472,
+        "decel": 4.774
       },
       "fullDetailDistance": 120.0,
       "coarseInterval": 0.1,
@@ -7558,8 +7558,8 @@
           "noveltyRadius": 28.0,
           "minRange": 18.0,
           "maxRange": 220.0,
-          "speed": 1.1186,
-          "runSpeed": 2.6566,
+          "speed": 2.17,
+          "runSpeed": 5.1538,
           "turnRate": 130.0,
           "runChance": 0.12,
           "strollChance": 0.4,
@@ -7621,16 +7621,16 @@
       "seed": 16180339,
       "gait": {
         "matchRate": true,
-        "walkSpeed": 1.5819,
-        "runSpeed": 3.8098,
+        "walkSpeed": 3.069,
+        "runSpeed": 7.391,
         "rateMin": 0.08,
         "rateMax": 1.75,
-        "runEnter": 2.4821,
-        "runExit": 1.5819,
-        "moveEnter": 0.4127,
-        "moveExit": 0.2063,
-        "accel": 2.201,
-        "decel": 3.0263
+        "runEnter": 4.8152,
+        "runExit": 3.069,
+        "moveEnter": 0.8006,
+        "moveExit": 0.4003,
+        "accel": 4.2699,
+        "decel": 5.8711
       },
       "fullDetailDistance": 120.0,
       "coarseInterval": 0.1,
@@ -7659,8 +7659,8 @@
           "noveltyRadius": 28.0,
           "minRange": 18.0,
           "maxRange": 220.0,
-          "speed": 1.3756,
-          "runSpeed": 3.5885,
+          "speed": 2.6687,
+          "runSpeed": 6.9617,
           "turnRate": 170.0,
           "runChance": 0.28,
           "strollChance": 0.2,
@@ -7731,16 +7731,16 @@
       "seed": 8814473,
       "gait": {
         "matchRate": true,
-        "walkSpeed": 1.5819,
-        "runSpeed": 3.8098,
+        "walkSpeed": 3.069,
+        "runSpeed": 7.391,
         "rateMin": 0.08,
         "rateMax": 1.75,
-        "runEnter": 2.4821,
-        "runExit": 1.5819,
-        "moveEnter": 0.4127,
-        "moveExit": 0.2063,
-        "accel": 2.201,
-        "decel": 3.0263
+        "runEnter": 4.8152,
+        "runExit": 3.069,
+        "moveEnter": 0.8006,
+        "moveExit": 0.4003,
+        "accel": 4.2699,
+        "decel": 5.8711
       },
       "fullDetailDistance": 120.0,
       "coarseInterval": 0.1,
@@ -7769,8 +7769,8 @@
           "noveltyRadius": 28.0,
           "minRange": 18.0,
           "maxRange": 220.0,
-          "speed": 1.3756,
-          "runSpeed": 3.5885,
+          "speed": 2.6687,
+          "runSpeed": 6.9617,
           "turnRate": 170.0,
           "runChance": 0.28,
           "strollChance": 0.2,
@@ -7853,8 +7853,8 @@
           "minRange": 1.8,
           "pauseMax": 5.34,
           "pauseMin": 1.08,
-          "runSpeed": 1.5933,
-          "speed": 0.9958,
+          "runSpeed": 3.0911,
+          "speed": 1.9319,
           "turnRate": 76.3
         },
         {
@@ -7872,18 +7872,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.5944,
-        "decel": 2.1917,
+        "accel": 3.0932,
+        "decel": 4.2518,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.005,
-        "runEnter": 1.5933,
-        "runExit": 1.1453,
-        "runSpeed": 1.6689,
-        "walkSpeed": 1.6689
+        "runEnter": 3.0911,
+        "runExit": 2.2218,
+        "runSpeed": 3.2375,
+        "walkSpeed": 3.2375
       },
       "name": "bull-1",
       "node": "bull-1",
@@ -7912,8 +7912,8 @@
           "minRange": 2.78,
           "pauseMax": 5.03,
           "pauseMin": 1.03,
-          "runSpeed": 1.1444,
-          "speed": 0.7153,
+          "runSpeed": 2.2202,
+          "speed": 1.3876,
           "turnRate": 94.4
         },
         {
@@ -7931,18 +7931,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.1444,
-        "decel": 1.575,
+        "accel": 2.2202,
+        "decel": 3.0555,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0051,
-        "runEnter": 1.1444,
-        "runExit": 0.8225,
-        "runSpeed": 1.6278,
-        "walkSpeed": 1.6278
+        "runEnter": 2.2202,
+        "runExit": 1.5956,
+        "runSpeed": 3.1577,
+        "walkSpeed": 3.1577
       },
       "name": "horse-2",
       "node": "horse-2",
@@ -7971,8 +7971,8 @@
           "minRange": 2.48,
           "pauseMax": 3.45,
           "pauseMin": 1.13,
-          "runSpeed": 1.3172,
-          "speed": 0.8233,
+          "runSpeed": 2.5554,
+          "speed": 1.5973,
           "turnRate": 110.0
         },
         {
@@ -7990,18 +7990,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.3167,
-        "decel": 1.8111,
+        "accel": 2.5543,
+        "decel": 3.5136,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0054,
-        "runEnter": 1.3172,
-        "runExit": 0.9469,
-        "runSpeed": 1.5528,
-        "walkSpeed": 1.5528
+        "runEnter": 2.5554,
+        "runExit": 1.8371,
+        "runSpeed": 3.0122,
+        "walkSpeed": 3.0122
       },
       "name": "cow-3",
       "node": "cow-3",
@@ -8030,8 +8030,8 @@
           "minRange": 2.14,
           "pauseMax": 5.68,
           "pauseMin": 1.16,
-          "runSpeed": 0.4569,
-          "speed": 0.2856,
+          "runSpeed": 0.8865,
+          "speed": 0.554,
           "turnRate": 93.8
         },
         {
@@ -8049,18 +8049,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 0.4556,
-        "decel": 0.6278,
+        "accel": 0.8838,
+        "decel": 1.2179,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0121,
-        "runEnter": 0.4569,
-        "runExit": 0.3283,
-        "runSpeed": 0.6894,
-        "walkSpeed": 0.6894
+        "runEnter": 0.8865,
+        "runExit": 0.637,
+        "runSpeed": 1.3374,
+        "walkSpeed": 1.3374
       },
       "name": "sheep-4",
       "node": "sheep-4",
@@ -8089,8 +8089,8 @@
           "minRange": 2.24,
           "pauseMax": 4.62,
           "pauseMin": 1.11,
-          "runSpeed": 0.4836,
-          "speed": 0.3022,
+          "runSpeed": 0.9382,
+          "speed": 0.5863,
           "turnRate": 85.6
         },
         {
@@ -8108,18 +8108,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 0.4833,
-        "decel": 0.6639,
+        "accel": 0.9377,
+        "decel": 1.2879,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0143,
-        "runEnter": 0.4836,
-        "runExit": 0.3475,
-        "runSpeed": 0.5831,
-        "walkSpeed": 0.5831
+        "runEnter": 0.9382,
+        "runExit": 0.6741,
+        "runSpeed": 1.1312,
+        "walkSpeed": 1.1312
       },
       "name": "goat-5",
       "node": "goat-5",
@@ -8148,8 +8148,8 @@
           "minRange": 2.93,
           "pauseMax": 5.19,
           "pauseMin": 1.06,
-          "runSpeed": 0.8022,
-          "speed": 0.5014,
+          "runSpeed": 1.5563,
+          "speed": 0.9727,
           "turnRate": 101.7
         },
         {
@@ -8167,18 +8167,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 0.8028,
-        "decel": 1.1028,
+        "accel": 1.5574,
+        "decel": 2.1394,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0105,
-        "runEnter": 0.8022,
-        "runExit": 0.5767,
-        "runSpeed": 0.7903,
-        "walkSpeed": 0.7903
+        "runEnter": 1.5563,
+        "runExit": 1.1187,
+        "runSpeed": 1.5332,
+        "walkSpeed": 1.5332
       },
       "name": "pig-6",
       "node": "pig-6",
@@ -8207,8 +8207,8 @@
           "minRange": 2.32,
           "pauseMax": 3.06,
           "pauseMin": 1.3,
-          "runSpeed": 0.4733,
-          "speed": 0.2958,
+          "runSpeed": 0.9183,
+          "speed": 0.5739,
           "turnRate": 99.6
         },
         {
@@ -8226,18 +8226,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 0.4722,
-        "decel": 0.65,
+        "accel": 0.9161,
+        "decel": 1.261,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0168,
-        "runEnter": 0.4733,
-        "runExit": 0.3403,
-        "runSpeed": 0.4972,
-        "walkSpeed": 0.4972
+        "runEnter": 0.9183,
+        "runExit": 0.6601,
+        "runSpeed": 0.9646,
+        "walkSpeed": 0.9646
       },
       "name": "rooster-7",
       "node": "rooster-7",
@@ -8266,8 +8266,8 @@
           "minRange": 2.53,
           "pauseMax": 3.82,
           "pauseMin": 1.65,
-          "runSpeed": 0.4178,
-          "speed": 0.2611,
+          "runSpeed": 0.8105,
+          "speed": 0.5066,
           "turnRate": 106.4
         },
         {
@@ -8285,18 +8285,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 0.4167,
-        "decel": 0.575,
+        "accel": 0.8083,
+        "decel": 1.1155,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0147,
-        "runEnter": 0.4178,
-        "runExit": 0.3003,
-        "runSpeed": 0.5653,
-        "walkSpeed": 0.5653
+        "runEnter": 0.8105,
+        "runExit": 0.5825,
+        "runSpeed": 1.0965,
+        "walkSpeed": 1.0965
       },
       "name": "chicken-8",
       "node": "chicken-8",
@@ -8325,8 +8325,8 @@
           "minRange": 2.38,
           "pauseMax": 6.05,
           "pauseMin": 0.9,
-          "runSpeed": 1.6872,
-          "speed": 1.0544,
+          "runSpeed": 3.2732,
+          "speed": 2.0456,
           "turnRate": 69.2
         },
         {
@@ -8344,18 +8344,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.6861,
-        "decel": 2.3194,
+        "accel": 3.2711,
+        "decel": 4.4997,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.005,
-        "runEnter": 1.6872,
-        "runExit": 1.2125,
-        "runSpeed": 1.6689,
-        "walkSpeed": 1.6689
+        "runEnter": 3.2732,
+        "runExit": 2.3523,
+        "runSpeed": 3.2375,
+        "walkSpeed": 3.2375
       },
       "name": "bull-10",
       "node": "bull-10",
@@ -8384,8 +8384,8 @@
           "minRange": 2.63,
           "pauseMax": 6.24,
           "pauseMin": 1.6,
-          "runSpeed": 1.3436,
-          "speed": 0.8397,
+          "runSpeed": 2.6066,
+          "speed": 1.6291,
           "turnRate": 81.5
         },
         {
@@ -8403,18 +8403,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.3444,
-        "decel": 1.8472,
+        "accel": 2.6082,
+        "decel": 3.5836,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0051,
-        "runEnter": 1.3436,
-        "runExit": 0.9656,
-        "runSpeed": 1.6278,
-        "walkSpeed": 1.6278
+        "runEnter": 2.6066,
+        "runExit": 1.8732,
+        "runSpeed": 3.1577,
+        "walkSpeed": 3.1577
       },
       "name": "horse-11",
       "node": "horse-11",
@@ -8443,8 +8443,8 @@
           "minRange": 2.34,
           "pauseMax": 5.61,
           "pauseMin": 1.0,
-          "runSpeed": 1.0222,
-          "speed": 0.6389,
+          "runSpeed": 1.9831,
+          "speed": 1.2394,
           "turnRate": 75.5
         },
         {
@@ -8462,18 +8462,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 1.0222,
-        "decel": 1.4056,
+        "accel": 1.9831,
+        "decel": 2.7268,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0054,
-        "runEnter": 1.0222,
-        "runExit": 0.7347,
-        "runSpeed": 1.5528,
-        "walkSpeed": 1.5528
+        "runEnter": 1.9831,
+        "runExit": 1.4254,
+        "runSpeed": 3.0122,
+        "walkSpeed": 3.0122
       },
       "name": "cow-12",
       "node": "cow-12",
@@ -8502,8 +8502,8 @@
           "minRange": 2.89,
           "pauseMax": 3.54,
           "pauseMin": 1.43,
-          "runSpeed": 0.5339,
-          "speed": 0.3336,
+          "runSpeed": 1.0357,
+          "speed": 0.6472,
           "turnRate": 88.8
         },
         {
@@ -8521,18 +8521,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 0.5333,
-        "decel": 0.7333,
+        "accel": 1.0347,
+        "decel": 1.4227,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0121,
-        "runEnter": 0.5339,
-        "runExit": 0.3836,
-        "runSpeed": 0.6894,
-        "walkSpeed": 0.6894
+        "runEnter": 1.0357,
+        "runExit": 0.7442,
+        "runSpeed": 1.3374,
+        "walkSpeed": 1.3374
       },
       "name": "sheep-13",
       "node": "sheep-13",
@@ -8561,8 +8561,8 @@
           "minRange": 2.13,
           "pauseMax": 4.29,
           "pauseMin": 0.84,
-          "runSpeed": 0.515,
-          "speed": 0.3219,
+          "runSpeed": 0.9991,
+          "speed": 0.6246,
           "turnRate": 107.1
         },
         {
@@ -8580,18 +8580,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 0.5139,
-        "decel": 0.7083,
+        "accel": 0.9969,
+        "decel": 1.3742,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0143,
-        "runEnter": 0.515,
-        "runExit": 0.3703,
-        "runSpeed": 0.5831,
-        "walkSpeed": 0.5831
+        "runEnter": 0.9991,
+        "runExit": 0.7183,
+        "runSpeed": 1.1312,
+        "walkSpeed": 1.1312
       },
       "name": "goat-14",
       "node": "goat-14",
@@ -8620,8 +8620,8 @@
           "minRange": 2.61,
           "pauseMax": 3.35,
           "pauseMin": 1.28,
-          "runSpeed": 0.5111,
-          "speed": 0.3194,
+          "runSpeed": 0.9916,
+          "speed": 0.6197,
           "turnRate": 106.7
         },
         {
@@ -8639,18 +8639,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 0.5111,
-        "decel": 0.7028,
+        "accel": 0.9916,
+        "decel": 1.3634,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0105,
-        "runEnter": 0.5111,
-        "runExit": 0.3672,
-        "runSpeed": 0.7903,
-        "walkSpeed": 0.7903
+        "runEnter": 0.9916,
+        "runExit": 0.7124,
+        "runSpeed": 1.5332,
+        "walkSpeed": 1.5332
       },
       "name": "pig-15",
       "node": "pig-15",
@@ -8679,8 +8679,8 @@
           "minRange": 2.98,
           "pauseMax": 3.28,
           "pauseMin": 1.35,
-          "runSpeed": 0.3828,
-          "speed": 0.2392,
+          "runSpeed": 0.7426,
+          "speed": 0.464,
           "turnRate": 110.8
         },
         {
@@ -8698,18 +8698,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 0.3833,
-        "decel": 0.525,
+        "accel": 0.7437,
+        "decel": 1.0185,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0168,
-        "runEnter": 0.3828,
-        "runExit": 0.275,
-        "runSpeed": 0.4972,
-        "walkSpeed": 0.4972
+        "runEnter": 0.7426,
+        "runExit": 0.5335,
+        "runSpeed": 0.9646,
+        "walkSpeed": 0.9646
       },
       "name": "rooster-16",
       "node": "rooster-16",
@@ -8738,8 +8738,8 @@
           "minRange": 2.1,
           "pauseMax": 4.72,
           "pauseMin": 1.65,
-          "runSpeed": 0.5564,
-          "speed": 0.3478,
+          "runSpeed": 1.0794,
+          "speed": 0.6747,
           "turnRate": 78.4
         },
         {
@@ -8757,18 +8757,18 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 0.5556,
-        "decel": 0.7639,
+        "accel": 1.0778,
+        "decel": 1.4819,
         "idleRate": 0.0,
         "matchRate": true,
-        "moveEnter": 0.0167,
-        "moveExit": 0.0083,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
         "rateMax": 1.0,
         "rateMin": 0.0147,
-        "runEnter": 0.5564,
-        "runExit": 0.4,
-        "runSpeed": 0.5653,
-        "walkSpeed": 0.5653
+        "runEnter": 1.0794,
+        "runExit": 0.776,
+        "runSpeed": 1.0965,
+        "walkSpeed": 1.0965
       },
       "name": "chicken-17",
       "node": "chicken-17",
@@ -8780,8 +8780,8 @@
       ]
     }
   ],
-  "navWadeDepth": 0.44,
-  "navBodyRadius": 0.67,
+  "navWadeDepth": 0.8536,
+  "navBodyRadius": 1.2998,
   "staging": {
     "actors": [
       {
@@ -8878,7 +8878,7 @@
           },
           {
             "name": "liftHeight",
-            "value": -1.83,
+            "value": -3.5502,
             "min": -40.0,
             "max": 0.0
           },
@@ -8902,7 +8902,7 @@
           },
           {
             "name": "animalGait",
-            "value": 0.361,
+            "value": 0.7003,
             "min": 0.0,
             "max": 10.0
           },

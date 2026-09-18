@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-2-multicam.scene.json",
-        "sha256": "a56220ffd7e3bb36a215037ac05622ed55077bc529419ccafa0e1c09c2609fa8",
-        "size": 210989
+        "sha256": "c2b8c6521bfc51c621036a3d137bda3956043c6ab82340eabad7dee8cb28f756",
+        "size": 211375
       }
     }
   },
@@ -574,7 +574,7 @@
         10.619667053222656,
         -17.73651123046875
       ],
-      "subjectRadius": 0.8309500217437744,
+      "subjectRadius": 1.612043023109436,
       "travel": false
     },
     {
@@ -616,7 +616,7 @@
         8.266629219055176,
         69.00340270996094
       ],
-      "subjectRadius": 0.8970000147819519,
+      "subjectRadius": 1.7401800155639648,
       "travel": false
     },
     {
@@ -658,7 +658,7 @@
         10.597615242004395,
         16.179840087890625
       ],
-      "subjectRadius": 0.8554499745368958,
+      "subjectRadius": 1.659572958946228,
       "travel": false
     },
     {
@@ -672,7 +672,7 @@
         -0.8069725036621094,
         264.763916015625
       ],
-      "subjectRadius": 0.90625,
+      "subjectRadius": 1.7581249475479126,
       "travel": false
     },
     {
@@ -700,7 +700,7 @@
         10.617985725402832,
         -45.77507019042969
       ],
-      "subjectRadius": 0.8330000042915344,
+      "subjectRadius": 1.6160199642181396,
       "travel": false
     },
     {
@@ -742,7 +742,7 @@
         10.619667053222656,
         -17.73651123046875
       ],
-      "subjectRadius": 0.8309500217437744,
+      "subjectRadius": 1.612043023109436,
       "travel": false
     },
     {
@@ -784,7 +784,7 @@
         10.597615242004395,
         16.179840087890625
       ],
-      "subjectRadius": 0.8554499745368958,
+      "subjectRadius": 1.659572958946228,
       "travel": false
     },
     {
@@ -840,7 +840,7 @@
         8.266629219055176,
         69.00340270996094
       ],
-      "subjectRadius": 0.8970000147819519,
+      "subjectRadius": 1.7401800155639648,
       "travel": false
     },
     {
@@ -854,7 +854,7 @@
         -0.8069725036621094,
         264.763916015625
       ],
-      "subjectRadius": 0.90625,
+      "subjectRadius": 1.7581249475479126,
       "travel": false
     },
     {
@@ -874,7 +874,7 @@
         -0.8069725036621094,
         264.763916015625
       ],
-      "subjectRadius": 0.90625,
+      "subjectRadius": 1.7581249475479126,
       "travel": true
     },
     {
@@ -916,7 +916,7 @@
         10.619667053222656,
         -17.73651123046875
       ],
-      "subjectRadius": 0.8309500217437744,
+      "subjectRadius": 1.612043023109436,
       "travel": false
     },
     {
@@ -986,7 +986,7 @@
         10.597615242004395,
         16.179840087890625
       ],
-      "subjectRadius": 0.8554499745368958,
+      "subjectRadius": 1.659572958946228,
       "travel": false
     },
     {
@@ -1000,7 +1000,7 @@
         8.266629219055176,
         69.00340270996094
       ],
-      "subjectRadius": 0.8970000147819519,
+      "subjectRadius": 1.7401800155639648,
       "travel": false
     },
     {
@@ -1056,7 +1056,7 @@
         -0.8069725036621094,
         264.763916015625
       ],
-      "subjectRadius": 0.90625,
+      "subjectRadius": 1.7581249475479126,
       "travel": false
     },
     {
@@ -1098,7 +1098,7 @@
         10.619667053222656,
         -17.73651123046875
       ],
-      "subjectRadius": 0.8309500217437744,
+      "subjectRadius": 1.612043023109436,
       "travel": false
     },
     {
@@ -1199,14 +1199,14 @@
       "yaw": 2.3559999465942383
     },
     {
-      "activationRadius": 11.641799926757812,
+      "activationRadius": 22.585092544555664,
       "colorAccent": [
         1.0,
         0.4699999988079071,
         0.15000000596046448
       ],
       "focalWeight": 0.5,
-      "height": 1.6619000434875488,
+      "height": 3.224086046218872,
       "importance": 0.5,
       "name": "rook",
       "position": [
@@ -1214,21 +1214,21 @@
         10.633624076843262,
         -17.73651123046875
       ],
-      "preferredCameraDistance": 3.8805999755859375,
+      "preferredCameraDistance": 7.528364181518555,
       "preferredCameraElevation": 8.0,
-      "radius": 0.4625999927520752,
+      "radius": 0.8974440097808838,
       "scale": 1.0,
       "yaw": -0.0
     },
     {
-      "activationRadius": 11.696000099182129,
+      "activationRadius": 22.69024085998535,
       "colorAccent": [
         1.0,
         0.4699999988079071,
         0.15000000596046448
       ],
       "focalWeight": 0.5,
-      "height": 1.6660000085830688,
+      "height": 3.2320399284362793,
       "importance": 0.5,
       "name": "tide",
       "position": [
@@ -1236,21 +1236,21 @@
         12.179045677185059,
         -45.77507019042969
       ],
-      "preferredCameraDistance": 3.898699998855591,
+      "preferredCameraDistance": 7.563477993011475,
       "preferredCameraElevation": 8.0,
-      "radius": 0.4666000008583069,
+      "radius": 0.9052039980888367,
       "scale": 1.0,
       "yaw": -0.0
     },
     {
-      "activationRadius": 12.437399864196777,
+      "activationRadius": 24.128555297851562,
       "colorAccent": [
         1.0,
         0.4699999988079071,
         0.15000000596046448
       ],
       "focalWeight": 0.5,
-      "height": 1.7108999490737915,
+      "height": 3.319145917892456,
       "importance": 0.5,
       "name": "sage",
       "position": [
@@ -1258,21 +1258,21 @@
         15.602531433105469,
         16.179832458496094
       ],
-      "preferredCameraDistance": 4.1458001136779785,
+      "preferredCameraDistance": 8.042852401733398,
       "preferredCameraElevation": 8.0,
-      "radius": 0.5264999866485596,
+      "radius": 1.0214099884033203,
       "scale": 1.0,
       "yaw": 31.02215576171875
     },
     {
-      "activationRadius": 12.842700004577637,
+      "activationRadius": 24.914838790893555,
       "colorAccent": [
         1.0,
         0.4699999988079071,
         0.15000000596046448
       ],
       "focalWeight": 0.5,
-      "height": 1.8125,
+      "height": 3.516249895095825,
       "importance": 0.5,
       "name": "ember",
       "position": [
@@ -1280,21 +1280,21 @@
         5.567467212677002,
         34.20152282714844
       ],
-      "preferredCameraDistance": 4.280900001525879,
+      "preferredCameraDistance": 8.304945945739746,
       "preferredCameraElevation": 8.0,
-      "radius": 0.5206999778747559,
+      "radius": 1.0101579427719116,
       "scale": 1.0,
       "yaw": -19.939193725585938
     },
     {
-      "activationRadius": 12.6875,
+      "activationRadius": 24.613750457763672,
       "colorAccent": [
         1.0,
         0.4699999988079071,
         0.15000000596046448
       ],
       "focalWeight": 0.5,
-      "height": 1.7940000295639038,
+      "height": 3.4803600311279297,
       "importance": 0.5,
       "name": "vane",
       "position": [
@@ -1302,9 +1302,9 @@
         11.83161449432373,
         -10.079681396484375
       ],
-      "preferredCameraDistance": 4.2291998863220215,
+      "preferredCameraDistance": 8.2046480178833,
       "preferredCameraElevation": 8.0,
-      "radius": 0.5127000212669373,
+      "radius": 0.9946380257606506,
       "scale": 1.0,
       "yaw": -112.0
     },
@@ -1685,8 +1685,8 @@
     "entity/bull-1/wander/minRange": 1.7999999523162842,
     "entity/bull-1/wander/pauseMax": 5.340000152587891,
     "entity/bull-1/wander/pauseMin": 1.0800000429153442,
-    "entity/bull-1/wander/runSpeed": 5.736000061035156,
-    "entity/bull-1/wander/speed": 3.5850000381469727,
+    "entity/bull-1/wander/runSpeed": 3.091099977493286,
+    "entity/bull-1/wander/speed": 1.9319000244140625,
     "entity/bull-1/wander/turnRate": 76.30000305175781,
     "entity/bull-10/ground/maxFloat": 0.2199999988079071,
     "entity/bull-10/ground/maxTilt": 34.0,
@@ -1703,8 +1703,8 @@
     "entity/bull-10/wander/minRange": 2.380000114440918,
     "entity/bull-10/wander/pauseMax": 6.050000190734863,
     "entity/bull-10/wander/pauseMin": 0.8999999761581421,
-    "entity/bull-10/wander/runSpeed": 6.073999881744385,
-    "entity/bull-10/wander/speed": 3.7960000038146973,
+    "entity/bull-10/wander/runSpeed": 3.273200035095215,
+    "entity/bull-10/wander/speed": 2.045599937438965,
     "entity/bull-10/wander/turnRate": 69.19999694824219,
     "entity/chicken-17/ground/maxFloat": 0.2199999988079071,
     "entity/chicken-17/ground/maxTilt": 34.0,
@@ -1721,8 +1721,8 @@
     "entity/chicken-17/wander/minRange": 2.0999999046325684,
     "entity/chicken-17/wander/pauseMax": 4.71999979019165,
     "entity/chicken-17/wander/pauseMin": 1.649999976158142,
-    "entity/chicken-17/wander/runSpeed": 2.003000020980835,
-    "entity/chicken-17/wander/speed": 1.2519999742507935,
+    "entity/chicken-17/wander/runSpeed": 1.0793999433517456,
+    "entity/chicken-17/wander/speed": 0.6747000217437744,
     "entity/chicken-17/wander/turnRate": 78.4000015258789,
     "entity/chicken-8/ground/maxFloat": 0.2199999988079071,
     "entity/chicken-8/ground/maxTilt": 34.0,
@@ -1739,8 +1739,8 @@
     "entity/chicken-8/wander/minRange": 2.5299999713897705,
     "entity/chicken-8/wander/pauseMax": 3.819999933242798,
     "entity/chicken-8/wander/pauseMin": 1.649999976158142,
-    "entity/chicken-8/wander/runSpeed": 1.503999948501587,
-    "entity/chicken-8/wander/speed": 0.9399999976158142,
+    "entity/chicken-8/wander/runSpeed": 0.8105000257492065,
+    "entity/chicken-8/wander/speed": 0.506600022315979,
     "entity/chicken-8/wander/turnRate": 106.4000015258789,
     "entity/cow-12/ground/maxFloat": 0.2199999988079071,
     "entity/cow-12/ground/maxTilt": 34.0,
@@ -1757,8 +1757,8 @@
     "entity/cow-12/wander/minRange": 2.3399999141693115,
     "entity/cow-12/wander/pauseMax": 5.610000133514404,
     "entity/cow-12/wander/pauseMin": 1.0,
-    "entity/cow-12/wander/runSpeed": 3.680000066757202,
-    "entity/cow-12/wander/speed": 2.299999952316284,
+    "entity/cow-12/wander/runSpeed": 1.9831000566482544,
+    "entity/cow-12/wander/speed": 1.239400029182434,
     "entity/cow-12/wander/turnRate": 75.5,
     "entity/cow-3/ground/maxFloat": 0.2199999988079071,
     "entity/cow-3/ground/maxTilt": 34.0,
@@ -1775,8 +1775,8 @@
     "entity/cow-3/wander/minRange": 2.4800000190734863,
     "entity/cow-3/wander/pauseMax": 3.450000047683716,
     "entity/cow-3/wander/pauseMin": 1.1299999952316284,
-    "entity/cow-3/wander/runSpeed": 4.742000102996826,
-    "entity/cow-3/wander/speed": 2.9639999866485596,
+    "entity/cow-3/wander/runSpeed": 2.5553998947143555,
+    "entity/cow-3/wander/speed": 1.5973000526428223,
     "entity/cow-3/wander/turnRate": 110.0,
     "entity/ember/explore/arrive": 3.0,
     "entity/ember/explore/bodyRadius": 2.4000000953674316,
@@ -1792,9 +1792,9 @@
     "entity/ember/explore/observeMax": 3.5,
     "entity/ember/explore/observeMin": 1.2000000476837158,
     "entity/ember/explore/runChance": 0.2800000011920929,
-    "entity/ember/explore/runSpeed": 12.0,
+    "entity/ember/explore/runSpeed": 6.961699962615967,
     "entity/ember/explore/slopeAlign": 0.5,
-    "entity/ember/explore/speed": 4.599999904632568,
+    "entity/ember/explore/speed": 2.6686999797821045,
     "entity/ember/explore/turnRate": 170.0,
     "entity/ember/explore/wadeDrag": 0.550000011920929,
     "entity/ember/liveliness/bounce": 0.3199999928474426,
@@ -1819,8 +1819,8 @@
     "entity/goat-14/wander/minRange": 2.130000114440918,
     "entity/goat-14/wander/pauseMax": 4.289999961853027,
     "entity/goat-14/wander/pauseMin": 0.8399999737739563,
-    "entity/goat-14/wander/runSpeed": 1.8539999723434448,
-    "entity/goat-14/wander/speed": 1.159000039100647,
+    "entity/goat-14/wander/runSpeed": 0.9991000294685364,
+    "entity/goat-14/wander/speed": 0.6245999932289124,
     "entity/goat-14/wander/turnRate": 107.0999984741211,
     "entity/goat-5/ground/maxFloat": 0.2199999988079071,
     "entity/goat-5/ground/maxTilt": 34.0,
@@ -1837,8 +1837,8 @@
     "entity/goat-5/wander/minRange": 2.240000009536743,
     "entity/goat-5/wander/pauseMax": 4.619999885559082,
     "entity/goat-5/wander/pauseMin": 1.1100000143051147,
-    "entity/goat-5/wander/runSpeed": 1.7410000562667847,
-    "entity/goat-5/wander/speed": 1.0880000591278076,
+    "entity/goat-5/wander/runSpeed": 0.9381999969482422,
+    "entity/goat-5/wander/speed": 0.5863000154495239,
     "entity/goat-5/wander/turnRate": 85.5999984741211,
     "entity/horse-11/ground/maxFloat": 0.2199999988079071,
     "entity/horse-11/ground/maxTilt": 34.0,
@@ -1855,8 +1855,8 @@
     "entity/horse-11/wander/minRange": 2.630000114440918,
     "entity/horse-11/wander/pauseMax": 6.239999771118164,
     "entity/horse-11/wander/pauseMin": 1.600000023841858,
-    "entity/horse-11/wander/runSpeed": 4.836999893188477,
-    "entity/horse-11/wander/speed": 3.0230000019073486,
+    "entity/horse-11/wander/runSpeed": 2.606600046157837,
+    "entity/horse-11/wander/speed": 1.62909996509552,
     "entity/horse-11/wander/turnRate": 81.5,
     "entity/horse-2/ground/maxFloat": 0.2199999988079071,
     "entity/horse-2/ground/maxTilt": 34.0,
@@ -1873,8 +1873,8 @@
     "entity/horse-2/wander/minRange": 2.7799999713897705,
     "entity/horse-2/wander/pauseMax": 5.03000020980835,
     "entity/horse-2/wander/pauseMin": 1.0299999713897705,
-    "entity/horse-2/wander/runSpeed": 4.119999885559082,
-    "entity/horse-2/wander/speed": 2.575000047683716,
+    "entity/horse-2/wander/runSpeed": 2.2202000617980957,
+    "entity/horse-2/wander/speed": 1.3875999450683594,
     "entity/horse-2/wander/turnRate": 94.4000015258789,
     "entity/pig-15/ground/maxFloat": 0.2199999988079071,
     "entity/pig-15/ground/maxTilt": 34.0,
@@ -1891,8 +1891,8 @@
     "entity/pig-15/wander/minRange": 2.609999895095825,
     "entity/pig-15/wander/pauseMax": 3.3499999046325684,
     "entity/pig-15/wander/pauseMin": 1.2799999713897705,
-    "entity/pig-15/wander/runSpeed": 1.840000033378601,
-    "entity/pig-15/wander/speed": 1.149999976158142,
+    "entity/pig-15/wander/runSpeed": 0.991599977016449,
+    "entity/pig-15/wander/speed": 0.619700014591217,
     "entity/pig-15/wander/turnRate": 106.69999694824219,
     "entity/pig-6/ground/maxFloat": 0.2199999988079071,
     "entity/pig-6/ground/maxTilt": 34.0,
@@ -1909,8 +1909,8 @@
     "entity/pig-6/wander/minRange": 2.930000066757202,
     "entity/pig-6/wander/pauseMax": 5.190000057220459,
     "entity/pig-6/wander/pauseMin": 1.059999942779541,
-    "entity/pig-6/wander/runSpeed": 2.888000011444092,
-    "entity/pig-6/wander/speed": 1.8049999475479126,
+    "entity/pig-6/wander/runSpeed": 1.5563000440597534,
+    "entity/pig-6/wander/speed": 0.9726999998092651,
     "entity/pig-6/wander/turnRate": 101.69999694824219,
     "entity/rook/explore/arrive": 3.0,
     "entity/rook/explore/bodyRadius": 2.4000000953674316,
@@ -1926,9 +1926,9 @@
     "entity/rook/explore/observeMax": 4.0,
     "entity/rook/explore/observeMin": 1.5,
     "entity/rook/explore/runChance": 0.3400000035762787,
-    "entity/rook/explore/runSpeed": 13.5,
+    "entity/rook/explore/runSpeed": 7.254799842834473,
     "entity/rook/explore/slopeAlign": 0.5,
-    "entity/rook/explore/speed": 5.599999904632568,
+    "entity/rook/explore/speed": 3.009399890899658,
     "entity/rook/explore/turnRate": 150.0,
     "entity/rook/explore/wadeDrag": 0.550000011920929,
     "entity/rook/liveliness/bounce": 0.2199999988079071,
@@ -1953,8 +1953,8 @@
     "entity/rooster-16/wander/minRange": 2.9800000190734863,
     "entity/rooster-16/wander/pauseMax": 3.2799999713897705,
     "entity/rooster-16/wander/pauseMin": 1.350000023841858,
-    "entity/rooster-16/wander/runSpeed": 1.378000020980835,
-    "entity/rooster-16/wander/speed": 0.8610000014305115,
+    "entity/rooster-16/wander/runSpeed": 0.7426000237464905,
+    "entity/rooster-16/wander/speed": 0.46399998664855957,
     "entity/rooster-16/wander/turnRate": 110.80000305175781,
     "entity/rooster-7/ground/maxFloat": 0.2199999988079071,
     "entity/rooster-7/ground/maxTilt": 34.0,
@@ -1971,8 +1971,8 @@
     "entity/rooster-7/wander/minRange": 2.319999933242798,
     "entity/rooster-7/wander/pauseMax": 3.059999942779541,
     "entity/rooster-7/wander/pauseMin": 1.2999999523162842,
-    "entity/rooster-7/wander/runSpeed": 1.7039999961853027,
-    "entity/rooster-7/wander/speed": 1.065000057220459,
+    "entity/rooster-7/wander/runSpeed": 0.9182999730110168,
+    "entity/rooster-7/wander/speed": 0.5738999843597412,
     "entity/rooster-7/wander/turnRate": 99.5999984741211,
     "entity/sage/explore/arrive": 3.0,
     "entity/sage/explore/bodyRadius": 2.4000000953674316,
@@ -1988,9 +1988,9 @@
     "entity/sage/explore/observeMax": 8.0,
     "entity/sage/explore/observeMin": 3.0,
     "entity/sage/explore/runChance": 0.11999999731779099,
-    "entity/sage/explore/runSpeed": 9.5,
+    "entity/sage/explore/runSpeed": 5.153800010681152,
     "entity/sage/explore/slopeAlign": 0.5,
-    "entity/sage/explore/speed": 4.0,
+    "entity/sage/explore/speed": 2.1700000762939453,
     "entity/sage/explore/turnRate": 130.0,
     "entity/sage/explore/wadeDrag": 0.550000011920929,
     "entity/sage/interest/alertThreshold": 0.30000001192092896,
@@ -2021,8 +2021,8 @@
     "entity/sheep-13/wander/minRange": 2.890000104904175,
     "entity/sheep-13/wander/pauseMax": 3.5399999618530273,
     "entity/sheep-13/wander/pauseMin": 1.4299999475479126,
-    "entity/sheep-13/wander/runSpeed": 1.9220000505447388,
-    "entity/sheep-13/wander/speed": 1.2009999752044678,
+    "entity/sheep-13/wander/runSpeed": 1.0356999635696411,
+    "entity/sheep-13/wander/speed": 0.6471999883651733,
     "entity/sheep-13/wander/turnRate": 88.80000305175781,
     "entity/sheep-4/ground/maxFloat": 0.2199999988079071,
     "entity/sheep-4/ground/maxTilt": 34.0,
@@ -2039,8 +2039,8 @@
     "entity/sheep-4/wander/minRange": 2.140000104904175,
     "entity/sheep-4/wander/pauseMax": 5.679999828338623,
     "entity/sheep-4/wander/pauseMin": 1.159999966621399,
-    "entity/sheep-4/wander/runSpeed": 1.6449999809265137,
-    "entity/sheep-4/wander/speed": 1.027999997138977,
+    "entity/sheep-4/wander/runSpeed": 0.8865000009536743,
+    "entity/sheep-4/wander/speed": 0.5540000200271606,
     "entity/sheep-4/wander/turnRate": 93.80000305175781,
     "entity/tide/explore/arrive": 3.0,
     "entity/tide/explore/bodyRadius": 2.4000000953674316,
@@ -2056,9 +2056,9 @@
     "entity/tide/explore/observeMax": 9.0,
     "entity/tide/explore/observeMin": 3.5,
     "entity/tide/explore/runChance": 0.05999999865889549,
-    "entity/tide/explore/runSpeed": 8.0,
+    "entity/tide/explore/runSpeed": 4.309899806976318,
     "entity/tide/explore/slopeAlign": 0.5,
-    "entity/tide/explore/speed": 3.200000047683716,
+    "entity/tide/explore/speed": 1.7239999771118164,
     "entity/tide/explore/turnRate": 110.0,
     "entity/tide/explore/wadeDrag": 0.550000011920929,
     "entity/tide/liveliness/bounce": 0.14000000059604645,
@@ -2082,9 +2082,9 @@
     "entity/vane/explore/observeMax": 3.5,
     "entity/vane/explore/observeMin": 1.2000000476837158,
     "entity/vane/explore/runChance": 0.2800000011920929,
-    "entity/vane/explore/runSpeed": 12.0,
+    "entity/vane/explore/runSpeed": 6.961699962615967,
     "entity/vane/explore/slopeAlign": 0.5,
-    "entity/vane/explore/speed": 4.599999904632568,
+    "entity/vane/explore/speed": 2.6686999797821045,
     "entity/vane/explore/turnRate": 170.0,
     "entity/vane/explore/wadeDrag": 0.550000011920929,
     "entity/vane/liveliness/bounce": 0.3199999928474426,
@@ -4324,9 +4324,9 @@
     ],
     "nodes/ember/roughnessScale": 1.0,
     "nodes/ember/scale": [
-      1.0,
-      1.0,
-      1.0
+      1.940000057220459,
+      1.940000057220459,
+      1.940000057220459
     ],
     "nodes/ember/visible": true,
     "nodes/foreground-leaves/emissiveBoost": 1.0,
@@ -4732,9 +4732,9 @@
     ],
     "nodes/rook/roughnessScale": 1.0,
     "nodes/rook/scale": [
-      1.0,
-      1.0,
-      1.0
+      1.940000057220459,
+      1.940000057220459,
+      1.940000057220459
     ],
     "nodes/rook/visible": true,
     "nodes/rooster-16/lightColor": [
@@ -4768,9 +4768,9 @@
     ],
     "nodes/sage/roughnessScale": 1.0,
     "nodes/sage/scale": [
-      1.0,
-      1.0,
-      1.0
+      1.940000057220459,
+      1.940000057220459,
+      1.940000057220459
     ],
     "nodes/sage/visible": true,
     "nodes/scree-cap/emissiveBoost": 1.0,
@@ -5096,9 +5096,9 @@
     ],
     "nodes/tide/roughnessScale": 1.0,
     "nodes/tide/scale": [
-      1.0,
-      1.0,
-      1.0
+      1.940000057220459,
+      1.940000057220459,
+      1.940000057220459
     ],
     "nodes/tide/visible": true,
     "nodes/umbra-cap/emissiveBoost": 1.0,
@@ -5279,9 +5279,9 @@
     ],
     "nodes/vane/roughnessScale": 1.0,
     "nodes/vane/scale": [
-      1.0,
-      1.0,
-      1.0
+      1.940000057220459,
+      1.940000057220459,
+      1.940000057220459
     ],
     "nodes/vane/visible": true,
     "nodes/veil-cap/emissiveBoost": 1.0,
@@ -13087,7 +13087,7 @@
     "scene/windSpeed": 0.7400000095367432,
     "staging/abduction/abductSeconds": 4.599999904632568,
     "staging/abduction/aimSeconds": 0.800000011920929,
-    "staging/abduction/animalGait": 0.3610000014305115,
+    "staging/abduction/animalGait": 0.7002999782562256,
     "staging/abduction/animalSpin": 230.0,
     "staging/abduction/animalWobble": 0.0,
     "staging/abduction/animalWobbleRate": 1.350000023841858,
@@ -13108,7 +13108,7 @@
     "staging/abduction/glowRiseSeconds": 1.2999999523162842,
     "staging/abduction/hoverHeight": 23.0,
     "staging/abduction/hoverSeconds": 2.4000000953674316,
-    "staging/abduction/liftHeight": -1.8300000429153442,
+    "staging/abduction/liftHeight": -3.5501999855041504,
     "staging/abduction/minRange": 25.0,
     "staging/abduction/searchRadius": 260.0,
     "staging/abduction/targetClearance": 6.5,

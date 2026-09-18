@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-atmospherics.scene.json",
-        "sha256": "9e2e512ef5c958282128b02212525c6290dbb29dcefcc2aba10fd4f07a58f18e",
-        "size": 234102
+        "sha256": "31fd879e06bf0338927a89f7015f01d8d69d7a5f10d88fd95a834f7037acf5de",
+        "size": 234488
       }
     }
   },
@@ -109,9 +109,9 @@
     "entity/ember/explore/observeMax": 3.5,
     "entity/ember/explore/observeMin": 1.2000000476837158,
     "entity/ember/explore/runChance": 0.2800000011920929,
-    "entity/ember/explore/runSpeed": 12.0,
+    "entity/ember/explore/runSpeed": 6.961699962615967,
     "entity/ember/explore/slopeAlign": 0.5,
-    "entity/ember/explore/speed": 4.599999904632568,
+    "entity/ember/explore/speed": 2.6686999797821045,
     "entity/ember/explore/turnRate": 170.0,
     "entity/ember/explore/wadeDrag": 0.550000011920929,
     "entity/ember/liveliness/bounce": 0.3199999928474426,
@@ -135,9 +135,9 @@
     "entity/rook/explore/observeMax": 4.0,
     "entity/rook/explore/observeMin": 1.5,
     "entity/rook/explore/runChance": 0.3400000035762787,
-    "entity/rook/explore/runSpeed": 13.5,
+    "entity/rook/explore/runSpeed": 7.254799842834473,
     "entity/rook/explore/slopeAlign": 0.5,
-    "entity/rook/explore/speed": 5.599999904632568,
+    "entity/rook/explore/speed": 3.009399890899658,
     "entity/rook/explore/turnRate": 150.0,
     "entity/rook/explore/wadeDrag": 0.550000011920929,
     "entity/rook/liveliness/bounce": 0.2199999988079071,
@@ -161,9 +161,9 @@
     "entity/sage/explore/observeMax": 8.0,
     "entity/sage/explore/observeMin": 3.0,
     "entity/sage/explore/runChance": 0.11999999731779099,
-    "entity/sage/explore/runSpeed": 9.5,
+    "entity/sage/explore/runSpeed": 5.153800010681152,
     "entity/sage/explore/slopeAlign": 0.5,
-    "entity/sage/explore/speed": 4.0,
+    "entity/sage/explore/speed": 2.1700000762939453,
     "entity/sage/explore/turnRate": 130.0,
     "entity/sage/explore/wadeDrag": 0.550000011920929,
     "entity/sage/interest/alertThreshold": 0.30000001192092896,
@@ -193,9 +193,9 @@
     "entity/tide/explore/observeMax": 9.0,
     "entity/tide/explore/observeMin": 3.5,
     "entity/tide/explore/runChance": 0.05999999865889549,
-    "entity/tide/explore/runSpeed": 8.0,
+    "entity/tide/explore/runSpeed": 4.309899806976318,
     "entity/tide/explore/slopeAlign": 0.5,
-    "entity/tide/explore/speed": 3.200000047683716,
+    "entity/tide/explore/speed": 1.7239999771118164,
     "entity/tide/explore/turnRate": 110.0,
     "entity/tide/explore/wadeDrag": 0.550000011920929,
     "entity/tide/liveliness/bounce": 0.14000000059604645,
@@ -778,9 +778,9 @@
     ],
     "nodes/ember/roughnessScale": 1.0,
     "nodes/ember/scale": [
-      1.0,
-      1.0,
-      1.0
+      1.940000057220459,
+      1.940000057220459,
+      1.940000057220459
     ],
     "nodes/ember/visible": true,
     "nodes/foreground-leaves/emissiveBoost": 1.0,
@@ -1138,9 +1138,9 @@
     ],
     "nodes/rook/roughnessScale": 1.0,
     "nodes/rook/scale": [
-      1.0,
-      1.0,
-      1.0
+      1.940000057220459,
+      1.940000057220459,
+      1.940000057220459
     ],
     "nodes/rook/visible": true,
     "nodes/sage/emissiveBoost": 1.0,
@@ -1162,9 +1162,9 @@
     ],
     "nodes/sage/roughnessScale": 1.0,
     "nodes/sage/scale": [
-      1.0,
-      1.0,
-      1.0
+      1.940000057220459,
+      1.940000057220459,
+      1.940000057220459
     ],
     "nodes/sage/visible": true,
     "nodes/scree-cap/emissiveBoost": 1.0,
@@ -1474,9 +1474,9 @@
     ],
     "nodes/tide/roughnessScale": 1.0,
     "nodes/tide/scale": [
-      1.0,
-      1.0,
-      1.0
+      1.940000057220459,
+      1.940000057220459,
+      1.940000057220459
     ],
     "nodes/tide/visible": true,
     "nodes/umbra-cap/emissiveBoost": 1.0,
