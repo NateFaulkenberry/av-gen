@@ -20,22 +20,21 @@ namespace avgen::app {
 
 namespace {
 
-// The sRGB transfer function, on a value already clamped to 0-1. The same curve `linearToSrgb` in
-// shaders/tonemap.wgsl applies as the last thing it does before writing the RGBA8 target -- so for
-// a PNG or video render the preview copies bytes that already went through it, and this is used
-// only for the EXR path, where the file is scene-linear and has no display encoding at all.
-// Never reused within a process, which is the whole point: an address is.
+// ADR-320. Never reused within a process, which is the whole point: an address is.
 std::uint64_t nextJobId() {
     static std::atomic<std::uint64_t> counter{0};
     return ++counter;
 }
 
+// The sRGB transfer function, on a value already clamped to 0-1. The same curve `linearToSrgb` in
+// shaders/tonemap.wgsl applies as the last thing it does before writing the RGBA8 target -- so for
+// a PNG or video render the preview copies bytes that already went through it, and this is used
+// only for the EXR path, where the file is scene-linear and has no display encoding at all.
 std::uint8_t encodeSrgb(float linear) {
     const float c = std::clamp(linear, 0.0f, 1.0f);
     const float s = c <= 0.0031308f ? c * 12.92f : 1.055f * std::pow(c, 1.0f / 2.4f) - 0.055f;
     return static_cast<std::uint8_t>(std::lround(s * 255.0f));
 }
-
 
 // ADR-256: the mapping from what the identifier AOV actually carries to what a surface IS, written
 // by the run that produced the frames.
