@@ -318,12 +318,21 @@ TEST_CASE("The showcase camera is static and the cosmos is dark", "[treeisland][
     REQUIRE(camera.contains("position"));
     REQUIRE(camera.contains("target"));
 
-    // §12/§13: deep space, dark enough that the tree's emission reads. Every channel of every
-    // background colour is well under a hundredth of a unit of scene-linear radiance.
+    // The cosmos is dark *relative to the tree*, which is the property that actually matters and
+    // is what the original "< 0.01" was reaching for. ADR-339 replaced near-black with a layered
+    // ethereal background (brief §17-§21), so the bound moves -- but it stays a bound, because
+    // the failure mode it guards is real: a background that climbs to the tree's brightness stops
+    // being a background. The tree's lit leaves sit near 0.5 scene-linear and its emissive specks
+    // above 1.0, so 0.05 is still more than an order of magnitude below the subject.
+    //
+    // Note this only constrains the *scene's* colours. The broad haze is a background user-shader
+    // layer (shaders/glowmere-cosmos.wgsl) and is not reachable from here; what keeps that honest
+    // is the rendered control arm `_ctl-no-cosmos-shader`, not an assertion.
+    constexpr float kBackgroundCeiling = 0.05f;
     const json& env = scene.at("environment");
     for (const float c : env.at("background").get<std::vector<float>>()) {
         CHECK(c >= 0.0f);
-        CHECK(c < 0.01f);
+        CHECK(c < kBackgroundCeiling);
     }
     const json& sky = env.at("sky");
     CHECK(sky.value("enabled", false));
@@ -331,16 +340,34 @@ TEST_CASE("The showcase camera is static and the cosmos is dark", "[treeisland][
         for (const float c : sky.at(key).get<std::vector<float>>()) {
             INFO("sky." << key);
             CHECK(c >= 0.0f);
-            CHECK(c < 0.01f);
+            CHECK(c < kBackgroundCeiling);
         }
     }
     // No sun disc: this is space, and §12 forbids giant distracting objects.
     CHECK(sky.value("sunIntensity", 1.0) == Approx(0.0));
 
-    // §14: one light. A rig is what this task was told not to build yet.
+    // Not one light any more, but still not a rig. ADR-339 added a teal rim and an indigo fill
+    // because the reference's cream-white canopy is the .blend's warm *key* and the island's
+    // underside was reading as a black silhouette (§22). The guard that survives is the one that
+    // was meant: a small, hand-countable set, with exactly one key and exactly one shadow caster.
     REQUIRE(scene.contains("lights"));
-    CHECK(scene.at("lights").size() == 1);
-    const json& key = scene.at("lights").at(0);
+    const json& lights = scene.at("lights");
+    CHECK(lights.size() <= 3);
+    int keys = 0;
+    int shadowCasters = 0;
+    for (const json& light : lights) {
+        CHECK(light.value("type", std::string{}) == "directional");
+        if (light.value("role", std::string{}) == "key") {
+            ++keys;
+        }
+        if (light.value("castsShadow", false)) {
+            ++shadowCasters;
+        }
+    }
+    CHECK(keys == 1);
+    CHECK(shadowCasters == 1);
+
+    const json& key = lights.at(0);
     CHECK(key.value("type", std::string{}) == "directional");
     CHECK(key.value("role", std::string{}) == "key");
     // From above: the downward component dominates.
