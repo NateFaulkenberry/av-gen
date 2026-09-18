@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-2-multicam.scene.json",
-        "sha256": "a3b55f5b068fbb94f72af5ebbc024891d813b467db4583532170220a8b2ce1cf",
-        "size": 210995
+        "sha256": "ef1374389d053386ea3a31df5b9b155aef4ab5e396c008c21bb674aab50a948c",
+        "size": 211312
       }
     }
   },
@@ -574,7 +574,7 @@
         10.619667053222656,
         -17.73651123046875
       ],
-      "subjectRadius": 2.999678611755371,
+      "subjectRadius": 0.8309500217437744,
       "travel": false
     },
     {
@@ -616,7 +616,7 @@
         8.266629219055176,
         69.00340270996094
       ],
-      "subjectRadius": 2.9996089935302734,
+      "subjectRadius": 0.8970000147819519,
       "travel": false
     },
     {
@@ -658,7 +658,7 @@
         10.597615242004395,
         16.179840087890625
       ],
-      "subjectRadius": 3.05910062789917,
+      "subjectRadius": 0.8554499745368958,
       "travel": false
     },
     {
@@ -672,7 +672,7 @@
         -0.8069725036621094,
         264.763916015625
       ],
-      "subjectRadius": 3.030536413192749,
+      "subjectRadius": 0.90625,
       "travel": false
     },
     {
@@ -700,7 +700,7 @@
         10.617985725402832,
         -45.77507019042969
       ],
-      "subjectRadius": 2.9996161460876465,
+      "subjectRadius": 0.8330000042915344,
       "travel": false
     },
     {
@@ -742,7 +742,7 @@
         10.619667053222656,
         -17.73651123046875
       ],
-      "subjectRadius": 2.999678611755371,
+      "subjectRadius": 0.8309500217437744,
       "travel": false
     },
     {
@@ -784,7 +784,7 @@
         10.597615242004395,
         16.179840087890625
       ],
-      "subjectRadius": 3.05910062789917,
+      "subjectRadius": 0.8554499745368958,
       "travel": false
     },
     {
@@ -840,7 +840,7 @@
         8.266629219055176,
         69.00340270996094
       ],
-      "subjectRadius": 2.9996089935302734,
+      "subjectRadius": 0.8970000147819519,
       "travel": false
     },
     {
@@ -854,7 +854,7 @@
         -0.8069725036621094,
         264.763916015625
       ],
-      "subjectRadius": 3.030536413192749,
+      "subjectRadius": 0.90625,
       "travel": false
     },
     {
@@ -874,7 +874,7 @@
         -0.8069725036621094,
         264.763916015625
       ],
-      "subjectRadius": 3.030536413192749,
+      "subjectRadius": 0.90625,
       "travel": true
     },
     {
@@ -916,7 +916,7 @@
         10.619667053222656,
         -17.73651123046875
       ],
-      "subjectRadius": 2.999678611755371,
+      "subjectRadius": 0.8309500217437744,
       "travel": false
     },
     {
@@ -986,7 +986,7 @@
         10.597615242004395,
         16.179840087890625
       ],
-      "subjectRadius": 3.05910062789917,
+      "subjectRadius": 0.8554499745368958,
       "travel": false
     },
     {
@@ -1000,7 +1000,7 @@
         8.266629219055176,
         69.00340270996094
       ],
-      "subjectRadius": 2.9996089935302734,
+      "subjectRadius": 0.8970000147819519,
       "travel": false
     },
     {
@@ -1056,7 +1056,7 @@
         -0.8069725036621094,
         264.763916015625
       ],
-      "subjectRadius": 3.030536413192749,
+      "subjectRadius": 0.90625,
       "travel": false
     },
     {
@@ -1098,7 +1098,7 @@
         10.619667053222656,
         -17.73651123046875
       ],
-      "subjectRadius": 2.999678611755371,
+      "subjectRadius": 0.8309500217437744,
       "travel": false
     },
     {
@@ -1199,14 +1199,14 @@
       "yaw": 2.3559999465942383
     },
     {
-      "activationRadius": 42.026954650878906,
+      "activationRadius": 11.641799926757812,
       "colorAccent": [
         1.0,
         0.4699999988079071,
         0.15000000596046448
       ],
       "focalWeight": 0.5,
-      "height": 5.999357223510742,
+      "height": 1.6619000434875488,
       "importance": 0.5,
       "name": "rook",
       "position": [
@@ -1214,21 +1214,21 @@
         10.633624076843262,
         -17.73651123046875
       ],
-      "preferredCameraDistance": 14.008984565734863,
+      "preferredCameraDistance": 3.8805999755859375,
       "preferredCameraElevation": 8.0,
-      "radius": 1.66998291015625,
+      "radius": 0.4625999927520752,
       "scale": 1.0,
       "yaw": -0.0
     },
     {
-      "activationRadius": 42.117130279541016,
+      "activationRadius": 11.696000099182129,
       "colorAccent": [
         1.0,
         0.4699999988079071,
         0.15000000596046448
       ],
       "focalWeight": 0.5,
-      "height": 5.999232292175293,
+      "height": 1.6660000085830688,
       "importance": 0.5,
       "name": "tide",
       "position": [
@@ -1236,21 +1236,21 @@
         12.179045677185059,
         -45.77507019042969
       ],
-      "preferredCameraDistance": 14.039043426513672,
+      "preferredCameraDistance": 3.898699998855591,
       "preferredCameraElevation": 8.0,
-      "radius": 1.6800651550292969,
+      "radius": 0.4666000008583069,
       "scale": 1.0,
       "yaw": -0.0
     },
     {
-      "activationRadius": 44.47601318359375,
+      "activationRadius": 12.437399864196777,
       "colorAccent": [
         1.0,
         0.4699999988079071,
         0.15000000596046448
       ],
       "focalWeight": 0.5,
-      "height": 6.11820125579834,
+      "height": 1.7108999490737915,
       "importance": 0.5,
       "name": "sage",
       "position": [
@@ -1258,21 +1258,21 @@
         15.602531433105469,
         16.179832458496094
       ],
-      "preferredCameraDistance": 14.825338363647461,
+      "preferredCameraDistance": 4.1458001136779785,
       "preferredCameraElevation": 8.0,
-      "radius": 1.8826789855957031,
+      "radius": 0.5264999866485596,
       "scale": 1.0,
       "yaw": 31.02215576171875
     },
     {
-      "activationRadius": 42.946102142333984,
+      "activationRadius": 12.842700004577637,
       "colorAccent": [
         1.0,
         0.4699999988079071,
         0.15000000596046448
       ],
       "focalWeight": 0.5,
-      "height": 6.061072826385498,
+      "height": 1.8125,
       "importance": 0.5,
       "name": "ember",
       "position": [
@@ -1280,21 +1280,21 @@
         5.567467212677002,
         34.20152282714844
       ],
-      "preferredCameraDistance": 14.315367698669434,
+      "preferredCameraDistance": 4.280900001525879,
       "preferredCameraElevation": 8.0,
-      "radius": 1.7412528991699219,
+      "radius": 0.5206999778747559,
       "scale": 1.0,
       "yaw": -19.939193725585938
     },
     {
-      "activationRadius": 42.42697525024414,
+      "activationRadius": 12.6875,
       "colorAccent": [
         1.0,
         0.4699999988079071,
         0.15000000596046448
       ],
       "focalWeight": 0.5,
-      "height": 5.999217987060547,
+      "height": 1.7940000295639038,
       "importance": 0.5,
       "name": "vane",
       "position": [
@@ -1302,9 +1302,9 @@
         11.83161449432373,
         -10.079681396484375
       ],
-      "preferredCameraDistance": 14.142325401306152,
+      "preferredCameraDistance": 4.2291998863220215,
       "preferredCameraElevation": 8.0,
-      "radius": 1.7144994735717773,
+      "radius": 0.5127000212669373,
       "scale": 1.0,
       "yaw": -112.0
     },
@@ -4324,9 +4324,9 @@
     ],
     "nodes/ember/roughnessScale": 1.0,
     "nodes/ember/scale": [
-      3.3440001010894775,
-      3.3440001010894775,
-      3.3440001010894775
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/ember/visible": true,
     "nodes/foreground-leaves/emissiveBoost": 1.0,
@@ -4732,9 +4732,9 @@
     ],
     "nodes/rook/roughnessScale": 1.0,
     "nodes/rook/scale": [
-      3.609999895095825,
-      3.609999895095825,
-      3.609999895095825
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/rook/visible": true,
     "nodes/rooster-16/lightColor": [
@@ -4768,9 +4768,9 @@
     ],
     "nodes/sage/roughnessScale": 1.0,
     "nodes/sage/scale": [
-      3.5759999752044678,
-      3.5759999752044678,
-      3.5759999752044678
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/sage/visible": true,
     "nodes/scree-cap/emissiveBoost": 1.0,
@@ -5096,9 +5096,9 @@
     ],
     "nodes/tide/roughnessScale": 1.0,
     "nodes/tide/scale": [
-      3.6010000705718994,
-      3.6010000705718994,
-      3.6010000705718994
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/tide/visible": true,
     "nodes/umbra-cap/emissiveBoost": 1.0,
@@ -5279,9 +5279,9 @@
     ],
     "nodes/vane/roughnessScale": 1.0,
     "nodes/vane/scale": [
-      3.3440001010894775,
-      3.3440001010894775,
-      3.3440001010894775
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/vane/visible": true,
     "nodes/veil-cap/emissiveBoost": 1.0,
@@ -13109,7 +13109,7 @@
     "staging/abduction/glowRiseSeconds": 1.2999999523162842,
     "staging/abduction/hoverHeight": 23.0,
     "staging/abduction/hoverSeconds": 2.4000000953674316,
-    "staging/abduction/liftHeight": -6.599999904632568,
+    "staging/abduction/liftHeight": -1.8300000429153442,
     "staging/abduction/minRange": 25.0,
     "staging/abduction/searchRadius": 260.0,
     "staging/abduction/targetClearance": 6.5,

@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-2-song.scene.json",
-        "sha256": "cd2ca160c68f3e288607ba3e7f4be83e6aa4550805207bf09046d4806fde7092",
-        "size": 527482
+        "sha256": "680bd7448f96a016dc24e69a1a3032cded48b33987f0eebb7d6a546b2f40ab74",
+        "size": 524639
       }
     }
   },
@@ -2698,9 +2698,9 @@
     ],
     "nodes/bull-1/roughnessScale": 1.0,
     "nodes/bull-1/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/bull-1/visible": true,
     "nodes/bull-10/emissiveBoost": 1.0,
@@ -2722,9 +2722,9 @@
     ],
     "nodes/bull-10/roughnessScale": 1.0,
     "nodes/bull-10/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/bull-10/visible": true,
     "nodes/cairn-cap/emissiveBoost": 1.0,
@@ -2866,9 +2866,9 @@
     ],
     "nodes/chicken-17/roughnessScale": 1.0,
     "nodes/chicken-17/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/chicken-17/visible": false,
     "nodes/chicken-8/emissiveBoost": 1.0,
@@ -2890,9 +2890,9 @@
     ],
     "nodes/chicken-8/roughnessScale": 1.0,
     "nodes/chicken-8/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/chicken-8/visible": true,
     "nodes/cow-12/emissiveBoost": 1.0,
@@ -2914,9 +2914,9 @@
     ],
     "nodes/cow-12/roughnessScale": 1.0,
     "nodes/cow-12/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/cow-12/visible": true,
     "nodes/cow-3/emissiveBoost": 1.0,
@@ -2938,9 +2938,9 @@
     ],
     "nodes/cow-3/roughnessScale": 1.0,
     "nodes/cow-3/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/cow-3/visible": false,
     "nodes/elder-2-cap/emissiveBoost": 1.0,
@@ -3202,9 +3202,9 @@
     ],
     "nodes/ember/roughnessScale": 1.0,
     "nodes/ember/scale": [
-      3.3440001010894775,
-      3.3440001010894775,
-      3.3440001010894775
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/ember/visible": true,
     "nodes/foreground-leaves/emissiveBoost": 1.0,
@@ -3250,9 +3250,9 @@
     ],
     "nodes/goat-14/roughnessScale": 1.0,
     "nodes/goat-14/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/goat-14/visible": false,
     "nodes/goat-5/emissiveBoost": 0.0,
@@ -3274,9 +3274,9 @@
     ],
     "nodes/goat-5/roughnessScale": 1.0,
     "nodes/goat-5/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/goat-5/visible": false,
     "nodes/horse-11/emissiveBoost": 1.0,
@@ -3298,9 +3298,9 @@
     ],
     "nodes/horse-11/roughnessScale": 1.0,
     "nodes/horse-11/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/horse-11/visible": true,
     "nodes/horse-2/emissiveBoost": 1.0,
@@ -3322,9 +3322,9 @@
     ],
     "nodes/horse-2/roughnessScale": 1.0,
     "nodes/horse-2/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/horse-2/visible": false,
     "nodes/lantern-cap/emissiveBoost": 1.0,
@@ -3466,9 +3466,9 @@
     ],
     "nodes/pig-15/roughnessScale": 1.0,
     "nodes/pig-15/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/pig-15/visible": false,
     "nodes/pig-6/emissiveBoost": 1.0,
@@ -3490,9 +3490,9 @@
     ],
     "nodes/pig-6/roughnessScale": 1.0,
     "nodes/pig-6/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/pig-6/visible": true,
     "nodes/ridge-cap/emissiveBoost": 1.0,
@@ -3706,9 +3706,9 @@
     ],
     "nodes/rook/roughnessScale": 1.0,
     "nodes/rook/scale": [
-      3.609999895095825,
-      3.609999895095825,
-      3.609999895095825
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/rook/visible": true,
     "nodes/rooster-16/emissiveBoost": 1.0,
@@ -3730,9 +3730,9 @@
     ],
     "nodes/rooster-16/roughnessScale": 1.0,
     "nodes/rooster-16/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/rooster-16/visible": true,
     "nodes/rooster-7/emissiveBoost": 1.0,
@@ -3754,9 +3754,9 @@
     ],
     "nodes/rooster-7/roughnessScale": 1.0,
     "nodes/rooster-7/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/rooster-7/visible": true,
     "nodes/sage/emissiveBoost": 1.0,
@@ -3778,9 +3778,9 @@
     ],
     "nodes/sage/roughnessScale": 1.0,
     "nodes/sage/scale": [
-      3.5759999752044678,
-      3.5759999752044678,
-      3.5759999752044678
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/sage/visible": true,
     "nodes/scree-cap/emissiveBoost": 1.0,
@@ -3922,9 +3922,9 @@
     ],
     "nodes/sheep-13/roughnessScale": 1.0,
     "nodes/sheep-13/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/sheep-13/visible": false,
     "nodes/sheep-4/emissiveBoost": 1.0,
@@ -3946,9 +3946,9 @@
     ],
     "nodes/sheep-4/roughnessScale": 1.0,
     "nodes/sheep-4/scale": [
-      3.5999999046325684,
-      3.5999999046325684,
-      3.5999999046325684
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/sheep-4/visible": true,
     "nodes/spire-cap/emissiveBoost": 1.0,
@@ -4138,9 +4138,9 @@
     ],
     "nodes/tide/roughnessScale": 1.0,
     "nodes/tide/scale": [
-      3.6010000705718994,
-      3.6010000705718994,
-      3.6010000705718994
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/tide/visible": true,
     "nodes/umbra-cap/emissiveBoost": 1.0,
@@ -4321,9 +4321,9 @@
     ],
     "nodes/vane/roughnessScale": 1.0,
     "nodes/vane/scale": [
-      3.3440001010894775,
-      3.3440001010894775,
-      3.3440001010894775
+      1.0,
+      1.0,
+      1.0
     ],
     "nodes/vane/visible": true,
     "nodes/veil-cap/emissiveBoost": 1.0,
@@ -12112,7 +12112,7 @@
     "staging/abduction/glowRiseSeconds": 1.2999999523162842,
     "staging/abduction/hoverHeight": 23.0,
     "staging/abduction/hoverSeconds": 2.4000000953674316,
-    "staging/abduction/liftHeight": -6.6,
+    "staging/abduction/liftHeight": -1.8300000429153442,
     "staging/abduction/minRange": 25.0,
     "staging/abduction/searchRadius": 260.0,
     "staging/abduction/targetClearance": 6.5,
