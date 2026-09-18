@@ -2,9 +2,7 @@
 
 > Which lights reached this pixel, and with how much?
 
-Lab #7 of the Engineering Lab Suite (ADR-260, ADR-261). (`docs/engineering-labs.md` §7 advertises
-`--lab-case <lab>:<n> --print`; there is no `--print` flag. `--lab-case` logs the reproduce command
-as it opens, which is the same string from the same `labs::reproduceCommand`.) Registered in `src/labs/lab.cpp`; opens on
+Lab #7 of the Engineering Lab Suite (ADR-260, ADR-261). Registered in `src/labs/lab.cpp`; opens on
 `examples/labs/lighting-lab.scene.json` with `examples/lightrigs/lighting-lab.rig.json`; cases in
 `examples/labs/lighting/cases.json`.
 
@@ -213,13 +211,14 @@ kept as an A/B arm, and §2.2 is the probe that holds the two paths to each othe
 
 ### 2.1 An area light's reach, seen in a frame
 
-`tests/rendering/test_lighting_lab_gpu.cpp`, "an area light's fall-off has no cliff where its
-froxel assignment ends". A corridor of diffuse floor seen edge-on, one Rect light at the near end,
-no sky, no second light, **post disabled**. The middle column of the image is the fall-off curve,
-and the probe asks for the sharpest ratio between neighbouring rows.
+`tests/rendering/test_lighting_lab_gpu.cpp`, "an area light with no authored range reaches as far as
+one that has it". A corridor of diffuse floor seen edge-on, one Rect light at the near end, no sky,
+no second light, **post disabled**. The middle column of the image is the fall-off curve, and
+`AVGEN_LAB_DUMP=1` prints it.
 
-Two things had to be got right before the probe could fail at all, and both are worth writing down
-because each cost a run that proved nothing:
+**The first two versions of it passed with the defect in place.** Both failures are worth writing
+down, because each cost a run that proved nothing, and the first version looked for the sharpest
+ratio between neighbouring rows of that one image:
 
 1. **The post chain has to be off.** AgX plus the exposure meter compressed a 0.76 step in
    scene-linear radiance into 0.08 of display luminance — under any threshold that is not also
@@ -229,10 +228,10 @@ because each cost a run that proved nothing:
 2. **The emitter has to be large.** The radiance a rect light still carries where a reach computed
    from its radiance alone runs out is `cutoff × area / π` — *independent of its intensity*, because
    the reach and the radiance scale together. A 6 x 4 m softbox leaves 0.031 behind, which is under
-   the hemispheric ambient floor of §1.8 and reads as nothing. A 30 x 20 m sky panel leaves 0.76.
+   the hemispheric ambient floor of §1.8 and reads as nothing. A large panel leaves enough.
 
-The probe as it now stands is an **A/B on the reach itself**, not a hunt for a step inside one
-frame: the arm is a 40 x 28 m panel with `range = 0`, the control is the identical light with an
+So the probe as it now stands is an **A/B on the reach itself**, not a hunt for a step inside one
+frame — which also removes the exposure meter's per-frame adaptation from the comparison: the arm is a 40 x 28 m panel with `range = 0`, the control is the identical light with an
 explicit 600 m range whose own window is within 0.05% of 1 everywhere in shot, and the difference
 between the two frames is exactly the light the heuristic threw away. Measured:
 
@@ -307,8 +306,8 @@ out of `light_rig.cpp`'s anonymous namespace into `scene_types.hpp` beside `colo
 so the rig's nits-to-candela conversion and the reach's candela-to-distance conversion use one
 area rather than two copies of it.
 
-**Regression.** "a light's packed reach outlives its contribution" (CPU) and "an area light's
-fall-off has no cliff where its froxel assignment ends" (GPU). The CPU probe failed on six of ten
+**Regression.** "a light's packed reach outlives its contribution" (CPU) and "an area light with no
+authored range reaches as far as one that has it" (GPU). The CPU probe failed on six of ten
 lights before the fix and passes on all ten after; the white control point passed throughout, which
 is what says the other six were being measured.
 
@@ -471,6 +470,10 @@ Every light in a fragment's froxel is evaluated for every drawable in it. `diffu
     avgen --labs                                     # the ownership map, printed
     avgen --lab-case lighting:1                      # the fixture, at the case's time, with the lab's overlays
                                                      # (it logs `reproduce: avgen --headless ...` as it opens)
+
+`docs/engineering-labs.md` §7 advertises `avgen --lab-case <lab>:<n> --print`. There is no `--print`
+flag and the binary rejects it. `--lab-case` logs the reproduce command as it opens, from the same
+`labs::reproduceCommand`, which is the string that flag was meant to print.
     avgen --headless --composition examples/labs/lighting-lab.scene.json \
           --size 1280x720 --range 0.5:0.5 --render out --debug-draw lights
     avgen ... --cluster-stats --bench-json out.json  # froxel occupancy, ADR-114 (it reports
