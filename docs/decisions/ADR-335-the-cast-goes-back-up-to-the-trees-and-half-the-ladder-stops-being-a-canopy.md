@@ -85,7 +85,8 @@ Territories do **not** move. `homeRadius`, `minRange` and `maxRange` are metres 
 world has not changed. The beam's own radius is untouched: the owner set it by hand through the
 panel (ADR-271) and has since said *"I want a narrow beam."* The widest animal now reaches 3.13 m
 from its own origin against a 7.80 m beam, and `test_abduction_alignment.cpp` still passes with
-`reach + worstOrigin <= beamRadius` at 4.03 m against 7.80.
+`reach + worstOrigin <= beamRadius` at 3.13 + 1.01 = 4.14 m against 7.80, and all eight lifts
+report INSIDE.
 
 ### Forty-two speeds per project were still at 3.6x, and had been since ADR-334 merged
 
@@ -196,6 +197,38 @@ cameras.
   regenerator of these, so re-running it has never been part of this pass, but it will hand the
   next scenario a 3.6x beam.
 - `glowmere-stylized` is deliberately untouched, for the reasons ADR-334 gives.
+
+### The five aliens' `explore` body metrics are still at 3.6x, and were left there
+
+Found while re-deriving the list, reported rather than fixed. Each alien's `explore` behaviour --
+in the scene and copied into every project -- carries its own body metrics, and ADR-334 moved the
+*world's* `navBodyRadius` from 2.4 to 0.67 without touching them:
+
+| field | authored | what it should be at 1.94x | what it is |
+|---|---:|---:|---|
+| `explore.bodyRadius` | 2.4 (the world's old value) | 1.2933 | a body radius, overrides `navBodyRadius` per entity |
+| `explore.headroom` | 9.0 | 4.85 | metres of clearance a body needs |
+| `explore.footprint` | 2.6 | 1.4011 | the disc the ground is averaged over |
+| `explore.waypointRadius` / `arrive` | 3.5 / 3.0 | 1.8861 / 1.6167 | |
+| `explore.jumpRange` / `jumpApex` (vane, ember) | 7.0 / 2.6 | 3.7722 / 1.4011 | |
+| `liveliness.stride` (rook, vane) | 5.78 / 5.35 | 3.1148 / 2.8831 | metres per stride, drives the bob |
+
+They are not scaled by 1.94 here: they are not at 1.0 to begin with, so multiplying them would
+make them 6.98x. They are also not brought down, because that is a *different* correction --
+ADR-334's, not this one -- and `headroom` and `bodyRadius` change which paths are navigable, which
+would move every alien in every frame above and invalidate the comparison this record rests on.
+The forty-two project speeds *were* fixed here because leaving them would have made this change
+inert; leaving these does not.
+
+### One new foot-slip warning, and it is a property of a bigger body
+
+`sage` creeping at 0.10 m/s warns at 0.4x slip against a 3.07 m/s walk clip. It did not at 1.0
+(0.10 / 1.58 = 0.063, clamped by `rateMin` 0.08 to a 0.79x slip, inside the 1.5x threshold). No
+other Glowmere body warns. `rateMin` is a playback rate and correctly does not scale, so the
+slowest speed the matcher can track scales with the body: 0.08 x 3.07 = 0.245 m/s, still below
+`moveExit` 0.3255, so the coverage relationship is intact and what is being seen is a body
+lingering in Walk below its own `moveExit`. Retuning `rateMin` for one creeping alien would be
+tuning a constant at a symptom.
 
 ### `glowmere-atmospherics` was edited, not regenerated, and that is a finding
 
