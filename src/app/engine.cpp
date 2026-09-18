@@ -1022,6 +1022,38 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
             })) {
             doc["atmosphericEffects"] = std::move(liveAtmos);
         }
+        // ADR-274, and it is the same defect a third time. Starring an object in the world editor
+        // calls `Composition::setHeroes`; the composition is saved **by reference**; so the star
+        // lived in the window and in no document any render reads. Measured on the owner's own
+        // session: one hero starred, one hero in the composition, **zero** after a save and a
+        // reload -- and an offline render builds its own `Engine` and loads the project, so a
+        // starred hero never reached a deliverable at all.
+        //
+        // It is written here rather than into the scene file for the reason ADR-271 gives and
+        // ADR-207/230 gave before it: nothing but a "Save Scene As..." dialog writes a scene file,
+        // so a re-authored hero would be discarded by the next Cmd-S; and a scene is shared between
+        // projects -- `glowmere-stylized.scene.json` backs two -- so an editor that wrote scenes
+        // would change a project the user did not open and re-fingerprint it on every star.
+        //
+        // The same rule as its two siblings above: written only when the session's list is not the
+        // one the scene file holds, compared after a round trip through the same `fromJson`/
+        // `toJson` so a hand-typed number and the float the engine ran it as are one authored value
+        // rather than an edit; and an *emptied* list is a difference like any other, written as an
+        // empty array, because an unstar that only survives while the process does is the identical
+        // defect pointing the other way.
+        //
+        // `cameraAimFollow` above names heroes by name, and this is what makes that table mean
+        // something after a reload: a cut whose heroes did not survive the save is a cut aimed at
+        // nothing (`Composition::applyDirectedAim` skips an entry whose hero is not in `heroes()`).
+        nlohmann::json liveHeroes = nlohmann::json::array();
+        for (const world::HeroPoint& hero : comp->heroes()) {
+            liveHeroes.push_back(hero.toJson());
+        }
+        if (liveHeroes != onDisk("heroes", [](const nlohmann::json& j) {
+                return world::HeroPoint::fromJson(j);
+            })) {
+            doc["heroes"] = std::move(liveHeroes);
+        }
     }
     if (!states_.empty()) {
         doc["states"] = states_.toJson();
@@ -1492,6 +1524,38 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     // Over rather than instead of: the scene file is still the state that runs first (ADR-264), and
     // an absent key changes nothing. A present one is the session's answer, including an empty array,
     // which is how a deleted effect stays deleted.
+    // ADR-274: the session's heroes, over the ones its scene authors. **Before** the world effects,
+    // and not by taste: a `WorldEffect` may name a hero as its source, and `Composition::setHeroes`
+    // is what decides whether that name is real. The scene file's own reader orders them the same
+    // way and says so (`composition.cpp`, "read after the heroes").
+    //
+    // Over rather than instead of (ADR-264): the scene file is still the state that runs first, an
+    // absent key changes nothing, and a present one is the session's answer -- including an empty
+    // array, which is how an unstarred object stays unstarred.
+    if (const auto entry = doc.find("heroes"); entry != doc.end() && entry->is_array()) {
+        std::vector<world::HeroPoint> heroes;
+        heroes.reserve(entry->size());
+        bool readable = true;
+        for (std::size_t i = 0; i < entry->size(); ++i) {
+            auto one = world::HeroPoint::fromJson((*entry)[i]);
+            if (!one) {
+                // Named, and the whole block refused rather than the member skipped: a hero that
+                // quietly failed to load looks exactly like a hero nobody declared, which is
+                // ADR-067 and ADR-070, twice bitten.
+                warn(fmt::format("heroes[{}]: {}", i, one.error().message));
+                readable = false;
+                break;
+            }
+            heroes.push_back(std::move(*one));
+        }
+        if (readable) {
+            if (auto* comp = composition(); comp != nullptr) {
+                if (auto ok = comp->setHeroes(std::move(heroes)); !ok) {
+                    warn("heroes: " + ok.error().message);
+                }
+            }
+        }
+    }
     if (const auto entry = doc.find("worldEffects"); entry != doc.end() && entry->is_array()) {
         std::vector<world::WorldEffect> effects;
         effects.reserve(entry->size());

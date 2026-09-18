@@ -305,7 +305,7 @@ the copy that a test checks.
 | Lab | Owns | Does **not** own | Decision site |
 |---|---|---|---|
 | Animation | clip sampling, blending, the joint palette | where the character stands → Character | `src/scene/animation.cpp` |
-| Character Runtime | root motion, grounding, steering, navigation | what the joints do → Animation | `src/entity/entity.cpp` |
+| Character Intelligence | what a body knows, what it chooses, where it walks, where its sockets are | what the joints do → Animation | `src/entity/behaviors.cpp:Explore` — [its own document](character-intelligence-lab.md) |
 | Visibility | whether an object reaches a draw call | which representation → LOD | `Composition::cullEntityNodes` |
 | LOD / Geometry | which level, and whether it holds still | whether it was culled → Visibility | `cull.wgsl:cs_cull_classify` |
 | Camera / Framing **(built)** | camera pose, the frustum handed to the cull, clearance, line of sight, which camera the viewport shows | which objects survive that frustum → Visibility | `src/world/camera_clearance.cpp:heroSightline` |
