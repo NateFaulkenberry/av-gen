@@ -247,7 +247,7 @@ writing a second 700-line class.
 
 ### B.3 Recommendation: a utility scorer over the existing queue
 
-**Built 2026-09-18 as ADR-310** (`src/entity/decision.{hpp,cpp}`, the `decide` behaviour, four stock
+**Built 2026-09-18 as ADR-330** (`src/entity/decision.{hpp,cpp}`, the `decide` behaviour, four stock
 considerers). Three things this section did not anticipate and one it got exactly right. The dwell
 had to be counted in **decision ticks** rather than seconds, for the reason ADR-290 gave the sense
 cadence: an accumulator drifts with the frame rate and a replayed decision boundary lands on a
@@ -651,7 +651,7 @@ thousand. Three mitigations, in order of value:
   honest about it.
 - **Decide** (new, `IConsiderer`): a scored option list composed from several considerers, a
   selector with dwell and margin, output is `ActionDesc`s onto `Authority::Routine`. **Built:
-  ADR-310.** Four stock considerers; a guard and an explorer are the same C++ class with different
+  ADR-330.** Four stock considerers; a guard and an explorer are the same C++ class with different
   lists. A fifth that prices a route is `docs/character-ai-plan.md` §P11.
 - **Act** (unchanged): `ActionQueue`, the eleven behaviours, `Navigator`, `stage::Staging`.
 - **Express** (extended): `ISkeletonQuery` implemented, sockets made real, a two-slot masked layer

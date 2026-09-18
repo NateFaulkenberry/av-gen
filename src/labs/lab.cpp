@@ -33,7 +33,7 @@ namespace {
 //     explorer, and naming a decision layer that did not exist would have been the registry sending
 //     somebody nowhere. That entry carried its own expiry -- "it will be renamed when P3 extracts
 //     the goal model out of it, at which point this test fails, which is the point." P3 landed
-//     (ADR-310) and this is that rename. `decision.cpp:Selector` is where the choice is made now:
+//     (ADR-330) and this is that rename. `decision.cpp:Selector` is where the choice is made now:
 //     `Explore` still *has* a goal model, but it calls `entity::goalWeight` for it and the class
 //     that decides between courses of action is here.
 constexpr std::array<LabDescriptor, 15> kLabs{{

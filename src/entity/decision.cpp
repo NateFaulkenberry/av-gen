@@ -158,18 +158,14 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
     // an author's statement rather than an artefact of iteration.
     std::size_t best = kNone;
     float bestScore = 0.0f;
-    float runnerUp = 0.0f;
     for (std::size_t i = 0; i < options_.size(); ++i) {
         const float score = options_[i].score;
         if (score <= 0.0f) {
             continue;
         }
         if (best == kNone || score > bestScore) {
-            runnerUp = best == kNone ? 0.0f : bestScore;
             best = i;
             bestScore = score;
-        } else if (score > runnerUp) {
-            runnerUp = score;
         }
     }
     if (best == kNone) {
@@ -210,10 +206,10 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
     }();
 
     if (!commit) {
+        // The chosen option is the one that is *running*, not the one that scored highest. That
+        // distinction is the whole value of the overlay: a dwell or a margin refusal is exactly the
+        // case where "why is it still doing that" has an answer and nothing was drawing it.
         chosen_ = incumbent;
-        // `margin` on the debug is the winner's lead over the runner-up, and the runner-up of a
-        // held choice is whatever beat it -- which is the number that says how close it came.
-        (void)runnerUp;
         return false;
     }
 
@@ -230,7 +226,7 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
 // ---- the goal model ----------------------------------------------------------------------------
 
 // **Do not tidy this function.** Every expression in it is the expression `Explore::pickGoal`
-// inlined before ADR-310, in the same order, and the extraction's control is a position trace taken
+// inlined before ADR-330, in the same order, and the extraction's control is a position trace taken
 // from the build before the move and compared as raw float bits. A reciprocal multiply instead of
 // the division, a `std::hypot` instead of `glm::length`, or hoisting `std::max(hi * 0.5f, 1.0f)`
 // out of the loop are all algebraically identical and none of them is bit-identical.

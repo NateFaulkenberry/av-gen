@@ -286,11 +286,11 @@ struct DecisionContext {
     std::size_t self = 0;
     const EntityState* state = nullptr;   // R1: `position()` is the simulation's answer
     // What this body knows. ADR-290 builds this fresh every sense tick and deliberately does not
-    // accumulate it; ADR-310 §5 is where the decider folds a bounded fade back in, so what arrives
+    // accumulate it; ADR-330 §5 is where the decider folds a bounded fade back in, so what arrives
     // here may include a percept whose `seenAt` is older than the last tick. That is why `seenAt`
     // is on a percept at all.
     std::span<const Percept> percepts;
-    // Where this character has recently been. ADR-310 §3: the goal model suppresses a place the
+    // Where this character has recently been. ADR-330 §3: the goal model suppresses a place the
     // body has already visited, and that history is the one thing in the model that is not a fact
     // about the world. It is carried **in the context rather than in the considerer** because a
     // considerer holds no per-character state -- that rule is what makes D4 free, and a novelty

@@ -115,7 +115,7 @@ proves it is a before/after position trace, not a test that both versions "still
 when it perceives something, expressed entirely as considerers and scene data, with no new C++ class
 per character kind.
 
-**Landed 2026-09-18: ADR-310.** `src/entity/decision.{hpp,cpp}`, the `decide` behaviour, four stock
+**Landed 2026-09-18: ADR-330.** `src/entity/decision.{hpp,cpp}`, the `decide` behaviour, four stock
 considerers, and the extraction with 0 of 3,600 trace samples differing. The guard is
 `examples/labs/character/guard-post.scene.json` and there is no `Guard` anywhere in `src/`. Three
 corrections this list did not have: the dwell is counted in decision ticks rather than seconds (an
@@ -222,7 +222,7 @@ every time Glowmere plays it. The opt-in is what keeps the other 163 clips exact
 
 ### P11 — Route pricing  ·  independent  ·  needs P3  ·  small
 
-**Added by P3 (ADR-310), because P3 finished without it and the Character Intelligence Lab's case 9
+**Added by P3 (ADR-330), because P3 finished without it and the Character Intelligence Lab's case 9
 still says so.** ADR-269's shape is right and four stock considerers are enough for the guard and
 the explorer; the one thing none of them can express is a preference between two *ways* to the same
 place. `holdPost` and `investigate` score a place; `interest` scores taste times nearness, and

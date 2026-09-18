@@ -1,7 +1,7 @@
-// The byte-identical control for the `Explore` goal-model extraction (ADR-310 §3).
+// The byte-identical control for the `Explore` goal-model extraction (ADR-330 §3).
 //
 // `Explore` is the only autonomous mind this engine has ever had and five Glowmere characters
-// depend on it. ADR-310 moved its goal model -- taste over the interest registry, damped by
+// depend on it. ADR-330 moved its goal model -- taste over the interest registry, damped by
 // distance, suppressed where the body has recently been -- out of that class and into
 // `entity::goalWeight`, where a second character kind can score with it. A refactor of the only
 // mind in the engine is the kind of change whose damage is a film that looks slightly different
@@ -138,7 +138,7 @@ std::vector<std::string> readGolden() {
 
 } // namespace
 
-TEST_CASE("the extracted goal model walks the same route to the bit", "[entity][decision][adr310]") {
+TEST_CASE("the extracted goal model walks the same route to the bit", "[entity][decision][adr330]") {
     if (!assetsPresent()) {
         WARN("assets missing; skipping");
         return;
@@ -150,7 +150,7 @@ TEST_CASE("the extracted goal model walks the same route to the bit", "[entity][
         std::ofstream out(golden());
         out << "# Sixty seconds of examples/labs/character/character-intelligence-lab.scene.json at a\n"
                "# fixed 60 Hz, every fifth frame: <entity> <frame> <x> <y> <z> <yaw>, each float as\n"
-               "# its raw 32 bits. Written by the build BEFORE ADR-310's goal-model extraction and\n"
+               "# its raw 32 bits. Written by the build BEFORE ADR-330's goal-model extraction and\n"
                "# compared by tests/unit/test_decision_extraction.cpp after it. Regenerating this is\n"
                "# a statement that a route was *meant* to change; see that file's header.\n";
         for (const std::string& line : now) {
@@ -204,7 +204,7 @@ TEST_CASE("the extracted goal model walks the same route to the bit", "[entity][
     CHECK(names.size() == 5);
 }
 
-TEST_CASE("the trace is sensitive to the goal model it is measuring", "[entity][decision][adr310]") {
+TEST_CASE("the trace is sensitive to the goal model it is measuring", "[entity][decision][adr330]") {
     if (!assetsPresent()) {
         WARN("assets missing; skipping");
         return;

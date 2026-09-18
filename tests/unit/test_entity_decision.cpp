@@ -1,4 +1,4 @@
-// The decision layer (ADR-269, ADR-310): what a character chooses to do, out of everything it
+// The decision layer (ADR-269, ADR-330): what a character chooses to do, out of everything it
 // could, and the controls that make each answer mean something.
 //
 // Until this landed, `character_ai.hpp` §3 declared `Option`, `DecisionContext` and `IConsiderer`
@@ -155,7 +155,7 @@ struct World {
 // ---- the selector ------------------------------------------------------------------------------
 
 TEST_CASE("a chosen option is held for a dwell and must be beaten by a margin",
-          "[entity][decision][adr310]") {
+          "[entity][decision][adr330]") {
     EntityState state;
     Selector selector;
     SelectorSettings settings;
@@ -210,7 +210,7 @@ TEST_CASE("a chosen option is held for a dwell and must be beaten by a margin",
     CHECK(selector.counts().marginRejections == 2);
 }
 
-TEST_CASE("an option that scores nothing is not an option", "[entity][decision][adr310]") {
+TEST_CASE("an option that scores nothing is not an option", "[entity][decision][adr330]") {
     EntityState state;
     Selector selector;
     SelectorSettings settings;
@@ -233,7 +233,7 @@ TEST_CASE("an option that scores nothing is not an option", "[entity][decision][
 }
 
 TEST_CASE("the decision boundary is a function of the instant, not of the frames",
-          "[entity][decision][adr310][adr091]") {
+          "[entity][decision][adr330][adr091]") {
     // ADR-267's D1 and ADR-290 §2, one layer up. A dwell accumulated across frames expires on a
     // different instant at a different frame rate, so a replayed decision lands on a different
     // step from the played one -- which is exactly the class of defect ADR-091's scrub-equals-play
@@ -291,7 +291,7 @@ TEST_CASE("the decision boundary is a function of the instant, not of the frames
 // ---- the stock considerers ---------------------------------------------------------------------
 
 TEST_CASE("holdPost wants its post back in proportion to how far it is from it",
-          "[entity][decision][adr310]") {
+          "[entity][decision][adr330]") {
     nlohmann::json settings = {{"pull", 0.25}, {"tolerance", 1.5}, {"weight", 1.0}};
     HoldPostConsiderer post(&settings);
     post.setName("post");
@@ -342,7 +342,7 @@ TEST_CASE("holdPost wants its post back in proportion to how far it is from it",
 }
 
 TEST_CASE("investigate scores what a body noticed, and only the kinds it was told to care about",
-          "[entity][decision][adr310][adr290]") {
+          "[entity][decision][adr330][adr290]") {
     nlohmann::json settings = {{"kinds", {"character"}}, {"weight", 2.0}, {"staleSeconds", 4.0}};
     InvestigateConsiderer investigate(&settings);
     investigate.setName("investigate");
@@ -423,7 +423,7 @@ TEST_CASE("investigate scores what a body noticed, and only the kinds it was tol
     CHECK(half[0].score > 0.0f);
 }
 
-TEST_CASE("a considerer is a pure function of its context", "[entity][decision][adr310]") {
+TEST_CASE("a considerer is a pure function of its context", "[entity][decision][adr330]") {
     // ADR-269: given the same context twice a considerer must produce the same scores -- the
     // property that makes a selector's answer reproducible under a replay, and the reason a
     // considerer may not draw from `Entity::rng_`.
@@ -460,7 +460,7 @@ TEST_CASE("a considerer is a pure function of its context", "[entity][decision][
 }
 
 TEST_CASE("the same goal model over two sources is two different characters",
-          "[entity][decision][adr310][adr270]") {
+          "[entity][decision][adr330][adr270]") {
     // ADR-270's whole finding, as one assertion. `interest` over `interestPoints()` is what
     // `Explore` has always read: everything there is, with no range, no facing and no notion of
     // having noticed. Over `percepts` it is what this body knows.
@@ -515,7 +515,7 @@ TEST_CASE("the same goal model over two sources is two different characters",
 // ---- the guard ---------------------------------------------------------------------------------
 
 TEST_CASE("a guard is scene data, and it leaves its post for what it notices",
-          "[entity][decision][adr310][labs]") {
+          "[entity][decision][adr330][labs]") {
     if (!assetsPresent()) {
         WARN("assets missing; skipping");
         return;
@@ -580,7 +580,7 @@ TEST_CASE("a guard is scene data, and it leaves its post for what it notices",
     CHECK(heldFurthest < furthest);
 }
 
-TEST_CASE("two character kinds, one C++ class", "[entity][decision][adr310][labs]") {
+TEST_CASE("two character kinds, one C++ class", "[entity][decision][adr330][labs]") {
     if (!assetsPresent()) {
         WARN("assets missing; skipping");
         return;
@@ -626,7 +626,7 @@ TEST_CASE("two character kinds, one C++ class", "[entity][decision][adr310][labs
 }
 
 TEST_CASE("a decider reads a percept a test wrote, with no world to produce one",
-          "[entity][decision][adr310][adr290]") {
+          "[entity][decision][adr330][adr290]") {
     if (!assetsPresent()) {
         WARN("assets missing; skipping");
         return;
@@ -678,7 +678,7 @@ TEST_CASE("a decider reads a percept a test wrote, with no world to produce one"
     CHECK(stayed < 2.0f);
 }
 
-TEST_CASE("a guard that loses sight of something keeps going", "[entity][decision][adr310][adr290]") {
+TEST_CASE("a guard that loses sight of something keeps going", "[entity][decision][adr330][adr290]") {
     if (!assetsPresent()) {
         WARN("assets missing; skipping");
         return;
@@ -747,7 +747,7 @@ TEST_CASE("a guard that loses sight of something keeps going", "[entity][decisio
     CHECK(std::get<1>(remembering) > std::get<1>(forgetting));
 }
 
-TEST_CASE("a decided scene scrubs to where it played", "[entity][decision][adr310][adr091]") {
+TEST_CASE("a decided scene scrubs to where it played", "[entity][decision][adr330][adr091]") {
     if (!assetsPresent()) {
         WARN("assets missing; skipping");
         return;

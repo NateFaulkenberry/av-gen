@@ -117,7 +117,7 @@ struct BehaviorContext {
     std::size_t self = 0;
     Rng* rng = nullptr;  // this entity's own stream, seeded from the scene seed and the entity name
     // This entity's own action queue, for a behaviour that *decides* rather than moves (ADR-269,
-    // ADR-310). A decider's whole output is an `ActionDesc` list pushed onto `Authority::Routine`;
+    // ADR-330). A decider's whole output is an `ActionDesc` list pushed onto `Authority::Routine`;
     // without this it would have to move the body itself, which is the second execution engine
     // ADR-269 exists to refuse. Null for every behaviour that does not need it, and the fourteen
     // that came before this one do not touch it.
@@ -170,7 +170,7 @@ struct NavDebug {
     std::string_view goalKind;          // landmark / character / glow / water / vista
 };
 
-// One option as a decider scored it, flattened for an overlay (ADR-269 §4, ADR-310).
+// One option as a decider scored it, flattened for an overlay (ADR-269 §4, ADR-330).
 //
 // `NavDebug` exists because "why is it going that way" is a question this project has repeatedly
 // been unable to answer about its own characters, and it was published and read by nobody for long
@@ -197,7 +197,7 @@ struct DecisionDebug {
     std::size_t decisions = 0;             // times the choice changed, since the last reset
     std::size_t dwellRejections = 0;       // switches the dwell refused
     std::size_t marginRejections = 0;      // switches the margin refused
-    std::size_t remembered = 0;            // percepts held past the tick that saw them (ADR-310 §5)
+    std::size_t remembered = 0;            // percepts held past the tick that saw them (ADR-330 §5)
 };
 
 class IBehavior {

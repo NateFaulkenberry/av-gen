@@ -1,6 +1,6 @@
 #pragma once
 
-// The decision layer (ADR-269, ADR-310). What a character chooses to do, out of everything it
+// The decision layer (ADR-269, ADR-330). What a character chooses to do, out of everything it
 // could.
 //
 // `src/entity/character_ai.hpp` §3 is the normative declaration of `Option`, `DecisionContext` and
@@ -77,14 +77,13 @@ struct SelectorSettings {
     float margin = 0.08f;
 };
 
-// One option as it was scored, flattened for an overlay. See `NavDebug`: the losing scores beside
-// the winner is the question this project has repeatedly been unable to answer about its own
-// characters, and a score that is true and invisible is the same as absent.
+// The chooser. One per deciding character, because the committed option and the tick it was
+// committed on are per-character facts -- which is exactly the state ADR-269 keeps *out* of a
+// considerer so that a considerer can be shared and needs no checkpoint.
 //
-// Declared in `entity/behavior.hpp` so that `IBehavior::decisionDebug` can carry it without
-// `behavior.hpp` depending on `character_ai.hpp`, which depends on it.
-
-// What the selector decided, and the bookkeeping that says how hard the decision was.
+// `ScoredOption`, the flattened form an overlay reads, is declared in `entity/behavior.hpp` rather
+// than here, so that `IBehavior::decisionDebug` can carry it without `behavior.hpp` depending on
+// `character_ai.hpp`, which depends on it.
 class Selector {
 public:
     // Structural quantities, not milliseconds (ADR-170). "It scored 6 options, took 3 decisions and
@@ -164,7 +163,7 @@ struct GoalCandidate {
     float weight = 0.0f;
 };
 
-// **The goal model, as one function.** This is the thing that was extracted (ADR-310 §3): taste
+// **The goal model, as one function.** This is the thing that was extracted (ADR-330 §3): taste
 // times the point's own weight, damped by distance, suppressed where the character has recently
 // been. `Explore::pickGoal` inlined exactly this arithmetic and now calls it.
 //
@@ -361,7 +360,7 @@ public:
     void consider(const DecisionContext& ctx, std::vector<Option>& out) const override;
 
     // The goal model on its own, without the `Option` wrapping. This is the entry point `Explore`
-    // calls (ADR-310 §3): it keeps its own weighted roll over these candidates, because that roll
+    // calls (ADR-330 §3): it keeps its own weighted roll over these candidates, because that roll
     // draws from `Entity::rng_` and moving it would have re-cast every later choice the stream
     // makes -- which is exactly the drift the byte-identical control exists to catch. Wrapping 140
     // candidates into `ActionDesc`s every selection would also be work done for nothing there.

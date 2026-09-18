@@ -1036,7 +1036,7 @@ public:
         // registered: an author sets what a character cares about when they build it, and "how
         // much does it like water" is not a thing anybody automates on a timeline.
         //
-        // **They live on a considerer now** (ADR-310). The five affinities, the distance falloff
+        // **They live on a considerer now** (ADR-330). The five affinities, the distance falloff
         // and the visited-place suppression were `Explore`'s goal model, inlined in `pickGoal`;
         // `entity::goalWeight` is that arithmetic with a name, and this class holds an
         // `InterestConsiderer` over it the way a character with a `decide` behaviour does. The
@@ -1767,7 +1767,7 @@ private:
 
         const bool stroll = ctx.rng != nullptr && ctx.rng->nextFloat() < strollChance_;
         if (!stroll && ctx.world != nullptr) {
-            // **The goal model, which now lives in `entity::goalWeight`** (ADR-310 §3). What was
+            // **The goal model, which now lives in `entity::goalWeight`** (ADR-330 §3). What was
             // here was the affinity switch, the distance falloff and the visited-place scan, all
             // inlined; what is here now is the same arithmetic called by name, so a guard and an
             // explorer weigh a place with one function instead of two copies of one.
@@ -1801,7 +1801,7 @@ private:
             // number of values from the stream would re-cast every later choice it makes -- D2 is
             // the rule that exists because of exactly this. So the extraction is of the model and
             // not of the choice, and `tests/unit/test_decision_extraction.cpp` is what says the
-            // difference is nothing at all. ADR-310 §4 is the argument for leaving the stream
+            // difference is nothing at all. ADR-330 §4 is the argument for leaving the stream
             // where it is and what it would cost to unify.
             if (total > 0.0f && ctx.rng != nullptr) {
                 float roll = ctx.rng->nextFloat() * total;
@@ -1853,7 +1853,7 @@ private:
     float minRangeDefault_, maxRangeDefault_, homeDefault_, runChanceDefault_, slopeAlignDefault_;
     float bodyRadiusDefault_, headroomDefault_, footprintDefault_, wadeDragDefault_;
     float strollChance_, waypointRadius_, repathSeconds_, stuckSeconds_;
-    // The goal model (ADR-310). Held by value because it is configuration -- one taste, one source
+    // The goal model (ADR-330). Held by value because it is configuration -- one taste, one source
     // -- and holds no per-character state of its own; the two things that *are* per-character, the
     // visited list and the live ranges, are handed to it through the `DecisionContext`.
     InterestConsiderer goals_{nullptr};
@@ -1988,7 +1988,7 @@ private:
 
 // ---- decide ----------------------------------------------------------------------------------
 //
-// The decider (ADR-269, ADR-310). **A character kind, expressed as scene data.**
+// The decider (ADR-269, ADR-330). **A character kind, expressed as scene data.**
 //
 // This is the one behaviour in the vocabulary that has no behaviour of its own. It scores options,
 // commits to one, and pushes that option's `ActionDesc` list onto `Authority::Routine`; the
@@ -2114,9 +2114,14 @@ public:
         dctx.bus = ctx.bus;
         dctx.seed = self != nullptr ? self->seed() : 0;
 
+        // Republish the overlay's list whenever a tick actually fired -- including the very first
+        // one, whose tick index may legitimately be the same 0 the selector starts at. Testing the
+        // index alone left the first decision's options invisible, which is the one decision a
+        // person watching a character start up is most likely to be looking at.
         const std::uint64_t before = selector_.tick();
+        const bool startedBefore = selector_.started();
         const bool changed = selector_.select(dctx, views_);
-        if (selector_.tick() != before || !selector_.started()) {
+        if (!startedBefore || selector_.tick() != before) {
             publish();
         }
         if (!changed) {

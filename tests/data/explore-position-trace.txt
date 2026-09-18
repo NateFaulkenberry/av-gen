@@ -1,6 +1,6 @@
 # Sixty seconds of examples/labs/character/character-intelligence-lab.scene.json at a
 # fixed 60 Hz, every fifth frame: <entity> <frame> <x> <y> <z> <yaw>, each float as
-# its raw 32 bits. Written by the build BEFORE ADR-310's goal-model extraction and
+# its raw 32 bits. Written by the build BEFORE ADR-330's goal-model extraction and
 # compared by tests/unit/test_decision_extraction.cpp after it. Regenerating this is
 # a statement that a route was *meant* to change; see that file's header.
 scout 0 00000000 00000000 00000000 00000000

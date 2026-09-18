@@ -3,15 +3,17 @@
 **Question**: *Why is this character here, facing this way, and why did it decide to be?*
 
 Registry entry: `LabId::Character`, key `character` (`src/labs/lab.cpp`).
-Fixture: `examples/labs/character/character-intelligence-lab.scene.json`.
+Fixtures: `examples/labs/character/character-intelligence-lab.scene.json` (the explorers, frozen —
+see §2), `examples/labs/character/guard-post.scene.json` (the decided characters) and
+`examples/labs/character/perception-crowd.scene.json` (the occlusion budget).
 Cases: `examples/labs/character/cases.json`, reachable as `avgen --lab-case character:<n>`.
-Fixture (the decided characters): `examples/labs/character/guard-post.scene.json`.
 Tests: `tests/unit/test_character_intelligence_lab.cpp`, `tests/unit/test_character_lab_sockets.cpp`,
 `tests/unit/test_entity_perception.cpp`, `tests/unit/test_entity_decision.cpp`,
 `tests/unit/test_decision_extraction.cpp`.
 
 Companion reading, in this order: `docs/character-ai-research.md` (what already exists),
-`docs/character-ai-plan.md` (the units and who owns which file), ADR-266 to ADR-275.
+`docs/character-ai-plan.md` (the units and who owns which file), ADR-266 to ADR-275, then ADR-290
+(perception, built) and ADR-330 (the decision layer, built).
 
 ---
 
@@ -27,12 +29,12 @@ whether the body reached a draw call — that is the Visibility Lab.
 `decides` named `src/entity/behaviors.cpp:Explore` for as long as **nobody decided** (ADR-269), and
 that entry carried its own expiry: "when P3 extracts the goal model out of `Explore`, the registry
 test fails and this entry moves. That is the intended failure." It did, on 2026-09-18, and `decides`
-is now `src/entity/decision.cpp:Selector` (ADR-310). `Explore` still *has* a goal model; it calls
+is now `src/entity/decision.cpp:Selector` (ADR-330). `Explore` still *has* a goal model; it calls
 `entity::goalWeight` for it, and the class that chooses between courses of action is the selector.
 
 ---
 
-## 1. Three of the six scenarios cannot be run, and say so
+## 1. One of the six scenarios cannot be run, and says so
 
 The owner's brief asked for six: basic wandering, investigating a mushroom, crossing a river, a
 social interaction, a dense environment, a long-running simulation.
@@ -45,15 +47,15 @@ social interaction, a dense environment, a long-running simulation.
 | 4 | a penned character is stuck and nothing says so | runnable |
 | 5 | two minutes, and the scrub against the play | runnable |
 | 6 | every character *used to* see everything, and nothing scored an option | runnable — the before-arm, kept |
-| 7 | investigating a mushroom | runnable — *unblocked by ADR-310* |
-| 8 | a social interaction | runnable — *unblocked by ADR-310* |
+| 7 | investigating a mushroom | runnable — *unblocked by ADR-330* |
+| 8 | a social interaction | runnable — *unblocked by ADR-330* |
 | 9 | crossing a river | blocked on **P11 route pricing** |
 | 10 | two characters, two ranges, two different worlds | runnable — the after-arm (ADR-290) |
 | 11 | the occlusion budget, and the arm at zero | runnable (ADR-290) |
 | 12 | a head that turns while the legs keep walking | runnable — *unblocked by ADR-300* |
 | 13 | half a metre of landing the engine throws away | blocked on **P9 root motion** |
-| 14 | a guard, and no C++ class called Guard | runnable (ADR-310) |
-| 15 | seven hundred lines moved and the route did not | runnable (ADR-310) |
+| 14 | a guard, and no C++ class called Guard | runnable (ADR-330) |
+| 15 | seven hundred lines moved and the route did not | runnable (ADR-330) |
 
 Cases 7 and 8 were blocked on *two* units, then on one, and are now runnable. That is what a
 `blockedBy` is for: the day a unit lands, the cases that were waiting on it are a list rather than a
@@ -86,7 +88,7 @@ second half still did not unblock, which is why §P11 exists.
 
 **There are two, and the reason is the golden trace.** `character-intelligence-lab.scene.json` is
 frozen: `tests/data/explore-position-trace.txt` is 3,600 samples of its five bodies taken from the
-build before ADR-310's extraction, and a sixth body in that scene changes what the other five
+build before ADR-330's extraction, and a sixth body in that scene changes what the other five
 perceive and score. So the decided characters live in `guard-post.scene.json` — a flat world, four
 cairns, a guard at a post, a courier patrolling a line under authored `move` actions, and an
 explorer far enough away to be out of everybody's senses.
@@ -222,7 +224,7 @@ same second lands in the same place.
 the skeletons. What it cannot turn on is **the losing option scores beside the winner** — but the
 reason has changed. There are options now: `IBehavior::decisionDebug` carries every option scored on
 the last decision tick with its name, its score and which one was chosen, plus the tick, the dwell
-and margin refusal counts and how many percepts the fade is holding (ADR-310). It is read by the
+and margin refusal counts and how many percepts the fade is holding (ADR-330). It is read by the
 tests and by nothing in `src/ui/`, which is the same shape as the thing this section was written
 about. Drawing it is an afternoon against a seam that exists. What it *could* also turn on, and does
 not yet, is a body's working set:

@@ -1,4 +1,4 @@
-# ADR-310: A character kind is a list of considerers, and the goal model had to move without moving a millimetre
+# ADR-330: A character kind is a list of considerers, and the goal model had to move without moving a millimetre
 
 **Status:** Accepted
 **Date:** 2026-09-18
