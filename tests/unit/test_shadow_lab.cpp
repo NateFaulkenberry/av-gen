@@ -22,6 +22,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <vector>
@@ -405,29 +406,106 @@ TEST_CASE("a procedural instance a cascade can see is submitted to the shadow pa
 }
 
 TEST_CASE("a LOD impostor is the size of the object it stands in for",
-          "[shadows][lab][impostor][!shouldfail]") {
-    // **Expected to fail.** Not a shadow defect -- a LOD one, found because it made a shadow
-    // experiment unmeasurable, and recorded here so the day it is fixed is announced.
+          "[shadows][lab][impostor]") {
+    // Was `[!shouldfail]`. `makeLodMesh` sized the rung-2 quad from `sourceBoundingRadius(spec)` --
+    // the RAW asset -- and the billboard branch of shaders/procedural.wgsl scales the quad by
+    // `inst.scale` alone and never applies `proc.sourceMatrix`. Rungs 0 and 1 do go through
+    // `sourceMatrix`. Every terrain scatter layer normalises its asset's height onto
+    // `sourceTransform` ("the layer says how tall the thing should be; the asset says how tall it
+    // is"), so the impostor drew at the asset's authored size in the camera pass as well as in the
+    // shadows: a 0.5 m shrub grid drew as a hedge of 7.3 m trees.
     //
-    // `makeLodMesh` sizes the rung-2 quad from `sourceBoundingRadius(spec)`, the RAW asset, and the
-    // billboard branch of shaders/procedural.wgsl scales it by `inst.scale` alone and never applies
-    // `proc.sourceMatrix`. Rungs 0 and 1 do go through `sourceMatrix`. Every terrain scatter layer
-    // normalises its asset's height onto `sourceTransform`, so every scatter layer's impostors are
-    // drawn at the asset's authored size instead of the layer's. Routed to the LOD Lab.
-    scene::ProceduralGeometry g;
-    g.name = "shrub";
-    g.source.kind = scene::PrimitiveKind::Box;
-    g.source.size = glm::vec3(2.0f);
-    // The layer says how tall the thing should be; the asset says how tall it is.
-    g.sourceTransform.scale = glm::vec3(0.1f);
+    // The size is now taken through `sourceTransform.scale`, which is the one step of the chain a
+    // quad built in the camera's basis cannot pick up for itself.
+    //
+    // Three arms and a control, because the wrong rule and the right one agree on a uniformly
+    // scaled cube and this file exists to stop that happening again (ADR-182).
+    const auto halfExtentOf = [](const scene::MeshData& quad) {
+        float half = 0.0f;
+        for (const scene::Vertex& v : quad.vertices) {
+            half = std::max(half, std::max(std::abs(v.position.x), std::abs(v.position.y)));
+        }
+        return half;
+    };
+    scene::SourceSpec box;
+    box.kind = scene::PrimitiveKind::Box;
+    box.size = glm::vec3(2.0f);
 
-    const auto quad = scene::makeLodMesh(g.source, 2, g.lod.impostorSize);
-    REQUIRE(quad.has_value());
-    float half = 0.0f;
-    for (const scene::Vertex& v : quad->vertices) {
-        half = std::max(half, std::max(std::abs(v.position.x), std::abs(v.position.y)));
+    SECTION("the control: an unscaled source is the size it always was") {
+        // The half that says the fix is not a blanket shrink. A layer that does not normalise its
+        // source gets byte-identical geometry to the one this code shipped with.
+        const auto quad = scene::makeLodMesh(box, 2, 1.0f, glm::vec3(1.0f));
+        REQUIRE(quad.has_value());
+        CHECK_THAT(halfExtentOf(*quad),
+                   Catch::Matchers::WithinRel(scene::sourceBoundingRadius(box), 1e-5f));
     }
-    const float wanted = scene::sourceBoundingRadius(g.source) * g.sourceTransform.scale.x;
-    INFO("impostor half extent " << half << ", the scaled source's radius " << wanted);
-    CHECK_THAT(half, Catch::Matchers::WithinRel(wanted, 0.01f));
+
+    SECTION("a scatter layer's normalisation reaches the quad") {
+        scene::ProceduralGeometry g;
+        g.name = "shrub";
+        g.source = box;
+        g.sourceTransform.scale = glm::vec3(0.1f);
+        const auto quad = scene::makeLodMesh(g.source, 2, g.lod.impostorSize, g.sourceTransform.scale);
+        REQUIRE(quad.has_value());
+        const float wanted = scene::sourceBoundingRadius(g.source) * g.sourceTransform.scale.x;
+        INFO("impostor half extent " << halfExtentOf(*quad) << ", the scaled source's radius " << wanted);
+        CHECK_THAT(halfExtentOf(*quad), Catch::Matchers::WithinRel(wanted, 0.01f));
+    }
+
+    SECTION("a non-uniform normalisation is not read off one axis") {
+        // The shape that separates "multiply the radius by scale.x" from "measure the scaled box".
+        // A source squashed in y has a smaller sphere than scale.x alone would give it, and a
+        // source stretched in y has a larger one, so a rule that picks an axis is wrong in both
+        // directions here and right on the uniform fixture above.
+        scene::SourceSpec slab;
+        slab.kind = scene::PrimitiveKind::Box;
+        slab.size = {2.0f, 2.0f, 2.0f};
+        for (const glm::vec3 scale : {glm::vec3(0.1f, 0.5f, 0.1f), glm::vec3(0.5f, 0.1f, 0.5f)}) {
+            INFO("source scale (" << scale.x << ", " << scale.y << ", " << scale.z << ")");
+            const auto quad = scene::makeLodMesh(slab, 2, 1.0f, scale);
+            REQUIRE(quad.has_value());
+            const float wanted = scene::sourceBoundingRadius(slab, scale);
+            CHECK_THAT(halfExtentOf(*quad), Catch::Matchers::WithinRel(wanted, 1e-4f));
+            // ...and it really is a different number from the one-axis rule, or the check above
+            // would pass whichever rule the code used.
+            CHECK(std::abs(wanted - scene::sourceBoundingRadius(slab) * scale.x) > 1e-3f);
+        }
+    }
+
+    SECTION("a thin source, where the sphere and the tallest axis disagree most") {
+        scene::SourceSpec post;
+        post.kind = scene::PrimitiveKind::Box;
+        post.size = {0.08f, 6.0f, 0.08f};
+        const glm::vec3 scale(1.0f, 0.25f, 1.0f);
+        const auto quad = scene::makeLodMesh(post, 2, 1.0f, scale);
+        REQUIRE(quad.has_value());
+        CHECK_THAT(halfExtentOf(*quad),
+                   Catch::Matchers::WithinRel(scene::sourceBoundingRadius(post, scale), 1e-4f));
+    }
+
+    SECTION("rung 3 is an eighth of rung 2, at the scaled size too") {
+        const glm::vec3 scale(0.1f);
+        const auto quad = scene::makeLodMesh(box, 2, 1.0f, scale);
+        const auto dot = scene::makeLodMesh(box, 3, 1.0f, scale);
+        REQUIRE(quad.has_value());
+        REQUIRE(dot.has_value());
+        CHECK_THAT(halfExtentOf(*dot), Catch::Matchers::WithinRel(halfExtentOf(*quad) * 0.125f, 1e-4f));
+    }
+
+    SECTION("the world size the quad is built at is the world size rung 0 draws at") {
+        // The invariant behind the arithmetic, stated without reference to which function holds the
+        // scale: rung 0 is source geometry through `sourceMatrix`, rung 2 is a quad circumscribing
+        // it, and they must describe one object. Measured off the meshes, not off a formula.
+        const glm::vec3 scale(0.1f, 0.35f, 0.1f);
+        const auto rung0 = scene::makeLodMesh(box, 0);
+        const auto rung2 = scene::makeLodMesh(box, 2, 1.0f, scale);
+        REQUIRE(rung0.has_value());
+        REQUIRE(rung2.has_value());
+        float rung0Radius = 0.0f;
+        for (const scene::Vertex& v : rung0->vertices) {
+            rung0Radius = std::max(rung0Radius, glm::length(v.position * scale));
+        }
+        INFO("rung 0 scaled radius " << rung0Radius << ", rung 2 half extent " << halfExtentOf(*rung2));
+        CHECK_THAT(halfExtentOf(*rung2), Catch::Matchers::WithinRel(rung0Radius, 0.01f));
+    }
 }

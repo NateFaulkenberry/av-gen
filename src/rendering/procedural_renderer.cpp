@@ -778,11 +778,17 @@ const ProceduralRenderer::Impl::CachedMesh* ProceduralRenderer::Impl::ensureLodM
         return ensureMesh(object);
     }
     // A cache key of its own: the level and (for the impostor levels) the billboard size are what
-    // make the reduced mesh differ from the source's.
+    // make the reduced mesh differ from the source's -- and so is the source transform's scale,
+    // which is what the impostor is now built at. Two scatter layers over the same asset differ in
+    // exactly that: `Composition::flatten` normalises the asset's height onto `sourceTransform`, so
+    // a 0.45 m fern layer and a 14 m canopy layer share a `meshHash` and must not share a quad.
     std::uint64_t key = object.meshHash;
     const auto mix = [&key](std::uint64_t v) { key ^= v + 0x9E3779B97F4A7C15ull + (key << 6) + (key >> 2); };
     mix(0x10D0000ull + static_cast<std::uint64_t>(level));
     mix(static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(object.lod.impostorSize)));
+    mix(static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(object.sourceTransform.scale.x)));
+    mix(static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(object.sourceTransform.scale.y)));
+    mix(static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(object.sourceTransform.scale.z)));
     auto it = meshes.find(key);
     if (it == meshes.end()) {
         // What the level actually comes back as, against the level above it. A LOD level is only
@@ -796,7 +802,9 @@ const ProceduralRenderer::Impl::CachedMesh* ProceduralRenderer::Impl::ensureLodM
         const CachedMesh* base = ensureMesh(object);
         const std::uint32_t sourceTris = base != nullptr ? base->indexCount / 3 : 0;
         const CachedMesh uploaded =
-            uploadMesh(scene::makeLodMesh(object.source, level, object.lod.impostorSize), object.name);
+            uploadMesh(scene::makeLodMesh(object.source, level, object.lod.impostorSize,
+                                          object.sourceTransform.scale),
+                       object.name);
         log::debug("procedural '{}': lod {} = {} triangles, {:.0f}% of the source mesh's {}",
                    object.name, level, uploaded.indexCount / 3,
                    sourceTris > 0 ? 100.0 * static_cast<double>(uploaded.indexCount / 3) /
