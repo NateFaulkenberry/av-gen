@@ -83,6 +83,12 @@ public:
     [[nodiscard]] double resolvedEndSeconds() const { return end_; }
     // Per-frame hashes of the frames read back so far, in frame order (determinism checks).
     [[nodiscard]] const std::vector<std::uint64_t>& frameHashes() const { return frameHashes_; }
+    // A number no other job in this process has had. The editor needs to know when the job it is
+    // showing frames from has been replaced, and the pointer will not tell it: a queue starts the
+    // next job in the same UI frame the last one finished, and `new` can hand back the address the
+    // one just destroyed was at. That would leave the previous render's last frame on the panel
+    // labelled as the new render's live one, which is the exact thing the preview must never do.
+    [[nodiscard]] std::uint64_t id() const { return id_; }
 
     // ---- watching the frames go out (ADR-320) --------------------------------------------------
     //
@@ -175,6 +181,7 @@ private:
     void encoderLoop();
     void fail(std::string message);
 
+    const std::uint64_t id_;
     gpu::Context& context_;
     gpu::ShaderLibrary& shaders_;
     std::unique_ptr<Engine> engine_;

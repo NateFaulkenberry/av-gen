@@ -335,7 +335,7 @@ private:
     wgpu::Texture renderPreviewTexture_;
     wgpu::TextureView renderPreviewView_;
     RenderJob::FramePreview renderPreviewFrame_;
-    const RenderJob* renderPreviewJob_ = nullptr; // which job the panel's frame came from
+    std::uint64_t renderPreviewJobId_ = 0; // which job the panel's frame came from (never an address)
     std::unique_ptr<rendering::OutputMapper> mapper_;
     OutputManager outputs_;
     share::TextureShare share_;

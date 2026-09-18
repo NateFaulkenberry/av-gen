@@ -1093,3 +1093,31 @@ TEST_CASE("A supersampled EXR previews the frame that is written, not the one it
     CHECK(differing == 0);
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("A job identifies itself by something an address cannot fake", "[gpu][render][preview]") {
+    // The editor decides "is the frame on the panel still this render's?" by comparing what it
+    // showed last against the running job. Running a queue starts the next job in the same UI frame
+    // the last one finished, and `new` may hand back the address the destroyed one was at -- so a
+    // pointer comparison can say "same job" about a different render and leave the previous one's
+    // last frame on screen, under a running progress bar, labelled live. This is the check that
+    // makes that impossible; it is deliberately written as the queue does it.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+    std::uint64_t firstId = 0;
+    const app::RenderJob* firstAddress = nullptr;
+    {
+        app::RenderJob one(*ctx, shaders, loadOffline(f.project), smallSettings(f.dir / "id_one"), f.dir);
+        firstId = one.id();
+        firstAddress = &one;
+    }
+    app::RenderJob two(*ctx, shaders, loadOffline(f.project), smallSettings(f.dir / "id_two"), f.dir);
+    CHECK(two.id() != firstId);
+    CHECK(two.id() > firstId);
+    // Not an assertion about the allocator -- it is free to place the second job anywhere. It says
+    // what the identity is NOT allowed to depend on: if this ever prints "reused", the pointer
+    // comparison this replaced was already wrong on this machine.
+    INFO(std::string(&two == firstAddress ? "the allocator reused the address"
+                                          : "the allocator did not reuse it"));
+    CHECK(two.id() != 0);
+}

@@ -1901,8 +1901,14 @@ void Application::serviceRenderPreview() {
     // A new job -- or the same panel after the last one was released -- starts from nothing. The
     // alternative is the previous render's last frame sitting under a running progress bar as
     // though it were this render's first, which is the exact failure a preview exists to not have.
-    if (job_.get() != renderPreviewJob_) {
-        renderPreviewJob_ = job_.get();
+    //
+    // Compared by `RenderJob::id()` and not by the pointer. Running a queue starts the next job in
+    // the same UI frame the last one finished, inside the `if (complete)` branch and *after* this
+    // function has already recorded the old job -- so the address can be reused and the comparison
+    // below would say "same job" about a different render.
+    const std::uint64_t id = job_ != nullptr ? job_->id() : 0;
+    if (id != renderPreviewJobId_) {
+        renderPreviewJobId_ = id;
         if (job_ != nullptr) {
             view.width = 0;
             view.height = 0;

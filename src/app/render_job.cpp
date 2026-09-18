@@ -24,6 +24,12 @@ namespace {
 // shaders/tonemap.wgsl applies as the last thing it does before writing the RGBA8 target -- so for
 // a PNG or video render the preview copies bytes that already went through it, and this is used
 // only for the EXR path, where the file is scene-linear and has no display encoding at all.
+// Never reused within a process, which is the whole point: an address is.
+std::uint64_t nextJobId() {
+    static std::atomic<std::uint64_t> counter{0};
+    return ++counter;
+}
+
 std::uint8_t encodeSrgb(float linear) {
     const float c = std::clamp(linear, 0.0f, 1.0f);
     const float s = c <= 0.0031308f ? c * 12.92f : 1.055f * std::pow(c, 1.0f / 2.4f) - 0.055f;
@@ -83,7 +89,7 @@ nlohmann::ordered_json materialManifest(const scene::Scene& scene) {
 
 RenderJob::RenderJob(gpu::Context& context, gpu::ShaderLibrary& shaders, std::unique_ptr<Engine> engine,
                      RenderSettings settings, std::filesystem::path baseDir)
-    : context_(context), shaders_(shaders), engine_(std::move(engine)), settings_(std::move(settings)),
+    : id_(nextJobId()), context_(context), shaders_(shaders), engine_(std::move(engine)), settings_(std::move(settings)),
       baseDir_(std::move(baseDir)) {}
 
 RenderJob::~RenderJob() {
