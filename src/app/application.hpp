@@ -122,6 +122,8 @@ struct AppOptions {
     // --supersample: an offline render's multiple of the output size (ADR-212). 1 = off.
     float supersample = 1.0f;
     std::optional<std::string> aovs; // ADR-242: --aov, auxiliary passes beside the beauty frames
+    // ADR-277: --post-stages, every intermediate the post chain rendered, as scene-linear EXRs.
+    std::filesystem::path postStages;
     bool liftViewportLimits = false; // --viewport-matches-render: lift ADR-186's limits live too
     // --preview-mode: which of ADR-246's three canvas modes to open in. Unset keeps whatever the
     // settings file remembers, which is what a person's own session should do.

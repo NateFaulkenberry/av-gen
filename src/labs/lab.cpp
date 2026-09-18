@@ -84,12 +84,13 @@ constexpr std::array<LabDescriptor, 15> kLabs{{
      "src/rendering/light_data.cpp:assignClusters", "docs/lighting-lab/README.md",
      "examples/labs/lighting-lab.scene.json", "examples/labs/lighting/cases.json"},
 
-    {LabId::Hdr, "hdr", "HDR / Exposure / Bloom Lab", LabStatus::Planned,
+    {LabId::Hdr, "hdr", "HDR / Exposure / Bloom Lab", LabStatus::Built,
      "Why is this frame this bright, and where did the glow come from?",
-     "metering, the exposure state, bloom, halation and the tonemap operator",
+     "metering, the exposure state, the bright pass, the bloom and halation pyramids, the wide "
+     "tier, the composite and the tonemap operator -- and which of those a given pixel came from",
      "the radiance that entered the pipe -- that is the Lighting Lab",
-     "src/rendering/post_processor.cpp:PostProcessor::run", "docs/engineering-labs.md",
-     "examples/looks", ""},
+     "src/rendering/post_processor.cpp:PostProcessor::run", "docs/hdr-lab/README.md",
+     "examples/labs/hdr-lab.scene.json", "examples/labs/hdr/cases.json"},
 
     {LabId::Volumetric, "volumetric", "Volumetric / Atmosphere Lab", LabStatus::Planned,
      "What is the air doing between the camera and the subject?",

@@ -1,0 +1,173 @@
+{
+ "format": "avgen-lab-cases",
+ "version": 1,
+ "lab": "hdr",
+ "_note": "The fixture is examples/labs/hdr-lab.scene.json: sixteen UNLIT calibrated patches on page 1 and two unlit bright sources on page 2, a hundred metres to the right, which a case's camera selects. Unlit is the whole design -- pbr_shade.wgsl's object.flags.z branch returns baseColor + emissive with fog applied, and the fog is off -- so a patch's scene-linear radiance is the number written in the scene file and this lab measures what the chain DOES with a radiance rather than jointly measuring a BRDF and a tone curve. Every arm here has a control: case 1 controls the fixture, case 7 controls the bloom cases, case 3 controls case 6. What a case CANNOT express is a post parameter: labs::LabCase carries a fixture, a time, a size, a camera, a tier, --disable arms, --quality-arm arms, --aov names and a supersample factor, and nothing else, so every exposure, threshold and hue arm in this lab lives in tests/rendering/test_hdr_lab_gpu.cpp instead. See docs/hdr-lab/README.md.",
+ "cases": [
+  {
+   "lab": "hdr",
+   "number": 1,
+   "title": "The calibrated card, with nothing between it and the readback",
+   "question": "Does the fixture put the radiance it authors into the HDR target?",
+   "expectation": "Yes, to within half-float. Every patch is UNLIT, so its scene-linear radiance is baseColor + emissiveColor * emissiveIntensity and nothing else -- 0.18 reads 0.17993 because that is what a half carries, and the wedge's other fifteen patches read exact. This is the control every other case in this file rests on, and tests/rendering/test_hdr_lab_gpu.cpp asserts it: a calibrated card whose patches are not the values it claims cannot calibrate anything (ADR-182). It is also where the ceiling was found -- a scene file that authors emissiveIntensity 256 is silently given 50, the hard maximum of the material/emissive parameter, so 50 is the brightest radiance a procedural node in this repository can express.",
+   "fixture": "examples/labs/hdr-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "disable": [
+    "post"
+   ],
+   "notes": "--disable post is the boundary the Lighting Lab drew in code and this is the reading it protects."
+  },
+  {
+   "lab": "hdr",
+   "number": 2,
+   "title": "The same card through the shipped chain",
+   "question": "What does the default post chain and the AgX curve do to a ladder of known radiances?",
+   "expectation": "Measured, bloom off, at the default exposure (the photographic defaults are a no-op: EV100(f/5.6, 1/50 s, ISO 400) is referenceEv100, so the scale is exactly 1): 0.18 -> 128, 0.5 -> 175, 1.0 -> 204, 2.0 -> 226, 4.0 -> 241, 16 -> 255, 50 -> 255. The curve separates every stop below scene white by tens of display levels, separates a doubling above it by fifteen, and separates nothing at all above about sixteen. That last clause is the Lighting Lab's sentence -- 'any lighting measurement read through the tone curve is a measurement of the tone curve' -- as a number, and it is asserted in test_hdr_lab_gpu.cpp with the low end as its control. With the chain's DEFAULT bloom on (intensity 0.2, threshold 1.0) every patch above the threshold is also lifted: 16.0 arrives at the tonemap as 18.95.",
+   "fixture": "examples/labs/hdr-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "An exposure arm cannot be written as a case: labs::LabCase carries a camera, a size, a tier, pass arms and quality arms, and no way to set a parameter -- so 'the same frame at ev-2' lives in the test file. See docs/hdr-lab/README.md section 6."
+  },
+  {
+   "lab": "hdr",
+   "number": 3,
+   "title": "The card at twice the render scale",
+   "question": "Does supersampling change what the curve does to a flat patch?",
+   "expectation": "No, and it must not: the patches are large and flat, so there is no spatial frequency for a resolution change to reach. Read against case 2 patch for patch. This is the control for case 6, where the same flag moves a small highlight's glow by half -- an arm whose control also moved would be measuring the render scale rather than the bloom.",
+   "fixture": "examples/labs/hdr-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "supersample": 2.0
+  },
+  {
+   "lab": "hdr",
+   "number": 4,
+   "title": "The two bright sources, and the glow around them",
+   "question": "What does the bloom pyramid do with a highlight fifteen pixels across and one two hundred pixels across?",
+   "expectation": "The fixture's page 2: a 0.3 m emitter at radiance 64 and a 4.0 m one beside it, on black. At 1280x720 the small one's halo reaches r99 = 0.119 of the frame height and the large one's 0.190 -- the large source's own width is 0.138 of the frame, so almost all of its halo IS the source and only the small one's is the filter. Run with --post-stages to see it assembled: twelve stages, the pyramid's mean going 3.5607 at the prefilter to 3.5562 at up0, which is the energy-conserving upsample of ADR-039 measured rather than asserted.",
+   "fixture": "examples/labs/hdr-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     100.0,
+     0.0,
+     20.0
+    ],
+    "aim": [
+     100.0,
+     0.0,
+     0.0
+    ]
+   },
+   "notes": "avgen --headless --composition examples/labs/hdr-lab.scene.json --size 1280x720 --range 0.5:0.5 --render out --post-stages stages"
+  },
+  {
+   "lab": "hdr",
+   "number": 5,
+   "title": "The same two sources at a third of the resolution",
+   "question": "Is the glow a fixed fraction of the picture, or a fixed number of pixels?",
+   "expectation": "A fixed number of pixels, and that is the finding. Six pyramid levels from half resolution means the coarsest level's texel is 2^6 = 64 OUTPUT pixels whatever the frame's size, so the reach is measured in pixels. Against case 4 the small source's r99 roughly doubles as a fraction of the frame when the frame is a third as tall. The large source is the control and barely moves, because its halo is mostly its own width. Nothing here is a defect of the pyramid's arithmetic -- the halo is centred on its source to within 0.2 px at every size measured -- it is what a fixed level COUNT means.",
+   "fixture": "examples/labs/hdr-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    640,
+    360
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     100.0,
+     0.0,
+     20.0
+    ],
+    "aim": [
+     100.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "lab": "hdr",
+   "number": 6,
+   "title": "The two sources with the deliverable's supersampling on",
+   "question": "Does --supersample 2 change the look, or only the sampling?",
+   "expectation": "It changes the look of a small highlight. The whole post chain runs at the scene target, which render_job sets to output * supersample, so at 2 the pyramid's fixed 64-pixel coarsest texel is half as much of the delivered frame. Measured through SceneRenderer at a 1280x720 output: the 0.3 m source's r99 goes 0.11944 -> 0.06042 of the frame height, a ratio of 0.506, while the 4.0 m source beside it goes 0.19028 -> 0.18472 and is the control that says the frame is otherwise the same shot. Case 3 is the second control, on a patch with no highlight in it at all.",
+   "fixture": "examples/labs/hdr-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     100.0,
+     0.0,
+     20.0
+    ],
+    "aim": [
+     100.0,
+     0.0,
+     0.0
+    ]
+   },
+   "supersample": 2.0,
+   "notes": "Finding, not fix: making the halo a fixed fraction of the frame means scaling the level count with the resolution, which changes every render at every size that is not the one it was tuned at. See docs/hdr-lab/README.md section 5.2."
+  },
+  {
+   "lab": "hdr",
+   "number": 7,
+   "title": "The two sources with the chain switched off",
+   "question": "How much of what cases 4, 5 and 6 measure is the post chain, and how much is the source?",
+   "expectation": "All of the halo and none of the source. With post disabled each emitter is exactly its own rectangle at radiance 64 with a hard edge, at 0.3 m and 4.0 m -- 15 px and 198 px of a 720-line frame. Any r99 above the source's own half-width in cases 4 to 6 is the pyramid, and the source's width itself must be identical in all four, at every resolution and both render scales, or those cases are comparing two different shots.",
+   "fixture": "examples/labs/hdr-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "camera": {
+    "eye": [
+     100.0,
+     0.0,
+     20.0
+    ],
+    "aim": [
+     100.0,
+     0.0,
+     0.0
+    ]
+   },
+   "disable": [
+    "post"
+   ]
+  }
+ ]
+}

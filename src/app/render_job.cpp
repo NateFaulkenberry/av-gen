@@ -7,6 +7,7 @@
 #include "assets/image.hpp"
 #include "core/log.hpp"
 #include "gpu/context.hpp"
+#include "gpu/readback.hpp"
 #include "rendering/debug_visualizer.hpp"
 
 #include <fmt/format.h>
@@ -282,6 +283,20 @@ Result<void> RenderJob::start() {
         ldrView_ = ldr_.CreateView();
     }
     ring_ = std::make_unique<gpu::ReadbackRing>(context_, 3);
+
+    // ADR-277: the post chain's own intermediates. Resolved here, as the AOVs are, so an
+    // unwritable directory fails at start() rather than after the first frame.
+    if (!settings_.postStages.empty()) {
+        std::error_code ec;
+        std::filesystem::create_directories(settings_.postStages, ec);
+        if (ec) {
+            return avgen::fail("cannot create '{}' for post stages: {}", settings_.postStages.string(),
+                               ec.message());
+        }
+        log::warn("render: --post-stages is a DIAGNOSTIC -- every stage is read back synchronously, "
+                  "so this run's frame timings mean nothing. Writing to '{}'",
+                  settings_.postStages.string());
+    }
 
     // ADR-242: AOV export. The auxiliary targets have been written every frame since ADR-035 and
     // nothing outside a debug view has ever read them; this is the consumer. Resolved here rather
@@ -559,6 +574,68 @@ void RenderJob::encoderLoop() {
     }
 }
 
+// ADR-277: every intermediate the post chain rendered for the frame just submitted, as its own
+// scene-linear EXR, plus a manifest naming them with the structural numbers a person would
+// otherwise have to open a file to get (ADR-170 prefers those over milliseconds).
+//
+// The capture handles alias transient-pool entries. `SceneRenderer::render` has already called
+// `pool_->endFrame()`, which RETURNS them to the pool rather than destroying them, so their
+// contents are the frame's until the next render reuses a slot. That is why this runs here and
+// not at the end of the job, and it is the same window `test_post_artifact_forensics_gpu.cpp`
+// reads in.
+Result<void> RenderJob::writePostStages() {
+    const rendering::PostCapture capture = renderer_->post().takeCapture();
+    nlohmann::json manifest;
+    manifest["format"] = "avgen-post-stages";
+    manifest["version"] = 1;
+    manifest["frame"] = rendered_;
+    manifest["output"] = {{"width", settings_.width}, {"height", settings_.height}};
+    manifest["exposure"] = {{"scale", renderer_->stats().post.exposureScale},
+                            {"ev100", renderer_->stats().post.exposureEv100},
+                            {"meteredLuminance", renderer_->stats().post.meteredLuminance}};
+    nlohmann::json stages = nlohmann::json::array();
+    for (const rendering::PostCaptureStage& stage : capture.stages) {
+        auto image = gpu::readTextureF16(context_, stage.texture.texture, stage.texture.width, stage.texture.height);
+        if (!image) {
+            return std::unexpected(image.error());
+        }
+        // '/' is a directory separator and a stage name is "bloom/down3"; the file is flat so the
+        // manifest and the listing sort together.
+        std::string file = stage.name;
+        std::replace(file.begin(), file.end(), '/', '-');
+        file = fmt::format("frame_{:06d}.{}.exr", rendered_, file);
+        if (auto r = assets::writeExr(settings_.postStages / file, image->width, image->height, image->rgba);
+            !r) {
+            return r;
+        }
+        double total = 0.0;
+        float peak = 0.0f;
+        const std::size_t count = static_cast<std::size_t>(image->width) * image->height;
+        for (std::size_t i = 0; i < count; ++i) {
+            const float* px = image->rgba.data() + i * 4;
+            const float lum = 0.2126f * px[0] + 0.7152f * px[1] + 0.0722f * px[2];
+            peak = std::max(peak, lum);
+            total += static_cast<double>(lum);
+        }
+        stages.push_back({{"name", stage.name},
+                          {"file", file},
+                          {"width", image->width},
+                          {"height", image->height},
+                          {"peakLuminance", peak},
+                          {"meanLuminance", count == 0 ? 0.0 : total / static_cast<double>(count)}});
+    }
+    manifest["stages"] = std::move(stages);
+    const std::filesystem::path path = settings_.postStages / fmt::format("frame_{:06d}.stages.json", rendered_);
+    std::ofstream file(path);
+    file << manifest.dump(1);
+    if (!file) {
+        return avgen::fail("cannot write '{}'", path.string());
+    }
+    log::info("render: wrote {} post stage(s) for frame {} to '{}'", capture.stages.size(), rendered_,
+              settings_.postStages.string());
+    return {};
+}
+
 Result<void> RenderJob::renderOne() {
     const FrameTime time = engine_->tick(*clock_);
     engine_->setViewport(settings_.width, settings_.height);
@@ -583,6 +660,11 @@ Result<void> RenderJob::renderOne() {
     // and starts the map, and only blocks when all its slots are still on the GPU.
     wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();
     const gpu::TargetView target{ldrView_, wgpu::TextureFormat::RGBA8Unorm, settings_.width, settings_.height};
+    // ADR-277. Arming widens the pyramid and wide targets with CopySrc and changes nothing else:
+    // every pass, every uniform and every resolution is the production one.
+    if (!settings_.postStages.empty()) {
+        renderer_->post().armCapture();
+    }
     if (auto r = renderer_->render(encoder, engine_->scene(), time, target, &shaderInputs); !r) {
         return r;
     }
@@ -618,6 +700,11 @@ Result<void> RenderJob::renderOne() {
         if (auto r = aovRing_->enqueue(*a.texture, settings_.width, settings_.height,
                                        rendered_ * aovs_.size() + i, a.format);
             !r) {
+            return r;
+        }
+    }
+    if (!settings_.postStages.empty()) {
+        if (auto r = writePostStages(); !r) {
             return r;
         }
     }

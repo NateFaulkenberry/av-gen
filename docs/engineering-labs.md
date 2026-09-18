@@ -319,7 +319,7 @@ the copy that a test checks.
 | Camera / Framing **(built)** | camera pose, the frustum handed to the cull, clearance, line of sight, which camera the viewport shows | which objects survive that frustum → Visibility | `src/world/camera_clearance.cpp:heroSightline` |
 | Shadow **(built)** | cascade fitting, the caster list, the atlas, the mask, the contact march | the light's position and intensity → Lighting; which LOD rung an instance draws at → LOD; how the camera frustum is built → Camera | `shadow_math.cpp:casterState` |
 | Lighting **(built)** | light packing, the reach a light is given, cluster assignment and the froxel a fragment reads, LTC, IBL | whether a light is occluded → Shadow; what post does with the radiance → HDR | `light_data.cpp:assignClusters` |
-| HDR / Exposure / Bloom | metering, exposure state, bloom, halation, tonemap | the radiance that entered → Lighting | `post_processor.cpp:PostProcessor::run` |
+| HDR / Exposure / Bloom **(built)** | metering, the exposure state, the bright pass, the bloom and halation pyramids, the wide tier, the composite and the tonemap operator | the radiance that entered → Lighting | `post_processor.cpp:PostProcessor::run` |
 | Volumetric / Atmosphere | the march, its scaling, the composite, atmospheric effects | the bloom the in-scatter feeds → HDR | `src/rendering/volume_renderer.cpp` |
 | Particle / VFX | emission, simulation, compaction, indirect draw, velocity writes | the fields that push them — authored data | `src/rendering/particle_renderer.cpp` |
 | Temporal Stability | every piece of state crossing a frame: GTAO history, LOD hysteresis and spread, the 1–3 frame cull readback lag, the exposure meter | how loudly it reads to a person → Rendering | `src/rendering/ao_renderer.cpp` |
@@ -488,7 +488,18 @@ the debug flag. `[gpu]` tests take `tools/gpu-lock.sh`.
    `tools/link-worktree-assets.sh`. **This is §37 with the sign flipped**: a test environment that
    silently lacks its data produces failures that are not about the code, and a lab suite whose
    fixtures use production assets (§29 asks for exactly that) inherits the trap.
-6. **`indtune.cpp` at the repository root is a 0-byte file** referenced by no CMakeLists, and
+6. **A scene file cannot author an emissive above 50.** `material/emissive` is registered with a
+   hard maximum of 50 (`src/scene/procedural.cpp`) and the parameter clamps an authored 256 with no
+   warning; `baseColor` and `emissiveColor` clamp to [0, 1], so `emissiveIntensity` is the only
+   route above unit radiance from a scene file and 50 is its ceiling. ADR-225's defect in an
+   authoring format, the same shape as the Lighting Lab's `coneDegrees` in a different parser.
+   Found by the HDR Lab's fixture, which asked for 256 and got 50. **Owner: whoever owns
+   `procedural.cpp`'s parameter table** — not a lab.
+7. **The bloom pyramid's reach is a pixel count, not a fraction of the frame**, so `--supersample 2`
+   halves a small highlight's glow across the delivered picture. Measured, with two controls, in
+   ADR-278; deliberately not changed, because the fix is an art-direction decision. **Owner: the
+   owner.**
+8. **`indtune.cpp` at the repository root is a 0-byte file** referenced by no CMakeLists, and
    `avgen_bench_flatten` is marked temporary and slated for deletion with its investigation.
 
 ---
@@ -511,6 +522,10 @@ see [camera-lab.md](camera-lab.md). They share no file. Visibility must land bef
 *Lighting* → *HDR* → *Volumetric*, in that order and preferably not concurrently: all three write to
 `post_processor.cpp` or the scene pass's uniforms, and an exposure change and a bloom change landing
 together cannot be told apart. This is the one group where parallelism costs more than it buys.
+**Lighting and HDR are built** ([lighting-lab](lighting-lab/README.md),
+[hdr-lab](hdr-lab/README.md)); neither changed a shader, and HDR's only edit to
+`post_processor.cpp` is one line in `resetExposure` (ADR-277 §2), so Volumetric still enters a post
+chain it can measure against main.
 
 **Wave 4 — the two that consume everything above.**
 *AOV* (`render_job.cpp`, `render_settings.cpp`) and *Temporal* (`ao_renderer.cpp`, and the LOD

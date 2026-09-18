@@ -841,3 +841,238 @@ TEST_CASE("supersampling changes how much of the frame a highlight glows over", 
     bench.renderer->setQualitySettings(q);
     CHECK(bench.ctx->errorCount() == 0);
 }
+
+// ================================================================================================
+// The assertions. Everything above prints; everything below fails.
+// ================================================================================================
+
+// §26: the invariant, stated before the test. A calibrated card is worth nothing unless its
+// patches are the values it claims, so this is the arm every other reading in this file rests on.
+// With post disabled there is nothing between the shaded pixel and the readback, and an unlit
+// surface's radiance is `baseColor + emissiveColor * emissiveIntensity` exactly.
+TEST_CASE("the HDR fixture's patches are the radiances it authors", "[hdr][lab][gpu]") {
+    HdrBench bench = HdrBench::make();
+    rendering::SceneRenderer::PassToggles toggles;
+    toggles.post = false;
+    bench.renderer->setPassToggles(toggles);
+    const gpu::ImageF raw = bench.hdr();
+    for (const Patch& p : kWedge) {
+        const glm::vec3 got = sampleF(raw, cellU(p.col), cellV(p.row));
+        INFO("patch " << p.name);
+        // Half-float carries 0.18 as 0.17993, which is the format and not the fixture.
+        CHECK(std::abs(got.r - p.authored.r) <= 0.002f * std::max(1.0f, p.authored.r));
+        CHECK(std::abs(got.g - p.authored.g) <= 0.002f * std::max(1.0f, p.authored.g));
+        CHECK(std::abs(got.b - p.authored.b) <= 0.002f * std::max(1.0f, p.authored.b));
+    }
+    CHECK(bench.ctx->errorCount() == 0);
+}
+
+// The Lighting Lab drew a boundary in code -- its GPU probe disables post -- on the grounds that
+// "any lighting measurement read through the tone curve is a measurement of the tone curve". This
+// is the number behind that sentence, and it is an invariant with a control at each end: below
+// scene white the curve separates every step of the wedge, and above about sixteen it separates
+// none of them. A change to the operator that moved either end would be a change to what every
+// other lab can measure through it, and this is where it fails.
+TEST_CASE("where AgX stops being able to tell two radiances apart", "[hdr][lab][gpu]") {
+    HdrBench bench = HdrBench::make();
+    // Bloom off: the chain's default adds 0.2 of a bloom pyramid to every patch, and this arm is
+    // about the curve and not about the chain. The composite still runs (it always does) and is
+    // arithmetically the identity at these settings.
+    bench.setBool("post/bloom/enabled", false);
+    bench.apply();
+    const gpu::ImageF linear = bench.hdr();
+    const gpu::Image8 shown = bench.display();
+
+    auto grey = [&](const char* name) {
+        for (const Patch& p : kWedge) {
+            if (std::string_view(p.name) == name) {
+                return std::pair{sampleF(linear, cellU(p.col), cellV(p.row)).r,
+                                 sample8(shown, cellU(p.col), cellV(p.row)).r};
+            }
+        }
+        FAIL("no patch named " << name);
+        return std::pair{0.0f, 0.0f};
+    };
+    const auto [l018, d018] = grey("grey-018");
+    const auto [l050, d050] = grey("grey-050");
+    const auto [l100, d100] = grey("grey-100");
+    const auto [l200, d200] = grey("grey-200");
+    const auto [l400, d400] = grey("grey-400");
+    const auto [l1600, d1600] = grey("grey-1600");
+    const auto [l5000, d5000] = grey("grey-5000");
+    INFO("linear " << l018 << " " << l050 << " " << l100 << " " << l200 << " " << l400 << " " << l1600 << " " << l5000);
+    INFO("display " << d018 << " " << d050 << " " << d100 << " " << d200 << " " << d400 << " " << d1600 << " "
+                    << d5000);
+
+    // The control: the scene-linear side keeps every step, so a failure below is the curve and not
+    // the fixture, the exposure or the composite.
+    CHECK(l050 > l018 * 2.5f);
+    CHECK(l100 > l050 * 1.8f);
+    CHECK(l1600 > l400 * 3.5f);
+    CHECK(l5000 > l1600 * 2.9f);
+
+    // Below scene white the curve separates every stop, and generously.
+    CHECK(d050 - d018 > 30.0f);
+    CHECK(d100 - d050 > 20.0f);
+    // Above it the same doubling is worth a handful of levels...
+    CHECK(d200 - d100 > 5.0f);
+    CHECK(d200 - d100 < 40.0f);
+    CHECK(d400 - d200 < 25.0f);
+    // ...and past sixteen it is worth nothing at all: a further factor of three in radiance moves
+    // the display by less than one level. This is the sentence "a lighting measurement read
+    // through the tone curve is a measurement of the tone curve", as a number.
+    CHECK(d1600 >= 254.0f);
+    CHECK(std::abs(d5000 - d1600) <= 1.0f);
+    CHECK(bench.ctx->errorCount() == 0);
+}
+
+// The bright pass gates on luminance; every tone curve here compresses each channel on its own.
+// The invariant this asserts is the one the code actually implements -- the radiance a hue needs
+// to cross the bloom threshold is inversely proportional to its luminance -- so that a change of
+// basis (to the peak channel, say) is a deliberate change with a test to update rather than a
+// silent one. The neutral emitter is the control: its luminance is 1 by construction.
+TEST_CASE("the bright pass gates a hue on its luminance, not on its brightest channel", "[hdr][lab][gpu]") {
+    PostBench bench = PostBench::make();
+    scene::PostSettings settings = neutralPost();
+    settings.bloomEnabled = true;
+    settings.bloomIntensity = 1.0f;
+    settings.bloomThreshold = 1.0f;
+    settings.bloomKnee = 0.5f;
+    settings.bloomLevels = 6;
+
+    constexpr std::uint32_t kW = 256;
+    constexpr std::uint32_t kH = 128;
+    struct Emitter {
+        const char* name;
+        glm::vec3 hue;
+    };
+    const Emitter emitters[] = {
+        {"neutral", {1.0f, 1.0f, 1.0f}}, {"green", {0.0f, 1.0f, 0.0f}}, {"red", {1.0f, 0.0f, 0.0f}},
+        {"blue", {0.0f, 0.0f, 1.0f}},    {"cyan", {0.0f, 1.0f, 1.0f}},  {"violet", {0.5f, 0.0f, 1.0f}},
+    };
+    float neutralCrossing = 0.0f;
+    for (const Emitter& e : emitters) {
+        float crossed = 0.0f;
+        for (float scale = 0.25f; scale <= 64.0f && crossed == 0.0f; scale *= 1.02f) {
+            Canvas canvas(kW, kH);
+            for (std::uint32_t y = kH / 2 - 8; y < kH / 2 + 8; ++y) {
+                for (std::uint32_t x = kW / 2 - 8; x < kW / 2 + 8; ++x) {
+                    canvas.set(x, y, e.hue.r * scale, e.hue.g * scale, e.hue.b * scale);
+                }
+            }
+            SyntheticHdr hdr = makeHdr(*bench.ctx, kW, kH, canvas.rgba);
+            const auto stages = bench.run(hdr, settings);
+            if (statOf(stageNamed(stages, "bloom/prefilter")).peak > 1e-3f) {
+                crossed = scale;
+            }
+            bench.pool->endFrame();
+        }
+        REQUIRE(crossed > 0.0f);
+        if (std::string_view(e.name) == "neutral") {
+            neutralCrossing = crossed;
+            continue;
+        }
+        const float lum = luminance(e.hue.r, e.hue.g, e.hue.b);
+        const float predicted = neutralCrossing / lum;
+        INFO(e.name << ": crosses at " << crossed << ", luminance " << lum << ", predicted " << predicted);
+        CHECK(std::abs(crossed - predicted) <= 0.06f * predicted);
+    }
+    // The control that gives the tolerance above teeth: blue and green differ by a factor of ten,
+    // so an assertion that held for both regardless of hue would be an assertion about nothing.
+    CHECK(neutralCrossing > 0.4f);
+    CHECK(neutralCrossing < 0.7f);
+    CHECK(bench.ctx->errorCount() == 0);
+}
+
+// The invariant: an assembled bloom pyramid puts a highlight's halo where the highlight is. The
+// pyramid's levels do NOT halve exactly at most frame sizes -- 1080 goes 540, 270, 135, 67, 33 --
+// and the passes address them in normalised uv, which assumes they do. 512x256 halves exactly six
+// times and is the control; a displacement that appeared only at 512x288 would be the truncation.
+//
+// The statistic is a centroid WINDOWED to twelve texels about the source. The unwindowed one is
+// the wrong instrument and reported a 27-pixel displacement that is the frame edge clipping a
+// halo wider than the frame, not the halo moving; that cost a run.
+TEST_CASE("the bloom pyramid puts the halo where the highlight is", "[hdr][lab][gpu]") {
+    PostBench bench = PostBench::make();
+    struct Size {
+        std::uint32_t w, h;
+    };
+    for (float radius : {1.0f, 1.9f}) {
+        scene::PostSettings settings = neutralPost();
+        settings.bloomEnabled = true;
+        settings.bloomIntensity = 1.0f;
+        settings.bloomThreshold = 1.0f;
+        settings.bloomKnee = 0.5f;
+        settings.bloomRadius = radius;
+        settings.bloomLevels = 6;
+        for (const Size& size : {Size{512, 256}, Size{512, 288}}) {
+            for (double frac : {0.5, 0.75}) {
+                Canvas canvas(size.w, size.h);
+                const auto px = static_cast<std::uint32_t>(size.w * frac);
+                const auto py = static_cast<std::uint32_t>(size.h * frac);
+                canvas.set(px, py, 64.0f);
+                SyntheticHdr hdr = makeHdr(*bench.ctx, size.w, size.h, canvas.rgba);
+                const auto stages = bench.run(hdr, settings);
+                const gpu::ImageF& up0 = stageNamed(stages, "bloom/up0");
+                const Centroid c = centroidOf(up0, (px + 0.5) / size.w, (py + 0.5) / size.h, 12.0);
+                // +0.5 px is what a half-resolution grid owes a point mass: the prefilter's box
+                // spans two source texels and its centroid is their shared boundary.
+                const double du = (c.u - (px + 0.5) / size.w) * size.w - 0.5;
+                const double dv = (c.v - (py + 0.5) / size.h) * size.h - 0.5;
+                INFO(size.w << "x" << size.h << " radius " << radius << " at " << frac << ": du=" << du
+                            << " dv=" << dv);
+                CHECK(std::abs(du) < 0.5);
+                CHECK(std::abs(dv) < 0.5);
+                bench.pool->endFrame();
+            }
+        }
+    }
+    CHECK(bench.ctx->errorCount() == 0);
+}
+
+// The invariant: moving a bright object across the frame does not change its glow. The
+// specification asks for bright-object movement and camera movement as separate variations; they
+// are the same variation as far as the post chain is concerned, because the chain has no history
+// and no knowledge of the camera -- it sees a different arrangement of the same pixels.
+TEST_CASE("a highlight's bloom does not depend on where in the frame it is", "[hdr][lab][gpu]") {
+    PostBench bench = PostBench::make();
+    scene::PostSettings settings = neutralPost();
+    settings.bloomEnabled = true;
+    settings.bloomIntensity = 1.0f;
+    settings.bloomThreshold = 1.0f;
+    settings.bloomKnee = 0.5f;
+    settings.bloomRadius = 1.0f;
+    settings.bloomLevels = 6;
+    float referencePeak = 0.0f;
+    double referenceR90 = 0.0;
+    double referenceTotal = 0.0;
+    for (const auto& [u, v] : {std::pair{0.5, 0.5}, std::pair{0.25, 0.5}, std::pair{0.75, 0.75},
+                               std::pair{0.1, 0.1}, std::pair{0.9, 0.5}}) {
+        Canvas canvas(1280, 720);
+        const auto px = static_cast<std::uint32_t>(1280 * u);
+        const auto py = static_cast<std::uint32_t>(720 * v);
+        canvas.set(px, py, 64.0f);
+        SyntheticHdr hdr = makeHdr(*bench.ctx, 1280, 720, canvas.rgba);
+        const auto stages = bench.run(hdr, settings);
+        const gpu::ImageF& up0 = stageNamed(stages, "bloom/up0");
+        const Stat s = statOf(up0);
+        const double r90 = energyRadius(up0, (px + 0.5) / 1280.0, (py + 0.5) / 720.0, 0.9);
+        INFO("u=" << u << " v=" << v << " peak=" << s.peak << " r90=" << r90 << " total=" << s.total);
+        if (referencePeak == 0.0f) {
+            referencePeak = s.peak;
+            referenceR90 = r90;
+            referenceTotal = s.total;
+            // The control: the halo has to exist before "it does not change" means anything.
+            CHECK(referencePeak > 1.0f);
+            CHECK(referenceR90 > 0.0);
+            continue;
+        }
+        CHECK(s.peak == referencePeak);
+        CHECK(r90 == referenceR90);
+        // Energy is allowed to leave the frame at a corner; nothing else may change.
+        CHECK(s.total > referenceTotal * 0.99);
+        CHECK(s.total <= referenceTotal * 1.001);
+        bench.pool->endFrame();
+    }
+    CHECK(bench.ctx->errorCount() == 0);
+}

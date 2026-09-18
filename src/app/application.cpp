@@ -201,6 +201,12 @@ std::string usageText() {
            "                      depth (metres), velocity, id, shadow (directional visibility of\n"
            "                      lights 0/1/2, recomputed at full resolution -- ADR-255; refused\n"
            "                      on a scene with no directional light). Comma separated.\n"
+           "  --post-stages <dir> offline render only: write every intermediate the post chain\n"
+           "                      rendered -- exposure, bloom/prefilter, bloom/downN, bloom/upN,\n"
+           "                      halation/*, wide, composite, fxaa, sharpen -- as scene-linear\n"
+           "                      EXRs at the resolution the chain chose, plus stages.json with\n"
+           "                      each one's extent, peak and mean. A diagnostic: the readback is\n"
+           "                      synchronous, so use it with --range t:t (ADR-277)\n"
            "                      size and resolve down (1 = off, max 2). Buys back the sub-pixel\n"
            "                      detail a small output cannot sample.\n"
            "  --profile-cpu       print the main thread's per-phase frame distribution on exit\n"
@@ -594,6 +600,13 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--aov");
             if (!v) return std::unexpected(v.error());
             options.aovs = *v;
+            ++i;
+        } else if (arg == "--post-stages") {
+            // ADR-277. Not a setting the project keeps: a diagnostic, like --debug-draw, that
+            // names where this run should put the chain's intermediates.
+            auto v = need(i, "--post-stages");
+            if (!v) return std::unexpected(v.error());
+            options.postStages = std::filesystem::path(*v);
             ++i;
         } else if (arg == "--canvas-scale") {
             auto v = need(i, "--canvas-scale");
@@ -4089,6 +4102,7 @@ RenderSettings Application::renderSettingsFromOptions() const {
     if (options_.quality) s.quality = *options_.quality;
     if (options_.supersample > 1.0f) s.supersample = options_.supersample;
     if (options_.aovs) s.aovs = *options_.aovs;
+    if (!options_.postStages.empty()) s.postStages = options_.postStages;
     return s;
 }
 
@@ -4187,6 +4201,7 @@ int Application::runQueue(const std::filesystem::path& queueFile) {
         if (options_.quality) settings.quality = *options_.quality;
         if (options_.supersample > 1.0f) settings.supersample = options_.supersample;
         if (options_.aovs) settings.aovs = *options_.aovs;
+        if (!options_.postStages.empty()) settings.postStages = options_.postStages;
         if (options_.renderOutput) settings.output = *options_.renderOutput;
         settings.normalisePattern();
         if (settings.outputPath.empty()) {
