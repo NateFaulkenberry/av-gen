@@ -534,3 +534,87 @@ TEST_CASE("the lab's fixture delivers every light kind to the renderer", "[light
         CHECK(rendering::lightInfluenceRadius(l) == Approx(l.range));
     }
 }
+
+TEST_CASE("a spot light's influence volume is a sphere, and this is what that costs",
+          "[lighting][lab][clusters]") {
+    // §5.3 of docs/lighting-lab/README.md, as a number rather than an assertion.
+    // `clusterTouchesSphere` is the only test the froxel grid makes, so a narrow spot is assigned
+    // to every froxel within `range` of its **position**, in every direction including behind it,
+    // and the shading pass then multiplies almost all of them by a spot term of zero.
+    //
+    // ADR-170: this is a count, not a millisecond. It is exact, it is the same sphere-against-box
+    // test the compute pass makes, and it does not depend on what else was running on the machine.
+    rendering::ClusterGrid grid;
+    grid.zNear = 0.1f;
+    grid.zFar = 200.0f;
+    grid.tanHalfFovY = std::tan(0.44f);
+    grid.aspect = 16.0f / 9.0f;
+
+    // Off the view axis, aimed across the frustum rather than down it: a spot on the axis pointing
+    // away from the camera is the centred box of this measurement.
+    const glm::vec3 viewPosition(-6.0f, 9.0f, -26.0f);
+    const glm::vec3 aim = glm::normalize(glm::vec3(0.35f, -1.0f, -0.2f));
+    constexpr float kRange = 40.0f;
+    constexpr float kOuter = 0.14f; // ~16 degrees full angle
+
+    const auto touched = [&](const glm::vec3& p, float radius) {
+        const auto report = rendering::lightAssignments(grid, {p}, {radius});
+        REQUIRE(report.size() == 1);
+        return report.front().touched;
+    };
+
+    // How many of those froxels the cone can reach, counted **conservatively**: a froxel counts
+    // when the angle from the light's axis to its centre, minus the angular radius of the sphere
+    // that bounds it, is inside the outer cone. That over-counts -- a box whose bounding sphere
+    // clips the cone need not itself be in it -- and over-counting is the direction an argument
+    // about waste has to err in. A corner test would have been cheaper and would have biased the
+    // finding the other way.
+    const auto inCone = [&](const glm::vec3& p, const glm::vec3& direction, float outerAngle) {
+        std::uint32_t reachable = 0;
+        for (std::uint32_t k = 0; k < grid.z; ++k) {
+            for (std::uint32_t j = 0; j < grid.y; ++j) {
+                for (std::uint32_t i = 0; i < grid.x; ++i) {
+                    if (!rendering::clusterTouchesSphere(grid, i, j, k, p, kRange)) {
+                        continue;
+                    }
+                    glm::vec3 lo;
+                    glm::vec3 hi;
+                    grid.bounds(i, j, k, lo, hi);
+                    const glm::vec3 centre = (lo + hi) * 0.5f;
+                    const float bounding = glm::length(hi - lo) * 0.5f;
+                    const glm::vec3 delta = centre - p;
+                    const float d = glm::length(delta);
+                    if (d <= bounding) {
+                        ++reachable; // the light is inside this froxel; every direction is in it
+                        continue;
+                    }
+                    const float angle = std::acos(std::clamp(glm::dot(delta / d, direction), -1.0f, 1.0f));
+                    const float spread = std::asin(std::clamp(bounding / d, 0.0f, 1.0f));
+                    reachable += angle - spread <= outerAngle ? 1u : 0u;
+                }
+            }
+        }
+        return reachable;
+    };
+
+    const std::uint32_t spotTouched = touched(viewPosition, kRange);
+    const std::uint32_t spotReachable = inCone(viewPosition, aim, kOuter);
+    INFO("spot: assigned to " << spotTouched << " froxels, " << spotReachable << " of which its cone reaches");
+    REQUIRE(spotTouched > 0);
+    REQUIRE(spotReachable > 0); // it lights something, or the measurement is about an unlit light
+
+    // The control, and it is what makes the spot's number mean anything: the identical sphere of
+    // influence belonging to a **point** light, whose cone is the whole sphere. Every froxel the
+    // grid gives it can receive light from it, so the ratio is one -- and the same code path
+    // computes both, so a ratio far from one for the spot is about the cone and not about the
+    // counting.
+    const std::uint32_t pointTouched = touched(viewPosition, kRange);
+    const std::uint32_t pointReachable = inCone(viewPosition, aim, kPi);
+    CHECK(pointTouched == spotTouched);
+    CHECK(pointReachable == pointTouched);
+
+    // The finding. A sixteen-degree cone subtends 0.0048 steradian of the 4*pi its sphere covers,
+    // so the froxel count is not expected to fall by that factor -- a froxel is large near the
+    // light -- but it must fall by a lot, and it does not fall at all today.
+    CHECK(spotReachable * 3u < spotTouched);
+}

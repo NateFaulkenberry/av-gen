@@ -1267,10 +1267,19 @@ TEST_CASE("a non-finite light is refused rather than packed into the GPU light r
         const rendering::GpuLight packed = rendering::packLight(light);
         CHECK(finite(packed.directionRange));
         CHECK(finite(packed.colorIntensity));
-        // `lightInfluenceRadius` is still infinite for such a light -- it is a pure function of the
-        // authored range and is not the guard's business. What matters is that it no longer reaches
-        // the packed record.
-        CHECK_FALSE(std::isfinite(rendering::lightInfluenceRadius(light)));
+        // ADR-272 reversed this. It used to read `CHECK_FALSE(std::isfinite(...))`, on the
+        // grounds that the reach is a pure function of the authored range and not the guard's
+        // business -- and that "what matters is that it no longer reaches the packed record".
+        //
+        // It reaches a different record. `SceneRenderer::updateLights` asks `packLight` for the
+        // light **and asks `lightInfluenceRadius` separately, on the scene light**, for the radius
+        // it writes into the froxel pass's own uniform. So an infinite range did reach the GPU,
+        // through `ClusterParamsGpu::lights[n].w`, on a light the packer had already refused. It
+        // was invisible rather than harmless: `w <= 0` is false for an infinity and the
+        // sphere-against-box test is false too, so the light was assigned to nothing by way of
+        // every comparison failing. `lightInfluenceRadius` now makes the same refusal in the same
+        // words, so both halves agree about what a broken light reaches: nothing.
+        CHECK(rendering::lightInfluenceRadius(light) == 0.0f);
     }
 }
 

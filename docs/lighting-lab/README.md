@@ -38,12 +38,18 @@ exactly four routes into `scene::Scene::lights`:
 | procedural ecology lights | `Composition::updateEcologyLights` | ADR-053; glow clusters near the camera become Point lights, capped by `kMaxEcologyLights` |
 | the default key | `defaultKeyLight()` (`src/scene/composition.cpp`) | added only when the scene has no rig **and** no lights |
 
-The practical consequence, and it cost a fixture design to find: `examples/labs/lod-geometry-lab.scene.json`
-carries a top-level `"lights"` array with an authored directional key in it. Nothing reads it. That
-scene is lit by `defaultKeyLight()` — a different direction, a different colour and a different
-intensity from the one written in the file. It is ADR-225's defect in a scene file, and it is why
-`tests/unit/test_lighting_lab.cpp` asserts that *this* lab's fixture delivers the lights it claims
-rather than assuming it.
+The practical consequence, and it cost a fixture design to find: **two** lab fixtures —
+`examples/labs/lod-geometry-lab.scene.json` and `examples/labs/visibility-culling-lab.scene.json` —
+carry a top-level `"lights"` array with an authored directional key in it. Nothing reads either.
+Both scenes are lit by `defaultKeyLight()`, at a different direction, a different colour and a
+different intensity from the one written in the file. It is ADR-225's defect in a scene file, it
+belongs to those two labs to decide about, and it is why `tests/unit/test_lighting_lab.cpp` asserts
+that *this* lab's fixture delivers the lights it claims rather than assuming it.
+
+It is also why the reach fix of §3.1 **cannot change a shipped frame**. Every non-directional light
+in this repository comes from a rig or from the ecology, and both set an explicit range; no asset
+carries a KHR_lights_punctual light; and a directional light never enters the froxel grid. The
+heuristic path is reached only by a light built in code, which today means the render tests.
 
 `LightRig::expand` is also the reason most of §1.3's arithmetic never runs in production: it sets
 `range = distance * 6` on **every** non-directional light it makes, and the ecology lights set
@@ -423,12 +429,22 @@ answerable from a frame rather than from a diagnostic, which is §37's own prefe
 
 ### 5.3 A light's influence volume is a sphere, whatever shape the light is
 
-`clusterTouchesSphere` is the only test the grid makes. A 16-degree spot is assigned to every froxel
-within `range` of its **position**, in every direction including behind it, and the shader then
-multiplies almost all of them by a spot term of zero. A cone-aware or an OBB test would cut that,
-and the lab's `lightAssignments` report is the instrument that would size the win before anyone
-wrote it. Not attempted here: a tighter assignment test that is wrong in one corner is a missing
-light, and this lab's first job was to stop cutting lights off, not to start.
+`clusterTouchesSphere` is the only test the grid makes. A spot is assigned to every froxel within
+`range` of its **position**, in every direction including behind it, and the shader then multiplies
+almost all of them by a spot term of zero.
+
+Measured, by `tests/unit/test_lighting_lab.cpp`: **a 16-degree spot at 40 m range is assigned to
+2,618 of the grid's 3,072 froxels, and its cone reaches 57 of them.** Forty-six times more than it
+can light, and eighty-five per cent of the whole grid, for one lamp. The reachable count is
+deliberately generous — a froxel counts when the angle to its centre minus the angular radius of
+its bounding sphere is inside the cone, which over-counts — and the control is the identical sphere
+belonging to a **point** light, whose cone is the whole sphere and whose ratio is therefore exactly
+one, computed by the same code.
+
+It is a count rather than a millisecond (ADR-170), and it is the instrument that would size a
+cone-aware or OBB assignment before anyone wrote one. Not attempted here: a tighter assignment test
+that is wrong in one corner is a missing light, and this lab's first job was to stop cutting lights
+off, not to start.
 
 ### 5.4 There is no light culling against the camera
 

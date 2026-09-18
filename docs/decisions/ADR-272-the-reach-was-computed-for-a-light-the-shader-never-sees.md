@@ -140,11 +140,15 @@ corridor seen edge-on is a small share of the image.
 ## 7. What was not attempted
 
 **A cone-aware or oriented influence volume.** `clusterTouchesSphere` is the only test the grid
-makes, so a 16-degree spot is assigned to every froxel within its range in every direction,
-including behind it, and the shader multiplies almost all of them by a spot term of zero.
-`lightAssignments` is the instrument that would size that win before anyone wrote it. It is not
-taken here because a tighter assignment test that is wrong in one corner is a missing light, and
-this lab's job was to stop cutting lights off rather than to start.
+makes, so a spot is assigned to every froxel within its range in every direction, including behind
+it, and the shader multiplies almost all of them by a spot term of zero. Measured: **a 16-degree
+spot at 40 m range takes 2,618 of the grid's 3,072 froxels and its cone reaches 57 of them** --
+forty-six times over-assigned, eighty-five per cent of the whole grid, for one lamp. The reachable
+count is deliberately generous (the angle to a froxel's centre minus the angular radius of its
+bounding sphere), and the control is the same sphere belonging to a point light, whose cone is the
+whole sphere and whose ratio is therefore exactly one, through the same code. It is not taken here
+because a tighter assignment test that is wrong in one corner is a missing light, and this lab's
+job was to stop cutting lights off rather than to start.
 
 **A per-light isolation arm.** `--disable` has arms for passes and `--quality-arm` for behaviours;
 neither can render a frame with one light. It is the single most useful thing that could be added

@@ -246,6 +246,10 @@ TEST_CASE("an area light with no authored range reaches as far as one that has i
     const double meanLevel = level / samples;
     INFO("mean channel difference " << mean << ", worst " << worst << ", over a control level of "
                                     << meanLevel);
+    // The fall-off curve itself, on demand. It is behind an environment variable rather than an
+    // assertion because it is the instrument this probe was *designed* with -- the first two
+    // versions passed with the defect present and reading the curve is what showed why -- and a
+    // 256-row dump in every run is noise nobody reads.
     if (std::getenv("AVGEN_LAB_DUMP") != nullptr) {
         const std::vector<float> a = falloffProfile(*arm);
         const std::vector<float> b = falloffProfile(*control);
