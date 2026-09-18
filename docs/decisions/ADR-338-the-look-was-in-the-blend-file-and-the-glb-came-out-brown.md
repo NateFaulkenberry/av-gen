@@ -1,4 +1,4 @@
-# ADR-337 — The look was in the .blend file and the GLB came out brown
+# ADR-338 — The look was in the .blend file and the GLB came out brown
 
 Status: Accepted
 Date: 2026-09-18

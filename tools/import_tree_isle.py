@@ -383,7 +383,7 @@ def main(argv: list[str]) -> int:
     manifest = {
         "source": (
             "Two externally authored hero assets, imported 2026-09-18 by "
-            "tools/import_tree_isle.py for the tree-of-life-floating-island project (ADR-337)."
+            "tools/import_tree_isle.py for the tree-of-life-floating-island project (ADR-338)."
         ),
         "license": (
             "Not recorded for either asset. The Tree of Life was generated for this project by the "
@@ -414,7 +414,7 @@ def main(argv: list[str]) -> int:
                     "in hero_pass/renders/Glowmere.png is a Blender shading setup that did not "
                     "survive this export. Only one of the seven materials carries any emission at "
                     "all. The scene restores the palette with material overrides; see "
-                    "docs/decisions/ADR-337."
+                    "docs/decisions/ADR-338."
                 ),
                 **tree,
             },
@@ -482,7 +482,7 @@ def main(argv: list[str]) -> int:
                 "note": (
                     "The island with nobody living on it. Kept because the built structures compete "
                     "with the Tree of Life for the frame -- at the scene's island scale the cottage "
-                    "is taller than the tree. See docs/decisions/ADR-337."
+                    "is taller than the tree. See docs/decisions/ADR-338."
                 ),
                 **island["bare"],
                 "objects": island["bareObjects"],

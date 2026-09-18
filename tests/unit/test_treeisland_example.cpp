@@ -2,7 +2,7 @@
 // things about it that are easy to break without anything failing.
 //
 // This file replaces `test_tree_example.cpp`, which guarded the *previous* Tree of Life -- a scene
-// assembled in C++ from a parameter vector. That project is retired (ADR-337); the tree is now an
+// assembled in C++ from a parameter vector. That project is retired (ADR-338); the tree is now an
 // externally authored hero export and this project presents it.
 //
 // Two of the checks here exist because of failures this repository has already had.
