@@ -289,7 +289,25 @@ it. Nothing here provides it either, and a layer kind called `RootMotion` that q
 
 ---
 
-## 9. What changed that nothing tested
+## 9. A GPU crash found on the way, which is not this branch's
+
+`avgen_render_tests` run whole, under `tools/gpu-lock.sh`, **dies with SIGBUS** late in the suite —
+after `test_tree_gpu` and `test_texture_share`, in the same neighbourhood on every run. Three runs on
+this branch, three crashes.
+
+It is **not this work**. The control is the merge base, `9d5347c`, built in its own worktree and run
+the same way under the same lock: **it crashes too**, with the same signal, in the same region. And
+`[tree]` — the only GPU tag that poses a skinned rig, 239 joints of it — **passes in isolation**,
+134 assertions in 5 test cases.
+
+Recorded here rather than fixed, because it belongs to whoever owns the render suite and because the
+honest thing to say about a crash you did not cause is where its control was taken. The CPU suite is
+the tier this unit is measured on and it is clean: **2,220 cases, 2,215 passed, 4 skipped, 1 failed
+as expected** — `test_character_lab_slopes`, ADR-260's deliberate `[!shouldfail]` invariant.
+
+---
+
+## 10. What changed that nothing tested
 
 Any scene authoring `animation.layers` on a node now poses differently; **no scene in this
 repository authored one before this change**, so every existing render is byte-identical and the
