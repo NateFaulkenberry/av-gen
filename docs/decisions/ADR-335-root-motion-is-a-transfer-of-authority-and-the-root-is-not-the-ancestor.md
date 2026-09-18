@@ -138,6 +138,20 @@ implementation and it is the one thing that could not have survived a seek (ADR-
 The two fields the entity does keep — the previous sample and its generation — are cleared by
 `EntityWorld::reset`, so a replay rebuilds them from the first step it runs.
 
+**Measured.** The entity reaches its final position by summing ~60 differences, and the sum of a
+telescoping series is its endpoints. Against the clip's closed form at the second each arm actually
+stops on:
+
+| rate | frames | last second | summed y | closed form y | error |
+|---|---:|---:|---:|---:|---:|
+| 60 Hz | 60 | 0.98333 | −2.04594 | −2.04594 | **0.0000005 m** |
+| 40 Hz | 40 | 0.97500 | −2.04607 | −2.04607 | **0.0000000 m** |
+| 24 Hz | 24 | 0.95833 | −2.04646 | −2.04645 | **0.0000007 m** |
+
+The control on that arm is that the three rates are *not* three copies of the same arithmetic: they
+stop on three different seconds and 0.00274 m apart, so each agreeing with its own closed form to
+under a micron is a statement and not a tautology.
+
 `RootMotionSample::generation` is the run a sample belongs to, hashed from the state index and the
 second it was entered at. Two samples may only be differenced when it agrees. Without it, a
 cross-fade out of `Landing` and back in hands the entity **+0.5306 model units in one step** — the
@@ -231,7 +245,20 @@ is the bug ADR-182 is named after.
 2. **`addDefaultStates` makes every clip loop.** `Landing`'s playable length is 1.0667 s; an arm
    that sampled at 1.10 s read a body that had landed and then teleported back into the air, and
    reported −0.06 for a −0.57 displacement.
-3. The scene fixture is a temp file, not an addition to
+3. **The closed form was 33 ms of clip early.** A state's local clock starts at zero and the clip
+   it plays starts wherever its keys do -- 1/30 s on every take in the alien pack, because Blender
+   writes the frame range it was given (`animation.hpp` says what that cost the pack once
+   already). Arm F's closed form omitted `clip.start` and reported a **3.9 mm** error at all three
+   rates. The tell was that it was the same at all three: accumulation noise grows with the number
+   of accumulations and a constant offset does not.
+4. **A floor that was a snapshot.** `test_character_intelligence_lab.cpp` asserted
+   `blocked >= 2` over the lab's case list; P9 answering case 13 dropped it to 1 and the line
+   failed, correctly. The check is a liveness control on the "a blocked case names a unit" arm
+   above it -- which asserts nothing when nothing is blocked -- so it is now `>= 1` with that said
+   out loud, plus `runnable + blocked == cases.size()`, and a note that the day the last case is
+   answered the check and `LabCase::blockedBy` go together rather than the number being lowered
+   again.
+5. The scene fixture is a temp file, not an addition to
    `examples/labs/character/character-intelligence-lab.scene.json`. Six bodies there perceive and
    score one another and case 15's golden position trace is taken from it; a seventh would change
    what the other five see (the plan says so about P11 and it is just as true here).

@@ -704,3 +704,80 @@ TEST_CASE("a clip change ends a run of root motion rather than unwinding it", "[
     // The real consumer's step across the same boundary is the displacement of the new run alone.
     CHECK(std::abs(again.displacement.y) < 0.08f);
 }
+
+// ================================================================================================
+// F. Determinism. The frame rate decides how many samples, never what they add up to.
+// ================================================================================================
+
+TEST_CASE("the accumulated root motion is the clip's closed form, at any frame rate",
+          "[unit][rootmotion]") {
+    if (!assetsPresent()) {
+        SKIP("assets/aliens/alien-scout.glb not present");
+    }
+    constexpr float kScale = 3.61f;
+
+    // The closed form: the clip's own displacement at the second the arm stops on, times the
+    // scale. The entity gets there by summing ~60 differences, and the sum of a telescoping series
+    // is its endpoints -- which is exactly the property a running total kept on the rig would not
+    // have had, and the reason `rootMotionAt` measures from the clip's first key every time
+    // rather than from the previous frame (ADR-091, ADR-267 D4).
+    const scene::Scene s = loadScout();
+    const scene::SkinnedRig& asset = s.rigs[0];
+    scene::RootMotionSet set;
+    REQUIRE(set.bind({scene::RootMotionSpec{"Landing", "", {}}}, asset.skeleton, asset.clips).empty());
+    const scene::RootMotionBinding& b = *set.find(asset.findClip("Landing"));
+    scene::Pose scratch;
+
+    struct Arm {
+        double hz;
+        const char* tag;
+    };
+    std::vector<glm::vec3> errors;
+    for (const Arm& arm : {Arm{60.0, "60hz"}, Arm{40.0, "40hz"}, Arm{24.0, "24hz"}}) {
+        EngineArm e(true, false, kScale, arm.tag);
+        e.play(1.0, arm.hz);
+        // The last second this arm actually rendered, which is not 1.0 s and is not the same on
+        // all three: an arm that compared final positions between rates rather than each against
+        // its own closed form would be measuring the sub-frame remainder, not determinism.
+        const auto frames = static_cast<int>(std::llround(1.0 * arm.hz));
+        const double last = static_cast<double>(frames - 1) / arm.hz;
+        // `clip.start`, not zero. A state's local clock starts at zero and the *clip* it plays
+        // starts wherever its keys do -- 1/30 s on every take in the alien pack, because Blender
+        // writes the frame range it was given. Omitting it put the closed form 33 ms of clip
+        // early and the arm reported a systematic 3.9 mm error at all three rates, which is what
+        // a constant offset looks like when you were expecting accumulation noise.
+        const float clipSeconds =
+            asset.clips[static_cast<std::size_t>(b.clip)].start + static_cast<float>(last);
+        const glm::vec3 closed =
+            scene::rootMotionDisplacement(asset.skeleton, asset.clips, b, clipSeconds, scratch) *
+            kScale;
+        const glm::vec3 got = e.subject().state().position();
+        const glm::vec3 err = got - closed;
+        INFO(fmt::format("{}: {} frames to t={:.5f}; summed ({:+.5f}, {:+.5f}, {:+.5f}), closed "
+                         "form ({:+.5f}, {:+.5f}, {:+.5f}), error {:.7f} m",
+                         arm.tag, frames, last, got.x, got.y, got.z, closed.x, closed.y, closed.z,
+                         glm::length(err)));
+        // A tenth of a millimetre over two metres of travel and sixty accumulations.
+        CHECK(glm::length(err) < 1e-4f);
+        // And the closed form is not trivially zero, which is what would make the check above
+        // pass on a body that never moved.
+        CHECK(closed.y < -1.9f);
+        errors.push_back(err);
+    }
+
+    // ---- the control ---------------------------------------------------------------------------
+    // The three rates land on three different seconds and therefore three different positions, so
+    // this is not three copies of the same arithmetic: they disagree with one another by more than
+    // the tolerance each one meets against its own closed form.
+    REQUIRE(errors.size() == 3);
+    EngineArm a60(true, false, kScale, "c60");
+    EngineArm a24(true, false, kScale, "c24");
+    a60.play(1.0, 60.0);
+    a24.play(1.0, 24.0);
+    const float between =
+        glm::length(a60.subject().state().position() - a24.subject().state().position());
+    INFO(fmt::format("60 Hz and 24 Hz stop {:.5f} m apart, and each is within 1e-4 m of its own "
+                     "closed form",
+                     between));
+    CHECK(between > 1e-3f);
+}

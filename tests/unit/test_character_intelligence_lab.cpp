@@ -221,7 +221,14 @@ TEST_CASE("the Character Intelligence Lab is registered and its cases resolve",
     }
     INFO(fmt::format("{} runnable, {} blocked", runnable, blocked));
     CHECK(runnable >= 4);
-    CHECK(blocked >= 2);
+    // One, not two. Case 13 was blocked on P9 and P9 has landed (ADR-335), so the count fell and
+    // this line failed -- which is the correct behaviour of a floor and the reason to say what it
+    // is a floor *on*. It is not a target and nobody should keep the number up: it is the
+    // liveness control on the `namesAUnit` arm above, which asserts nothing at all if no case is
+    // blocked. The day the last blocked case is answered, this check and that arm and
+    // `LabCase::blockedBy` go together, rather than this number being quietly lowered again.
+    CHECK(blocked >= 1);
+    CHECK(runnable + blocked == cases->size());
 
     // The control on `resolveCaseSpec`: a lab that exists with a number that does not is a
     // different failure from a lab that does not exist, and both are failures rather than silence.
