@@ -149,18 +149,35 @@ glowmere-valley-2    grid vouches: NO   (315 walks checked, 1 wrong)   build 321
 The stride, the angles and the reaches are fixed, so two builds of one world reach the same verdict
 on any machine — a verdict that varied would make a bake irreproducible (ADR-091).
 
-## 4. What this means, plainly
+## 4. What this means, plainly — including a number this ADR had wrong
 
-* **Glowmere gets part 1 and nothing else.** Its walkability queries are 1.9× cheaper and every
-  route is bit-identical. Its grid refuses to answer for its terrain and says so in the log.
-* **A world with authored, gentle ground gets all of it** — 3.97× on the simulation of a cast of
-  explorers, measured on the lab fixture at 0.000000 m of divergence over ninety seconds.
+* **Glowmere gets part 1 and nothing else.** Its walkability queries are 1.9× cheaper and every route
+  is bit-identical. Its grid refuses to answer for its terrain and says so in the log.
 * **`gridTrustMetres = 0` turns part 2 off entirely** and is what the probe's control arm runs.
+* **A world that qualifies gets about 1.4×**, and the first draft of this ADR said 3.97×. That figure
+  was Glowmere with the gate bypassed, not the lab fixture, and quoting it here was the wrong number
+  in the wrong place. Re-measured on the lab, three runs, minima, load 26.6:
 
-The thing this rejects is worth naming: an optimisation that is 4× faster and moves a character a
-metre in the first second is not an optimisation, it is a content change wearing one. The engine now
-holds the fast path *and* the measurement that says when it may be used, and the measurement is
-taken by the build rather than by whoever last remembered to.
+  ```
+  analytic only   75 ms of simulation, furthest body 149.73 m
+  grid-assisted   54 ms                furthest body 149.73 m   (1.39x)
+  ```
+
+**And the deflating part, which is the honest reading.** The grid buys most where the analytic query
+is dearest, and the analytic query is dearest where the terrain is rich — which is exactly where the
+self-check refuses. The lab's world is flat with one river and no noise layers, so its
+`WorldMap::height` is nearly free and there is not much for the grid to save. **The speed-up the gate
+permits is smallest in the worlds that pass it.**
+
+That does not make the mechanism worthless — it is 1.4× of a walking cast for free and exactly zero
+change to the picture, and an authored interior or a set-dressed flat stage is a real shape of scene.
+But it does mean part 1 is the win in this ADR and part 2 is the groundwork, and anyone reading this
+to decide where to spend the next day should spend it on `WorldMap::height` rather than on the grid.
+
+The thing this rejects is still worth naming: an optimisation that is 4× faster and moves a character
+a metre in the first second is not an optimisation, it is a content change wearing one. The engine now
+holds the fast path *and* the measurement that says when it may be used, and the measurement is taken
+by the build rather than by whoever last remembered to.
 
 ## 5. What would change the answer
 
