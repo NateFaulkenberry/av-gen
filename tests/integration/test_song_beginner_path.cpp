@@ -23,6 +23,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <filesystem>
 #include <set>
 
@@ -86,10 +87,19 @@ TEST_CASE("import, analyze, Song Mode: a first film with no performer rules",
     }
 
     // ---- step 4: the director turns the plan into shots --------------------------------------
+    //
+    // **The autonomy is stated, not inherited.** This used to pass `engine.autoDirector()` straight
+    // through, which is whatever freedom the demo project happened to be saved with -- and the
+    // owner saved it as `locked` in commit 5e3637c. Locked is one shot on one camera by definition,
+    // so the "more than one camera was used" assertion below became a claim about a JSON field
+    // rather than about the director, and failed. What this test is for is that the director can
+    // cut a film from an analyzed song, so it says which freedom it is asking for.
     scene::Composition* comp = engine.composition();
     REQUIRE(comp != nullptr);
-    const auto direction = app::directSongFromPlan(comp->heroes(), *plan, comp->cameraDirection(),
-                                                   engine.autoDirector());
+    app::AutoDirectorSettings settings = engine.autoDirector();
+    settings.autonomy = app::Autonomy::Expressive;
+    const auto direction =
+        app::directSongFromPlan(comp->heroes(), *plan, comp->cameraDirection(), settings);
     INFO((direction ? std::string() : direction.error().message));
     REQUIRE(direction.has_value());
 
@@ -119,7 +129,7 @@ TEST_CASE("import, analyze, Song Mode: a first film with no performer rules",
     CHECK(used.size() > 1);
 
     // ---- step 6: and it installs, which is what playback consumes ----------------------------
-    const auto installed = app::installSongDirection(engine, *direction, engine.autoDirector());
+    const auto installed = app::installSongDirection(engine, *direction, settings);
     INFO((installed ? std::string() : installed.error().message));
     REQUIRE(installed.has_value());
     CHECK(*installed > 0);
@@ -181,11 +191,15 @@ TEST_CASE("Song Mode bakes a film without touching the Shots lane", "[integratio
     REQUIRE(plan.has_value());
     scene::Composition* comp = engine.composition();
     REQUIRE(comp != nullptr);
-    const auto direction = app::directSongFromPlan(comp->heroes(), *plan, comp->cameraDirection(),
-                                                   engine.autoDirector());
+    // Stated rather than inherited, for the reason given at the first test's step 4: the demo is
+    // saved Locked, and Locked is one shot on one camera, which is not the thing under test here.
+    app::AutoDirectorSettings settings = engine.autoDirector();
+    settings.autonomy = app::Autonomy::Expressive;
+    const auto direction =
+        app::directSongFromPlan(comp->heroes(), *plan, comp->cameraDirection(), settings);
     REQUIRE(direction.has_value());
     REQUIRE(direction->sequence.shots.size() > 1); // the director really did decide a film
-    REQUIRE(app::installSongDirection(engine, *direction, engine.autoDirector()).has_value());
+    REQUIRE(app::installSongDirection(engine, *direction, settings).has_value());
 
     const seq::Sequence& after = engine.sequence();
 
@@ -376,7 +390,13 @@ TEST_CASE("Song Mode's sections follow the sequencer's", "[integration][song][se
     {
         seq::Sequence edited = engine.sequence();
         const double was = edited.sectionTimeline.sections[1].startSeconds;
-        const double now = was + 7.5;
+        // **A quarter of the section's own length, not a fixed 7.5 s.** `moveBoundary` clamps so
+        // neither neighbour falls under the minimum, so a fixed distance is a bet on the fixture
+        // staying roughly as long as it was. It did not: the owner split the opening of
+        // `glowmere-valley-2-multicam` into seven pieces of about 3.7 s each, the 7.5 s move
+        // clamped to 3.44 s, and this test started failing on a data edit rather than on a code
+        // change. A fraction of the span cannot clamp, so it measures what it meant to measure.
+        const double now = was + 0.25 * edited.sectionTimeline.sections[1].durationSeconds();
         REQUIRE(song::moveBoundary(edited.sectionTimeline, 1, now));
         edited.refreshSectionMarkers();
         REQUIRE(engine.setSequence(std::move(edited)).has_value());
@@ -396,8 +416,16 @@ TEST_CASE("Song Mode's sections follow the sequencer's", "[integration][song][se
     {
         seq::Sequence edited = engine.sequence();
         const std::size_t was = edited.sectionTimeline.sections.size();
-        const song::Section& target = edited.sectionTimeline.sections[1];
-        const double at = (target.startSeconds + target.endSeconds) * 0.5;
+        // The longest section, for the same reason: a fixture whose second section happens to be a
+        // quarter of a second long cannot be split, and refusing to split it is `splitSection`
+        // being right rather than this test finding something.
+        const auto& all = edited.sectionTimeline.sections;
+        const auto longest = std::max_element(
+            all.begin(), all.end(), [](const song::Section& a, const song::Section& b) {
+                return a.durationSeconds() < b.durationSeconds();
+            });
+        REQUIRE(longest != all.end());
+        const double at = (longest->startSeconds + longest->endSeconds) * 0.5;
         REQUIRE(song::splitSection(edited.sectionTimeline, at, 0.25));
         edited.refreshSectionMarkers();
         REQUIRE(engine.setSequence(std::move(edited)).has_value());

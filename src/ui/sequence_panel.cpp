@@ -2317,6 +2317,7 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
                                      piece.shotLanguage)) {
                 piece.refreshSectionMarkers();
                 touch();
+                sectionsEdited();
             }
         }
         if (ImGui::IsItemHovered() && current < static_cast<int>(types.size())) {
@@ -2356,6 +2357,7 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
                                                  piece.shotLanguage);
             if (ok) {
                 touch();
+                sectionsEdited();
             }
         }
         if (ImGui::IsItemHovered()) {
@@ -2431,6 +2433,7 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
                 (void)song::setSectionType(piece.sectionTimeline, index, *id, piece.shotLanguage);
                 piece.refreshSectionMarkers();
                 touch();
+                sectionsEdited();
                 ImGui::CloseCurrentPopup();
             }
         }

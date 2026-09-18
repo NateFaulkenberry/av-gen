@@ -282,7 +282,9 @@ SongPlan songPlanFromMeasurements(const analysis::SongStructure& structure) {
         out.transition = i == 0 ? 0.0f
                                 : std::clamp(std::abs(in.energy - structure.sections[i - 1].energy),
                                              0.0f, 1.0f);
-        out.autonomy = Autonomy::Guided;
+        // The top of the range, for the reason `songPlanFromCues` gives at length: nothing measured
+        // a section's autonomy, so nothing should be spending the film's ceiling on its behalf.
+        out.autonomy = Autonomy::Expressive;
 
         if (in.repetitionGroup >= 0) {
             out.occurrence = in.occurrence >= 0 ? in.occurrence : seenByGroup[in.repetitionGroup];
@@ -328,6 +330,22 @@ Result<SongPlan> songPlanFromCues(std::span<const song::SectionCue> cues) {
         section.energy = cue.energy;
         section.density = cue.density;
         section.occurrence = cue.occurrence;
+        // **A section with no opinion sits at the top of the range, not in the middle of it.**
+        //
+        // The effective autonomy is `min(section, film)`, and the film-wide control is documented as
+        // a ceiling that "can always be trusted to reduce". A `song::Section` carries no autonomy --
+        // the vocabulary is a type and a treatment, and how faithfully to execute one is a property
+        // of the *director* -- so every cue-derived section used to arrive at `SongPlanSection`'s
+        // `Guided` default and clamp the film to `Guided` forever. `Expressive` was therefore
+        // unreachable for every film directed from its section timeline, which, since
+        // `songPlanForEngine` put the film first, is every film Song Mode directs.
+        //
+        // Measured rather than reasoned: a 60 s section measuring energy 1.0 and density 1.0 baked
+        // six shots at `Expressive`, which is exactly what it baked at `Guided`. It bakes fifteen
+        // now. A ceiling nothing could raise to its own top value is a control nobody keeps
+        // (ADR-225), and it looked from the outside like a director that had read the measurements
+        // and been unimpressed.
+        section.autonomy = Autonomy::Expressive;
 
         ShotIntentProfile& profile = section.intent;
         profile.id = intent.id;

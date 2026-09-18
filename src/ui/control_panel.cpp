@@ -3634,15 +3634,29 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.35f, 1.0f), "%s", plan.error().message.c_str());
         return;
     }
-    const bool authored = !engine.songPlan().empty();
+    // **Where the plan came from, said the way `songPlanForEngine` decides it.**
+    //
+    // This used to read `!engine.songPlan().empty()` and call the answer "from this project's song
+    // plan", which stopped being true the day the film outranked the saved plan: a project with a
+    // section timeline *and* a saved plan is cut from the timeline and the panel said the opposite.
+    // A panel that misreports its own source sends a person to edit the wrong object, which is most
+    // of what made this feature look unwired.
+    const bool fromFilm = !engine.sequence().sectionTimeline.sections.empty();
+    const bool authored = !fromFilm && !engine.songPlan().empty();
     ImGui::TextDisabled("%zu section(s), %s", plan->sections.size(),
-                        authored ? "from this project's song plan"
-                                 : "derived from the analyzed structure");
-    if (!authored && ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Nobody has authored shot intents for this song yet, so each section's\n"
-                          "intent is derived from how loud and how busy it measured -- no labels\n"
-                          "are read. Change a section's freedom below and the derived plan becomes\n"
-                          "this project's own, saved with it.");
+                        fromFilm    ? "from the Sequencer's sections"
+                        : authored  ? "from this project's saved song plan"
+                                    : "derived from the analyzed structure");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+            fromFilm ? "Cut from the sections in the Sequencer, through each one's type and\n"
+                       "treatment. Change a section's Type or Shot there and the film re-cuts."
+            : authored ? "Cut from the song plan saved in this project. Add sections in the\n"
+                         "Sequencer and they take over: the thing being edited outranks a\n"
+                         "snapshot of what it used to be."
+                       : "Nobody has authored sections for this song yet, so each section's\n"
+                         "intent is derived from how loud and how busy it measured -- no labels\n"
+                         "are read.");
     }
 
     // The per-section rows. In a scrolling child, because a four-minute track is twenty of them and
@@ -3664,7 +3678,23 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
             const char* names[] = {app::autonomyName(app::Autonomy::Locked),
                                    app::autonomyName(app::Autonomy::Guided),
                                    app::autonomyName(app::Autonomy::Expressive)};
+            // **Disabled when the film is the source, because there is nowhere to put the answer.**
+            //
+            // This combo writes to `engine.songPlan()`, and a project with a section timeline is no
+            // longer cut from `engine.songPlan()` at all -- so every click landed on an object the
+            // director does not read. `song::Section` carries a type and a treatment and no
+            // autonomy: per-section freedom is not a thing the film can currently hold, and a
+            // control that cannot be kept is not a control (ADR-225). Shown rather than removed so
+            // that the film-wide radio above it still reads as the thing that governs.
+            ImGui::BeginDisabled(fromFilm);
             const bool retyped = ImGui::Combo("##autonomy", &rowAutonomy, names, IM_ARRAYSIZE(names));
+            ImGui::EndDisabled();
+            if (fromFilm && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip(
+                    "These sections come from the Sequencer, and a section there does not carry a\n"
+                    "freedom of its own -- only a type and a treatment. Use Director freedom above,\n"
+                    "which applies to the whole film.");
+            }
             ImGui::SameLine();
             ImGui::Text("%5.1f  %s  --  %s", section.startSeconds,
                         section.label.empty() ? "(unnamed)" : section.label.c_str(),
