@@ -157,6 +157,12 @@ params::ParamDesc<glm::vec4> color(const std::string& base, const char* name, gl
 }
 } // namespace
 
+glm::vec3 particleExtentFromRadius(const glm::vec3& authored, float radius) {
+    const float base = std::max(authored.x, 1e-4f);
+    const float ratio = radius / base;
+    return glm::vec3(radius, authored.y * ratio, authored.z * ratio);
+}
+
 ParticleParameters registerParticleParameters(params::ParameterSet& params, const ParticleSystem& s) {
     const std::string base = "particles/" + s.name + "/";
     ParticleParameters p;
@@ -166,7 +172,16 @@ ParticleParameters registerParticleParameters(params::ParameterSet& params, cons
     p.speed = &params.add(f(base, "speed", 1.0f, 0.0f, 50.0f, 0.0f, 5.0f));
     p.spread = &params.add(f(base, "spread", s.spread, 0.0f, 1.0f, 0.0f, 1.0f));
     p.position = &params.add(v3(base, "position", s.position, -1000.0f, 1000.0f));
-    p.extent = &params.add(f(base, "extent", 1.0f, 0.0f, 100.0f, 0.0f, 5.0f));
+    // Absolute metres, seeded from the scene, exactly like `position` above and `spread` below.
+    //
+    // It was a multiplier over the authored value, defaulting to 1.0, and that is what this defect
+    // was. `lifetime`, `speed` and `size` are multipliers for a reason a scalar cannot avoid: each
+    // scales a *pair* (min/max, start/end) that one number cannot replace, and each says "x" on the
+    // control that writes it. `extent` scales a single vector and the control that writes it says
+    // "m" -- so a project file recorded `0.0538` for a beam somebody had set to 0.42 m, a number
+    // meaningless without opening the scene file to find the 7.8 it multiplied. The owner set a
+    // beam radius through the UI and what persisted was neither the radius nor findable as one.
+    p.extent = &params.add(v3(base, "extent", s.extent, 0.0f, 10000.0f));
     p.gravity = &params.add(v3(base, "gravity", s.gravity, -50.0f, 50.0f));
     p.drag = &params.add(f(base, "drag", s.drag, 0.0f, 20.0f, 0.0f, 3.0f));
     p.turbulence = &params.add(f(base, "turbulence", s.turbulence, 0.0f, 50.0f, 0.0f, 5.0f));
@@ -212,7 +227,7 @@ void applyParticleParameters(const ParticleParameters& p, const ParticleSystem& 
     s.speedMax = rest.speedMax * p.speed->value();
     s.spread = p.spread->value();
     s.position = p.position->value();
-    s.extent = rest.extent * p.extent->value();
+    s.extent = p.extent->value();
     s.gravity = p.gravity->value();
     s.drag = p.drag->value();
     s.turbulence = p.turbulence->value();

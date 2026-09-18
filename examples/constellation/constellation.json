@@ -48,7 +48,7 @@
    "source": "audio.bass",
    "target": "particles/coreKnot/extent",
    "op": "add",
-   "amount": 1.3,
+   "amount": 1.95,
    "polarity": "unipolar",
    "chain": {
     "attackMs": 120.0,

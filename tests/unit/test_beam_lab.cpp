@@ -75,6 +75,7 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <unistd.h>
 #include <map>
 #include <set>
 #include <string>
@@ -838,6 +839,17 @@ TEST_CASE("No project contradicts its scene about a body its scenario owns",
     CHECK(compared >= 20);
 }
 
+// The emitter's radius as the *parameter stack* holds it: the scene's value with the project's
+// applied over it, which is the state that runs (ADR-264 again, one level down). `applyParameters`
+// then multiplies it by the beam node's own `cbrt(|sx*sy*sz|)`, so the runtime width and this
+// number agree only when nothing has quietly resized the node -- which is the residue class.
+namespace {
+float beamRadiusFromParameters(const params::ParameterSet& params) {
+    const params::IParameter* p = params.find("particles/visitor-beam/extent");
+    return p == nullptr ? 0.0f : p->baseComponent(0);
+}
+} // namespace
+
 TEST_CASE("The shipped Glowmere project abducts the way its scene says it does",
           "[stage][beam][abduction][project][glowmere]") {
     if (!farmAssetsPresent()) {
@@ -849,29 +861,44 @@ TEST_CASE("The shipped Glowmere project abducts the way its scene says it does",
     REQUIRE(fs::is_regular_file(scene));
     REQUIRE(fs::is_regular_file(project));
 
-    // What the scene authors for the beam, read straight out of the file, so the assertion below is
-    // "production runs what the scene says" rather than "production runs 7.8".
+    // What the scene authors for the beam, read straight out of the file. Reported rather than
+    // asserted against, and that change of role is the subject of ADR-268.
+    //
+    // This used to be the assertion: "the beam's runtime radius equals the radius the scene file
+    // authors". It caught the ADR-264 residue on its first live encounter, which is the most a
+    // regression test can be asked to do -- and then it caught the owner widening the beam through
+    // the panel, reported that as residue, and their tuning was reverted twice on its word.
+    //
+    // A project's `parameters` are *meant* to sit over its scene; that is what a project is. The
+    // invariant that survives is narrower and is the one the residue actually violated: whatever
+    // radius the parameter stack ends up holding, **that** is the radius the emitter runs at. The
+    // squashed `nodes/visitor-beam/scale` broke it by a hidden `cbrt(0.061)` = 0.394 that no file
+    // states and no panel shows; a person typing 0.42 m into the radius field does not.
     std::ifstream in(scene);
     nlohmann::json doc;
     in >> doc;
-    float authoredExtent = 0.0f;
+    float sceneExtent = 0.0f;
     for (const nlohmann::json& n : doc["nodes"]) {
         if (n.value("name", std::string{}) == "visitor-beam") {
-            authoredExtent = n["particles"]["extent"][0].get<float>();
+            sceneExtent = n["particles"]["extent"][0].get<float>();
         }
     }
-    REQUIRE(authoredExtent > 1.0f);
+    REQUIRE(sceneExtent > 1.0f);
 
     Run run(scene, project);
+    const float authoredExtent = beamRadiusFromParameters(run.params);
+    REQUIRE(authoredExtent > 0.0f);
     run.play(60.0);
     REQUIRE(run.lifts.size() >= 2);
     REQUIRE(!run.loadedProject.empty());
 
     for (const Lift& l : run.lifts) {
-        // 1. The project did not resize the beam. `applyParameters` scales `extent` by the node's
-        //    own `cbrt(|sx*sy*sz|)`, so a saved node scale is a saved beam width.
+        // 1. Nothing resized the beam behind the author's back. `applyParameters` scales `extent`
+        //    by the node's own `cbrt(|sx*sy*sz|)`, so a saved node scale is a saved beam width --
+        //    and it is a beam width stated nowhere, which is what made it residue rather than a
+        //    setting. The control arm below re-introduces exactly that scale and watches this fail.
         INFO(l.animal << ": the beam ran at " << l.beamExtent << " m against the " << authoredExtent
-                      << " m the scene authors");
+                      << " m the parameters carry (the scene file authors " << sceneExtent << " m)");
         CHECK(std::fabs(l.beamExtent - authoredExtent) <= 0.01f);
 
         // 2. The craft's entity and the craft's node are the same body. This is the one the 28.661 m
@@ -884,8 +911,102 @@ TEST_CASE("The shipped Glowmere project abducts the way its scene says it does",
         // 3. And then the ADR-262 invariants, in production rather than in the lab.
         INFO(l.animal << ": body centre " << l.bodyOffAxisEnd << " m off the axis at the top");
         CHECK(l.bodyOffAxisEnd <= kOnAxis);
-        CHECK(l.worstCornerLate <= l.beamRadius);
+        // Centred, not contained. The lab asserts `worstCornerLate <= beamRadius` against the 7.8 m
+        // ADR-218 sized from the cast, and that is where a claim about the beam's *width* belongs,
+        // because the lab is where the width is fixed. Production's width is the author's: this
+        // project now runs a 0.42 m emitter at 0.128 rad, a beam that tapers to the saucer rather
+        // than a column, and every animal it lifts is wider than its mouth. Containment there would
+        // be a test asserting an art direction the owner has changed. What does not change is that
+        // the animal hangs on the axis and no further from it than its own size -- the arm a magic
+        // offset cannot pass, and the one the original report was actually about.
+        INFO(l.animal << ": reaches " << l.worstCornerLate << " m from the axis; its own reach from "
+                      << "its centre is " << l.bodyReach << " and the emitter's radius is "
+                      << l.beamRadius);
+        CHECK(l.worstCornerLate <= l.bodyReach + kOnAxis);
         CHECK(l.columnReach >= l.craftAboveGround);
         CHECK(l.highestY <= l.emitterY);
     }
+}
+
+// ---- and the control for the arm above (ADR-182) --------------------------------------------------
+//
+// Assertion 1 changed from "equals what the scene authors" to "equals what the parameters carry",
+// and the whole question about a change like that is whether it can still fail on the thing it was
+// built for. So: the shipped project with `nodes/visitor-beam/scale` put back exactly as ADR-264
+// found it, written to a scratch copy, run through the same probe.
+//
+// Cheap on purpose -- one second, no lifts. The residue is a load-time fact and does not need an
+// abduction to be visible; a sixty-second Glowmere run to observe a number that is settled by the
+// first frame is a minute of nothing.
+TEST_CASE("The beam probe still sees a node scale that resizes the emitter",
+          "[stage][beam][abduction][project][glowmere]") {
+    const fs::path world = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world";
+    const fs::path scene = world / "glowmere-valley-2-multicam.scene.json";
+    const fs::path project = world / "glowmere-valley-2-multicam.json";
+    REQUIRE(fs::is_regular_file(project));
+
+    std::ifstream in(project);
+    nlohmann::json doc;
+    in >> doc;
+    REQUIRE(doc.contains("parameters"));
+    // The shipped file states the beam node's scale and states it as `[1, 1, 1]` -- ADR-264 had
+    // `make_abduction_scenario.py` write that transform out explicitly, because "concentric,
+    // unrotated, unscaled" is the contract ADR-218 sizes the emitter against and it had been
+    // promoted out of a session into a scene file once already. So the two arms below differ by the
+    // *value* of one key. If it ever arrives squashed, this case would be comparing a file with
+    // itself and would prove nothing about either arm.
+    REQUIRE(doc["parameters"].value("nodes/visitor-beam/scale",
+                                    nlohmann::json::array({1.0, 1.0, 1.0})) ==
+            nlohmann::json::array({1.0, 1.0, 1.0}));
+
+    const fs::path dir = fs::temp_directory_path() /
+                         ("avgen_beam_residue_" + std::to_string(::getpid()));
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    const fs::path squashed = dir / "squashed.json";
+
+    // The clean arm, from the same scratch copy, so the two differ by one key and nothing else --
+    // not by a path, a working directory or a re-serialisation.
+    const fs::path clean = dir / "clean.json";
+    {
+        std::ofstream out(clean);
+        out << doc.dump(2) << '\n';
+    }
+    doc["parameters"]["nodes/visitor-beam/scale"] = nlohmann::json::array({1.0, 0.061, 1.0});
+    {
+        std::ofstream out(squashed);
+        out << doc.dump(2) << '\n';
+    }
+
+    float cleanRuntime = 0.0f;
+    float cleanAuthored = 0.0f;
+    {
+        Run run(scene, clean);
+        cleanAuthored = beamRadiusFromParameters(run.params);
+        run.play(1.0);
+        cleanRuntime = run.beamRadius;
+    }
+    float squashedRuntime = 0.0f;
+    float squashedAuthored = 0.0f;
+    {
+        Run run(scene, squashed);
+        squashedAuthored = beamRadiusFromParameters(run.params);
+        run.play(1.0);
+        squashedRuntime = run.beamRadius;
+    }
+    fs::remove_all(dir);
+
+    // The control: with no node scale the probe reports the parameter's own number, so a failure in
+    // the other arm is about the scale and not about the probe.
+    INFO("clean: the emitter ran at " << cleanRuntime << " m against the " << cleanAuthored
+                                      << " m the parameters carry");
+    CHECK(std::fabs(cleanRuntime - cleanAuthored) <= 0.01f);
+
+    // And the arm. `cbrt(|1 * 0.061 * 1|)` is 0.3936, which is a beam width nothing states.
+    INFO("squashed: the emitter ran at " << squashedRuntime << " m against the " << squashedAuthored
+                                         << " m the parameters carry");
+    CHECK(squashedAuthored == cleanAuthored);
+    CHECK(std::fabs(squashedRuntime - squashedAuthored) > 0.01f);
+    CHECK_THAT(squashedRuntime,
+               Catch::Matchers::WithinRel(squashedAuthored * 0.3936f, 0.01f));
 }

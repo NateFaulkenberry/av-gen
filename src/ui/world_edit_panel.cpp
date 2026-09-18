@@ -907,17 +907,26 @@ void WorldEditPanel::drawParticleSettings(app::Engine& engine, WorldEditor& edit
     }
     ImGui::TextColored(ImVec4(0.55f, 0.85f, 1.0f, 1.0f), "particles -- %s emitter", shape);
 
-    // Radius in metres rather than as the multiplier it writes. A disc's radius is extent.x; a
-    // sphere's is the same field, which is why one control serves both.
+    // Radius in metres, and metres are what it writes.
+    //
+    // This control used to write a *multiplier* over the scene's value while displaying metres, and
+    // that is the defect this panel was reported for: the owner set the tractor beam to 0.42 m and
+    // the project file kept `particles/visitor-beam/extent: 0.0538`, a number that means nothing
+    // without the 7.8 in the scene file beside it -- and that the beam lab, correctly, read as
+    // residue. The parameter is now absolute and seeded from the scene, like `spread` two controls
+    // down, so what the slider says is what the file holds. The proportions of a box emitter are
+    // still the scene's (`particleExtentFromRadius`); only the size is this control's.
     if (params::IParameter* p = engine.params().find(base + "extent")) {
-        const float authored = std::max(rest.extent.x, 1e-4f);
-        const float metres = authored * p->finalComponent(0);
-        if (const auto edited = drag("extent", "radius", metres, 0.05f, authored * 8.0f, "%.2f m",
-                                     "How wide the emitter is, in metres.\n\n"
-                                     "Written as a multiple of the size the scene authored, so the "
-                                     "authored value stays put and this rides on top of it -- which "
-                                     "is what makes it keyable and modulatable like anything else.")) {
-            ui::setBaseComponents(engine, base + "extent", {*edited / authored});
+        const float metres = p->finalComponent(0);
+        const float top = std::max(rest.extent.x, metres) * 8.0f;
+        if (const auto edited = drag("extent", "radius", metres, 0.01f, std::max(top, 1.0f), "%.2f m",
+                                     "How wide the emitter is, in metres: a disc's or a sphere's "
+                                     "radius, a box's half-extent along x.\n\n"
+                                     "Absolute, like spread -- what you set here is what the "
+                                     "project keeps, and it replaces the scene's value rather than "
+                                     "scaling it. Keyable and modulatable like anything else.")) {
+            const glm::vec3 want = scene::particleExtentFromRadius(rest.extent, *edited);
+            ui::setBaseComponents(engine, base + "extent", {want.x, want.y, want.z});
         }
     }
     if (params::IParameter* p = engine.params().find(base + "spawnRate")) {
