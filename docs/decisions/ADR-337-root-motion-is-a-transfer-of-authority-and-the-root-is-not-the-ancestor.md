@@ -1,4 +1,4 @@
-# ADR-335: Root motion is a transfer of authority, and on this content the root is not the ancestor
+# ADR-337: Root motion is a transfer of authority, and on this content the root is not the ancestor
 
 **Status:** Accepted
 **Date:** 2026-09-18

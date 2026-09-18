@@ -849,7 +849,7 @@ void EntityWorld::reset() {
         // resets alongside this and re-issues whatever the scenario is doing at the new second.
         entity->director_ = DirectorMotion{};
         entity->locomotion_ = LocomotionState{};
-        // ADR-335 / ADR-267 D4: the previous root-motion sample is recoverable by replaying the
+        // ADR-337 / ADR-267 D4: the previous root-motion sample is recoverable by replaying the
         // steps, so a reset must forget it. Keeping it would make the first step of a seek a
         // difference between two unrelated clips -- the whole of `Landing` backwards, in one
         // step, as a teleport, which is exactly the class of thing `reset` exists to remove.
@@ -1446,7 +1446,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
             perceiveOne(entityIndex, ctx.time);
         }
 
-        // ---- root motion, before the behaviours (ADR-335) ----
+        // ---- root motion, before the behaviours (ADR-337) ----
         //
         // **Which position (ADR-260).** It writes `state_.travel` -- the *simulation* position,
         // `MotionAuthority::Simulation`. Everything else in the animation seam is `PoseOnly` and
@@ -1463,7 +1463,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // motion at all: `applyGrounding` assigns `state.travel.y = ground.height - anchor.y`, so
         // the y component is overwritten within the same update that produced it. That is correct
         // -- a body standing on terrain has its height decided by the terrain -- and it is why
-        // `RootMotionAxes` exists and why ADR-335 §5 recommends `xz` for `Landing` in a world with
+        // `RootMotionAxes` exists and why ADR-337 §5 recommends `xz` for `Landing` in a world with
         // ground in it.
         entity.rootMotionStep_ = glm::vec3(0.0f);
         if (entity.rootMotion_ != nullptr) {

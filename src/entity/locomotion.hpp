@@ -137,7 +137,7 @@ public:
 // the GPU palette, whose entry k is `model[palette[k]] * inverseBind[k]` and whose translation is
 // therefore not where the joint is (ADR-260). That mistake is what a skeleton overlay exists to
 // catch; `tests/unit/test_character_lab_sockets.cpp` measures the gap so nobody makes it silently.
-// ---- root motion (ADR-335) ----------------------------------------------------------------------
+// ---- root motion (ADR-337) ----------------------------------------------------------------------
 
 // How far the clip an animation layer is playing has carried the body, and which run of which
 // clip that number belongs to.

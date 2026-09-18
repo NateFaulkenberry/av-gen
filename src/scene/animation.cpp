@@ -465,7 +465,7 @@ bool SkinnedRig::evaluate(double now, float hz) {
     // ADR-260: this writes `pose`, which becomes `palette`, which the renderer draws. It does not
     // write the simulation position, the motion offset or the node transform, and cannot: the layer
     // module has no way to reach any of them.
-    // ADR-335, and it goes *before* the layers rather than after, because it is a statement about
+    // ADR-337, and it goes *before* the layers rather than after, because it is a statement about
     // where the body is and they are statements about what parts of it are doing. A head turning
     // to look at something must turn on top of a body that has already been put where the
     // simulation now says it is; compensating afterwards would move an aim layer's pivot out from

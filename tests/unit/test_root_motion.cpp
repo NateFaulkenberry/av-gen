@@ -1,4 +1,4 @@
-// Root motion (ADR-335), P9 of `docs/character-ai-plan.md`.
+// Root motion (ADR-337), P9 of `docs/character-ai-plan.md`.
 //
 // ADR-161 decided root motion was not implemented because the content had none; ADR-260 re-ran the
 // check across all 168 clips this project can load and found five per alien that do, `Landing`'s
@@ -529,7 +529,7 @@ TEST_CASE("a grounded body keeps no vertical root motion, which is why the axis 
     // `ground` assigns rather than adds: `state.travel.y = ground.height - anchor.y`, every frame,
     // after root motion has run. So the vertical is gone and the horizontal survives. This is not
     // a defect in either layer -- a body standing on terrain has its height decided by the terrain
-    // -- and it is the measurement behind ADR-335 §5's recommendation that a world with ground in
+    // -- and it is the measurement behind ADR-337 §5's recommendation that a world with ground in
     // it opts `Landing` in on `xz` and not on `xyz`.
     const glm::vec3 g = grounded.subject().state().position();
     const glm::vec3 l = loose.subject().state().position();

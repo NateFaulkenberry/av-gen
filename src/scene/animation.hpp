@@ -221,7 +221,7 @@ struct SkinnedRig {
     // (ADR-170): a layer that reported 0 joints is a layer whose mask missed.
     PoseLayerStats layerStats;
 
-    // ---- root motion (ADR-335) -------------------------------------------------------------
+    // ---- root motion (ADR-337) -------------------------------------------------------------
     // Which of this rig's clips hand their root displacement to the simulation instead of drawing
     // it. Empty on every rig that does not author one, and an empty set is checked with one
     // `bindings_.empty()` before anything else happens -- which is how the other 163 clips stay
@@ -310,7 +310,7 @@ struct RigStats {
     std::uint32_t joints = 0;    // joint matrices recomputed this frame
     std::uint32_t layers = 0;      // ADR-300: layers evaluated this frame, over every posed rig
     std::uint32_t layerJoints = 0; // joints those layers wrote
-    // ADR-335: posed rigs whose current clip was opted in to root motion and had its displacement
+    // ADR-337: posed rigs whose current clip was opted in to root motion and had its displacement
     // taken out of the pose this frame. Zero on every scene in this repository but the Character
     // Intelligence Lab, which is the number that says the opt-in is an opt-in.
     std::uint32_t rootMotion = 0;

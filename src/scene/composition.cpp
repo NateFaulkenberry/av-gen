@@ -2020,7 +2020,7 @@ void Composition::installEntities() {
         // own frame. One line, and it is the line between the engine and every socket, attachment,
         // carried prop and aim.
         live->setSkeleton(animationSinks_.back().get());
-        // ADR-335: the third. Installed unconditionally, like the other two, because whether a
+        // ADR-337: the third. Installed unconditionally, like the other two, because whether a
         // clip was opted in is a question about the *rig* -- which may not be built yet when this
         // runs -- and the source answers "nothing" for a body playing a clip nobody named. A
         // source that were only installed for opted-in bodies would have to be re-installed every
@@ -2028,7 +2028,7 @@ void Composition::installEntities() {
         live->setRootMotionSource(animationSinks_.back().get());
     }
 
-    // ADR-335: a root-motion opt-in on a node **no entity drives** deletes motion instead of
+    // ADR-337: a root-motion opt-in on a node **no entity drives** deletes motion instead of
     // transferring it. There is nothing to hand the displacement to, so the compensation lands on
     // the pose and the clip's travel simply disappears -- a body that used to descend stands
     // still. It is precisely the class of silent wrongness ADR-274 charged a metre for, so it is
@@ -2288,7 +2288,7 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
     }
 }
 
-// ADR-335. The return half of the animation seam: what the clip this node is playing has carried
+// ADR-337. The return half of the animation seam: what the clip this node is playing has carried
 // the body by, so the entity can add it to `EntityState::travel` and the simulation can stop
 // disagreeing with the drawing about where the body went.
 //
@@ -3855,7 +3855,7 @@ void Composition::rebuild() {
                         log::warn("node '{}' rig '{}': {}", node.name, src.name, problem);
                     }
                 }
-                // ADR-335, bound in the same place and for the same reason: the authored clip
+                // ADR-337, bound in the same place and for the same reason: the authored clip
                 // name and the asset that has to carry it are only both in scope here.
                 if (!node.animation.rootMotion.empty()) {
                     for (const std::string& problem :
@@ -6629,7 +6629,7 @@ nlohmann::json Composition::toJson() const {
                 }
                 anim["layers"] = std::move(layers);
             }
-            if (!node.animation.rootMotion.empty()) { // ADR-335
+            if (!node.animation.rootMotion.empty()) { // ADR-337
                 json rm = json::array();
                 for (const RootMotionSpec& spec : node.animation.rootMotion) {
                     // The short form round-trips as the short form. A save that rewrote every
@@ -7651,7 +7651,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         node.animation.layers.push_back(std::move(layer));
                     }
                 }
-                // ADR-335: the per-clip root-motion opt-in. By clip *name*, because the thing
+                // ADR-337: the per-clip root-motion opt-in. By clip *name*, because the thing
                 // being opted in is a take an animator authored and the engine's own vocabulary
                 // for a take is its name. A clip this rig does not have is warned about when the
                 // rig is built, with the node's name on it -- never silently dropped, which is

@@ -168,7 +168,7 @@ struct NodeAnimation {
     // fields reach a pose; without one authored on the node they go on reaching nothing, which is
     // the honest behaviour -- there is no joint name this engine may assume.
     std::vector<PoseLayer> layers;
-    // ---- root motion (ADR-335) -----------------------------------------------------------------
+    // ---- root motion (ADR-337) -----------------------------------------------------------------
     // Which of this character's clips hand their root displacement to the simulation instead of
     // drawing it. Per clip and per node, because it is an art decision twice over: whether a clip
     // means to travel is a property of the take, and whether *this* body should be moved by it is
@@ -1166,7 +1166,7 @@ private:
         // The joint's transform in the entity's own frame -- the rig's model space. False when
         // this node carries no rig, no rig of its carries the joint, or the rig has not been posed.
         [[nodiscard]] bool jointTransform(std::string_view joint, scene::Transform& out) const override;
-        // ADR-335. The only method on this object that answers a question about the *simulation*
+        // ADR-337. The only method on this object that answers a question about the *simulation*
         // rather than about the drawing, and it does not write it: it reports, and the entity
         // decides. Entity-local, in the asset's own units, exactly like `jointTransform`.
         [[nodiscard]] entity::RootMotionSample rootMotion(double now) const override;

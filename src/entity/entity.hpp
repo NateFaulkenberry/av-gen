@@ -312,7 +312,7 @@ public:
     // Installed by the animation layer; all three may stay null forever (see locomotion.hpp).
     void setPoseSink(IPoseSink* sink) { pose_ = sink; }
     void setSkeleton(const ISkeletonQuery* skeleton) { skeleton_ = skeleton; }
-    // ADR-335. The return half of the seam: what the clip has carried the body by, so the
+    // ADR-337. The return half of the seam: what the clip has carried the body by, so the
     // simulation can stop disagreeing with the drawing about where the body went.
     void setRootMotionSource(const IRootMotionSource* source) { rootMotion_ = source; }
     // How much root motion this body took from the animation on its last update, in world metres.
@@ -515,7 +515,7 @@ private:
     IPoseSink* pose_ = nullptr;
     const ISkeletonQuery* skeleton_ = nullptr;
 
-    // ---- root motion (ADR-335) ----
+    // ---- root motion (ADR-337) ----
     const IRootMotionSource* rootMotion_ = nullptr;
     // The previous sample, which is the only state this needs. `IRootMotionSource::rootMotion`
     // answers "how far from the clip's first key", always, so a step is the difference between

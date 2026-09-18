@@ -1,6 +1,6 @@
 #pragma once
 
-// Root motion extraction (ADR-335), behind a per-clip opt-in.
+// Root motion extraction (ADR-337), behind a per-clip opt-in.
 //
 // ADR-161 decided root motion was not implemented because the content had none. It measured three
 // clips of one Mixamo file and it was right about those three; two asset packs arrived afterwards
@@ -91,7 +91,7 @@ struct AnimationClip;
 // root motion is overwritten inside the same update that produced it. That is not a bug in either
 // layer: a body standing on terrain has its height decided by the terrain. It does mean that for
 // `Landing`, whose displacement is 96% vertical, the axis mask is the difference between a setting
-// that does something and one that is silently erased. ADR-335 §5 has the measurement.
+// that does something and one that is silently erased. ADR-337 §5 has the measurement.
 struct RootMotionAxes {
     bool x = true;
     bool y = true;
