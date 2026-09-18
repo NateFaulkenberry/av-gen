@@ -250,3 +250,32 @@ Useful prior art rather than a thing to duplicate: `rendering::ReferenceRenderer
 (`skippedSkinned/Blended/Water/Invisible/NoMesh`) and is the closest existing statement of what a
 naive consumer of `Scene` does and does not see. The capability report should be recognisably its
 descendant.
+
+## The branch baseline, which is not green
+
+`./build/release/tests/avgen_tests "~[gpu]"` at `57b41994` plus this ADR, verbatim:
+
+```
+test cases:    2295 |    2289 passed | 1 failed | 4 skipped | 1 failed as expected
+assertions: 2225021 | 2225019 passed | 1 failed | 1 failed as expected
+```
+
+**2295 cases matches main. The assertion count does not**: 2,225,021 here against the 2,225,003
+main was reported at. An 18-assertion drift in a suite this size is small, but it is unexplained
+and is recorded rather than rounded away.
+
+The one real failure is **pre-existing and not the path tracer's**:
+`tests/integration/test_project_node_set.cpp:98`, *"an object deleted from the owner's own film
+stays deleted"* — `CHECK_FALSE(doc.contains("sceneNodes"))` expanding to `!true`, on
+`glowmere-valley-2-multicam.json`. It reproduces in isolation from a clean worktree at main's tip
+with no engine source modified, so it belongs to whoever owns that scene, not here. Any future
+claim that this branch is green means *this* baseline, not zero.
+
+`tests/unit/test_character_lab_slopes.cpp:187` also prints `FAILED:` and is **a pass** — it is
+tagged `[!shouldfail]` and is the "1 failed as expected" line. It is named here because three
+agents have now misread that output.
+
+One failure on the first baseline run **was** this branch's: `test_repo_hygiene.cpp:112` caught
+ADR-339 not being listed in `docs/decisions/README.md`. The suite reads that directory from disk,
+so a new ADR fails a test in a binary compiled before the ADR existed. Fixed, and worth knowing
+about for every later phase of this branch.
