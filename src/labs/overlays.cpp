@@ -60,9 +60,22 @@ rendering::DebugViewOptions overlaysFor(LabId id) {
         o.frustum = true;
         break;
     case LabId::Lighting:
+        // Where every light is, what shape the shading pass thinks its emitter is, and the sphere
+        // of influence past which the froxel pass stops evaluating it. That last ring is the
+        // reason this profile is not empty: it is a *hard* edge in the image, and before it was
+        // drawn the only way to find it was to notice a line on the floor.
+        //
+        // `lightClusters` is deliberately OFF. It is 16 x 8 x 24 froxels over the whole frame and
+        // it obscures exactly the pixels a lighting question is about; it is reachable from
+        // `--debug-draw lightClusters` when the question is about the grid rather than the light.
+        // `worldAxes` places the rest, because a light rig expresses positions relative to a
+        // subject and the first question about a light that is in the wrong place is where zero is.
+        o.lights = true;
+        o.worldAxes = true;
+        break;
     case LabId::Hdr:
     case LabId::Volumetric:
-        // Nothing. These three are judged on the frame, not on geometry drawn over it, and an
+        // Nothing. These two are judged on the frame, not on geometry drawn over it, and an
         // overlay switched on because the profile had to say something would be a line across the
         // image being measured. `--debug-target` and `--aov` are their instruments.
         break;
