@@ -72,6 +72,32 @@ TEST_CASE("a lab case round-trips through JSON", "[labs][case]") {
     CHECK(back->notes == c.notes);
 }
 
+TEST_CASE("a blocked case says what it is waiting for, and an ordinary one says nothing",
+          "[labs][case]") {
+    // ADR-273. `blockedBy` is what stops a lab pretending: a case that asserted a decider this
+    // engine does not have would pass by asserting nothing. It has to survive the round trip, and
+    // -- the control -- it has to stay absent on a case that never set it, or every case in the
+    // suite would come back carrying an empty reason and `runnable()` would be meaningless.
+    labs::LabCase c = goodCase();
+    c.blockedBy = "P2 perception";
+    CHECK_FALSE(c.runnable());
+    const json written = labs::toJson(c);
+    REQUIRE(written.contains("blockedBy"));
+    const auto back = labs::caseFromJson(written);
+    REQUIRE(back.has_value());
+    CHECK(back->blockedBy == "P2 perception");
+    CHECK_FALSE(back->runnable());
+
+    const labs::LabCase ordinary = goodCase();
+    CHECK(ordinary.runnable());
+    const json plain = labs::toJson(ordinary);
+    CHECK_FALSE(plain.contains("blockedBy"));
+    const auto plainBack = labs::caseFromJson(plain);
+    REQUIRE(plainBack.has_value());
+    CHECK(plainBack->blockedBy.empty());
+    CHECK(plainBack->runnable());
+}
+
 TEST_CASE("a case with no camera stays without one", "[labs][case]") {
     // The default is "use the fixture's camera". A round-trip that invented an origin-to-origin
     // camera would silently repoint every case that did not ask for one.
