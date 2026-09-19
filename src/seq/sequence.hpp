@@ -532,6 +532,33 @@ void trimShotStart(Shot& shot, double newStart, double fixedEnd, double minSecon
 // has no authored camera, which is what an untouched project already looks like.
 bool removeShot(std::vector<Shot>& shots, std::size_t index);
 
+// ---- the same cut, on the lanes that are not shots (ADR-356) -------------------------------------
+//
+// The slice tool cuts every lane that holds a span, and two of those lanes had no split operation at
+// all: a lyric was a block you could only move and trim, and an actor's clip cue was a block you
+// could only add or delete. They are here, beside `splitShot`, for the reason `splitShot` is here --
+// so the gesture and a test drive the same arithmetic -- and they take the same shape as it:
+// `minSeconds`, a refusal rather than a degenerate result, and the new index on success.
+
+// Splits the overlay at `index` at `seconds`. The later half is a copy with the same text, an id
+// suffixed "-b", and the same style: a slice is the start of two lines, not a guess at what they
+// say, and a lyric cut in half that arrived with half the words would have thrown away the text a
+// person was about to retype in one of the two halves anyway.
+[[nodiscard]] std::optional<std::size_t> splitOverlay(std::vector<OverlayCue>& overlays,
+                                                      std::size_t index, double seconds,
+                                                      double minSeconds = kMinShotSeconds);
+
+// Splits the clip-cue span starting at `index` on one actor.
+//
+// A cue is an instant, and the block the lane draws for it runs to the NEXT cue -- or to the end of
+// the piece for the last one, which is why `endOfPiece` is passed rather than derived: the panel
+// already knows the piece's duration and `Actor` alone does not. Splitting inserts a second cue for
+// the same clip at the cut, which is what turns one span into two that can then be given different
+// clips, speeds or blends. Cues are kept in time order.
+[[nodiscard]] std::optional<std::size_t> splitActorClip(Actor& actor, std::size_t index,
+                                                        double seconds, double endOfPiece,
+                                                        double minSeconds = kMinShotSeconds);
+
 struct Sequence {
     std::string name = "sequence";
     // 0 = derive from the shots, the actors and the overlays.

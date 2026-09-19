@@ -130,6 +130,18 @@ public:
     };
     [[nodiscard]] const StripRect& stripRect() const { return stripRect_; }
 
+    // ---- what the arrow keys step by (ADR-357) ---------------------------------------------------
+    //
+    // The transport owns the arrow keys and always has; what it did not have was any idea what grid
+    // the author was working on, so it stepped a frame plain and a beat with Shift whatever the
+    // strip was snapped to. These two are how it asks. Read-only, and on the panel rather than
+    // duplicated into the application, because the snap mode is the *sequencer's* setting and a
+    // second copy of it is a second thing to keep in step.
+    [[nodiscard]] int snapMode() const { return snapMode_; }
+    // The stretch of the piece the strip is currently showing, in seconds. Zero until the strip has
+    // been drawn once, which the Off arm treats as "no view yet" rather than as a zero-length step.
+    [[nodiscard]] double visibleSpanSeconds() const { return lastSpan_; }
+
 private:
     void drawToolbar(app::Engine& engine);
     void drawImportPopup(app::Engine& engine);
@@ -178,6 +190,27 @@ private:
     // addendum's section 10 is about -- the world editor solves it by routing everything through
     // `app::EditSystem`, and the sequencer, which has no such system and therefore no undo, gets
     // the next best thing: one function per operation, called by both.
+    // ---- the slice tool (ADR-356) ----------------------------------------------------------------
+    //
+    // Cmd+click cuts whatever is under the pointer, on every lane that holds a span, on the grid
+    // that lane's drags already obey. The three "Split..." items scattered across the context menu
+    // and the section inspector are now the *same* operation reached a different way, which is the
+    // rule this block of the header is about: two paths to one operation is how they drift, and
+    // these two had already drifted -- neither Split item snapped, and neither was undoable.
+    //
+    // `planSliceAt` answers the whole question without mutating anything, so a menu item's enabled
+    // test and the click ask it identically and cannot disagree about what is legal.
+    [[nodiscard]] SlicePlan planSliceAt(const app::Engine& engine, StripLane lane, double rawSeconds,
+                                        int actorRow) const;
+    // Carries out a plan as one undo step, labelled, with `touchesAudio` taken from the plan rather
+    // than from the call site. Writes the refusal to the status line and returns false when the plan
+    // is not legal: a gesture that does nothing must still say why.
+    bool performSlice(app::Engine& engine, const SlicePlan& plan);
+    // The blocks a lane holds, as spans. The one place that knows a shot, a section, a clip, a lyric
+    // and a cue are all "a thing occupying a stretch of the timeline".
+    [[nodiscard]] std::vector<SliceBlock> sliceBlocksFor(const app::Engine& engine, StripLane lane,
+                                                         int actorRow) const;
+
     void addShotAt(app::Engine& engine, double seconds);
     void addShotAtEnd(app::Engine& engine);
     void addLyricAt(app::Engine& engine, double seconds);
@@ -223,6 +256,10 @@ private:
     // Safe to call with no `edits`: both become no-ops and the mutation still happens.
     void beginEdit(app::Engine& engine, bool touchesAudio = false);
     void commitEdit(app::Engine& engine, std::string label);
+    // Throws the bracketed edit away rather than pushing it. For the arm where the operation
+    // declined after all: an undo step that restores the state it was already in is worse than no
+    // step, because it makes Cmd+Z appear to do nothing once before it works.
+    void abandonEdit() { pendingEdit_.reset(); }
     std::unique_ptr<TimelineChange> pendingEdit_;
     void installIfDirty(app::Engine& engine);
     [[nodiscard]] double snap(const app::Engine& engine, double seconds) const;

@@ -43,6 +43,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -117,5 +118,26 @@ private:
 [[nodiscard]] double clipEndSeconds(const AudioClip& clip, const AudioFile* file);
 // The end of the whole arrangement.
 [[nodiscard]] double arrangementDuration(std::span<const AudioClip> clips, const ClipSources& sources);
+
+// ---- cutting a clip in two (ADR-356) --------------------------------------------------------------
+//
+// The slice tool's audio arm. There was no split here before, and the arithmetic is the reason it is
+// worth having in one place: a clip is a window onto a file, so cutting it at a timeline second has
+// to move `inSeconds` by the same amount it moves `startSeconds`, or the later half plays the wrong
+// part of the take. Doing that at a call site is one sign error away from a cut that sounds like a
+// skip.
+//
+// `endSeconds` is the clip's resolved end -- `clipEndSeconds(clip, file)` -- passed in rather than
+// derived, because a `durationSeconds` of 0 means "the rest of the file" and only the caller holds
+// the file. The later half inherits that open end: a split of an open clip stays open, so it still
+// follows the source if the source is replaced.
+//
+// Refuses where either half would be shorter than `minSeconds`, the same way `splitShot` does, and
+// returns the index of the new later half. The clip's fades stay at the OUTER edges -- the fade in
+// on the first half, the fade out on the second -- because a cut is not a place a person asked for
+// two new fades, and a crossfade at the seam is a decision they make afterwards.
+[[nodiscard]] std::optional<std::size_t> splitClip(std::vector<AudioClip>& clips, std::size_t index,
+                                                   double seconds, double endSeconds,
+                                                   double minSeconds = 0.25);
 
 } // namespace avgen::audio

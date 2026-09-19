@@ -1062,6 +1062,47 @@ bool removeShot(std::vector<Shot>& shots, std::size_t index) {
     return true;
 }
 
+std::optional<std::size_t> splitOverlay(std::vector<OverlayCue>& overlays, std::size_t index,
+                                        double seconds, double minSeconds) {
+    if (index >= overlays.size()) {
+        return std::nullopt;
+    }
+    const OverlayCue& cue = overlays[index];
+    if (seconds <= cue.startSeconds + minSeconds || seconds >= cue.endSeconds - minSeconds) {
+        return std::nullopt;
+    }
+    OverlayCue tail = cue;
+    // A distinct id, because `id` is how the sequence names the layer this becomes -- two cues
+    // sharing one would be two layers claiming the same target, and the bake would bind whichever
+    // it reached last.
+    tail.id = fmt::format("{}-b", cue.id);
+    tail.startSeconds = seconds;
+    overlays[index].endSeconds = seconds;
+    overlays.insert(overlays.begin() + static_cast<std::ptrdiff_t>(index) + 1, std::move(tail));
+    return index + 1;
+}
+
+std::optional<std::size_t> splitActorClip(Actor& actor, std::size_t index, double seconds,
+                                          double endOfPiece, double minSeconds) {
+    if (index >= actor.clips.size()) {
+        return std::nullopt;
+    }
+    const ClipCue& cue = actor.clips[index];
+    // The span this cue draws: to the next cue, or to the end of the piece for the last one.
+    const double end = index + 1 < actor.clips.size() ? actor.clips[index + 1].timeSeconds : endOfPiece;
+    if (seconds <= cue.timeSeconds + minSeconds || seconds >= end - minSeconds) {
+        return std::nullopt;
+    }
+    ClipCue tail = cue;
+    tail.timeSeconds = seconds;
+    // Re-blending at the seam would make an audible-looking hitch out of what is meant to be a
+    // continuation of the same animation, so the later half cuts in hard and the author raises it
+    // again if that is what they wanted.
+    tail.blendSeconds = 0.0f;
+    actor.clips.insert(actor.clips.begin() + static_cast<std::ptrdiff_t>(index) + 1, std::move(tail));
+    return index + 1;
+}
+
 const Shot* Sequence::shotAt(double seconds) const {
     for (const auto& s : shots) {
         if (seconds >= s.startSeconds && seconds < s.endSeconds()) {

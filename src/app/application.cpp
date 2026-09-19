@@ -2607,8 +2607,19 @@ void Application::handleInputEvent(const SDL_Event& event) {
             }
 }
 
-// The transport's keyboard (ADR-102). The set every editing tool uses: space plays, the arrows step
-// a frame, shift and the arrows step a beat, home and end go to the ends of the piece.
+// The transport's keyboard (ADR-102, and ADR-357 for the arrows). The set every editing tool uses:
+// space plays, the arrows step the playhead, home and end go to the ends of the piece.
+//
+// **The arrows step by whatever the sequencer is snapped to, and Shift is the next unit up.** They
+// used to step a frame plain and a beat with Shift, fixed, whatever grid the strip was on -- so a
+// person working in beats got frames from the key they were pressing most and a person working in
+// frames got beats from the other one. `ui::arrowNudge` holds the table; this reads it.
+//
+// Global rather than scoped to a focused Sequence panel, deliberately. The arrows already moved the
+// playhead from anywhere and the playhead is one object; scoping the *distance* to which window had
+// focus would make the same key travel different amounts depending on where you last clicked, and a
+// second handler on the panel would have to fight this one for the event or move the playhead twice.
+// What is panel-scoped is the *setting* it reads, which is where the setting lives anyway.
 //
 // Arrows reach here only when the world editor declined them, which it does when nothing is
 // selected -- with a selection they nudge it, and that is the older and more specific meaning.
@@ -2642,20 +2653,15 @@ bool Application::handleTransportShortcut(const SDL_Event& event) {
         engine_->seekSeconds(transport.playEndSeconds());
         return true;
     case SDLK_LEFT:
-        if (shift) {
-            engine_->stepBeats(-1);
-        } else {
-            engine_->stepFrames(-1);
-        }
+        nudgePlayhead(-1, shift);
         return true;
     case SDLK_RIGHT:
-        if (shift) {
-            engine_->stepBeats(1);
-        } else {
-            engine_->stepFrames(1);
-        }
+        nudgePlayhead(1, shift);
         return true;
     case SDLK_UP:
+        // Up and Down stay marker jumps at every snap mode. They are the "go to the next place" keys
+        // and always were; folding them into the grid would leave the piece with no way to jump
+        // between its landmarks whenever somebody was working in frames.
         engine_->stepMarkers(-1);
         return true;
     case SDLK_DOWN:
@@ -2672,6 +2678,47 @@ bool Application::handleTransportShortcut(const SDL_Event& event) {
         return true;
     default:
         return false;
+    }
+}
+
+// One press of Left or Right (ADR-357). `direction` is -1 or +1; `coarse` is Shift.
+//
+// The decision is `ui::arrowNudge`'s and the movement is the transport's existing stepping, which is
+// the split that makes this testable: walking a beat grid is `Engine::beatBoundary`'s job and it
+// already falls back from the analysed beats to the tempo, which no pure function handed a vector of
+// beat times could reproduce. So the table lives where a test can read it and the walking stays
+// where it works.
+void Application::nudgePlayhead(int direction, bool coarse) {
+    if (engine_ == nullptr) {
+        return;
+    }
+    // The sequencer's grid, if there is a sequencer. Without one the piece has no strip and no snap
+    // setting, and Frames is the honest default: it is what the transport did before any of this.
+    const int snapMode = panel_ != nullptr ? panel_->sequence.snapMode()
+                                           : static_cast<int>(seq::SnapMode::Frames);
+    const double viewSpan = panel_ != nullptr ? panel_->sequence.visibleSpanSeconds() : 0.0;
+    // `beatsPerBar` from the bake options rather than a literal 4, so the day time-signature
+    // detection lands there is one default to change and this follows it.
+    const ui::Nudge nudge =
+        ui::arrowNudge(snapMode, direction, coarse, engine_->renderSettings().fps, viewSpan,
+                       seq::BakeOptions{}.beatsPerBar);
+    switch (nudge.unit) {
+    case ui::NudgeUnit::Frames:
+        engine_->stepFrames(nudge.count);
+        break;
+    case ui::NudgeUnit::Beats:
+        engine_->stepBeats(nudge.count);
+        break;
+    case ui::NudgeUnit::Markers:
+        engine_->stepMarkers(nudge.count, nudge.sectionsOnly);
+        break;
+    case ui::NudgeUnit::Seconds:
+        // The only arm that computes a time rather than asking for a step, so it is the only one
+        // that has to clamp for itself. `seekSeconds` clamps again through `Transport::seek`; this
+        // is here so the arm with no grid is clamped by something a test can reach without an engine.
+        engine_->seekSeconds(ui::nudgedTime(engine_->transport().positionSeconds(), nudge.seconds,
+                                            engine_->durationSeconds()));
+        break;
     }
 }
 
