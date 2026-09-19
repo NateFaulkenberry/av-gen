@@ -1447,7 +1447,7 @@
     "scene/volumeScattering": 1.0,
     "scene/volumeSteps": 32,
     "scene/windDirection": 0.0,
-    "scene/windSpeed": 1.319000005722046,
+    "scene/windSpeed": 4.0,
     "shader/glowmere-cosmos/baseLevel": 0.16200000047683716,
     "shader/glowmere-cosmos/baseTint": [
       0.029999999329447746,

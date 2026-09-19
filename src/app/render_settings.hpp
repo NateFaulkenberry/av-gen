@@ -185,7 +185,7 @@ struct RenderSettings {
 };
 
 
-// ---- the path tracer's half of the Render panel (ADR-363) --------------------------------------
+// ---- the path tracer's half of the Render panel (ADR-366) --------------------------------------
 //
 // ADR-351's CPU path tracer had, until this existed, no settings in the ADR-225 sense at all.
 // Samples per pixel, bounces, denoise, AOVs, the timeline second, the albedo probe, the seed and

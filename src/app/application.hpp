@@ -203,7 +203,7 @@ struct AppOptions {
     // equivalent for -- samples per pixel, path depth, and the seed.
     std::optional<std::filesystem::path> pathtrace;
     // Optional, and every one of them, because the project now carries a `pathtrace` block and a
-    // flag has to be distinguishable from its own default to override it (ADR-363). This is the
+    // flag has to be distinguishable from its own default to override it (ADR-366). This is the
     // shape `renderSettingsFromOptions` already had: start from what the project says, then apply
     // what the command line asked for. Before, `--pathtrace out.exr` on a project authored at 512
     // samples silently traced 32, because 32 was a struct default nobody had typed.
@@ -352,7 +352,7 @@ private:
     // destroyed so the panel can still say "done in 1:04" or why it failed -- a snapshot of what
     // the job reported, never a second place the state is decided.
     std::unique_ptr<pathtrace::TraceJob> ptJob_;
-    // The authored set, copied from the project at load and written back at save (ADR-363). This
+    // The authored set, copied from the project at load and written back at save (ADR-366). This
     // was five loose members with no reader and no writer; `pathtrace::TraceSettings` is now built
     // from it in one place, `traceSettingsFrom`, so the persisted form and the renderer's argument
     // cannot drift apart in three call sites.

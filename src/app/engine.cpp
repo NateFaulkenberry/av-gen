@@ -1232,7 +1232,7 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
         doc["sequence"] = sequence_.toJson();
     }
     doc["render"] = render_.toJson();
-    // ADR-363. Written unconditionally, beside "render" and for the same reason: a block
+    // ADR-366. Written unconditionally, beside "render" and for the same reason: a block
     // that is only emitted when it differs from the default is a writer gated on its own
     // subject, which is the half of ADR-350's defect that survived the first fix of it.
     doc["pathtrace"] = pathTrace_.toJson();

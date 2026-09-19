@@ -1110,7 +1110,7 @@ TEST_CASE("A sections-only sequence round-trips through a project file",
 }
 
 TEST_CASE("A project keeps its path-trace settings across two saves", "[integration][project][pathtrace]") {
-    // ADR-363, and ADR-350's second prescribed test. Before this, `pathtrace::TraceSettings` lived
+    // ADR-366, and ADR-350's second prescribed test. Before this, `pathtrace::TraceSettings` lived
     // only in `Application` member fields: a person who set 512 samples and eight bounces, saved,
     // and reopened the project got 32 and 3, because two of the eight settings were hard-coded at
     // the binding site and the rest were struct defaults. There was no reader AND no writer, which

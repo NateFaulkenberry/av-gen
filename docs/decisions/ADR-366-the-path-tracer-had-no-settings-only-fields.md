@@ -1,4 +1,4 @@
-# ADR-363: The path tracer had no settings, only fields
+# ADR-366: The path tracer had no settings, only fields
 
 Status: accepted
 Date: 2026-09-19
@@ -7,8 +7,9 @@ Relates to: ADR-225 (a setting the application does not keep is not a setting), 
 defect in `DayNightSettings`, and the two tests it prescribes), ADR-351 (the path tracer and its
 naming), ADR-352 (the albedo probe), ADR-020 (`RenderSettings`, the shape this follows)
 
-*Numbered 363 after 361 and 362 on this branch; main's high-water mark was 360. Renumber at merge
-if another branch lands first — three collisions have already happened in this session.*
+*Written as 363 and renumbered to 366 at merge: `main` landed its own ADR-363 (the multicam's
+frame time) while this branch was in flight. Four collisions in one session now, and the cause is
+structural — every agent branches from the same tip and mints the next free number independently.*
 
 ## What was wrong
 

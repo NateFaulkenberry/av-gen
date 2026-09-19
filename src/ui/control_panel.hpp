@@ -140,7 +140,7 @@ public:
     // Anything the job does not own does not live here: two sources of truth for a render's state
     // is how a UI ends up showing "rendering" after a job has failed.
     //
-    // One struct rather than the five loose pointers this used to be (ADR-363). They were five
+    // One struct rather than the five loose pointers this used to be (ADR-366). They were five
     // because nothing persisted them and each had grown where it was needed; now they are the
     // project's own `pathtrace` block and the panel edits it the way it edits `render`.
     app::PathTraceSettings* pathTraceSettings = nullptr;

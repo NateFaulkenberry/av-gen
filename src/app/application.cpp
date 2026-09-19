@@ -1530,7 +1530,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // ---- path tracing from the UI ----
         // The samples and bounces used to be assigned here, which is why a project could not carry
         // them: two of the eight settings were a hard-coded pair at the binding site and the other
-        // six were struct defaults (ADR-363). They come from the project now, like `render` does.
+        // six were struct defaults (ADR-366). They come from the project now, like `render` does.
         uiPathTrace_ = engine_->pathTraceSettings();
         panel_->pathTraceSettings = &uiPathTrace_;
         panel_->pathTraceDenoiseAvailable = pathtrace::denoiseAvailable();
@@ -2143,7 +2143,7 @@ void Application::rememberProject(const std::filesystem::path& path) {
     // Refreshed here, where a project has just *become* the current one -- the same hook the recent
     // list and the window title use. The panel's pointer is to `uiRender_` itself and stays valid.
     uiRender_ = engine_->renderSettings();
-    uiPathTrace_ = engine_->pathTraceSettings();   // ADR-363, and for the same reason
+    uiPathTrace_ = engine_->pathTraceSettings();   // ADR-366, and for the same reason
     if (context_ && shaders_) {
         applyOutputsFromProject();
         if (auto r = outputs_.open(*context_, *shaders_); !r) {
@@ -4497,7 +4497,7 @@ void Application::startPathTraceFromUi() {
         }
     }
 
-    // The trace's OWN output path (ADR-363). It used to read the raster job's, which the Render
+    // The trace's OWN output path (ADR-366). It used to read the raster job's, which the Render
     // panel returns before drawing while a trace is selected -- so the field was unreachable and an
     // unset one went to $TMPDIR with only a status line to say so. Resolved against the project's
     // folder, like a render's is, rather than against whatever the process's cwd happens to be.
@@ -4542,7 +4542,7 @@ int Application::runPathTrace() {
 
     // Start from what the project says and override with what was typed -- the shape
     // `renderSettingsFromOptions` already had, and it matters now that a project carries a
-    // `pathtrace` block (ADR-363). Before this, `--pathtrace out.exr` on a project authored at 512
+    // `pathtrace` block (ADR-366). Before this, `--pathtrace out.exr` on a project authored at 512
     // samples traced 32, because 32 was a struct default nobody had asked for.
     PathTraceSettings authored = engine_ != nullptr ? engine_->pathTraceSettings() : PathTraceSettings{};
     if (options_.ptSeconds) authored.seconds = *options_.ptSeconds;

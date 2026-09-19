@@ -14,7 +14,9 @@
     {"NAME": "haloCenter", "TYPE": "point2D", "DEFAULT": [0.5, 0.47], "LABEL": "Halo centre"},
     {"NAME": "distantAmount", "TYPE": "float", "DEFAULT": 0.028, "MIN": 0.0, "MAX": 0.4, "LABEL": "Distant regions"},
     {"NAME": "drift", "TYPE": "float", "DEFAULT": 0.004, "MIN": 0.0, "MAX": 0.15, "LABEL": "Drift"},
-    {"NAME": "vignette", "TYPE": "float", "DEFAULT": 0.38, "MIN": 0.0, "MAX": 1.0, "LABEL": "Edge falloff"}
+    {"NAME": "vignette", "TYPE": "float", "DEFAULT": 0.38, "MIN": 0.0, "MAX": 1.0, "LABEL": "Edge falloff"},
+    {"NAME": "nebulaIntensity", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Nebula intensity"},
+    {"NAME": "backgroundSaturation", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 2.0, "LABEL": "Background saturation"}
   ]
 }*/
 
@@ -118,6 +120,17 @@ fn mainImage(uv: vec2<f32>, fragCoord: vec2<f32>) -> vec4<f32> {
     // Edge falloff: the frame gets quieter toward its corners so the eye stays on the tree.
     let edge = 1.0 - inputs.vignette * smoothstep(0.35, 1.05, length(p));
     colour = colour * edge;
+
+    // ADR-360, the key-light brief's section 18. "Background brightness" and "background
+    // saturation" are asked for as environment controls, and for this scene the background IS this
+    // layer: the clear colour behind it is 0.0045, 0.0062, 0.0185 and scaling that alone would be
+    // invisible. One multiply and one desaturate at the end is the honest place for them, because
+    // the composition rule they serve is section 23's -- the vortex, the nebula and the stars must
+    // stay below the tree in luminance, and this is the single number that decides it for the
+    // largest of the three. Both default to 1.0, so a project written before them is unchanged.
+    colour = colour * inputs.nebulaIntensity;
+    let grey = dot(colour, vec3<f32>(0.2126, 0.7152, 0.0722));
+    colour = mix(vec3<f32>(grey), colour, inputs.backgroundSaturation);
 
     return vec4<f32>(max(colour, vec3<f32>(0.0)), 1.0);
 }

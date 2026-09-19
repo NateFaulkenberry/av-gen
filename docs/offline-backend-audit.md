@@ -507,7 +507,7 @@ records and ADR-362 half-fixes.
   `tests/CMakeLists.txt`.
 * **ADR-362** — the Catch2 reporter that could not survive printing the failure it found.
   `tests/support/image_diff.hpp` (new), four test files converted.
-* **ADR-363** (step 3) — the path tracer's settings become settings: `app::PathTraceSettings`
+* **ADR-366** (step 3) — the path tracer's settings become settings: `app::PathTraceSettings`
   under the project's `"pathtrace"` key with a reader, a writer and ADR-350's two tests; its own
   output path, which was unreachable while a trace was selected; `SaveKind::Exr`; and `--pt-*`
   options made optional so a project can be the base.

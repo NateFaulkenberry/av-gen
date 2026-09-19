@@ -376,7 +376,7 @@ Result<void> shadowAovPreconditions(const scene::Scene& scene, std::string_view 
 
 
 
-// ---- PathTraceSettings (ADR-363) -------------------------------------------------------------
+// ---- PathTraceSettings (ADR-366) -------------------------------------------------------------
 
 Result<void> PathTraceSettings::validate() const {
     if (!(seconds >= 0.0) || !std::isfinite(seconds)) {

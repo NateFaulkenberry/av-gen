@@ -2847,7 +2847,7 @@ void ControlPanel::drawPathTrace() {
                 "adds indirect light and costs time. Russian roulette ends long paths early.");
     }
 
-    // ADR-363: the trace's own destination. It used to read the raster job's, which this function
+    // ADR-366: the trace's own destination. It used to read the raster job's, which this function
     // returns before ever drawing -- so a trace's output path was unreachable while a trace was
     // selected, and an unset one went to $TMPDIR without saying so.
     {

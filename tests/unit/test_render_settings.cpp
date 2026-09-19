@@ -402,7 +402,7 @@ TEST_CASE("--aov shadow refuses the configurations where it would be a constant"
     }
 }
 
-// ---- the path tracer's authored settings (ADR-363) --------------------------------------------
+// ---- the path tracer's authored settings (ADR-366) --------------------------------------------
 //
 // ADR-350's rule, and its two prescribed tests. The defect it records is a system the application
 // runs and does not keep, and the path tracer had it in the most complete form available: no

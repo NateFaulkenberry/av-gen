@@ -546,7 +546,7 @@
       80.0
     ],
     "nodes/island-surface/visible": true,
-    "nodes/tree-foliage/emissiveBoost": 2.200000047683716,
+    "nodes/tree-foliage/emissiveBoost": 0.5,
     "nodes/tree-foliage/lightColor": [
       1.0,
       1.0,

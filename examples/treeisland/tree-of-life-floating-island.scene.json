@@ -2,6 +2,10 @@
   "format": "avgen-scene",
   "version": 1,
   "name": "Tree of Life - Floating Island",
+  "wind": {"enabled": true, "speed": 0.0, "direction": 0.35, "gustAmount": 0.9,
+           "gustScale": 48.0, "gustSpeed": 9.0, "gustSharpness": 3.0,
+           "turbulence": 0.35, "turbulenceScale": 26.0, "turbulenceSpeed": 1.4,
+           "flutterScale": 3.5},
   "camera": {
     "mode": 1,
     "position": [158.0, 6.0, 152.0],
@@ -114,7 +118,8 @@
       "parent": "floating-island",
       "position": [2.0, 3.0, 1.0],
       "rotation": [0.0, 0.0, 0.0],
-      "scale": [1.0, 1.0, 1.0]
+      "scale": [1.0, 1.0, 1.0],
+      "wind": {"strength": 0.0, "trunk": 0.3, "branch": 1.2, "foliage": 1.5, "flutter": 1.2, "lag": 0.3}
     },
     {
       "name": "tree-wood",

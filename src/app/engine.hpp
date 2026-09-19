@@ -368,7 +368,7 @@ public:
     // ---- offline render settings (milestone 1.0), saved in the project under "render" ----
     [[nodiscard]] RenderSettings& renderSettings() { return render_; }
     [[nodiscard]] const RenderSettings& renderSettings() const { return render_; }
-    // The path tracer's authored settings (ADR-363). A peer of the render settings, not a member
+    // The path tracer's authored settings (ADR-366). A peer of the render settings, not a member
     // of them: the two renderers share a resolution and nothing else.
     [[nodiscard]] PathTraceSettings& pathTraceSettings() { return pathTrace_; }
     [[nodiscard]] const PathTraceSettings& pathTraceSettings() const { return pathTrace_; }
