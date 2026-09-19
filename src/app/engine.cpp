@@ -1701,6 +1701,44 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         if (auto r = shaderLayers_.fromJson(doc["shaders"]); !r) {
             return r;
         }
+        // ADR-354. A shader layer's ISF inputs ARE parameters -- `ShaderLayerSet::registerInputs`
+        // adds one per input under "shader/<layer>/<input>" -- but they do not exist until the
+        // line above has run, and `params::loadProject` ran twenty-five lines up. So every
+        // `"shader/..."` a project wrote was met with "references unknown parameter; ignored" and
+        // the layer drew its file defaults. Not a hypothetical: the Tree of Life's cosmos layer
+        // has eleven inputs and no project in the repository has ever been able to set one, which
+        // is why the defect went unseen -- nobody could author the thing that would have shown it.
+        //
+        // A second, narrow pass rather than moving the load: `loadProject` also installs sources,
+        // routes and presets, and reordering the whole of it to serve one prefix is a change whose
+        // blast radius is every project. This one touches exactly the paths that could not
+        // previously be set, so no existing picture moves -- there is no project in the repository
+        // with a `shader/` parameter in it, because until now writing one did nothing.
+        if (const auto parameters = doc.find("parameters");
+            parameters != doc.end() && parameters->is_object()) {
+            std::size_t applied = 0;
+            for (const auto& [path, value] : parameters->items()) {
+                if (!path.starts_with("shader/")) {
+                    continue;
+                }
+                params::IParameter* param = params_.find(path);
+                if (param == nullptr) {
+                    log::warn("project references unknown shader parameter '{}'; ignored", path);
+                    continue;
+                }
+                if (auto r = params::parameterFromJson(*param, value); !r) {
+                    log::warn("project parameter '{}': {}", path, r.error().message);
+                    continue;
+                }
+                ++applied;
+            }
+            // Said out loud, because the pass twenty lines up has already warned that these paths
+            // are unknown -- it ran before the layers existed -- and a reader watching the log
+            // would otherwise have only the warning and no sign that they were set after all.
+            if (applied > 0) {
+                log::info("project: {} shader-layer parameter(s) applied after the layers loaded", applied);
+            }
+        }
     } else {
         shaderLayers_.clear();
     }

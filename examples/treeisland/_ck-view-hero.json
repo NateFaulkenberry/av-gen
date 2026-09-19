@@ -31,7 +31,7 @@
     "lights/celestial-key/enabled": true,
     "lights/celestial-key/azimuth": -50.0,
     "lights/celestial-key/elevation": 35.0,
-    "lights/celestial-key/intensity": 8.5,
+    "lights/celestial-key/intensity": 22.0,
     "lights/celestial-key/color": [
       1.0,
       0.92,
@@ -39,7 +39,7 @@
     ],
     "lights/celestial-key/angularSize": 1.8,
     "lights/celestial-key/shadowStrength": 0.95,
-    "lights/cosmic-fill/intensity": 0.55,
+    "lights/cosmic-fill/intensity": 0.72,
     "lights/cosmic-fill/color": [
       0.32,
       0.45,
@@ -144,7 +144,7 @@
           35.0
         ],
         "lights/celestial-key/intensity": [
-          8.5
+          22.0
         ],
         "lights/celestial-key/color": [
           1.0,
@@ -158,7 +158,7 @@
           0.95
         ],
         "lights/cosmic-fill/intensity": [
-          0.55
+          0.72
         ],
         "lights/cosmic-fill/color": [
           0.32,
@@ -222,7 +222,7 @@
           35.0
         ],
         "lights/celestial-key/intensity": [
-          1.75
+          4.6
         ],
         "lights/celestial-key/color": [
           0.62,
@@ -236,7 +236,7 @@
           0.99
         ],
         "lights/cosmic-fill/intensity": [
-          0.2
+          0.3
         ],
         "lights/cosmic-fill/color": [
           0.34,
