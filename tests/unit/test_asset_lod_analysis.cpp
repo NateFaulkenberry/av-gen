@@ -116,14 +116,73 @@ TEST_CASE("what an imported Tree of Life layer contains", "[.analysis][assetlod]
                 static_cast<double>(totalUnique * sizeof(scene::Vertex)) / 1.0e6);
 }
 
+TEST_CASE("how each layer is built, and by which strategy", "[.analysis][assetlod]") {
+    if (!haveLayers()) {
+        SKIP("assets/treeisle is not present in this checkout");
+    }
+    // Three settings over the same geometry, so "thinning was necessary" is a comparison and not an
+    // assertion: preserving only (what heroLodSettings does), the sloppy simplifier (what
+    // vegetationLodSettings does, and what an ordinary reading of the header would reach for), and
+    // shell thinning.
+    struct Arm {
+        const char* name;
+        assets::LodChainSettings settings;
+    };
+    std::vector<Arm> arms;
+    {
+        assets::LodChainSettings preserving = assets::heroLodSettings();
+        preserving.ratios = {1.0f, 0.5f, 0.2f, 0.07f, 0.02f};
+        arms.push_back({"preserve", preserving});
+        assets::LodChainSettings sloppy = preserving;
+        sloppy.sloppyFallback = 1.5f;
+        arms.push_back({"sloppy", sloppy});
+        arms.push_back({"thin", assets::foliageLodSettings()});
+    }
+    std::printf("\n%-10s %-9s %7s %12s", "layer", "strategy", "shells", "source");
+    for (float r : {0.5f, 0.2f, 0.07f, 0.02f}) {
+        std::printf("  %5.2f", static_cast<double>(r));
+    }
+    std::printf("   ms\n");
+    for (const char* layer : kLayers) {
+        scene::Scene s;
+        REQUIRE(assets::loadGltf(layerPath(layer), s, {}));
+        for (const Arm& arm : arms) {
+            std::uint64_t sourceTotal = 0;
+            std::uint64_t shellTotal = 0;
+            std::vector<std::uint64_t> rungTotals(arm.settings.ratios.size(), 0);
+            double buildMs = 0.0;
+            float scale = 1.0f;
+            for (const scene::MeshData& mesh : s.meshes) {
+                const auto started = std::chrono::steady_clock::now();
+                const auto chain = assets::buildLodChain(mesh, arm.settings);
+                buildMs += millisSince(started);
+                REQUIRE(chain);
+                sourceTotal += chain->sourceTriangles;
+                shellTotal += chain->sourceShells;
+                for (std::size_t r = 0; r < chain->levels.size() && r < rungTotals.size(); ++r) {
+                    rungTotals[r] += chain->levels[r].mesh.indices.size() / 3;
+                    scale = std::max(scale, chain->levels[r].shellScale);
+                }
+            }
+            std::printf("%-10s %-9s %7llu %12llu", layer, arm.name,
+                        static_cast<unsigned long long>(shellTotal),
+                        static_cast<unsigned long long>(sourceTotal));
+            for (std::size_t r = 1; r < rungTotals.size(); ++r) {
+                std::printf("  %5.3f",
+                            static_cast<double>(rungTotals[r]) / static_cast<double>(sourceTotal));
+            }
+            std::printf("  %5.0f  (max shell scale %.2f)\n", buildMs, static_cast<double>(scale));
+        }
+    }
+}
+
 TEST_CASE("what the chain builder achieves on Tree of Life geometry", "[.analysis][assetlod]") {
     if (!haveLayers()) {
         SKIP("assets/treeisle is not present in this checkout");
     }
-    assets::LodChainSettings settings = assets::heroLodSettings();
-    settings.ratios = {1.0f, 0.5f, 0.2f, 0.07f, 0.02f};
-    std::printf("\n%-10s %4s %12s %8s %8s %10s %10s %7s %7s\n", "layer", "rung", "triangles", "want",
-                "got", "error", "bounds", "sloppy", "reached");
+    assets::LodChainSettings settings = assets::foliageLodSettings();
+    std::printf("\n%-10s %4s %12s %8s %8s %10s %10s %7s %7s %9s %5s\n", "layer", "rung", "triangles",
+                "want", "got", "error", "bounds", "how", "reached", "shells", "scale");
     for (const char* layer : kLayers) {
         scene::Scene s;
         REQUIRE(assets::loadGltf(layerPath(layer), s, {}));
@@ -153,11 +212,13 @@ TEST_CASE("what the chain builder achieves on Tree of Life geometry", "[.analysi
             }
             for (std::size_t r = 0; r < chain->levels.size(); ++r) {
                 const assets::LodLevel& level = chain->levels[r];
-                std::printf("%-10s %4zu %12zu %8.3f %8.3f %10.4f %10.4f %7s %7s\n", layer, r,
+                std::printf("%-10s %4zu %12zu %8.3f %8.3f %10.4f %10.4f %7s %7s %9u %5.2f\n", layer, r,
                             level.mesh.indices.size() / 3, static_cast<double>(level.targetRatio),
                             static_cast<double>(level.achievedRatio), static_cast<double>(level.error),
-                            static_cast<double>(level.boundsError), level.sloppy ? "yes" : "",
-                            level.reachedTarget ? "yes" : "NO");
+                            static_cast<double>(level.boundsError),
+                            level.thinned ? "thin" : (level.sloppy ? "sloppy" : ""),
+                            level.reachedTarget ? "yes" : "NO", level.shells,
+                            static_cast<double>(level.shellScale));
             }
         }
         std::printf("%-10s  all %12llu", layer, static_cast<unsigned long long>(sourceTotal));

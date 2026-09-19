@@ -12,6 +12,8 @@
 namespace avgen::assets {
 namespace {
 
+constexpr std::uint32_t kNoShell = 0xFFFFFFFFu;
+
 // meshoptimizer reads positions as "float3 in the first 12 bytes of each vertex" and weld/shadow
 // index generation compares raw bytes, padding included. Both are true of this layout and neither
 // is true of a layout with a gap in it, so the assumption is pinned here rather than discovered as
@@ -67,6 +69,195 @@ scene::MeshData compact(const scene::MeshData& source, std::vector<std::uint32_t
 
 std::string levelName(const std::string& base, std::size_t level) {
     return level == 0 ? base : base + "#lod" + std::to_string(level);
+}
+
+// ---- shells: the disconnected pieces of a mesh, and removing whole ones -----------------------
+//
+// See `ShellThinning` in the header for why this exists. Everything here is position-based:
+// meshopt_generateShadowIndexBuffer collapses vertices that share a position and differ only in
+// normal or UV, so a hard-shaded leaf carrying three vertices per corner is one shell rather than
+// the several an index-space union would find.
+
+struct ShellSet {
+    std::vector<std::uint32_t> triangleShell; // per triangle: which shell it belongs to
+    std::uint32_t count = 0;
+};
+
+ShellSet findShells(const scene::MeshData& mesh) {
+    ShellSet out;
+    const std::size_t triangles = mesh.indices.size() / 3;
+    if (triangles == 0 || mesh.vertices.empty()) {
+        return out;
+    }
+    std::vector<std::uint32_t> positionIndices(mesh.indices.size());
+    meshopt_generateShadowIndexBuffer(positionIndices.data(), mesh.indices.data(), mesh.indices.size(),
+                                      positionData(mesh), mesh.vertices.size(), sizeof(glm::vec3),
+                                      sizeof(scene::Vertex));
+    std::vector<std::uint32_t> parent(mesh.vertices.size());
+    for (std::uint32_t i = 0; i < parent.size(); ++i) {
+        parent[i] = i;
+    }
+    // Path-halving find, union towards the smaller root. The trees stay shallow because every union
+    // is between corners of one triangle and the halving flattens what is left.
+    const auto find = [&parent](std::uint32_t x) {
+        while (parent[x] != x) {
+            parent[x] = parent[parent[x]];
+            x = parent[x];
+        }
+        return x;
+    };
+    const auto unite = [&](std::uint32_t a, std::uint32_t b) {
+        const std::uint32_t ra = find(a);
+        const std::uint32_t rb = find(b);
+        if (ra != rb) {
+            parent[std::max(ra, rb)] = std::min(ra, rb);
+        }
+    };
+    for (std::size_t t = 0; t < triangles; ++t) {
+        unite(positionIndices[t * 3], positionIndices[t * 3 + 1]);
+        unite(positionIndices[t * 3], positionIndices[t * 3 + 2]);
+    }
+    // Numbered in first-appearance order, so a shell's id does not depend on how many vertices
+    // happen to precede it in the buffer.
+    std::vector<std::uint32_t> shellOf(mesh.vertices.size(), kNoShell);
+    out.triangleShell.resize(triangles);
+    for (std::size_t t = 0; t < triangles; ++t) {
+        const std::uint32_t root = find(positionIndices[t * 3]);
+        if (shellOf[root] == kNoShell) {
+            shellOf[root] = out.count++;
+        }
+        out.triangleShell[t] = shellOf[root];
+    }
+    return out;
+}
+
+// A value in [0, 1) from a shell's centroid, so which leaves survive depends on where they are and
+// not on the order the exporter wrote them in. Two shells at the same place collide and take the
+// same decision, which is right: they are the same leaf twice.
+float shellHash01(glm::vec3 centroid, std::uint32_t seed) {
+    const auto mix = [](std::uint32_t h) {
+        h ^= h >> 16;
+        h *= 0x7feb352du;
+        h ^= h >> 15;
+        h *= 0x846ca68bu;
+        h ^= h >> 16;
+        return h;
+    };
+    std::uint32_t h = seed;
+    for (int axis = 0; axis < 3; ++axis) {
+        // Quantised to a thousandth of a unit before hashing: a re-export that moves a leaf by a
+        // float's last bit must not reshuffle the whole canopy.
+        const auto q = static_cast<std::int32_t>(std::lround(static_cast<double>(centroid[axis]) * 1000.0));
+        h = mix(h ^ static_cast<std::uint32_t>(q));
+    }
+    return static_cast<float>(h >> 8) * (1.0f / 16777216.0f);
+}
+
+struct ThinResult {
+    scene::MeshData mesh;
+    std::uint32_t keptShells = 0;
+    float scale = 1.0f;
+};
+
+// Keep whole shells until the triangle budget is met, then grow each kept shell about its own
+// centre to give back the area the dropped ones took with them.
+ThinResult thinShells(const scene::MeshData& source, const ShellSet& shells,
+                      std::uint32_t targetTriangles, const ShellThinning& thinning) {
+    ThinResult out;
+    const std::size_t triangles = source.indices.size() / 3;
+    if (shells.count == 0 || triangles == 0) {
+        return out;
+    }
+    struct Shell {
+        std::uint32_t triangles = 0;
+        float area = 0.0f;
+        glm::vec3 lo{std::numeric_limits<float>::max()};
+        glm::vec3 hi{std::numeric_limits<float>::lowest()};
+    };
+    std::vector<Shell> info(shells.count);
+    for (std::size_t t = 0; t < triangles; ++t) {
+        Shell& s = info[shells.triangleShell[t]];
+        const glm::vec3 a = source.vertices[source.indices[t * 3]].position;
+        const glm::vec3 b = source.vertices[source.indices[t * 3 + 1]].position;
+        const glm::vec3 c = source.vertices[source.indices[t * 3 + 2]].position;
+        s.triangles += 1;
+        s.area += 0.5f * glm::length(glm::cross(b - a, c - a));
+        s.lo = glm::min(s.lo, glm::min(a, glm::min(b, c)));
+        s.hi = glm::max(s.hi, glm::max(a, glm::max(b, c)));
+    }
+    double totalArea = 0.0;
+    for (const Shell& s : info) {
+        totalArea += static_cast<double>(s.area);
+    }
+    const auto meanArea = static_cast<float>(totalArea / static_cast<double>(shells.count));
+
+    std::vector<std::uint32_t> order(shells.count);
+    std::vector<float> score(shells.count);
+    for (std::uint32_t i = 0; i < shells.count; ++i) {
+        order[i] = i;
+        const glm::vec3 centroid = 0.5f * (info[i].lo + info[i].hi);
+        const float relative = meanArea > 0.0f ? std::max(info[i].area / meanArea, 1e-4f) : 1.0f;
+        score[i] = shellHash01(centroid, thinning.seed) /
+                   std::pow(relative, std::max(thinning.sizeBias, 0.0f));
+    }
+    std::ranges::sort(order, [&](std::uint32_t a, std::uint32_t b) {
+        // The index breaks ties, so the result does not depend on the sort being stable.
+        return score[a] != score[b] ? score[a] < score[b] : a < b;
+    });
+
+    std::vector<char> keep(shells.count, 0);
+    std::uint32_t kept = 0;
+    std::uint32_t keptTriangles = 0;
+    for (const std::uint32_t shell : order) {
+        if (keptTriangles >= targetTriangles) {
+            break;
+        }
+        keep[shell] = 1;
+        ++kept;
+        keptTriangles += info[shell].triangles;
+    }
+    if (kept == 0 || keptTriangles >= triangles) {
+        return out; // nothing kept, or nothing removed: the caller keeps what it had
+    }
+    out.keptShells = kept;
+
+    const float ratio = static_cast<float>(keptTriangles) / static_cast<float>(triangles);
+    out.scale = thinning.areaCompensation > 0.0f
+                    ? std::clamp(std::pow(ratio, -0.5f * std::clamp(thinning.areaCompensation, 0.0f, 1.0f)),
+                                 1.0f, std::max(thinning.maxScale, 1.0f))
+                    : 1.0f;
+
+    scene::MeshData built;
+    built.name = source.name;
+    built.indices.reserve(static_cast<std::size_t>(keptTriangles) * 3);
+    std::vector<std::uint32_t> remap(source.vertices.size(), kNoShell);
+    std::vector<std::uint32_t> vertexShell;
+    for (std::size_t t = 0; t < triangles; ++t) {
+        const std::uint32_t shell = shells.triangleShell[t];
+        if (keep[shell] == 0) {
+            continue;
+        }
+        for (int corner = 0; corner < 3; ++corner) {
+            const std::uint32_t original = source.indices[t * 3 + static_cast<std::size_t>(corner)];
+            if (remap[original] == kNoShell) {
+                remap[original] = static_cast<std::uint32_t>(built.vertices.size());
+                built.vertices.push_back(source.vertices[original]);
+                vertexShell.push_back(shell);
+            }
+            built.indices.push_back(remap[original]);
+        }
+    }
+    if (out.scale > 1.0f) {
+        // About each shell's own centre, so the canopy's shape is unchanged and only its leaves are
+        // larger. Uniform, so the normals stay correct without renormalising.
+        for (std::size_t v = 0; v < built.vertices.size(); ++v) {
+            const Shell& s = info[vertexShell[v]];
+            const glm::vec3 centroid = 0.5f * (s.lo + s.hi);
+            built.vertices[v].position = centroid + (built.vertices[v].position - centroid) * out.scale;
+        }
+    }
+    out.mesh = std::move(built);
+    return out;
 }
 
 // One level's two attempts over `src`: the preserving simplifier, then meshoptimizer's sloppy one
@@ -320,6 +511,30 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
     chain.sourceTriangles = sourceTriangles;
     chain.levels.reserve(settings.ratios.size());
 
+    // Only when thinning is armed. It is a union-find over every triangle, and the answer is 1 for
+    // most meshes in this engine, so it is not a diagnostic worth paying for unconditionally.
+    ShellSet shells;
+    if (settings.thinning.fallback > 0.0f) {
+        shells = findShells(source);
+        chain.sourceShells = shells.count;
+    }
+    // The strategy is chosen once, from the geometry, rather than per level from what the
+    // simplifier happened to return -- because the two fallbacks are not interchangeable and the
+    // per-level version cannot express that. On the Tree of Life's foliage the *sloppy* simplifier
+    // reaches every ratio it is asked for (0.483 / 0.186 / 0.062 / 0.017), so a per-level rule would
+    // never see an overshoot and thinning would never fire; what it reaches them by is quantising
+    // 8-triangle leaves onto a grid coarse enough to collapse each one to a speck, which is a bare
+    // branch structure where a canopy was. So on shell geometry the sloppy simplifier is taken off
+    // the table and thinning replaces it, and everywhere else nothing changes at all.
+    const bool thinStrategy = settings.thinning.fallback > 0.0f &&
+                              shells.count >= settings.thinning.minShells &&
+                              sourceTriangles / std::max(shells.count, 1u) <=
+                                  settings.thinning.maxShellTriangles;
+    LodChainSettings simplifySettings = settings;
+    if (thinStrategy) {
+        simplifySettings.sloppyFallback = 0.0f;
+    }
+
     const float attributeWeights[kAttributeCount] = {settings.attributes.normal, settings.attributes.normal,
                                                      settings.attributes.normal, settings.attributes.uv,
                                                      settings.attributes.uv};
@@ -342,7 +557,76 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
 
         const std::size_t targetIndices = static_cast<std::size_t>(targetTriangles) * 3;
         // Every level is simplified from the source, so errors do not compound down the chain.
-        SimplifyAttempt best = simplifyTo(source, targetIndices, settings, attributeWeights);
+        SimplifyAttempt best = simplifyTo(source, targetIndices, simplifySettings, attributeWeights);
+
+        // ---- the last resort: remove whole shells ---------------------------------------------
+        //
+        // Armed only by `ShellThinning::fallback`, and tested against what the simplifiers actually
+        // returned rather than against a guess about the geometry. `best.indices.empty()` counts as
+        // an overshoot of infinity: neither simplifier produced anything, which on shell geometry
+        // is the same refusal expressed differently.
+        //
+        // It runs *after* the simplifiers and not instead of them, because a mesh that is both
+        // shell-structured and simplifiable -- a hundred rocks in one part -- should be simplified.
+        // Thinning such a mesh would delete ninety of the rocks to reach a ratio that collapsing
+        // edges reaches with all hundred still there.
+        if (thinStrategy) {
+            const std::size_t got = best.indices.size() / 3;
+            const bool overshot = best.indices.empty() ||
+                                  static_cast<float>(got) >
+                                      settings.thinning.fallback * static_cast<float>(targetTriangles);
+            if (overshot) {
+                ThinResult thin = thinShells(source, shells, targetTriangles, settings.thinning);
+                if (!thin.mesh.indices.empty() && (best.indices.empty() || thin.mesh.indices.size() / 3 < got)) {
+                    out.mesh = settings.optimise ? optimiseMesh(thin.mesh) : std::move(thin.mesh);
+                    out.mesh.name = levelName(source.name, level);
+                    const auto levelTriangles = static_cast<std::uint32_t>(out.mesh.indices.size() / 3);
+                    out.achievedRatio =
+                        static_cast<float>(levelTriangles) / static_cast<float>(sourceTriangles);
+                    out.thinned = true;
+                    out.shells = thin.keptShells;
+                    out.shellScale = thin.scale;
+                    // Thinning's granularity is one shell: it stops at the first shell that meets
+                    // the budget, so it can only ever overshoot by that shell's triangles. Judging
+                    // it by `<= targetTriangles` reported "did not reach" on a level that landed on
+                    // 0.500 of a requested 0.500, which is a false alarm and the kind that trains a
+                    // reader to ignore the flag.
+                    const auto grain = static_cast<std::uint32_t>(
+                        std::max<std::size_t>(1, sourceTriangles / std::max(shells.count, 1u)));
+                    out.reachedTarget = levelTriangles <= targetTriangles + grain;
+                    // Thinning's deviation is not the simplifier's and must not be reported as it.
+                    // What a thinned level is wrong by, at worst, is a whole shell: any point on a
+                    // removed leaf can be that leaf's radius away from anything that is still
+                    // there, and grown neighbours do not close that gap, they cover it. So the
+                    // error is the largest kept shell's radius, floored by the bounding-box
+                    // recession the same way a simplified level's is. It is an over-estimate for a
+                    // dense canopy and the right order for a sparse one, and it is deliberately
+                    // *not* small: a selector must not take a thinned rung while the object is
+                    // large on screen.
+                    out.boundsError = boundsRecession(out.mesh);
+                    const auto [lo, hi] = out.mesh.bounds();
+                    float shellRadius = 0.0f;
+                    if (thin.keptShells > 0) {
+                        // Mean shell extent, from the level's own geometry: total kept area over
+                        // kept shells gives a mean area, and a disc of that area has this radius.
+                        double area = 0.0;
+                        for (std::size_t t = 0; t + 2 < out.mesh.indices.size(); t += 3) {
+                            const glm::vec3 a = out.mesh.vertices[out.mesh.indices[t]].position;
+                            const glm::vec3 b = out.mesh.vertices[out.mesh.indices[t + 1]].position;
+                            const glm::vec3 c = out.mesh.vertices[out.mesh.indices[t + 2]].position;
+                            area += 0.5 * static_cast<double>(glm::length(glm::cross(b - a, c - a)));
+                        }
+                        shellRadius = static_cast<float>(
+                            std::sqrt(area / (3.14159265358979 * static_cast<double>(thin.keptShells))));
+                        shellRadius = std::min(shellRadius, glm::length(hi - lo));
+                    }
+                    out.error = std::max(shellRadius, out.boundsError);
+                    out.relativeError = errorScale > 0.0f ? out.error / errorScale : 0.0f;
+                    chain.levels.push_back(std::move(out));
+                    continue;
+                }
+            }
+        }
 
         // A chain must *descend*. `validate()` enforces that of the ratios asked for; nothing
         // enforced it of the ratios achieved, and on CommonTree_1 the achieved ones do not descend:
@@ -398,7 +682,7 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
                               best.indices.size() / 3 > trianglesOf(*previous);
         const bool lostGeometry = !best.indices.empty() && candidateRecession > boundsLimit;
         if (previous != nullptr && (best.indices.empty() || inverted || lostGeometry)) {
-            SimplifyAttempt again = simplifyTo(*previous, targetIndices, settings, attributeWeights);
+            SimplifyAttempt again = simplifyTo(*previous, targetIndices, simplifySettings, attributeWeights);
             scene::MeshData retry;
             float retryRecession = 0.0f;
             if (!again.indices.empty()) {
@@ -583,6 +867,43 @@ LodChainSettings vegetationLodSettings() {
     s.attributes = {.normal = 0.2f, .uv = 0.05f};
     s.sloppyFallback = 1.5f;
     return s;
+}
+
+// An imported hero asset that is partly instanced foliage (ADR-344). Measured on the Tree of Life's
+// five layers; see tests/unit/test_asset_lod_analysis.cpp "[.analysis][assetlod]" for the table.
+//
+// Five rungs, because §3 of the brief asks for five, and 1 / 0.5 / 0.2 / 0.07 / 0.02 rather than
+// vegetation's ladder because this is an asset somebody looks at: the near rungs have to be close
+// together or the hero shot pops.
+//
+// The attribute weights are the hero calibration's. This asset has no UVs at all -- the Tree of
+// Life's materials are per-bucket constants with no texture behind them (ADR-339) -- so the uv
+// weight costs nothing here and is kept for the assets that do.
+//
+// **Both fallbacks are armed and the geometry decides which one runs** -- `ShellThinning::
+// maxShellTriangles` makes that choice, and the Tree of Life needs both answers in one asset. The
+// sloppy simplifier is the right one for the twigs and the tracery, which are connected
+// non-manifold structures where it ignores topology and reaches the ratio. It is the wrong one for
+// 122,000 separate leaves: it reaches the ratio there too -- 0.483 / 0.186 / 0.062 / 0.017, which
+// looks like success in a table -- by quantising onto a grid coarse enough to collapse each
+// 8-triangle leaf into a speck, leaving a bare branch structure where a canopy was. Thinning
+// removes whole leaves and grows the survivors, which keeps the canopy's area, its outline and its
+// gaps. Both thresholds are 1.5, deliberately the same number: past a 50% overshoot the simplifier
+// is not making slow progress towards the ratio, it is refusing.
+LodChainSettings foliageLodSettings() {
+    LodChainSettings s;
+    s.ratios = {1.0f, 0.5f, 0.2f, 0.07f, 0.02f};
+    s.attributes = {.normal = 0.5f, .uv = 0.1f};
+    s.sloppyFallback = 1.5f;
+    s.thinning.fallback = 1.5f;
+    return s;
+}
+
+std::uint32_t countShells(const scene::MeshData& mesh) {
+    if (!mesh.valid()) {
+        return 0;
+    }
+    return findShells(mesh).count;
 }
 
 } // namespace avgen::assets
