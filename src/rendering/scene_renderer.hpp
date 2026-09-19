@@ -781,6 +781,9 @@ private:
     glm::mat4 prevViewProj_{1.0f};
     bool havePrevViewProj_ = false;
     double previousRenderTime_ = -std::numeric_limits<double>::infinity();
+    // ADR-359: the previous frame's render time, captured before `previousRenderTime_` is
+    // overwritten, so the wind's contribution to the velocity target is a real difference.
+    float windPrevTime_ = 0.0f;
     QualityTier tier_ = QualityTier::Realtime;
     QualitySettings qualitySettings_ = QualitySettings::forTier(QualityTier::Realtime);
     PassToggles toggles_;

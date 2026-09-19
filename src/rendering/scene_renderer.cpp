@@ -2225,6 +2225,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         prevModels_.clear();
         prevModelsNext_.clear();
     }
+    // ADR-359: the wind deformation is a function of time, so the velocity target needs the time
+    // the PREVIOUS frame was at, and `previousRenderTime_` is about to stop being that. Captured
+    // rather than read later: the object fill runs several hundred lines below this line, and
+    // reading `previousRenderTime_` there quietly gave every swaying vertex a zero velocity --
+    // correct-looking, silently wrong, and exactly the class of defect a motion-blur pass hides.
+    // On a discontinuity the previous frame is not a previous frame, so the velocity is zero by
+    // construction, which is what a seek should produce.
+    windPrevTime_ = (havePrevViewProj_ && std::isfinite(previousRenderTime_))
+                        ? static_cast<float>(previousRenderTime_)
+                        : static_cast<float>(time.renderTime);
     previousRenderTime_ = time.renderTime;
     clusterDispatches_ = 0;
     // The CPU side of the frame, stage by stage (ADR-077). The boundary rolls: every interval
@@ -2901,12 +2911,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             const scene::Entity::WindBody& w = entity.wind;
             obj.windOrigin = glm::vec4(w.origin, 1.0f / std::max(w.height, 1e-3f));
             obj.windShape = glm::vec4(1.0f / std::max(w.radius, 1e-3f), w.strength, w.branch, w.foliage);
-            // On the first frame there is no previous time (-inf); using this frame's makes the
-            // velocity zero, which is what a first frame's velocity should be anyway.
-            const float prevTime = std::isfinite(previousRenderTime_)
-                                       ? static_cast<float>(previousRenderTime_)
-                                       : static_cast<float>(time.renderTime);
-            obj.windTune = glm::vec4(w.trunk, w.flutter, w.lag, prevTime);
+            obj.windTune = glm::vec4(w.trunk, w.flutter, w.lag, windPrevTime_);
         }
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));
