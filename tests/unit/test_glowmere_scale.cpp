@@ -306,7 +306,7 @@ TEST_CASE("Glowmere's cast stands in its undergrowth", "[glowmere][scale]") {
         INFO("control: the same body at " << kBeforeCast << "x stands " << before << " m");
         CHECK(before > tallestPlant);
     }
-    CHECK(scenesChecked == 5);
+    CHECK(scenesChecked == static_cast<int>(kScenes.size()));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -393,7 +393,7 @@ TEST_CASE("Glowmere's cast stands inside the fungal ladder", "[glowmere][scale]"
                          << groundedAt334 << " grounded");
         CHECK(groundedAt334 < kGroundedMin);
     }
-    CHECK(scenesChecked == 5);
+    CHECK(scenesChecked == static_cast<int>(kScenes.size()));
 }
 
 // ---------------------------------------------------------------------------------------------

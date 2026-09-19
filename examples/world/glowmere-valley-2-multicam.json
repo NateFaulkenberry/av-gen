@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-2-multicam.scene.json",
-        "sha256": "565d5dd02c41d014e8561d6da89fcc3f8fc935b2777846bf9a7d81fd7b422517",
-        "size": 211373
+        "sha256": "2623d655a305881dcdd7a33f939e737929e2768c7e2440659d34f56affd0c025",
+        "size": 228180
       }
     }
   },
@@ -13239,7 +13239,7 @@
     "limits": "unlimited",
     "muxAudio": true,
     "output": "video",
-    "path": "/Users/natefaulkenberry/Desktop/bad.mov",
+    "path": "glowmere-valley-2-multicam.mov",
     "pattern": "frame_{:06d}.png",
     "quality": 80,
     "start": 0.0,
