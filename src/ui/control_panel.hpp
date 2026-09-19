@@ -139,14 +139,16 @@ public:
     // Application owns, exactly as `renderSettings` does, and `pathTraceProgress` reads the job.
     // Anything the job does not own does not live here: two sources of truth for a render's state
     // is how a UI ends up showing "rendering" after a job has failed.
-    pathtrace::TraceSettings* pathTraceSettings = nullptr;
-    double* pathTraceSeconds = nullptr;
-    bool* pathTraceDenoise = nullptr;
-    bool* pathTraceAovs = nullptr;
+    //
+    // One struct rather than the five loose pointers this used to be (ADR-363). They were five
+    // because nothing persisted them and each had grown where it was needed; now they are the
+    // project's own `pathtrace` block and the panel edits it the way it edits `render`.
+    app::PathTraceSettings* pathTraceSettings = nullptr;
     bool pathTraceDenoiseAvailable = false;   // false greys the checkbox and explains why
     std::function<pathtrace::TraceProgress()> pathTraceProgress;
     std::function<void()> onStartPathTrace;
     std::function<void()> onCancelPathTrace;
+    std::function<void()> onChoosePathTraceOutput;
     std::function<void()> onEnqueueRender;
     std::function<void()> onRunQueue;
     std::function<void()> onChooseRenderOutput;

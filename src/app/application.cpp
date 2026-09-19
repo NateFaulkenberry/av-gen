@@ -1512,12 +1512,11 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         liftViewportLimits_ = options.liftViewportLimits;
         panel_->liftViewportLimits = &liftViewportLimits_;
         // ---- path tracing from the UI ----
-        uiPathTrace_.samplesPerPixel = 32;
-        uiPathTrace_.maxDepth = 3;
+        // The samples and bounces used to be assigned here, which is why a project could not carry
+        // them: two of the eight settings were a hard-coded pair at the binding site and the other
+        // six were struct defaults (ADR-363). They come from the project now, like `render` does.
+        uiPathTrace_ = engine_->pathTraceSettings();
         panel_->pathTraceSettings = &uiPathTrace_;
-        panel_->pathTraceSeconds = &uiPathTraceSeconds_;
-        panel_->pathTraceDenoise = &uiPathTraceDenoise_;
-        panel_->pathTraceAovs = &uiPathTraceAovs_;
         panel_->pathTraceDenoiseAvailable = pathtrace::denoiseAvailable();
         panel_->pathTraceProgress = [this]() -> pathtrace::TraceProgress {
             // While a job exists it IS the answer; once it is gone, the last thing it said.
@@ -1531,6 +1530,14 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->onCancelPathTrace = [this] {
             if (ptJob_) ptJob_->cancel();
         };
+        panel_->onChoosePathTraceOutput = [this] {
+            window_->saveFileDialog(platform::Window::SaveKind::Exr, [this](std::string path) {
+                if (path.empty()) {
+                    return;
+                }
+                uiPathTrace_.outputPath = std::filesystem::path(path).replace_extension(".exr");
+            });
+        };
         panel_->onStartRender = [this] { startRenderFromUi(); };
         panel_->onCancelRender = [this] {
             if (job_) job_->cancel();
@@ -1541,6 +1548,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                 return;
             }
             engine_->renderSettings() = uiRender_;
+            engine_->pathTraceSettings() = uiPathTrace_;
             if (auto r = engine_->saveProject(engine_->projectPath()); !r) {
                 panel_->setStatus(r.error().message);
                 return;
@@ -2085,6 +2093,7 @@ void Application::startRenderFromUi() {
         return;
     }
     engine_->renderSettings() = uiRender_;
+    engine_->pathTraceSettings() = uiPathTrace_;
     // Renders load a project file: the current one when saved, else a session snapshot.
     std::filesystem::path projectFile = engine_->projectPath();
     if (projectFile.empty()) {
@@ -2118,6 +2127,7 @@ void Application::rememberProject(const std::filesystem::path& path) {
     // Refreshed here, where a project has just *become* the current one -- the same hook the recent
     // list and the window title use. The panel's pointer is to `uiRender_` itself and stays valid.
     uiRender_ = engine_->renderSettings();
+    uiPathTrace_ = engine_->pathTraceSettings();   // ADR-363, and for the same reason
     if (context_ && shaders_) {
         applyOutputsFromProject();
         if (auto r = outputs_.open(*context_, *shaders_); !r) {
@@ -4431,20 +4441,26 @@ void Application::startPathTraceFromUi() {
         }
     }
 
-    std::filesystem::path out = uiRender_.outputPath;
-    if (out.empty()) out = std::filesystem::temp_directory_path() / "avgen_pathtrace.exr";
+    // The trace's OWN output path (ADR-363). It used to read the raster job's, which the Render
+    // panel returns before drawing while a trace is selected -- so the field was unreachable and an
+    // unset one went to $TMPDIR with only a status line to say so. Resolved against the project's
+    // folder, like a render's is, rather than against whatever the process's cwd happens to be.
+    std::filesystem::path out = uiPathTrace_.outputPath;
+    if (out.empty()) {
+        out = std::filesystem::temp_directory_path() / "avgen_pathtrace.exr";
+        panel_->setStatus("no output path set; tracing to " + out.string());
+    } else if (out.is_relative()) {
+        out = std::filesystem::absolute(projectFile).parent_path() / out;
+    }
     out.replace_extension(".exr");   // the tracer writes scene-linear EXR and nothing else
 
     pathtrace::TraceJobRequest request;
     request.project = projectFile;
-    request.seconds = uiPathTraceSeconds_;
+    request.seconds = uiPathTrace_.seconds;
     request.output = out;
-    request.settings = uiPathTrace_;
-    request.settings.width = std::max(16u, uiRender_.width);
-    request.settings.height = std::max(16u, uiRender_.height);
-    request.denoise = uiPathTraceDenoise_;
-    request.writeAovs = uiPathTraceAovs_;
-    if (request.writeAovs || request.denoise) request.settings.captureFeatures = true;
+    request.settings = traceSettingsFrom(uiPathTrace_, uiRender_.width, uiRender_.height);
+    request.denoise = uiPathTrace_.denoise;
+    request.writeAovs = uiPathTrace_.writeAovs;
 
     if (auto ok = request.validate(); !ok) {
         panel_->setStatus(ok.error().message);
@@ -4468,20 +4484,27 @@ int Application::runPathTrace() {
         return 2;
     }
 
+    // Start from what the project says and override with what was typed -- the shape
+    // `renderSettingsFromOptions` already had, and it matters now that a project carries a
+    // `pathtrace` block (ADR-363). Before this, `--pathtrace out.exr` on a project authored at 512
+    // samples traced 32, because 32 was a struct default nobody had asked for.
+    PathTraceSettings authored = engine_ != nullptr ? engine_->pathTraceSettings() : PathTraceSettings{};
+    if (options_.ptSeconds) authored.seconds = *options_.ptSeconds;
+    if (options_.ptSamples) authored.samplesPerPixel = std::max(1u, *options_.ptSamples);
+    if (options_.ptDepth) authored.maxDepth = *options_.ptDepth;
+    if (options_.ptSeed) authored.seed = *options_.ptSeed;
+    if (options_.ptThreads) authored.threads = *options_.ptThreads;
+    if (options_.ptDenoise) authored.denoise = *options_.ptDenoise;
+    if (options_.ptAovs) authored.writeAovs = *options_.ptAovs;
+    if (options_.ptProbe) authored.albedoProbe = *options_.ptProbe;
+
     pathtrace::TraceJobRequest request;
     request.project = projectFile;
-    request.seconds = options_.ptSeconds;
+    request.seconds = authored.seconds;
     request.output = *options_.pathtrace;
-    request.writeAovs = options_.ptAovs;
-    request.denoise = options_.ptDenoise;
-    request.settings.width = std::max(options_.width, 16u);
-    request.settings.height = std::max(options_.height, 16u);
-    request.settings.samplesPerPixel = std::max(options_.ptSamples, 1u);
-    request.settings.maxDepth = options_.ptDepth;
-    request.settings.seed = options_.ptSeed;
-    request.settings.threads = options_.ptThreads;
-    request.settings.albedoProbe.enabled = options_.ptProbe;
-    if (options_.ptAovs) request.settings.captureFeatures = true;
+    request.writeAovs = authored.writeAovs;
+    request.denoise = authored.denoise;
+    request.settings = traceSettingsFrom(authored, options_.width, options_.height);
 
     log::info("pathtrace: {} at second {:.3f}, {}x{} at {} spp, depth {}, seed {}",
               projectFile.string(), request.seconds, request.settings.width, request.settings.height,

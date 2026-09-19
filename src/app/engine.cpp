@@ -1232,6 +1232,10 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
         doc["sequence"] = sequence_.toJson();
     }
     doc["render"] = render_.toJson();
+    // ADR-363. Written unconditionally, beside "render" and for the same reason: a block
+    // that is only emitted when it differs from the default is a writer gated on its own
+    // subject, which is the half of ADR-350's defect that survived the first fix of it.
+    doc["pathtrace"] = pathTrace_.toJson();
     // The transport's persistent half (ADR-102). Additively, and only when there is something to
     // say: a project that never set a loop gains no key, so files written before this round-trip
     // unchanged. The playing state, the position and the playback rate are deliberately *not* here
@@ -1882,6 +1886,18 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         render_ = *r;
     } else {
         render_ = RenderSettings{};
+    }
+    // A project with no "pathtrace" block gets the defaults rather than inheriting the trace
+    // settings of whatever was open before -- the same rule the transport's loop follows, and for
+    // the same reason: 512 samples set for one piece must not silently govern the next.
+    if (doc.contains("pathtrace")) {
+        auto r = PathTraceSettings::fromJson(doc["pathtrace"]);
+        if (!r) {
+            return std::unexpected(r.error());
+        }
+        pathTrace_ = *r;
+    } else {
+        pathTrace_ = PathTraceSettings{};
     }
     // The transport's persistent half. A project with no "transport" block clears the loop rather
     // than inheriting the one from whatever was open before: loading a project must not leave a

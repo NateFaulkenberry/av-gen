@@ -117,7 +117,9 @@ public:
     // output chosen through the project filter came back as "my-take.json" -- and the render
     // settings then read that extension, saw no video in it, and switched the output back to a PNG
     // sequence in front of the person who had just chosen Video.
-    enum class SaveKind { Project, Video };
+    // Exr (ADR-363): the path tracer writes scene-linear EXR and nothing else, so its save
+    // dialog must not offer a container that would produce a file of the wrong kind.
+    enum class SaveKind { Project, Video, Exr };
     // Native save dialog. Same delivery contract as openFileDialog.
     void saveFileDialog(SaveKind kind, std::function<void(std::string)> onChosen);
     // Native folder picker, for the outputs that are a directory rather than a file -- an image

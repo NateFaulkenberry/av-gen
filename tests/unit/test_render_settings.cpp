@@ -2,6 +2,7 @@
 
 #include "app/render_settings.hpp"
 
+#include "pathtrace/path_tracer.hpp"
 #include "rendering/render_quality.hpp"
 #include "scene/scene.hpp"
 
@@ -396,5 +397,136 @@ TEST_CASE("--aov shadow refuses the configurations where it would be a constant"
         REQUIRE_FALSE(r.has_value());
         CHECK(r.error().message.find("--disable shadows") != std::string::npos);
         CHECK_FALSE(shadowAovPreconditions(scene, "particles,shadows").has_value());
+    }
+}
+
+// ---- the path tracer's authored settings (ADR-363) --------------------------------------------
+//
+// ADR-350's rule, and its two prescribed tests. The defect it records is a system the application
+// runs and does not keep, and the path tracer had it in the most complete form available: no
+// reader, no writer, and two of its eight settings hard-coded at the binding site. The first test
+// below is the registration arm -- every field survives -- and the second is the round trip that
+// ADR-350 insists runs TWICE, because a writer that emits what it just parsed can still lose a
+// value the second time round.
+
+TEST_CASE("Every path-trace setting survives a JSON round trip, twice", "[render][pathtrace][settings]") {
+    PathTraceSettings authored;
+    authored.seconds = 12.75;
+    authored.samplesPerPixel = 512;
+    authored.maxDepth = 9;
+    authored.seed = 0xfeedfacecafebeefULL;
+    authored.threads = 6;
+    authored.denoise = true;
+    authored.writeAovs = false;
+    authored.albedoProbe = true;
+    authored.outputPath = "renders/tree-of-life.exr";
+
+    // Every one of these differs from the default, or the round trip proves nothing: a writer that
+    // emits nothing at all passes a test whose input is the defaults.
+    const PathTraceSettings defaults;
+    REQUIRE(authored.seconds != defaults.seconds);
+    REQUIRE(authored.samplesPerPixel != defaults.samplesPerPixel);
+    REQUIRE(authored.maxDepth != defaults.maxDepth);
+    REQUIRE(authored.seed != defaults.seed);
+    REQUIRE(authored.threads != defaults.threads);
+    REQUIRE(authored.denoise != defaults.denoise);
+    REQUIRE(authored.writeAovs != defaults.writeAovs);
+    REQUIRE(authored.albedoProbe != defaults.albedoProbe);
+    REQUIRE(authored.outputPath != defaults.outputPath);
+
+    const auto first = PathTraceSettings::fromJson(authored.toJson());
+    REQUIRE(first.has_value());
+    const auto second = PathTraceSettings::fromJson(first->toJson());
+    REQUIRE(second.has_value());
+
+    CHECK(second->seconds == authored.seconds);
+    CHECK(second->samplesPerPixel == authored.samplesPerPixel);
+    CHECK(second->maxDepth == authored.maxDepth);
+    // The seed goes through the integer path deliberately: 0x853c49e6748fea9b does not survive a
+    // double, and a determinism seed that changes when a project is saved is not a seed.
+    CHECK(second->seed == authored.seed);
+    CHECK(second->threads == authored.threads);
+    CHECK(second->denoise == authored.denoise);
+    CHECK(second->writeAovs == authored.writeAovs);
+    CHECK(second->albedoProbe == authored.albedoProbe);
+    CHECK(second->outputPath == authored.outputPath);
+}
+
+TEST_CASE("A project with no pathtrace block reads the defaults, not the last one open",
+          "[render][pathtrace][settings]") {
+    const auto empty = PathTraceSettings::fromJson(nlohmann::json::object());
+    REQUIRE(empty.has_value());
+    CHECK(empty->samplesPerPixel == PathTraceSettings{}.samplesPerPixel);
+    CHECK(empty->seed == PathTraceSettings{}.seed);
+
+    // And the control: a block that is not an object is refused rather than quietly ignored.
+    CHECK_FALSE(PathTraceSettings::fromJson(nlohmann::json(42)).has_value());
+    CHECK_FALSE(PathTraceSettings::fromJson(nlohmann::json{{"samples", "lots"}}).has_value());
+    CHECK_FALSE(PathTraceSettings::fromJson(nlohmann::json{{"denoise", 1}}).has_value());
+}
+
+TEST_CASE("Path-trace settings refuse what cannot be a render", "[render][pathtrace][settings]") {
+    PathTraceSettings s;
+    CHECK(s.validate().has_value());          // the defaults are valid, or every refusal below is vacuous
+
+    SECTION("zero samples is not a render") {
+        s.samplesPerPixel = 0;
+        CHECK_FALSE(s.validate().has_value());
+    }
+    SECTION("a negative second is not a time") {
+        s.seconds = -1.0;
+        CHECK_FALSE(s.validate().has_value());
+    }
+    SECTION("the output must be an EXR, because that is the only thing written") {
+        s.outputPath = "out.png";
+        CHECK_FALSE(s.validate().has_value());
+        s.outputPath = "out.exr";
+        CHECK(s.validate().has_value());
+        s.outputPath.clear();                  // and empty is allowed; it means "somewhere temporary"
+        CHECK(s.validate().has_value());
+    }
+}
+
+TEST_CASE("The authored settings and the renderer's argument agree", "[render][pathtrace][settings]") {
+    // One translation, `traceSettingsFrom`, so a field that stops being carried fails in one place.
+    // These assertions are what stops the two structs' defaults drifting: the seed in particular is
+    // written out as a literal in both, and a silent disagreement would make a project's recorded
+    // seed differ from the one a default render used.
+    CHECK(PathTraceSettings{}.seed == avgen::pathtrace::TraceSettings{}.seed);
+    CHECK(PathTraceSettings{}.threads == avgen::pathtrace::TraceSettings{}.threads);
+
+    PathTraceSettings authored;
+    authored.samplesPerPixel = 128;
+    authored.maxDepth = 7;
+    authored.seed = 99;
+    authored.threads = 3;
+    authored.albedoProbe = true;
+    const auto t = traceSettingsFrom(authored, 1920, 1080);
+    CHECK(t.width == 1920);
+    CHECK(t.height == 1080);
+    CHECK(t.samplesPerPixel == 128);
+    CHECK(t.maxDepth == 7);
+    CHECK(t.seed == 99);
+    CHECK(t.threads == 3);
+    CHECK(t.albedoProbe.enabled);
+    // The diagnostic control arm is never carried across from a project, however a project spells
+    // it. An unbiased estimator is not something a file gets to switch off.
+    CHECK(t.russianRouletteCompensation == 1.0f);
+
+    SECTION("a degenerate size is floored rather than passed through") {
+        const auto small = traceSettingsFrom(authored, 0, 0);
+        CHECK(small.width >= 16);
+        CHECK(small.height >= 16);
+    }
+    SECTION("captureFeatures is derived, and is on for either consumer and off for neither") {
+        PathTraceSettings s;
+        s.denoise = false;
+        s.writeAovs = false;
+        CHECK_FALSE(traceSettingsFrom(s, 64, 64).captureFeatures);
+        s.denoise = true;
+        CHECK(traceSettingsFrom(s, 64, 64).captureFeatures);
+        s.denoise = false;
+        s.writeAovs = true;
+        CHECK(traceSettingsFrom(s, 64, 64).captureFeatures);
     }
 }
