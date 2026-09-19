@@ -479,6 +479,31 @@ Not measured, and deliberately not: any Embree or renderer timing. Two other age
 one of them taking performance measurements, and a contended timing is worse than none (ADR-170).
 The benchmark table the brief asks for belongs to step 10 and needs a quiet machine.
 
+## 9b. Where this leaves the brief's acceptance criteria
+
+Honest accounting, because the brief asks for a checklist and a half-true tick is worse than a
+blank. Of its ~45 boxes:
+
+**Met before this branch started** (and the brief did not know): Embree remains functional; the
+output system is renderer-agnostic at the sink; EXR output works with HDR preserved; image mode
+exists in the UI; MOV/MP4 output works; the timeline renders frame by frame at the correct rate,
+resolution and range; audio can be included and is synchronised.
+
+**Met by this branch**: the ImGui conflict is fixed at its source with detection still enabled;
+dynamic UI uses stable ids; offline rendering suspends the viewport; the hidden viewport does not
+continue rendering underneath; the UI stays responsive and progress stays visible; cancellation
+works; the viewport resumes; colour management is now at least *stated* on the video output.
+
+**Not met, and not attempted**: everything Metal. Rendering mode and backend are still one concept;
+there is no `TraceBackend` interface, no Metal prototype, no hybrid pass, no benchmark table. Those
+are steps 9-13 and step 10 is a decision point, not a task (section 5).
+
+**Not met, and newly understood as harder than the brief thinks**: "no code-only controls for
+user-facing features" — `aovs`, `supersample` and `encoderThreads` are still CLI-only (G3), and the
+codec combo still advertises codecs the machine may not have (G4). "Colour management is correct"
+is only true at SDR; the HDR path does not exist end to end (W3) and cannot without the tone-map
+decision (W4/R1).
+
 ## 10. Test baseline for this branch
 
 `./build/release/tests/avgen_tests "~[gpu]"` at `8f23d2ec` with no source change, verbatim:
@@ -499,6 +524,41 @@ use to prove they broke nothing.
 `avgen_render_tests` has no green baseline to quote: it aborts, on `main`, for the reason ADR-358
 records and ADR-362 half-fixes.
 
+**After this branch's work, merged with `main` at `1cdfb84a`:**
+
+```
+test cases:    2470 |    2465 passed | 4 skipped | 1 failed as expected
+assertions: 3800104 | 3800103 passed | 1 failed as expected
+```
+
+The only `FAILED:` line is `test_character_lab_slopes.cpp:187`, with its `with expansion:` present,
+which is the `[!shouldfail]` pass.
+
+### An instrument that was built, could not be shown to fire, and was removed
+
+Recorded because the negative result is the useful part. ADR-361's conflict was invisible to every
+automated run because Dear ImGui reports it **only as a tooltip**. The obvious improvement is to log
+it instead, and it was written: six lines in `ImGuiLayer::render` reading
+`ImGuiContext::DebugDrawIdConflictsId`, once per process.
+
+Then the control (ADR-182): two deliberately identical `Button("dupe##adr361")` calls were injected
+into an always-drawn panel and the editor was run for 600 and then 900 frames under
+`--ui-script hover`, `hover,tabs,panels`. **The line never appeared.** Not once, with the conflict
+guaranteed present.
+
+The reason is in ImGui's own detection (`imgui.cpp:5841-5843`): it keys on
+`g.HoveredIdPreviousFrame == id`, so the pointer must be over the *same* item on two consecutive
+frames. `--ui-script hover` is a Lissajous sweep that writes a new pointer position every frame, so
+it essentially never satisfies that — and the `click` arms park somewhere else.
+
+So the instrument cannot be demonstrated to work, and this project's whole discipline is that a
+probe which has not been seen to fire proves nothing. It was **removed rather than shipped with a
+caveat**, because a caveated no-op is how the last four unreachable subsystems got merged. The
+finding to carry forward: **ImGui ID conflicts cannot be detected by any scripted run this repo
+has**, and the only way to catch the next one is a person hovering it, or a static check over the
+call sites — which is what `ui::helpSidebarGroups` and its test are, for the one place that had
+one.
+
 ## 11. What this branch has done so far
 
 * This document.
@@ -517,6 +577,25 @@ records and ADR-362 half-fixes.
 * **ADR-365** (step 7, brought forward because it is cheap) — W3.4: both video backends now tag
   BT.709, `VideoInfo` reads the tags back from the track's format description, and the control
   writes a deliberately untagged file and requires the probe to notice.
+
+### G8. An in-app render rewrites the project it renders, and the integrity checker does not mind
+
+Self-inflicted and therefore well measured. `--render-in-app` goes through
+`startRenderFromUi`, which **saves the project first** — deliberately, because a render loads from
+the file rather than from live state, and that is what makes it reproducible (ADR-020). So five
+verification runs against `examples/chamber/chamber.json` rewrote it: 88 lines became 3,268, every
+default parameter the engine registers written out as an explicit value, plus `control/`, `midi/`,
+`osc/`, an asset hash and a reordered document.
+
+Nothing about the scene changed and nothing looks wrong, which is the problem — it is a photograph
+of the run, not an edit of the piece. **`python3 tools/check_project_integrity.py` passed on it
+twice**, because the file is valid, its parameters resolve and its asset exists. The check that
+would catch it is "an example project is not modified by a run that only read it", and nothing
+asserts it.
+
+Relevant beyond this branch: the brief's validation workflows are exactly these commands, and
+`--pathtrace` has the same rule for the same reason. Copy the project to a scratch directory first,
+or expect to revert it.
 
 ### G7, found by ADR-364's control arm and added to this list after the fact
 
