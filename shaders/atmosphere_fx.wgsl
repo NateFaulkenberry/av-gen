@@ -212,7 +212,21 @@ fn atmosphereCometsAt(ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f32) -> AtmosRes
             // light source rather than as a bright dot.
             let hr = max(c.halo.w, 1.0);
             let halo = (hr * hr) / (perp * perp + hr * hr);
-            radiance = radiance + (c.core.rgb * core + c.halo.rgb * halo * halo) * rainbowHead;
+            // ADR-369. The coma is an inverse-square wash SQUARED, and it is never zero at any
+            // distance -- while the `th > 0.0` above it is a half-space test through the eye, whose
+            // boundary projects to an exactly straight line across the frame. So a small but finite
+            // wash was being cut to nothing along that line, and the owner saw a crisp diagonal
+            // terminator across the sky with a brighter wedge on one side.
+            //
+            // The fix is not to widen the test. It is to make the falloff compactly supported, so
+            // the test discards only what is already zero -- the same discipline as the ADR-367
+            // soft-particle fade: "off" has to be off AT the boundary, not near it. `facing` is the
+            // cosine of the angle off the head, so the window closes smoothly well before the ray
+            // turns side-on and the cut fires. Within about 20 degrees of the head, where the coma
+            // is anything anyone can see, `facing` is above 0.94 and this multiplies by exactly 1.
+            let facing = clamp(th / max(length(toH), 1.0e-4), 0.0, 1.0);
+            let coma = halo * halo * smoothstep(0.0, 0.30, facing);
+            radiance = radiance + (c.core.rgb * core + c.halo.rgb * coma) * rainbowHead;
         }
 
         // ---- the tail ----

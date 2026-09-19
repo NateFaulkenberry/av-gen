@@ -754,7 +754,7 @@ fn fogCorrection(world: vec3<f32>, pixel: vec2<i32>) -> f32 {
     return mix(1.0, clamp(toParticleT / max(toSurfaceT, 1e-4), 0.0, 64.0), coupling);
 }
 
-// ADR-364: the depth-aware soft-particle fade `ParticleSystem::softness` has been promising since
+// ADR-367: the depth-aware soft-particle fade `ParticleSystem::softness` has been promising since
 // ADR-015. The value was authored, serialised, uploaded into `turb.z` -- and read by nothing, so
 // fifteen scene files carry deliberately tuned values from 0.3 to 3.0 that have never rendered.
 //
@@ -769,7 +769,7 @@ fn fogCorrection(world: vec3<f32>, pixel: vec2<i32>) -> f32 {
 // the view axis up to sign; every drawn particle is in front of the eye, so `abs` picks the sign.
 //
 // Returns exactly 1.0 when softness is 0 or no linear-depth target is bound, so "off" is off and a
-// pre-ADR-364 frame is reproduced bit for bit.
+// pre-ADR-367 frame is reproduced bit for bit.
 fn softParticleFade(world: vec3<f32>, pixel: vec2<i32>) -> f32 {
     let softness = params.turb.z;
     if (softness <= 0.0 || params.fog2.w < 0.5) { return 1.0; }

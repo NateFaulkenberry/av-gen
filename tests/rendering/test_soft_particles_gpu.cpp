@@ -1,4 +1,4 @@
-// ADR-364: the depth-aware soft-particle fade.
+// ADR-367: the depth-aware soft-particle fade.
 //
 // `ParticleSystem::softness` was authored, serialised, uploaded into the particle uniforms' `turb.z`
 // and read by no shader at all -- the fourth member of this repository's reader-without-a-writer
@@ -19,6 +19,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
+#include "support/image_diff.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -27,6 +28,23 @@
 #include <memory>
 
 using namespace avgen;
+
+// ADR-362: never `CHECK(a.rgba == b.rgba)` on a frame. Catch2 stringifies BOTH operands into the
+// report, and megabytes of that kills the process inside the assertion handler -- printing a
+// `FAILED:` with no `with expansion:`, which is this repository's documented signature for a KILLED
+// run. The suite that finds a real difference then destroys the evidence and everything after it.
+#define CHECK_IDENTICAL(a, b)                                                                      \
+    do {                                                                                           \
+        const auto d__ = ::avgen::testing::byteDiff((a).rgba, (b).rgba);                           \
+        INFO(d__.describe());                                                                      \
+        CHECK(d__.identical());                                                                    \
+    } while (false)
+#define CHECK_DIFFERS(a, b)                                                                        \
+    do {                                                                                           \
+        const auto d__ = ::avgen::testing::byteDiff((a).rgba, (b).rgba);                           \
+        INFO(d__.describe());                                                                      \
+        CHECK_FALSE(d__.identical());                                                              \
+    } while (false)
 
 namespace {
 
@@ -153,11 +171,11 @@ TEST_CASE("With nothing behind them, soft particles are byte-identical to hard o
     const gpu::Image8 soft = renderCloud(*ctx, shaders, softScene);
     CHECK(ctx->errorCount() == 0);
     CHECK(totalBrightness(hard) > 0); // the arm is populated, or the equality below is vacuous
-    CHECK(hard.rgba == soft.rgba);
+    CHECK_IDENTICAL(hard, soft);
 }
 
-TEST_CASE("Softness zero reproduces the pre-ADR-364 picture exactly", "[gpu][particles][soft][determinism]") {
-    // The identity claim, stated as a test rather than as a comment. Before ADR-364 no shader read
+TEST_CASE("Softness zero reproduces the pre-ADR-367 picture exactly", "[gpu][particles][soft][determinism]") {
+    // The identity claim, stated as a test rather than as a comment. Before ADR-367 no shader read
     // `turb.z`, so every particle system in the repository rendered as though softness were 0 --
     // which is why 0, and not the old 0.2 struct default, is the value that reproduces them. With a
     // wall present and softness 0 the fade must return 1 before it ever samples the depth texture,
@@ -169,7 +187,7 @@ TEST_CASE("Softness zero reproduces the pre-ADR-364 picture exactly", "[gpu][par
     const scene::Scene two = cloudScene(0.0f, true);
     const gpu::Image8 a = renderCloud(*ctx, shaders, one);
     const gpu::Image8 b = renderCloud(*ctx, shaders, two);
-    CHECK(a.rgba == b.rgba);
+    CHECK_IDENTICAL(a, b);
 
     // And the default really is the identity value, so a system that says nothing gets nothing.
     CHECK(scene::ParticleSystem{}.softness == 0.0f);

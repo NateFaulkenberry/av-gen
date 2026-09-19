@@ -409,7 +409,7 @@ json particlesToJson(const ParticleSystem& s) {
     j["colorEnd"] = vecToJson(s.colorEnd);
     j["emissive"] = s.emissive;
     j["blend"] = blendName(s.blend);
-    // ADR-364: written only when it does something. It used to be written unconditionally, which is
+    // ADR-367: written only when it does something. It used to be written unconditionally, which is
     // how a default nobody chose ended up baked into every scene file the editor ever saved.
     if (s.softness != 0.0f) {
         j["softness"] = s.softness;

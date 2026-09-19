@@ -202,7 +202,7 @@ ParticleParameters registerParticleParameters(params::ParameterSet& params, cons
     p.colorStart = &params.add(color(base, "colorStart", s.colorStart));
     p.colorEnd = &params.add(color(base, "colorEnd", s.colorEnd));
     p.emissive = &params.add(f(base, "emissive", s.emissive, 0.0f, 100.0f, 0.0f, 20.0f));
-    // ADR-364: reachable now that it does something. A value that reaches the GPU and is ignored is
+    // ADR-367: reachable now that it does something. A value that reaches the GPU and is ignored is
     // one defect; a value that reaches the GPU, is obeyed, and cannot be turned is the next one.
     p.softness = &params.add(f(base, "softness", s.softness, 0.0f, 50.0f, 0.0f, 4.0f));
     p.stretch = &params.add(f(base, "stretch", s.velocityStretch, 0.0f, 20.0f, 0.0f, 4.0f));
@@ -252,7 +252,7 @@ void applyParticleParameters(const ParticleParameters& p, const ParticleSystem& 
     s.colorStart = p.colorStart->value();
     s.colorEnd = p.colorEnd->value();
     s.emissive = p.emissive->value();
-    s.softness = p.softness != nullptr ? p.softness->value() : rest.softness; // ADR-364
+    s.softness = p.softness != nullptr ? p.softness->value() : rest.softness; // ADR-367
     s.velocityStretch = p.stretch->value();
     s.trailWidth = p.trailWidth->value();
     s.enabled = p.enabled->value();

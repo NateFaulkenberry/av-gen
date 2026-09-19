@@ -17,6 +17,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
+#include "support/image_diff.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -24,6 +25,23 @@
 #include <memory>
 
 using namespace avgen;
+
+// ADR-362: never `CHECK(a.rgba == b.rgba)` on a frame. Catch2 stringifies BOTH operands into the
+// report, and megabytes of that kills the process inside the assertion handler -- printing a
+// `FAILED:` with no `with expansion:`, which is this repository's documented signature for a KILLED
+// run. The suite that finds a real difference then destroys the evidence and everything after it.
+#define CHECK_IDENTICAL(a, b)                                                                      \
+    do {                                                                                           \
+        const auto d__ = ::avgen::testing::byteDiff((a).rgba, (b).rgba);                           \
+        INFO(d__.describe());                                                                      \
+        CHECK(d__.identical());                                                                    \
+    } while (false)
+#define CHECK_DIFFERS(a, b)                                                                        \
+    do {                                                                                           \
+        const auto d__ = ::avgen::testing::byteDiff((a).rgba, (b).rgba);                           \
+        INFO(d__.describe());                                                                      \
+        CHECK_FALSE(d__.identical());                                                              \
+    } while (false)
 
 namespace {
 
@@ -104,7 +122,7 @@ TEST_CASE("A mesh that declares no wind body is untouched by the wind", "[gpu][w
     const scene::Scene gale = treeish(blowingHard(), false);
     const gpu::Image8 a = render(*ctx, shaders, calm, 4.0);
     const gpu::Image8 b = render(*ctx, shaders, gale, 4.0);
-    CHECK(a.rgba == b.rgba);
+    CHECK_IDENTICAL(a, b);
 
     // ...and still true at another second, because "nothing moved" and "nothing moves" are
     // different claims and only the second is the guarantee. Both arms move to the new time: the
@@ -114,7 +132,7 @@ TEST_CASE("A mesh that declares no wind body is untouched by the wind", "[gpu][w
     // cannot attribute the difference to either.
     const gpu::Image8 calmLater = render(*ctx, shaders, calm, 9.5);
     const gpu::Image8 galeLater = render(*ctx, shaders, gale, 9.5);
-    CHECK(calmLater.rgba == galeLater.rgba);
+    CHECK_IDENTICAL(calmLater, galeLater);
     CHECK(ctx->errorCount() == 0);
 }
 
@@ -129,20 +147,20 @@ TEST_CASE("A mesh that declares a wind body moves in it", "[gpu][wind][mesh]") {
     const scene::Scene blown = treeish(blowingHard(), true);
     const gpu::Image8 a = render(*ctx, shaders, still, 4.0);
     const gpu::Image8 b = render(*ctx, shaders, blown, 4.0);
-    CHECK(a.rgba != b.rgba);
+    CHECK_DIFFERS(a, b);
 
     // Wind that is switched off is not wind, whatever its speed says.
     wind::WindParams disabled = blowingHard();
     disabled.enabled = false;
     const gpu::Image8 off = render(*ctx, shaders, treeish(disabled, true), 4.0);
-    CHECK(a.rgba == off.rgba);
+    CHECK_IDENTICAL(a, off);
 
     // And the deformation is a pure function of time (ADR-091): the same second twice, from a
     // fresh renderer, is the same frame. This is the half the owner's particle relaxation does not
     // cover, and a hero asset in a different pose after a scrub is the reason it does not.
     const gpu::Image8 t1 = render(*ctx, shaders, blown, 7.25);
     const gpu::Image8 t2 = render(*ctx, shaders, blown, 7.25);
-    CHECK(t1.rgba == t2.rgba);
-    CHECK(t1.rgba != b.rgba); // ...and a different second really is a different pose
+    CHECK_IDENTICAL(t1, t2);
+    CHECK_DIFFERS(t1, b); // ...and a different second really is a different pose
     CHECK(ctx->errorCount() == 0);
 }

@@ -1,14 +1,17 @@
-# ADR-364: A value that reached the GPU and was ignored
+# ADR-367: A value that reached the GPU and was ignored
 
 - Status: Accepted (2026-09-19)
 - Extends ADR-015 (GPU particles), ADR-040 (particles and motion), ADR-035 (the linear-depth target).
 - Related: ADR-350 (a system the application runs and does not keep), ADR-360 (the same family, in
   the wind).
 
-*Numbered 364 because 361-363 were taken on other branches while this was in flight. Note in
-passing that **363 is claimed twice** — `agent/mbackend` has "the path tracer had no settings, only
-fields" and `agent/mcperf` has "the multicam did not grind to a halt where anyone was looking".
-That collision is not resolved here, but somebody has to resolve it before both merge.*
+*Numbered 367, at the third attempt. It was written as 361, renumbered to 364 when 361-363 turned
+out to be taken on branches in flight, and renumbered again when 364 landed on main as the offline
+branch's viewport suspension. The number is not the point; the habit is: check the high-water mark
+across every worktree, not just your own, and renumber by counting references rather than by a
+blanket substitution, because the moment a second ADR of that number exists anywhere in the tree a
+`sed` will silently rewrite the wrong ones. `composition.cpp` briefly held two different meanings of
+one number today for exactly that reason.*
 
 ## Problem
 
