@@ -404,8 +404,8 @@ state. Revised, with the reason for each move:
 | **7** | **Colour tagging on video output** (W3.4) — **done, ADR-365**. The W4 tone-map decision — **taken by the owner and done, ADR-382** | Small, overdue, and a prerequisite for anything HDR. |
 | **8** | **Expose the CLI-only render settings** (G3, G4) — **done, ADR-382** | `supersample`, `aovs` and `encoderThreads` have widgets; the codec combo is filtered by what the machine can actually produce. |
 | **9** | **Extract `pathtrace::TraceBackend` from `EmbreeScene`** | Only now, when there is a second backend candidate worth measuring. Doing it earlier is an abstraction with one implementation. |
-| **10** | **Metal RT prototype, outside the tree, to decide** (section 5) | Under `tools/gpu-lock.sh`, minima over repeats, with a control. |
-| **11** | **Metal backend, or defer** | Gated on 10 |
+| **10** | **Metal RT prototype, to decide** (section 5) — **built and measured, `docs/metal-rt-decision.md`** | `tools/metal_rt_probe.mm`. Metal builds an acceleration structure over the Tree of Life's 3.1M triangles in **136 ms against Embree's 1,669 ms** — but the trace numbers are not like-for-like and are not quoted as a speedup. **Recommendation: do not start the backend yet**; one more day of matched-work measurement on a quiet machine answers it. |
+| **11** | **Metal backend, or defer** — **deferred on the measurement** | Gated on 10, and 10 says not yet. The 136 ms figure also prices the audit's other option: BVH reuse across frames in the Embree backend. |
 | **12** | **Hybrid ray contribution pass** — shadows first, then reflections | Gated on 11, and on costing the albedo target (W8) |
 | **13** | **HDR through to video** (W3.1-3) | Large, and the deliverable it buys should be confirmed as wanted before it is built |
 
@@ -496,9 +496,11 @@ dynamic UI uses stable ids; offline rendering suspends the viewport; the hidden 
 continue rendering underneath; the UI stays responsive and progress stays visible; cancellation
 works; the viewport resumes; colour management is now at least *stated* on the video output.
 
-**Not met, and not attempted**: everything Metal. Rendering mode and backend are still one concept;
-there is no `TraceBackend` interface, no Metal prototype, no hybrid pass, no benchmark table. Those
-are steps 9-13 and step 10 is a decision point, not a task (section 5).
+**Not met, and deliberately deferred on a measurement**: the Metal backend. The prototype exists and
+has been run on the Tree of Life (`docs/metal-rt-decision.md`); it says the acceleration-structure
+build is 12x faster on the GPU and says nothing yet about tracing, because the two trace numbers
+measure different work. There is still no `TraceBackend` interface and no hybrid pass, and there
+should not be until the matched-work comparison is taken on a quiet machine.
 
 **Met since, by ADR-382**: "Do not fake GI and call it path tracing" was never at issue, but the
 brief's *"Timeline -> Frame evaluation -> Offline renderer -> HDR frame -> Colour/output transform
