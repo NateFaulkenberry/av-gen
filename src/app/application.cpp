@@ -3081,6 +3081,41 @@ void Application::serviceViewportPick() {
     view.cameraPosition = camera.position;
     view.cameraForward = glm::normalize(camera.target - camera.position);
 
+    // Editor helpers first, on the CPU, in screen space -- before the GPU readback and regardless of
+    // what geometry is behind them.
+    //
+    // A light has no geometry, so it is in no identifier target and the readback below can never
+    // find one. See `ui::pickProjectedPoint` for why this is screen space rather than a fifth
+    // `PickSpace`: the tag has one free value and two claimants, and a helper written into the
+    // identifier target would be in a pass the offline renderer runs.
+    //
+    // Before the readback and not after, because a helper drawn on top of the world should be
+    // picked as though it is on top of the world. Clicking the star over a tree selects the light,
+    // not the tree; clicking two centimetres away selects the tree.
+    if (panel_ != nullptr && engine_->composition() != nullptr) {
+        const scene::Composition& comp = *engine_->composition();
+        std::vector<glm::vec3> positions;
+        std::vector<std::string> names;
+        for (const scene::Composition::AuthoredLight& a : comp.authoredLights()) {
+            positions.push_back(a.light.position);
+            names.push_back(a.light.name);
+        }
+        const glm::vec2 ndc(
+            (static_cast<float>(viewportPickPixel_.x) / static_cast<float>(std::max(pw, 1u))) * 2.0f - 1.0f,
+            1.0f - (static_cast<float>(viewportPickPixel_.y) / static_cast<float>(std::max(ph, 1u))) * 2.0f);
+        const int hit =
+            ui::pickProjectedPoint(positions, camera, aspect, ndc, ui::kHelperPickRadius);
+        if (hit >= 0) {
+            const ui::SelectionRef ref{ui::SelectionRef::Kind::Light, names[static_cast<std::size_t>(hit)]};
+            if (viewportPickAdditive_) {
+                panel_->editor.selection.toggle(ref);
+            } else {
+                panel_->editor.selection.set(ref);
+            }
+            return; // the light took the click
+        }
+    }
+
     auto result = pickAt(*context_, renderer_->identifierTexture(), renderer_->linearDepthTexture(),
                          view, viewportPickPixel_);
     if (!result) {

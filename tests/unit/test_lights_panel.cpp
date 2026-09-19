@@ -17,6 +17,7 @@
 #include "scene/composition.hpp"
 #include "signals/signal_bus.hpp"
 #include "ui/lights_panel_logic.hpp"
+#include "ui/world_probe.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -201,4 +202,36 @@ TEST_CASE("the panel offers the four kinds the brief names", "[ui][lights][panel
     // "Area" in the menu is a Rect: Disk, Tube and Sphere are real kinds the renderer shades, but
     // they are a shape chosen after the light exists rather than four create-menu entries.
     CHECK(types[3] == scene::PunctualLight::Type::Rect);
+}
+
+// ---- picking a light in the viewport -------------------------------------------------------------
+
+TEST_CASE("a light is picked in screen space, nearest to the cursor", "[ui][lights][pick]") {
+    scene::Camera camera;
+    camera.position = glm::vec3(0.0f, 0.0f, 10.0f);
+    camera.target = glm::vec3(0.0f);
+    const float aspect = 16.0f / 9.0f;
+
+    const std::vector<glm::vec3> lights{glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(4.0f, 0.0f, 0.0f)};
+
+    // Dead centre picks the one at the origin.
+    CHECK(ui::pickProjectedPoint(lights, camera, aspect, glm::vec2(0.0f, 0.0f),
+                                 ui::kHelperPickRadius) == 0);
+
+    // THE CONTROL: a click well away from both picks nothing, so the function is not simply
+    // returning the first entry.
+    CHECK(ui::pickProjectedPoint(lights, camera, aspect, glm::vec2(-0.9f, -0.9f),
+                                 ui::kHelperPickRadius) == -1);
+
+    // A light behind the eye is never picked. It projects to a mirrored position that looks
+    // entirely plausible, which is how a click on empty sky selects something standing behind you.
+    const std::vector<glm::vec3> behind{glm::vec3(0.0f, 0.0f, 30.0f)};
+    CHECK(ui::pickProjectedPoint(behind, camera, aspect, glm::vec2(0.0f), 2.0f) == -1);
+
+    // Two lights on one sight line: the near one wins.
+    const std::vector<glm::vec3> stacked{glm::vec3(0.0f, 0.0f, -20.0f), glm::vec3(0.0f, 0.0f, 0.0f)};
+    CHECK(ui::pickProjectedPoint(stacked, camera, aspect, glm::vec2(0.0f), ui::kHelperPickRadius) == 1);
+
+    // An empty scene picks nothing rather than indexing an empty list.
+    CHECK(ui::pickProjectedPoint({}, camera, aspect, glm::vec2(0.0f), ui::kHelperPickRadius) == -1);
 }

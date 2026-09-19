@@ -430,6 +430,97 @@ void drawViewportOverlay(const WorldEditor& editor, const scene::Camera& camera,
         painter.box(bounds, kGhostBad, 2.0f);
     }
 
+    // ---- the authored lights, as objects in the world -------------------------------------------
+    //
+    // Restrained on purpose (the viewport brief's §33): a small cross, a name, and -- only for the
+    // selected light -- the thing that light actually does in space. A world with a light's full
+    // cone, range sphere and axes drawn at all times is the "debugging tool" look the brief asks
+    // this not to have, and with a dozen practicals it is unreadable.
+    //
+    // The marker takes the light's own colour so that a warm practical and a cool rim are telling
+    // apart at a glance, normalised for brightness -- an intensity-scaled colour would make the dim
+    // ones invisible, which is the opposite of what somebody hunting a missing light wants.
+    for (const EditorVisuals::LightMarker& light : visuals.lightMarkers) {
+        ImVec2 centre;
+        if (!painter.point(light.position, centre)) {
+            continue; // behind the eye
+        }
+        const glm::vec3 c = glm::normalize(glm::max(light.color, glm::vec3(0.03f)));
+        const float dim = light.enabled ? 1.0f : 0.35f;
+        const ImU32 colour = IM_COL32(static_cast<int>(c.r * 255.0f * dim),
+                                      static_cast<int>(c.g * 255.0f * dim),
+                                      static_cast<int>(c.b * 255.0f * dim), light.selected ? 255 : 190);
+
+        // The body: a four-armed star, which reads as "a light" at any size and does not need an
+        // icon font this application does not have.
+        const float arm = light.selected ? 9.0f : 6.0f;
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        draw->AddLine(ImVec2(centre.x - arm, centre.y), ImVec2(centre.x + arm, centre.y), colour, 1.6f);
+        draw->AddLine(ImVec2(centre.x, centre.y - arm), ImVec2(centre.x, centre.y + arm), colour, 1.6f);
+        const float d = arm * 0.62f;
+        draw->AddLine(ImVec2(centre.x - d, centre.y - d), ImVec2(centre.x + d, centre.y + d), colour, 1.1f);
+        draw->AddLine(ImVec2(centre.x + d, centre.y - d), ImVec2(centre.x - d, centre.y + d), colour, 1.1f);
+        if (light.selected) {
+            draw->AddCircle(centre, arm + 4.0f, kSelection, 0, 1.6f);
+        }
+
+        // Which way it faces, for the kinds where that is the whole of what they are.
+        const bool aimed = light.type == scene::PunctualLight::Type::Directional ||
+                           light.type == scene::PunctualLight::Type::Spot;
+        if (aimed) {
+            const float length = light.type == scene::PunctualLight::Type::Directional
+                                     ? 4.0f
+                                     : std::max(light.range > 0.0f ? light.range : 8.0f, 2.0f);
+            painter.line(light.position, light.position + light.direction * length, colour, 1.4f);
+        }
+
+        if (light.selected) {
+            // What this light reaches, drawn only for the selected one.
+            if (light.type == scene::PunctualLight::Type::Spot) {
+                // The cone, as four edges and a mouth. Its half-angle and its length are the
+                // light's own outer cone and range, so the drawing is the parameters rather than a
+                // decoration that agrees with them by coincidence.
+                const float reach = std::max(light.range > 0.0f ? light.range : 8.0f, 2.0f);
+                const float radius = reach * std::tan(glm::radians(std::min(light.outerConeDegrees, 89.0f)));
+                const glm::vec3 tip = light.position + light.direction * reach;
+                glm::vec3 up = std::abs(light.direction.y) > 0.95f ? glm::vec3(1.0f, 0.0f, 0.0f)
+                                                                   : glm::vec3(0.0f, 1.0f, 0.0f);
+                const glm::vec3 right = glm::normalize(glm::cross(light.direction, up));
+                up = glm::normalize(glm::cross(right, light.direction));
+                painter.ring(tip, light.direction, radius, colour, 32, 1.3f);
+                for (int i = 0; i < 4; ++i) {
+                    const float a = static_cast<float>(i) * 1.5707963f;
+                    const glm::vec3 edge = tip + (right * std::cos(a) + up * std::sin(a)) * radius;
+                    painter.line(light.position, edge, colour, 1.2f);
+                }
+            } else if (light.type == scene::PunctualLight::Type::Point) {
+                // Three rings rather than a sphere: a filled ball hides the scene behind it, and a
+                // range of zero means "no cutoff", which is drawn as nothing rather than as a lie.
+                if (light.range > 0.0f) {
+                    painter.ring(light.position, glm::vec3(0.0f, 1.0f, 0.0f), light.range, colour, 40, 1.0f);
+                    painter.ring(light.position, glm::vec3(1.0f, 0.0f, 0.0f), light.range, colour, 40, 1.0f);
+                    painter.ring(light.position, glm::vec3(0.0f, 0.0f, 1.0f), light.range, colour, 40, 1.0f);
+                }
+            } else if (light.type != scene::PunctualLight::Type::Directional) {
+                // An area emitter: the rectangle that is actually emitting, and the way it faces.
+                glm::vec3 up = std::abs(light.direction.y) > 0.95f ? glm::vec3(1.0f, 0.0f, 0.0f)
+                                                                   : glm::vec3(0.0f, 1.0f, 0.0f);
+                const glm::vec3 right = glm::normalize(glm::cross(light.direction, up));
+                up = glm::normalize(glm::cross(right, light.direction));
+                const glm::vec3 hw = right * (light.width * 0.5f);
+                const glm::vec3 hh = up * (light.height * 0.5f);
+                const std::array<glm::vec3, 4> corner{light.position - hw - hh, light.position + hw - hh,
+                                                      light.position + hw + hh, light.position - hw + hh};
+                for (std::size_t i = 0; i < corner.size(); ++i) {
+                    painter.line(corner[i], corner[(i + 1) % corner.size()], colour, 1.3f);
+                }
+                painter.line(light.position, light.position + light.direction * 1.5f, colour, 1.2f);
+            }
+        }
+
+        painter.label(light.position, light.name.c_str(), light.selected ? kSelection : colour);
+    }
+
     // ---- the gizmo ----
     if (visuals.showGizmo) {
         const GizmoFrame& frame = visuals.gizmo;

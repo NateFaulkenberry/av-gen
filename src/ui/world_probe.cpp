@@ -255,4 +255,33 @@ std::vector<std::string> nodesInScreenRect(scene::Composition& composition, cons
     return out;
 }
 
+
+int pickProjectedPoint(std::span<const glm::vec3> positions, const scene::Camera& camera, float aspect,
+                       glm::vec2 ndc, float radiusNdc) {
+    int best = -1;
+    float bestDistance = radiusNdc;
+    float bestDepth = 0.0f;
+    for (std::size_t i = 0; i < positions.size(); ++i) {
+        const Projected p = projectPoint(camera, aspect, positions[i]);
+        if (!p.inFront) {
+            // A point behind the eye projects to a mirrored position that looks entirely plausible,
+            // which is how a click on empty sky selects something standing behind the camera.
+            continue;
+        }
+        const float distance = glm::length(p.ndc - ndc);
+        if (distance > radiusNdc) {
+            continue;
+        }
+        // Within the radius, the nearer-to-the-cursor wins; ties on the cursor go to the nearer to
+        // the camera.
+        if (best < 0 || distance < bestDistance - 1e-4f ||
+            (std::abs(distance - bestDistance) <= 1e-4f && p.depth < bestDepth)) {
+            best = static_cast<int>(i);
+            bestDistance = distance;
+            bestDepth = p.depth;
+        }
+    }
+    return best;
+}
+
 } // namespace avgen::ui

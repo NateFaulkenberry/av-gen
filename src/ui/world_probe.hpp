@@ -119,4 +119,27 @@ struct Projected {
 };
 [[nodiscard]] Projected projectPoint(const scene::Camera& camera, float aspect, glm::vec3 world);
 
+// Which of `positions` the pointer is over, in screen space, or -1 for none.
+//
+// **Screen space and not the GPU identifier target, and that is a decision rather than an
+// expedient.** Three reasons, in the order they settled it. The pick id is a two-bit space tag with
+// exactly one free value (`scene::PickSpace`) and lights and cameras are two claimants. Writing
+// helpers into the identifier target would put them in a pass the offline renderer runs, and the
+// viewport brief's §32 requires that editor helpers cannot reach a frame -- structurally is better
+// than by testing for their absence. And an icon has no depth to test against: it is a fixed size
+// on screen whatever it is standing in.
+//
+// The cost, stated rather than discovered: a light behind a mountain is still clickable. That is
+// what every DCC does, and the alternative has a failure with no recovery -- a light you cannot
+// select because the thing it lights is in front of it.
+//
+// Nearest to the cursor wins, then nearest to the camera, so two lights along one sight line pick
+// the near one rather than whichever was authored first.
+[[nodiscard]] int pickProjectedPoint(std::span<const glm::vec3> positions, const scene::Camera& camera,
+                                     float aspect, glm::vec2 ndc, float radiusNdc);
+
+// The grab radius for an icon-like helper, in NDC. Larger than the gizmo's because a light marker
+// is a few pixels of star and a person aiming at one should not have to be precise.
+inline constexpr float kHelperPickRadius = 0.045f;
+
 } // namespace avgen::ui
