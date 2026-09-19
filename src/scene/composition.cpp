@@ -409,7 +409,11 @@ json particlesToJson(const ParticleSystem& s) {
     j["colorEnd"] = vecToJson(s.colorEnd);
     j["emissive"] = s.emissive;
     j["blend"] = blendName(s.blend);
-    j["softness"] = s.softness;
+    // ADR-364: written only when it does something. It used to be written unconditionally, which is
+    // how a default nobody chose ended up baked into every scene file the editor ever saved.
+    if (s.softness != 0.0f) {
+        j["softness"] = s.softness;
+    }
     // ADR-040. Only written when they differ from the defaults so existing files stay short and
     // round-tripping a pre-ADR-040 scene produces the same JSON it started with.
     if (s.velocityStretch != 0.0f) {
