@@ -176,6 +176,19 @@ are tipped onto their toes and driven into the surface and the far pair hangs; a
 lie on the slope and the uphill pair has stepped up onto the higher ground. The control scene sets
 `footDrop` too, so the pair compares the layers and not the seating.
 
+Both frames reproduce bit-identically from the committed scenes:
+
+```
+python3 tools/make_foot_ik_lab.py          # regenerates both scenes from the shipped valley-2 terrain
+tools/gpu-lock.sh ./build/release/src/avgen \
+    --composition examples/labs/footik/foot-ik-lab.scene.json \
+    --render renders/footik/after --range 2:2 --size 1280x720
+```
+
+`--range 2:2` because the layer is a pure function and the second is not one of its inputs: any
+second of the walk gives the same answer for the same pose, and 2.0 is the one the pair was framed
+on.
+
 ## Consequences
 
 * Nine rigs gain a solvable leg. The alien pack does not, and is reported rather than approximated.
