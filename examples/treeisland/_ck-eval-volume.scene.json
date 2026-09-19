@@ -5,13 +5,13 @@
   "camera": {
     "mode": 1,
     "position": [
-      -139.0,
-      24.0,
-      144.0
+      158.0,
+      6.0,
+      152.0
     ],
     "target": [
       0.0,
-      16.0,
+      13.0,
       0.0
     ],
     "fov": 36.0,
@@ -35,7 +35,8 @@
       "intensity": 5.0,
       "castsShadow": true,
       "shadowStrength": 0.95,
-      "softness": 1.8
+      "softness": 1.8,
+      "volumetric": 1.0
     },
     {
       "name": "glowmere-rim",
@@ -54,7 +55,8 @@
       "intensity": 0.3,
       "castsShadow": false,
       "shadowStrength": 0.0,
-      "softness": 3.0
+      "softness": 3.0,
+      "volumetric": 0.0
     },
     {
       "name": "cosmic-fill",
@@ -73,7 +75,8 @@
       "intensity": 0.38,
       "castsShadow": false,
       "shadowStrength": 0.0,
-      "softness": 4.0
+      "softness": 4.0,
+      "volumetric": 0.0
     }
   ],
   "environment": {
@@ -122,7 +125,14 @@
       "sunSize": 0.01,
       "sunGlow": 0.01,
       "intensity": 1.0
-    }
+    },
+    "volumeDensity": 0.004,
+    "fogHeight": 40.0,
+    "fogHeightFalloff": 0.004,
+    "volumeScattering": 1.0,
+    "volumeAnisotropy": 0.72,
+    "volumeSteps": 48,
+    "volumeMaxDistance": 700.0
   },
   "post": {
     "tonemap": 1,

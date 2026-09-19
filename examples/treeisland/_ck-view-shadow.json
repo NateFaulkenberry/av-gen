@@ -27,7 +27,31 @@
     "sources/tilt-x/rate": 0.0092,
     "sources/tilt-x/phase": 0.25,
     "sources/tilt-z/rate": 0.0067,
-    "sources/tilt-z/phase": 0.6
+    "sources/tilt-z/phase": 0.6,
+    "lights/celestial-key/enabled": true,
+    "lights/celestial-key/azimuth": -50.0,
+    "lights/celestial-key/elevation": 31.0,
+    "lights/celestial-key/intensity": 5.0,
+    "lights/celestial-key/color": [
+      1.0,
+      0.92,
+      0.78
+    ],
+    "lights/celestial-key/angularSize": 1.8,
+    "lights/celestial-key/shadowStrength": 0.95,
+    "lights/cosmic-fill/intensity": 0.38,
+    "lights/cosmic-fill/color": [
+      0.32,
+      0.45,
+      0.88
+    ],
+    "lights/glowmere-rim/intensity": 0.3,
+    "nodes/cosmos-stars-near/emissiveBoost": 1.0,
+    "nodes/cosmos-stars-mid/emissiveBoost": 1.0,
+    "nodes/cosmos-stars-far/emissiveBoost": 1.0,
+    "nodes/cosmos-motes/emissiveBoost": 1.0,
+    "scene/shadowRange": 420.0,
+    "env/sky/intensity": 1.0
   },
   "sources": [
     {
@@ -103,7 +127,122 @@
       "stage": "background"
     }
   ],
-  "presets": [],
+  "presets": [
+    {
+      "name": "Celestial Day",
+      "values": {
+        "lights/celestial-key/enabled": [
+          1.0
+        ],
+        "lights/celestial-key/azimuth": [
+          -50.0
+        ],
+        "lights/celestial-key/elevation": [
+          31.0
+        ],
+        "lights/celestial-key/intensity": [
+          5.0
+        ],
+        "lights/celestial-key/color": [
+          1.0,
+          0.92,
+          0.78
+        ],
+        "lights/celestial-key/angularSize": [
+          1.8
+        ],
+        "lights/celestial-key/shadowStrength": [
+          0.95
+        ],
+        "lights/cosmic-fill/intensity": [
+          0.38
+        ],
+        "lights/cosmic-fill/color": [
+          0.32,
+          0.45,
+          0.88
+        ],
+        "lights/glowmere-rim/intensity": [
+          0.3
+        ],
+        "nodes/cosmos-stars-near/emissiveBoost": [
+          1.0
+        ],
+        "nodes/cosmos-stars-mid/emissiveBoost": [
+          1.0
+        ],
+        "nodes/cosmos-stars-far/emissiveBoost": [
+          1.0
+        ],
+        "nodes/cosmos-motes/emissiveBoost": [
+          1.0
+        ],
+        "scene/shadowRange": [
+          420.0
+        ],
+        "env/sky/intensity": [
+          1.0
+        ]
+      }
+    },
+    {
+      "name": "Celestial Night",
+      "values": {
+        "lights/celestial-key/enabled": [
+          1.0
+        ],
+        "lights/celestial-key/azimuth": [
+          -50.0
+        ],
+        "lights/celestial-key/elevation": [
+          31.0
+        ],
+        "lights/celestial-key/intensity": [
+          1.75
+        ],
+        "lights/celestial-key/color": [
+          0.62,
+          0.72,
+          1.0
+        ],
+        "lights/celestial-key/angularSize": [
+          2.4
+        ],
+        "lights/celestial-key/shadowStrength": [
+          0.99
+        ],
+        "lights/cosmic-fill/intensity": [
+          0.2
+        ],
+        "lights/cosmic-fill/color": [
+          0.34,
+          0.37,
+          0.88
+        ],
+        "lights/glowmere-rim/intensity": [
+          0.22
+        ],
+        "nodes/cosmos-stars-near/emissiveBoost": [
+          1.9
+        ],
+        "nodes/cosmos-stars-mid/emissiveBoost": [
+          1.9
+        ],
+        "nodes/cosmos-stars-far/emissiveBoost": [
+          1.9
+        ],
+        "nodes/cosmos-motes/emissiveBoost": [
+          1.7
+        ],
+        "scene/shadowRange": [
+          420.0
+        ],
+        "env/sky/intensity": [
+          1.0
+        ]
+      }
+    }
+  ],
   "timeline": {
     "enabled": false,
     "tracks": [],

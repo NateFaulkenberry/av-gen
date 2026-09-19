@@ -2,12 +2,12 @@
   "format": "avgen-project",
   "version": 4,
   "app": {
-    "name": "cosmickey _ck-ctl-nofill"
+    "name": "cosmickey _ck-perf-noshadowrange"
   },
   "assets": {
     "scene": {
       "kind": "composition",
-      "path": "_ck-ctl-nofill.scene.json"
+      "path": "_ck-perf-noshadowrange.scene.json"
     }
   },
   "parameters": {

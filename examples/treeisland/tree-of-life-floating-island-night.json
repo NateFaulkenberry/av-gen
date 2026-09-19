@@ -2,12 +2,12 @@
   "format": "avgen-project",
   "version": 4,
   "app": {
-    "name": "cosmickey _ck-ctl-nofill"
+    "name": "Tree of Life - Floating Island (Celestial Night)"
   },
   "assets": {
     "scene": {
       "kind": "composition",
-      "path": "_ck-ctl-nofill.scene.json"
+      "path": "tree-of-life-floating-island.scene.json"
     }
   },
   "parameters": {
@@ -31,25 +31,25 @@
     "lights/celestial-key/enabled": true,
     "lights/celestial-key/azimuth": -50.0,
     "lights/celestial-key/elevation": 31.0,
-    "lights/celestial-key/intensity": 5.0,
+    "lights/celestial-key/intensity": 1.75,
     "lights/celestial-key/color": [
-      1.0,
-      0.92,
-      0.78
+      0.62,
+      0.72,
+      1.0
     ],
-    "lights/celestial-key/angularSize": 1.8,
-    "lights/celestial-key/shadowStrength": 0.95,
-    "lights/cosmic-fill/intensity": 0.38,
+    "lights/celestial-key/angularSize": 2.4,
+    "lights/celestial-key/shadowStrength": 0.99,
+    "lights/cosmic-fill/intensity": 0.2,
     "lights/cosmic-fill/color": [
-      0.32,
-      0.45,
+      0.34,
+      0.37,
       0.88
     ],
-    "lights/glowmere-rim/intensity": 0.3,
-    "nodes/cosmos-stars-near/emissiveBoost": 1.0,
-    "nodes/cosmos-stars-mid/emissiveBoost": 1.0,
-    "nodes/cosmos-stars-far/emissiveBoost": 1.0,
-    "nodes/cosmos-motes/emissiveBoost": 1.0,
+    "lights/glowmere-rim/intensity": 0.22,
+    "nodes/cosmos-stars-near/emissiveBoost": 1.9,
+    "nodes/cosmos-stars-mid/emissiveBoost": 1.9,
+    "nodes/cosmos-stars-far/emissiveBoost": 1.9,
+    "nodes/cosmos-motes/emissiveBoost": 1.7,
     "scene/shadowRange": 420.0,
     "env/sky/intensity": 1.0
   },
