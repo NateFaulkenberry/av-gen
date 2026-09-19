@@ -39,6 +39,28 @@ never reaches into the realtime post chain. Colour management is downstream of t
 | 7 | Glowmere | not started |
 | 8 | Embree instancing | **partly** |
 
+## From the Render panel
+
+`Renderer: (o) Realtime  ( ) Path trace` at the top of the existing Render panel -- a choice
+*within* it, not a second panel beside it, so resolution, the output path and the progress line are
+the same affordances serving whichever renderer is selected. `docs/pathtrace/render-panel-path-trace.png`
+and `-realtime.png` are captures of both states.
+
+**The panel is a view of `pathtrace::TraceJob` and holds no trace state of its own.** Its pointers
+(`pathTraceSettings`, `pathTraceSeconds`, ...) address settings the Application owns, exactly as
+`renderSettings` does, and every number it shows comes from `pathTraceProgress()`. The only thing
+the panel owns is `rendererChoice_`, which is which controls are on screen rather than anything
+about a render.
+
+**Progress honesty survives the progress bar.** A bar is drawn *only* for a stage that can measure
+itself -- rendering, which counts finished samples. Scene build, BVH build, denoise and write show
+the **stage name** instead ("Building acceleration..."), because a bar sitting at 40% while nothing
+is known is a lie, and a UI is where that discipline usually dies: a still bar looks broken and a
+creeping one looks fine.
+
+`denoise` is greyed out with an explanatory tooltip when the build has no OIDN, rather than offered
+and then failing.
+
 ## Running one
 
 ```

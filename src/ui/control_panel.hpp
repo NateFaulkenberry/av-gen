@@ -19,6 +19,7 @@
 #include "app/render_job.hpp"
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
+#include "pathtrace/trace_job.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "rendering/sdf_renderer.hpp"
 #include "ui/composition_panel.hpp"
@@ -127,6 +128,25 @@ public:
     bool* liftViewportLimits = nullptr;
     std::function<void()> onStartRender;
     std::function<void()> onCancelRender;
+
+    // ---- path tracing (ADR-351, spec section 67) -------------------------------------------------
+    //
+    // A choice WITHIN this panel, not a second panel beside it: the renderer is a radio at the top
+    // and everything below it -- resolution, output path, the Render button, the progress line --
+    // is the same affordance serving whichever renderer is selected.
+    //
+    // The panel holds NO trace state of its own. `pathTraceSettings` points at settings the
+    // Application owns, exactly as `renderSettings` does, and `pathTraceProgress` reads the job.
+    // Anything the job does not own does not live here: two sources of truth for a render's state
+    // is how a UI ends up showing "rendering" after a job has failed.
+    pathtrace::TraceSettings* pathTraceSettings = nullptr;
+    double* pathTraceSeconds = nullptr;
+    bool* pathTraceDenoise = nullptr;
+    bool* pathTraceAovs = nullptr;
+    bool pathTraceDenoiseAvailable = false;   // false greys the checkbox and explains why
+    std::function<pathtrace::TraceProgress()> pathTraceProgress;
+    std::function<void()> onStartPathTrace;
+    std::function<void()> onCancelPathTrace;
     std::function<void()> onEnqueueRender;
     std::function<void()> onRunQueue;
     std::function<void()> onChooseRenderOutput;
@@ -358,6 +378,12 @@ private:
     void drawSceneTab(app::Engine& engine);
     void drawTimelineTab(app::Engine& engine);
     void drawRender(app::Engine& engine);
+    // The path-tracing half of the Render panel. Split out only for length; it shares the
+    // panel's resolution control, its output path and its Separator rhythm.
+    void drawPathTrace();
+    // Which renderer the Render panel is currently showing. Not a render setting -- it is
+    // which set of controls is on screen -- so it lives with the panel and nowhere else.
+    int rendererChoice_ = 0;   // 0 = realtime, 1 = path trace
     void drawAutoDirector(app::Engine& engine);
     // ADR-249: Song Mode's half of that panel. Separate because it is a different question --
     // how faithfully to execute an authored song -- and because the other half is long enough.

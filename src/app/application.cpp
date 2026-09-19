@@ -1511,6 +1511,26 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->renderProgress = [this]() -> RenderProgress { return job_ ? job_->progress() : lastRender_; };
         liftViewportLimits_ = options.liftViewportLimits;
         panel_->liftViewportLimits = &liftViewportLimits_;
+        // ---- path tracing from the UI ----
+        uiPathTrace_.samplesPerPixel = 32;
+        uiPathTrace_.maxDepth = 3;
+        panel_->pathTraceSettings = &uiPathTrace_;
+        panel_->pathTraceSeconds = &uiPathTraceSeconds_;
+        panel_->pathTraceDenoise = &uiPathTraceDenoise_;
+        panel_->pathTraceAovs = &uiPathTraceAovs_;
+        panel_->pathTraceDenoiseAvailable = pathtrace::denoiseAvailable();
+        panel_->pathTraceProgress = [this]() -> pathtrace::TraceProgress {
+            // While a job exists it IS the answer; once it is gone, the last thing it said.
+            if (ptJob_) {
+                lastPathTrace_ = ptJob_->progress();
+                return lastPathTrace_;
+            }
+            return lastPathTrace_;
+        };
+        panel_->onStartPathTrace = [this] { startPathTraceFromUi(); };
+        panel_->onCancelPathTrace = [this] {
+            if (ptJob_) ptJob_->cancel();
+        };
         panel_->onStartRender = [this] { startRenderFromUi(); };
         panel_->onCancelRender = [this] {
             if (job_) job_->cancel();
@@ -4346,6 +4366,50 @@ Result<std::unique_ptr<RenderJob>> Application::makeRenderJob(const std::filesys
 // The CPU path tracer (ADR-351). Unlike `--render` this needs no GPU at all: the tracer is CPU-only
 // and `EngineMode::Offline` evaluates a scene without a device, so a trace runs on a machine whose
 // GPU is busy with something else -- which, with several agents sharing one machine, it usually is.
+// Starting a trace from the Render panel. The job runs on its own coordinator thread, so this
+// returns immediately and the UI keeps its frame rate; the panel polls `progress()`.
+void Application::startPathTraceFromUi() {
+    if (ptJob_ && !ptJob_->done()) {
+        panel_->setStatus("a path trace is already running");
+        return;
+    }
+    // Same rule as a render: the job loads from the project FILE, not from live state, which is
+    // what makes the result reproducible. A session with no file is snapshotted to a temporary one.
+    std::filesystem::path projectFile = engine_->projectPath();
+    if (projectFile.empty()) {
+        projectFile = std::filesystem::temp_directory_path() / "avgen_pathtrace_session.json";
+        if (auto r = engine_->saveProject(projectFile); !r) {
+            panel_->setStatus(r.error().message);
+            return;
+        }
+    }
+
+    std::filesystem::path out = uiRender_.outputPath;
+    if (out.empty()) out = std::filesystem::temp_directory_path() / "avgen_pathtrace.exr";
+    out.replace_extension(".exr");   // the tracer writes scene-linear EXR and nothing else
+
+    pathtrace::TraceJobRequest request;
+    request.project = projectFile;
+    request.seconds = uiPathTraceSeconds_;
+    request.output = out;
+    request.settings = uiPathTrace_;
+    request.settings.width = std::max(16u, uiRender_.width);
+    request.settings.height = std::max(16u, uiRender_.height);
+    request.denoise = uiPathTraceDenoise_;
+    request.writeAovs = uiPathTraceAovs_;
+    if (request.writeAovs || request.denoise) request.settings.captureFeatures = true;
+
+    if (auto ok = request.validate(); !ok) {
+        panel_->setStatus(ok.error().message);
+        return;
+    }
+
+    lastPathTrace_ = pathtrace::TraceProgress{};
+    ptJob_ = std::make_unique<pathtrace::TraceJob>(std::move(request));
+    ptJob_->start();
+    panel_->setStatus(fmt::format("path tracing to {}", out.filename().string()));
+}
+
 int Application::runPathTrace() {
     // Same rule as `--render`: the job loads the project itself, so a session with no project file
     // is snapshotted to a temporary one first. Loading from the file rather than from live state is

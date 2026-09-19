@@ -220,3 +220,84 @@ TEST_CASE("progress does not claim to know what it cannot", "[unit][pathtrace][j
     REQUIRE(maxSamples > 0);
     std::filesystem::remove(out);
 }
+
+TEST_CASE("a running job does not block the thread that started it", "[unit][pathtrace][job]") {
+    // Spec section 36, and the reason TraceJob exists at all. The Render panel polls this job from
+    // the UI thread every frame; if `start()` or `progress()` blocked, the editor would freeze for
+    // the length of a trace.
+    //
+    // This is the mechanical form of "drag something in the UI while a trace runs": the caller
+    // loops doing work and polling, exactly as a UI frame loop does, and must get many turns while
+    // the job is still going. It is NOT a substitute for a human dragging a window, and I could not
+    // do that -- but a caller that is starved would fail here.
+    if (!std::filesystem::exists(projectPath())) {
+        SUCCEED("project or assets absent");
+        return;
+    }
+    const auto out = std::filesystem::temp_directory_path() / "avgen_tracejob_nonblock.exr";
+    std::filesystem::remove(out);
+    auto request = smallRequest(out);
+    request.settings.samplesPerPixel = 256;
+    request.settings.samplesPerBatch = 1;
+
+    pathtrace::TraceJob job(std::move(request));
+    job.start();
+
+    int turns = 0;
+    volatile double busy = 0.0;
+    bool sawRendering = false;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    while (!job.done() && std::chrono::steady_clock::now() < deadline) {
+        const auto p = job.progress();   // must never block
+        if (p.state == pathtrace::TraceJobState::Rendering) sawRendering = true;
+        for (int i = 0; i < 2000; ++i) busy += i * 0.5;   // stand in for a UI frame's work
+        ++turns;
+    }
+    job.cancel();
+    job.wait();
+
+    INFO("caller got " << turns << " turns while the job ran");
+    REQUIRE(sawRendering);   // the job really was working, not finished before we looked
+    // A blocked caller gets one turn. Hundreds means the loop kept running throughout.
+    REQUIRE(turns > 100);
+    std::filesystem::remove(out);
+}
+
+TEST_CASE("cancelling mid-render leaves a terminal state and no file", "[unit][pathtrace][job]") {
+    // The panel's Cancel button reaches exactly this. Cancelled partway through the samples rather
+    // than before the job starts, which is the case the button is actually for.
+    if (!std::filesystem::exists(projectPath())) {
+        SUCCEED("project or assets absent");
+        return;
+    }
+    const auto out = std::filesystem::temp_directory_path() / "avgen_tracejob_midcancel.exr";
+    std::filesystem::remove(out);
+    auto request = smallRequest(out);
+    request.settings.samplesPerPixel = 4096;
+    request.settings.samplesPerBatch = 1;
+
+    pathtrace::TraceJob job(std::move(request));
+    job.start();
+
+    // Wait until it is genuinely rendering, then cancel. Cancelling before the render starts is a
+    // different and easier case, already covered.
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    while (job.progress().state != pathtrace::TraceJobState::Rendering &&
+           !job.done() && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    REQUIRE(job.progress().state == pathtrace::TraceJobState::Rendering);
+    const std::uint32_t partway = job.progress().samplesDone;
+
+    job.cancel();
+    job.wait();
+
+    const auto p = job.progress();
+    REQUIRE(p.state == pathtrace::TraceJobState::Cancelled);
+    REQUIRE(job.done());
+    REQUIRE_FALSE(std::filesystem::exists(out));
+    // It stopped early rather than quietly finishing all 4096 samples.
+    INFO("stopped after " << p.samplesDone << " of " << p.samplesTotal);
+    REQUIRE(p.samplesDone < p.samplesTotal);
+    (void)partway;
+}
