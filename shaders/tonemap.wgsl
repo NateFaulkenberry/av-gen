@@ -39,6 +39,15 @@ fn acesFitted(x: vec3<f32>) -> vec3<f32> {
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
+// The exact inverse of `linearToSrgb` below (IEC 61966-2-1). The two are used as a pair by the AgX
+// path and must stay each other's inverse: a `pow(x, 2.2)` approximation here is worth up to 9 code
+// values (ADR-372).
+fn srgbToLinear(c: vec3<f32>) -> vec3<f32> {
+    let lo = c / 12.92;
+    let hi = pow((c + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4));
+    return select(hi, lo, c <= vec3<f32>(0.04045));
+}
+
 // AgX (Troy Sobotka; polynomial fit by Benjamin Wende), base look.
 fn agxDefaultContrastApprox(xIn: vec3<f32>) -> vec3<f32> {
     let x = xIn;
@@ -61,8 +70,17 @@ fn agx(val: vec3<f32>) -> vec3<f32> {
     v = (v - minEv) / (maxEv - minEv);
     v = agxDefaultContrastApprox(v);
     v = agxOutset * v;
-    // AgX output is sRGB-encoded; return linear so the shared encode applies.
-    return pow(clamp(v, vec3<f32>(0.0), vec3<f32>(1.0)), vec3<f32>(2.2));
+    // AgX's output is sRGB-ENCODED. `fs_main` re-encodes with `linearToSrgb` at the end, so this
+    // has to undo exactly that encode and nothing else -- otherwise the pair is not a round trip
+    // and every AgX pixel carries the residual.
+    //
+    // It used to be `pow(v, 2.2)`, which is not the inverse of the piecewise IEC 61966-2-1 curve
+    // `linearToSrgb` applies. Measured over AgX's whole output range the mismatch reached **9 code
+    // values of 255**, at v = 0.0495; a scene-linear grey five stops under mid grey rendered 7
+    // where it should have rendered 16, so the deepest shadows were being more than halved. Through
+    // the midtones it went the other way and cost 1-2 levels. AgX is the default operator, so this
+    // was on in every shipped frame. See ADR-372.
+    return srgbToLinear(clamp(v, vec3<f32>(0.0), vec3<f32>(1.0)));
 }
 
 fn reinhardExtended(c: vec3<f32>) -> vec3<f32> {
