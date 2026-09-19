@@ -381,33 +381,23 @@ TEST_CASE("The showcase camera is static and the cosmos is dark", "[treeisland][
     }
     const json& sky = env.at("sky");
     CHECK(sky.value("enabled", false));
-    // What the camera sees *behind* the subject keeps the strict ceiling.
-    for (const char* key : {"zenithColor", "horizonColor"}) {
+    // One ceiling again, for all three.
+    //
+    // This was briefly split, with `groundColor` given a looser bound of its own, because ADR-358's
+    // lighting pass had taken the sky's ground hemisphere up in three doublings to 0.096 on blue and
+    // the strict bound failed on it. The split was wrong, and wrong in an instructive way: the
+    // project overrides `env/sky/groundColor` with the pre-ADR-358 value, so by ADR-264 those
+    // doublings were never in a rendered frame at all. The loosening accommodated a number that
+    // nothing ever saw. The scene and the project now agree on the value that actually renders, and
+    // all three components are back under the strict bound with nothing special-cased.
+    for (const char* key : {"zenithColor", "horizonColor", "groundColor"}) {
         for (const float c : sky.at(key).get<std::vector<float>>()) {
             INFO("sky." << key);
             CHECK(c >= 0.0f);
             CHECK(c < kBackgroundCeiling);
         }
     }
-    // The ground hemisphere is not backdrop, it is fill -- it is what lights the underside of an
-    // island that has no ground under it. ADR-358's lighting pass took it up in three deliberate
-    // doublings, 0.0052 -> 0.0105 -> 0.0210 -> 0.0360 on red, to lift that underside out of black,
-    // and nobody revisited this ceiling, so the test failed on the merge rather than on a defect.
-    //
-    // It gets its own bound, and the bound is weaker on purpose: at 0.096 on blue the "more than an
-    // order of magnitude below the subject" argument above no longer holds for this one value -- it
-    // is about five times below the lit canopy, not ten. That is a real loosening and it is written
-    // down rather than hidden by widening the shared constant.
-    //
-    // Brief §17 wants the island "emerging dramatically from deep environmental shadow" and warns
-    // against "flat HDRI illumination", which is an argument for taking this back down. That is an
-    // art decision with a render behind it, not a lint threshold, and it is open.
-    constexpr float kGroundFillCeiling = 0.12f;
-    for (const float c : sky.at("groundColor").get<std::vector<float>>()) {
-        INFO("sky.groundColor");
-        CHECK(c >= 0.0f);
-        CHECK(c < kGroundFillCeiling);
-    }
+
     // No sun disc: this is space, and §12 forbids giant distracting objects.
     CHECK(sky.value("sunIntensity", 1.0) == Approx(0.0));
 

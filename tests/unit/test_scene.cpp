@@ -207,7 +207,7 @@ TEST_CASE("OrbScene registers all parameters and default routes", "[scene][orb]"
         INFO(path);
         CHECK(params.find(path) != nullptr);
     }
-    CHECK(params.size() == 33); // 11 orb/scene/camera + 22 particles/sparks
+    CHECK(params.size() == 34); // 11 orb/scene/camera + 23 particles/sparks (ADR-367 added softness)
     CHECK(orb.scale().value() == 1.0f);
     CHECK(orb.scale().softMax(0) == 3.0f);
     CHECK(orb.scale().hardMax(0) == 8.0f);

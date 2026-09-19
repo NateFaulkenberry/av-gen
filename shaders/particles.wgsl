@@ -754,13 +754,41 @@ fn fogCorrection(world: vec3<f32>, pixel: vec2<i32>) -> f32 {
     return mix(1.0, clamp(toParticleT / max(toSurfaceT, 1e-4), 0.0, 64.0), coupling);
 }
 
+// ADR-367: the depth-aware soft-particle fade `ParticleSystem::softness` has been promising since
+// ADR-015. The value was authored, serialised, uploaded into `turb.z` -- and read by nothing, so
+// fifteen scene files carry deliberately tuned values from 0.3 to 3.0 that have never rendered.
+//
+// A billboard is a flat card in a world with depth, so where it crosses a surface it shows its own
+// silhouette as a hard line -- the tell that the volume is a sprite. Fading the card out as it
+// approaches the surface behind it hides the intersection, which is the whole trick.
+//
+// `linearDepthTex` holds VIEW-SPACE Z (`dot(p - cameraPos, cameraForward)` in linear_depth.wgsl),
+// not ray distance, so the particle has to be measured the same way or the fade would tighten
+// toward the corners of the frame where the two diverge. There is no camera forward in `Params`,
+// but `cameraRight` and `cameraUp` are the orthonormal billboard basis, so their cross product is
+// the view axis up to sign; every drawn particle is in front of the eye, so `abs` picks the sign.
+//
+// Returns exactly 1.0 when softness is 0 or no linear-depth target is bound, so "off" is off and a
+// pre-ADR-367 frame is reproduced bit for bit.
+fn softParticleFade(world: vec3<f32>, pixel: vec2<i32>) -> f32 {
+    let softness = params.turb.z;
+    if (softness <= 0.0 || params.fog2.w < 0.5) { return 1.0; }
+    let axis = normalize(cross(params.cameraRight.xyz, params.cameraUp.xyz));
+    let particleZ = abs(dot(world - params.cameraPos.xyz, axis));
+    // Where nothing was drawn, linear_depth.wgsl writes 1e7, so the fade is 1 and a particle
+    // against the sky is untouched.
+    let sceneZ = textureLoad(linearDepthTex, pixel, 0).x;
+    return clamp((sceneZ - particleZ) / softness, 0.0, 1.0);
+}
+
 @fragment
 fn fs_particle(in: VsOut) -> ParticleOut {
     let r2 = dot(in.uv, in.uv);
     if (r2 > 1.0) { discard; }
     let falloff = (1.0 - r2) * (1.0 - r2);
-    let alpha = in.color.a * falloff;
-    let emissive = params.turb.w * fogCorrection(in.world, vec2<i32>(floor(in.clip.xy)));
+    let pixel = vec2<i32>(floor(in.clip.xy));
+    let alpha = in.color.a * falloff * softParticleFade(in.world, pixel);
+    let emissive = params.turb.w * fogCorrection(in.world, pixel);
     var out: ParticleOut;
     if (params.counts.z == 0u) {
         out.color = vec4<f32>(in.color.rgb * alpha * emissive, alpha); // additive: premultiplied

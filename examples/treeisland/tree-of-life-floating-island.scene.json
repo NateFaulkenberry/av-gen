@@ -2,7 +2,7 @@
   "format": "avgen-scene",
   "version": 1,
   "name": "Tree of Life - Floating Island",
-  "wind": {"enabled": true, "speed": 0.0, "direction": 0.35, "gustAmount": 0.9,
+  "wind": {"enabled": true, "speed": 1.0, "direction": 0.35, "gustAmount": 0.9,
            "gustScale": 48.0, "gustSpeed": 9.0, "gustSharpness": 3.0,
            "turbulence": 0.35, "turbulenceScale": 26.0, "turbulenceSpeed": 1.4,
            "flutterScale": 3.5},
@@ -63,7 +63,7 @@
       "sunDirection": [0.0, 1.0, 0.0],
       "zenithColor": [0.0032, 0.0044, 0.0166],
       "horizonColor": [0.0094, 0.0102, 0.0286],
-      "groundColor": [0.0360, 0.0570, 0.0960],
+      "groundColor": [0.0052, 0.0118, 0.0212],
       "haze": 0.62,
       "sunColor": [0.0, 0.0, 0.0],
       "sunIntensity": 0.0,
@@ -119,7 +119,7 @@
       "position": [2.0, 3.0, 1.0],
       "rotation": [0.0, 0.0, 0.0],
       "scale": [1.0, 1.0, 1.0],
-      "wind": {"strength": 0.0, "trunk": 0.3, "branch": 1.2, "foliage": 1.5, "flutter": 1.2, "lag": 0.3}
+      "wind": {"strength": 1.0, "trunk": 0.3, "branch": 1.2, "foliage": 1.5, "flutter": 1.2, "lag": 0.3}
     },
     {
       "name": "tree-wood",

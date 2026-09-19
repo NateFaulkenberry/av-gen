@@ -357,11 +357,6 @@
     "env/rotation": 0.0,
     "env/sky/background": false,
     "env/sky/enabled": true,
-    "env/sky/groundColor": [
-      0.005200000014156103,
-      0.011800000444054604,
-      0.021199999377131462
-    ],
     "env/sky/haze": 0.6200000047683716,
     "env/sky/horizonColor": [
       0.009399999864399433,
@@ -546,7 +541,7 @@
       80.0
     ],
     "nodes/island-surface/visible": true,
-    "nodes/tree-foliage/emissiveBoost": 0.5,
+    "nodes/tree-foliage/emissiveBoost": 2.200000047683716,
     "nodes/tree-foliage/lightColor": [
       1.0,
       1.0,
@@ -1697,7 +1692,7 @@
     }
   ],
   "render": {
-    "aovs": "",
+    "aovs": "normal,shadow",
     "backend": "auto",
     "codec": "h264",
     "encoderThreads": 0,

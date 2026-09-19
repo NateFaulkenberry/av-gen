@@ -358,9 +358,9 @@
     "env/sky/background": false,
     "env/sky/enabled": true,
     "env/sky/groundColor": [
-      0.005200000014156103,
-      0.011800000444054604,
-      0.021199999377131462
+      0.072,
+      0.114,
+      0.192
     ],
     "env/sky/haze": 0.6200000047683716,
     "env/sky/horizonColor": [
@@ -1697,7 +1697,7 @@
     }
   ],
   "render": {
-    "aovs": "",
+    "aovs": "normal,shadow",
     "backend": "auto",
     "codec": "h264",
     "encoderThreads": 0,

@@ -12,9 +12,9 @@
     "scene": {
       "kind": "composition",
       "path": {
-        "path": "tree-of-life-floating-island.scene.json",
-        "sha256": "3d686aac62f953b8381ee86a4d7e2df034d433a126f7f3223601bff517bfeb30",
-        "size": 9156
+        "path": "_ca-cal3.scene.json",
+        "sha256": "f0079722ef270f4d3a7209f50fa22839134987f64f72b96d31a41d9775cf3161",
+        "size": 12836
       }
     }
   },
@@ -1447,7 +1447,6 @@
     "scene/volumeScattering": 1.0,
     "scene/volumeSteps": 32,
     "scene/windDirection": 0.0,
-    "scene/windSpeed": 1.319000005722046,
     "shader/glowmere-cosmos/baseLevel": 0.16200000047683716,
     "shader/glowmere-cosmos/baseTint": [
       0.029999999329447746,

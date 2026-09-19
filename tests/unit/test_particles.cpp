@@ -42,7 +42,12 @@ TEST_CASE("Particle parameters register and apply with rest-relative scaling", "
     // Registering the same system twice returns the same parameters (no duplicates).
     auto again = scene::registerParticleParameters(params, rest);
     CHECK(again.spawnRate == p.spawnRate);
-    CHECK(params.size() == 22); // ADR-040 added stretch and trailWidth
+    // ADR-040 added stretch and trailWidth; ADR-367 added softness, which had existed as a field
+    // and a serialised value for far longer and was registered by nobody.
+    CHECK(params.size() == 23);
+    // Named as well as counted. A bare count says a parameter arrived and not which one, and this
+    // number has now been wrong twice for the same reason -- somebody made a value reachable.
+    CHECK(params.find("particles/sparks/softness") == p.softness);
 }
 
 TEST_CASE("Field force modes and per-slot strength parameters", "[scene][particles]") {
@@ -65,7 +70,7 @@ TEST_CASE("Field force modes and per-slot strength parameters", "[scene][particl
     b.strength = 0.5f;
     rest.fieldForces = {a, b};
     auto p = scene::registerParticleParameters(params, rest);
-    CHECK(params.size() == 24);
+    CHECK(params.size() == 25); // 23 base (ADR-367's softness included) + 2 field-force strengths
     REQUIRE(p.fieldStrength[0] != nullptr);
     REQUIRE(p.fieldStrength[1] != nullptr);
     CHECK(p.fieldStrength[2] == nullptr);

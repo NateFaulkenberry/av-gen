@@ -119,7 +119,12 @@ struct ParticleSystem {
     glm::vec4 colorEnd{0.4f, 0.1f, 1.0f, 0.0f};
     float emissive = 4.0f;           // HDR intensity multiplier
     ParticleBlend blend = ParticleBlend::Additive;
-    float softness = 0.2f;           // depth fade distance (world units)
+    // ADR-367: how far in front of a surface the billboard has fully faded in, in world units.
+    // 0 is off and is the default, and "off" has to be the default because until ADR-367 this value
+    // was read by no shader at all: every system in the repository was rendering as though it were
+    // 0, so 0 is the only value that reproduces what those scenes already look like. The old 0.2
+    // default was never a behaviour, it was a number the writer baked into every scene it saved.
+    float softness = 0.0f;
 
     // Lifetime curves (ADR-040). Empty (fewer than two keys) = the linear ramp above.
     ParticleCurve sizeCurve;         // world units; replaces mix(sizeStart, sizeEnd)
@@ -194,6 +199,7 @@ struct ParticleParameters {
     params::Parameter<glm::vec4>* colorStart = nullptr;
     params::Parameter<glm::vec4>* colorEnd = nullptr;
     params::Parameter<float>* emissive = nullptr;
+    params::Parameter<float>* softness = nullptr; // ADR-367
     params::Parameter<float>* stretch = nullptr;    // scales velocityStretch (ADR-040)
     params::Parameter<float>* trailWidth = nullptr; // scales trailWidth (ADR-040)
     params::Parameter<bool>* enabled = nullptr;
