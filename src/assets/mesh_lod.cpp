@@ -559,75 +559,6 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
         // Every level is simplified from the source, so errors do not compound down the chain.
         SimplifyAttempt best = simplifyTo(source, targetIndices, simplifySettings, attributeWeights);
 
-        // ---- the last resort: remove whole shells ---------------------------------------------
-        //
-        // Armed only by `ShellThinning::fallback`, and tested against what the simplifiers actually
-        // returned rather than against a guess about the geometry. `best.indices.empty()` counts as
-        // an overshoot of infinity: neither simplifier produced anything, which on shell geometry
-        // is the same refusal expressed differently.
-        //
-        // It runs *after* the simplifiers and not instead of them, because a mesh that is both
-        // shell-structured and simplifiable -- a hundred rocks in one part -- should be simplified.
-        // Thinning such a mesh would delete ninety of the rocks to reach a ratio that collapsing
-        // edges reaches with all hundred still there.
-        if (thinStrategy) {
-            const std::size_t got = best.indices.size() / 3;
-            const bool overshot = best.indices.empty() ||
-                                  static_cast<float>(got) >
-                                      settings.thinning.fallback * static_cast<float>(targetTriangles);
-            if (overshot) {
-                ThinResult thin = thinShells(source, shells, targetTriangles, settings.thinning);
-                if (!thin.mesh.indices.empty() && (best.indices.empty() || thin.mesh.indices.size() / 3 < got)) {
-                    out.mesh = settings.optimise ? optimiseMesh(thin.mesh) : std::move(thin.mesh);
-                    out.mesh.name = levelName(source.name, level);
-                    const auto levelTriangles = static_cast<std::uint32_t>(out.mesh.indices.size() / 3);
-                    out.achievedRatio =
-                        static_cast<float>(levelTriangles) / static_cast<float>(sourceTriangles);
-                    out.thinned = true;
-                    out.shells = thin.keptShells;
-                    out.shellScale = thin.scale;
-                    // Thinning's granularity is one shell: it stops at the first shell that meets
-                    // the budget, so it can only ever overshoot by that shell's triangles. Judging
-                    // it by `<= targetTriangles` reported "did not reach" on a level that landed on
-                    // 0.500 of a requested 0.500, which is a false alarm and the kind that trains a
-                    // reader to ignore the flag.
-                    const auto grain = static_cast<std::uint32_t>(
-                        std::max<std::size_t>(1, sourceTriangles / std::max(shells.count, 1u)));
-                    out.reachedTarget = levelTriangles <= targetTriangles + grain;
-                    // Thinning's deviation is not the simplifier's and must not be reported as it.
-                    // What a thinned level is wrong by, at worst, is a whole shell: any point on a
-                    // removed leaf can be that leaf's radius away from anything that is still
-                    // there, and grown neighbours do not close that gap, they cover it. So the
-                    // error is the largest kept shell's radius, floored by the bounding-box
-                    // recession the same way a simplified level's is. It is an over-estimate for a
-                    // dense canopy and the right order for a sparse one, and it is deliberately
-                    // *not* small: a selector must not take a thinned rung while the object is
-                    // large on screen.
-                    out.boundsError = boundsRecession(out.mesh);
-                    const auto [lo, hi] = out.mesh.bounds();
-                    float shellRadius = 0.0f;
-                    if (thin.keptShells > 0) {
-                        // Mean shell extent, from the level's own geometry: total kept area over
-                        // kept shells gives a mean area, and a disc of that area has this radius.
-                        double area = 0.0;
-                        for (std::size_t t = 0; t + 2 < out.mesh.indices.size(); t += 3) {
-                            const glm::vec3 a = out.mesh.vertices[out.mesh.indices[t]].position;
-                            const glm::vec3 b = out.mesh.vertices[out.mesh.indices[t + 1]].position;
-                            const glm::vec3 c = out.mesh.vertices[out.mesh.indices[t + 2]].position;
-                            area += 0.5 * static_cast<double>(glm::length(glm::cross(b - a, c - a)));
-                        }
-                        shellRadius = static_cast<float>(
-                            std::sqrt(area / (3.14159265358979 * static_cast<double>(thin.keptShells))));
-                        shellRadius = std::min(shellRadius, glm::length(hi - lo));
-                    }
-                    out.error = std::max(shellRadius, out.boundsError);
-                    out.relativeError = errorScale > 0.0f ? out.error / errorScale : 0.0f;
-                    chain.levels.push_back(std::move(out));
-                    continue;
-                }
-            }
-        }
-
         // A chain must *descend*. `validate()` enforces that of the ratios asked for; nothing
         // enforced it of the ratios achieved, and on CommonTree_1 the achieved ones do not descend:
         // the sloppy simplifier reaches 7.6% at the 35% rung and then returns nothing at all at the
@@ -681,6 +612,85 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
         const bool inverted = previous != nullptr && !best.indices.empty() &&
                               best.indices.size() / 3 > trianglesOf(*previous);
         const bool lostGeometry = !best.indices.empty() && candidateRecession > boundsLimit;
+
+        // ---- the last resort: remove whole shells ---------------------------------------------
+        //
+        // Armed only by `ShellThinning::fallback`, and tested against what the simplifiers actually
+        // produced rather than against a guess about the geometry. It runs *after* them and not
+        // instead of them, because a mesh that is both shell-structured and simplifiable -- a
+        // hundred rocks in one part -- should be simplified. Thinning such a mesh would delete
+        // ninety of the rocks to reach a ratio that collapsing edges reaches with all hundred still
+        // there.
+        //
+        // Three things count as the simplifier having failed, and the third is the one that was
+        // missing at first. An **overshoot** past `fallback` times the target is the ordinary case.
+        // **Nothing at all** is an overshoot of infinity: neither simplifier produced a triangle,
+        // which on shell geometry is the same refusal said differently. And a level that **lost
+        // geometry** -- reached the ratio but took the bounding box with it -- is a failure the
+        // triangle count cannot see, and it is what a cloud of small shells does under a simplifier
+        // that is willing to delete them: it hits 25% exactly, by removing the outermost shells and
+        // shrinking the object. Without this third case the chain fell all the way back to the
+        // source on that geometry, with thinning armed, having declined to thin a level the
+        // simplifier had already been refused.
+        if (thinStrategy) {
+            const std::size_t got = best.indices.size() / 3;
+            const bool overshot = best.indices.empty() || lostGeometry ||
+                                  static_cast<float>(got) >
+                                      settings.thinning.fallback * static_cast<float>(targetTriangles);
+            if (overshot) {
+                ThinResult thin = thinShells(source, shells, targetTriangles, settings.thinning);
+                const bool better = best.indices.empty() || lostGeometry || thin.mesh.indices.size() / 3 < got;
+                if (!thin.mesh.indices.empty() && better) {
+                    out.mesh = settings.optimise ? optimiseMesh(thin.mesh) : std::move(thin.mesh);
+                    out.mesh.name = levelName(source.name, level);
+                    const auto levelTriangles = static_cast<std::uint32_t>(out.mesh.indices.size() / 3);
+                    out.achievedRatio =
+                        static_cast<float>(levelTriangles) / static_cast<float>(sourceTriangles);
+                    out.thinned = true;
+                    out.shells = thin.keptShells;
+                    out.shellScale = thin.scale;
+                    // Thinning's granularity is one shell: it stops at the first shell that meets
+                    // the budget, so it can only ever overshoot by that shell's triangles. Judging
+                    // it by `<= targetTriangles` reported "did not reach" on a level that landed on
+                    // 0.500 of a requested 0.500, which is a false alarm and the kind that trains a
+                    // reader to ignore the flag.
+                    const auto grain = static_cast<std::uint32_t>(
+                        std::max<std::size_t>(1, sourceTriangles / std::max(shells.count, 1u)));
+                    out.reachedTarget = levelTriangles <= targetTriangles + grain;
+                    // Thinning's deviation is not the simplifier's and must not be reported as it.
+                    // What a thinned level is wrong by, at worst, is a whole shell: any point on a
+                    // removed leaf can be that leaf's radius away from anything that is still
+                    // there, and grown neighbours do not close that gap, they cover it. So the
+                    // error is the largest kept shell's radius, floored by the bounding-box
+                    // recession the same way a simplified level's is. It is an over-estimate for a
+                    // dense canopy and the right order for a sparse one, and it is deliberately
+                    // *not* small: a selector must not take a thinned rung while the object is
+                    // large on screen.
+                    out.boundsError = boundsRecession(out.mesh);
+                    const auto [lo, hi] = out.mesh.bounds();
+                    float shellRadius = 0.0f;
+                    if (thin.keptShells > 0) {
+                        // Mean shell extent, from the level's own geometry: total kept area over
+                        // kept shells gives a mean area, and a disc of that area has this radius.
+                        double area = 0.0;
+                        for (std::size_t t = 0; t + 2 < out.mesh.indices.size(); t += 3) {
+                            const glm::vec3 a = out.mesh.vertices[out.mesh.indices[t]].position;
+                            const glm::vec3 b = out.mesh.vertices[out.mesh.indices[t + 1]].position;
+                            const glm::vec3 c = out.mesh.vertices[out.mesh.indices[t + 2]].position;
+                            area += 0.5 * static_cast<double>(glm::length(glm::cross(b - a, c - a)));
+                        }
+                        shellRadius = static_cast<float>(
+                            std::sqrt(area / (3.14159265358979 * static_cast<double>(thin.keptShells))));
+                        shellRadius = std::min(shellRadius, glm::length(hi - lo));
+                    }
+                    out.error = std::max(shellRadius, out.boundsError);
+                    out.relativeError = errorScale > 0.0f ? out.error / errorScale : 0.0f;
+                    chain.levels.push_back(std::move(out));
+                    continue;
+                }
+            }
+        }
+
         if (previous != nullptr && (best.indices.empty() || inverted || lostGeometry)) {
             SimplifyAttempt again = simplifyTo(*previous, targetIndices, simplifySettings, attributeWeights);
             scene::MeshData retry;

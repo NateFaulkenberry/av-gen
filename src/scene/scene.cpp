@@ -213,6 +213,7 @@ void Scene::clear() {
     cameras.clear();
     lights.clear();
     meshes.clear();
+    meshLods.clear();
     textures.clear();
     entities.clear();
     particles.clear();

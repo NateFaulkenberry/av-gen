@@ -7,6 +7,7 @@
 #include "core/log.hpp"
 #include "gpu/context.hpp"
 #include "gpu/shader_library.hpp"
+#include "scene/mesh_metrics.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
 
@@ -1870,6 +1871,12 @@ void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
     probe2::frame().meshesUploaded += scene.meshes.size();
     meshes_.clear();
     meshes_.reserve(scene.meshes.size());
+    // ADR-344. Rebuilt with the meshes and from the same version, because a chain is geometry and
+    // a chain left behind by a scene that has been re-flattened is the derived-copy defect this
+    // engine has found nine of.
+    meshLods_.assign(scene.meshes.size(), GpuMeshLod{});
+    anyMeshLod_ = false;
+    representation_.reset();
     for (std::size_t i = 0; i < scene.meshes.size(); ++i) {
         const auto& mesh = scene.meshes[i];
         GpuMesh gpuMesh;
@@ -1900,6 +1907,45 @@ void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
             context_.queue().WriteBuffer(gpuMesh.skin, 0, mesh.skin.data(), sdesc.size);
         }
         meshes_.push_back(std::move(gpuMesh));
+    }
+    // The rungs. Uploaded exactly the way LOD0 was, which is the point of holding them as MeshData:
+    // there is one upload path and one GpuMesh, so a rung cannot be drawn through a path the source
+    // mesh has never been through.
+    for (const scene::MeshLodChain& chain : scene.meshLods) {
+        if (chain.base >= meshLods_.size() || chain.levels.empty()) {
+            continue;
+        }
+        GpuMeshLod& out = meshLods_[chain.base];
+        out.hysteresis = chain.hysteresis;
+        // Rung 0 is the source, so the selector's level index and this array agree without an
+        // off-by-one anywhere: `levels[n - 1]` is what rung n draws.
+        out.rungs.push_back(LodRung{chain.sourceSurfaceArea, chain.sourceTriangles});
+        for (const scene::MeshLodLevel& level : chain.levels) {
+            if (!level.mesh.valid() || level.mesh.indices.empty()) {
+                continue;
+            }
+            GpuMesh rung;
+            wgpu::BufferDescriptor vdesc{};
+            vdesc.label = "mesh-lod-vertices";
+            vdesc.size = level.mesh.vertices.size() * sizeof(scene::Vertex);
+            vdesc.usage = wgpu::BufferUsage::Vertex | wgpu::BufferUsage::CopyDst;
+            rung.vertices = context_.device().CreateBuffer(&vdesc);
+            context_.queue().WriteBuffer(rung.vertices, 0, level.mesh.vertices.data(), vdesc.size);
+            wgpu::BufferDescriptor idesc{};
+            idesc.label = "mesh-lod-indices";
+            idesc.size = level.mesh.indices.size() * sizeof(std::uint32_t);
+            idesc.usage = wgpu::BufferUsage::Index | wgpu::BufferUsage::CopyDst;
+            rung.indices = context_.device().CreateBuffer(&idesc);
+            context_.queue().WriteBuffer(rung.indices, 0, level.mesh.indices.data(), idesc.size);
+            rung.indexCount = static_cast<std::uint32_t>(level.mesh.indices.size());
+            out.levels.push_back(std::move(rung));
+            out.rungs.push_back(LodRung{level.surfaceArea, level.triangles});
+        }
+        if (out.levels.empty()) {
+            out.rungs.clear();
+        } else {
+            anyMeshLod_ = true;
+        }
     }
     meshScene_ = &scene;
     meshIdentity_ = scene.identity;
@@ -2582,6 +2628,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ADR-099: which of the scene's water surfaces this entity draws with, resolved once here
         // from the material-program name rather than looked up per draw.
         std::uint32_t water = 0;
+        // ADR-344: which geometry this item draws. `meshes_[entity->mesh]` unless the selector
+        // chose a rung, and a pointer rather than a level index so that every draw site reads one
+        // field and none of them can look the choice up a second time and get a different answer.
+        const GpuMesh* geometry = nullptr;
+        std::uint8_t lodLevel = 0;
         [[nodiscard]] bool skinned() const { return skin.valid(); }
     };
     std::vector<DrawItem> opaque;
@@ -2636,11 +2687,117 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     };
     const std::span<const FrustumPlanes> viewPlanes(cascadePlanes.data(),
                                                     std::min(cascadePlanes.size(), shadowViewList.size()));
+    // ---- ADR-344: which rung each entity draws this frame ---------------------------------------
+    //
+    // The selector and the importance evaluator already existed (ADR-122 / ADR-123 / ADR-124) and
+    // were consumed by nothing: this is the wiring, not a second system. Three properties are worth
+    // stating because each is what keeps an existing scene's frame byte-identical.
+    //
+    //   * The whole block is skipped unless some mesh in this scene carries a chain, and a scene
+    //     only carries one if a node asked. Nothing that does not opt in reaches the selector.
+    //   * The kind bands -- proxy, impostor, cull -- are switched off, because those
+    //     representations are declared and not built. Without that, an entity a hundred metres away
+    //     with a chain would be selected into a billboard that does not exist and would stop being
+    //     drawn. The selector can therefore only return LOD0 or a rung.
+    //   * `forceTopRepresentation` comes from the tier and from the scene's DetailLimits. The
+    //     offline tier sets it, which is §5.9's promise that a render never inherits a realtime
+    //     compromise, and `--render-limits unlimited` sets it too, because that is what the flag
+    //     already means for every other ladder in the engine.
+    const ViewContext lodView = [&] {
+        ViewContext v;
+        // The frozen camera when the view is frozen, which is what `view` already is: reading
+        // scene.camera.position here would choose rungs from where the camera is and draw the frame
+        // from where it was told to stay.
+        v.cameraPosition = toggles_.cameraMotion ? scene.camera.position : frozenCameraPosition_;
+        v.viewProjection = proj * view;
+        v.viewportWidth = static_cast<float>(hdr_.width());
+        v.viewportHeight = static_cast<float>(hdr_.height());
+        v.nearPlane = scene.camera.nearPlane;
+        const float fovY = scene.camera.effectiveFovY();
+        v.pixelsPerUnit = fovY > 0.0f ? v.viewportHeight / (2.0f * std::tan(fovY * 0.5f)) : 0.0f;
+        return v;
+    }();
+    RepresentationPolicy lodPolicy = RepresentationPolicy::forTier(tier_);
+    // Negative rather than zero: a projected radius is never negative, and an entity behind the
+    // camera has a radius of exactly zero, which a threshold of zero would read as "small enough to
+    // cull". An off-screen shadow caster demoted to a representation that does not exist is a
+    // shadow that disappears, and it would have been reached by a comparison that looks disabled.
+    lodPolicy.proxyRadius = -1.0f;
+    lodPolicy.impostorRadius = -1.0f;
+    lodPolicy.cullRadius = -1.0f;
+    if (!scene.detailLimits.proceduralLodRungs) {
+        lodPolicy.forceTopRepresentation = true;
+    }
+    entityLod_ = EntityLodStats{};
+    // Returns the geometry to draw for one entity, and records what it decided.
+    const auto chooseGeometry = [&](const scene::Entity& entity,
+                                    std::size_t thisEntity) -> const GpuMesh* {
+        const GpuMesh* source = &meshes_[entity.mesh];
+        if (!anyMeshLod_ || entity.mesh >= meshLods_.size()) {
+            return source;
+        }
+        const GpuMeshLod& chain = meshLods_[entity.mesh];
+        if (chain.levels.empty()) {
+            return source;
+        }
+        ++entityLod_.drawables;
+        const auto& [lo, hi] = scene.meshBounds(entity.mesh);
+        const glm::mat4 model = entity.transform.matrix();
+        const glm::vec3 centre = glm::vec3(model * glm::vec4((lo + hi) * 0.5f, 1.0f));
+        // The world-space radius of the mesh's bounding sphere under this instance's transform.
+        // Taken from the transformed corners rather than from `length(hi - lo) * 0.5 * scale`,
+        // because a non-uniform scale makes those two different numbers and the corners are the
+        // one that is right.
+        float radius = 0.0f;
+        for (int corner = 0; corner < 8; ++corner) {
+            const glm::vec3 p{(corner & 1) != 0 ? hi.x : lo.x, (corner & 2) != 0 ? hi.y : lo.y,
+                              (corner & 4) != 0 ? hi.z : lo.z};
+            radius = std::max(radius, glm::length(glm::vec3(model * glm::vec4(p, 1.0f)) - centre));
+        }
+        const float areaScale = scene::MeshMetrics::areaScale(entity.transform.scale);
+        ImportanceInput in;
+        in.center = centre;
+        in.radius = radius;
+        in.surfaceArea = chain.rungs.front().surfaceArea * areaScale;
+        in.triangles = chain.rungs.front().triangles;
+        const ImportanceRecord record =
+            ImportanceEvaluator::evaluate(lodView, in, static_cast<std::uint32_t>(thisEntity));
+        // The rungs, at this instance's scale. Rebuilt per entity because two instances of one mesh
+        // at different scales cost differently, which is the whole of what px/triangle measures.
+        std::vector<LodRung> rungs = chain.rungs;
+        for (LodRung& rung : rungs) {
+            rung.surfaceArea *= areaScale;
+        }
+        RepresentationPolicy policy = lodPolicy;
+        policy.hysteresis = chain.hysteresis;
+        const RepresentationChoice choice = representation_.select(record, rungs, policy);
+        // The kinds that are not built map to the coarsest rung rather than to nothing. They cannot
+        // be reached with the radii zeroed above; this is the belt to that brace, and it fails
+        // towards drawing the object.
+        std::size_t level = choice.kind == Representation::FullMesh ? 0
+                            : choice.kind == Representation::MeshLod ? choice.lodLevel
+                                                                     : chain.levels.size();
+        level = std::min(level, chain.levels.size());
+        entityLod_.changed += choice.changed ? 1u : 0u;
+        entityLod_.held += choice.held ? 1u : 0u;
+        entityLod_.sourceTriangles += chain.rungs.front().triangles;
+        entityLod_.drawnTriangles += chain.rungs[level].triangles;
+        if (level < entityLod_.rungCounts.size()) {
+            ++entityLod_.rungCounts[level];
+        }
+        if (level == 0) {
+            return source;
+        }
+        ++entityLod_.demoted;
+        return &chain.levels[level - 1];
+    };
+
     std::uint32_t objectIndex = 0;
     // Writes one 256-byte object slot and returns the draw item, or nothing when the budget is
     // spent. Shared by the camera pass and the shadow-only pass so the two cannot describe the
     // same entity differently.
-    const auto makeItem = [&](const scene::Entity& entity, std::size_t thisEntity) -> std::optional<DrawItem> {
+    const auto makeItem = [&](const scene::Entity& entity, std::size_t thisEntity,
+                              bool shadowOnly = false) -> std::optional<DrawItem> {
         // A backstop, not the budget: ensureObjectCapacity() above sized the buffer for every
         // drawable entity in the scene, so this only fires if that arithmetic and this loop
         // disagree -- and then it drops a draw rather than writing past the staging mirror.
@@ -2710,7 +2867,26 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         diagnostic.submitted = true;
         diagnostic.cullReason = "submitted";
         ++objectIndex;
-        return DrawItem{offset, &entity, depth, skin};
+        DrawItem out{offset, &entity, depth, skin};
+        // A skinned mesh never has a chain (the builder declines them: every level re-orders the
+        // vertex buffer and MeshData::skin is parallel to the one it came from), so this asks only
+        // for static geometry and the skinned path is untouched.
+        // A skinned mesh never has a chain, and an entity the camera cannot see is drawing only
+        // into a shadow map: its projected radius is measured against a frustum it is not in, so
+        // there is no screen size to choose a rung by and LOD0 is the only honest answer.
+        out.geometry = (skin.valid() || shadowOnly) ? &meshes_[entity.mesh]
+                                                    : chooseGeometry(entity, thisEntity);
+        out.lodLevel = 0;
+        if (out.geometry != &meshes_[entity.mesh] && entity.mesh < meshLods_.size()) {
+            const GpuMeshLod& chain = meshLods_[entity.mesh];
+            for (std::size_t k = 0; k < chain.levels.size(); ++k) {
+                if (&chain.levels[k] == out.geometry) {
+                    out.lodLevel = static_cast<std::uint8_t>(k + 1);
+                    break;
+                }
+            }
+        }
+        return out;
     };
     std::size_t entityIndex = 0;
     for (const auto& entity : scene.entities) {
@@ -2776,7 +2952,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             }
             continue;
         }
-        const auto item = makeItem(entity, thisEntity);
+        const auto item = makeItem(entity, thisEntity, /*shadowOnly=*/true);
         if (!item) {
             break; // the camera's own entities have the slots; nothing more to say about it
         }
@@ -2990,7 +3166,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                     continue;
                 }
             }
-            const GpuMesh& mesh = meshes_[item.entity->mesh];
+            const GpuMesh& mesh = *item.geometry;
             if (item.skinned()) {
                 bindSkinned(rp, item, mesh, skinning_->depthPipeline(), skinnedBound);
                 ++stats_.state.pipelineBinds;
@@ -3080,7 +3256,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         ++stats_.state.pipelineBinds;
         bool skinnedBound = false;
         for (const auto& item : opaque) {
-            const GpuMesh& mesh = meshes_[item.entity->mesh];
+            const GpuMesh& mesh = *item.geometry;
             if (item.skinned()) {
                 bindSkinned(rp, item, mesh, skinning_->depthPipeline(), skinnedBound);
                 ++stats_.state.pipelineBinds;
@@ -3183,7 +3359,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         auto drawItems = [&](const std::vector<DrawItem>& items, bool lit) {
             bool skinnedBound = false;
             for (const auto& item : items) {
-                const GpuMesh& mesh = meshes_[item.entity->mesh];
+                const GpuMesh& mesh = *item.geometry;
                 const auto& m = item.entity->material;
                 const bool skinned = lit && item.skinned();
                 if (skinned) {
@@ -3308,7 +3484,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             rp.SetPipeline(water_->pipeline());
             ++stats_.state.pipelineBinds;
             for (const auto& item : water) {
-                const GpuMesh& mesh = meshes_[item.entity->mesh];
+                const GpuMesh& mesh = *item.geometry;
                 const std::uint32_t waterOffset = water_->offset(item.water);
                 rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
                 rp.SetBindGroup(2, water_->bindGroup(), 1, &waterOffset);
@@ -3531,7 +3707,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             if (item.skinned()) {
                 continue;
             }
-            const GpuMesh& mesh = meshes_[item.entity->mesh];
+            const GpuMesh& mesh = *item.geometry;
             rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
             rp.SetVertexBuffer(0, mesh.vertices);
             rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
@@ -3847,6 +4023,17 @@ void SceneRenderer::collectFrameTimings() {
     stats_.culledInstances = stats_.procedural.culledInstances;
     for (std::size_t i = 0; i < 4; ++i) {
         stats_.lodCounts[i] = stats_.procedural.lodCounts[i];
+    }
+    // ADR-344. Copied rather than accumulated, for the reason the comment below gives about running
+    // twice per submitted frame.
+    stats_.entityLod.drawables = entityLod_.drawables;
+    stats_.entityLod.demoted = entityLod_.demoted;
+    stats_.entityLod.changed = entityLod_.changed;
+    stats_.entityLod.held = entityLod_.held;
+    stats_.entityLod.sourceTriangles = entityLod_.sourceTriangles;
+    stats_.entityLod.drawnTriangles = entityLod_.drawnTriangles;
+    for (std::size_t i = 0; i < entityLod_.rungCounts.size() && i < 8; ++i) {
+        stats_.entityLod.rungs[i] = entityLod_.rungCounts[i];
     }
     // Assigned, not accumulated: this runs twice per submitted frame (once before the queue
     // drains and once after), and a counter that adds on each pass would double what it reports.
