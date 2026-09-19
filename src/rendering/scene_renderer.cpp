@@ -2913,6 +2913,22 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             obj.windShape = glm::vec4(1.0f / std::max(w.radius, 1e-3f), w.strength, w.branch, w.foliage);
             obj.windTune = glm::vec4(w.trunk, w.flutter, w.lag, windPrevTime_);
         }
+        // ADR-374: the energy shares the wind body's frame, so it is only meaningful when that
+        // frame exists -- an energy pulse needs to know where the root and the crown are.
+        if (entity.energy.active() && entity.wind.height > 0.0f) {
+            const scene::Entity::TreeEnergy& e = entity.energy;
+            if (!entity.wind.active()) {
+                // The body's frame without its motion: a tree can conduct while standing still.
+                obj.windOrigin = glm::vec4(entity.wind.origin, 1.0f / std::max(entity.wind.height, 1e-3f));
+                obj.windShape.x = 1.0f / std::max(entity.wind.radius, 1e-3f);
+            }
+            obj.energy0 = glm::vec4(e.intensity, e.pulseSpeed, std::max(e.pulseWidth, 1e-3f), e.propagation);
+            obj.energy1 = glm::vec4(e.root, e.trunk, e.branch, e.canopy);
+            obj.energy2 = glm::vec4(e.noiseAmount, e.noiseScale, e.noiseSpeed, e.bloom);
+            obj.energy3 = glm::vec4(e.shimmer, e.shimmerSpeed, e.shimmerScale, e.shimmerVariation);
+            obj.energyA = glm::vec4(e.colorNear, 0.0f);
+            obj.energyB = glm::vec4(e.colorFar, 0.0f);
+        }
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));
         const float depth = -(view * glm::vec4(entity.transform.position, 1.0f)).z;

@@ -367,6 +367,24 @@ struct Entity {
         [[nodiscard]] bool active() const { return strength > 0.0f; }
     };
     WindBody wind;
+    // ADR-374: what the tree does when it is not moving. Shares `wind`'s origin/height/radius --
+    // one body, one frame, so the two cannot disagree about where the tree is. Both intensities
+    // default to 0, which is the state of every entity in every scene that has not asked.
+    struct TreeEnergy {
+        float intensity = 0.0f;       // the conducted pulse; 0 is off
+        float pulseSpeed = 0.18f;     // Hz of the slow breathing over the whole conduction
+        float pulseWidth = 0.28f;     // fraction of the cycle that is lit
+        float propagation = 0.16f;    // body heights per second the band climbs
+        float root = 1.0f, trunk = 1.0f, branch = 0.85f, canopy = 0.6f;
+        float noiseAmount = 0.35f, noiseScale = 0.08f, noiseSpeed = 2.0f;
+        float bloom = 1.0f;           // how much of it reaches the emission target
+        float shimmer = 0.0f;         // the canopy's travelling wave; 0 is off
+        float shimmerSpeed = 0.05f, shimmerScale = 0.035f, shimmerVariation = 0.5f;
+        glm::vec3 colorNear{0.20f, 0.85f, 0.55f};
+        glm::vec3 colorFar{0.35f, 0.75f, 1.00f};
+        [[nodiscard]] bool active() const { return intensity > 0.0f || shimmer > 0.0f; }
+    };
+    TreeEnergy energy;
 };
 
 // ---- lights ---------------------------------------------------------------------------------

@@ -3756,6 +3756,30 @@ void Composition::applyWindBodies() {
         w.height = std::max(hi.y - lo.y, 1e-3f);
         w.radius = std::max(std::max(0.5f * (hi.x - lo.x), 0.5f * (hi.z - lo.z)), 1e-3f);
 
+        // ADR-374: the energy rides the same span as the wind, so it is stamped in the same walk.
+        Entity::TreeEnergy te;
+        {
+            auto pk = [](const params::Parameter<float>* p, float fb) { return p != nullptr ? p->value() : fb; };
+            const TreeEnergySettings& es = owner.energy;
+            te.intensity = pk(owner.energyIntensityParam, es.intensity);
+            te.pulseSpeed = pk(owner.energyPulseSpeedParam, es.pulseSpeed);
+            te.pulseWidth = pk(owner.energyPulseWidthParam, es.pulseWidth);
+            te.propagation = pk(owner.energyPropagationParam, es.propagation);
+            te.root = pk(owner.energyRootParam, es.root);
+            te.trunk = pk(owner.energyTrunkParam, es.trunk);
+            te.branch = pk(owner.energyBranchParam, es.branch);
+            te.canopy = pk(owner.energyCanopyParam, es.canopy);
+            te.noiseAmount = pk(owner.energyNoiseParam, es.noiseAmount);
+            te.noiseScale = es.noiseScale;
+            te.noiseSpeed = es.noiseSpeed;
+            te.bloom = pk(owner.energyBloomParam, es.bloom);
+            te.shimmer = pk(owner.shimmerParam, es.shimmer);
+            te.shimmerSpeed = pk(owner.shimmerSpeedParam, es.shimmerSpeed);
+            te.shimmerScale = pk(owner.shimmerScaleParam, es.shimmerScale);
+            te.shimmerVariation = es.shimmerVariation;
+            te.colorNear = owner.energyColorNearParam != nullptr ? owner.energyColorNearParam->value() : es.colorNear;
+            te.colorFar = owner.energyColorFarParam != nullptr ? owner.energyColorFarParam->value() : es.colorFar;
+        }
         WindBodySpan span;
         span.node = body;
         for (std::size_t n : members) {
@@ -3767,6 +3791,7 @@ void Composition::applyWindBodies() {
             span.entities.emplace_back(r.firstEntity, last - r.firstEntity);
             for (std::size_t e = r.firstEntity; e < last; ++e) {
                 scene_.entities[e].wind = w;
+                scene_.entities[e].energy = te;
             }
         }
         windBodies_.push_back(std::move(span));
@@ -3789,6 +3814,12 @@ void Composition::refreshWindBodyAmounts() {
         const float foliage = pick(owner.windFoliageParam, owner.wind.foliage);
         const float flutter = pick(owner.windFlutterParam, owner.wind.flutter);
         const float lag = pick(owner.windLagParam, owner.wind.lag);
+        auto pk = [](const params::Parameter<float>* p, float fb) { return p != nullptr ? p->value() : fb; };
+        const float eIntensity = pk(owner.energyIntensityParam, owner.energy.intensity);
+        const float eShimmer = pk(owner.shimmerParam, owner.energy.shimmer);
+        const float ePulseSpeed = pk(owner.energyPulseSpeedParam, owner.energy.pulseSpeed);
+        const float ePropagation = pk(owner.energyPropagationParam, owner.energy.propagation);
+        const float eBloom = pk(owner.energyBloomParam, owner.energy.bloom);
         for (const auto& [first, count] : span.entities) {
             for (std::size_t e = first; e < first + count && e < scene_.entities.size(); ++e) {
                 Entity::WindBody& w = scene_.entities[e].wind;
@@ -3798,6 +3829,12 @@ void Composition::refreshWindBodyAmounts() {
                 w.foliage = foliage;
                 w.flutter = flutter;
                 w.lag = lag;
+                Entity::TreeEnergy& te2 = scene_.entities[e].energy;
+                te2.intensity = eIntensity;
+                te2.shimmer = eShimmer;
+                te2.pulseSpeed = ePulseSpeed;
+                te2.propagation = ePropagation;
+                te2.bloom = eBloom;
             }
         }
     }
@@ -3855,6 +3892,27 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     // a scene full of rocks does not grow six inert sliders each. Strength 0 is a genuine no-op and
     // is the default, so a node that declares `"wind": {}` still moves nothing until it is turned
     // up -- which is the point: "off" has to be somewhere a user can leave it.
+    // ADR-374: the tree's emissive life. Registered when the node declares either the wind body or
+    // the energy, because the two are authored together on the same group and somebody who has
+    // given a tree wind is the person who will next want it to glow.
+    if (node.energyAuthored || node.windAuthored) {
+        const std::string e = base + "energy/";
+        node.energyIntensityParam = &params_->add(floatDesc(e + "intensity", node.energy.intensity, 0.0f, 20.0f, 0.0f, 4.0f));
+        node.energyPulseSpeedParam = &params_->add(floatDesc(e + "pulseSpeed", node.energy.pulseSpeed, 0.0f, 8.0f, 0.0f, 1.0f));
+        node.energyPulseWidthParam = &params_->add(floatDesc(e + "pulseWidth", node.energy.pulseWidth, 0.01f, 1.0f, 0.02f, 0.8f));
+        node.energyPropagationParam = &params_->add(floatDesc(e + "propagation", node.energy.propagation, -4.0f, 4.0f, 0.0f, 1.0f));
+        node.energyRootParam = &params_->add(floatDesc(e + "root", node.energy.root, 0.0f, 4.0f, 0.0f, 2.0f));
+        node.energyTrunkParam = &params_->add(floatDesc(e + "trunk", node.energy.trunk, 0.0f, 4.0f, 0.0f, 2.0f));
+        node.energyBranchParam = &params_->add(floatDesc(e + "branch", node.energy.branch, 0.0f, 4.0f, 0.0f, 2.0f));
+        node.energyCanopyParam = &params_->add(floatDesc(e + "canopy", node.energy.canopy, 0.0f, 4.0f, 0.0f, 2.0f));
+        node.energyNoiseParam = &params_->add(floatDesc(e + "noise", node.energy.noiseAmount, 0.0f, 1.0f, 0.0f, 1.0f));
+        node.energyBloomParam = &params_->add(floatDesc(e + "bloom", node.energy.bloom, 0.0f, 4.0f, 0.0f, 2.0f));
+        node.shimmerParam = &params_->add(floatDesc(e + "shimmer", node.energy.shimmer, 0.0f, 4.0f, 0.0f, 1.0f));
+        node.shimmerSpeedParam = &params_->add(floatDesc(e + "shimmerSpeed", node.energy.shimmerSpeed, 0.0f, 2.0f, 0.0f, 0.5f));
+        node.shimmerScaleParam = &params_->add(floatDesc(e + "shimmerScale", node.energy.shimmerScale, 0.001f, 1.0f, 0.005f, 0.2f));
+        node.energyColorNearParam = &params_->add(vec3Desc(e + "colorNear", node.energy.colorNear, 0.0f, 8.0f, 0.0f, 2.0f));
+        node.energyColorFarParam = &params_->add(vec3Desc(e + "colorFar", node.energy.colorFar, 0.0f, 8.0f, 0.0f, 2.0f));
+    }
     if (node.windAuthored) {
         const std::string w = base + "wind/";
         node.windStrengthParam = &params_->add(floatDesc(w + "strength", node.wind.strength, 0.0f, 8.0f, 0.0f, 2.0f));
@@ -3974,6 +4032,17 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
                   "wind/lag"}) {
                 params_->remove(base + suffix);
             }
+        }
+        if (node.energyAuthored || node.windAuthored) {
+            for (const char* suffix :
+                 {"energy/intensity", "energy/pulseSpeed", "energy/pulseWidth", "energy/propagation",
+                  "energy/root", "energy/trunk", "energy/branch", "energy/canopy", "energy/noise",
+                  "energy/bloom", "energy/shimmer", "energy/shimmerSpeed", "energy/shimmerScale",
+                  "energy/colorNear", "energy/colorFar"}) {
+                params_->remove(base + suffix);
+            }
+            node.energyIntensityParam = nullptr;
+            node.shimmerParam = nullptr;
             node.windStrengthParam = nullptr;
             node.windTrunkParam = nullptr;
             node.windBranchParam = nullptr;
@@ -7714,6 +7783,36 @@ nlohmann::json Composition::toJson() const {
             n["canopySource"] = node.canopySource;
             n["canopyFrom"] = node.canopyFrom;
         }
+        // ADR-374: the tree's emissive life, written only when declared.
+        if (node.energyAuthored) {
+            auto eb = [](const params::Parameter<float>* p, float fallback) {
+                return p != nullptr ? p->base() : fallback;
+            };
+            auto ec = [](const params::Parameter<glm::vec3>* p, const glm::vec3& fallback) {
+                const glm::vec3 v = p != nullptr ? p->base() : fallback;
+                return json::array({v.x, v.y, v.z});
+            };
+            json e;
+            e["intensity"] = eb(node.energyIntensityParam, node.energy.intensity);
+            e["pulseSpeed"] = eb(node.energyPulseSpeedParam, node.energy.pulseSpeed);
+            e["pulseWidth"] = eb(node.energyPulseWidthParam, node.energy.pulseWidth);
+            e["propagation"] = eb(node.energyPropagationParam, node.energy.propagation);
+            e["root"] = eb(node.energyRootParam, node.energy.root);
+            e["trunk"] = eb(node.energyTrunkParam, node.energy.trunk);
+            e["branch"] = eb(node.energyBranchParam, node.energy.branch);
+            e["canopy"] = eb(node.energyCanopyParam, node.energy.canopy);
+            e["noise"] = eb(node.energyNoiseParam, node.energy.noiseAmount);
+            e["noiseScale"] = node.energy.noiseScale;
+            e["noiseSpeed"] = node.energy.noiseSpeed;
+            e["bloom"] = eb(node.energyBloomParam, node.energy.bloom);
+            e["shimmer"] = eb(node.shimmerParam, node.energy.shimmer);
+            e["shimmerSpeed"] = eb(node.shimmerSpeedParam, node.energy.shimmerSpeed);
+            e["shimmerScale"] = eb(node.shimmerScaleParam, node.energy.shimmerScale);
+            e["shimmerVariation"] = node.energy.shimmerVariation;
+            e["colorNear"] = ec(node.energyColorNearParam, node.energy.colorNear);
+            e["colorFar"] = ec(node.energyColorFarParam, node.energy.colorFar);
+            n["energy"] = std::move(e);
+        }
         if (node.windAuthored) {
             auto base = [](const params::Parameter<float>* p, float fallback) {
                 return p != nullptr ? p->base() : fallback;
@@ -8830,6 +8929,38 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             }
             if (item.contains("canopyFrom") && item.at("canopyFrom").is_number()) {
                 node.canopyFrom = item.at("canopyFrom").get<float>();
+            }
+            // ADR-374: the tree's emissive life. Absent is off.
+            if (item.contains("energy") && item.at("energy").is_object()) {
+                const nlohmann::json& ej = item.at("energy");
+                node.energyAuthored = true;
+                auto f = [&ej](const char* key, float& out) {
+                    if (ej.contains(key) && ej.at(key).is_number()) { out = ej.at(key).get<float>(); }
+                };
+                auto c3 = [&ej](const char* key, glm::vec3& out) {
+                    if (ej.contains(key) && ej.at(key).is_array() && ej.at(key).size() == 3) {
+                        out = glm::vec3(ej.at(key)[0].get<float>(), ej.at(key)[1].get<float>(),
+                                        ej.at(key)[2].get<float>());
+                    }
+                };
+                f("intensity", node.energy.intensity);
+                f("pulseSpeed", node.energy.pulseSpeed);
+                f("pulseWidth", node.energy.pulseWidth);
+                f("propagation", node.energy.propagation);
+                f("root", node.energy.root);
+                f("trunk", node.energy.trunk);
+                f("branch", node.energy.branch);
+                f("canopy", node.energy.canopy);
+                f("noise", node.energy.noiseAmount);
+                f("noiseScale", node.energy.noiseScale);
+                f("noiseSpeed", node.energy.noiseSpeed);
+                f("bloom", node.energy.bloom);
+                f("shimmer", node.energy.shimmer);
+                f("shimmerSpeed", node.energy.shimmerSpeed);
+                f("shimmerScale", node.energy.shimmerScale);
+                f("shimmerVariation", node.energy.shimmerVariation);
+                c3("colorNear", node.energy.colorNear);
+                c3("colorFar", node.energy.colorFar);
             }
             // ADR-360: the wind body. Absent is the ordinary state, not a fault.
             if (item.contains("wind") && item.at("wind").is_object()) {

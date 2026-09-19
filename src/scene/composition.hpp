@@ -233,6 +233,18 @@ struct WindBodySettings {
     float lag = 0.25f;      // seconds the body's whole-mass lean trails the field
 };
 
+// ADR-374: the tree's emissive life, authored on the same GROUP node as the wind body and stamped
+// onto the same meshes, for the same reason: one body, one frame.
+struct TreeEnergySettings {
+    float intensity = 0.0f;
+    float pulseSpeed = 0.18f, pulseWidth = 0.28f, propagation = 0.16f;
+    float root = 1.0f, trunk = 1.0f, branch = 0.85f, canopy = 0.6f;
+    float noiseAmount = 0.35f, noiseScale = 0.08f, noiseSpeed = 2.0f, bloom = 1.0f;
+    float shimmer = 0.0f, shimmerSpeed = 0.05f, shimmerScale = 0.035f, shimmerVariation = 0.5f;
+    glm::vec3 colorNear{0.20f, 0.85f, 0.55f};
+    glm::vec3 colorFar{0.35f, 0.75f, 1.00f};
+};
+
 struct CompositionNode {
     std::string name;
     NodeKind kind = NodeKind::Gltf;
@@ -256,6 +268,25 @@ struct CompositionNode {
     // which is what keeps a scene written before this key existed byte-identical on a re-save.
     WindBodySettings wind;
     bool windAuthored = false;
+    // ADR-374. Authored alongside the wind body; `energyAuthored` keeps "wrote nothing" apart from
+    // "wrote the defaults", which is what keeps a re-save byte-identical.
+    TreeEnergySettings energy;
+    bool energyAuthored = false;
+    params::Parameter<float>* energyIntensityParam = nullptr;
+    params::Parameter<float>* energyPulseSpeedParam = nullptr;
+    params::Parameter<float>* energyPulseWidthParam = nullptr;
+    params::Parameter<float>* energyPropagationParam = nullptr;
+    params::Parameter<float>* energyRootParam = nullptr;
+    params::Parameter<float>* energyTrunkParam = nullptr;
+    params::Parameter<float>* energyBranchParam = nullptr;
+    params::Parameter<float>* energyCanopyParam = nullptr;
+    params::Parameter<float>* energyNoiseParam = nullptr;
+    params::Parameter<float>* energyBloomParam = nullptr;
+    params::Parameter<float>* shimmerParam = nullptr;
+    params::Parameter<float>* shimmerSpeedParam = nullptr;
+    params::Parameter<float>* shimmerScaleParam = nullptr;
+    params::Parameter<glm::vec3>* energyColorNearParam = nullptr;
+    params::Parameter<glm::vec3>* energyColorFarParam = nullptr;
     // ADR-370: for a Particles node, the node whose canopy it sheds from. Empty means the authored
     // emitter box stands. `canopyFrom` is where the crown starts, as a fraction of the body's
     // height, so leaves do not fall out of the trunk.
