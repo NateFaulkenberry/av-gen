@@ -780,3 +780,56 @@ TEST_CASE("A toolbar row knows when the next control will not fit", "[ui][wrap]"
     // before "Catch playhead" ended past the edge already.
     CHECK_FALSE(toolbarItemFits(930.0f, 120.0f, 8.0f, 980.0f));
 }
+
+// ---- the arrow keys the transport takes off Dear ImGui -------------------------------------------
+//
+// The owner reported that ADR-357's arrow stepping worked and *also* walked the focus ring across
+// the transport's own buttons. Both were true at once: the application forwarded every event to
+// ImGui before deciding whether a shortcut claimed it, so `NavEnableKeyboard` had already moved the
+// focus by the time the transport consumed the key. The fix decides before forwarding, and this is
+// the decision.
+TEST_CASE("The transport takes the arrow keys off ImGui, except where ImGui needs them",
+          "[unit][ui][shortcuts]") {
+    using avgen::ui::transportOwnsArrowKey;
+
+    SECTION("a plain arrow with nothing focused is the transport's") {
+        CHECK(transportOwnsArrowKey(true, false, false, false, false));
+    }
+
+    SECTION("anything that is not an arrow is left alone") {
+        // The guard must not swallow the rest of the keyboard on its way past.
+        CHECK_FALSE(transportOwnsArrowKey(false, false, false, false, false));
+    }
+
+    SECTION("Cmd+arrow belongs to whoever wants it") {
+        CHECK_FALSE(transportOwnsArrowKey(true, true, false, false, false));
+    }
+
+    SECTION("typing keeps the arrows, because they move the caret") {
+        CHECK_FALSE(transportOwnsArrowKey(true, false, true, false, false));
+    }
+
+    SECTION("a slider mid-drag or an open combo keeps them") {
+        CHECK_FALSE(transportOwnsArrowKey(true, false, false, true, false));
+    }
+
+    // The case the fix would otherwise break, and the reason `popupOpen` exists as its own input: an
+    // open menu is a popup *window*, not an active *item*, so `IsAnyItemActive()` is false while the
+    // menu plainly owns the arrows. Taking them here would have made every menu unnavigable by
+    // keyboard -- trading the reported regression for a worse one.
+    SECTION("an open menu keeps them, and is not covered by the active-item test") {
+        CHECK_FALSE(transportOwnsArrowKey(true, false, false, false, true));
+        // Explicitly: no active item, yet still not the transport's.
+        const bool widgetActive = false;
+        CHECK_FALSE(transportOwnsArrowKey(true, false, false, widgetActive, true));
+    }
+
+    SECTION("the three exceptions are independent, not a single flag") {
+        // A control that comes out the other way: if any one of them alone did not block, this
+        // would pass with two of the three wired to nothing.
+        CHECK_FALSE(transportOwnsArrowKey(true, false, true, false, false));
+        CHECK_FALSE(transportOwnsArrowKey(true, false, false, true, false));
+        CHECK_FALSE(transportOwnsArrowKey(true, false, false, false, true));
+        CHECK(transportOwnsArrowKey(true, false, false, false, false));
+    }
+}
