@@ -63,6 +63,13 @@ constexpr float kPlayheadHalfWidth = 6.0f;
 constexpr float kPlayheadHandleHeight = 13.0f;
 // The shortest a block may be trimmed to. A block of zero length cannot be grabbed again, so a
 // trim that reached zero would be a delete with no way back -- and this panel has no undo.
+// `snapMode_` is stored as an int and `ui::arrowNudge` reads it as one (ADR-356). These pin the two
+// spellings together: the pure helper cannot include the sequencer to find out what 2 means, so the
+// place that can is the place that checks.
+static_assert(static_cast<int>(seq::SnapMode::Off) == 0);
+static_assert(static_cast<int>(seq::SnapMode::Frames) == 1);
+static_assert(static_cast<int>(seq::SnapMode::Beats) == 2);
+static_assert(static_cast<int>(seq::SnapMode::Markers) == 3);
 constexpr double kMinBlockSeconds = 0.25;
 // `splitSection`'s own minimum, named here so the menu's enabled test and the operation agree.
 constexpr double kMinSectionSeconds = 0.25;
@@ -3881,10 +3888,13 @@ double SequencePanel::snapSection(const app::Engine& engine, double seconds) con
         return seq::snapTime(seconds, seq::SnapMode::Beats, beats);
     }
     // Bars: every fourth beat, which is the same assumption `seq::BakeOptions::beatsPerBar` makes
-    // and is stated in one place there. The returned value is still a beat's own time.
+    // and is stated in one place there. It is now *read* from there rather than restated as a 4 --
+    // the comment promised one place and there were two, and the arrow keys' bar step (ADR-356)
+    // would have made it three. The returned value is still a beat's own time.
+    const auto perBar = static_cast<std::size_t>(std::max(1, seq::BakeOptions{}.beatsPerBar));
     std::vector<double> bars;
-    bars.reserve(beats.size() / 4 + 1);
-    for (std::size_t i = 0; i < beats.size(); i += 4) {
+    bars.reserve(beats.size() / perBar + 1);
+    for (std::size_t i = 0; i < beats.size(); i += perBar) {
         bars.push_back(beats[i]);
     }
     return seq::snapTime(seconds, seq::SnapMode::Beats, bars);

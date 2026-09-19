@@ -130,6 +130,18 @@ public:
     };
     [[nodiscard]] const StripRect& stripRect() const { return stripRect_; }
 
+    // ---- what the arrow keys step by (ADR-356) ---------------------------------------------------
+    //
+    // The transport owns the arrow keys and always has; what it did not have was any idea what grid
+    // the author was working on, so it stepped a frame plain and a beat with Shift whatever the
+    // strip was snapped to. These two are how it asks. Read-only, and on the panel rather than
+    // duplicated into the application, because the snap mode is the *sequencer's* setting and a
+    // second copy of it is a second thing to keep in step.
+    [[nodiscard]] int snapMode() const { return snapMode_; }
+    // The stretch of the piece the strip is currently showing, in seconds. Zero until the strip has
+    // been drawn once, which the Off arm treats as "no view yet" rather than as a zero-length step.
+    [[nodiscard]] double visibleSpanSeconds() const { return lastSpan_; }
+
 private:
     void drawToolbar(app::Engine& engine);
     void drawImportPopup(app::Engine& engine);

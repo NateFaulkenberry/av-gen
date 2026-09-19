@@ -49,10 +49,13 @@ inline constexpr const char* kToggleLocalSpace = "X";
 inline constexpr const char* kPlayPause = "Space";
 inline constexpr const char* kGoToStart = "Return";
 inline constexpr const char* kGoToEnd = "End";
-inline constexpr const char* kStepFrameBack = "Left";
-inline constexpr const char* kStepFrameForward = "Right";
-inline constexpr const char* kStepBeatBack = "Shift+Left";
-inline constexpr const char* kStepBeatForward = "Shift+Right";
+// The arrows step by the sequencer's active snap unit and Shift by the next unit up (ADR-356), so
+// these are no longer named for a frame and a beat: what they move by is a setting, and a constant
+// that said "Step frame back" would be wrong in three of the four snap modes.
+inline constexpr const char* kNudgeBack = "Left";
+inline constexpr const char* kNudgeForward = "Right";
+inline constexpr const char* kNudgeBackCoarse = "Shift+Left";
+inline constexpr const char* kNudgeForwardCoarse = "Shift+Right";
 inline constexpr const char* kPreviousMarker = "Up";
 inline constexpr const char* kNextMarker = "Down";
 inline constexpr const char* kToggleLoop = "L";

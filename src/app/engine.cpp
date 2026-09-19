@@ -2820,7 +2820,7 @@ double Engine::beatBoundary(double fromSeconds, int direction) const {
     return std::max(0.0, next * beatSeconds);
 }
 
-double Engine::markerBoundary(double fromSeconds, int direction) const {
+double Engine::markerBoundary(double fromSeconds, int direction, bool sectionsOnly) const {
     if (direction == 0) {
         return fromSeconds;
     }
@@ -2829,6 +2829,9 @@ double Engine::markerBoundary(double fromSeconds, int direction) const {
     bool found = false;
     for (const seq::Marker& marker : sequence_.markers) {
         if (marker.kind == seq::MarkerKind::Beat) {
+            continue;
+        }
+        if (sectionsOnly && marker.kind != seq::MarkerKind::Section) {
             continue;
         }
         if (direction > 0) {
@@ -2844,8 +2847,16 @@ double Engine::markerBoundary(double fromSeconds, int direction) const {
     return found ? best : fromSeconds;
 }
 
-void Engine::stepMarkers(int direction) {
-    const double target = markerBoundary(transport_.positionSeconds(), direction);
+void Engine::stepMarkers(int direction, bool sectionsOnly) {
+    // A piece with no section markers gets every marker instead. Shift+arrow going nowhere at all
+    // would read as a broken key rather than as "this song has no sections".
+    const bool anySections =
+        sectionsOnly && std::any_of(sequence_.markers.begin(), sequence_.markers.end(),
+                                    [](const seq::Marker& m) {
+                                        return m.kind == seq::MarkerKind::Section;
+                                    });
+    const double target =
+        markerBoundary(transport_.positionSeconds(), direction, sectionsOnly && anySections);
     if (target != transport_.positionSeconds()) {
         seekSeconds(target);
     }

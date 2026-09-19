@@ -638,6 +638,120 @@ enum class SliceGrid : std::uint8_t { Strip, Section };
     }
 }
 
+// ---- what an arrow key moves the playhead by (ADR-356) --------------------------------------------
+//
+// **The step is the active snap mode's own unit, and Shift is the next unit up.** That is the whole
+// idea, and it is the reason this is worth a function rather than four lines at a key handler: the
+// arrows were bound to a *fixed* pair -- a frame plain, a beat with Shift -- which ignored the grid
+// the strip was actually snapped to, so somebody working in beats got frames from the plain key and
+// somebody working in frames got beats from the shifted one. Exactly backwards in one of the two.
+//
+//   | snap mode | arrow           | Shift + arrow                  |
+//   |-----------|-----------------|--------------------------------|
+//   | Beats     | one beat        | one bar (`beatsPerBar`)        |
+//   | Frames    | one frame       | one second                     |
+//   | Markers   | one marker      | one *section* marker           |
+//   | Off       | 1% of the view  | 10% of the view                |
+//
+// It returns a *unit and a count* rather than a new time, and that is deliberate. The transport
+// already knows how to walk a beat grid -- `Engine::beatBoundary` uses the analysed beats where
+// there are any and the tempo where there are not -- and a pure function handed a vector of beats
+// could not reproduce that fallback. So this decides the thing that is a decision, and the existing
+// stepping does the thing it already does correctly.
+
+enum class NudgeUnit : std::uint8_t {
+    Frames,
+    Beats,
+    Markers,
+    Seconds, // the Off arm: no grid, so the step is a distance
+};
+
+struct Nudge {
+    NudgeUnit unit = NudgeUnit::Frames;
+    int count = 0;         // signed, for Frames / Beats / Markers
+    double seconds = 0.0;  // signed, for NudgeUnit::Seconds
+    // Markers with Shift. The marker list is mostly cues; the section boundaries are the structural
+    // landmarks within it, and they are what "the next unit up" means when the unit is a place.
+    bool sectionsOnly = false;
+};
+
+// 1% of the visible span, and 10% for the coarse step.
+//
+// **View-relative, and only for Off.** With no grid there is no unit, so the only thing a step can
+// be proportional to is what is on screen -- and a step that is a fixed number of seconds is either
+// invisible at a four-minute view or enormous at a ten-second one. At a 10 s view these are 0.1 s
+// and 1 s; at a 240 s view they are 2.4 s and 24 s, which is the same *gesture* at both.
+inline constexpr double kNudgeViewFraction = 0.01;
+inline constexpr double kNudgeCoarseViewFraction = 0.10;
+// What Off falls back to before the strip has ever been drawn and there is no visible span to be a
+// fraction of.
+inline constexpr double kNudgeFallbackSeconds = 0.1;
+
+// `snapMode` is the strip's `snapMode_`, which is `seq::SnapMode`'s ordering as an int: 0 Off,
+// 1 Frames, 2 Beats, 3 Markers. The caller static_asserts that against the enum; this header
+// deliberately does not include the sequencer to find out.
+//
+// `direction` is -1 or +1. `coarse` is Shift. `beatsPerBar` comes from `seq::BakeOptions` rather
+// than being spelled 4 here, so that the day time-signature detection lands, one default changes and
+// this follows it.
+[[nodiscard]] inline Nudge arrowNudge(int snapMode, int direction, bool coarse, double fps,
+                                      double viewSpanSeconds, int beatsPerBar = 4) {
+    Nudge nudge;
+    const int sign = direction < 0 ? -1 : 1;
+    const int bar = beatsPerBar > 0 ? beatsPerBar : 1;
+    switch (std::clamp(snapMode, 0, 3)) {
+    case 1: // Frames
+        nudge.unit = NudgeUnit::Frames;
+        // A second, in frames. Not four frames: the unit above a frame is a second in every editor
+        // that has a frame counter, and four frames is not a duration anybody thinks in.
+        nudge.count = sign * (coarse ? std::max(1, static_cast<int>(std::lround(fps > 0.0 ? fps : 60.0)))
+                                     : 1);
+        break;
+    case 2: // Beats
+        nudge.unit = NudgeUnit::Beats;
+        nudge.count = sign * (coarse ? bar : 1);
+        break;
+    case 3: // Markers
+        nudge.unit = NudgeUnit::Markers;
+        nudge.count = sign;
+        // **Shift jumps to the next section rather than four markers along.** Marker spacing is
+        // irregular, so "four markers" is a distance nobody can predict -- it could be four bars or
+        // four minutes. A section boundary is the coarser *landmark*, which is the same relationship
+        // a bar has to a beat, so somebody arriving from Beats finds Shift meaning what it meant
+        // there: the bigger structural step. The caller falls back to plain marker stepping where a
+        // piece has no sections, so Shift is never a dead key.
+        nudge.sectionsOnly = coarse;
+        break;
+    case 0: // Off
+    default: {
+        nudge.unit = NudgeUnit::Seconds;
+        const double fraction = coarse ? kNudgeCoarseViewFraction : kNudgeViewFraction;
+        double step = viewSpanSeconds > 0.0 ? viewSpanSeconds * fraction
+                                            : kNudgeFallbackSeconds * (coarse ? 10.0 : 1.0);
+        // **Off must still move.** A fraction of a very short view can come out below a frame, and
+        // an arrow key that rounds to nothing is a feature that vanished with the grid -- which is
+        // the one thing turning snapping off must not do.
+        const double oneFrame = 1.0 / (fps > 0.0 ? fps : 60.0);
+        step = std::max(step, oneFrame);
+        nudge.seconds = static_cast<double>(sign) * step;
+        break;
+    }
+    }
+    return nudge;
+}
+
+// The Off arm's landing place, clamped to the piece.
+//
+// Left at zero stops at zero and right past the end stops at the end: a playhead that ran negative
+// would be a position no clock in the application can represent, and one that ran past the end would
+// leave the transport and the strip disagreeing about where the piece was. The grid arms clamp in
+// `Engine::seekSeconds`, which goes through `Transport::seek`; this one is here so that the arm with
+// no grid is clamped by something a test can reach.
+[[nodiscard]] inline double nudgedTime(double seconds, double delta, double durationSeconds) {
+    const double end = durationSeconds > 0.0 ? durationSeconds : 0.0;
+    return std::clamp(seconds + delta, 0.0, end);
+}
+
 // ---- when the canvas admits it is working ------------------------------------------------------
 //
 // The rule the brief asks for, as arithmetic: nothing at all under the threshold, then a fade in.

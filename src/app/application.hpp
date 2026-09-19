@@ -464,6 +464,9 @@ private:
     // the editor's because they are allowed to repeat and because they mean the same thing whichever
     // panel has the focus.
     bool handleTransportShortcut(const SDL_Event& event);
+    // One press of Left or Right: the playhead moves by the sequencer's current snap unit, or by the
+    // next unit up with Shift (ADR-356). `direction` is -1 or +1.
+    void nudgePlayhead(int direction, bool coarse);
 
     // Reads `camera/position` and `camera/target`. Returns the scene camera's own pose when the
     // parameters are missing, so a gesture over a scene without them still does something sensible.

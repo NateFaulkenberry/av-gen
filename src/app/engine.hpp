@@ -577,8 +577,15 @@ public:
     // The next or previous marker on the sequence, skipping the `Beat` markers -- those are the beat
     // grid drawn on the strip, there are thousands of them, and "jump to the next marker" means the
     // next *place*, not the next beat. Returns the position unchanged when there is none that way.
-    [[nodiscard]] double markerBoundary(double fromSeconds, int direction) const;
-    void stepMarkers(int direction);
+    //
+    // `sectionsOnly` narrows it to the `Section` markers: the structural landmarks, which is what
+    // Shift+arrow means in Markers snap mode (ADR-356). A marker list is mostly cues, and skipping
+    // to the next *section* is the coarser step in the same sense a bar is coarser than a beat.
+    [[nodiscard]] double markerBoundary(double fromSeconds, int direction,
+                                        bool sectionsOnly = false) const;
+    // Falls back to every marker when `sectionsOnly` is asked for and the piece has no sections, so
+    // the coarse key is never a dead one.
+    void stepMarkers(int direction, bool sectionsOnly = false);
     void setVolume(float volume);
     [[nodiscard]] float volume() const;
 
