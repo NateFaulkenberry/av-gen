@@ -161,6 +161,59 @@ So the volumetric beam is **not built**, and §18's four Volumetric Beam paramet
 registered**. A knob that does nothing is the same defect as a system with no knobs, one layer
 along, and this project shipped four unreachable capabilities in a single day.
 
+## The measurement
+
+Two cameras, the before taken from 1e9f1b74 at its own key angles (azimuth -39.4, elevation 52.8 --
+which is what `direction: [0.387, -0.806, -0.472]` works out to), the after at its own (-50, 35).
+`tools/light_probe.py` partitions subject pixels by the sign of n.L against the key, out of the
+normal AOV, so the partition is made of the thing under test and moves when the key moves.
+
+|                           | before | after  | no-key control |
+|---------------------------|--------|--------|----------------|
+| wide  `shadowed_frac`     | 0.0000 | 0.5099 | n/a            |
+| wide  `key_to_shadow`     | 2.394  | 12.760 | **0.586**      |
+| wide  `shadow_floor`      | 0.1798 | 0.0534 | 0.0550         |
+| wide  `rms_contrast`      | 0.0846 | 0.1134 |                |
+| wide  `p99`               | 0.4393 | 0.6749 |                |
+| under `shadowed_frac`     | 0.0000 | 0.5838 |                |
+| under `key_to_shadow`     | 2.535  | 25.112 |                |
+| under `shadow_floor`      | 0.2588 | 0.0267 |                |
+
+The no-key arm does not merely fall short of the band: the ratio **inverts**, because with the key
+off the surfaces facing where it was are the ones facing away from the fill. Key-facing mean
+luminance goes 0.27113 to 0.01047, a factor of 25.9.
+
+Two more controls, on the after:
+
+* `_ck-ctl-noshadow` — the key lit, `castsShadow` off. Key-facing mean 0.31702 against 0.26894 with
+  shadows on: **14.5% of the light on key-facing surfaces is occluded by the scene's own geometry**,
+  which is the self-shadowing and branch layering §14 asks for, as a number.
+* `_ck-ctl-nofill` — `shadow_floor` 0.0534 to 0.1544. The fill is measurably what keeps the shadow
+  side readable, which is §6.
+
+### Cost
+
+1920x1080, tier high, engine GPU timestamps, minima over samples (ADR-170), n=10 and n=4:
+
+| | shadow phase | shadow draws | GPU frame |
+|---|---|---|---|
+| shipping (`shadowRange` 420) | 23.20 ms | 74 | 49.74 ms |
+| control (`shadowRange` 0)    | 22.09 ms | 72 | — |
+
+**+1.11 ms, 5%.** The caster list does not depend on where the cascades are fitted, so before this
+branch the renderer was already spending twenty-two milliseconds a frame — 44% of its GPU time —
+rasterising 3,203,880 triangles into shadow maps that every fragment in the picture looked up
+outside of. The change did not add the cost; it made the cost buy something.
+
+Both numbers are **contended** and are an attribution rather than a benchmark: another agent's test
+binary held 99.5% of a core through the window and `CrashPlanService` held 123.9%. The phase split
+survives that in a way the wall clock does not, which is why the shadow-against-scene ratio is
+quoted and the absolute frame time is not.
+
+Unrelated, and flagged rather than investigated: the same log line reports `cpu(scene)=1818.14 ms`.
+49.74 ms of GPU work is 20 fps; the owner reports 5. If that CPU number is per frame it is the whole
+of the gap and it is not in this renderer.
+
 ## Consequences
 
 * A scene can make the shadowed range a compositional decision. Nothing that does not ask, moves.
