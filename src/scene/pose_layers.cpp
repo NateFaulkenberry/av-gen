@@ -194,6 +194,7 @@ void PoseLayerStack::clear() {
     clipIndex_.clear();
     pivotIndex_.clear();
     chain_.clear();
+    soleUp_.clear();
     ikStatus_.clear();
 }
 
@@ -210,6 +211,7 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
     clipIndex_.assign(layers_.size(), -1);
     pivotIndex_.assign(layers_.size(), -1);
     chain_.assign(layers_.size(), glm::ivec3(-1));
+    soleUp_.assign(layers_.size(), glm::vec3(0.0f, 1.0f, 0.0f));
     ikStatus_.assign(layers_.size(), IkStatus::Solved);
     results_.assign(layers_.size(), LayerResolution::Inactive);
     masks_.reserve(layers_.size());
@@ -297,6 +299,22 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
                         layer.name, layer.chainTip, layer.chainMid));
                 } else {
                     chain_[i] = glm::ivec3(root, mid, tip);
+                    // The sole's up, resolved against the rest pose once. `reference_` is the
+                    // scratch pose the additive path also uses; nothing here runs per frame.
+                    setRestPose(skeleton, reference_);
+                    poseToModel(skeleton, reference_, model_);
+                    const glm::mat3 bind(model_[static_cast<std::size_t>(tip)]);
+                    const glm::vec3 authored = glm::dot(layer.soleUp, layer.soleUp) > 1e-8f
+                                                   ? glm::normalize(layer.soleUp)
+                                                   : glm::inverse(bind) * glm::vec3(0.0f, 1.0f, 0.0f);
+                    soleUp_[i] = safeNormalize(authored);
+                    if (glm::dot(soleUp_[i], soleUp_[i]) < 0.5f) {
+                        problems.push_back(fmt::format(
+                            "layer '{}': joint '{}' has a degenerate rest transform, so there is no "
+                            "direction for the sole to face",
+                            layer.name, layer.chainTip));
+                        soleUp_[i] = glm::vec3(0.0f, 1.0f, 0.0f);
+                    }
                 }
             }
         } else {
@@ -330,6 +348,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
     if (layers_.empty() || masks_.size() != layers_.size() || results_.size() != layers_.size() ||
         clipIndex_.size() != layers_.size() || pivotIndex_.size() != layers_.size() ||
         chain_.size() != layers_.size() || ikStatus_.size() != layers_.size() ||
+        soleUp_.size() != layers_.size() ||
         pose.size() != skeleton.jointCount()) {
         return stats;
     }
@@ -489,7 +508,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 // rather than assumed -- a hoof that the clip has already rotated is a hoof that
                 // has already moved its sole.
                 const glm::mat4 tipWorld = afterBend(model_[t]);
-                const glm::vec3 have = safeNormalize(glm::mat3(tipWorld) * layer.soleUp);
+                const glm::vec3 have = safeNormalize(glm::mat3(tipWorld) * soleUp_[i]);
                 const glm::vec3 want = safeNormalize(layer.groundNormal);
                 if (glm::dot(have, have) > 0.5f && glm::dot(want, want) > 0.5f) {
                     const glm::quat full = shortestArc(have, want, glm::vec3(1.0f, 0.0f, 0.0f));

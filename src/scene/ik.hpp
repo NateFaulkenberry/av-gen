@@ -102,11 +102,22 @@ inline constexpr float kStraightEpsilon = 1e-3f;
 // solver has no business having a second opinion. The exception is a straight chain, which has no
 // plane to keep; that is `DegenerateBend`.
 //
-// `extension` is the fraction of (upper + lower) the limb may straighten to, 0..1. Short of 1 on
-// purpose: at exactly 1 the knee angle is pi, the bend plane vanishes, and the next frame's solve
-// has nothing to keep. 0.99 leaves a visible-to-nobody bend and a well-defined axis.
+// `extension` is the fraction of (upper + lower) the limb may straighten to, 0..1.
+//
+// **The default is 1 and that is a measurement, not a shrug.** The obvious default is something
+// short of 1, so the knee keeps a hair of bend and the bend plane never vanishes -- and it is
+// wrong here, because every rig in `assets/farm` binds with its hind leg already at 97.9% to 100.0%
+// of its own span (a bull's front leg is at 100.0%, knee angle 177.7 degrees). An extension of 0.99
+// would clamp a hoof standing exactly where the artist put it, and report every foot in the herd as
+// out of reach.
+//
+// What makes 1 safe is that this solver is a *pure function of the pose it is handed*. The classic
+// argument against full extension -- that a straight limb has no plane, so the next frame's solve
+// has nothing to keep -- assumes the next frame starts from this frame's answer. It does not: the
+// layer re-reads the animated pose every time, and the animated pose is where the plane comes from.
+// An author who wants a visibly bent knee sets this lower.
 [[nodiscard]] TwoBoneSolution solveTwoBone(const TwoBoneChain& chain, const glm::vec3& target,
-                                           const glm::vec3& pole, bool hasPole, float extension = 0.99f);
+                                           const glm::vec3& pole, bool hasPole, float extension = 1.0f);
 
 // The shortest-arc rotation taking unit `from` to unit `to`, with the antiparallel case resolved
 // about `fallbackAxis` rather than left to a zero-length cross product. Exposed because both the

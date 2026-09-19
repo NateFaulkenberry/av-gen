@@ -135,8 +135,10 @@ struct PoseLayer {
     // than the animator. It is only needed for a chain the clip leaves straight, and there it is
     // required: `IkStatus::DegenerateBend` refuses rather than picking a side.
     glm::vec3 poleDirection{0.0f};
-    // How straight the limb may go, as a fraction of its own length. Under 1 on purpose (ADR-344).
-    float extension = 0.99f;
+    // How straight the limb may go, as a fraction of its own length. 1 by default, and ADR-344 has
+    // the measurement that says so: the farm pack binds its legs at 97.9% to 100.0% of their own
+    // span, so anything less clamps a hoof standing exactly where the artist put it.
+    float extension = 1.0f;
 
     // ---- Foot: the ground, as a plane ----------------------------------------------------------
     // Foot planting takes a plane rather than a point so that one piece of intent serves all four
@@ -156,10 +158,16 @@ struct PoseLayer {
     // hoof leans into a slope, it does not become part of it. The two are complementary --
     // `slopeAlign` tilts the body, this tilts one foot -- and neither replaces the other.
     float footAlign = 0.0f;
-    // The axis of the tip joint that points *out of the sole*, in the rig's own bind frame. +Y on
-    // every rig in this repository; authorable because the day one arrives that does not, the
-    // alternative is a hoof rotated into the ground.
-    glm::vec3 soleUp{0.0f, 1.0f, 0.0f};
+    // Which way is *out of the sole*, as a direction in the tip joint's own bind frame.
+    //
+    // **Zero means "whatever was up when the animal was standing"**, resolved once by `bind` from
+    // the rig's rest pose, and that default is a measurement rather than a convenience. The obvious
+    // convention is a cardinal axis -- the tip joint's +Y -- and on this pack it is wrong on all
+    // nine: these joints are aligned along the *bone*, not along the ground. Not one of them has an
+    // axis within 26 degrees of vertical, and a bull's hind hoof is 42.8 degrees off, so a +Y
+    // convention lays the sole at 43 degrees to the slope and calls it aligned. Taking the rest
+    // pose's up needs no authoring and cannot be wrong about a rig it has read.
+    glm::vec3 soleUp{0.0f};
 
     // ---- intent, written per frame by whatever drives the layer --------------------------------
     float weight = 0.0f;         // 0 = this layer does nothing at all this frame
@@ -248,6 +256,10 @@ private:
     // Per layer, the three joint indices of a `Foot` chain, or -1. Resolved once by bind, including
     // the check that they are an ancestor chain rather than three names that happen to exist.
     std::vector<glm::ivec3> chain_;
+    // Per layer, `PoseLayer::soleUp` resolved against this rig's rest pose. Held here rather than
+    // recomputed per frame because it is a fact about the asset, and read out of the *rest* pose
+    // rather than the current one because "up" has to mean the same thing on every frame of a walk.
+    std::vector<glm::vec3> soleUp_;
     std::vector<IkStatus> ikStatus_;
     // Scratch, kept so a per-frame apply allocates nothing after the first.
     std::vector<glm::mat4> model_;
