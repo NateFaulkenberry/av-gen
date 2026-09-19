@@ -138,31 +138,64 @@ is an open question and a separate decision.
 
 ## Consequences
 
-**Performance, under the GPU lock, 1920×1080, tier high, on a contended machine** (see the caveat
-below). Five cameras through the tree, LOD0 against the default ladder:
+**Performance.** GPU lock held, 1920×1080, tier high, three interleaved repeats per arm, **minima
+over repeats** (ADR-170: never means, never one run), binary hashed before and after the pass and
+unchanged, load average 2.84 at the start. The per-run spread is printed because it is wide and is
+the reason minima are the only honest statistic here — `hero off` ran 18.09 / 15.20 / 18.35 across
+its three repeats.
 
-| view | radius px | LOD0 GPU | LOD GPU | triangles drawn |
-|---|---:|---:|---:|---|
-| closeup | 1678 | 32.96 ms | 29.16 ms | 50.7% of LOD0 |
-| hero | 470 | 19.86 | 17.76 | 32.0% |
-| medium | 196 | 14.16 | 12.71 | 12.8% |
-| wide | 78 | 14.88 | 11.34 | 5.2% |
-| small | 24 | 10.03 | 7.14 | 2.7% |
+| view | radius px | LOD0 GPU | LOD GPU | saved | triangles submitted |
+|---|---:|---:|---:|---:|---|
+| closeup | 1678 | 30.08 ms | 22.87 ms | 7.21 (24.0%) | 51.4% of LOD0 |
+| hero | 470 | 15.20 | 8.85 | 6.35 (**41.8%**) | 33.3% |
+| medium | 196 | 8.91 | 4.85 | 4.06 (45.6%) | 13.9% |
+| wide | 78 | 6.55 | 4.13 | 2.42 (36.9%) | 6.5% |
+| small | 24 | 3.93 | 2.56 | 1.37 (34.9%) | 3.9% |
 
-**The tree is what costs, and an earlier finding to the contrary does not reproduce.** At the
-shipping hero camera the scene is 51 draws and 19.01 ms, and hiding the five tree nodes takes it to
-7.60 — the scene pass alone goes 12.85 → 2.88. Hiding only foliage and twigs recovers 10.9 of that
-11.4 ms. An earlier measurement recorded as "nine draws, 15.96 ms, 3.16M triangles is not what costs
-here" does not reproduce at this camera or this configuration.
+At the hero camera the scene pass goes 9.44 → 6.68 ms and the shadow pass 3.08 → 1.31, the second
+because a camera-visible caster draws its shadow from the rung the camera chose.
+
+**The tree is what costs, and the earlier finding to the contrary has an explanation.** The same
+instrument on the shipping animated scene, minima over three interleaved repeats:
+
+| arm | GPU | scene pass | draws | triangles |
+|---|---:|---:|---:|---:|
+| everything | 11.86 ms | 9.37 ms | 51 | 3,203,880 |
+| the five tree nodes hidden | 6.49 | 1.51 | **8** | 41,694 |
+| foliage and twigs hidden | 7.93 | 3.34 | 24 | 711,292 |
+| tree, cosmos and shader all off | 4.13 | 1.70 | 3 | 32,710 |
+
+The tree is 5.37 ms of 11.86, and **7.86 ms of the 9.37 ms scene pass — 84% of it**. Foliage and
+twigs are 3.93 of that 5.37, which is the two layers §4 says to treat differently.
+
+An earlier measurement recorded as "nine draws, 15.96 ms, 3.16M triangles is not what costs here"
+does not reproduce: this scene is 51 draws in every run of every arm that has the tree in it. It is
+**eight** draws with the five tree nodes hidden. The earlier number was almost certainly taken with
+the tree absent or invisible, which would make its conclusion true of the frame it measured and
+false of the scene it was about.
 
 **The hero number is the cost of §13 and should be read as a result.** Without the quality floor the
-hero shot runs at 11.01 ms instead of 17.76 — 8.9 ms saved instead of 2.1 — and looks wrong. Most of
-the saving LOD can offer at a hero camera is a saving the brief forbids taking. The floor is
-authorable for exactly that reason.
+hero shot submits 2.6% of the source instead of 33% and looks wrong: a sparse scattering of huge
+leaf cards. The floor gives back most of the saving anyway — 41.8% at the hero camera — because
+what it refuses is the bottom of the ladder and not the middle of it. It is authorable per node
+(`lod.maxScreenError`) for the cases where the trade should go the other way.
 
-**The scene pass is markedly sublinear in triangles here.** 3.16M → 1.01M at the hero camera buys
-1.24 ms of a 13.63 ms pass; 3.16M → 0 buys 10. The canopy covers the same pixels whichever rung
-draws it, and what LOD removes first is geometry that was behind other geometry.
+**Popping: measured in frames, and better than the system deserves.** Thirteen rendered steps from
+660 m to 420 m, LOD against no-LOD at the same cameras. The worst frame-to-frame pair is **1.01×**
+as different as the same pair without a ladder — the rung changes are smaller than the camera's own
+20 m step. The reason is worth recording because it is a property of the asset rather than of the
+system: the tree is 43 separate parts, each with its own ladder and its own thresholds, so they
+cross at different distances. Across those thirteen steps the rung histogram goes 5/5/14/9/10 to
+5/10/12/11/5 and the submitted triangles go 341,384 to 530,371 — a 55% change in geometry, arriving
+a part or two at a time. **A single-part asset would not get that cross-fade for free.**
+
+**Nothing that did not ask for LOD changed.** `tree-hero-off` — the shipping scene with no `lod`
+block — renders to sequence hash `9b4040cf331a37b2` after every change in this branch, the same
+hash it produced before the quality floor, the UI line, the selector reset and the ViewContext
+cleanup. The other arms rendered in the same pass all hash differently, so that is a stable frame
+and not a hash of nothing.
+
+**Tests**: 2,327 cases / 2,241,670 assertions green, up from the 2,307 / 2,239,146 baseline.
 
 **A finding outside this work's scope, reported because it is larger than this work's result.** The
 imported vertex buffer for these five layers is **1,277 MB where 142 MB is needed**. Every primitive

@@ -123,7 +123,12 @@ TEST_CASE("a dolly across a rung boundary does not pop", "[.analysis][assetlodfr
     constexpr int kSteps = 13;
     std::vector<double> lodPairs;
     std::vector<double> basePairs;
-    std::printf("\n%-6s %-10s %10s %10s %10s\n", "pair", "distance", "lod ssim", "off ssim", "excess");
+    // The control this test cannot do without: how far the LOD frame is from the no-LOD frame at
+    // *the same* camera. If that never moves, no rung ever changed in this range and every "no pop"
+    // number below is measuring a ladder that did nothing -- ADR-182's probe that cannot fail.
+    std::vector<double> againstBase;
+    std::printf("\n%-6s %-10s %10s %10s %10s %10s\n", "pair", "distance", "lod ssim", "off ssim",
+                "excess", "vs base");
     for (int i = 1; i < kSteps; ++i) {
         const auto previousLod = quality::readFrame(
             framePath(root, fmt::format("dolly-auto-{:02d}", i - 1)));
@@ -140,15 +145,41 @@ TEST_CASE("a dolly across a rung boundary does not pop", "[.analysis][assetlodfr
         basePairs.push_back(baseStep);
         // Dissimilarity rather than similarity, so "twice as different" is twice the number.
         const double excess = (1.0 - baseStep) > 1e-9 ? (1.0 - lodStep) / (1.0 - baseStep) : 1.0;
-        std::printf("%-6d %10.0f %10.5f %10.5f %10.2f\n", i, 660.0 - 20.0 * i, lodStep, baseStep, excess);
+        const double versusBase = quality::msSsim(*currentOff, *currentLod);
+        againstBase.push_back(versusBase);
+        std::printf("%-6d %10.0f %10.5f %10.5f %10.2f %10.5f\n", i, 660.0 - 20.0 * i, lodStep, baseStep,
+                    excess, versusBase);
     }
     REQUIRE(lodPairs.size() == kSteps - 1);
 
-    // The control first. The camera moves twenty metres between steps, so consecutive frames differ
-    // whatever the ladder does; if they did not, the dolly did not happen and every number below
-    // would be measuring a still.
+    // Two controls, and the second is the one that matters.
+    //
+    // The camera moves twenty metres between steps, so consecutive frames differ whatever the
+    // ladder does; if they did not, the dolly did not happen.
     const double worstBase = *std::ranges::min_element(basePairs);
     CHECK(worstBase < 0.9999);
+
+    // And the ladder was doing something. `vs base` is how far the LOD frame is from the no-LOD
+    // frame at the *same* camera: if it were 1.0 the ladder would be drawing LOD0 and "no pop"
+    // would be a statement about a system that did nothing, which is ADR-182's probe that cannot
+    // fail. It is 0.991 to 0.996 across the dolly, and it moves.
+    //
+    // **It moves smoothly, and that is the finding rather than a disappointment.** The first cut of
+    // this control looked for a step and demanded a spread of 0.005; the spread is 0.0042 and there
+    // is no step anywhere in the column. The renderer's own rung histogram says why: the tree is 43
+    // separate parts, each with its own ladder and its own thresholds, so they cross at different
+    // distances. Over these thirteen steps the distribution goes 5/5/14/9/10 at 660 m to 5/10/12/11/5
+    // at 420 m and the submitted triangles go 341,384 to 530,371 -- a 55% change in geometry,
+    // arriving a part or two at a time. The asset's own subdivision by material is acting as a
+    // cross-fade that nobody designed, and it is why the worst frame-to-frame excess is 1.01x.
+    //
+    // A single-part asset would not get this for free, and that is the limitation to carry: this
+    // measurement says the Tree of Life does not pop, not that the system cannot.
+    const double closestToBase = *std::ranges::max_element(againstBase);
+    const double furthestFromBase = *std::ranges::min_element(againstBase);
+    std::printf("vs base: %.5f at its closest, %.5f at its furthest\n", closestToBase, furthestFromBase);
+    CHECK(closestToBase < 0.999);                        // the ladder is not drawing LOD0
+    CHECK(closestToBase - furthestFromBase > 0.002);     // ...and it is not frozen on one rung
 
     // The arm. The worst LOD pair may be no more than three times as different as the worst no-LOD
     // pair. A band rather than a floor, and three rather than one because a rung change *is* a
