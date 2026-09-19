@@ -3637,10 +3637,15 @@ void Composition::registerAuthoredLightParameters(params::ParameterSet& params) 
         }
         if (l.type == PunctualLight::Type::Spot) {
             // Degrees, matching the file and every other angle a person writes here.
+            // Hard max 90, not 180, and the distinction is not cosmetic: a modulation route
+            // clamps to the **hard** range, and `packLight` clamps both cone angles to pi/2 before
+            // it packs them. A hard range of 180 would therefore have given a route half a
+            // travel that cannot move the picture -- ADR-372's defect, arriving through the range
+            // rather than through the shader.
             p.innerCone = &params.add(floatDesc(base + "innerCone", glm::degrees(l.innerConeAngle),
-                                                0.0f, 180.0f, 0.0f, 90.0f));
+                                                0.0f, 90.0f, 0.0f, 90.0f));
             p.outerCone = &params.add(floatDesc(base + "outerCone", glm::degrees(l.outerConeAngle),
-                                                0.0f, 180.0f, 0.0f, 90.0f));
+                                                0.0f, 90.0f, 0.0f, 90.0f));
         }
         // Only the area kinds have an extent. `emitterArea` is what converts a nits-over-the-emitter
         // intensity into the candela the shader wants, so these three are not cosmetic: changing a

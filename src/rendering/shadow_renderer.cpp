@@ -206,6 +206,27 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
         }
         if (light.type == scene::PunctualLight::Type::Directional) {
             if (directionalDone || views_.size() + cascades > kMaxShadowViews) {
+                // Said out loud, once per light per frame-of-first-occurrence, because the
+                // alternative is a light whose `castsShadow` is ticked and which casts nothing,
+                // with nothing anywhere saying why. That is exactly ADR-358's defect -- a
+                // shadow-casting key that cast nothing -- and it was diagnosable only by reading an
+                // AOV and recognising a constant.
+                //
+                // Reachable now in a way it was not: a scene file could author a second
+                // shadow-casting sun, but only a person editing JSON would. A Lights panel with a
+                // "Cast Shadows" checkbox makes a sun-and-moon rig the obvious thing to build.
+                //
+                // A warning rather than a larger budget, deliberately. `kMaxShadowViews` is 8 and
+                // raising it is a per-frame cost paid by every scene in the repository to serve a
+                // case nobody has hit yet; what the user needs is to be told, not to be charged.
+                // Revisit when somebody measures what the ninth view costs.
+                if (shadowWarned_.insert(light.name).second) {
+                    log::warn("shadows: light '{}' casts no shadow -- this frame already has a "
+                              "cascaded directional light and the renderer fits only one. Turn off "
+                              "'Cast Shadows' on the other directional light, or accept that this "
+                              "one lights without shadowing.",
+                              light.name);
+                }
                 continue; // one cascaded directional light per frame
             }
             float nearDepth = cameraNear;

@@ -14,8 +14,18 @@ const std::string kNoLabel;
 } // namespace
 
 std::size_t EditCommand::touched() const {
+    // A light edit counts as the number of lights that actually entered or left, so the label
+    // reads "Delete 1 light" rather than "Delete 1 thing" -- and as 1 for an edit that changed a
+    // light in place, which is the fallback the sizes cannot express.
+    const std::size_t lightsTouched =
+        lights == nullptr
+            ? 0
+            : std::max<std::size_t>(lights->after.size() > lights->before.size()
+                                        ? lights->after.size() - lights->before.size()
+                                        : lights->before.size() - lights->after.size(),
+                                    1);
     return params.size() + parents.size() + heroes.size() + added.size() + removed.size() +
-           (timeline != nullptr ? 1 : 0);
+           (timeline != nullptr ? 1 : 0) + lightsTouched;
 }
 
 std::vector<float> baseComponents(app::Engine& engine, const std::string& path) {
@@ -127,12 +137,33 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
         }
     }
 
+    // The authored lights, before the composition null-check below rejects the command, because a
+    // light list needs a composition and says so in its own words.
+    if (command.lights != nullptr) {
+        if (scene::Composition* comp = engine.composition(); comp != nullptr) {
+            const LightChange& change = *command.lights;
+            if (auto r = comp->setAuthoredLights(forward ? change.after : change.before); !r) {
+                out.problems.push_back(r.error().message);
+            } else {
+                out.lightListsInstalled = 1;
+                // `setAuthoredLights` re-registers the parameters, which invalidates every raw
+                // `IParameter*` a route or a track is holding. The rebind at the end of this
+                // function is what puts them back -- without it an undone delete would restore the
+                // light and leave its automation silently disconnected, which is the defect the
+                // node path already documents.
+            }
+        } else {
+            out.problems.push_back("there is no composition to light");
+        }
+    }
+
     scene::Composition* composition = engine.composition();
     if (composition == nullptr) {
         // Not a failure when the command was the sequencer's: there was nothing here for a
         // composition to do.
-        if (command.timeline == nullptr || !command.params.empty() || !command.added.empty() ||
-            !command.removed.empty() || !command.parents.empty() || !command.heroes.empty()) {
+        if ((command.timeline == nullptr && command.lights == nullptr) || !command.params.empty() ||
+            !command.added.empty() || !command.removed.empty() || !command.parents.empty() ||
+            !command.heroes.empty()) {
             out.problems.push_back("there is no composition to edit");
         }
         if (ownsRecord) {
