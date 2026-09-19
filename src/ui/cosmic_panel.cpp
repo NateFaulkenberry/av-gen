@@ -322,8 +322,18 @@ void drawTreePanel(app::Engine& engine) {
                    "the two cannot disagree about where the tree is.");
         }
         for (const std::string& wp : bodies2) {
-            const std::string e = wp.substr(0, wp.size() - 5) + "energy/";
+            // `windBodies` already returns the node's base -- "nodes/<name>/" -- not the wind
+            // prefix. Stripping five more characters here took "nodes/tree-of-life/" to
+            // "nodes/tree-of-" and asked for "nodes/tree-of-energy/intensity", which no scene has.
+            const std::string e = wp + "energy/";
             if (!have(engine, (e + "intensity").c_str())) {
+                // Not `continue`. A panel asks for parameters by string, so a wrong path draws an
+                // empty box indistinguishable from "this scene has no energy" -- which is exactly
+                // how the prefix bug above survived being tested: the test asserted the paths the
+                // *registration* makes, and the panel computes its own.
+                absent(("No energy parameters under '" + e +
+                        "'. The node declares a wind body, so this is a path the panel got wrong, "
+                        "not a scene that opted out.").c_str());
                 continue;
             }
             ImGui::PushID(e.c_str());
@@ -352,7 +362,10 @@ void drawTreePanel(app::Engine& engine) {
             absent("Needs a wind body, for the same reason the energy does.");
         }
         for (const std::string& wp : bodies2) {
-            const std::string e = wp.substr(0, wp.size() - 5) + "energy/";
+            // `windBodies` already returns the node's base -- "nodes/<name>/" -- not the wind
+            // prefix. Stripping five more characters here took "nodes/tree-of-life/" to
+            // "nodes/tree-of-" and asked for "nodes/tree-of-energy/intensity", which no scene has.
+            const std::string e = wp + "energy/";
             if (!have(engine, (e + "shimmer").c_str())) {
                 continue;
             }

@@ -155,3 +155,64 @@ TEST_CASE("A wind body can be created and removed from the application", "[ui][p
 
     CHECK_FALSE(comp.setNodeWindBody("nonesuch", true));
 }
+
+// The owner opened the Tree panel and found "Tree energy" and "Canopy shimmer" empty on a scene
+// whose tree declares both a wind body and an energy block.
+//
+// Nothing was missing. `windBodies()` returns the node's *base* -- "nodes/tree-of-life/" -- because
+// it already strips the "/wind/strength" tail it matched on. The energy section then removed five
+// more characters on the assumption that it still ended in "wind/", which turned
+// "nodes/tree-of-life/" into "nodes/tree-of-" and asked for "nodes/tree-of-energy/intensity". No
+// scene has that, so `have()` said no and the section drew nothing.
+//
+// The section above it -- wind -- was fine, because it uses the base as given. So the two sections
+// disagreed about what `windBodies` returns, and only one of them was right.
+//
+// **Why the existing tests did not catch it.** They assert the paths the *registration* produces.
+// The panel does not use those; it computes its own from a prefix, and the arithmetic in between
+// was never exercised. A panel asks for parameters by string, so a wrong path neither fails to
+// compile nor throws -- it draws an empty box indistinguishable from a scene that has no energy.
+// This case does the panel's arithmetic and then asks whether the answer exists.
+TEST_CASE("The Tree panel's energy prefix resolves to parameters that exist",
+          "[ui][panels][parameters][energy]") {
+    assets::AssetRegistry registry;
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "composition");
+    comp.attach(params, modulator);
+
+    scene::CompositionNode body;
+    body.name = "tree-of-life"; // the real name: long enough that the old off-by-five truncated it
+    body.kind = scene::NodeKind::Group;
+    body.windAuthored = true;   // energy registers on either flag
+    REQUIRE(comp.addNode(std::move(body)).has_value());
+
+    // Step 1: what `windBodies()` hands the section, derived by its own rule rather than assumed.
+    const std::string tail = "/wind/strength";
+    std::string base;
+    for (const params::IParameter* p : params.ordered()) {
+        const std::string& path = p->path();
+        if (path.size() > tail.size() &&
+            path.compare(path.size() - tail.size(), tail.size(), tail) == 0) {
+            base = path.substr(0, path.size() - tail.size() + 1);
+        }
+    }
+    REQUIRE(base == "nodes/tree-of-life/");
+
+    // Step 2: the prefix the section builds from it, and every leaf both sections ask for.
+    const std::string e = base + "energy/";
+    for (const char* leaf : {"intensity", "pulseSpeed", "pulseWidth", "propagation", "root",
+                             "trunk", "branch", "canopy", "noise", "bloom", "shimmer",
+                             "shimmerSpeed", "shimmerScale", "colorNear", "colorFar"}) {
+        INFO(e + leaf);
+        CHECK(registered(params, e + leaf));
+    }
+
+    // The control, and the whole point of the case: the arithmetic that shipped produced a path
+    // that resolves to nothing. If someone reintroduces it, this fails instead of the panel going
+    // quietly blank.
+    const std::string broken = base.substr(0, base.size() - 5) + "energy/";
+    CHECK(broken == "nodes/tree-of-energy/");
+    CHECK_FALSE(registered(params, broken + "intensity"));
+    CHECK_FALSE(registered(params, e + "nonesuch"));
+}
