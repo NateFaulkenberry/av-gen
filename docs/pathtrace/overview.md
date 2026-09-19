@@ -34,7 +34,7 @@ never reaches into the realtime post chain. Colour management is downstream of t
 | 2 | glTF metallic-roughness BRDF, textures, colour space | **done** |
 | 3 | BSDF + light sampling, MIS, Russian roulette | **done** |
 | 4 | OIDN denoising | **done** (opt-in) |
-| 5 | Full AV Gen scene integration (skinning, instancing, procedurals) | not started |
+| 5 | Scene integration: CPU skinning, procedural scatter | **done** |
 | 6 | AOVs | not started |
 | 7 | Glowmere | not started |
 | 8 | Production features | not started |
@@ -81,8 +81,8 @@ pixels rather than after somebody notices they are wrong.
 | Feature | Status | Why |
 |---|---|---|
 | Particles | **unsupported** | GPU-only by construction (`src/scene/particles.hpp`): the CPU holds settings, the simulation is a compute shader, and no positions exist to intersect at any time |
-| Skinned characters | **unsupported** (Phase 5) | `MeshData` is bind pose; drawing it would place the character wrongly with no warning, so it is omitted and counted |
-| Procedural / scatter | **unsupported** (Phase 5) | CPU-reachable, but it arrives with Embree instancing rather than as baked triangle soup |
+| Skinned characters | **supported** | four-influence linear blend skinning from `SkinnedRig::palette`. A rig with an EMPTY palette (frozen by `cullDistance`) is refused and counted, because its bind pose is not where the character is |
+| Procedural / scatter | **degraded** | placed correctly from the baked `instances`, but baked to world-space triangles rather than Embree instances, so memory grows with instance count; deformers and effectors are not applied |
 | SDF in `Raymarch` mode | **unsupported** | no triangles exist; `spatial::SdfTree` is CPU-evaluable but sphere tracing is a separate integrator path |
 | Water surface | **degraded** | the mesh is a real CPU sheet, but ripples, swell, foam and refraction live in `shaders/water.wgsl` |
 | Point / spot lights | **degraded** | treated as delta positions, so their shadows are hard; the realtime path softens them |
@@ -97,6 +97,26 @@ inheriting them would be the ADR-146 mistake in a new place:
 * `Entity::cameraCulled`, which means "outside the realtime frustum", not "not in the scene";
   off-screen geometry still casts shadows and still bounces light into the frame;
 * procedural LOD rungs 2 and 3, which are camera-facing billboards.
+
+## Phase 5 in particular
+
+**CPU skinning.** Four-influence linear blend skinning from `Scene::rigs[e.rig].palette`, the same
+model `shaders/skinning.wgsl` runs. Normals take the skin matrix's inverse transpose, which only
+differs under a non-uniform joint scale -- and when it differs, the shading shears in a way that
+looks like a BSDF fault. A rig whose palette is empty is **refused and counted**: that happens when
+`SkinnedRig::cullDistance` froze it, and the bind pose is not where the character is. Set
+`cullDistance` and `updateHz` to 0 for an offline trace.
+
+**Procedural scatter.** Resolved through `scene::makeSourceMesh`, the same function the realtime
+renderer calls, at LOD 0 only.
+
+**Do not use `ProceduralGeometry::instanceMatrix()`.** It re-derives placement from the
+*distribution* and ignores the baked `instances` array entirely. The realtime renderer uploads
+`object.instances` (`procedural_renderer.cpp:1418`), so the tracer must read the same thing or the
+two renderers draw different worlds. The instance transform is composed exactly as
+`shaders/procedural.wgsl` composes it -- `objectModel * T(position) * R(rotation) * S(scale) *
+sourceTransform` -- where the object model is `distributionTransform`, already baked to world at
+flatten. Found by measurement: `instanceMatrix` put twelve cubes spanning 22 m into a 7 m span.
 
 ## Phase 4 in particular
 
