@@ -211,7 +211,7 @@
       "name": "floating-island",
       "position": [
         -1.1098289489746094,
-        2.598111629486084,
+        11.695127487182617,
         2.5072479248046875
       ],
       "preferredCameraDistance": 429.55084228515625,
@@ -317,9 +317,9 @@
     "camera/mode": 1,
     "camera/orbitSpeed": 0.0,
     "camera/position": [
-      198.25363159179688,
-      44.20619583129883,
-      82.52941131591797
+      197.67652893066406,
+      45.33953094482422,
+      83.45803833007813
     ],
     "camera/shake/amplitude": 0.0,
     "camera/shake/decay": 0.0,
@@ -333,9 +333,9 @@
     ],
     "camera/splineT": 0.0,
     "camera/target": [
-      -16.329608917236328,
-      8.221421241760254,
-      -6.914485931396484
+      -16.906749725341797,
+      9.354751586914063,
+      -5.985854148864746
     ],
     "env/dayNight/cycleSeconds": 240.0,
     "env/dayNight/dayPhase": 0.0,
@@ -715,7 +715,7 @@
     "post/dof/focusDistance": 6.0,
     "post/dof/focusRange": 2.0,
     "post/dof/maxRadius": 8.0,
-    "post/dof/physical": false,
+    "post/dof/physical": true,
     "post/grade/contrast": 1.0,
     "post/grade/gain": [
       1.0,
@@ -727,7 +727,7 @@
       1.0,
       1.0
     ],
-    "post/grade/hueShift": 0.0,
+    "post/grade/hueShift": 0.01899999938905239,
     "post/grade/lift": [
       0.0,
       0.0,
@@ -756,15 +756,15 @@
     "post/output/vignette": 0.0,
     "post/tiltShift/bandWidth": 0.20000000298023224,
     "post/tiltShift/centre": [
-      0.5,
-      0.5
+      0.3840000033378601,
+      0.3330000042915344
     ],
-    "post/tiltShift/enabled": false,
+    "post/tiltShift/enabled": true,
     "post/tiltShift/falloff": 0.25,
-    "post/tiltShift/maxRadius": 8.0,
+    "post/tiltShift/maxRadius": 3.6500000953674316,
     "post/tiltShift/rotation": 0.0,
     "post/tonemap/chroma-retention": 0.6000000238418579,
-    "post/tonemap/operator": 1,
+    "post/tonemap/operator": 0,
     "procedural/cosmos-motes/distribution/alignToSpline": true,
     "procedural/cosmos-motes/distribution/center": [
       0.0,
@@ -1406,7 +1406,7 @@
     "scene/fogHeight": 0.0,
     "scene/fogHeightFalloff": 0.0,
     "scene/gridIntensity": 0.6000000238418579,
-    "scene/keyLight": 0.7549999952316284,
+    "scene/keyLight": 0.9629999995231628,
     "scene/styledGroundAmbient": [
       0.11999999731779099,
       0.10000000149011612,
@@ -1428,7 +1428,7 @@
     "scene/volumeScattering": 1.0,
     "scene/volumeSteps": 32,
     "scene/windDirection": 0.0,
-    "scene/windSpeed": 0.8569999933242798,
+    "scene/windSpeed": 1.319000005722046,
     "shader/glowmere-cosmos/baseLevel": 0.16200000047683716,
     "shader/glowmere-cosmos/baseTint": [
       0.029999999329447746,
@@ -1468,48 +1468,48 @@
     "sources/tilt-z/phase": 0.6000000238418579,
     "sources/tilt-z/pulseWidth": 0.5,
     "sources/tilt-z/rate": 0.0066999997943639755,
-    "worldfx/Hero Pulse/beamRadius": 0.0,
-    "worldfx/Hero Pulse/color": [
+    "worldfx/Hero Mushroom Pulse/beamRadius": 0.0,
+    "worldfx/Hero Mushroom Pulse/color": [
       0.2199999988079071,
       0.5799999833106995,
       0.8600000143051147
     ],
-    "worldfx/Hero Pulse/delay": 0.3499999940395355,
-    "worldfx/Hero Pulse/edgeColor": [
+    "worldfx/Hero Mushroom Pulse/delay": 0.3499999940395355,
+    "worldfx/Hero Mushroom Pulse/edgeColor": [
       0.8199999928474426,
       0.9599999785423279,
       1.0
     ],
-    "worldfx/Hero Pulse/edgeIntensity": 2.4000000953674316,
-    "worldfx/Hero Pulse/enabled": false,
-    "worldfx/Hero Pulse/fadeIn": 0.6000000238418579,
-    "worldfx/Hero Pulse/fadeOut": 1.2000000476837158,
-    "worldfx/Hero Pulse/falloff": 1.7000000476837158,
-    "worldfx/Hero Pulse/frontWidth": 2.4000000953674316,
-    "worldfx/Hero Pulse/intensity": 1.5,
-    "worldfx/Hero Pulse/lifetime": 0.0,
-    "worldfx/Hero Pulse/rainbow": true,
-    "worldfx/Hero Pulse/rainbowBrightness": 1.0,
-    "worldfx/Hero Pulse/rainbowSaturation": 0.8500000238418579,
-    "worldfx/Hero Pulse/rainbowScale": 0.02500000037252903,
-    "worldfx/Hero Pulse/rainbowSpeed": 0.3499999940395355,
-    "worldfx/Hero Pulse/range": 46.0,
-    "worldfx/Hero Pulse/repeat": 2.0,
-    "worldfx/Hero Pulse/response/emissive": 0.8999999761581421,
-    "worldfx/Hero Pulse/response/foliage": 1.350000023841858,
-    "worldfx/Hero Pulse/response/ground": 0.8500000238418579,
-    "worldfx/Hero Pulse/response/surface": 1.0,
-    "worldfx/Hero Pulse/ringCount": 3.0,
-    "worldfx/Hero Pulse/sparkle": true,
-    "worldfx/Hero Pulse/sparkleDensity": 0.8999999761581421,
-    "worldfx/Hero Pulse/sparkleIntensity": 1.7999999523162842,
-    "worldfx/Hero Pulse/sparkleSize": 0.30000001192092896,
-    "worldfx/Hero Pulse/sparkleSpeed": 0.6000000238418579,
-    "worldfx/Hero Pulse/speed": 11.0,
-    "worldfx/Hero Pulse/startOffset": 0.0,
-    "worldfx/Hero Pulse/trailLength": 16.0,
-    "worldfx/Hero Pulse/verticalExtent": 4.5,
-    "worldfx/Hero Pulse/width": 1.0
+    "worldfx/Hero Mushroom Pulse/edgeIntensity": 2.4000000953674316,
+    "worldfx/Hero Mushroom Pulse/enabled": false,
+    "worldfx/Hero Mushroom Pulse/fadeIn": 0.6000000238418579,
+    "worldfx/Hero Mushroom Pulse/fadeOut": 1.2000000476837158,
+    "worldfx/Hero Mushroom Pulse/falloff": 1.7000000476837158,
+    "worldfx/Hero Mushroom Pulse/frontWidth": 2.4000000953674316,
+    "worldfx/Hero Mushroom Pulse/intensity": 1.5,
+    "worldfx/Hero Mushroom Pulse/lifetime": 0.0,
+    "worldfx/Hero Mushroom Pulse/rainbow": true,
+    "worldfx/Hero Mushroom Pulse/rainbowBrightness": 1.0,
+    "worldfx/Hero Mushroom Pulse/rainbowSaturation": 0.8500000238418579,
+    "worldfx/Hero Mushroom Pulse/rainbowScale": 0.02500000037252903,
+    "worldfx/Hero Mushroom Pulse/rainbowSpeed": 0.3499999940395355,
+    "worldfx/Hero Mushroom Pulse/range": 46.0,
+    "worldfx/Hero Mushroom Pulse/repeat": 2.0,
+    "worldfx/Hero Mushroom Pulse/response/emissive": 0.8999999761581421,
+    "worldfx/Hero Mushroom Pulse/response/foliage": 1.350000023841858,
+    "worldfx/Hero Mushroom Pulse/response/ground": 0.8500000238418579,
+    "worldfx/Hero Mushroom Pulse/response/surface": 1.0,
+    "worldfx/Hero Mushroom Pulse/ringCount": 3.0,
+    "worldfx/Hero Mushroom Pulse/sparkle": true,
+    "worldfx/Hero Mushroom Pulse/sparkleDensity": 0.8999999761581421,
+    "worldfx/Hero Mushroom Pulse/sparkleIntensity": 1.7999999523162842,
+    "worldfx/Hero Mushroom Pulse/sparkleSize": 0.30000001192092896,
+    "worldfx/Hero Mushroom Pulse/sparkleSpeed": 0.6000000238418579,
+    "worldfx/Hero Mushroom Pulse/speed": 11.0,
+    "worldfx/Hero Mushroom Pulse/startOffset": 0.0,
+    "worldfx/Hero Mushroom Pulse/trailLength": 16.0,
+    "worldfx/Hero Mushroom Pulse/verticalExtent": 4.5,
+    "worldfx/Hero Mushroom Pulse/width": 1.0
   },
   "presets": [],
   "render": {
@@ -1681,6 +1681,36 @@
       "polarity": "unipolar",
       "source": "beat.pulse",
       "target": "atmos/Bioluminescent Comet/coreIntensity"
+    },
+    {
+      "amount": 1.0,
+      "chain": {
+        "attackMs": 20.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 200.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "unipolar",
+      "source": "state.progress",
+      "target": "post/grade/hueShift"
     }
   ],
   "sequence": {
@@ -1947,7 +1977,7 @@
         "width": 1.0
       },
       "enabled": true,
-      "name": "Hero Pulse",
+      "name": "Hero Mushroom Pulse",
       "propagation": {
         "beamRadius": 0.0,
         "direction": "explicit",
