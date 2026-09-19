@@ -135,6 +135,10 @@ struct FrameUniforms {
     skyHorizonColor: vec4<f32>,     // rgb = horizon, w = sun angular radius
     skyGroundColor: vec4<f32>,      // rgb = below the horizon, w = sun glow width
     skySunRadiance: vec4<f32>,      // rgb = sun/moon colour, w = 1 when the analytic sky is drawn
+    // ADR-379: the cosmic vortex's light on what floats above it. Appended last, mirroring
+    // FrameUniforms; the sum in scene_renderer.hpp's static_assert catches these drifting apart.
+    vortexGlow: vec4<f32>,          // xyz = mouth centre, w = mouth radius
+    vortexGlowColor: vec4<f32>,     // rgb = radiance, w = intensity (0 = no vortex)
 };
 
 struct ObjectUniforms {

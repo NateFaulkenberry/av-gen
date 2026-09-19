@@ -304,7 +304,7 @@
       0.0
     ],
     "camera/focus/speed": 0.0,
-    "camera/fov": 36.0,
+    "camera/fov": 44.0,
     "camera/height": 880.753173828125,
     "camera/lens/aperture": 5.599999904632568,
     "camera/lens/focalLength": 35.0,
@@ -317,9 +317,9 @@
     "camera/mode": 1,
     "camera/orbitSpeed": 0.0,
     "camera/position": [
-      197.67652893066406,
-      45.33953094482422,
-      83.45803833007812
+      150.0,
+      -96.0,
+      120.0
     ],
     "camera/shake/amplitude": 0.0,
     "camera/shake/decay": 0.0,
@@ -333,9 +333,9 @@
     ],
     "camera/splineT": 0.0,
     "camera/target": [
-      -16.906749725341797,
-      9.354751586914062,
-      -5.985854148864746
+      -10.0,
+      -14.0,
+      0.0
     ],
     "env/dayNight/cycleSeconds": 240.0,
     "env/dayNight/dayPhase": 0.0,
@@ -358,9 +358,9 @@
     "env/sky/background": false,
     "env/sky/enabled": true,
     "env/sky/groundColor": [
-      0.005200000014156103,
-      0.011800000444054604,
-      0.021199999377131462
+      0.0026,
+      0.0059,
+      0.0106
     ],
     "env/sky/haze": 0.6200000047683716,
     "env/sky/horizonColor": [
@@ -393,7 +393,7 @@
     ],
     "lights/celestial-key/elevation": 35.0,
     "lights/celestial-key/enabled": true,
-    "lights/celestial-key/intensity": 6.0,
+    "lights/celestial-key/intensity": 22.0,
     "lights/celestial-key/shadowStrength": 0.95,
     "lights/cosmic-fill/color": [
       0.32,
@@ -1528,9 +1528,7 @@
     "worldfx/Hero Mushroom Pulse/startOffset": 0.0,
     "worldfx/Hero Mushroom Pulse/trailLength": 16.0,
     "worldfx/Hero Mushroom Pulse/verticalExtent": 4.5,
-    "worldfx/Hero Mushroom Pulse/width": 1.0,
-    "scene/vortex/emission": 0.012,
-    "nodes/tree-of-life/energy/intensity": 0.2
+    "worldfx/Hero Mushroom Pulse/width": 1.0
   },
   "presets": [
     {
