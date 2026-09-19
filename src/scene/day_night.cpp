@@ -139,9 +139,37 @@ void DayNightSettings::applyDefaults() {
         {kMidnight, 1.00f}, {kPreDawn, 0.92f}, {kSunrise, 0.55f}, {kMorning, 0.30f},
         {kNoon, 0.22f}, {kAfternoon, 0.32f}, {kSunset, 0.62f}, {kTwilight, 0.85f}, {kNight, 1.00f},
     });
+    // Tuned against the ocean's actual extent, not guessed. Transmittance is exp(-(d*density)^2),
+    // so the number that matters is the pair (island at ~257 u, water edge at 20,000 u): these
+    // leave the island at 0.99+ and the far water at 0.00. An earlier set was 15x higher because
+    // it was tuned when the plane edge was at 3,000 u, and at the enlarged extent it washed the
+    // whole frame into flat dust -- the island, the water and the sky all one colour at sunset.
+    // The water is part of the world changing state, not a static surface the sky happens to fall
+    // on. `reflection` multiplies its environment sample: a night sea that mirrors the sky as hard
+    // as a noon sea does comes out a pale sheet, which is what it was doing.
+    //
+    // The reflection is deliberately LOW at dawn and sunset, and the deep colour correspondingly
+    // warm. That is not an aesthetic preference, it is working around a real limitation: the water
+    // shader samples the environment *cube*, which is the HDRI, and the HDRI is a fixed blue-sky
+    // map. With the visible sky now procedural (ADR-348) the two disagree at exactly the moments
+    // the brief cares most about -- "sky says sunset, water still looks like noon" is its own §28
+    // failure mode. Turning the reflection down at the warm ends and carrying the colour in the
+    // water's own body is the half of that which does not need another renderer change.
+    fill<float>(waterReflection, {
+        {kMidnight, 0.55f}, {kPreDawn, 0.60f}, {kSunrise, 0.80f}, {kMorning, 2.40f},
+        {kNoon, 3.10f}, {kAfternoon, 2.50f}, {kSunset, 0.85f}, {kTwilight, 0.62f}, {kNight, 0.58f},
+    });
+    fill<glm::vec3>(waterDeepColor, {
+        {kMidnight, {0.0016f, 0.0060f, 0.0150f}},
+        {kSunrise, {0.1450f, 0.0560f, 0.0520f}},   // the warm horizon reaching into the water
+        {kNoon, {0.0090f, 0.0330f, 0.0620f}},
+        {kSunset, {0.1750f, 0.0600f, 0.0540f}},
+        {kTwilight, {0.0520f, 0.0260f, 0.0700f}},  // violet
+        {kNight, {0.0018f, 0.0064f, 0.0162f}},
+    });
     fill<float>(fogDensity, {
-        {kMidnight, 0.0021f}, {kSunrise, 0.0034f}, {kNoon, 0.0015f}, {kSunset, 0.0032f},
-        {kTwilight, 0.0026f}, {kNight, 0.0022f},
+        {kMidnight, 0.000135f}, {kSunrise, 0.000215f}, {kNoon, 0.000095f}, {kSunset, 0.000205f},
+        {kTwilight, 0.000165f}, {kNight, 0.000140f},
     });
     fill<glm::vec3>(fogColor, {
         {kMidnight, {0.0125f, 0.0165f, 0.0335f}},
@@ -168,6 +196,7 @@ std::uint64_t DayNightSettings::hash() const {
     h.f32(starBrightnessScale);
     h.f32(hdriIntensityScale);
     h.f32(glowInfluence);
+    h.f32(fogHorizonBlend);
     const auto hs = [&h](const std::string& v) {
         for (const char ch : v) {
             h.u32(static_cast<std::uint32_t>(static_cast<unsigned char>(ch)));
@@ -204,6 +233,8 @@ std::uint64_t DayNightSettings::hash() const {
     hf(hdriIntensity);
     hf(hdriBlend);
     hf(glowScale);
+    hf(waterReflection);
+    hv(waterDeepColor);
     hf(fogDensity);
     hv(fogColor);
     return h.value();
@@ -255,8 +286,15 @@ DayNightState resolveDayNight(const DayNightSettings& settings, float phase) {
     // `glowInfluence` mixes between "ignore the cycle" and "follow it fully", so the manual
     // Glowmere intensities stay independently controllable as the brief requires.
     s.glowScale = std::max(0.0f, 1.0f + (glow - 1.0f) * settings.glowInfluence);
+    s.waterReflection = std::max(0.0f, samplePhase(settings.waterReflection, s.phase));
+    s.waterDeepColor = glm::max(samplePhase(settings.waterDeepColor, s.phase), glm::vec3(0.0f));
     s.fogDensity = std::max(0.0f, samplePhase(settings.fogDensity, s.phase));
-    s.fogColor = glm::max(samplePhase(settings.fogColor, s.phase), glm::vec3(0.0f));
+    const glm::vec3 authoredFog = glm::max(samplePhase(settings.fogColor, s.phase), glm::vec3(0.0f));
+    // The colour the sky actually is at the horizon, scaled the way the visible sky is scaled, so
+    // water receding into fog and sky meeting the horizon arrive at the same value.
+    const glm::vec3 horizonFog = s.horizonColor * s.skyIntensity;
+    const float blend = std::clamp(settings.fogHorizonBlend, 0.0f, 1.0f);
+    s.fogColor = glm::max(authoredFog * (1.0f - blend) + horizonFog * blend, glm::vec3(0.0f));
     s.useNightMap = s.hdriBlend >= 0.5f;
     return s;
 }

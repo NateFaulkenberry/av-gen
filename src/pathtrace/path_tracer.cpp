@@ -311,7 +311,7 @@ struct PathResult {
 
         result += throughput * nextEventEstimate(snap, embree, hit, m, view, sampler, settings, counters);
 
-        // Diagnostic only (ADR-345). Placed here, after emission and next-event estimation have
+        // Diagnostic only (ADR-349). Placed here, after emission and next-event estimation have
         // been added and before nothing that depends on them: it reads state that is already final.
         if (settings.albedoProbe.enabled) {
             probeAlbedo(settings.albedoProbe, m, hit.shadingNormal, view, depth,
@@ -578,7 +578,7 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
     }
     if (settings.albedoProbe.enabled && probe_.any()) {
         log::warn("pathtrace: directional albedo exceeded 1 at {} of {} measured shading events "
-                  "(worst {:.3f}). The glTF BRDF is faithful to spec and gains at grazing; see ADR-345.",
+                  "(worst {:.3f}). The glTF BRDF is faithful to spec and gains at grazing; see ADR-349.",
                   probe_.exceedances, probe_.hitsProbed, probe_.worstAlbedo);
     }
     for (const auto& c : perThread) {

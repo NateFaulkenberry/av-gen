@@ -95,7 +95,7 @@ Result<void> EmbreeScene::build(const Snapshot& snapshot, unsigned buildThreads)
     }
     geometryCount_ = snapshot.meshes.size();
 
-    // Build the BVH on threads this process owns (ADR-344). One `rtcJoinCommitScene` per thread;
+    // Build the BVH on threads this process owns (ADR-348). One `rtcJoinCommitScene` per thread;
     // they cooperate and all return when the build is done.
     if (threads <= 1) {
         rtcJoinCommitScene(impl_->scene);

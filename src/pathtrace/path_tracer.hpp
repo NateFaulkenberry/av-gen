@@ -1,6 +1,6 @@
 #pragma once
 
-// The CPU path tracer (ADR-344).
+// The CPU path tracer (ADR-348).
 //
 // Phase 1 scope, deliberately small and deliberately correct before it is fast (spec section 76):
 // primary rays, a Lambertian BSDF, direct lighting from the scene's lights with shadow rays, the
@@ -65,7 +65,7 @@ struct TraceSettings {
     // negative radiance is counted and clamped away instead of poisoning the accumulation.
     bool debugCheckNonFinite = false;
 
-    // ADR-345's instrument. Diagnostic ONLY: it must never change a pixel, and a bit-identity test
+    // ADR-349's instrument. Diagnostic ONLY: it must never change a pixel, and a bit-identity test
     // is what holds that claim up rather than the comment. Off by default.
     //
     // It is a runtime setting rather than a compile flag deliberately. A compile flag would make

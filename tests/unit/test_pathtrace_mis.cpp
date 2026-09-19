@@ -1,4 +1,4 @@
-// MIS, Russian roulette and the fireflies they kill (ADR-344 Phase 3, spec sections 43-45, 50).
+// MIS, Russian roulette and the fireflies they kill (ADR-348 Phase 3, spec sections 43-45, 50).
 //
 // The two bugs this file exists to catch both hide behind plausibility:
 //

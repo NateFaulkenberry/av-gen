@@ -121,13 +121,14 @@ const std::map<std::string, float>& beforeFungi() {
 fs::path sourceDir() { return fs::path(AVGEN_SOURCE_DIR); }
 fs::path worldDir() { return sourceDir() / "examples" / "world"; }
 
-// The four valley-2-family scenes plus valley 3 (ADR-344). Valley 3 has no farm in it, so its
-// `cast` is the five aliens and the tallest of them is the same `alien-ranger` at the same 1.94x
-// -- which is the point of adding it: a new Glowmere is exactly where a scale ladder goes wrong,
-// and it is where ADR-213's 3.6x reached four files without anything failing.
-constexpr std::array<const char*, 5> kScenes{{"glowmere-valley-2", "glowmere-valley-2-multicam",
-                                              "glowmere-valley-2-song", "glowmere-atmospherics",
-                                              "glowmere-valley-3"}};
+// The four valley-2-family scenes. Valley 3 was here too until ADR-348 retired it; what that
+// scene proved about this file survives it, because the tree line below is *derived* from the
+// scatter layers rather than read off a list of names. `glowmere-valley-2-multicam` now carries
+// the eight-layer canopy valley 3 was built to try, so the case that motivated the derivation is
+// still in the array -- under a different name, which is exactly why a name list would have been
+// the wrong instrument.
+constexpr std::array<const char*, 4> kScenes{{"glowmere-valley-2", "glowmere-valley-2-multicam",
+                                              "glowmere-valley-2-song", "glowmere-atmospherics"}};
 
 // The ten hero organisms, in the order `tools/make_glowmere_valley_2.py` lists them.
 constexpr std::array<const char*, 10> kHeroes{{"elder-2", "lantern", "spire", "bloom", "veil",
@@ -305,7 +306,7 @@ TEST_CASE("Glowmere's cast stands in its undergrowth", "[glowmere][scale]") {
         INFO("control: the same body at " << kBeforeCast << "x stands " << before << " m");
         CHECK(before > tallestPlant);
     }
-    CHECK(scenesChecked == 5);
+    CHECK(scenesChecked == static_cast<int>(kScenes.size()));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -392,7 +393,7 @@ TEST_CASE("Glowmere's cast stands inside the fungal ladder", "[glowmere][scale]"
                          << groundedAt334 << " grounded");
         CHECK(groundedAt334 < kGroundedMin);
     }
-    CHECK(scenesChecked == 5);
+    CHECK(scenesChecked == static_cast<int>(kScenes.size()));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -415,10 +416,11 @@ TEST_CASE("Glowmere's signature organism is monumental and stands above the tree
     const auto farm = farmNaturalHeights();
     const auto aliens = alienNaturalHeights();
     // **A tree is a layer that places something at least five metres tall.** Structural, and not a
-    // list of three names, because a name list is a floor that outlives what it counted: valley 3
-    // has eight tree layers of which exactly one is still called `canopy`, and a `kTreeLayers` of
-    // {"pines", "canopy", "deadwood"} would have computed that world's tree line off one layer and
-    // thrown on the two names it no longer has.
+    // list of three names, because a name list is a floor that outlives what it counted: the
+    // multicam now has eight tree layers of which exactly one is still called `canopy`, and a
+    // `kTreeLayers` of {"pines", "canopy", "deadwood"} would have computed that world's tree line
+    // off one layer and thrown on the two names it no longer has. ADR-340 wrote this derivation
+    // for valley 3; valley 3 is gone and the derivation is what it left behind.
     constexpr float kTreeMetres = 5.0f;
     // What those layers carried at bc79a51, for the control. 15.0 -- `pines`, the tallest -- is
     // the stand-in for a layer that did not exist then, because what the control asks is "would

@@ -559,7 +559,7 @@ private:
 // Pick somewhere navigable, walk there, pause, repeat. The navigation layer answers "may I stand
 // here" and "which way do I go"; this decides when to ask. Seeded throughout: the same scene, the
 // same seed and the same frame produce the same walk, which is what an offline render needs.
-// **Walking out of a crowd, for anything that stands on the ground (ADR-240, ADR-344).**
+// **Walking out of a crowd, for anything that stands on the ground (ADR-240, ADR-348).**
 //
 // Lifted out of `Explore` verbatim -- the same expressions in the same order, with the same
 // constant -- because `Explore` was the only thing in the engine that did it, and ADR-333 moved
@@ -1954,7 +1954,7 @@ public:
     }
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
-        // **How wide this body is (ADR-344).**
+        // **How wide this body is (ADR-348).**
         //
         // `EntityState::radius` is what `EntityWorld` collects into the crowd field, and 0 means
         // "not a body: takes part in nothing that separates crowds". Before this, the only
@@ -2183,7 +2183,7 @@ public:
         // one, whose tick index may legitimately be the same 0 the selector starts at. Testing the
         // index alone left the first decision's options invisible, which is the one decision a
         // person watching a character start up is most likely to be looking at.
-        // **The stall breaker (ADR-344), off unless a scene asks for it.**
+        // **The stall breaker (ADR-348), off unless a scene asks for it.**
         //
         // `Selector::select` hands the queue new actions only when the committed option
         // *changes*, and `remember` is likewise called only on a change -- both for good reasons

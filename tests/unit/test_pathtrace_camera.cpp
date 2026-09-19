@@ -1,4 +1,4 @@
-// Ray generation, the sampler and the sampling warps (ADR-344, spec sections 14-15, 26).
+// Ray generation, the sampler and the sampling warps (ADR-348, spec sections 14-15, 26).
 //
 // The camera tests deliberately check the generated rays against `scene::Camera`'s OWN matrices
 // rather than against a hand-derived expectation. A ray generator and a projection that disagree by

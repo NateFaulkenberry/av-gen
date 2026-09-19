@@ -1,6 +1,6 @@
 #pragma once
 
-// The transient render snapshot (ADR-344, spec section 8) and the capability report (section 55).
+// The transient render snapshot (ADR-348, spec section 8) and the capability report (section 55).
 //
 // `scene::Scene` is mutated in place by its controller: two timeline times cannot coexist, and the
 // realtime renderer rewrites per-frame fields (terrain LOD, `cameraCulled`) that a path trace must

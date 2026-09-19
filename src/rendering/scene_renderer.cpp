@@ -2435,6 +2435,18 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     {
         const scene::SkyRuntime resolved = scene::resolveSky(scene.environment.sky, scene.lights);
         frame.skySun = glm::vec4(resolved.sunDirection, skyIbl ? 1.0f : 0.0f);
+        // ADR-348: the same resolved sky, handed to the background pass as parameters rather than
+        // as a cube. `resolveSky` is already being called here, so this costs nothing and cannot
+        // disagree with the disc drawn above it.
+        frame.skyZenithColor = glm::vec4(resolved.zenithColor, resolved.hazeWidth);
+        frame.skyHorizonColor = glm::vec4(resolved.horizonColor, resolved.sunAngularRadius);
+        frame.skyGroundColor = glm::vec4(resolved.groundColor, resolved.sunGlowWidth);
+        // The flag only means anything when a map is the IBL: with the procedural sky already the
+        // IBL there is nothing to decouple, and the existing cube path is the better one because
+        // it is what the lighting was built from.
+        const bool analyticBackground =
+            scene::skyBackgroundFor(scene.environment, ibl, skyIbl) == scene::SkyBackground::Analytic;
+        frame.skySunRadiance = glm::vec4(resolved.sunColor, analyticBackground ? 1.0f : 0.0f);
     }
     frame.fogParams = glm::vec4(scene.environment.fogColor, std::max(scene.environment.fogDensity, 0.0f));
     // ADR-058: the surface fog borrows the volumetric's mist layer rather than declaring one of
@@ -3261,8 +3273,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         }
         // A procedural sky lights the scene without necessarily standing behind it: existing
         // scenes keep their flat background unless `env/sky/background` asks for the sky (ADR-036).
-        const bool drawSky = ibl && (!ibl_.fromSky || scene.environment.sky.showBackground);
-        if (scene.environment.showSkybox && drawSky) {
+        // ADR-348: one predicate, in scene_types.hpp beside the struct it reads, so which
+        // background gets drawn is a thing a test can ask rather than a thing a render reveals.
+        const scene::SkyBackground background =
+            scene::skyBackgroundFor(scene.environment, ibl, ibl_.fromSky);
+        if (background != scene::SkyBackground::FlatColour) {
             rp.SetPipeline(skyboxPipeline_);
             const std::uint32_t zeroOffset = 0; // layout requires group 1; the skybox ignores it
             rp.SetBindGroup(1, objectBindGroup_, 1, &zeroOffset);

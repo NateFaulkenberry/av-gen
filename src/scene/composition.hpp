@@ -937,7 +937,8 @@ private:
     void rebuild();          // flattens nodes into scene_ (meshes/textures/entities/particles)
     void ensureBuilt();      // rebuild() when dirty
     void applyParameters();
-    void applyDayNight();  // ADR-343; the tail of applyParameters // node finals -> transforms/materials/particles; camera; environment
+    void applyDayNight();
+    void resolveEnvironmentMap();  // ADR-349; runs alone, without a rebuild
     // Nudges the camera's aim onto the hero the active directed shot was cut for (ADR-158).
     // After `syncHeroesToNodes`, not inside `applyParameters`, so it reads where the hero is
     // *this* frame rather than where it was last one.
@@ -1015,6 +1016,18 @@ private:
     float skyIntensitySetting_ = 1.0f;     // the visible sky only
     float skyBloomSetting_ = 0.0f;         // how much of the sky the bloom mask sees
     bool showSkyboxSetting_ = true;        // draw the environment behind the world at all
+    bool proceduralSkyBackgroundSetting_ = false; // ADR-348; analytic sky behind an HDRI
+    // ADR-349: an environment-map change resolves on its own rather than re-flattening the world.
+    bool environmentDirty_ = false;
+    struct EnvironmentTexture {
+        std::string path;
+        TextureId texture = kInvalidTexture;
+        glm::vec3 dominant{0.0f, 1.0f, 0.0f};
+    };
+    // Cleared by `rebuild()`, which clears the scene and with it every id in here. Without the
+    // cache, `addTexture` would append on every swap and a long-running cycle would leak one
+    // texture per crossing.
+    std::vector<EnvironmentTexture> environmentTextureCache_;
     bool lightFromEnvironmentSetting_ = false;
     bool stylizedSetting_ = false;
     params::Parameter<bool>* stylized_ = nullptr;

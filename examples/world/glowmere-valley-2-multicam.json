@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-2-multicam.scene.json",
-        "sha256": "565d5dd02c41d014e8561d6da89fcc3f8fc935b2777846bf9a7d81fd7b422517",
-        "size": 211373
+        "sha256": "d6c87dc60f2127283fb5b54395afbc809c14ba1a2c2d5524d0645034c6020ccb",
+        "size": 228180
       }
     }
   },
@@ -191,9 +191,9 @@
       "end": 4.181333333333333,
       "hero": "visitor",
       "heroAtCut": [
-        6.072404861450195,
-        22.353635787963867,
-        246.69989013671875
+        20.0,
+        29.5,
+        150.0
       ],
       "start": 0.0
     },
@@ -201,9 +201,9 @@
       "end": 7.872,
       "hero": "rook",
       "heroAtCut": [
-        -65.53382110595703,
-        15.920747756958008,
-        -266.46209716796875
+        -74.0,
+        9.232043266296387,
+        -18.0
       ],
       "start": 4.181333333333333
     },
@@ -231,9 +231,9 @@
       "end": 18.933333333333334,
       "hero": "vane",
       "heroAtCut": [
-        22.259342193603516,
-        6.891383647918701,
-        103.28028869628906
+        20.0,
+        10.57017993927002,
+        -10.0
       ],
       "start": 15.242666666666667
     },
@@ -251,9 +251,9 @@
       "end": 30.037333333333333,
       "hero": "sage",
       "heroAtCut": [
-        -41.17908477783203,
-        16.97957420349121,
-        -46.09128952026367
+        -112.0,
+        9.279572486877441,
+        16.0
       ],
       "start": 26.377403436899183
     },
@@ -261,9 +261,9 @@
       "end": 37.36016613006592,
       "hero": "ember",
       "heroAtCut": [
-        -161.60086059570313,
-        3.5619640350341797,
-        128.72381591796875
+        12.0,
+        9.41812515258789,
+        34.0
       ],
       "start": 30.037333333333333
     },
@@ -281,9 +281,9 @@
       "end": 52.1905454187072,
       "hero": "tide",
       "heroAtCut": [
-        -28.71380043029785,
-        16.031932830810547,
-        -177.52313232421875
+        -28.0,
+        9.2360200881958,
+        -46.0
       ],
       "start": 44.8
     },
@@ -301,9 +301,9 @@
       "end": 63.264,
       "hero": "visitor",
       "heroAtCut": [
-        6.072404861450195,
-        22.353635787963867,
-        246.69989013671875
+        20.0,
+        29.5,
+        150.0
       ],
       "start": 59.562666666666665
     },
@@ -331,9 +331,9 @@
       "end": 74.30254406713867,
       "hero": "rook",
       "heroAtCut": [
-        -65.53382110595703,
-        15.920747756958008,
-        -266.46209716796875
+        -74.0,
+        9.232043266296387,
+        -18.0
       ],
       "start": 70.64533333333334
     },
@@ -351,9 +351,9 @@
       "end": 81.66228332453535,
       "hero": "sage",
       "heroAtCut": [
-        -41.17908477783203,
-        16.97957420349121,
-        -46.09128952026367
+        -112.0,
+        9.279572486877441,
+        16.0
       ],
       "start": 78.02666666666667
     },
@@ -381,9 +381,9 @@
       "end": 96.49066666666667,
       "hero": "visitor",
       "heroAtCut": [
-        6.072404861450195,
-        22.353635787963867,
-        246.69989013671875
+        20.0,
+        29.5,
+        150.0
       ],
       "start": 89.09866666666667
     },
@@ -391,9 +391,9 @@
       "end": 103.83439546647693,
       "hero": "vane",
       "heroAtCut": [
-        22.259342193603516,
-        6.891383647918701,
-        103.28028869628906
+        20.0,
+        10.57017993927002,
+        -10.0
       ],
       "start": 96.49066666666667
     },
@@ -401,9 +401,9 @@
       "end": 118.64533333333334,
       "hero": "tide",
       "heroAtCut": [
-        -28.71380043029785,
-        16.031932830810547,
-        -177.52313232421875
+        -28.0,
+        9.2360200881958,
+        -46.0
       ],
       "start": 111.25333333333333
     },
@@ -411,9 +411,9 @@
       "end": 132.49066666666667,
       "hero": "visitor",
       "heroAtCut": [
-        6.072404861450195,
-        22.353635787963867,
-        246.69989013671875
+        20.0,
+        29.5,
+        150.0
       ],
       "start": 118.64533333333334
     },
@@ -451,9 +451,9 @@
       "end": 177.728,
       "hero": "rook",
       "heroAtCut": [
-        -65.53382110595703,
-        15.920747756958008,
-        -266.46209716796875
+        -74.0,
+        9.232043266296387,
+        -18.0
       ],
       "start": 170.336
     },
@@ -461,9 +461,9 @@
       "end": 181.41866666666667,
       "hero": "visitor",
       "heroAtCut": [
-        6.072404861450195,
-        22.353635787963867,
-        246.69989013671875
+        20.0,
+        29.5,
+        150.0
       ],
       "start": 177.728
     },
@@ -501,9 +501,9 @@
       "end": 196.18133333333333,
       "hero": "sage",
       "heroAtCut": [
-        -41.17908477783203,
-        16.97957420349121,
-        -46.09128952026367
+        -112.0,
+        9.279572486877441,
+        16.0
       ],
       "start": 192.49066666666667
     },
@@ -521,9 +521,9 @@
       "end": 203.56266666666667,
       "hero": "visitor",
       "heroAtCut": [
-        6.072404861450195,
-        22.353635787963867,
-        246.69989013671875
+        20.0,
+        29.5,
+        150.0
       ],
       "start": 199.8225850852573
     },
@@ -531,9 +531,9 @@
       "end": 207.25333333333333,
       "hero": "vane",
       "heroAtCut": [
-        22.259342193603516,
-        6.891383647918701,
-        103.28028869628906
+        20.0,
+        10.57017993927002,
+        -10.0
       ],
       "start": 203.56266666666667
     },
@@ -551,9 +551,9 @@
       "end": 226.29333333333332,
       "hero": "ember",
       "heroAtCut": [
-        -161.60086059570313,
-        3.5619640350341797,
-        128.72381591796875
+        12.0,
+        9.41812515258789,
+        34.0
       ],
       "start": 222.02666666666667
     }
@@ -566,9 +566,9 @@
       "start": 0.0,
       "subject": "visitor",
       "subjectPosition": [
-        6.072404861450195,
-        22.353635787963867,
-        246.69989013671875
+        20.0,
+        29.5,
+        150.0
       ],
       "subjectRadius": 8.199999809265137,
       "travel": false
@@ -580,9 +580,9 @@
       "start": 4.181333333333333,
       "subject": "rook",
       "subjectPosition": [
-        -65.53382110595703,
-        15.920747756958008,
-        -266.46209716796875
+        -74.0,
+        9.232043266296387,
+        -18.0
       ],
       "subjectRadius": 1.612043023109436,
       "travel": false
@@ -622,9 +622,9 @@
       "start": 15.242666666666667,
       "subject": "vane",
       "subjectPosition": [
-        22.259342193603516,
-        6.891383647918701,
-        103.28028869628906
+        20.0,
+        10.57017993927002,
+        -10.0
       ],
       "subjectRadius": 1.7401800155639648,
       "travel": false
@@ -664,9 +664,9 @@
       "start": 26.377403436899183,
       "subject": "sage",
       "subjectPosition": [
-        -41.17908477783203,
-        16.97957420349121,
-        -46.09128952026367
+        -112.0,
+        9.279572486877441,
+        16.0
       ],
       "subjectRadius": 1.659572958946228,
       "travel": false
@@ -678,9 +678,9 @@
       "start": 30.037333333333333,
       "subject": "ember",
       "subjectPosition": [
-        -161.60086059570313,
-        3.5619640350341797,
-        128.72381591796875
+        12.0,
+        9.41812515258789,
+        34.0
       ],
       "subjectRadius": 1.7581249475479126,
       "travel": false
@@ -706,9 +706,9 @@
       "start": 44.8,
       "subject": "tide",
       "subjectPosition": [
-        -28.71380043029785,
-        16.031932830810547,
-        -177.52313232421875
+        -28.0,
+        9.2360200881958,
+        -46.0
       ],
       "subjectRadius": 1.6160199642181396,
       "travel": false
@@ -734,9 +734,9 @@
       "start": 59.562666666666665,
       "subject": "visitor",
       "subjectPosition": [
-        6.072404861450195,
-        22.353635787963867,
-        246.69989013671875
+        20.0,
+        29.5,
+        150.0
       ],
       "subjectRadius": 8.199999809265137,
       "travel": false
@@ -776,9 +776,9 @@
       "start": 70.64533333333334,
       "subject": "rook",
       "subjectPosition": [
-        -65.53382110595703,
-        15.920747756958008,
-        -266.46209716796875
+        -74.0,
+        9.232043266296387,
+        -18.0
       ],
       "subjectRadius": 1.612043023109436,
       "travel": false
@@ -804,9 +804,9 @@
       "start": 78.02666666666667,
       "subject": "sage",
       "subjectPosition": [
-        -41.17908477783203,
-        16.97957420349121,
-        -46.09128952026367
+        -112.0,
+        9.279572486877441,
+        16.0
       ],
       "subjectRadius": 1.659572958946228,
       "travel": false
@@ -846,9 +846,9 @@
       "start": 89.09866666666667,
       "subject": "visitor",
       "subjectPosition": [
-        6.072404861450195,
-        22.353635787963867,
-        246.69989013671875
+        20.0,
+        29.5,
+        150.0
       ],
       "subjectRadius": 8.199999809265137,
       "travel": false
@@ -860,9 +860,9 @@
       "start": 96.49066666666667,
       "subject": "vane",
       "subjectPosition": [
-        22.259342193603516,
-        6.891383647918701,
-        103.28028869628906
+        20.0,
+        10.57017993927002,
+        -10.0
       ],
       "subjectRadius": 1.7401800155639648,
       "travel": false
@@ -872,17 +872,17 @@
       "end": 111.25333333333333,
       "handoff": "ember",
       "handoffPosition": [
-        -161.60086059570313,
-        3.5619640350341797,
-        128.72381591796875
+        12.0,
+        9.41812515258789,
+        34.0
       ],
       "spotlight": false,
       "start": 103.83439546647693,
       "subject": "vane",
       "subjectPosition": [
-        22.259342193603516,
-        6.891383647918701,
-        103.28028869628906
+        20.0,
+        10.57017993927002,
+        -10.0
       ],
       "subjectRadius": 1.7401800155639648,
       "travel": true
@@ -894,9 +894,9 @@
       "start": 111.25333333333333,
       "subject": "tide",
       "subjectPosition": [
-        -28.71380043029785,
-        16.031932830810547,
-        -177.52313232421875
+        -28.0,
+        9.2360200881958,
+        -46.0
       ],
       "subjectRadius": 1.6160199642181396,
       "travel": false
@@ -908,9 +908,9 @@
       "start": 118.64533333333334,
       "subject": "visitor",
       "subjectPosition": [
-        6.072404861450195,
-        22.353635787963867,
-        246.69989013671875
+        20.0,
+        29.5,
+        150.0
       ],
       "subjectRadius": 8.199999809265137,
       "travel": false
@@ -964,9 +964,9 @@
       "start": 170.336,
       "subject": "rook",
       "subjectPosition": [
-        -65.53382110595703,
-        15.920747756958008,
-        -266.46209716796875
+        -74.0,
+        9.232043266296387,
+        -18.0
       ],
       "subjectRadius": 1.612043023109436,
       "travel": false
@@ -978,9 +978,9 @@
       "start": 177.728,
       "subject": "visitor",
       "subjectPosition": [
-        6.072404861450195,
-        22.353635787963867,
-        246.69989013671875
+        20.0,
+        29.5,
+        150.0
       ],
       "subjectRadius": 8.199999809265137,
       "travel": false
@@ -1034,9 +1034,9 @@
       "start": 192.49066666666667,
       "subject": "sage",
       "subjectPosition": [
-        -41.17908477783203,
-        16.97957420349121,
-        -46.09128952026367
+        -112.0,
+        9.279572486877441,
+        16.0
       ],
       "subjectRadius": 1.659572958946228,
       "travel": false
@@ -1062,9 +1062,9 @@
       "start": 199.8225850852573,
       "subject": "visitor",
       "subjectPosition": [
-        6.072404861450195,
-        22.353635787963867,
-        246.69989013671875
+        20.0,
+        29.5,
+        150.0
       ],
       "subjectRadius": 8.199999809265137,
       "travel": false
@@ -1076,9 +1076,9 @@
       "start": 203.56266666666667,
       "subject": "vane",
       "subjectPosition": [
-        22.259342193603516,
-        6.891383647918701,
-        103.28028869628906
+        20.0,
+        10.57017993927002,
+        -10.0
       ],
       "subjectRadius": 1.7401800155639648,
       "travel": false
@@ -1104,9 +1104,9 @@
       "start": 210.95466666666667,
       "subject": "tide",
       "subjectPosition": [
-        -28.71380043029785,
-        16.031932830810547,
-        -177.52313232421875
+        -28.0,
+        9.2360200881958,
+        -46.0
       ],
       "subjectRadius": 1.6160199642181396,
       "travel": false
@@ -1146,9 +1146,9 @@
       "start": 222.02666666666667,
       "subject": "ember",
       "subjectPosition": [
-        -161.60086059570313,
-        3.5619640350341797,
-        128.72381591796875
+        12.0,
+        9.41812515258789,
+        34.0
       ],
       "subjectRadius": 1.7581249475479126,
       "travel": false
@@ -1189,9 +1189,9 @@
       "importance": 0.4000000059604645,
       "name": "visitor",
       "position": [
-        -30.87479019165039,
-        26.602706909179688,
-        -35.507415771484375
+        20.0,
+        29.5,
+        150.0
       ],
       "preferredCameraDistance": 34.0,
       "preferredCameraElevation": -4.0,
@@ -1234,9 +1234,9 @@
       "importance": 0.5,
       "name": "rook",
       "position": [
-        -31.300582885742188,
-        12.845587730407715,
-        -59.940391540527344
+        -74.0,
+        9.232043023109437,
+        -18.0
       ],
       "preferredCameraDistance": 7.528364181518555,
       "preferredCameraElevation": 8.0,
@@ -1256,9 +1256,9 @@
       "importance": 0.5,
       "name": "tide",
       "position": [
-        -41.438228607177734,
-        19.162155151367188,
-        -165.00416564941406
+        -28.0,
+        9.23601996421814,
+        -46.0
       ],
       "preferredCameraDistance": 7.563477993011475,
       "preferredCameraElevation": 8.0,
@@ -1278,9 +1278,9 @@
       "importance": 0.5,
       "name": "sage",
       "position": [
-        -40.07037353515625,
-        17.05178451538086,
-        -46.37556076049805
+        -112.0,
+        9.279572958946229,
+        16.0
       ],
       "preferredCameraDistance": 8.042852401733398,
       "preferredCameraElevation": 8.0,
@@ -1300,9 +1300,9 @@
       "importance": 0.5,
       "name": "ember",
       "position": [
-        -78.61520385742188,
-        -0.4602484703063965,
-        183.99330139160156
+        12.0,
+        9.418124947547913,
+        34.0
       ],
       "preferredCameraDistance": 8.304945945739746,
       "preferredCameraElevation": 8.0,
@@ -1322,9 +1322,9 @@
       "importance": 0.5,
       "name": "vane",
       "position": [
-        16.81873321533203,
-        10.782392501831055,
-        38.25005340576172
+        20.0,
+        10.570180015563965,
+        -10.0
       ],
       "preferredCameraDistance": 8.2046480178833,
       "preferredCameraElevation": 8.0,
@@ -1675,8 +1675,8 @@
       2.0,
       0.0
     ],
-    "cameras/valleywide/focalLength": 24.0,
-    "cameras/valleywide/fov": 52.0,
+    "cameras/valleywide/focalLength": 30.0,
+    "cameras/valleywide/fov": 44.0,
     "cameras/valleywide/lookAhead": 2.0,
     "cameras/valleywide/position": [
       -88.0,
@@ -1694,6 +1694,7 @@
       6.0,
       46.0
     ],
+    "entity/bull-1/ground/bodyRadius": 0.0,
     "entity/bull-1/ground/maxFloat": 0.2199999988079071,
     "entity/bull-1/ground/maxTilt": 34.0,
     "entity/bull-1/ground/slopeAlign": 1.0,
@@ -1712,6 +1713,7 @@
     "entity/bull-1/wander/runSpeed": 3.091099977493286,
     "entity/bull-1/wander/speed": 1.9319000244140625,
     "entity/bull-1/wander/turnRate": 76.30000305175781,
+    "entity/bull-10/ground/bodyRadius": 0.0,
     "entity/bull-10/ground/maxFloat": 0.2199999988079071,
     "entity/bull-10/ground/maxTilt": 34.0,
     "entity/bull-10/ground/slopeAlign": 1.0,
@@ -1730,6 +1732,7 @@
     "entity/bull-10/wander/runSpeed": 3.273200035095215,
     "entity/bull-10/wander/speed": 2.045599937438965,
     "entity/bull-10/wander/turnRate": 69.19999694824219,
+    "entity/chicken-17/ground/bodyRadius": 0.0,
     "entity/chicken-17/ground/maxFloat": 0.2199999988079071,
     "entity/chicken-17/ground/maxTilt": 34.0,
     "entity/chicken-17/ground/slopeAlign": 0.550000011920929,
@@ -1748,6 +1751,7 @@
     "entity/chicken-17/wander/runSpeed": 1.0793999433517456,
     "entity/chicken-17/wander/speed": 0.6747000217437744,
     "entity/chicken-17/wander/turnRate": 78.4000015258789,
+    "entity/chicken-8/ground/bodyRadius": 0.0,
     "entity/chicken-8/ground/maxFloat": 0.2199999988079071,
     "entity/chicken-8/ground/maxTilt": 34.0,
     "entity/chicken-8/ground/slopeAlign": 0.550000011920929,
@@ -1766,6 +1770,7 @@
     "entity/chicken-8/wander/runSpeed": 0.8105000257492065,
     "entity/chicken-8/wander/speed": 0.506600022315979,
     "entity/chicken-8/wander/turnRate": 106.4000015258789,
+    "entity/cow-12/ground/bodyRadius": 0.0,
     "entity/cow-12/ground/maxFloat": 0.2199999988079071,
     "entity/cow-12/ground/maxTilt": 34.0,
     "entity/cow-12/ground/slopeAlign": 1.0,
@@ -1784,6 +1789,7 @@
     "entity/cow-12/wander/runSpeed": 1.9831000566482544,
     "entity/cow-12/wander/speed": 1.239400029182434,
     "entity/cow-12/wander/turnRate": 75.5,
+    "entity/cow-3/ground/bodyRadius": 0.0,
     "entity/cow-3/ground/maxFloat": 0.2199999988079071,
     "entity/cow-3/ground/maxTilt": 34.0,
     "entity/cow-3/ground/slopeAlign": 1.0,
@@ -1802,25 +1808,20 @@
     "entity/cow-3/wander/runSpeed": 2.5553998947143555,
     "entity/cow-3/wander/speed": 1.5973000526428223,
     "entity/cow-3/wander/turnRate": 110.0,
-    "entity/ember/explore/arrive": 3.0,
-    "entity/ember/explore/bodyRadius": 2.4000000953674316,
-    "entity/ember/explore/footprint": 2.5999999046325684,
-    "entity/ember/explore/headroom": 9.0,
-    "entity/ember/explore/homeRadius": 0.0,
-    "entity/ember/explore/idleMax": 2.0,
-    "entity/ember/explore/idleMin": 0.5,
-    "entity/ember/explore/jumpRange": 7.0,
-    "entity/ember/explore/maxRange": 220.0,
-    "entity/ember/explore/minRange": 18.0,
-    "entity/ember/explore/observeChance": 0.30000001192092896,
-    "entity/ember/explore/observeMax": 3.5,
-    "entity/ember/explore/observeMin": 1.2000000476837158,
-    "entity/ember/explore/runChance": 0.2800000011920929,
-    "entity/ember/explore/runSpeed": 6.961699962615967,
-    "entity/ember/explore/slopeAlign": 0.5,
-    "entity/ember/explore/speed": 2.6686999797821045,
-    "entity/ember/explore/turnRate": 170.0,
-    "entity/ember/explore/wadeDrag": 0.550000011920929,
+    "entity/ember/decide/dwellTicks": 3.0,
+    "entity/ember/decide/hertz": 1.2000000476837158,
+    "entity/ember/decide/idle/weight": 0.05000000074505806,
+    "entity/ember/decide/margin": 0.05000000074505806,
+    "entity/ember/decide/memorySeconds": 9.0,
+    "entity/ember/decide/range/pull": 0.44999998807907104,
+    "entity/ember/decide/range/weight": 0.10000000149011612,
+    "entity/ember/decide/roam/weight": 1.0,
+    "entity/ember/decide/stallSeconds": 12.0,
+    "entity/ember/ground/bodyRadius": 0.8999999761581421,
+    "entity/ember/ground/maxFloat": 0.2199999988079071,
+    "entity/ember/ground/maxTilt": 34.0,
+    "entity/ember/ground/slopeAlign": 0.5,
+    "entity/ember/ground/smoothingMs": 85.0,
     "entity/ember/liveliness/bounce": 0.3199999928474426,
     "entity/ember/liveliness/bounceRate": 0.8999999761581421,
     "entity/ember/liveliness/nod": 3.0,
@@ -1828,6 +1829,18 @@
     "entity/ember/liveliness/swayRate": 0.15000000596046448,
     "entity/ember/lookAt/turnRate": 140.0,
     "entity/ember/lookAt/weight": 1.0,
+    "entity/ember/perception/capacity": 14.0,
+    "entity/ember/perception/fieldOfView": 200.0,
+    "entity/ember/perception/hertz": 4.0,
+    "entity/ember/perception/occlusionTestsPerSecond": 0.0,
+    "entity/ember/perception/proximityRange": 6.0,
+    "entity/ember/perception/range": 90.0,
+    "entity/ember/perception/weight/character": 1.2999999523162842,
+    "entity/ember/perception/weight/glow": 1.2000000476837158,
+    "entity/ember/perception/weight/landmark": 1.0,
+    "entity/ember/perception/weight/vista": 0.699999988079071,
+    "entity/ember/perception/weight/water": 0.8999999761581421,
+    "entity/goat-14/ground/bodyRadius": 0.0,
     "entity/goat-14/ground/maxFloat": 0.2199999988079071,
     "entity/goat-14/ground/maxTilt": 34.0,
     "entity/goat-14/ground/slopeAlign": 1.0,
@@ -1846,6 +1859,7 @@
     "entity/goat-14/wander/runSpeed": 0.9991000294685364,
     "entity/goat-14/wander/speed": 0.6245999932289124,
     "entity/goat-14/wander/turnRate": 107.0999984741211,
+    "entity/goat-5/ground/bodyRadius": 0.0,
     "entity/goat-5/ground/maxFloat": 0.2199999988079071,
     "entity/goat-5/ground/maxTilt": 34.0,
     "entity/goat-5/ground/slopeAlign": 1.0,
@@ -1864,6 +1878,7 @@
     "entity/goat-5/wander/runSpeed": 0.9381999969482422,
     "entity/goat-5/wander/speed": 0.5863000154495239,
     "entity/goat-5/wander/turnRate": 85.5999984741211,
+    "entity/horse-11/ground/bodyRadius": 0.0,
     "entity/horse-11/ground/maxFloat": 0.2199999988079071,
     "entity/horse-11/ground/maxTilt": 34.0,
     "entity/horse-11/ground/slopeAlign": 1.0,
@@ -1882,6 +1897,7 @@
     "entity/horse-11/wander/runSpeed": 2.606600046157837,
     "entity/horse-11/wander/speed": 1.62909996509552,
     "entity/horse-11/wander/turnRate": 81.5,
+    "entity/horse-2/ground/bodyRadius": 0.0,
     "entity/horse-2/ground/maxFloat": 0.2199999988079071,
     "entity/horse-2/ground/maxTilt": 34.0,
     "entity/horse-2/ground/slopeAlign": 1.0,
@@ -1900,6 +1916,7 @@
     "entity/horse-2/wander/runSpeed": 2.2202000617980957,
     "entity/horse-2/wander/speed": 1.3875999450683594,
     "entity/horse-2/wander/turnRate": 94.4000015258789,
+    "entity/pig-15/ground/bodyRadius": 0.0,
     "entity/pig-15/ground/maxFloat": 0.2199999988079071,
     "entity/pig-15/ground/maxTilt": 34.0,
     "entity/pig-15/ground/slopeAlign": 1.0,
@@ -1918,6 +1935,7 @@
     "entity/pig-15/wander/runSpeed": 0.991599977016449,
     "entity/pig-15/wander/speed": 0.619700014591217,
     "entity/pig-15/wander/turnRate": 106.69999694824219,
+    "entity/pig-6/ground/bodyRadius": 0.0,
     "entity/pig-6/ground/maxFloat": 0.2199999988079071,
     "entity/pig-6/ground/maxTilt": 34.0,
     "entity/pig-6/ground/slopeAlign": 1.0,
@@ -1936,25 +1954,20 @@
     "entity/pig-6/wander/runSpeed": 1.5563000440597534,
     "entity/pig-6/wander/speed": 0.9726999998092651,
     "entity/pig-6/wander/turnRate": 101.69999694824219,
-    "entity/rook/explore/arrive": 3.0,
-    "entity/rook/explore/bodyRadius": 2.4000000953674316,
-    "entity/rook/explore/footprint": 2.5999999046325684,
-    "entity/rook/explore/headroom": 9.0,
-    "entity/rook/explore/homeRadius": 0.0,
-    "entity/rook/explore/idleMax": 2.200000047683716,
-    "entity/rook/explore/idleMin": 0.6000000238418579,
-    "entity/rook/explore/jumpRange": 0.0,
-    "entity/rook/explore/maxRange": 220.0,
-    "entity/rook/explore/minRange": 18.0,
-    "entity/rook/explore/observeChance": 0.25,
-    "entity/rook/explore/observeMax": 4.0,
-    "entity/rook/explore/observeMin": 1.5,
-    "entity/rook/explore/runChance": 0.3400000035762787,
-    "entity/rook/explore/runSpeed": 7.254799842834473,
-    "entity/rook/explore/slopeAlign": 0.5,
-    "entity/rook/explore/speed": 3.009399890899658,
-    "entity/rook/explore/turnRate": 150.0,
-    "entity/rook/explore/wadeDrag": 0.550000011920929,
+    "entity/rook/decide/dwellTicks": 3.0,
+    "entity/rook/decide/hertz": 1.2000000476837158,
+    "entity/rook/decide/idle/weight": 0.05000000074505806,
+    "entity/rook/decide/margin": 0.05999999865889549,
+    "entity/rook/decide/memorySeconds": 9.0,
+    "entity/rook/decide/range/pull": 0.5,
+    "entity/rook/decide/range/weight": 0.11999999731779099,
+    "entity/rook/decide/roam/weight": 1.0,
+    "entity/rook/decide/stallSeconds": 12.0,
+    "entity/rook/ground/bodyRadius": 0.8999999761581421,
+    "entity/rook/ground/maxFloat": 0.2199999988079071,
+    "entity/rook/ground/maxTilt": 34.0,
+    "entity/rook/ground/slopeAlign": 0.5,
+    "entity/rook/ground/smoothingMs": 85.0,
     "entity/rook/liveliness/bounce": 0.2199999988079071,
     "entity/rook/liveliness/bounceRate": 0.8999999761581421,
     "entity/rook/liveliness/nod": 2.0,
@@ -1962,6 +1975,18 @@
     "entity/rook/liveliness/swayRate": 0.15000000596046448,
     "entity/rook/lookAt/turnRate": 90.0,
     "entity/rook/lookAt/weight": 1.0,
+    "entity/rook/perception/capacity": 14.0,
+    "entity/rook/perception/fieldOfView": 200.0,
+    "entity/rook/perception/hertz": 4.0,
+    "entity/rook/perception/occlusionTestsPerSecond": 0.0,
+    "entity/rook/perception/proximityRange": 6.0,
+    "entity/rook/perception/range": 85.0,
+    "entity/rook/perception/weight/character": 1.2999999523162842,
+    "entity/rook/perception/weight/glow": 1.2000000476837158,
+    "entity/rook/perception/weight/landmark": 1.0,
+    "entity/rook/perception/weight/vista": 0.699999988079071,
+    "entity/rook/perception/weight/water": 0.8999999761581421,
+    "entity/rooster-16/ground/bodyRadius": 0.0,
     "entity/rooster-16/ground/maxFloat": 0.2199999988079071,
     "entity/rooster-16/ground/maxTilt": 34.0,
     "entity/rooster-16/ground/slopeAlign": 0.550000011920929,
@@ -1980,6 +2005,7 @@
     "entity/rooster-16/wander/runSpeed": 0.7426000237464905,
     "entity/rooster-16/wander/speed": 0.46399998664855957,
     "entity/rooster-16/wander/turnRate": 110.80000305175781,
+    "entity/rooster-7/ground/bodyRadius": 0.0,
     "entity/rooster-7/ground/maxFloat": 0.2199999988079071,
     "entity/rooster-7/ground/maxTilt": 34.0,
     "entity/rooster-7/ground/slopeAlign": 0.550000011920929,
@@ -1998,25 +2024,20 @@
     "entity/rooster-7/wander/runSpeed": 0.9182999730110168,
     "entity/rooster-7/wander/speed": 0.5738999843597412,
     "entity/rooster-7/wander/turnRate": 99.5999984741211,
-    "entity/sage/explore/arrive": 3.0,
-    "entity/sage/explore/bodyRadius": 2.4000000953674316,
-    "entity/sage/explore/footprint": 2.5999999046325684,
-    "entity/sage/explore/headroom": 9.0,
-    "entity/sage/explore/homeRadius": 0.0,
-    "entity/sage/explore/idleMax": 4.5,
-    "entity/sage/explore/idleMin": 1.399999976158142,
-    "entity/sage/explore/jumpRange": 0.0,
-    "entity/sage/explore/maxRange": 220.0,
-    "entity/sage/explore/minRange": 18.0,
-    "entity/sage/explore/observeChance": 0.6000000238418579,
-    "entity/sage/explore/observeMax": 8.0,
-    "entity/sage/explore/observeMin": 3.0,
-    "entity/sage/explore/runChance": 0.11999999731779099,
-    "entity/sage/explore/runSpeed": 5.153800010681152,
-    "entity/sage/explore/slopeAlign": 0.5,
-    "entity/sage/explore/speed": 2.1700000762939453,
-    "entity/sage/explore/turnRate": 130.0,
-    "entity/sage/explore/wadeDrag": 0.550000011920929,
+    "entity/sage/decide/dwellTicks": 4.0,
+    "entity/sage/decide/graze/weight": 0.949999988079071,
+    "entity/sage/decide/grove/pull": 0.18000000715255737,
+    "entity/sage/decide/grove/weight": 0.41999998688697815,
+    "entity/sage/decide/hertz": 0.6000000238418579,
+    "entity/sage/decide/idle/weight": 0.05000000074505806,
+    "entity/sage/decide/margin": 0.10000000149011612,
+    "entity/sage/decide/memorySeconds": 9.0,
+    "entity/sage/decide/stallSeconds": 12.0,
+    "entity/sage/ground/bodyRadius": 0.8999999761581421,
+    "entity/sage/ground/maxFloat": 0.2199999988079071,
+    "entity/sage/ground/maxTilt": 34.0,
+    "entity/sage/ground/slopeAlign": 0.5,
+    "entity/sage/ground/smoothingMs": 85.0,
     "entity/sage/interest/alertThreshold": 0.30000001192092896,
     "entity/sage/interest/maxDwell": 3.4000000953674316,
     "entity/sage/interest/minDwell": 1.2000000476837158,
@@ -2030,6 +2051,18 @@
     "entity/sage/liveliness/swayRate": 0.15000000596046448,
     "entity/sage/lookAt/turnRate": 110.0,
     "entity/sage/lookAt/weight": 1.0,
+    "entity/sage/perception/capacity": 10.0,
+    "entity/sage/perception/fieldOfView": 200.0,
+    "entity/sage/perception/hertz": 3.0,
+    "entity/sage/perception/occlusionTestsPerSecond": 0.0,
+    "entity/sage/perception/proximityRange": 6.0,
+    "entity/sage/perception/range": 60.0,
+    "entity/sage/perception/weight/character": 1.2999999523162842,
+    "entity/sage/perception/weight/glow": 1.2000000476837158,
+    "entity/sage/perception/weight/landmark": 1.0,
+    "entity/sage/perception/weight/vista": 0.699999988079071,
+    "entity/sage/perception/weight/water": 0.8999999761581421,
+    "entity/sheep-13/ground/bodyRadius": 0.0,
     "entity/sheep-13/ground/maxFloat": 0.2199999988079071,
     "entity/sheep-13/ground/maxTilt": 34.0,
     "entity/sheep-13/ground/slopeAlign": 1.0,
@@ -2048,6 +2081,7 @@
     "entity/sheep-13/wander/runSpeed": 1.0356999635696411,
     "entity/sheep-13/wander/speed": 0.6471999883651733,
     "entity/sheep-13/wander/turnRate": 88.80000305175781,
+    "entity/sheep-4/ground/bodyRadius": 0.0,
     "entity/sheep-4/ground/maxFloat": 0.2199999988079071,
     "entity/sheep-4/ground/maxTilt": 34.0,
     "entity/sheep-4/ground/slopeAlign": 1.0,
@@ -2066,25 +2100,20 @@
     "entity/sheep-4/wander/runSpeed": 0.8865000009536743,
     "entity/sheep-4/wander/speed": 0.5540000200271606,
     "entity/sheep-4/wander/turnRate": 93.80000305175781,
-    "entity/tide/explore/arrive": 3.0,
-    "entity/tide/explore/bodyRadius": 2.4000000953674316,
-    "entity/tide/explore/footprint": 2.5999999046325684,
-    "entity/tide/explore/headroom": 9.0,
-    "entity/tide/explore/homeRadius": 0.0,
-    "entity/tide/explore/idleMax": 6.0,
-    "entity/tide/explore/idleMin": 2.0,
-    "entity/tide/explore/jumpRange": 0.0,
-    "entity/tide/explore/maxRange": 220.0,
-    "entity/tide/explore/minRange": 18.0,
-    "entity/tide/explore/observeChance": 0.699999988079071,
-    "entity/tide/explore/observeMax": 9.0,
-    "entity/tide/explore/observeMin": 3.5,
-    "entity/tide/explore/runChance": 0.05999999865889549,
-    "entity/tide/explore/runSpeed": 4.309899806976318,
-    "entity/tide/explore/slopeAlign": 0.5,
-    "entity/tide/explore/speed": 1.7239999771118164,
-    "entity/tide/explore/turnRate": 110.0,
-    "entity/tide/explore/wadeDrag": 0.550000011920929,
+    "entity/tide/decide/dwellTicks": 4.0,
+    "entity/tide/decide/hertz": 0.800000011920929,
+    "entity/tide/decide/idle/weight": 0.05000000074505806,
+    "entity/tide/decide/margin": 0.07999999821186066,
+    "entity/tide/decide/memorySeconds": 9.0,
+    "entity/tide/decide/range/pull": 0.4000000059604645,
+    "entity/tide/decide/range/weight": 0.10000000149011612,
+    "entity/tide/decide/roam/weight": 1.0,
+    "entity/tide/decide/stallSeconds": 12.0,
+    "entity/tide/ground/bodyRadius": 0.8999999761581421,
+    "entity/tide/ground/maxFloat": 0.2199999988079071,
+    "entity/tide/ground/maxTilt": 34.0,
+    "entity/tide/ground/slopeAlign": 0.5,
+    "entity/tide/ground/smoothingMs": 85.0,
     "entity/tide/liveliness/bounce": 0.14000000059604645,
     "entity/tide/liveliness/bounceRate": 0.8999999761581421,
     "entity/tide/liveliness/nod": 4.0,
@@ -2092,25 +2121,31 @@
     "entity/tide/liveliness/swayRate": 0.10000000149011612,
     "entity/tide/lookAt/turnRate": 60.0,
     "entity/tide/lookAt/weight": 1.0,
-    "entity/vane/explore/arrive": 3.0,
-    "entity/vane/explore/bodyRadius": 2.4000000953674316,
-    "entity/vane/explore/footprint": 2.5999999046325684,
-    "entity/vane/explore/headroom": 9.0,
-    "entity/vane/explore/homeRadius": 0.0,
-    "entity/vane/explore/idleMax": 2.0,
-    "entity/vane/explore/idleMin": 0.5,
-    "entity/vane/explore/jumpRange": 7.0,
-    "entity/vane/explore/maxRange": 220.0,
-    "entity/vane/explore/minRange": 18.0,
-    "entity/vane/explore/observeChance": 0.30000001192092896,
-    "entity/vane/explore/observeMax": 3.5,
-    "entity/vane/explore/observeMin": 1.2000000476837158,
-    "entity/vane/explore/runChance": 0.2800000011920929,
-    "entity/vane/explore/runSpeed": 6.961699962615967,
-    "entity/vane/explore/slopeAlign": 0.5,
-    "entity/vane/explore/speed": 2.6686999797821045,
-    "entity/vane/explore/turnRate": 170.0,
-    "entity/vane/explore/wadeDrag": 0.550000011920929,
+    "entity/tide/perception/capacity": 12.0,
+    "entity/tide/perception/fieldOfView": 200.0,
+    "entity/tide/perception/hertz": 3.0,
+    "entity/tide/perception/occlusionTestsPerSecond": 0.0,
+    "entity/tide/perception/proximityRange": 6.0,
+    "entity/tide/perception/range": 70.0,
+    "entity/tide/perception/weight/character": 1.2999999523162842,
+    "entity/tide/perception/weight/glow": 1.2000000476837158,
+    "entity/tide/perception/weight/landmark": 1.0,
+    "entity/tide/perception/weight/vista": 0.699999988079071,
+    "entity/tide/perception/weight/water": 0.8999999761581421,
+    "entity/vane/decide/dwellTicks": 3.0,
+    "entity/vane/decide/hertz": 1.0,
+    "entity/vane/decide/idle/weight": 0.05000000074505806,
+    "entity/vane/decide/margin": 0.07000000029802322,
+    "entity/vane/decide/memorySeconds": 9.0,
+    "entity/vane/decide/range/pull": 0.2800000011920929,
+    "entity/vane/decide/range/weight": 0.09000000357627869,
+    "entity/vane/decide/stallSeconds": 12.0,
+    "entity/vane/decide/watch/weight": 1.25,
+    "entity/vane/ground/bodyRadius": 0.8999999761581421,
+    "entity/vane/ground/maxFloat": 0.2199999988079071,
+    "entity/vane/ground/maxTilt": 34.0,
+    "entity/vane/ground/slopeAlign": 0.5,
+    "entity/vane/ground/smoothingMs": 85.0,
     "entity/vane/liveliness/bounce": 0.3199999928474426,
     "entity/vane/liveliness/bounceRate": 0.8999999761581421,
     "entity/vane/liveliness/nod": 3.0,
@@ -2118,6 +2153,17 @@
     "entity/vane/liveliness/swayRate": 0.15000000596046448,
     "entity/vane/lookAt/turnRate": 140.0,
     "entity/vane/lookAt/weight": 1.0,
+    "entity/vane/perception/capacity": 16.0,
+    "entity/vane/perception/fieldOfView": 260.0,
+    "entity/vane/perception/hertz": 5.0,
+    "entity/vane/perception/occlusionTestsPerSecond": 0.0,
+    "entity/vane/perception/proximityRange": 6.0,
+    "entity/vane/perception/range": 120.0,
+    "entity/vane/perception/weight/character": 1.2999999523162842,
+    "entity/vane/perception/weight/glow": 1.2000000476837158,
+    "entity/vane/perception/weight/landmark": 1.0,
+    "entity/vane/perception/weight/vista": 0.699999988079071,
+    "entity/vane/perception/weight/water": 0.8999999761581421,
     "entity/visitor/bank/degrees": 5.0,
     "entity/visitor/bank/responseMs": 1500.0,
     "entity/visitor/drift/radius": 2.4000000953674316,
@@ -4061,12 +4107,6 @@
       1.0
     ],
     "nodes/cairn-under/visible": true,
-    "nodes/chicken-17/lightColor": [
-      1.0,
-      1.0,
-      1.0
-    ],
-    "nodes/chicken-17/lightIntensity": 1.0,
     "nodes/chicken-8/emissiveBoost": 1.0,
     "nodes/chicken-8/lightColor": [
       1.0,
@@ -4763,12 +4803,6 @@
       1.940000057220459
     ],
     "nodes/rook/visible": true,
-    "nodes/rooster-16/lightColor": [
-      1.0,
-      1.0,
-      1.0
-    ],
-    "nodes/rooster-16/lightIntensity": 1.0,
     "nodes/rooster-7/emissiveBoost": 1.0,
     "nodes/rooster-7/lightColor": [
       1.0,
@@ -13239,7 +13273,7 @@
     "limits": "unlimited",
     "muxAudio": true,
     "output": "video",
-    "path": "/Users/natefaulkenberry/Desktop/bad.mov",
+    "path": "glowmere-valley-2-multicam.mov",
     "pattern": "frame_{:06d}.png",
     "quality": 80,
     "start": 0.0,
@@ -15181,144 +15215,144 @@
             "interp": "linear",
             "time": 0.0,
             "value": [
-              57.07240295410156,
-              18.787368774414063,
-              246.69989013671875
+              71.0,
+              25.933732986450195,
+              150.0
             ]
           },
           {
             "interp": "linear",
             "time": 0.5973333600362142,
             "value": [
-              57.071739196777344,
-              18.768964767456055,
-              246.96060180664063
+              70.99932861328125,
+              25.915328979492188,
+              150.26071166992188
             ]
           },
           {
             "interp": "linear",
             "time": 1.1946667200724284,
             "value": [
-              57.063865661621094,
-              18.72150421142578,
-              247.63291931152344
+              70.99146270751953,
+              25.867868423461914,
+              150.9330291748047
             ]
           },
           {
             "interp": "linear",
             "time": 1.7920000178019204,
             "value": [
-              57.03876495361328,
-              18.65660858154297,
-              248.5519256591797
+              70.96636199951172,
+              25.8029727935791,
+              151.85203552246094
             ]
           },
           {
             "interp": "linear",
             "time": 2.3893334401448567,
             "value": [
-              56.99256134033203,
-              18.589170455932617,
-              249.55252075195313
+              70.92015838623047,
+              25.73553466796875,
+              152.85263061523438
             ]
           },
           {
             "interp": "linear",
             "time": 2.9866667378743488,
             "value": [
-              56.93286895751953,
-              18.52972412109375,
-              250.4699249267578
+              70.86046600341797,
+              25.67608642578125,
+              153.77003479003906
             ]
           },
           {
             "interp": "linear",
             "time": 3.584000035603841,
             "value": [
-              56.878746032714844,
-              18.693016052246094,
-              251.14010620117188
+              70.80634307861328,
+              25.631893157958984,
+              154.44021606445313
             ]
           },
           {
             "interp": "linear",
             "time": 4.181333333333333,
             "value": [
-              56.855384826660156,
-              19.70186424255371,
-              251.39976501464844
+              70.7829818725586,
+              25.601505279541016,
+              154.6998748779297
             ]
           },
           {
             "interp": "linear",
             "time": 4.181333333333333,
             "value": [
-              -73.86056518554688,
-              21.75649070739746,
-              -258.8340759277344
+              -82.32675170898438,
+              17.35080909729004,
+              -10.371968269348145
             ]
           },
           {
             "interp": "linear",
             "time": 4.7085714521408075,
             "value": [
-              -73.98646545410156,
-              21.77959442138672,
-              -258.97381591796875
+              -82.45276641845703,
+              13.231298446655273,
+              -10.511850357055664
             ]
           },
           {
             "interp": "linear",
             "time": 5.235809570948282,
             "value": [
-              -74.30023956298828,
-              21.810531616210938,
-              -259.34368896484375
+              -82.76683044433594,
+              12.419676780700684,
+              -10.882110595703125
             ]
           },
           {
             "interp": "linear",
             "time": 5.763047634760539,
             "value": [
-              -74.70298767089844,
-              21.848634719848633,
-              -259.8705749511719
+              -83.169921875,
+              12.438852310180664,
+              -11.409540176391602
             ]
           },
           {
             "interp": "linear",
             "time": 6.290285808563232,
             "value": [
-              -75.10575866699219,
-              21.887052536010742,
-              -260.470458984375
+              -83.572998046875,
+              12.460796356201172,
+              -12.010063171386719
             ]
           },
           {
             "interp": "linear",
             "time": 6.817523872375488,
             "value": [
-              -75.2234115600586,
-              21.907480239868164,
-              -261.1617126464844
+              -83.68975830078125,
+              12.480417251586914,
+              -12.702457427978516
             ]
           },
           {
             "interp": "linear",
             "time": 7.344761936187744,
             "value": [
-              -75.24110412597656,
-              21.91764259338379,
-              -261.6816711425781
+              -83.70730590820313,
+              13.066024780273438,
+              -13.222883224487305
             ]
           },
           {
             "interp": "linear",
             "time": 7.872,
             "value": [
-              -75.24081420898438,
-              21.920270919799805,
-              -261.881103515625
+              -83.70695495605469,
+              15.94471263885498,
+              -13.422473907470703
             ]
           },
           {
@@ -15326,7 +15360,7 @@
             "time": 7.872,
             "value": [
               80.18431091308594,
-              21.780017852783203,
+              21.692890167236328,
               -88.73625946044922
             ]
           },
@@ -15335,7 +15369,7 @@
             "time": 8.397714309215546,
             "value": [
               80.00721740722656,
-              21.71527862548828,
+              21.70084571838379,
               -88.58944702148438
             ]
           },
@@ -15469,72 +15503,72 @@
             "interp": "linear",
             "time": 15.242666666666667,
             "value": [
-              18.641193389892578,
-              20.28148078918457,
-              91.5171890258789
+              16.381851196289063,
+              19.06509780883789,
+              -21.76310157775879
             ]
           },
           {
             "interp": "linear",
             "time": 15.769904785474141,
             "value": [
-              18.779918670654297,
-              15.255373001098633,
-              91.47541046142578
+              16.52057647705078,
+              13.427360534667969,
+              -21.804880142211914
             ]
           },
           {
             "interp": "linear",
             "time": 16.297142904281618,
             "value": [
-              19.13983154296875,
-              14.257166862487793,
-              91.37523651123047
+              16.880489349365234,
+              12.299812316894531,
+              -21.90505027770996
             ]
           },
           {
             "interp": "linear",
             "time": 16.824380968093873,
             "value": [
-              19.636573791503906,
-              14.26772403717041,
-              91.25603485107422
+              17.37723159790039,
+              12.299812316894531,
+              -22.024253845214844
             ]
           },
           {
             "interp": "linear",
             "time": 17.351619141896567,
             "value": [
-              20.182798385620117,
-              14.27942180633545,
-              91.14976501464844
+              17.9234561920166,
+              12.299812316894531,
+              -22.13051986694336
             ]
           },
           {
             "interp": "linear",
             "time": 17.878857205708822,
             "value": [
-              20.687999725341797,
-              14.289800643920898,
-              91.07404327392578
+              18.42865753173828,
+              12.299812316894531,
+              -22.206247329711914
             ]
           },
           {
             "interp": "linear",
             "time": 18.406095269521078,
             "value": [
-              21.05921745300293,
-              14.539262771606445,
-              91.03197479248047
+              18.799875259399414,
+              12.668374061584473,
+              -22.24831771850586
             ]
           },
           {
             "interp": "linear",
             "time": 18.933333333333334,
             "value": [
-              21.2034854888916,
-              15.760087966918945,
-              91.01869201660156
+              18.944143295288086,
+              14.51118278503418,
+              -22.2615966796875
             ]
           },
           {
@@ -15668,7 +15702,7 @@
             "time": 25.84272678730661,
             "value": [
               -63.3144645690918,
-              17.274322509765625,
+              17.546863555908203,
               159.40542602539063
             ]
           },
@@ -15677,7 +15711,7 @@
             "time": 26.377403436899183,
             "value": [
               -63.54846954345703,
-              18.052764892578125,
+              19.688018798828125,
               159.38218688964844
             ]
           },
@@ -15685,144 +15719,144 @@
             "interp": "linear",
             "time": 26.377403436899183,
             "value": [
-              -50.42198181152344,
-              19.60965347290039,
-              -53.84471893310547
+              -121.2428970336914,
+              23.970327377319336,
+              8.246570587158203
             ]
           },
           {
             "interp": "linear",
             "time": 26.90025058833429,
             "value": [
-              -50.29296112060547,
-              19.63068962097168,
-              -53.995975494384766
+              -121.11387634277344,
+              24.03256607055664,
+              8.095312118530273
             ]
           },
           {
             "interp": "linear",
             "time": 27.423097739769403,
             "value": [
-              -49.94888687133789,
-              19.66045379638672,
-              -54.376060485839844
+              -120.76980590820313,
+              24.12419891357422,
+              7.715230941772461
             ]
           },
           {
             "interp": "linear",
             "time": 27.945944836667305,
             "value": [
-              -49.45289993286133,
-              19.699115753173828,
-              -54.87142562866211
+              -120.27381896972656,
+              24.249248504638672,
+              7.219862937927246
             ]
           },
           {
             "interp": "linear",
             "time": 28.46879204263962,
             "value": [
-              -48.880767822265625,
-              19.741779327392578,
-              -55.377349853515625
+              -119.7016830444336,
+              24.392642974853516,
+              6.713939666748047
             ]
           },
           {
             "interp": "linear",
             "time": 28.991639139537526,
             "value": [
-              -48.328426361083984,
-              19.778709411621094,
-              -55.808990478515625
+              -119.14933776855469,
+              24.514968872070313,
+              6.2822980880737305
             ]
           },
           {
             "interp": "linear",
             "time": 29.514486236435427,
             "value": [
-              -47.909095764160156,
-              20.2813777923584,
-              -56.10396957397461
+              -118.73001098632813,
+              24.564687728881836,
+              5.987320899963379
             ]
           },
           {
             "interp": "linear",
             "time": 30.037333333333333,
             "value": [
-              -47.743186950683594,
-              22.70272445678711,
-              -56.2135124206543
+              -118.56410217285156,
+              24.57237434387207,
+              5.877778053283691
             ]
           },
           {
             "interp": "linear",
             "time": 30.037333333333333,
             "value": [
-              -152.39736938476563,
-              27.528335571289063,
-              120.32840728759766
+              21.20349884033203,
+              20.775535583496094,
+              25.604591369628906
             ]
           },
           {
             "interp": "linear",
             "time": 31.083452351060295,
             "value": [
-              -152.496826171875,
-              27.53801727294922,
-              120.22065734863281
+              21.10403823852539,
+              18.874195098876953,
+              25.49683952331543
             ]
           },
           {
             "interp": "linear",
             "time": 32.12957136878725,
             "value": [
-              -152.7591094970703,
-              27.552963256835938,
-              119.9482421875
+              20.841753005981445,
+              18.4876708984375,
+              25.22442626953125
             ]
           },
           {
             "interp": "linear",
             "time": 33.1756902773955,
             "value": [
-              -153.13088989257813,
-              27.57423210144043,
-              119.58889770507813
+              20.46997833251953,
+              18.4755859375,
+              24.865081787109375
             ]
           },
           {
             "interp": "linear",
             "time": 34.22180940424118,
             "value": [
-              -153.5525360107422,
-              27.59972381591797,
-              119.21530151367188
+              20.048322677612305,
+              18.4617977142334,
+              24.49148941040039
             ]
           },
           {
             "interp": "linear",
             "time": 35.26792831284942,
             "value": [
-              -153.95404052734375,
-              27.627063751220703,
-              118.88951873779297
+              19.646818161010742,
+              17.8201904296875,
+              24.165699005126953
             ]
           },
           {
             "interp": "linear",
             "time": 36.31404722145767,
             "value": [
-              -154.2560577392578,
-              29.314891815185547,
-              118.66194915771484
+              19.344799041748047,
+              19.8037166595459,
+              23.93813133239746
             ]
           },
           {
             "interp": "linear",
             "time": 37.36016613006592,
             "value": [
-              -154.375,
-              37.6639289855957,
-              118.57618713378906
+              19.225852966308594,
+              31.272796630859375,
+              23.852373123168945
             ]
           },
           {
@@ -15901,72 +15935,72 @@
             "interp": "linear",
             "time": 44.8,
             "value": [
-              -23.905513763427734,
-              29.48836898803711,
-              -187.79904174804688
+              -23.191713333129883,
+              27.476318359375,
+              -56.275909423828125
             ]
           },
           {
             "interp": "linear",
             "time": 45.85579224987004,
             "value": [
-              -24.02679443359375,
-              19.6033935546875,
-              -187.85491943359375
+              -23.312992095947266,
+              16.587797164916992,
+              -56.331790924072266
             ]
           },
           {
             "interp": "linear",
             "time": 46.911584499740094,
             "value": [
-              -24.34255027770996,
-              17.626399993896484,
-              -187.992431640625
+              -23.62874984741211,
+              14.415115356445313,
+              -56.469295501708984
             ]
           },
           {
             "interp": "linear",
             "time": 47.96737663948243,
             "value": [
-              -24.7807674407959,
-              17.626399993896484,
-              -188.16481018066406
+              -24.066967010498047,
+              14.422622680664063,
+              -56.64167404174805
             ]
           },
           {
             "interp": "linear",
             "time": 49.023168999480184,
             "value": [
-              -25.26589584350586,
-              17.626399993896484,
-              -188.3317413330078
+              -24.552095413208008,
+              14.430891036987305,
+              -56.80860137939453
             ]
           },
           {
             "interp": "linear",
             "time": 50.07896113922253,
             "value": [
-              -25.71739959716797,
-              17.626399993896484,
-              -188.4654998779297
+              -25.003597259521484,
+              14.438074111938477,
+              -56.9423713684082
             ]
           },
           {
             "interp": "linear",
             "time": 51.134753278964865,
             "value": [
-              -26.05091094970703,
-              18.334522247314453,
-              -188.55140686035156
+              -25.337108612060547,
+              15.349063873291016,
+              -57.02827835083008
             ]
           },
           {
             "interp": "linear",
             "time": 52.1905454187072,
             "value": [
-              -26.180896759033203,
-              21.8751277923584,
-              -188.5819854736328
+              -25.46709632873535,
+              19.885940551757813,
+              -57.05885696411133
             ]
           },
           {
@@ -16045,72 +16079,72 @@
             "interp": "linear",
             "time": 59.562666666666665,
             "value": [
-              -38.054344177246094,
-              23.3272705078125,
-              221.12979125976563
+              -24.126750946044922,
+              27.793746948242188,
+              124.42990112304688
             ]
           },
           {
             "interp": "linear",
             "time": 60.09142859506607,
             "value": [
-              -37.81597137451172,
-              19.52922821044922,
-              221.00762939453125
+              -23.888378143310547,
+              26.228944778442383,
+              124.30774688720703
             ]
           },
           {
             "interp": "linear",
             "time": 60.620190523465475,
             "value": [
-              -37.22270584106445,
-              18.74941635131836,
-              220.67880249023438
+              -23.29511260986328,
+              25.895780563354492,
+              123.97891235351563
             ]
           },
           {
             "interp": "linear",
             "time": 61.14895239671071,
             "value": [
-              -36.54244613647461,
-              18.712020874023438,
-              220.1455078125
+              -22.61485481262207,
+              25.85838508605957,
+              123.44563293457031
             ]
           },
           {
             "interp": "linear",
             "time": 61.677714380264284,
             "value": [
-              -36.066226959228516,
-              18.673160552978516,
-              219.3961181640625
+              -22.13863182067871,
+              25.81952476501465,
+              122.69622802734375
             ]
           },
           {
             "interp": "linear",
             "time": 62.20647625350952,
             "value": [
-              -35.872318267822266,
-              18.638906478881836,
-              218.55377197265625
+              -21.944721221923828,
+              25.78527069091797,
+              121.8538818359375
             ]
           },
           {
             "interp": "linear",
             "time": 62.735238126754766,
             "value": [
-              -35.826568603515625,
-              18.746456146240234,
-              217.87701416015625
+              -21.898971557617188,
+              25.75980567932129,
+              121.17713165283203
             ]
           },
           {
             "interp": "linear",
             "time": 63.264,
             "value": [
-              -35.81720733642578,
-              19.395061492919922,
-              217.6093292236328
+              -21.889610290527344,
+              25.742294311523438,
+              120.90943908691406
             ]
           },
           {
@@ -16118,7 +16152,7 @@
             "time": 63.264,
             "value": [
               -54.543800354003906,
-              20.71355438232422,
+              22.59536361694336,
               115.39324188232422
             ]
           },
@@ -16127,7 +16161,7 @@
             "time": 63.79123811880748,
             "value": [
               -54.656707763671875,
-              20.702974319458008,
+              21.012434005737305,
               115.14947509765625
             ]
           },
@@ -16244,7 +16278,7 @@
             "time": 70.11809526952108,
             "value": [
               -74.94117736816406,
-              17.24471664428711,
+              17.21097183227539,
               -24.322729110717773
             ]
           },
@@ -16253,7 +16287,7 @@
             "time": 70.64533333333334,
             "value": [
               -75.0936050415039,
-              17.39702796936035,
+              17.193513870239258,
               -24.538005828857422
             ]
           },
@@ -16261,72 +16295,72 @@
             "interp": "linear",
             "time": 70.64533333333334,
             "value": [
-              -66.98556518554688,
-              17.722862243652344,
-              -277.66094970703125
+              -75.45174407958984,
+              14.420501708984375,
+              -29.198841094970703
             ]
           },
           {
             "interp": "linear",
             "time": 71.16779203294696,
             "value": [
-              -67.21721649169922,
-              17.89246940612793,
-              -277.7522888183594
+              -75.6829605102539,
+              13.040888786315918,
+              -29.290061950683594
             ]
           },
           {
             "interp": "linear",
             "time": 71.6902507325606,
             "value": [
-              -67.8047103881836,
-              18.13550567626953,
-              -277.94708251953125
+              -76.26945495605469,
+              12.778400421142578,
+              -29.484603881835938
             ]
           },
           {
             "interp": "linear",
             "time": 72.21270937767754,
             "value": [
-              -68.56029510498047,
-              18.454177856445313,
-              -278.0399475097656
+              -77.0237808227539,
+              12.797515869140625,
+              -29.57744598388672
             ]
           },
           {
             "interp": "linear",
             "time": 72.73516813178784,
             "value": [
-              -69.29132843017578,
-              18.80734634399414,
-              -277.8237609863281
+              -77.75363159179688,
+              12.811126708984375,
+              -29.361812591552734
             ]
           },
           {
             "interp": "linear",
             "time": 73.25762677690479,
             "value": [
-              -69.8748550415039,
-              19.112653732299805,
-              -277.3348693847656
+              -78.33638000488281,
+              12.813796997070313,
+              -28.87392807006836
             ]
           },
           {
             "interp": "linear",
             "time": 73.78008542202173,
             "value": [
-              -70.26190185546875,
-              19.323097229003906,
-              -276.85186767578125
+              -78.72297668457031,
+              13.302980422973633,
+              -28.391887664794922
             ]
           },
           {
             "interp": "linear",
             "time": 74.30254406713867,
             "value": [
-              -70.40660858154297,
-              19.4028263092041,
-              -276.64923095703125
+              -78.86750030517578,
+              15.788896560668945,
+              -28.189655303955078
             ]
           },
           {
@@ -16334,7 +16368,7 @@
             "time": 74.30254406713867,
             "value": [
               48.22197341918945,
-              18.545520782470703,
+              20.769775390625,
               -102.0127944946289
             ]
           },
@@ -16343,7 +16377,7 @@
             "time": 74.83456160514,
             "value": [
               48.34885025024414,
-              18.107315063476563,
+              20.786174774169922,
               -102.24156188964844
             ]
           },
@@ -16352,7 +16386,7 @@
             "time": 75.36657914314131,
             "value": [
               48.65834426879883,
-              17.99932861328125,
+              20.809465408325195,
               -102.83304595947266
             ]
           },
@@ -16361,7 +16395,7 @@
             "time": 75.89859662564888,
             "value": [
               48.94389724731445,
-              17.961671829223633,
+              20.83953857421875,
               -103.64671325683594
             ]
           },
@@ -16370,7 +16404,7 @@
             "time": 76.43061421914396,
             "value": [
               48.96391677856445,
-              17.92253875732422,
+              20.872329711914063,
               -104.54061126708984
             ]
           },
@@ -16379,7 +16413,7 @@
             "time": 76.96263170165153,
             "value": [
               48.715065002441406,
-              17.888044357299805,
+              20.899444580078125,
               -105.36624145507813
             ]
           },
@@ -16388,7 +16422,7 @@
             "time": 77.4946491841591,
             "value": [
               48.43235778808594,
-              17.914962768554688,
+              20.9772891998291,
               -105.97098541259766
             ]
           },
@@ -16397,7 +16431,7 @@
             "time": 78.02666666666667,
             "value": [
               48.31584930419922,
-              18.16119956970215,
+              21.301422119140625,
               -106.2052001953125
             ]
           },
@@ -16405,72 +16439,72 @@
             "interp": "linear",
             "time": 78.02666666666667,
             "value": [
-              -52.11901092529297,
-              18.675098419189453,
-              -41.00553894042969
+              -122.93992614746094,
+              21.94031524658203,
+              21.085750579833984
             ]
           },
           {
             "interp": "linear",
             "time": 78.54604049815144,
             "value": [
-              -52.085113525390625,
-              18.66655731201172,
-              -41.20884704589844
+              -122.9060287475586,
+              21.995548248291016,
+              20.882442474365234
             ]
           },
           {
             "interp": "linear",
             "time": 79.06541432963621,
             "value": [
-              -52.00883102416992,
-              18.644527435302734,
-              -41.73126220703125
+              -122.82974243164063,
+              22.068252563476563,
+              20.360027313232422
             ]
           },
           {
             "interp": "linear",
             "time": 79.58478810694608,
             "value": [
-              -52.0037841796875,
-              18.61440658569336,
-              -42.41788101196289
+              -122.82469940185547,
+              22.155406951904297,
+              19.673410415649414
             ]
           },
           {
             "interp": "linear",
             "time": 80.10416199260577,
             "value": [
-              -52.21230697631836,
-              18.583106994628906,
-              -43.101966857910156
+              -123.03321838378906,
+              22.203771591186523,
+              18.989322662353516
             ]
           },
           {
             "interp": "linear",
             "time": 80.62353576991562,
             "value": [
-              -52.5994987487793,
-              18.55551528930664,
-              -43.66902160644531
+              -123.42041015625,
+              22.206300735473633,
+              18.422266006469727
             ]
           },
           {
             "interp": "linear",
             "time": 81.14290954722549,
             "value": [
-              -52.954219818115234,
-              18.535003662109375,
-              -44.06005859375
+              -123.77513885498047,
+              22.19679069519043,
+              18.031230926513672
             ]
           },
           {
             "interp": "linear",
             "time": 81.66228332453535,
             "value": [
-              -53.095760345458984,
-              18.520898818969727,
-              -44.20989227294922
+              -123.91667175292969,
+              22.18909454345703,
+              17.88139533996582
             ]
           },
           {
@@ -16478,7 +16512,7 @@
             "time": 81.66228332453535,
             "value": [
               85.38298034667969,
-              13.235687255859375,
+              14.611260414123535,
               212.394775390625
             ]
           },
@@ -16487,7 +16521,7 @@
             "time": 82.19738573066553,
             "value": [
               85.66557312011719,
-              10.600953102111816,
+              10.830214500427246,
               212.39308166503906
             ]
           },
@@ -16604,7 +16638,7 @@
             "time": 88.57142860285441,
             "value": [
               -61.701847076416016,
-              12.260730743408203,
+              12.707378387451172,
               192.40664672851563
             ]
           },
@@ -16613,7 +16647,7 @@
             "time": 89.09866666666667,
             "value": [
               -61.490413665771484,
-              14.4296293258667,
+              17.109516143798828,
               192.24920654296875
             ]
           },
@@ -16621,360 +16655,360 @@
             "interp": "linear",
             "time": 89.09866666666667,
             "value": [
-              -26.606332778930664,
-              18.787368774414063,
-              207.54507446289063
+              -12.67873764038086,
+              25.933732986450195,
+              110.84517669677734
             ]
           },
           {
             "interp": "linear",
             "time": 90.15466671387355,
             "value": [
-              -26.960615158081055,
-              18.754671096801758,
-              207.84349060058594
+              -13.03302001953125,
+              25.90103530883789,
+              111.14360046386719
             ]
           },
           {
             "interp": "linear",
             "time": 91.21066676108043,
             "value": [
-              -27.8615779876709,
-              18.67034912109375,
-              208.62779235839844
+              -13.933982849121094,
+              25.816713333129883,
+              111.92790222167969
             ]
           },
           {
             "interp": "linear",
             "time": 92.26666669813793,
             "value": [
-              -29.063344955444336,
-              18.555051803588867,
-              209.73397827148438
+              -15.135749816894531,
+              25.701416015625,
+              113.0340805053711
             ]
           },
           {
             "interp": "linear",
             "time": 93.32266685549419,
             "value": [
-              -30.3315486907959,
-              18.435237884521484,
-              210.98220825195313
+              -16.403953552246094,
+              25.581602096557617,
+              114.2823257446289
             ]
           },
           {
             "interp": "linear",
             "time": 94.37866679255168,
             "value": [
-              -31.456655502319336,
-              18.329618453979492,
-              212.16629028320313
+              -17.52906036376953,
+              25.475982666015625,
+              115.46640014648438
             ]
           },
           {
             "interp": "linear",
             "time": 95.43466672960918,
             "value": [
-              -32.25514221191406,
-              18.2511043548584,
-              213.0546875
+              -18.327545166015625,
+              25.39746856689453,
+              116.35480499267578
             ]
           },
           {
             "interp": "linear",
             "time": 96.49066666666667,
             "value": [
-              -32.55915069580078,
-              18.197111129760742,
-              213.40420532226563
+              -18.631553649902344,
+              25.343477249145508,
+              116.70431518554688
             ]
           },
           {
             "interp": "linear",
             "time": 96.49066666666667,
             "value": [
-              26.36101722717285,
-              12.203615188598633,
-              114.8836441040039
+              24.101675033569336,
+              17.965744018554688,
+              1.6033544540405273
             ]
           },
           {
             "interp": "linear",
             "time": 97.53977082782389,
             "value": [
-              26.059171676635742,
-              9.186738967895508,
-              114.9859619140625
+              23.799829483032227,
+              14.272806167602539,
+              1.7056760787963867
             ]
           },
           {
             "interp": "linear",
             "time": 98.5888749889811,
             "value": [
-              25.26953125,
-              8.54050064086914,
-              115.21344757080078
+              23.010189056396484,
+              13.525497436523438,
+              1.933161735534668
             ]
           },
           {
             "interp": "linear",
             "time": 99.63797904070823,
             "value": [
-              24.158967971801758,
-              8.453113555908203,
-              115.37584686279297
+              21.899625778198242,
+              13.48801326751709,
+              2.095560073852539
             ]
           },
           {
             "interp": "linear",
             "time": 100.68708331129554,
             "value": [
-              22.91659927368164,
-              8.309444427490234,
-              114.94544219970703
+              20.657257080078125,
+              13.454463005065918,
+              1.6651525497436523
             ]
           },
           {
             "interp": "linear",
             "time": 101.73618736302267,
             "value": [
-              21.868087768554688,
-              8.185577392578125,
-              114.44296264648438
+              19.608745574951172,
+              13.42846393585205,
+              1.1626720428466797
             ]
           },
           {
             "interp": "linear",
             "time": 102.7852914147498,
             "value": [
-              21.16224479675293,
-              8.135007858276367,
-              114.01791381835938
+              18.902902603149414,
+              13.416433334350586,
+              0.7376222610473633
             ]
           },
           {
             "interp": "linear",
             "time": 103.83439546647693,
             "value": [
-              20.90313148498535,
-              8.272587776184082,
-              113.84129333496094
+              18.643789291381836,
+              13.430809020996094,
+              0.5610027313232422
             ]
           },
           {
             "interp": "linear",
             "time": 103.83439546647693,
             "value": [
-              23.815624237060547,
-              8.621015548706055,
-              115.48846435546875
+              21.55628204345703,
+              13.472427368164063,
+              2.208176612854004
             ]
           },
           {
             "interp": "linear",
             "time": 104.89424378054962,
             "value": [
-              23.815624237060547,
-              8.621015548706055,
-              115.48846435546875
+              21.55628204345703,
+              13.472427368164063,
+              2.208176612854004
             ]
           },
           {
             "interp": "linear",
             "time": 105.9540920946223,
             "value": [
-              23.815624237060547,
-              8.621015548706055,
-              115.48846435546875
+              21.55628204345703,
+              13.472427368164063,
+              2.208176612854004
             ]
           },
           {
             "interp": "linear",
             "time": 107.01394029814419,
             "value": [
-              23.815624237060547,
-              8.621015548706055,
-              115.48846435546875
+              21.55628204345703,
+              13.472427368164063,
+              2.208176612854004
             ]
           },
           {
             "interp": "linear",
             "time": 108.07378872276766,
             "value": [
-              23.815624237060547,
-              8.621015548706055,
-              115.48846435546875
+              21.55628204345703,
+              13.472427368164063,
+              2.208176612854004
             ]
           },
           {
             "interp": "linear",
             "time": 109.13363692628955,
             "value": [
-              23.815624237060547,
-              8.621015548706055,
-              115.48846435546875
+              21.55628204345703,
+              13.472427368164063,
+              2.208176612854004
             ]
           },
           {
             "interp": "linear",
             "time": 110.19348512981144,
             "value": [
-              23.815624237060547,
-              9.183852195739746,
-              115.48846435546875
+              21.55628204345703,
+              13.53323745727539,
+              2.208176612854004
             ]
           },
           {
             "interp": "linear",
             "time": 111.25333333333333,
             "value": [
-              23.815624237060547,
-              11.998035430908203,
-              115.48846435546875
+              21.55628204345703,
+              13.83729076385498,
+              2.208176612854004
             ]
           },
           {
             "interp": "linear",
             "time": 111.25333333333333,
             "value": [
-              -26.22454261779785,
-              17.626399993896484,
-              -188.59188842773438
+              -25.5107421875,
+              14.445396423339844,
+              -57.068763732910156
             ]
           },
           {
             "interp": "linear",
             "time": 112.30933338054021,
             "value": [
-              -26.042482376098633,
-              17.626399993896484,
-              -188.54937744140625
+              -25.32868194580078,
+              14.44285774230957,
+              -57.026241302490234
             ]
           },
           {
             "interp": "linear",
             "time": 113.36533342774709,
             "value": [
-              -25.576425552368164,
-              17.626399993896484,
-              -188.42591857910156
+              -24.862625122070313,
+              14.43589973449707,
+              -56.90279006958008
             ]
           },
           {
             "interp": "linear",
             "time": 114.42133336480458,
             "value": [
-              -24.948482513427734,
-              17.626399993896484,
-              -188.2252960205078
+              -24.234682083129883,
+              14.425455093383789,
+              -56.70216369628906
             ]
           },
           {
             "interp": "linear",
             "time": 115.47733352216085,
             "value": [
-              -24.278858184814453,
-              17.626399993896484,
-              -187.96560668945313
+              -23.5650577545166,
+              14.413060188293457,
+              -56.442474365234375
             ]
           },
           {
             "interp": "linear",
             "time": 116.53333345921834,
             "value": [
-              -23.679841995239258,
-              17.626399993896484,
-              -187.69039916992188
+              -22.966041564941406,
+              14.401718139648438,
+              -56.167259216308594
             ]
           },
           {
             "interp": "linear",
             "time": 117.58933339627585,
             "value": [
-              -23.25241470336914,
-              17.698959350585938,
-              -187.4673309326172
+              -22.538612365722656,
+              15.114822387695313,
+              -55.94420623779297
             ]
           },
           {
             "interp": "linear",
             "time": 118.64533333333334,
             "value": [
-              -23.08928680419922,
-              18.061763763427734,
-              -187.37599182128906
+              -22.375486373901367,
+              18.718597412109375,
+              -55.85285949707031
             ]
           },
           {
             "interp": "linear",
             "time": 118.64533333333334,
             "value": [
-              31.432016372680664,
-              18.787368774414063,
-              290.94793701171875
+              45.35961151123047,
+              25.933732986450195,
+              194.248046875
             ]
           },
           {
             "interp": "linear",
             "time": 120.62323818365734,
             "value": [
-              32.1577262878418,
-              18.787368774414063,
-              290.5240478515625
+              46.08531951904297,
+              25.933732986450195,
+              193.82415771484375
             ]
           },
           {
             "interp": "linear",
             "time": 122.60114303398133,
             "value": [
-              33.996116638183594,
-              18.787368774414063,
-              289.3761901855469
+              47.923709869384766,
+              25.933732986450195,
+              192.67630004882813
             ]
           },
           {
             "interp": "linear",
             "time": 124.57904767799378,
             "value": [
-              36.427635192871094,
-              18.787368774414063,
-              287.68231201171875
+              50.35523223876953,
+              25.933732986450195,
+              190.98243713378906
             ]
           },
           {
             "interp": "linear",
             "time": 126.55695273462932,
             "value": [
-              38.959930419921875,
-              18.787368774414063,
-              285.67950439453125
+              52.88752746582031,
+              25.933732986450195,
+              188.9796142578125
             ]
           },
           {
             "interp": "linear",
             "time": 128.53485737864176,
             "value": [
-              41.168365478515625,
-              18.787368774414063,
-              283.7035827636719
+              55.09596252441406,
+              25.933732986450195,
+              187.00369262695313
             ]
           },
           {
             "interp": "linear",
             "time": 130.51276202265421,
             "value": [
-              42.70884704589844,
-              18.90775489807129,
-              282.1790466308594
+              56.63644027709961,
+              25.933732986450195,
+              185.4791717529297
             ]
           },
           {
             "interp": "linear",
             "time": 132.49066666666667,
             "value": [
-              43.28852081298828,
-              19.509689331054688,
-              281.5705261230469
+              57.21611404418945,
+              25.933732986450195,
+              184.87063598632813
             ]
           },
           {
@@ -16982,7 +17016,7 @@
             "time": 132.49066666666667,
             "value": [
               51.627197265625,
-              20.71355438232422,
+              22.67112159729004,
               18.557445526123047
             ]
           },
@@ -16991,7 +17025,7 @@
             "time": 135.1939048827489,
             "value": [
               51.075904846191406,
-              20.71355438232422,
+              21.03981590270996,
               17.51083755493164
             ]
           },
@@ -17180,7 +17214,7 @@
             "time": 169.2815238723755,
             "value": [
               -74.5779037475586,
-              17.155872344970703,
+              17.037771224975586,
               -21.756853103637695
             ]
           },
@@ -17189,7 +17223,7 @@
             "time": 170.336,
             "value": [
               -74.91253662109375,
-              17.71356201171875,
+              17.002872467041016,
               -22.14237403869629
             ]
           },
@@ -17197,144 +17231,144 @@
             "interp": "linear",
             "time": 170.336,
             "value": [
-              -69.35673522949219,
-              18.87135124206543,
-              -277.0878601074219
+              -77.82291412353516,
+              14.37318229675293,
+              -28.62576675415039
             ]
           },
           {
             "interp": "linear",
             "time": 171.3920000472069,
             "value": [
-              -69.63056945800781,
-              19.096410751342773,
-              -276.9853210449219
+              -78.09674835205078,
+              13.058746337890625,
+              -28.523223876953125
             ]
           },
           {
             "interp": "linear",
             "time": 172.44800009441377,
             "value": [
-              -70.32373809814453,
-              19.416996002197266,
-              -276.6884460449219
+              -78.7899169921875,
+              12.796533584594727,
+              -28.22635269165039
             ]
           },
           {
             "interp": "linear",
             "time": 173.50400003147126,
             "value": [
-              -71.23631286621094,
-              19.826921463012695,
-              -276.20904541015625
+              -79.7024917602539,
+              12.795473098754883,
+              -27.74695587158203
             ]
           },
           {
             "interp": "linear",
             "time": 174.56000018882753,
             "value": [
-              -71.90035247802734,
-              20.190160751342773,
-              -275.21490478515625
+              -80.36653137207031,
+              12.77092170715332,
+              -26.752819061279297
             ]
           },
           {
             "interp": "linear",
             "time": 175.61600012588502,
             "value": [
-              -72.3578872680664,
-              20.447362899780273,
-              -274.2398681640625
+              -80.82406616210938,
+              12.74730396270752,
+              -25.777782440185547
             ]
           },
           {
             "interp": "linear",
             "time": 176.67200006294252,
             "value": [
-              -72.61506652832031,
-              20.595685958862305,
-              -273.5212097167969
+              -81.08124542236328,
+              13.555347442626953,
+              -25.059106826782227
             ]
           },
           {
             "interp": "linear",
             "time": 177.728,
             "value": [
-              -72.69737243652344,
-              20.644407272338867,
-              -273.2426452636719
+              -81.1635513305664,
+              17.676172256469727,
+              -24.780553817749023
             ]
           },
           {
             "interp": "linear",
             "time": 177.728,
             "value": [
-              51.21931457519531,
-              19.477636337280273,
-              270.42236328125
+              65.14691162109375,
+              25.933732986450195,
+              173.7224884033203
             ]
           },
           {
             "interp": "linear",
             "time": 178.25523811880748,
             "value": [
-              51.11134338378906,
-              18.879642486572266,
-              270.6267395019531
+              65.0389404296875,
+              25.91740608215332,
+              173.92684936523438
             ]
           },
           {
             "interp": "linear",
             "time": 178.78247623761496,
             "value": [
-              50.82843017578125,
-              18.728939056396484,
-              271.15185546875
+              64.75602722167969,
+              25.875301361083984,
+              174.45196533203125
             ]
           },
           {
             "interp": "linear",
             "time": 179.30971430142722,
             "value": [
-              50.43151092529297,
-              18.671367645263672,
-              271.86474609375
+              64.3591079711914,
+              25.817731857299805,
+              175.1648406982422
             ]
           },
           {
             "interp": "linear",
             "time": 179.8369524752299,
             "value": [
-              49.986488342285156,
-              18.611541748046875,
-              272.6335144042969
+              63.91408157348633,
+              25.757905960083008,
+              175.93362426757813
             ]
           },
           {
             "interp": "linear",
             "time": 180.36419053904217,
             "value": [
-              49.56597900390625,
-              18.55880355834961,
-              273.332763671875
+              63.49357223510742,
+              25.70516586303711,
+              176.6328582763672
             ]
           },
           {
             "interp": "linear",
             "time": 180.8914286028544,
             "value": [
-              49.25151824951172,
-              20.440284729003906,
-              273.839599609375
+              63.17911148071289,
+              27.14000129699707,
+              177.1397247314453
             ]
           },
           {
             "interp": "linear",
             "time": 181.41866666666667,
             "value": [
-              49.128082275390625,
-              30.01836395263672,
-              274.0350036621094
+              63.0556755065918,
+              34.48484420776367,
+              177.3351287841797
             ]
           },
           {
@@ -17486,7 +17520,7 @@
             "time": 188.8,
             "value": [
               51.72288131713867,
-              22.577163696289063,
+              24.565006256103516,
               -114.92422485351563
             ]
           },
@@ -17495,7 +17529,7 @@
             "time": 189.3272381188075,
             "value": [
               51.96620178222656,
-              18.779325485229492,
+              21.777597427368164,
               -115.01700592041016
             ]
           },
@@ -17504,7 +17538,7 @@
             "time": 189.85447623761496,
             "value": [
               52.58110809326172,
-              17.999509811401367,
+              21.235502243041992,
               -115.268798828125
             ]
           },
@@ -17513,7 +17547,7 @@
             "time": 190.38171430142722,
             "value": [
               53.32025146484375,
-              17.962034225463867,
+              21.261028289794922,
               -115.70524597167969
             ]
           },
@@ -17522,7 +17556,7 @@
             "time": 190.9089524752299,
             "value": [
               53.90835189819336,
-              17.92308807373047,
+              21.29247283935547,
               -116.3729019165039
             ]
           },
@@ -17531,7 +17565,7 @@
             "time": 191.43619053904217,
             "value": [
               54.24802780151367,
-              17.88875961303711,
+              21.32663917541504,
               -117.16121673583984
             ]
           },
@@ -17540,7 +17574,7 @@
             "time": 191.9634286028544,
             "value": [
               54.420204162597656,
-              17.94782829284668,
+              21.43832778930664,
               -117.80298614501953
             ]
           },
@@ -17549,7 +17583,7 @@
             "time": 192.49066666666667,
             "value": [
               54.48153305053711,
-              18.35427474975586,
+              21.966346740722656,
               -118.05606842041016
             ]
           },
@@ -17557,72 +17591,72 @@
             "interp": "linear",
             "time": 192.49066666666667,
             "value": [
-              -52.821922302246094,
-              19.188495635986328,
-              -49.25217056274414
+              -123.64283752441406,
+              23.017059326171875,
+              12.839117050170898
             ]
           },
           {
             "interp": "linear",
             "time": 193.01790478547414,
             "value": [
-              -53.00922775268555,
-              19.172714233398438,
-              -49.0585823059082
+              -123.83014678955078,
+              22.958240509033203,
+              13.032707214355469
             ]
           },
           {
             "interp": "linear",
             "time": 193.54514290428162,
             "value": [
-              -53.44723892211914,
-              18.826675415039063,
-              -48.5523796081543
+              -124.26815032958984,
+              22.80427360534668,
+              13.538908004760742
             ]
           },
           {
             "interp": "linear",
             "time": 194.07238096809388,
             "value": [
-              -53.85267639160156,
-              18.635719299316406,
-              -47.83613586425781
+              -124.67359924316406,
+              22.63726806640625,
+              14.255155563354492
             ]
           },
           {
             "interp": "linear",
             "time": 194.59961914189657,
             "value": [
-              -53.938720703125,
-              18.569101333618164,
-              -47.01655578613281
+              -124.7596435546875,
+              22.503955841064453,
+              15.074736595153809
             ]
           },
           {
             "interp": "linear",
             "time": 195.12685720570883,
             "value": [
-              -53.69087600708008,
-              18.537309646606445,
-              -46.231719970703125
+              -124.51178741455078,
+              22.418701171875,
+              15.859569549560547
             ]
           },
           {
             "interp": "linear",
             "time": 195.65409526952106,
             "value": [
-              -53.3675422668457,
-              19.121112823486328,
-              -45.645591735839844
+              -124.18846130371094,
+              22.740751266479492,
+              16.44569969177246
             ]
           },
           {
             "interp": "linear",
             "time": 196.18133333333333,
             "value": [
-              -53.224525451660156,
-              22.143016815185547,
-              -45.417320251464844
+              -124.04544067382813,
+              24.552753448486328,
+              16.673969268798828
             ]
           },
           {
@@ -17701,144 +17735,144 @@
             "interp": "linear",
             "time": 199.8225850852573,
             "value": [
-              -28.556554794311523,
-              22.244657516479492,
-              284.1409912109375
+              -14.628959655761719,
+              26.71113395690918,
+              187.4410858154297
             ]
           },
           {
             "interp": "linear",
             "time": 200.356882477915,
             "value": [
-              -28.481266021728516,
-              19.348960876464844,
-              284.40447998046875
+              -14.553671836853027,
+              26.048675537109375,
+              187.70457458496094
             ]
           },
           {
             "interp": "linear",
             "time": 200.89117987057273,
             "value": [
-              -28.264129638671875,
-              18.749847412109375,
-              285.0579833984375
+              -14.336538314819336,
+              25.89621353149414,
+              188.35809326171875
             ]
           },
           {
             "interp": "linear",
             "time": 201.4254772074989,
             "value": [
-              -27.853439331054688,
-              18.712881088256836,
-              285.81756591796875
+              -13.925849914550781,
+              25.85924530029297,
+              189.11767578125
             ]
           },
           {
             "interp": "linear",
             "time": 201.95977465588817,
             "value": [
-              -27.185150146484375,
-              18.674463272094727,
-              286.3872985839844
+              -13.257560729980469,
+              25.82082748413086,
+              189.68740844726563
             ]
           },
           {
             "interp": "linear",
             "time": 202.49407199281436,
             "value": [
-              -26.370162963867188,
-              18.64059829711914,
-              286.6726379394531
+              -12.442571640014648,
+              25.786964416503906,
+              189.97276306152344
             ]
           },
           {
             "interp": "linear",
             "time": 203.0283693297405,
             "value": [
-              -25.69053077697754,
-              18.61542510986328,
-              286.7836608886719
+              -11.76293659210205,
+              25.761789321899414,
+              190.08375549316406
             ]
           },
           {
             "interp": "linear",
             "time": 203.56266666666667,
             "value": [
-              -25.418447494506836,
-              18.598114013671875,
-              286.8162841796875
+              -11.490852355957031,
+              25.744478225708008,
+              190.1164093017578
             ]
           },
           {
             "interp": "linear",
             "time": 203.56266666666667,
             "value": [
-              33.23908996582031,
-              15.814577102661133,
-              97.72090911865234
+              30.979747772216797,
+              18.414464950561523,
+              -15.559381484985352
             ]
           },
           {
             "interp": "linear",
             "time": 204.08990478547415,
             "value": [
-              33.30376434326172,
-              14.418041229248047,
-              97.85052490234375
+              31.04442024230957,
+              14.750487327575684,
+              -15.429764747619629
             ]
           },
           {
             "interp": "linear",
             "time": 204.61714290428162,
             "value": [
-              33.46348190307617,
-              14.128524780273438,
-              98.1882553100586
+              31.204139709472656,
+              14.021017074584961,
+              -15.092035293579102
             ]
           },
           {
             "interp": "linear",
             "time": 205.14438096809388,
             "value": [
-              33.665138244628906,
-              14.108906745910645,
-              98.65758514404297
+              31.40579605102539,
+              14.027496337890625,
+              -14.622702598571777
             ]
           },
           {
             "interp": "linear",
             "time": 205.67161914189657,
             "value": [
-              33.862464904785156,
-              14.086694717407227,
-              99.17796325683594
+              31.603124618530273,
+              14.035703659057617,
+              -14.102323532104492
             ]
           },
           {
             "interp": "linear",
             "time": 206.19885720570883,
             "value": [
-              34.022708892822266,
-              14.043254852294922,
-              99.66300201416016
+              31.76336669921875,
+              14.039310455322266,
+              -13.617286682128906
             ]
           },
           {
             "interp": "linear",
             "time": 206.72609526952107,
             "value": [
-              34.12708282470703,
-              14.296281814575195,
-              100.02172088623047
+              31.867740631103516,
+              14.314868927001953,
+              -13.258569717407227
             ]
           },
           {
             "interp": "linear",
             "time": 207.25333333333333,
             "value": [
-              34.164615631103516,
-              15.684773445129395,
-              100.16162872314453
+              31.9052734375,
+              15.702313423156738,
+              -13.118660926818848
             ]
           },
           {
@@ -17900,7 +17934,7 @@
             "time": 210.42590479342144,
             "value": [
               163.86302185058594,
-              17.9180850982666,
+              17.838321685791016,
               135.39566040039063
             ]
           },
@@ -17909,7 +17943,7 @@
             "time": 210.95466666666667,
             "value": [
               163.68447875976563,
-              18.441408157348633,
+              17.962825775146484,
               135.54449462890625
             ]
           },
@@ -17917,72 +17951,72 @@
             "interp": "linear",
             "time": 210.95466666666667,
             "value": [
-              -40.01073455810547,
-              19.5353946685791,
-              -178.56871032714844
+              -39.296932220458984,
+              18.259172439575195,
+              -47.04558563232422
             ]
           },
           {
             "interp": "linear",
             "time": 211.48190478547414,
             "value": [
-              -39.98714065551758,
-              19.540264129638672,
-              -178.7981719970703
+              -39.273338317871094,
+              18.283164978027344,
+              -47.27504348754883
             ]
           },
           {
             "interp": "linear",
             "time": 212.00914290428162,
             "value": [
-              -39.904815673828125,
-              19.546855926513672,
-              -179.38729858398438
+              -39.191017150878906,
+              18.31817626953125,
+              -47.864158630371094
             ]
           },
           {
             "interp": "linear",
             "time": 212.53638096809388,
             "value": [
-              -39.742515563964844,
-              19.554988861083984,
-              -180.18421936035156
+              -39.02871322631836,
+              18.365345001220703,
+              -48.66109085083008
             ]
           },
           {
             "interp": "linear",
             "time": 213.06361914189657,
             "value": [
-              -39.501190185546875,
-              19.524364471435547,
-              -181.03684997558594
+              -38.78738784790039,
+              18.41884422302246,
+              -49.51371383666992
             ]
           },
           {
             "interp": "linear",
             "time": 213.59085720570883,
             "value": [
-              -39.22174835205078,
-              19.426727294921875,
-              -181.80062866210938
+              -38.50794982910156,
+              18.469207763671875,
+              -50.27749252319336
             ]
           },
           {
             "interp": "linear",
             "time": 214.11809526952106,
             "value": [
-              -38.98311233520508,
-              19.339027404785156,
-              -182.34548950195313
+              -38.269309997558594,
+              18.504920959472656,
+              -50.822364807128906
             ]
           },
           {
             "interp": "linear",
             "time": 214.64533333333333,
             "value": [
-              -38.8829460144043,
-              19.26730728149414,
-              -182.55328369140625
+              -38.16914367675781,
+              18.518430709838867,
+              -51.0301513671875
             ]
           },
           {
@@ -17990,7 +18024,7 @@
             "time": 214.64533333333333,
             "value": [
               83.4921875,
-              13.455558776855469,
+              13.17473030090332,
               213.3174285888672
             ]
           },
@@ -17999,7 +18033,7 @@
             "time": 215.1725714521408,
             "value": [
               83.27791595458984,
-              9.965089797973633,
+              10.306045532226563,
               213.4029541015625
             ]
           },
@@ -18008,7 +18042,7 @@
             "time": 215.69980957094828,
             "value": [
               82.71983337402344,
-              6.922232151031494,
+              9.311555862426758,
               213.60894775390625
             ]
           },
@@ -18017,7 +18051,7 @@
             "time": 216.22704763476054,
             "value": [
               81.94491577148438,
-              5.400803565979004,
+              8.971446990966797,
               213.85623168945313
             ]
           },
@@ -18026,7 +18060,7 @@
             "time": 216.75428580856322,
             "value": [
               81.08746337890625,
-              5.096518039703369,
+              8.883469581604004,
               214.07968139648438
             ]
           },
@@ -18035,7 +18069,7 @@
             "time": 217.2815238723755,
             "value": [
               80.29042053222656,
-              5.096518039703369,
+              8.862323760986328,
               214.24205017089844
             ]
           },
@@ -18044,7 +18078,7 @@
             "time": 217.80876193618775,
             "value": [
               79.7027816772461,
-              6.072583198547363,
+              9.590118408203125,
               214.33462524414063
             ]
           },
@@ -18053,7 +18087,7 @@
             "time": 218.336,
             "value": [
               79.47401428222656,
-              10.952906608581543,
+              13.293970108032227,
               214.3645477294922
             ]
           },
@@ -18116,7 +18150,7 @@
             "time": 221.4994286028544,
             "value": [
               -53.52804183959961,
-              21.62772560119629,
+              20.71355438232422,
               -10.619056701660156
             ]
           },
@@ -18125,7 +18159,7 @@
             "time": 222.02666666666667,
             "value": [
               -53.33073425292969,
-              26.19858169555664,
+              20.71355438232422,
               -10.740318298339844
             ]
           },
@@ -18133,72 +18167,72 @@
             "interp": "linear",
             "time": 222.02666666666667,
             "value": [
-              -174.01779174804688,
-              35.340293884277344,
-              129.72740173339844
+              -0.4169273376464844,
+              15.187663078308105,
+              35.00358963012695
             ]
           },
           {
             "interp": "linear",
             "time": 222.6361905034383,
             "value": [
-              -173.9995574951172,
-              35.398128509521484,
-              129.931884765625
+              -0.39870357513427734,
+              12.406112670898438,
+              35.20806884765625
             ]
           },
           {
             "interp": "linear",
             "time": 223.24571434020996,
             "value": [
-              -173.93704223632813,
-              35.48026657104492,
-              130.45762634277344
+              -0.33617496490478516,
+              11.829044342041016,
+              35.733802795410156
             ]
           },
           {
             "interp": "linear",
             "time": 223.85523811340332,
             "value": [
-              -173.81552124023438,
-              35.58482360839844,
-              131.1710968017578
+              -0.21466827392578125,
+              11.810672760009766,
+              36.44727325439453
             ]
           },
           {
             "interp": "linear",
             "time": 224.46476201375324,
             "value": [
-              -173.6361846923828,
-              35.68265151977539,
-              131.93914794921875
+              -0.03531837463378906,
+              11.796133041381836,
+              37.21533203125
             ]
           },
           {
             "interp": "linear",
             "time": 225.0742857869466,
             "value": [
-              -173.42913818359375,
-              35.72785949707031,
-              132.6326446533203
+              0.17171573638916016,
+              11.784252166748047,
+              37.90883255004883
             ]
           },
           {
             "interp": "linear",
             "time": 225.68380956013996,
             "value": [
-              -173.25238037109375,
-              35.741905212402344,
-              133.1317138671875
+              0.34848690032958984,
+              11.776321411132813,
+              38.40789031982422
             ]
           },
           {
             "interp": "linear",
             "time": 226.29333333333332,
             "value": [
-              -173.17816162109375,
-              35.741920471191406,
-              133.32310485839844
+              0.42270565032958984,
+              11.772579193115234,
+              38.59929656982422
             ]
           }
         ],
@@ -18215,144 +18249,144 @@
             "interp": "linear",
             "time": 0.0,
             "value": [
-              6.746806621551514,
-              22.700937271118164,
-              240.99195861816406
+              20.674402236938477,
+              29.847301483154297,
+              144.2920684814453
             ]
           },
           {
             "interp": "linear",
             "time": 0.5973333600362142,
             "value": [
-              6.7761359214782715,
-              22.700937271118164,
-              240.99534606933594
+              20.703731536865234,
+              29.847301483154297,
+              144.2954559326172
             ]
           },
           {
             "interp": "linear",
             "time": 1.1946667200724284,
             "value": [
-              6.8516926765441895,
-              22.70093536376953,
-              241.0048065185547
+              20.779287338256836,
+              29.847299575805664,
+              144.30491638183594
             ]
           },
           {
             "interp": "linear",
             "time": 1.7920000178019204,
             "value": [
-              6.954800605773926,
-              22.700931549072266,
-              241.0193328857422
+              20.882396697998047,
+              29.8472957611084,
+              144.31944274902344
             ]
           },
           {
             "interp": "linear",
             "time": 2.3893334401448567,
             "value": [
-              7.066834449768066,
-              22.700927734375,
-              241.0372772216797
+              20.994428634643555,
+              29.847291946411133,
+              144.33738708496094
             ]
           },
           {
             "interp": "linear",
             "time": 2.9866667378743488,
             "value": [
-              7.169343948364258,
-              22.700923919677734,
-              241.05567932128906
+              21.09693717956543,
+              29.847288131713867,
+              144.3557891845703
             ]
           },
           {
             "interp": "linear",
             "time": 3.584000035603841,
             "value": [
-              7.2440996170043945,
-              22.7009220123291,
-              241.07032775878906
+              21.171693801879883,
+              29.847286224365234,
+              144.3704376220703
             ]
           },
           {
             "interp": "linear",
             "time": 4.181333333333333,
             "value": [
-              7.273035049438477,
-              22.70092010498047,
-              241.07626342773438
+              21.200632095336914,
+              29.8472843170166,
+              144.37637329101563
             ]
           },
           {
             "interp": "linear",
             "time": 4.181333333333333,
             "value": [
-              -64.77236938476563,
-              15.99775218963623,
-              -265.4306640625
+              -73.2385482788086,
+              9.309048652648926,
+              -16.96856117248535
             ]
           },
           {
             "interp": "linear",
             "time": 4.7085714521408075,
             "value": [
-              -64.78982543945313,
-              15.99775218963623,
-              -265.4182434082031
+              -73.25601959228516,
+              9.30904769897461,
+              -16.95614242553711
             ]
           },
           {
             "interp": "linear",
             "time": 5.235809570948282,
             "value": [
-              -64.83576965332031,
-              15.997751235961914,
-              -265.3876037597656
+              -73.30200958251953,
+              9.309046745300293,
+              -16.925477981567383
             ]
           },
           {
             "interp": "linear",
             "time": 5.763047634760539,
             "value": [
-              -64.90059661865234,
-              15.997749328613281,
-              -265.3489685058594
+              -73.36690521240234,
+              9.30904483795166,
+              -16.88681411743164
             ]
           },
           {
             "interp": "linear",
             "time": 6.290285808563232,
             "value": [
-              -64.97364044189453,
-              15.997747421264648,
-              -265.3113098144531
+              -73.44001770019531,
+              9.309042930603027,
+              -16.849124908447266
             ]
           },
           {
             "interp": "linear",
             "time": 6.817523872375488,
             "value": [
-              -65.05342102050781,
-              15.996054649353027,
-              -265.3068542480469
+              -73.5199203491211,
+              9.307342529296875,
+              -16.84479331970215
             ]
           },
           {
             "interp": "linear",
             "time": 7.344761936187744,
             "value": [
-              -65.11251831054688,
-              15.994525909423828,
-              -265.3114929199219
+              -73.57907104492188,
+              9.305811882019043,
+              -16.849443435668945
             ]
           },
           {
             "interp": "linear",
             "time": 7.872,
             "value": [
-              -65.13508605957031,
-              15.99393367767334,
-              -265.3140563964844
+              -73.6016616821289,
+              9.305218696594238,
+              -16.852027893066406
             ]
           },
           {
@@ -18503,72 +18537,72 @@
             "interp": "linear",
             "time": 15.242666666666667,
             "value": [
-              20.887975692749023,
-              6.975306034088135,
-              103.5478744506836
+              18.628633499145508,
+              10.654102325439453,
+              -9.73241138458252
             ]
           },
           {
             "interp": "linear",
             "time": 15.769904785474141,
             "value": [
-              20.88492202758789,
-              6.975306034088135,
-              103.5317153930664
+              18.625579833984375,
+              10.654102325439453,
+              -9.748573303222656
             ]
           },
           {
             "interp": "linear",
             "time": 16.297142904281618,
             "value": [
-              20.87792205810547,
-              6.975306034088135,
-              103.48988342285156
+              18.618579864501953,
+              10.654102325439453,
+              -9.790407180786133
             ]
           },
           {
             "interp": "linear",
             "time": 16.824380968093873,
             "value": [
-              20.87041473388672,
-              6.975306034088135,
-              103.432373046875
+              18.611072540283203,
+              10.654102325439453,
+              -9.847915649414063
             ]
           },
           {
             "interp": "linear",
             "time": 17.351619141896567,
             "value": [
-              20.864959716796875,
-              6.975306034088135,
-              103.36943054199219
+              18.60561752319336,
+              10.654102325439453,
+              -9.910856246948242
             ]
           },
           {
             "interp": "linear",
             "time": 17.878857205708822,
             "value": [
-              20.86246109008789,
-              6.975306034088135,
-              103.31149291992188
+              18.603118896484375,
+              10.654102325439453,
+              -9.968799591064453
             ]
           },
           {
             "interp": "linear",
             "time": 18.406095269521078,
             "value": [
-              20.862159729003906,
-              6.975306034088135,
-              103.26907348632813
+              18.602815628051758,
+              10.654102325439453,
+              -10.011212348937988
             ]
           },
           {
             "interp": "linear",
             "time": 18.933333333333334,
             "value": [
-              20.86238670349121,
-              6.975306034088135,
-              103.25263214111328
+              18.603044509887695,
+              10.654102325439453,
+              -10.027660369873047
             ]
           },
           {
@@ -18719,144 +18753,144 @@
             "interp": "linear",
             "time": 26.377403436899183,
             "value": [
-              -42.165138244628906,
-              17.06184196472168,
-              -45.14065170288086
+              -112.98605346679688,
+              9.36184024810791,
+              16.950637817382813
             ]
           },
           {
             "interp": "linear",
             "time": 26.90025058833429,
             "value": [
-              -42.180667877197266,
-              17.06184196472168,
-              -45.15703201293945
+              -113.0015869140625,
+              9.36184024810791,
+              16.93425941467285
             ]
           },
           {
             "interp": "linear",
             "time": 27.423097739769403,
             "value": [
-              -42.219459533691406,
-              17.06184196472168,
-              -45.2004280090332
+              -113.04037475585938,
+              9.36184024810791,
+              16.89086151123047
             ]
           },
           {
             "interp": "linear",
             "time": 27.945944836667305,
             "value": [
-              -42.26944351196289,
-              17.06184196472168,
-              -45.26235580444336
+              -113.09036254882813,
+              9.36184024810791,
+              16.82893180847168
             ]
           },
           {
             "interp": "linear",
             "time": 28.46879204263962,
             "value": [
-              -42.31970977783203,
-              17.06184196472168,
-              -45.3330078125
+              -113.140625,
+              9.36184024810791,
+              16.75827980041504
             ]
           },
           {
             "interp": "linear",
             "time": 28.991639139537526,
             "value": [
-              -42.36182403564453,
-              17.06184196472168,
-              -45.400535583496094
+              -113.1827392578125,
+              9.36184024810791,
+              16.690752029418945
             ]
           },
           {
             "interp": "linear",
             "time": 29.514486236435427,
             "value": [
-              -42.390106201171875,
-              17.06184196472168,
-              -45.451412200927734
+              -113.21102142333984,
+              9.36184024810791,
+              16.639877319335938
             ]
           },
           {
             "interp": "linear",
             "time": 30.037333333333333,
             "value": [
-              -42.40048599243164,
-              17.06184196472168,
-              -45.47145462036133
+              -113.22139739990234,
+              9.36184024810791,
+              16.619834899902344
             ]
           },
           {
             "interp": "linear",
             "time": 30.037333333333333,
             "value": [
-              -162.43844604492188,
-              3.6469123363494873,
-              127.5842056274414
+              11.1624116897583,
+              9.503073692321777,
+              32.860389709472656
             ]
           },
           {
             "interp": "linear",
             "time": 31.083452351060295,
             "value": [
-              -162.45181274414063,
-              3.6469123363494873,
-              127.5941390991211
+              11.149054527282715,
+              9.503073692321777,
+              32.87032699584961
             ]
           },
           {
             "interp": "linear",
             "time": 32.12957136878725,
             "value": [
-              -162.48570251464844,
-              3.6469123363494873,
-              127.62049102783203
+              11.115159034729004,
+              9.503073692321777,
+              32.896671295166016
             ]
           },
           {
             "interp": "linear",
             "time": 33.1756902773955,
             "value": [
-              -162.5307159423828,
-              3.6469123363494873,
-              127.65815734863281
+              11.070137023925781,
+              9.503073692321777,
+              32.93434143066406
             ]
           },
           {
             "interp": "linear",
             "time": 34.22180940424118,
             "value": [
-              -162.57794189453125,
-              3.6469123363494873,
-              127.7012939453125
+              11.022908210754395,
+              9.503073692321777,
+              32.97747039794922
             ]
           },
           {
             "interp": "linear",
             "time": 35.26792831284942,
             "value": [
-              -162.6195526123047,
-              3.6469123363494873,
-              127.74271392822266
+              10.981318473815918,
+              9.503073692321777,
+              33.018898010253906
             ]
           },
           {
             "interp": "linear",
             "time": 36.31404722145767,
             "value": [
-              -162.6488494873047,
-              3.6469123363494873,
-              127.77408599853516
+              10.952008247375488,
+              9.503073692321777,
+              33.05027389526367
             ]
           },
           {
             "interp": "linear",
             "time": 37.36016613006592,
             "value": [
-              -162.6599578857422,
-              3.6469123363494873,
-              127.78648376464844
+              10.940902709960938,
+              9.503073692321777,
+              33.06267166137695
             ]
           },
           {
@@ -18935,72 +18969,72 @@
             "interp": "linear",
             "time": 44.8,
             "value": [
-              -29.81633758544922,
-              16.109296798706055,
-              -178.18905639648438
+              -29.102537155151367,
+              9.313384056091309,
+              -46.665924072265625
             ]
           },
           {
             "interp": "linear",
             "time": 45.85579224987004,
             "value": [
-              -29.824098587036133,
-              16.109296798706055,
-              -178.17604064941406
+              -29.110300064086914,
+              9.313384056091309,
+              -46.65290069580078
             ]
           },
           {
             "interp": "linear",
             "time": 46.911584499740094,
             "value": [
-              -29.84340476989746,
-              16.109296798706055,
-              -178.1420440673828
+              -29.12960433959961,
+              9.313384056091309,
+              -46.618900299072266
             ]
           },
           {
             "interp": "linear",
             "time": 47.96737663948243,
             "value": [
-              -29.868114471435547,
-              16.109296798706055,
-              -178.09461975097656
+              -29.154314041137695,
+              9.313384056091309,
+              -46.57149124145508
             ]
           },
           {
             "interp": "linear",
             "time": 49.023168999480184,
             "value": [
-              -29.892772674560547,
-              16.109296798706055,
-              -178.04185485839844
+              -29.178972244262695,
+              9.313384056091309,
+              -46.51872253417969
             ]
           },
           {
             "interp": "linear",
             "time": 50.07896113922253,
             "value": [
-              -29.913280487060547,
-              16.109296798706055,
-              -177.9924774169922
+              -29.199480056762695,
+              9.313384056091309,
+              -46.46935272216797
             ]
           },
           {
             "interp": "linear",
             "time": 51.134753278964865,
             "value": [
-              -29.92697525024414,
-              16.109296798706055,
-              -177.9558563232422
+              -29.21317481994629,
+              9.313384056091309,
+              -46.4327278137207
             ]
           },
           {
             "interp": "linear",
             "time": 52.1905454187072,
             "value": [
-              -29.931983947753906,
-              16.109296798706055,
-              -177.94154357910156
+              -29.218183517456055,
+              9.313384056091309,
+              -46.418418884277344
             ]
           },
           {
@@ -19079,72 +19113,72 @@
             "interp": "linear",
             "time": 59.562666666666665,
             "value": [
-              2.6270816326141357,
-              22.700937271118164,
-              251.30043029785156
+              16.554676055908203,
+              29.847301483154297,
+              154.6005401611328
             ]
           },
           {
             "interp": "linear",
             "time": 60.09142859506607,
             "value": [
-              2.6163341999053955,
-              22.699953079223633,
-              251.27218627929688
+              16.54393196105957,
+              29.846317291259766,
+              154.57229614257813
             ]
           },
           {
             "interp": "linear",
             "time": 60.620190523465475,
             "value": [
-              2.586813449859619,
-              22.69761848449707,
-              251.20150756835938
+              16.5144100189209,
+              29.843982696533203,
+              154.50161743164063
             ]
           },
           {
             "interp": "linear",
             "time": 61.14895239671071,
             "value": [
-              2.5354714393615723,
-              22.695558547973633,
-              251.11839294433594
+              16.463069915771484,
+              29.841922760009766,
+              154.4185028076172
             ]
           },
           {
             "interp": "linear",
             "time": 61.677714380264284,
             "value": [
-              2.45743727684021,
-              22.695556640625,
-              251.0552215576172
+              16.38503074645996,
+              29.841920852661133,
+              154.35533142089844
             ]
           },
           {
             "interp": "linear",
             "time": 62.20647625350952,
             "value": [
-              2.36553955078125,
-              22.69761085510254,
-              251.02236938476563
+              16.293134689331055,
+              29.843975067138672,
+              154.32247924804688
             ]
           },
           {
             "interp": "linear",
             "time": 62.735238126754766,
             "value": [
-              2.2903616428375244,
-              22.69994354248047,
-              251.00827026367188
+              16.217958450317383,
+              29.8463077545166,
+              154.30838012695313
             ]
           },
           {
             "interp": "linear",
             "time": 63.264,
             "value": [
-              2.2605185508728027,
-              22.700927734375,
-              251.00369262695313
+              16.188114166259766,
+              29.847291946411133,
+              154.30380249023438
             ]
           },
           {
@@ -19295,72 +19329,72 @@
             "interp": "linear",
             "time": 70.64533333333334,
             "value": [
-              -66.81553649902344,
-              15.997753143310547,
-              -266.4323425292969
+              -75.28170776367188,
+              9.309048652648926,
+              -17.97023582458496
             ]
           },
           {
             "interp": "linear",
             "time": 71.16779203294696,
             "value": [
-              -66.8282241821289,
-              15.998586654663086,
-              -266.40740966796875
+              -75.29438018798828,
+              9.309881210327148,
+              -17.945371627807617
             ]
           },
           {
             "interp": "linear",
             "time": 71.6902507325606,
             "value": [
-              -66.85630798339844,
-              16.000577926635742,
-              -266.3438720703125
+              -75.32242584228516,
+              9.311868667602539,
+              -17.881916046142578
             ]
           },
           {
             "interp": "linear",
             "time": 72.21270937767754,
             "value": [
-              -66.87494659423828,
-              16.00234603881836,
-              -266.26025390625
+              -75.34104919433594,
+              9.313633918762207,
+              -17.798439025878906
             ]
           },
           {
             "interp": "linear",
             "time": 72.73516813178784,
             "value": [
-              -66.85893249511719,
-              16.002344131469727,
-              -266.175537109375
+              -75.32508087158203,
+              9.313632011413574,
+              -17.713876724243164
             ]
           },
           {
             "interp": "linear",
             "time": 73.25762677690479,
             "value": [
-              -66.81088256835938,
-              16.000574111938477,
-              -266.1039123535156
+              -75.27713775634766,
+              9.31186580657959,
+              -17.642358779907227
             ]
           },
           {
             "interp": "linear",
             "time": 73.78008542202173,
             "value": [
-              -66.76127624511719,
-              15.998581886291504,
-              -266.0544128417969
+              -75.22763061523438,
+              9.30987548828125,
+              -17.59288787841797
             ]
           },
           {
             "interp": "linear",
             "time": 74.30254406713867,
             "value": [
-              -66.7402572631836,
-              15.997747421264648,
-              -266.03558349609375
+              -75.2066650390625,
+              9.309041976928711,
+              -17.574111938476563
             ]
           },
           {
@@ -19439,72 +19473,72 @@
             "interp": "linear",
             "time": 78.02666666666667,
             "value": [
-              -40.7359504699707,
-              17.06184196472168,
-              -44.79528045654297
+              -111.5568618774414,
+              9.36184024810791,
+              17.296009063720703
             ]
           },
           {
             "interp": "linear",
             "time": 78.54604049815144,
             "value": [
-              -40.758419036865234,
-              17.06105613708496,
-              -44.80144119262695
+              -111.57933807373047,
+              9.361054420471191,
+              17.28985023498535
             ]
           },
           {
             "interp": "linear",
             "time": 79.06541432963621,
             "value": [
-              -40.816341400146484,
-              17.059185028076172,
-              -44.81607437133789
+              -111.63725280761719,
+              9.359182357788086,
+              17.27521514892578
             ]
           },
           {
             "interp": "linear",
             "time": 79.58478810694608,
             "value": [
-              -40.89378356933594,
-              17.057523727416992,
-              -44.824798583984375
+              -111.7146987915039,
+              9.357522964477539,
+              17.266490936279297
             ]
           },
           {
             "interp": "linear",
             "time": 80.10416199260577,
             "value": [
-              -40.97378158569336,
-              17.057523727416992,
-              -44.8099250793457
+              -111.7947006225586,
+              9.357521057128906,
+              17.2813663482666
             ]
           },
           {
             "interp": "linear",
             "time": 80.62353576991562,
             "value": [
-              -41.04285430908203,
-              17.059181213378906,
-              -44.77395248413086
+              -111.86376953125,
+              9.359179496765137,
+              17.31733512878418
             ]
           },
           {
             "interp": "linear",
             "time": 81.14290954722549,
             "value": [
-              -41.091575622558594,
-              17.061050415039063,
-              -44.73948287963867
+              -111.91249084472656,
+              9.36104965209961,
+              17.351808547973633
             ]
           },
           {
             "interp": "linear",
             "time": 81.66228332453535,
             "value": [
-              -41.11030578613281,
-              17.06183624267578,
-              -44.72565841674805
+              -111.93122100830078,
+              9.361834526062012,
+              17.365631103515625
             ]
           },
           {
@@ -19655,360 +19689,360 @@
             "interp": "linear",
             "time": 89.09866666666667,
             "value": [
-              1.2580612897872925,
-              22.700937271118164,
-              249.8395233154297
+              15.185654640197754,
+              29.847301483154297,
+              153.13963317871094
             ]
           },
           {
             "interp": "linear",
             "time": 90.15466671387355,
             "value": [
-              1.2864190340042114,
-              22.70093536376953,
-              249.88307189941406
+              15.214014053344727,
+              29.847301483154297,
+              153.1831817626953
             ]
           },
           {
             "interp": "linear",
             "time": 91.21066676108043,
             "value": [
-              1.3613537549972534,
-              22.700931549072266,
-              249.994140625
+              15.288948059082031,
+              29.8472957611084,
+              153.29425048828125
             ]
           },
           {
             "interp": "linear",
             "time": 92.26666669813793,
             "value": [
-              1.467963457107544,
-              22.700925827026367,
-              250.14315795898438
+              15.395557403564453,
+              29.8472900390625,
+              153.44326782226563
             ]
           },
           {
             "interp": "linear",
             "time": 93.32266685549419,
             "value": [
-              1.5894404649734497,
-              22.700918197631836,
-              250.30160522460938
+              15.517036437988281,
+              29.84728240966797,
+              153.60171508789063
             ]
           },
           {
             "interp": "linear",
             "time": 94.37866679255168,
             "value": [
-              1.705722451210022,
-              22.700912475585938,
-              250.44329833984375
+              15.633317947387695,
+              29.84727668762207,
+              153.743408203125
             ]
           },
           {
             "interp": "linear",
             "time": 95.43466672960918,
             "value": [
-              1.793583631515503,
-              22.700908660888672,
-              250.5445556640625
+              15.721179008483887,
+              29.847272872924805,
+              153.84466552734375
             ]
           },
           {
             "interp": "linear",
             "time": 96.49066666666667,
             "value": [
-              1.8282885551452637,
-              22.70090675354004,
-              250.58326721191406
+              15.75588321685791,
+              29.847270965576172,
+              153.8833770751953
             ]
           },
           {
             "interp": "linear",
             "time": 96.49066666666667,
             "value": [
-              23.618465423583984,
-              6.975306034088135,
-              102.95619201660156
+              21.359121322631836,
+              10.654102325439453,
+              -10.324090957641602
             ]
           },
           {
             "interp": "linear",
             "time": 97.53977082782389,
             "value": [
-              23.626081466674805,
-              6.975305080413818,
-              102.99168395996094
+              21.36673927307129,
+              10.654101371765137,
+              -10.288605690002441
             ]
           },
           {
             "interp": "linear",
             "time": 98.5888749889811,
             "value": [
-              23.64145851135254,
-              6.9753031730651855,
-              103.08394622802734
+              21.382116317749023,
+              10.654099464416504,
+              -10.196342468261719
             ]
           },
           {
             "interp": "linear",
             "time": 99.63797904070823,
             "value": [
-              23.64531707763672,
-              6.974869728088379,
-              103.21162414550781
+              21.385976791381836,
+              10.653666496276855,
+              -10.068669319152832
             ]
           },
           {
             "interp": "linear",
             "time": 100.68708331129554,
             "value": [
-              23.580717086791992,
-              6.971047401428223,
-              103.3468246459961
+              21.321374893188477,
+              10.649843215942383,
+              -9.933465003967285
             ]
           },
           {
             "interp": "linear",
             "time": 101.73618736302267,
             "value": [
-              23.510517120361328,
-              6.967539310455322,
-              103.45906829833984
+              21.251174926757813,
+              10.64633560180664,
+              -9.82121753692627
             ]
           },
           {
             "interp": "linear",
             "time": 102.7852914147498,
             "value": [
-              23.453495025634766,
-              6.964973449707031,
-              103.53348541259766
+              21.19415283203125,
+              10.643770217895508,
+              -9.746801376342773
             ]
           },
           {
             "interp": "linear",
             "time": 103.83439546647693,
             "value": [
-              23.43024444580078,
-              6.9639787673950195,
-              103.56053924560547
+              21.170902252197266,
+              10.642775535583496,
+              -9.71975326538086
             ]
           },
           {
             "interp": "linear",
             "time": 103.83439546647693,
             "value": [
-              23.656259536743164,
-              6.975306034088135,
-              103.25080871582031
+              21.39691734313965,
+              10.654102325439453,
+              -10.0294771194458
             ]
           },
           {
             "interp": "linear",
             "time": 104.89424378054962,
             "value": [
-              22.02056884765625,
-              6.946417331695557,
-              103.28953552246094
+              21.2838077545166,
+              10.641317367553711,
+              -9.652420043945313
             ]
           },
           {
             "interp": "linear",
             "time": 105.9540920946223,
             "value": [
-              4.7714762687683105,
-              6.704227924346924,
-              103.71432495117188
+              20.093570709228516,
+              10.507302284240723,
+              -5.6793084144592285
             ]
           },
           {
             "interp": "linear",
             "time": 107.01394029814419,
             "value": [
-              -39.57466506958008,
-              6.190881729125977,
-              104.82200622558594
+              16.961612701416016,
+              10.210562705993652,
+              4.528130054473877
             ]
           },
           {
             "interp": "linear",
             "time": 108.07378872276766,
             "value": [
-              -97.55266571044922,
-              5.5378923416137695,
-              106.26409149169922
+              12.938295364379883,
+              9.936086654663086,
+              17.948013305664063
             ]
           },
           {
             "interp": "linear",
             "time": 109.13363692628955,
             "value": [
-              -141.89244079589844,
-              5.040298938751221,
-              107.36602783203125
+              9.860363960266113,
+              9.73136043548584,
+              28.185026168823242
             ]
           },
           {
             "interp": "linear",
             "time": 110.19348512981144,
             "value": [
-              -159.12599182128906,
-              4.847046375274658,
-              107.79421997070313
+              8.663410186767578,
+              9.651962280273438,
+              32.163063049316406
             ]
           },
           {
             "interp": "linear",
             "time": 111.25333333333333,
             "value": [
-              -160.76071166992188,
-              4.8287177085876465,
-              107.83484649658203
+              8.549860000610352,
+              9.64443302154541,
+              32.54039764404297
             ]
           },
           {
             "interp": "linear",
             "time": 111.25333333333333,
             "value": [
-              -29.933624267578125,
-              16.109296798706055,
-              -177.93673706054688
+              -29.219823837280273,
+              9.313384056091309,
+              -46.41360855102539
             ]
           },
           {
             "interp": "linear",
             "time": 112.30933338054021,
             "value": [
-              -29.926645278930664,
-              16.109296798706055,
-              -177.956787109375
+              -29.212844848632813,
+              9.313384056091309,
+              -46.43365478515625
             ]
           },
           {
             "interp": "linear",
             "time": 113.36533342774709,
             "value": [
-              -29.90712547302246,
-              16.109296798706055,
-              -178.00791931152344
+              -29.19332504272461,
+              9.313384056091309,
+              -46.48479080200195
             ]
           },
           {
             "interp": "linear",
             "time": 114.42133336480458,
             "value": [
-              -29.876953125,
-              16.109296798706055,
-              -178.076416015625
+              -29.16315269470215,
+              9.313384056091309,
+              -46.55328369140625
             ]
           },
           {
             "interp": "linear",
             "time": 115.47733352216085,
             "value": [
-              -29.83961296081543,
-              16.109296798706055,
-              -178.14891052246094
+              -29.125812530517578,
+              9.313384056091309,
+              -46.625770568847656
             ]
           },
           {
             "interp": "linear",
             "time": 116.53333345921834,
             "value": [
-              -29.801368713378906,
-              16.109296798706055,
-              -178.21322631835938
+              -29.087568283081055,
+              9.313384056091309,
+              -46.690101623535156
             ]
           },
           {
             "interp": "linear",
             "time": 117.58933339627585,
             "value": [
-              -29.77106475830078,
-              16.109296798706055,
-              -178.25881958007813
+              -29.057266235351563,
+              9.313384056091309,
+              -46.735687255859375
             ]
           },
           {
             "interp": "linear",
             "time": 118.64533333333334,
             "value": [
-              -29.758798599243164,
-              16.109296798706055,
-              -178.27613830566406
+              -29.044998168945313,
+              9.313384056091309,
+              -46.75300598144531
             ]
           },
           {
             "interp": "linear",
             "time": 118.64533333333334,
             "value": [
-              11.360000610351563,
-              22.700937271118164,
-              244.44676208496094
+              25.287595748901367,
+              29.847301483154297,
+              147.7468719482422
             ]
           },
           {
             "interp": "linear",
             "time": 120.62323818365734,
             "value": [
-              11.322154998779297,
-              22.700937271118164,
-              244.35992431640625
+              25.2497501373291,
+              29.847301483154297,
+              147.6600341796875
             ]
           },
           {
             "interp": "linear",
             "time": 122.60114303398133,
             "value": [
-              11.217995643615723,
-              22.700937271118164,
-              244.1389923095703
+              25.145591735839844,
+              29.847301483154297,
+              147.43910217285156
             ]
           },
           {
             "interp": "linear",
             "time": 124.57904767799378,
             "value": [
-              11.060571670532227,
-              22.700937271118164,
-              243.84445190429688
+              24.988168716430664,
+              29.847301483154297,
+              147.14456176757813
             ]
           },
           {
             "interp": "linear",
             "time": 126.55695273462932,
             "value": [
-              10.869901657104492,
-              22.700937271118164,
-              243.53456115722656
+              24.797496795654297,
+              29.847301483154297,
+              146.8346710205078
             ]
           },
           {
             "interp": "linear",
             "time": 128.53485737864176,
             "value": [
-              10.677959442138672,
-              22.700937271118164,
-              243.26126098632813
+              24.605554580688477,
+              29.847301483154297,
+              146.56137084960938
             ]
           },
           {
             "interp": "linear",
             "time": 130.51276202265421,
             "value": [
-              10.527703285217285,
-              22.700937271118164,
-              243.06869506835938
+              24.45530128479004,
+              29.847301483154297,
+              146.36880493164063
             ]
           },
           {
             "interp": "linear",
             "time": 132.49066666666667,
             "value": [
-              10.467263221740723,
-              22.700937271118164,
-              242.99575805664063
+              24.394859313964844,
+              29.847301483154297,
+              146.29586791992188
             ]
           },
           {
@@ -20231,144 +20265,144 @@
             "interp": "linear",
             "time": 170.336,
             "value": [
-              -66.77923583984375,
-              15.997753143310547,
-              -266.15777587890625
+              -75.24541473388672,
+              9.309048652648926,
+              -17.69567108154297
             ]
           },
           {
             "interp": "linear",
             "time": 171.3920000472069,
             "value": [
-              -66.7706527709961,
-              15.99775218963623,
-              -266.12579345703125
+              -75.23683166503906,
+              9.30904769897461,
+              -17.663711547851563
             ]
           },
           {
             "interp": "linear",
             "time": 172.44800009441377,
             "value": [
-              -66.74478149414063,
-              15.997750282287598,
-              -266.0445251464844
+              -75.2109603881836,
+              9.309045791625977,
+              -17.582433700561523
             ]
           },
           {
             "interp": "linear",
             "time": 173.50400003147126,
             "value": [
-              -66.7008285522461,
-              15.997747421264648,
-              -265.9366149902344
+              -75.1670150756836,
+              9.309042930603027,
+              -17.47452163696289
             ]
           },
           {
             "interp": "linear",
             "time": 174.56000018882753,
             "value": [
-              -66.59606170654297,
-              15.994544982910156,
-              -265.8506774902344
+              -75.06224060058594,
+              9.305840492248535,
+              -17.38860321044922
             ]
           },
           {
             "interp": "linear",
             "time": 175.61600012588502,
             "value": [
-              -66.49127197265625,
-              15.99129581451416,
-              -265.7882385253906
+              -74.95745086669922,
+              9.302591323852539,
+              -17.326129913330078
             ]
           },
           {
             "interp": "linear",
             "time": 176.67200006294252,
             "value": [
-              -66.41322326660156,
-              15.988919258117676,
-              -265.7511901855469
+              -74.87940216064453,
+              9.300214767456055,
+              -17.289087295532227
             ]
           },
           {
             "interp": "linear",
             "time": 177.728,
             "value": [
-              -66.3827896118164,
-              15.987997055053711,
-              -265.73876953125
+              -74.84896850585938,
+              9.29929256439209,
+              -17.27667999267578
             ]
           },
           {
             "interp": "linear",
             "time": 177.728,
             "value": [
-              9.324432373046875,
-              22.700937271118164,
-              241.96072387695313
+              23.252029418945313,
+              29.847301483154297,
+              145.26083374023438
             ]
           },
           {
             "interp": "linear",
             "time": 178.25523811880748,
             "value": [
-              9.346055030822754,
-              22.700937271118164,
-              241.97547912597656
+              23.273651123046875,
+              29.847301483154297,
+              145.2755889892578
             ]
           },
           {
             "interp": "linear",
             "time": 178.78247623761496,
             "value": [
-              9.401544570922852,
-              22.70093536376953,
-              242.01400756835938
+              23.329139709472656,
+              29.847299575805664,
+              145.31411743164063
             ]
           },
           {
             "interp": "linear",
             "time": 179.30971430142722,
             "value": [
-              9.47671890258789,
-              22.700931549072266,
-              242.0677490234375
+              23.404312133789063,
+              29.8472957611084,
+              145.36785888671875
             ]
           },
           {
             "interp": "linear",
             "time": 179.8369524752299,
             "value": [
-              9.557575225830078,
-              22.700927734375,
-              242.1276397705078
+              23.485170364379883,
+              29.847291946411133,
+              145.42774963378906
             ]
           },
           {
             "interp": "linear",
             "time": 180.36419053904217,
             "value": [
-              9.630928039550781,
-              22.700925827026367,
-              242.1838836669922
+              23.55851936340332,
+              29.8472900390625,
+              145.48399353027344
             ]
           },
           {
             "interp": "linear",
             "time": 180.8914286028544,
             "value": [
-              9.683976173400879,
-              22.700923919677734,
-              242.22573852539063
+              23.611572265625,
+              29.847288131713867,
+              145.52584838867188
             ]
           },
           {
             "interp": "linear",
             "time": 181.41866666666667,
             "value": [
-              9.704401016235352,
-              22.7009220123291,
-              242.24212646484375
+              23.63199806213379,
+              29.847286224365234,
+              145.542236328125
             ]
           },
           {
@@ -20591,72 +20625,72 @@
             "interp": "linear",
             "time": 192.49066666666667,
             "value": [
-              -41.67539596557617,
-              17.06184196472168,
-              -44.814697265625
+              -112.49630737304688,
+              9.36184024810791,
+              17.276592254638672
             ]
           },
           {
             "interp": "linear",
             "time": 193.01790478547414,
             "value": [
-              -41.65576171875,
-              17.062742233276367,
-              -44.79169845581055
+              -112.47667694091797,
+              9.362741470336914,
+              17.29959487915039
             ]
           },
           {
             "interp": "linear",
             "time": 193.54514290428162,
             "value": [
-              -41.60389709472656,
-              17.064895629882813,
-              -44.73729705810547
+              -112.42481994628906,
+              9.364893913269043,
+              17.353992462158203
             ]
           },
           {
             "interp": "linear",
             "time": 194.07238096809388,
             "value": [
-              -41.52809524536133,
-              17.066804885864258,
-              -44.684078216552734
+              -112.34900665283203,
+              9.366804122924805,
+              17.407211303710938
             ]
           },
           {
             "interp": "linear",
             "time": 194.59961914189657,
             "value": [
-              -41.43687057495117,
-              17.066804885864258,
-              -44.66508483886719
+              -112.2577896118164,
+              9.366803169250488,
+              17.426204681396484
             ]
           },
           {
             "interp": "linear",
             "time": 195.12685720570883,
             "value": [
-              -41.34547424316406,
-              17.064891815185547,
-              -44.68355941772461
+              -112.16638946533203,
+              9.364890098571777,
+              17.407732009887695
             ]
           },
           {
             "interp": "linear",
             "time": 195.65409526952106,
             "value": [
-              -41.2755012512207,
-              17.06273651123047,
-              -44.71272659301758
+              -112.09642028808594,
+              9.362735748291016,
+              17.37856101989746
             ]
           },
           {
             "interp": "linear",
             "time": 196.18133333333333,
             "value": [
-              -41.2480354309082,
-              17.06183624267578,
-              -44.72599792480469
+              -112.0689468383789,
+              9.361833572387695,
+              17.36528968811035
             ]
           },
           {
@@ -20735,144 +20769,144 @@
             "interp": "linear",
             "time": 199.8225850852573,
             "value": [
-              9.804903984069824,
-              22.700937271118164,
-              251.07066345214844
+              23.73249626159668,
+              29.847301483154297,
+              154.3707733154297
             ]
           },
           {
             "interp": "linear",
             "time": 200.356882477915,
             "value": [
-              9.835387229919434,
-              22.7019100189209,
-              251.06573486328125
+              23.762981414794922,
+              29.84827423095703,
+              154.3658447265625
             ]
           },
           {
             "interp": "linear",
             "time": 200.89117987057273,
             "value": [
-              9.911397933959961,
-              22.70421600341797,
-              251.05010986328125
+              23.838993072509766,
+              29.8505802154541,
+              154.3502197265625
             ]
           },
           {
             "interp": "linear",
             "time": 201.4254772074989,
             "value": [
-              10.001834869384766,
-              22.706247329711914,
-              251.01437377929688
+              23.92943000793457,
+              29.852611541748047,
+              154.31448364257813
             ]
           },
           {
             "interp": "linear",
             "time": 201.95977465588817,
             "value": [
-              10.074434280395508,
-              22.70624542236328,
-              250.9475555419922
+              24.002031326293945,
+              29.852609634399414,
+              154.24766540527344
             ]
           },
           {
             "interp": "linear",
             "time": 202.49407199281436,
             "value": [
-              10.117161750793457,
-              22.70421028137207,
-              250.8607635498047
+              24.04475975036621,
+              29.850574493408203,
+              154.16087341308594
             ]
           },
           {
             "interp": "linear",
             "time": 203.0283693297405,
             "value": [
-              10.138604164123535,
-              22.701902389526367,
-              250.7867431640625
+              24.066198348999023,
+              29.8482666015625,
+              154.08685302734375
             ]
           },
           {
             "interp": "linear",
             "time": 203.56266666666667,
             "value": [
-              10.145869255065918,
-              22.700927734375,
-              250.7569580078125
+              24.073467254638672,
+              29.847291946411133,
+              154.05706787109375
             ]
           },
           {
             "interp": "linear",
             "time": 203.56266666666667,
             "value": [
-              21.76321029663086,
-              6.975306034088135,
-              101.97411346435547
+              19.503868103027344,
+              10.654102325439453,
+              -11.30617904663086
             ]
           },
           {
             "interp": "linear",
             "time": 204.08990478547415,
             "value": [
-              21.77861785888672,
-              6.975306034088135,
-              101.9683609008789
+              19.519275665283203,
+              10.654102325439453,
+              -11.311927795410156
             ]
           },
           {
             "interp": "linear",
             "time": 204.61714290428162,
             "value": [
-              21.818660736083984,
-              6.975306034088135,
-              101.95437622070313
+              19.55931854248047,
+              10.654102325439453,
+              -11.32591438293457
             ]
           },
           {
             "interp": "linear",
             "time": 205.14438096809388,
             "value": [
-              21.87406349182129,
-              6.975306034088135,
-              101.93722534179688
+              19.61471939086914,
+              10.654102325439453,
+              -11.343058586120605
             ]
           },
           {
             "interp": "linear",
             "time": 205.67161914189657,
             "value": [
-              21.9351749420166,
-              6.975306034088135,
-              101.92118835449219
+              19.675832748413086,
+              10.654102325439453,
+              -11.35910415649414
             ]
           },
           {
             "interp": "linear",
             "time": 206.19885720570883,
             "value": [
-              21.99185562133789,
-              6.975306034088135,
-              101.90889739990234
+              19.732511520385742,
+              10.654102325439453,
+              -11.371386528015137
             ]
           },
           {
             "interp": "linear",
             "time": 206.72609526952107,
             "value": [
-              22.03360366821289,
-              6.975306034088135,
-              101.90141296386719
+              19.774261474609375,
+              10.654102325439453,
+              -11.378872871398926
             ]
           },
           {
             "interp": "linear",
             "time": 207.25333333333333,
             "value": [
-              22.049846649169922,
-              6.975306034088135,
-              101.89885711669922
+              19.790504455566406,
+              10.654102325439453,
+              -11.381434440612793
             ]
           },
           {
@@ -20951,72 +20985,72 @@
             "interp": "linear",
             "time": 210.95466666666667,
             "value": [
-              -28.71380043029785,
-              16.031932830810547,
-              -177.52313232421875
+              -28.0,
+              9.2360200881958,
+              -46.0
             ]
           },
           {
             "interp": "linear",
             "time": 211.48190478547414,
             "value": [
-              -28.69020652770996,
-              16.031932830810547,
-              -177.75259399414063
+              -27.97640609741211,
+              9.2360200881958,
+              -46.22945785522461
             ]
           },
           {
             "interp": "linear",
             "time": 212.00914290428162,
             "value": [
-              -28.607881546020508,
-              16.031932830810547,
-              -178.3417205810547
+              -27.894084930419922,
+              9.2360200881958,
+              -46.818572998046875
             ]
           },
           {
             "interp": "linear",
             "time": 212.53638096809388,
             "value": [
-              -28.445581436157227,
-              16.031932830810547,
-              -179.13864135742188
+              -27.731781005859375,
+              9.2360200881958,
+              -47.61550521850586
             ]
           },
           {
             "interp": "linear",
             "time": 213.06361914189657,
             "value": [
-              -28.204256057739258,
-              16.031932830810547,
-              -179.99127197265625
+              -27.490455627441406,
+              9.2360200881958,
+              -48.4681282043457
             ]
           },
           {
             "interp": "linear",
             "time": 213.59085720570883,
             "value": [
-              -27.924814224243164,
-              16.031932830810547,
-              -180.7550506591797
+              -27.211017608642578,
+              9.2360200881958,
+              -49.23190689086914
             ]
           },
           {
             "interp": "linear",
             "time": 214.11809526952106,
             "value": [
-              -27.68617820739746,
-              16.031932830810547,
-              -181.29991149902344
+              -26.97237777709961,
+              9.2360200881958,
+              -49.77677917480469
             ]
           },
           {
             "interp": "linear",
             "time": 214.64533333333333,
             "value": [
-              -27.58601188659668,
-              16.031932830810547,
-              -181.50770568847656
+              -26.872211456298828,
+              9.2360200881958,
+              -49.98456573486328
             ]
           },
           {
@@ -21167,72 +21201,72 @@
             "interp": "linear",
             "time": 222.02666666666667,
             "value": [
-              -161.63629150390625,
-              3.6469123363494873,
-              130.13768005371094
+              11.964578628540039,
+              9.503073692321777,
+              35.41386413574219
             ]
           },
           {
             "interp": "linear",
             "time": 222.6361905034383,
             "value": [
-              -161.61297607421875,
-              3.6469123363494873,
-              130.1380615234375
+              11.987882614135742,
+              9.503073692321777,
+              35.41425704956055
             ]
           },
           {
             "interp": "linear",
             "time": 223.24571434020996,
             "value": [
-              -161.55288696289063,
-              3.6469123363494873,
-              130.13731384277344
+              12.047986030578613,
+              9.503073692321777,
+              35.41349792480469
             ]
           },
           {
             "interp": "linear",
             "time": 223.85523811340332,
             "value": [
-              -161.4708709716797,
-              3.6469123363494873,
-              130.13214111328125
+              12.129989624023438,
+              9.503073692321777,
+              35.408321380615234
             ]
           },
           {
             "interp": "linear",
             "time": 224.46476201375324,
             "value": [
-              -161.3820037841797,
-              3.6469123363494873,
-              130.12109375
+              12.218851089477539,
+              9.503073692321777,
+              35.397274017333984
             ]
           },
           {
             "interp": "linear",
             "time": 225.0742857869466,
             "value": [
-              -161.30123901367188,
-              3.6469123363494873,
-              130.10601806640625
+              12.299625396728516,
+              9.503073692321777,
+              35.382205963134766
             ]
           },
           {
             "interp": "linear",
             "time": 225.68380956013996,
             "value": [
-              -161.24276733398438,
-              3.6469123363494873,
-              130.092041015625
+              12.358085632324219,
+              9.503073692321777,
+              35.36822509765625
             ]
           },
           {
             "interp": "linear",
             "time": 226.29333333333332,
             "value": [
-              -161.22027587890625,
-              3.6469123363494873,
-              130.08595275878906
+              12.380583763122559,
+              9.503073692321777,
+              35.36214065551758
             ]
           }
         ],
@@ -21864,7 +21898,7 @@
             "interp": "linear",
             "time": 0.5973333600362142,
             "value": [
-              51.12582778930664
+              51.12582015991211
             ]
           },
           {
@@ -21913,56 +21947,56 @@
             "interp": "linear",
             "time": 4.181333333333333,
             "value": [
-              11.403514862060547
+              11.40352725982666
             ]
           },
           {
             "interp": "linear",
             "time": 4.7085714521408075,
             "value": [
-              11.401681900024414
+              11.401683807373047
             ]
           },
           {
             "interp": "linear",
             "time": 5.235809570948282,
             "value": [
-              11.397018432617188
+              11.397005081176758
             ]
           },
           {
             "interp": "linear",
             "time": 5.763047634760539,
             "value": [
-              11.390786170959473
+              11.390768051147461
             ]
           },
           {
             "interp": "linear",
             "time": 6.290285808563232,
             "value": [
-              11.384210586547852
+              11.384188652038574
             ]
           },
           {
             "interp": "linear",
             "time": 6.817523872375488,
             "value": [
-              11.128497123718262
+              11.127248764038086
             ]
           },
           {
             "interp": "linear",
             "time": 7.344761936187744,
             "value": [
-              10.898791313171387
+              10.89731502532959
             ]
           },
           {
             "interp": "linear",
             "time": 7.872,
             "value": [
-              10.809782028198242
+              10.808231353759766
             ]
           },
           {
@@ -22081,21 +22115,21 @@
             "interp": "linear",
             "time": 15.242666666666667,
             "value": [
-              12.42791748046875
+              12.427919387817383
             ]
           },
           {
             "interp": "linear",
             "time": 15.769904785474141,
             "value": [
-              12.427918434143066
+              12.427921295166016
             ]
           },
           {
             "interp": "linear",
             "time": 16.297142904281618,
             "value": [
-              12.427922248840332
+              12.4279203414917
             ]
           },
           {
@@ -22109,21 +22143,21 @@
             "interp": "linear",
             "time": 17.351619141896567,
             "value": [
-              12.427922248840332
+              12.427919387817383
             ]
           },
           {
             "interp": "linear",
             "time": 17.878857205708822,
             "value": [
-              12.427919387817383
+              12.427921295166016
             ]
           },
           {
             "interp": "linear",
             "time": 18.406095269521078,
             "value": [
-              12.42791748046875
+              12.427921295166016
             ]
           },
           {
@@ -22256,21 +22290,21 @@
             "interp": "linear",
             "time": 26.90025058833429,
             "value": [
-              12.182840347290039
+              12.182841300964355
             ]
           },
           {
             "interp": "linear",
             "time": 27.423097739769403,
             "value": [
-              12.182843208312988
+              12.182844161987305
             ]
           },
           {
             "interp": "linear",
             "time": 27.945944836667305,
             "value": [
-              12.182840347290039
+              12.182844161987305
             ]
           },
           {
@@ -22284,14 +22318,14 @@
             "interp": "linear",
             "time": 28.991639139537526,
             "value": [
-              12.182840347290039
+              12.182839393615723
             ]
           },
           {
             "interp": "linear",
             "time": 29.514486236435427,
             "value": [
-              12.182841300964355
+              12.182840347290039
             ]
           },
           {
@@ -22304,57 +22338,57 @@
           {
             "interp": "linear",
             "time": 30.037333333333333,
-            "value": [
-              12.579838752746582
-            ]
-          },
-          {
-            "interp": "linear",
-            "time": 31.083452351060295,
-            "value": [
-              12.579839706420898
-            ]
-          },
-          {
-            "interp": "linear",
-            "time": 32.12957136878725,
-            "value": [
-              12.579843521118164
-            ]
-          },
-          {
-            "interp": "linear",
-            "time": 33.1756902773955,
-            "value": [
-              12.579838752746582
-            ]
-          },
-          {
-            "interp": "linear",
-            "time": 34.22180940424118,
-            "value": [
-              12.579848289489746
-            ]
-          },
-          {
-            "interp": "linear",
-            "time": 35.26792831284942,
-            "value": [
-              12.579843521118164
-            ]
-          },
-          {
-            "interp": "linear",
-            "time": 36.31404722145767,
             "value": [
               12.579845428466797
             ]
           },
           {
             "interp": "linear",
+            "time": 31.083452351060295,
+            "value": [
+              12.579843521118164
+            ]
+          },
+          {
+            "interp": "linear",
+            "time": 32.12957136878725,
+            "value": [
+              12.579845428466797
+            ]
+          },
+          {
+            "interp": "linear",
+            "time": 33.1756902773955,
+            "value": [
+              12.579843521118164
+            ]
+          },
+          {
+            "interp": "linear",
+            "time": 34.22180940424118,
+            "value": [
+              12.57984447479248
+            ]
+          },
+          {
+            "interp": "linear",
+            "time": 35.26792831284942,
+            "value": [
+              12.579845428466797
+            ]
+          },
+          {
+            "interp": "linear",
+            "time": 36.31404722145767,
+            "value": [
+              12.57984447479248
+            ]
+          },
+          {
+            "interp": "linear",
             "time": 37.36016613006592,
             "value": [
-              12.579851150512695
+              12.579845428466797
             ]
           },
           {
@@ -22424,49 +22458,49 @@
             "interp": "linear",
             "time": 45.85579224987004,
             "value": [
-              11.456708908081055
+              11.45671272277832
             ]
           },
           {
             "interp": "linear",
             "time": 46.911584499740094,
             "value": [
-              11.456717491149902
+              11.456714630126953
             ]
           },
           {
             "interp": "linear",
             "time": 47.96737663948243,
             "value": [
-              11.456717491149902
+              11.456713676452637
             ]
           },
           {
             "interp": "linear",
             "time": 49.023168999480184,
             "value": [
-              11.456718444824219
+              11.456711769104004
             ]
           },
           {
             "interp": "linear",
             "time": 50.07896113922253,
             "value": [
-              11.456707954406738
+              11.456711769104004
             ]
           },
           {
             "interp": "linear",
             "time": 51.134753278964865,
             "value": [
-              11.456707954406738
+              11.456711769104004
             ]
           },
           {
             "interp": "linear",
             "time": 52.1905454187072,
             "value": [
-              11.456707954406738
+              11.456711769104004
             ]
           },
           {
@@ -22529,7 +22563,7 @@
             "interp": "linear",
             "time": 59.562666666666665,
             "value": [
-              51.124534606933594
+              51.12453842163086
             ]
           },
           {
@@ -22550,7 +22584,7 @@
             "interp": "linear",
             "time": 61.14895239671071,
             "value": [
-              50.34304428100586
+              50.34303665161133
             ]
           },
           {
@@ -22571,7 +22605,7 @@
             "interp": "linear",
             "time": 62.735238126754766,
             "value": [
-              50.99335861206055
+              50.99335479736328
             ]
           },
           {
@@ -22697,56 +22731,56 @@
             "interp": "linear",
             "time": 70.64533333333334,
             "value": [
-              11.403535842895508
+              11.403524398803711
             ]
           },
           {
             "interp": "linear",
             "time": 71.16779203294696,
             "value": [
-              11.523550033569336
+              11.523361206054688
             ]
           },
           {
             "interp": "linear",
             "time": 71.6902507325606,
             "value": [
-              11.810090065002441
+              11.809450149536133
             ]
           },
           {
             "interp": "linear",
             "time": 72.21270937767754,
             "value": [
-              12.063323020935059
+              12.062273979187012
             ]
           },
           {
             "interp": "linear",
             "time": 72.73516813178784,
             "value": [
-              12.05896282196045
+              12.057915687561035
             ]
           },
           {
             "interp": "linear",
             "time": 73.25762677690479,
             "value": [
-              11.797439575195313
+              11.796819686889648
             ]
           },
           {
             "interp": "linear",
             "time": 73.78008542202173,
             "value": [
-              11.504438400268555
+              11.50428581237793
             ]
           },
           {
             "interp": "linear",
             "time": 74.30254406713867,
             "value": [
-              11.381818771362305
+              11.381847381591797
             ]
           },
           {
@@ -22823,42 +22857,42 @@
             "interp": "linear",
             "time": 79.06541432963621,
             "value": [
-              11.792595863342285
+              11.79259204864502
             ]
           },
           {
             "interp": "linear",
             "time": 79.58478810694608,
             "value": [
-              11.547325134277344
+              11.54732608795166
             ]
           },
           {
             "interp": "linear",
             "time": 80.10416199260577,
             "value": [
-              11.542724609375
+              11.542720794677734
             ]
           },
           {
             "interp": "linear",
             "time": 80.62353576991562,
             "value": [
-              11.779817581176758
+              11.779812812805176
             ]
           },
           {
             "interp": "linear",
             "time": 81.14290954722549,
             "value": [
-              12.049140930175781
+              12.049144744873047
             ]
           },
           {
             "interp": "linear",
             "time": 81.66228332453535,
             "value": [
-              12.162339210510254
+              12.162334442138672
             ]
           },
           {
@@ -22977,7 +23011,7 @@
             "interp": "linear",
             "time": 89.09866666666667,
             "value": [
-              51.12453079223633
+              51.12453842163086
             ]
           },
           {
@@ -22998,14 +23032,14 @@
             "interp": "linear",
             "time": 92.26666669813793,
             "value": [
-              51.14126205444336
+              51.141265869140625
             ]
           },
           {
             "interp": "linear",
             "time": 93.32266685549419,
             "value": [
-              51.1507568359375
+              51.150753021240234
             ]
           },
           {
@@ -23019,7 +23053,7 @@
             "interp": "linear",
             "time": 95.43466672960918,
             "value": [
-              51.16645812988281
+              51.16645431518555
             ]
           },
           {
@@ -23033,28 +23067,28 @@
             "interp": "linear",
             "time": 96.49066666666667,
             "value": [
-              12.427921295166016
+              12.4279203414917
             ]
           },
           {
             "interp": "linear",
             "time": 97.53977082782389,
             "value": [
-              12.424805641174316
+              12.424808502197266
             ]
           },
           {
             "interp": "linear",
             "time": 98.5888749889811,
             "value": [
-              12.41696834564209
+              12.416971206665039
             ]
           },
           {
             "interp": "linear",
             "time": 99.63797904070823,
             "value": [
-              12.343018531799316
+              12.34302043914795
             ]
           },
           {
@@ -23068,98 +23102,98 @@
             "interp": "linear",
             "time": 101.73618736302267,
             "value": [
-              11.241979598999023
+              11.241976737976074
             ]
           },
           {
             "interp": "linear",
             "time": 102.7852914147498,
             "value": [
-              10.857888221740723
+              10.857885360717773
             ]
           },
           {
             "interp": "linear",
             "time": 103.83439546647693,
             "value": [
-              10.709122657775879
+              10.709120750427246
             ]
           },
           {
             "interp": "linear",
             "time": 103.83439546647693,
             "value": [
-              12.427919387817383
+              12.427921295166016
             ]
           },
           {
             "interp": "linear",
             "time": 104.89424378054962,
             "value": [
-              12.427919387817383
+              12.427921295166016
             ]
           },
           {
             "interp": "linear",
             "time": 105.9540920946223,
             "value": [
-              12.427919387817383
+              12.427921295166016
             ]
           },
           {
             "interp": "linear",
             "time": 107.01394029814419,
             "value": [
-              12.427919387817383
+              12.427921295166016
             ]
           },
           {
             "interp": "linear",
             "time": 108.07378872276766,
             "value": [
-              12.427919387817383
+              12.427921295166016
             ]
           },
           {
             "interp": "linear",
             "time": 109.13363692628955,
             "value": [
-              12.427919387817383
+              12.427921295166016
             ]
           },
           {
             "interp": "linear",
             "time": 110.19348512981144,
             "value": [
-              12.427919387817383
+              12.427921295166016
             ]
           },
           {
             "interp": "linear",
             "time": 111.25333333333333,
             "value": [
-              12.427919387817383
+              12.427921295166016
             ]
           },
           {
             "interp": "linear",
             "time": 111.25333333333333,
             "value": [
-              11.456705093383789
+              11.45671272277832
             ]
           },
           {
             "interp": "linear",
             "time": 112.30933338054021,
             "value": [
-              11.456716537475586
+              11.45671272277832
             ]
           },
           {
             "interp": "linear",
             "time": 113.36533342774709,
             "value": [
-              11.456709861755371
+              11.45671272277832
             ]
           },
           {
@@ -23180,14 +23214,14 @@
             "interp": "linear",
             "time": 116.53333345921834,
             "value": [
-              11.456717491149902
+              11.456710815429688
             ]
           },
           {
             "interp": "linear",
             "time": 117.58933339627585,
             "value": [
-              11.456707954406738
+              11.456714630126953
             ]
           },
           {
@@ -23222,7 +23256,7 @@
             "interp": "linear",
             "time": 124.57904767799378,
             "value": [
-              51.12452697753906
+              51.12453842163086
             ]
           },
           {
@@ -23243,7 +23277,7 @@
             "interp": "linear",
             "time": 130.51276202265421,
             "value": [
-              51.12453079223633
+              51.124542236328125
             ]
           },
           {
@@ -23425,7 +23459,7 @@
             "interp": "linear",
             "time": 170.336,
             "value": [
-              11.403520584106445
+              11.403524398803711
             ]
           },
           {
@@ -23439,49 +23473,49 @@
             "interp": "linear",
             "time": 172.44800009441377,
             "value": [
-              11.393473625183105
+              11.393477439880371
             ]
           },
           {
             "interp": "linear",
             "time": 173.50400003147126,
             "value": [
-              11.38403034210205
+              11.384037017822266
             ]
           },
           {
             "interp": "linear",
             "time": 174.56000018882753,
             "value": [
-              10.901658058166504
+              10.901667594909668
             ]
           },
           {
             "interp": "linear",
             "time": 175.61600012588502,
             "value": [
-              10.414173126220703
+              10.41418170928955
             ]
           },
           {
             "interp": "linear",
             "time": 176.67200006294252,
             "value": [
-              10.058377265930176
+              10.05837345123291
             ]
           },
           {
             "interp": "linear",
             "time": 177.728,
             "value": [
-              9.92055892944336
+              9.920562744140625
             ]
           },
           {
             "interp": "linear",
             "time": 177.728,
             "value": [
-              51.12453079223633
+              51.12453842163086
             ]
           },
           {
@@ -23502,35 +23536,35 @@
             "interp": "linear",
             "time": 179.30971430142722,
             "value": [
-              51.13276290893555
+              51.132755279541016
             ]
           },
           {
             "interp": "linear",
             "time": 179.8369524752299,
             "value": [
-              51.13731384277344
+              51.13731002807617
             ]
           },
           {
             "interp": "linear",
             "time": 180.36419053904217,
             "value": [
-              51.141571044921875
+              51.141563415527344
             ]
           },
           {
             "interp": "linear",
             "time": 180.8914286028544,
             "value": [
-              51.144710540771484
+              51.14471435546875
             ]
           },
           {
             "interp": "linear",
             "time": 181.41866666666667,
             "value": [
-              51.145938873291016
+              51.14594650268555
             ]
           },
           {
@@ -23705,49 +23739,49 @@
             "interp": "linear",
             "time": 192.49066666666667,
             "value": [
-              12.182841300964355
+              12.182842254638672
             ]
           },
           {
             "interp": "linear",
             "time": 193.01790478547414,
             "value": [
-              12.312540054321289
+              12.312542915344238
             ]
           },
           {
             "interp": "linear",
             "time": 193.54514290428162,
             "value": [
-              12.622248649597168
+              12.622244834899902
             ]
           },
           {
             "interp": "linear",
             "time": 194.07238096809388,
             "value": [
-              12.896005630493164
+              12.896012306213379
             ]
           },
           {
             "interp": "linear",
             "time": 194.59961914189657,
             "value": [
-              12.891294479370117
+              12.891301155090332
             ]
           },
           {
             "interp": "linear",
             "time": 195.12685720570883,
             "value": [
-              12.60859489440918
+              12.608591079711914
             ]
           },
           {
             "interp": "linear",
             "time": 195.65409526952106,
             "value": [
-              12.291906356811523
+              12.291911125183105
             ]
           },
           {
@@ -23817,70 +23851,70 @@
             "interp": "linear",
             "time": 199.8225850852573,
             "value": [
-              51.12454605102539
+              51.124534606933594
             ]
           },
           {
             "interp": "linear",
             "time": 200.356882477915,
             "value": [
-              51.267784118652344
+              51.26776885986328
             ]
           },
           {
             "interp": "linear",
             "time": 200.89117987057273,
             "value": [
-              51.60744094848633
+              51.60744857788086
             ]
           },
           {
             "interp": "linear",
             "time": 201.4254772074989,
             "value": [
-              51.907711029052734
+              51.90771484375
             ]
           },
           {
             "interp": "linear",
             "time": 201.95977465588817,
             "value": [
-              51.91054916381836
+              51.910552978515625
             ]
           },
           {
             "interp": "linear",
             "time": 202.49407199281436,
             "value": [
-              51.61553955078125
+              51.61555862426758
             ]
           },
           {
             "interp": "linear",
             "time": 203.0283693297405,
             "value": [
-              51.27980422973633
+              51.279788970947266
             ]
           },
           {
             "interp": "linear",
             "time": 203.56266666666667,
             "value": [
-              51.13807678222656
+              51.13808822631836
             ]
           },
           {
             "interp": "linear",
             "time": 203.56266666666667,
             "value": [
-              12.427919387817383
+              12.427921295166016
             ]
           },
           {
             "interp": "linear",
             "time": 204.08990478547415,
             "value": [
-              12.427921295166016
+              12.427919387817383
             ]
           },
           {
@@ -23901,7 +23935,7 @@
             "interp": "linear",
             "time": 205.67161914189657,
             "value": [
-              12.427918434143066
+              12.427919387817383
             ]
           },
           {
@@ -23985,14 +24019,14 @@
             "interp": "linear",
             "time": 210.95466666666667,
             "value": [
-              11.45671272277832
+              11.456711769104004
             ]
           },
           {
             "interp": "linear",
             "time": 211.48190478547414,
             "value": [
-              11.45671272277832
+              11.456709861755371
             ]
           },
           {
@@ -24006,14 +24040,14 @@
             "interp": "linear",
             "time": 212.53638096809388,
             "value": [
-              11.45671272277832
+              11.456711769104004
             ]
           },
           {
             "interp": "linear",
             "time": 213.06361914189657,
             "value": [
-              11.456714630126953
+              11.456711769104004
             ]
           },
           {
@@ -24027,14 +24061,14 @@
             "interp": "linear",
             "time": 214.11809526952106,
             "value": [
-              11.456710815429688
+              11.45671272277832
             ]
           },
           {
             "interp": "linear",
             "time": 214.64533333333333,
             "value": [
-              11.45671272277832
+              11.456710815429688
             ]
           },
           {
@@ -24153,56 +24187,56 @@
             "interp": "linear",
             "time": 222.02666666666667,
             "value": [
-              12.579848289489746
+              12.57984447479248
             ]
           },
           {
             "interp": "linear",
             "time": 222.6361905034383,
             "value": [
-              12.579838752746582
+              12.57984447479248
             ]
           },
           {
             "interp": "linear",
             "time": 223.24571434020996,
             "value": [
-              12.579853057861328
+              12.579845428466797
             ]
           },
           {
             "interp": "linear",
             "time": 223.85523811340332,
             "value": [
-              12.579838752746582
+              12.57984447479248
             ]
           },
           {
             "interp": "linear",
             "time": 224.46476201375324,
             "value": [
-              12.579849243164063
+              12.579843521118164
             ]
           },
           {
             "interp": "linear",
             "time": 225.0742857869466,
             "value": [
-              12.579837799072266
+              12.579845428466797
             ]
           },
           {
             "interp": "linear",
             "time": 225.68380956013996,
             "value": [
-              12.579853057861328
+              12.579843521118164
             ]
           },
           {
             "interp": "linear",
             "time": 226.29333333333332,
             "value": [
-              12.579848289489746
+              12.57984447479248
             ]
           }
         ],

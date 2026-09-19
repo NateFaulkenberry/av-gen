@@ -152,12 +152,6 @@
     },
     {
       "category": "Showcase",
-      "description": "Glowmere Valley 3, the autonomous-character showcase (ADR-340). Five aliens, no script: every one of them is a `decide` behaviour over stock considerers, with no actions list, no timeline and no staging scenario anywhere in the file. A scout that wanders by curiosity and stops to look at what it noticed; two aliens with one number between them, of which the cheaper-on-wet-metres fords the backwater and the other walks 231 m round its end; one alien that notices another and goes to watch it. Eight tree species carry the hills, which valley 2 banded off on purpose. The project carries four parameters.",
-      "name": "Glowmere Valley 3 - The Autonomous Cast",
-      "project": "world/glowmere-valley-3.json"
-    },
-    {
-      "category": "Showcase",
       "description": "Glowmere at night with ADR-230's atmospheric effects: an audio-reactive aurora rising from the horizon, and bioluminescent comets crossing the sky -- one hero, one rainbow, and a three-comet burst, all launched by sequencer events.",
       "name": "Glowmere Atmospherics",
       "project": "world/glowmere-atmospherics.json"
@@ -227,6 +221,12 @@
       "description": "The authored Tree of Life hero export -- 3.16 M triangles, seven meshes -- standing on a floating island in cosmic space, the island turning once every three minutes and breathing on a forty-second swell. The tree is a child of the island's transform and never moves of its own accord. Bare landmass, one overhead key, a shell of 1,700 points for stars; nothing else in frame.",
       "name": "Tree of Life - Floating Island",
       "project": "treeisland/tree-of-life-floating-island.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "The same Tree of Life and island, now suspended above an endless sea under a full day/night cycle. One dayPhase parameter drives sky, sun, moon, stars, atmosphere, water and the tree's bioluminescence together, wrapping seamlessly at midnight; the night sky and its moon are an HDRI the water reflects, and the moonlight is a real shadow-casting key aimed along that moon. Scrub the cycle or let it run.",
+      "name": "Tree of Life - Ocean World",
+      "project": "treeisland/tree-of-life-ocean-world.json"
     },
     {
       "category": "Showcase",

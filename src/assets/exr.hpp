@@ -22,7 +22,7 @@ Result<void> writeExr(const std::filesystem::path& path, std::uint32_t width, st
 // Reads a single-part RGB(A) EXR as Rgba32Float (missing alpha reads as 1). For tests and tools.
 Result<scene::TextureData> readExr(const std::filesystem::path& path);
 
-// ---- multi-channel EXR with arbitrary named layers (ADR-344) -------------------------------------
+// ---- multi-channel EXR with arbitrary named layers (ADR-348) -------------------------------------
 //
 // `writeExr` above writes exactly R/G/B/A, which is right for a beauty pass and wrong for an AOV.
 // Spec section 33 is explicit: normals and motion must NOT be stored as R/G/B, because a colour

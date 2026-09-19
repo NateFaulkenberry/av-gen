@@ -113,7 +113,7 @@ endif()
 add_library(tinyexr::tinyexr ALIAS tinyexr)
 
 # ---- Embree (ray/geometry intersection and BVH for the path tracer) ---------------------------
-# ADR-344. Embree owns intersection and acceleration only; the integrator, materials, sampling and
+# ADR-348. Embree owns intersection and acceleration only; the integrator, materials, sampling and
 # output are AV Gen's (spec section 74). Apache-2.0; it vendors sse2neon.h (MIT) for the NEON path.
 #
 # EMBREE_TASKING_SYSTEM=INTERNAL keeps oneTBB out of the build. The path tracer additionally
@@ -141,7 +141,7 @@ set(CMAKE_CXX_STANDARD "${_avgen_saved_cxx_standard}")
 unset(_avgen_saved_cxx_standard)
 
 # ---- OpenImageDenoise (path-tracer denoise) ----------------------------------------------------
-# ADR-346. Prebuilt macOS arm64 archive, SHA256-pinned, exactly as Dawn is -- and for a sharper
+# ADR-350. Prebuilt macOS arm64 archive, SHA256-pinned, exactly as Dawn is -- and for a sharper
 # reason than Dawn's. OIDN's CPU device cannot be built from source without TWO things this project
 # does not have and should not acquire for one feature:
 #

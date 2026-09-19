@@ -12,6 +12,39 @@
 
 const SKY_PI: f32 = 3.14159265;
 
+// ADR-344: the analytic sky, evaluated here rather than sampled from a cube.
+//
+// This is shaders/environment.wgsl's `skyRadiance` reading the frame block instead of the
+// environment processor's, because the two passes cannot see each other's uniforms. It is
+// deliberately the same maths: the sky the camera sees and the sky the IBL was built from have to
+// be the same sky, and the way that goes wrong is two implementations drifting. The one difference
+// is the trailing intensity multiply, which is left to the caller here -- the background pass
+// already applies `skyExtra.z`, the visible sky's own intensity, and applying both would square it.
+fn skySmoothstepF(e0: f32, e1: f32, x: f32) -> f32 {
+    if (e0 == e1) { return select(1.0, 0.0, x < e0); }
+    let t = saturate((x - e0) / (e1 - e0));
+    return t * t * (3.0 - 2.0 * t);
+}
+
+fn skyRadianceFrame(dir: vec3<f32>, minRadius: f32) -> vec3<f32> {
+    let d = normalize(dir);
+    let hazeWidth = max(frame.skyZenithColor.w, 1e-3);
+    let haze = exp(-saturate(d.y) / hazeWidth);
+    let gradient = mix(frame.skyZenithColor.rgb, frame.skyHorizonColor.rgb, haze);
+    let band = skySmoothstepF(-0.03, 0.03, d.y);
+    let base = mix(frame.skyGroundColor.rgb, gradient, band);
+
+    let cosTheta = clamp(dot(d, frame.skySun.xyz), -1.0, 1.0);
+    let theta = acos(cosTheta);
+    let sunRadius = max(frame.skyHorizonColor.w, 1e-3);
+    let radius = max(sunRadius, max(minRadius, 0.0));
+    let energy = (sunRadius / radius) * (sunRadius / radius);
+    let disc = (1.0 - skySmoothstepF(radius * 0.85, radius * 1.15, theta)) * energy;
+    let glow = exp(-theta / max(frame.skyGroundColor.w, 1e-3)) * 0.02; // SKY_AUREOLE, scene/sky.cpp
+    let sun = frame.skySunRadiance.rgb * (disc + glow) * band;
+    return base + sun;
+}
+
 struct SkyOut {
     @builtin(position) clip: vec4<f32>,
     @location(0) ndc: vec2<f32>,
@@ -61,7 +94,13 @@ fn fs_sky(in: SkyOut) -> SceneOut {
     // scene asks for it (skyExtra.y), so existing looks keep their flat background.
     if (frame.envParams.w >= 0.5 && frame.skyExtra.y >= 0.5) {
         let d = envRotate(dir);
-        if (frame.skyExtra.x >= 0.5) {
+        if (frame.skySunRadiance.w >= 0.5) {
+            // ADR-344: an HDRI is lighting the scene and the scene has asked for the procedural
+            // sky behind it. One pixel of sky is a few ALU here against a cube fetch, and it is
+            // the only way to get a background whose colours move with a day/night cycle while
+            // the lighting comes from a map.
+            color = skyRadianceFrame(d, 0.0);
+        } else if (frame.skyExtra.x >= 0.5) {
             // The analytic sky has no map behind it; the prefiltered cube is its only form, and
             // its own `intensity` (params.w) is what has always scaled it.
             let mip = frame.skyParams.w * frame.envParams.y;

@@ -1,4 +1,4 @@
-// AV Gen scene integration (ADR-344 Phase 5): CPU skinning and procedural scatter.
+// AV Gen scene integration (ADR-348 Phase 5): CPU skinning and procedural scatter.
 //
 // Phase 5's risk is not that a feature is missing -- it is that a feature appears to work while
 // putting geometry in the wrong place. A character rendered in its bind pose looks like a

@@ -1971,8 +1971,17 @@ TEST_CASE("examples/world/glowmere-stylized.scene.json declares the elder as its
 // The observable here is `scene().meshVersion`, which `rebuild()` increments. Deliberately not a
 // getter for the flag: what matters is whether the world is flattened again, and the version is
 // what the renderer watches to decide whether to re-upload every buffer.
-TEST_CASE("Setting the same environment map again does not re-flatten the world",
+TEST_CASE("Setting an environment map never re-flattens the world",
           "[scene][composition][performance]") {
+    // ADR-349 strengthened this. It used to read "setting the *same* map again does not re-flatten",
+    // because a new map did: `setEnvironmentMap` marked the composition dirty and `dirty_` has no
+    // granularity, so changing one texture id re-flattened everything -- 273-293 ms for 557 entities
+    // and 1,069 meshes on the Tree of Life ocean world, and a day/night cycle paid it twice per
+    // revolution. Resolving the map is its own step now, so the answer is never.
+    //
+    // The observable is `scene().meshVersion`, which `rebuild()` increments and which the renderer
+    // watches to decide whether to re-upload every buffer. Deliberately not a getter for the flag:
+    // what matters is whether the world was flattened again.
     assets::AssetRegistry registry;
     registry.setBaseDirectory(tempDir());
     params::ParameterSet params;
@@ -1984,35 +1993,39 @@ TEST_CASE("Setting the same environment map again does not re-flatten the world"
     comp.update(time);
     const std::uint64_t settled = comp.scene().meshVersion;
 
+    // A new map, the same map twice, the same map by the absolute name the engine resolves to,
+    // a different map, and clearing it. None of them is a reason to rebuild the world.
     comp.setEnvironmentMap("env/studio.hdr");
     comp.update(time);
-    const std::uint64_t afterFirstSet = comp.scene().meshVersion;
-    CHECK(afterFirstSet > settled); // a new map is a real change
+    CHECK(comp.scene().meshVersion == settled);
 
-    // The same map again, by the same name: nothing about the flattened scene depends on it.
     comp.setEnvironmentMap("env/studio.hdr");
     comp.update(time);
-    CHECK(comp.scene().meshVersion == afterFirstSet);
+    CHECK(comp.scene().meshVersion == settled);
 
-    // And the same map by its absolute name, which is the form the engine hands back after
-    // resolving it in order to load the image. This is the case the load path actually hits; a
-    // guard that only compared the raw strings would never fire here, which is why it is pinned
-    // separately from the one above.
     comp.setEnvironmentMap(registry.resolve("env/studio.hdr"));
     comp.update(time);
-    CHECK(comp.scene().meshVersion == afterFirstSet);
+    CHECK(comp.scene().meshVersion == settled);
     CHECK(!comp.environmentMap().empty());
 
-    // A different map is still a change.
+    const std::string studio = comp.environmentMap().generic_string();
+
     comp.setEnvironmentMap("env/sunset.hdr");
     comp.update(time);
-    CHECK(comp.scene().meshVersion > afterFirstSet);
+    CHECK(comp.scene().meshVersion == settled);
 
-    // So is clearing it.
-    const std::uint64_t afterSunset = comp.scene().meshVersion;
+    // THE CONTROL. Every assertion above is satisfied by a `setEnvironmentMap` that does nothing
+    // at all, which is precisely the failure mode of making a call cheaper. The composition must
+    // actually be holding the map it was handed, and the two names must differ.
+    const std::string sunset = comp.environmentMap().generic_string();
+    INFO("studio '" << studio << "' vs sunset '" << sunset << "'");
+    CHECK(sunset != studio);
+    CHECK(sunset.find("sunset") != std::string::npos);
+
     comp.setEnvironmentMap({});
     comp.update(time);
-    CHECK(comp.scene().meshVersion > afterSunset);
+    CHECK(comp.scene().meshVersion == settled);
+    CHECK(comp.environmentMap().empty());
 }
 
 // ---- interactive regeneration (docs/application-performance.md) ---------------------------------

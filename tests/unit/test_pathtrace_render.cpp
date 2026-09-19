@@ -1,4 +1,4 @@
-// Phase 1 of the path tracer, end to end (ADR-344): snapshot, BVH, primary rays, Lambertian direct
+// Phase 1 of the path tracer, end to end (ADR-348): snapshot, BVH, primary rays, Lambertian direct
 // lighting, shadow rays, accumulation, EXR.
 //
 // The scene is the spec's section 69 first visual target rather than Glowmere: a dark environment,
@@ -680,7 +680,7 @@ TEST_CASE("a metal reflects its surroundings and a dielectric does not",
 
 TEST_CASE("the capability report warns about the BRDF's grazing energy gain on every render",
           "[unit][pathtrace][capability]") {
-    // ADR-345. The owner chose to keep the glTF model faithful, gain and all, so the gain is
+    // ADR-349. The owner chose to keep the glTF model faithful, gain and all, so the gain is
     // permanent and the warning must be too. It goes in the startup report because an ADR is no use
     // to somebody who does not already suspect the BRDF.
     const pathtrace::Snapshot snap = pathtrace::buildSnapshot(buildTargetScene());
@@ -688,7 +688,7 @@ TEST_CASE("the capability report warns about the BRDF's grazing energy gain on e
 
     const bool found = std::any_of(
         snap.capabilities.caveats.begin(), snap.capabilities.caveats.end(),
-        [](const std::string& c) { return c.find("ADR-345") != std::string::npos; });
+        [](const std::string& c) { return c.find("ADR-349") != std::string::npos; });
     REQUIRE(found);
     // It must say the number and the direction, not merely that a caveat exists.
     const std::string& c = snap.capabilities.caveats.front();
@@ -699,7 +699,7 @@ TEST_CASE("the capability report warns about the BRDF's grazing energy gain on e
     // It is printed. `format()` is what reaches the log.
     const std::string report = snap.capabilities.format();
     REQUIRE(report.find("caveat") != std::string::npos);
-    REQUIRE(report.find("ADR-345") != std::string::npos);
+    REQUIRE(report.find("ADR-349") != std::string::npos);
 
     // CONTROL: a caveat is NOT a scene-content problem. An unremarkable scene must still report
     // nothing degraded or unsupported, or callers branching on those lose the distinction.

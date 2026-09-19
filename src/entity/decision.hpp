@@ -125,7 +125,7 @@ public:
 
     void reset();
 
-    // Forget the commitment, keep the counts (ADR-344).
+    // Forget the commitment, keep the counts (ADR-348).
     //
     // A decider whose plan has failed needs the *next* tick to be free to choose anything, which
     // `reset()` also gives it -- and `reset()` throws away `Counts`, which is the instrument an

@@ -1,4 +1,4 @@
-// Glowmere Valley through the path tracer (ADR-344 Phase 7).
+// Glowmere Valley through the path tracer (ADR-348 Phase 7).
 //
 // This is the phase where the section 55 capability report stops being theoretical. Glowmere has
 // everything the tracer cannot do: GPU-only particles, water whose entire look lives in a shader,

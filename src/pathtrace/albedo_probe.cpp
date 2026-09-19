@@ -29,7 +29,7 @@ AlbedoEstimate estimateDirectionalAlbedo(const SurfaceMaterial& m, const glm::ve
     // situation the probe exists to catch -- while the rare samples that DID land in the lobe were
     // divided by a tiny cosine density and produced spikes up to **586**. Too low where it matters
     // and absurd where it does not. `sampleBsdf` draws from the lobe it is measuring, so the
-    // estimator has low variance where the integrand is large, and its numbers match ADR-345's
+    // estimator has low variance where the integrand is large, and its numbers match ADR-349's
     // table, which is the whole point of the instrument.
     double sum = 0.0;
     double sumSq = 0.0;
@@ -96,7 +96,7 @@ std::string AlbedoProbeReport::format() const {
     out += "  This is the TRUE hemispherical integral of f*cos at a sampled subset of hits, not a\n"
            "  throughput-growth proxy. 'worst' is a CONFIDENT LOWER BOUND (mean - sigma*stderr), so\n"
            "  the BRDF really does reach it. The glTF BRDF is faithful to spec and gains at grazing\n"
-           "  (ADR-345); these are measurements of that, not of a bug in the integrator.\n";
+           "  (ADR-349); these are measurements of that, not of a bug in the integrator.\n";
     if (materials.empty()) {
         out += "  (nothing exceeded the threshold)\n";
         return out;

@@ -266,13 +266,27 @@ struct FrameUniforms {
     world::CometGpu comets[world::kMaxGpuComets];
     world::AuroraGpu auroras[world::kMaxGpuAuroras];
     world::SkyGroundGpu skyGround;
+    // ADR-348: the analytic sky's own parameters, so the background pass can evaluate it directly
+    // instead of sampling whatever cube the IBL happens to be built from. Appended at the very end
+    // for the same reason `atmosCount` was appended after the world effects: no offset above moves,
+    // so every other pass's view of this block is byte-identical to what it was.
+    //
+    // Before this, "which thing lights the scene" and "which thing is drawn behind it" were one
+    // choice: with an environment map bound the skybox *is* that map's cube, and a scene wanting
+    // HDRI lighting under a procedural sky had no way to ask for it. `skySunRadiance.w` is that
+    // ask, and it is off unless a scene sets it.
+    glm::vec4 skyZenithColor{0.0f};   // rgb = zenith, w = haze width
+    glm::vec4 skyHorizonColor{0.0f};  // rgb = horizon, w = sun angular radius (radians)
+    glm::vec4 skyGroundColor{0.0f};   // rgb = below the horizon, w = sun glow width
+    glm::vec4 skySunRadiance{0.0f};   // rgb = sun/moon colour, w = 1 when the analytic sky is drawn
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 8x144 world effects. The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
 // the same field in the same place, which is the whole reason it is written as a sum rather than a
 // number.
 static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::kMaxGpuWorldEffects +
-                                       16 + 160 * world::kMaxGpuComets + 224 * world::kMaxGpuAuroras + 48);
+                                       16 + 160 * world::kMaxGpuComets + 224 * world::kMaxGpuAuroras + 48 +
+                                       64); // ADR-348: four vec4s of analytic sky, appended last
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);

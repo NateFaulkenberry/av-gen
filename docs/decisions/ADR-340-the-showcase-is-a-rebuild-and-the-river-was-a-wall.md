@@ -1,6 +1,6 @@
 # ADR-340: The showcase is a rebuild, the river was a wall, and the hills were banded off on purpose
 
-**Status:** Accepted
+**Status:** Retired / superseded by ADR-344 (2026-09-18) — the scene it decided no longer exists.
 **Date:** 2026-09-18
 **Follows:** ADR-264 (a scene file is not the state that runs), ADR-271 (a UI edit lands in the
 project), ADR-333 (a character kind is a list of considerers), ADR-336 (the route considerer),
@@ -12,6 +12,55 @@ valley 2 can be cleaned or must be rebuilt and record why; make four demonstrati
 emergent; and, added by the owner on the day,
 
 > *"have the agent make the hills more densely populated with variety of trees available"*
+
+---
+
+## 0. Retired, and what survives it
+
+The owner cut Glowmere Valley 3 on the day it landed:
+
+> *"why dont you update glowmere-valley-2-multicam.json to use the new animation system - the
+> glowmere valley 3 terrain did not come out well and I dont feel like starting all over - let's
+> just cut glowmere-valley-3 altogether"*
+
+The terrain is the stated reason. ADR-344 does the cutting: the two scene pairs, the generator, the
+shot tool and the unit test are deleted, and the tree work and the `decide` cast this ADR designed
+are ported into `glowmere-valley-2-multicam` rather than thrown away.
+
+**This ADR is kept, not deleted, because most of what it established is not about valley 3.** What
+outlives the scene:
+
+* **§2 — Glowmere's river is a wall.** The run is 3.5–3.65 m deep against a wade depth of 0.85 m
+  and leaves the map at both ends. The nav grid it produces has **19 regions with 49% of the
+  ground stranded**. That is a fact about `glowmere-valley-2`'s terrain, which every surviving
+  Glowmere scene shares, and it is why a character that decides where to go in this world needs
+  either an authored crossing or a route considerer that can price the detour. Valley 3 authored a
+  ford and a backwater and got 3 regions with 0% stranded; **the surviving scenes did not get that
+  terrain edit and still have the wall.** ADR-344 §3 records what that costs the ported cast.
+* **§3 — the tree gate was ADR-174's riparian ladder, not biome and not `maxSlope`.** The hills are
+  refused on height-above-water **95.1%** of the time and on slope **0.4%**. `canopy` is banded
+  2.5–42 m above the water table; the hills sit at p05 47.4 m / p50 66.8 m / p95 100.5 m. Raising
+  `maxSlope` buys about one per cent of the map. Anybody who reaches for the slope cap to put trees
+  on a Glowmere hillside is reaching for the wrong lever, and this is the measurement that says so.
+* **§4 — the `investigate` lock-on negative result.** `investigate` has no novelty memory, by
+  design: only `interest` scores through `goalWeight`, which reads the decider's `visited_` set.
+  On a *stationary* subject `investigate` therefore locks — salience rises as the body approaches,
+  so the option being executed keeps improving and the body never leaves. Measured: a watcher with
+  `investigate kinds:["character"]` at weight 1.7 walked 36.8 m, stopped 8.2 m off and spent
+  **6,183 of 7,200 frames idle** there. `minRange` does not fix it, it converts it into an
+  approach/retreat cycle the size of the selector's dwell. Approach-and-resume is `interest`.
+* **§4's two engine defects, and their fixes, which are in the engine and stay there.** The
+  `decide` stall (`Selector::select` returns true only on a *change*, so a body whose committed
+  goal became unreachable froze: four of five bodies stopped by t = 90 s) is fixed by
+  `stallSeconds`/`stallDistance`; a `decide` character was not a body in the crowd field (two
+  aliens closed to **0.238 m**) and is fixed by `ground`'s `bodyRadius`. Both are opt-in and
+  default to 0, both fix real defects, and **neither is reverted by ADR-344** — the ported cast in
+  `glowmere-valley-2-multicam` opts into both.
+
+What does *not* survive: §1's rebuild-versus-clean argument, which was an argument about where the
+showcase should live and has been answered the other way by the owner; the four demonstrations as a
+deliverable; and the ford and backwater terrain edits, which lived in valley 3's scene and are gone
+with it.
 
 ---
 
