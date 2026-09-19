@@ -187,7 +187,7 @@ struct NodeAnimation {
     }
 };
 
-// What a scene file says about runtime LOD on a Gltf node (ADR-348). Serialised as a `lod` block.
+// What a scene file says about runtime LOD on a Gltf node (ADR-351). Serialised as a `lod` block.
 //
 // The ladder lives here rather than on the asset because it is a property of how the node is *used*
 // -- the same tree is a hero in one shot and scenery in another -- and because the chain is built
@@ -263,7 +263,7 @@ struct CompositionNode {
     std::size_t cityCells = 0;         // what the last rebuild planned, for the editor to show
 
     NodeAnimation animation;       // ADR-086; Gltf nodes whose asset carries a skin
-    // ADR-348: runtime LOD for this node's imported meshes. Off unless the scene file asks, which
+    // ADR-351: runtime LOD for this node's imported meshes. Off unless the scene file asks, which
     // is the whole of the opt-in: a behaviour that changes under every existing scene is not a fix,
     // and nothing in this repository draws differently until a node writes `"lod": {...}`.
     NodeLod lod;
@@ -364,6 +364,20 @@ struct CompositionNode {
     params::Parameter<float>* waterFlowSpeedParam = nullptr;
     params::Parameter<float>* waterSwellParam = nullptr;
     params::Parameter<float>* waterFoamParam = nullptr;
+    // ADR-350. ADR-099 chose six water properties as "the ones worth moving". The water-world
+    // spec's §17 and §23 ask for a different nine, and none of them were reachable: a scene could
+    // not change how clear its water was, what colour it went with depth, or how much sky it
+    // reflected, without editing JSON. Added rather than replacing the six.
+    params::Parameter<float>* waterClarityParam = nullptr;
+    params::Parameter<float>* waterMaxOpacityParam = nullptr;
+    params::Parameter<float>* waterFresnelParam = nullptr;
+    params::Parameter<float>* waterReflectionParam = nullptr;
+    params::Parameter<float>* waterRoughnessParam = nullptr;
+    params::Parameter<float>* waterRefractionParam = nullptr;
+    params::Parameter<float>* waterRippleScaleParam = nullptr;
+    params::Parameter<float>* waterShallowDepthParam = nullptr;
+    params::Parameter<glm::vec3>* waterShallowColorParam = nullptr;
+    params::Parameter<glm::vec3>* waterDeepColorParam = nullptr;
     params::Parameter<glm::vec3>* waterGlowColorParam = nullptr;
 };
 
@@ -1076,6 +1090,34 @@ private:
     // parameter, so "one environment changing state" is true by ordering rather than by care.
     scene::DayNightSettings dayNight_;
     scene::DayNightState dayNightState_;  // this frame's resolved environment
+    // ADR-350. Every one of these was a struct field the application read and never kept: no
+    // parameter, no UI, no modulation, no keyframing -- and no writer either, so a scene that
+    // loaded a `dayNight` block and was saved lost it. ADR-225 twice over.
+    struct DayNightParams {
+        params::Parameter<bool>* enabled = nullptr;
+        params::Parameter<bool>* paused = nullptr;
+        params::Parameter<float>* dayPhase = nullptr;      // the scrub target
+        params::Parameter<float>* cycleSeconds = nullptr;
+        params::Parameter<float>* phaseOffset = nullptr;
+        params::Parameter<float>* sunPeakElevation = nullptr;
+        params::Parameter<float>* sunAzimuthAtDawn = nullptr;
+        params::Parameter<float>* sunAzimuthSweep = nullptr;
+        params::Parameter<float>* sunIntensityScale = nullptr;
+        params::Parameter<float>* moonIntensityScale = nullptr;
+        params::Parameter<float>* starBrightnessScale = nullptr;
+        params::Parameter<float>* hdriIntensityScale = nullptr;
+        params::Parameter<float>* glowInfluence = nullptr;
+        params::Parameter<float>* fogHorizonBlend = nullptr;
+        // No colour parameters. The owner asked for the curves to stay scene-authored, and a wall
+        // of stops is a control surface nobody reaches for while looking at the scene. The sun
+        // angles below are in DEGREES for the same reason: a raw radian sweep is an inscrutable
+        // knob, and a slider from 0 to 90 is not.
+    };
+    DayNightParams dayNightParams_;
+    params::Parameter<bool>* showSkybox_ = nullptr;                 // ADR-350
+    params::Parameter<bool>* proceduralSkyBackground_ = nullptr;    // ADR-350
+    params::Parameter<bool>* lightFromEnvironment_ = nullptr;       // ADR-350
+    params::Parameter<float>* skyBloom_ = nullptr;                  // ADR-350
     bool dayNightNightMap_ = false;       // which map is currently bound
     Scene scene_;
     std::vector<std::unique_ptr<CompositionNode>> nodes_;
@@ -1337,14 +1379,14 @@ private:
     std::vector<MaterialProgramParameters> materialParams_;
     std::size_t ownMaterialCount_ = 0; // this composition's programs come first in scene_.materialPrograms
 
-    // ADR-348: LOD chains built for imported assets, keyed by the asset path and the ladder asked
+    // ADR-351: LOD chains built for imported assets, keyed by the asset path and the ladder asked
     // for. A cache with a lifetime longer than a flatten, which this file is otherwise careful not
     // to have -- justified because building the Tree of Life's chains takes 3.4 seconds of pure
     // arithmetic and a flatten runs on every parameter edit. What makes it safe is that the value
     // is a pure function of its key: `buildLodChain` is deterministic and reads nothing but the
     // mesh, and the mesh comes from the registry, which is itself keyed on the path and bumps a
     // version when a file is reloaded -- so the version is in the key too.
-    // ADR-348: this asset's LOD chains, built once per (path, version, ladder) and shared.
+    // ADR-351: this asset's LOD chains, built once per (path, version, ladder) and shared.
     [[nodiscard]] std::shared_ptr<const std::vector<MeshLodChain>>
     lodChainsFor(const assets::SceneAsset& asset, const NodeLod& lod, const std::string& owner);
 

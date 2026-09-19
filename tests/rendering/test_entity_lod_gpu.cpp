@@ -1,4 +1,4 @@
-// Entity LOD against the pixels the renderer actually produced (ADR-348).
+// Entity LOD against the pixels the renderer actually produced (ADR-351).
 //
 // The trap this file avoids is the one test_lod_gpu.cpp names: it is easy to "verify" a ladder by
 // re-deriving the expected rung from the same numbers the selector used, which agrees by

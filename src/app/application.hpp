@@ -14,6 +14,7 @@
 #include "app/world_builder.hpp"
 #include "app/recent_files.hpp"
 #include "app/render_job.hpp"
+#include "pathtrace/trace_job.hpp"
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
 #include "app/settings.hpp"
@@ -192,6 +193,22 @@ struct AppOptions {
     bool clusterStats = false;
     // Offline rendering (1.0): --render <dir|video file>, --range a:b, --codec, --quality, --queue <file>
     std::optional<std::filesystem::path> render;
+
+    // ---- path tracer (ADR-351) -----------------------------------------------------------------
+    //
+    // Spelled like `--render`, deliberately: `--pathtrace <out.exr>` takes the output path the same
+    // way, sets headless the same way, and borrows `--width`/`--height` rather than introducing a
+    // parallel size vocabulary. The flags that are genuinely new are the ones a rasteriser has no
+    // equivalent for -- samples per pixel, path depth, and the seed.
+    std::optional<std::filesystem::path> pathtrace;
+    std::uint32_t ptSamples = 32;
+    std::uint32_t ptDepth = 4;
+    double ptSeconds = 0.0;
+    std::uint64_t ptSeed = 0x853c49e6748fea9bULL;
+    unsigned ptThreads = 0;
+    bool ptDenoise = false;
+    bool ptAovs = false;
+    bool ptProbe = false;
     std::optional<std::filesystem::path> queue;
     std::optional<double> rangeStart, rangeEnd;
     std::optional<std::string> codec;
@@ -287,6 +304,8 @@ private:
 
     [[nodiscard]] Result<std::unique_ptr<RenderJob>> makeRenderJob(const std::filesystem::path& projectFile,
                                                                    RenderSettings settings);
+    void startPathTraceFromUi();
+    int runPathTrace();
     int runQueue(const std::filesystem::path& queueFile);
     void startRenderFromUi();
     bool renderInAppStarted_ = false; // `--render-in-app` fires once
@@ -319,6 +338,19 @@ private:
     AppOptions options_;
     RecentFiles recent_{{}};
     std::unique_ptr<RenderJob> job_;             // in-app render in progress
+
+    // ---- path tracing from the UI (ADR-351) -----------------------------------------------------
+    //
+    // The job owns every piece of the trace's state; these are the settings the panel edits and a
+    // handle to the running job. `lastPathTrace_` keeps the terminal progress after the job is
+    // destroyed so the panel can still say "done in 1:04" or why it failed -- a snapshot of what
+    // the job reported, never a second place the state is decided.
+    std::unique_ptr<pathtrace::TraceJob> ptJob_;
+    pathtrace::TraceSettings uiPathTrace_;
+    pathtrace::TraceProgress lastPathTrace_;
+    double uiPathTraceSeconds_ = 0.0;
+    bool uiPathTraceDenoise_ = false;
+    bool uiPathTraceAovs_ = true;
     RenderSettings uiRender_;                     // the Render window's settings
     // ADR-186's limits, lifted in the viewport as well as in a render. A working default of false
     // because lifting them costs real frame time on a wide shot -- which is the whole reason live

@@ -516,7 +516,7 @@ TEST_CASE("a change is reported on the frame it happens and not afterwards", "[r
     CHECK(selector.select(recordWithRadius(20.0f), one, policy).changed == false);
 }
 
-// ---- the quality floor, and a dolly across it (ADR-348) ------------------------------------------
+// ---- the quality floor, and a dolly across it (ADR-351) ------------------------------------------
 //
 // `maxScreenError` is a second family of thresholds on the rung ladder, and it needs what the kind
 // bands already have: an arm that shows it acts, a control that shows the arm is not a tautology,

@@ -130,7 +130,7 @@ struct RepresentationPolicy {
     float floorPixelsPerTriangle = 8.0f;
     float ceilingPixelsPerTriangle = 50000.0f;
 
-    // ---- the quality floor, in pixels of screen-space error (ADR-348) ----------------------------
+    // ---- the quality floor, in pixels of screen-space error (ADR-351) ----------------------------
     //
     // The px/triangle rule above is a *cost* rule and has no fidelity term in it at all. On a
     // scatter that is fine: a fern never reaches the target at any rung, so the ladder's own
