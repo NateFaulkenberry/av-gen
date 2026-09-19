@@ -9535,6 +9535,52 @@ nlohmann::json nodeEditsAgainst(const nlohmann::json& liveNodes, const nlohmann:
     return edits;
 }
 
+// ---- a project's authored lights over the scene file it saves by reference --------------------
+//
+// The fifth instance of the defect ADR-207, ADR-230, ADR-276 and ADR-330 each fixed once: a
+// composition saved *by reference* carries only the scene's path, so anything the session authored
+// and the scene file does not have is lost on save. `setAuthoredLights` gaining a UI caller is what
+// makes that reachable for lights, and this is the key that makes it stick.
+//
+// Not `nodeEditsAgainst`'s shape, and the difference is the whole reason this exists. That function
+// compares **by name**, a set difference, because a node's numbers already live in the `parameters`
+// block. Lights are the opposite: most of a light's 25 fields -- `type`, `role`, `node`, `width`,
+// `up` -- will never be parameters, so the list has to be copied whole, the way `worldEffects` and
+// `heroes` are, and a whole-list copy can only be decided by comparing the lists.
+//
+// Which forces the canonicalisation below. `authoredLightToJson` omits defaults, so comparing the
+// live list against the raw document would report a scene that spells out `"intensity": 1.0` as an
+// edit, and **every untouched project would start writing a `lights` key it does not need** --
+// destroying the byte-stability control those four ADRs all rely on. So the scene's own list goes
+// out and back through the same converters the live list came from, and only then are they compared.
+nlohmann::json authoredLightsAgainst(const nlohmann::json& liveLights, const nlohmann::json& sceneDoc) {
+    // A scene document this build could not read is not evidence that the session's lights are an
+    // edit -- it is no evidence at all, and recording the difference against nothing would bake a
+    // copy of the scene's lighting into the project. No document, no record. (`nodeEditsAgainst`
+    // above, same reasoning, same guard.)
+    if (!sceneDoc.is_object() || !liveLights.is_array()) {
+        return json();
+    }
+    const json& sceneLights = sceneDoc.contains("lights") ? sceneDoc.at("lights") : json::array();
+    json canonical = json::array();
+    if (sceneLights.is_array()) {
+        for (const json& e : sceneLights) {
+            auto one = authoredLightFromJson(e, "scene");
+            if (!one) {
+                // Unreadable is the same as absent: no evidence. Refusing here rather than treating
+                // the light as missing is what stops a parse failure looking like a deletion.
+                return json();
+            }
+            canonical.push_back(authoredLightToJson(*one));
+        }
+    }
+    if (canonical == liveLights) {
+        return json();
+    }
+    return liveLights;
+}
+
+
 void applyNodeEdits(nlohmann::json& sceneDoc, const nlohmann::json& edits) {
     if (!edits.is_object() || edits.empty() || !sceneDoc.is_object()) {
         return;

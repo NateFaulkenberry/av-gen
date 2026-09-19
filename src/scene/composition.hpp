@@ -1646,6 +1646,14 @@ private:
 // out of it, because the graph re-emits them on load and recording them would double them.
 [[nodiscard]] nlohmann::json nodeEditsAgainst(const nlohmann::json& liveNodes, const nlohmann::json& sceneDoc);
 
+// Null when the session's authored lights are the scene file's, so a project nobody edited stays
+// byte-stable through a save (ADR-182's control). Otherwise the whole live list, which is the shape
+// `worldEffects` and `heroes` use -- most of a light's fields are not parameters, so there is no
+// by-name difference to record the way `nodeEditsAgainst` can. Pure, so it is testable without an
+// engine; the converters it needs stay file-local.
+[[nodiscard]] nlohmann::json authoredLightsAgainst(const nlohmann::json& liveLights,
+                                                   const nlohmann::json& sceneDoc);
+
 // Splices the record into a scene document before it is parsed. A null or empty record is a no-op.
 //
 // Before the parse, rather than onto the composition afterwards, for one reason worth its ten
