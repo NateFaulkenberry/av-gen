@@ -136,6 +136,27 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     p.grain = &params.add(f("post/output/grain", s.grain, 0.0f, 1.0f, 0.0f, 1.0f));
     p.chromaRetention =
         &params.add(f("post/tonemap/chroma-retention", s.chromaRetention, 0.0f, 1.0f, 0.0f, 1.0f));
+
+    // ---- cinematic integration (§52.1, §68). §54: a new namespace, `post/look/*`, so no existing
+    // parameter ID is renamed and nothing has to migrate. Every amount here is zero by default,
+    // which is §60 -- and the two *shape* parameters below have non-zero defaults only because a
+    // shape has no meaningful zero; they are inert while their amount is zero.
+    p.lookAtmospheric = &params.add(f("post/look/atmospheric", s.look.atmospheric, 0.0f, 1.0f, 0.0f, 1.0f));
+    // The hard maximum is generous because a scene's length unit is not metres by decree -- this
+    // engine's scene-linear *intensity* unit is explicitly uncalibrated (docs/image-formation.md:87)
+    // and its distances are whatever the author built in.
+    p.lookAtmosphericDistance =
+        &params.add(f("post/look/atmosphericDistance", s.look.atmosphericDistance, 1.0f, 100000.0f, 10.0f, 2000.0f));
+    p.lookAtmosphericTint = &params.add(v3("post/look/atmosphericTint", s.look.atmosphericTint, 0.0f, 4.0f, true));
+    p.lookColour = &params.add(f("post/look/colour", s.look.colour, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.lookLocalContrast = &params.add(f("post/look/localContrast", s.look.localContrast, 0.0f, 1.0f, 0.0f, 1.0f));
+    // Not zero at the bottom: a zero radius makes the local mean equal the pixel, so the unsharp
+    // subtracts a value from itself and the amount slider moves with no effect at all. That is
+    // ADR-182's "a probe that cannot fail" applied to a control, and the hard minimum is what stops
+    // the parameter set from being able to express it.
+    p.lookLocalContrastRadius =
+        &params.add(f("post/look/localContrastRadius", s.look.localContrastRadius, 1.0f, 128.0f, 4.0f, 64.0f));
+    p.lookLightWrap = &params.add(f("post/look/lightWrap", s.look.lightWrap, 0.0f, 1.0f, 0.0f, 1.0f));
     return p;
 }
 
@@ -173,10 +194,33 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
         {"tiltShiftBandWidth", p.tiltShiftBandWidth},
         {"tiltShiftFalloff", p.tiltShiftFalloff},
         {"tiltShiftMaxRadius", p.tiltShiftMaxRadius},
+        // Cinematic integration (§52.1). Read here *and* written back, because ADR-350's failure was
+        // a block with a reader and no writer, and this block's writer is the echo of what was read
+        // -- so a key this table does not name is a key a scene cannot carry.
+        {"lookAtmospheric", p.lookAtmospheric},
+        {"lookAtmosphericDistance", p.lookAtmosphericDistance},
+        {"lookColour", p.lookColour},
+        {"lookLocalContrast", p.lookLocalContrast},
+        {"lookLocalContrastRadius", p.lookLocalContrastRadius},
+        {"lookLightWrap", p.lookLightWrap},
     };
     const std::pair<const char*, params::Parameter<bool>*> bools[] = {
         {"bloomEnabled", p.bloomEnabled}, {"halationEnabled", p.halationEnabled},
         {"tiltShiftEnabled", p.tiltShiftEnabled},
+    };
+    // This table used to not exist: `applyPostJson` handled no vec3 at all, so `lift`, `gamma`,
+    // `gain` and both tints were registered parameters that a scene's own `post` block could not
+    // set -- it got `post.lift: unknown key, ignored`. Adding the type closes that gap, and it is
+    // safe to close now rather than never: no scene file in `examples/` names any of these five
+    // keys (surveyed 2026-09-19), so nothing changes behaviour today and the next scene that wants
+    // a tint gets one. `lookAtmosphericTint` is the new one the cinematic integration needs.
+    const std::pair<const char*, params::Parameter<glm::vec3>*> vec3s[] = {
+        {"lift", p.lift},
+        {"gamma", p.gamma},
+        {"gain", p.gain},
+        {"halationTint", p.halationTint},
+        {"anamorphicTint", p.anamorphicTint},
+        {"lookAtmosphericTint", p.lookAtmosphericTint},
     };
     for (const auto& [key, value] : j.items()) {
         bool handled = false;
@@ -199,6 +243,20 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
                     return fail("post.{} must be a boolean", key);
                 }
                 param->setBase(value.get<bool>());
+                handled = true;
+                break;
+            }
+        }
+        if (handled) {
+            continue;
+        }
+        for (const auto& [name, param] : vec3s) {
+            if (key == name && param != nullptr) {
+                if (!value.is_array() || value.size() != 3 || !value[0].is_number() || !value[1].is_number() ||
+                    !value[2].is_number()) {
+                    return fail("post.{} must be an array of three numbers", key);
+                }
+                param->setBase(glm::vec3(value[0].get<float>(), value[1].get<float>(), value[2].get<float>()));
                 handled = true;
                 break;
             }
@@ -281,6 +339,18 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
     s.vignette = p.vignette->value();
     s.grain = p.grain->value();
     s.chromaRetention = p.chromaRetention->value();
+    // Cinematic integration (§52.1). Guarded because `registerPostParameters` is what creates these
+    // and an older caller may hold a `PostParameters` from before they existed; without the guard
+    // that is a null dereference rather than a default.
+    if (p.lookAtmospheric != nullptr) {
+        s.look.atmospheric = p.lookAtmospheric->value();
+        s.look.atmosphericDistance = p.lookAtmosphericDistance->value();
+        s.look.atmosphericTint = p.lookAtmosphericTint->value();
+        s.look.colour = p.lookColour->value();
+        s.look.localContrast = p.lookLocalContrast->value();
+        s.look.localContrastRadius = p.lookLocalContrastRadius->value();
+        s.look.lightWrap = p.lookLightWrap->value();
+    }
 }
 
 float tiltShiftCoverage(const PostSettings& s, glm::vec2 uv, float aspect) {

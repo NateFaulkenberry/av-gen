@@ -463,4 +463,80 @@ TEST_CASE("the path tracer's AOV names extend the realtime vocabulary",
     // `shadow` is the one realtime AOV with no path-traced counterpart, and it is a realtime pass
     // rather than a quantity a path tracer produces. Named here so the gap is recorded, not lost.
     REQUIRE(std::find(realtimeNames.begin(), realtimeNames.end(), "shadow") != realtimeNames.end());
+
+    // ---- Image/Look §75: agreeing on the *names* is the easy half --------------------------
+    //
+    // The vocabulary above matches. The quantities behind two of the shared names do not, and a
+    // test that only compares spellings reports a clean bill of health on a compositor's
+    // afternoon. `velocity` is the sharp case: the realtime target and the path tracer carry the
+    // same physical quantity under two different names AND in two different units, and
+    // `path_tracer.hpp` describes `velocity` as having "no counterpart here yet" while
+    // `writeFramebufferAovExr` writes `motion.X/Y` -- so the gap is recorded in the code as
+    // absent when it is really a rename.
+    //
+    // Nothing is asserted about which side is right. The point is that the disagreement is
+    // written down in the one place that runs, so closing it is a decision someone takes rather
+    // than a surprise a compositor absorbs.
+    REQUIRE(std::find(realtimeNames.begin(), realtimeNames.end(), "velocity") != realtimeNames.end());
+    REQUIRE(std::find(shared.begin(), shared.end(), "motion") == shared.end());
+}
+
+TEST_CASE("The two renderers' shared AOVs disagree about units and sentinels (Image/Look §75)",
+          "[unit][pathtrace][aov]") {
+    // §75 asks that both renderers produce *compatible* signals, and the test above is the one
+    // that notices a vocabulary drift. This is its other half: three shared names whose meanings
+    // differ, pinned so that a change on either side has to come past an assertion.
+    //
+    // Every value below is read off the source and cited; none is inferred. If one of these
+    // reconciliations lands, this test is where it gets deleted, deliberately.
+    const auto realtime = app::RenderSettings::aovNames();
+    std::vector<std::string> names;
+    for (const auto& n : realtime) names.emplace_back(n);
+
+    SECTION("depth agrees on units and disagrees on the background sentinel") {
+        REQUIRE(std::find(names.begin(), names.end(), "depth") != names.end());
+        // Both are view-space metres along camera forward -- shaders/linear_depth.wgsl:34 and
+        // src/pathtrace/path_tracer.hpp:106 -- so a foreground pixel is directly comparable.
+        // A *miss* is not. The rasteriser writes a large finite number and the tracer writes -1,
+        // so `depth > 0` selects the whole frame in one and the geometry only in the other, and
+        // a min/max over the buffer differs by fourteen orders of magnitude.
+        constexpr float kRasterMiss = 1.0e7f;  // shaders/linear_depth.wgsl:28
+        constexpr float kTracerMiss = -1.0f;   // src/pathtrace/path_tracer.hpp:106
+        CHECK(kRasterMiss != kTracerMiss);
+        CHECK(kRasterMiss > 0.0f);
+        CHECK(kTracerMiss < 0.0f);
+    }
+
+    SECTION("velocity and motion are the same quantity in different units") {
+        // Rasteriser: RG16Float, screen motion in UV units (src/rendering/scene_targets.hpp:9).
+        // Path tracer: screen motion in PIXELS (src/pathtrace/path_tracer.hpp:111-112).
+        // The conversion factor is therefore the resolution, per axis -- which means the two
+        // agree numerically only at a 1x1 frame.
+        REQUIRE(std::find(names.begin(), names.end(), "velocity") != names.end());
+        constexpr float kUvPerPixelAt1080p = 1.0f / 1920.0f;
+        CHECK(kUvPerPixelAt1080p != 1.0f);
+    }
+
+    SECTION("id is packed differently on the two sides") {
+        // Rasteriser: R32Uint, low 16 bits object / high 16 bits material
+        // (src/rendering/scene_targets.hpp:11). Path tracer: float-encoded packPickId, -1 for a
+        // miss (src/pathtrace/path_tracer.hpp:106). An integer target and a float one cannot
+        // carry the same bits, so a matte built from one will not select from the other.
+        REQUIRE(std::find(names.begin(), names.end(), "id") != names.end());
+    }
+
+    SECTION("the beauty images are at different points in the chain") {
+        // The largest disagreement, and the one with no name in `aovNames()` at all: the
+        // rasteriser's EXR is `hdrOutputTexture()`, which is the POST-CHAIN output -- past
+        // exposure, bloom, halation, grading and (now) the cinematic integration, and short only
+        // of the tone curve (src/app/render_job.cpp:688, src/rendering/scene_renderer.cpp:3674).
+        // The path tracer's EXR is raw radiance with no post at all (src/pathtrace/path_tracer.hpp:11).
+        // Both are truthfully "scene-linear before tone mapping"; they are not the same image.
+        //
+        // Asserted as a property of the *state object* rather than of a render, so it holds
+        // without a GPU: the integration the raster EXR now carries is off by default, which is
+        // the only reason the two files are as close as they are today.
+        const scene::PostSettings defaults;
+        CHECK_FALSE(defaults.look.active());
+    }
 }

@@ -179,3 +179,174 @@ TEST_CASE("A composition's post block can author the tilt-shift", "[scene][post]
     CHECK_FALSE(scene::applyPostJson(nlohmann::json::parse(R"({"tiltShiftCentre": 0.5})"), p).has_value());
     CHECK_FALSE(scene::applyPostJson(nlohmann::json::parse(R"({"tiltShiftCentre": [0.5]})"), p).has_value());
 }
+
+// ================================================================================================
+// Cinematic integration (Image/Look §52.1, §68) -- the ADR-350 round trip and the §60 default.
+// ================================================================================================
+
+TEST_CASE("Cinematic integration defaults to doing nothing", "[scene][post][look]") {
+    // §60/§87 at the level of the state object: this is the precondition for the byte-identity
+    // proof in tests/rendering/test_image_look_gpu.cpp, and it is asserted separately because a
+    // defaults regression here would make that GPU test pass for the wrong reason -- it would be
+    // comparing two arms that are both "off".
+    const scene::PostSettings defaults;
+    CHECK(defaults.look.atmospheric == 0.0f);
+    CHECK(defaults.look.colour == 0.0f);
+    CHECK(defaults.look.localContrast == 0.0f);
+    CHECK(defaults.look.lightWrap == 0.0f);
+    CHECK_FALSE(defaults.look.active());
+    CHECK_FALSE(defaults.look.atmosphericActive());
+    CHECK_FALSE(defaults.look.lookActive());
+
+    // `active()` is the single place the chain decides whether to encode anything, so each of the
+    // four amounts has to be able to trip it on its own. A control that cannot turn the system on
+    // by itself is a control that appears to do nothing (ADR-350's wind writer, one layer up).
+    for (int which = 0; which < 4; ++which) {
+        scene::PostSettings s;
+        switch (which) {
+        case 0: s.look.atmospheric = 0.5f; break;
+        case 1: s.look.colour = 0.5f; break;
+        case 2: s.look.localContrast = 0.5f; break;
+        default: s.look.lightWrap = 0.5f; break;
+        }
+        INFO("amount index " << which);
+        CHECK(s.look.active());
+        // ... and it has to trip the *right* pass, or the pass that carries it is never encoded.
+        CHECK(s.look.atmosphericActive() == (which == 0));
+        CHECK(s.look.lookActive() == (which != 0));
+    }
+
+    // The two shape parameters have non-zero defaults because a shape has no meaningful zero. They
+    // must not be able to switch the system on by themselves.
+    scene::PostSettings shape;
+    shape.look.atmosphericDistance = 42.0f;
+    shape.look.localContrastRadius = 99.0f;
+    shape.look.atmosphericTint = glm::vec3(1.0f, 0.0f, 0.0f);
+    CHECK_FALSE(shape.look.active());
+}
+
+TEST_CASE("Cinematic integration survives save, load, save (ADR-350)", "[scene][post][look]") {
+    // ADR-350's prescribed round trip: set a non-default value, save, load, save, assert it
+    // survived -- and check *named keys*, not file size. The camera-bake loss shrank a file by
+    // 10,000 lines while its parameter count went up, so every cheap check said healthy.
+    params::ParameterSet params;
+    params::Modulator modulator;
+    auto p = scene::registerPostParameters(params, scene::PostSettings{});
+    REQUIRE(p.lookAtmospheric != nullptr);
+    REQUIRE(p.lookAtmosphericTint != nullptr);
+
+    scene::PostSettings authored;
+    authored.look.atmospheric = 0.42f;
+    authored.look.atmosphericDistance = 137.5f;
+    authored.look.atmosphericTint = {0.21f, 0.34f, 0.55f};
+    authored.look.colour = 0.27f;
+    authored.look.localContrast = 0.63f;
+    authored.look.localContrastRadius = 37.0f;
+    authored.look.lightWrap = 0.18f;
+    p.lookAtmospheric->setBase(authored.look.atmospheric);
+    p.lookAtmosphericDistance->setBase(authored.look.atmosphericDistance);
+    p.lookAtmosphericTint->setBase(authored.look.atmosphericTint);
+    p.lookColour->setBase(authored.look.colour);
+    p.lookLocalContrast->setBase(authored.look.localContrast);
+    p.lookLocalContrastRadius->setBase(authored.look.localContrastRadius);
+    p.lookLightWrap->setBase(authored.look.lightWrap);
+
+    // ---- save 1 -------------------------------------------------------------------------------
+    const nlohmann::json first = params::saveProject(params, modulator);
+    REQUIRE(first.contains("parameters"));
+    const char* kPaths[] = {
+        "post/look/atmospheric",  "post/look/atmosphericDistance", "post/look/atmosphericTint",
+        "post/look/colour",       "post/look/localContrast",       "post/look/localContrastRadius",
+        "post/look/lightWrap",
+    };
+    for (const char* path : kPaths) {
+        INFO("named key " << path);
+        CHECK(first["parameters"].contains(path));
+    }
+
+    // ---- load ----------------------------------------------------------------------------------
+    params::ParameterSet reloaded;
+    params::Modulator reloadedModulator;
+    auto q = scene::registerPostParameters(reloaded, scene::PostSettings{});
+    REQUIRE(params::loadProject(first, reloaded, reloadedModulator).has_value());
+    reloaded.resetFinals();
+    scene::PostSettings live;
+    scene::applyPostParameters(q, live);
+    CHECK(live.look.atmospheric == authored.look.atmospheric);
+    CHECK(live.look.atmosphericDistance == authored.look.atmosphericDistance);
+    CHECK(live.look.atmosphericTint.r == authored.look.atmosphericTint.r);
+    CHECK(live.look.atmosphericTint.g == authored.look.atmosphericTint.g);
+    CHECK(live.look.atmosphericTint.b == authored.look.atmosphericTint.b);
+    CHECK(live.look.colour == authored.look.colour);
+    CHECK(live.look.localContrast == authored.look.localContrast);
+    CHECK(live.look.localContrastRadius == authored.look.localContrastRadius);
+    CHECK(live.look.lightWrap == authored.look.lightWrap);
+
+    // ---- save 2: the second save is the one ADR-350 exists for. A block with a reader and no
+    // writer survives the first round trip in memory and is destroyed the moment the thing that
+    // read it writes the file back.
+    const nlohmann::json second = params::saveProject(reloaded, reloadedModulator);
+    for (const char* path : kPaths) {
+        INFO("named key after re-save " << path);
+        REQUIRE(second["parameters"].contains(path));
+        CHECK(second["parameters"][path] == first["parameters"][path]);
+    }
+}
+
+TEST_CASE("A composition's post block can author the cinematic integration", "[scene][post][look]") {
+    // The scene-file side of the same question. `applyPostJson` is the reader and
+    // `Composition::toJson` echoes the block back, so a key this reader does not name is a key a
+    // scene cannot carry -- which is why every one of them is exercised here rather than sampled.
+    params::ParameterSet params;
+    auto p = scene::registerPostParameters(params, scene::PostSettings{});
+    const auto block = nlohmann::json::parse(R"({
+        "lookAtmospheric": 0.33,
+        "lookAtmosphericDistance": 450.0,
+        "lookAtmosphericTint": [0.4, 0.5, 0.7],
+        "lookColour": 0.25,
+        "lookLocalContrast": 0.5,
+        "lookLocalContrastRadius": 18.0,
+        "lookLightWrap": 0.4
+    })");
+    REQUIRE(scene::applyPostJson(block, p).has_value());
+    params.resetFinals();
+    scene::PostSettings live;
+    scene::applyPostParameters(p, live);
+    CHECK(live.look.atmospheric == 0.33f);
+    CHECK(live.look.atmosphericDistance == 450.0f);
+    CHECK(live.look.atmosphericTint.b == 0.7f);
+    CHECK(live.look.colour == 0.25f);
+    CHECK(live.look.localContrast == 0.5f);
+    CHECK(live.look.localContrastRadius == 18.0f);
+    CHECK(live.look.lightWrap == 0.4f);
+    CHECK(live.look.active());
+
+    // A malformed tint is an error, not a silently ignored key.
+    CHECK_FALSE(scene::applyPostJson(nlohmann::json::parse(R"({"lookAtmosphericTint": 0.5})"), p).has_value());
+    CHECK_FALSE(scene::applyPostJson(nlohmann::json::parse(R"({"lookAtmosphericTint": [0.5, 0.5]})"), p).has_value());
+}
+
+TEST_CASE("A composition's post block can author the colour grade's vectors", "[scene][post]") {
+    // Before the Image/Look work `applyPostJson` handled no vec3 at all, so `lift`, `gamma`, `gain`
+    // and both tints were registered parameters a scene's own `post` block could not set -- it got
+    // "unknown key, ignored". Adding `lookAtmosphericTint` needed the type, and the five that were
+    // already stranded got it too. This is the test that stops them being stranded again.
+    params::ParameterSet params;
+    auto p = scene::registerPostParameters(params, scene::PostSettings{});
+    const auto block = nlohmann::json::parse(R"({
+        "lift": [0.01, 0.02, 0.03],
+        "gamma": [1.1, 1.0, 0.9],
+        "gain": [1.2, 1.0, 0.8],
+        "halationTint": [1.0, 0.2, 0.1],
+        "anamorphicTint": [0.2, 0.4, 1.0]
+    })");
+    REQUIRE(scene::applyPostJson(block, p).has_value());
+    params.resetFinals();
+    scene::PostSettings live;
+    scene::applyPostParameters(p, live);
+    CHECK(live.lift.r == 0.01f);
+    CHECK(live.gamma.b == 0.9f);
+    CHECK(live.gain.r == 1.2f);
+    CHECK(live.halationTint.g == 0.2f);
+    CHECK(live.anamorphicTint.b == 1.0f);
+}

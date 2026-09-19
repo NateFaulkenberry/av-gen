@@ -52,6 +52,10 @@ constexpr std::uint32_t kMeterReduceFactor = 4;  // then quarters again per pass
 // Glowmere's authored stretch (docs/post-artifact-forensics.md); the sweep is in
 // tests/rendering/test_post_artifact_forensics_gpu.cpp.
 constexpr std::uint32_t kAnamorphicTapBudget = 48;
+// Image/Look §68.3: the separable low-pass the late look stage is built on. 32 taps a side at
+// quarter resolution covers a full-resolution radius of about 128 px, which is the parameter's own
+// hard maximum, so the budget is a guard rather than a limit an author can reach.
+constexpr std::uint32_t kLookBlurTapBudget = 32;
 
 } // namespace
 
@@ -215,7 +219,7 @@ Result<wgpu::RenderPipeline> PostProcessor::makePipeline(const wgpu::ShaderModul
 }
 
 Result<void> PostProcessor::createPipelines(const wgpu::ShaderModule& module) {
-    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 14> slots{{
+    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 17> slots{{
         {"fs_exposure", &exposure_},
         {"fs_meter_prefilter", &meterPrefilter_},
         {"fs_meter_reduce", &meterReduce_},
@@ -230,6 +234,13 @@ Result<void> PostProcessor::createPipelines(const wgpu::ShaderModule& module) {
         {"fs_sharpen", &sharpen_},
         {"fs_dof", &dof_},
         {"fs_motion_blur", &motionBlur_},
+        // Cinematic integration (Image/Look §68). Appended, never inserted -- the ADR-345
+        // precedent. These three pipelines are *built* unconditionally, because building them is
+        // what proves the shader compiles; they are only *encoded* when an amount is non-zero,
+        // which is where §60's guarantee lives.
+        {"fs_look_atmos", &lookAtmos_},
+        {"fs_look_blur", &lookBlur_},
+        {"fs_look", &look_},
     }};
     // The two velocity-tile passes write RG16F, not the HDR format (ADR-040).
     const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 2> tileSlots{{
@@ -493,6 +504,25 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         current = target.view;
     }
 
+    // ---- 1b. cinematic integration, atmospheric (Image/Look §68.1) -------------------------------
+    // Here, and not later, for the reason depth of field is here: it reads depth, and everything
+    // from the lens stage onward resamples the image without resampling the depth buffer. Ahead of
+    // defocus rather than behind it, so a distant hazed object then defocuses as one thing.
+    //
+    // §60: not encoded at all unless the amount is off zero. That is the whole guarantee -- see the
+    // comment on `scene::ImageLookIntegration` and docs/image-look-audit.md §5.
+    if (s.look.atmosphericActive()) {
+        auto target = pool.acquire(in.width, in.height, kHdrFormat);
+        Uniforms u = base;
+        u.params0 = glm::vec4(std::clamp(s.look.atmospheric, 0.0f, 1.0f),
+                              std::max(s.look.atmosphericDistance, 1e-3f), 0.0f, 0.0f);
+        u.tintA = glm::vec4(s.look.atmosphericTint, 0.0f);
+        stage_ = "post/look-atmos";
+        runPass(encoder, lookAtmos_, target.view, current, nullptr, in.depth, u);
+        captureStage("look-atmos", target);
+        current = target.view;
+    }
+
     // ---- 2. defocus: depth of field and the tilt-shift band (a lens effect, but it needs
     // undistorted depth) ---------------------------------------------------------------------
     // ADR-079: one pass serves both. They differ only in how the circle of confusion is decided -
@@ -749,6 +779,67 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         stage_ = "post/composite";
         runPass(encoder, composite_, target.view, textures, u);
         captureStage("composite", target);
+        current = target.view;
+        output_ = target.texture;
+    }
+
+    // ---- 6b. cinematic integration: colour, local contrast, light wrap (Image/Look §68.2-4) -------
+    // After the composite because all three are statements about the *graded* image -- the point of
+    // colour integration is that the elements share the look they will be shown in, and grading
+    // afterwards would undo it. Before FXAA because FXAA is an edge filter and light wrap
+    // deliberately creates a soft edge that FXAA should then treat as one.
+    //
+    // All three read the same wide local mean, so it is computed once: quarter-resolution
+    // downsample (the existing 13-tap `fs_downsample`, a real prefilter) then a separable gaussian.
+    // Not a single wide gather -- docs/post-artifact-forensics.md is the record of what a gaussian
+    // sampled more coarsely than its source's texel actually is, and the water lattice it printed.
+    //
+    // §60: none of these four passes is encoded when every amount is zero.
+    if (s.look.lookActive()) {
+        const std::uint32_t lw = std::max(1u, in.width / 4);
+        const std::uint32_t lh = std::max(1u, in.height / 4);
+        stage_ = "post/look";
+
+        // Quarter-resolution prefilter. Reusing `fs_downsample` rather than a plain bilinear tap:
+        // it is the Jimenez 13-tap, which is what makes the spacing below Nyquist-safe.
+        auto small = pool.acquire(lw, lh, kHdrFormat);
+        {
+            Uniforms u = base;
+            u.texelSize = 1.0f / base.outputSize;
+            runPass(encoder, downsample_, small.view, current, nullptr, nullptr, u);
+        }
+        // The author's radius is in pixels at 720p, as every other radius in `PostSettings` is; at
+        // quarter resolution that is a quarter of the pixels. The tap count covers +-3 sigma, which
+        // is where a gaussian has 99.7% of its weight, and is bounded so a large radius costs
+        // samples linearly rather than making the pass unbounded.
+        const float sigma = std::max(s.look.localContrastRadius * pixelScale * 0.25f, 0.5f);
+        const auto taps = static_cast<float>(
+            std::clamp<std::uint32_t>(static_cast<std::uint32_t>(std::ceil(3.0f * sigma)), 1, kLookBlurTapBudget));
+        auto blurH = pool.acquire(lw, lh, kHdrFormat);
+        auto blurV = pool.acquire(lw, lh, kHdrFormat);
+        {
+            Uniforms u = base;
+            u.outputSize = glm::vec2(static_cast<float>(lw), static_cast<float>(lh));
+            u.texelSize = 1.0f / u.outputSize;
+            u.params0 = glm::vec4(sigma, taps, 1.0f, 0.0f);
+            runPass(encoder, lookBlur_, blurH.view, small.view, nullptr, nullptr, u);
+            u.params0 = glm::vec4(sigma, taps, 0.0f, 1.0f);
+            runPass(encoder, lookBlur_, blurV.view, blurH.view, nullptr, nullptr, u);
+        }
+        captureStage("look/mean", blurV);
+        pool.release(small);
+        pool.release(blurH);
+
+        auto target = pool.acquire(in.width, in.height, kHdrFormat);
+        Uniforms u = base;
+        u.params0 = glm::vec4(std::clamp(s.look.colour, 0.0f, 1.0f), std::clamp(s.look.localContrast, 0.0f, 1.0f),
+                              std::clamp(s.look.lightWrap, 0.0f, 1.0f), 0.0f);
+        PassTextures textures;
+        textures.source = current;
+        textures.second = blurV.view;
+        runPass(encoder, look_, target.view, textures, u);
+        captureStage("look", target);
+        pool.release(blurV);
         current = target.view;
         output_ = target.texture;
     }
