@@ -11,6 +11,7 @@
 #include <iterator>
 #include <filesystem>
 #include <string>
+#include <span>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -456,6 +457,185 @@ inline constexpr float kContextClickSlop = 4.0f;
         return menu;
     }
     return false;
+}
+
+// ---- the slice tool (ADR-355) --------------------------------------------------------------------
+//
+// Cmd+click cuts whatever is under the pointer. The *operations* it performs already existed, one
+// per lane, and the context menu has been offering two of them for some time; what did not exist was
+// the one decision that stands in front of all of them -- which lane, which block, where exactly the
+// cut lands once the grid has had its say, and whether that cut is legal.
+//
+// It is here, and it is pure, for the reason the lane geometry above is: the panel's copy of this
+// question cannot be tested, and a slice that quietly cuts the wrong block or refuses for no visible
+// reason is precisely the kind of defect that only a test written against arithmetic will catch. The
+// panel supplies the times and performs the mutation; nothing below reads a mouse.
+
+// What a slice would cut. One per lane that has something sliceable in it.
+enum class SliceKind : std::uint8_t {
+    None,
+    Shot,
+    Section,
+    AudioClip,
+    Overlay,
+    ActorClip, // a span between two clip cues on one actor's lane
+};
+
+// Why a slice was refused, so the panel can say so rather than doing nothing.
+//
+// A reason rather than a bool, because "there is nothing here" and "there is something here but the
+// cut would shave a twentieth of a second off it" are different mistakes and the second one is the
+// one a person will repeat until told.
+enum class SliceRefusal : std::uint8_t {
+    None,               // legal: go ahead
+    LaneNotSliceable,   // the ruler, a lane header, a lane with no blocks in it at all
+    NothingUnderPointer,
+    WouldBeTooShort,    // a block is there, but this cut would leave a half under the minimum
+};
+
+// A block on a lane, as the slice tool needs to see it: two times and nothing else.
+//
+// Deliberately not a `seq::Shot`, an `audio::AudioClip` or a `song::Section`. Five lanes hold five
+// unrelated types whose only shared property is that they occupy a span, and the alternative to
+// this two-field struct is five copies of the same decision -- which is the drift the panel's
+// "one function per operation" rule exists to prevent, one level up.
+struct SliceBlock {
+    double start = 0.0;
+    double end = 0.0;
+};
+
+// Everything the panel needs to carry out a slice, or to grey out the menu item that would.
+struct SlicePlan {
+    SliceKind kind = SliceKind::None;
+    int index = -1;    // which block within the lane
+    int actorRow = -1; // which actor's lane, for SliceKind::ActorClip
+    // Where the cut lands: the snapped time, not the pointer's. Meaningful only when `legal()`.
+    double atSeconds = 0.0;
+    SliceRefusal refusal = SliceRefusal::LaneNotSliceable;
+
+    [[nodiscard]] bool legal() const { return refusal == SliceRefusal::None; }
+    // **Whether the edit re-mixes the audio.** Only the audio lane does, and getting this wrong in
+    // the other direction is not a cosmetic error: `TimelineChange::clipsTouched` makes an undo
+    // record re-open every source and re-mix the whole piece, so a shot slice that claimed to touch
+    // the audio would spend a pass over five million samples saying nothing had changed.
+    [[nodiscard]] bool touchesAudio() const { return kind == SliceKind::AudioClip; }
+};
+
+// Which lane cuts what. `None` for the lanes that hold no spans.
+[[nodiscard]] inline SliceKind sliceKindFor(StripLane lane) {
+    switch (lane) {
+    case StripLane::Shots: return SliceKind::Shot;
+    case StripLane::Sections: return SliceKind::Section;
+    case StripLane::Audio: return SliceKind::AudioClip;
+    case StripLane::Overlays: return SliceKind::Overlay;
+    case StripLane::Actors: return SliceKind::ActorClip;
+    case StripLane::Ruler:
+    case StripLane::None:
+    default: return SliceKind::None;
+    }
+}
+
+// Which of the strip's two grids a slice obeys.
+//
+// **The strip has two snaps on purpose** and this is the decision about which one a cut takes. A
+// section boundary is dragged on `sectionSnap_` and everything else on `snapMode_`, because -- as
+// the declaration of `snapSection` puts it -- a person dragging a section boundary and a person
+// dragging a shot are not necessarily asking for the same grid.
+//
+// A slice on the section lane *creates a section boundary*: the identical object, in the identical
+// list, that the very next gesture will drag. If the cut landed on the strip's grid and the drag
+// that followed it moved on the section grid, then nudging a boundary you had just placed would
+// move it somewhere you did not put it -- and the two grids only differ at all when somebody has
+// deliberately set them apart, which is exactly when they would notice. So the rule is: **a cut
+// lands on the grid the thing it creates is dragged on.** Sections take the section grid; shots,
+// clips, lyrics and cues take the strip's.
+enum class SliceGrid : std::uint8_t { Strip, Section };
+
+[[nodiscard]] inline SliceGrid sliceGridFor(StripLane lane) {
+    return lane == StripLane::Sections ? SliceGrid::Section : SliceGrid::Strip;
+}
+
+// The block containing `seconds`, or -1. Half-open at the end, so two blocks butted edge to edge
+// answer once between them rather than twice at the seam.
+[[nodiscard]] inline int sliceBlockAt(std::span<const SliceBlock> blocks, double seconds) {
+    for (std::size_t i = 0; i < blocks.size(); ++i) {
+        if (seconds >= blocks[i].start && seconds < blocks[i].end) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+// The whole decision.
+//
+// `rawSeconds` is where the pointer is; `snappedSeconds` is where the grid would put the cut. Both,
+// because they answer different halves of the question and conflating them cuts the wrong block:
+// **the block is found at the pointer and the cut is tested against that block.** With beats on and
+// the pointer near a shot's end, the snapped time can land past that end and inside the next shot --
+// and slicing a block the person did not point at is a worse outcome than refusing. So a snap that
+// leaves the pointed-at block is `WouldBeTooShort`, which is what it is: there is no legal cut here.
+[[nodiscard]] inline SlicePlan planSlice(StripLane lane, std::span<const SliceBlock> blocks,
+                                         double rawSeconds, double snappedSeconds, double minSeconds,
+                                         int actorRow = -1) {
+    SlicePlan plan;
+    plan.kind = sliceKindFor(lane);
+    plan.actorRow = actorRow;
+    if (plan.kind == SliceKind::None) {
+        plan.refusal = SliceRefusal::LaneNotSliceable;
+        return plan;
+    }
+    // An actor lane needs to know *which* actor, and the strip's hit test answers -1 in the gaps
+    // between rows. A slice with no row is a slice with no list of blocks to cut.
+    if (plan.kind == SliceKind::ActorClip && actorRow < 0) {
+        plan.refusal = SliceRefusal::NothingUnderPointer;
+        return plan;
+    }
+    const int index = sliceBlockAt(blocks, rawSeconds);
+    if (index < 0) {
+        plan.refusal = SliceRefusal::NothingUnderPointer;
+        return plan;
+    }
+    plan.index = index;
+    const SliceBlock& block = blocks[static_cast<std::size_t>(index)];
+    plan.atSeconds = snappedSeconds;
+    // The same comparison the operations themselves make, so that a menu item enabled by this and
+    // an operation refusing it cannot disagree. Strictly greater / strictly less: a cut exactly
+    // `minSeconds` from an edge leaves a half of exactly the minimum, which `splitShot` accepts and
+    // `song::splitSection` accepts, and rounding the two apart is how the menu and the operation
+    // drifted the first time.
+    if (!(snappedSeconds > block.start + minSeconds) || !(snappedSeconds < block.end - minSeconds)) {
+        plan.refusal = SliceRefusal::WouldBeTooShort;
+        return plan;
+    }
+    plan.refusal = SliceRefusal::None;
+    return plan;
+}
+
+// What to tell somebody whose slice was refused. One line, in the status strip under the lanes.
+//
+// **There is no silent arm.** A cut that cannot happen has to say why, or the tool reads as broken
+// on the one gesture -- clicking a fraction of a second from an edge -- that people will try first.
+[[nodiscard]] inline const char* sliceRefusalMessage(SliceRefusal refusal) {
+    switch (refusal) {
+    case SliceRefusal::None: return "";
+    case SliceRefusal::LaneNotSliceable: return "Nothing to slice in this lane";
+    case SliceRefusal::NothingUnderPointer: return "Nothing under the pointer to slice";
+    case SliceRefusal::WouldBeTooShort: return "Too close to an edge: a slice there would leave nothing";
+    default: return "";
+    }
+}
+
+// The noun for the status line a slice writes when it succeeds.
+[[nodiscard]] inline const char* sliceKindName(SliceKind kind) {
+    switch (kind) {
+    case SliceKind::Shot: return "shot";
+    case SliceKind::Section: return "section";
+    case SliceKind::AudioClip: return "audio clip";
+    case SliceKind::Overlay: return "lyric";
+    case SliceKind::ActorClip: return "clip cue";
+    case SliceKind::None:
+    default: return "";
+    }
 }
 
 // ---- when the canvas admits it is working ------------------------------------------------------

@@ -63,10 +63,18 @@ inline constexpr const char* kOpenAudio = "O";
 inline constexpr const char* kOpenScene = "S";
 inline constexpr const char* kOpenEnvironment = "E";
 
+// ---- the sequencer strip's tools (ADR-355) -------------------------------------------------------
+//
+// A mouse gesture rather than a key, and named here anyway, because the menu rows that perform the
+// same operation advertise it in their shortcut column -- and a gesture nothing tells you about is
+// one nobody finds. Cmd, not Ctrl: on macOS Ctrl+click is the system right-click, which the strip
+// already spends on pan-or-menu.
+inline constexpr const char* kSlice = "Cmd+Click";
+
 // ---- deliberately absent -------------------------------------------------------------------------
 //
-// There is **no binding** for rename, split, mute, solo, lock, add track, or reveal-in-finder, and
-// no constant is provided for them. A menu item for one of those shows no shortcut column at all,
+// There is **no binding** for rename, mute, solo, lock, add track, or reveal-in-finder, and
+// no constant is provided for them. (Split left this list when the slice tool gave it a gesture.) A menu item for one of those shows no shortcut column at all,
 // which is the truthful presentation: the action exists, the key does not.
 
 } // namespace avgen::ui::shortcut

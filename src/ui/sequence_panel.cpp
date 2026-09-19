@@ -1402,7 +1402,26 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     }
 
     // ---- interaction ----
-    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    //
+    // **Cmd+click is the slice tool (ADR-355), and it is tested before anything else a press could
+    // mean.** Held down, the left button cuts rather than selects, drags, trims, scrubs or starts a
+    // rubber band -- which is why this is a branch in front of the press handling rather than a flag
+    // inside it: a gesture that both sliced a shot and started dragging one of its halves would be
+    // two edits from one click.
+    //
+    // Cmd rather than Ctrl, deliberately. On macOS Ctrl+click is the system's own right-click and
+    // the strip's right button already means pan-or-menu, so claiming Ctrl would have put the slice
+    // tool and the context menu on the same gesture. Nothing in this panel read Cmd before this.
+    //
+    // The gutter is left alone: a lane header is not on the time axis, so there is no second for a
+    // cut to land on, and a Cmd+click there falls through and selects the lane as it always did.
+    const bool slicing = hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+                         ImGui::GetIO().KeySuper && !overGutter;
+    if (slicing) {
+        // Refusals are not silent: `performSlice` writes the reason to the status line under the
+        // lanes, so a cut too near an edge reads as "too near an edge" rather than as a broken tool.
+        performSlice(engine, planSliceAt(engine, lanes.at(localY), mouseTime, hoverActorRow));
+    } else if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         // Which lane was hit decides what the click means. The ruler, the marker row and the
         // **waveform** are always a scrub, so there is one place on the strip that is guaranteed not
         // to grab a block. The waveform holds no blocks and is deliberately left that way: clicking
@@ -1948,6 +1967,16 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
     const auto valid = [](int index, std::size_t size) {
         return index >= 0 && static_cast<std::size_t>(index) < size;
     };
+    // **The slice tool's menu face** (ADR-355). Not a second implementation of Split: it plans with
+    // `planSliceAt` and performs with `performSlice`, which is exactly what Cmd+click does, so the
+    // row and the gesture cannot come to different conclusions about what is legal or about where
+    // the cut lands. The shortcut column names the gesture, which is how anybody finds it.
+    const auto sliceItem = [&](const char* label, StripLane lane, double seconds, int actorRow) {
+        const SlicePlan plan = planSliceAt(engine, lane, seconds, actorRow);
+        if (menuAction(label, shortcut::kSlice, plan.legal())) {
+            performSlice(engine, plan);
+        }
+    };
 
     // A header: the lane's own actions, not the timeline's.
     if (menu_.header == StripLane::Actors && valid(menu_.actorRow, piece.actors.size())) {
@@ -2011,13 +2040,13 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
             // Splitting is a real operation on a shot -- two shots whose durations add up to the
             // original's -- and it is offered only where it would produce two shots that are not
             // degenerate, rather than as a row that is always there and usually refuses.
-            const bool splittable = at > shot.startSeconds + kMinBlockSeconds &&
-                                    at < shot.endSeconds() - kMinBlockSeconds;
-            if (menuAction("Split at pointer", nullptr, splittable)) {
-                if (seq::splitShot(piece.shots, index, at, kMinBlockSeconds)) {
-                    touch();
-                }
-            }
+            //
+            // **The enabled test and the action are now the same question asked once** (ADR-355).
+            // It used to compute its own bounds here and then call `splitShot`, which snapped the
+            // cut nowhere and recorded no undo step -- so a Split done from this menu landed off the
+            // grid every drag on the strip lands on, and Cmd+Z could not take it back. Both are
+            // `planSliceAt`'s answer now, the same one Cmd+click gets.
+            sliceItem("Split at pointer", StripLane::Shots, at, -1);
             ImGui::Separator();
             if (menuAction("Delete", shortcut::kDelete)) {
                 beginEdit(engine);
@@ -2059,6 +2088,7 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
                 selection_ = Selection::Overlay;
                 touch();
             }
+            sliceItem("Split at pointer", StripLane::Overlays, at, -1);
             ImGui::Separator();
             if (menuAction("Delete", shortcut::kDelete)) {
                 beginEdit(engine);
@@ -2093,6 +2123,12 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
                 applyAudioClips(engine, std::move(clips));
                 break;
             }
+            // **A cut is the one edit the audio lane does accept in place** (ADR-355). Moving and
+            // trimming a clip stayed in the Audio... popup because making them drag gestures stole
+            // the click that scrubs (ADR-103) -- but a slice is Cmd+click and a menu row, and
+            // neither of those is the plain left click that lane's promise is about. This row is
+            // that gesture's face; both go through `performSlice`, which knows a clip edit re-mixes.
+            sliceItem("Split at pointer", StripLane::Audio, at, -1);
             ImGui::Separator();
             if (menuAction("Remove clip", shortcut::kDelete)) {
                 beginEdit(engine, /*touchesAudio=*/true);
@@ -2117,6 +2153,19 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
         }
         break;
     }
+    case StripLane::Actors: {
+        // This lane had no body menu at all before (ADR-355): a right-click on an actor's clips fell
+        // through to the generic Timeline menu, so the one thing you can do to a clip cue in place
+        // was unreachable from the pointer that was already on it.
+        if (valid(menu_.actorRow, piece.actors.size())) {
+            menuSubject(fmt::format("Performer: {}",
+                                    piece.actors[static_cast<std::size_t>(menu_.actorRow)].id));
+            sliceItem("Split clip cue at pointer", StripLane::Actors, at, menu_.actorRow);
+        } else {
+            menuSubject("Performers");
+        }
+        break;
+    }
     case StripLane::Sections: {
         if (valid(menu_.index, piece.sectionTimeline.sections.size())) {
             const auto index = static_cast<std::size_t>(menu_.index);
@@ -2126,18 +2175,13 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
                 selection_ = Selection::Section;
                 selected_ = menu_.index;
             }
-            const song::Section& section = piece.sectionTimeline.sections[index];
             // `splitSection` takes a time and refuses a split that would leave a section shorter
             // than its minimum, so the enabled test asks the same question the operation will:
             // an item that is offered and then declines is worse than one that was never offered.
-            const bool splittable = at > section.startSeconds + kMinSectionSeconds &&
-                                    at < section.endSeconds - kMinSectionSeconds;
-            if (menuAction("Split here", nullptr, splittable)) {
-                if (song::splitSection(piece.sectionTimeline, at, kMinSectionSeconds)) {
-                    piece.refreshSectionMarkers();
-                    touch();
-                }
-            }
+            // Both halves of that promise are `planSliceAt` now (ADR-355), which also puts the cut
+            // on the SECTION grid -- the one a boundary drag obeys, so the boundary this makes can
+            // be nudged afterwards without moving somewhere nobody put it.
+            sliceItem("Split here", StripLane::Sections, at, -1);
             // Not "delete": the structure is gapless, so removing a section gives its time to a
             // neighbour rather than leaving a hole, and the label says which of those it is.
             if (menuAction("Remove (merge into neighbour)", nullptr,
@@ -2367,6 +2411,168 @@ void SequencePanel::commitEdit(app::Engine& engine, std::string label) {
     EditCommand command(std::move(label));
     command.timeline = std::move(change);
     edits->history().push(std::move(command));
+}
+
+// ---- the slice tool (ADR-355) --------------------------------------------------------------------
+//
+// Three functions, and the split between them is the point. `sliceBlocksFor` says where the blocks
+// are, `ui::planSlice` decides, and `performSlice` mutates. Only the middle one holds the rule, only
+// the last one can fail to be undoable, and neither reads a mouse -- so the cmd-click, the context
+// menu and the inspector's button are three call sites of one operation rather than three
+// operations that happen to have the same name.
+
+std::vector<SliceBlock> SequencePanel::sliceBlocksFor(const app::Engine& engine, StripLane lane,
+                                                      int actorRow) const {
+    const seq::Sequence& piece = engine.sequence();
+    std::vector<SliceBlock> blocks;
+    switch (lane) {
+    case StripLane::Shots:
+        blocks.reserve(piece.shots.size());
+        for (const seq::Shot& shot : piece.shots) {
+            blocks.push_back({shot.startSeconds, shot.endSeconds()});
+        }
+        break;
+    case StripLane::Sections:
+        blocks.reserve(piece.sectionTimeline.sections.size());
+        for (const song::Section& section : piece.sectionTimeline.sections) {
+            blocks.push_back({section.startSeconds, section.endSeconds});
+        }
+        break;
+    case StripLane::Audio:
+        blocks.reserve(engine.audioClips().size());
+        for (const audio::AudioClip& clip : engine.audioClips()) {
+            blocks.push_back({clip.startSeconds,
+                              audio::clipEndSeconds(clip, engine.clipSource(clip.file).get())});
+        }
+        break;
+    case StripLane::Overlays:
+        blocks.reserve(piece.overlays.size());
+        for (const seq::OverlayCue& cue : piece.overlays) {
+            blocks.push_back({cue.startSeconds, cue.endSeconds});
+        }
+        break;
+    case StripLane::Actors: {
+        if (actorRow < 0 || static_cast<std::size_t>(actorRow) >= piece.actors.size()) {
+            break;
+        }
+        const seq::Actor& actor = piece.actors[static_cast<std::size_t>(actorRow)];
+        const double endOfPiece = piece.duration();
+        blocks.reserve(actor.clips.size());
+        for (std::size_t i = 0; i < actor.clips.size(); ++i) {
+            // A cue is an instant; the block is the stretch until the next one. The same span the
+            // lane draws, computed the same way, because a slice that disagreed with the picture
+            // about where a block ends is the drift ADR-103 is the record of.
+            const double end = i + 1 < actor.clips.size() ? actor.clips[i + 1].timeSeconds : endOfPiece;
+            blocks.push_back({actor.clips[i].timeSeconds, end});
+        }
+        break;
+    }
+    case StripLane::Ruler:
+    case StripLane::None:
+    default:
+        break;
+    }
+    return blocks;
+}
+
+SlicePlan SequencePanel::planSliceAt(const app::Engine& engine, StripLane lane, double rawSeconds,
+                                     int actorRow) const {
+    // **The lane picks the grid, and the grid is one of the two the strip already has.** Not a third
+    // snap of the slice tool's own: `snap` and `snapSection` are what the drags obey, and a cut that
+    // landed somewhere neither of them would put a boundary would be a cut you could not then nudge
+    // without it moving. See `ui::sliceGridFor` for why the section lane is the odd one out.
+    const double snapped = sliceGridFor(lane) == SliceGrid::Section ? snapSection(engine, rawSeconds)
+                                                                    : snap(engine, rawSeconds);
+    const double minimum = lane == StripLane::Sections ? kMinSectionSeconds : kMinBlockSeconds;
+    const std::vector<SliceBlock> blocks = sliceBlocksFor(engine, lane, actorRow);
+    return planSlice(lane, blocks, rawSeconds, snapped, minimum, actorRow);
+}
+
+bool SequencePanel::performSlice(app::Engine& engine, const SlicePlan& plan) {
+    if (!plan.legal()) {
+        status_ = sliceRefusalMessage(plan.refusal);
+        return false;
+    }
+    seq::Sequence& piece = engine.sequence();
+    const auto index = static_cast<std::size_t>(plan.index);
+    bool cut = false;
+    // One `beginEdit`/`commitEdit` bracket around the whole thing, whichever lane it lands in, so a
+    // slice is exactly one Cmd+Z. `touchesAudio` comes off the plan rather than being spelled at
+    // each of the five call sites below -- the audio lane re-mixes the piece and the other four must
+    // say they did not.
+    beginEdit(engine, plan.touchesAudio());
+    switch (plan.kind) {
+    case SliceKind::Shot:
+        if (const auto made = seq::splitShot(piece.shots, index, plan.atSeconds, kMinBlockSeconds)) {
+            selection_ = Selection::Shot;
+            selected_ = static_cast<int>(*made);
+            chosen_.clear();
+            cut = true;
+        }
+        break;
+    case SliceKind::Section:
+        if (const auto made = song::splitSection(piece.sectionTimeline, plan.atSeconds,
+                                                 kMinSectionSeconds)) {
+            selection_ = Selection::Section;
+            selected_ = static_cast<int>(*made);
+            chosen_.clear();
+            piece.refreshSectionMarkers();
+            cut = true;
+        }
+        break;
+    case SliceKind::AudioClip: {
+        std::vector<audio::AudioClip> clips = engine.audioClips();
+        if (index >= clips.size()) {
+            break;
+        }
+        const double end = audio::clipEndSeconds(clips[index], engine.clipSource(clips[index].file).get());
+        if (const auto made = audio::splitClip(clips, index, plan.atSeconds, end, kMinBlockSeconds)) {
+            selection_ = Selection::Clip;
+            selected_ = static_cast<int>(*made);
+            audioSelected_ = static_cast<int>(*made);
+            chosen_.clear();
+            applyAudioClips(engine, std::move(clips));
+            cut = true;
+        }
+        break;
+    }
+    case SliceKind::Overlay:
+        if (const auto made = seq::splitOverlay(piece.overlays, index, plan.atSeconds, kMinBlockSeconds)) {
+            selection_ = Selection::Overlay;
+            selected_ = static_cast<int>(*made);
+            chosen_.clear();
+            cut = true;
+        }
+        break;
+    case SliceKind::ActorClip: {
+        if (plan.actorRow < 0 || static_cast<std::size_t>(plan.actorRow) >= piece.actors.size()) {
+            break;
+        }
+        seq::Actor& actor = piece.actors[static_cast<std::size_t>(plan.actorRow)];
+        if (seq::splitActorClip(actor, index, plan.atSeconds, piece.duration(), kMinBlockSeconds)) {
+            selection_ = Selection::Actor;
+            selected_ = plan.actorRow;
+            chosen_.clear();
+            cut = true;
+        }
+        break;
+    }
+    case SliceKind::None:
+    default:
+        break;
+    }
+    if (!cut) {
+        // The plan said legal and the operation refused anyway. That is a disagreement between the
+        // two, not a thing a person did, and it gets said rather than swallowed -- the whole reason
+        // `planSlice` asks the same question the operations do is so this line never prints.
+        status_ = "the slice was refused by the operation";
+        abandonEdit();
+        return false;
+    }
+    touch();
+    commitEdit(engine, fmt::format("Slice {}", sliceKindName(plan.kind)));
+    status_ = fmt::format("sliced the {} at {:.2f}s", sliceKindName(plan.kind), plan.atSeconds);
+    return true;
 }
 
 void SequencePanel::applyAudioClips(app::Engine& engine, std::vector<audio::AudioClip> clips) {
@@ -2664,15 +2870,14 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
     // confidence about a span that no longer exists, which is worse than no number (ADR-215 makes
     // the same argument about a touched section).
 
+    // The third face of one operation (ADR-355). It used to split here, in its own three lines, with
+    // `snapSection` and no undo step; it now plans and performs exactly as Cmd+click and the context
+    // menu do, so the playhead, the pointer and the menu cannot land a cut in three different places.
     if (ImGui::Button("Split at playhead")) {
-        const double at = engine.timelineClock().seconds;
-        if (const auto made = song::splitSection(piece.sectionTimeline, snapSection(engine, at))) {
-            selected_ = static_cast<int>(*made);
-            piece.refreshSectionMarkers();
-            touch();
+        const SlicePlan plan =
+            planSliceAt(engine, StripLane::Sections, engine.timelineClock().seconds, -1);
+        if (performSlice(engine, plan)) {
             status_ = "split; the new section is yours, not the analyzer's";
-        } else {
-            status_ = "the playhead is not far enough inside a section to split it";
         }
     }
     ImGui::SameLine();

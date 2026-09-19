@@ -40,6 +40,32 @@ double clipEndSeconds(const AudioClip& clip, const AudioFile* file) {
     return clip.startSeconds + frames / static_cast<double>(file->sampleRate());
 }
 
+std::optional<std::size_t> splitClip(std::vector<AudioClip>& clips, std::size_t index,
+                                     double seconds, double endSeconds, double minSeconds) {
+    if (index >= clips.size()) {
+        return std::nullopt;
+    }
+    const AudioClip& clip = clips[index];
+    if (seconds <= clip.startSeconds + minSeconds || seconds >= endSeconds - minSeconds) {
+        return std::nullopt;
+    }
+    const double head = seconds - clip.startSeconds;
+    AudioClip tail = clip;
+    tail.startSeconds = seconds;
+    // The window into the file moves by exactly as much as the clip's place on the timeline did.
+    tail.inSeconds = clip.inSeconds + head;
+    // An open clip stays open; a bounded one loses the head's worth of length.
+    tail.durationSeconds = clip.durationSeconds > 0.0 ? clip.durationSeconds - head : 0.0;
+    tail.fadeInSeconds = 0.0;
+    if (!clip.name.empty()) {
+        tail.name = clip.name + " b";
+    }
+    clips[index].durationSeconds = head;
+    clips[index].fadeOutSeconds = 0.0;
+    clips.insert(clips.begin() + static_cast<std::ptrdiff_t>(index) + 1, std::move(tail));
+    return index + 1;
+}
+
 double arrangementDuration(std::span<const AudioClip> clips, const ClipSources& sources) {
     double end = 0.0;
     for (const AudioClip& clip : clips) {
