@@ -536,3 +536,4 @@ TEST_CASE("culling a scene does not rescan its vertices", "[scene][culling][boun
     CHECK(cached.first == lo);
     CHECK(cached.second == hi);
 }
+

@@ -15,6 +15,7 @@
 #include "core/time.hpp"
 #include "gpu/context.hpp"
 #include "gpu/shader_library.hpp"
+#include "rendering/debug_visualizer.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/mesh_metrics.hpp"
@@ -250,4 +251,45 @@ TEST_CASE("a rung still draws the object it replaced", "[gpu][entitylod]") {
     CHECK(lodCoverage < baseCoverage * 1.1);
     // ...and it really did draw something cheaper, or the band above would be a tautology.
     CHECK(renderer.stats().entityLod.drawnTriangles < renderer.stats().entityLod.sourceTriangles / 2);
+}
+
+// The editor's debug pass must not rescan the geometry either (ADR-354).
+//
+// `scene::entityCullBounds` was not the only caller that had the Scene in hand and asked
+// `MeshData::bounds()` to rescan every vertex; `buildDebugGeometry` did it twice more, and one of
+// its loops has no `options` guard on its entry, so it pays for every visible entity on every frame
+// of every editor session whether or not an overlay is on. On the Tree of Life that was 87 ms a
+// frame, and the comment at its call site says "an empty set costs nothing".
+//
+// It lives in the GPU suite because `DebugDraw` takes a device to construct, not because the
+// property needs one: the assertion is a rebuild count, which is the same fact at any load.
+TEST_CASE("building debug geometry does not rescan the vertices", "[gpu][entitylod][bounds]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::DebugDraw draw(*ctx, shaders);
+
+    scene::Scene scene;
+    const scene::MeshId mesh = scene.addMesh(scene::makeUvSphere(1.0f, 64, 48));
+    for (int i = 0; i < 8; ++i) {
+        scene::Entity& e = scene.addEntity("ball", mesh);
+        e.transform.position = glm::vec3(static_cast<float>(i) * 3.0f, 0.0f, 0.0f);
+    }
+    REQUIRE(scene.meshes[mesh].vertices.size() > 3000);
+
+    rendering::DebugViewOptions options; // everything off: the case that must be free
+    (void)scene.meshBounds(mesh);        // warm it, so the count below is about the loop
+    const std::uint64_t before = scene.meshBoundsRebuilds();
+    for (int frame = 0; frame < 10; ++frame) {
+        draw.clear();
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+    }
+    CHECK(scene.meshBoundsRebuilds() - before == 0);
+
+    // The control: with an overlay switched on it still does not rescan, and it does emit geometry
+    // -- otherwise the arm above would pass on a function that had quietly stopped doing anything.
+    options.entityBounds = true;
+    draw.clear();
+    rendering::buildDebugGeometry(draw, scene, options, 0.0);
+    CHECK(scene.meshBoundsRebuilds() - before == 0);
+    CHECK(draw.lineVertexCount() > 0);
 }
