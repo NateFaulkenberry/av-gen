@@ -96,10 +96,14 @@ struct RepresentationChoice {
     }
 };
 
-// One rung of an object's ladder, as the selector needs to cost it.
+// One rung of an object's ladder, as the selector needs to cost it and to judge it.
 struct LodRung {
     float surfaceArea = 0.0f;    // world units^2 at the instance's scale
     std::uint32_t triangles = 0;
+    // How far this rung deviates from the source, in world units at the instance's scale --
+    // `assets::LodLevel::error` scaled by the instance. Zero on a rung nobody measured, which
+    // admits it unconditionally and is the right default for a caller that has no such number.
+    float error = 0.0f;
 };
 
 struct RepresentationPolicy {
@@ -125,6 +129,38 @@ struct RepresentationPolicy {
     float targetPixelsPerTriangle = 500.0f;
     float floorPixelsPerTriangle = 8.0f;
     float ceilingPixelsPerTriangle = 50000.0f;
+
+    // ---- the quality floor, in pixels of screen-space error (ADR-344) ----------------------------
+    //
+    // The px/triangle rule above is a *cost* rule and has no fidelity term in it at all. On a
+    // scatter that is fine: a fern never reaches the target at any rung, so the ladder's own
+    // thresholds decide and the answer is reasonable. On a single large asset it is not. The Tree
+    // of Life's 3.16M triangles project to a fifth of a pixel each at its hero camera, so no rung
+    // of its ladder reaches 500 px/triangle at any size the shot will ever be, and "the coarsest
+    // rung still under the target" is always the bottom one. Measured: every drawable went to rung
+    // 3 or 4 at a camera where the tree is 900 pixels tall, and the rendered frame is a sparse
+    // scattering of huge leaf cards with the sky visible through the canopy.
+    //
+    // So a rung is also refused when its deviation projects to more than this many pixels. The
+    // deviation is `LodRung::error`, which mesh_lod.hpp guarantees never understates, and the
+    // projection is the record's own pixels-per-unit -- no second notion of screen size.
+    //
+    // **Where 8 comes from.** Rendered, not reasoned. The Tree of Life at its hero camera (219 m,
+    // a 470 px bounding radius, 1920x1080, tier high), each rung forced and compared against LOD0
+    // by eye and by MS-SSIM: rung 1 is the same picture, rung 2 is visibly chunkier foliage, rungs
+    // 3 and 4 are a different tree. The foliage layer's projected errors at that camera are 5.8,
+    // 19, 67 and 108 px. 8 is the round number between the rung that passes and the rung that does
+    // not, and it puts rung 2 at 520 m, rung 3 at 1.8 km and rung 4 at 3.0 km.
+    //
+    // It is one number over every asset, which is the part of it that is a guess: a deviation of
+    // eight pixels on a canopy is a slightly different canopy, and eight pixels on a face is a
+    // different face. An asset-level override is the obvious next thing and is deliberately not
+    // here yet, because nothing has been measured that would set it.
+    //
+    // Infinity restores the pure cost rule, which is what a scatter wants and what every caller
+    // that builds a LodRung without an error gets for free: a rung whose error is 0 is always
+    // admitted.
+    float maxScreenError = 8.0f;
 
     // Dead zone around every threshold, as a fraction of it. Off by default (see the header).
     float hysteresis = 0.0f;

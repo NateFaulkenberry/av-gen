@@ -3709,6 +3709,7 @@ Composition::lodChainsFor(const assets::SceneAsset& asset, const NodeLod& lod, c
         out.sourceShells = built->sourceShells;
         out.sourceSurfaceArea = meshMetrics(mesh).surfaceArea;
         out.hysteresis = lod.hysteresis;
+        out.maxScreenError = lod.maxScreenError;
         sourceTriangles += built->sourceTriangles;
         // levels[0] is the source and is deliberately not carried: scene.meshes[base] is LOD0 and
         // there must be exactly one copy of it.
@@ -6797,6 +6798,9 @@ nlohmann::json Composition::toJson() const {
             lod["enabled"] = true;
             lod["thinning"] = node.lod.thinning;
             lod["hysteresis"] = node.lod.hysteresis;
+            if (node.lod.maxScreenError >= 0.0f) {
+                lod["maxScreenError"] = node.lod.maxScreenError;
+            }
             if (!node.lod.ratios.empty()) {
                 lod["ratios"] = node.lod.ratios;
             }
@@ -7795,12 +7799,15 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 auto enabled = readBool(lod, "enabled", true);
                 auto thinning = readBool(lod, "thinning", true);
                 auto hysteresis = readFloat(lod, "hysteresis", 0.0f);
+                auto screenError = readFloat(lod, "maxScreenError", -1.0f);
                 if (!enabled) return std::unexpected(enabled.error());
                 if (!thinning) return std::unexpected(thinning.error());
                 if (!hysteresis) return std::unexpected(hysteresis.error());
+                if (!screenError) return std::unexpected(screenError.error());
                 node.lod.enabled = *enabled;
                 node.lod.thinning = *thinning;
                 node.lod.hysteresis = *hysteresis;
+                node.lod.maxScreenError = *screenError;
                 node.lod.ratios.clear();
                 if (lod.contains("ratios")) {
                     const json& ratios = lod.at("ratios");
@@ -7818,7 +7825,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 // animation block below gives: a misspelt setting that parses is a setting that is
                 // configured in the file and absent from the engine.
                 for (const auto& [key, unused] : lod.items()) {
-                    if (key != "enabled" && key != "thinning" && key != "hysteresis" && key != "ratios") {
+                    if (key != "enabled" && key != "thinning" && key != "hysteresis" &&
+                        key != "ratios" && key != "maxScreenError") {
                         return fail("node '{}': unknown key 'lod.{}'", node.name, key);
                     }
                 }

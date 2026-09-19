@@ -1917,9 +1917,10 @@ void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
         }
         GpuMeshLod& out = meshLods_[chain.base];
         out.hysteresis = chain.hysteresis;
+        out.maxScreenError = chain.maxScreenError;
         // Rung 0 is the source, so the selector's level index and this array agree without an
         // off-by-one anywhere: `levels[n - 1]` is what rung n draws.
-        out.rungs.push_back(LodRung{chain.sourceSurfaceArea, chain.sourceTriangles});
+        out.rungs.push_back(LodRung{chain.sourceSurfaceArea, chain.sourceTriangles, 0.0f});
         for (const scene::MeshLodLevel& level : chain.levels) {
             if (!level.mesh.valid() || level.mesh.indices.empty()) {
                 continue;
@@ -1939,7 +1940,7 @@ void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
             context_.queue().WriteBuffer(rung.indices, 0, level.mesh.indices.data(), idesc.size);
             rung.indexCount = static_cast<std::uint32_t>(level.mesh.indices.size());
             out.levels.push_back(std::move(rung));
-            out.rungs.push_back(LodRung{level.surfaceArea, level.triangles});
+            out.rungs.push_back(LodRung{level.surfaceArea, level.triangles, level.error});
         }
         if (out.levels.empty()) {
             out.rungs.clear();
@@ -2765,11 +2766,22 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // The rungs, at this instance's scale. Rebuilt per entity because two instances of one mesh
         // at different scales cost differently, which is the whole of what px/triangle measures.
         std::vector<LodRung> rungs = chain.rungs;
+        // The largest axis scale for the error, not the area scale: a deviation is a distance and
+        // it grows by whichever axis stretches it most. Taking the smaller number would understate
+        // the error of a non-uniformly scaled instance, and understating the error is the one
+        // direction this must never fail in.
+        const float lengthScale = std::max({std::abs(entity.transform.scale.x),
+                                            std::abs(entity.transform.scale.y),
+                                            std::abs(entity.transform.scale.z)});
         for (LodRung& rung : rungs) {
             rung.surfaceArea *= areaScale;
+            rung.error *= lengthScale;
         }
         RepresentationPolicy policy = lodPolicy;
         policy.hysteresis = chain.hysteresis;
+        if (chain.maxScreenError >= 0.0f) {
+            policy.maxScreenError = chain.maxScreenError;
+        }
         const RepresentationChoice choice = representation_.select(record, rungs, policy);
         // The kinds that are not built map to the coarsest rung rather than to nothing. They cannot
         // be reached with the radii zeroed above; this is the belt to that brace, and it fails

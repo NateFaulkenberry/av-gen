@@ -681,6 +681,7 @@ private:
         // applied where the record is built.
         std::vector<LodRung> rungs;
         float hysteresis = 0.0f;
+        float maxScreenError = -1.0f; // negative takes the policy's calibrated default
     };
     enum class LitVariant : std::uint8_t { OpaqueCull, OpaqueNoCull, Blend };
     // One auxiliary colour target: its texture, its view and nothing else.

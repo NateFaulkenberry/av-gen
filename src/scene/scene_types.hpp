@@ -299,6 +299,9 @@ struct MeshLodChain {
     // node and the renderer sees entities: this is the only place the two meet. 0 -- frame
     // independence -- everywhere until a scene file says otherwise.
     float hysteresis = 0.0f;
+    // The quality floor in pixels (rendering/representation.hpp), or negative for the calibrated
+    // default. Carried here for the reason `hysteresis` is.
+    float maxScreenError = -1.0f;
 };
 
 // A skinned rig in the scene (ADR-086; scene/animation.hpp holds the type). Lives here because

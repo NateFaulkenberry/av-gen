@@ -5,14 +5,14 @@
  "camera": {
   "mode": 1,
   "position": [
-   158.0,
-   6.0,
-   152.0
+   377.3,
+   20.499999999999996,
+   360.40000000000003
   ],
   "target": [
-   0.0,
-   13.0,
-   0.0
+   -1.9,
+   37.3,
+   -4.4
   ],
   "fov": 36.0,
   "orbitSpeed": 0.0
@@ -244,7 +244,10 @@
    "emissiveBoost": 1.0,
    "lod": {
     "enabled": true,
-    "hysteresis": 0.1
+    "ratios": [
+     1.0,
+     0.07
+    ]
    }
   },
   {
@@ -272,7 +275,10 @@
    "emissiveBoost": 1.0,
    "lod": {
     "enabled": true,
-    "hysteresis": 0.1
+    "ratios": [
+     1.0,
+     0.07
+    ]
    }
   },
   {
@@ -300,7 +306,10 @@
    "emissiveBoost": 1.0,
    "lod": {
     "enabled": true,
-    "hysteresis": 0.1
+    "ratios": [
+     1.0,
+     0.07
+    ]
    }
   },
   {
@@ -328,7 +337,10 @@
    "emissiveBoost": 1.0,
    "lod": {
     "enabled": true,
-    "hysteresis": 0.1
+    "ratios": [
+     1.0,
+     0.07
+    ]
    }
   },
   {
@@ -356,7 +368,10 @@
    "emissiveBoost": 1.0,
    "lod": {
     "enabled": true,
-    "hysteresis": 0.1
+    "ratios": [
+     1.0,
+     0.07
+    ]
    }
   },
   {

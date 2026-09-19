@@ -208,6 +208,12 @@ struct NodeLod {
     // A dead zone around the selector's thresholds, as a fraction of them (rendering/
     // representation.hpp). 0 is frame-independent and is the default everywhere in this engine.
     float hysteresis = 0.0f;
+    // The quality floor, in pixels of projected deviation: a rung whose error projects to more than
+    // this is refused however cheap it would be. Negative takes `RepresentationPolicy`'s calibrated
+    // default, which is 8 px and is where the Tree of Life's rungs were measured to stop being
+    // distinguishable from the source. Raise it to trade the hero shot's detail for its frame time;
+    // this is the one number that decides that trade and it is authorable for that reason.
+    float maxScreenError = -1.0f;
 };
 
 struct CompositionNode {
