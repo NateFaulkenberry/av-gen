@@ -147,7 +147,8 @@ public:
 private:
     void stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
     void stepStrip(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
-    void stepSliceMenu(ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepSliceMenu(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                       std::uint64_t frame);
     void stepSlice(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
                    std::uint64_t frame);
     void stepGizmo(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);

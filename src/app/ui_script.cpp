@@ -298,7 +298,7 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
     }
 
     if (has(arms_, UiScriptArm::SliceMenu)) {
-        stepSliceMenu(*panel, window, frame);
+        stepSliceMenu(engine, *panel, window, frame);
     }
     if (has(arms_, UiScriptArm::Slice)) {
         stepSlice(engine, *panel, window, frame);
@@ -643,11 +643,23 @@ void UiScript::stepSlice(Engine& engine, ui::ControlPanel& panel, platform::Wind
         return;
     }
     const float x = strip.x + strip.gutter + (strip.width - strip.gutter) * 0.25f;
-    const float y = strip.y + strip.shotsTop + ui::kStripLaneHeight * 0.5f;
+    // The audio lane when the project has clips, the shots lane otherwise -- the same rule
+    // `stepSliceMenu` uses, so one arm proves the gesture on the two lanes that matter by choice of
+    // `--project`. The audio lane is the one worth proving: ADR-103 keeps it a scrub, and the claim
+    // that a Cmd+click does not take the click that scrubs is a claim about this lane specifically.
+    const bool onAudio = !engine.audioClips().empty();
+    const float y = onAudio
+                        ? strip.y + strip.shotsTop - ui::kStripLaneGap -
+                              ui::kStripAudioLaneHeight * 0.5f
+                        : strip.y + strip.shotsTop + ui::kStripLaneHeight * 0.5f;
+    const auto count = [&] {
+        return onAudio ? engine.audioClips().size() : engine.sequence().shots.size();
+    };
+    const char* const noun = onAudio ? "audio clip(s)" : "shot(s)";
     switch (frame) {
     case 20:
-        sliceShotsBefore_ = engine.sequence().shots.size();
-        editLog_.push_back(fmt::format("slice: {} shot(s) before the gesture", sliceShotsBefore_));
+        sliceShotsBefore_ = count();
+        editLog_.push_back(fmt::format("slice: {} {} before the gesture", sliceShotsBefore_, noun));
         break;
     case 26:
     case 27:
@@ -698,12 +710,13 @@ void UiScript::stepSlice(Engine& engine, ui::ControlPanel& panel, platform::Wind
         ImGui::GetIO().AddKeyEvent(ImGuiMod_Super, false);
         break;
     case 50: {
-        const std::size_t after = engine.sequence().shots.size();
-        editLog_.push_back(fmt::format("slice: {} shot(s) after the Cmd+click", after));
+        const std::size_t after = count();
+        editLog_.push_back(fmt::format("slice: {} {} after the Cmd+click", after, noun));
         if (after == sliceShotsBefore_ + 1) {
-            editLog_.emplace_back("slice: the gesture cut a shot in two");
+            editLog_.push_back(fmt::format("slice: the gesture cut a {} in two",
+                                           onAudio ? "clip" : "shot"));
         } else {
-            editLog_.emplace_back("slice: the shot count did not change -- THIS ARM MEASURED NOTHING");
+            editLog_.emplace_back("slice: the count did not change -- THIS ARM MEASURED NOTHING");
         }
         break;
     }
@@ -712,7 +725,7 @@ void UiScript::stepSlice(Engine& engine, ui::ControlPanel& panel, platform::Wind
     }
 }
 
-void UiScript::stepSliceMenu(ui::ControlPanel& panel, platform::Window& window,
+void UiScript::stepSliceMenu(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
                              std::uint64_t frame) {
     const ui::SequencePanel::StripRect& strip = panel.sequence.stripRect();
     if (frame == 2) {
@@ -729,10 +742,19 @@ void UiScript::stepSliceMenu(ui::ControlPanel& panel, platform::Window& window,
     if (!strip.valid()) {
         return;
     }
-    // A third of the way along the shots lane: far enough into a shot that the cut is legal and the
-    // "Split at pointer" row is enabled rather than greyed, which is the state worth photographing.
+    // A quarter of the way along the lane: far enough into a block that the cut is legal and the
+    // Split row is enabled rather than greyed, which is the state worth photographing. (Pushing it
+    // to a third lands near a shot boundary in `behaviors.json` and captures the greyed state
+    // instead, which is also worth having and is how that capture was taken.)
     const float x = strip.x + strip.gutter + (strip.width - strip.gutter) * 0.25f;
-    const float y = strip.y + strip.shotsTop + ui::kStripLaneHeight * 0.5f;
+    // **Which lane is chosen by the project, not by a flag.** The audio lane is the contentious one
+    // -- ADR-103 keeps it a scrub -- so a project with clips gets its menu photographed, and one
+    // without gets the shots lane. One arm, two captures, by choice of `--project`.
+    const bool onAudio = !engine.audioClips().empty();
+    const float y = onAudio
+                        ? strip.y + strip.shotsTop - ui::kStripLaneGap -
+                              ui::kStripAudioLaneHeight * 0.5f
+                        : strip.y + strip.shotsTop + ui::kStripLaneHeight * 0.5f;
     if (frame >= 26 && frame <= 33) {
         warpAndMove(window, x, y);
         return;
