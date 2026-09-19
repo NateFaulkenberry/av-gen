@@ -417,3 +417,48 @@ TEST_CASE("The motion-blur shape parameters survive save, load, save (ADR-350, A
     p.motionBlurTileSize->setBase(0);
     CHECK(p.motionBlurTileSize->base() == 4);
 }
+
+TEST_CASE("bloomLevels is a live control and now round-trips (ADR-379)", "[scene][post][bloom]") {
+    // It was accepted by `applyPostJson` and dropped, on the stated grounds that the pyramid is
+    // "fixed when the bloom pyramid is created, so there is no parameter to move". That was false:
+    // `PostProcessor::run` clamps and reads it every frame for both the bloom and halation
+    // pyramids. So it was a working control that no scene and no project could reach -- the sixth
+    // instance of that family in this project, and the one that hid behind a plausible reason.
+    params::ParameterSet params;
+    params::Modulator modulator;
+    auto p = scene::registerPostParameters(params, scene::PostSettings{});
+    REQUIRE(p.bloomLevels != nullptr);
+    CHECK(p.bloomLevels->value() == static_cast<int>(scene::PostSettings{}.bloomLevels));
+
+    // The scene block: the key a dozen committed scenes already carry now does what they meant.
+    REQUIRE(scene::applyPostJson(nlohmann::json::parse(R"({"bloomLevels": 3})"), p).has_value());
+    params.resetFinals();
+    scene::PostSettings live;
+    scene::applyPostParameters(p, live);
+    CHECK(live.bloomLevels == 3u);
+    // ... and a malformed one is an error rather than a silent default.
+    CHECK_FALSE(scene::applyPostJson(nlohmann::json::parse(R"({"bloomLevels": "six"})"), p).has_value());
+
+    // ADR-350 round trip: set, save, load, save, assert by named key.
+    p.bloomLevels->setBase(4);
+    const nlohmann::json first = params::saveProject(params, modulator);
+    REQUIRE(first["parameters"].contains("post/bloom/levels"));
+    params::ParameterSet reloaded;
+    params::Modulator reloadedModulator;
+    auto q = scene::registerPostParameters(reloaded, scene::PostSettings{});
+    REQUIRE(params::loadProject(first, reloaded, reloadedModulator).has_value());
+    reloaded.resetFinals();
+    scene::PostSettings back;
+    scene::applyPostParameters(q, back);
+    CHECK(back.bloomLevels == 4u);
+    const nlohmann::json second = params::saveProject(reloaded, reloadedModulator);
+    REQUIRE(second["parameters"].contains("post/bloom/levels"));
+    CHECK(second["parameters"]["post/bloom/levels"] == first["parameters"]["post/bloom/levels"]);
+
+    // The declared range is the clamp `run()` already applies, so the parameter cannot express a
+    // value the chain would silently alter.
+    p.bloomLevels->setBase(99);
+    CHECK(p.bloomLevels->base() == 8);
+    p.bloomLevels->setBase(0);
+    CHECK(p.bloomLevels->base() == 1);
+}

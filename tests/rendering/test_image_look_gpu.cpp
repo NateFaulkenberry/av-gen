@@ -365,3 +365,54 @@ TEST_CASE("Wiring the identifier target changes no frame at the default sharpenI
     CHECK(hashOf(renderer, offMasked) == sharpenOff);
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("post/bloom/levels reaches the pyramid from a project (ADR-379)", "[gpu][post][bloom]") {
+    // The round-trip test proves the parameter survives a save. This proves it arrives somewhere
+    // that matters -- which is the half the five previous instances of this family all passed
+    // without having.
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FrameTime time{};
+
+    scene::Scene s = lookScene();
+    s.post.bloomEnabled = true;
+    s.post.bloomIntensity = 0.8f;
+    s.post.bloomThreshold = 0.5f;
+
+    s.post.bloomLevels = 6;
+    auto six = renderer.renderToImageFloat(s, time, 192, 128);
+    REQUIRE(six.has_value());
+    const std::uint32_t sixCount = renderer.stats().post.bloomLevels;
+
+    s.post.bloomLevels = 2;
+    auto two = renderer.renderToImageFloat(s, time, 192, 128);
+    REQUIRE(two.has_value());
+    const std::uint32_t twoCount = renderer.stats().post.bloomLevels;
+
+    // The chain built the depth it was asked for. `stats().post.bloomLevels` is the count the
+    // pyramid actually reached, so this is the renderer reporting back rather than the setting
+    // being read again.
+    INFO("levels reported: six=" << sixCount << " two=" << twoCount);
+    CHECK(sixCount > twoCount);
+    CHECK(twoCount == 2u);
+
+    // And the image differs, or the count is bookkeeping about a pyramid nobody looks at. A
+    // shallower pyramid is a tighter glow, so the frames must not match.
+    CHECK(gpu::hashImage(*six) != gpu::hashImage(*two));
+
+    // With bloom off the depth is inert whatever it is set to -- the control cannot invent work
+    // for a pass that does not run.
+    scene::Scene off = s;
+    off.post.bloomEnabled = false;
+    off.post.bloomIntensity = 0.0f;
+    off.post.bloomLevels = 6;
+    auto offSix = renderer.renderToImageFloat(off, time, 192, 128);
+    REQUIRE(offSix.has_value());
+    off.post.bloomLevels = 2;
+    auto offTwo = renderer.renderToImageFloat(off, time, 192, 128);
+    REQUIRE(offTwo.has_value());
+    CHECK(gpu::hashImage(*offSix) == gpu::hashImage(*offTwo));
+    CHECK(ctx->errorCount() == 0);
+}

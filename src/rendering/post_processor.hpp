@@ -14,8 +14,20 @@
 // plane (depth of field, ADR-037) or by distance from a band across the frame (the tilt-shift,
 // ADR-079), or by both at once, whichever circle is larger.
 //
-// Passes run only when their settings are active; with everything off and a unit exposure the
-// input is returned unchanged. Selective post (bloom weighted by emission, sharpening masked by
+// Passes run only when their settings are active. With everything off and a unit exposure the
+// chain is a SINGLE COMPOSITE PASS carrying the grade -- not a pass-through: `run()` always encodes
+// the composite and always returns a pool texture, never `in.sceneHdr`, and at default grade
+// settings `fs_composite` is the identity only to within a float ulp (`pow(x, 1.0)` lowers to
+// `exp2(log2(x))` and runs twice, `max(colour, 1e-5)` lifts true black, and the 0.18 divide and
+// multiply do not cancel in binary floating point).
+//
+// This sentence used to say "the input is returned unchanged", and docs/image-look-spec.md quoted
+// it as proof that the spec's own no-change guarantee already existed. It did not. A feature that
+// must not change the image therefore proves it DIFFERENTIALLY -- against the same build without
+// the feature -- rather than against the scene HDR, which is a comparison that could never pass
+// (ADR-368, ADR-182). docs/image-formation.md has the long version.
+//
+// Selective post (bloom weighted by emission, sharpening masked by
 // object identifier) uses the ADR-035 auxiliary targets when the caller supplies them in
 // PostFrameInputs, and silently falls back to the luminance-only behaviour when it does not.
 

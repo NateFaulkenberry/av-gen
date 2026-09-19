@@ -105,7 +105,10 @@ struct PostSettings {
     float bloomThreshold = 1.0f;   // exposed luminance where bloom starts
     float bloomKnee = 0.6f;        // soft-knee width as a fraction of the threshold
     float bloomRadius = 1.0f;      // upsample spread (0.5..2)
-    std::uint32_t bloomLevels = 6; // mip levels (fixed at creation of the chain)
+    // Pyramid depth. NOT fixed at creation, whatever this comment used to say: `PostProcessor::run`
+    // reads it every frame and builds that many levels (ADR-379). Six is deep enough that the
+    // coarsest level is a handful of texels at 1080p; fewer makes a tighter, harder glow.
+    std::uint32_t bloomLevels = 6;
     // Selective bloom (ADR-039): 0 = luminance only, 1 = the emission target only. Ignored, with
     // no visible change, when the renderer supplies no emission target (ADR-035).
     float bloomEmissionWeight = 0.0f;
@@ -205,6 +208,7 @@ struct PostParameters {
     params::Parameter<float>* bloomThreshold = nullptr;
     params::Parameter<float>* bloomKnee = nullptr;
     params::Parameter<float>* bloomRadius = nullptr;
+    params::Parameter<int>* bloomLevels = nullptr; // ADR-379: live per frame, never registered
     params::Parameter<float>* bloomEmissionWeight = nullptr;
     params::Parameter<bool>* halationEnabled = nullptr;
     params::Parameter<float>* halationIntensity = nullptr;

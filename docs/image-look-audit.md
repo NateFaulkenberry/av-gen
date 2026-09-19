@@ -664,3 +664,60 @@ the loader said `unknown node kind 'light'`, the boxes were unlit, the frame was
 there was nothing for fog to tint. **The render log said so and the frame did not** — a black frame
 and a nearly-black frame are indistinguishable in a hash, and I would have reported a false defect
 in someone else's subsystem if I had trusted the number over the log.
+
+---
+
+## 9. What is actually left (scoping against main at `414fb765`)
+
+Asked to say plainly what remains rather than invent work. **Phases 0, 1 and 2 are done.** The tail
+is three items, two of them small, and four candidates that are properly closed rather than
+deferred.
+
+### 9.1 Real, and done in this pass
+
+**`bloomLevels` was a working control nobody could reach — the sixth instance of that family, and
+the one that hid behind a plausible reason.** `applyPostJson` accepted the key and dropped it,
+saying *"Fixed when the bloom pyramid is created, so there is no parameter to move."* That sentence
+is false. `PostProcessor::run` clamps and reads `s.bloomLevels` **on every frame**, at
+`post_processor.cpp:612` for the bloom pyramid and `:649` for halation's — both inside `run()`,
+which begins at `:456`. And `tests/rendering/test_image_formation_gpu.cpp:362` has set it to 3 and
+asserted the energy is unchanged since ADR-039, which is a test that only means anything if the
+setting is live.
+
+So it was not a control that could not work; it was a control nobody had wired, protected by a
+reason that sounded sufficient. It is now `post/bloom/levels`, with the range equal to the clamp
+`run()` already applies, a reader, a writer, an ADR-350 round trip and a GPU test that the pyramid
+actually changes depth.
+
+**`post_processor.hpp`'s disabled-path sentence is corrected.** It said *"with everything off and a
+unit exposure the input is returned unchanged"*, and `docs/image-look-spec.md` quoted exactly that
+as proof the spec's own no-change guarantee already existed. It did not, and the misquotation set
+the shape of the whole §60 argument. The header now says what is true — a single composite pass,
+identity only to within a float ulp — and points at the differential proof.
+
+### 9.2 Closed, with the reason rather than a deferral
+
+**§89, the AgX question: closed.** The brief says do not replace AgX without evidence. What the
+engine had was not a bad operator but a broken **inverse** — `agx()` undid its own sRGB encode with
+`pow(v, 2.2)` against a piecewise `linearToSrgb` (ADR-372). That is fixed, and fixing it removed
+the only evidence that had ever been offered against AgX. **§89 asked for evidence before replacing
+the operator; the evidence turned out to be a bug in the code around it.** Nothing further is owed.
+
+**§56, versioning: closed, and adding a version would be the wrong move.** `LookPreset::fromJson`
+is fully permissive — every field optional with a default, `format` never checked, unknown keys
+ignored — so the look format has no migration surface to version, and a `version` field nothing
+reads is the "built but unreachable" family again. Versioning that matters happens where
+`post/look/*` actually lives: the **project** format, which has `kProjectFormatVersion` and real
+migrations, and which already carries every parameter this work added.
+
+**ADR-378's trap does not apply to this work.** That failure was an absolute error measured against
+a relative tolerance, and the old form passed a shader perturbed by +15%. Checked every assertion in
+`tests/rendering/test_image_look_gpu.cpp`: there is no `Approx`, no `epsilon`, no `margin` and no
+percentage bound anywhere in the file. The §60 arms compare **hash equality**, `byteDiff::identical()`,
+**exact float equality** on corner pixels and **exact integer** pass counts. The two threshold
+assertions that exist (`changed > 200`, `towardTint > changed / 2`) are absolute counts against
+absolute floors, and they can only fail by an effect vanishing — never by one growing, which is the
+direction ADR-378's form was blind to. The eight Phase 0 captures assert nothing at all; they are
+arms to be diffed.
+
+<!-- SIXTYSIX -->
