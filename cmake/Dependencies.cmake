@@ -140,6 +140,45 @@ CPMAddPackage(
 set(CMAKE_CXX_STANDARD "${_avgen_saved_cxx_standard}")
 unset(_avgen_saved_cxx_standard)
 
+# ---- OpenImageDenoise (path-tracer denoise) ----------------------------------------------------
+# ADR-346. Prebuilt macOS arm64 archive, SHA256-pinned, exactly as Dawn is -- and for a sharper
+# reason than Dawn's. OIDN's CPU device cannot be built from source without TWO things this project
+# does not have and should not acquire for one feature:
+#
+#   * oneTBB, which `devices/cpu/CMakeLists.txt` marks REQUIRED with no alternative tasking backend;
+#   * ISPC >= 1.21, a *binary compiler toolchain* (not a library) that OIDN's CMake refuses to
+#     proceed without. Nothing else in this project needs a third-party compiler to build.
+#
+# The prebuilt archive carries both -- it ships its own `libtbb` -- and also carries the trained
+# weights, which are the 49 MB in `libOpenImageDenoise_core`. On Apple silicon OIDN runs its network
+# through BNNS (Accelerate), so no oneDNN is involved.
+#
+# OFF by default: it is a 51 MB download for a feature the renderer works without, and a build that
+# has not opted in must not pay for it. `AVGEN_PATHTRACE_DENOISE` gates the code as well as the
+# fetch, and the tracer reports denoising as unavailable rather than failing (spec section 54).
+option(AVGEN_PATHTRACE_DENOISE "Fetch Open Image Denoise and enable path-tracer denoising" OFF)
+if(AVGEN_PATHTRACE_DENOISE)
+    if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+        CPMAddPackage(
+            NAME oidn_prebuilt
+            URL "https://github.com/RenderKit/oidn/releases/download/v2.3.3/oidn-2.3.3.arm64.macos.tar.gz"
+            URL_HASH SHA256=b3c005ed437547fca5460ae43c8631ff46bc4ec4f9d5f219940ef941601a9d81
+            DOWNLOAD_ONLY YES)
+        add_library(oidn INTERFACE)
+        target_include_directories(oidn SYSTEM INTERFACE "${oidn_prebuilt_SOURCE_DIR}/include")
+        target_link_libraries(oidn INTERFACE
+            "${oidn_prebuilt_SOURCE_DIR}/lib/libOpenImageDenoise.dylib")
+        # The dylibs resolve each other by @rpath at load time, so the directory has to be on it.
+        target_link_options(oidn INTERFACE "-Wl,-rpath,${oidn_prebuilt_SOURCE_DIR}/lib")
+        add_library(oidn::oidn ALIAS oidn)
+        set(AVGEN_HAVE_OIDN ON)
+        message(STATUS "avgen: Open Image Denoise 2.3.3 (prebuilt arm64)")
+    else()
+        message(WARNING "avgen: AVGEN_PATHTRACE_DENOISE is ON but no prebuilt OIDN exists for this "
+                        "platform; denoising will report itself unavailable")
+    endif()
+endif()
+
 # ---- Catch2 (tests) ---------------------------------------------------------------------------
 if(AVGEN_BUILD_TESTS)
     CPMAddPackage(

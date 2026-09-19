@@ -33,7 +33,7 @@ never reaches into the realtime post chain. Colour management is downstream of t
 | 1 | Primary rays, Lambertian, one area light, shadow rays, accumulation, EXR | **done** |
 | 2 | glTF metallic-roughness BRDF, textures, colour space | **done** |
 | 3 | BSDF + light sampling, MIS, Russian roulette | **done** |
-| 4 | OIDN denoising | not started |
+| 4 | OIDN denoising | **done** (opt-in) |
 | 5 | Full AV Gen scene integration (skinning, instancing, procedurals) | not started |
 | 6 | AOVs | not started |
 | 7 | Glowmere | not started |
@@ -97,6 +97,26 @@ inheriting them would be the ADR-146 mistake in a new place:
 * `Entity::cameraCulled`, which means "outside the realtime frustum", not "not in the scene";
   off-screen geometry still casts shadows and still bounces light into the frame;
 * procedural LOD rungs 2 and 3, which are camera-facing billboards.
+
+## Phase 4 in particular
+
+Denoising through Open Image Denoise, **off by default**. Configure with
+`-DAVGEN_PATHTRACE_DENOISE=ON` to fetch the SHA256-pinned prebuilt macOS arm64 archive. Without it,
+`denoiseAvailable()` is false and `denoise()` fails with a message naming the option -- it never
+returns the input unchanged, because a denoise that silently did nothing is worse to debug than a
+refusal.
+
+**Why prebuilt and not CPM-from-source:** OIDN's CPU device requires oneTBB *and* ISPC >= 1.21, a
+third-party **compiler toolchain** its CMake will not proceed without. See **ADR-346**, which also
+amends ADR-344's claim that this work would bring no oneTBB into the tree.
+
+The albedo and normal **feature AOVs** arrived here rather than at Phase 6 because the denoiser
+needs them. Captured from the first hit, opt-in via `TraceSettings::captureFeatures`, and capturing
+them leaves the beauty pass bit-identical (tested).
+
+`docs/pathtrace/phase4-denoise-before-8spp.png` and `-after-oidn.png`: a Cornell-style box at 8 spp,
+before and after. RMSE against a 512-sample reference falls by more than 30% and the mean moves
+0.1183 to 0.1175.
 
 ## Phase 3 in particular
 
@@ -192,6 +212,9 @@ told anyone.
 * **Do not set `CMAKE_CXX_STANDARD` globally around Embree.** It overrides Embree's own
   `-std=c++11` and Embree 4.4.0 does not compile as C++23 under Apple clang 21. `Dependencies.cmake`
   saves, unsets and restores it; the comment there explains why.
+* **`cp` of a Mach-O invalidates its ad-hoc code signature on Apple silicon** and the kernel
+  SIGKILLs the copy with **no output at all** (exit 137). `tools/pathtrace-test.sh` re-signs after
+  copying; it exists because a plain `cp` looked like a mysterious silent crash.
 * **A shadow ray must clear the surface it leaves AND stop short of the one it aims at.** Offsetting
   the origin by `eps` along the normal already consumes roughly `eps * (n.dir)` of the distance
   budget, so subtracting `eps` from `tfar` as well cancels the gap to within 1e-5 and the ray reports

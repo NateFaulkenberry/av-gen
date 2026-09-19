@@ -170,10 +170,18 @@ struct Counters {
 }
 
 // One camera path.
-[[nodiscard]] glm::vec3 radiance(const Snapshot& snap, const EmbreeScene& embree, Ray ray,
-                                 const TraceSettings& settings, Sampler& sampler, Counters& counters) {
+struct PathResult {
+    glm::vec3 radiance{0.0f};
+    glm::vec3 albedo{0.0f};
+    glm::vec3 normal{0.0f};
+};
+
+[[nodiscard]] PathResult radiance(const Snapshot& snap, const EmbreeScene& embree, Ray ray,
+                                  const TraceSettings& settings, Sampler& sampler, Counters& counters) {
+    PathResult path;
     glm::vec3 result{0.0f};
     glm::vec3 throughput{1.0f};
+    bool firstHitRecorded = false;
 
     // Carried from the previous bounce so an emitter found by a BSDF ray can be MIS-weighted
     // against the light sampler that could also have found it. `specularBounce` starts true because
@@ -188,13 +196,30 @@ struct Counters {
             embree.intersect(snap, ray.origin, ray.direction, 0.0f, std::numeric_limits<float>::infinity());
 
         if (!hit.hit) {
-            result += throughput * environmentRadiance(snap, ray.direction);
+            const glm::vec3 env = environmentRadiance(snap, ray.direction);
+            result += throughput * env;
+            if (!firstHitRecorded) {
+                // The background IS the albedo the denoiser should see for a pixel that hit nothing:
+                // giving it black would tell the filter there is an edge where there is only sky.
+                path.albedo = env;
+                path.normal = -ray.direction;
+                firstHitRecorded = true;
+            }
             break;
         }
 
         const scene::Material& mat = snap.meshes[hit.meshIndex].material;
         const SurfaceMaterial m = resolveMaterial(snap, mat, hit.uv);
         const glm::vec3 view = -ray.direction;
+
+        if (!firstHitRecorded) {
+            // A metal's "albedo" for denoising purposes is its F0, which is its base colour; a
+            // dielectric's is its diffuse colour. Emission is added so an emitter does not look
+            // like a black hole in the albedo buffer and get smoothed into its surroundings.
+            path.albedo = m.diffuseAlbedo() + m.f0() * m.metallic + m.emission;
+            path.normal = hit.shadingNormal;
+            firstHitRecorded = true;
+        }
 
         // --- emission, MIS-weighted against the light sampler that could also have found it ---
         if (m.emission.x > 0.0f || m.emission.y > 0.0f || m.emission.z > 0.0f) {
@@ -262,7 +287,8 @@ struct Counters {
             result = glm::max(result, glm::vec3(0.0f));
         }
     }
-    return result;
+    path.radiance = result;
+    return path;
 }
 
 } // namespace
@@ -289,7 +315,36 @@ void Framebuffer::resize(std::uint32_t w, std::uint32_t h) {
     width = w;
     height = h;
     radiance.assign(static_cast<std::size_t>(w) * h, glm::vec3(0.0f));
+    albedo.clear();
+    normal.clear();
     sampleCount = 0;
+}
+
+std::vector<glm::vec3> Framebuffer::resolvedRadiance() const {
+    std::vector<glm::vec3> out(radiance.size(), glm::vec3(0.0f));
+    if (sampleCount == 0) return out;
+    const float inv = 1.0f / static_cast<float>(sampleCount);
+    for (std::size_t i = 0; i < radiance.size(); ++i) out[i] = radiance[i] * inv;
+    return out;
+}
+
+std::vector<glm::vec3> Framebuffer::resolvedAlbedo() const {
+    std::vector<glm::vec3> out(albedo.size(), glm::vec3(0.0f));
+    if (sampleCount == 0) return out;
+    const float inv = 1.0f / static_cast<float>(sampleCount);
+    for (std::size_t i = 0; i < albedo.size(); ++i) out[i] = albedo[i] * inv;
+    return out;
+}
+
+std::vector<glm::vec3> Framebuffer::resolvedNormal() const {
+    std::vector<glm::vec3> out(normal.size(), glm::vec3(0.0f));
+    if (sampleCount == 0) return out;
+    for (std::size_t i = 0; i < normal.size(); ++i) {
+        // Averaged normals are shorter than unit; renormalise so the denoiser gets a direction.
+        const float len = glm::length(normal[i]);
+        out[i] = len > 1e-6f ? normal[i] / len : glm::vec3(0.0f);
+    }
+    return out;
 }
 
 glm::vec3 Framebuffer::pixel(std::uint32_t x, std::uint32_t y) const {
@@ -344,6 +399,11 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
     stats_.buildSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - buildStart).count();
 
     out.resize(settings.width, settings.height);
+    if (settings.captureFeatures) {
+        const std::size_t n = static_cast<std::size_t>(settings.width) * settings.height;
+        out.albedo.assign(n, glm::vec3(0.0f));
+        out.normal.assign(n, glm::vec3(0.0f));
+    }
     const CameraBasis basis = cameraBasis(snapshot.camera, settings.width, settings.height);
 
     const auto renderStart = std::chrono::steady_clock::now();
@@ -365,15 +425,26 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
             for (std::uint32_t x = 0; x < settings.width; ++x) {
                 const std::uint32_t pixelIndex = y * settings.width + x;
                 glm::vec3 sum{0.0f};
+                glm::vec3 albedoSum{0.0f};
+                glm::vec3 normalSum{0.0f};
                 for (std::uint32_t s = 0; s < settings.samplesPerPixel; ++s) {
                     Sampler sampler(settings.seed, pixelIndex, s);
                     const glm::vec2 jitter = sampler.next2D();
                     const Ray ray = generateRay(basis, static_cast<float>(x) + jitter.x,
                                                 static_cast<float>(y) + jitter.y, settings.width,
                                                 settings.height);
-                    sum += radiance(snapshot, embree, ray, settings, sampler, counters);
+                    const PathResult p = radiance(snapshot, embree, ray, settings, sampler, counters);
+                    sum += p.radiance;
+                    if (settings.captureFeatures) {
+                        albedoSum += p.albedo;
+                        normalSum += p.normal;
+                    }
                 }
                 out.radiance[pixelIndex] = sum;
+                if (settings.captureFeatures) {
+                    out.albedo[pixelIndex] = albedoSum;
+                    out.normal[pixelIndex] = normalSum;
+                }
             }
         }
     };

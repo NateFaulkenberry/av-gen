@@ -56,6 +56,10 @@ struct TraceSettings {
     // 0 = std::thread::hardware_concurrency(). These are AV Gen's threads, not Embree's.
     unsigned threads = 0;
 
+    // Capture the albedo and normal feature buffers. Cheap (first hit only) but not free, so it is
+    // opt-in; the denoiser needs them and turns this on for itself.
+    bool captureFeatures = false;
+
     // Spec section 59. Off by default because it costs a branch per sample; on, a non-finite or
     // negative radiance is counted and clamped away instead of poisoning the accumulation.
     bool debugCheckNonFinite = false;
@@ -70,6 +74,16 @@ struct Framebuffer {
     std::uint32_t height = 0;
     std::vector<glm::vec3> radiance;  // accumulated sum, NOT yet divided by sampleCount
     std::uint32_t sampleCount = 0;
+
+    // Feature buffers from the FIRST hit along each path (spec sections 51, 61). They are what lets
+    // a denoiser keep an edge it would otherwise smooth away, and they are the first two AOVs.
+    // Accumulated and averaged like radiance so they carry the same anti-aliasing.
+    std::vector<glm::vec3> albedo;
+    std::vector<glm::vec3> normal;   // world space, unit length after resolve
+
+    [[nodiscard]] std::vector<glm::vec3> resolvedRadiance() const;
+    [[nodiscard]] std::vector<glm::vec3> resolvedAlbedo() const;
+    [[nodiscard]] std::vector<glm::vec3> resolvedNormal() const;
 
     void resize(std::uint32_t w, std::uint32_t h);
     // Mean radiance per pixel. Empty if no samples have landed.
