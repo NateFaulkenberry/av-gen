@@ -1,4 +1,4 @@
-// The slice tool's decision (ADR-355), and the four cuts it performs.
+// The slice tool's decision (ADR-356), and the four cuts it performs.
 //
 // Neither the author of this file nor the person who asked for the feature can see Dear ImGui, so
 // the only way the tool is verifiable at all is that the decision is arithmetic: `ui::planSlice`
@@ -345,7 +345,7 @@ TEST_CASE("an open-ended audio clip stays open when it is sliced", "[audio][slic
 }
 
 TEST_CASE("every refusal has something to say", "[ui][slice]") {
-    // ADR-355's no-silent-no-op rule, as a test. A cut that cannot happen must put a line in the
+    // ADR-356's no-silent-no-op rule, as a test. A cut that cannot happen must put a line in the
     // status strip; an empty string here is a gesture that looks like a broken tool.
     for (const ui::SliceRefusal refusal : {ui::SliceRefusal::LaneNotSliceable,
                                            ui::SliceRefusal::NothingUnderPointer,

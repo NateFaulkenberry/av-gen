@@ -119,7 +119,7 @@ private:
 // The end of the whole arrangement.
 [[nodiscard]] double arrangementDuration(std::span<const AudioClip> clips, const ClipSources& sources);
 
-// ---- cutting a clip in two (ADR-355) --------------------------------------------------------------
+// ---- cutting a clip in two (ADR-356) --------------------------------------------------------------
 //
 // The slice tool's audio arm. There was no split here before, and the arithmetic is the reason it is
 // worth having in one place: a clip is a window onto a file, so cutting it at a timeline second has

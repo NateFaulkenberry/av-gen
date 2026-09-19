@@ -34,7 +34,7 @@ struct ArmName {
     std::string_view name;
     UiScriptArm arm;
 };
-constexpr std::array<ArmName, 14> kArms{{
+constexpr std::array<ArmName, 16> kArms{{
     {"hover", UiScriptArm::Hover},
     {"sliders", UiScriptArm::Sliders},
     {"panels", UiScriptArm::Panels},
@@ -49,6 +49,8 @@ constexpr std::array<ArmName, 14> kArms{{
     {"star", UiScriptArm::Star},
     {"click", UiScriptArm::Click},
     {"drag", UiScriptArm::Drag},
+    {"slicemenu", UiScriptArm::SliceMenu},
+    {"slice", UiScriptArm::Slice},
 }};
 
 // Pushes a motion event as though the device had produced it. SDL routes it to the window under
@@ -87,17 +89,36 @@ void warpAndMove(platform::Window& window, float x, float y) {
     pushMotion(window, x, y);
 }
 
-void pushButton(platform::Window& window, float x, float y, bool down) {
+void pushButton(platform::Window& window, float x, float y, bool down,
+                std::uint8_t which = SDL_BUTTON_LEFT) {
     SDL_Event e{};
     e.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
     e.button.timestamp = SDL_GetTicksNS();
     e.button.windowID = window.id();
     e.button.which = 0;
-    e.button.button = SDL_BUTTON_LEFT;
+    e.button.button = which;
     e.button.down = down;
     e.button.clicks = 1;
     e.button.x = x;
     e.button.y = y;
+    SDL_PushEvent(&e);
+}
+
+// A modifier, held or let go. Dear ImGui reads Cmd from `io.KeySuper`, which the SDL3 backend sets
+// from these events -- so a scripted Cmd+click has to press the key as a real one would rather than
+// poking the IO struct, which the backend would overwrite on the next frame anyway.
+void pushKey(platform::Window& window, SDL_Keycode key, SDL_Scancode scancode, SDL_Keymod mod,
+             bool down) {
+    SDL_Event e{};
+    e.type = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+    e.key.timestamp = SDL_GetTicksNS();
+    e.key.windowID = window.id();
+    e.key.which = 0;
+    e.key.scancode = scancode;
+    e.key.key = key;
+    e.key.mod = mod;
+    e.key.down = down;
+    e.key.repeat = false;
     SDL_PushEvent(&e);
 }
 
@@ -287,6 +308,12 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
         stepEdit(engine, *panel, window, frame);
     }
 
+    if (has(arms_, UiScriptArm::SliceMenu)) {
+        stepSliceMenu(*panel, window, frame);
+    }
+    if (has(arms_, UiScriptArm::Slice)) {
+        stepSlice(engine, *panel, window, frame);
+    }
     if (has(arms_, UiScriptArm::Strip)) {
         stepStrip(engine, *panel, window, frame);
     }
@@ -580,6 +607,161 @@ void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Windo
 //    90  press on the shots lane and drag a shot to 140 -- the drag half
 //   142  release, which is the frame the bake happens on
 //   150  report what moved
+// The strip's context menu, opened on a shot and left open (ADR-356).
+//
+// A capture arm, not a measurement one. The slice tool's rows live in a popup, and a popup only
+// exists on the frames it is up -- so `--capture-ui` on an idle editor photographs a strip with no
+// menu on it, which is a picture of nothing this change touched. This opens one and then stops,
+// so every frame after the release has the menu on screen and any capture frame will do.
+//
+//     tools/gpu-lock.sh ./build/release/src/avgen --project examples/camera/behaviors.json \
+//         --ui-script slicemenu --capture-ui out.png --capture-ui-frame 120
+//
+// Timing copied from `stepStrip` and for its reasons: the layout is restored first, the Sequence
+// tab is raised (a background tab's body never runs, so `stripRect_` would be a stale frame's), and
+// the pointer is parked on the target for several frames before the press, because the SDL3 backend
+// rewrites `io.MousePos` from the OS cursor on any frame with no button held.
+// Cmd+click on a shot: the slice tool's actual gesture (ADR-356).
+//
+// The menu capture shows the row exists. This shows the *click* works, which is a different claim
+// and the one that cannot be tested any other way -- `ui::planSlice` is covered by unit tests, and
+// everything between an SDL button event and that function is not.
+//
+//     tools/gpu-lock.sh ./build/release/src/avgen --project examples/camera/behaviors.json \
+//         --ui-script slice --frames 160 --headless=false
+//
+// It says the shot count before and after in so many words, including when nothing happened, for
+// the reason the Star arm says "THIS ARM MEASURED NOTHING": a probe that cannot report its own
+// failure is not a probe (ADR-182).
+void UiScript::stepSlice(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                         std::uint64_t frame) {
+    const ui::SequencePanel::StripRect& strip = panel.sequence.stripRect();
+    if (frame == 2) {
+        panel.restoreDefaultLayout();
+        return;
+    }
+    if (frame == 4 || frame == 5) {
+        if (bool* slot = panel.layout().slot("Sequence"); slot != nullptr) {
+            *slot = true;
+        }
+        ImGui::SetWindowFocus("Sequence");
+        return;
+    }
+    if (!strip.valid()) {
+        if (frame == 20) {
+            editLog_.emplace_back("slice: the Sequence panel never laid out; THIS ARM MEASURED NOTHING");
+        }
+        return;
+    }
+    const float x = strip.x + strip.gutter + (strip.width - strip.gutter) * 0.25f;
+    const float y = strip.y + strip.shotsTop + ui::kStripLaneHeight * 0.5f;
+    switch (frame) {
+    case 20:
+        sliceShotsBefore_ = engine.sequence().shots.size();
+        editLog_.push_back(fmt::format("slice: {} shot(s) before the gesture", sliceShotsBefore_));
+        break;
+    case 26:
+    case 27:
+    case 28:
+    case 29:
+    case 30:
+    case 31:
+        // Parked on the target first, for the reason `warpAndMove` documents: with no button held
+        // the backend rewrites the pointer from the OS cursor, so the press frame must find the real
+        // cursor already there.
+        warpAndMove(window, x, y);
+        break;
+    // **Cmd is held through ImGui's own input queue, not as an SDL key event**, and that is a
+    // finding rather than a shortcut. A synthetic `SDL_EVENT_KEY_DOWN` pushed with `SDL_PushEvent`
+    // never reaches the backend -- this arm's first two runs reported `KeySuper false` with the
+    // pointer exactly on target and `mouseDown true`, so the button half of the same mechanism was
+    // working and the key half was being dropped. `AddKeyEvent` is where the backend would have put
+    // it anyway, and nothing overwrites it: `ImGui_ImplSDL3_UpdateKeyModifiers` is called only from
+    // a real key event, and the arm generates none.
+    //
+    // Held across the press and the release rather than tapped, because that is what a hand does.
+    case 32:
+    case 33:
+    case 34:
+    case 35:
+    case 36:
+    case 37:
+        // **`ImGuiMod_Super`, which arrives as `io.KeyCtrl`.** The swap in `AddKeyEvent` under
+        // `ConfigMacOSXBehaviors` runs in both directions, so the rule is: *say what the backend
+        // says*. A real Cmd press reaches `AddKeyEvent` as `ImGuiMod_Super`, and this arm stands in
+        // for the backend, so it says the same thing. Saying `ImGuiMod_Ctrl` here instead sets
+        // `io.KeySuper` -- which is physical Ctrl -- and ImGui then aliases the left press that
+        // follows into a RIGHT click ("Super+Left Click aliased into Right Click", imgui.cpp), so
+        // the run reported no Cmd and no left button down at all. Both directions of this were
+        // walked; this is the one that matches a keyboard.
+        ImGui::GetIO().AddKeyEvent(ImGuiMod_Super, true);
+        if (frame == 34) {
+            pushButton(window, x, y, true);
+        } else if (frame == 36) {
+            editLog_.push_back(fmt::format(
+                "slice: at the click -- Cmd (io.KeyCtrl) {}, mouseDown {}, strip hovered {}",
+                ImGui::GetIO().KeyCtrl, ImGui::IsMouseDown(ImGuiMouseButton_Left), strip.hovered));
+            pushButton(window, x, y, false);
+        }
+        break;
+
+    case 38:
+        ImGui::GetIO().AddKeyEvent(ImGuiMod_Super, false);
+        break;
+    case 50: {
+        const std::size_t after = engine.sequence().shots.size();
+        editLog_.push_back(fmt::format("slice: {} shot(s) after the Cmd+click", after));
+        if (after == sliceShotsBefore_ + 1) {
+            editLog_.emplace_back("slice: the gesture cut a shot in two");
+        } else {
+            editLog_.emplace_back("slice: the shot count did not change -- THIS ARM MEASURED NOTHING");
+        }
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+void UiScript::stepSliceMenu(ui::ControlPanel& panel, platform::Window& window,
+                             std::uint64_t frame) {
+    const ui::SequencePanel::StripRect& strip = panel.sequence.stripRect();
+    if (frame == 2) {
+        panel.restoreDefaultLayout();
+        return;
+    }
+    if (frame == 4 || frame == 5) {
+        if (bool* slot = panel.layout().slot("Sequence"); slot != nullptr) {
+            *slot = true;
+        }
+        ImGui::SetWindowFocus("Sequence");
+        return;
+    }
+    if (!strip.valid()) {
+        return;
+    }
+    // A third of the way along the shots lane: far enough into a shot that the cut is legal and the
+    // "Split at pointer" row is enabled rather than greyed, which is the state worth photographing.
+    const float x = strip.x + strip.gutter + (strip.width - strip.gutter) * 0.25f;
+    const float y = strip.y + strip.shotsTop + ui::kStripLaneHeight * 0.5f;
+    if (frame >= 26 && frame <= 33) {
+        warpAndMove(window, x, y);
+        return;
+    }
+    if (frame == 34) {
+        pushButton(window, x, y, true, SDL_BUTTON_RIGHT);
+        return;
+    }
+    if (frame == 36) {
+        // The release is what opens it: the strip treats a right press that stays put as a menu and
+        // one that travels as a pan, so the press and the release must be at the same point.
+        pushButton(window, x, y, false, SDL_BUTTON_RIGHT);
+        return;
+    }
+    // And then nothing, deliberately. Any further pointer event would close the popup, and the
+    // whole purpose of the arm is that the capture frame finds it still up.
+}
+
 void UiScript::stepStrip(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
                          std::uint64_t frame) {
     const auto say = [&](std::string line) { editLog_.push_back(std::move(line)); };

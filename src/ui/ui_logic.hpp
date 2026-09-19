@@ -459,7 +459,7 @@ inline constexpr float kContextClickSlop = 4.0f;
     return false;
 }
 
-// ---- the slice tool (ADR-355) --------------------------------------------------------------------
+// ---- the slice tool (ADR-356) --------------------------------------------------------------------
 //
 // Cmd+click cuts whatever is under the pointer. The *operations* it performs already existed, one
 // per lane, and the context menu has been offering two of them for some time; what did not exist was
@@ -638,7 +638,7 @@ enum class SliceGrid : std::uint8_t { Strip, Section };
     }
 }
 
-// ---- what an arrow key moves the playhead by (ADR-356) --------------------------------------------
+// ---- what an arrow key moves the playhead by (ADR-357) --------------------------------------------
 //
 // **The step is the active snap mode's own unit, and Shift is the next unit up.** That is the whole
 // idea, and it is the reason this is worth a function rather than four lines at a key handler: the

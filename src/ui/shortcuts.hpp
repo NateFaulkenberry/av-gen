@@ -49,7 +49,7 @@ inline constexpr const char* kToggleLocalSpace = "X";
 inline constexpr const char* kPlayPause = "Space";
 inline constexpr const char* kGoToStart = "Return";
 inline constexpr const char* kGoToEnd = "End";
-// The arrows step by the sequencer's active snap unit and Shift by the next unit up (ADR-356), so
+// The arrows step by the sequencer's active snap unit and Shift by the next unit up (ADR-357), so
 // these are no longer named for a frame and a beat: what they move by is a setting, and a constant
 // that said "Step frame back" would be wrong in three of the four snap modes.
 inline constexpr const char* kNudgeBack = "Left";
@@ -66,7 +66,7 @@ inline constexpr const char* kOpenAudio = "O";
 inline constexpr const char* kOpenScene = "S";
 inline constexpr const char* kOpenEnvironment = "E";
 
-// ---- the sequencer strip's tools (ADR-355) -------------------------------------------------------
+// ---- the sequencer strip's tools (ADR-356) -------------------------------------------------------
 //
 // A mouse gesture rather than a key, and named here anyway, because the menu rows that perform the
 // same operation advertise it in their shortcut column -- and a gesture nothing tells you about is

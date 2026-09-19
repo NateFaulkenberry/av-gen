@@ -532,7 +532,7 @@ void trimShotStart(Shot& shot, double newStart, double fixedEnd, double minSecon
 // has no authored camera, which is what an untouched project already looks like.
 bool removeShot(std::vector<Shot>& shots, std::size_t index);
 
-// ---- the same cut, on the lanes that are not shots (ADR-355) -------------------------------------
+// ---- the same cut, on the lanes that are not shots (ADR-356) -------------------------------------
 //
 // The slice tool cuts every lane that holds a span, and two of those lanes had no split operation at
 // all: a lyric was a block you could only move and trim, and an actor's clip cue was a block you

@@ -579,7 +579,7 @@ public:
     // next *place*, not the next beat. Returns the position unchanged when there is none that way.
     //
     // `sectionsOnly` narrows it to the `Section` markers: the structural landmarks, which is what
-    // Shift+arrow means in Markers snap mode (ADR-356). A marker list is mostly cues, and skipping
+    // Shift+arrow means in Markers snap mode (ADR-357). A marker list is mostly cues, and skipping
     // to the next *section* is the coarser step in the same sense a bar is coarser than a beat.
     [[nodiscard]] double markerBoundary(double fromSeconds, int direction,
                                         bool sectionsOnly = false) const;

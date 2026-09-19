@@ -2607,7 +2607,7 @@ void Application::handleInputEvent(const SDL_Event& event) {
             }
 }
 
-// The transport's keyboard (ADR-102, and ADR-356 for the arrows). The set every editing tool uses:
+// The transport's keyboard (ADR-102, and ADR-357 for the arrows). The set every editing tool uses:
 // space plays, the arrows step the playhead, home and end go to the ends of the piece.
 //
 // **The arrows step by whatever the sequencer is snapped to, and Shift is the next unit up.** They
@@ -2681,7 +2681,7 @@ bool Application::handleTransportShortcut(const SDL_Event& event) {
     }
 }
 
-// One press of Left or Right (ADR-356). `direction` is -1 or +1; `coarse` is Shift.
+// One press of Left or Right (ADR-357). `direction` is -1 or +1; `coarse` is Shift.
 //
 // The decision is `ui::arrowNudge`'s and the movement is the transport's existing stepping, which is
 // the split that makes this testable: walking a beat grid is `Engine::beatBoundary`'s job and it

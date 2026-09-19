@@ -88,6 +88,19 @@ enum class UiScriptArm : std::uint32_t {
     // in every block it is given and can be put beside another arm in one process. A drag and a
     // click are different measurements and only this arm measures the drag.
     Drag = 1u << 13,
+    // The strip's context menu, opened and left open (ADR-356). Not a measurement: a *capture* arm.
+    // The slice tool's menu rows only exist while a popup is up, and neither the author of this
+    // feature nor the person who asked for it can see Dear ImGui -- so the only way to know the
+    // rows are there, spelled right and not clipped, is to make the program open the menu and then
+    // photograph it with `--capture-ui`. It right-clicks a shot and does nothing else, ever, so the
+    // popup is still on screen whenever the capture frame arrives.
+    SliceMenu = 1u << 14,
+    // The slice tool's *gesture* (ADR-356): Cmd held, left button clicked on a shot. It exists
+    // because the menu capture proves the row is drawn and proves nothing at all about the click --
+    // and a Cmd+click is exactly the wiring no unit test reaches: SDL to the backend's `KeySuper`
+    // to the strip's hit test to `performSlice`. It reports the shot count before and after, so the
+    // run either says the piece gained a shot or says it did not.
+    Slice = 1u << 15,
 };
 
 [[nodiscard]] constexpr UiScriptArm operator|(UiScriptArm a, UiScriptArm b) {
@@ -134,6 +147,9 @@ public:
 private:
     void stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
     void stepStrip(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepSliceMenu(ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepSlice(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                   std::uint64_t frame);
     void stepGizmo(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
     void stepBox(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
     void stepStar(Engine& engine, ui::ControlPanel& panel, std::uint64_t frame);
@@ -141,6 +157,7 @@ private:
     void stepDrag(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
 
     std::vector<std::string> editLog_;
+    std::size_t sliceShotsBefore_ = 0;
     std::size_t editNodesBefore_ = 0;
     std::vector<std::string> lastWrites_;
     UiScriptArm arms_ = UiScriptArm::None;

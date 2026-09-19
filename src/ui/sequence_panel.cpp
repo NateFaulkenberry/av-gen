@@ -63,7 +63,7 @@ constexpr float kPlayheadHalfWidth = 6.0f;
 constexpr float kPlayheadHandleHeight = 13.0f;
 // The shortest a block may be trimmed to. A block of zero length cannot be grabbed again, so a
 // trim that reached zero would be a delete with no way back -- and this panel has no undo.
-// `snapMode_` is stored as an int and `ui::arrowNudge` reads it as one (ADR-356). These pin the two
+// `snapMode_` is stored as an int and `ui::arrowNudge` reads it as one (ADR-357). These pin the two
 // spellings together: the pure helper cannot include the sequencer to find out what 2 means, so the
 // place that can is the place that checks.
 static_assert(static_cast<int>(seq::SnapMode::Off) == 0);
@@ -1410,20 +1410,30 @@ void SequencePanel::drawStrip(app::Engine& engine) {
 
     // ---- interaction ----
     //
-    // **Cmd+click is the slice tool (ADR-355), and it is tested before anything else a press could
+    // **Cmd+click is the slice tool (ADR-356), and it is tested before anything else a press could
     // mean.** Held down, the left button cuts rather than selects, drags, trims, scrubs or starts a
     // rubber band -- which is why this is a branch in front of the press handling rather than a flag
     // inside it: a gesture that both sliced a shot and started dragging one of its halves would be
     // two edits from one click.
     //
-    // Cmd rather than Ctrl, deliberately. On macOS Ctrl+click is the system's own right-click and
-    // the strip's right button already means pan-or-menu, so claiming Ctrl would have put the slice
-    // tool and the context menu on the same gesture. Nothing in this panel read Cmd before this.
+    // Cmd rather than Ctrl, deliberately. On macOS Ctrl+click is the system's own right-click -- and
+    // Dear ImGui turns it into one itself (`MouseCtrlLeftAsRightClick`) -- while the strip's right
+    // button already means pan-or-menu, so claiming Ctrl would have put the slice tool and the
+    // context menu on the same gesture. Nothing in this panel read Cmd before this.
+    //
+    // **And `KeyCtrl` is how you ask for Cmd.** That is not a typo and it cost a probe to find:
+    // `ImGuiIO::AddKeyEvent` swaps the two under `ConfigMacOSXBehaviors`, which defaults on for
+    // `__APPLE__` (imgui.cpp, "MacOS: swap Cmd(Super) and Ctrl"). A real Cmd press therefore arrives
+    // as `ImGuiMod_Ctrl` and sets `io.KeyCtrl`; `io.KeySuper` is what a *Ctrl* press sets. Written
+    // the way it reads -- `io.KeySuper` -- this branch fired on Ctrl+click, which macOS had already
+    // turned into a right-click, and never on the gesture the feature is named for. The scripted arm
+    // reported six shots before and six after, three runs running, which is the only reason this is
+    // not how it shipped. `ai_panel.cpp` hedges with `KeySuper || KeyCtrl` for the same reason.
     //
     // The gutter is left alone: a lane header is not on the time axis, so there is no second for a
     // cut to land on, and a Cmd+click there falls through and selects the lane as it always did.
     const bool slicing = hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
-                         ImGui::GetIO().KeySuper && !overGutter;
+                         ImGui::GetIO().KeyCtrl && !overGutter;
     if (slicing) {
         // Refusals are not silent: `performSlice` writes the reason to the status line under the
         // lanes, so a cut too near an edge reads as "too near an edge" rather than as a broken tool.
@@ -1974,7 +1984,7 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
     const auto valid = [](int index, std::size_t size) {
         return index >= 0 && static_cast<std::size_t>(index) < size;
     };
-    // **The slice tool's menu face** (ADR-355). Not a second implementation of Split: it plans with
+    // **The slice tool's menu face** (ADR-356). Not a second implementation of Split: it plans with
     // `planSliceAt` and performs with `performSlice`, which is exactly what Cmd+click does, so the
     // row and the gesture cannot come to different conclusions about what is legal or about where
     // the cut lands. The shortcut column names the gesture, which is how anybody finds it.
@@ -2048,7 +2058,7 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
             // original's -- and it is offered only where it would produce two shots that are not
             // degenerate, rather than as a row that is always there and usually refuses.
             //
-            // **The enabled test and the action are now the same question asked once** (ADR-355).
+            // **The enabled test and the action are now the same question asked once** (ADR-356).
             // It used to compute its own bounds here and then call `splitShot`, which snapped the
             // cut nowhere and recorded no undo step -- so a Split done from this menu landed off the
             // grid every drag on the strip lands on, and Cmd+Z could not take it back. Both are
@@ -2130,7 +2140,7 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
                 applyAudioClips(engine, std::move(clips));
                 break;
             }
-            // **A cut is the one edit the audio lane does accept in place** (ADR-355). Moving and
+            // **A cut is the one edit the audio lane does accept in place** (ADR-356). Moving and
             // trimming a clip stayed in the Audio... popup because making them drag gestures stole
             // the click that scrubs (ADR-103) -- but a slice is Cmd+click and a menu row, and
             // neither of those is the plain left click that lane's promise is about. This row is
@@ -2161,7 +2171,7 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
         break;
     }
     case StripLane::Actors: {
-        // This lane had no body menu at all before (ADR-355): a right-click on an actor's clips fell
+        // This lane had no body menu at all before (ADR-356): a right-click on an actor's clips fell
         // through to the generic Timeline menu, so the one thing you can do to a clip cue in place
         // was unreachable from the pointer that was already on it.
         if (valid(menu_.actorRow, piece.actors.size())) {
@@ -2185,7 +2195,7 @@ void SequencePanel::drawStripContextMenu(app::Engine& engine) {
             // `splitSection` takes a time and refuses a split that would leave a section shorter
             // than its minimum, so the enabled test asks the same question the operation will:
             // an item that is offered and then declines is worse than one that was never offered.
-            // Both halves of that promise are `planSliceAt` now (ADR-355), which also puts the cut
+            // Both halves of that promise are `planSliceAt` now (ADR-356), which also puts the cut
             // on the SECTION grid -- the one a boundary drag obeys, so the boundary this makes can
             // be nudged afterwards without moving somewhere nobody put it.
             sliceItem("Split here", StripLane::Sections, at, -1);
@@ -2420,7 +2430,7 @@ void SequencePanel::commitEdit(app::Engine& engine, std::string label) {
     edits->history().push(std::move(command));
 }
 
-// ---- the slice tool (ADR-355) --------------------------------------------------------------------
+// ---- the slice tool (ADR-356) --------------------------------------------------------------------
 //
 // Three functions, and the split between them is the point. `sliceBlocksFor` says where the blocks
 // are, `ui::planSlice` decides, and `performSlice` mutates. Only the middle one holds the rule, only
@@ -2877,7 +2887,7 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
     // confidence about a span that no longer exists, which is worse than no number (ADR-215 makes
     // the same argument about a touched section).
 
-    // The third face of one operation (ADR-355). It used to split here, in its own three lines, with
+    // The third face of one operation (ADR-356). It used to split here, in its own three lines, with
     // `snapSection` and no undo step; it now plans and performs exactly as Cmd+click and the context
     // menu do, so the playhead, the pointer and the menu cannot land a cut in three different places.
     if (ImGui::Button("Split at playhead")) {
@@ -3889,7 +3899,7 @@ double SequencePanel::snapSection(const app::Engine& engine, double seconds) con
     }
     // Bars: every fourth beat, which is the same assumption `seq::BakeOptions::beatsPerBar` makes
     // and is stated in one place there. It is now *read* from there rather than restated as a 4 --
-    // the comment promised one place and there were two, and the arrow keys' bar step (ADR-356)
+    // the comment promised one place and there were two, and the arrow keys' bar step (ADR-357)
     // would have made it three. The returned value is still a beat's own time.
     const auto perBar = static_cast<std::size_t>(std::max(1, seq::BakeOptions{}.beatsPerBar));
     std::vector<double> bars;

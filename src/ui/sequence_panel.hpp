@@ -130,7 +130,7 @@ public:
     };
     [[nodiscard]] const StripRect& stripRect() const { return stripRect_; }
 
-    // ---- what the arrow keys step by (ADR-356) ---------------------------------------------------
+    // ---- what the arrow keys step by (ADR-357) ---------------------------------------------------
     //
     // The transport owns the arrow keys and always has; what it did not have was any idea what grid
     // the author was working on, so it stepped a frame plain and a beat with Shift whatever the
@@ -190,7 +190,7 @@ private:
     // addendum's section 10 is about -- the world editor solves it by routing everything through
     // `app::EditSystem`, and the sequencer, which has no such system and therefore no undo, gets
     // the next best thing: one function per operation, called by both.
-    // ---- the slice tool (ADR-355) ----------------------------------------------------------------
+    // ---- the slice tool (ADR-356) ----------------------------------------------------------------
     //
     // Cmd+click cuts whatever is under the pointer, on every lane that holds a span, on the grid
     // that lane's drags already obey. The three "Split..." items scattered across the context menu
