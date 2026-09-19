@@ -20,19 +20,33 @@ ordinary parameters. Point the same three fields at a different world and the sa
 writes `examples/world/glowmere-valley-2-multicam.scene.json` and `.json` beside the originals and
 leaves the originals untouched.
 
-**This generator no longer reproduces the checked-in demo.** Two things it copies have since been
-changed in the files themselves and cannot be expressed here:
+**This generator no longer reproduces the checked-in demo, and by ADR-344 it is further away than
+ever.** What it copies has since been changed in the files themselves and cannot be expressed here:
 
   * the render range and output path, which were re-saved from the app;
-  * the cut itself -- `glowmere-valley-2.json` now carries a 39-shot bake where the demo carries
-    41, so copying its `camera/*` tracks today would replace the film, not just re-place it; and
-  * the Hero Free Roam camera's 20% dolly-in -- 328 baked keys on `camera/position`,
-    `camera/target` and `camera/lens/focusDistance`, each scaled about the subject of the shot it
-    belongs to. Those keys are copied wholesale from `glowmere-valley-2.json`, which was *not*
-    given the same treatment, so a regeneration would put the hero camera back where it was.
+  * the cut itself -- the demo's 42 shots are a *re-bake* against a cast that no longer behaves the
+    way `glowmere-valley-2.json`'s does, so copying that project's `camera/*` tracks would replace
+    the film rather than re-place it;
+  * the scene, which is the big one. ADR-344 gave the multicam eight tree layers where its siblings
+    still have three, and moved its five aliens from `explore` to `decide` with ADR-300 pose
+    layers. This script starts from `glowmere-valley-2.scene.json`, so a regeneration would put
+    both back;
+  * `cameras/valleywide/fov`, which is 44 degrees here and 52 in the CAMERAS table below. The scene
+    value is only a default -- the project registers it as a parameter and the parameter wins
+    (ADR-344 §4) -- so changing one of the two and not the other is a silent no-op.
 
-What this file is still good for is the three cameras and the shot track. Re-run it only if you
-mean to rebuild those, and expect to redo the dolly afterwards.
+What this file is still good for is the *shape*: three cameras, a shot track, an event camera bound
+to a scenario. Re-run it only if you mean to rebuild those from scratch, and expect to redo the
+tree port, the cast and the bake afterwards.
+
+**If you only want to re-cut the camera, do not run this.** Correct the six moving heroes'
+`position` entries to their scene nodes, then
+
+    avgen --headless --frames 2 --project examples/world/glowmere-valley-2-multicam.json \
+          --direct --save-project examples/world/glowmere-valley-2-multicam.json
+
+and then correct them *again*, because the save re-photographs them from the end of the director's
+forward simulation. ADR-344 §4 has the measurement and the reason.
 """
 
 from __future__ import annotations
