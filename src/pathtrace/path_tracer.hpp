@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <string_view>
 #include <vector>
 
 namespace avgen::pathtrace {
@@ -56,6 +57,13 @@ struct TraceSettings {
 
     // 0 = std::thread::hardware_concurrency(). These are AV Gen's threads, not Embree's.
     unsigned threads = 0;
+
+    // Samples accumulated per pass (spec section 30). The image is rendered in batches so progress
+    // is a real count of completed samples rather than an interpolation, and so cancellation lands
+    // between batches rather than being checked never. Determinism is unaffected: a sample's seed
+    // is (seed, pixel, sampleIndex), so where the batch boundaries fall cannot change its value --
+    // a test asserts the same image at one batch and at many.
+    std::uint32_t samplesPerBatch = 8;
 
     // Capture the albedo and normal feature buffers. Cheap (first hit only) but not free, so it is
     // opt-in; the denoiser needs them and turns this on for itself.
@@ -139,9 +147,18 @@ class PathTracer {
 public:
     // `cancel` is polled between scanline blocks; a cancelled render keeps what it accumulated.
     using CancelFn = std::function<bool()>;
+    // Called after each completed batch with (samplesDone, samplesTotal). Never called from more
+    // than one thread at a time.
+    using ProgressFn = std::function<void(std::uint32_t, std::uint32_t)>;
 
     [[nodiscard]] Result<void> render(const Snapshot& snapshot, const TraceSettings& settings,
-                                      Framebuffer& out, CancelFn cancel = {});
+                                      Framebuffer& out, CancelFn cancel = {},
+                                      ProgressFn progress = {});
+
+    // Reports which stage a caller-visible build step is in, so a job can distinguish scene
+    // preparation from acceleration build rather than lumping them together.
+    using StageFn = std::function<void(std::string_view)>;
+    void setStageCallback(StageFn fn) { stage_ = std::move(fn); }
 
     [[nodiscard]] const TraceStats& stats() const { return stats_; }
     [[nodiscard]] const AlbedoProbeReport& albedoProbe() const { return probe_; }
@@ -149,6 +166,7 @@ public:
 private:
     TraceStats stats_{};
     AlbedoProbeReport probe_{};
+    StageFn stage_{};
 };
 
 // Writes the framebuffer as scene-linear float EXR through the project's existing tinyexr path.

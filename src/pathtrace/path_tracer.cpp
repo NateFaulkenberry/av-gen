@@ -509,7 +509,7 @@ double Framebuffer::meanLuminance() const {
 // ---- render --------------------------------------------------------------------------------------
 
 Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& settings, Framebuffer& out,
-                                CancelFn cancel) {
+                                CancelFn cancel, ProgressFn progress) {
     stats_ = TraceStats{};
 
     if (auto ok = settings.validate(); !ok) return ok;
@@ -520,6 +520,7 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
 
     const unsigned threadCount = settings.resolvedThreads();
 
+    if (stage_) stage_("acceleration");
     const auto buildStart = std::chrono::steady_clock::now();
     EmbreeScene embree;
     if (auto ok = embree.build(snapshot, threadCount); !ok) return ok;
@@ -543,6 +544,7 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
                                       ? cameraBasis(snapshot.previousCamera, settings.width, settings.height)
                                       : basis;
 
+    if (stage_) stage_("rendering");
     const auto renderStart = std::chrono::steady_clock::now();
     std::atomic<bool> cancelled{false};
     std::vector<Counters> perThread(threadCount);
@@ -551,6 +553,9 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
     // (src/world/terrain.cpp, src/world/ecology.cpp). Each row is written by exactly one thread and
     // every pixel's sampler is seeded from its own coordinates, so the image does not depend on how
     // the rows were divided -- which a test asserts by rendering at one thread and at many.
+    std::uint32_t batchFirst = 0;
+    std::uint32_t batchLast = 0;
+
     auto renderRows = [&](unsigned threadIndex) {
         Counters& counters = perThread[threadIndex];
         for (std::uint32_t y = threadIndex; y < settings.height; y += threadCount) {
@@ -567,7 +572,7 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
                 glm::vec3 normalSum{0.0f};
                 glm::vec3 emissionSum{0.0f};
                 glm::vec2 motionSum{0.0f};
-                for (std::uint32_t s = 0; s < settings.samplesPerPixel; ++s) {
+                for (std::uint32_t s = batchFirst; s < batchLast; ++s) {
                     Sampler sampler(settings.seed, pixelIndex, s);
                     const glm::vec2 jitter = sampler.next2D();
                     const Ray ray = generateRay(basis, static_cast<float>(x) + jitter.x,
@@ -590,29 +595,48 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
                         }
                     }
                 }
-                out.radiance[pixelIndex] = sum;
-                if (settings.albedoProbe.enabled) out.worstAlbedo[pixelIndex] = counters.pixelWorstAlbedo;
+                // ACCUMULATE, never assign: with batching this runs once per batch and the pixel
+                // must keep what earlier batches put there.
+                out.radiance[pixelIndex] += sum;
+                if (settings.albedoProbe.enabled) {
+                    out.worstAlbedo[pixelIndex] =
+                        std::max(out.worstAlbedo[pixelIndex], counters.pixelWorstAlbedo);
+                }
                 if (settings.captureFeatures) {
-                    out.albedo[pixelIndex] = albedoSum;
-                    out.normal[pixelIndex] = normalSum;
-                    out.emission[pixelIndex] = emissionSum;
-                    if (snapshot.hasMotion) out.motion[pixelIndex] = glm::vec3(motionSum, 0.0f);
+                    out.albedo[pixelIndex] += albedoSum;
+                    out.normal[pixelIndex] += normalSum;
+                    out.emission[pixelIndex] += emissionSum;
+                    if (snapshot.hasMotion) out.motion[pixelIndex] += glm::vec3(motionSum, 0.0f);
                 }
             }
         }
     };
 
-    if (threadCount <= 1) {
-        renderRows(0);
-    } else {
-        std::vector<std::thread> workers;
-        workers.reserve(threadCount - 1);
-        for (unsigned i = 1; i < threadCount; ++i) workers.emplace_back(renderRows, i);
-        renderRows(0);
-        for (auto& t : workers) t.join();
-    }
+    // Sample batches (spec section 30). Each batch renders a contiguous range of sample indices
+    // for every pixel, so progress is a count of finished samples and cancellation lands between
+    // batches. The worker threads are created and JOINED inside each batch: they exist only while a
+    // batch is running, so this is not a second long-lived pool competing with anything (spec
+    // section 36) -- it is the same banded split src/world/terrain.cpp uses, run repeatedly.
+    const std::uint32_t batchSize = std::max(1u, settings.samplesPerBatch);
+    for (std::uint32_t done = 0; done < settings.samplesPerPixel;) {
+        batchFirst = done;
+        batchLast = std::min(settings.samplesPerPixel, done + batchSize);
 
-    out.sampleCount = settings.samplesPerPixel;
+        if (threadCount <= 1) {
+            renderRows(0);
+        } else {
+            std::vector<std::thread> workers;
+            workers.reserve(threadCount - 1);
+            for (unsigned i = 1; i < threadCount; ++i) workers.emplace_back(renderRows, i);
+            renderRows(0);
+            for (auto& t : workers) t.join();
+        }
+
+        if (cancelled.load()) break;
+        done = batchLast;
+        out.sampleCount = done;
+        if (progress) progress(done, settings.samplesPerPixel);
+    }
     stats_.renderSeconds =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - renderStart).count();
     stats_.primaryRays =

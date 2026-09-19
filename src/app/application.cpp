@@ -1,4 +1,6 @@
 #include "app/application.hpp"
+#include "pathtrace/denoise.hpp"
+#include "pathtrace/trace_job.hpp"
 #include "labs/overlays.hpp"
 
 #include "ai/scripted_provider.hpp"
@@ -142,6 +144,16 @@ std::string usageText() {
            "  --composition <f>   load a scene composition file (avgen-scene JSON)\n"
            "  --export-bundle <d> copy every referenced asset into <d>/assets and write <d>/project.json\n"
            "  --render <out>      offline render (headless) to a PNG sequence directory or a video file\n"
+           "  --pathtrace <out.exr>  CPU path trace (headless, no GPU) of one frame to scene-linear EXR;\n"
+           "                      takes its resolution from --size\n"
+           "  --pt-samples <n>    samples per pixel for --pathtrace (default 32)\n"
+           "  --pt-depth <n>      path depth for --pathtrace (default 4)\n"
+           "  --pt-seconds <s>    timeline second to trace (default 0)\n"
+           "  --pt-seed <n>       sampler seed; the image is a pure function of it\n"
+           "  --pt-threads <n>    worker threads (0 = hardware concurrency)\n"
+           "  --pt-aovs           write one multi-layer EXR with albedo, normal, emission, depth, id\n"
+           "  --pt-denoise        denoise with OIDN (needs -DAVGEN_PATHTRACE_DENOISE=ON)\n"
+           "  --pt-probe          report directional albedo above 1 (ADR-352); does not alter the image\n"
            "                      (.mov/.mp4/...); size/fps/range/codec from the project's render settings\n"
            "  --format <kind>     render output kind: png (default for a directory), exr (scene-linear half\n"
            "                      EXR sequence, before tone mapping), or video\n"
@@ -357,6 +369,43 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             options.render = *v;
             options.headless = true;
             ++i;
+        } else if (arg == "--pathtrace") {
+            auto v = need(i, "--pathtrace");
+            if (!v) return std::unexpected(v.error());
+            options.pathtrace = *v;
+            options.headless = true;
+            ++i;
+        } else if (arg == "--pt-samples") {
+            auto v = need(i, "--pt-samples");
+            if (!v) return std::unexpected(v.error());
+            options.ptSamples = static_cast<std::uint32_t>(std::strtoul(v->c_str(), nullptr, 10));
+            ++i;
+        } else if (arg == "--pt-depth") {
+            auto v = need(i, "--pt-depth");
+            if (!v) return std::unexpected(v.error());
+            options.ptDepth = static_cast<std::uint32_t>(std::strtoul(v->c_str(), nullptr, 10));
+            ++i;
+        } else if (arg == "--pt-seconds") {
+            auto v = need(i, "--pt-seconds");
+            if (!v) return std::unexpected(v.error());
+            options.ptSeconds = std::strtod(v->c_str(), nullptr);
+            ++i;
+        } else if (arg == "--pt-seed") {
+            auto v = need(i, "--pt-seed");
+            if (!v) return std::unexpected(v.error());
+            options.ptSeed = std::strtoull(v->c_str(), nullptr, 10);
+            ++i;
+        } else if (arg == "--pt-threads") {
+            auto v = need(i, "--pt-threads");
+            if (!v) return std::unexpected(v.error());
+            options.ptThreads = static_cast<unsigned>(std::strtoul(v->c_str(), nullptr, 10));
+            ++i;
+        } else if (arg == "--pt-denoise") {
+            options.ptDenoise = true;
+        } else if (arg == "--pt-aovs") {
+            options.ptAovs = true;
+        } else if (arg == "--pt-probe") {
+            options.ptProbe = true;
         } else if (arg == "--queue") {
             auto v = need(i, "--queue");
             if (!v) return std::unexpected(v.error());
@@ -4294,6 +4343,72 @@ Result<std::unique_ptr<RenderJob>> Application::makeRenderJob(const std::filesys
     return job;
 }
 
+// The CPU path tracer (ADR-351). Unlike `--render` this needs no GPU at all: the tracer is CPU-only
+// and `EngineMode::Offline` evaluates a scene without a device, so a trace runs on a machine whose
+// GPU is busy with something else -- which, with several agents sharing one machine, it usually is.
+int Application::runPathTrace() {
+    // Same rule as `--render`: the job loads the project itself, so a session with no project file
+    // is snapshotted to a temporary one first. Loading from the file rather than from live state is
+    // what makes a trace reproducible (ADR-020's reasoning, and it applies here unchanged).
+    std::filesystem::path projectFile = engine_ != nullptr ? engine_->projectPath() : std::filesystem::path{};
+    if (options_.project) projectFile = *options_.project;
+    if (projectFile.empty()) {
+        log::error("--pathtrace needs a project: pass --project <file.json>");
+        return 2;
+    }
+
+    pathtrace::TraceJobRequest request;
+    request.project = projectFile;
+    request.seconds = options_.ptSeconds;
+    request.output = *options_.pathtrace;
+    request.writeAovs = options_.ptAovs;
+    request.denoise = options_.ptDenoise;
+    request.settings.width = std::max(options_.width, 16u);
+    request.settings.height = std::max(options_.height, 16u);
+    request.settings.samplesPerPixel = std::max(options_.ptSamples, 1u);
+    request.settings.maxDepth = options_.ptDepth;
+    request.settings.seed = options_.ptSeed;
+    request.settings.threads = options_.ptThreads;
+    request.settings.albedoProbe.enabled = options_.ptProbe;
+    if (options_.ptAovs) request.settings.captureFeatures = true;
+
+    log::info("pathtrace: {} at second {:.3f}, {}x{} at {} spp, depth {}, seed {}",
+              projectFile.string(), request.seconds, request.settings.width, request.settings.height,
+              request.settings.samplesPerPixel, request.settings.maxDepth, request.settings.seed);
+    log::info("pathtrace: denoise {}", pathtrace::denoiseVersion());
+
+    pathtrace::TraceJob job(std::move(request));
+    // Started on the job's own thread rather than run inline, so this path exercises exactly the
+    // code a UI would: if progress or cancellation were broken, the CLI would show it.
+    job.start();
+
+    // Poll and log real progress. The stages that cannot report say so rather than creeping.
+    pathtrace::TraceJobState lastState = pathtrace::TraceJobState::Queued;
+    std::uint32_t lastSamples = 0;
+    while (!job.done()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        const auto p = job.progress();
+        if (p.state != lastState) {
+            lastState = p.state;
+            log::info("pathtrace: {}", p.stage);
+        } else if (p.state == pathtrace::TraceJobState::Rendering && p.samplesDone != lastSamples) {
+            lastSamples = p.samplesDone;
+            log::info("pathtrace: {}/{} samples ({:.0f}%), {:.1f} s elapsed", p.samplesDone,
+                      p.samplesTotal, p.fraction * 100.0f, p.elapsedSeconds);
+        }
+    }
+    job.wait();
+
+    const auto final = job.progress();
+    if (final.state == pathtrace::TraceJobState::Complete) return 0;
+    if (final.state == pathtrace::TraceJobState::Cancelled) {
+        log::warn("pathtrace: cancelled");
+        return 8;
+    }
+    log::error("pathtrace: {}", final.error.empty() ? "failed" : final.error);
+    return 7;
+}
+
 int Application::runQueue(const std::filesystem::path& queueFile) {
     std::ifstream in(queueFile);
     nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
@@ -4366,6 +4481,9 @@ int Application::runQueue(const std::filesystem::path& queueFile) {
 int Application::runHeadless() {
     if (options_.queue) {
         return runQueue(*options_.queue);
+    }
+    if (options_.pathtrace) {
+        return runPathTrace();
     }
     if (options_.render) {
         // The offline engine builds its own renderer, so a debug view selected on the command line

@@ -192,6 +192,22 @@ struct AppOptions {
     bool clusterStats = false;
     // Offline rendering (1.0): --render <dir|video file>, --range a:b, --codec, --quality, --queue <file>
     std::optional<std::filesystem::path> render;
+
+    // ---- path tracer (ADR-351) -----------------------------------------------------------------
+    //
+    // Spelled like `--render`, deliberately: `--pathtrace <out.exr>` takes the output path the same
+    // way, sets headless the same way, and borrows `--width`/`--height` rather than introducing a
+    // parallel size vocabulary. The flags that are genuinely new are the ones a rasteriser has no
+    // equivalent for -- samples per pixel, path depth, and the seed.
+    std::optional<std::filesystem::path> pathtrace;
+    std::uint32_t ptSamples = 32;
+    std::uint32_t ptDepth = 4;
+    double ptSeconds = 0.0;
+    std::uint64_t ptSeed = 0x853c49e6748fea9bULL;
+    unsigned ptThreads = 0;
+    bool ptDenoise = false;
+    bool ptAovs = false;
+    bool ptProbe = false;
     std::optional<std::filesystem::path> queue;
     std::optional<double> rangeStart, rangeEnd;
     std::optional<std::string> codec;
@@ -287,6 +303,7 @@ private:
 
     [[nodiscard]] Result<std::unique_ptr<RenderJob>> makeRenderJob(const std::filesystem::path& projectFile,
                                                                    RenderSettings settings);
+    int runPathTrace();
     int runQueue(const std::filesystem::path& queueFile);
     void startRenderFromUi();
     bool renderInAppStarted_ = false; // `--render-in-app` fires once

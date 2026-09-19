@@ -39,6 +39,40 @@ never reaches into the realtime post chain. Colour management is downstream of t
 | 7 | Glowmere | not started |
 | 8 | Embree instancing | **partly** |
 
+## Running one
+
+```
+avgen --project examples/world/glowmere-valley-2-multicam.json \
+      --pathtrace out.exr --pt-seconds 12 --pt-samples 32 --pt-depth 3 --size 640x360 --pt-aovs
+```
+
+Spelled like `--render` on purpose: `--pathtrace <out>` takes the output path the same way, sets
+headless the same way, and takes its resolution from the existing `--size WxH` rather than inventing
+a parallel vocabulary. The `--pt-*` flags are only the things a rasteriser has no equivalent for --
+samples per pixel, path depth, seed, threads, AOVs, denoise, and the ADR-352 albedo probe.
+
+**No GPU is involved.** The tracer is CPU-only and `EngineMode::Offline` evaluates a scene without a
+device, so a trace runs while the GPU is busy with something else -- which, on a machine shared by
+several agents, it usually is.
+
+`pathtrace::TraceJob` is the entry point behind that flag, with the states spec section 36 names:
+`Queued -> BuildingScene -> BuildingAcceleration -> Rendering -> Denoising -> Writing ->
+Complete | Cancelled | Failed`. `start()` runs it on the job's own thread and returns immediately;
+`progress()` is safe from any thread; `cancel()` sets a flag the stages poll -- between sample
+batches, and before denoising and before writing -- and never terminates a thread.
+
+**Progress is real, not interpolated.** Rendering reports a genuine count of finished samples, so
+`fractionKnown` is true. Scene build, BVH build, denoise and write emit no intermediate signal, so
+they report `fractionKnown == false` rather than a bar that creeps while nothing is known. A test
+asserts both halves of that.
+
+**Threading.** The job owns exactly one thread: a coordinator. The per-batch workers belong to
+`PathTracer::render`, which creates and *joins* them inside each sample batch, so they exist only
+while a batch is running. There is no second long-lived pool. `app::JobSystem` is deliberately not
+used and cannot be -- two hard-coded workers, no parallel-for, and a header that forbids waiting on
+it from a render thread; a trace occupying one of its two workers for minutes would starve world
+generation and the AI control plane, which are what it exists for.
+
 ## Design
 
 **`pathtrace::Snapshot`** (`snapshot.hpp`) is the transient render snapshot. `scene::Scene` is
