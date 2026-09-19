@@ -1015,6 +1015,7 @@ private:
     float skyIntensitySetting_ = 1.0f;     // the visible sky only
     float skyBloomSetting_ = 0.0f;         // how much of the sky the bloom mask sees
     bool showSkyboxSetting_ = true;        // draw the environment behind the world at all
+    bool proceduralSkyBackgroundSetting_ = false; // ADR-344; analytic sky behind an HDRI
     bool lightFromEnvironmentSetting_ = false;
     bool stylizedSetting_ = false;
     params::Parameter<bool>* stylized_ = nullptr;

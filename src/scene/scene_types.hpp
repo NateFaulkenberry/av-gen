@@ -379,6 +379,20 @@ struct SkySettings {
     glm::vec3 sunDirection{0.35f, 0.75f, 0.55f}; // fallback direction *towards* the sun
 };
 
+// ADR-344. Which background the scene pass should draw, as a function of the environment alone.
+//
+// Extracted from `SceneRenderer::render` so it can be tested: it used to be one expression inline
+// in the middle of a render pass, and the only way to find out what it did was to render. The
+// three answers are exclusive and the order matters.
+enum class SkyBackground : std::uint8_t {
+    FlatColour,   // no IBL, or an IBL the scene did not ask to stand behind the world
+    Analytic,     // evaluate the procedural sky directly (ADR-344)
+    IblCube,      // sample whatever the IBL was built from -- a map's equirect or the sky's cube
+};
+
+struct Environment;
+[[nodiscard]] SkyBackground skyBackgroundFor(const Environment& env, bool haveIbl, bool iblFromSky);
+
 struct Environment {
     bool stylized = false;
     glm::vec3 backgroundColor{0.012f, 0.012f, 0.02f};
@@ -389,6 +403,12 @@ struct Environment {
     float environmentRotation = 0.0f;  // radians about +Y; rotates the visible sky and its lighting
                                        // together, so the moon and the moonlight cannot separate
     bool showSkybox = true;
+    // ADR-344. Draw the *analytic* sky as the background even when `environmentMap` is bound, so a
+    // scene can be lit by an HDRI and still stand under a procedural sky whose colours move.
+    // Before this the two were one choice -- the skybox was always whatever the IBL was built
+    // from -- and a day/night cycle's zenith/horizon/ground curves were simply inert in any scene
+    // that used an HDRI. Default false: no existing world changes.
+    bool proceduralSkyBackground = false;
     float skyboxBlur = 0.0f; // 0 = sharp, 1 = fully prefiltered
     // ADR-049. What the sky looks like and how much light it casts are two looks, not one: a night
     // valley wants a sky dark enough to read as night and an IBL bright enough to keep shadowed
@@ -466,5 +486,22 @@ struct Environment {
     // now, particles and cloth later) has to agree about it or the world stops being one place.
     wind::WindParams wind;
 };
+
+inline SkyBackground skyBackgroundFor(const Environment& env, bool haveIbl, bool iblFromSky) {
+    if (!haveIbl || !env.showSkybox) {
+        return SkyBackground::FlatColour;
+    }
+    // The analytic sky only decouples anything when a *map* is the IBL. With the procedural sky
+    // already the IBL source, its cube is what the lighting was built from and sampling it is both
+    // cheaper and guaranteed to agree with the shading.
+    if (env.proceduralSkyBackground && env.sky.enabled && !iblFromSky) {
+        return SkyBackground::Analytic;
+    }
+    // ADR-036: a procedural sky lights the scene without necessarily standing behind it.
+    if (iblFromSky && !env.sky.showBackground) {
+        return SkyBackground::FlatColour;
+    }
+    return SkyBackground::IblCube;
+}
 
 } // namespace avgen::scene

@@ -44,6 +44,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "fogDensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
     "skyBloom", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "skybox",
+    "proceduralSkyBackground",
     "lightFromEnvironment", "fogColor", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
@@ -5859,6 +5860,7 @@ void Composition::applyParameters() {
         envRotation_ != nullptr ? envRotation_->value() : envRotationSetting_;
     // ADR-049: the visible sky's own two controls, independent of the shading intensity above.
     scene_.environment.showSkybox = showSkyboxSetting_;
+    scene_.environment.proceduralSkyBackground = proceduralSkyBackgroundSetting_;
     scene_.environment.skyIntensity = skyIntensitySetting_;
     scene_.environment.skyBloom = skyBloomSetting_;
     scene_.environment.lightFromEnvironment = lightFromEnvironmentSetting_;
@@ -7259,6 +7261,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return fail("'skybox' must be a boolean");
             }
             comp->showSkyboxSetting_ = e["skybox"].get<bool>();
+        }
+        // ADR-344: light from the map, stand under the procedural sky. Off unless asked for.
+        if (e.contains("proceduralSkyBackground")) {
+            if (!e["proceduralSkyBackground"].is_boolean()) {
+                return fail("'proceduralSkyBackground' must be a boolean");
+            }
+            comp->proceduralSkyBackgroundSetting_ = e["proceduralSkyBackground"].get<bool>();
         }
         if (e.contains("lightFromEnvironment")) {
             if (!e["lightFromEnvironment"].is_boolean()) {

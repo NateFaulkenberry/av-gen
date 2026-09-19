@@ -139,9 +139,14 @@ void DayNightSettings::applyDefaults() {
         {kMidnight, 1.00f}, {kPreDawn, 0.92f}, {kSunrise, 0.55f}, {kMorning, 0.30f},
         {kNoon, 0.22f}, {kAfternoon, 0.32f}, {kSunset, 0.62f}, {kTwilight, 0.85f}, {kNight, 1.00f},
     });
+    // Tuned against the ocean's actual extent, not guessed. Transmittance is exp(-(d*density)^2),
+    // so the number that matters is the pair (island at ~257 u, water edge at 20,000 u): these
+    // leave the island at 0.99+ and the far water at 0.00. An earlier set was 15x higher because
+    // it was tuned when the plane edge was at 3,000 u, and at the enlarged extent it washed the
+    // whole frame into flat dust -- the island, the water and the sky all one colour at sunset.
     fill<float>(fogDensity, {
-        {kMidnight, 0.0021f}, {kSunrise, 0.0034f}, {kNoon, 0.0015f}, {kSunset, 0.0032f},
-        {kTwilight, 0.0026f}, {kNight, 0.0022f},
+        {kMidnight, 0.000135f}, {kSunrise, 0.000215f}, {kNoon, 0.000095f}, {kSunset, 0.000205f},
+        {kTwilight, 0.000165f}, {kNight, 0.000140f},
     });
     fill<glm::vec3>(fogColor, {
         {kMidnight, {0.0125f, 0.0165f, 0.0335f}},
