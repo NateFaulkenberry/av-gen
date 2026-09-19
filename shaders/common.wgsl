@@ -156,6 +156,20 @@ struct ObjectUniforms {
                                // w = foliage influence
     windTune: vec4<f32>,       // x = trunk influence, y = leaf flutter, z = response lag (seconds),
                                // w = the previous frame's time, for the velocity target
+    // ADR-376: tree energy and canopy shimmer. Both are emissive modulation keyed on WHERE a point
+    // is in the body -- height above the root, distance from the axis -- which is exactly the frame
+    // `windOrigin`/`windShape` already establish, so they are reused rather than duplicated. A
+    // separate origin for the same tree is two things that can disagree.
+    // energy0.x is the gate for both; zero means the fragment stage returns before any of it.
+    energy0: vec4<f32>,        // x = energy intensity, y = pulse speed (Hz), z = pulse width,
+                               // w = propagation speed (body heights per second)
+    energy1: vec4<f32>,        // x = root, y = trunk, z = branch, w = canopy share
+    energy2: vec4<f32>,        // x = noise amount, y = noise scale, z = noise speed,
+                               // w = bloom contribution
+    energy3: vec4<f32>,        // x = shimmer intensity, y = shimmer speed, z = shimmer scale,
+                               // w = shimmer variation
+    energyA: vec4<f32>,        // rgb = the pulse's near colour
+    energyB: vec4<f32>,        // rgb = its far colour
 };
 
 // The material tier this draw shades at (ADR-133; 0 full, 1 reduced lights, 2 flat). Uniform across
@@ -245,6 +259,7 @@ struct VertexOut {
 //
 // Pure function of (uniforms, position, time), per ADR-091: scrubbing to a frame and playing to it
 // put the crown in the same place. The owner's 2026-09-19 relaxation covers particles, not this.
+const kMeshBendLimit: f32 = 0.60; // ADR-377: crown travel ceiling, in body heights
 fn meshWindOffset(worldPos: vec3<f32>, t: f32) -> vec3<f32> {
     let strength = object.windShape.y;
     if (strength <= 0.0 || frame.windDir.w <= 0.0) {
@@ -292,8 +307,41 @@ fn meshWindOffset(worldPos: vec3<f32>, t: f32) -> vec3<f32> {
     // what keeps neighbouring leaves rattling out of step instead of shimmering together. Two
     // orders of magnitude below the lean, because this is centimetres of leaf, not metres of limb.
     let flutter = sin(wHere.phase + t * (5.5 + 3.0 * wHere.strength) + h * 9.0);
-    off = off + perp * (flutter * foliage * object.windTune.y * 0.0016 * (0.35 + wHere.strength));
+    // ADR-377. The flutter's amplitude SATURATES; the lean above does not, and the difference is
+    // the whole reason the canopy survives a gale. `WindSample::phase` turns a full cycle every
+    // `flutterScale` metres, so the flutter's amplitude appears as a difference between one end of
+    // a leaf card and the other (ADR-360 found this the first time). The lean varies only through
+    // pow(h,k) and a smoothstep over radius and shreds nothing however large it gets.
+    //
+    // Unbounded, `wHere.strength` reaches about 4.9 at the slider's own maximum -- regional
+    // variation multiplies the authored speed -- and at 3.4 the twelve-shot review caught the
+    // canopy smeared into streaks. A slider that destroys the asset inside its own range is a
+    // defect, so the flutter stops growing at 1.8 and the lean carries the rest. Below 1.8 this is
+    // exactly what it was, which is why the shipped scene at 1.319 is byte-identical.
+    let flutterDrive = min(wHere.strength, 2.2);
+    off = off + perp * (flutter * foliage * object.windTune.y * 0.0016 * (0.35 + flutterDrive));
 
+    // ADR-377. A SOFT CEILING on how far the crown may travel, as a fraction of the body's height.
+    // ADR-055 gives procedural plants exactly this (`bendLimit`) and the mesh path never got one,
+    // so the lean grew without bound: `wHere.strength` is the authored speed multiplied by the
+    // regional variation and reaches about 4.9 at the slider's own maximum, and the twelve-shot
+    // review caught the canopy smeared into streaks at 3.4 -- not from the flutter, which was the
+    // obvious suspect and which capping barely changed, but from the lean. A large enough lean
+    // makes even the smoothstep weights' gentle gradient amount to metres across a single leaf.
+    //
+    // The form is ADR-055's: identity for small offsets, asymptotic to the limit for large ones,
+    // and no corner anywhere for a hard clamp to show as a crease.
+    // A KNEE, not an asymptote. ADR-055's `off * L/(len+L)` is smooth but scales everything, even
+    // a tiny lean, so it moves frames that were never in danger -- measured, it changed 839,162
+    // channels of the shipped hero. This is exactly 1 below 0.7 of the limit, so a scene that never
+    // approached the ceiling is untouched, and saturates to the limit above it with a smoothstep
+    // across the join so there is no crease where the two halves meet.
+    let bend = length(off);
+    let s = bend / kMeshBendLimit;
+    if (s > 0.7) {
+        let hard = 1.0 / max(s, 1.0e-6);
+        off = off * mix(1.0, hard, smoothstep(0.7, 1.4, s));
+    }
     var disp = vec3<f32>(off.x, 0.0, off.y) * (strength * height);
     // A limb that bends keeps its length, so the tip drops. Without this the crown shears sideways,
     // which is the classic fake-wind read.
@@ -333,6 +381,84 @@ fn hash21(p: vec2<f32>) -> f32 {
     let h = dot(p, vec2<f32>(127.1, 311.7));
     return fract(sin(h) * 43758.5453123);
 }
+
+// ADR-376. Tree energy and canopy shimmer: what the tree does when it is not moving.
+//
+// Both are emissive terms, because the brief asks for the tree to "conduct energy" and to "feel
+// alive even when stationary", and neither needs geometry. They share one function because they
+// share one body frame and one early-out, and evaluating that frame twice for two effects on the
+// same 3.16M-triangle asset is a cost with nothing to show for it.
+//
+// ENERGY is a travelling pulse: a band of brightness that leaves the roots and climbs to the
+// canopy. `h` is height along the body, so the pulse is `h - t * speed` wrapped -- which makes it
+// a function of position and time and nothing else, so scrubbing and playing agree (ADR-091). The
+// four tier shares let an artist say where it is allowed to show; the brief asks for roots, trunk,
+// branches and canopy to be separately controllable and this is that, over the same radial/height
+// proxy the wind uses rather than a topology the GLB does not carry.
+//
+// SHIMMER is deliberately NOT a brightness pulse. The brief is explicit that the canopy must not
+// simply flash: it asks for a travelling wave that is spatially coherent. So it is a low-frequency
+// noise field advected across the crown, weighted to the foliage, at an amplitude that is small by
+// default -- the point is that the canopy is never quite still, not that it twinkles.
+fn treeEnergyAt(worldPos: vec3<f32>) -> vec3<f32> {
+    if (object.energy0.x <= 0.0 && object.energy3.x <= 0.0) {
+        return vec3<f32>(0.0);
+    }
+    let root = object.windOrigin.xyz;
+    let invHeight = object.windOrigin.w;
+    let h = clamp((worldPos.y - root.y) * invHeight, 0.0, 1.0);
+    let r = clamp(length(worldPos.xz - root.xz) * object.windShape.x, 0.0, 1.0);
+    let t = frame.params.x;
+
+    // Which tier this point belongs to, as four overlapping weights rather than a hard partition:
+    // a hard one would draw a visible line across the trunk where two shares met.
+    let wRoot = (1.0 - smoothstep(0.0, 0.18, h)) * object.energy1.x;
+    let wTrunk = (1.0 - smoothstep(0.08, 0.55, h)) * smoothstep(0.0, 0.12, h) * object.energy1.y;
+    let wBranch = smoothstep(0.15, 0.6, h) * (1.0 - smoothstep(0.55, 0.95, h)) * object.energy1.z;
+    let wCanopy = smoothstep(0.45, 0.9, h) * smoothstep(0.15, 0.55, r) * object.energy1.w;
+
+    var lit = vec3<f32>(0.0);
+
+    if (object.energy0.x > 0.0) {
+        // The travelling band. `fract` on (h - t*speed) makes it repeat up the trunk; the pulse
+        // width is how much of that cycle is lit, and the falloff is squared so the band has a
+        // bright core and a soft tail rather than a hard edge at both ends.
+        let phase = fract(h - t * object.energy0.w);
+        let width = max(object.energy0.z, 1.0e-3);
+        let band = max(1.0 - phase / width, 0.0);
+        var pulse = band * band;
+        // A slow breathing of the whole conduction, so the tree does not pulse like a metronome.
+        pulse = pulse * (0.55 + 0.45 * sin(t * object.energy0.y * WIND_TAU));
+        // Noise, so the current is uneven the way a living thing is.
+        if (object.energy2.x > 0.0) {
+            let n = hash21(floor(worldPos.xz * object.energy2.y) + vec2<f32>(0.0, floor(t * object.energy2.z)));
+            pulse = pulse * mix(1.0, n, clamp(object.energy2.x, 0.0, 1.0));
+        }
+        let tier = wRoot + wTrunk + wBranch + wCanopy;
+        // Colour travels with height: the near colour at the roots, the far one at the crown, which
+        // is what makes it read as a current arriving rather than as a region brightening.
+        let tint = mix(object.energyA.rgb, object.energyB.rgb, h);
+        lit = lit + tint * (pulse * tier * object.energy0.x);
+    }
+
+    if (object.energy3.x > 0.0) {
+        // A spatially coherent wave across the crown. Two octaves at incommensurate rates so the
+        // pattern never repeats on any interval an eye can latch onto, advected along +X+Z so it
+        // travels rather than throbs in place.
+        let drift = t * object.energy3.y;
+        let q = worldPos.xz * object.energy3.z + vec2<f32>(drift, drift * 0.73);
+        let a = hash21(floor(q));
+        let b = hash21(floor(q * 2.17 + vec2<f32>(19.0, 7.0)));
+        let wave = mix(a, b, 0.4);
+        // Centred on zero, so the shimmer takes light away as often as it adds it. A one-sided
+        // shimmer is a brightening, which is the thing the brief says not to do.
+        let signedWave = (wave - 0.5) * 2.0;
+        let variation = mix(1.0, hash21(floor(worldPos.xz * 0.5)), clamp(object.energy3.w, 0.0, 1.0));
+        lit = lit + object.energyB.rgb * (signedWave * wCanopy * object.energy3.x * variation);
+    }
+    return max(lit, vec3<f32>(0.0));
+}
+
 
 // How much air sits below height `y`, measured relative to the mist layer's top and in metres of
 // the layer's full density: the antiderivative of exp(-b * max(0, y)), zeroed at y = 0. It is
