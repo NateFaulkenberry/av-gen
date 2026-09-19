@@ -478,6 +478,27 @@ new binary loads **1032** from the same file. Exactly seven more, which is exact
 with `0 warning(s)`. Counted by name, not by file size: ADR-350's camera-bake loss shrank a file by
 10,000 lines while its parameter count went *up*, so a size check would have said healthy.
 
+**Repeated against main's tip after merging it.** The table above was taken with the baseline at
+`8f23d2ec`, this branch's parent. After merging main (`598082c1`, which brought ADR-360 through
+ADR-366) the whole experiment was rebuilt and re-run with the baseline moved to **main's tip**, so
+the comparison is "main" against "main plus this feature" rather than against a commit main has
+since moved past:
+
+| arm | binary | frame 0 sha256 (first 24) |
+|---|---|---|
+| A baseline | main `598082c1` | `6a525a5756becac7700ea62d` |
+| B zero | `agent/imagelook` (main + Image/Look) | **`6a525a5756becac7700ea62d`** |
+| C control (new) | `post/look/colour = 0.6` | `3bca64b6993c087547c0bbb0` |
+| D control (old) | `post/grade/saturation = 1.4` | `974ed699719682db2559088e` |
+
+**Every hash is identical to the first run**, from four freshly built binaries across two different
+baseline commits, and `cmp` again reports no difference between A and B on either frame. The
+parameter counts moved with main — 1037 in the baseline against 1044 in the new binary — and the
+delta is still exactly the seven `post/look/*` parameters. A result that survives a rebuild, a
+merge, and a change of baseline is the one worth quoting; this project has been burned by
+byte-identical pairs that were really one stale binary compared with itself, and four distinct
+binaries with two distinct hashes between them is what rules that out.
+
 ---
 
 ## 6. Performance (§82/§83), measured in the live editor
