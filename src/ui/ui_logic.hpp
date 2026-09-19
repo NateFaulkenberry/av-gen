@@ -149,6 +149,35 @@ enum class ViewportIntent : std::uint8_t {
     return hoveredLastFrame && pointerInsideCanvas;
 }
 
+// Whether an arrow key belongs to the transport, and therefore must NOT also reach Dear ImGui.
+//
+// ADR-357 gave the four arrows to the transport: they step the playhead by the sequencer's active
+// snap unit. But `ImGuiConfigFlags_NavEnableKeyboard` makes the same four keys drive keyboard
+// navigation, and the application hands every event to ImGui *before* it decides whether a shortcut
+// claims it. So the playhead moved and the focus ring walked the transport's own buttons at the same
+// time, which is what the owner reported: "it also selects buttons from the sequence transport menu".
+// Consuming the key afterwards cannot undo that -- by then ImGui has already seen it.
+//
+// The three exceptions are the cases where the arrows genuinely belong to the interface:
+//
+//   * `typing` -- a text field has the keyboard, and Left/Right move the caret.
+//   * `widgetActive` -- a slider is mid-drag or a combo is open, and the arrows adjust it.
+//   * `popupOpen` -- a menu is pulled down. This one is easy to miss, because an open menu is a
+//     popup *window* and not an active *item*: `IsAnyItemActive()` is false while a menu the user
+//     just opened plainly owns the arrows. Without this the fix would make menus unnavigable, which
+//     trades one regression for another.
+//
+// The cost, stated rather than discovered later: while none of the three holds, the arrows cannot
+// move ImGui's focus ring anywhere in the application. That is what giving the arrows to the
+// transport means, and Tab still moves focus.
+[[nodiscard]] inline bool transportOwnsArrowKey(bool isArrowKey, bool withCommand, bool typing,
+                                                bool widgetActive, bool popupOpen) {
+    if (!isArrowKey || withCommand) {
+        return false; // Cmd+arrow belongs to whoever wants it; the transport takes neither.
+    }
+    return !typing && !widgetActive && !popupOpen;
+}
+
 // Labels for a list of file paths: the file name where that is enough to tell them apart, and as
 // much of the trailing path as it takes where it is not.
 //

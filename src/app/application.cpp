@@ -2536,7 +2536,27 @@ void Application::handleInputEvent(const SDL_Event& event) {
                 ++uiFilteredEvents_;
                 return;
             }
-            imgui_->processEvent(event);
+            // The transport's arrow keys never reach Dear ImGui (ADR-357 gave them the playhead;
+            // `NavEnableKeyboard` gives the same keys the focus ring). Deciding here rather than
+            // after `handleTransportShortcut` is the whole point: forwarding first and consuming
+            // second is what let the playhead step *and* the focus ring walk the transport's own
+            // buttons on one press. `ui::transportOwnsArrowKey` carries the reasoning and the three
+            // cases where ImGui keeps them.
+            //
+            // KEY_DOWN only, and KEY_UP always forwarded. If ImGui saw the press -- because a text
+            // field had focus at the time -- and the field then deactivated mid-press, swallowing
+            // the release would leave ImGui believing the key is still held, and nav would repeat
+            // forever. A release for a press it never saw is harmless; the reverse is a stuck key.
+            const bool arrowForTransport =
+                event.type == SDL_EVENT_KEY_DOWN &&
+                ui::transportOwnsArrowKey(event.key.key == SDLK_LEFT || event.key.key == SDLK_RIGHT ||
+                                              event.key.key == SDLK_UP || event.key.key == SDLK_DOWN,
+                                          (SDL_GetModState() & (SDL_KMOD_GUI | SDL_KMOD_CTRL)) != 0,
+                                          imgui_->wantsTextInput(), imgui_->itemActive(),
+                                          imgui_->popupOpen());
+            if (!arrowForTransport) {
+                imgui_->processEvent(event);
+            }
             // The viewport gets the mouse when the pointer is over the canvas. Since the canvas is
             // an ImGui window of its own (ADR-076), ImGui's WantCaptureMouse is true whenever the
             // pointer is on the world, so it can no longer be the test -- the canvas's own hover
