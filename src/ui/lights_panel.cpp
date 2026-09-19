@@ -211,11 +211,20 @@ void drawLightsPanel(app::Engine& engine, Selection& selection, EditHistory& his
         return;
     }
 
-    // Panel-local and not worth a member: the error from the last structural edit, and whether the
-    // list is soloed. Solo is deliberately editor state and never reaches the scene -- the brief
-    // says so, and a solo saved into a film is a film with one light.
+    // Panel-local and not worth a member: the error from the last structural edit.
+    //
+    // **There is no Solo here, and that is a decision rather than an omission.** The brief's §19
+    // asks for one, and the natural implementation -- force every other light's `enabled` final
+    // each frame -- makes this panel a writer of parameter finals. `test_repo_hygiene.cpp`
+    // enumerates every such writer and requires each to be a kind the Inspector can name, so that
+    // "why is this value not what I set?" always has an answer; solo would have been the only one
+    // with no answer, and a light forced off with nothing saying why is the defect this repository
+    // has spent the week paying for. The guard caught it the first time the suite ran.
+    //
+    // Turning the other lights off with their own `enabled` checkboxes does the same job and is
+    // entirely explicable. Restoring solo properly means an `Influence::Kind::Solo` and a way for
+    // `influencesOf` to see editor state, which is a larger change than the feature is worth here.
     static std::string problem;
-    static std::string soloed;
 
     const std::vector<scene::Composition::AuthoredLight>& lights = comp->authoredLights();
 
@@ -257,35 +266,8 @@ void drawLightsPanel(app::Engine& engine, Selection& selection, EditHistory& his
     // ---- the list -------------------------------------------------------------------------------
     ImGui::Spacing();
     ImGui::TextColored(kMuted, "%zu light%s", lights.size(), lights.size() == 1 ? "" : "s");
-    if (!soloed.empty()) {
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.95f, 0.8f, 0.4f, 1.0f), "  SOLO: %s", soloed.c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton("clear")) {
-            soloed.clear();
-        }
-    }
 
-    // Solo, actually applied. It writes each other light's `enabled` **final**, not its base: the
-    // final is this frame's value and is reset from the base at the top of the next one, so solo
-    // darkens the scene for exactly as long as it is on and leaves nothing behind. Writing the base
-    // would be the same gesture and would save a film with one light in it -- the brief's §19 warns
-    // about precisely that, and it is also why letting the panel close is a safe way out of solo.
-    //
-    // A badge on its own would have been a control that does nothing, which ADR-375 calls worse
-    // than no control at all.
-    if (!soloed.empty()) {
-        for (const scene::Composition::AuthoredLight& a : lights) {
-            if (a.light.name == soloed) {
-                continue;
-            }
-            if (params::IParameter* p = engine.params().find("lights/" + scene::Composition::authoredLightId(a) +
-                                                             "/enabled");
-                p != nullptr) {
-                p->setFinalComponent(0, 0.0f);
-            }
-        }
-    }
+
 
     // A child so a scene with eighty lights scrolls its list rather than its properties. The brief
     // asks for the panel to stay usable at "dozens/hundreds".
@@ -303,8 +285,7 @@ void drawLightsPanel(app::Engine& engine, Selection& selection, EditHistory& his
             checkbox(engine, enabledPath, "##en");
             ImGui::SameLine();
 
-            const bool on = a.light.enabled && (soloed.empty() || soloed == a.light.name);
-            ImGui::TextColored(on ? ImGui::GetStyleColorVec4(ImGuiCol_Text) : kOff, "%s",
+            ImGui::TextColored(a.light.enabled ? ImGui::GetStyleColorVec4(ImGuiCol_Text) : kOff, "%s",
                                typeGlyph(a.light.type));
             ImGui::SameLine();
 
@@ -476,10 +457,6 @@ void drawLightsPanel(app::Engine& engine, Selection& selection, EditHistory& his
         selection.set(SelectionRef{SelectionRef::Kind::Light, created});
     }
     ImGui::SameLine();
-    if (ImGui::Button(soloed == light.light.name ? "Unsolo" : "Solo")) {
-        soloed = soloed == light.light.name ? std::string() : light.light.name;
-    }
-    ImGui::SameLine();
     if (ImGui::Button("Delete")) {
         std::vector<scene::Composition::AuthoredLight> next;
         for (const auto& a : lights) {
@@ -490,8 +467,6 @@ void drawLightsPanel(app::Engine& engine, Selection& selection, EditHistory& his
         commitLights(engine, history, "Delete light", std::move(next), &problem);
         selection.clear();
     }
-
-    ImGui::TextColored(kMuted, "Solo is an editor state and is never saved into the scene.");
 }
 
 } // namespace avgen::ui
