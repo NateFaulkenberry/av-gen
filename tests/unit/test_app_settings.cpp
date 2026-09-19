@@ -138,3 +138,28 @@ TEST_CASE("the pan and the fullscreen state are deliberately not kept", "[app][s
     CHECK(loaded->preview.panX == 0.0f);
     CHECK_FALSE(loaded->preview.fullscreen);
 }
+
+TEST_CASE("Suspending the viewport during a render is remembered", "[settings][viewport]") {
+    // ADR-364 / ADR-225. The default is on, so the value that has to survive is OFF -- a writer
+    // that emitted nothing would pass a test that saved the default and read it back.
+    app::AppSettings settings;
+    REQUIRE(settings.suspendViewportDuringRender);   // the premise; if this flips, so must the test
+    settings.suspendViewportDuringRender = false;
+
+    const auto first = app::AppSettings::fromJson(settings.toJson());
+    REQUIRE(first.has_value());
+    CHECK_FALSE(first->suspendViewportDuringRender);
+
+    // Twice, per ADR-350: a writer that echoes what it parsed can still lose it on the way back.
+    const auto second = app::AppSettings::fromJson(first->toJson());
+    REQUIRE(second.has_value());
+    CHECK_FALSE(second->suspendViewportDuringRender);
+
+    // A settings file written before the option existed keeps the default rather than reading a
+    // missing key as false, which would silently reverse the behaviour for everyone who upgrades.
+    auto older = settings.toJson();
+    older["general"].erase("suspendViewportDuringRender");
+    const auto upgraded = app::AppSettings::fromJson(older);
+    REQUIRE(upgraded.has_value());
+    CHECK(upgraded->suspendViewportDuringRender);
+}

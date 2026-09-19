@@ -20,6 +20,10 @@ namespace avgen::scene {
 struct Scene;
 }
 
+namespace avgen::pathtrace {
+struct TraceSettings;
+}
+
 
 namespace avgen::app {
 
@@ -179,5 +183,59 @@ struct RenderSettings {
     [[nodiscard]] nlohmann::json toJson() const;
     static Result<RenderSettings> fromJson(const nlohmann::json& j); // missing fields keep defaults
 };
+
+
+// ---- the path tracer's half of the Render panel (ADR-366) --------------------------------------
+//
+// ADR-351's CPU path tracer had, until this existed, no settings in the ADR-225 sense at all.
+// Samples per pixel, bounces, denoise, AOVs, the timeline second, the albedo probe, the seed and
+// the thread count lived only in `Application` member fields. No project file, no scene file and no
+// `AppSettings` carried a `pathtrace` key; grep found none. A person who set 512 spp, saved, and
+// reopened got 32 back, because two of the eight were hard-coded at the binding site and the rest
+// were struct defaults.
+//
+// That is ADR-350's defect exactly -- no reader AND no writer -- one subsystem along, and it is why
+// this is a peer of `RenderSettings` in the project document rather than a member of it: the two
+// renderers share a resolution and nothing else, and nesting one inside the other would make the
+// raster job's settings validate a trace's sample count.
+//
+// Deliberately NOT `pathtrace::TraceSettings`. This is the authored, persisted, user-facing set;
+// `TraceSettings` is the renderer's argument, carries diagnostic fields no project should record
+// (`russianRouletteCompensation` is an intentionally-wrong control arm), and pulling its header in
+// would drag Embree's neighbours into every translation unit that reads a project. `Application`
+// translates one into the other in one place, and a test asserts the defaults of the two agree so
+// the translation cannot drift silently.
+struct PathTraceSettings {
+    double seconds = 0.0;             // the timeline second to trace; one frame, not a sequence
+    std::uint32_t samplesPerPixel = 32;
+    std::uint32_t maxDepth = 3;       // surface interactions; 0 is direct lighting only
+    // Determinism (ADR-351): the image is a pure function of the snapshot and these. It is
+    // persisted for that reason -- a reproducible render whose seed is not written down is not
+    // reproducible by anybody but the process that made it.
+    std::uint64_t seed = 0x853c49e6748fea9bULL;
+    unsigned threads = 0;             // 0 = hardware concurrency
+    bool denoise = false;             // needs AVGEN_PATHTRACE_DENOISE; the UI greys it otherwise
+    bool writeAovs = true;            // one multi-layer EXR instead of beauty-only
+    bool albedoProbe = false;         // ADR-352's diagnostic; cannot change a pixel
+    // Where the EXR goes, relative to the project. Its own field rather than the raster job's,
+    // because the Render panel returns before it draws that one: a trace's destination was
+    // unreachable while the trace was selected, and an unset one landed in $TMPDIR without saying
+    // so. Always written with an `.exr` extension.
+    std::filesystem::path outputPath;
+
+    [[nodiscard]] Result<void> validate() const;
+    [[nodiscard]] nlohmann::json toJson() const;
+    static Result<PathTraceSettings> fromJson(const nlohmann::json& j); // missing fields keep defaults
+};
+
+// The one place the authored settings become the renderer's argument. Both the Render panel and
+// `--pathtrace` go through it, so a field that stops being carried across fails in one place rather
+// than in two that have drifted. `captureFeatures` is derived here and never authored: the denoiser
+// and the AOV writer both require it and neither should be able to be switched on without it.
+//
+// Defined in render_settings.cpp so `pathtrace/path_tracer.hpp` stays out of every translation unit
+// that merely reads a project. Declared against an incomplete type for the same reason.
+[[nodiscard]] pathtrace::TraceSettings traceSettingsFrom(const PathTraceSettings& settings,
+                                                         std::uint32_t width, std::uint32_t height);
 
 } // namespace avgen::app

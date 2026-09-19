@@ -600,6 +600,12 @@ void InvestigateConsiderer::consider(const DecisionContext& ctx, std::vector<Opt
         attend.name = name_;
         attend.activity = activity_;
         attend.duration = dwell_;
+        // The **subject**, not the stand-off the walk ends on. `action.cpp`'s Pose case publishes
+        // this as `lookTarget`, which is what an aim layer reads (ADR-300); aiming at the point the
+        // body is standing on would be a target on top of its own pivot and would resolve to
+        // `NoTarget`.
+        attend.target.kind = TargetKind::Point;
+        attend.target.point = target.position;
         actions_.push_back(std::move(attend));
     }
     out.push_back(Option{name_, weight() * score, std::span<const ActionDesc>(actions_),
@@ -670,6 +676,10 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
             attend.kind = ActionKind::Pose;
             attend.activity = activity_;
             attend.duration = dwell_;
+            // The candidate itself, not `walk.target.point` -- that is the stand-off the body ends
+            // the walk on, and a look at your own feet is not a look (ADR-300).
+            attend.target.kind = TargetKind::Point;
+            attend.target.point = candidate.position;
             actions_.push_back(std::move(attend));
         }
         ranges.emplace_back(first, actions_.size() - first);
@@ -1029,6 +1039,8 @@ void RouteConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& 
             attend.name = names_.back();
             attend.activity = activity_;
             attend.duration = dwell_;
+            attend.target.kind = TargetKind::Point;
+            attend.target.point = p.at; // the destination, not the leg's stand-off (ADR-300)
             actions_.push_back(std::move(attend));
         }
         ranges.emplace_back(first, actions_.size() - first);

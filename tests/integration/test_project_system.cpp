@@ -1108,3 +1108,71 @@ TEST_CASE("A sections-only sequence round-trips through a project file",
 
     std::filesystem::remove_all(dir, ec);
 }
+
+TEST_CASE("A project keeps its path-trace settings across two saves", "[integration][project][pathtrace]") {
+    // ADR-366, and ADR-350's second prescribed test. Before this, `pathtrace::TraceSettings` lived
+    // only in `Application` member fields: a person who set 512 samples and eight bounces, saved,
+    // and reopened the project got 32 and 3, because two of the eight settings were hard-coded at
+    // the binding site and the rest were struct defaults. There was no reader AND no writer, which
+    // is the same failure `DayNightSettings` had, and it is why this test saves TWICE -- a writer
+    // that emits what it has just parsed can still lose the value on the second pass.
+    Fixture f;
+    const auto project = f.dir / "trace.json";
+
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        auto& pt = engine.pathTraceSettings();
+        pt.samplesPerPixel = 512;
+        pt.maxDepth = 8;
+        pt.seconds = 12.75;
+        pt.seed = 0xfeedfacecafebeefULL;
+        pt.threads = 6;
+        pt.denoise = true;
+        pt.writeAovs = false;
+        pt.albedoProbe = true;
+        pt.outputPath = "renders/hero.exr";
+        REQUIRE(engine.saveProject(project).has_value());
+    }
+
+    // The block is on disk at all -- the writer half. A reader that is never fed proves nothing.
+    const auto doc = readJson(project);
+    REQUIRE(doc.contains("pathtrace"));
+    CHECK(doc["pathtrace"]["samples"].get<std::uint32_t>() == 512);
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(project).has_value());
+    CHECK(engine.pathTraceSettings().samplesPerPixel == 512);
+    CHECK(engine.pathTraceSettings().seed == 0xfeedfacecafebeefULL);
+
+    // Second round trip, which is the one ADR-350 was written about.
+    const auto again = f.dir / "trace-again.json";
+    REQUIRE(engine.saveProject(again).has_value());
+    app::Engine reopened(app::EngineMode::Offline);
+    REQUIRE(reopened.loadProject(again).has_value());
+    const auto& pt = reopened.pathTraceSettings();
+    CHECK(pt.samplesPerPixel == 512);
+    CHECK(pt.maxDepth == 8);
+    CHECK(pt.seconds == 12.75);
+    CHECK(pt.seed == 0xfeedfacecafebeefULL);
+    CHECK(pt.threads == 6u);
+    CHECK(pt.denoise);
+    CHECK_FALSE(pt.writeAovs);
+    CHECK(pt.albedoProbe);
+    CHECK(pt.outputPath == std::filesystem::path("renders/hero.exr"));
+
+    // The control: a project that never carried the block gets the defaults back, not the 512 the
+    // process last had in hand. Without this, an engine that simply never cleared the struct would
+    // pass every assertion above.
+    const auto plain = f.dir / "plain.json";
+    {
+        app::Engine fresh(app::EngineMode::Offline);
+        REQUIRE(fresh.saveProject(plain).has_value());
+        auto stripped = readJson(plain);
+        stripped.erase("pathtrace");
+        std::ofstream out(plain);
+        out << stripped.dump(2);
+    }
+    REQUIRE(reopened.loadProject(plain).has_value());
+    CHECK(reopened.pathTraceSettings().samplesPerPixel == app::PathTraceSettings{}.samplesPerPixel);
+    CHECK(reopened.pathTraceSettings().outputPath.empty());
+}

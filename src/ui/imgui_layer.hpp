@@ -56,6 +56,10 @@ public:
     // True when a widget is being interacted with -- a slider mid-drag, a combo open. Arrow keys
     // belong to it while that lasts, so an editor nudge must not also fire.
     [[nodiscard]] bool itemActive() const;
+    // True when any popup or menu is open, at any level. `itemActive` does not answer this: an open
+    // menu is a popup window, not an active item, so a menu the user has just pulled down reports
+    // no active item while plainly owning the arrow keys.
+    [[nodiscard]] bool popupOpen() const;
     [[nodiscard]] bool wantsMouse() const;
     // Whether the ini file already existed when the context was made. False means a first run, and
     // the shell has to build its default dock tree rather than trust an empty one.

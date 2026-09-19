@@ -13,6 +13,7 @@
 #include "help/database.hpp"
 #include "help/markdown.hpp"
 #include "help/validation.hpp"
+#include "ui/help_panel.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <algorithm>
@@ -772,4 +773,110 @@ TEST_CASE("Every parameter path the documentation cites is one the engine regist
     }
     INFO("paths the engine does not register:" << missing);
     CHECK(missing.empty());
+}
+
+// ---- the sidebar's row identities (ADR-361) --------------------------------------------------
+//
+// The panel drew every recently viewed topic twice in one child window -- once under "Recently
+// viewed" and once under its category -- and derived both rows' ImGui ids from the document id
+// alone. `CollapsingHeader` carries `NoTreePushOnOpen` and `Indent` has no id effect, so the two
+// lists sat at the same id-stack depth and the two rows were one item as far as ImGui was
+// concerned. It reported "2 visible items with conflicting ID" at runtime and nothing else ever
+// noticed, because no test could see an id.
+//
+// These run over the SHIPPED content as well as a synthetic database, for the reason the file's
+// header gives: a Help system that passes over three synthetic topics and ships a broken panel is
+// the failure this project keeps repeating.
+
+namespace {
+
+// What ImGui actually hashes for a row: the id stack the panel pushed, then the document. The
+// control below drops the first half, which is precisely what the defect did.
+std::vector<std::string> sidebarRowIdentities(const std::vector<avgen::ui::HelpSidebarGroup>& groups,
+                                              bool includeScope) {
+    std::vector<std::string> ids;
+    for (const auto& group : groups) {
+        for (const help::HelpDocument* doc : group.documents) {
+            ids.push_back(includeScope ? group.scope + "\x1f" + doc->id : doc->id);
+        }
+    }
+    return ids;
+}
+
+std::size_t duplicateCount(std::vector<std::string> ids) {
+    std::ranges::sort(ids);
+    const std::size_t total = ids.size();
+    ids.erase(std::ranges::unique(ids).begin(), ids.end());
+    return total - ids.size();
+}
+
+} // namespace
+
+TEST_CASE("No two Help sidebar rows can produce the same ImGui id", "[ui][help]") {
+    help::HelpDatabase db;
+    REQUIRE(db.addDocument(makeDoc("start/welcome", "Welcome", "Getting Started")));
+    REQUIRE(db.addDocument(makeDoc("start/tour", "A tour", "Getting Started")));
+    REQUIRE(db.addDocument(makeDoc("rendering/offline-render", "Offline render", "Rendering")));
+
+    SECTION("a topic in no recent list appears once") {
+        const auto groups = avgen::ui::helpSidebarGroups(db, {});
+        CHECK(duplicateCount(sidebarRowIdentities(groups, true)) == 0);
+        // The arm has to be able to fire. With nothing recent there is nothing drawn twice, so the
+        // control agrees here -- which is why the next section exists and this one is not the proof.
+        CHECK(duplicateCount(sidebarRowIdentities(groups, false)) == 0);
+    }
+
+    SECTION("a recently viewed topic is drawn twice, and the two rows are still distinct") {
+        const std::vector<std::string> recent = {"start/welcome", "rendering/offline-render"};
+        const auto groups = avgen::ui::helpSidebarGroups(db, recent);
+
+        // The premise: those two topics really are drawn twice each. If this stops being true the
+        // rest of the test proves nothing.
+        const auto withScope = sidebarRowIdentities(groups, true);
+        REQUIRE(withScope.size() == 5);
+
+        // THE CONTROL, and it fails the other way: identify a row by its document alone -- what the
+        // panel did before ADR-361 -- and two pairs collide. An assertion that only checked the
+        // fixed form would pass just as happily against a database where nothing repeats.
+        CHECK(duplicateCount(sidebarRowIdentities(groups, false)) == 2);
+
+        // THE ARM: with the group's scope in the identity, nothing collides.
+        CHECK(duplicateCount(withScope) == 0);
+    }
+
+    SECTION("a recent id the database does not know is dropped, not drawn blank") {
+        const std::vector<std::string> recent = {"start/welcome", "gone/missing"};
+        const auto groups = avgen::ui::helpSidebarGroups(db, recent);
+        REQUIRE(groups.front().scope == "recent");
+        CHECK(groups.front().documents.size() == 1);
+    }
+
+    SECTION("an empty recent list contributes no group at all") {
+        const auto groups = avgen::ui::helpSidebarGroups(db, {});
+        CHECK(std::ranges::none_of(groups, [](const auto& g) { return g.scope == "recent"; }));
+    }
+}
+
+TEST_CASE("The shipped Help content cannot collide in the sidebar either", "[ui][help]") {
+    help::HelpDatabase db;
+    REQUIRE(db.loadDirectory(contentDir()).has_value());
+    REQUIRE(db.documents().size() > 10);
+
+    // The owner's reproduction: open a topic, and it is then in both lists. Take the first eight
+    // shipped topics as "recently viewed", which is what the panel caps `recent_` at.
+    std::vector<std::string> recent;
+    for (const help::HelpDocument& doc : db.documents() | std::views::take(8)) {
+        recent.push_back(doc.id);
+    }
+    const auto groups = avgen::ui::helpSidebarGroups(db, recent);
+
+    CHECK(duplicateCount(sidebarRowIdentities(groups, true)) == 0);
+    // Again with the control, over the real content: eight topics listed twice is eight collisions
+    // without the scope. This is the number the runtime warning was counting.
+    CHECK(duplicateCount(sidebarRowIdentities(groups, false)) == 8);
+
+    // And no two groups share a scope, or the header items would collide before the rows did.
+    std::vector<std::string> scopes;
+    for (const auto& g : groups) scopes.push_back(g.scope);
+    CHECK(duplicateCount(scopes) == 0);
 }

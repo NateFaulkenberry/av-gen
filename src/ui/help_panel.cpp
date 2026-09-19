@@ -485,49 +485,41 @@ void HelpPanel::drawSidebar() {
         return;
     }
 
-    if (!recent_.empty()) {
-        if (ImGui::CollapsingHeader("Recently viewed")) {
-            for (const std::string& id : recent_) {
-                const help::HelpDocument* doc = db_.get(id);
-                if (doc == nullptr) {
-                    continue;
-                }
+    const float indent = ImGui::GetStyle().IndentSpacing * 0.5f;
+    for (const HelpSidebarGroup& group : helpSidebarGroups(db_, recent_)) {
+        // The group's own scope, so one document drawn in two lists is two distinct ids. Pushed
+        // around the header as well as the rows: a header is an item with an id too, and two
+        // headers that ever shared a label would collide for the same reason the rows did.
+        ImGui::PushID(group.scope.c_str());
+        const ImGuiTreeNodeFlags flags = group.defaultOpen ? ImGuiTreeNodeFlags_DefaultOpen : 0;
+        if (ImGui::CollapsingHeader(group.title.c_str(), flags)) {
+            if (group.indented) {
+                ImGui::Indent(indent);
+            }
+            for (const help::HelpDocument* doc : group.documents) {
                 ImGui::PushID(doc->id.c_str());
+                if (doc->status != help::HelpStatus::Stable) {
+                    ImGui::PushStyleColor(ImGuiCol_Text, statusColor(doc->status));
+                }
                 if (ImGui::Selectable(doc->title.c_str(), doc->id == current_)) {
                     navigate(doc->id);
                 }
+                if (doc->status != help::HelpStatus::Stable) {
+                    ImGui::PopStyleColor();
+                }
+                if (ImGui::IsItemHovered() && !doc->summary.empty()) {
+                    tooltip("%s", doc->summary.c_str());
+                }
                 ImGui::PopID();
             }
+            if (group.indented) {
+                ImGui::Unindent(indent);
+            }
         }
-        ImGui::Separator();
-    }
-
-    for (const help::HelpCategory& category : db_.categories()) {
-        // Getting Started open, the rest closed: a tree that is entirely expanded is a list, and a
-        // list of forty-six is not navigation.
-        const ImGuiTreeNodeFlags flags =
-            category.name == "Getting Started" ? ImGuiTreeNodeFlags_DefaultOpen : 0;
-        if (!ImGui::CollapsingHeader(category.name.c_str(), flags)) {
-            continue;
+        ImGui::PopID();
+        if (group.separatorAfter) {
+            ImGui::Separator();
         }
-        ImGui::Indent(ImGui::GetStyle().IndentSpacing * 0.5f);
-        for (const help::HelpDocument* doc : category.documents) {
-            ImGui::PushID(doc->id.c_str());
-            if (doc->status != help::HelpStatus::Stable) {
-                ImGui::PushStyleColor(ImGuiCol_Text, statusColor(doc->status));
-            }
-            if (ImGui::Selectable(doc->title.c_str(), doc->id == current_)) {
-                navigate(doc->id);
-            }
-            if (doc->status != help::HelpStatus::Stable) {
-                ImGui::PopStyleColor();
-            }
-            if (ImGui::IsItemHovered() && !doc->summary.empty()) {
-                tooltip("%s", doc->summary.c_str());
-            }
-            ImGui::PopID();
-        }
-        ImGui::Unindent(ImGui::GetStyle().IndentSpacing * 0.5f);
     }
 }
 

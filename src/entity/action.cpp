@@ -624,6 +624,29 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
         }
         case ActionKind::Pose: {
             state.speed = 0.0f;
+            // ADR-300, and the half of the pose layer seam that had no writer.
+            //
+            // A `Pose` that names a target is a body attending to *that thing*: `interest`,
+            // `investigate` and `route` all emit one as the last step of an errand, and until now
+            // the target went nowhere because a pose does not move. `Explore::stepObserve` has
+            // always published `lookTarget` at exactly this moment and `decide` never did, so the
+            // five characters ADR-344 ported from `explore` to `decide` kept their authored aim
+            // layer and lost the only thing that drove it -- measured over ninety seconds of the
+            // film, four of the five had `hasLookTarget` false on every frame and turned their
+            // heads exactly never.
+            //
+            // It is published here rather than in the decider because it is a property of the
+            // action and not of what chose it: a schedule, a director or a hand-written action
+            // list that says "stand here and look at that" now means it. Pose intent only --
+            // `lookAt` decides whether the *body* turns, and the layer stack decides what the head
+            // does (ADR-260: this writes neither a position nor a MotionOffset).
+            if (action.target.kind != TargetKind::None) {
+                glm::vec3 at{0.0f};
+                if (resolvePoint(ctx, action.target, at)) {
+                    state.lookTarget = at;
+                    state.hasLookTarget = true;
+                }
+            }
             // A pose with no duration runs until something else ends it: a character told to sleep
             // sleeps until the director says otherwise, and inventing a length would be a lie.
             done = action.duration > 0.0 && layer.elapsed >= action.duration;

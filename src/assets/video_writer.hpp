@@ -77,6 +77,20 @@ struct VideoInfo {
     std::uint64_t frames = 0;
     double durationSeconds = 0.0;
     bool hasAudio = false;
+    // The colour tags the file carries, as the four-character-ish strings the format description
+    // uses ("ITU_R_709_2", "IEC_sRGB", ...), or empty where the file says nothing (ADR-365).
+    //
+    // Empty is a real answer and the one every file this project has ever written gave: nothing
+    // set `AVVideoColorPropertiesKey`, and the ffmpeg arguments carried no `-color_primaries`,
+    // `-color_trc` or `-colorspace`. An untagged file is not broken -- every player guesses, and on
+    // an SDR deliverable the guess is usually BT.709, which is why it went unnoticed for the whole
+    // life of ADR-020 -- but a guess is not a delivery, and nothing HDR can be built on top of one.
+    std::string colorPrimaries;
+    std::string colorTransfer;
+    std::string colorMatrix;
+    [[nodiscard]] bool colorTagged() const {
+        return !colorPrimaries.empty() && !colorTransfer.empty() && !colorMatrix.empty();
+    }
 };
 
 [[nodiscard]] Result<VideoInfo> probeVideo(const std::filesystem::path& file);

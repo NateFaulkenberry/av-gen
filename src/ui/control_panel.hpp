@@ -139,14 +139,16 @@ public:
     // Application owns, exactly as `renderSettings` does, and `pathTraceProgress` reads the job.
     // Anything the job does not own does not live here: two sources of truth for a render's state
     // is how a UI ends up showing "rendering" after a job has failed.
-    pathtrace::TraceSettings* pathTraceSettings = nullptr;
-    double* pathTraceSeconds = nullptr;
-    bool* pathTraceDenoise = nullptr;
-    bool* pathTraceAovs = nullptr;
+    //
+    // One struct rather than the five loose pointers this used to be (ADR-366). They were five
+    // because nothing persisted them and each had grown where it was needed; now they are the
+    // project's own `pathtrace` block and the panel edits it the way it edits `render`.
+    app::PathTraceSettings* pathTraceSettings = nullptr;
     bool pathTraceDenoiseAvailable = false;   // false greys the checkbox and explains why
     std::function<pathtrace::TraceProgress()> pathTraceProgress;
     std::function<void()> onStartPathTrace;
     std::function<void()> onCancelPathTrace;
+    std::function<void()> onChoosePathTraceOutput;
     std::function<void()> onEnqueueRender;
     std::function<void()> onRunQueue;
     std::function<void()> onChooseRenderOutput;
@@ -158,6 +160,11 @@ public:
     std::string shareStatus;                // describe() + live stats from the host
     std::function<void(const std::string&, const std::string&)> onShare; // kind ("syphon"/"ndi"/"off"), name
     std::function<app::RenderProgress()> renderProgress; // empty when no job is running
+    // ADR-364: the viewport's state during a render, and the evidence that it is real. A
+    // suspension that is switched on and has skipped zero frames is not happening, and the count
+    // is in the panel so a person can see that rather than having to trust it.
+    bool viewportSuspended = false;
+    std::uint64_t viewportFramesSuspended = 0;
 
     // ---- watching the deliverable's own frames (ADR-320) ---------------------------------------
     //
@@ -381,6 +388,7 @@ private:
     // The path-tracing half of the Render panel. Split out only for length; it shares the
     // panel's resolution control, its output path and its Separator rhythm.
     void drawPathTrace();
+    void drawViewportSuspension();
     // Which renderer the Render panel is currently showing. Not a render setting -- it is
     // which set of controls is on screen -- so it lives with the panel and nowhere else.
     int rendererChoice_ = 0;   // 0 = realtime, 1 = path trace

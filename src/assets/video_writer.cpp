@@ -180,6 +180,13 @@ std::vector<std::string> ffmpegArguments(const std::filesystem::path& file, cons
     if (!plan.pixelFormat.empty()) {
         args.insert(args.end(), {"-pix_fmt", plan.pixelFormat});
     }
+    // ADR-365: the same three tags the native backend writes, so the two backends produce files a
+    // player reads the same way. The input is 8-bit RGBA that the tone map has already
+    // sRGB-encoded, and BT.709 is what a video deliverable of that is. Without these, ffmpeg writes
+    // the file untagged and every downstream tool guesses -- usually correctly, which is exactly
+    // what makes it worth fixing before anything depends on the guess.
+    args.insert(args.end(), {"-color_primaries", "bt709", "-color_trc", "bt709",
+                             "-colorspace", "bt709"});
     if (audio) {
         if (const std::string aenc = audioEncoderFor(ext, plan.encoder); !aenc.empty()) {
             args.insert(args.end(), {"-c:a", aenc});

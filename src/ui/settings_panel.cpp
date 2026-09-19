@@ -130,6 +130,27 @@ void SettingsPanel::drawRendering() {
         "The world is rendered at this fraction of the viewport's pixels and shown stretched to "
         "fill it. Below 1.0 trades sharpness for frame rate, which on a high-density display is "
         "often the better trade.");
+
+    // ADR-364. Here rather than in the Render panel because it is a property of how this person
+    // works on this machine, like the render scale above it, and not of the piece -- opening
+    // someone else's project must not change whether your viewport keeps running.
+    if (settings != nullptr) {
+        ImGui::Spacing();
+        propertyLabel("Suspend while rendering", "Give the render the machine");
+        bool suspend = settings->suspendViewportDuringRender;
+        if (ImGui::Checkbox("##suspend-viewport-during-render", &suspend)) {
+            settings->suspendViewportDuringRender = suspend;
+            if (onChanged) {
+                onChanged();
+            }
+        }
+        ImGui::TextWrapped(
+            "While an offline render or a path trace is running, stop drawing the world into the "
+            "canvas. The interface, the progress and Cancel keep working; what you see in the "
+            "canvas is the last frame before the render started. Turn it off to keep working "
+            "while a render goes -- which is what this application did before the option existed, "
+            "and is still the right answer when you are iterating rather than delivering.");
+    }
 }
 
 void SettingsPanel::drawAi() {

@@ -841,6 +841,22 @@ Application::~Application() {
     panel_.reset();
     worldBuilder_.reset();
     jobs_.reset();
+    // The two offline jobs, and they were missing from this list (ADR-364). A `RenderJob` owns a
+    // `gpu::ReadbackRing` whose destructor calls `Context::waitFor` on an outstanding map; a
+    // `unique_ptr` member destroys in reverse declaration order, and `job_` is declared at :346
+    // against `context_` at :394, so the context went FIRST and the ring then waited on a Dawn
+    // instance that no longer existed. Measured: `--render-in-app` plus `--frames n` with n small
+    // enough that the render is still in flight segfaults in
+    // `ReadbackRing::~ReadbackRing -> Context::waitFor -> InstanceBase::APIWaitAny`, with the
+    // report naming a pointer-authentication failure. It reproduces on a pristine `main` build at
+    // 1cdfb84a, so it is not this branch's -- but this is the list whose comment claims to own
+    // destruction order, and the jobs were simply never added to it.
+    //
+    // `ptJob_` is here for the weaker but real version of the same reason: its coordinator thread
+    // is joined by its own destructor, and a thread still running while the engine underneath it
+    // is torn down is a race nobody would find twice.
+    job_.reset();
+    ptJob_.reset();
     imgui_.reset();
     engine_.reset();
     renderer_.reset();
@@ -1512,12 +1528,11 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         liftViewportLimits_ = options.liftViewportLimits;
         panel_->liftViewportLimits = &liftViewportLimits_;
         // ---- path tracing from the UI ----
-        uiPathTrace_.samplesPerPixel = 32;
-        uiPathTrace_.maxDepth = 3;
+        // The samples and bounces used to be assigned here, which is why a project could not carry
+        // them: two of the eight settings were a hard-coded pair at the binding site and the other
+        // six were struct defaults (ADR-366). They come from the project now, like `render` does.
+        uiPathTrace_ = engine_->pathTraceSettings();
         panel_->pathTraceSettings = &uiPathTrace_;
-        panel_->pathTraceSeconds = &uiPathTraceSeconds_;
-        panel_->pathTraceDenoise = &uiPathTraceDenoise_;
-        panel_->pathTraceAovs = &uiPathTraceAovs_;
         panel_->pathTraceDenoiseAvailable = pathtrace::denoiseAvailable();
         panel_->pathTraceProgress = [this]() -> pathtrace::TraceProgress {
             // While a job exists it IS the answer; once it is gone, the last thing it said.
@@ -1531,6 +1546,14 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->onCancelPathTrace = [this] {
             if (ptJob_) ptJob_->cancel();
         };
+        panel_->onChoosePathTraceOutput = [this] {
+            window_->saveFileDialog(platform::Window::SaveKind::Exr, [this](std::string path) {
+                if (path.empty()) {
+                    return;
+                }
+                uiPathTrace_.outputPath = std::filesystem::path(path).replace_extension(".exr");
+            });
+        };
         panel_->onStartRender = [this] { startRenderFromUi(); };
         panel_->onCancelRender = [this] {
             if (job_) job_->cancel();
@@ -1541,6 +1564,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                 return;
             }
             engine_->renderSettings() = uiRender_;
+            engine_->pathTraceSettings() = uiPathTrace_;
             if (auto r = engine_->saveProject(engine_->projectPath()); !r) {
                 panel_->setStatus(r.error().message);
                 return;
@@ -2085,6 +2109,7 @@ void Application::startRenderFromUi() {
         return;
     }
     engine_->renderSettings() = uiRender_;
+    engine_->pathTraceSettings() = uiPathTrace_;
     // Renders load a project file: the current one when saved, else a session snapshot.
     std::filesystem::path projectFile = engine_->projectPath();
     if (projectFile.empty()) {
@@ -2118,6 +2143,7 @@ void Application::rememberProject(const std::filesystem::path& path) {
     // Refreshed here, where a project has just *become* the current one -- the same hook the recent
     // list and the window title use. The panel's pointer is to `uiRender_` itself and stays valid.
     uiRender_ = engine_->renderSettings();
+    uiPathTrace_ = engine_->pathTraceSettings();   // ADR-366, and for the same reason
     if (context_ && shaders_) {
         applyOutputsFromProject();
         if (auto r = outputs_.open(*context_, *shaders_); !r) {
@@ -2536,7 +2562,27 @@ void Application::handleInputEvent(const SDL_Event& event) {
                 ++uiFilteredEvents_;
                 return;
             }
-            imgui_->processEvent(event);
+            // The transport's arrow keys never reach Dear ImGui (ADR-357 gave them the playhead;
+            // `NavEnableKeyboard` gives the same keys the focus ring). Deciding here rather than
+            // after `handleTransportShortcut` is the whole point: forwarding first and consuming
+            // second is what let the playhead step *and* the focus ring walk the transport's own
+            // buttons on one press. `ui::transportOwnsArrowKey` carries the reasoning and the three
+            // cases where ImGui keeps them.
+            //
+            // KEY_DOWN only, and KEY_UP always forwarded. If ImGui saw the press -- because a text
+            // field had focus at the time -- and the field then deactivated mid-press, swallowing
+            // the release would leave ImGui believing the key is still held, and nav would repeat
+            // forever. A release for a press it never saw is harmless; the reverse is a stuck key.
+            const bool arrowForTransport =
+                event.type == SDL_EVENT_KEY_DOWN &&
+                ui::transportOwnsArrowKey(event.key.key == SDLK_LEFT || event.key.key == SDLK_RIGHT ||
+                                              event.key.key == SDLK_UP || event.key.key == SDLK_DOWN,
+                                          (SDL_GetModState() & (SDL_KMOD_GUI | SDL_KMOD_CTRL)) != 0,
+                                          imgui_->wantsTextInput(), imgui_->itemActive(),
+                                          imgui_->popupOpen());
+            if (!arrowForTransport) {
+                imgui_->processEvent(event);
+            }
             // The viewport gets the mouse when the pointer is over the canvas. Since the canvas is
             // an ImGui window of its own (ADR-076), ImGui's WantCaptureMouse is true whenever the
             // pointer is on the world, so it can no longer be the test -- the canvas's own hover
@@ -3787,6 +3833,37 @@ int Application::runLive() {
         engine_->setDetailLimits(liftViewportLimits_ ? scene::DetailLimits::unlimited()
                                                       : scene::DetailLimits{});
 
+        // ADR-364: what the application is doing this frame, and therefore what the viewport is
+        // allowed to cost. Computed here -- before the jobs are stepped -- so that the frame in
+        // which a render *starts* is already suspended, rather than one frame late.
+        const RenderActivity activity = job_             ? RenderActivity::OfflineRaster
+                                        : (ptJob_ && !ptJob_->done()) ? RenderActivity::OfflinePathTrace
+                                                                      : RenderActivity::Interactive;
+        const ViewportPolicy viewportPolicy =
+            viewportPolicyFor(activity, settings_.suspendViewportDuringRender);
+        // Said once on each edge, not per frame. The log is where a scripted arm can see it --
+        // `--render-in-app` is the only way to reach a mid-render state without a person at the
+        // machine, and a feature whose only evidence is a tooltip is a feature no run can check.
+        if (!viewportPolicy.drawWorld != viewportWasSuspended_) {
+            viewportWasSuspended_ = !viewportPolicy.drawWorld;
+            if (viewportWasSuspended_) {
+                log::info("viewport: suspended for the {} (ADR-364)", renderActivityName(activity));
+            } else {
+                log::info("viewport: resumed after {} frame(s) not drawn",
+                          viewportFramesSuspended_ - viewportSuspendedAtStart_);
+                viewportSuspendedAtStart_ = viewportFramesSuspended_;
+            }
+        }
+        if (panel_) {
+            // The panel says which of the two it is doing, and how many frames it has not drawn.
+            // That count is the evidence the feature fired: a suspension that is on and reports
+            // zero skipped frames is a suspension that is not happening, and a person can see it
+            // (ADR-182 -- the arm has to be able to come out the other way, in the product and not
+            // only in a test).
+            panel_->viewportSuspended = !viewportPolicy.drawWorld;
+            panel_->viewportFramesSuspended = viewportFramesSuspended_;
+        }
+
         // `--render-in-app`: the Render button, pressed once, on the first frame that has a
         // window, a project and a panel. Here rather than in `init()` because the job renders
         // between UI frames and there is no frame loop to render between until this one.
@@ -3906,7 +3983,7 @@ int Application::runLive() {
         wgpu::CommandEncoder encoder = context_->device().CreateCommandEncoder();
         // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
         // options; an empty set costs nothing.
-        if (panel_) {
+        if (panel_ && viewportPolicy.drawWorld) {
             core::PhaseProfiler::Scope scope(prof, kPhDebug);
             panel_->composition.stats = &compositor_->stats();
             rendering::DebugViewOptions options = panel_->world.debug;
@@ -3930,7 +4007,14 @@ int Application::runLive() {
         }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                         engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
-        {
+        // ADR-364. `drawUi` is deliberately not consulted here: the interface is drawn
+        // unconditionally a few lines below, and the field exists so that invariant is written down
+        // rather than being true by accident. What this skips is the world -- the scene pass, the
+        // post chain and the debug geometry -- into the same device the render is using.
+        if (!viewportPolicy.drawWorld) {
+            ++viewportFramesSuspended_;
+        }
+        if (viewportPolicy.drawWorld) {
             // The CPU cost of *recording* the frame's commands. Not the GPU's cost of running them:
             // that is gpu::FrameTimeline's, is reported separately, and belongs to the renderer
             // effort rather than to this one.
@@ -3962,7 +4046,9 @@ int Application::runLive() {
         // The frame has published its diagnosis; keep it. Recording after the render and drawing
         // before it means the trail is one frame behind the picture, which is the honest ordering:
         // a trail drawn from a frame that has not been rendered would be a prediction.
-        transformHistory_.record(renderer_->diagnosticFrame());
+        if (viewportPolicy.drawWorld) {
+            transformHistory_.record(renderer_->diagnosticFrame());
+        }
         // Clearing the window is the whole of the main window's present now: the editor draws the
         // frame into its canvas, and the world no longer covers the surface for the panels to be
         // painted over. The clear still has to happen, because ImGui's pass loads rather than
@@ -4431,20 +4517,26 @@ void Application::startPathTraceFromUi() {
         }
     }
 
-    std::filesystem::path out = uiRender_.outputPath;
-    if (out.empty()) out = std::filesystem::temp_directory_path() / "avgen_pathtrace.exr";
+    // The trace's OWN output path (ADR-366). It used to read the raster job's, which the Render
+    // panel returns before drawing while a trace is selected -- so the field was unreachable and an
+    // unset one went to $TMPDIR with only a status line to say so. Resolved against the project's
+    // folder, like a render's is, rather than against whatever the process's cwd happens to be.
+    std::filesystem::path out = uiPathTrace_.outputPath;
+    if (out.empty()) {
+        out = std::filesystem::temp_directory_path() / "avgen_pathtrace.exr";
+        panel_->setStatus("no output path set; tracing to " + out.string());
+    } else if (out.is_relative()) {
+        out = std::filesystem::absolute(projectFile).parent_path() / out;
+    }
     out.replace_extension(".exr");   // the tracer writes scene-linear EXR and nothing else
 
     pathtrace::TraceJobRequest request;
     request.project = projectFile;
-    request.seconds = uiPathTraceSeconds_;
+    request.seconds = uiPathTrace_.seconds;
     request.output = out;
-    request.settings = uiPathTrace_;
-    request.settings.width = std::max(16u, uiRender_.width);
-    request.settings.height = std::max(16u, uiRender_.height);
-    request.denoise = uiPathTraceDenoise_;
-    request.writeAovs = uiPathTraceAovs_;
-    if (request.writeAovs || request.denoise) request.settings.captureFeatures = true;
+    request.settings = traceSettingsFrom(uiPathTrace_, uiRender_.width, uiRender_.height);
+    request.denoise = uiPathTrace_.denoise;
+    request.writeAovs = uiPathTrace_.writeAovs;
 
     if (auto ok = request.validate(); !ok) {
         panel_->setStatus(ok.error().message);
@@ -4468,20 +4560,27 @@ int Application::runPathTrace() {
         return 2;
     }
 
+    // Start from what the project says and override with what was typed -- the shape
+    // `renderSettingsFromOptions` already had, and it matters now that a project carries a
+    // `pathtrace` block (ADR-366). Before this, `--pathtrace out.exr` on a project authored at 512
+    // samples traced 32, because 32 was a struct default nobody had asked for.
+    PathTraceSettings authored = engine_ != nullptr ? engine_->pathTraceSettings() : PathTraceSettings{};
+    if (options_.ptSeconds) authored.seconds = *options_.ptSeconds;
+    if (options_.ptSamples) authored.samplesPerPixel = std::max(1u, *options_.ptSamples);
+    if (options_.ptDepth) authored.maxDepth = *options_.ptDepth;
+    if (options_.ptSeed) authored.seed = *options_.ptSeed;
+    if (options_.ptThreads) authored.threads = *options_.ptThreads;
+    if (options_.ptDenoise) authored.denoise = *options_.ptDenoise;
+    if (options_.ptAovs) authored.writeAovs = *options_.ptAovs;
+    if (options_.ptProbe) authored.albedoProbe = *options_.ptProbe;
+
     pathtrace::TraceJobRequest request;
     request.project = projectFile;
-    request.seconds = options_.ptSeconds;
+    request.seconds = authored.seconds;
     request.output = *options_.pathtrace;
-    request.writeAovs = options_.ptAovs;
-    request.denoise = options_.ptDenoise;
-    request.settings.width = std::max(options_.width, 16u);
-    request.settings.height = std::max(options_.height, 16u);
-    request.settings.samplesPerPixel = std::max(options_.ptSamples, 1u);
-    request.settings.maxDepth = options_.ptDepth;
-    request.settings.seed = options_.ptSeed;
-    request.settings.threads = options_.ptThreads;
-    request.settings.albedoProbe.enabled = options_.ptProbe;
-    if (options_.ptAovs) request.settings.captureFeatures = true;
+    request.writeAovs = authored.writeAovs;
+    request.denoise = authored.denoise;
+    request.settings = traceSettingsFrom(authored, options_.width, options_.height);
 
     log::info("pathtrace: {} at second {:.3f}, {}x{} at {} spp, depth {}, seed {}",
               projectFile.string(), request.seconds, request.settings.width, request.settings.height,
