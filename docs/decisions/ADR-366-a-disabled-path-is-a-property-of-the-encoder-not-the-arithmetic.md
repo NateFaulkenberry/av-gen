@@ -103,7 +103,31 @@ includes the usage bits.
 (`8f23d2ec`) and built from scratch, so it contains no `ImageLookIntegration`, no `post/look/*`
 parameters and no `fs_look*` entry points. Compared by sha256 of the PNG.
 
-<!-- MEASUREMENT -->
+| arm | binary | change | sha256 of frame 0 (first 24) |
+|---|---|---|---|
+| **A baseline** | parent commit `8f23d2ec` | none — the feature does not exist | `6a525a5756becac7700ea62d` |
+| **B zero** | `agent/imagelook` | none — the feature exists and is at zero | **`6a525a5756becac7700ea62d`** |
+| **C control (new)** | `agent/imagelook` | `post/look/colour = 0.6` | `3bca64b6993c087547c0bbb0` |
+| **D control (old)** | `agent/imagelook` | `post/grade/saturation = 1.4` | `974ed699719682db2559088e` |
+
+**A and B are byte-identical** — `cmp` reports no difference, on frame 0 and on frame 1. Adding the
+cinematic integration to the engine changed nothing about a render that does not ask for it.
+
+Both controls fire, and they are there for different reasons:
+
+- **C** perturbs one of the *new* parameters. It is the arm that proves the probe can fail: if the
+  new code were inert — never encoded, never reaching the shader — C would have matched B and the
+  byte-identity result would have been worthless. It does not match.
+- **D** perturbs an *old* parameter, one that exists in both binaries. It proves the render harness
+  is sensitive to a project-parameter change at all, independently of anything this work added. A
+  harness that produced one hash whatever you did to it would satisfy A = B for the wrong reason.
+
+The parameter counts corroborate it from the other side, and they are the check that would have
+caught a silent registration failure: the baseline loads **1025** parameters from `hero.json`; the
+new binary loads **1032** from the same file. Exactly seven more, which is exactly the seven
+`post/look/*` parameters — registered, reaching the application, and reported by the project loader
+with `0 warning(s)`. Counted by name, not by file size: ADR-350's camera-bake loss shrank a file by
+10,000 lines while its parameter count went *up*, so a size check would have said healthy.
 
 ## Consequences
 
