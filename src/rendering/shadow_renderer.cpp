@@ -137,7 +137,8 @@ Result<void> ShadowRenderer::init(std::uint64_t frameUniformSize) {
 
 std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLight*>& lights,
                                      const glm::mat4& viewProj, float cameraNear, float cameraFar,
-                                     float sceneRadius, const QualitySettings& quality) {
+                                     float sceneRadius, const QualitySettings& quality,
+                                     float rangeOverride) {
     Impl& im = *impl_;
     views_.clear();
     stats_ = ShadowStats{};
@@ -155,8 +156,15 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
     // arithmetic and the reasoning live in shadow_math so they can be checked without a device.
     // `kShadowRangeReference`, deliberately, and not `im.resolution`: how far the shadows reach is
     // the same in a preview and in the final render, and only how sharp they are differs.
-    const float shadowFar = directionalShadowRange(cameraNear, cameraFar, sceneRadius,
-                                                   kShadowRangeReference, quality.shadowTexelTarget);
+    float shadowFar = directionalShadowRange(cameraNear, cameraFar, sceneRadius,
+                                             kShadowRangeReference, quality.shadowTexelTarget);
+    // The scene's own range wins when it has one. It is clamped to the camera rather than trusted:
+    // a range shorter than a few near planes fits cascades to a sliver and one past the far plane
+    // fits them to a frustum the camera does not have, and both read as "the shadows vanished".
+    if (rangeOverride > 0.0f) {
+        const float near = std::max(cameraNear, 1e-3f);
+        shadowFar = std::clamp(rangeOverride, near * 4.0f, std::max(cameraFar, near * 4.0f));
+    }
     stats_.range = shadowFar;
     const glm::mat4 invViewProj = glm::inverse(viewProj);
     const std::uint32_t cascades = std::clamp(quality.cascadeCount, 1u, kMaxCascades);

@@ -1,0 +1,310 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "cosmickey _ck-eval-volume"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "_ck-eval-volume.scene.json"
+    }
+  },
+  "parameters": {
+    "camera/exposure/mode": 0,
+    "camera/exposure/compensation": 0.0,
+    "post/tonemap/operator": 1,
+    "post/bloom/enabled": true,
+    "post/bloom/intensity": 0.16,
+    "nodes/tree-tracery/emissiveBoost": 2.4,
+    "nodes/tree-twigs/emissiveBoost": 0.55,
+    "nodes/tree-foliage/emissiveBoost": 0.5,
+    "nodes/tree-lumens/emissiveBoost": 2.4,
+    "sources/spin/rate": 0.0055555556,
+    "sources/spin/phase": 0.0,
+    "sources/bob/rate": 0.025,
+    "sources/bob/phase": 0.25,
+    "sources/tilt-x/rate": 0.0092,
+    "sources/tilt-x/phase": 0.25,
+    "sources/tilt-z/rate": 0.0067,
+    "sources/tilt-z/phase": 0.6,
+    "lights/celestial-key/enabled": true,
+    "lights/celestial-key/azimuth": -50.0,
+    "lights/celestial-key/elevation": 35.0,
+    "lights/celestial-key/intensity": 22.0,
+    "lights/celestial-key/color": [
+      1.0,
+      0.92,
+      0.78
+    ],
+    "lights/celestial-key/angularSize": 1.8,
+    "lights/celestial-key/shadowStrength": 0.95,
+    "lights/cosmic-fill/intensity": 0.72,
+    "lights/cosmic-fill/color": [
+      0.32,
+      0.45,
+      0.88
+    ],
+    "lights/glowmere-rim/intensity": 0.34,
+    "nodes/cosmos-stars-near/emissiveBoost": 1.25,
+    "nodes/cosmos-stars-mid/emissiveBoost": 1.25,
+    "nodes/cosmos-stars-far/emissiveBoost": 1.2,
+    "nodes/cosmos-motes/emissiveBoost": 1.15,
+    "scene/shadowRange": 420.0,
+    "env/sky/intensity": 1.0,
+    "shader/glowmere-cosmos/violetAmount": 0.022,
+    "shader/glowmere-cosmos/hazeAmount": 0.058,
+    "shader/glowmere-cosmos/haloAmount": 0.062
+  },
+  "sources": [
+    {
+      "kind": "lfo",
+      "name": "spin",
+      "settings": {
+        "shape": "saw"
+      }
+    },
+    {
+      "kind": "lfo",
+      "name": "bob",
+      "settings": {
+        "shape": "sine"
+      }
+    },
+    {
+      "kind": "lfo",
+      "name": "tilt-x",
+      "settings": {
+        "shape": "sine"
+      }
+    },
+    {
+      "kind": "lfo",
+      "name": "tilt-z",
+      "settings": {
+        "shape": "sine"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "source": "lfo.spin",
+      "target": "nodes/floating-island/rotation",
+      "component": 1,
+      "amount": 360.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {}
+    },
+    {
+      "source": "lfo.bob.bipolar",
+      "target": "nodes/floating-island/position",
+      "component": 1,
+      "amount": 2.4,
+      "op": "add",
+      "polarity": "bipolar",
+      "chain": {}
+    },
+    {
+      "source": "lfo.tilt-x.bipolar",
+      "target": "nodes/floating-island/rotation",
+      "component": 0,
+      "amount": 1.1,
+      "op": "add",
+      "polarity": "bipolar",
+      "chain": {}
+    },
+    {
+      "source": "lfo.tilt-z.bipolar",
+      "target": "nodes/floating-island/rotation",
+      "component": 2,
+      "amount": 0.9,
+      "op": "add",
+      "polarity": "bipolar",
+      "chain": {}
+    }
+  ],
+  "shaders": [
+    {
+      "path": "../../shaders/glowmere-cosmos.wgsl",
+      "stage": "background"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Celestial Day",
+      "values": {
+        "lights/celestial-key/enabled": [
+          1.0
+        ],
+        "lights/celestial-key/azimuth": [
+          -50.0
+        ],
+        "lights/celestial-key/elevation": [
+          35.0
+        ],
+        "lights/celestial-key/intensity": [
+          22.0
+        ],
+        "lights/celestial-key/color": [
+          1.0,
+          0.92,
+          0.78
+        ],
+        "lights/celestial-key/angularSize": [
+          1.8
+        ],
+        "lights/celestial-key/shadowStrength": [
+          0.95
+        ],
+        "lights/cosmic-fill/intensity": [
+          0.72
+        ],
+        "lights/cosmic-fill/color": [
+          0.32,
+          0.45,
+          0.88
+        ],
+        "lights/glowmere-rim/intensity": [
+          0.34
+        ],
+        "nodes/cosmos-stars-near/emissiveBoost": [
+          1.25
+        ],
+        "nodes/cosmos-stars-mid/emissiveBoost": [
+          1.25
+        ],
+        "nodes/cosmos-stars-far/emissiveBoost": [
+          1.2
+        ],
+        "nodes/cosmos-motes/emissiveBoost": [
+          1.15
+        ],
+        "scene/shadowRange": [
+          420.0
+        ],
+        "env/sky/intensity": [
+          1.0
+        ],
+        "nodes/tree-tracery/emissiveBoost": [
+          2.4
+        ],
+        "nodes/tree-twigs/emissiveBoost": [
+          0.55
+        ],
+        "nodes/tree-foliage/emissiveBoost": [
+          0.5
+        ],
+        "nodes/tree-lumens/emissiveBoost": [
+          2.4
+        ],
+        "shader/glowmere-cosmos/violetAmount": [
+          0.022
+        ],
+        "shader/glowmere-cosmos/hazeAmount": [
+          0.058
+        ],
+        "shader/glowmere-cosmos/haloAmount": [
+          0.062
+        ]
+      }
+    },
+    {
+      "name": "Celestial Night",
+      "values": {
+        "lights/celestial-key/enabled": [
+          1.0
+        ],
+        "lights/celestial-key/azimuth": [
+          -50.0
+        ],
+        "lights/celestial-key/elevation": [
+          35.0
+        ],
+        "lights/celestial-key/intensity": [
+          4.6
+        ],
+        "lights/celestial-key/color": [
+          0.62,
+          0.72,
+          1.0
+        ],
+        "lights/celestial-key/angularSize": [
+          2.4
+        ],
+        "lights/celestial-key/shadowStrength": [
+          0.99
+        ],
+        "lights/cosmic-fill/intensity": [
+          0.3
+        ],
+        "lights/cosmic-fill/color": [
+          0.34,
+          0.37,
+          0.88
+        ],
+        "lights/glowmere-rim/intensity": [
+          0.22
+        ],
+        "nodes/cosmos-stars-near/emissiveBoost": [
+          1.9
+        ],
+        "nodes/cosmos-stars-mid/emissiveBoost": [
+          1.9
+        ],
+        "nodes/cosmos-stars-far/emissiveBoost": [
+          1.9
+        ],
+        "nodes/cosmos-motes/emissiveBoost": [
+          1.7
+        ],
+        "scene/shadowRange": [
+          420.0
+        ],
+        "env/sky/intensity": [
+          1.0
+        ],
+        "nodes/tree-tracery/emissiveBoost": [
+          2.4
+        ],
+        "nodes/tree-twigs/emissiveBoost": [
+          0.55
+        ],
+        "nodes/tree-foliage/emissiveBoost": [
+          0.5
+        ],
+        "nodes/tree-lumens/emissiveBoost": [
+          2.4
+        ]
+      }
+    },
+    {
+      "name": "Glowmere Bloom (ADR-338 emissives)",
+      "values": {
+        "nodes/tree-tracery/emissiveBoost": [
+          5.0
+        ],
+        "nodes/tree-twigs/emissiveBoost": [
+          1.5
+        ],
+        "nodes/tree-foliage/emissiveBoost": [
+          2.2
+        ],
+        "nodes/tree-lumens/emissiveBoost": [
+          4.0
+        ]
+      }
+    }
+  ],
+  "timeline": {
+    "enabled": false,
+    "tracks": [],
+    "cues": []
+  },
+  "render": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "output": "sequence"
+  }
+}

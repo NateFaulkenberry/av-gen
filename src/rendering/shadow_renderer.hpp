@@ -84,8 +84,13 @@ public:
     // Chooses this frame's views and computes their matrices. `lights` are the scene lights in the
     // order they were packed (so `ShadowView::lightIndex` indexes the GPU light buffer);
     // `sceneRadius` sizes the caster range behind the visible frustum. Returns the number of views.
+    // `rangeOverride` is `scene::Environment::shadowRange`: how far the directional cascades
+    // reach, in view depth, when the scene has an opinion. 0 -- the default, and what every scene
+    // that does not set it passes -- leaves ADR-112's automatic rule in charge. Clamped to the
+    // camera's own planes here, because a range past the far plane fits cascades to nothing.
     std::uint32_t update(const std::vector<const scene::PunctualLight*>& lights, const glm::mat4& viewProj,
-                         float cameraNear, float cameraFar, float sceneRadius, const QualitySettings& quality);
+                         float cameraNear, float cameraFar, float sceneRadius, const QualitySettings& quality,
+                         float rangeOverride = 0.0f);
     // Writes each view's frame-uniform copy (the caller's block with `viewProj` replaced) and the
     // ShadowUniforms block. Call after update() and after the frame block is final.
     void upload(const void* frameUniforms, std::uint64_t frameUniformSize);
