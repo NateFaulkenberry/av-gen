@@ -415,7 +415,7 @@ TEST_CASE("--aov shadow refuses the configurations where it would be a constant"
 TEST_CASE("Every path-trace setting survives a JSON round trip, twice", "[render][pathtrace][settings]") {
     PathTraceSettings authored;
     authored.seconds = 12.75;
-    authored.endSeconds = 20.5;     // ADR-382: the range is part of the authored set
+    authored.endSeconds = 20.5;     // ADR-383: the range is part of the authored set
     authored.fps = 30.0;
     authored.samplesPerPixel = 512;
     authored.maxDepth = 9;
@@ -476,7 +476,7 @@ TEST_CASE("A project with no pathtrace block reads the defaults, not the last on
 
 TEST_CASE("A project with no range traces one frame, and saying so is not a range",
           "[render][pathtrace][settings]") {
-    // ADR-382. Every project written before the range existed says nothing about it, and every one
+    // ADR-383. Every project written before the range existed says nothing about it, and every one
     // of them must still mean "one frame at `seconds`". The default is what carries that, so it is
     // asserted rather than assumed.
     const PathTraceSettings defaults;

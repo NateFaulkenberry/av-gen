@@ -360,7 +360,7 @@ private:
     // cannot drift apart in three call sites.
     PathTraceSettings uiPathTrace_;
     pathtrace::TraceProgress lastPathTrace_;
-    // ADR-382: a path-traced SEQUENCE, on its own thread for the reason `TraceJob` has one -- it
+    // ADR-383: a path-traced SEQUENCE, on its own thread for the reason `TraceJob` has one -- it
     // is minutes of CPU and the editor has to keep its frame.
     std::unique_ptr<TraceSequence> ptSequence_;
     std::thread ptSeqThread_;

@@ -148,7 +148,7 @@ public:
     app::PathTraceSettings* pathTraceSettings = nullptr;
     bool pathTraceDenoiseAvailable = false;   // false greys the checkbox and explains why
     std::function<pathtrace::TraceProgress()> pathTraceProgress;
-    // ADR-382: a path-traced SEQUENCE reports frames as well as samples, so it has its own reader
+    // ADR-383: a path-traced SEQUENCE reports frames as well as samples, so it has its own reader
     // rather than being squeezed into a single frame's progress. Empty optional means there is no
     // sequence -- which is not the same as a sequence with no frames done.
     std::function<std::optional<app::SequenceProgress>()> pathTraceSequenceProgress;

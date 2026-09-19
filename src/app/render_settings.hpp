@@ -144,7 +144,7 @@ struct RenderSettings {
 
     // Frame count for a resolved end time (endSeconds >= startSeconds); the last frame is the one
     // whose time is < end (end exclusive), at least 1.
-    // This render's range, as the one type that owns the arithmetic (ADR-382). The two calls below
+    // This render's range, as the one type that owns the arithmetic (ADR-383). The two calls below
     // delegate to it and are kept because every existing caller and test uses them.
     [[nodiscard]] FrameRange frameRange() const;
     [[nodiscard]] std::uint64_t frameCount(double resolvedEndSeconds) const;
@@ -212,7 +212,7 @@ struct RenderSettings {
 // the translation cannot drift silently.
 struct PathTraceSettings {
     double seconds = 0.0;             // the first (or only) timeline second to trace
-    // ADR-382: the range, and the reason the Render panel's tooltip no longer says "one frame, not
+    // ADR-383: the range, and the reason the Render panel's tooltip no longer says "one frame, not
     // a sequence". Below zero means exactly one frame, at `seconds`, which is what every existing
     // project says and what a person asking for a look at one moment wants. A value at or above
     // `seconds` makes it a range, walked at `fps`, end exclusive -- the same arithmetic the

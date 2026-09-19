@@ -46,7 +46,7 @@ gpu::ShaderLibrary makeShaders(gpu::Context& ctx) {
     return gpu::ShaderLibrary(ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
 }
 
-// ---- the CPU output transform, used as the GPU's independent check (ADR-382) -------------------
+// ---- the CPU output transform, used as the GPU's independent check (ADR-383) -------------------
 //
 // These used to be a private copy of shaders/tonemap.wgsl living in this file. It is now
 // `src/scene/tonemap.cpp`, because the path tracer needs it to turn a frame into video without a

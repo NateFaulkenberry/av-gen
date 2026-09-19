@@ -853,7 +853,7 @@ TEST_CASE("the arrows nudge only where the user is pointing", "[ui][logic][trans
 }
 
 TEST_CASE("The codec list is what this machine can actually produce", "[ui][video]") {
-    // ADR-382, audit G4. The Render panel offered a hardcoded eight -- four of them ffmpeg-only --
+    // ADR-383, audit G4. The Render panel offered a hardcoded eight -- four of them ffmpeg-only --
     // whether or not an ffmpeg existed anywhere, so choosing one was a render that failed when the
     // output was opened, after the project had already been saved to disk.
     const std::vector<std::string> native = {"prores4444", "prores422", "h264", "hevc"};

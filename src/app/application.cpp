@@ -858,7 +858,7 @@ Application::~Application() {
     // is torn down is a race nobody would find twice.
     job_.reset();
     ptJob_.reset();
-    // ADR-382, and ADR-364's lesson applied the moment it was earned: a job that is not on this
+    // ADR-383, and ADR-364's lesson applied the moment it was earned: a job that is not on this
     // list is a job whose thread outlives the engine it is reading. Cancel first, then join, then
     // destroy -- `run()` is on that thread and holds a reference to the sequence's own engine.
     if (ptSequence_) {
@@ -1989,6 +1989,8 @@ Result<void> Application::applyDebugDraw() {
         {"shadowCasters", &d.shadowCasters},
         {"lights", &d.lights},
         {"lightClusters", &d.lightClusters},
+        {"wind", &d.wind},          // ADR-382 section 19
+        {"vortex", &d.vortex},
     };
     std::string enabled;
     std::stringstream stream(options_.debugDraw);
@@ -4621,7 +4623,7 @@ void Application::startPathTraceFromUi() {
         return;
     }
 
-    // ADR-382: a range goes to `TraceSequence` instead. Same settings object, same output field,
+    // ADR-383: a range goes to `TraceSequence` instead. Same settings object, same output field,
     // same button -- the only thing the person did differently is tick "range".
     if (uiPathTrace_.isSequence()) {
         // The decision itself is `traceSequenceRequestFrom`, which is a free function so a test can
@@ -4658,7 +4660,7 @@ void Application::startPathTraceFromUi() {
     panel_->setStatus(fmt::format("path tracing to {}", out.filename().string()));
 }
 
-// ADR-382. A path-traced range, through `app::TraceSequence`: one project load, the shared
+// ADR-383. A path-traced range, through `app::TraceSequence`: one project load, the shared
 // `FrameSequenceDriver`, and either an EXR per frame or -- via the CPU output transform -- a movie.
 int Application::runTraceSequence(const std::filesystem::path& projectFile,
                                   const PathTraceSettings& authored) {
@@ -4735,7 +4737,7 @@ int Application::runPathTrace() {
     if (options_.ptDenoise) authored.denoise = *options_.ptDenoise;
     if (options_.ptAovs) authored.writeAovs = *options_.ptAovs;
     if (options_.ptProbe) authored.albedoProbe = *options_.ptProbe;
-    // ADR-382: `--range a:b` makes it a sequence. Deliberately the SAME flag `--render` uses rather
+    // ADR-383: `--range a:b` makes it a sequence. Deliberately the SAME flag `--render` uses rather
     // than a `--pt-range`: it is the same question about the same timeline, and a second vocabulary
     // for it is a second thing to get wrong. `--fps` likewise.
     if (options_.rangeStart) authored.seconds = *options_.rangeStart;

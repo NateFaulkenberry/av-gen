@@ -42,7 +42,7 @@ void RenderSettings::normalisePattern() {
     }
 }
 
-// ADR-382: the range arithmetic has one home now. `RenderSettings` carried its own copy of these
+// ADR-383: the range arithmetic has one home now. `RenderSettings` carried its own copy of these
 // two, and a second renderer growing a third copy is how two deliverables of one project end up a
 // frame apart. `frameRange()` is the seam; the behaviour is unchanged, and the assertions in
 // `test_render_settings.cpp` that predate this are what say so.

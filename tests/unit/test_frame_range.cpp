@@ -1,4 +1,4 @@
-// The frame-range driver (ADR-382): the arithmetic, the loop, the hash chain and the bounded
+// The frame-range driver (ADR-383): the arithmetic, the loop, the hash chain and the bounded
 // writer pool, checked with a fake renderer so none of it needs a device.
 //
 // This is the point of extracting it. `app::RenderJob` has twenty GPU tests pinning the same

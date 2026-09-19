@@ -1,4 +1,4 @@
-// A path-traced sequence (ADR-382). The Render panel used to say "One frame, not a sequence -- a
+// A path-traced sequence (ADR-383). The Render panel used to say "One frame, not a sequence -- a
 // path-traced sequence is a queue of these and is not built yet"; this is the thing that makes that
 // sentence false, and these are the arms that say it is really a sequence rather than one frame
 // rendered repeatedly.
@@ -194,7 +194,7 @@ TEST_CASE("A trace sequence refuses what it cannot deliver", "[pathtrace][sequen
 
 TEST_CASE("The output path decides the kind, the same way for the button and the flag",
           "[pathtrace][sequence]") {
-    // ADR-382. This is the decision `Application::startPathTraceFromUi` used to make inline, where
+    // ADR-383. This is the decision `Application::startPathTraceFromUi` used to make inline, where
     // no test could see it. It is the rule a person gets wrong first -- and both the Render panel
     // and `--pathtrace` go through this one function, so a flag and a button cannot come to
     // disagree about what a path means.

@@ -2812,7 +2812,7 @@ void ControlPanel::drawPathTrace() {
 
     const pathtrace::TraceProgress p =
         pathTraceProgress ? pathTraceProgress() : pathtrace::TraceProgress{};
-    // ADR-382: a sequence reports frames AND samples-within-the-frame, because a path-traced frame
+    // ADR-383: a sequence reports frames AND samples-within-the-frame, because a path-traced frame
     // takes long enough that a frame counter on its own reads as a hang.
     const std::optional<app::SequenceProgress> seq =
         pathTraceSequenceProgress ? pathTraceSequenceProgress() : std::nullopt;
@@ -2840,7 +2840,7 @@ void ControlPanel::drawPathTrace() {
             tooltip("The timeline second to trace, or the first second of a range.");
         }
 
-        // ADR-382. A path-traced SEQUENCE. The tooltip above used to end "one frame, not a
+        // ADR-383. A path-traced SEQUENCE. The tooltip above used to end "one frame, not a
         // sequence -- a path-traced sequence is a queue of these and is not built yet", and this
         // is the thing that makes that sentence false.
         bool sequence = t.isSequence();
@@ -3216,7 +3216,7 @@ void ControlPanel::drawRender(app::Engine& engine) {
         onChooseRenderOutput();
     }
     if (s.output == app::RenderOutput::Video) {
-        // ADR-382 / audit G4: only what this machine can actually produce. This was a hardcoded
+        // ADR-383 / audit G4: only what this machine can actually produce. This was a hardcoded
         // array of eight, four of them ffmpeg-only, offered whether or not an ffmpeg exists
         // anywhere -- so picking one was a render that failed when the output was opened, after
         // the project had been saved. The decision is `ui::availableCodecs`, which a test can ask
@@ -3268,7 +3268,7 @@ void ControlPanel::drawRender(app::Engine& engine) {
         ImGui::Checkbox("mux audio", &s.muxAudio);
         ImGui::SameLine();
         ImGui::SetNextItemWidth(90.0f);
-        // ADR-382 / audit G3. `encoderThreads` round-tripped through the project and had no widget
+        // ADR-383 / audit G3. `encoderThreads` round-tripped through the project and had no widget
         // anywhere: CLI only, on a setting whose whole purpose is "this machine is busy, spend
         // fewer cores on the encoder".
         ImGui::InputInt("encoders", &s.encoderThreads, 1, 2);
@@ -3290,7 +3290,7 @@ void ControlPanel::drawRender(app::Engine& engine) {
         }
     }
 
-    // ---- properties of the deliverable that were CLI-only (audit G3, ADR-382) --------------------
+    // ---- properties of the deliverable that were CLI-only (audit G3, ADR-383) --------------------
     {
         ImGui::SetNextItemWidth(120.0f);
         float supersample = s.supersample;

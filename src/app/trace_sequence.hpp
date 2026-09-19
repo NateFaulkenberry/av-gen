@@ -1,6 +1,6 @@
 #pragma once
 
-// A path-traced SEQUENCE (ADR-382, `docs/offline-backend-audit.md` step 6).
+// A path-traced SEQUENCE (ADR-383, `docs/offline-backend-audit.md` step 6).
 //
 // `pathtrace::TraceJob` renders exactly one frame, and the Render panel's tooltip said so: *"One
 // frame, not a sequence -- a path-traced sequence is a queue of these and is not built yet."* This

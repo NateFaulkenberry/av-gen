@@ -42,6 +42,14 @@ struct DebugViewOptions {
     // an overlay drawn at the wrong aspect is a box that does not match the screen it is over. On a
     // live camera this is exactly the screen edge and tells you nothing; it is worth drawing when
     // the camera is frozen (Phase 4.2's arm), because then it is the volume the cull used.
+    // ADR-382, the brief's §19. Developer views, not artist controls -- three of the real bugs in
+    // this branch were geometry errors that a picture would have shown in a second and that a
+    // metric did not: the vortex funnel extending UPWARD as a full-radius cylinder, the camera
+    // sitting inside the funnel's mouth, and a per-metre conversion missing so a term was two
+    // orders of magnitude out. None of those is visible in a luminance number.
+    bool wind = false;            // the wind field: direction and strength on a grid, and each
+                                  // declared wind body's origin, height and radius
+    bool vortex = false;          // the vortex's mouth, throat, depth and swirl direction
     bool frustum = false;
     float frustumAspect = 16.0f / 9.0f;
     bool transformTrail = false;  // the recorded world path of the selected object (transform_history.hpp)

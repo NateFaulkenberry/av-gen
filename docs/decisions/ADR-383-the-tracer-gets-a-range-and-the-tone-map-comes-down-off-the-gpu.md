@@ -1,4 +1,4 @@
-# ADR-382: The tracer gets a range, and the tone map comes down off the GPU
+# ADR-383: The tracer gets a range, and the tone map comes down off the GPU
 
 Status: accepted
 Date: 2026-09-19

@@ -78,7 +78,7 @@ target_link_libraries(avgen_charai_probe PRIVATE avgen_core)
 add_executable(avgen_seek_probe seek_probe.cpp)
 target_link_libraries(avgen_seek_probe PRIVATE avgen_core)
 
-# TEMPORARY (ADR-382, the audit's W6). The Metal ray-tracing DECISION, not a backend: does Metal
+# TEMPORARY (ADR-383, the audit's W6). The Metal ray-tracing DECISION, not a backend: does Metal
 # beat Embree on an M2, where there is no hardware RT unit? Delete it with the decision it informs.
 if(APPLE)
     # The same app/ sources `avgen_overlay_shot` lists, and for the same reason: `Engine` lives in

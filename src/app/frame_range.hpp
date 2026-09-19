@@ -1,6 +1,6 @@
 #pragma once
 
-// A frame range, and the loop that walks one (ADR-382, `docs/offline-backend-audit.md` step 5).
+// A frame range, and the loop that walks one (ADR-383, `docs/offline-backend-audit.md` step 5).
 //
 // ## What was missing, and what was not
 //

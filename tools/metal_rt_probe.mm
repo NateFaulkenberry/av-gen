@@ -1,4 +1,4 @@
-// Metal ray tracing: does it beat Embree on THIS machine? (ADR-382's open question, the audit's W6
+// Metal ray tracing: does it beat Embree on THIS machine? (ADR-383's open question, the audit's W6
 // and section 5.)
 //
 // TEMPORARY. This exists to answer one question and should be deleted with the decision it
