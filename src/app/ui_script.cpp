@@ -104,23 +104,12 @@ void pushButton(platform::Window& window, float x, float y, bool down,
     SDL_PushEvent(&e);
 }
 
-// A modifier, held or let go. Dear ImGui reads Cmd from `io.KeySuper`, which the SDL3 backend sets
-// from these events -- so a scripted Cmd+click has to press the key as a real one would rather than
-// poking the IO struct, which the backend would overwrite on the next frame anyway.
-void pushKey(platform::Window& window, SDL_Keycode key, SDL_Scancode scancode, SDL_Keymod mod,
-             bool down) {
-    SDL_Event e{};
-    e.type = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
-    e.key.timestamp = SDL_GetTicksNS();
-    e.key.windowID = window.id();
-    e.key.which = 0;
-    e.key.scancode = scancode;
-    e.key.key = key;
-    e.key.mod = mod;
-    e.key.down = down;
-    e.key.repeat = false;
-    SDL_PushEvent(&e);
-}
+// There is deliberately no `pushKey` here. A synthetic `SDL_EVENT_KEY_DOWN` pushed with
+// `SDL_PushEvent` was written, tried and removed: it never reached the ImGui backend at all, while
+// the synthetic *button* events beside it worked -- so a scripted modifier goes in through
+// `ImGui::GetIO().AddKeyEvent`, which is where the backend would have put it anyway, and nothing
+// overwrites it because `ImGui_ImplSDL3_UpdateKeyModifiers` runs only from a real key event. See
+// `stepSlice`, which is the only arm that holds one.
 
 } // namespace
 
