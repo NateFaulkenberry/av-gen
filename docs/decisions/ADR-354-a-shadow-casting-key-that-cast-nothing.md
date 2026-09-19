@@ -219,6 +219,15 @@ of the gap and it is not in this renderer.
 * A scene can make the shadowed range a compositional decision. Nothing that does not ask, moves.
 * `--aov shadow` is worth running on any scene where a shadow looks absent: the difference between
   "soft" and "the constant 1.0" is one `min` away and invisible in the beauty pass.
+* **The render suite aborts, and it is not this branch.** `avgen_render_tests` dies with a bus
+  error in a full-suite run; with `-s` the last thing it prints is
+  `tests/rendering/test_wind_gpu.cpp:272 FAILED` in "Wind off is byte-identical to wind never
+  having existed", then SIGABRT while Catch2 stringifies a four-megabyte byte vector. The same test
+  passes 3 of 3 in isolation under the GPU lock. `src/` checked out to the merge base e41660d5 --
+  none of this branch's changes present -- **reproduces the bus error**, so it is on `main`. Two
+  things are worth separating in it: a byte-identity check that passes alone and fails in a suite
+  (ADR-170's documented contention signature, or state leaking between GPU tests), and a reporter
+  that cannot survive printing the failure it found.
 * A control has to be authored in the layer that wins. `_ck-ctl-nokey` first disabled the key in
   the scene, was overruled by the project parameter this ADR added, and returned statistics
   identical to its arm to five decimal places — which is what a control that did not fire looks
