@@ -351,8 +351,16 @@ struct ObjectUniforms {
                                 // w = foliage influence
     glm::vec4 windTune{0.0f};   // x = trunk influence, y = leaf flutter, z = response lag (s),
                                 // w = the previous frame's time
+    // ADR-376: tree energy and canopy shimmer, sharing the wind body's frame above. energy0.x and
+    // energy3.x are the two gates; both zero means the fragment stage returns immediately.
+    glm::vec4 energy0{0.0f};    // intensity, pulse speed, pulse width, propagation speed
+    glm::vec4 energy1{0.0f};    // root, trunk, branch, canopy share
+    glm::vec4 energy2{0.0f};    // noise amount, noise scale, noise speed, bloom contribution
+    glm::vec4 energy3{0.0f};    // shimmer intensity, speed, scale, variation
+    glm::vec4 energyA{0.0f};
+    glm::vec4 energyB{0.0f};
 };
-static_assert(sizeof(ObjectUniforms) == 320);
+static_assert(sizeof(ObjectUniforms) == 416);
 static_assert(offsetof(ObjectUniforms, model) == 0);
 static_assert(offsetof(ObjectUniforms, normalMatrix) == 64);
 static_assert(offsetof(ObjectUniforms, prevModel) == 128);
