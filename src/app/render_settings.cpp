@@ -3,6 +3,7 @@
 #include "scene/scene.hpp"
 
 #include "rendering/render_quality.hpp"
+#include "pathtrace/path_tracer.hpp"
 
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
@@ -371,6 +372,130 @@ Result<void> shadowAovPreconditions(const scene::Scene& scene, std::string_view 
             "frame shadowed against 4.6% with shadows on (ADR-182, ADR-255)");
     }
     return {};
+}
+
+
+
+// ---- PathTraceSettings (ADR-366) -------------------------------------------------------------
+
+Result<void> PathTraceSettings::validate() const {
+    if (!(seconds >= 0.0) || !std::isfinite(seconds)) {
+        return fail("pathtrace: 'seconds' must be a finite time at or after zero, got {}", seconds);
+    }
+    if (samplesPerPixel == 0) {
+        return fail("pathtrace: 'samples' must be at least 1");
+    }
+    // The UI's slider stops at 1024 and the ceiling here is deliberately higher: a person who edits
+    // the project file to ask for an overnight 4096-sample frame is not making a mistake. What is a
+    // mistake is a number that cannot have been meant, so the refusal is at a value no render is.
+    if (samplesPerPixel > 65536) {
+        return fail("pathtrace: 'samples' of {} is not a render anybody asked for (max 65536)",
+                    samplesPerPixel);
+    }
+    if (maxDepth > 64) {
+        return fail("pathtrace: 'bounces' of {} is past any useful path length (max 64)", maxDepth);
+    }
+    if (threads > 1024) {
+        return fail("pathtrace: 'threads' of {} is not a machine (max 1024; 0 means all of them)",
+                    threads);
+    }
+    if (!outputPath.empty() && outputPath.extension() != ".exr") {
+        // The tracer writes scene-linear EXR and nothing else. A '.png' here would be accepted by
+        // the filesystem and would contain float EXR bytes, which is the silently-corrupt output
+        // the error-handling rule exists to prevent.
+        return fail("pathtrace: the output is scene-linear EXR, so '{}' must end in .exr",
+                    outputPath.generic_string());
+    }
+    return {};
+}
+
+nlohmann::json PathTraceSettings::toJson() const {
+    return nlohmann::json{{"seconds", seconds},
+                          {"samples", samplesPerPixel},
+                          {"bounces", maxDepth},
+                          {"seed", seed},
+                          {"threads", threads},
+                          {"denoise", denoise},
+                          {"aovs", writeAovs},
+                          {"albedoProbe", albedoProbe},
+                          {"path", outputPath.generic_string()}};
+}
+
+Result<PathTraceSettings> PathTraceSettings::fromJson(const nlohmann::json& j) {
+    if (!j.is_object()) {
+        return fail("'pathtrace' must be an object");
+    }
+    PathTraceSettings s;
+    auto number = [&](const char* key, auto& out) -> Result<void> {
+        if (const auto it = j.find(key); it != j.end()) {
+            if (!it->is_number()) {
+                return fail("pathtrace.{} must be a number", key);
+            }
+            out = it->get<std::remove_reference_t<decltype(out)>>();
+        }
+        return {};
+    };
+    auto boolean = [&](const char* key, bool& out) -> Result<void> {
+        if (const auto it = j.find(key); it != j.end()) {
+            if (!it->is_boolean()) {
+                return fail("pathtrace.{} must be a boolean", key);
+            }
+            out = it->get<bool>();
+        }
+        return {};
+    };
+    if (const auto it = j.find("seconds"); it != j.end()) {
+        if (!it->is_number()) {
+            return fail("pathtrace.seconds must be a number");
+        }
+        s.seconds = it->get<double>();
+    }
+    if (auto r = number("samples", s.samplesPerPixel); !r) return std::unexpected(r.error());
+    if (auto r = number("bounces", s.maxDepth); !r) return std::unexpected(r.error());
+    // The seed goes through the integer path rather than the double one every other field uses:
+    // 0x853c49e6748fea9b does not survive a round trip through a double, and a seed that changes
+    // when a project is saved is a determinism guarantee that quietly stops holding.
+    if (const auto it = j.find("seed"); it != j.end()) {
+        if (!it->is_number_unsigned() && !it->is_number_integer()) {
+            return fail("pathtrace.seed must be an integer");
+        }
+        s.seed = it->get<std::uint64_t>();
+    }
+    if (auto r = number("threads", s.threads); !r) return std::unexpected(r.error());
+    if (auto r = boolean("denoise", s.denoise); !r) return std::unexpected(r.error());
+    if (auto r = boolean("aovs", s.writeAovs); !r) return std::unexpected(r.error());
+    if (auto r = boolean("albedoProbe", s.albedoProbe); !r) return std::unexpected(r.error());
+    if (const auto it = j.find("path"); it != j.end()) {
+        if (!it->is_string()) {
+            return fail("pathtrace.path must be a string");
+        }
+        s.outputPath = it->get<std::string>();
+    }
+    if (auto r = s.validate(); !r) {
+        return std::unexpected(r.error());
+    }
+    return s;
+}
+
+
+pathtrace::TraceSettings traceSettingsFrom(const PathTraceSettings& settings, std::uint32_t width,
+                                           std::uint32_t height) {
+    pathtrace::TraceSettings t;
+    t.width = std::max(16u, width);
+    t.height = std::max(16u, height);
+    t.samplesPerPixel = std::max(1u, settings.samplesPerPixel);
+    t.maxDepth = settings.maxDepth;
+    t.seed = settings.seed;
+    t.threads = settings.threads;
+    t.albedoProbe.enabled = settings.albedoProbe;
+    // Derived, never authored: both consumers need the feature buffers and a project that could
+    // record "denoise, but do not capture what the denoiser reads" would be recording a failure.
+    t.captureFeatures = settings.denoise || settings.writeAovs;
+    // Deliberately NOT carried across, and named so nobody later assumes the omission was an
+    // oversight: `strategy`, `russianRouletteDepth` and `russianRouletteCompensation`. The last is
+    // documented as an intentionally-wrong control arm that must never be set in production, and a
+    // project file is exactly the place a wrong value would survive long enough to be believed.
+    return t;
 }
 
 } // namespace avgen::app

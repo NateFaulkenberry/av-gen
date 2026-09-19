@@ -573,3 +573,57 @@ TEST_CASE("video writer: ffmpeg backend encodes libx264 through a pipe", "[asset
         CHECK(std::filesystem::file_size(out.path) > 1024);
     }
 }
+
+TEST_CASE("A written movie says what its pixels mean", "[video][color]") {
+    // ADR-365. Every file this backend produced from ADR-020 until now was untagged: no
+    // AVVideoColorPropertiesKey, no -color_primaries. Players guess, and on an SDR deliverable the
+    // guess is usually right, which is why it survived -- but a delivery is not a guess and nothing
+    // HDR can be built on one.
+    if (!assets::hasNativeVideo()) {
+        SKIP("no native video backend on this platform");
+    }
+    TempFile out("tagged.mov");
+    const auto writer = writeClip(out.path, smallClip("prores422"));
+    const auto info = assets::probeVideo(out.path);
+    INFO((info ? std::string() : info.error().message));
+    REQUIRE(info.has_value());
+
+    INFO("primaries='" << info->colorPrimaries << "' transfer='" << info->colorTransfer
+                       << "' matrix='" << info->colorMatrix << "'");
+    CHECK(info->colorTagged());
+    // The exact strings, not merely "something is set": a file tagged BT.2020 would pass a
+    // non-empty check and would be wrong in a way that only shows up on somebody else's monitor.
+    CHECK(info->colorPrimaries == "ITU_R_709_2");
+    CHECK(info->colorTransfer == "ITU_R_709_2");
+    CHECK(info->colorMatrix == "ITU_R_709_2");
+}
+
+TEST_CASE("The probe reports an untagged file as untagged", "[video][color]") {
+    // THE CONTROL (ADR-182). `colorTagged()` has to be able to come out false, or the test above is
+    // asserting that a function which always returns true returns true. This writes a file with the
+    // tags stripped -- the state the shipping backend was in until ADR-365 -- through the ffmpeg
+    // backend's own argument list, and requires the probe to notice.
+    //
+    // Skipped rather than faked where there is no ffmpeg: a control that cannot run is not a
+    // control, and saying so is better than passing.
+    if (!assets::hasNativeVideo()) {
+        SKIP("no native video backend to probe with");
+    }
+    const std::filesystem::path ffmpeg = assets::findFfmpeg();
+    if (ffmpeg.empty()) {
+        SKIP("no ffmpeg on this machine to write an untagged control file with");
+    }
+    TempFile out("untagged.mov");
+    const std::string cmd =
+        ffmpeg.string() + " -v quiet -y -f lavfi -i testsrc=size=64x64:rate=10:duration=0.5" +
+        " -c:v prores_ks -profile:v 3 -color_primaries unspecified -color_trc unspecified" +
+        " -colorspace unspecified " + out.path.string();
+    if (std::system(cmd.c_str()) != 0) {
+        SKIP("ffmpeg could not write the control file");
+    }
+    const auto info = assets::probeVideo(out.path);
+    REQUIRE(info.has_value());
+    INFO("primaries='" << info->colorPrimaries << "' transfer='" << info->colorTransfer
+                       << "' matrix='" << info->colorMatrix << "'");
+    CHECK_FALSE(info->colorTagged());
+}

@@ -2811,16 +2811,17 @@ void ControlPanel::drawPathTrace() {
 
     // Resolution comes from the same control the realtime half uses, so the two cannot disagree
     // about what "the output size" means.
+    // Resolution comes from the render settings and is not copied into the trace's own struct:
+    // the two renderers share one output size and a second copy of it is a second thing to keep in
+    // step. `traceSettingsFrom` reads it at the point of use.
     if (renderSettings != nullptr) {
         static_cast<void>(drawOutputResolutionControls(*renderSettings));
-        t.width = std::max(16u, renderSettings->width);
-        t.height = std::max(16u, renderSettings->height);
     }
 
-    if (pathTraceSeconds != nullptr) {
-        auto seconds = static_cast<float>(*pathTraceSeconds);
+    {
+        auto seconds = static_cast<float>(t.seconds);
         if (ImGui::InputFloat("second", &seconds, 0.1f, 1.0f, "%.3f")) {
-            *pathTraceSeconds = std::max(0.0, static_cast<double>(seconds));
+            t.seconds = std::max(0.0, static_cast<double>(seconds));
         }
         if (ImGui::IsItemHovered()) {
             tooltip("The timeline second to trace. One frame, not a sequence -- a path-traced\n"
@@ -2846,9 +2847,32 @@ void ControlPanel::drawPathTrace() {
                 "adds indirect light and costs time. Russian roulette ends long paths early.");
     }
 
-    if (pathTraceDenoise != nullptr) {
+    // ADR-366: the trace's own destination. It used to read the raster job's, which this function
+    // returns before ever drawing -- so a trace's output path was unreachable while a trace was
+    // selected, and an unset one went to $TMPDIR without saying so.
+    {
+        std::string out = t.outputPath.generic_string();
+        out.resize(512, '\0');
+        ImGui::SetNextItemWidth(-72.0f);
+        if (ImGui::InputText("##pt-out", out.data(), out.size())) {
+            t.outputPath = std::filesystem::path(out.c_str());
+        }
+        if (ImGui::IsItemHovered()) {
+            tooltip("Where the scene-linear EXR goes, relative to the project. The extension is\n"
+                    "forced to .exr: the tracer writes nothing else, and a float image in a file\n"
+                    "called .png is worse than a refusal.");
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Choose...") && onChoosePathTraceOutput) {
+            onChoosePathTraceOutput();
+        }
+        ImGui::SameLine();
+        ImGui::TextUnformatted("output");
+    }
+
+    {
         ImGui::BeginDisabled(!pathTraceDenoiseAvailable);
-        ImGui::Checkbox("denoise", pathTraceDenoise);
+        ImGui::Checkbox("denoise", &t.denoise);
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered()) {
             tooltip(pathTraceDenoiseAvailable
@@ -2858,10 +2882,8 @@ void ControlPanel::drawPathTrace() {
                         : "This build has no denoiser. Configure with\n"
                           "-DAVGEN_PATHTRACE_DENOISE=ON to fetch it (ADR-353).");
         }
-    }
-    if (pathTraceAovs != nullptr) {
         ImGui::SameLine();
-        ImGui::Checkbox("AOVs", pathTraceAovs);
+        ImGui::Checkbox("AOVs", &t.writeAovs);
         if (ImGui::IsItemHovered()) {
             tooltip("Write albedo, normal, emission, depth and id as named layers in the same\n"
                     "EXR. Normals go in normal.X/Y/Z, never R/G/B, so a colour-managed\n"
@@ -2869,7 +2891,7 @@ void ControlPanel::drawPathTrace() {
         }
     }
 
-    ImGui::Checkbox("albedo probe", &t.albedoProbe.enabled);
+    ImGui::Checkbox("albedo probe", &t.albedoProbe);
     if (ImGui::IsItemHovered()) {
         tooltip("Report surfaces whose directional albedo exceeds 1 (ADR-352). The glTF BRDF is\n"
                 "kept faithful to the specification and gains energy at grazing angles; this\n"
@@ -2877,6 +2899,9 @@ void ControlPanel::drawPathTrace() {
     }
 
     ImGui::EndDisabled();
+    if (const auto ok = t.validate(); !ok) {
+        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "%s", ok.error().message.c_str());
+    }
     ImGui::Separator();
 
     if (running) {
@@ -2899,6 +2924,7 @@ void ControlPanel::drawPathTrace() {
                         "would be an interpolation rather than a measurement.");
             }
         }
+        drawViewportSuspension();
         if (ImGui::Button("Cancel") && onCancelPathTrace) {
             onCancelPathTrace();
         }
@@ -2919,6 +2945,23 @@ void ControlPanel::drawPathTrace() {
         } else if (p.state == pathtrace::TraceJobState::Failed) {
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "failed: %s",
                                p.error.empty() ? "unknown" : p.error.c_str());
+        }
+    }
+}
+
+// ADR-364. Drawn under both renderers' progress lines, because a trace suspends the viewport too.
+void ControlPanel::drawViewportSuspension() {
+    if (viewportSuspended) {
+        ImGui::TextColored(ImVec4(0.72f, 0.80f, 0.95f, 1.0f),
+                           "viewport suspended -- %llu frames not drawn",
+                           static_cast<unsigned long long>(viewportFramesSuspended));
+        if (ImGui::IsItemHovered()) {
+            tooltip("The world is not being drawn into the canvas while this runs, so the render\n"
+                    "gets the machine. What you are looking at is the last frame before it\n"
+                    "started, not a live view.\n\n"
+                    "The count is here so you can tell the difference between a suspension that\n"
+                    "is working and one that is only switched on. Turn it off in Settings if you\n"
+                    "would rather keep working while a render goes.");
         }
     }
 }
@@ -3148,6 +3191,7 @@ void ControlPanel::drawRender(app::Engine& engine) {
                               "goes on; early frames are slower because shaders are still\n"
                               "compiling and assets are still uploading.");
         }
+        drawViewportSuspension();
         if (ImGui::Button("Cancel") && onCancelRender) {
             onCancelRender();
         }

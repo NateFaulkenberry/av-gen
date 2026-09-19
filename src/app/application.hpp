@@ -17,6 +17,7 @@
 #include "pathtrace/trace_job.hpp"
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
+#include "app/render_state.hpp"
 #include "app/settings.hpp"
 #include "labs/case.hpp"
 #include "ai/control_plane.hpp"
@@ -201,14 +202,19 @@ struct AppOptions {
     // parallel size vocabulary. The flags that are genuinely new are the ones a rasteriser has no
     // equivalent for -- samples per pixel, path depth, and the seed.
     std::optional<std::filesystem::path> pathtrace;
-    std::uint32_t ptSamples = 32;
-    std::uint32_t ptDepth = 4;
-    double ptSeconds = 0.0;
-    std::uint64_t ptSeed = 0x853c49e6748fea9bULL;
-    unsigned ptThreads = 0;
-    bool ptDenoise = false;
-    bool ptAovs = false;
-    bool ptProbe = false;
+    // Optional, and every one of them, because the project now carries a `pathtrace` block and a
+    // flag has to be distinguishable from its own default to override it (ADR-366). This is the
+    // shape `renderSettingsFromOptions` already had: start from what the project says, then apply
+    // what the command line asked for. Before, `--pathtrace out.exr` on a project authored at 512
+    // samples silently traced 32, because 32 was a struct default nobody had typed.
+    std::optional<std::uint32_t> ptSamples;
+    std::optional<std::uint32_t> ptDepth;
+    std::optional<double> ptSeconds;
+    std::optional<std::uint64_t> ptSeed;
+    std::optional<unsigned> ptThreads;
+    std::optional<bool> ptDenoise;
+    std::optional<bool> ptAovs;
+    std::optional<bool> ptProbe;
     std::optional<std::filesystem::path> queue;
     std::optional<double> rangeStart, rangeEnd;
     std::optional<std::string> codec;
@@ -346,12 +352,19 @@ private:
     // destroyed so the panel can still say "done in 1:04" or why it failed -- a snapshot of what
     // the job reported, never a second place the state is decided.
     std::unique_ptr<pathtrace::TraceJob> ptJob_;
-    pathtrace::TraceSettings uiPathTrace_;
+    // The authored set, copied from the project at load and written back at save (ADR-366). This
+    // was five loose members with no reader and no writer; `pathtrace::TraceSettings` is now built
+    // from it in one place, `traceSettingsFrom`, so the persisted form and the renderer's argument
+    // cannot drift apart in three call sites.
+    PathTraceSettings uiPathTrace_;
     pathtrace::TraceProgress lastPathTrace_;
-    double uiPathTraceSeconds_ = 0.0;
-    bool uiPathTraceDenoise_ = false;
-    bool uiPathTraceAovs_ = true;
     RenderSettings uiRender_;                     // the Render window's settings
+    // ADR-364: how many frames the viewport has NOT drawn the world in, over the life of
+    // this process. Shown in the Render panel, because a count that stays at zero while a
+    // render runs is how a person finds out the suspension is not working.
+    std::uint64_t viewportFramesSuspended_ = 0;
+    bool viewportWasSuspended_ = false;
+    std::uint64_t viewportSuspendedAtStart_ = 0;
     // ADR-186's limits, lifted in the viewport as well as in a render. A working default of false
     // because lifting them costs real frame time on a wide shot -- which is the whole reason live
     // playback has them -- but the editor showing a different world from the deliverable is a

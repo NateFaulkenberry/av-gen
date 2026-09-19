@@ -14,11 +14,41 @@
 #include "help/database.hpp"
 
 #include <filesystem>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace avgen::ui {
+
+// ---- the sidebar's rows, as data (ADR-361) ---------------------------------------------------
+//
+// The sidebar lists every topic twice over: once under "Recently viewed" and once under its
+// category. Dear ImGui derives a widget's id from the id stack plus its label, and
+// `CollapsingHeader` does NOT push the id stack -- `ImGuiTreeNodeFlags_CollapsingHeader` carries
+// `NoTreePushOnOpen`, and `Indent` has no id effect at all. So both lists sat at the identical
+// stack depth and two `Selectable`s for one document produced one id. That is the
+// "2 visible items with conflicting ID" the owner sees, and it fires as soon as somebody opens a
+// topic in the default-open "Getting Started" category and then expands "Recently viewed".
+//
+// The fix is that a row's identity is (which list, which document) rather than (which document),
+// so each group carries the scope the panel pushes before drawing it. It is a free function
+// rather than a private method because a test can then assert the property that was violated --
+// no two rows share an identity -- over the real database, which a test that drove ImGui could
+// not do without a context and a frame.
+struct HelpSidebarGroup {
+    std::string scope;       // pushed with ImGui::PushID before the group's rows are drawn
+    std::string title;       // the CollapsingHeader's label
+    bool defaultOpen = false;
+    bool indented = false;
+    bool separatorAfter = false;
+    std::vector<const help::HelpDocument*> documents;
+};
+
+// `recent` is most-recent-first; ids the database does not know are dropped rather than drawn as
+// a blank row. The returned pointers belong to the database and are valid for as long as it is.
+[[nodiscard]] std::vector<HelpSidebarGroup> helpSidebarGroups(const help::HelpDatabase& db,
+                                                              std::span<const std::string> recent);
 
 class HelpPanel {
 public:

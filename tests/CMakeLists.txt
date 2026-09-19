@@ -39,6 +39,11 @@ target_sources(avgen_tests PRIVATE
     # through are ImGui-free, and a viewport rule that needs a window and a device to check is a
     # rule nobody checks. The drawing half lives in control_panel.cpp and is not on this list.
     "${CMAKE_SOURCE_DIR}/src/ui/output_preview.cpp"
+    # The Help sidebar's navigation (ADR-361). Same reason again: the sidebar drew every recently
+    # viewed topic a second time under its category, with the same id, and Dear ImGui said so at
+    # runtime and nowhere else. The grouping is now data, it is ImGui-free, and a test asserts the
+    # property that was violated. `help_panel.cpp` -- the drawing half -- is not on this list.
+    "${CMAKE_SOURCE_DIR}/src/ui/help_sidebar.cpp"
     # The world editor (ADR-092). Every decision it makes -- what the ghost says, which handle the
     # pointer is over, what a drag means, what undo restores -- is ImGui-free for exactly this
     # reason: an editor whose behaviour can only be checked by looking at it is an editor nobody

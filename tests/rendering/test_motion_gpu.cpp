@@ -10,6 +10,7 @@
 #include "gpu/shader_library.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "scene/scene.hpp"
+#include "support/image_diff.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -188,7 +189,11 @@ TEST_CASE("Motion blur is deterministic: two fresh renderers produce identical f
     renderMoved(*ctx, shaders, s, glm::vec3(-0.8f, 0.0f, 0.0f), glm::vec3(0.0f), &a);
     renderMoved(*ctx, shaders, s, glm::vec3(-0.8f, 0.0f, 0.0f), glm::vec3(0.0f), &b);
     REQUIRE(a.rgba.size() == b.rgba.size());
-    CHECK(a.rgba == b.rgba);
+    {
+        const auto d = testing::byteDiff(a.rgba, b.rgba);
+        INFO("same move rendered twice: " << d.describe());  // ADR-362
+        CHECK(d.identical());
+    }
 }
 
 TEST_CASE("camera-culling history does not create a false re-entry velocity", "[gpu][motion][blur]") {

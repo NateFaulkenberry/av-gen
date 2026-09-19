@@ -401,9 +401,17 @@ void Window::saveFileDialog(SaveKind kind, std::function<void(std::string)> onCh
     static const SDL_DialogFileFilter videoFilters[] = {{"QuickTime movie", "mov"},
                                                         {"MPEG-4 video", "mp4;m4v"},
                                                         {"Matroska / WebM", "mkv;webm"}};
-    const bool video = kind == SaveKind::Video;
-    SDL_ShowSaveFileDialog(dialogCallback, &dialogState(), window_,
-                           video ? videoFilters : projectFilters, video ? 3 : 1, nullptr);
+    static const SDL_DialogFileFilter exrFilters[] = {{"OpenEXR image", "exr"}};
+    const SDL_DialogFileFilter* filters = projectFilters;
+    int count = 1;
+    if (kind == SaveKind::Video) {
+        filters = videoFilters;
+        count = 3;
+    } else if (kind == SaveKind::Exr) {
+        filters = exrFilters;
+        count = 1;
+    }
+    SDL_ShowSaveFileDialog(dialogCallback, &dialogState(), window_, filters, count, nullptr);
 }
 
 void Window::chooseFolderDialog(std::function<void(std::string)> onChosen) {
