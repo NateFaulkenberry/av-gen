@@ -59,6 +59,8 @@ constexpr std::uint64_t kMaxTrailBytes = 64ull << 20;
 
 // Spline: emits along the scene spline named `spline` (position = S(u) + jitter within extent.x).
 enum class EmitterShape : std::uint8_t { Point, Sphere, Disc, Box, Spline };
+// ADR-370: the silhouette a particle draws with.
+enum class ParticleShape : std::uint8_t { Round, Leaf };
 enum class ParticleBlend : std::uint8_t { Additive, Alpha };
 
 enum class FieldForceMode : std::uint8_t { Force, Velocity, Turbulence, Kill };
@@ -119,6 +121,17 @@ struct ParticleSystem {
     glm::vec4 colorEnd{0.4f, 0.1f, 1.0f, 0.0f};
     float emissive = 4.0f;           // HDR intensity multiplier
     ParticleBlend blend = ParticleBlend::Additive;
+    // ADR-370: what a particle looks like. `Round` is the soft dot this system has always drawn and
+    // is the default, so nothing that does not ask changes. `Leaf` draws an oriented, tumbling card
+    // with a pointed-ellipse silhouette -- because the brief's falling leaves must not read as
+    // "generic glowing dots", and a round additive blob is exactly that.
+    ParticleShape shape2d = ParticleShape::Round;
+    float tumbleRate = 2.4f;  // radians per second the card spins about its long axis
+    float leafAspect = 0.42f; // half-width over half-length; below 1 the card is longer than wide
+    float twoSided = 0.45f;   // how much darker the card is edge-on, 0..1
+    // ADR-370: how much of ADR-055's wind field this system catches. 0 is off and is the default,
+    // so no existing particle system starts drifting.
+    float windInfluence = 0.0f;
     // ADR-367: how far in front of a surface the billboard has fully faded in, in world units.
     // 0 is off and is the default, and "off" has to be the default because until ADR-367 this value
     // was read by no shader at all: every system in the repository was rendering as though it were
@@ -200,6 +213,10 @@ struct ParticleParameters {
     params::Parameter<glm::vec4>* colorEnd = nullptr;
     params::Parameter<float>* emissive = nullptr;
     params::Parameter<float>* softness = nullptr; // ADR-367
+    params::Parameter<float>* windInfluence = nullptr; // ADR-370
+    params::Parameter<float>* tumbleRate = nullptr; // ADR-370
+    params::Parameter<float>* leafAspect = nullptr;
+    params::Parameter<float>* twoSided = nullptr;
     params::Parameter<float>* stretch = nullptr;    // scales velocityStretch (ADR-040)
     params::Parameter<float>* trailWidth = nullptr; // scales trailWidth (ADR-040)
     params::Parameter<bool>* enabled = nullptr;

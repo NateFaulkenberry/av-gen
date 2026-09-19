@@ -51,6 +51,14 @@ struct ParticleUniforms {
     glm::vec4 trail2;     // tail alpha fraction, tail tint rgb
     glm::vec4 fog;        // volume density, fog height, height falloff, absorption
     glm::vec4 fog2;       // volume max distance, fog coupling, glow strength, 0
+    glm::vec4 leaf;       // ADR-370: shape (0 round, 1 leaf), tumble rate, aspect, two-sided depth
+    // ADR-370: ADR-055's packed wind field, so `cs_simulate` can sample the same air the tree bends
+    // in without the particle pipelines growing a frame bind group they have never had.
+    glm::vec4 windDir;
+    glm::vec4 windRegion;
+    glm::vec4 windGust;
+    glm::vec4 windTurb;
+    glm::vec4 windMix;    // x = windInfluence, yzw unused
     glm::uvec4 curves;    // size / colour / opacity key counts, glow slot
     glm::uvec4 counts; // emitCount, capacity, blend, scan blocks
     glm::uvec4 fieldInfo; // x = field force count (ADR-025), y = spline emitter slot + 1 (0 = none, ADR-026)
@@ -59,10 +67,12 @@ struct ParticleUniforms {
     glm::vec4 opacityKeys[scene::kMaxCurveKeys]; // (t, value, 0, 0)
     glm::vec4 colorKeys[scene::kMaxCurveKeys];   // (t, r, g, b)
 };
-static_assert(sizeof(ParticleUniforms) == 128 + 16 * 22 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys);
+static_assert(sizeof(ParticleUniforms) == 128 + 16 * 28 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys);
 
 // Everything the draw needs that is not a per-system parameter (ADR-040). Set once per frame.
 struct ParticleFrameContext {
+    // ADR-370: the frame's wind, packed by wind::packWind, exactly as FrameUniforms carries it.
+    wind::WindUniforms wind{};
     glm::mat4 prevViewProj{1.0f};   // ADR-035, for the velocity target
     glm::vec3 cameraPosition{0.0f}; // ribbons face it; the fog coupling marches from it
     float shutterSeconds = 0.0f;    // shutterAngle / 360 * frame duration (ADR-037)

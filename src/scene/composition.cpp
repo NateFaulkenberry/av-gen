@@ -289,6 +289,22 @@ Result<EmitterShape> shapeFromName(const std::string& name) {
     return fail("unknown emitter shape '{}'", name);
 }
 
+// ADR-370: the leaf card's silhouette. Written and read only when it is not Round, so a scene that
+// never asks for a leaf is byte-identical on a re-save.
+const char* particleShape2dName(ParticleShape shape) {
+    return shape == ParticleShape::Leaf ? "leaf" : "round";
+}
+
+Result<ParticleShape> particleShape2dFromName(const std::string& name) {
+    if (name == "round") {
+        return ParticleShape::Round;
+    }
+    if (name == "leaf") {
+        return ParticleShape::Leaf;
+    }
+    return fail("unknown particle shape '{}' (expected round or leaf)", name);
+}
+
 const char* blendName(ParticleBlend blend) {
     return blend == ParticleBlend::Alpha ? "alpha" : "additive";
 }
@@ -413,6 +429,16 @@ json particlesToJson(const ParticleSystem& s) {
     // how a default nobody chose ended up baked into every scene file the editor ever saved.
     if (s.softness != 0.0f) {
         j["softness"] = s.softness;
+    }
+    if (s.windInfluence != 0.0f) {
+        j["windInfluence"] = s.windInfluence;
+    }
+    // ADR-370.
+    if (s.shape2d != ParticleShape::Round) {
+        j["shape2d"] = particleShape2dName(s.shape2d);
+        j["tumbleRate"] = s.tumbleRate;
+        j["leafAspect"] = s.leafAspect;
+        j["twoSided"] = s.twoSided;
     }
     // ADR-040. Only written when they differ from the defaults so existing files stay short and
     // round-tripping a pre-ADR-040 scene produces the same JSON it started with.
@@ -554,6 +580,18 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
         s.blend = *blend;
     }
     AVGEN_READ(softness, readFloat);
+    // ADR-370: the leaf card. Absent is Round, which is the ordinary state.
+    if (j.contains("shape2d") && j.at("shape2d").is_string()) {
+        auto shape = particleShape2dFromName(j.at("shape2d").get<std::string>());
+        if (!shape) {
+            return std::unexpected(shape.error());
+        }
+        s.shape2d = *shape;
+    }
+    AVGEN_READ(windInfluence, readFloat);
+    AVGEN_READ(tumbleRate, readFloat);
+    AVGEN_READ(leafAspect, readFloat);
+    AVGEN_READ(twoSided, readFloat);
     // ---- ADR-040: stretching, trails, atmosphere coupling and lifetime curves ----
     AVGEN_READ(velocityStretch, readFloat);
     AVGEN_READ(stretchMax, readFloat);
@@ -3475,6 +3513,117 @@ void Composition::unregisterAuthoredLightParameters() {
 // Bounds come from `Scene::meshBounds`, the caching accessor, never `MeshData::bounds()`: ADR-355
 // is three call sites that used the uncached one and rescanned 39.9M vertices about five times a
 // frame, for a 350 ms editor frame. This runs at bake, not per frame, and still uses the cache.
+// ADR-370: the world-space bounds of everything a node contains, measured from the meshes that were
+// actually baked. Shared by the wind body and the canopy emitter, because both are asking the same
+// question -- "where is this tree" -- and asking it twice in two ways is how the two drift apart.
+//
+// `Scene::meshBounds` is the caching accessor; `MeshData::bounds()` scans every vertex and ADR-355
+// is what that costs. This runs at bake rather than per frame and still uses the cache.
+bool Composition::subtreeWorldBounds(std::size_t node, glm::vec3& lo, glm::vec3& hi,
+                                     std::vector<std::size_t>* members) const {
+    if (nodes_.size() != ranges_.size()) {
+        return false;
+    }
+    std::unordered_map<std::string, std::size_t> byName;
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+        byName.emplace(nodes_[i]->name, i);
+    }
+    auto inside = [&](std::size_t n) {
+        std::size_t cur = n;
+        for (std::size_t hops = 0; cur != node && hops <= nodes_.size(); ++hops) {
+            const std::string& parent = nodes_[cur]->parent;
+            if (parent.empty()) {
+                return false;
+            }
+            const auto it = byName.find(parent);
+            if (it == byName.end()) {
+                return false;
+            }
+            cur = it->second;
+        }
+        return cur == node;
+    };
+    lo = glm::vec3(std::numeric_limits<float>::max());
+    hi = glm::vec3(std::numeric_limits<float>::lowest());
+    for (std::size_t n = 0; n < nodes_.size(); ++n) {
+        if (!inside(n)) {
+            continue;
+        }
+        if (members != nullptr) {
+            members->push_back(n);
+        }
+        const NodeRange& r = ranges_[n];
+        for (std::size_t e = r.firstEntity; e < r.firstEntity + r.entityCount && e < scene_.entities.size(); ++e) {
+            const Entity& entity = scene_.entities[e];
+            if (entity.mesh == kInvalidMesh) {
+                continue;
+            }
+            const auto& [bmin, bmax] = scene_.meshBounds(entity.mesh);
+            const glm::mat4 m = entity.transform.matrix();
+            for (int corner = 0; corner < 8; ++corner) {
+                const glm::vec3 local((corner & 1) != 0 ? bmax.x : bmin.x, (corner & 2) != 0 ? bmax.y : bmin.y,
+                                      (corner & 4) != 0 ? bmax.z : bmin.z);
+                const glm::vec3 world = glm::vec3(m * glm::vec4(local, 1.0f));
+                lo = glm::min(lo, world);
+                hi = glm::max(hi, world);
+            }
+        }
+    }
+    return lo.x <= hi.x;
+}
+
+// ADR-370: a particle node may say which node's canopy it sheds from, and the emitter box is then
+// MEASURED rather than typed. The brief asks for leaves that "originate from the Tree canopy rather
+// than from a generic box emitter", and the difference that matters is not the shape of the box --
+// it is that a measured box follows the tree when the tree is moved, rescaled or swapped for
+// another asset, and a typed one silently stops describing it.
+void Composition::applyCanopyEmitters() {
+    if (nodes_.size() != ranges_.size()) {
+        return;
+    }
+    std::unordered_map<std::string, std::size_t> byName;
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+        byName.emplace(nodes_[i]->name, i);
+    }
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+        CompositionNode& node = *nodes_[i];
+        if (node.kind != NodeKind::Particles || node.canopySource.empty()) {
+            continue;
+        }
+        const auto it = byName.find(node.canopySource);
+        if (it == byName.end()) {
+            log::warn("particle node '{}': canopySource '{}' names no node in this scene; the "
+                      "authored emitter box is used instead",
+                      node.name, node.canopySource);
+            continue;
+        }
+        glm::vec3 lo{0.0f};
+        glm::vec3 hi{0.0f};
+        if (!subtreeWorldBounds(it->second, lo, hi, nullptr)) {
+            continue;
+        }
+        // The canopy is the upper part of the crown, not the whole tree: shedding from the trunk
+        // would drop leaves out of the bark. `canopyFrom` is the fraction of the height the crown
+        // starts at.
+        const float from = std::clamp(node.canopyFrom, 0.0f, 0.95f);
+        const float base = lo.y + (hi.y - lo.y) * from;
+        const glm::vec3 centre(0.5f * (lo.x + hi.x), 0.5f * (base + hi.y), 0.5f * (lo.z + hi.z));
+        const glm::vec3 half(0.5f * (hi.x - lo.x), 0.5f * (hi.y - base), 0.5f * (hi.z - lo.z));
+        for (std::size_t p = 0; p < scene_.particles.size(); ++p) {
+            if (scene_.particles[p].name != sanitise(prefix_) + node.name &&
+                scene_.particles[p].name != node.name) {
+                continue;
+            }
+            scene_.particles[p].position = centre;
+            scene_.particles[p].extent = glm::max(half, glm::vec3(0.01f));
+            if (node.particleRest.name == scene_.particles[p].name || true) {
+                node.particleRest.position = centre;
+                node.particleRest.extent = scene_.particles[p].extent;
+            }
+        }
+    }
+}
+
 void Composition::applyWindBodies() {
     if (nodes_.size() != ranges_.size()) {
         return; // mid-rebuild; the next bake will do it
@@ -3504,6 +3653,7 @@ void Composition::applyWindBodies() {
         if (!owner.windAuthored) {
             continue;
         }
+        (void)0;
         auto pick = [](const params::Parameter<float>* p, float fallback) {
             return p != nullptr ? p->value() : fallback;
         };
@@ -5272,6 +5422,7 @@ void Composition::rebuild() {
 
     windBodies_.clear();
     applyWindBodies();
+    applyCanopyEmitters();
 
     // Composition (ADR-038) contributes reserved fields, so density filters and effectors can
     // reference them by name like any other field.
@@ -7436,6 +7587,11 @@ nlohmann::json Composition::toJson() const {
         // ADR-360. Written only when the node declares a wind body, so nothing else grows a key,
         // and written from the parameters' BASE so a session's edits survive the save -- the
         // failure this whole ADR is about was a reader whose writer could not be reached.
+        // ADR-370: only when asked for, like everything else additive here.
+        if (!node.canopySource.empty()) {
+            n["canopySource"] = node.canopySource;
+            n["canopyFrom"] = node.canopyFrom;
+        }
         if (node.windAuthored) {
             auto base = [](const params::Parameter<float>* p, float fallback) {
                 return p != nullptr ? p->base() : fallback;
@@ -8485,6 +8641,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             auto locked = readBool(item, "locked", false);
             auto emissive = readFloat(item, "emissiveBoost", 1.0f);
             auto roughness = readFloat(item, "roughnessScale", 1.0f);
+            // ADR-370: which node's canopy a particle emitter is measured from.
+            if (item.contains("canopySource") && item.at("canopySource").is_string()) {
+                node.canopySource = item.at("canopySource").get<std::string>();
+            }
+            if (item.contains("canopyFrom") && item.at("canopyFrom").is_number()) {
+                node.canopyFrom = item.at("canopyFrom").get<float>();
+            }
             // ADR-360: the wind body. Absent is the ordinary state, not a fault.
             if (item.contains("wind") && item.at("wind").is_object()) {
                 const nlohmann::json& w = item.at("wind");

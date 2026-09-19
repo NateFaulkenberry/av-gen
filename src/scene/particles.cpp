@@ -205,6 +205,14 @@ ParticleParameters registerParticleParameters(params::ParameterSet& params, cons
     // ADR-367: reachable now that it does something. A value that reaches the GPU and is ignored is
     // one defect; a value that reaches the GPU, is obeyed, and cannot be turned is the next one.
     p.softness = &params.add(f(base, "softness", s.softness, 0.0f, 50.0f, 0.0f, 4.0f));
+    // ADR-370: the leaf card's three artist controls. Registered for every system, not only leaf
+    // ones, because `shape2d` itself is structural and a system that is not a leaf simply ignores
+    // them -- and a control that appears and disappears depending on another control is worse to
+    // find than one that is always there.
+    p.windInfluence = &params.add(f(base, "windInfluence", s.windInfluence, 0.0f, 8.0f, 0.0f, 2.0f));
+    p.tumbleRate = &params.add(f(base, "tumbleRate", s.tumbleRate, 0.0f, 40.0f, 0.0f, 8.0f));
+    p.leafAspect = &params.add(f(base, "leafAspect", s.leafAspect, 0.05f, 4.0f, 0.1f, 1.5f));
+    p.twoSided = &params.add(f(base, "twoSided", s.twoSided, 0.0f, 1.0f, 0.0f, 1.0f));
     p.stretch = &params.add(f(base, "stretch", s.velocityStretch, 0.0f, 20.0f, 0.0f, 4.0f));
     p.trailWidth = &params.add(f(base, "trailWidth", s.trailWidth, 0.0f, 20.0f, 0.0f, 4.0f));
     {
@@ -253,6 +261,10 @@ void applyParticleParameters(const ParticleParameters& p, const ParticleSystem& 
     s.colorEnd = p.colorEnd->value();
     s.emissive = p.emissive->value();
     s.softness = p.softness != nullptr ? p.softness->value() : rest.softness; // ADR-367
+    if (p.windInfluence != nullptr) { s.windInfluence = p.windInfluence->value(); } // ADR-370
+    if (p.tumbleRate != nullptr) { s.tumbleRate = p.tumbleRate->value(); }   // ADR-370
+    if (p.leafAspect != nullptr) { s.leafAspect = p.leafAspect->value(); }
+    if (p.twoSided != nullptr) { s.twoSided = p.twoSided->value(); }
     s.velocityStretch = p.stretch->value();
     s.trailWidth = p.trailWidth->value();
     s.enabled = p.enabled->value();

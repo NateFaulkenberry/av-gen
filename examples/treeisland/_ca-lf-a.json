@@ -12,9 +12,9 @@
     "scene": {
       "kind": "composition",
       "path": {
-        "path": "tree-of-life-floating-island.scene.json",
-        "sha256": "93efd62c5f77cef56d8406e7ec927f22769a64750a5df6ecb86e40ca024ca231",
-        "size": 10104
+        "path": "_ca-lf-a.scene.json",
+        "sha256": "19a0ae47f9be5fc96c6996ef7580d48d773eb4f69c4ac0a8caffab920094b450",
+        "size": 14159
       }
     }
   },
@@ -546,7 +546,7 @@
       80.0
     ],
     "nodes/island-surface/visible": true,
-    "nodes/tree-foliage/emissiveBoost": 2.2,
+    "nodes/tree-foliage/emissiveBoost": 0.5,
     "nodes/tree-foliage/lightColor": [
       1.0,
       1.0,
@@ -1697,7 +1697,7 @@
     }
   ],
   "render": {
-    "aovs": "normal,shadow",
+    "aovs": "",
     "backend": "auto",
     "codec": "h264",
     "encoderThreads": 0,
@@ -2094,8 +2094,8 @@
     {
       "enabled": true,
       "path": "../../shaders/glowmere-cosmos.wgsl",
-      "sha256": "0585c03623fcc86a0c328000c6ba98d152713d82e9be7857ae8e7759a3519313",
-      "size": 8482,
+      "sha256": "999a71b93bb076359f1a9e0870b819ecd66e7987661862d65a5a81c86c037a67",
+      "size": 7372,
       "stage": "background"
     }
   ],

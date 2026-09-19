@@ -512,6 +512,16 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         u.speedLife = glm::vec4(sys.speedMin, sys.speedMax, sys.lifetimeMin, sys.lifetimeMax);
         u.gravity = glm::vec4(sys.gravity, sys.turbulence);
         u.turb = glm::vec4(sys.turbulenceScale, sys.turbulenceSpeed, sys.softness, sys.emissive);
+    // ADR-370: all zero for a Round system, which is every system that has not asked otherwise, so
+    // the shader's `params.leaf.x > 0.5` branch is never taken and the draw is what it always was.
+    u.windDir = frame_.wind.dir;
+    u.windRegion = frame_.wind.region;
+    u.windGust = frame_.wind.gust;
+    u.windTurb = frame_.wind.turbulence;
+    u.windMix = glm::vec4(std::max(sys.windInfluence, 0.0f), 0.0f, 0.0f, 0.0f);
+    u.leaf = sys.shape2d == scene::ParticleShape::Leaf
+                 ? glm::vec4(1.0f, sys.tumbleRate, sys.leafAspect, glm::clamp(sys.twoSided, 0.0f, 1.0f))
+                 : glm::vec4(0.0f);
         u.attractor = glm::vec4(sys.attractorPosition, sys.attractorStrength);
         u.attractor2 = glm::vec4(sys.attractorRadius, sys.orbit, sys.sizeStart, sys.sizeEnd);
         u.colorStart = sys.colorStart;
