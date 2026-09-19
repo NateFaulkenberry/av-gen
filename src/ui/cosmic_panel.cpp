@@ -172,6 +172,7 @@ void drawEnvironmentPanel(app::Engine& engine) {
             slider(engine, "scene/vortex/contrast", "Contrast", "%.2f");
             slider(engine, "scene/vortex/innerVoid", "Inner void", "%.2f");
             slider(engine, "scene/vortex/filaments", "Filaments", "%.2f");
+            slider(engine, "scene/vortex/spill", "Light spill on the island", "%.2f");
             ImGui::Separator();
             slider(engine, "scene/vortex/breathAmount", "Breath amount", "%.3f");
             ImGui::Separator();

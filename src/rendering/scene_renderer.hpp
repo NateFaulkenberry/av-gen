@@ -300,6 +300,12 @@ struct FrameUniforms {
     glm::vec4 skyHorizonColor{0.0f};  // rgb = horizon, w = sun angular radius (radians)
     glm::vec4 skyGroundColor{0.0f};   // rgb = below the horizon, w = sun glow width
     glm::vec4 skySunRadiance{0.0f};   // rgb = sun/moon colour, w = 1 when the analytic sky is drawn
+    // ADR-379: the cosmic vortex's light on the surfaces above it. Appended last for the reason
+    // every block before it was: no offset above moves, so every other pass's view of this
+    // structure is byte-identical. `w` of the second is the gate -- zero and the surface shader
+    // returns before it reads the first.
+    glm::vec4 vortexGlow{0.0f};       // xyz = mouth centre in world space, w = mouth radius
+    glm::vec4 vortexGlowColor{0.0f};  // rgb = radiance, w = intensity (0 = no vortex)
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 8x144 world effects. The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
@@ -307,7 +313,8 @@ struct FrameUniforms {
 // number.
 static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::kMaxGpuWorldEffects +
                                        16 + 160 * world::kMaxGpuComets + 224 * world::kMaxGpuAuroras + 48 +
-                                       64); // ADR-345: four vec4s of analytic sky, appended last
+                                       64 + // ADR-345: four vec4s of analytic sky
+                                       32); // ADR-379: two vec4s of vortex glow, appended last
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);

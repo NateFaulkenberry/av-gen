@@ -608,6 +608,10 @@ struct Environment {
         float breathSpeed = 0.18f;
         float emission = 1.0f;
         float filaments = 0.9f;
+        // ADR-379: how much of the vortex's light lands on the surfaces above it. Separate from
+        // `emission` so the spill can be tuned against the island without changing the funnel, and
+        // separately measurable -- an A/B that moves both at once cannot attribute the difference.
+        float spill = 2.5f;
         // ADR-374: the funnel. `funnelDepth` 0 keeps the flat slab the first version was.
         float funnelDepth = 0.0f;   // metres the throat descends
         float throat = 0.25f;       // throat radius as a fraction of the mouth
