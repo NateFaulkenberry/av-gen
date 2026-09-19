@@ -56,6 +56,20 @@
     "skyBloom": 0.0,
     "fogDensity": 0.0,
     "shadowRange": 420.0,
+    "volumeMaxDistance": 4000.0,
+    "volumeSteps": 48,
+    "vortex": {
+      "center": [0.0, -70.0, 0.0], "radius": 200.0,
+      "funnelDepth": 1500.0, "throat": 0.1, "throatDensity": 0.55,
+      "thickness": 70.0, "swirl": 6.5, "rotationSpeed": 0.028,
+      "density": 0.0013, "innerVoid": 0.24, "contrast": 3.6,
+      "turbulence": 0.65, "turbulenceScale": 2.4,
+      "breathAmount": 0.05, "breathSpeed": 0.18,
+      "emission": 0.04, "filaments": 2.2,
+      "colorDeep": [0.016, 0.012, 0.062],
+      "colorMid": [0.05, 0.085, 0.24],
+      "colorAccent": [0.1, 0.34, 0.46]
+    },
     "sky": {
       "enabled": true,
       "background": false,

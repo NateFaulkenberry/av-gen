@@ -1241,6 +1241,9 @@ private:
     params::Parameter<float>* vortexBreath_ = nullptr;
     params::Parameter<float>* vortexThickness_ = nullptr;
     params::Parameter<float>* vortexFilaments_ = nullptr;
+    params::Parameter<float>* vortexFunnelDepth_ = nullptr;
+    params::Parameter<float>* vortexThroat_ = nullptr;
+    params::Parameter<float>* vortexThroatDensity_ = nullptr;
     params::Parameter<glm::vec3>* vortexColorDeep_ = nullptr;
     params::Parameter<glm::vec3>* vortexColorMid_ = nullptr;
     params::Parameter<glm::vec3>* vortexColorAccent_ = nullptr;

@@ -48,6 +48,7 @@ struct VolumeUniforms {
     vortexA: vec4<f32>,   // deep colour
     vortexB: vec4<f32>,   // mid colour
     vortexAccent: vec4<f32>, // luminous accent
+    vortex4: vec4<f32>,   // ADR-372: funnel depth, throat radius fraction, throat density, 0
 };
 
 @group(1) @binding(1) var<uniform> vol: VolumeUniforms;
@@ -119,15 +120,48 @@ fn vortexShape(p: vec3<f32>, t: f32) -> f32 {
     // to the density so the silhouette moves, which is what reads as breathing; scaling density
     // alone just pulses the brightness.
     let breath = 1.0 + vol.vortex3.x * sin(t * vol.vortex3.y);
-    let rr = length(rel.xz) / max(radius * breath, 1e-3);
+    // ADR-372: a FUNNEL, not a flat disc. The first version was a slab, and from the hero camera --
+    // which looks very nearly level -- a slab 700 m below is seen edge-on and reads as a band of
+    // haze, not as a vortex. The brief's own diagram is a funnel narrowing into a dark void, and a
+    // funnel has an inner wall that a level camera can see down into. That is the whole difference
+    // between "there is something below" and "the island is hanging over a hole".
+    //
+    // `depth` is how far down the throat goes and `throat` is the radius it narrows to, as a
+    // fraction of the mouth. Depth 0 keeps the old slab, so the shape is a superset.
+    let depth = max(vol.vortex4.x, 1e-3);
+    let yn = clamp(-rel.y / depth, 0.0, 1.0); // 0 at the mouth, 1 at the throat
+    let mouth = mix(1.0, clamp(vol.vortex4.y, 0.02, 1.0), yn * yn);
+    let rr = length(rel.xz) / max(radius * breath * mouth, 1e-3);
     if (rr > 1.35) {
-        return 0.0; // outside the disc entirely, and compactly so -- ADR-369's lesson
+        return 0.0; // outside the funnel entirely, and compactly so -- ADR-369's lesson
     }
-    // The disc's vertical profile. A gaussian, so there is no edge anywhere for a hard line to
-    // live on (ADR-369 again: a falloff inside a bound has to reach zero before the bound does).
-    const kOverThickness = 1.0;
-    let vert = exp(-(rel.y * rel.y) / max(vol.vortex1.x * vol.vortex1.x, 1e-3));
+    // The wall's thickness across the funnel surface, and its fade down the throat. Gaussian, so
+    // there is no edge anywhere for a hard line to live on (ADR-369 again).
+    let wall = exp(-(rel.y * rel.y) / max(vol.vortex1.x * vol.vortex1.x, 1e-3));
+    // Below the mouth the funnel keeps going instead of stopping at the slab's edge; the taper is
+    // what makes it read as depth rather than as a second disc.
+    //
+    // `below` is not decoration. `yn` clamps to 0 for anything ABOVE the mouth, so without it the
+    // throat term evaluated to its full value up there and the funnel extended *upward* as a
+    // full-radius cylinder at `throatDensity` -- which is why every wide variant washed the top of
+    // the frame as badly as the bottom. The measurement that found it was the contribution split by
+    // band: a funnel that only descends cannot add +12 luminance to the sky above the island.
+    let below = smoothstep(0.0, -vol.vortex1.x, rel.y);
+    let throatFade = 1.0 - smoothstep(0.55, 1.0, yn);
+    let vert = max(wall, throatFade * vol.vortex4.z * below);
     if (vert < 1e-4) {
+        return 0.0;
+    }
+    // ADR-372: the cheap masks BEFORE the noise. Measured, the vortex's cost is not the march
+    // length and is barely the step count -- it is how many pixels have non-zero density and
+    // therefore evaluate three fBMs. The void at the centre and everything past the rim are exactly
+    // the places where the answer is already zero, and they were paying full price for it.
+    // Every factor here is smooth, so the early-out fires only where the result was already
+    // negligible and introduces no edge (ADR-369).
+    let voidMask = smoothstep(vol.vortex2.x, vol.vortex2.x + 0.22, rr);
+    let rim = 1.0 - smoothstep(0.72, 1.3, rr);
+    let envelope = voidMask * rim * vert;
+    if (envelope < 1.0e-6) {
         return 0.0;
     }
     let angle = atan2(rel.z, rel.x);
@@ -146,12 +180,10 @@ fn vortexShape(p: vec3<f32>, t: f32) -> f32 {
     // Turbulence breaks the spiral's symmetry, because a real nebula is not a mathematical spiral
     // and the brief says so.
     n = mix(n, n * (0.55 + 0.9 * n1), clamp(vol.vortex2.z, 0.0, 1.0));
-    // The dark centre. Contrast pushes the midtones apart so the structure reads as filaments in a
-    // void rather than as an even wash.
-    let voidMask = smoothstep(vol.vortex2.x, vol.vortex2.x + 0.22, rr);
-    let rim = 1.0 - smoothstep(0.72, 1.3, rr);
+    // Contrast pushes the midtones apart so the structure reads as filaments in a void rather than
+    // as an even wash. The dark centre and the rim are already folded into `envelope` above.
     let shaped = pow(clamp(n, 0.0, 1.0), max(vol.vortex2.y, 0.05));
-    return shaped * voidMask * rim * vert;
+    return shaped * envelope;
 }
 
 // The vortex's own light. It is emissive rather than lit: nothing in this scene could illuminate

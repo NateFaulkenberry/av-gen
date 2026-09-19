@@ -590,6 +590,10 @@ struct Environment {
         float breathSpeed = 0.18f;
         float emission = 1.0f;
         float filaments = 0.9f;
+        // ADR-372: the funnel. `funnelDepth` 0 keeps the flat slab the first version was.
+        float funnelDepth = 0.0f;   // metres the throat descends
+        float throat = 0.25f;       // throat radius as a fraction of the mouth
+        float throatDensity = 0.6f; // how much of the wall's density the throat keeps
         glm::vec3 colorDeep{0.020f, 0.016f, 0.075f};
         glm::vec3 colorMid{0.050f, 0.085f, 0.230f};
         glm::vec3 colorAccent{0.090f, 0.320f, 0.420f};

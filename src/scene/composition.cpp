@@ -3389,6 +3389,9 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         vortexBreath_ = &params.add(floatDesc(b + "breathAmount", vx.breathAmount, 0.0f, 1.0f, 0.0f, 0.3f));
         vortexThickness_ = &params.add(floatDesc(b + "thickness", vx.thickness, 0.1f, 5000.0f, 5.0f, 600.0f));
         vortexFilaments_ = &params.add(floatDesc(b + "filaments", vx.filaments, 0.0f, 4.0f, 0.0f, 2.0f));
+        vortexFunnelDepth_ = &params.add(floatDesc(b + "funnelDepth", vx.funnelDepth, 0.0f, 20000.0f, 0.0f, 3000.0f));
+        vortexThroat_ = &params.add(floatDesc(b + "throat", vx.throat, 0.02f, 1.0f, 0.05f, 1.0f));
+        vortexThroatDensity_ = &params.add(floatDesc(b + "throatDensity", vx.throatDensity, 0.0f, 1.0f, 0.0f, 1.0f));
         vortexColorDeep_ = &params.add(vec3Desc(b + "colorDeep", vx.colorDeep, 0.0f, 4.0f, 0.0f, 1.0f));
         vortexColorMid_ = &params.add(vec3Desc(b + "colorMid", vx.colorMid, 0.0f, 4.0f, 0.0f, 1.0f));
         vortexColorAccent_ = &params.add(vec3Desc(b + "colorAccent", vx.colorAccent, 0.0f, 8.0f, 0.0f, 2.0f));
@@ -4105,6 +4108,7 @@ void Composition::detach() {
     vortexSwirl_ = nullptr; vortexRotation_ = nullptr; vortexTurbulence_ = nullptr;
     vortexInnerVoid_ = nullptr; vortexContrast_ = nullptr; vortexBreath_ = nullptr;
     vortexThickness_ = nullptr; vortexFilaments_ = nullptr;
+    vortexFunnelDepth_ = nullptr; vortexThroat_ = nullptr; vortexThroatDensity_ = nullptr;
     vortexColorDeep_ = nullptr; vortexColorMid_ = nullptr; vortexColorAccent_ = nullptr;
     windEnabled_ = nullptr;
     windSpeed_ = nullptr;
@@ -6642,6 +6646,9 @@ void Composition::applyParameters() {
         env.vortex.breathAmount = pick(vortexBreath_, volumeSetting_.vortex.breathAmount);
         env.vortex.thickness = pick(vortexThickness_, volumeSetting_.vortex.thickness);
         env.vortex.filaments = pick(vortexFilaments_, volumeSetting_.vortex.filaments);
+        env.vortex.funnelDepth = pick(vortexFunnelDepth_, volumeSetting_.vortex.funnelDepth);
+        env.vortex.throat = pick(vortexThroat_, volumeSetting_.vortex.throat);
+        env.vortex.throatDensity = pick(vortexThroatDensity_, volumeSetting_.vortex.throatDensity);
         if (vortexColorDeep_ != nullptr) { env.vortex.colorDeep = vortexColorDeep_->value(); }
         if (vortexColorMid_ != nullptr) { env.vortex.colorMid = vortexColorMid_->value(); }
         if (vortexColorAccent_ != nullptr) { env.vortex.colorAccent = vortexColorAccent_->value(); }
@@ -8453,6 +8460,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 f("breathSpeed", vx.breathSpeed);
                 f("emission", vx.emission);
                 f("filaments", vx.filaments);
+                f("funnelDepth", vx.funnelDepth);
+                f("throat", vx.throat);
+                f("throatDensity", vx.throatDensity);
                 c3("colorDeep", vx.colorDeep);
                 c3("colorMid", vx.colorMid);
                 c3("colorAccent", vx.colorAccent);
