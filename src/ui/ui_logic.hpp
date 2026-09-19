@@ -178,6 +178,26 @@ enum class ViewportIntent : std::uint8_t {
     return !typing && !widgetActive && !popupOpen;
 }
 
+// Whether an arrow key belongs to the *editor* -- nudging the selection -- rather than the
+// transport.
+//
+// A selection is not enough, and that is the whole point of this function. `nudgeSelection` used to
+// claim the arrows whenever anything at all was selected, so the transport only ever saw them with
+// an empty selection. That was tolerable while only composition nodes could be selected, because a
+// user scrubbing a timeline usually had nothing selected. Making **lights and cameras selectable
+// widens that window enormously**: selecting a light in the Lights panel to check its intensity
+// would silently stop the arrows scrubbing, anywhere in the application, until it was deselected.
+// The owner has already reported this symptom once from the other direction (ADR-357, the focus
+// ring and the playhead moving on one press), and it must not come back wearing a different hat.
+//
+// So the editor has to be the thing the user is actually pointing at. `viewportHasPointer` is the
+// canvas's own hover state -- the same signal `viewportOwnsPointer` uses for the mouse -- which is
+// what every DCC does: the arrows go to the editor under the cursor. Working in the sequencer with
+// a light selected therefore scrubs, and hovering the viewport nudges.
+[[nodiscard]] inline bool editorOwnsArrowKey(bool hasSelection, bool viewportHasPointer) {
+    return hasSelection && viewportHasPointer;
+}
+
 // Labels for a list of file paths: the file name where that is enough to tell them apart, and as
 // much of the trailing path as it takes where it is not.
 //

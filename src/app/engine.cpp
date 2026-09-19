@@ -1107,6 +1107,32 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
             !edits.is_null()) {
             doc["sceneNodes"] = std::move(edits);
         }
+        // The authored lights, and this is the same defect a **fifth** time -- ADR-207's world
+        // effects, ADR-230's atmospherics, ADR-276's heroes and ADR-330's nodes were the first
+        // four. Adding a light in the Lights panel calls `Composition::setAuthoredLights`; the
+        // composition is saved **by reference** (`assets.scene.path` plus a hash of the bytes
+        // already on disk); so without this the light lived in the window and in no document any
+        // render reads -- and an offline render builds its own `Engine` and loads the project, so
+        // it would never have reached a deliverable at all. `check_project_integrity.py` passes on
+        // that result, because the file is still perfectly valid; it is just missing a light.
+        //
+        // The whole list rather than ADR-330's difference-by-name, and the reason is the shape of
+        // the data rather than a preference: a node's numbers are already in `parameters`, so the
+        // project only owes the *set*. Most of a light's twenty-five fields -- `type`, `role`,
+        // `node`, `up`, the area extents -- are not parameters and never will be, so a by-name
+        // difference would record which lights exist and lose what they are. That puts lights in
+        // `worldEffects`/`heroes`' family, which is small lists the project can simply hold.
+        //
+        // `authoredLightsAgainst` canonicalises the file's own list out and back through the same
+        // parser before comparing, so a scene that spells out `"intensity": 1.0` does not read as
+        // an edit and an untouched project stays byte-stable.
+        // `authoredLightsRestJson()` rather than `toJson()["lights"]`: the latter carries the
+        // per-frame parameter writeback, so a project that merely dims a light would record its
+        // whole lighting rig -- a second answer to a question `parameters` already answers.
+        if (nlohmann::json lights = scene::authoredLightsAgainst(comp->authoredLightsRestJson(), sceneDoc);
+            !lights.is_null()) {
+            doc["lights"] = std::move(lights);
+        }
     }
     if (!states_.empty()) {
         doc["states"] = states_.toJson();
@@ -1621,6 +1647,28 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                 if (auto ok = comp->setHeroes(std::move(heroes)); !ok) {
                     warn("heroes: " + ok.error().message);
                 }
+            }
+        }
+    }
+    // The authored lights the session ended with (the fifth of ADR-207's family; see the save).
+    //
+    // **Before `params::loadProject` below, and that ordering is the whole of whether this works.**
+    // `setAuthoredLights` is what registers `lights/<id>/...`, and `params::loadProject` drops any
+    // path it cannot find with a warning rather than keeping it -- so a lights block applied after
+    // the parameters would leave every light's intensity, colour and position in the document and
+    // in no parameter. That is ADR-358's shader-layer defect exactly, where `shader/<layer>/<input>`
+    // was written by every save and met with "references unknown parameter; ignored" by every load.
+    //
+    // Over rather than instead of (ADR-264): an absent key changes nothing and the scene still runs
+    // first; a present one is the session's answer, including an empty array, which is how a
+    // deleted light stays deleted.
+    if (const auto entry = doc.find("lights"); entry != doc.end() && entry->is_array()) {
+        auto lights = scene::authoredLightsFromJson(*entry, "project");
+        if (!lights) {
+            warn(lights.error().message);
+        } else if (auto* comp = composition(); comp != nullptr) {
+            if (auto ok = comp->setAuthoredLights(std::move(*lights)); !ok) {
+                warn("lights: " + ok.error().message);
             }
         }
     }
