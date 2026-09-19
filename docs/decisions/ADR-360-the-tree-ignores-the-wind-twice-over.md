@@ -1,4 +1,4 @@
-# ADR-359: The tree ignores the wind twice over, and particles are allowed to drift
+# ADR-360: The tree ignores the wind twice over, and particles are allowed to drift
 
 - Status: Accepted (2026-09-19)
 - Supersedes nothing. Builds on ADR-055 (the wind field), ADR-015/040 (GPU particles),

@@ -2225,7 +2225,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         prevModels_.clear();
         prevModelsNext_.clear();
     }
-    // ADR-359: the wind deformation is a function of time, so the velocity target needs the time
+    // ADR-360: the wind deformation is a function of time, so the velocity target needs the time
     // the PREVIOUS frame was at, and `previousRenderTime_` is about to stop being that. Captured
     // rather than read later: the object fill runs several hundred lines below this line, and
     // reading `previousRenderTime_` there quietly gave every swaying vertex a zero velocity --
@@ -2903,7 +2903,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             static_cast<float>(scene::packPickId(scene::PickSpace::Entity, thisEntity)),
             static_cast<float>(thisEntity + 1), 1.0f,
                             static_cast<float>(skin.jointCount));
-        // ADR-359: the wind body, if this mesh is part of one. Everything here is the body's, not
+        // ADR-360: the wind body, if this mesh is part of one. Everything here is the body's, not
         // the mesh's, so five meshes of one tree hand the shader identical numbers and cannot come
         // apart at the joints between them. Off (strength 0) leaves all three lanes zero and the
         // vertex stage returns before it reads them.

@@ -216,7 +216,7 @@ struct NodeLod {
     float maxScreenError = -1.0f;
 };
 
-// ADR-359: a wind body. Authored on a GROUP node, and stamped onto every mesh the group contains,
+// ADR-360: a wind body. Authored on a GROUP node, and stamped onto every mesh the group contains,
 // because the deformation is continuous in world space and two meshes that touch stay joined only
 // if they are given the same origin and extent. Putting it on the group rather than on each mesh is
 // what makes that impossible to get wrong from a scene file.
@@ -251,7 +251,7 @@ struct CompositionNode {
     bool locked = false;
     float emissiveBoost = 1.0f;
     float roughnessScale = 1.0f;
-    // ADR-359: the wind body this node's meshes belong to, when it is a Group that declares one.
+    // ADR-360: the wind body this node's meshes belong to, when it is a Group that declares one.
     // `windAuthored` distinguishes "the author wrote nothing" from "the author wrote the defaults",
     // which is what keeps a scene written before this key existed byte-identical on a re-save.
     WindBodySettings wind;
@@ -1063,7 +1063,7 @@ private:
     void updateEcologyLights();
     void registerAuthoredLightParameters(params::ParameterSet& params);
     void unregisterAuthoredLightParameters();
-    // ADR-359: stamp each declared wind body's measured origin/extent onto every mesh it holds.
+    // ADR-360: stamp each declared wind body's measured origin/extent onto every mesh it holds.
     void applyWindBodies();
     // ...and the entity spans it stamped, so the per-frame parameter pass can move `strength` and
     // the three influences without re-measuring anything. The bounds are geometry and only change
@@ -1213,7 +1213,7 @@ private:
     nlohmann::json postJson_;
     params::Parameter<float>* fogHeight_ = nullptr;
     params::Parameter<float>* fogHeightFalloff_ = nullptr;
-    // ADR-055/ADR-359: the whole field, live. Two of these existed; the other twelve were authored
+    // ADR-055/ADR-360: the whole field, live. Two of these existed; the other twelve were authored
     // only, and `enabled` -- the gate every other one hangs off -- was reachable from neither the
     // UI nor a save, so `scene/windSpeed` could be dragged to its maximum and do nothing. The two
     // original paths keep their spelling (`scene/windSpeed`, `scene/windDirection`): renaming them

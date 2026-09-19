@@ -121,7 +121,7 @@ fn mainImage(uv: vec2<f32>, fragCoord: vec2<f32>) -> vec4<f32> {
     let edge = 1.0 - inputs.vignette * smoothstep(0.35, 1.05, length(p));
     colour = colour * edge;
 
-    // ADR-359, the key-light brief's section 18. "Background brightness" and "background
+    // ADR-360, the key-light brief's section 18. "Background brightness" and "background
     // saturation" are asked for as environment controls, and for this scene the background IS this
     // layer: the clear colour behind it is 0.0045, 0.0062, 0.0185 and scaling that alone would be
     // invisible. One multiply and one desaturate at the end is the honest place for them, because

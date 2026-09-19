@@ -3293,7 +3293,7 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     stylized_ = &params.add(boolDesc(prefix_ + "scene/stylized", stylizedSetting_));
     fogDensity_ = &params.add(floatDesc(prefix_ + "scene/fogDensity", fogDensitySetting_, 0.0f, 2.0f, 0.0f, 0.2f));
     keyLight_ = &params.add(floatDesc(prefix_ + "scene/keyLight", 1.0f, 0.0f, 10.0f, 0.0f, 3.0f));
-    // ADR-055/ADR-359. `WindParams::active()` is `enabled && speed > 0`, and until ADR-359 only
+    // ADR-055/ADR-360. `WindParams::active()` is `enabled && speed > 0`, and until ADR-360 only
     // `speed` was reachable -- the comment that used to sit here said "speed 0 is a genuine no-op:
     // active() is false", reading the gate as speed alone, which is how a field nobody could switch
     // on shipped. Both halves are parameters now. Speed 0 is still a genuine no-op, and so is
@@ -3462,7 +3462,7 @@ void Composition::unregisterAuthoredLightParameters() {
     authoredLightParams_.clear();
 }
 
-// ADR-359. Hand every mesh inside a wind body the SAME origin and extent, measured from the body's
+// ADR-360. Hand every mesh inside a wind body the SAME origin and extent, measured from the body's
 // combined world bounds rather than authored, so the tree keeps its wind when it is moved or
 // rescaled and so no two of its meshes can disagree about where its root is. That sharing is the
 // whole reason the deformation is continuous across the five GLBs the Tree of Life is made of; see
@@ -3617,7 +3617,7 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     node.lightIntensityParam =
         &params_->add(floatDesc(base + "lightIntensity", 1.0f, 0.0f, 20.0f, 0.0f, 4.0f));
     node.lightColorParam = &params_->add(vec3Desc(base + "lightColor", glm::vec3(1.0f), 0.0f, 4.0f, 0.0f, 1.0f));
-    // ADR-359: the wind body, when this node declares one. Registered only on a node that does, so
+    // ADR-360: the wind body, when this node declares one. Registered only on a node that does, so
     // a scene full of rocks does not grow six inert sliders each. Strength 0 is a genuine no-op and
     // is the default, so a node that declares `"wind": {}` still moves nothing until it is turned
     // up -- which is the point: "off" has to be somewhere a user can leave it.
@@ -6413,7 +6413,7 @@ void Composition::applyParameters() {
         env.styledGroundAmbient = styledGroundAmbient_ != nullptr ? styledGroundAmbient_->value()
                                                                   : volumeSetting_.styledGroundAmbient;
         env.styledAmbientFloor = volumeSetting_.styledAmbientFloor;
-        // ADR-359: every field of the wind is a live parameter now, not just two, so the whole
+        // ADR-360: every field of the wind is a live parameter now, not just two, so the whole
         // field can be turned up, down, off, gustier or calmer from the UI, keyed on the timeline
         // and driven by audio (`music.build -> scene/windSpeed` is the intended idiom).
         env.wind = windSetting_;
@@ -6432,7 +6432,7 @@ void Composition::applyParameters() {
         env.wind.regionDrift = pick(windRegionDrift_, windSetting_.regionDrift);
         env.wind.flutterScale = pick(windFlutterScale_, windSetting_.flutterScale);
     }
-    // ADR-359: and the per-body amounts, so `nodes/<tree>/wind/strength` is a live slider.
+    // ADR-360: and the per-body amounts, so `nodes/<tree>/wind/strength` is a live slider.
     refreshWindBodyAmounts();
     {
     }
@@ -7362,7 +7362,7 @@ nlohmann::json Composition::toJson() const {
     if (navWadeDepth_ != 0.0f) {
         j["navWadeDepth"] = navWadeDepth_;
     }
-    // ADR-359. This used to be `if (windSetting_.enabled)`, which made the writer unreachable from
+    // ADR-360. This used to be `if (windSetting_.enabled)`, which made the writer unreachable from
     // the same place the reader was: `enabled` had no control, so it could only ever be true if the
     // file already said so, and a scene that did not say so could never start saying it. A save now
     // records whatever the parameters currently say, and emits nothing at all while the wind is
@@ -7429,7 +7429,7 @@ nlohmann::json Composition::toJson() const {
         }
         n["emissiveBoost"] = node.emissiveBoost;
         n["roughnessScale"] = node.roughnessScale;
-        // ADR-359. Written only when the node declares a wind body, so nothing else grows a key,
+        // ADR-360. Written only when the node declares a wind body, so nothing else grows a key,
         // and written from the parameters' BASE so a session's edits survive the save -- the
         // failure this whole ADR is about was a reader whose writer could not be reached.
         if (node.windAuthored) {
@@ -8481,7 +8481,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             auto locked = readBool(item, "locked", false);
             auto emissive = readFloat(item, "emissiveBoost", 1.0f);
             auto roughness = readFloat(item, "roughnessScale", 1.0f);
-            // ADR-359: the wind body. Absent is the ordinary state, not a fault.
+            // ADR-360: the wind body. Absent is the ordinary state, not a fault.
             if (item.contains("wind") && item.at("wind").is_object()) {
                 const nlohmann::json& w = item.at("wind");
                 node.windAuthored = true;

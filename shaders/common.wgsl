@@ -147,7 +147,7 @@ struct ObjectUniforms {
     flags: vec4<f32>,          // x = alpha mode (0 opaque, 1 mask, 2 blend), y = alpha cutoff, z = unlit, w = texture mask
     ids: vec4<f32>,            // x = object id (ADR-030 `objectId`), y = material id, z = bloom weight,
                                // w = the skinned joint count (pbr_skinned.wgsl)
-    // ADR-359: mesh wind. windShape.y is the gate AND the amplitude; 0 means the deformation is not
+    // ADR-360: mesh wind. windShape.y is the gate AND the amplitude; 0 means the deformation is not
     // evaluated and the draw is byte-identical to one from before this existed, which is the state
     // every object in every existing scene is in. Shared by every mesh of one body, deliberately:
     // see meshWindOffset below for why they may not each carry their own origin.
@@ -206,7 +206,7 @@ fn materialTierLocalLights(tier: u32) -> u32 {
 @group(0) @binding(0) var<uniform> frame: FrameUniforms;
 @group(1) @binding(0) var<uniform> object: ObjectUniforms;
 
-// ADR-055's wind field, and ADR-359's reason for hoisting it here from procedural.wgsl: the mesh
+// ADR-055's wind field, and ADR-360's reason for hoisting it here from procedural.wgsl: the mesh
 // vertex stage below now deforms too, and wind.wgsl needs `frame`, so it has to come after the
 // binding above and before vs_main. The include directive does not de-duplicate -- procedural.wgsl
 // used to include this itself and no longer may.
@@ -227,7 +227,7 @@ struct VertexOut {
     @location(4) prevClip: vec4<f32>, // last frame's clip position, for the velocity target
 };
 
-// ADR-359. Wind deformation for imported meshes, which had none: `windDisplacement` above was
+// ADR-360. Wind deformation for imported meshes, which had none: `windDisplacement` above was
 // reached only from the instanced procedural scatter, so the Tree of Life -- five GLBs -- could not
 // move however high the scene's wind was turned, and a four-arm render of it at windSpeed 0, 4.0
 // and with the field forced on in the scene file came back byte-identical.

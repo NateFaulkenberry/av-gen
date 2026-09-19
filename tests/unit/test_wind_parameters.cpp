@@ -1,4 +1,4 @@
-// ADR-359: the wind was a system the application ran and could not switch on.
+// ADR-360: the wind was a system the application ran and could not switch on.
 //
 // `wind::WindParams` has seventeen authored fields. Two were parameters. The one that gates every
 // other -- `enabled` -- was not, and the scene writer emitted the whole block only `if

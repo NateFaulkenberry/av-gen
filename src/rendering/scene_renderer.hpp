@@ -341,7 +341,7 @@ struct ObjectUniforms {
                    // y = material id, z = bloom weight of this object's emission,
                    // w = the skinned joint count. ADR-135: there is no free lane here for a
                    // per-draw material tier, which is why ADR-133's tier is frame-global.
-    // ADR-359: mesh wind. `windShape.y` is the gate and the amplitude at once; zero means
+    // ADR-360: mesh wind. `windShape.y` is the gate and the amplitude at once; zero means
     // `meshWindOffset` returns early and the draw is byte-identical to one from before this
     // existed. Every entity of one body carries the SAME origin and extent -- that sharing is what
     // makes the deformation continuous across meshes that touch, and it is why these live here
@@ -781,7 +781,7 @@ private:
     glm::mat4 prevViewProj_{1.0f};
     bool havePrevViewProj_ = false;
     double previousRenderTime_ = -std::numeric_limits<double>::infinity();
-    // ADR-359: the previous frame's render time, captured before `previousRenderTime_` is
+    // ADR-360: the previous frame's render time, captured before `previousRenderTime_` is
     // overwritten, so the wind's contribution to the velocity target is a real difference.
     float windPrevTime_ = 0.0f;
     QualityTier tier_ = QualityTier::Realtime;

@@ -346,7 +346,7 @@ struct Entity {
     // shadow passes, which test it against each cascade's own frustum. Runtime only: never
     // serialised, and cleared every frame by whatever set it.
     bool cameraCulled = false;
-    // ADR-359: which wind body this mesh belongs to, if any. `strength` 0 -- the default, and the
+    // ADR-360: which wind body this mesh belongs to, if any. `strength` 0 -- the default, and the
     // state of every entity in every scene that does not ask otherwise -- means the vertex stage
     // returns before it evaluates anything, so this changes no existing picture.
     //

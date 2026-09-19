@@ -1,7 +1,7 @@
 # Tree of Life COSMIC — environment & VFX overhaul: research findings and plan
 
 Scene: `examples/treeisland/tree-of-life-floating-island.{json,scene.json}`.
-Companion decision record: `docs/decisions/ADR-359-the-tree-ignores-the-wind-twice-over.md`.
+Companion decision record: `docs/decisions/ADR-360-the-tree-ignores-the-wind-twice-over.md`.
 
 ## Phase 0 — research, and what it found
 
@@ -28,7 +28,7 @@ Companion decision record: `docs/decisions/ADR-359-the-tree-ignores-the-wind-twi
 | A. GPU compute particles, deterministic randomisation, instanced HDR rendering | **ADR-015/040**, `shaders/particles.wgsl` + `src/rendering/particle_renderer.cpp`. Fixed pool, dead/alive lists, **deterministic prefix-sum compaction with no atomics**, indirect draw, keyframed size/colour/opacity curves, velocity stretch, trail ribbons, fog coupling, glow injection into the volume march. Strictly more advanced than the WebGPU sample. | Billboards and ribbons only — **no mesh/card instancing**, no per-particle orientation, no texture. `softness` is authored, serialised, uploaded and never read. No mesh emitter. |
 | B. Curl noise / flow fields | `turbCurl` in `cs_simulate` (Bridson-style divergence-free curl of three hash potentials), plus `attractorStrength` (radial) and `orbit` (tangential/vortex) around a point. | Not wired to the wind field at all. |
 | C/D. Ray-marched volumetrics | **ADR-032/139/140**, `shaders/volume.wgsl`: half-res march (`volumeResolutionScale`, 1.0 offline), Henyey-Greenstein phase, clustered local lights, arbitrary `FieldKind` density **and** colour fields, depth-aware bilinear upsample and composite. | Gated entirely on `Environment::volumeDensity > 0`, which this project sets to 0. |
-| E. Wind-driven foliage | **ADR-055** `src/core/wind.hpp` + `shaders/wind.wgsl`: travelling gust fronts, regional variation, direction-turning turbulence, per-species damped-oscillator response. | Consumed **only** by `procedural.wgsl`. Two of ~17 fields are parameters. `enabled` is unreachable. See ADR-359. |
+| E. Wind-driven foliage | **ADR-055** `src/core/wind.hpp` + `shaders/wind.wgsl`: travelling gust fronts, regional variation, direction-turning turbulence, per-species damped-oscillator response. | Consumed **only** by `procedural.wgsl`. Two of ~17 fields are parameters. `enabled` is unreachable. See ADR-360. |
 | Comet | **ADR-230** `AtmosphereKind::Comet`, great-circle arc, core/halo/tail/sparkle/rainbow + ground illumination. Already authored here as `atmos/Bioluminescent Comet/*`. | Keep. It is good and the spec says so. |
 | Parameter/modulation/UI | **ADR-011**: registering a parameter makes it a Parameters-panel row, a modulation target, a timeline key target, a preset member and a save/load entry — all automatic. | Bespoke panel rows are hand-written. `ui_logic.hpp`'s authoring-layer prefix lists decide whether a prefix is visible below Advanced. |
 
@@ -41,7 +41,7 @@ There is no `docs/adr` directory; ADRs live in `docs/decisions/`.
 
 ## Phase 1 — the audit, answered
 
-Both halves are measured, not argued. See ADR-359 for the four-arm render table. Short form:
+Both halves are measured, not argued. See ADR-360 for the four-arm render table. Short form:
 
 1. `wind.enabled` is a gate with no parameter, read from a **top-level** scene key `"wind"` (not
    `environment.wind`), and written back only when it is already true. The application cannot turn
@@ -95,7 +95,7 @@ functions of time except the particles.
 ## The `emissiveBoost` decision the owner left open
 
 **Recommendation: 0.5. Superseded my own first answer of 2.2 within the same session** — see the
-addendum to ADR-359 for the numbers and for why the first probe was the wrong one. Short form:
+addendum to ADR-360 for the numbers and for why the first probe was the wrong one. Short form:
 `tools/light_probe.py` partitions subject pixels by the sign of n.L against the key out of the
 normal AOV, and it reports key-to-shadow **5.537 at 2.2 against 8.368 at 0.5**, because the
 emission lifts the shadow side by 60% and the key side by 6%. `shadow_floor` stays at 0.0001 either
