@@ -108,6 +108,53 @@ def build(view_name, ladder_name, write=True):
     return name, distance, projected_radius(distance)
 
 
+# The dolly (§11: "camera moving toward", "camera moving away"). One project per step, rather than
+# one project with an animated camera, and the reason is the measurement rather than convenience:
+# with the clock frozen and only the camera moved, *any* difference between consecutive frames is
+# the LOD change and nothing else. An animated camera would put the island's spin, the LFOs and the
+# temporal post into every pair, and the pop would have to be separated from them.
+#
+# The range brackets the rung 1 -> rung 2 boundary, which the eight-pixel floor puts at about 520 m
+# for this asset. `off` renders the same steps with no ladder at all: that pair-to-pair difference
+# is the baseline a pop has to be seen against, because a camera that moves at all changes the frame.
+DOLLY_STEPS = 13
+DOLLY_NEAR = 420.0
+DOLLY_FAR = 660.0
+
+
+def build_dolly(index, ladder_name, write=True):
+    project = json.load(open(os.path.join(SOURCE_DIR, SOURCE_PROJECT)))
+    scene = json.load(open(os.path.join(SOURCE_DIR, SOURCE_SCENE)))
+    camera = scene["camera"]
+    offset = [camera["position"][i] - camera["target"][i] for i in range(3)]
+    length = math.sqrt(sum(o * o for o in offset))
+    unit = [o / length for o in offset]
+    t = index / (DOLLY_STEPS - 1)
+    distance = DOLLY_FAR + (DOLLY_NEAR - DOLLY_FAR) * t
+    camera["target"] = list(TREE_CENTRE)
+    camera["position"] = [TREE_CENTRE[i] + unit[i] * distance for i in range(3)]
+
+    ladder = LADDERS[ladder_name]
+    for node in scene["nodes"]:
+        if node["name"] in TREE_NODES and ladder is not None:
+            node["lod"] = copy.deepcopy(ladder)
+
+    name = f"dolly-{ladder_name}-{index:02d}"
+    project["app"]["name"] = f"Tree of Life LOD dolly {index} / {ladder_name}"
+    project["assets"]["scene"]["path"] = f"{name}.scene.json"
+    project["routes"] = []
+    project["sources"] = []
+    project["parameters"] = {
+        k: v for k, v in project["parameters"].items() if not k.startswith("sources/")
+    }
+    if write:
+        with open(os.path.join(OUT_DIR, f"{name}.scene.json"), "w") as f:
+            json.dump(scene, f, indent=1)
+        with open(os.path.join(OUT_DIR, f"{name}.json"), "w") as f:
+            json.dump(project, f, indent=1)
+    return name, distance, projected_radius(distance)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--list", action="store_true", help="print the arms without writing them")
@@ -117,6 +164,10 @@ def main():
     for view in VIEWS:
         for ladder in LADDERS:
             name, distance, radius = build(view, ladder, write=not args.list)
+            print(f"{name:34} {distance:10.1f} {radius:10.1f}")
+    for ladder in ("auto", "off"):
+        for index in range(DOLLY_STEPS):
+            name, distance, radius = build_dolly(index, ladder, write=not args.list)
             print(f"{name:34} {distance:10.1f} {radius:10.1f}")
 
 

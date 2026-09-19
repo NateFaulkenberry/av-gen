@@ -25,6 +25,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <fmt/format.h>
+
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -96,4 +99,63 @@ TEST_CASE("what each rung of the Tree of Life's ladder looks like", "[.analysis]
         }
         CHECK(anyDiffers);
     }
+}
+
+// ---- the dolly: popping, measured between consecutive frames -------------------------------------
+//
+// §11 asks for "camera moving toward" and "camera moving away" and says to look for popping. The
+// selector's own stability is tested device-free in test_representation.cpp; this measures what a
+// rung change does to the *picture*, which is the only place a pop exists.
+//
+// Thirteen steps from 660 m to 420 m, which brackets the rung 1 -> rung 2 boundary the eight-pixel
+// floor puts at about 520 m. One project per step with the clock frozen, so the only thing that
+// differs between two consecutive frames is the camera -- and, at one of the pairs, the rung.
+//
+// The control is the same thirteen steps with no ladder at all. A camera that moves changes the
+// frame, so "consecutive frames differ" proves nothing on its own: what a pop is, is the LOD pair
+// differing *more than the no-LOD pair at the same two distances*. That ratio is the number this
+// prints, and it is the one to read.
+TEST_CASE("a dolly across a rung boundary does not pop", "[.analysis][assetlodframes]") {
+    const fs::path root = frameRoot();
+    if (root.empty() || !fs::is_directory(root / "dolly-auto-00")) {
+        SKIP("set AVGEN_LOD_FRAMES to a directory containing the rendered dolly arms");
+    }
+    constexpr int kSteps = 13;
+    std::vector<double> lodPairs;
+    std::vector<double> basePairs;
+    std::printf("\n%-6s %-10s %10s %10s %10s\n", "pair", "distance", "lod ssim", "off ssim", "excess");
+    for (int i = 1; i < kSteps; ++i) {
+        const auto previousLod = quality::readFrame(
+            framePath(root, fmt::format("dolly-auto-{:02d}", i - 1)));
+        const auto currentLod = quality::readFrame(framePath(root, fmt::format("dolly-auto-{:02d}", i)));
+        const auto previousOff = quality::readFrame(
+            framePath(root, fmt::format("dolly-off-{:02d}", i - 1)));
+        const auto currentOff = quality::readFrame(framePath(root, fmt::format("dolly-off-{:02d}", i)));
+        if (!previousLod || !currentLod || !previousOff || !currentOff) {
+            SKIP("the dolly arms are not fully rendered");
+        }
+        const double lodStep = quality::msSsim(*previousLod, *currentLod);
+        const double baseStep = quality::msSsim(*previousOff, *currentOff);
+        lodPairs.push_back(lodStep);
+        basePairs.push_back(baseStep);
+        // Dissimilarity rather than similarity, so "twice as different" is twice the number.
+        const double excess = (1.0 - baseStep) > 1e-9 ? (1.0 - lodStep) / (1.0 - baseStep) : 1.0;
+        std::printf("%-6d %10.0f %10.5f %10.5f %10.2f\n", i, 660.0 - 20.0 * i, lodStep, baseStep, excess);
+    }
+    REQUIRE(lodPairs.size() == kSteps - 1);
+
+    // The control first. The camera moves twenty metres between steps, so consecutive frames differ
+    // whatever the ladder does; if they did not, the dolly did not happen and every number below
+    // would be measuring a still.
+    const double worstBase = *std::ranges::min_element(basePairs);
+    CHECK(worstBase < 0.9999);
+
+    // The arm. The worst LOD pair may be no more than three times as different as the worst no-LOD
+    // pair. A band rather than a floor, and three rather than one because a rung change *is* a
+    // change -- the claim is that it is of the same order as the camera's own motion, not that it
+    // is invisible.
+    const double worstLod = *std::ranges::min_element(lodPairs);
+    const double worstExcess = (1.0 - worstBase) > 1e-9 ? (1.0 - worstLod) / (1.0 - worstBase) : 1.0;
+    std::printf("\nworst pair: lod %.5f, off %.5f, excess %.2fx\n", worstLod, worstBase, worstExcess);
+    CHECK(worstExcess < 3.0);
 }
