@@ -12,9 +12,9 @@
     "scene": {
       "kind": "composition",
       "path": {
-        "path": "tree-of-life-floating-island.scene.json",
-        "sha256": "cd9c80fa3ec951787e032ddf243ddad2f64cfb0c8034926cae30b27eaaeb7af1",
-        "size": 11129
+        "path": "_cc-e-lo.scene.json",
+        "sha256": "1664ae401fcb08bc67c0d587da776547169ec44888e477f02ff988b2bdead476",
+        "size": 15415
       }
     }
   },
@@ -570,7 +570,7 @@
       1.0
     ],
     "nodes/tree-foliage/visible": true,
-    "nodes/tree-lumens/emissiveBoost": 2.4,
+    "nodes/tree-lumens/emissiveBoost": 4.0,
     "nodes/tree-lumens/lightColor": [
       1.0,
       1.0,
@@ -618,7 +618,7 @@
       1.0
     ],
     "nodes/tree-of-life/visible": true,
-    "nodes/tree-tracery/emissiveBoost": 2.4,
+    "nodes/tree-tracery/emissiveBoost": 5.0,
     "nodes/tree-tracery/lightColor": [
       1.0,
       1.0,
@@ -642,7 +642,7 @@
       1.0
     ],
     "nodes/tree-tracery/visible": false,
-    "nodes/tree-twigs/emissiveBoost": 0.55,
+    "nodes/tree-twigs/emissiveBoost": 1.5,
     "nodes/tree-twigs/lightColor": [
       1.0,
       1.0,
@@ -1697,7 +1697,7 @@
     }
   ],
   "render": {
-    "aovs": "normal,shadow",
+    "aovs": "",
     "backend": "auto",
     "codec": "h264",
     "encoderThreads": 0,

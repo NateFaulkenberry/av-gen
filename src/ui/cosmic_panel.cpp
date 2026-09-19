@@ -293,9 +293,64 @@ void drawTreePanel(app::Engine& engine) {
         ImGui::PopID();
     }
 
-    if (ImGui::CollapsingHeader("Tree energy, canopy shimmer, tree particles")) {
-        absent("Not built. Phases 5, 6 and 7 of the brief; the wind, the leaves and the vortex "
-               "came first because they read at a glance and these do not.");
+    // ADR-376: the tree's emissive life. Keyed off the same body as the wind, so a node without a
+    // wind body has no energy either and the section says so rather than being absent.
+    const std::vector<std::string> bodies2 = windBodies(engine);
+    if (ImGui::CollapsingHeader("Tree energy")) {
+        ImGui::PushID("energy");
+        if (bodies2.empty()) {
+            absent("Needs a wind body: the energy uses the same root, height and radius, so that "
+                   "the two cannot disagree about where the tree is.");
+        }
+        for (const std::string& wp : bodies2) {
+            const std::string e = wp.substr(0, wp.size() - 5) + "energy/";
+            if (!have(engine, (e + "intensity").c_str())) {
+                continue;
+            }
+            ImGui::PushID(e.c_str());
+            slider(engine, (e + "intensity").c_str(), "Intensity", "%.2f");
+            slider(engine, (e + "propagation").c_str(), "Propagation speed", "%.3f /s");
+            slider(engine, (e + "pulseSpeed").c_str(), "Pulse speed", "%.3f Hz");
+            slider(engine, (e + "pulseWidth").c_str(), "Pulse width", "%.2f");
+            ImGui::Separator();
+            slider(engine, (e + "root").c_str(), "Root", "%.2f");
+            slider(engine, (e + "trunk").c_str(), "Trunk", "%.2f");
+            slider(engine, (e + "branch").c_str(), "Branch", "%.2f");
+            slider(engine, (e + "canopy").c_str(), "Canopy", "%.2f");
+            ImGui::Separator();
+            slider(engine, (e + "noise").c_str(), "Noise", "%.2f");
+            slider(engine, (e + "bloom").c_str(), "Bloom contribution", "%.2f");
+            colorRow(engine, (e + "colorNear").c_str(), "Colour at the roots");
+            colorRow(engine, (e + "colorFar").c_str(), "Colour at the crown");
+            ImGui::PopID();
+        }
+        ImGui::PopID();
+    }
+
+    if (ImGui::CollapsingHeader("Canopy shimmer")) {
+        ImGui::PushID("shimmer");
+        if (bodies2.empty()) {
+            absent("Needs a wind body, for the same reason the energy does.");
+        }
+        for (const std::string& wp : bodies2) {
+            const std::string e = wp.substr(0, wp.size() - 5) + "energy/";
+            if (!have(engine, (e + "shimmer").c_str())) {
+                continue;
+            }
+            ImGui::PushID(e.c_str());
+            slider(engine, (e + "shimmer").c_str(), "Intensity", "%.2f");
+            slider(engine, (e + "shimmerSpeed").c_str(), "Speed", "%.3f");
+            slider(engine, (e + "shimmerScale").c_str(), "Scale", "%.3f");
+            ImGui::PopID();
+        }
+        ImGui::TextColored(kMuted, "A travelling wave, not a flash: it takes light away as often "
+                                   "as it adds it, which is why low values read as alive rather "
+                                   "than as blinking.");
+        ImGui::PopID();
+    }
+
+    if (ImGui::CollapsingHeader("Tree particles")) {
+        absent("Not built. Phase 7 of the brief.");
     }
 }
 
