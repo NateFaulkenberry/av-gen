@@ -30,18 +30,24 @@ def projects():
             yield path, doc
 
 
-def effect_names(node, out):
-    """Every `worldEffects[].name` anywhere in a document. They are not always at the top level, and
-    a project that defines none may still inherit them from its scene."""
+# The two parameter groups whose path is `<group>/<effect name>/<property>`, and the document key
+# each group's effects are declared under. `nodes/...` is deliberately not here: it resolves against
+# scene node ids on a different path, and a removed node is a legitimate authored edit.
+GROUPS = {'worldfx': 'worldEffects', 'atmos': 'atmosphericEffects'}
+
+
+def effect_names(node, key, out):
+    """Every `<key>[].name` anywhere in a document. They are not always at the top level, and a
+    project that declares none may still inherit them from its scene."""
     if isinstance(node, dict):
-        for entry in node.get('worldEffects') or []:
+        for entry in node.get(key) or []:
             if isinstance(entry, dict) and entry.get('name'):
                 out.add(entry['name'])
         for value in node.values():
-            effect_names(value, out)
+            effect_names(value, key, out)
     elif isinstance(node, list):
         for value in node:
-            effect_names(value, out)
+            effect_names(value, key, out)
 
 
 def scene_path(path, doc):
@@ -59,22 +65,30 @@ def main():
             problems.append('%s: will not parse: %s' % (rel, doc))
             continue
 
-        # An effect's name is the prefix its parameters hang off, so renaming one orphans the other.
+        # An effect's name is the prefix its parameters hang off, so renaming or deleting one
+        # orphans the other, and the loader then refuses every orphaned value as an unknown path.
         params = doc.get('parameters') or {}
-        prefixes = {k.split('/')[1] for k in params if k.startswith('worldfx/') and k.count('/') >= 2}
-        if prefixes:
-            checked_fx += 1
+        counted = False
+        for group, key in sorted(GROUPS.items()):
+            prefixes = {k.split('/')[1] for k in params
+                        if k.startswith(group + '/') and k.count('/') >= 2}
+            if not prefixes:
+                continue
+            if not counted:
+                checked_fx += 1
+                counted = True
             names = set()
-            effect_names(doc, names)
+            effect_names(doc, key, names)
             scene, _ = scene_path(path, doc)
             if scene and os.path.exists(scene):
                 try:
-                    effect_names(json.load(open(scene)), names)
+                    effect_names(json.load(open(scene)), key, names)
                 except Exception:
                     pass
             for orphan in sorted(prefixes - names):
-                n = sum(1 for k in params if k.startswith('worldfx/%s/' % orphan))
-                problems.append("%s: %d parameter(s) under 'worldfx/%s/' name no effect" % (rel, n, orphan))
+                n = sum(1 for k in params if k.startswith('%s/%s/' % (group, orphan)))
+                problems.append("%s: %d parameter(s) under '%s/%s/' name no effect"
+                                % (rel, n, group, orphan))
 
         scene, ref = scene_path(path, doc)
         if ref is None:
@@ -90,7 +104,7 @@ def main():
                             'refresh_scene_fingerprint.py %s'
                             % (rel, ref['sha256'][:16], ref.get('size'), digest[:16], size, ref['path']))
 
-    print('%d project(s) carrying worldfx parameters, %d fingerprinting a scene' % (checked_fx, checked_fp))
+    print('%d project(s) carrying effect parameters, %d fingerprinting a scene' % (checked_fx, checked_fp))
     for problem in problems:
         print('  ' + problem)
     print('%d problem(s)' % len(problems))
