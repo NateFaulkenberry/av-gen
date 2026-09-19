@@ -6633,6 +6633,30 @@ nlohmann::json Composition::toJson() const {
                     if (layer.drive != PoseLayerDrive::Manual) {
                         l["drive"] = poseLayerDriveName(layer.drive);
                     }
+                    // ADR-344: a foot layer is a different set of keys, not the same set with some
+                    // of them empty. Written through the shared path it came out with `"joints":
+                    // []` and `"clip": ""`, and the file it produced would not load -- a save that
+                    // breaks the scene it saved is worse than one that refuses.
+                    if (layer.kind == PoseLayerKind::Foot) {
+                        l["chain"] = json::array({layer.chainRoot, layer.chainMid, layer.chainTip});
+                        if (glm::dot(layer.poleDirection, layer.poleDirection) > 0.0f) {
+                            l["poleDirection"] = vecToJson(layer.poleDirection);
+                        }
+                        if (layer.footAlign != 1.0f) {
+                            l["footAlign"] = layer.footAlign;
+                        }
+                        if (layer.groundOffset != 0.0f) {
+                            l["groundOffset"] = layer.groundOffset;
+                        }
+                        if (layer.extension != 1.0f) {
+                            l["extension"] = layer.extension;
+                        }
+                        if (glm::dot(layer.soleUp, layer.soleUp) > 0.0f) {
+                            l["soleUp"] = vecToJson(layer.soleUp);
+                        }
+                        layers.push_back(std::move(l));
+                        continue;
+                    }
                     l["joints"] = layer.mask.joints;
                     if (!layer.mask.weights.empty()) {
                         l["weights"] = layer.mask.weights;

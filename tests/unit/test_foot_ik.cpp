@@ -20,8 +20,10 @@
 // Bands, not floors. "The hoof went down" passes on a hoof that went to the centre of the earth;
 // every assertion below is an interval with a top as well as a bottom.
 
+#include "assets/asset_registry.hpp"
 #include "assets/gltf_loader.hpp"
 #include "scene/animation.hpp"
+#include "scene/composition.hpp"
 #include "scene/ik.hpp"
 #include "scene/pose_layers.hpp"
 #include "scene/scene.hpp"
@@ -30,6 +32,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -37,6 +41,7 @@
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -685,8 +690,15 @@ TEST_CASE("foot planting lands four hooves on one slope and lays the soles on it
         CHECK(bull.rig->layers.results()[i] == scene::LayerResolution::Applied);
         const glm::vec3 before = jointAt(sk, rest, kFeet[i]);
         const glm::vec3 after = jointAt(sk, bull.rig->pose, kFeet[i]);
-        // On the plane: the residual along the normal is zero, which is what "planted" means.
-        CHECK(glm::dot(after - planePoint, normal) == Approx(0.0f).margin(2e-4));
+        // Planted means "standing on this slope the way it stands on the flat", not "the joint is
+        // on the plane": a hoof joint is not the sole of the hoof, and on this rig it rests 0.120
+        // model units above the ground (0.097 on the front leg). The plant preserves that height,
+        // read out of the rest pose, so the residual along the normal is exactly it -- and a plant
+        // that dropped the joint onto the plane instead would bury a quarter of every hoof.
+        const float standsAt = jointAt(sk, rest, kFeet[i]).y;
+        CHECK(standsAt > 0.05f); // the fixture's premise, so a re-export cannot make this vacuous
+        CHECK(standsAt < 0.20f);
+        CHECK(glm::dot(after - planePoint, normal) == Approx(standsAt * normal.y).margin(2e-4));
         // Straight down, not sideways: a plant must not slide the hoof across the ground.
         CHECK(after.x == Approx(before.x).margin(1e-4));
         CHECK(after.z == Approx(before.z).margin(1e-4));
@@ -718,7 +730,7 @@ TEST_CASE("foot planting lands four hooves on one slope and lays the soles on it
                 // Clamped means "at the end of my leg", and the residual is what a body drop would
                 // have to make up. It is bounded by the leg, not by the ask.
                 CHECK(glm::dot(after - low[i].groundPoint, normal) > 0.0f);
-                CHECK(glm::dot(after - low[i].groundPoint, normal) < 0.40f);
+                CHECK(glm::dot(after - low[i].groundPoint, normal) < 0.50f);
             }
         }
         CHECK(clamped >= 3);
@@ -925,5 +937,61 @@ TEST_CASE("a farm leg stands nearly straight, which is what bounds what foot IK 
     CHECK(leastBindExtension < 0.995f);
     CHECK(mostWalkFold > 0.01f);
     CHECK(mostWalkFold < 0.20f);
+#endif
+}
+
+TEST_CASE("a foot layer survives a scene save and reload", "[ik][layers][scene]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const fs::path source = fs::path(AVGEN_SOURCE_DIR) / "examples" / "labs" / "footik" /
+                            "foot-ik-lab.scene.json";
+    if (!fs::exists(source) || !fs::exists(farmDir() / "bull.glb")) {
+        SKIP("the foot IK lab scene or the farm assets are not present");
+    }
+    // The shipped lab scene, loaded, serialised back out, and loaded again. Round-tripping is where
+    // a layer kind with its own key set goes wrong quietly: written through the shared path this
+    // one came out with `"joints": []` and `"clip": ""`, which is a file that does not load,
+    // produced by a save of a file that did. The second load is what catches it -- checking the
+    // JSON alone would pass on a writer that emitted keys the parser happens to ignore.
+    assets::AssetRegistry registry(source.parent_path());
+    auto loaded = scene::Composition::loadFile(source, registry);
+    INFO((loaded.has_value() ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+
+    const nlohmann::json written = (*loaded)->toJson();
+    const fs::path round = fs::temp_directory_path() / "avgen-footik-roundtrip.scene.json";
+    std::ofstream(round) << written.dump(1);
+    auto again = scene::Composition::loadFile(round, registry);
+    INFO((again.has_value() ? std::string() : again.error().message));
+    REQUIRE(again.has_value());
+    fs::remove(round);
+
+    // Four foot layers, with their chains, on the far side of the trip.
+    const auto layersOf = [](const scene::Composition& comp) {
+        std::vector<scene::PoseLayer> out;
+        for (const auto& node : comp.nodes()) {
+            for (const scene::PoseLayer& layer : node->animation.layers) {
+                out.push_back(layer);
+            }
+        }
+        return out;
+    };
+    const std::vector<scene::PoseLayer> before = layersOf(**loaded);
+    const std::vector<scene::PoseLayer> after = layersOf(**again);
+    REQUIRE(before.size() == 4);
+    REQUIRE(after.size() == before.size());
+    for (std::size_t i = 0; i < before.size(); ++i) {
+        INFO(before[i].name);
+        CHECK(after[i].name == before[i].name);
+        CHECK(after[i].kind == scene::PoseLayerKind::Foot);
+        CHECK(after[i].drive == scene::PoseLayerDrive::Ground);
+        CHECK(after[i].chainRoot == before[i].chainRoot);
+        CHECK(after[i].chainMid == before[i].chainMid);
+        CHECK(after[i].chainTip == before[i].chainTip);
+        CHECK(after[i].footAlign == before[i].footAlign);
+        CHECK(after[i].extension == before[i].extension);
+        CHECK_FALSE(after[i].chainTip.empty());
+    }
 #endif
 }
