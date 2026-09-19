@@ -278,6 +278,30 @@ is the *input* texture format (`src/gpu/texture.cpp:109`), i.e. hardware decode 
 passes a non-sRGB `*Unorm`, so the hardware writes the shader's bytes through unchanged. **One
 encode, in `linearToSrgb`. No double.**
 
+### 2.1a Past the display: the delivery end, which this map originally stopped short of
+
+The table above ends at the output surface. `docs/offline-backend-audit.md` (the offline-render
+branch, merged 2026-09-19) maps what happens *after* that, and two of its findings belong in any
+honest account of this engine's colour pipeline. Cross-referenced rather than restated:
+
+- **Until ADR-365, every movie this project had ever written was untagged.** No
+  `AVVideoColorPropertiesKey` in the native backend, no `-color_primaries` / `-color_trc` /
+  `-colorspace` in the ffmpeg arguments. Every player was guessing, and the guess was usually
+  BT.709, which is why it went unnoticed. Both backends now tag BT.709 explicitly. This closes the
+  last boundary in the map: the chain is Rec.709 from shading to file, and as of ADR-365 it finally
+  *says so* at the one point a downstream tool reads.
+- **There is no CPU tone map at all.** All five operators live only in `shaders/tonemap.wgsl`, and
+  `render_job.cpp` refuses a CPU copy deliberately, on the grounds that a twin would be free to
+  drift from the picture it claims to represent. That is consistent with this audit's §1 finding
+  that tone mapping happens exactly once — it is the same fact from the other side — but it has a
+  consequence worth naming here: **a path-traced frame cannot become a video frame without a GPU**,
+  which costs the tracer the "no GPU required" property that makes it usable on a shared machine.
+  The offline audit calls that an owner's decision and recommends porting the operators to C++ with
+  a parity test against the WGSL. Nothing in the Image/Look work depends on the outcome, and the
+  cinematic integration deliberately adds no sixth place where a curve could be applied.
+
+Neither finding contradicts the map above; both extend it past the boundary it had stopped at.
+
 ### 2.2 Two findings in the colour map
 
 **AgX's round trip out of its own encoding is not its inverse.** `tonemap.wgsl:64–65` undoes AgX's

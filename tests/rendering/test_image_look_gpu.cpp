@@ -31,6 +31,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
+#include "support/image_diff.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -103,6 +104,22 @@ std::uint64_t hashOf(rendering::SceneRenderer& renderer, const scene::Scene& sce
     return gpu::hashImage(*img);
 }
 
+// The float buffer behind that hash, kept so a mismatch can say *how* the two frames differ.
+//
+// A hash is the right thing to assert -- it is exact, and §60 is an exactness claim -- but it is
+// the wrong thing to fail with: two unequal 64-bit numbers tell you nothing about whether a
+// disabled path leaked one ulp into every pixel or one pass into a corner. ADR-362's `byteDiff`
+// gives a count, a first offset and a maximum delta, and it does it without stringifying eight
+// megabytes inside a failing assertion handler -- which is the bug that made a real failure in
+// `test_wind_gpu.cpp` present as a bus error with a `FAILED:` line and no `with expansion:`.
+std::vector<std::uint8_t> bytesOf(rendering::SceneRenderer& renderer, const scene::Scene& scene) {
+    FrameTime time{};
+    auto img = renderer.renderToImageFloat(scene, time, 192, 128);
+    REQUIRE(img.has_value());
+    const auto* raw = reinterpret_cast<const std::uint8_t*>(img->rgba.data());
+    return {raw, raw + img->rgba.size() * sizeof(float)};
+}
+
 } // namespace
 
 TEST_CASE("With cinematic integration at zero the pre-tonemap image is unchanged (§60)",
@@ -117,9 +134,15 @@ TEST_CASE("With cinematic integration at zero the pre-tonemap image is unchanged
 
     // ---- the reference: the chain with the feature present and every amount at zero ------------
     const std::uint64_t zero = hashOf(renderer, base);
+    const std::vector<std::uint8_t> zeroBytes = bytesOf(renderer, base);
 
     // Rendering it again must give the same hash, or this whole test is measuring noise rather
     // than the feature. (ADR-037's determinism guarantee, borrowed as a sanity check.)
+    {
+        const auto d = testing::byteDiff(zeroBytes, bytesOf(renderer, base));
+        INFO("zero arm rendered twice: " << d.describe());
+        CHECK(d.identical());
+    }
     CHECK(hashOf(renderer, base) == zero);
 
     // ---- the arm that must not move: the *shape* parameters, whose amounts are still zero ------
@@ -132,7 +155,9 @@ TEST_CASE("With cinematic integration at zero the pre-tonemap image is unchanged
         s.post.look.localContrastRadius = 96.0f;
         s.post.look.atmosphericTint = {1.0f, 0.0f, 0.0f}; // a colour nothing in this scene is
         REQUIRE_FALSE(s.post.look.active());
-        INFO("shape parameters moved while every amount is zero");
+        const auto d = testing::byteDiff(zeroBytes, bytesOf(renderer, s));
+        INFO("shape parameters moved while every amount is zero: " << d.describe());
+        CHECK(d.identical());
         CHECK(hashOf(renderer, s) == zero);
     }
 
