@@ -65,14 +65,19 @@ void PostProcessor::resetExposure() {
     exposureState_.reset();
     haveMeasurement_ = false;
     measuredLuminance_ = 0.0f;
-    // ADR-277. A copy of the PREVIOUS frame's metered luminance may still be in flight to
-    // `meterReadback_`, and `takeMeasurement` maps whatever is pending at the top of the next
-    // run(). Leaving the flag set makes the first frame after a scene swap or a seek adopt the
-    // measurement the reset exists to discard -- the reading is the old scene's, and this call
-    // is documented as the one that makes an offline render reproduce a live one exactly.
-    // Dropping the flag drops the copy: the buffer is written again before it is ever read, and
-    // an unmapped buffer with a completed copy in it is not a hazard.
-    meterPending_ = false;
+    // ADR-277. Copies of an earlier frame's metered luminance may still be in flight, and
+    // `takeMeasurement` maps whatever is pending at the top of the next run(). Leaving the flags
+    // set makes the first frame after a scene swap or a seek adopt a measurement the reset exists
+    // to discard -- the reading is the old scene's, and this call is documented as the one that
+    // makes an offline render reproduce a live one exactly. Dropping the flags drops the copies:
+    // a buffer is written again before it is ever read, and an unmapped buffer with a completed
+    // copy in it is not a hazard.
+    //
+    // ADR-379: EVERY slot, and the write cursor too. Clearing one of two would leave the ring
+    // holding a stale reading that surfaces two frames later -- which is precisely the bug this
+    // reset exists to prevent, arriving one frame further away from its cause.
+    meterPending_.fill(false);
+    meterSlot_ = 0;
 }
 
 Result<void> PostProcessor::init() {
@@ -134,7 +139,9 @@ Result<void> PostProcessor::init() {
         mdesc.label = "post-meter-readback";
         mdesc.size = kMeterReadbackBytes;
         mdesc.usage = wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst;
-        meterReadback_ = device.CreateBuffer(&mdesc);
+        for (std::uint32_t i = 0; i < kMeterSlots; ++i) {
+            meterReadback_[i] = device.CreateBuffer(&mdesc);
+        }
     }
     {
         wgpu::TextureDescriptor desc{};
@@ -333,16 +340,22 @@ void PostProcessor::runPass(wgpu::CommandEncoder& encoder, const wgpu::RenderPip
 }
 
 bool PostProcessor::takeMeasurement(float& luminance) {
-    if (meterPending_) {
+    // ADR-379: read the slot `encodeMetering` is about to overwrite. With two slots that is the one
+    // written TWO frames ago, so the copy has long since executed and this map does not drain the
+    // pipeline. The map is still blocking and still ordered, so the loop stays a pure function of
+    // the frames that came before it -- the determinism ADR-037 asserts is a property of *which*
+    // frame's measurement is used, not of how long the CPU waited for it.
+    wgpu::Buffer& slot = meterReadback_[meterSlot_];
+    if (meterPending_[meterSlot_]) {
         bool ok = false;
-        auto future = meterReadback_.MapAsync(wgpu::MapMode::Read, 0, kMeterReadbackBytes,
-                                              wgpu::CallbackMode::WaitAnyOnly,
-                                              [&](wgpu::MapAsyncStatus status, wgpu::StringView) {
-                                                  ok = status == wgpu::MapAsyncStatus::Success;
-                                              });
+        auto future = slot.MapAsync(wgpu::MapMode::Read, 0, kMeterReadbackBytes,
+                                    wgpu::CallbackMode::WaitAnyOnly,
+                                    [&](wgpu::MapAsyncStatus status, wgpu::StringView) {
+                                        ok = status == wgpu::MapAsyncStatus::Success;
+                                    });
         context_.waitFor(future);
         if (ok) {
-            const auto* raw = static_cast<const std::uint16_t*>(meterReadback_.GetConstMappedRange(0, kMeterReadbackBytes));
+            const auto* raw = static_cast<const std::uint16_t*>(slot.GetConstMappedRange(0, kMeterReadbackBytes));
             if (raw != nullptr) {
                 const float weighted = halfToFloat(raw[0]);
                 const float weight = halfToFloat(raw[1]);
@@ -351,9 +364,9 @@ bool PostProcessor::takeMeasurement(float& luminance) {
                     haveMeasurement_ = true;
                 }
             }
-            meterReadback_.Unmap();
+            slot.Unmap();
         }
-        meterPending_ = false;
+        meterPending_[meterSlot_] = false;
     }
     luminance = measuredLuminance_;
     return haveMeasurement_;
@@ -388,12 +401,19 @@ void PostProcessor::encodeMetering(wgpu::CommandEncoder& encoder, const PostFram
     wgpu::TexelCopyTextureInfo src{};
     src.texture = current.texture;
     wgpu::TexelCopyBufferInfo dst{};
-    dst.buffer = meterReadback_;
+    dst.buffer = meterReadback_[meterSlot_];
     dst.layout.bytesPerRow = static_cast<std::uint32_t>(kMeterReadbackBytes);
     dst.layout.rowsPerImage = 1;
     const wgpu::Extent3D extent{1, 1, 1};
     encoder.CopyTextureToBuffer(&src, &dst, &extent);
-    meterPending_ = true;
+    meterPending_[meterSlot_] = true;
+    // Advance AFTER writing, so next frame reads the other slot and the frame after that comes
+    // back to this one. Deterministic, and -- measured, not assumed -- it costs NO adaptation
+    // latency on the synchronised path: the EV curve through a ten-fold step is byte-identical at
+    // one slot and at two, because the loop already had a two-frame floor that a two-slot ring
+    // fits inside. A four-slot control lags by exactly two frames and 0.100 EV, which is what
+    // proves the mechanism is live rather than the comparison vacuous. See ADR-379.
+    meterSlot_ = (meterSlot_ + 1) % kMeterSlots;
 }
 
 const gpu::TransientTexture* PostCapture::find(std::string_view name) const {
@@ -492,7 +512,10 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
     if (autoExposure) {
         encodeMetering(encoder, in, pool, base);
     } else {
-        meterPending_ = false;
+        // Manual: nothing is metered, so nothing may be left in flight. ADR-379 -- every slot, not
+        // just the current one, or switching automatic -> manual -> automatic would surface a
+        // reading from before the switch two frames after it.
+        meterPending_.fill(false);
     }
     if (std::abs(exposure - 1.0f) > 1e-3f) {
         auto target = pool.acquire(in.width, in.height, kHdrFormat);

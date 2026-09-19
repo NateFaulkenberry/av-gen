@@ -40,6 +40,7 @@
 #include <glm/glm.hpp>
 #include <webgpu/webgpu_cpp.h>
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -244,8 +245,17 @@ private:
     wgpu::TextureView depthPlaceholderView_;
     wgpu::Texture idPlaceholder_;
     wgpu::TextureView idPlaceholderView_;
-    wgpu::Buffer meterReadback_;
-    bool meterPending_ = false;   // a copy into meterReadback_ is in flight
+    // ADR-379: a RING, not one buffer. With a single buffer `takeMeasurement` mapped the copy
+    // issued by the PREVIOUS frame, which on a pipelined renderer has often not executed yet, so
+    // the blocking map drained the pipeline -- measured at +1.577 ms of CPU per frame. Reading the
+    // slot written two frames ago instead means the copy has long landed and the map returns
+    // without a stall. Two slots is exactly enough: `takeMeasurement` reads the slot
+    // `encodeMetering` is about to overwrite, which with two slots is the one written two frames
+    // back.
+    static constexpr std::uint32_t kMeterSlots = 2;
+    std::array<wgpu::Buffer, kMeterSlots> meterReadback_;
+    std::array<bool, kMeterSlots> meterPending_{}; // a copy into that slot is in flight
+    std::uint32_t meterSlot_ = 0;                  // the slot to read now and write next
     bool haveMeasurement_ = false;
     float measuredLuminance_ = 0.0f;
     scene::ExposureState exposureState_;

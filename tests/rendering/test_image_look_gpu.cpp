@@ -416,3 +416,48 @@ TEST_CASE("post/bloom/levels reaches the pyramid from a project (ADR-379)", "[gp
     CHECK(gpu::hashImage(*offSix) == gpu::hashImage(*offTwo));
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("diag: auto-exposure adaptation curve through a step change", "[.adapt]") {
+    // ADR-379's condition 2: the readback ring adds one frame of adaptation latency (frame N used
+    // frame N-1's measurement; it now uses N-2). The claim to falsify is that this is invisible.
+    //
+    // A STEP change, not the day/night cycle, because a step is the worst case: the cycle crosses
+    // dusk over tens of seconds and an extra 17 ms cannot show there, so proving it on the cycle
+    // would prove almost nothing. If one frame of latency is invisible against an instantaneous
+    // ten-fold change in scene brightness, it is invisible anywhere.
+    //
+    // Hidden (`[.adapt]`), because it prints a curve rather than asserting one. Run it with
+    // kMeterSlots 2 and then 1 -- one constant, everything else identical, and slots=1 reproduces
+    // the old N-1 behaviour exactly -- and diff the two curves:
+    //
+    //     ./build/release/tests/avgen_render_tests "[.adapt]" -s | grep ADAPT
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    scene::Scene s;
+    s.environment.backgroundColor = {0.18f, 0.18f, 0.18f};
+    s.environment.brightness = 1.0f;
+    s.camera.position = {0.0f, 0.0f, 6.0f};
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+    s.post.bloomEnabled = false;
+    s.post.bloomIntensity = 0.0f;
+    s.post.exposure.mode = scene::ExposureSettings::Mode::Automatic;
+    s.post.exposureDeltaSeconds = 1.0f / 60.0f;
+
+    FrameTime time{};
+    constexpr int kFrames = 120;
+    constexpr int kStep = 40;
+    for (int f = 0; f < kFrames; ++f) {
+        // A ten-fold step at frame 40: mid grey to a blazing field and nothing gradual about it.
+        const float v = f < kStep ? 0.18f : 1.8f;
+        s.environment.backgroundColor = {v, v, v};
+        auto img = renderer.renderToImageFloat(s, time, 96, 64);
+        REQUIRE(img.has_value());
+        const auto& st = renderer.stats().post;
+        WARN("ADAPT " << f << " ev100=" << st.exposureEv100 << " scale=" << st.exposureScale
+                      << " metered=" << st.meteredLuminance);
+    }
+    CHECK(ctx->errorCount() == 0);
+}
