@@ -140,24 +140,25 @@
           "metallic": 0.0
         }
       }
-    },
+    }
+  ],
+  "lights": [
     {
       "name": "key",
-      "kind": "light",
-      "light": {
-        "kind": "directional",
-        "direction": [
-          -0.4,
-          -0.8,
-          -0.45
-        ],
-        "color": [
-          1.0,
-          0.96,
-          0.9
-        ],
-        "intensity": 3.0
-      }
+      "type": "directional",
+      "role": "key",
+      "direction": [
+        -0.4,
+        -0.8,
+        -0.45
+      ],
+      "color": [
+        1.0,
+        0.96,
+        0.9
+      ],
+      "intensity": 3.0,
+      "castsShadow": false
     }
   ]
 }

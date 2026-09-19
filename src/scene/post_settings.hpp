@@ -45,10 +45,18 @@ struct ImageLookIntegration {
     //
     // ADR-347 already gives the scene real fog, taking its colour from the sky's horizon, at a
     // density it also corrected (it was 15x too high). This control is deliberately NOT a second
-    // fog and must not be sold as one: it is applied in post, from depth, after the scene has been
-    // shaded, and its purpose is the one thing scene fog structurally cannot reach -- everything
-    // composited *after* shading. Measure ADR-347's fog before reaching for this. See
-    // docs/image-look-audit.md §5.1 for what was measured.
+    // fog and must not be sold as one.
+    //
+    // **Prefer `environment.fogDensity`.** That comparison has now been measured rather than
+    // assumed (docs/image-look-audit.md §8): on a scene that already has ADR-347's fog, taking this
+    // control to 0.6 moves 1.6% of pixels by at most three code values, where the fog alone moves
+    // 32% by up to 109. Scene fog is the stronger and the more physical of the two -- per surface,
+    // at shading time, in the sky's own colour.
+    //
+    // What is left for this control is narrow and real: it is applied to the *composed* frame, so
+    // it reaches everything composited after shading -- volumetrics, user post layers, the bloom
+    // and wide tiers -- which scene fog structurally cannot, and it needs no volumetric march. That
+    // is the case to use it for. It is not the way to get aerial perspective.
     float atmospheric = 0.0f;         // 0..1
     float atmosphericDistance = 200.0f; // metres at which `atmospheric` is reached in full
     glm::vec3 atmosphericTint{0.55f, 0.68f, 0.85f}; // the colour distance tends toward

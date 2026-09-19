@@ -622,3 +622,45 @@ third case.
 a moving camera and these arms are deliberately static, because an arm whose framing depends on the
 clock cannot be compared frame to frame), the volumetric march, the path tracer, and anything
 needing real assets. Those are gaps in the proposal, not in the engine.
+
+---
+
+## 8. §68.1 measured against ADR-347's fog, which is the comparison the spec asked for first
+
+The spec says of atmospheric integration: *"measure what atmospheric integration would add on top of
+it before building a second mechanism."* The measurement was owed and is now taken. It is not
+flattering to the feature, which is why it is here rather than in a commit message.
+
+Four arms on one scene (`examples/imagelook/_il-atmos-*`, three lit boxes at 10, 18 and 34 m,
+1280x720, one binary, through `tools/gpu-lock.sh`). Scene fog is `environment.fogDensity = 0.05`
+with a horizon-blue `fogColor`; the post control is `post/look/atmospheric = 0.6`.
+
+| arm | pixels changed vs `none` | worst channel delta |
+|---|---|---|
+| scene fog alone (ADR-347) | **32.1%** | **+109** |
+| post atmospheric alone (§68.1) | 5.6% | +63 |
+| both | 33.0% | +109 |
+| **post atmospheric added on top of scene fog** | **1.56%** | **+3** |
+
+**The last row is the finding.** On a scene that already has ADR-347's fog, turning
+`post/look/atmospheric` up to 0.6 moves 1.6% of pixels by at most three code values. The two
+mechanisms are substantially redundant, and scene fog is by far the stronger and the more physical
+of the two — it is applied per surface at shading time with the sky's own horizon colour, where the
+post control is a depth-driven tint applied to the composed frame.
+
+**Conclusion, stated against my own feature:** `post/look/atmospheric` is **not** the way to get
+aerial perspective in this engine, and a scene that wants haze should use `environment.fogDensity`.
+The post control keeps a narrow justification — it reaches everything composited *after* shading,
+which scene fog structurally cannot, and it needs no volumetric march — but on content that already
+fogs, its marginal contribution is close to nothing. It is off by default and costs nothing when
+off (ADR-368), so it stays; it should not be recommended, and the header comment on
+`ImageLookIntegration` now says so.
+
+**A defect in the first version of this measurement, recorded because the number was wrong in a way
+that looked right.** The first run showed scene fog changing *zero* pixels, which would have been a
+spectacular finding — ADR-347's fog not working at all. It was my probe. The scene generator wrote
+its light as `{"kind": "light"}`, and a light is a top-level `"lights"` entry, not a node kind, so
+the loader said `unknown node kind 'light'`, the boxes were unlit, the frame was near black and
+there was nothing for fog to tint. **The render log said so and the frame did not** — a black frame
+and a nearly-black frame are indistinguishable in a hash, and I would have reported a false defect
+in someone else's subsystem if I had trusted the number over the log.

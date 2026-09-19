@@ -166,9 +166,12 @@ def patch_nodes(kind):
             n["procedural"]["material"]["emissiveIntensity"] = 0.0
             n["procedural"]["material"]["baseColor"] = list(c)
             nodes.append(n)
-        nodes.append({"name": "key", "kind": "light", "light": {
-            "kind": "directional", "direction": [-0.4, -0.8, -0.45], "color": [1.0, 0.96, 0.9],
-            "intensity": 3.0}})
+        # A light is a top-level `lights` entry, not a node kind -- the first version of this
+        # generator wrote `{"kind": "light"}` and the loader said `unknown node kind 'light'`, so
+        # the three depth arms rendered unlit boxes on black and measured almost nothing. Caught by
+        # reading the render log rather than the frame, which is the only reason it was caught at
+        # all: a black frame and a nearly-black frame look alike in a hash.
+        pass
     return nodes
 
 
@@ -195,6 +198,13 @@ def scene_doc(name, overrides):
                    "orbitSpeed": 0.0},
         "environment": {"intensity": 0.0, "background": [0.01, 0.012, 0.02], "fogDensity": 0.0},
         "nodes": patch_nodes(overrides.get("patches", "grey")),
+        # Only the depth arm needs a light: every other arm's patches are emissive on purpose, so
+        # their value is the authored number rather than the product of a light rig.
+        **({"lights": [{
+            "name": "key", "type": "directional", "role": "key",
+            "direction": [-0.4, -0.8, -0.45], "color": [1.0, 0.96, 0.9], "intensity": 3.0,
+            "castsShadow": False,
+        }]} if overrides.get("patches") == "depth" else {}),
     }
 
 
