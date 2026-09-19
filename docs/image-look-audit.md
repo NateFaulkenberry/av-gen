@@ -453,3 +453,59 @@ new binary loads **1032** from the same file. Exactly seven more, which is exact
 `post/look/*` parameters — registered, reaching the application, and reported by the project loader
 with `0 warning(s)`. Counted by name, not by file size: ADR-350's camera-bake loss shrank a file by
 10,000 lines while its parameter count went *up*, so a size check would have said healthy.
+
+---
+
+## 6. Performance (§82/§83), measured in the live editor
+
+ADR-355 is the reason this is not a headless measurement: the editor frame was 350 ms because of a
+per-frame vertex rescan, and every diagnosis made headless was blind to the CPU stages that carried
+it. `--profile-cpu` prints those stages only in the live editor.
+
+**The load-bearing number is a count, not a duration.** With the integration at zero the chain
+encodes *no pass for it*, and that is asserted in `tests/rendering/test_image_look_gpu.cpp` against
+`PostStats::passes` rather than against a clock:
+
+| arm | post passes |
+|---|---|
+| every amount zero | *N* |
+| `atmospheric` on | *N* + 1 |
+| `atmospheric` + `localContrast` on | *N* + 5 |
+
+One pass for the atmospheric stage; four for the late look stage (quarter-resolution downsample, two
+separable blur halves, the combine). A pass count cannot be perturbed by another agent's benchmark,
+which is exactly why it is the thing pinned in a test — a timing assertion on a shared machine is a
+flaky test with a respectable-looking face.
+
+**Wall clock, and the conditions it was taken under.** `examples/hero/hero.json`, live editor,
+`--ui-script idle --frames 420 --profile-cpu`, 960x540 canvas (0.52 Mpx), 12 861 triangles, 9 draw
+calls, serialised through `tools/gpu-lock.sh`. **The machine was contended throughout** — three
+other agents were running, one of them a 100%-CPU windowed benchmark. The arms were therefore
+**interleaved off / on / off / on in one batch**, which is what makes the comparison survive the
+contention; the absolute numbers do not.
+
+Minima over the repeats, never means (ADR-170):
+
+| arm | `gpu.frame` min (ms) | `FRAME` min (ms) |
+|---|---|---|
+| look off (defaults) | **4.522** | 8.313 |
+| all four controls on | **4.981** | 8.328 |
+
+- **GPU: +0.46 ms** at 0.52 Mpx with all four controls on. The passes are full- and
+  quarter-resolution fullscreen, so this is expected to scale with pixel count — *expected*, not
+  measured; no 1080p figure is claimed here because none was taken.
+- **CPU: no change, and no new stage.** The `FRAME` minima span 8.313–8.336 ms across all four arms,
+  a 0.02 ms spread, and that value is the frame-pacing floor rather than work. No new row appears in
+  the `--profile-cpu` table in the "on" arm, which is the expected result: every part of this
+  feature is GPU work reached through `PostSettings`, and nothing was added to the update path.
+- **At defaults the cost is exactly zero**, because nothing is encoded. That is the §60 result
+  restated as a performance claim, and it is the one that matters for the 99% of scenes that never
+  touch these controls.
+
+One measurement was thrown away rather than reported: a first attempt showed the "on" arm *faster*
+than the "off" arm (1.558 ms against 4.634 ms). The two arms had rendered different scenes — 5 889
+triangles against 12 861 — because the project file for the second arm was still being written when
+the batch launched. The tell was `upd.controller` reading 0.000 ms in one arm and 0.093 in the
+other: the composition had not attached at all. A 3× "speed-up" from adding four post passes should
+never have been believable, and the number is recorded here because the next person to see a
+suspiciously good result should check the triangle count before the code.

@@ -171,6 +171,39 @@ TEST_CASE("With cinematic integration at zero the pre-tonemap image is unchanged
         }
     }
 
+    // ---- the cost, stated as a count rather than a duration -------------------------------------
+    // §82/§83 want the performance of this, and the load-bearing performance claim is not a
+    // millisecond: it is that a scene which does not ask for the feature encodes no pass for it.
+    // A pass count is immune to machine contention in a way a wall-clock number is not, so it is
+    // the number worth pinning in a test -- this repository has bought the lesson that a timing
+    // assertion taken on a shared machine is a flaky test with a respectable-looking face.
+    {
+        FrameTime time{};
+        auto off = renderer.renderToImageFloat(base, time, 192, 128);
+        REQUIRE(off.has_value());
+        const std::uint32_t passesOff = renderer.stats().post.passes;
+
+        scene::Scene on = base;
+        on.post.look.atmospheric = 0.5f;
+        auto onImg = renderer.renderToImageFloat(on, time, 192, 128);
+        REQUIRE(onImg.has_value());
+        const std::uint32_t passesAtmos = renderer.stats().post.passes;
+
+        scene::Scene both = base;
+        both.post.look.atmospheric = 0.5f;
+        both.post.look.localContrast = 0.5f;
+        auto bothImg = renderer.renderToImageFloat(both, time, 192, 128);
+        REQUIRE(bothImg.has_value());
+        const std::uint32_t passesBoth = renderer.stats().post.passes;
+
+        INFO("post passes: off " << passesOff << ", atmospheric " << passesAtmos << ", both "
+                                 << passesBoth);
+        // Atmospheric is one pass. The late look stage is four: a quarter-resolution downsample,
+        // two separable blur halves, and the combine.
+        CHECK(passesAtmos == passesOff + 1);
+        CHECK(passesBoth == passesOff + 5);
+    }
+
     // ---- and back to zero, after all of that ---------------------------------------------------
     // The pool is reused across renders and the look stage acquires four textures of its own, so
     // "off" after "on" is a different allocation history from "off" first. It must still be the
