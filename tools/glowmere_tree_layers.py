@@ -537,9 +537,16 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--leaf-bands", type=int, default=6)
     ap.add_argument("--tracery-bands", type=int, default=4)
     ap.add_argument("--wood-bands", type=int, default=4)
+    ap.add_argument("--leaf-dim", type=float, default=None,
+                    help="override the unlit leaves' emission floor (Blender's is 0.035). Lower "
+                         "values sharpen the 6%% speckle against the 94%% wash; this exists so the "
+                         "owner can compare rather than be told.")
     ap.add_argument("--report", type=Path, default=None)
     args = ap.parse_args(argv)
 
+    if args.leaf_dim is not None:
+        global LEAF_DIM
+        LEAF_DIM = args.leaf_dim
     src, binary = read_glb(args.source)
     if len(src["meshes"]) != 7 or len(src["materials"]) != 7:
         raise SystemExit(f"{args.source}: expected the 7-mesh hero export, found "
