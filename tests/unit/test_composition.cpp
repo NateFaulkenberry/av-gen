@@ -3151,3 +3151,115 @@ TEST_CASE("the texture digest answers to a single texel", "[scene][composition][
     // An empty table is a legal state and is not confused with a one-texture one.
     CHECK(scene::textureTableDigest({}) != scene::textureTableDigest(table(0)));
 }
+
+// ---- runtime LOD on an imported node (ADR-344) ---------------------------------------------------
+
+TEST_CASE("a gltf node builds no LOD chain unless it asks", "[scene][composition][lod]") {
+    // The opt-in rule, asserted rather than trusted. Two engine changes landed on this project in
+    // one day under "a behaviour that changes under everyone is not a fix", and this is the arm
+    // that says the third one did not.
+    Fixture fx;
+    scene::Composition comp(fx.registry, "opt-in");
+    REQUIRE(comp.addNode(makeNode(scene::NodeKind::Gltf, "plain", fx.glb.filename())).has_value());
+    comp.update(FrameTime{});
+    CHECK(comp.scene().meshLods.empty());
+    CHECK_FALSE(comp.scene().meshes.empty()); // ...and the mesh itself did arrive
+}
+
+TEST_CASE("a lod block survives a save and a load", "[scene][composition][lod]") {
+    Fixture fx;
+    scene::Composition comp(fx.registry, "roundtrip");
+    auto node = makeNode(scene::NodeKind::Gltf, "tree", fx.glb.filename());
+    node.lod.enabled = true;
+    node.lod.ratios = {1.0f, 0.4f, 0.1f};
+    node.lod.thinning = false;
+    node.lod.hysteresis = 0.15f;
+    node.lod.maxScreenError = 12.0f;
+    REQUIRE(comp.addNode(std::move(node)).has_value());
+
+    const nlohmann::json saved = comp.toJson();
+    auto reloaded = scene::Composition::fromJson(saved, fx.registry);
+    REQUIRE(reloaded);
+    const scene::CompositionNode* back = (*reloaded)->findNode("tree");
+    REQUIRE(back != nullptr);
+    CHECK(back->lod.enabled);
+    CHECK(back->lod.ratios == std::vector<float>{1.0f, 0.4f, 0.1f});
+    CHECK_FALSE(back->lod.thinning);
+    CHECK_THAT(static_cast<double>(back->lod.hysteresis), WithinAbs(0.15, 1e-6));
+    CHECK_THAT(static_cast<double>(back->lod.maxScreenError), WithinAbs(12.0, 1e-6));
+
+    // A node that never asked writes no `lod` key at all, so enabling the feature does not add a
+    // line to every scene file in the repository.
+    scene::Composition plain(fx.registry, "plain");
+    REQUIRE(plain.addNode(makeNode(scene::NodeKind::Gltf, "quiet", fx.glb.filename())).has_value());
+    const nlohmann::json quiet = plain.toJson();
+    REQUIRE(quiet.contains("nodes"));
+    CHECK_FALSE(quiet["nodes"][0].contains("lod"));
+}
+
+TEST_CASE("a misspelt lod key is refused rather than ignored", "[scene][composition][lod]") {
+    // The failure this closes is named in the parser: `"lodCount"` was accepted for months against
+    // a reader that wanted `"count"`, and the ladder read as configured in the file while being one
+    // rung in the engine.
+    Fixture fx;
+    const std::string text = fmt::format(R"({{"format":"avgen-scene","version":1,
+"nodes":[{{"name":"tree","kind":"gltf","asset":"{}","lod":{{"enabled":true,"ratio":[1.0,0.5]}}}}]}})",
+                                         fx.glb.filename().generic_string());
+    const auto refused = scene::Composition::fromJson(nlohmann::json::parse(text), fx.registry);
+    CHECK_FALSE(refused);
+    // The control: the same document with the key spelt right loads.
+    const std::string ok = fmt::format(R"({{"format":"avgen-scene","version":1,
+"nodes":[{{"name":"tree","kind":"gltf","asset":"{}","lod":{{"enabled":true,"ratios":[1.0,0.5]}}}}]}})",
+                                       fx.glb.filename().generic_string());
+    CHECK(scene::Composition::fromJson(nlohmann::json::parse(ok), fx.registry).has_value());
+}
+
+TEST_CASE("the Tree of Life's chains reach the scene with LOD0 untouched", "[scene][composition][lod]") {
+    const std::filesystem::path asset =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "treeisle" / "tree-glowmere-foliage.glb";
+    if (!std::filesystem::is_regular_file(asset)) {
+        SKIP("assets/treeisle is not present in this checkout");
+    }
+    assets::AssetRegistry registry{std::filesystem::path(AVGEN_SOURCE_DIR)};
+    scene::Composition comp(registry, "tree");
+    auto node = makeNode(scene::NodeKind::Gltf, "foliage", asset);
+    node.lod.enabled = true;
+    node.lod.ratios = {1.0f, 0.5f, 0.2f};
+    REQUIRE(comp.addNode(std::move(node)).has_value());
+    comp.update(FrameTime{});
+    const scene::Scene& s = comp.scene();
+    REQUIRE_FALSE(s.meshLods.empty());
+    CHECK(s.meshLods.size() == s.meshes.size()); // one chain per part of this asset
+
+    for (const scene::MeshLodChain& chain : s.meshLods) {
+        INFO("chain on mesh " << chain.base);
+        REQUIRE(chain.base < s.meshes.size());
+        // §1: LOD0 *is* the source mesh. The chain carries the rungs below it and nothing else, so
+        // an offline render reading scene.meshes gets the asset and cannot be handed a rung.
+        CHECK(s.meshes[chain.base].indices.size() / 3 == chain.sourceTriangles);
+        REQUIRE(chain.levels.size() == 2);
+        CHECK(chain.levels[0].triangles < chain.sourceTriangles);
+        CHECK(chain.levels[1].triangles < chain.levels[0].triangles);
+        // Non-decreasing error, which is the property the selector's threshold depends on. Not
+        // *strictly* increasing: two of this asset's 22 parts hit the shell-growth cap at both
+        // rungs and report the same deviation, which the chain builder's monotone floor makes equal
+        // rather than inverted.
+        CHECK(chain.levels[1].error >= chain.levels[0].error);
+        // This layer is the one that cannot be simplified, so every rung of it must be thinned --
+        // if this ever reads false the strategy switch has stopped firing and the canopy has
+        // silently stopped having a LOD.
+        CHECK(chain.levels[0].thinned);
+        CHECK(chain.levels[1].thinned);
+        CHECK(chain.sourceShells > 0);
+    }
+
+    // Built once per (asset, version, ladder): a second node on the same asset and the same ladder
+    // does not build a second chain, and does not install a second one either.
+    const std::size_t chains = s.meshLods.size();
+    auto second = makeNode(scene::NodeKind::Gltf, "foliage-again", asset);
+    second.lod.enabled = true;
+    second.lod.ratios = {1.0f, 0.5f, 0.2f};
+    REQUIRE(comp.addNode(std::move(second)).has_value());
+    comp.update(FrameTime{});
+    CHECK(comp.scene().meshLods.size() == chains);
+}

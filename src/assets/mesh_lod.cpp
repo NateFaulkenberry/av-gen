@@ -764,6 +764,22 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
         chain.levels.push_back(std::move(out));
     }
 
+    // The header promises that `error` "rises monotonically with aggressiveness", and a selector
+    // that picks the coarsest admissible rung depends on it. Nothing enforced it, and shell
+    // thinning breaks it: the deviation of a thinned level is the size of a shell, and on a part
+    // whose thinning hit the growth cap at one rung and not the next, a coarser level can come back
+    // with a *smaller* mean shell than the one above it. Measured on two of the Tree of Life's 22
+    // foliage parts: rung 2 reporting 1.59 against rung 1's 1.84.
+    //
+    // Floored rather than recomputed, because the claim `error` makes is an upper bound and raising
+    // an upper bound keeps it true. A level cannot be nearer to the source than a coarser
+    // description of the same object built from the same source.
+    for (std::size_t level = 1; level < chain.levels.size(); ++level) {
+        chain.levels[level].error = std::max(chain.levels[level].error, chain.levels[level - 1].error);
+        chain.levels[level].relativeError =
+            std::max(chain.levels[level].relativeError, chain.levels[level - 1].relativeError);
+    }
+
     if (settings.generateShadowIndices && !chain.levels.empty()) {
         const scene::MeshData& lod0 = chain.levels.front().mesh;
         chain.shadowIndices.resize(lod0.indices.size());
