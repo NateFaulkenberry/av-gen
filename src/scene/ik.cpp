@@ -119,11 +119,18 @@ TwoBoneSolution solveTwoBone(const TwoBoneChain& chain, const glm::vec3& target,
             out.status = IkStatus::DegenerateBend;
             return out;
         }
-        // Straight, but told which way to fold: the plane through the root, the target and the pole.
-        const glm::vec3 toPole = pole - chain.root;
-        bendAxis = glm::cross(at, toPole);
-        if (lengthOf(bendAxis) < kStraightEpsilon) {
-            // The pole is on the root-target line, so it names no plane either.
+        // Straight, but told which way to fold: the plane through the root, the target and the
+        // pole. Both directions are normalised *before* the cross product, so the test below is a
+        // sine and not a length. Crossing the raw vectors and comparing against `kStraightEpsilon`
+        // would be a threshold in square metres: a chick's leg is 0.041 model units long, so two
+        // perfectly good directions 2 degrees apart cross to 6e-5 and the solve would refuse a
+        // plane it had been handed. The same arithmetic on a horse passes. Scale-dependent
+        // thresholds fail on exactly one end of a content set and look like an asset problem.
+        const glm::vec3 toTargetDir = at * (1.0f / out.requested);
+        const glm::vec3 toPoleDir = normalizeOr(pole - chain.root, glm::vec3(0.0f));
+        bendAxis = glm::cross(toTargetDir, toPoleDir);
+        if (glm::dot(toPoleDir, toPoleDir) < 0.5f || lengthOf(bendAxis) < kStraightEpsilon) {
+            // The pole is on the root-target line, or on top of the root: it names no plane either.
             out.status = IkStatus::DegenerateBend;
             return out;
         }

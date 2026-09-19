@@ -304,6 +304,27 @@ TEST_CASE("a two-bone solve refuses what it cannot do instead of exploding", "[i
         CHECK(other.status == scene::IkStatus::Solved);
         CHECK(dist(other.tip, target) < 1e-4f);
         CHECK(kneeSide(other, straight.root, target, glm::vec3(0.0f, 0.0f, 1.0f)) < -0.05f);
+
+        // And the same question at a chick's scale, which is the control against a threshold in
+        // square metres. `chick.glb`'s leg is 0.041 model units; the pole test crosses two
+        // root-relative vectors, and comparing that raw cross against a sine epsilon refuses a
+        // perfectly good plane on the small end of the content set while passing on the large. The
+        // fixture is the 1.8 m leg above divided by 44, and it has to give the same answer.
+        constexpr float kChick = 1.0f / 44.0f;
+        const scene::TwoBoneChain tiny{straight.root * kChick, straight.mid * kChick,
+                                       straight.tip * kChick};
+        const auto small = scene::solveTwoBone(tiny, target * kChick,
+                                               glm::vec3(0.0f, -0.9f, 3.0f) * kChick, true);
+        CHECK(small.status == scene::IkStatus::Solved);
+        // Relative to the limb, not in metres. The absolute residual here is 4.3e-6 model units,
+        // which is a ten-thousandth of a 0.041-unit leg and the same relative precision the
+        // metre-scale arm above gets -- a tolerance copied across unchanged would have been the
+        // scale mistake this arm exists to catch, in the assertion instead of in the solver.
+        const float tinyLimb = dist(tiny.root, tiny.mid) + dist(tiny.mid, tiny.tip);
+        CHECK(dist(small.tip, target * kChick) < 1e-3f * tinyLimb);
+        CHECK(kneeSide(small, tiny.root, target * kChick, glm::vec3(0.0f, 0.0f, 1.0f)) > 0.001f);
+        // Same shape, same answer: the knee angle is scale-free and must match the metre-scale arm.
+        CHECK(small.kneeAngle == Approx(told.kneeAngle).margin(1e-3));
     }
 }
 
