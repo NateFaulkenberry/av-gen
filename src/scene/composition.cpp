@@ -5965,6 +5965,12 @@ void Composition::applyDayNight() {
     sky.groundColor = s.groundColor;
     sky.hazeWidth = s.haze;
     sky.intensity = s.skyIntensity;
+    // Every water surface in the scene follows the cycle too, so the sea is part of the world
+    // changing state rather than a sheet the sky happens to fall on (brief §28).
+    for (WaterSurface& water : scene_.waters) {
+        water.settings.reflection = s.waterReflection;
+        water.settings.deepColor = s.waterDeepColor;
+    }
     // The sun and the moon are two directionals the scene named. The sun travels; the moon does
     // not, because its disc is a feature of the night environment map and the map does not move
     // unless `environmentRotation` moves all of it together.
