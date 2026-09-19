@@ -151,7 +151,7 @@ void DayNightSettings::applyDefaults() {
     // The reflection is deliberately LOW at dawn and sunset, and the deep colour correspondingly
     // warm. That is not an aesthetic preference, it is working around a real limitation: the water
     // shader samples the environment *cube*, which is the HDRI, and the HDRI is a fixed blue-sky
-    // map. With the visible sky now procedural (ADR-344) the two disagree at exactly the moments
+    // map. With the visible sky now procedural (ADR-345) the two disagree at exactly the moments
     // the brief cares most about -- "sky says sunset, water still looks like noon" is its own §28
     // failure mode. Turning the reflection down at the warm ends and carrying the colour in the
     // water's own body is the half of that which does not need another renderer change.

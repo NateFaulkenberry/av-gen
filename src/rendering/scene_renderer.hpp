@@ -266,7 +266,7 @@ struct FrameUniforms {
     world::CometGpu comets[world::kMaxGpuComets];
     world::AuroraGpu auroras[world::kMaxGpuAuroras];
     world::SkyGroundGpu skyGround;
-    // ADR-344: the analytic sky's own parameters, so the background pass can evaluate it directly
+    // ADR-345: the analytic sky's own parameters, so the background pass can evaluate it directly
     // instead of sampling whatever cube the IBL happens to be built from. Appended at the very end
     // for the same reason `atmosCount` was appended after the world effects: no offset above moves,
     // so every other pass's view of this block is byte-identical to what it was.
@@ -286,7 +286,7 @@ struct FrameUniforms {
 // number.
 static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::kMaxGpuWorldEffects +
                                        16 + 160 * world::kMaxGpuComets + 224 * world::kMaxGpuAuroras + 48 +
-                                       64); // ADR-344: four vec4s of analytic sky, appended last
+                                       64); // ADR-345: four vec4s of analytic sky, appended last
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);

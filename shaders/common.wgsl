@@ -128,7 +128,7 @@ struct FrameUniforms {
     skyGroundAmbient: vec4<f32>,    // rgb = hemispheric radiance, w = 0
     skyGroundPoint: vec4<f32>,      // xyz = the brightest comet's ground track point, w = radius (m)
     skyGroundPointColor: vec4<f32>, // rgb = its radiance, w = falloff exponent
-    // ADR-344: the analytic sky's parameters, so the background pass can evaluate it without a
+    // ADR-345: the analytic sky's parameters, so the background pass can evaluate it without a
     // cube. Appended last, mirroring FrameUniforms in rendering/scene_renderer.hpp -- the sum in
     // that file's static_assert is what catches these two drifting apart.
     skyZenithColor: vec4<f32>,      // rgb = zenith, w = haze width

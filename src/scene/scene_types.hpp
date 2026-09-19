@@ -379,14 +379,14 @@ struct SkySettings {
     glm::vec3 sunDirection{0.35f, 0.75f, 0.55f}; // fallback direction *towards* the sun
 };
 
-// ADR-344. Which background the scene pass should draw, as a function of the environment alone.
+// ADR-345. Which background the scene pass should draw, as a function of the environment alone.
 //
 // Extracted from `SceneRenderer::render` so it can be tested: it used to be one expression inline
 // in the middle of a render pass, and the only way to find out what it did was to render. The
 // three answers are exclusive and the order matters.
 enum class SkyBackground : std::uint8_t {
     FlatColour,   // no IBL, or an IBL the scene did not ask to stand behind the world
-    Analytic,     // evaluate the procedural sky directly (ADR-344)
+    Analytic,     // evaluate the procedural sky directly (ADR-345)
     IblCube,      // sample whatever the IBL was built from -- a map's equirect or the sky's cube
 };
 
@@ -403,7 +403,7 @@ struct Environment {
     float environmentRotation = 0.0f;  // radians about +Y; rotates the visible sky and its lighting
                                        // together, so the moon and the moonlight cannot separate
     bool showSkybox = true;
-    // ADR-344. Draw the *analytic* sky as the background even when `environmentMap` is bound, so a
+    // ADR-345. Draw the *analytic* sky as the background even when `environmentMap` is bound, so a
     // scene can be lit by an HDRI and still stand under a procedural sky whose colours move.
     // Before this the two were one choice -- the skybox was always whatever the IBL was built
     // from -- and a day/night cycle's zenith/horizon/ground curves were simply inert in any scene

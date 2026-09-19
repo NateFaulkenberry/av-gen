@@ -1,14 +1,14 @@
 Tree of Life - Floating Island: the second art pass, and what each claim is measured against
 ============================================================================================
 
-NOTE (ADR-343 to ADR-346). This file documents the ART PASS -- materials, placement, cosmos.
+NOTE (ADR-343 to ADR-347). This file documents the ART PASS -- materials, placement, cosmos.
 The world has since gained an ocean and a day/night cycle, and the numbers for those live in
 their own ADRs rather than being duplicated here:
 
   ADR-343  the dayPhase spine, the ocean's geometry, the two skyIntensities
-  ADR-344  lighting and background stop being one choice; the sky's colour journey
-  ADR-345  an environment change is not a world rebuild (273-293 ms -> 35.4 ms)
-  ADR-346  the sea joins the cycle; the second horizon was the fog; the specks were clouds
+  ADR-345  lighting and background stop being one choice; the sky's colour journey
+  ADR-346  an environment change is not a world rebuild (273-293 ms -> 35.4 ms)
+  ADR-347  the sea joins the cycle; the second horizon was the fog; the specks were clouds
 
   renders/treeisland/cycle.json          the eight times of day
   renders/treeisland/cycle-preview.json  one full cycle as a 60 s video

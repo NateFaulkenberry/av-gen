@@ -2435,7 +2435,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     {
         const scene::SkyRuntime resolved = scene::resolveSky(scene.environment.sky, scene.lights);
         frame.skySun = glm::vec4(resolved.sunDirection, skyIbl ? 1.0f : 0.0f);
-        // ADR-344: the same resolved sky, handed to the background pass as parameters rather than
+        // ADR-345: the same resolved sky, handed to the background pass as parameters rather than
         // as a cube. `resolveSky` is already being called here, so this costs nothing and cannot
         // disagree with the disc drawn above it.
         frame.skyZenithColor = glm::vec4(resolved.zenithColor, resolved.hazeWidth);
@@ -3273,7 +3273,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         }
         // A procedural sky lights the scene without necessarily standing behind it: existing
         // scenes keep their flat background unless `env/sky/background` asks for the sky (ADR-036).
-        // ADR-344: one predicate, in scene_types.hpp beside the struct it reads, so which
+        // ADR-345: one predicate, in scene_types.hpp beside the struct it reads, so which
         // background gets drawn is a thing a test can ask rather than a thing a render reveals.
         const scene::SkyBackground background =
             scene::skyBackgroundFor(scene.environment, ibl, ibl_.fromSky);

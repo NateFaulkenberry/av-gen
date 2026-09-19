@@ -4933,7 +4933,7 @@ void Composition::update(const FrameTime& time) {
         cameraAngle_ += cameraOrbitSpeed_->value() * dt;
     }
     applyParameters();
-    // ADR-345: after `applyParameters`, not before it. The day/night cycle asks for the map swap
+    // ADR-346: after `applyParameters`, not before it. The day/night cycle asks for the map swap
     // from inside that call, so resolving first meant the swap landed a frame late -- and in a
     // one-frame headless render it never landed at all, which is how this was found: the night map
     // simply stopped appearing in the log.
@@ -5892,7 +5892,7 @@ void Composition::applyParameters() {
     applyDayNight();
 }
 
-// ADR-345: resolving the environment map, on its own, so that changing it does not mean rebuilding
+// ADR-346: resolving the environment map, on its own, so that changing it does not mean rebuilding
 // the world.
 //
 // This used to live inline at the top of `rebuild()`, and `setEnvironmentMap` asked for a rebuild
@@ -6465,7 +6465,7 @@ void Composition::setEnvironmentMap(const std::filesystem::path& path) {
         return;
     }
     environmentPath_ = path;
-    // ADR-345: an environment change is an environment change. It used to set `dirty_`, and
+    // ADR-346: an environment change is an environment change. It used to set `dirty_`, and
     // `dirty_` has no granularity -- so swapping a map re-flattened 557 entities and 1,069 meshes
     // to change one texture id, 273-293 ms, twice per day/night cycle.
     environmentDirty_ = true;
@@ -7305,7 +7305,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             }
             comp->showSkyboxSetting_ = e["skybox"].get<bool>();
         }
-        // ADR-344: light from the map, stand under the procedural sky. Off unless asked for.
+        // ADR-345: light from the map, stand under the procedural sky. Off unless asked for.
         if (e.contains("proceduralSkyBackground")) {
             if (!e["proceduralSkyBackground"].is_boolean()) {
                 return fail("'proceduralSkyBackground' must be a boolean");

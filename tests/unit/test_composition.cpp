@@ -1973,7 +1973,7 @@ TEST_CASE("examples/world/glowmere-stylized.scene.json declares the elder as its
 // what the renderer watches to decide whether to re-upload every buffer.
 TEST_CASE("Setting an environment map never re-flattens the world",
           "[scene][composition][performance]") {
-    // ADR-345 strengthened this. It used to read "setting the *same* map again does not re-flatten",
+    // ADR-346 strengthened this. It used to read "setting the *same* map again does not re-flatten",
     // because a new map did: `setEnvironmentMap` marked the composition dirty and `dirty_` has no
     // granularity, so changing one texture id re-flattened everything -- 273-293 ms for 557 entities
     // and 1,069 meshes on the Tree of Life ocean world, and a day/night cycle paid it twice per

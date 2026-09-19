@@ -938,7 +938,7 @@ private:
     void ensureBuilt();      // rebuild() when dirty
     void applyParameters();
     void applyDayNight();
-    void resolveEnvironmentMap();  // ADR-345; runs alone, without a rebuild
+    void resolveEnvironmentMap();  // ADR-346; runs alone, without a rebuild
     // Nudges the camera's aim onto the hero the active directed shot was cut for (ADR-158).
     // After `syncHeroesToNodes`, not inside `applyParameters`, so it reads where the hero is
     // *this* frame rather than where it was last one.
@@ -1016,8 +1016,8 @@ private:
     float skyIntensitySetting_ = 1.0f;     // the visible sky only
     float skyBloomSetting_ = 0.0f;         // how much of the sky the bloom mask sees
     bool showSkyboxSetting_ = true;        // draw the environment behind the world at all
-    bool proceduralSkyBackgroundSetting_ = false; // ADR-344; analytic sky behind an HDRI
-    // ADR-345: an environment-map change resolves on its own rather than re-flattening the world.
+    bool proceduralSkyBackgroundSetting_ = false; // ADR-345; analytic sky behind an HDRI
+    // ADR-346: an environment-map change resolves on its own rather than re-flattening the world.
     bool environmentDirty_ = false;
     struct EnvironmentTexture {
         std::string path;

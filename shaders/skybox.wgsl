@@ -12,7 +12,7 @@
 
 const SKY_PI: f32 = 3.14159265;
 
-// ADR-344: the analytic sky, evaluated here rather than sampled from a cube.
+// ADR-345: the analytic sky, evaluated here rather than sampled from a cube.
 //
 // This is shaders/environment.wgsl's `skyRadiance` reading the frame block instead of the
 // environment processor's, because the two passes cannot see each other's uniforms. It is
@@ -95,7 +95,7 @@ fn fs_sky(in: SkyOut) -> SceneOut {
     if (frame.envParams.w >= 0.5 && frame.skyExtra.y >= 0.5) {
         let d = envRotate(dir);
         if (frame.skySunRadiance.w >= 0.5) {
-            // ADR-344: an HDRI is lighting the scene and the scene has asked for the procedural
+            // ADR-345: an HDRI is lighting the scene and the scene has asked for the procedural
             // sky behind it. One pixel of sky is a few ALU here against a cube fetch, and it is
             // the only way to get a background whose colours move with a day/night cycle while
             // the lighting comes from a map.
