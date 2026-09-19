@@ -12,9 +12,9 @@
     "scene": {
       "kind": "composition",
       "path": {
-        "path": "tree-of-life-floating-island.scene.json",
-        "sha256": "9f4fb1eb26bf4f445b7ac22100a81f39ef1ecfbfcf9f1e1bee5d945e682a382f",
-        "size": 12092
+        "path": "_tp-long-pull.scene.json",
+        "sha256": "29c880ab425549043e013554f743c958b96b748b3c8728ab03691ad564776dac",
+        "size": 16917
       }
     }
   },
@@ -317,9 +317,9 @@
     "camera/mode": 1,
     "camera/orbitSpeed": 0.0,
     "camera/position": [
-      190.0,
-      -40.0,
-      150.0
+      197.67652893066406,
+      45.33953094482422,
+      83.45803833007812
     ],
     "camera/shake/amplitude": 0.0,
     "camera/shake/decay": 0.0,
@@ -333,9 +333,9 @@
     ],
     "camera/splineT": 0.0,
     "camera/target": [
-      -10.0,
-      -30.0,
-      0.0
+      -16.906749725341797,
+      9.354751586914062,
+      -5.985854148864746
     ],
     "env/dayNight/cycleSeconds": 240.0,
     "env/dayNight/dayPhase": 0.0,
@@ -358,9 +358,9 @@
     "env/sky/background": false,
     "env/sky/enabled": true,
     "env/sky/groundColor": [
-      0.005200000014156103,
-      0.011800000444054604,
-      0.021199999377131462
+      0.0026,
+      0.0059,
+      0.0106
     ],
     "env/sky/haze": 0.6200000047683716,
     "env/sky/horizonColor": [
@@ -1703,7 +1703,7 @@
     "encoderThreads": 0,
     "end": -1.0,
     "fps": 30.0,
-    "height": 1080,
+    "height": 540,
     "limits": "tier",
     "muxAudio": true,
     "output": "sequence",
@@ -1713,7 +1713,7 @@
     "start": 0.0,
     "supersample": 1.0,
     "tier": "offline",
-    "width": 1920
+    "width": 960
   },
   "routes": [
     {

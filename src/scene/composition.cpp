@@ -3773,6 +3773,33 @@ void Composition::applyCanopyEmitters() {
     for (std::size_t i = 0; i < nodes_.size(); ++i) {
         byName.emplace(nodes_[i]->name, i);
     }
+    // ADR-380: a particle system may say that its attractor IS the vortex, rather than carrying a
+    // copy of the vortex's coordinates. The brief's §9 asks for the vortex's relationship to the
+    // island to survive the island moving, and §11 makes particles entrained by the vortex the
+    // scene's "visual storytelling mechanism" -- neither survives a hand-typed position that stops
+    // describing the thing it was copied from. Same argument as the measured canopy emitter above.
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+        CompositionNode& node = *nodes_[i];
+        if (node.kind != NodeKind::Particles || !node.vortexAttractor) {
+            continue;
+        }
+        const Environment::Vortex& vx = volumeSetting_.vortex;
+        if (!vx.active()) {
+            continue;
+        }
+        const std::string full = sanitise(prefix_) + node.name;
+        for (ParticleSystem& ps : scene_.particles) {
+            if (ps.name != full && ps.name != node.name) {
+                continue;
+            }
+            // The mouth, and a reach that covers it. The particles have to feel the pull well
+            // before they arrive or they fall past it rather than spiralling in.
+            ps.attractorPosition = vx.center;
+            ps.attractorRadius = std::max(vx.radius * node.vortexReach, 1.0f);
+            node.particleRest.attractorPosition = ps.attractorPosition;
+            node.particleRest.attractorRadius = ps.attractorRadius;
+        }
+    }
     for (std::size_t i = 0; i < nodes_.size(); ++i) {
         CompositionNode& node = *nodes_[i];
         if (node.kind != NodeKind::Particles || node.canopySource.empty()) {
@@ -7971,6 +7998,11 @@ nlohmann::json Composition::toJson() const {
             n["canopySource"] = node.canopySource;
             n["canopyFrom"] = node.canopyFrom;
         }
+        // ADR-380.
+        if (node.vortexAttractor) {
+            n["vortexAttractor"] = true;
+            n["vortexReach"] = node.vortexReach;
+        }
         // ADR-376: the tree's emissive life, written only when declared.
         if (node.energyAuthored) {
             auto eb = [](const params::Parameter<float>* p, float fallback) {
@@ -9118,6 +9150,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             }
             if (item.contains("canopyFrom") && item.at("canopyFrom").is_number()) {
                 node.canopyFrom = item.at("canopyFrom").get<float>();
+            }
+            if (item.contains("vortexAttractor") && item.at("vortexAttractor").is_boolean()) {
+                node.vortexAttractor = item.at("vortexAttractor").get<bool>();
+            }
+            if (item.contains("vortexReach") && item.at("vortexReach").is_number()) {
+                node.vortexReach = item.at("vortexReach").get<float>();
             }
             // ADR-376: the tree's emissive life. Absent is off.
             if (item.contains("energy") && item.at("energy").is_object()) {
