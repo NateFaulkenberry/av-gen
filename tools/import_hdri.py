@@ -153,13 +153,18 @@ def build(name: str, spec: dict, cache: Path, out: Path, width: int, prefer_orig
     print(f"[{name}] resolution_2K tier : {small}")
     print(f"[{name}] original           : {large if large else 'MISSING'}")
 
-    # Decode the ORIGINAL when it is there, not the 2K tier. The 2K tier is DWAA, which is lossy,
-    # and it fails where lossy codecs always fail -- the brightest region. Measured on the day map:
-    # 2,676 texels in the upper hemisphere sit at ~1/3 of their local neighbourhood's radiance, all
-    # of them inside x 769..1198 of 2048, which is the patch of sky around the sun. Rendered across
-    # a whole sky those become visible dark blobs, and they are why the ocean world's grazing view
-    # was speckled. The original is PIZ, which is lossless; tinyexr cannot read it but Blender can,
-    # and this tool is already Blender.
+    # Decode the ORIGINAL when it is there, not the 2K tier: the spec asks for "the original EXR
+    # data exactly as supplied", the original is PIZ and therefore lossless, and the derived file
+    # costs 6.0 MB against 5.7. tinyexr cannot read either at runtime; Blender reads both, which is
+    # why this tool is a Blender script.
+    #
+    # It is NOT a fix for the dark blobs in the ocean world's grazing view, which is what this
+    # change was first made for. That hypothesis was wrong and the measurement says so: the day
+    # map has 2,676 dark-outlier texels decoded from the DWAA tier and **2,727** decoded losslessly,
+    # in the same place, and the rendered blob count went UP, 2,463 -> 6,190. Cropping and tone
+    # mapping x 769..1198 -- the region every one of them sits in -- shows why: it is a dark cumulus
+    # bank silhouetted against the sun. They are clouds. The lossless decode preserves them better,
+    # which is the whole point of it and the opposite of a defect.
     decode_from = large if (prefer_original and large is not None) else small
     if decode_from is large:
         print(f"  decoding the lossless PIZ original ({large.stat().st_size / 1e6:.0f} MB)")
