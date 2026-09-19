@@ -99,6 +99,23 @@ void absent(const char* what) {
 // The falling-leaf system, found by the convention its parameters are registered under. A particle
 // node named "falling-leaves" registers `particles/falling-leaves/...`; a nested one gets a
 // prefixed name, so the search is by suffix rather than by an exact path.
+// The named particle system's parameter prefix, found by the `/spawnRate` suffix on a path whose
+// node name contains `needle` -- a nested composition prefixes node names, so an exact path misses.
+std::string systemPrefix(app::Engine& engine, const char* needle) {
+    for (const params::IParameter* p : engine.params().ordered()) {
+        const std::string& path = p->path();
+        const std::string tail = "/spawnRate";
+        if (path.size() <= tail.size() || path.compare(path.size() - tail.size(), tail.size(), tail) != 0) {
+            continue;
+        }
+        if (path.find(needle) == std::string::npos) {
+            continue;
+        }
+        return path.substr(0, path.size() - tail.size() + 1);
+    }
+    return {};
+}
+
 std::string leafPrefix(app::Engine& engine) {
     for (const params::IParameter* p : engine.params().ordered()) {
         const std::string& path = p->path();
@@ -173,6 +190,7 @@ void drawEnvironmentPanel(app::Engine& engine) {
             slider(engine, "scene/vortex/innerVoid", "Inner void", "%.2f");
             slider(engine, "scene/vortex/filaments", "Filaments", "%.2f");
             slider(engine, "scene/vortex/spill", "Light spill on the island", "%.2f");
+            slider(engine, "scene/vortex/cometResponse", "Comet response", "%.2f");
             ImGui::Separator();
             slider(engine, "scene/vortex/breathAmount", "Breath amount", "%.3f");
             ImGui::Separator();
@@ -351,7 +369,29 @@ void drawTreePanel(app::Engine& engine) {
     }
 
     if (ImGui::CollapsingHeader("Tree particles")) {
-        absent("Not built. Phase 7 of the brief.");
+        ImGui::PushID("motes");
+        const std::string m = systemPrefix(engine, "mote");
+        if (m.empty()) {
+            absent("This scene has no tree particles. A particles node named \"tree-motes\" with a "
+                   "canopySource and vortexAttractor is what makes one.");
+        } else {
+            checkbox(engine, (m + "enabled").c_str(), "Enabled");
+            slider(engine, (m + "spawnRate").c_str(), "Emission rate", "%.0f /s");
+            slider(engine, (m + "lifetime").c_str(), "Lifetime", "%.2f x");
+            slider(engine, (m + "size").c_str(), "Size", "%.2f x");
+            slider(engine, (m + "emissive").c_str(), "Brightness", "%.2f");
+            ImGui::Separator();
+            slider(engine, (m + "gravity").c_str(), "Rise", "%.2f");
+            slider(engine, (m + "turbulence").c_str(), "Turbulence", "%.2f");
+            slider(engine, (m + "windInfluence").c_str(), "Wind influence", "%.2f");
+            ImGui::Separator();
+            slider(engine, (m + "attractorStrength").c_str(), "Pull toward the vortex", "%.2f");
+            slider(engine, (m + "orbit").c_str(), "Swirl around it", "%.2f");
+            ImGui::TextColored(kMuted, "The entrainment takes 30 to 50 seconds of playback to "
+                                       "develop, and pools start empty after a seek -- a short "
+                                       "render will not show it.");
+        }
+        ImGui::PopID();
     }
 }
 
