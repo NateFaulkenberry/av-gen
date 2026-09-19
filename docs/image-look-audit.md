@@ -522,30 +522,47 @@ separable blur halves, the combine). A pass count cannot be perturbed by another
 which is exactly why it is the thing pinned in a test — a timing assertion on a shared machine is a
 flaky test with a respectable-looking face.
 
-**Wall clock, and the conditions it was taken under.** `examples/hero/hero.json`, live editor,
-`--ui-script idle --frames 420 --profile-cpu`, 960x540 canvas (0.52 Mpx), 12 861 triangles, 9 draw
-calls, serialised through `tools/gpu-lock.sh`. **The machine was contended throughout** — three
-other agents were running, one of them a 100%-CPU windowed benchmark. The arms were therefore
-**interleaved off / on / off / on in one batch**, which is what makes the comparison survive the
-contention; the absolute numbers do not.
+**Wall clock — retaken on a quiet machine, and the first figure withdrawn.**
+`examples/hero/hero.json`, live editor, `--ui-script idle --frames 420 --profile-cpu`, 960x540
+canvas (0.52 Mpx), 12 861 triangles, 9 draw calls, through `tools/gpu-lock.sh`, arms interleaved
+off/on **three times** in one batch. Taken after waiting for the machine to go genuinely quiet (no
+other agent's compile, test or render above 40% CPU, and macOS's XprotectService — which had been
+at 552% scanning the freshly built binaries — back to zero).
 
-Minima over the repeats, never means (ADR-170):
+The `--profile-cpu` table's columns are `min, median, mean, p95, p99, max`. The **median** is the
+statistic to read: `gpu.frame`'s `min` is 0.000 in every arm because frames without a GPU timestamp
+are counted, so the minimum is degenerate rather than fast.
 
-| arm | `gpu.frame` min (ms) | `FRAME` min (ms) |
+| repeat | `gpu.frame` median, look off | `gpu.frame` median, look on |
 |---|---|---|
-| look off (defaults) | **4.522** | 8.313 |
-| all four controls on | **4.981** | 8.328 |
+| 1 | 4.784 | 5.177 |
+| 2 | 4.915 | 5.046 |
+| 3 | 4.784 | 4.784 |
+| **best of three** | **4.784** | **4.784** |
 
-- **GPU: +0.46 ms** at 0.52 Mpx with all four controls on. The passes are full- and
-  quarter-resolution fullscreen, so this is expected to scale with pixel count — *expected*, not
-  measured; no 1080p figure is claimed here because none was taken.
-- **CPU: no change, and no new stage.** The `FRAME` minima span 8.313–8.336 ms across all four arms,
-  a 0.02 ms spread, and that value is the frame-pacing floor rather than work. No new row appears in
-  the `--profile-cpu` table in the "on" arm, which is the expected result: every part of this
-  feature is GPU work reached through `PostSettings`, and nothing was added to the update path.
-- **At defaults the cost is exactly zero**, because nothing is encoded. That is the §60 result
-  restated as a performance claim, and it is the one that matters for the 99% of scenes that never
-  touch these controls.
+**The two arms are indistinguishable, and the reason is that the instrument cannot resolve the
+effect at this resolution.** Every distinct value observed across all six runs — 4.784, 4.915,
+5.046, 5.177 — is a multiple of **0.131 ms** apart from its neighbour, which is this GPU timer's
+quantisation step. The best median is identical in both arms and the distributions overlap. So the
+honest statement is: **with all four controls on, the cost at 0.52 Mpx is at or below 0.131 ms, and
+this measurement cannot put a number on it.** Four extra fullscreen passes at half a megapixel are
+simply too cheap for this instrument; resolving them would need a larger canvas, and no such
+measurement was taken, so no figure is claimed for one.
+
+CPU is unaffected, which is the expected result and the one this measurement *can* resolve: `FRAME`
+medians are 8.361 / 8.458 / 8.468 ms with the look off and 8.323 / 8.375 / 8.329 with it on — the
+"on" arm is marginally *lower*, i.e. the difference is noise about a frame-pacing floor. No new row
+appears in the `--profile-cpu` table in either arm, which is correct: every part of this feature is
+GPU work reached through `PostSettings`, and nothing was added to the update path.
+
+> **Withdrawn.** An earlier version of this section reported **+0.46 ms** for the same comparison
+> (4.522 ms off against 4.981 ms on). That measurement was taken while three other agents were
+> running, one of them a 100%-CPU windowed benchmark, and it was labelled as such — but labelling a
+> contended number does not make it a number. Re-taken quiet and repeated three times, the effect
+> disappears into the timer's quantisation. **The +0.46 ms figure was contention, not signal, and
+> should not be quoted.** The lesson is the one ADR-170 already states and this is a fresh instance
+> of: minima over repeats, and a single pair of runs is not a measurement even when it is honestly
+> labelled.
 
 One measurement was thrown away rather than reported: a first attempt showed the "on" arm *faster*
 than the "off" arm (1.558 ms against 4.634 ms). The two arms had rendered different scenes — 5 889
