@@ -1256,6 +1256,11 @@ private:
     std::size_t authoredLightFirst_ = 0;
     std::vector<std::size_t> authoredLightNodeIndex_;
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
+    // The subset of `heroes_` a *walker's* clearance field may treat as solid: the ones no entity
+    // drives (ADR-349). Storage rather than a filter at the point of use, because
+    // `ClearanceField::heroes` is a span and the field outlives the call that built it. Rebuilt by
+    // `buildNavigator`, which is the only reader and is called after both lists are known.
+    mutable std::vector<world::HeroPoint> walkerHeroes_;
     std::uint64_t heroRevision_ = 1;
     std::uint64_t heroPlacementRevision_ = 1;
     // Where each hero's node stood when the hero was last in step with it, so a move can be applied

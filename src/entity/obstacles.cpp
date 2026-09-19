@@ -241,10 +241,15 @@ std::size_t obstaclesFromScatter(const world::ScatterLayer& layer, const spatial
 }
 
 std::size_t obstaclesFromHeroes(std::span<const world::HeroPoint> heroes, spatial::ObstacleField& out,
-                                float radiusScale) {
+                                float radiusScale, std::span<const std::string_view> moving) {
     std::size_t added = 0;
     for (const world::HeroPoint& hero : heroes) {
         if (hero.radius <= 0.0f || hero.height <= 0.0f) {
+            continue;
+        }
+        // ADR-349. A hero that an entity drives is a body, not a monument, and a body must not be
+        // baked into the static field -- see the header for the measurement that found this.
+        if (std::find(moving.begin(), moving.end(), std::string_view(hero.name)) != moving.end()) {
             continue;
         }
         spatial::NavigationObstacle o;

@@ -2146,7 +2146,24 @@ entity::Navigator Composition::buildNavigator() const {
         world::ClearanceField field;
         field.map = &nodePtr->worldMap;
         field.ecology = &nodePtr->ecology;
-        field.heroes = heroes_;
+        // ADR-349, and the second half of it: the obstacle field is not the only place a hero is a
+        // solid. `TerrainQuery::at` asks `ClearanceField::heroPenetration` and answers `InsideHero`
+        // inside `radius + cameraRadius` of any hero, so a starred character was a 1.5 m no-stand
+        // zone centred on its own feet and *every* query at its own position said "not navigable".
+        // A **walker's** clearance field therefore excludes the heroes that entities drive. The
+        // camera's does not and must not: a camera flying through a character is a real artefact,
+        // and this field is built here, for this navigator, and is not the one the camera reads.
+        walkerHeroes_.clear();
+        walkerHeroes_.reserve(heroes_.size());
+        for (const world::HeroPoint& hero : heroes_) {
+            const bool driven = std::any_of(
+                entityDescs_.begin(), entityDescs_.end(),
+                [&](const entity::EntityDesc& e) { return e.driven() == hero.name; });
+            if (!driven) {
+                walkerHeroes_.push_back(hero);
+            }
+        }
+        field.heroes = walkerHeroes_;
         // A walker is not a camera: it stands on the ground rather than clearing it, and its
         // personal space is its own width rather than a near plane.
         field.cameraRadius = 0.6f;
@@ -4420,7 +4437,17 @@ void Composition::rebuild() {
             range.ecologyCount = scene_.procedurals.size() - range.ecologyFirst;
             // Heroes are the large authored solids -- the elder, the monument, the arch -- and the
             // only things in this world that already carry a volume worth colliding with.
-            entity::obstaclesFromHeroes(heroes_, *obstacles_);
+            //
+            // ...except the ones somebody starred, which is how a hero stops being scenery
+            // (ADR-349). Every hero an entity drives is handed over as an exclusion, because a
+            // body's collision is `Ground`'s crowd field and not a cylinder pinned to where it
+            // happened to be standing when the world was built.
+            std::vector<std::string_view> movingHeroes;
+            movingHeroes.reserve(entityDescs_.size());
+            for (const entity::EntityDesc& e : entityDescs_) {
+                movingHeroes.emplace_back(e.driven());
+            }
+            entity::obstaclesFromHeroes(heroes_, *obstacles_, 0.72f, movingHeroes);
             obstacles_->build();
             // Publish it through §3's seam. Until this happens `TerrainQuery::isOccupied` answers a
             // narrower question than its name suggests -- heroes and the world's edge -- and

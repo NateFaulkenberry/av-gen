@@ -150,7 +150,21 @@ std::size_t obstaclesFromScatter(const world::ScatterLayer& layer, const spatial
 // Heroes are the one thing in this world that already carries an authored obstacle volume, and
 // they are the large structures a walker must not walk through: the elder, the monument, the arch.
 // `radiusScale` trims the composition radius, which is sized for framing rather than for collision.
+//
+// **`moving` is the names this rule does not apply to, and it is not an optimisation (ADR-349).**
+// The sentence above -- "the elder, the monument, the arch" -- is an assumption, and starring a
+// character in the Objects list breaks it: a hero is whatever somebody wants the camera to look at,
+// and four of the five aliens in `glowmere-valley-2-multicam` were starred so the Auto-director
+// would cut to them. Each then got a Blocking cylinder centred on its own standing position, so
+// `TerrainQuery::at` answered `InsideHero` at the body's own feet and the router refused to plan a
+// route out of it. Three of the five travelled **0.00 m in 226 seconds, at every seed tried**.
+//
+// A hero that is also a body is not scenery and must not be baked into the static field: a body
+// moves, so a cylinder at where it was is wrong a second later, and bodies already avoid each
+// other through `Ground`'s `bodyRadius` crowd field, which is dynamic and is the mechanism for
+// exactly this. Pass the driven-node name of every entity; those heroes are skipped.
 std::size_t obstaclesFromHeroes(std::span<const world::HeroPoint> heroes,
-                                spatial::ObstacleField& out, float radiusScale = 0.72f);
+                                spatial::ObstacleField& out, float radiusScale = 0.72f,
+                                std::span<const std::string_view> moving = {});
 
 } // namespace avgen::entity
