@@ -160,11 +160,17 @@ struct PoseLayer {
     // there is nothing to author and nothing to measure wrong. This field is for the cases the rest
     // pose cannot know about -- a hoof sunk into mud, a foot on a step.
     float groundOffset = 0.0f;
-    // 0 keeps the foot's animated orientation; 1 lays its sole flat on the plane. Deliberately the
-    // same shape and the same argument as `entity::GroundSettings::slopeAlign`, one level down: a
-    // hoof leans into a slope, it does not become part of it. The two are complementary --
-    // `slopeAlign` tilts the body, this tilts one foot -- and neither replaces the other.
-    float footAlign = 0.0f;
+    // 0 keeps the foot's animated orientation; 1 lays its sole flat on the plane. The same shape as
+    // `entity::GroundSettings::slopeAlign`, one level down, and complementary to it -- `slopeAlign`
+    // tilts the body, this tilts one foot -- but **not** the same argument, and the default is the
+    // other way round on purpose. A body leans part of the way into a hill; a hoof is flat on it.
+    //
+    // 1 rather than 0 because 0 is not the conservative default, it is the broken one: the tip
+    // joint rides whatever rotations the hip and the knee needed to reach the target, and on an
+    // 18-degree bank a bull's four hooves come out at 18, 27, 27 and 56 degrees from vertical --
+    // one of them on its edge -- while every distance assertion about them passes. The scene
+    // parser defaults this to 1 too; the two diverging is the kind of thing nobody finds twice.
+    float footAlign = 1.0f;
     // Which way is *out of the sole*, as a direction in the tip joint's own bind frame.
     //
     // **Zero means "whatever was up when the animal was standing"**, resolved once by `bind` from
