@@ -35,7 +35,7 @@ never reaches into the realtime post chain. Colour management is downstream of t
 | 3 | BSDF + light sampling, MIS, Russian roulette | **done** |
 | 4 | OIDN denoising | **done** (opt-in) |
 | 5 | Scene integration: CPU skinning, procedural scatter | **done** |
-| 6 | AOVs | not started |
+| 6 | AOVs: albedo, normal, multi-layer EXR | **partly** |
 | 7 | Glowmere | not started |
 | 8 | Production features | not started |
 
@@ -97,6 +97,24 @@ inheriting them would be the ADR-146 mistake in a new place:
 * `Entity::cameraCulled`, which means "outside the realtime frustum", not "not in the scene";
   off-screen geometry still casts shadows and still bounces light into the frame;
 * procedural LOD rungs 2 and 3, which are camera-facing billboards.
+
+## Phase 6 in particular (partly)
+
+`writeFramebufferAovExr` puts the beauty pass and every captured AOV into **one multi-layer EXR**.
+Beauty is `R/G/B` because it is colour and every compositor expects it there; albedo is
+`albedo.R/G/B` for the same reason under its own prefix; and the normal is **`normal.X/Y/Z`, never
+`normal.R/G/B`** -- spec section 33, because a colour-managed pipeline downstream will transform
+anything it believes is colour, and the result looks like a shading bug rather than a naming
+mistake. Tests assert the forbidden names are absent, not merely that the right ones are present.
+
+`assets::writeExrLayers` is the new engine-side primitive: arbitrary channel names and
+**per-channel** half/float, which `writeExr` cannot express at all. No new dependency -- the pinned
+tinyexr header always exposed `EXRHeader`/`EXRChannelInfo`/`SaveEXRImageToFile`. This discharges the
+debt recorded at `src/app/render_settings.hpp`: *"the layered form is a better file and a bigger
+change; it is recorded as not done rather than half-built."*
+
+Still to do in Phase 6: depth, motion vectors, object and material IDs, and reconciling this
+vocabulary with `app::RenderSettings::aovNames()`.
 
 ## Phase 5 in particular
 

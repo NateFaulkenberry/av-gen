@@ -5,7 +5,7 @@ add_executable(avgen_tests ${AVGEN_UNIT_TEST_SOURCES})
 target_include_directories(avgen_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 # The Quality Lab's metric engine, so its distortion ladder (docs/quality-lab/metrics.md 4.1) runs
 # in the ordinary unit suite rather than in a harness of its own.
-target_link_libraries(avgen_tests PRIVATE avgen_quality_metrics)
+target_link_libraries(avgen_tests PRIVATE tinyexr::tinyexr PRIVATE avgen_quality_metrics)
 # Integration tests drive app::Engine, which lives in the app sources; compile the GPU-free part in.
 target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"

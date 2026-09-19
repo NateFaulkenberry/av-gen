@@ -486,6 +486,52 @@ Result<void> writeFramebufferExr(const Framebuffer& fb, const std::filesystem::p
     return assets::writeExr(path, fb.width, fb.height, rgba, half);
 }
 
+Result<void> writeFramebufferAovExr(const Framebuffer& fb, const std::filesystem::path& path) {
+    if (fb.width == 0 || fb.height == 0) return fail("pathtrace: cannot write an empty framebuffer");
+    const std::size_t pixels = static_cast<std::size_t>(fb.width) * fb.height;
+
+    // tinyexr wants planar channels, so the interleaved vec3 buffers are deinterleaved once here.
+    std::vector<std::vector<float>> planes;
+    std::vector<assets::ExrChannel> channels;
+
+    const auto addVec3 = [&](const std::vector<glm::vec3>& src, const char* c0, const char* c1,
+                             const char* c2, bool half) {
+        if (src.size() != pixels) return;
+        const std::size_t base = planes.size();
+        planes.emplace_back(pixels);
+        planes.emplace_back(pixels);
+        planes.emplace_back(pixels);
+        for (std::size_t i = 0; i < pixels; ++i) {
+            planes[base + 0][i] = src[i].x;
+            planes[base + 1][i] = src[i].y;
+            planes[base + 2][i] = src[i].z;
+        }
+        channels.push_back({c0, {}, half});
+        channels.push_back({c1, {}, half});
+        channels.push_back({c2, {}, half});
+    };
+
+    const std::vector<glm::vec3> colour = fb.resolvedRadiance();
+    // Beauty is R/G/B: it IS colour, and every compositor expects to find it under those names.
+    // Float, not half: the emissive range in a path trace routinely exceeds half's precision where
+    // it matters, and this is the deliverable.
+    addVec3(colour, "R", "G", "B", false);
+
+    const std::vector<glm::vec3> albedo = fb.resolvedAlbedo();
+    if (!albedo.empty()) addVec3(albedo, "albedo.R", "albedo.G", "albedo.B", true);
+
+    const std::vector<glm::vec3> normal = fb.resolvedNormal();
+    // `normal.X/Y/Z`, never `normal.R/G/B`: a direction is not a colour (spec section 33). Half is
+    // enough for a unit vector and is what every renderer writes.
+    if (!normal.empty()) addVec3(normal, "normal.X", "normal.Y", "normal.Z", true);
+
+    // Bind the spans only once `planes` has stopped growing, or a reallocation dangles them.
+    for (std::size_t i = 0; i < channels.size(); ++i) {
+        channels[i].data = std::span<const float>(planes[i]);
+    }
+    return assets::writeExrLayers(path, fb.width, fb.height, channels);
+}
+
 void logCapabilities(const Snapshot& snapshot) {
     log::info("pathtrace: capability report -- {} mesh(es), {} triangle(s), {} light(s)",
               snapshot.meshes.size(), snapshot.triangleCount(), snapshot.lights.size());

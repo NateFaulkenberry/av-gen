@@ -217,9 +217,17 @@ TEST_CASE("the section 69 target scene renders, and the picture has what it shou
     // --- there is a SHADOW: the ground directly under a sphere is darker than ground beside it ---
     // This is the arm that proves shadow rays do something. Without it, an occlusion query that
     // always returned false would pass every other check in this test.
-    const glm::vec3 underGrey = regionMean(fb, 74, 64, 86, 70);
+    //
+    // Measured under the BLUE sphere, at x = -2.2, rather than under the middle one. Since Phase 3
+    // the emissive cyan sphere at x = +2.2 is sampled as a light in its own right, so it fills the
+    // middle sphere's shadow from the side and that shadow is no longer the darkest thing around.
+    // That is better physics, not a regression -- but it makes the middle sphere the wrong place to
+    // ask the question.
+    const glm::vec3 underBlue = regionMean(fb, 40, 64, 52, 70);
     const glm::vec3 besideSpheres = regionMean(fb, 4, 64, 20, 70);
-    REQUIRE(luminance(underGrey) < luminance(besideSpheres) * 0.75f);
+    INFO("under blue " << luminance(underBlue) << " beside " << luminance(besideSpheres));
+    REQUIRE(luminance(besideSpheres) > 0.01f); // live arm: the open ground really is lit
+    REQUIRE(luminance(underBlue) < luminance(besideSpheres) * 0.75f);
 }
 
 TEST_CASE("CONTROL: with the light removed the lit scene collapses, and with shadows off the shadow goes",
@@ -238,7 +246,11 @@ TEST_CASE("CONTROL: with the light removed the lit scene collapses, and with sha
     pathtrace::PathTracer t2;
     pathtrace::Framebuffer darkFb;
     REQUIRE(t2.render(pathtrace::buildSnapshot(dark), settings, darkFb).has_value());
-    REQUIRE(t2.stats().shadowRays == 0);
+    // Shadow rays do NOT fall to zero any more: since Phase 3 the emissive cyan sphere is sampled
+    // as a light in its own right and casts its own shadows. What must fall is the count, because
+    // one emitter is now being sampled where two light sources were before.
+    REQUIRE(t2.stats().shadowRays > 0);
+    REQUIRE(t2.stats().shadowRays < t1.stats().shadowRays);
 
     // Assert on a region the KEY LIGHT governs, not on the whole-frame mean. The emissive sphere is
     // the brightest thing in this frame by a wide margin and it is unaffected by the key light, so
@@ -268,7 +280,9 @@ TEST_CASE("CONTROL: with the light removed the lit scene collapses, and with sha
     pathtrace::PathTracer t3;
     pathtrace::Framebuffer noShadowFb;
     REQUIRE(t3.render(pathtrace::buildSnapshot(noShadow), settings, noShadowFb).has_value());
-    REQUIRE(t3.stats().shadowRays == 0);
+    // The analytic light stops casting, but the emissive sphere still does, so this is a fall
+    // rather than a zero -- for the same reason as above.
+    REQUIRE(t3.stats().shadowRays < t1.stats().shadowRays);
 
     const float shadowedGround = luminance(regionMean(litFb, 74, 64, 86, 70));
     const float unshadowedGround = luminance(regionMean(noShadowFb, 74, 64, 86, 70));

@@ -122,6 +122,15 @@ private:
 [[nodiscard]] Result<void> writeFramebufferExr(const Framebuffer& fb, const std::filesystem::path& path,
                                                bool half = false);
 
+// Writes the beauty pass plus every captured AOV into ONE multi-layer EXR (spec section 33).
+//
+// Colour goes in R/G/B/A. Everything else goes in a NAMED LAYER -- `albedo.R/G/B`, `normal.X/Y/Z` --
+// so a colour-managed pipeline downstream cannot mistake a normal for a colour and transform it.
+// Storing a normal as R/G/B is the mistake section 33 exists to prevent, and it is invisible until
+// somebody grades the file.
+[[nodiscard]] Result<void> writeFramebufferAovExr(const Framebuffer& fb,
+                                                  const std::filesystem::path& path);
+
 // Logs the capability report at render startup (spec section 55).
 void logCapabilities(const Snapshot& snapshot);
 
