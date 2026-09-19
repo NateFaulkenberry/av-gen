@@ -468,7 +468,11 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
                 entity.mesh >= scene.meshes.size()) {
                 continue;
             }
-            const auto bounds = scene.meshes[entity.mesh].bounds();
+            // `scene.meshBounds`, not `MeshData::bounds()`: the latter scans every vertex and this
+            // runs per entity per frame. See the note in scene::entityCullBounds -- the same
+            // mistake, in the same shape, cost the Tree of Life 90 ms a frame in the cull and 87 ms
+            // here in the editor's debug pass.
+            const auto bounds = scene.meshBounds(entity.mesh);
             const CasterState state = casterState(entity, bounds, planes);
             const auto [lo, hi] = entityWorldBounds(entity, bounds);
             draw.box(lo, hi, state == CasterState::Caster            ? kCasterColour
@@ -489,7 +493,11 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
         if (options.submittedOnly && entity.cameraCulled) {
             continue;
         }
-        const auto [meshLo, meshHi] = scene.meshes[entity.mesh].bounds();
+        // Cached, for the reason above, and it matters most here: this loop has no `options`
+        // guard on its entry, so it pays for every visible entity on every frame of every session
+        // whether or not a single overlay is switched on. The comment at the call site says "an
+        // empty set costs nothing"; with the uncached scan an empty set cost 87 ms.
+        const auto [meshLo, meshHi] = scene.meshBounds(entity.mesh);
         const glm::mat4 model = entity.transform.matrix();
         glm::vec3 worldLo(std::numeric_limits<float>::max());
         glm::vec3 worldHi(std::numeric_limits<float>::lowest());
