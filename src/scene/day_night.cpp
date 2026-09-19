@@ -196,6 +196,7 @@ std::uint64_t DayNightSettings::hash() const {
     h.f32(starBrightnessScale);
     h.f32(hdriIntensityScale);
     h.f32(glowInfluence);
+    h.f32(fogHorizonBlend);
     const auto hs = [&h](const std::string& v) {
         for (const char ch : v) {
             h.u32(static_cast<std::uint32_t>(static_cast<unsigned char>(ch)));
@@ -288,7 +289,12 @@ DayNightState resolveDayNight(const DayNightSettings& settings, float phase) {
     s.waterReflection = std::max(0.0f, samplePhase(settings.waterReflection, s.phase));
     s.waterDeepColor = glm::max(samplePhase(settings.waterDeepColor, s.phase), glm::vec3(0.0f));
     s.fogDensity = std::max(0.0f, samplePhase(settings.fogDensity, s.phase));
-    s.fogColor = glm::max(samplePhase(settings.fogColor, s.phase), glm::vec3(0.0f));
+    const glm::vec3 authoredFog = glm::max(samplePhase(settings.fogColor, s.phase), glm::vec3(0.0f));
+    // The colour the sky actually is at the horizon, scaled the way the visible sky is scaled, so
+    // water receding into fog and sky meeting the horizon arrive at the same value.
+    const glm::vec3 horizonFog = s.horizonColor * s.skyIntensity;
+    const float blend = std::clamp(settings.fogHorizonBlend, 0.0f, 1.0f);
+    s.fogColor = glm::max(authoredFog * (1.0f - blend) + horizonFog * blend, glm::vec3(0.0f));
     s.useNightMap = s.hdriBlend >= 0.5f;
     return s;
 }

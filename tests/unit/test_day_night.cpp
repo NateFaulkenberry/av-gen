@@ -167,6 +167,36 @@ TEST_CASE("The sun is up by day and down by night", "[daynight][environment]") {
     CHECK(resolveDayNight(ignore, 0.5f).glowScale == Approx(1.0f));
 }
 
+TEST_CASE("Fog fades into the colour the sky has at the horizon", "[daynight][environment]") {
+    const DayNightSettings s = defaults();
+    // Atmospheric perspective is "a thing receding fades into the sky at the horizon". Authoring
+    // the fog colour and the horizon colour as two independent curves let them disagree, and on
+    // the ocean world they did: distant water fully fogged to one colour met a sky of another and
+    // the seam read as a SECOND HORIZON in the grazing view. Measured before the fix -- the band
+    // sat at 24/32/55 sRGB against a fog colour of 29/35/51, which is how it was identified.
+    for (float phase : {0.0f, 0.25f, 0.5f, 0.75f, 0.9f}) {
+        const DayNightState st = resolveDayNight(s, phase);
+        const glm::vec3 want = st.horizonColor * st.skyIntensity;
+        INFO("phase " << phase);
+        CHECK(st.fogColor.r == Approx(want.r).margin(1e-5));
+        CHECK(st.fogColor.g == Approx(want.g).margin(1e-5));
+        CHECK(st.fogColor.b == Approx(want.b).margin(1e-5));
+    }
+
+    // THE CONTROL. `fogHorizonBlend` 0 must give the hand-authored curve back, and that curve must
+    // actually differ from the horizon -- otherwise the assertions above would hold for a system
+    // that ignored the setting entirely.
+    DayNightSettings authored = s;
+    authored.fogHorizonBlend = 0.0f;
+    const DayNightState tracked = resolveDayNight(s, 0.75f);
+    const DayNightState hand = resolveDayNight(authored, 0.75f);
+    const float apart = std::abs(tracked.fogColor.r - hand.fogColor.r) +
+                        std::abs(tracked.fogColor.g - hand.fogColor.g) +
+                        std::abs(tracked.fogColor.b - hand.fogColor.b);
+    INFO("tracked vs authored fog at sunset, summed channel difference " << apart);
+    CHECK(apart > 0.02f);
+}
+
 TEST_CASE("The HDRI contribution follows the cycle and swaps at its quietest", "[daynight][environment]") {
     const DayNightSettings s = defaults();
     // Strong by day, near zero at night: the brief's target behaviour.
