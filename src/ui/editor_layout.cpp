@@ -18,7 +18,7 @@ constexpr int kFormatVersion = 1;
 // The panels, grouped the way the View menu reads them: what you build with on the left, what you
 // inspect and tune on the right, what runs underneath along the bottom. Nothing is assigned to the
 // centre -- see DockRegion.
-constexpr std::array<EditorPanel, 21> kPanels{{
+constexpr std::array<EditorPanel, 22> kPanels{{
     {"World Builder", "World Builder", DockRegion::Left, true,
      "recipe, Generate World and the job monitor"},
     // ADR-092. One panel, not two: the brush and the selection are the same job seen from two
@@ -52,6 +52,12 @@ constexpr std::array<EditorPanel, 21> kPanels{{
      "the sky and what is under the island: cosmic atmosphere and the vortex"},
     {"Tree", "Tree", DockRegion::Right, false,
      "what the tree does: wind, the bodies that bend in it, and the leaves it sheds"},
+    // The scene's authored local lights. Beside Cameras, because "what is looking at this" and
+    // "what is lighting it" are the same kind of question about the same scene. Sky, fog and
+    // environment intensity are deliberately NOT here; they are the Environment panel's, which is
+    // the boundary the brief's §21 asks for and which that panel already provides.
+    {"Lights", "Lights", DockRegion::Right, false,
+     "the scene's lights: add, shape, aim and animate them"},
     {"Control", "Control", DockRegion::Bottom, true, "transport, audio response and performance"},
     // §13. The data has been machine-readable since ADR-148 and had no surface: the answer to "why
     // is this frame expensive" lived in `--bench-json` and in the log. Closed by its own panel
