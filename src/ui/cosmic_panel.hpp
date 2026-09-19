@@ -1,6 +1,6 @@
 #pragma once
 
-// ADR-373: the Environment and Tree panels the brief's §16 asks for.
+// ADR-375: the Environment and Tree panels the brief's §16 asks for.
 //
 // Everything these show was already reachable: registering a parameter puts it in the Parameters
 // panel, makes it a modulation target, a timeline key and a save entry (ADR-011), which is what

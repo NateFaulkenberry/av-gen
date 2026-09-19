@@ -28,7 +28,7 @@ fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     let screenUv = in.clip.xy * frame.targetSize.zw;
     let shaded = shadeSurface(in.worldPos, in.normal, in.uv, frontFacing, vec3<f32>(1.0), vec3<f32>(1.0),
                               materialInstanceZero(in.localPos), screenUv);
-    // ADR-374: the tree's own light. Added to both the radiance and the emission target, because
+    // ADR-376: the tree's own light. Added to both the radiance and the emission target, because
     // an emissive term that reaches the frame but not the AOV is invisible to bloom -- which is
     // most of what makes a conducted pulse read.
     let energy = treeEnergyAt(in.worldPos);

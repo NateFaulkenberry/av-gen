@@ -76,7 +76,15 @@ glm::vec3 agx(glm::vec3 val) {
     v = (v - minEv) / (maxEv - minEv);
     v = agxContrast(v);
     v = outset * v;
-    return glm::pow(clamp01(v), glm::vec3(2.2f));
+    // The exact inverse of the sRGB OETF `srgbByte` applies, mirroring shaders/tonemap.wgsl's
+    // `srgbToLinear`. This was `glm::pow(clamp01(v), 2.2f)` on both sides -- the same wrong
+    // inverse in the shader and in its mirror, so the mirror confirmed the shader was consistent
+    // with itself and never that it was right (ADR-372).
+    const glm::vec3 c = clamp01(v);
+    const glm::vec3 lo = c / 12.92f;
+    const glm::vec3 hi = glm::pow((c + 0.055f) / 1.055f, glm::vec3(2.4f));
+    return glm::vec3(c.x <= 0.04045f ? lo.x : hi.x, c.y <= 0.04045f ? lo.y : hi.y,
+                     c.z <= 0.04045f ? lo.z : hi.z);
 }
 
 glm::vec3 reinhardExtended(glm::vec3 c) {

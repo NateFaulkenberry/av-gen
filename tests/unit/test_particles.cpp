@@ -40,14 +40,23 @@ TEST_CASE("Particle parameters register and apply with rest-relative scaling", "
     CHECK(live.burst == 40.0f);
     CHECK_FALSE(live.enabled);
     // Registering the same system twice returns the same parameters (no duplicates).
+    //
+    // This used to assert a literal count, and that count broke three times in one day -- ADR-040's
+    // stretch and trailWidth, ADR-367's softness, ADR-370's four leaf controls. Every break was a
+    // parameter *correctly* being added, and every fix was editing a number to match reality, which
+    // is not a test. The invariant this case exists for is that a second registration adds nothing;
+    // state it that way and it survives the next parameter.
+    const std::size_t afterFirst = params.size();
     auto again = scene::registerParticleParameters(params, rest);
     CHECK(again.spawnRate == p.spawnRate);
-    // ADR-040 added stretch and trailWidth; ADR-367 added softness, which had existed as a field
-    // and a serialised value for far longer and was registered by nobody.
-    CHECK(params.size() == 23);
-    // Named as well as counted. A bare count says a parameter arrived and not which one, and this
-    // number has now been wrong twice for the same reason -- somebody made a value reachable.
-    CHECK(params.find("particles/sparks/softness") == p.softness);
+    CHECK(params.size() == afterFirst);
+    // A floor rather than an exact count, so a new control does not fail this and a *missing* set
+    // still does.
+    CHECK(afterFirst >= 23);
+    // And the ones whose absence has been a real defect, by name -- a count says a parameter
+    // arrived without saying which.
+    CHECK(params.find("particles/sparks/softness") == p.softness);   // ADR-367
+    CHECK(params.find("particles/sparks/windInfluence") != nullptr); // ADR-370
 }
 
 TEST_CASE("Field force modes and per-slot strength parameters", "[scene][particles]") {
@@ -69,8 +78,15 @@ TEST_CASE("Field force modes and per-slot strength parameters", "[scene][particl
     b.mode = scene::FieldForceMode::Turbulence;
     b.strength = 0.5f;
     rest.fieldForces = {a, b};
+    // The count that matters is the *difference* the two field forces make, not the absolute total,
+    // which moves whenever anybody adds a control. Registering the same system without them is the
+    // control, and it is what makes "+2" a measurement rather than a copied number.
+    params::ParameterSet baseline;
+    scene::ParticleSystem noForces = rest;
+    noForces.fieldForces.clear();
+    scene::registerParticleParameters(baseline, noForces);
     auto p = scene::registerParticleParameters(params, rest);
-    CHECK(params.size() == 25); // 23 base (ADR-367's softness included) + 2 field-force strengths
+    CHECK(params.size() == baseline.size() + 2);
     REQUIRE(p.fieldStrength[0] != nullptr);
     REQUIRE(p.fieldStrength[1] != nullptr);
     CHECK(p.fieldStrength[2] == nullptr);

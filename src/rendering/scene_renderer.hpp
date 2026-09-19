@@ -351,7 +351,7 @@ struct ObjectUniforms {
                                 // w = foliage influence
     glm::vec4 windTune{0.0f};   // x = trunk influence, y = leaf flutter, z = response lag (s),
                                 // w = the previous frame's time
-    // ADR-374: tree energy and canopy shimmer, sharing the wind body's frame above. energy0.x and
+    // ADR-376: tree energy and canopy shimmer, sharing the wind body's frame above. energy0.x and
     // energy3.x are the two gates; both zero means the fragment stage returns immediately.
     glm::vec4 energy0{0.0f};    // intensity, pulse speed, pulse width, propagation speed
     glm::vec4 energy1{0.0f};    // root, trunk, branch, canopy share

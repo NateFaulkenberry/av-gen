@@ -48,7 +48,7 @@ struct VolumeUniforms {
     vortexA: vec4<f32>,   // deep colour
     vortexB: vec4<f32>,   // mid colour
     vortexAccent: vec4<f32>, // luminous accent
-    vortex4: vec4<f32>,   // ADR-372: funnel depth, throat radius fraction, throat density, 0
+    vortex4: vec4<f32>,   // ADR-374: funnel depth, throat radius fraction, throat density, 0
 };
 
 @group(1) @binding(1) var<uniform> vol: VolumeUniforms;
@@ -120,7 +120,7 @@ fn vortexShape(p: vec3<f32>, t: f32) -> f32 {
     // to the density so the silhouette moves, which is what reads as breathing; scaling density
     // alone just pulses the brightness.
     let breath = 1.0 + vol.vortex3.x * sin(t * vol.vortex3.y);
-    // ADR-372: a FUNNEL, not a flat disc. The first version was a slab, and from the hero camera --
+    // ADR-374: a FUNNEL, not a flat disc. The first version was a slab, and from the hero camera --
     // which looks very nearly level -- a slab 700 m below is seen edge-on and reads as a band of
     // haze, not as a vortex. The brief's own diagram is a funnel narrowing into a dark void, and a
     // funnel has an inner wall that a level camera can see down into. That is the whole difference
@@ -152,7 +152,7 @@ fn vortexShape(p: vec3<f32>, t: f32) -> f32 {
     if (vert < 1e-4) {
         return 0.0;
     }
-    // ADR-372: the cheap masks BEFORE the noise. Measured, the vortex's cost is not the march
+    // ADR-374: the cheap masks BEFORE the noise. Measured, the vortex's cost is not the march
     // length and is barely the step count -- it is how many pixels have non-zero density and
     // therefore evaluate three fBMs. The void at the centre and everything past the rim are exactly
     // the places where the answer is already zero, and they were paying full price for it.

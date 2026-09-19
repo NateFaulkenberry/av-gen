@@ -3756,7 +3756,7 @@ void Composition::applyWindBodies() {
         w.height = std::max(hi.y - lo.y, 1e-3f);
         w.radius = std::max(std::max(0.5f * (hi.x - lo.x), 0.5f * (hi.z - lo.z)), 1e-3f);
 
-        // ADR-374: the energy rides the same span as the wind, so it is stamped in the same walk.
+        // ADR-376: the energy rides the same span as the wind, so it is stamped in the same walk.
         Entity::TreeEnergy te;
         {
             auto pk = [](const params::Parameter<float>* p, float fb) { return p != nullptr ? p->value() : fb; };
@@ -3840,7 +3840,7 @@ void Composition::refreshWindBodyAmounts() {
     }
 }
 
-// ADR-373: give a node a wind body, or take it away, from the application.
+// ADR-375: give a node a wind body, or take it away, from the application.
 //
 // Until now `windAuthored` could only be set by hand-editing the scene file, so the wind was
 // tunable from the UI and not CREATABLE from it -- which is the same defect ADR-360 was written
@@ -3892,7 +3892,7 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     // a scene full of rocks does not grow six inert sliders each. Strength 0 is a genuine no-op and
     // is the default, so a node that declares `"wind": {}` still moves nothing until it is turned
     // up -- which is the point: "off" has to be somewhere a user can leave it.
-    // ADR-374: the tree's emissive life. Registered when the node declares either the wind body or
+    // ADR-376: the tree's emissive life. Registered when the node declares either the wind body or
     // the energy, because the two are authored together on the same group and somebody who has
     // given a tree wind is the person who will next want it to glow.
     if (node.energyAuthored || node.windAuthored) {
@@ -4023,7 +4023,7 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
              {"position", "rotation", "scale", "visible", "emissiveBoost", "roughnessScale"}) {
             params_->remove(base + suffix);
         }
-        // ADR-373: the wind body's leaves, by their exact paths. A suffix table and never a prefix
+        // ADR-375: the wind body's leaves, by their exact paths. A suffix table and never a prefix
         // sweep -- ADR-207 is explicit that an exact list is what stops an unregister taking
         // something that happens to share a prefix.
         if (node.windAuthored) {
@@ -7783,7 +7783,7 @@ nlohmann::json Composition::toJson() const {
             n["canopySource"] = node.canopySource;
             n["canopyFrom"] = node.canopyFrom;
         }
-        // ADR-374: the tree's emissive life, written only when declared.
+        // ADR-376: the tree's emissive life, written only when declared.
         if (node.energyAuthored) {
             auto eb = [](const params::Parameter<float>* p, float fallback) {
                 return p != nullptr ? p->base() : fallback;
@@ -8930,7 +8930,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             if (item.contains("canopyFrom") && item.at("canopyFrom").is_number()) {
                 node.canopyFrom = item.at("canopyFrom").get<float>();
             }
-            // ADR-374: the tree's emissive life. Absent is off.
+            // ADR-376: the tree's emissive life. Absent is off.
             if (item.contains("energy") && item.at("energy").is_object()) {
                 const nlohmann::json& ej = item.at("energy");
                 node.energyAuthored = true;

@@ -3,6 +3,7 @@
 #include "params/parameter_set.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/orb_scene.hpp"
+#include "scene/particles.hpp"
 #include "scene/scene.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -207,7 +208,14 @@ TEST_CASE("OrbScene registers all parameters and default routes", "[scene][orb]"
         INFO(path);
         CHECK(params.find(path) != nullptr);
     }
-    CHECK(params.size() == 34); // 11 orb/scene/camera + 23 particles/sparks (ADR-367 added softness)
+    // 11 orb/scene/camera plus one particle system's worth. The particle half is measured rather
+    // than written down, because a literal total here broke three times in one day for parameters
+    // that were correctly added.
+    params::ParameterSet particlesOnly;
+    scene::ParticleSystem sparks;
+    sparks.name = "sparks";
+    scene::registerParticleParameters(particlesOnly, sparks);
+    CHECK(params.size() == 11 + particlesOnly.size());
     CHECK(orb.scale().value() == 1.0f);
     CHECK(orb.scale().softMax(0) == 3.0f);
     CHECK(orb.scale().hardMax(0) == 8.0f);

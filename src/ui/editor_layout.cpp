@@ -45,7 +45,7 @@ constexpr std::array<EditorPanel, 21> kPanels{{
     // "why is my beam not firing" is nearly always "nothing is directing the camera".
     {"World Effects", "World Effects", DockRegion::Right, false,
      "waves propagating through the world: beams, ripples, their styles and what answers the beat"},
-    // ADR-373. Beside World Effects, because the question "why does the sky look like that" is
+    // ADR-375. Beside World Effects, because the question "why does the sky look like that" is
     // asked in the same breath as "why is the beam not firing", and both were answered until now by
     // scrolling the flat Parameters list.
     {"Environment", "Environment", DockRegion::Right, false,

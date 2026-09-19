@@ -233,7 +233,7 @@ struct WindBodySettings {
     float lag = 0.25f;      // seconds the body's whole-mass lean trails the field
 };
 
-// ADR-374: the tree's emissive life, authored on the same GROUP node as the wind body and stamped
+// ADR-376: the tree's emissive life, authored on the same GROUP node as the wind body and stamped
 // onto the same meshes, for the same reason: one body, one frame.
 struct TreeEnergySettings {
     float intensity = 0.0f;
@@ -268,7 +268,7 @@ struct CompositionNode {
     // which is what keeps a scene written before this key existed byte-identical on a re-save.
     WindBodySettings wind;
     bool windAuthored = false;
-    // ADR-374. Authored alongside the wind body; `energyAuthored` keeps "wrote nothing" apart from
+    // ADR-376. Authored alongside the wind body; `energyAuthored` keeps "wrote nothing" apart from
     // "wrote the defaults", which is what keeps a re-save byte-identical.
     TreeEnergySettings energy;
     bool energyAuthored = false;

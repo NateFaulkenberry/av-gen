@@ -156,7 +156,7 @@ struct ObjectUniforms {
                                // w = foliage influence
     windTune: vec4<f32>,       // x = trunk influence, y = leaf flutter, z = response lag (seconds),
                                // w = the previous frame's time, for the velocity target
-    // ADR-374: tree energy and canopy shimmer. Both are emissive modulation keyed on WHERE a point
+    // ADR-376: tree energy and canopy shimmer. Both are emissive modulation keyed on WHERE a point
     // is in the body -- height above the root, distance from the axis -- which is exactly the frame
     // `windOrigin`/`windShape` already establish, so they are reused rather than duplicated. A
     // separate origin for the same tree is two things that can disagree.
@@ -348,7 +348,7 @@ fn hash21(p: vec2<f32>) -> f32 {
     return fract(sin(h) * 43758.5453123);
 }
 
-// ADR-374. Tree energy and canopy shimmer: what the tree does when it is not moving.
+// ADR-376. Tree energy and canopy shimmer: what the tree does when it is not moving.
 //
 // Both are emissive terms, because the brief asks for the tree to "conduct energy" and to "feel
 // alive even when stationary", and neither needs geometry. They share one function because they

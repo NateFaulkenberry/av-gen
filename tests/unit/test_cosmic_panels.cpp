@@ -1,4 +1,4 @@
-// ADR-373: the Environment and Tree panels, and the two ways a bespoke panel lies.
+// ADR-375: the Environment and Tree panels, and the two ways a bespoke panel lies.
 //
 // A hand-written panel asks for parameters by string. If a path is wrong -- a typo, or a rename
 // somewhere else -- the row simply does not draw, and the section degrades to an empty box that

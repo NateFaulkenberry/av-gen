@@ -832,7 +832,26 @@ fn fogCorrection(world: vec3<f32>, pixel: vec2<i32>) -> f32 {
     let dist = length(toParticle);
     if (dist < 1e-5) { return 1.0; }
     let dir = toParticle / dist;
-    let sceneDist = min(textureLoad(linearDepthTex, pixel, 0).x, params.fog2.x);
+    // ADR-372: `linearDepthTex` holds VIEW-SPACE Z, `dist` above is EUCLIDEAN ray distance, and
+    // `fog2.x` (volumeMaxDistance) is the march's euclidean limit. This line compared all three as
+    // though they were one quantity. They agree only on the optical axis: off it, euclidean exceeds
+    // view-Z by 1/cos(theta) -- measured at the default 42 degree vertical FOV on 16:9, **+7.1% at
+    // the top edge, +21.1% at the side, +27.0% in the corner**.
+    //
+    // The consequence was not a small error but a silent switch-off. `max(sceneDist, dist)` below
+    // picks the particle's own distance whenever the surface reads nearer, so understating the
+    // surface by up to 27% made the two transmittances equal and the correction returned 1.0 --
+    // strongest exactly at the frame corners, where a particle in front of distant geometry stayed
+    // over-fogged, which is the defect ADR-040 added this function to remove.
+    //
+    // `softParticleFade` below already solves the same problem the other way (it converts the
+    // particle to view-Z) and its comment names the trap; this function did not get the memo. The
+    // conversion goes to euclidean here rather than to view-Z because `fogTransmittance` marches
+    // along `dir` for a distance, so euclidean is what it wants.
+    let axis = normalize(cross(params.cameraRight.xyz, params.cameraUp.xyz));
+    let cosTheta = max(abs(dot(dir, axis)), 1e-4);
+    let sceneZ = textureLoad(linearDepthTex, pixel, 0).x;
+    let sceneDist = min(sceneZ / cosTheta, params.fog2.x);
     let toParticleT = fogTransmittance(params.cameraPos.xyz, dir, dist);
     let toSurfaceT = fogTransmittance(params.cameraPos.xyz, dir, max(sceneDist, dist));
     return mix(1.0, clamp(toParticleT / max(toSurfaceT, 1e-4), 0.0, 64.0), coupling);

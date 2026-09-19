@@ -367,7 +367,7 @@ struct Entity {
         [[nodiscard]] bool active() const { return strength > 0.0f; }
     };
     WindBody wind;
-    // ADR-374: what the tree does when it is not moving. Shares `wind`'s origin/height/radius --
+    // ADR-376: what the tree does when it is not moving. Shares `wind`'s origin/height/radius --
     // one body, one frame, so the two cannot disagree about where the tree is. Both intensities
     // default to 0, which is the state of every entity in every scene that has not asked.
     struct TreeEnergy {
@@ -608,7 +608,7 @@ struct Environment {
         float breathSpeed = 0.18f;
         float emission = 1.0f;
         float filaments = 0.9f;
-        // ADR-372: the funnel. `funnelDepth` 0 keeps the flat slab the first version was.
+        // ADR-374: the funnel. `funnelDepth` 0 keeps the flat slab the first version was.
         float funnelDepth = 0.0f;   // metres the throat descends
         float throat = 0.25f;       // throat radius as a fraction of the mouth
         float throatDensity = 0.6f; // how much of the wall's density the throat keeps

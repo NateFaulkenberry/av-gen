@@ -571,3 +571,96 @@ the batch launched. The tell was `upd.controller` reading 0.000 ms in one arm an
 other: the composition had not attached at all. A 3× "speed-up" from adding four post passes should
 never have been believable, and the number is recorded here because the next person to see a
 suspiciously good result should check the triangle count before the code.
+
+---
+
+## 7. Phase 0's eight captures — proposed, and mine rather than the owner's
+
+The spec's §3 asks for "the **Phase 0 baseline**: the eight captures §51.2 lists, as committed scene
+arms that regenerate". §51.2's text is **not in this repository** — only the revision, which names
+the deliverable without enumerating it. The first pass of this work therefore declined to invent
+eight and attribute them to the owner. This is the second pass, and the set below is **a proposal
+of mine**. If the original list turns up and disagrees, `tools/make_imagelook_captures.py` is the
+one file to change.
+
+They regenerate rather than being committed as scene files, which is the convention
+`tools/make_mcperf_arms.py` established and the reason it gives: the repository has already decided
+not to carry twenty near-identical scenes, and the recipe is the part worth keeping.
+
+```
+tools/make_imagelook_captures.py          # write them into examples/imagelook/
+tools/make_imagelook_captures.py --list   # the set and what each one pins
+tools/make_imagelook_captures.py --clean  # remove them
+```
+
+Each isolates **one** decision in the chain, so a frame that moves says which stage moved it. They
+are self-contained — procedural geometry, flat background, no external assets — so a missing asset
+cannot be mistaken for a regression.
+
+| arm | pins |
+|---|---|
+| `il-grey-ramp` | the tone curve: ten scene-linear greys from 0.002 to 50 |
+| `il-hue-wheel` | hue through AgX's inset — the measurement `chroma-retention` exists to answer |
+| `il-exposure` | the exposure stage at EV−2, far enough from 1 that the pass is definitely encoded |
+| `il-bloom` | the pyramid's energy: one bright emitter at the shipped threshold |
+| `il-defocus` | the shared gather with depth of field **and** the tilt-shift band on, which is the case that takes the larger circle |
+| `il-wide-tier` | halation and the anamorphic streak, both off by default so nothing else notices them |
+| `il-look` | the ADR-368 cinematic integration, all four controls non-zero |
+| `il-disabled` | **the tripwire** — every optional stage off. See below. |
+
+**Verified, not assumed.** All eight render, and all eight produce **distinct** hashes — a baseline
+whose arms are secretly the same image detects nothing. And the pair that matters is confirmed
+live: `il-look` against `il-disabled` is the same scene with only `post/look/*` differing, and it
+moves **54.5% of pixels, by up to +83 levels**. So the tripwire has something real to guard.
+
+`il-disabled` is the one to care about. Its job is to stay byte-identical across any change that
+claims to be off by default — §60/§87 as a standing check rather than a one-off measurement
+(ADR-368). A change there is either a real regression or a deliberate re-baseline, and there is no
+third case.
+
+**What this set does not cover**, said plainly so nobody reads it as complete: motion blur (it needs
+a moving camera and these arms are deliberately static, because an arm whose framing depends on the
+clock cannot be compared frame to frame), the volumetric march, the path tracer, and anything
+needing real assets. Those are gaps in the proposal, not in the engine.
+
+---
+
+## 8. §68.1 measured against ADR-347's fog, which is the comparison the spec asked for first
+
+The spec says of atmospheric integration: *"measure what atmospheric integration would add on top of
+it before building a second mechanism."* The measurement was owed and is now taken. It is not
+flattering to the feature, which is why it is here rather than in a commit message.
+
+Four arms on one scene (`examples/imagelook/_il-atmos-*`, three lit boxes at 10, 18 and 34 m,
+1280x720, one binary, through `tools/gpu-lock.sh`). Scene fog is `environment.fogDensity = 0.05`
+with a horizon-blue `fogColor`; the post control is `post/look/atmospheric = 0.6`.
+
+| arm | pixels changed vs `none` | worst channel delta |
+|---|---|---|
+| scene fog alone (ADR-347) | **32.1%** | **+109** |
+| post atmospheric alone (§68.1) | 5.6% | +63 |
+| both | 33.0% | +109 |
+| **post atmospheric added on top of scene fog** | **1.56%** | **+3** |
+
+**The last row is the finding.** On a scene that already has ADR-347's fog, turning
+`post/look/atmospheric` up to 0.6 moves 1.6% of pixels by at most three code values. The two
+mechanisms are substantially redundant, and scene fog is by far the stronger and the more physical
+of the two — it is applied per surface at shading time with the sky's own horizon colour, where the
+post control is a depth-driven tint applied to the composed frame.
+
+**Conclusion, stated against my own feature:** `post/look/atmospheric` is **not** the way to get
+aerial perspective in this engine, and a scene that wants haze should use `environment.fogDensity`.
+The post control keeps a narrow justification — it reaches everything composited *after* shading,
+which scene fog structurally cannot, and it needs no volumetric march — but on content that already
+fogs, its marginal contribution is close to nothing. It is off by default and costs nothing when
+off (ADR-368), so it stays; it should not be recommended, and the header comment on
+`ImageLookIntegration` now says so.
+
+**A defect in the first version of this measurement, recorded because the number was wrong in a way
+that looked right.** The first run showed scene fog changing *zero* pixels, which would have been a
+spectacular finding — ADR-347's fog not working at all. It was my probe. The scene generator wrote
+its light as `{"kind": "light"}`, and a light is a top-level `"lights"` entry, not a node kind, so
+the loader said `unknown node kind 'light'`, the boxes were unlit, the frame was near black and
+there was nothing for fog to tint. **The render log said so and the frame did not** — a black frame
+and a nearly-black frame are indistinguishable in a hash, and I would have reported a false defect
+in someone else's subsystem if I had trusted the number over the log.

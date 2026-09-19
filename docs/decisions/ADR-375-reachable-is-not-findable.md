@@ -1,4 +1,4 @@
-# ADR-373: Reachable is not findable
+# ADR-375: Reachable is not findable
 
 - Status: Accepted (2026-09-19)
 - Closes the brief's §16. Extends ADR-011 (parameters), ADR-350 (a setting the application does not

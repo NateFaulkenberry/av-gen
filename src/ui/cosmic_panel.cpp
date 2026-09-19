@@ -1,4 +1,4 @@
-// ADR-373. See cosmic_panel.hpp for why these exist when every control in them was already
+// ADR-375. See cosmic_panel.hpp for why these exist when every control in them was already
 // reachable from the Parameters panel.
 
 #include "ui/cosmic_panel.hpp"
@@ -180,7 +180,7 @@ void drawEnvironmentPanel(app::Engine& engine) {
             colorRow(engine, "scene/vortex/colorAccent", "Accent colour");
             ImGui::EndDisabled();
             // The one number a person needs when this gets expensive, said where they are looking
-            // at the thing that costs it (ADR-372: the vortex is the most expensive term here, and
+            // at the thing that costs it (ADR-374: the vortex is the most expensive term here, and
             // its cost is pixel coverage rather than march length).
             ImGui::TextColored(kMuted, "The vortex is the frame's most expensive term. Density and "
                                        "the quality tier's volume resolution are what to turn down.");
@@ -222,7 +222,7 @@ void drawTreePanel(app::Engine& engine) {
             absent("No node in this scene declares a wind body, so nothing bends in the field "
                    "above.");
         }
-        // ADR-373: creating one, not just tuning one. Until now `windAuthored` could only be set by
+        // ADR-375: creating one, not just tuning one. Until now `windAuthored` could only be set by
         // hand-editing the scene file, so the wind was reachable and not *creatable* -- ADR-360's
         // defect one step earlier in the workflow, and flagged in that ADR's own consequences.
         if (scene::Composition* comp = engine.composition(); comp != nullptr) {

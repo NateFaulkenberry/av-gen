@@ -1,4 +1,4 @@
-# ADR-372: The vortex is a funnel, and the camera has to be outside its mouth
+# ADR-374: The vortex is a funnel, and the camera has to be outside its mouth
 
 - Status: Accepted (2026-09-19)
 - Finishes ADR-371, which shipped the mechanism switched off because it was unfinished.

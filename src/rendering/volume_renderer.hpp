@@ -76,7 +76,7 @@ struct VolumeUniforms {
     glm::vec4 vortexA;
     glm::vec4 vortexB;
     glm::vec4 vortexAccent;
-    glm::vec4 vortex4;     // ADR-372: funnel depth, throat fraction, throat density, 0
+    glm::vec4 vortex4;     // ADR-374: funnel depth, throat fraction, throat density, 0
 };
 static_assert(sizeof(VolumeUniforms) == 256);
 
