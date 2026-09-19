@@ -360,3 +360,54 @@ repository's defining failure mode and is called out by both specs.
   largest; (a) is what the codebase does everywhere else today. **Recommend (a) for this pass** and
   record (c) as the revisit trigger.
 * **A second shadow-casting directional** (§6.1): warn, or raise the shadow-view budget?
+
+---
+
+## 10. What was built against this audit (2026-09-19)
+
+Recorded here rather than left as a plan somebody has to diff against the code.
+
+**The three blockers in §3 are closed.** A light has `position`, `range`, cone angles, temperature,
+tint, extents and shadow controls as registered parameters (20 of 25 fields, up from 7). The Lights
+panel creates, renames, duplicates and deletes. `Engine::saveProject` carries the fifth divergence
+key and its reader runs *before* the parameter load, so the new paths are not dropped as unknown.
+
+**§3.5's rename hazard was solved rather than avoided.** `AuthoredLight::id` is the identity and
+`name` is the label; parameter paths key on the id, so renaming re-points nothing. The id is derived
+from the sanitised name when a file gives none, which is what keeps the 81 shipped projects keyed on
+`lights/celestial-key/...` resolving — measured at 0 unknown-parameter warnings against a control
+project that produces 2.
+
+**§4.4's CPU picking was taken.** `ui::pickProjectedPoint`, screen space, ahead of the GPU readback.
+No new `PickSpace`, no shader touched, and helpers structurally cannot reach a render.
+
+**§5's capability boundary is in the panel**, next to the control it qualifies: a second cascaded
+directional light is warned about at the renderer *and* explained under the Shadows heading.
+
+### Corrections to this audit, found by measuring
+
+* **§2's claim that light serialization was complete was true but incomplete.** Three drift defects
+  sat between the authored list and its serialisation, each of which would have made every project
+  write a `lights` key on every save: a lossy `lightAngles` round trip (~6e-8 per load), the
+  per-frame parameter writeback contaminating the comparison, and a C++-constructed light keeping an
+  un-normalised default direction where a parsed one was normalised.
+* **§3.9's "three unrelated selections" is now two.** `ui::Selection` holds `SelectionRef`s and
+  `nodes()` is a filter over the one storage. The sequencer's remains unconnected.
+* **§9's rename question was decided as (c), not the (a) this audit recommended.** The owner waived
+  backwards compatibility, which removed the only argument for the smaller option.
+
+### Deliberately not shipped
+
+* **Solo (§19 of the panel brief).** It would have made the panel the only writer of a parameter
+  final the Inspector cannot name, which `test_repo_hygiene.cpp` exists to prevent. §19 is
+  conditional on the editor already having a solo concept and this one has none. Restoring it means
+  an `Influence::Kind::Solo` and editor state visible to `influencesOf`.
+* **The Metal hybrid path tracer's acceptance criteria**, struck on the evidence in §7.1. There is
+  one path tracer and it is CPU over Embree.
+
+### Still open
+
+Cameras are not yet `SelectionRef::Kind::Camera` in practice: the type exists and the selection
+carries it, but the Camera panel still holds a private `selectedCamera_` with no observer, and no
+camera is drawn in or picked from the Canvas. That is the remaining half of viewport spec §2-§8 and
+§28-§30, and it is the natural next piece.
