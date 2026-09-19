@@ -59,6 +59,13 @@ struct AppSettings {
     // `canvasRenderScale` is: opening someone else's project must not change how you are watching
     // your own render.
     bool renderFramePreview = false;
+    // ADR-364: while an offline render or a path trace is running, stop drawing the world into the
+    // viewport. On by default, because that is what a person doing a final render wants and the
+    // brief asks for it as a hard requirement -- but reachable in one click, because the opposite
+    // was a shipped, documented feature ("renders load the saved project; the live view keeps
+    // playing") and a person iterating wants it back. Here rather than in the project for the same
+    // reason `canvasRenderScale` is: it is how you work, not what the piece is.
+    bool suspendViewportDuringRender = true;
 
     // ---- output preview (ADR-246) ----
     // The editor-local half of the output preview: which of the three view modes the canvas is in,

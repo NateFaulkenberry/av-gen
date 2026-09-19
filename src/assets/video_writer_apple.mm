@@ -243,6 +243,21 @@ private:
         output[AVVideoCodecKey] = codecType;
         output[AVVideoWidthKey] = @(settings_.width);
         output[AVVideoHeightKey] = @(settings_.height);
+        // ADR-365: say what the pixels mean. Every file this backend has written since ADR-020 has
+        // been untagged, so every player has been guessing -- and the guess is usually BT.709,
+        // which is why it was never noticed and why it is not a picture change to stop guessing.
+        //
+        // BT.709 primaries with the BT.709 transfer and matrix, because that is what the source
+        // actually is: `writeFrame` takes 8-bit RGBA that `shaders/tonemap.wgsl` has already
+        // tone-mapped and sRGB-encoded (ADR-016). The sRGB and BT.709 primaries are identical and
+        // only their transfer curves differ, in the toe; BT.709 is the right tag for a *video*
+        // deliverable and is what every editor expects in a .mov. When an HDR path exists this is
+        // the one place that has to learn BT.2020 and PQ.
+        output[AVVideoColorPropertiesKey] = @{
+            AVVideoColorPrimariesKey : AVVideoColorPrimaries_ITU_R_709_2,
+            AVVideoTransferFunctionKey : AVVideoTransferFunction_ITU_R_709_2,
+            AVVideoYCbCrMatrixKey : AVVideoYCbCrMatrix_ITU_R_709_2,
+        };
         if (!prores) {
             NSMutableDictionary* compression = [NSMutableDictionary dictionary];
             compression[AVVideoAverageBitRateKey] = @(targetBitRate(settings_, hevc));
@@ -696,6 +711,26 @@ Result<VideoInfo> probeVideo(const std::filesystem::path& file) {
         info.height = static_cast<std::uint32_t>(std::llround(size.height));
         info.durationSeconds = CMTimeGetSeconds(track.timeRange.duration);
         info.hasAudio = audio != nil && audio.count > 0;
+
+        // ADR-365: the tags, read from the track's own format description rather than from
+        // anything we remember writing. An untagged file leaves all three empty, which is a real
+        // answer and is what every file this project wrote before that ADR gave.
+        {
+            NSArray* descriptions = track.formatDescriptions;
+            if (descriptions != nil && descriptions.count > 0) {
+                auto desc = (__bridge CMFormatDescriptionRef)descriptions[0];
+                auto readTag = [&](CFStringRef key) -> std::string {
+                    CFTypeRef value = CMFormatDescriptionGetExtension(desc, key);
+                    if (value == nullptr || CFGetTypeID(value) != CFStringGetTypeID()) {
+                        return {};
+                    }
+                    return std::string([(__bridge NSString*)value UTF8String]);
+                };
+                info.colorPrimaries = readTag(kCMFormatDescriptionExtension_ColorPrimaries);
+                info.colorTransfer = readTag(kCMFormatDescriptionExtension_TransferFunction);
+                info.colorMatrix = readTag(kCMFormatDescriptionExtension_YCbCrMatrix);
+            }
+        }
 
         // Exact frame count: a pass-through read of the video samples (no decoding). Buffers without
         // samples are edit-list markers (e.g. the B-frame reorder delay of H.264/HEVC), not frames.

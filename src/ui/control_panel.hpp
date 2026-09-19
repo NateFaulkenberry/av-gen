@@ -160,6 +160,11 @@ public:
     std::string shareStatus;                // describe() + live stats from the host
     std::function<void(const std::string&, const std::string&)> onShare; // kind ("syphon"/"ndi"/"off"), name
     std::function<app::RenderProgress()> renderProgress; // empty when no job is running
+    // ADR-364: the viewport's state during a render, and the evidence that it is real. A
+    // suspension that is switched on and has skipped zero frames is not happening, and the count
+    // is in the panel so a person can see that rather than having to trust it.
+    bool viewportSuspended = false;
+    std::uint64_t viewportFramesSuspended = 0;
 
     // ---- watching the deliverable's own frames (ADR-320) ---------------------------------------
     //
@@ -383,6 +388,7 @@ private:
     // The path-tracing half of the Render panel. Split out only for length; it shares the
     // panel's resolution control, its output path and its Separator rhythm.
     void drawPathTrace();
+    void drawViewportSuspension();
     // Which renderer the Render panel is currently showing. Not a render setting -- it is
     // which set of controls is on screen -- so it lives with the panel and nowhere else.
     int rendererChoice_ = 0;   // 0 = realtime, 1 = path trace

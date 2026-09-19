@@ -401,7 +401,7 @@ state. Revised, with the reason for each move:
 | **4** | **Render-state + viewport suspension** (W5) | The brief's one hard requirement that is genuinely absent. Independent of every renderer question. Needs an owner decision on the *default* (see R3). |
 | **5** | **Extract `FrameRangeDriver` from `RenderJob`** | The actual missing abstraction (W2). Small, testable without a GPU, and it is what makes step 6 possible at all. |
 | **6** | **Path-traced sequences** — a frame range of traces to EXR, then to video | The first genuinely new user-facing capability, and it falls out of step 5. Forces the W4 colour decision. |
-| **7** | **Colour tagging on video output** (W3.4) + the W4 tone-map decision | Small, overdue, and a prerequisite for anything HDR. |
+| **7** | **Colour tagging on video output** (W3.4) — **done, ADR-365** — plus the W4 tone-map decision, which is not | Small, overdue, and a prerequisite for anything HDR. |
 | **8** | **Expose the CLI-only render settings** (G3, G4) | UI PRINCIPLE, and they already exist below the UI. |
 | **9** | **Extract `pathtrace::TraceBackend` from `EmbreeScene`** | Only now, when there is a second backend candidate worth measuring. Doing it earlier is an abstraction with one implementation. |
 | **10** | **Metal RT prototype, outside the tree, to decide** (section 5) | Under `tools/gpu-lock.sh`, minima over repeats, with a control. |
@@ -472,6 +472,8 @@ hand-edited or imported scene JSON bypasses it. Same pattern at `control_panel.c
 | Metal RT capability | `supportsRaytracing: 1`, `MTLGPUFamilyApple9: 0` | standalone `MTLCreateSystemDefaultDevice` probe, 2026-09-19 |
 | Unified memory budget | 55.66 GB recommended working set, 41.75 GB max buffer | same probe |
 | Help sidebar collisions, shipped content, 8 recent topics | 8 without scope, 0 with | `avgen_tests "[help]"` |
+| Viewport frames not drawn during a 400-frame in-app render | 307 with the setting on, 0 (and no log line) with it off | `avgen --render-in-app`, both arms, under the GPU lock |
+| Quit with a render in flight | SIGSEGV 3/3 before, exit 0 3/3 after; reproduces on `main` at `1cdfb84a` | `avgen --render-in-app --frames 60` |
 
 Not measured, and deliberately not: any Embree or renderer timing. Two other agents are running,
 one of them taking performance measurements, and a contended timing is worse than none (ADR-170).
@@ -505,7 +507,28 @@ records and ADR-362 half-fixes.
   `tests/CMakeLists.txt`.
 * **ADR-362** — the Catch2 reporter that could not survive printing the failure it found.
   `tests/support/image_diff.hpp` (new), four test files converted.
+* **ADR-363** (step 3) — the path tracer's settings become settings: `app::PathTraceSettings`
+  under the project's `"pathtrace"` key with a reader, a writer and ADR-350's two tests; its own
+  output path, which was unreachable while a trace was selected; `SaveKind::Exr`; and `--pt-*`
+  options made optional so a project can be the base.
+* **ADR-364** (step 4) — viewport suspension. `src/app/render_state.hpp` (new),
+  `AppSettings::suspendViewportDuringRender` defaulting to on with a Settings control, the count of
+  undrawn frames in the Render panel, and a shutdown segfault on `main` fixed on the way past.
+* **ADR-365** (step 7, brought forward because it is cheap) — W3.4: both video backends now tag
+  BT.709, `VideoInfo` reads the tags back from the track's format description, and the control
+  writes a deliberately untagged file and requires the probe to notice.
 
-Neither touches a renderer. That is deliberate: the brief's own step 3 would have had this branch
-changing the path tracer's internals before anything a person can see had moved.
+### G7, found by ADR-364's control arm and added to this list after the fact
+
+`Application::~Application` carries an explicit, commented destruction order and **`job_` and
+`ptJob_` were not on it**. `unique_ptr` members destroy in reverse declaration order, `job_` is at
+`application.hpp:346` and `context_` at `:394`, so quitting with a render in flight destroyed the
+GPU context and then had `ReadbackRing::~ReadbackRing` wait on a Dawn instance that no longer
+existed. `--render-in-app --frames 60` segfaults every time, **including on a pristine `main` build
+at `1cdfb84a`**, so it is not this branch's. Fixed here: three runs of three exit 0.
+
+This is worth generalising. The brief's error-handling section asks for cancellation to shut the
+renderer, the encoder, the temporary resources and the background jobs down cleanly, and the first
+thing that was actually tried in that area was already broken. **Before any new backend is added,
+its teardown wants the same one-line check**: quit while it is running.
 

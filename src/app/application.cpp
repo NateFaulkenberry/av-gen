@@ -841,6 +841,22 @@ Application::~Application() {
     panel_.reset();
     worldBuilder_.reset();
     jobs_.reset();
+    // The two offline jobs, and they were missing from this list (ADR-364). A `RenderJob` owns a
+    // `gpu::ReadbackRing` whose destructor calls `Context::waitFor` on an outstanding map; a
+    // `unique_ptr` member destroys in reverse declaration order, and `job_` is declared at :346
+    // against `context_` at :394, so the context went FIRST and the ring then waited on a Dawn
+    // instance that no longer existed. Measured: `--render-in-app` plus `--frames n` with n small
+    // enough that the render is still in flight segfaults in
+    // `ReadbackRing::~ReadbackRing -> Context::waitFor -> InstanceBase::APIWaitAny`, with the
+    // report naming a pointer-authentication failure. It reproduces on a pristine `main` build at
+    // 1cdfb84a, so it is not this branch's -- but this is the list whose comment claims to own
+    // destruction order, and the jobs were simply never added to it.
+    //
+    // `ptJob_` is here for the weaker but real version of the same reason: its coordinator thread
+    // is joined by its own destructor, and a thread still running while the engine underneath it
+    // is torn down is a race nobody would find twice.
+    job_.reset();
+    ptJob_.reset();
     imgui_.reset();
     engine_.reset();
     renderer_.reset();
@@ -3797,6 +3813,37 @@ int Application::runLive() {
         engine_->setDetailLimits(liftViewportLimits_ ? scene::DetailLimits::unlimited()
                                                       : scene::DetailLimits{});
 
+        // ADR-364: what the application is doing this frame, and therefore what the viewport is
+        // allowed to cost. Computed here -- before the jobs are stepped -- so that the frame in
+        // which a render *starts* is already suspended, rather than one frame late.
+        const RenderActivity activity = job_             ? RenderActivity::OfflineRaster
+                                        : (ptJob_ && !ptJob_->done()) ? RenderActivity::OfflinePathTrace
+                                                                      : RenderActivity::Interactive;
+        const ViewportPolicy viewportPolicy =
+            viewportPolicyFor(activity, settings_.suspendViewportDuringRender);
+        // Said once on each edge, not per frame. The log is where a scripted arm can see it --
+        // `--render-in-app` is the only way to reach a mid-render state without a person at the
+        // machine, and a feature whose only evidence is a tooltip is a feature no run can check.
+        if (!viewportPolicy.drawWorld != viewportWasSuspended_) {
+            viewportWasSuspended_ = !viewportPolicy.drawWorld;
+            if (viewportWasSuspended_) {
+                log::info("viewport: suspended for the {} (ADR-364)", renderActivityName(activity));
+            } else {
+                log::info("viewport: resumed after {} frame(s) not drawn",
+                          viewportFramesSuspended_ - viewportSuspendedAtStart_);
+                viewportSuspendedAtStart_ = viewportFramesSuspended_;
+            }
+        }
+        if (panel_) {
+            // The panel says which of the two it is doing, and how many frames it has not drawn.
+            // That count is the evidence the feature fired: a suspension that is on and reports
+            // zero skipped frames is a suspension that is not happening, and a person can see it
+            // (ADR-182 -- the arm has to be able to come out the other way, in the product and not
+            // only in a test).
+            panel_->viewportSuspended = !viewportPolicy.drawWorld;
+            panel_->viewportFramesSuspended = viewportFramesSuspended_;
+        }
+
         // `--render-in-app`: the Render button, pressed once, on the first frame that has a
         // window, a project and a panel. Here rather than in `init()` because the job renders
         // between UI frames and there is no frame loop to render between until this one.
@@ -3916,7 +3963,7 @@ int Application::runLive() {
         wgpu::CommandEncoder encoder = context_->device().CreateCommandEncoder();
         // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
         // options; an empty set costs nothing.
-        if (panel_) {
+        if (panel_ && viewportPolicy.drawWorld) {
             core::PhaseProfiler::Scope scope(prof, kPhDebug);
             panel_->composition.stats = &compositor_->stats();
             rendering::DebugViewOptions options = panel_->world.debug;
@@ -3940,7 +3987,14 @@ int Application::runLive() {
         }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                         engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
-        {
+        // ADR-364. `drawUi` is deliberately not consulted here: the interface is drawn
+        // unconditionally a few lines below, and the field exists so that invariant is written down
+        // rather than being true by accident. What this skips is the world -- the scene pass, the
+        // post chain and the debug geometry -- into the same device the render is using.
+        if (!viewportPolicy.drawWorld) {
+            ++viewportFramesSuspended_;
+        }
+        if (viewportPolicy.drawWorld) {
             // The CPU cost of *recording* the frame's commands. Not the GPU's cost of running them:
             // that is gpu::FrameTimeline's, is reported separately, and belongs to the renderer
             // effort rather than to this one.
@@ -3972,7 +4026,9 @@ int Application::runLive() {
         // The frame has published its diagnosis; keep it. Recording after the render and drawing
         // before it means the trail is one frame behind the picture, which is the honest ordering:
         // a trail drawn from a frame that has not been rendered would be a prediction.
-        transformHistory_.record(renderer_->diagnosticFrame());
+        if (viewportPolicy.drawWorld) {
+            transformHistory_.record(renderer_->diagnosticFrame());
+        }
         // Clearing the window is the whole of the main window's present now: the editor draws the
         // frame into its canvas, and the world no longer covers the surface for the panels to be
         // painted over. The clear still has to happen, because ImGui's pass loads rather than

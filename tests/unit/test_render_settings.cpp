@@ -1,6 +1,7 @@
 // Milestone 1.0: render settings (ADR-020) — ranges, frame counts, patterns, JSON.
 
 #include "app/render_settings.hpp"
+#include "app/render_state.hpp"
 
 #include "pathtrace/path_tracer.hpp"
 #include "rendering/render_quality.hpp"
@@ -9,6 +10,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <nlohmann/json.hpp>
+#include <string_view>
 
 using namespace avgen::app;
 using Catch::Matchers::WithinAbs;
@@ -528,5 +530,51 @@ TEST_CASE("The authored settings and the renderer's argument agree", "[render][p
         s.denoise = false;
         s.writeAovs = true;
         CHECK(traceSettingsFrom(s, 64, 64).captureFeatures);
+    }
+}
+
+// ---- the application's render state (ADR-364) -------------------------------------------------
+
+TEST_CASE("The viewport stops drawing the world during an offline render", "[render][viewport][state]") {
+    using avgen::app::RenderActivity;
+    using avgen::app::viewportPolicyFor;
+
+    SECTION("an author at the editor always gets their viewport") {
+        CHECK(viewportPolicyFor(RenderActivity::Interactive, true).drawWorld);
+        CHECK(viewportPolicyFor(RenderActivity::Interactive, false).drawWorld);
+    }
+
+    SECTION("a render suspends it, and a trace does too") {
+        // The trace is CPU-only, so it is tempting to leave the viewport alone during one. It is
+        // still wrong: the tracer takes every core it is given, and the world's per-frame CPU work
+        // is the largest thing competing with it.
+        CHECK_FALSE(viewportPolicyFor(RenderActivity::OfflineRaster, true).drawWorld);
+        CHECK_FALSE(viewportPolicyFor(RenderActivity::OfflinePathTrace, true).drawWorld);
+    }
+
+    SECTION("THE CONTROL: with the setting off, a render changes nothing") {
+        // "The live view keeps playing" is a shipped, documented behaviour and this is the arm that
+        // proves it is still reachable. Without it, a policy that suspended unconditionally would
+        // pass every assertion above.
+        CHECK(viewportPolicyFor(RenderActivity::OfflineRaster, false).drawWorld);
+        CHECK(viewportPolicyFor(RenderActivity::OfflinePathTrace, false).drawWorld);
+    }
+
+    SECTION("the interface is drawn in every case there is") {
+        // Progress and Cancel live in it. A render nobody can stop is a worse failure than a
+        // viewport that costs too much.
+        for (const RenderActivity a : {RenderActivity::Interactive, RenderActivity::OfflineRaster,
+                                       RenderActivity::OfflinePathTrace}) {
+            for (const bool suspend : {false, true}) {
+                INFO(avgen::app::renderActivityName(a) << ", suspend=" << suspend);
+                CHECK(viewportPolicyFor(a, suspend).drawUi);
+            }
+        }
+    }
+
+    SECTION("the state names do not reuse the word ADR-351 spent") {
+        CHECK(std::string_view(avgen::app::renderActivityName(RenderActivity::Interactive)) == "interactive");
+        CHECK(std::string_view(avgen::app::renderActivityName(RenderActivity::OfflineRaster)) == "offline render");
+        CHECK(std::string_view(avgen::app::renderActivityName(RenderActivity::OfflinePathTrace)) == "path trace");
     }
 }

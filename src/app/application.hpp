@@ -17,6 +17,7 @@
 #include "pathtrace/trace_job.hpp"
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
+#include "app/render_state.hpp"
 #include "app/settings.hpp"
 #include "labs/case.hpp"
 #include "ai/control_plane.hpp"
@@ -358,6 +359,12 @@ private:
     PathTraceSettings uiPathTrace_;
     pathtrace::TraceProgress lastPathTrace_;
     RenderSettings uiRender_;                     // the Render window's settings
+    // ADR-364: how many frames the viewport has NOT drawn the world in, over the life of
+    // this process. Shown in the Render panel, because a count that stays at zero while a
+    // render runs is how a person finds out the suspension is not working.
+    std::uint64_t viewportFramesSuspended_ = 0;
+    bool viewportWasSuspended_ = false;
+    std::uint64_t viewportSuspendedAtStart_ = 0;
     // ADR-186's limits, lifted in the viewport as well as in a render. A working default of false
     // because lifting them costs real frame time on a wide shot -- which is the whole reason live
     // playback has them -- but the editor showing a different world from the deliverable is a

@@ -2924,6 +2924,7 @@ void ControlPanel::drawPathTrace() {
                         "would be an interpolation rather than a measurement.");
             }
         }
+        drawViewportSuspension();
         if (ImGui::Button("Cancel") && onCancelPathTrace) {
             onCancelPathTrace();
         }
@@ -2944,6 +2945,23 @@ void ControlPanel::drawPathTrace() {
         } else if (p.state == pathtrace::TraceJobState::Failed) {
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "failed: %s",
                                p.error.empty() ? "unknown" : p.error.c_str());
+        }
+    }
+}
+
+// ADR-364. Drawn under both renderers' progress lines, because a trace suspends the viewport too.
+void ControlPanel::drawViewportSuspension() {
+    if (viewportSuspended) {
+        ImGui::TextColored(ImVec4(0.72f, 0.80f, 0.95f, 1.0f),
+                           "viewport suspended -- %llu frames not drawn",
+                           static_cast<unsigned long long>(viewportFramesSuspended));
+        if (ImGui::IsItemHovered()) {
+            tooltip("The world is not being drawn into the canvas while this runs, so the render\n"
+                    "gets the machine. What you are looking at is the last frame before it\n"
+                    "started, not a live view.\n\n"
+                    "The count is here so you can tell the difference between a suspension that\n"
+                    "is working and one that is only switched on. Turn it off in Settings if you\n"
+                    "would rather keep working while a render goes.");
         }
     }
 }
@@ -3173,6 +3191,7 @@ void ControlPanel::drawRender(app::Engine& engine) {
                               "goes on; early frames are slower because shaders are still\n"
                               "compiling and assets are still uploading.");
         }
+        drawViewportSuspension();
         if (ImGui::Button("Cancel") && onCancelRender) {
             onCancelRender();
         }
