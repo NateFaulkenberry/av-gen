@@ -73,7 +73,10 @@ VolumeRenderer::VolumeRenderer(gpu::Context& context, gpu::ShaderLibrary& shader
 VolumeRenderer::~VolumeRenderer() = default;
 
 bool VolumeRenderer::enabled(const scene::Environment& environment) {
-    return environment.volumeDensity > 0.0f;
+    // ADR-371: the vortex lives in this march, so it has to be able to switch the march on. The
+    // Tree of Life scene runs with volumeDensity 0 -- it wants no fog at all -- and gating the
+    // vortex behind the fog's density would have made it unreachable in the one scene it is for.
+    return environment.volumeDensity > 0.0f || environment.vortex.active();
 }
 
 const gpu::RenderTarget& VolumeRenderer::target() const {
@@ -358,6 +361,31 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     const std::uint32_t glowSystems = std::min(particleGlowSystems, kMaxParticleGlowSystems);
     u.glow = glm::vec4(static_cast<float>(glowSystems),
                        std::max(scene.environment.volumeLocalLights, 0.0f), 0.0f, 0.0f);
+    // ADR-371: the vortex. Written as all-zero when the radius is zero, which is the state of
+    // every scene that has not asked for one, so the march's added branch is never taken.
+    {
+        const scene::Environment::Vortex& v = scene.environment.vortex;
+        if (v.active()) {
+            u.vortex0 = glm::vec4(v.center, v.radius);
+            u.vortex1 = glm::vec4(std::max(v.thickness, 0.01f), v.swirl, v.rotationSpeed,
+                                  std::max(v.density, 0.0f));
+            u.vortex2 = glm::vec4(std::clamp(v.innerVoid, 0.0f, 0.95f), std::max(v.contrast, 0.05f),
+                                  std::clamp(v.turbulence, 0.0f, 1.0f), std::max(v.turbulenceScale, 1e-3f));
+            u.vortex3 = glm::vec4(std::max(v.breathAmount, 0.0f), v.breathSpeed,
+                                  std::max(v.emission, 0.0f), std::max(v.filaments, 0.0f));
+            u.vortexA = glm::vec4(v.colorDeep, 0.0f);
+            u.vortexB = glm::vec4(v.colorMid, 0.0f);
+            u.vortexAccent = glm::vec4(v.colorAccent, 0.0f);
+        } else {
+            u.vortex0 = glm::vec4(0.0f);
+            u.vortex1 = glm::vec4(0.0f);
+            u.vortex2 = glm::vec4(0.0f);
+            u.vortex3 = glm::vec4(0.0f);
+            u.vortexA = glm::vec4(0.0f);
+            u.vortexB = glm::vec4(0.0f);
+            u.vortexAccent = glm::vec4(0.0f);
+        }
+    }
     im.context.queue().WriteBuffer(im.uniforms, 0, &u, sizeof(u));
 
     im.activeThisFrame = true;

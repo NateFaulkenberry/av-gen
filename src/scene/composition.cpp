@@ -51,7 +51,8 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "shadowRange", "volumeSteps", "volumeDensityField", "volumeColorField", "sky"};
+    "shadowCascades", "shadowRange", "volumeSteps", "volumeDensityField", "volumeColorField", "sky",
+    "vortex"};
 constexpr std::string_view kSkyKeys[] = {
     "enabled", "background", "useKeyLight", "zenithColor", "horizonColor", "groundColor",
     "sunColor", "sunDirection", "haze", "sunIntensity", "sunSize", "sunGlow", "intensity"};
@@ -3341,6 +3342,27 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // on shipped. Both halves are parameters now. Speed 0 is still a genuine no-op, and so is
     // enabled false, which is the default for every scene that does not say otherwise, so
     // registering these moves no existing picture.
+    // ADR-371: the cosmic vortex. Registered always, so a scene that has not switched one on can
+    // still be given one from the UI -- the reachability lesson of ADR-360, applied the first time
+    // instead of the second. Radius 0 is off and is the default.
+    {
+        const scene::Environment::Vortex& vx = volumeSetting_.vortex;
+        const std::string b = prefix_ + "scene/vortex/";
+        vortexRadius_ = &params.add(floatDesc(b + "radius", vx.radius, 0.0f, 20000.0f, 0.0f, 1500.0f));
+        vortexDensity_ = &params.add(floatDesc(b + "density", vx.density, 0.0f, 8.0f, 0.0f, 2.0f));
+        vortexEmission_ = &params.add(floatDesc(b + "emission", vx.emission, 0.0f, 20.0f, 0.0f, 4.0f));
+        vortexSwirl_ = &params.add(floatDesc(b + "swirl", vx.swirl, -32.0f, 32.0f, -8.0f, 8.0f));
+        vortexRotation_ = &params.add(floatDesc(b + "rotationSpeed", vx.rotationSpeed, -4.0f, 4.0f, -0.4f, 0.4f));
+        vortexTurbulence_ = &params.add(floatDesc(b + "turbulence", vx.turbulence, 0.0f, 1.0f, 0.0f, 1.0f));
+        vortexInnerVoid_ = &params.add(floatDesc(b + "innerVoid", vx.innerVoid, 0.0f, 0.95f, 0.0f, 0.6f));
+        vortexContrast_ = &params.add(floatDesc(b + "contrast", vx.contrast, 0.05f, 12.0f, 0.5f, 5.0f));
+        vortexBreath_ = &params.add(floatDesc(b + "breathAmount", vx.breathAmount, 0.0f, 1.0f, 0.0f, 0.3f));
+        vortexThickness_ = &params.add(floatDesc(b + "thickness", vx.thickness, 0.1f, 5000.0f, 5.0f, 600.0f));
+        vortexFilaments_ = &params.add(floatDesc(b + "filaments", vx.filaments, 0.0f, 4.0f, 0.0f, 2.0f));
+        vortexColorDeep_ = &params.add(vec3Desc(b + "colorDeep", vx.colorDeep, 0.0f, 4.0f, 0.0f, 1.0f));
+        vortexColorMid_ = &params.add(vec3Desc(b + "colorMid", vx.colorMid, 0.0f, 4.0f, 0.0f, 1.0f));
+        vortexColorAccent_ = &params.add(vec3Desc(b + "colorAccent", vx.colorAccent, 0.0f, 8.0f, 0.0f, 2.0f));
+    }
     windEnabled_ = &params.add(boolDesc(prefix_ + "scene/wind/enabled", windSetting_.enabled));
     windSpeed_ = &params.add(floatDesc(prefix_ + "scene/windSpeed", windSetting_.speed, 0.0f, 4.0f, 0.0f, 1.5f));
     windDirection_ = &params.add(
@@ -4049,6 +4071,11 @@ void Composition::detach() {
     volumeDensity_ = nullptr;
     fogHeight_ = nullptr;
     fogHeightFalloff_ = nullptr;
+    vortexRadius_ = nullptr; vortexDensity_ = nullptr; vortexEmission_ = nullptr;
+    vortexSwirl_ = nullptr; vortexRotation_ = nullptr; vortexTurbulence_ = nullptr;
+    vortexInnerVoid_ = nullptr; vortexContrast_ = nullptr; vortexBreath_ = nullptr;
+    vortexThickness_ = nullptr; vortexFilaments_ = nullptr;
+    vortexColorDeep_ = nullptr; vortexColorMid_ = nullptr; vortexColorAccent_ = nullptr;
     windEnabled_ = nullptr;
     windSpeed_ = nullptr;
     windDirection_ = nullptr;
@@ -6571,6 +6598,23 @@ void Composition::applyParameters() {
         // ADR-360: every field of the wind is a live parameter now, not just two, so the whole
         // field can be turned up, down, off, gustier or calmer from the UI, keyed on the timeline
         // and driven by audio (`music.build -> scene/windSpeed` is the intended idiom).
+        // ADR-371: the vortex travels with the rest of the atmosphere. Copied rather than picked
+        // for now: the parameters below are the live half.
+        env.vortex = volumeSetting_.vortex;
+        env.vortex.radius = pick(vortexRadius_, volumeSetting_.vortex.radius);
+        env.vortex.density = pick(vortexDensity_, volumeSetting_.vortex.density);
+        env.vortex.emission = pick(vortexEmission_, volumeSetting_.vortex.emission);
+        env.vortex.swirl = pick(vortexSwirl_, volumeSetting_.vortex.swirl);
+        env.vortex.rotationSpeed = pick(vortexRotation_, volumeSetting_.vortex.rotationSpeed);
+        env.vortex.turbulence = pick(vortexTurbulence_, volumeSetting_.vortex.turbulence);
+        env.vortex.innerVoid = pick(vortexInnerVoid_, volumeSetting_.vortex.innerVoid);
+        env.vortex.contrast = pick(vortexContrast_, volumeSetting_.vortex.contrast);
+        env.vortex.breathAmount = pick(vortexBreath_, volumeSetting_.vortex.breathAmount);
+        env.vortex.thickness = pick(vortexThickness_, volumeSetting_.vortex.thickness);
+        env.vortex.filaments = pick(vortexFilaments_, volumeSetting_.vortex.filaments);
+        if (vortexColorDeep_ != nullptr) { env.vortex.colorDeep = vortexColorDeep_->value(); }
+        if (vortexColorMid_ != nullptr) { env.vortex.colorMid = vortexColorMid_->value(); }
+        if (vortexColorAccent_ != nullptr) { env.vortex.colorAccent = vortexColorAccent_->value(); }
         env.wind = windSetting_;
         env.wind.enabled = windEnabled_ != nullptr ? windEnabled_->value() : windSetting_.enabled;
         env.wind.speed = pick(windSpeed_, windSetting_.speed);
@@ -8324,6 +8368,40 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return std::unexpected(value.error());
                 }
                 *fk.target = *value;
+            }
+            // ADR-371: the cosmic vortex. Absent is off, which is every scene but the one this
+            // was written for.
+            if (e.contains("vortex") && e.at("vortex").is_object()) {
+                const nlohmann::json& vj = e.at("vortex");
+                scene::Environment::Vortex& vx = v.vortex;
+                auto f = [&vj](const char* key, float& out) {
+                    if (vj.contains(key) && vj.at(key).is_number()) {
+                        out = vj.at(key).get<float>();
+                    }
+                };
+                auto c3 = [&vj](const char* key, glm::vec3& out) {
+                    if (vj.contains(key) && vj.at(key).is_array() && vj.at(key).size() == 3) {
+                        out = glm::vec3(vj.at(key)[0].get<float>(), vj.at(key)[1].get<float>(),
+                                        vj.at(key)[2].get<float>());
+                    }
+                };
+                c3("center", vx.center);
+                f("radius", vx.radius);
+                f("thickness", vx.thickness);
+                f("swirl", vx.swirl);
+                f("rotationSpeed", vx.rotationSpeed);
+                f("density", vx.density);
+                f("innerVoid", vx.innerVoid);
+                f("contrast", vx.contrast);
+                f("turbulence", vx.turbulence);
+                f("turbulenceScale", vx.turbulenceScale);
+                f("breathAmount", vx.breathAmount);
+                f("breathSpeed", vx.breathSpeed);
+                f("emission", vx.emission);
+                f("filaments", vx.filaments);
+                c3("colorDeep", vx.colorDeep);
+                c3("colorMid", vx.colorMid);
+                c3("colorAccent", vx.colorAccent);
             }
             if (e.contains("shadowCascades")) {
                 if (!e["shadowCascades"].is_number_unsigned()) {

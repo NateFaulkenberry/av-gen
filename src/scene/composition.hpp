@@ -1229,6 +1229,21 @@ private:
     // UI nor a save, so `scene/windSpeed` could be dragged to its maximum and do nothing. The two
     // original paths keep their spelling (`scene/windSpeed`, `scene/windDirection`): renaming them
     // to `scene/wind/*` would orphan the value in every project that already has one.
+    // ADR-371: the cosmic vortex.
+    params::Parameter<float>* vortexRadius_ = nullptr;
+    params::Parameter<float>* vortexDensity_ = nullptr;
+    params::Parameter<float>* vortexEmission_ = nullptr;
+    params::Parameter<float>* vortexSwirl_ = nullptr;
+    params::Parameter<float>* vortexRotation_ = nullptr;
+    params::Parameter<float>* vortexTurbulence_ = nullptr;
+    params::Parameter<float>* vortexInnerVoid_ = nullptr;
+    params::Parameter<float>* vortexContrast_ = nullptr;
+    params::Parameter<float>* vortexBreath_ = nullptr;
+    params::Parameter<float>* vortexThickness_ = nullptr;
+    params::Parameter<float>* vortexFilaments_ = nullptr;
+    params::Parameter<glm::vec3>* vortexColorDeep_ = nullptr;
+    params::Parameter<glm::vec3>* vortexColorMid_ = nullptr;
+    params::Parameter<glm::vec3>* vortexColorAccent_ = nullptr;
     params::Parameter<bool>* windEnabled_ = nullptr;
     params::Parameter<float>* windSpeed_ = nullptr;
     params::Parameter<float>* windDirection_ = nullptr;

@@ -572,6 +572,30 @@ struct Environment {
     float volumeEmission = 0.0f;
     int volumeSteps = 32;                  // raymarch samples per pixel
     float volumeMaxDistance = 200.0f;
+    // ADR-371: the cosmic vortex, a world-space density and emission term inside the volumetric
+    // march. `vortexRadius` 0 is off and is the default, and it is the single gate: every shader
+    // function returns before doing any work when it is zero.
+    struct Vortex {
+        glm::vec3 center{0.0f};   // world space; the scene anchors it under the island
+        float radius = 0.0f;      // metres, 0 = off
+        float thickness = 120.0f; // vertical half-extent of the disc, metres
+        float swirl = 3.2f;       // radians of shear per unit radius
+        float rotationSpeed = 0.035f; // radians per second, macro
+        float density = 0.45f;
+        float innerVoid = 0.18f;  // fraction of the radius that is dark centre
+        float contrast = 1.9f;    // exponent; higher is more filament, less wash
+        float turbulence = 0.6f;
+        float turbulenceScale = 2.1f;
+        float breathAmount = 0.05f;
+        float breathSpeed = 0.18f;
+        float emission = 1.0f;
+        float filaments = 0.9f;
+        glm::vec3 colorDeep{0.020f, 0.016f, 0.075f};
+        glm::vec3 colorMid{0.050f, 0.085f, 0.230f};
+        glm::vec3 colorAccent{0.090f, 0.320f, 0.420f};
+        [[nodiscard]] bool active() const { return radius > 0.0f; }
+    };
+    Vortex vortex;
     std::string volumeDensityField;        // scalar field name ("" = none)
     std::string volumeColorField;          // colour field name ("" = fogColor)
     // ADR-055: what the air is doing over this world. It sits on the environment because it is a

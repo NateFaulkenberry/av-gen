@@ -68,8 +68,16 @@ struct VolumeUniforms {
     glm::vec4 depthParams; // camera near, camera far, 0, 0
     glm::vec4 fogColor;    // rgb, w = 0
     glm::vec4 glow;        // x = particle glow systems (ADR-040), yzw = 0
+    // ADR-371: the cosmic vortex. vortex0.w (the radius) at 0 is the gate.
+    glm::vec4 vortex0;     // centre xyz, radius
+    glm::vec4 vortex1;     // thickness, swirl, rotationSpeed, density
+    glm::vec4 vortex2;     // innerVoid, contrast, turbulence, turbulenceScale
+    glm::vec4 vortex3;     // breathAmount, breathSpeed, emission, filaments
+    glm::vec4 vortexA;
+    glm::vec4 vortexB;
+    glm::vec4 vortexAccent;
 };
-static_assert(sizeof(VolumeUniforms) == 128);
+static_assert(sizeof(VolumeUniforms) == 240);
 
 class VolumeRenderer {
 public:
