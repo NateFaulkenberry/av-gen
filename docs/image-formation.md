@@ -7,6 +7,13 @@ selective post and tone mapping), ADR-016 (post-processing). Research:
 This is the path from what the renderer shaded to what a viewer sees. Everything before the tone
 map is scene-linear HDR; everything after it is display-encoded sRGB.
 
+The full colour-space map -- every boundary named, with the file and line that decides it -- is
+`docs/image-look-audit.md` 2. Three things from it are worth having here. Primaries are Rec.709
+throughout and are nowhere declared. The sRGB OETF is applied **exactly once**, in `linearToSrgb`:
+no render target in this engine is an `*Srgb` format, so there is no hardware encode to double it.
+And **vignette and grain are applied in display-linear, after the curve and before the OETF**, which
+is why grain reads coarser in the highlights than in the shadows.
+
 ## The order
 
 The order is fixed. It is not a matter of taste: each stage assumes the ones before it have already
@@ -19,22 +26,51 @@ volumetric atmosphere                    rendering::VolumeRenderer (ADR-032)
 user post layers                         shaders::LayerStage::Post
 --- rendering::PostProcessor, shaders/post.wgsl -----------------------------------
  1. metering            fs_meter_prefilter, fs_meter_reduce   (automatic exposure only)
- 2. exposure            fs_exposure                           (skipped when the scale is 1)
- 3. depth of field      fs_dof                                (needs undistorted depth)
+ 2. exposure            fs_exposure     (skipped when the scale is within 1e-3 of 1 -- a
+                        deadband, not an equality: a settling automatic exposure would
+                        otherwise encode a full-resolution pass forever to multiply by
+                        1.0000001)
+ 2b. atmospheric        fs_look_atmos   (Image/Look 68.1; NOT encoded unless
+                        post/look/atmospheric is non-zero. Here because it reads depth)
+ 3. defocus             fs_dof          depth of field AND the ADR-079 tilt-shift band, in
+                        one shared gather -- they differ only in how the circle of
+                        confusion is decided and the shader takes the larger of the two,
+                        so this runs when EITHER is on. Needs undistorted depth
  4. motion blur         fs_velocity_tile_max, fs_velocity_neighbour_max, fs_motion_blur
                         (reads the ADR-035 velocity target and undistorted depth)
  5. lens                fs_lens        distortion, chromatic aberration
  6. bloom               fs_prefilter, fs_downsample, fs_upsample
  7. halation/anamorphic fs_halation_prefilter, ..., fs_wide
- 8. composite           fs_composite   bloom + wide tier mixed in, then the colour grade
- 9. sharpen             fs_sharpen
+ 8. composite           fs_composite   bloom + wide tier mixed in, then the colour grade.
+                        ALWAYS RUNS -- it is what carries the grade
+ 8b. colour / local contrast / light wrap
+                        fs_downsample, fs_look_blur x2, fs_look   (Image/Look 68.2-68.4;
+                        NOT encoded unless one of those three amounts is non-zero)
+ 9. antialias           fs_fxaa        (ADR-059) before sharpening, because sharpening an
+                        aliased edge fixes the contrast and keeps the stair step
+10. sharpen             fs_sharpen
 --- shaders/tonemap.wgsl ------------------------------------------------------------
-10. tone map            AgX by default; ACES, Reinhard, PBR Neutral, clamp
-11. output              vignette, film grain, sRGB encode
+11. tone map            AgX by default; ACES, Reinhard, PBR Neutral, clamp
+12. output              vignette, film grain, sRGB encode
 ```
+
+The FXAA row was missing from this table until 2026-09-19. It had been in the chain since ADR-059
+and in `post_processor.hpp`'s own header comment; only this document omitted it. That is the drift
+`docs/image-look-audit.md` 1.1 exists to catch, and it is not cosmetic -- FXAA is a spatial filter
+on scene-linear HDR immediately before the tone curve, so anything added near the end of the chain
+has to decide which side of it to sit on.
 
 Passes that are not needed are not encoded: with everything off and a unit exposure scale, the
 chain is one pass (the composite, which always runs because it carries the grade).
+
+That one pass is **not** the identity, and it is worth being exact because a disabled-path guarantee
+gets quoted. At default grade settings `fs_composite` still evaluates `pow(x, 1.0)` twice -- the
+log-space contrast and the gamma -- which lowers to `exp2(log2(x))` and is off by an ulp or two; it
+clamps every channel up to `1e-5`, so a true black pixel does not leave the composite black; and its
+divide and multiply by 0.18 do not cancel in binary floating point. `post_processor.hpp`'s summary,
+"the input is returned unchanged", overstates this. A feature that must not change the image
+therefore has to prove it **differentially** -- against the same build without the feature -- rather
+than against the scene HDR, which is a comparison that could never pass. See ADR-366.
 
 Two notes on where the boundaries fall:
 
@@ -286,12 +322,18 @@ Three effects can be masked by the auxiliary targets:
 | halation | warm highlights above a threshold | `post/halation/warmth`, `post/halation/threshold` |
 | sharpen | identifier target | `post/output/sharpenId` (0 = the whole image) |
 
-The halation mask is derived from the colour itself and works today. The other two need
-`PostFrameInputs::emission` and `PostFrameInputs::identifier`, which the renderer does not fill in
-yet (ADR-035 is a separate piece of work). Until it does, the post chain binds 1x1 placeholders,
-tells the shader the target is absent, and every effect behaves exactly as it would without a mask.
-Nothing needs to change in this file when the targets arrive: set the two views on
-`PostFrameInputs` and the flags follow.
+The halation mask is derived from the colour itself and works today. **The emission mask works
+today too**: `SceneRenderer` fills `PostFrameInputs::emission` (`src/rendering/scene_renderer.cpp`,
+in the post-chain block), so `post/bloom/emissionWeight` does what it says. It did not until that
+line was added -- the target had always been written, the debug view read it, and it was never
+handed to the post chain, so the parameter resolved, ran and changed nothing.
+
+`PostFrameInputs::identifier` is **still** unfilled: nothing in the renderer assigns it. So
+`post/output/sharpenId` is a registered, round-tripping parameter whose shader path exists and is
+tested, and which cannot affect any frame a user renders -- built, but unreachable. It is one line
+in the renderer away. Until then the post chain binds a 1x1 placeholder, tells the shader the target
+is absent, and sharpening behaves exactly as it would without a mask. Nothing needs to change in
+this file when it arrives: set the view on `PostFrameInputs` and the flag follows.
 
 ## Restraint
 
@@ -325,7 +367,8 @@ follow:
 | the passes themselves | `shaders/post.wgsl` |
 | tone map, vignette, grain, sRGB encode | `shaders/tonemap.wgsl` |
 | lens/focus/exposure applied to the live camera each frame | `src/app/engine.cpp` (`Engine::update`) |
-| tests | `tests/unit/test_camera.cpp`, `tests/rendering/test_image_formation_gpu.cpp`, `tests/rendering/test_hdr_lab_gpu.cpp` |
+| the cinematic integration (Image/Look 68) | `scene::ImageLookIntegration` in `src/scene/post_settings.{hpp,cpp}`; `fs_look_atmos`, `fs_look_blur`, `fs_look` in `shaders/post.wgsl` |
+| tests | `tests/unit/test_camera.cpp`, `tests/rendering/test_image_formation_gpu.cpp`, `tests/rendering/test_hdr_lab_gpu.cpp`, `tests/rendering/test_image_look_gpu.cpp` |
 | the chain measured stage by stage, and the fixture that calibrates it | [`docs/hdr-lab/README.md`](hdr-lab/README.md) |
 | every intermediate the chain rendered, from the command line | `--post-stages <dir>` (ADR-277) |
 | measured cost | `docs/performance/image-formation.md` |

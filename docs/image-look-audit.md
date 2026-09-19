@@ -382,3 +382,43 @@ the kind of thing that is invisible until a compositor's motion vectors are wron
 channel and read by nothing, and `AlbedoProbeReport::format()` — the per-material table ADR-352
 describes — is called only from tests, so a command-line `--pt-probe` run emits only a one-line
 `log::warn` summary. The ADR's per-material breakdown is unreachable from the CLI.
+
+---
+
+## 5. §60/§87 — with integration at zero, the image is unchanged
+
+The milestone. It is proved twice, because the in-process proof and the end-to-end proof fail in
+different ways and neither subsumes the other.
+
+**First, what the claim can mean.** §1.4 established that the chain was never bit-identical to its
+own input: the composite always runs and is not the identity at default grade settings. So
+"unchanged" is necessarily a **differential** claim — identical to *the same build with the feature
+absent* — and anything comparing against `in.sceneHdr` would be a probe that cannot pass.
+
+### 5.1 Was some of §68.1 already in the frame?
+
+The spec asks this before any atmospheric code is written, and the answer is **yes, and the new
+control is deliberately not the same mechanism.** ADR-347 gives the scene real fog that takes its
+colour from the sky's own horizon, at a density it also corrected downward by 15×. That is aerial
+perspective, done properly, at shading time.
+
+What it structurally cannot reach is **everything composited after shading** — volumetrics, user
+post layers, the bloom and wide tiers. `post/look/atmospheric` operates on the composed frame from
+depth, which is the gap, and it is documented in `ImageLookIntegration` as not being a second fog so
+that the next person does not turn both on and wonder why the distance went flat. **An author
+wanting physical haze should still use ADR-347's fog; this is the image-side control.**
+
+### 5.2 The in-process proof
+
+`tests/rendering/test_image_look_gpu.cpp`, hashing the pre-tonemap float buffer
+(`renderToImageFloat` → `hdrOutput_`) with `gpu::hashImage`, over float bit patterns.
+
+Arms and results are tabulated in ADR-366. In summary: the zero arm is stable across repeats; the
+two *shape* parameters moved off their defaults while the amounts are zero do **not** move it; each
+of the four amounts on its own **does**; no two move it the same way; and it returns to the original
+value after all of them, which is the arm that would catch a dependence on transient-pool
+allocation order.
+
+### 5.3 The end-to-end proof
+
+<!-- MEASUREMENT -->
