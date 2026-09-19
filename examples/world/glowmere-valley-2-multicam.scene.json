@@ -8080,7 +8080,7 @@
               {
                 "kind": "interest",
                 "name": "graze",
-                "weight": 0.62,
+                "weight": 0.95,
                 "source": "perceived",
                 "weights": {
                   "character": 1.8,
@@ -8093,8 +8093,8 @@
                 "approach": 6.0,
                 "dwell": 6.0,
                 "minRange": 10.0,
-                "maxRange": 48.0,
-                "homeRadius": 34.0,
+                "maxRange": 70.0,
+                "homeRadius": 50.0,
                 "noveltyRadius": 14.0,
                 "noveltyPenalty": 0.3
               },
@@ -9867,8 +9867,8 @@
           6.0,
           46.0
         ],
-        "fov": 52.0,
-        "focalLength": 24.0,
+        "fov": 44.0,
+        "focalLength": 30.0,
         "autoDirector": false
       },
       {
