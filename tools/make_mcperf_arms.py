@@ -115,6 +115,31 @@ def main() -> None:
             node["scatter"] = old_scatter
     write("oldtrees", json.loads(json.dumps(head_project)), json.dumps(scene, indent=2).encode())
 
+    # treelod: HEAD with the distance gates the port flattened, put back.
+    #
+    # `570e41c2` copied valley 3's eight-layer table in wholesale, and one of the eight was a layer
+    # this film already had: `deadwood` arrived carrying viewDistance 520 / minScreenRadius 1.0 over
+    # the 380 / 1.6 it had been authored with. That was not a decision, it was what came with the
+    # table. The four SECONDARY species -- the rungs ADR-344 gave the canopy *between* the tree line
+    # and the floor, 5.4 to 7.1 m tall -- get the same treatment, because at 400 m a 5.4 m tree is
+    # silhouette the three primary layers are already drawing. `canopy`, `twisted` and `pine-upper`
+    # keep 520 / 1.0: they are the skyline the owner asked for.
+    scene = json.loads(head_scene)
+    gates = {
+        "deadwood": (380.0, 1.6),
+        "deadwood-rim": (380.0, 1.6),
+        "canopy-broad": (420.0, 1.6),
+        "twisted-low": (420.0, 1.6),
+        "pine-rim": (420.0, 1.6),
+    }
+    for node in scene["nodes"]:
+        if node.get("kind") != "terrain":
+            continue
+        for layer in node["scatter"]:
+            if layer["name"] in gates:
+                layer["viewDistance"], layer["minScreenRadius"] = gates[layer["name"]]
+    write("treelod", json.loads(json.dumps(head_project)), json.dumps(scene, indent=2).encode())
+
     # nobake: HEAD with everything `releaseDirectedCamera` erases, erased.
     project = json.loads(json.dumps(head_project))
     project.pop("cameraAimFollow", None)
