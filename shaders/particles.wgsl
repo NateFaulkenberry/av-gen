@@ -89,6 +89,18 @@ struct Params {
     trail2: vec4<f32>,      // tail alpha fraction, tail tint rgb
     fog: vec4<f32>,         // volume density, fog height, height falloff, absorption
     fog2: vec4<f32>,        // volume max distance, fog coupling 0..1, glow strength, linear depth 1/0
+    // ADR-370: leaf cards. x = shape (0 round, 1 leaf), y = tumble rate (rad/s), z = leaf aspect
+    // (length over width), w = two-sided shading depth. All zero is the round dot this always was.
+    leaf: vec4<f32>,
+    // ADR-370: the ADR-055 wind field, copied into the particle uniforms rather than reached
+    // through the frame group. `particles.wgsl` binds no frame uniform at all -- it never has --
+    // and adding one would change the bind-group layout of every particle pipeline for four
+    // vectors. Same bytes, same meaning, same `windSampleAt` arithmetic, no layout churn.
+    windDir: vec4<f32>,
+    windRegion: vec4<f32>,
+    windGust: vec4<f32>,
+    windTurb: vec4<f32>,
+    windMix: vec4<f32>, // x = how much of the flow a particle catches, yzw = 0
     curves: vec4<u32>,      // size key count, colour key count, opacity key count, glow slot
     counts: vec4<u32>,      // emitCount, capacity, blend (0 additive, 1 alpha), scan blocks
     fieldInfo: vec4<u32>,   // x = field force count, y = spline slot + 1 (0 = none)
@@ -175,6 +187,40 @@ fn turbValueNoise(p: vec3<f32>) -> f32 {
 // Three decorrelated potentials; curl of the potential field is divergence-free (Bridson 2007).
 fn potential(p: vec3<f32>) -> vec3<f32> {
     return vec3<f32>(turbValueNoise(p), turbValueNoise(p + vec3<f32>(31.4, 47.1, 12.9)), turbValueNoise(p + vec3<f32>(-17.2, 5.3, 29.8))) - vec3<f32>(0.5);
+}
+
+// ADR-370: ADR-055's field sampler, reading the particle uniforms instead of the frame block. The
+// expressions are `shaders/wind.wgsl`'s, term for term and in the same order, because the whole
+// value of that field is that every consumer agrees about what the air is doing at a point.
+struct ParticleWind {
+    direction: vec2<f32>,
+    strength: f32,
+    gust: f32,
+};
+
+fn particleWindAt(pos: vec3<f32>, t: f32) -> ParticleWind {
+    let d = params.windDir.xy;
+    let perp = vec2<f32>(-d.y, d.x);
+    let a = dot(pos.xz, d);
+    let c = dot(pos.xz, perp);
+    let kr = params.windRegion.x;
+    let drift = params.windRegion.z;
+    let r1 = sin(kr * (0.94 * a + 0.34 * c) - t * drift);
+    let r2 = sin(kr * 1.63 * (0.61 * a - 0.79 * c) + t * drift * 0.61 + 2.1);
+    let region = max(1.0 + params.windRegion.y * 0.5 * (r1 + r2), 0.0);
+    let kg = params.windGust.x;
+    let gp = kg * (a - t * params.windGust.y) + 0.8 * sin(c * kg * 0.37);
+    let envelope = pow(max(0.5 + 0.5 * sin(gp), 0.0), params.windGust.w);
+    let kt = params.windTurb.x;
+    let ts = params.windTurb.y;
+    let s1 = sin(kt * (0.31 * a + 0.95 * c) - t * ts * kt);
+    let s2 = sin(kt * 1.41 * (-0.87 * a + 0.5 * c) + t * ts * kt * 0.83 + 1.3);
+    let turn = params.windRegion.w * 0.5 * (s1 + s2);
+    var out: ParticleWind;
+    out.direction = d * cos(turn) + perp * sin(turn);
+    out.strength = params.windDir.z * region;
+    out.gust = envelope * params.windGust.z;
+    return out;
 }
 
 fn turbCurl(p: vec3<f32>) -> vec3<f32> {
@@ -291,6 +337,18 @@ fn cs_simulate(@builtin(global_invocation_id) gid: vec3<u32>) {
     if (turbStrength > 0.0) {
         let np = p.position * params.turb.x + vec3<f32>(0.0, 0.0, params.sim.y * params.turb.y);
         force += turbCurl(np) * turbStrength;
+    }
+    // ADR-370: the wind. A leaf that ignores the scene's wind while the tree it fell from bends in
+    // it is the same defect as the tree ignoring it, one object along -- and the brief's acceptance
+    // list asks for leaves that respond to both the speed and the DIRECTION. The field is spatial,
+    // so two leaves ten metres apart catch different air and a gust front arrives at one before the
+    // other, which is what stops a shower drifting as a single sheet.
+    if (params.windMix.x > 0.0 && params.windDir.w > 0.5) {
+        let w = particleWindAt(p.position, params.sim.y);
+        let flow = vec3<f32>(w.direction.x, 0.0, w.direction.y) * (w.strength * (1.0 + w.gust));
+        // A force toward matching the air, not a shove: a leaf accelerates until it is travelling
+        // with the wind and then stops accelerating, which is what drag against moving air does.
+        force += (flow * params.windMix.x - vec3<f32>(p.velocity.x, 0.0, p.velocity.z)) * params.windMix.x;
     }
     let toA = params.attractor.xyz - p.position;
     let dist = length(toA) + 1e-4;
@@ -622,12 +680,38 @@ fn vs_particle(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32)
     var corners = array<vec2<f32>, 6>(vec2<f32>(-1.0, -1.0), vec2<f32>(1.0, -1.0), vec2<f32>(-1.0, 1.0),
                                       vec2<f32>(-1.0, 1.0), vec2<f32>(1.0, -1.0), vec2<f32>(1.0, 1.0));
     let c = corners[vi];
+    var out_size_scale = 1.0; // ADR-370: the leaf's short-axis squash; 1 for a round particle
     // Velocity-aligned stretching: rotate the billboard basis so +x runs along the screen-space
     // velocity and grow only that axis. The width is untouched, so the fragment falloff turns the
     // disc into an ellipse and a slow particle is exactly the round quad it always was.
     var axisX = params.cameraRight.xyz;
     var axisY = params.cameraUp.xyz;
     var halfLength = size;
+    // ADR-370: a leaf is a CARD, not a dot -- it has a long axis, it spins about that axis, and it
+    // turns edge-on twice a revolution. Two rotations do all of it: one in the view plane, which is
+    // the leaf yawing as it falls, and one that squashes the short axis, which is the same card
+    // seen at an angle. Cheaper than orienting a real quad in 3D and indistinguishable at the size
+    // a leaf occupies. Velocity stretch is deliberately skipped for leaves: a smeared leaf reads as
+    // a spark, which is the exact failure the brief names.
+    var faceLit = 1.0;
+    if (params.leaf.x > 0.5) {
+        let spin = p.seed * 6.28318530718 + p.age * params.leaf.y * (0.55 + p.seed);
+        let cs = cos(spin);
+        let sn = sin(spin);
+        let r = params.cameraRight.xyz * cs + params.cameraUp.xyz * sn;
+        let u = params.cameraRight.xyz * -sn + params.cameraUp.xyz * cs;
+        // The flip. `edge` goes to zero twice a turn, which is the leaf presenting its edge.
+        let edge = cos(spin * 0.7 + p.seed * 11.0);
+        axisX = r;
+        axisY = u;
+        halfLength = size * max(params.leaf.z, 0.2);
+        // Squash the short axis rather than the long one: a leaf turning edge-on gets narrower,
+        // not shorter.
+        out_size_scale = abs(edge);
+        // ...and a face turned away from the light catches less of it. Two-sided shading, for one
+        // multiply, with no normal and no light to look up.
+        faceLit = mix(1.0 - params.leaf.w, 1.0, abs(edge));
+    }
     // How much of the shutter's travel the stretched quad already covers. The billboard *is* a
     // smear, so writing the full per-frame motion into the velocity target as well would blur it
     // twice; the velocity is scaled by what the stretch has not already drawn.
@@ -643,7 +727,7 @@ fn vs_particle(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32)
         let shutterTravel = screenSpeed * params.cameraPos.w;
         motionLeft = clamp(1.0 - added / max(shutterTravel, 1e-6), 0.0, 1.0);
     }
-    let world = p.position + axisX * (c.x * halfLength) + axisY * (c.y * size);
+    let world = p.position + axisX * (c.x * halfLength) + axisY * (c.y * size * out_size_scale);
     var out: VsOut;
     out.clip = params.viewProj * vec4<f32>(world, 1.0);
     out.nowClip = out.clip;
@@ -651,7 +735,7 @@ fn vs_particle(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32)
     out.prevClip = params.prevViewProj * vec4<f32>(prevWorld, 1.0);
     out.uv = c;
     out.world = world;
-    out.color = vec4<f32>(particleTint(t, p.seed), particleAlpha(t));
+    out.color = vec4<f32>(particleTint(t, p.seed) * faceLit, particleAlpha(t));
     if (p.life <= 0.0) { out.clip = vec4<f32>(0.0, 0.0, 2.0, 1.0); } // cull dead (never drawn)
     return out;
 }
@@ -781,11 +865,33 @@ fn softParticleFade(world: vec3<f32>, pixel: vec2<i32>) -> f32 {
     return clamp((sceneZ - particleZ) / softness, 0.0, 1.0);
 }
 
+// ADR-370: the leaf silhouette. A pointed ellipse -- half-width tapering to zero at both ends by a
+// cosine raised to a power, which is the cheapest shape that reads as a leaf rather than as a
+// lozenge -- plus a faint midrib, because the rib is what the eye uses to tell a leaf from a petal.
+// Returns coverage in 0..1 with a soft edge, so the card antialiases instead of stair-stepping.
+fn leafCoverage(uv: vec2<f32>) -> f32 {
+    let along = clamp(uv.y, -1.0, 1.0);
+    let halfWidth = 0.66 * pow(max(cos(along * 1.5707963), 0.0), 0.62);
+    if (halfWidth <= 1.0e-4) { return 0.0; }
+    let a = abs(uv.x);
+    // One pixel of feather in uv terms is not knowable here, so the feather is a fraction of the
+    // width: narrow enough to stay crisp, wide enough that the tips do not crawl.
+    let cover = 1.0 - smoothstep(halfWidth * 0.72, halfWidth, a);
+    let rib = 1.0 + 0.35 * (1.0 - smoothstep(0.0, halfWidth * 0.22, a)) * (1.0 - abs(along));
+    return cover * rib;
+}
+
 @fragment
 fn fs_particle(in: VsOut) -> ParticleOut {
-    let r2 = dot(in.uv, in.uv);
-    if (r2 > 1.0) { discard; }
-    let falloff = (1.0 - r2) * (1.0 - r2);
+    var falloff: f32;
+    if (params.leaf.x > 0.5) {
+        falloff = leafCoverage(in.uv);
+        if (falloff <= 0.0) { discard; }
+    } else {
+        let r2 = dot(in.uv, in.uv);
+        if (r2 > 1.0) { discard; }
+        falloff = (1.0 - r2) * (1.0 - r2);
+    }
     let pixel = vec2<i32>(floor(in.clip.xy));
     let alpha = in.color.a * falloff * softParticleFade(in.world, pixel);
     let emissive = params.turb.w * fogCorrection(in.world, pixel);

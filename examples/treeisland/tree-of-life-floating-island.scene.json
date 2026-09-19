@@ -187,6 +187,28 @@
       "lod": { "enabled": true, "maxScreenError": 16.0 }
     },
     {
+      "name": "falling-leaves",
+      "kind": "particles",
+      "parent": "world-root",
+      "canopySource": "tree-of-life",
+      "canopyFrom": 0.6,
+      "particles": {
+        "enabled": true, "capacity": 4096, "seed": 7717, "shape": "box",
+        "position": [0.0, 60.0, 0.0], "extent": [30.0, 20.0, 30.0],
+        "spawnRate": 60.0, "burst": 0,
+        "lifetimeMin": 13.0, "lifetimeMax": 22.0,
+        "direction": [0.0, -1.0, 0.0], "spread": 0.55,
+        "speedMin": 2.0, "speedMax": 5.0,
+        "gravity": [0.0, -7.0, 0.0], "drag": 0.16,
+        "turbulence": 6.0, "turbulenceScale": 0.025, "turbulenceSpeed": 0.35,
+        "sizeStart": 1.9, "sizeEnd": 1.7,
+        "colorStart": [0.30, 0.62, 0.30, 1.0], "colorEnd": [0.16, 0.44, 0.46, 0.0],
+        "emissive": 0.3, "blend": "alpha", "softness": 2.5,
+        "windInfluence": 1.4,
+        "shape2d": "leaf", "tumbleRate": 2.6, "leafAspect": 0.4, "twoSided": 0.55
+      }
+    },
+    {
       "name": "cosmos-motes",
       "kind": "procedural",
       "parent": "world-root",

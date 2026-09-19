@@ -51,7 +51,8 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "shadowRange", "volumeSteps", "volumeDensityField", "volumeColorField", "sky"};
+    "shadowCascades", "shadowRange", "volumeSteps", "volumeDensityField", "volumeColorField", "sky",
+    "vortex"};
 constexpr std::string_view kSkyKeys[] = {
     "enabled", "background", "useKeyLight", "zenithColor", "horizonColor", "groundColor",
     "sunColor", "sunDirection", "haze", "sunIntensity", "sunSize", "sunGlow", "intensity"};
@@ -289,6 +290,22 @@ Result<EmitterShape> shapeFromName(const std::string& name) {
     return fail("unknown emitter shape '{}'", name);
 }
 
+// ADR-370: the leaf card's silhouette. Written and read only when it is not Round, so a scene that
+// never asks for a leaf is byte-identical on a re-save.
+const char* particleShape2dName(ParticleShape shape) {
+    return shape == ParticleShape::Leaf ? "leaf" : "round";
+}
+
+Result<ParticleShape> particleShape2dFromName(const std::string& name) {
+    if (name == "round") {
+        return ParticleShape::Round;
+    }
+    if (name == "leaf") {
+        return ParticleShape::Leaf;
+    }
+    return fail("unknown particle shape '{}' (expected round or leaf)", name);
+}
+
 const char* blendName(ParticleBlend blend) {
     return blend == ParticleBlend::Alpha ? "alpha" : "additive";
 }
@@ -413,6 +430,16 @@ json particlesToJson(const ParticleSystem& s) {
     // how a default nobody chose ended up baked into every scene file the editor ever saved.
     if (s.softness != 0.0f) {
         j["softness"] = s.softness;
+    }
+    if (s.windInfluence != 0.0f) {
+        j["windInfluence"] = s.windInfluence;
+    }
+    // ADR-370.
+    if (s.shape2d != ParticleShape::Round) {
+        j["shape2d"] = particleShape2dName(s.shape2d);
+        j["tumbleRate"] = s.tumbleRate;
+        j["leafAspect"] = s.leafAspect;
+        j["twoSided"] = s.twoSided;
     }
     // ADR-040. Only written when they differ from the defaults so existing files stay short and
     // round-tripping a pre-ADR-040 scene produces the same JSON it started with.
@@ -554,6 +581,18 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
         s.blend = *blend;
     }
     AVGEN_READ(softness, readFloat);
+    // ADR-370: the leaf card. Absent is Round, which is the ordinary state.
+    if (j.contains("shape2d") && j.at("shape2d").is_string()) {
+        auto shape = particleShape2dFromName(j.at("shape2d").get<std::string>());
+        if (!shape) {
+            return std::unexpected(shape.error());
+        }
+        s.shape2d = *shape;
+    }
+    AVGEN_READ(windInfluence, readFloat);
+    AVGEN_READ(tumbleRate, readFloat);
+    AVGEN_READ(leafAspect, readFloat);
+    AVGEN_READ(twoSided, readFloat);
     // ---- ADR-040: stretching, trails, atmosphere coupling and lifetime curves ----
     AVGEN_READ(velocityStretch, readFloat);
     AVGEN_READ(stretchMax, readFloat);
@@ -3333,6 +3372,27 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // on shipped. Both halves are parameters now. Speed 0 is still a genuine no-op, and so is
     // enabled false, which is the default for every scene that does not say otherwise, so
     // registering these moves no existing picture.
+    // ADR-371: the cosmic vortex. Registered always, so a scene that has not switched one on can
+    // still be given one from the UI -- the reachability lesson of ADR-360, applied the first time
+    // instead of the second. Radius 0 is off and is the default.
+    {
+        const scene::Environment::Vortex& vx = volumeSetting_.vortex;
+        const std::string b = prefix_ + "scene/vortex/";
+        vortexRadius_ = &params.add(floatDesc(b + "radius", vx.radius, 0.0f, 20000.0f, 0.0f, 1500.0f));
+        vortexDensity_ = &params.add(floatDesc(b + "density", vx.density, 0.0f, 8.0f, 0.0f, 2.0f));
+        vortexEmission_ = &params.add(floatDesc(b + "emission", vx.emission, 0.0f, 20.0f, 0.0f, 4.0f));
+        vortexSwirl_ = &params.add(floatDesc(b + "swirl", vx.swirl, -32.0f, 32.0f, -8.0f, 8.0f));
+        vortexRotation_ = &params.add(floatDesc(b + "rotationSpeed", vx.rotationSpeed, -4.0f, 4.0f, -0.4f, 0.4f));
+        vortexTurbulence_ = &params.add(floatDesc(b + "turbulence", vx.turbulence, 0.0f, 1.0f, 0.0f, 1.0f));
+        vortexInnerVoid_ = &params.add(floatDesc(b + "innerVoid", vx.innerVoid, 0.0f, 0.95f, 0.0f, 0.6f));
+        vortexContrast_ = &params.add(floatDesc(b + "contrast", vx.contrast, 0.05f, 12.0f, 0.5f, 5.0f));
+        vortexBreath_ = &params.add(floatDesc(b + "breathAmount", vx.breathAmount, 0.0f, 1.0f, 0.0f, 0.3f));
+        vortexThickness_ = &params.add(floatDesc(b + "thickness", vx.thickness, 0.1f, 5000.0f, 5.0f, 600.0f));
+        vortexFilaments_ = &params.add(floatDesc(b + "filaments", vx.filaments, 0.0f, 4.0f, 0.0f, 2.0f));
+        vortexColorDeep_ = &params.add(vec3Desc(b + "colorDeep", vx.colorDeep, 0.0f, 4.0f, 0.0f, 1.0f));
+        vortexColorMid_ = &params.add(vec3Desc(b + "colorMid", vx.colorMid, 0.0f, 4.0f, 0.0f, 1.0f));
+        vortexColorAccent_ = &params.add(vec3Desc(b + "colorAccent", vx.colorAccent, 0.0f, 8.0f, 0.0f, 2.0f));
+    }
     windEnabled_ = &params.add(boolDesc(prefix_ + "scene/wind/enabled", windSetting_.enabled));
     windSpeed_ = &params.add(floatDesc(prefix_ + "scene/windSpeed", windSetting_.speed, 0.0f, 4.0f, 0.0f, 1.5f));
     windDirection_ = &params.add(
@@ -3505,6 +3565,117 @@ void Composition::unregisterAuthoredLightParameters() {
 // Bounds come from `Scene::meshBounds`, the caching accessor, never `MeshData::bounds()`: ADR-355
 // is three call sites that used the uncached one and rescanned 39.9M vertices about five times a
 // frame, for a 350 ms editor frame. This runs at bake, not per frame, and still uses the cache.
+// ADR-370: the world-space bounds of everything a node contains, measured from the meshes that were
+// actually baked. Shared by the wind body and the canopy emitter, because both are asking the same
+// question -- "where is this tree" -- and asking it twice in two ways is how the two drift apart.
+//
+// `Scene::meshBounds` is the caching accessor; `MeshData::bounds()` scans every vertex and ADR-355
+// is what that costs. This runs at bake rather than per frame and still uses the cache.
+bool Composition::subtreeWorldBounds(std::size_t node, glm::vec3& lo, glm::vec3& hi,
+                                     std::vector<std::size_t>* members) const {
+    if (nodes_.size() != ranges_.size()) {
+        return false;
+    }
+    std::unordered_map<std::string, std::size_t> byName;
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+        byName.emplace(nodes_[i]->name, i);
+    }
+    auto inside = [&](std::size_t n) {
+        std::size_t cur = n;
+        for (std::size_t hops = 0; cur != node && hops <= nodes_.size(); ++hops) {
+            const std::string& parent = nodes_[cur]->parent;
+            if (parent.empty()) {
+                return false;
+            }
+            const auto it = byName.find(parent);
+            if (it == byName.end()) {
+                return false;
+            }
+            cur = it->second;
+        }
+        return cur == node;
+    };
+    lo = glm::vec3(std::numeric_limits<float>::max());
+    hi = glm::vec3(std::numeric_limits<float>::lowest());
+    for (std::size_t n = 0; n < nodes_.size(); ++n) {
+        if (!inside(n)) {
+            continue;
+        }
+        if (members != nullptr) {
+            members->push_back(n);
+        }
+        const NodeRange& r = ranges_[n];
+        for (std::size_t e = r.firstEntity; e < r.firstEntity + r.entityCount && e < scene_.entities.size(); ++e) {
+            const Entity& entity = scene_.entities[e];
+            if (entity.mesh == kInvalidMesh) {
+                continue;
+            }
+            const auto& [bmin, bmax] = scene_.meshBounds(entity.mesh);
+            const glm::mat4 m = entity.transform.matrix();
+            for (int corner = 0; corner < 8; ++corner) {
+                const glm::vec3 local((corner & 1) != 0 ? bmax.x : bmin.x, (corner & 2) != 0 ? bmax.y : bmin.y,
+                                      (corner & 4) != 0 ? bmax.z : bmin.z);
+                const glm::vec3 world = glm::vec3(m * glm::vec4(local, 1.0f));
+                lo = glm::min(lo, world);
+                hi = glm::max(hi, world);
+            }
+        }
+    }
+    return lo.x <= hi.x;
+}
+
+// ADR-370: a particle node may say which node's canopy it sheds from, and the emitter box is then
+// MEASURED rather than typed. The brief asks for leaves that "originate from the Tree canopy rather
+// than from a generic box emitter", and the difference that matters is not the shape of the box --
+// it is that a measured box follows the tree when the tree is moved, rescaled or swapped for
+// another asset, and a typed one silently stops describing it.
+void Composition::applyCanopyEmitters() {
+    if (nodes_.size() != ranges_.size()) {
+        return;
+    }
+    std::unordered_map<std::string, std::size_t> byName;
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+        byName.emplace(nodes_[i]->name, i);
+    }
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+        CompositionNode& node = *nodes_[i];
+        if (node.kind != NodeKind::Particles || node.canopySource.empty()) {
+            continue;
+        }
+        const auto it = byName.find(node.canopySource);
+        if (it == byName.end()) {
+            log::warn("particle node '{}': canopySource '{}' names no node in this scene; the "
+                      "authored emitter box is used instead",
+                      node.name, node.canopySource);
+            continue;
+        }
+        glm::vec3 lo{0.0f};
+        glm::vec3 hi{0.0f};
+        if (!subtreeWorldBounds(it->second, lo, hi, nullptr)) {
+            continue;
+        }
+        // The canopy is the upper part of the crown, not the whole tree: shedding from the trunk
+        // would drop leaves out of the bark. `canopyFrom` is the fraction of the height the crown
+        // starts at.
+        const float from = std::clamp(node.canopyFrom, 0.0f, 0.95f);
+        const float base = lo.y + (hi.y - lo.y) * from;
+        const glm::vec3 centre(0.5f * (lo.x + hi.x), 0.5f * (base + hi.y), 0.5f * (lo.z + hi.z));
+        const glm::vec3 half(0.5f * (hi.x - lo.x), 0.5f * (hi.y - base), 0.5f * (hi.z - lo.z));
+        for (std::size_t p = 0; p < scene_.particles.size(); ++p) {
+            if (scene_.particles[p].name != sanitise(prefix_) + node.name &&
+                scene_.particles[p].name != node.name) {
+                continue;
+            }
+            scene_.particles[p].position = centre;
+            scene_.particles[p].extent = glm::max(half, glm::vec3(0.01f));
+            if (node.particleRest.name == scene_.particles[p].name || true) {
+                node.particleRest.position = centre;
+                node.particleRest.extent = scene_.particles[p].extent;
+            }
+        }
+    }
+}
+
 void Composition::applyWindBodies() {
     if (nodes_.size() != ranges_.size()) {
         return; // mid-rebuild; the next bake will do it
@@ -3534,6 +3705,7 @@ void Composition::applyWindBodies() {
         if (!owner.windAuthored) {
             continue;
         }
+        (void)0;
         auto pick = [](const params::Parameter<float>* p, float fallback) {
             return p != nullptr ? p->value() : fallback;
         };
@@ -3929,6 +4101,11 @@ void Composition::detach() {
     volumeDensity_ = nullptr;
     fogHeight_ = nullptr;
     fogHeightFalloff_ = nullptr;
+    vortexRadius_ = nullptr; vortexDensity_ = nullptr; vortexEmission_ = nullptr;
+    vortexSwirl_ = nullptr; vortexRotation_ = nullptr; vortexTurbulence_ = nullptr;
+    vortexInnerVoid_ = nullptr; vortexContrast_ = nullptr; vortexBreath_ = nullptr;
+    vortexThickness_ = nullptr; vortexFilaments_ = nullptr;
+    vortexColorDeep_ = nullptr; vortexColorMid_ = nullptr; vortexColorAccent_ = nullptr;
     windEnabled_ = nullptr;
     windSpeed_ = nullptr;
     windDirection_ = nullptr;
@@ -5302,6 +5479,7 @@ void Composition::rebuild() {
 
     windBodies_.clear();
     applyWindBodies();
+    applyCanopyEmitters();
 
     // Composition (ADR-038) contributes reserved fields, so density filters and effectors can
     // reference them by name like any other field.
@@ -6450,6 +6628,23 @@ void Composition::applyParameters() {
         // ADR-360: every field of the wind is a live parameter now, not just two, so the whole
         // field can be turned up, down, off, gustier or calmer from the UI, keyed on the timeline
         // and driven by audio (`music.build -> scene/windSpeed` is the intended idiom).
+        // ADR-371: the vortex travels with the rest of the atmosphere. Copied rather than picked
+        // for now: the parameters below are the live half.
+        env.vortex = volumeSetting_.vortex;
+        env.vortex.radius = pick(vortexRadius_, volumeSetting_.vortex.radius);
+        env.vortex.density = pick(vortexDensity_, volumeSetting_.vortex.density);
+        env.vortex.emission = pick(vortexEmission_, volumeSetting_.vortex.emission);
+        env.vortex.swirl = pick(vortexSwirl_, volumeSetting_.vortex.swirl);
+        env.vortex.rotationSpeed = pick(vortexRotation_, volumeSetting_.vortex.rotationSpeed);
+        env.vortex.turbulence = pick(vortexTurbulence_, volumeSetting_.vortex.turbulence);
+        env.vortex.innerVoid = pick(vortexInnerVoid_, volumeSetting_.vortex.innerVoid);
+        env.vortex.contrast = pick(vortexContrast_, volumeSetting_.vortex.contrast);
+        env.vortex.breathAmount = pick(vortexBreath_, volumeSetting_.vortex.breathAmount);
+        env.vortex.thickness = pick(vortexThickness_, volumeSetting_.vortex.thickness);
+        env.vortex.filaments = pick(vortexFilaments_, volumeSetting_.vortex.filaments);
+        if (vortexColorDeep_ != nullptr) { env.vortex.colorDeep = vortexColorDeep_->value(); }
+        if (vortexColorMid_ != nullptr) { env.vortex.colorMid = vortexColorMid_->value(); }
+        if (vortexColorAccent_ != nullptr) { env.vortex.colorAccent = vortexColorAccent_->value(); }
         env.wind = windSetting_;
         env.wind.enabled = windEnabled_ != nullptr ? windEnabled_->value() : windSetting_.enabled;
         env.wind.speed = pick(windSpeed_, windSetting_.speed);
@@ -7466,6 +7661,11 @@ nlohmann::json Composition::toJson() const {
         // ADR-360. Written only when the node declares a wind body, so nothing else grows a key,
         // and written from the parameters' BASE so a session's edits survive the save -- the
         // failure this whole ADR is about was a reader whose writer could not be reached.
+        // ADR-370: only when asked for, like everything else additive here.
+        if (!node.canopySource.empty()) {
+            n["canopySource"] = node.canopySource;
+            n["canopyFrom"] = node.canopyFrom;
+        }
         if (node.windAuthored) {
             auto base = [](const params::Parameter<float>* p, float fallback) {
                 return p != nullptr ? p->base() : fallback;
@@ -8223,6 +8423,40 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 }
                 *fk.target = *value;
             }
+            // ADR-371: the cosmic vortex. Absent is off, which is every scene but the one this
+            // was written for.
+            if (e.contains("vortex") && e.at("vortex").is_object()) {
+                const nlohmann::json& vj = e.at("vortex");
+                scene::Environment::Vortex& vx = v.vortex;
+                auto f = [&vj](const char* key, float& out) {
+                    if (vj.contains(key) && vj.at(key).is_number()) {
+                        out = vj.at(key).get<float>();
+                    }
+                };
+                auto c3 = [&vj](const char* key, glm::vec3& out) {
+                    if (vj.contains(key) && vj.at(key).is_array() && vj.at(key).size() == 3) {
+                        out = glm::vec3(vj.at(key)[0].get<float>(), vj.at(key)[1].get<float>(),
+                                        vj.at(key)[2].get<float>());
+                    }
+                };
+                c3("center", vx.center);
+                f("radius", vx.radius);
+                f("thickness", vx.thickness);
+                f("swirl", vx.swirl);
+                f("rotationSpeed", vx.rotationSpeed);
+                f("density", vx.density);
+                f("innerVoid", vx.innerVoid);
+                f("contrast", vx.contrast);
+                f("turbulence", vx.turbulence);
+                f("turbulenceScale", vx.turbulenceScale);
+                f("breathAmount", vx.breathAmount);
+                f("breathSpeed", vx.breathSpeed);
+                f("emission", vx.emission);
+                f("filaments", vx.filaments);
+                c3("colorDeep", vx.colorDeep);
+                c3("colorMid", vx.colorMid);
+                c3("colorAccent", vx.colorAccent);
+            }
             if (e.contains("shadowCascades")) {
                 if (!e["shadowCascades"].is_number_unsigned()) {
                     return fail("'shadowCascades' must be an unsigned integer (0 = the quality tier)");
@@ -8539,6 +8773,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             auto locked = readBool(item, "locked", false);
             auto emissive = readFloat(item, "emissiveBoost", 1.0f);
             auto roughness = readFloat(item, "roughnessScale", 1.0f);
+            // ADR-370: which node's canopy a particle emitter is measured from.
+            if (item.contains("canopySource") && item.at("canopySource").is_string()) {
+                node.canopySource = item.at("canopySource").get<std::string>();
+            }
+            if (item.contains("canopyFrom") && item.at("canopyFrom").is_number()) {
+                node.canopyFrom = item.at("canopyFrom").get<float>();
+            }
             // ADR-360: the wind body. Absent is the ordinary state, not a fault.
             if (item.contains("wind") && item.at("wind").is_object()) {
                 const nlohmann::json& w = item.at("wind");

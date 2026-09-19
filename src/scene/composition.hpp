@@ -256,6 +256,11 @@ struct CompositionNode {
     // which is what keeps a scene written before this key existed byte-identical on a re-save.
     WindBodySettings wind;
     bool windAuthored = false;
+    // ADR-370: for a Particles node, the node whose canopy it sheds from. Empty means the authored
+    // emitter box stands. `canopyFrom` is where the crown starts, as a fraction of the body's
+    // height, so leaves do not fall out of the trunk.
+    std::string canopySource;
+    float canopyFrom = 0.45f;
     params::Parameter<float>* windStrengthParam = nullptr;
     params::Parameter<float>* windTrunkParam = nullptr;
     params::Parameter<float>* windBranchParam = nullptr;
@@ -1063,6 +1068,12 @@ private:
     void updateEcologyLights();
     void registerAuthoredLightParameters(params::ParameterSet& params);
     void unregisterAuthoredLightParameters();
+    // ADR-370: the world bounds of a node's whole subtree, from the baked meshes. Shared by the
+    // wind body and the canopy emitter so the two cannot disagree about where the tree is.
+    [[nodiscard]] bool subtreeWorldBounds(std::size_t node, glm::vec3& lo, glm::vec3& hi,
+                                          std::vector<std::size_t>* members) const;
+    // ADR-370: point a particle node's emitter box at the measured canopy of another node.
+    void applyCanopyEmitters();
     // ADR-360: stamp each declared wind body's measured origin/extent onto every mesh it holds.
     void applyWindBodies();
     // ...and the entity spans it stamped, so the per-frame parameter pass can move `strength` and
@@ -1218,6 +1229,21 @@ private:
     // UI nor a save, so `scene/windSpeed` could be dragged to its maximum and do nothing. The two
     // original paths keep their spelling (`scene/windSpeed`, `scene/windDirection`): renaming them
     // to `scene/wind/*` would orphan the value in every project that already has one.
+    // ADR-371: the cosmic vortex.
+    params::Parameter<float>* vortexRadius_ = nullptr;
+    params::Parameter<float>* vortexDensity_ = nullptr;
+    params::Parameter<float>* vortexEmission_ = nullptr;
+    params::Parameter<float>* vortexSwirl_ = nullptr;
+    params::Parameter<float>* vortexRotation_ = nullptr;
+    params::Parameter<float>* vortexTurbulence_ = nullptr;
+    params::Parameter<float>* vortexInnerVoid_ = nullptr;
+    params::Parameter<float>* vortexContrast_ = nullptr;
+    params::Parameter<float>* vortexBreath_ = nullptr;
+    params::Parameter<float>* vortexThickness_ = nullptr;
+    params::Parameter<float>* vortexFilaments_ = nullptr;
+    params::Parameter<glm::vec3>* vortexColorDeep_ = nullptr;
+    params::Parameter<glm::vec3>* vortexColorMid_ = nullptr;
+    params::Parameter<glm::vec3>* vortexColorAccent_ = nullptr;
     params::Parameter<bool>* windEnabled_ = nullptr;
     params::Parameter<float>* windSpeed_ = nullptr;
     params::Parameter<float>* windDirection_ = nullptr;

@@ -38,6 +38,16 @@ struct VolumeUniforms {
     depthParams: vec4<f32>, // camera near, camera far, 0, 0
     fogColor: vec4<f32>,  // rgb = emission tint when no colour field is named
     glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), yzw = 0
+    // ADR-371: the cosmic vortex. All zero -- specifically vortex0.w (the radius) at zero -- means
+    // every function below returns before it does any work, so a scene that does not ask for one
+    // marches exactly what it always marched.
+    vortex0: vec4<f32>,   // centre xyz, radius (0 = no vortex)
+    vortex1: vec4<f32>,   // thickness, swirl, rotationSpeed, density
+    vortex2: vec4<f32>,   // innerVoid, contrast, turbulence, turbulenceScale
+    vortex3: vec4<f32>,   // breathAmount, breathSpeed, emission, filaments
+    vortexA: vec4<f32>,   // deep colour
+    vortexB: vec4<f32>,   // mid colour
+    vortexAccent: vec4<f32>, // luminous accent
 };
 
 @group(1) @binding(1) var<uniform> vol: VolumeUniforms;
@@ -86,6 +96,79 @@ fn stepJitter(px: vec2<i32>, frameIndex: u32) -> f32 {
     return f32(h.x) * (1.0 / 4294967296.0);
 }
 
+// ADR-371: the cosmic vortex, as a world-space density field inside the volumetric march.
+//
+// WHY HERE and not a new pass or a skybox. The brief is emphatic that this is not a backdrop: it
+// must sit physically below the island, be seen in perspective, be occluded by the rock, gain depth
+// as the camera drops and flatten as it rises. The volumetric pass already gives every one of those
+// for free -- it marches world space, it stops at the depth buffer, and ADR-139's half-resolution
+// march with a depth-aware upsample is the scalable quality knob the brief asks for. A second
+// raymarcher would be a second set of all of that, drifting.
+//
+// The model is the polar construction the brief describes: radius and angle about the centre, the
+// angle sheared by radius so the structure winds, then domain-warped noise at three spatial and
+// three TEMPORAL rates. The last part is what stops it reading as a screensaver -- a single rate
+// makes everything move together, which the eye reads instantly as procedural.
+fn vortexShape(p: vec3<f32>, t: f32) -> f32 {
+    let radius = vol.vortex0.w;
+    if (radius <= 0.0) {
+        return 0.0;
+    }
+    let rel = p - vol.vortex0.xyz;
+    // Breathing: the whole structure widens and narrows slowly. Applied to the radius rather than
+    // to the density so the silhouette moves, which is what reads as breathing; scaling density
+    // alone just pulses the brightness.
+    let breath = 1.0 + vol.vortex3.x * sin(t * vol.vortex3.y);
+    let rr = length(rel.xz) / max(radius * breath, 1e-3);
+    if (rr > 1.35) {
+        return 0.0; // outside the disc entirely, and compactly so -- ADR-369's lesson
+    }
+    // The disc's vertical profile. A gaussian, so there is no edge anywhere for a hard line to
+    // live on (ADR-369 again: a falloff inside a bound has to reach zero before the bound does).
+    const kOverThickness = 1.0;
+    let vert = exp(-(rel.y * rel.y) / max(vol.vortex1.x * vol.vortex1.x, 1e-3));
+    if (vert < 1e-4) {
+        return 0.0;
+    }
+    let angle = atan2(rel.z, rel.x);
+    // The shear. Angle advanced by radius makes a spiral; advanced by time makes it turn.
+    let warped = angle + rr * vol.vortex1.y + t * vol.vortex1.z;
+    // Back to a cartesian sample point, so the noise is sampled in a frame that winds with the
+    // structure rather than across it.
+    let q = vec3<f32>(cos(warped) * rr, rel.y / max(vol.vortex1.x, 1e-3), sin(warped) * rr);
+    let scale = max(vol.vortex2.w, 1e-3);
+    // Three octaves at three rates: macro barely moves, fine detail moves fastest.
+    let n0 = fbm3(q * scale + vec3<f32>(t * 0.013, 0.0, t * 0.009), 29u);
+    let n1 = fbm3(q * (scale * 3.1) + vec3<f32>(0.0, t * 0.055, 0.0), 53u);
+    let n2 = fbm3(q * (scale * 9.7) + vec3<f32>(t * 0.17, 0.0, -t * 0.13), 97u);
+    var n = n0 + 0.45 * n1 + 0.2 * n2;
+    n = n / 1.65;
+    // Turbulence breaks the spiral's symmetry, because a real nebula is not a mathematical spiral
+    // and the brief says so.
+    n = mix(n, n * (0.55 + 0.9 * n1), clamp(vol.vortex2.z, 0.0, 1.0));
+    // The dark centre. Contrast pushes the midtones apart so the structure reads as filaments in a
+    // void rather than as an even wash.
+    let voidMask = smoothstep(vol.vortex2.x, vol.vortex2.x + 0.22, rr);
+    let rim = 1.0 - smoothstep(0.72, 1.3, rr);
+    let shaped = pow(clamp(n, 0.0, 1.0), max(vol.vortex2.y, 0.05));
+    return shaped * voidMask * rim * vert;
+}
+
+// The vortex's own light. It is emissive rather than lit: nothing in this scene could illuminate
+// something that size, and the brief's reference is a nebula, which glows.
+fn vortexEmissionAt(p: vec3<f32>, shape: f32, t: f32) -> vec3<f32> {
+    if (shape <= 0.0 || vol.vortex3.z <= 0.0) {
+        return vec3<f32>(0.0);
+    }
+    // Colour hierarchy, which is the brief's section on this almost verbatim: DARK -> MID ->
+    // LUMINOUS ACCENT, keyed on density, so the bright colour appears only in the dense filaments
+    // and the bulk of the cloud stays deep. Saturating everything is the failure mode named.
+    var c = mix(vol.vortexA.rgb, vol.vortexB.rgb, smoothstep(0.0, 0.45, shape));
+    let filament = smoothstep(0.62, 0.95, shape) * clamp(vol.vortex3.w, 0.0, 4.0);
+    c = c + vol.vortexAccent.rgb * filament;
+    return c * (shape * vol.vortex3.z);
+}
+
 fn volumeDensityAt(p: vec3<f32>) -> f32 {
     let heightTerm = exp(-max(0.0, p.y - vol.params0.y) * vol.params0.z);
     var base = vol.params0.x * heightTerm;
@@ -100,6 +183,13 @@ fn volumeDensityAt(p: vec3<f32>) -> f32 {
     let offset = vec3<f32>(vol.noiseParams.z * vol.noiseParams.w);
     let noiseTerm = 1.0 + vol.noiseParams.x * (fbm3(p * vol.noiseParams.y + offset, 17u) * 2.0 - 1.0);
     return max(0.0, base * noiseTerm);
+}
+
+// The fog and the vortex are one medium as far as the march is concerned: one density, one
+// transmittance. Keeping them separate would mean two marches or a composite, and a composite of
+// two participating media is wrong wherever they overlap.
+fn volumeTotalDensityAt(p: vec3<f32>, t: f32) -> f32 {
+    return volumeDensityAt(p) + vortexShape(p, t) * vol.vortex1.w;
 }
 
 // Henyey-Greenstein phase function; g = 0 is isotropic.
@@ -301,12 +391,29 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
     for (var i = 0; i < steps; i = i + 1) {
         let t = (f32(i) + jitter) * stepLength;
         let p = origin + direction * t;
-        let density = volumeDensityAt(p);
+        // ADR-371: the vortex is part of the same medium, so it shares one density and one
+        // transmittance with the fog. `vortexShape` returns before doing any work when no vortex is
+        // authored, which is what keeps this loop the cost it was.
+        let vortex = vortexShape(p, vol.noiseParams.w);
+        let fogDensity = volumeDensityAt(p);
+        let vortexDensity = vortex * vol.vortex1.w;
+        let density = fogDensity + vortexDensity;
         if (density <= 0.0) {
             continue;
         }
         let extinction = density * vol.params1.x;
-        let scattering = density * vol.params0.w;
+        // ADR-371: the FOG scatters the scene's lights; the VORTEX does not. This is the single
+        // most important line in the effect, and the first version did not have it. A nebula four
+        // hundred metres below an island is not lit by that island's key light, and letting it be
+        // turned the frame into an even wash: at density 0.0015 with the key at intensity 22, a
+        // 2.6 km march accumulated so much in-scattered key light that the picture came back mean
+        // luminance 131 of 255 with the vortex's own emission set to ZERO. That is precisely the
+        // flat haze ADR-358 predicted when it refused to build a volumetric beam without shadow
+        // sampling -- the same defect, arrived at from the other direction.
+        //
+        // So the vortex contributes extinction and emission and nothing else. It is self-luminous,
+        // which is both what a nebula is and what keeps it out of the scene's lighting entirely.
+        let scattering = fogDensity * vol.params0.w;
         var emission = vec3<f32>(0.0);
         if (vol.params1.z > 0.0) {
             var emissionColor = vol.fogColor.rgb;
@@ -316,6 +423,9 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
             }
             emission = density * vol.params1.z * emissionColor;
         }
+        // ...and the vortex brings its own light. Emissive rather than lit, because nothing in this
+        // scene could illuminate something that size and because the reference is a nebula.
+        emission = emission + vortexEmissionAt(p, vortex, vol.noiseParams.w);
         // The particle glow arrives as light to scatter, not as fog emission, so denser dust
         // catches more of it - which is what reads as "the sparks are lighting the dust".
         let local = localInScatterAt(p, screenUv, max(t * depthAlongRay, 1e-3), direction, anisotropy);
