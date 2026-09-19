@@ -514,6 +514,24 @@ codec combo still advertises codecs the machine may not have (G4). "Colour manag
 is only true at SDR; the HDR path does not exist end to end (W3) and cannot without the tone-map
 decision (W4/R1).
 
+## 9c. Second pass (2026-09-19, `agent/mbackend2`)
+
+Steps 5, 6, 7, 8 and the step-10 decision, after the pause for the Tree of Life.
+
+* **ADR-382** — `FrameRange` + `FrameSequenceDriver` (GPU-free, unit-tested, `RenderSettings`
+  delegates its arithmetic); the CPU output transform promoted out of the GPU test file and
+  anchored against published measurements with ADR-372's historical wrong inverse as a control;
+  `app::TraceSequence`, which renders a path-traced range to an EXR sequence or — via that
+  transform, with no GPU at all — to a movie; and the audit's G3 and G4.
+* **`docs/metal-rt-decision.md`** — the step-10 prototype, run on the Tree of Life, with a
+  recommendation **not** to start the backend on the numbers it produced.
+
+The honest shape of what changed: the brief's *"Timeline → frame evaluation → offline renderer →
+HDR frame → colour/output transform → video encoder → MOV/MP4"* pipeline now exists end to end for
+**both** renderers rather than only the rasteriser, and it exists for the path tracer without a
+device. What is still duplicated is the loop, not the arithmetic, and what is still unknown about
+Metal is tracing throughput, not feasibility.
+
 ## 10. Test baseline for this branch
 
 `./build/release/tests/avgen_tests "~[gpu]"` at `8f23d2ec` with no source change, verbatim:
