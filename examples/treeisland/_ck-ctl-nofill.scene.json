@@ -23,16 +23,16 @@
       "type": "directional",
       "role": "key",
       "direction": [
-        0.6566,
-        -0.515,
-        -0.551
+        0.6275,
+        -0.5736,
+        -0.5265
       ],
       "color": [
         1.0,
         0.92,
         0.78
       ],
-      "intensity": 5.0,
+      "intensity": 8.5,
       "castsShadow": true,
       "shadowStrength": 0.95,
       "softness": 1.8
@@ -51,7 +51,7 @@
         0.72,
         0.68
       ],
-      "intensity": 0.3,
+      "intensity": 0.34,
       "castsShadow": false,
       "shadowStrength": 0.0,
       "softness": 3.0
@@ -70,7 +70,7 @@
         0.45,
         0.88
       ],
-      "intensity": 0.38,
+      "intensity": 0.55,
       "castsShadow": false,
       "shadowStrength": 0.0,
       "softness": 4.0,
@@ -109,9 +109,9 @@
         0.0286
       ],
       "groundColor": [
-        0.0105,
-        0.0182,
-        0.033
+        0.021,
+        0.0345,
+        0.06
       ],
       "haze": 0.62,
       "sunColor": [

@@ -26,6 +26,13 @@ Control arms -- ADR-182. Each removes exactly one thing, so a probe that passes 
 deliverable has something it must fail on:
 
   _ck-ctl-nokey     the key light disabled. Every key-to-shadow ratio must collapse toward 1.
+                    Disabled through the PROJECT parameter and not the scene field: a project's
+                    parameters are applied OVER the scene it loads (ADR-264), so the first version
+                    of this arm wrote `"enabled": false` into the scene, had it overwritten by
+                    `lights/celestial-key/enabled` a frame later, and produced a control whose
+                    every statistic matched the arm it was controlling to five decimal places.
+                    That is what a control which did not fire looks like, and it looks exactly
+                    like an arm that does nothing.
   _ck-ctl-noshadow  the key still lit, `castsShadow` off. The shadow AOV must go uniformly white,
                     which is what tells a shadow measurement from a shading measurement.
   _ck-ctl-noglow    every emissiveBoost at 0. What the geometry looks like under the key alone --
@@ -68,6 +75,22 @@ CAMERAS = {
 GLOW_NODES = ["tree-tracery", "tree-twigs", "tree-foliage", "tree-lumens"]
 
 
+def disabled(project: dict, scene: dict, role: str):
+    """The project with every light of `role` switched off, in both layers it can be switched off.
+
+    Both, because either alone is a control that does not control: the scene field is what a
+    reader of the scene file sees, and the project parameter is what actually reaches the frame."""
+    out = json.loads(json.dumps(project))
+    dark = json.loads(json.dumps(scene))
+    for light in dark["lights"]:
+        if light["role"] == role:
+            light["enabled"] = False
+            out["parameters"][f"lights/{light['name']}/enabled"] = False
+            for preset in out.get("presets", []):
+                preset["values"][f"lights/{light['name']}/enabled"] = [0.0]
+    return out, dark
+
+
 def write(stem: str, project: dict, scene: dict) -> None:
     project = json.loads(json.dumps(project))
     project["assets"]["scene"]["path"] = f"{stem}.scene.json"
@@ -86,11 +109,7 @@ def main() -> None:
             s["camera"]["position"], s["camera"]["target"], s["camera"]["fov"] = cam
         write(f"_ck-view-{name}", project, s)
 
-    s = json.loads(json.dumps(scene))
-    for light in s["lights"]:
-        if light["role"] == "key":
-            light["enabled"] = False
-    write("_ck-ctl-nokey", project, s)
+    write("_ck-ctl-nokey", *disabled(project, scene, "key"))
 
     s = json.loads(json.dumps(scene))
     for light in s["lights"]:
@@ -98,11 +117,7 @@ def main() -> None:
             light["castsShadow"] = False
     write("_ck-ctl-noshadow", project, s)
 
-    s = json.loads(json.dumps(scene))
-    for light in s["lights"]:
-        if light["role"] == "fill":
-            light["enabled"] = False
-    write("_ck-ctl-nofill", project, s)
+    write("_ck-ctl-nofill", *disabled(project, scene, "fill"))
 
     s = json.loads(json.dumps(scene))
     s["environment"].update({
