@@ -291,7 +291,7 @@ balance (temperature and tint), hue rotation, contrast about mid grey in log spa
 luminance, then lift/gamma/gain.
 
 The grade compensates for the tone curve rather than fighting it. AgX is flatter than the ACES fit
-through the midtones — a four-stop grey ramp (0.045 to 0.72) spans 123 output levels under AgX
+through the midtones — a four-stop grey ramp (0.045 to 0.72) spans 120 output levels under AgX
 against 167 under ACES — so a scene moved from ACES to AgX generally wants `post/grade/contrast`
 around 1.1 and `post/grade/saturation` around 1.15 to land where it was.
 
@@ -309,7 +309,7 @@ around 1.1 and `post/grade/saturation` around 1.15 to land where it was.
 
 AgX is the default (ADR-039) because this engine's palettes are emissive and saturated, and that is
 exactly where the ACES fit misbehaves: feed it scene-linear (8, 1, 0.2) and it returns (255, 232,
-149) — the blue channel crushed and the hue skewed — where AgX returns (255, 210, 175), a highlight
+149) — the blue channel crushed and the hue skewed — where AgX returns (255, 209, 174), a highlight
 that reads as a bright warm colour rather than a different one.
 
 ## Selective post (ADR-035, ADR-039)

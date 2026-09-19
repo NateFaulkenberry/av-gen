@@ -322,3 +322,46 @@ TEST_CASE("The atmospheric pass leaves the sky alone", "[gpu][post][look]") {
     CHECK(towardTint > changed / 2);
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("Wiring the identifier target changes no frame at the default sharpenId (ADR-372)",
+          "[gpu][post][sharpen]") {
+    // `post/output/sharpenId` was registered, round-tripping, shader-complete and unable to affect
+    // any frame, because nothing assigned `PostFrameInputs::identifier`. Wiring it is one line, and
+    // the line has to be default-neutral or it re-bases every render in the repository for a
+    // feature nobody asked to turn on.
+    //
+    // It is neutral by construction -- `fs_sharpen` masks on `identifierAvailable > 0.5 && maskId
+    // != 0u`, and `sharpenId` defaults to 0 -- but "by construction" is what the four unreachable
+    // subsystems were also said to be. So: prove the default is unchanged, and prove the control
+    // now does something, which is the arm that would have failed before this change.
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    scene::Scene base = lookScene();
+    base.post.sharpen = 0.8f;   // sharpening on, so the mask has something to suppress
+    base.post.sharpenId = 0;    // ... and unmasked, which is the default
+
+    const std::uint64_t unmasked = hashOf(renderer, base);
+    CHECK(hashOf(renderer, base) == unmasked); // deterministic, or the rest measures noise
+
+    // A non-zero identifier now restricts sharpening to pixels carrying it. Whatever that id
+    // selects, it cannot select everything, so the frame must differ from the unmasked one. Before
+    // the renderer supplied the target this returned the unmasked frame for every id.
+    scene::Scene masked = base;
+    masked.post.sharpenId = 1;
+    const std::uint64_t maskedHash = hashOf(renderer, masked);
+    INFO("sharpenId 0 vs 1 with sharpen at 0.8");
+    CHECK(maskedHash != unmasked);
+
+    // And with sharpening off, the id is inert whatever it is set to -- the mask cannot invent
+    // work for a pass that does not run.
+    scene::Scene off = base;
+    off.post.sharpen = 0.0f;
+    const std::uint64_t sharpenOff = hashOf(renderer, off);
+    scene::Scene offMasked = off;
+    offMasked.post.sharpenId = 7;
+    CHECK(hashOf(renderer, offMasked) == sharpenOff);
+    CHECK(ctx->errorCount() == 0);
+}

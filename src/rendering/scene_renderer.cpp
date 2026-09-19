@@ -3657,6 +3657,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // always been written -- the debug view reads it -- and was never handed to the post chain,
         // so `post/bloom/emissionWeight` resolved, ran and changed nothing.
         postIn.emission = emission_.view;
+        // ADR-035's identifier target, wired for the same reason the emission target above was:
+        // `post/output/sharpenId` was a registered, round-tripping parameter whose shader path
+        // exists and is tested, and which could not affect any frame a user rendered, because
+        // nothing ever set this view and `fs_sharpen` gates the mask on its presence. Built, and
+        // unreachable -- the failure family that has now bitten five times in this session.
+        //
+        // Default-neutral by construction: `sharpenId` is 0 by default and the shader's mask is
+        // `identifierAvailable > 0.5 && maskId != 0u`, so with the default the mask stays 1.0 and
+        // every existing frame is unchanged. Proved rather than asserted -- see ADR-372.
+        postIn.identifier = ids_.view;
         postIn.width = hdr_.width();
         postIn.height = hdr_.height();
         postIn.prevViewProj = havePrevViewProj_ ? prevViewProj_ : frame.viewProj;

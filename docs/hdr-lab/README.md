@@ -125,12 +125,12 @@ AgX, the default, `chromaRetention` 0, exposure scale 1, **bloom off** — the o
 
 | authored radiance | into the tonemap | display byte | Δ from the row above |
 |---|---|---|---|
-| 0.18 | 0.1798 | 128 | — |
-| 0.5 | 0.4998 | 174 | +46 |
-| 1.0 | 0.9995 | 202 | +28 |
-| 2.0 | 1.9990 | 224 | +22 |
-| 4.0 | 3.9980 | 239 | +15 |
-| 16.0 | 15.9922 | 254 | +15 |
+| 0.18 | 0.1798 | 127 | — |
+| 0.5 | 0.4998 | 173 | +46 |
+| 1.0 | 0.9995 | 201 | +28 |
+| 2.0 | 1.9990 | 223 | +22 |
+| 4.0 | 3.9980 | 238 | +15 |
+| 16.0 | 15.9922 | 254 | +16 |
 | 50.0 | 49.9688 | 255 | **+1** |
 
 Read it as three regions. Below scene white a stop is worth twenty-eight to forty-six display
@@ -143,9 +143,9 @@ patches, because bloom is added to the picture before the curve and not layered 
 
 | authored | into the tonemap | display |
 |---|---|---|
-| 0.18 | 0.1816 | 128 |
-| 1.0 | 1.0576 | 204 |
-| 4.0 | 4.5898 | 241 |
+| 0.18 | 0.1816 | 127 |
+| 1.0 | 1.0576 | 203 |
+| 4.0 | 4.5898 | 240 |
 | 16.0 | **18.9531** | 255 |
 | 50.0 | 59.6250 | 255 |
 
@@ -175,15 +175,15 @@ Per-channel, the same frame, AgX, **bloom off**:
 
 | patch | authored | display |
 |---|---|---|
-| neutral | (2, 2, 2) | (224, 224, 224) |
+| neutral | (2, 2, 2) | (223, 223, 223) |
 | red | (2, 0, 0) | (243, 86, 86) |
-| green | (0, 2, 0) | (111, 235, 111) |
-| blue | (0, 0, 2) | (112, 112, 235) |
-| cyan | (0, 2, 2) | (140, 226, 226) |
-| violet | (1, 0, 2) | (207, 120, 230) |
-| blue | (0, 0, 8) | (178, 178, 255) |
+| green | (0, 2, 0) | (111, 234, 111) |
+| blue | (0, 0, 2) | (111, 111, 234) |
+| cyan | (0, 2, 2) | (139, 225, 225) |
+| violet | (1, 0, 2) | (206, 119, 230) |
+| blue | (0, 0, 8) | (177, 177, 255) |
 
-A pure blue at radiance 8 arrives on screen as **(178, 178, 255)** — a pale blue-white. That is AgX's
+A pure blue at radiance 8 arrives on screen as **(177, 177, 255)** — a pale blue-white. That is AgX's
 inset matrix doing what it is designed to do, and it is precisely what `post/output/chromaRetention`
 (Bioluminescence Phase A) exists to claw back. The measurement belongs here because the *bright
 pass* disagrees with it, which is §5.1.
@@ -514,3 +514,18 @@ tools/gpu-lock.sh build/release/tests/avgen_render_tests "[hdr][lab]"
 The `[.probe]` cases in `test_hdr_lab_gpu.cpp` are Catch2-hidden and are measurements rather than
 tests: they print the tables in §1.2, §2, §5.1 and §5.2 and assert only that the GPU reported no
 errors. Everything in §5.3, §5.4 and §6 that is stated as an invariant is a case that fails.
+
+---
+
+## Note on the AgX numbers above (ADR-372, 2026-09-19)
+
+Every AgX display byte in this document moved by −1 (and one by 0) when ADR-372 corrected the curve
+`agx()` used to undo its own sRGB encode: it was `pow(v, 2.2)` against a `linearToSrgb` that is the
+exact piecewise IEC 61966-2-1 function, and those are not inverses.
+
+The tables here are in the part of the range where the mismatch is smallest. **It is not small
+everywhere** — measured across AgX's whole output range the error reached **9 code values of 255**,
+and a scene-linear grey five stops under mid grey rendered **7 where it should have rendered 16**.
+If you are comparing a frame rendered before 2026-09-19 against one rendered after, the shadows will
+have lifted by up to nine levels and the midtones dropped by one or two. That is the correction, not
+a regression.

@@ -350,3 +350,70 @@ TEST_CASE("A composition's post block can author the colour grade's vectors", "[
     CHECK(live.halationTint.g == 0.2f);
     CHECK(live.anamorphicTint.b == 1.0f);
 }
+
+TEST_CASE("The motion-blur shape parameters survive save, load, save (ADR-350, ADR-372)",
+          "[scene][post][motionblur]") {
+    // Before ADR-372 these three were read by `fs_motion_blur` on every frame that blurs and
+    // registered nowhere, so no scene and no project could set them: `post/motionBlur/amount` was
+    // the only reachable motion-blur control. Built, and unreachable -- the same family as the
+    // unwired identifier target, one layer along.
+    params::ParameterSet params;
+    params::Modulator modulator;
+    auto p = scene::registerPostParameters(params, scene::PostSettings{});
+    REQUIRE(p.motionBlurSamples != nullptr);
+    REQUIRE(p.motionBlurMaxRadius != nullptr);
+    REQUIRE(p.motionBlurTileSize != nullptr);
+
+    // The defaults must still be the defaults, or registering them changes every existing render.
+    scene::PostSettings defaults;
+    CHECK(p.motionBlurSamples->value() == static_cast<int>(defaults.motionBlurSamples));
+    CHECK(p.motionBlurMaxRadius->value() == defaults.motionBlurMaxRadius);
+    CHECK(p.motionBlurTileSize->value() == static_cast<int>(defaults.motionBlurTileSize));
+
+    p.motionBlurSamples->setBase(24);
+    p.motionBlurMaxRadius->setBase(55.5f);
+    p.motionBlurTileSize->setBase(12);
+
+    const nlohmann::json first = params::saveProject(params, modulator);
+    const char* kPaths[] = {"post/motionBlur/samples", "post/motionBlur/maxRadius",
+                            "post/motionBlur/tileSize"};
+    for (const char* path : kPaths) {
+        INFO("named key " << path);
+        REQUIRE(first["parameters"].contains(path));
+    }
+
+    params::ParameterSet reloaded;
+    params::Modulator reloadedModulator;
+    auto q = scene::registerPostParameters(reloaded, scene::PostSettings{});
+    REQUIRE(params::loadProject(first, reloaded, reloadedModulator).has_value());
+    reloaded.resetFinals();
+    scene::PostSettings live;
+    scene::applyPostParameters(q, live);
+    CHECK(live.motionBlurSamples == 24u);
+    CHECK(live.motionBlurMaxRadius == 55.5f);
+    CHECK(live.motionBlurTileSize == 12u);
+
+    // The second save is the one ADR-350 exists for.
+    const nlohmann::json second = params::saveProject(reloaded, reloadedModulator);
+    for (const char* path : kPaths) {
+        INFO("named key after re-save " << path);
+        REQUIRE(second["parameters"].contains(path));
+        CHECK(second["parameters"][path] == first["parameters"][path]);
+    }
+
+    // The declared ranges are the clamps `PostProcessor::run` already applies -- samples to [2,32]
+    // and tileSize to [4,40]. A parameter that can express a value the chain silently alters is a
+    // slider whose top half does nothing, which is the defect this fix exists to remove wearing a
+    // different hat. Asserted here so the two cannot drift apart.
+    // `value()` reads the *final* value, which `setBase` does not touch until the set is resolved.
+    // Reading the base directly is what asks the question being asked here -- did the hard range
+    // clamp the authored value -- without depending on resolution order.
+    p.motionBlurSamples->setBase(1000);
+    CHECK(p.motionBlurSamples->base() == 32);
+    p.motionBlurSamples->setBase(-5);
+    CHECK(p.motionBlurSamples->base() == 2);
+    p.motionBlurTileSize->setBase(1000);
+    CHECK(p.motionBlurTileSize->base() == 40);
+    p.motionBlurTileSize->setBase(0);
+    CHECK(p.motionBlurTileSize->base() == 4);
+}

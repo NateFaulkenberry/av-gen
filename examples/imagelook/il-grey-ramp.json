@@ -1,0 +1,24 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "Image/Look capture: grey-ramp"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "il-grey-ramp.scene.json"
+    }
+  },
+  "parameters": {},
+  "routes": [],
+  "sources": [],
+  "presets": [],
+  "timeline": {},
+  "render": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "output": "sequence"
+  }
+}

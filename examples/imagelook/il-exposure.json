@@ -1,0 +1,26 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "Image/Look capture: exposure"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "il-exposure.scene.json"
+    }
+  },
+  "parameters": {
+    "camera/exposure/compensation": -2.0
+  },
+  "routes": [],
+  "sources": [],
+  "presets": [],
+  "timeline": {},
+  "render": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "output": "sequence"
+  }
+}

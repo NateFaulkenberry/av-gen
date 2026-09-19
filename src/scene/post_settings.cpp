@@ -110,6 +110,35 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     p.tiltShiftMaxRadius =
         &params.add(f("post/tiltShift/maxRadius", s.tiltShiftMaxRadius, 0.0f, 32.0f, 0.0f, 16.0f));
     p.motionBlurAmount = &params.add(f("post/motionBlur/amount", s.motionBlurAmount, 0.0f, 1.0f, 0.0f, 1.0f));
+    // ADR-372. These three were read by `fs_motion_blur` on every frame that blurs and could not be
+    // set from a scene or a project: `amount` was the only registered motion-blur control. Their
+    // ranges are the clamps `PostProcessor::run` already applies, so a parameter cannot now express
+    // a value the chain would silently alter -- a slider whose top half does nothing is the same
+    // defect wearing a different hat.
+    {
+        params::ParamDesc<int> d;
+        d.path = "post/motionBlur/samples";
+        d.defaultValue = static_cast<int>(s.motionBlurSamples);
+        d.hardMin = 2;   // PostProcessor clamps to [2, 32]
+        d.hardMax = 32;
+        d.softMin = 4;
+        d.softMax = 32;
+        d.label = "post/motionBlur/samples (taps along the smear; fewer bands a long streak)";
+        p.motionBlurSamples = &params.add(std::move(d));
+    }
+    p.motionBlurMaxRadius =
+        &params.add(f("post/motionBlur/maxRadius", s.motionBlurMaxRadius, 0.0f, 200.0f, 8.0f, 80.0f));
+    {
+        params::ParamDesc<int> d;
+        d.path = "post/motionBlur/tileSize";
+        d.defaultValue = static_cast<int>(s.motionBlurTileSize);
+        d.hardMin = 4;   // PostProcessor clamps to [4, 40]
+        d.hardMax = 40;
+        d.softMin = 8;
+        d.softMax = 40;
+        d.label = "post/motionBlur/tileSize (velocity tile edge in pixels; also the reach in tiles)";
+        p.motionBlurTileSize = &params.add(std::move(d));
+    }
     p.antialias = &params.add(f("post/output/antialias", s.antialias, 0.0f, 1.0f, 0.0f, 1.0f));
     p.sharpen = &params.add(f("post/output/sharpen", s.sharpen, 0.0f, 1.0f, 0.0f, 1.0f));
     {
@@ -197,6 +226,8 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
         // Cinematic integration (§52.1). Read here *and* written back, because ADR-350's failure was
         // a block with a reader and no writer, and this block's writer is the echo of what was read
         // -- so a key this table does not name is a key a scene cannot carry.
+        {"motionBlurAmount", p.motionBlurAmount},
+        {"motionBlurMaxRadius", p.motionBlurMaxRadius},
         {"lookAtmospheric", p.lookAtmospheric},
         {"lookAtmosphericDistance", p.lookAtmosphericDistance},
         {"lookColour", p.lookColour},
@@ -332,6 +363,11 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
     s.tiltShiftFalloff = p.tiltShiftFalloff->value();
     s.tiltShiftMaxRadius = p.tiltShiftMaxRadius->value();
     s.motionBlurAmount = p.motionBlurAmount->value();
+    if (p.motionBlurSamples != nullptr) {
+        s.motionBlurSamples = static_cast<std::uint32_t>(std::max(p.motionBlurSamples->value(), 2));
+        s.motionBlurMaxRadius = p.motionBlurMaxRadius->value();
+        s.motionBlurTileSize = static_cast<std::uint32_t>(std::max(p.motionBlurTileSize->value(), 4));
+    }
     s.antialias = p.antialias->value();
     s.sharpen = p.sharpen->value();
     s.sharpenId = static_cast<std::uint32_t>(std::max(p.sharpenId->value(), 0));

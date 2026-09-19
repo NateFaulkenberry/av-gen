@@ -1,0 +1,259 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "il-hue-wheel",
+  "camera": {
+    "mode": 0,
+    "position": [
+      0,
+      0,
+      12
+    ],
+    "target": [
+      0,
+      0,
+      0
+    ],
+    "fov": 42.0,
+    "orbitSpeed": 0.0
+  },
+  "environment": {
+    "intensity": 0.0,
+    "background": [
+      0.01,
+      0.012,
+      0.02
+    ],
+    "fogDensity": 0.0
+  },
+  "nodes": [
+    {
+      "name": "hue0",
+      "kind": "procedural",
+      "position": [
+        -3.125,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            2,
+            0,
+            0
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "hue1",
+      "kind": "procedural",
+      "position": [
+        -1.875,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            0,
+            2,
+            0
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "hue2",
+      "kind": "procedural",
+      "position": [
+        -0.625,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            0,
+            0,
+            2
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "hue3",
+      "kind": "procedural",
+      "position": [
+        0.625,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            0,
+            2,
+            2
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "hue4",
+      "kind": "procedural",
+      "position": [
+        1.875,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            2,
+            2,
+            0
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "hue5",
+      "kind": "procedural",
+      "position": [
+        3.125,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            1,
+            0,
+            2
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    }
+  ]
+}
