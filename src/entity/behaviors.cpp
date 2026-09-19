@@ -1726,6 +1726,10 @@ private:
 
     void applyGrounding(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion,
                         float speed) {
+        // ADR-344: cleared first, set below only when a surface was actually read. A foot IK layer
+        // reads this every frame and a stale `true` is a body planting its feet on ground it has
+        // left -- the same defect `airborne` exists to stop, one field along.
+        state.hasGroundPlane = false;
         if (ctx.nav == nullptr) {
             return;
         }
@@ -1998,6 +2002,12 @@ public:
         if (mine) {
             state.radius = declared;
         }
+        // ADR-344, and it goes above both yields rather than below them: a foot IK layer reads this
+        // every frame, and a body in a tractor beam that kept its last ground plane would plant its
+        // hooves on the hillside it was lifted off. That is the defect the comment below already
+        // names -- "a cow standing in a beam looking startled" -- arriving by a second route. Set
+        // true again only when a surface has actually been read.
+        state.hasGroundPlane = false;
         if (ctx.nav == nullptr) {
             return;
         }
