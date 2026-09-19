@@ -1,75 +1,78 @@
 # Current Task
 
 ## Objective
-Two owner-priority tracks, both running as agents in worktrees:
+Three owner-priority tracks running as agents in worktrees, plus merges landing on main.
 
-1. **`glowmere-valley-2-multicam` performance regression** (priority). The owner reports it "has
-   ground to a halt" since the project was ported to the new animation system. Also: get the
-   animations behaving correctly on that system.
-2. **Tree of Life COSMIC floating island art pass** (parallel). 26-phase owner spec: tree wind,
-   falling leaves, tree energy, canopy shimmer, tree particles, and a large world-space cosmic
-   vortex below the island. The owner has said this is likely the only Tree of Life variant they
-   will develop further.
-
-## Why
-Both are the owner's stated priorities as of 2026-09-19 ~10:00. The cinematic key-light work is
-**paused by owner instruction at its section 16** and is merged (`483cdaaa`); sections 17-20 are not
-done and are not to be continued without the owner saying so.
+1. **`glowmere-valley-2-multicam` performance regression** (`agent/mcperf`, running). Owner: it "has
+   ground to a halt" since the port to the new animation system. Also fix animation correctness.
+2. **Tree of Life COSMIC art pass** (`agent/cosmicart`). **Phase 0/1 delivered and being merged.**
+   Remaining S3-S6: leaf cards, cosmic vortex, tree energy / canopy shimmer / tree particles,
+   island underside, comet coupling, bespoke UI panels.
+3. **Multi-backend offline rendering + Metal hybrid RT + video output** (`agent/mbackend`, running).
+   Currently on the audit; not to start a large refactor before the audit is written down.
 
 ## Current Status
-- `agent/mcperf` -- performance agent, running.
-- `agent/cosmicart` -- Tree of Life cosmic agent, running.
-- Main is at the cosmickey merge plus the Aurora cleanup. Three test failures in
-  `test_treeisland_example.cpp` are being fixed by the supervisor (build in flight).
+Main at `8f23d2ec` plus an in-flight merge of `agent/cosmicart` (build + full suite running).
+
+## Two decisions open for the owner
+- **`nodes/tree-foliage/emissiveBoost` 2.2 -> 0.5.** Measured with `tools/light_probe.py`, which
+  partitions subject pixels by the sign of n.L from the normal AOV: key-to-shadow contrast 5.537 at
+  2.2 versus 8.368 at 0.5, because the emission lifts the shadow side 60% and the key side only 6%.
+  `shadow_floor` unchanged at 0.0001, so 0.5 does not crush to a silhouette. Agent recommends 0.5
+  and deliberately did not edit the owner's live UI value.
+- **`sky.groundColor`** was raised ~7x in three doublings by the key-light pass
+  (0.0052 -> 0.0105 -> 0.0210 -> 0.0360 on red) to lift the island underside out of black. Brief
+  section 17 wants "deep environmental shadow" and warns against "flat HDRI illumination", which
+  argues the other way. Test ceiling split and loosened with the reasoning recorded; unresolved.
 
 ## The strongest open lead on the performance regression
-**An app save silently drops the baked camera.** Observed live: at 10:07 the running app wrote
-`glowmere-valley-2-multicam.json` and the save removed two entire top-level keys --
-`cameraAimFollow` (37 entries) and `cameraShotSpans` (42 entries), the bake from `9433044d`.
-`parameters` went *up* 5502 -> 5530, so it is not a truncated write. Restored from git.
+**An app save silently drops the baked camera.** At 10:07 the running app wrote
+`glowmere-valley-2-multicam.json` and removed two whole top-level keys -- `cameraAimFollow` (37
+entries) and `cameraShotSpans` (42), the bake from `9433044d`. `parameters` went *up* 5502 -> 5530,
+so not a truncated write. Restored from git; both copies in the scratchpad. If a save destroys the
+bake, the camera must derive the cut live, which fits "ground to a halt" and fits "after I asked you
+to fix animation". **Hypothesis, not a finding** -- the frame-time cost must be measured.
 
-Both versions kept for comparison:
-- `<scratchpad>/multicam-committed.json`   (good, has the bake)
-- `<scratchpad>/multicam-app-save-1007.json` (the drop)
+## The pattern that keeps recurring: reader and writer disagree
+Three instances on 2026-09-19, all the same family:
+- `DayNightSettings` (ADR-350): reader, no writer -- saving a scene destroyed the block.
+- `wind.enabled` (ADR-360): writer gated on the flag its own reader checks, so nothing in the app
+  could ever turn it on. The owner's saved `scene/windSpeed` had never moved a vertex.
+- `cameraAimFollow` / `cameraShotSpans`: loads fine, save drops them.
+Still open and unfixed: **`softness` (soft particles) is authored, serialised, uploaded into
+`u.turb.z` and read by no shader.** Same family, found and flagged, not yet fixed.
 
-If the app destroys the bake on every save, the camera necessarily falls back to deriving the cut
-live, which is a plausible cause of "ground to a halt" and fits "after I asked you to fix animation"
-exactly. **This is a hypothesis, not a finding.** It must be shown that the absence of those keys
-actually costs frame time; if it does not, it is still a serious correctness bug but not this bug.
+The test that catches all of them is ADR-350's prescribed pair: set a non-default value, save, load,
+save, assert it survived. Check *named keys*, not file size -- the camera-bake loss shrank the file
+by 10,000 lines while the parameter count rose, so every cheap check said healthy.
 
-## Owner decisions taken today
-- **ADR-091 is relaxed for particle systems**: scrub need not exactly replay particle animation.
-  Owner's words: "I think we can ease the scrub must exactly replay particle animations yeah?"
-  Still required: a render must be reproducible, and the relaxation does not extend to tree wind,
-  shimmer, energy or vortex density, which stay pure functions of time.
-- `glowmere-valley-2.json`'s 47 dead `atmos/Aurora/` parameters: **dropped**, not restored. The base
-  cut has no aurora, deliberately; the multicam cut does.
-- `nodes/tree-foliage/emissiveBoost` **left at the owner's 2.2**, not the key-light branch's 0.5.
-  Unresolved: 0.5 was the point of that branch (the foliage was lighting itself, so the key appeared
-  to cast nothing). The cosmic-art agent is to settle it with a render.
+## ADR numbering is colliding constantly
+Three collisions in one session (354 twice, 359 twice). Agents branch from the same main and mint
+the next free number independently. **Before merging any branch that adds an ADR, check the number
+against main, and renumber per file** -- a blanket sed rewrites unrelated documents that cite the
+*other* ADR of that number. Current high-water mark: **ADR-360**.
 
 ## Known Problems
-- **A render is evidence about the binary that produced it.** Build `--target avgen` explicitly; an
-  agent lost an hour to byte-identical pairs from a stale `src/avgen`.
-- **Reconfigure CMake after every merge** (`cmake -S . -B build/release`). The test glob is evaluated
-  at configure time, so an incremental build omits test files a merge added and the suite passes
-  without compiling them.
-- Do not `pkill -f avgen_tests`; it kills other agents' runs. Copy to a distinct name and
-  `codesign -s - -f` it, or the kernel SIGKILLs the copy silently.
-- The owner edits projects in the running app while agents work. A file can change under you.
+- Build the `avgen` app target explicitly before rendering; a stale `src/avgen` once produced an
+  hour of byte-identical render pairs.
+- `cmake -S . -B build/release` after every merge -- the test glob is configure-time.
+- Do not `pkill -f avgen_tests`. Copy to a distinct name and `codesign -s - -f` it.
+- zsh does not word-split unquoted variables; verify by counting, not by absence of an error.
+- `pgrep -f <cmd>` matches your own command line, so `until ! pgrep ...` waiters never fire.
+- The owner edits projects in the running app while agents work.
+- **On main and not anyone's branch:** `avgen_render_tests` dies with a bus error in full-suite runs
+  (`test_wind_gpu.cpp:272`, then SIGABRT while Catch2 stringifies a 4 MB byte vector). Reproduces at
+  `e41660d5`. Two separable bugs: a byte-identity check that passes alone and fails in a suite, and
+  a reporter that cannot survive printing its own failure.
 
 ## Tests
-Main baseline **2436 cases**. One `[!shouldfail]` by design (`test_character_lab_slopes.cpp`,
-ADR-260). Three `test_treeisland_example.cpp` failures are the supervisor's to fix and are not a
-regression in anyone's branch.
-
-`python3 tools/check_project_integrity.py` -- new, read-only, exits non-zero. Checks stale scene
-fingerprints and `worldfx/`|`atmos/` parameters naming no effect. Run it before every commit that
-touches `examples/`.
+Main baseline **2452 cases** before the cosmicart merge; 1 `[!shouldfail]` by design
+(`test_character_lab_slopes.cpp`, ADR-260). `python3 tools/check_project_integrity.py` is read-only,
+exits non-zero, and must be clean before any commit touching `examples/`.
 
 ## Next Action
-Finish the `test_treeisland_example.cpp` fix (build in flight), run the suite, confirm 2436 green
-minus the one expected failure. Then await the two agents.
+Confirm the cosmicart full-suite numbers, commit the merge, remove the worktree. Then await mcperf
+and mbackend.
 
 ## Last Updated
-2026-09-19 11:05
+2026-09-19 12:35

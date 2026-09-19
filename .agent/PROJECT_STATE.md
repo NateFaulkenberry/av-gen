@@ -26,8 +26,9 @@
 - `agent/slicetool` — cmd-click slice tool for the sequence lanes, obeying active snapping.
 
 ## Known regressions / unresolved
-- **Possible colour regression**: the multicam film's t=48.5 reportedly went dark blue → bright
-  saturated cyan across the path-tracer/LOD/water merges. **Unconfirmed, uninvestigated.**
+- ~~**Possible colour regression** at multicam t=48.5~~ **CLOSED 2026-09-19.** The owner checked the
+  film and there is no regression. Never reproduced by anyone; it cost no work because nobody
+  started. Do not re-open without a render pair.
 - ~~**~5 fps** in both Tree of Life scenes~~ **FIXED** (ADR-355). Three call sites used the
   uncached `MeshData::bounds()` (a full vertex scan) where `Scene::meshBounds()` caches against
   `meshVersion`; the tree's 45 entities carry 39.9 M vertices, rescanned ~5x a frame. Editor frame

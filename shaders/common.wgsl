@@ -147,6 +147,15 @@ struct ObjectUniforms {
     flags: vec4<f32>,          // x = alpha mode (0 opaque, 1 mask, 2 blend), y = alpha cutoff, z = unlit, w = texture mask
     ids: vec4<f32>,            // x = object id (ADR-030 `objectId`), y = material id, z = bloom weight,
                                // w = the skinned joint count (pbr_skinned.wgsl)
+    // ADR-360: mesh wind. windShape.y is the gate AND the amplitude; 0 means the deformation is not
+    // evaluated and the draw is byte-identical to one from before this existed, which is the state
+    // every object in every existing scene is in. Shared by every mesh of one body, deliberately:
+    // see meshWindOffset below for why they may not each carry their own origin.
+    windOrigin: vec4<f32>,     // xyz = the body's root in world space, w = 1 / body height
+    windShape: vec4<f32>,      // x = 1 / body radius, y = strength (0 = off), z = branch influence,
+                               // w = foliage influence
+    windTune: vec4<f32>,       // x = trunk influence, y = leaf flutter, z = response lag (seconds),
+                               // w = the previous frame's time, for the velocity target
 };
 
 // The material tier this draw shades at (ADR-133; 0 full, 1 reduced lights, 2 flat). Uniform across
@@ -197,6 +206,12 @@ fn materialTierLocalLights(tier: u32) -> u32 {
 @group(0) @binding(0) var<uniform> frame: FrameUniforms;
 @group(1) @binding(0) var<uniform> object: ObjectUniforms;
 
+// ADR-055's wind field, and ADR-360's reason for hoisting it here from procedural.wgsl: the mesh
+// vertex stage below now deforms too, and wind.wgsl needs `frame`, so it has to come after the
+// binding above and before vs_main. The include directive does not de-duplicate -- procedural.wgsl
+// used to include this itself and no longer may.
+#include "wind.wgsl"
+
 struct VertexIn {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
@@ -212,16 +227,93 @@ struct VertexOut {
     @location(4) prevClip: vec4<f32>, // last frame's clip position, for the velocity target
 };
 
+// ADR-360. Wind deformation for imported meshes, which had none: `windDisplacement` above was
+// reached only from the instanced procedural scatter, so the Tree of Life -- five GLBs -- could not
+// move however high the scene's wind was turned, and a four-arm render of it at windSpeed 0, 4.0
+// and with the field forced on in the scene file came back byte-identical.
+//
+// WHY THIS IS A FUNCTION OF WORLD POSITION AND NOT OF THE MESH. `bendDisplacement` bends a mesh
+// about ITS OWN base, and scene/tree_rig.hpp already documents what that costs on this asset: two
+// tiers bent about different origins separate at every joint between them, and no setting of the
+// amounts fixes it, because the discontinuity is in the decomposition. Here every term reads the
+// vertex's world position and a per-BODY origin that all five meshes share, so two vertices at the
+// same point in space are displaced identically whichever mesh they came from. There are no cracks
+// to tune away. What that buys is paid for in fidelity: the hierarchy below is a proxy built from
+// height and radial distance, not the tree's real topology, so a branch that hangs low and close to
+// the trunk moves like a trunk. At this scale nobody reads that; a skeleton would need a TreeGraph
+// the GLB does not carry.
+//
+// Pure function of (uniforms, position, time), per ADR-091: scrubbing to a frame and playing to it
+// put the crown in the same place. The owner's 2026-09-19 relaxation covers particles, not this.
+fn meshWindOffset(worldPos: vec3<f32>, t: f32) -> vec3<f32> {
+    let strength = object.windShape.y;
+    if (strength <= 0.0 || frame.windDir.w <= 0.0) {
+        return vec3<f32>(0.0);
+    }
+    let root = object.windOrigin.xyz;
+    let invHeight = object.windOrigin.w;
+    let height = 1.0 / max(invHeight, 1e-6);
+    // Height along the body, 0 at the root: the whole anchoring story, since every tier's profile
+    // is a power of it and every power of 0 is 0.
+    let h = clamp((worldPos.y - root.y) * invHeight, 0.0, 1.0);
+    // Distance out from the body's axis, normalised. This is what separates a trunk from a twig
+    // without knowing which mesh either is in.
+    let r = clamp(length(worldPos.xz - root.xz) * object.windShape.x, 0.0, 1.0);
+
+    // Two samples. The root's is what the body leans to as a whole -- a tree does lean as one
+    // thing. The vertex's own is what stops the crown twitching as a unit: a limb on the windward
+    // side meets a gust front before the one behind it, because the front travels.
+    let wRoot = windSampleAt(root, t - object.windTune.z);
+    let wHere = windSampleAt(worldPos, t);
+    let dir = wRoot.direction;
+    let perp = vec2<f32>(-wHere.direction.y, wHere.direction.x);
+
+    // Three tiers, three profiles, three rates, and not one global sine between them.
+    let trunk = pow(h, 2.4) * (1.0 - 0.65 * r) * object.windTune.x;
+    let branch = pow(h, 1.7) * smoothstep(0.05, 0.60, r) * object.windShape.z;
+    let foliage = pow(h, 1.3) * smoothstep(0.28, 1.00, r) * object.windShape.w;
+
+    // The coefficients are fractions of the BODY'S HEIGHT, and the first calibration of them was
+    // wrong in a way worth recording: 0.05 reads as "five per cent" and sounds modest, but this
+    // tree is 138 metres, so it asked for seven metres of crown travel -- and because the tier
+    // weights vary with position, seven metres of travel means a couple of metres of DIFFERENCE
+    // across a single leaf card. The render came back with the canopy shredded into horizontal
+    // dashes: every leaf stretched, because its own vertices had been pulled apart. The amplitude
+    // that matters is not the one you can see at the crown, it is the gradient across the smallest
+    // piece of geometry the mesh is made of. A monument moves about one per cent of its height.
+    let steady = wRoot.strength * (1.0 + 0.9 * wRoot.gust);
+    var off = dir * (steady * (trunk + 0.55 * branch) * 0.045);
+    // Secondary limbs travel on their own local front, so the crown is never in phase with itself.
+    off = off + wHere.direction * (wHere.strength * (0.35 + wHere.gust) * branch * 0.030);
+    // Foliage flutter: fast, small, and decorrelated by the field's spatial phase term, which is
+    // what keeps neighbouring leaves rattling out of step instead of shimmering together. Two
+    // orders of magnitude below the lean, because this is centimetres of leaf, not metres of limb.
+    let flutter = sin(wHere.phase + t * (5.5 + 3.0 * wHere.strength) + h * 9.0);
+    off = off + perp * (flutter * foliage * object.windTune.y * 0.0004 * (0.35 + wHere.strength));
+
+    var disp = vec3<f32>(off.x, 0.0, off.y) * (strength * height);
+    // A limb that bends keeps its length, so the tip drops. Without this the crown shears sideways,
+    // which is the classic fake-wind read.
+    let travel = length(disp);
+    disp.y = disp.y - 0.5 * travel * travel / max(height * max(h, 0.05), 1e-4);
+    return disp;
+}
+
 @vertex
 fn vs_main(in: VertexIn) -> VertexOut {
     var out: VertexOut;
-    let world = object.model * vec4<f32>(in.position, 1.0);
+    var world = object.model * vec4<f32>(in.position, 1.0);
+    world = vec4<f32>(world.xyz + meshWindOffset(world.xyz, frame.params.x), world.w);
     out.clip = frame.viewProj * world;
     out.worldPos = world.xyz;
     out.normal = normalize((object.normalMatrix * vec4<f32>(in.normal, 0.0)).xyz);
     out.uv = in.uv;
     out.localPos = in.position;
-    out.prevClip = frame.prevViewProj * (object.prevModel * vec4<f32>(in.position, 1.0));
+    // The velocity target needs where this vertex was, which for a swaying mesh is not where the
+    // previous model matrix alone puts it (ADR-035).
+    let prevWorld = object.prevModel * vec4<f32>(in.position, 1.0);
+    let prevMoved = prevWorld.xyz + meshWindOffset(prevWorld.xyz, object.windTune.w);
+    out.prevClip = frame.prevViewProj * vec4<f32>(prevMoved, prevWorld.w);
     return out;
 }
 
