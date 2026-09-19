@@ -86,6 +86,8 @@ public:
           samplesTotal_(samplesTotal) {
         settings_ = traceSettingsFrom(request_.trace, request_.width, request_.height);
         samplesTotal_.store(settings_.samplesPerPixel);
+        // Motion is an AOV, and the AOVs are the only consumer of the previous frame.
+        wantsMotion_ = request_.trace.writeAovs;
     }
 
     Result<void> begin(const FrameRange& range, std::uint64_t frames) override {
@@ -171,9 +173,16 @@ public:
         aovFrames_.push_back(request_.trace.writeAovs ? std::move(fb) : pathtrace::Framebuffer{});
 
         // The scene as it was, for the next frame's motion pass. A deep copy, which is what
-        // `pathtrace::Snapshot`'s own header says is required: the controller mutates the scene in
-        // place and two timeline times cannot otherwise coexist.
-        previous_ = engine_.scene();
+        // `pathtrace::Snapshot`'s own header requires: the controller mutates the scene in place
+        // and two timeline times cannot otherwise coexist.
+        //
+        // Only when something will READ it. `scene::Scene` carries every mesh and every texture,
+        // so on the Tree of Life this is tens of megabytes per frame, and the motion pass is the
+        // sole consumer -- paying for it on a sequence that writes beauty only would be a cost
+        // with no output, which is the kind of thing that hides in a renderer for a year.
+        if (wantsMotion_) {
+            previous_ = engine_.scene();
+        }
         return {};
     }
 
@@ -205,6 +214,7 @@ private:
     std::uint64_t frames_ = 0;
     std::vector<SequenceFrame> ready_;
     std::vector<pathtrace::Framebuffer> aovFrames_;
+    bool wantsMotion_ = false;
     std::optional<scene::Scene> previous_;
 };
 
