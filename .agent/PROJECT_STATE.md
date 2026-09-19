@@ -3,8 +3,8 @@
 **Updated:** 2026-09-19 06:20
 **Branch:** `main` @ `3468d849`
 **Build:** PASS (`cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release && cmake --build build/release`)
-**Tests:** `~[gpu]` green. Last full verified run: **2,414 cases / 3,796,327 assertions**, 4 skipped,
-`1 failed as expected`. A run covering `3468d849` was in flight at handoff — re-run to confirm.
+**Tests:** `~[gpu]` green at `3468d849`: **2,416 cases / 3,796,385 assertions**, 4 skipped,
+`1 failed as expected`, exit 0. Verified after the multicam defect merge.
 
 > The single `FAILED:` in every run is `test_character_lab_slopes.cpp:187`, a `[!shouldfail]`
 > control. Catch2 reports it as *failed as expected* and exits 0. **It is a pass.**
