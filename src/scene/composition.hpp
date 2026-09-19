@@ -667,6 +667,37 @@ public:
         std::string node;     // the composition node this light rides, or empty
     };
     [[nodiscard]] const std::vector<AuthoredLight>& authoredLights() const { return authoredLights_; }
+
+    // The live knobs of one authored light (ADR-354). Registered under
+    // "lights/<name>/", which is the path `GltfScene` already gave an *imported* light's
+    // intensity, so the two lighting sources answer to the same prefix.
+    //
+    // Azimuth and elevation describe **where the light comes from**, in world space, which is the
+    // way a person describes a sun: elevation above the horizon, azimuth clockwise from +Z through
+    // +X. Deliberately NOT the camera-relative frame `LightRig` uses -- an authored light is a
+    // property of the world, and a scene whose sun swings round as the camera orbits is the exact
+    // failure the brief's §15 names. Only an aimed light (directional or spot) gets them.
+    //
+    // `angularSize` is the apparent DIAMETER of the source in degrees and it drives
+    // `PunctualLight::softness`, one for one. That is a calibration and not a physical solid
+    // angle: the renderer's penumbra is a PCSS filter width in shadow-map texels, not a cone, and
+    // shaders/shadows.wgsl clamps its blocker search at `softness * 6` texels capped at 24 -- so
+    // the picture stops changing somewhere above four degrees. Read it as "the sun is about a half
+    // and a soft celestial source is two to four", and see the ADR for what it is not.
+    struct AuthoredLightParams {
+        params::Parameter<bool>* enabled = nullptr;
+        params::Parameter<float>* intensity = nullptr;
+        params::Parameter<glm::vec3>* color = nullptr;
+        params::Parameter<float>* azimuth = nullptr;   // degrees, world, source side; aimed lights only
+        params::Parameter<float>* elevation = nullptr; // degrees above the horizon; aimed lights only
+        params::Parameter<float>* angularSize = nullptr;
+        params::Parameter<float>* shadowStrength = nullptr;
+    };
+    // Where a light's source sits, as the two angles above, given the direction it travels.
+    // Free functions rather than methods because the inverse pair has to be checkable without a
+    // composition, and because the editor and the tests both want them.
+    static void lightAngles(const glm::vec3& travelDirection, float& azimuthDegrees, float& elevationDegrees);
+    [[nodiscard]] static glm::vec3 lightDirectionFromAngles(float azimuthDegrees, float elevationDegrees);
     // Rejects the whole set on a duplicate or empty name, and names it, for the reason
     // `setWorldEffects` does: a name is half of an identity, and a light nobody can name is a light
     // nobody can find in a frame that has thirty of them.
@@ -988,6 +1019,8 @@ private:
     void updateFloaters(double time); // ADR-099 §13: drifting instances, once a frame
     std::vector<Floater> floaterScratch_; // reused by updateFloaters so a drifting layer allocates once
     void updateEcologyLights();
+    void registerAuthoredLightParameters(params::ParameterSet& params);
+    void unregisterAuthoredLightParameters();
     void registerNodeParameters(CompositionNode& node);
     void unregisterNodeParameters(CompositionNode& node);
     void unregisterParameters(); // removes every parameter this composition registered, then detach()
@@ -1110,6 +1143,9 @@ private:
     params::Parameter<glm::vec3>* styledSkyAmbient_ = nullptr;
     params::Parameter<glm::vec3>* styledGroundAmbient_ = nullptr;
     params::Parameter<int>* volumeSteps_ = nullptr;
+    // How far the directional shadow cascades reach; 0 = ADR-112's automatic range. See
+    // `Environment::shadowRange` for why a scene is allowed an opinion about this one.
+    params::Parameter<float>* shadowRange_ = nullptr;
     params::Parameter<float>* keyLight_ = nullptr;   // multiplier on the default key light
     bool addedKeyLight_ = false;
     mutable std::uint64_t frameCounter_ = 0;
@@ -1248,6 +1284,7 @@ private:
     std::vector<world::AtmosphericEffect> atmosphericEffects_;
     // ADR-278: authored, round-tripped as the top-level "lights".
     std::vector<AuthoredLight> authoredLights_;
+    std::vector<AuthoredLightParams> authoredLightParams_; // parallel to `authoredLights_`
     // Where `rebuild` put them in `scene_.lights`, and the node index each one rides (or npos).
     // Resolved once at rebuild rather than by name every frame: the name is the author's handle on
     // the light and the index is the engine's, and looking a string up 60 times a second to move a

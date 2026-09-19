@@ -2058,7 +2058,7 @@ void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Sce
         shadowQuality.cascadeCount = std::clamp(scene.environment.shadowCascades, 1u, 4u);
     }
     shadows_->update(lightOrder_, frame.viewProj, scene.camera.nearPlane, scene.camera.farPlane, sceneRadius,
-                     shadowQuality);
+                     shadowQuality, scene.environment.shadowRange);
     stats_.shadows = shadows_->stats();
     stats_.shadows.shadowMs = shadowMs;
 

@@ -484,6 +484,24 @@ struct Environment {
     // and saved about 11 ms of an 85 ms frame at 2880x1800 -- by a distance the largest single
     // saving found in this renderer. On an object-scale scene the third cascade earns more.
     std::uint32_t shadowCascades = 0; // 0 = whatever the tier says
+    // How far the directional cascades reach, in view depth (metres), overriding ADR-112's
+    // automatic rule when positive. 0 = automatic, which is what every scene that does not set it
+    // gets, so this changes no picture but the one that asks for it.
+    //
+    // It belongs to the scene for the reason `shadowCascades` does, and ADR-112 says so itself:
+    // "where the shadows stop is composition". The automatic rule chooses the range that keeps the
+    // coarsest cascade texel under `shadowTexelTarget` -- 8 cm, which works out at about 77 m
+    // whatever the world is, because the target and the reference resolution are both fixed. That
+    // is the right answer for a scene shot from inside itself and the wrong one for a monument
+    // photographed from two hundred metres away: the whole subject then sits past the last
+    // cascade, every fragment reads as unshadowed, and a shadow-casting key light casts nothing.
+    // Measured on examples/treeisland: the range was 77 m and the nearest geometry was at 110.
+    //
+    // Lengthening the range coarsens the far texel in proportion -- 2 * k * range / resolution,
+    // k about 1.06 at 16:9 -- so a scene that sets this is trading small-detail shadows for having
+    // any shadows at all, and should set it to about the depth its subject actually spans.
+    // Clamped to the camera's own planes where it is read.
+    float shadowRange = 0.0f; // 0 = ADR-112's automatic range
     // Procedural sky (ADR-036): used as the image-based lighting source whenever `environmentMap`
     // is unset, so metals and rough surfaces always have something to reflect. See scene/sky.hpp.
     SkySettings sky;
