@@ -195,7 +195,15 @@ hash it produced before the quality floor, the UI line, the selector reset and t
 cleanup. The other arms rendered in the same pass all hash differently, so that is a stable frame
 and not a hash of nothing.
 
-**Tests**: 2,327 cases / 2,241,670 assertions green, up from the 2,307 / 2,239,146 baseline.
+**Memory.** A chain is an addition, not a trade: the rungs are uploaded beside LOD0 and never
+instead of it. Over the five layers the source geometry is 1,315 MB as imported and the four rungs
+add **145 MB, +11%**. Per layer: wood +32%, twigs +27%, tracery +21%, lumens +55%, foliage **+8%**.
+The foliage's share is the smallest in relative terms and the largest in absolute (+89 MB), and that
+inversion is entirely the vertex-duplication finding below — its source is 1,118 MB of which 1,018
+is duplicate, while its rungs are compacted by `optimiseMesh` and are not.
+
+**Tests**: 2,327 unit cases / 2,241,670 assertions and 337 render cases / 420,238 assertions, both
+green. The unit suite is up from the 2,307 / 2,239,146 baseline this branch started from.
 
 **A finding outside this work's scope, reported because it is larger than this work's result.** The
 imported vertex buffer for these five layers is **1,277 MB where 142 MB is needed**. Every primitive
