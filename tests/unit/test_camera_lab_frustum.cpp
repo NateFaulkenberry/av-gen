@@ -26,11 +26,14 @@
 #include "params/parameter_set.hpp"
 #include "rendering/visibility.hpp"
 #include "scene/composition.hpp"
+#include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_types.hpp"
 #include "world/terrain.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+
+#include <fmt/format.h>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <array>
@@ -483,4 +486,53 @@ TEST_CASE("The frustum margins describe a smaller box than the cull decided with
     // rounding note: on those cameras the panel prints six margins that contradict the cull reason
     // printed beside them.
     CHECK(verdictsDiffer > 0);
+}
+
+// ---- the cull must not rescan the geometry (ADR-348 follow-up) -----------------------------------
+//
+// `Composition::cullEntityNodes` calls `entityCullBounds` for every entity, every frame. For two
+// years that called `MeshData::bounds()`, which scans every vertex, and on the Tree of Life -- 45
+// entities over meshes carrying 39.9 million vertices between them -- it cost **91 ms of a 91.5 ms
+// scene update**, against a 22 ms GPU frame. The scene ran at about five frames a second and every
+// GPU measurement of it looked healthy.
+//
+// This is asserted as a **rebuild count and not a duration**. A timing test would pass on a quiet
+// machine and fail on a loaded one, and this repository has five agents on one machine; a count is
+// the same fact at load average two and at load average forty.
+TEST_CASE("culling a scene does not rescan its vertices", "[scene][culling][bounds]") {
+    scene::Scene scene;
+    // One mesh with enough vertices that a rescan would be obvious, drawn by several entities --
+    // which is the shape that matters: the cost was per *entity*, not per mesh.
+    const scene::MeshId mesh = scene.addMesh(scene::makeUvSphere(1.0f, 64, 48));
+    for (int i = 0; i < 8; ++i) {
+        scene::Entity& e = scene.addEntity(fmt::format("ball{}", i), mesh);
+        e.transform.position = glm::vec3(static_cast<float>(i) * 3.0f, 0.0f, 0.0f);
+    }
+    REQUIRE(scene.meshes[mesh].vertices.size() > 3000);
+
+    const std::uint64_t before = scene.meshBoundsRebuilds();
+    for (int frame = 0; frame < 10; ++frame) {
+        for (const scene::Entity& e : scene.entities) {
+            const scene::CullBounds bounds = scene::entityCullBounds(scene, e);
+            CHECK(bounds.max.x >= bounds.min.x);
+        }
+    }
+    // Eighty calls, one rebuild. The arm.
+    CHECK(scene.meshBoundsRebuilds() - before == 1);
+
+    // The control: the cache is not simply frozen. Change the geometry, say so the way the engine
+    // says so, and the next question is answered afresh -- otherwise the assertion above would also
+    // pass on a cache that had stopped working.
+    scene.meshes[mesh].vertices[0].position = glm::vec3(100.0f, 100.0f, 100.0f);
+    ++scene.meshVersion;
+    const scene::CullBounds moved = scene::entityCullBounds(scene, scene.entities.front());
+    CHECK(scene.meshBoundsRebuilds() - before == 2);
+    CHECK(moved.max.x > 50.0f); // ...and it saw the new vertex
+
+    // And the cached answer is the same answer. A cache that is fast and wrong is worse than the
+    // scan it replaced, so the value is checked against `MeshData::bounds()` directly.
+    const auto [lo, hi] = scene.meshes[mesh].bounds();
+    const auto& cached = scene.meshBounds(mesh);
+    CHECK(cached.first == lo);
+    CHECK(cached.second == hi);
 }

@@ -166,6 +166,7 @@ const std::pair<glm::vec3, glm::vec3>& Scene::meshBounds(MeshId mesh) const {
             meshBoundsCache_[i] = meshes[i].bounds();
         }
         meshBoundsVersion_ = meshVersion;
+        ++meshBoundsRebuilds_;
     }
     return meshBoundsCache_[mesh];
 }
