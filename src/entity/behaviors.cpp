@@ -1946,7 +1946,13 @@ public:
           floatDefault_(readFloat(s, "maxFloat", 0.22f)),
           tiltDefault_(readFloat(s, "maxTilt", 34.0f)),
           bodyRadiusDefault_(readFloat(s, "bodyRadius", 0.0f)),
-          footprintDefault_(readFloat(s, "footprint", 0.0f)),
+          // `GroundSettings`'s own default and not 0. Exposing a knob whose default is not the
+          // value the code already used is how a new setting silently changes every scene that
+          // never heard of it: at 0 the footprint filter is switched off, the body reads the ground
+          // under one point, and every grounded character in the repository starts tracing terrain
+          // noise it used to bridge. ADR-344 shipped that for one commit and the suite lost 16
+          // assertions to it.
+          footprintDefault_(readFloat(s, "footprint", GroundSettings{}.footprint)),
           footDropDefault_(readFloat(s, "footDrop", 0.0f)) {}
 
     [[nodiscard]] std::string_view kind() const override { return "ground"; }
@@ -2026,10 +2032,10 @@ public:
         // ADR-344: how far the body sits down from the footprint mean towards its lowest point, so
         // a foot IK layer has somewhere to lift from. Zero unless a scene asks.
         settings.footDrop = footDrop_ != nullptr ? footDrop_->value() : footDropDefault_;
-        if (footprintDefault_ > 0.0f || footprint_ != nullptr) {
-            settings.footprint =
-                std::max(footprint_ != nullptr ? footprint_->value() : footprintDefault_, 0.0f);
-        }
+        // A body reads the ground over its own width. A bull is 2.65 m long and a chick is 0.14 m,
+        // and grounding both on the same disc makes one of them follow detail it would not feel.
+        settings.footprint =
+            std::max(footprint_ != nullptr ? footprint_->value() : footprintDefault_, 0.0f);
         const glm::vec3 here = state.position();
         const GroundResult ground = follower_.update(*ctx.nav, glm::vec2(here.x, here.z), state.yaw,
                                                      state.speed, ctx.dt, settings);
