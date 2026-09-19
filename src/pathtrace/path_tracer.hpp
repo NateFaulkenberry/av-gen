@@ -13,6 +13,7 @@
 // of the EXR.
 
 #include "core/error.hpp"
+#include "pathtrace/albedo_probe.hpp"
 #include "pathtrace/embree_scene.hpp"
 #include "pathtrace/lights.hpp"
 #include "pathtrace/snapshot.hpp"
@@ -64,6 +65,14 @@ struct TraceSettings {
     // negative radiance is counted and clamped away instead of poisoning the accumulation.
     bool debugCheckNonFinite = false;
 
+    // ADR-345's instrument. Diagnostic ONLY: it must never change a pixel, and a bit-identity test
+    // is what holds that claim up rather than the comment. Off by default.
+    //
+    // It is a runtime setting rather than a compile flag deliberately. A compile flag would make
+    // the diagnostic unavailable in exactly the build somebody is debugging, and the cost when off
+    // is a single predictable branch per shading event -- not worth a second binary.
+    AlbedoProbeSettings albedoProbe;
+
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] unsigned resolvedThreads() const;
 };
@@ -87,6 +96,10 @@ struct Framebuffer {
     std::vector<glm::vec3> emission;  // linear radiance emitted by the first surface hit
     std::vector<float> depth;         // VIEW-SPACE metres along the camera's forward axis
     std::vector<float> objectId;      // packPickId(Entity, index), float-encoded; -1 for a miss
+    // The worst directional albedo the probe saw anywhere along this pixel's paths. Points straight
+    // at the offending REGION of an image, which an aggregate table cannot. Empty unless the probe
+    // ran; 0 where nothing was measured.
+    std::vector<float> worstAlbedo;
 
     [[nodiscard]] std::vector<glm::vec3> resolvedRadiance() const;
     [[nodiscard]] std::vector<glm::vec3> resolvedAlbedo() const;
@@ -125,9 +138,11 @@ public:
                                       Framebuffer& out, CancelFn cancel = {});
 
     [[nodiscard]] const TraceStats& stats() const { return stats_; }
+    [[nodiscard]] const AlbedoProbeReport& albedoProbe() const { return probe_; }
 
 private:
     TraceStats stats_{};
+    AlbedoProbeReport probe_{};
 };
 
 // Writes the framebuffer as scene-linear float EXR through the project's existing tinyexr path.

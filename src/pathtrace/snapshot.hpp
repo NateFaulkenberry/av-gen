@@ -46,7 +46,15 @@ struct Capability {
 struct CapabilityReport {
     std::vector<Capability> entries;
 
+    // Caveats are properties of the RENDERER, not of the scene: they are true of every render and
+    // are listed whatever the content. They are kept apart from `entries` so that `anyDegraded()`
+    // keeps meaning "something in THIS scene was approximated" -- a question a caller may want to
+    // branch on -- while `format()` still prints both, because the startup log is where somebody
+    // debugging actually looks.
+    std::vector<std::string> caveats;
+
     void note(std::string feature, Support support, std::string detail, int count = 0);
+    void caveat(std::string text);
     // True if anything was dropped or approximated -- the one-line answer a caller wants.
     [[nodiscard]] bool anyDegraded() const;
     [[nodiscard]] bool anyUnsupported() const;

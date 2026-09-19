@@ -43,6 +43,8 @@ constexpr float kInvPi = 0.31830988618379067f;
 }
 
 struct Counters {
+    AlbedoProbeReport probe;
+    float pixelWorstAlbedo = 0.0f;
     std::uint64_t shadowRays = 0;
     std::uint64_t nonFinite = 0;
     std::uint64_t negative = 0;
@@ -170,6 +172,56 @@ struct Counters {
 }
 
 // One camera path.
+// The probe, called AFTER every shading decision at this vertex has been made and taken. It reads
+// `m`, `n` and `v`, all of which are already fixed, and writes only into `counters.probe`. It draws
+// from its own generator seeded on (probeSeed, pixel, sample, depth) and never touches `sampler`,
+// which is what makes the image bit-identical with it on and off.
+void probeAlbedo(const AlbedoProbeSettings& cfg, const SurfaceMaterial& m, const glm::vec3& n,
+                 const glm::vec3& v, std::uint32_t depth, std::uint32_t materialId,
+                 std::uint32_t pixelIndex, std::uint32_t sampleIndex, Counters& counters) {
+    // Stride on a hash of the event's identity rather than a running counter: a counter would make
+    // WHICH hits get measured depend on how rows were split across threads, and the report would
+    // change from run to run for no reason.
+    const std::uint64_t h = mixSeed((static_cast<std::uint64_t>(pixelIndex) << 24) ^
+                                    (static_cast<std::uint64_t>(sampleIndex) << 8) ^ depth ^ cfg.seed);
+    if (cfg.hitStride > 1 && (h % cfg.hitStride) != 0) return;
+
+    const AlbedoEstimate est = estimateDirectionalAlbedo(m, n, v, cfg.integralSamples, h);
+    const float albedo = est.mean;
+    ++counters.probe.hitsProbed;
+
+    auto& mats = counters.probe.materials;
+    auto it = std::find_if(mats.begin(), mats.end(),
+                           [&](const AlbedoProbeMaterial& e) { return e.materialId == materialId; });
+    if (it == mats.end()) {
+        mats.push_back(AlbedoProbeMaterial{});
+        it = mats.end() - 1;
+        it->materialId = materialId;
+    }
+    ++it->probed;
+
+    // Statistically significant, not merely numerically above. See AlbedoProbeSettings::sigmaGate.
+    if (albedo - cfg.sigmaGate * est.stdError <= cfg.threshold) return;
+
+    ++counters.probe.exceedances;
+    ++it->exceedances;
+    it->exceedancesByDepth[std::min<std::size_t>(depth, kProbeMaxDepthBuckets - 1)]++;
+    // Record the confident lower bound, not the raw estimate: a max over many noisy means is an
+    // outlier of the estimator rather than of the BRDF. See AlbedoProbeMaterial::worstAlbedo.
+    const float bound = albedo - cfg.sigmaGate * est.stdError;
+    counters.probe.worstAlbedo = std::max(counters.probe.worstAlbedo, bound);
+    counters.pixelWorstAlbedo = std::max(counters.pixelWorstAlbedo, bound);
+    if (bound > it->worstAlbedo) {
+        it->worstAlbedo = bound;
+        it->worstAlbedoEstimate = albedo;
+        it->worstViewCos = glm::dot(n, v);
+        it->worstDepth = depth;
+        it->worstRoughness = m.roughness;
+        it->worstMetallic = m.metallic;
+        it->worstBaseColor = m.baseColor;
+    }
+}
+
 struct PathResult {
     glm::vec3 radiance{0.0f};
     glm::vec3 albedo{0.0f};
@@ -181,7 +233,8 @@ struct PathResult {
 
 [[nodiscard]] PathResult radiance(const Snapshot& snap, const EmbreeScene& embree, Ray ray,
                                   const TraceSettings& settings, Sampler& sampler, Counters& counters,
-                                  const glm::vec3& viewOrigin, const glm::vec3& viewForward) {
+                                  const glm::vec3& viewOrigin, const glm::vec3& viewForward,
+                                  std::uint32_t pixelIndex, std::uint32_t sampleIndex) {
     PathResult path;
     glm::vec3 result{0.0f};
     glm::vec3 throughput{1.0f};
@@ -258,6 +311,15 @@ struct PathResult {
 
         result += throughput * nextEventEstimate(snap, embree, hit, m, view, sampler, settings, counters);
 
+        // Diagnostic only (ADR-345). Placed here, after emission and next-event estimation have
+        // been added and before nothing that depends on them: it reads state that is already final.
+        if (settings.albedoProbe.enabled) {
+            probeAlbedo(settings.albedoProbe, m, hit.shadingNormal, view, depth,
+                        static_cast<std::uint32_t>(scene::packPickId(
+                            scene::PickSpace::Entity, snap.meshes[hit.meshIndex].entityIndex)),
+                        pixelIndex, sampleIndex, counters);
+        }
+
         if (depth >= settings.maxDepth) break;
 
         // --- extend the path ---
@@ -330,6 +392,7 @@ void Framebuffer::resize(std::uint32_t w, std::uint32_t h) {
     radiance.assign(static_cast<std::size_t>(w) * h, glm::vec3(0.0f));
     albedo.clear();
     normal.clear();
+    worstAlbedo.clear();
     emission.clear();
     depth.clear();
     objectId.clear();
@@ -423,6 +486,9 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
     stats_.buildSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - buildStart).count();
 
     out.resize(settings.width, settings.height);
+    if (settings.albedoProbe.enabled) {
+        out.worstAlbedo.assign(static_cast<std::size_t>(settings.width) * settings.height, 0.0f);
+    }
     if (settings.captureFeatures) {
         const std::size_t n = static_cast<std::size_t>(settings.width) * settings.height;
         out.albedo.assign(n, glm::vec3(0.0f));
@@ -451,6 +517,7 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
             }
             for (std::uint32_t x = 0; x < settings.width; ++x) {
                 const std::uint32_t pixelIndex = y * settings.width + x;
+                counters.pixelWorstAlbedo = 0.0f;
                 glm::vec3 sum{0.0f};
                 glm::vec3 albedoSum{0.0f};
                 glm::vec3 normalSum{0.0f};
@@ -462,7 +529,7 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
                                                 static_cast<float>(y) + jitter.y, settings.width,
                                                 settings.height);
                     const PathResult p = radiance(snapshot, embree, ray, settings, sampler, counters,
-                                                  basis.origin, basis.forward);
+                                                  basis.origin, basis.forward, pixelIndex, s);
                     sum += p.radiance;
                     if (settings.captureFeatures) {
                         albedoSum += p.albedo;
@@ -477,6 +544,7 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
                     }
                 }
                 out.radiance[pixelIndex] = sum;
+                if (settings.albedoProbe.enabled) out.worstAlbedo[pixelIndex] = counters.pixelWorstAlbedo;
                 if (settings.captureFeatures) {
                     out.albedo[pixelIndex] = albedoSum;
                     out.normal[pixelIndex] = normalSum;
@@ -501,6 +569,18 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
         std::chrono::duration<double>(std::chrono::steady_clock::now() - renderStart).count();
     stats_.primaryRays =
         static_cast<std::uint64_t>(settings.width) * settings.height * settings.samplesPerPixel;
+    probe_ = AlbedoProbeReport{};
+    probe_.integralSamples = settings.albedoProbe.integralSamples;
+    probe_.hitStride = settings.albedoProbe.hitStride;
+    probe_.sigmaGate = settings.albedoProbe.sigmaGate;
+    for (const auto& c : perThread) {
+        probe_.merge(c.probe);
+    }
+    if (settings.albedoProbe.enabled && probe_.any()) {
+        log::warn("pathtrace: directional albedo exceeded 1 at {} of {} measured shading events "
+                  "(worst {:.3f}). The glTF BRDF is faithful to spec and gains at grazing; see ADR-345.",
+                  probe_.exceedances, probe_.hitsProbed, probe_.worstAlbedo);
+    }
     for (const auto& c : perThread) {
         stats_.shadowRays += c.shadowRays;
         stats_.pathsTerminatedByRoulette += c.roulette;

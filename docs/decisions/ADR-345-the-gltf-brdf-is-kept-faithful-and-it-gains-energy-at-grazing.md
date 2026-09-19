@@ -1,6 +1,6 @@
 # ADR-345: The glTF BRDF is kept faithful, and it gains 68% of its energy at grazing
 
-**Status:** Accepted (a finding plus a decision not to change the model)
+**Status:** Accepted (a finding, and a decision the owner has now made)
 **Date:** 2026-09-18
 **Relates to:** ADR-344 (the path tracer), spec sections 18 and 19
 **Note:** main is at 339 and two other branches hold 340; expect this to be renumbered at merge.
@@ -64,6 +64,23 @@ viewing angle is. Meanwhile the *specular* lobe's directional albedo at grazing 
 Fresnel approaches 1 there. Nothing tells the diffuse lobe how much the specular lobe already took.
 A physically-correct coupling would suppress the diffuse by the specular's **directional albedo**
 E(n.v), not by `F(v.h)`.
+
+## The owner's decision, 2026-09-18
+
+Put to the owner with the measurements and the three options below. Their answer: **"Leave it
+faithful I guess."**
+
+So this is settled rather than deferred. The model stays as the glTF specification defines it, and
+the grazing gain is a known, measured, accepted property of this renderer rather than an open
+question. Two things follow from the *"I guess"*, which is not an enthusiastic yes:
+
+* **The band stays, and stays tight.** It is the only thing that will report this getting worse.
+* **The caveat is printed at render startup**, in the section 55 capability report, not only here.
+  An ADR is no use to somebody who does not already suspect the BRDF; the log is what they read.
+  `CapabilityReport::caveats` exists for this and this is its first entry.
+
+**Do not build the compensation, even behind a flag.** If the owner revisits it, it is a focused
+change with its own renders. A dormant, unexercised code path is worse than none.
 
 ## Decision: keep it faithful, pin it, do not quietly fix it
 

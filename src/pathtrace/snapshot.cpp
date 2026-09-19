@@ -63,6 +63,13 @@ void CapabilityReport::note(std::string feature, Support support, std::string de
     entries.push_back(Capability{std::move(feature), support, std::move(detail), count});
 }
 
+void CapabilityReport::caveat(std::string text) {
+    for (const auto& c : caveats) {
+        if (c == text) return;
+    }
+    caveats.push_back(std::move(text));
+}
+
 bool CapabilityReport::anyDegraded() const {
     return std::any_of(entries.begin(), entries.end(),
                        [](const Capability& c) { return c.support == Support::Degraded && c.count > 0; });
@@ -77,6 +84,9 @@ std::string CapabilityReport::format() const {
     std::string out;
     for (const auto& e : entries) {
         out += fmt::format("  [{:<11}] {:<22} x{:<6} {}\n", supportName(e.support), e.feature, e.count, e.detail);
+    }
+    for (const auto& c : caveats) {
+        out += fmt::format("  [{:<11}] {}\n", "caveat", c);
     }
     return out;
 }
@@ -114,6 +124,15 @@ Snapshot buildSnapshot(const scene::Scene& scene) {
         snap.capabilities.note("analytic sky", Support::Full,
                                "scene::skyRadiance, the same model shaders/environment.wgsl draws", 1);
     }
+
+    // Renderer-level caveats, printed on every render whatever the scene holds. This one is here
+    // rather than only in ADR-345 because the ADR is not where somebody debugging an unexpectedly
+    // bright interior would think to look, and the startup log is.
+    snap.capabilities.caveat(
+        "the glTF metallic-roughness BRDF is kept faithful to the specification (ADR-345), and the "
+        "specification's model GAINS energy at grazing angles: up to 1.68x directional albedo on a "
+        "bright, smooth, non-metallic surface. It compounds per bounce. If an interior render looks "
+        "inexplicably bright, check this first.");
 
     snap.textures = scene.textures;
     snap.lights = scene.lights;

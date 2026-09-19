@@ -23,6 +23,7 @@
 #include <cmath>
 #include <chrono>
 #include <filesystem>
+#include <string>
 #include <thread>
 
 using namespace avgen;
@@ -675,4 +676,33 @@ TEST_CASE("a metal reflects its surroundings and a dielectric does not",
     // distinguish them. The discriminating claim is that the metal's cyan is much greener than the
     // blue sphere's, whose albedo has very little green.
     REQUIRE(metalRight.y / metalRight.x > blueLeft.y / blueLeft.x);
+}
+
+TEST_CASE("the capability report warns about the BRDF's grazing energy gain on every render",
+          "[unit][pathtrace][capability]") {
+    // ADR-345. The owner chose to keep the glTF model faithful, gain and all, so the gain is
+    // permanent and the warning must be too. It goes in the startup report because an ADR is no use
+    // to somebody who does not already suspect the BRDF.
+    const pathtrace::Snapshot snap = pathtrace::buildSnapshot(buildTargetScene());
+    REQUIRE_FALSE(snap.capabilities.caveats.empty());
+
+    const bool found = std::any_of(
+        snap.capabilities.caveats.begin(), snap.capabilities.caveats.end(),
+        [](const std::string& c) { return c.find("ADR-345") != std::string::npos; });
+    REQUIRE(found);
+    // It must say the number and the direction, not merely that a caveat exists.
+    const std::string& c = snap.capabilities.caveats.front();
+    REQUIRE(c.find("1.68") != std::string::npos);
+    REQUIRE(c.find("grazing") != std::string::npos);
+    REQUIRE(c.find("bright") != std::string::npos);
+
+    // It is printed. `format()` is what reaches the log.
+    const std::string report = snap.capabilities.format();
+    REQUIRE(report.find("caveat") != std::string::npos);
+    REQUIRE(report.find("ADR-345") != std::string::npos);
+
+    // CONTROL: a caveat is NOT a scene-content problem. An unremarkable scene must still report
+    // nothing degraded or unsupported, or callers branching on those lose the distinction.
+    REQUIRE_FALSE(snap.capabilities.anyUnsupported());
+    REQUIRE_FALSE(snap.capabilities.anyDegraded());
 }
