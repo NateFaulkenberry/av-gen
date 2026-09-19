@@ -1,4 +1,4 @@
-// Denoising and the feature AOVs that feed it (ADR-350 Phase 4, spec sections 51, 61).
+// Denoising and the feature AOVs that feed it (ADR-353 Phase 4, spec sections 51, 61).
 //
 // These tests run in BOTH build configurations. Without `AVGEN_PATHTRACE_DENOISE` the denoiser must
 // refuse with a message; with it, it must actually denoise. A test that only ran in one

@@ -1,0 +1,26 @@
+# The asset-LOD study's forced-rung and dolly arms (ADR-348).
+#
+# `tools/make_assetlod_arms.py` writes 61 projects and their scenes here, about a megabyte of
+# generated JSON. Two kinds of them are tracked and the rest are not.
+#
+# **Tracked**: `_arm-*` (the control experiment that asks whether the tree is what costs at all) and
+# `tree-<view>-off` / `tree-<view>-auto` (the before/after pairs the ADR's performance table is
+# built from). Those are the ones somebody reading the record would want to open.
+#
+# **Ignored**: `tree-<view>-r<n>` and `dolly-*`. They exist only as inputs to two `[.analysis]`
+# instruments that skip cleanly without them, they are 100 files of near-identical JSON, and one
+# command remakes every one of them byte-for-byte:
+#
+#     tools/make_assetlod_arms.py
+tree-*-r1.json
+tree-*-r1.scene.json
+tree-*-r2.json
+tree-*-r2.scene.json
+tree-*-r3.json
+tree-*-r3.scene.json
+tree-*-r4.json
+tree-*-r4.scene.json
+tree-*-r2-nothin.json
+tree-*-r2-nothin.scene.json
+dolly-*.json
+dolly-*.scene.json

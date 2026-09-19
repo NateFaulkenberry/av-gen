@@ -1,4 +1,4 @@
-// ADR-348: which background the scene pass draws, and the coupling that used to make that one
+// ADR-345: which background the scene pass draws, and the coupling that used to make that one
 // choice with "what lights the scene".
 //
 // Before this, the skybox was always whatever the IBL had been built from. A scene lit by an HDRI
@@ -32,7 +32,7 @@ TEST_CASE("An HDRI can light the scene while the procedural sky stands behind it
     Environment env;
     env.sky.enabled = true;
 
-    // THE ARM. This is the configuration that had no expressible form before ADR-348.
+    // THE ARM. This is the configuration that had no expressible form before ADR-345.
     env.proceduralSkyBackground = true;
     CHECK(skyBackgroundFor(env, kHaveIbl, kFromMap) == SkyBackground::Analytic);
 

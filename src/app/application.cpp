@@ -4736,6 +4736,18 @@ int Application::runHeadless() {
                 // The workload each measured phase was actually given. Without these an A/B that edits
                 // a scene cannot prove its two arms differ, and "no effect" reads exactly like a run
                 // whose edit never applied.
+                // ADR-351: the entity LOD line, printed only when a scene actually has a chain. A
+                // diagnostic that prints "entityLod: 0 of 0" on every frame of every scene that
+                // does not use the feature is a line people learn to skip past.
+                if (st.entityLod.drawables > 0) {
+                    log::info("             entityLod: {}/{} demoted, tris {} -> {} ({:.1f}% of LOD0), "
+                              "rungs {}/{}/{}/{}/{}, changed {} held {}",
+                              st.entityLod.demoted, st.entityLod.drawables,
+                              st.entityLod.sourceTriangles, st.entityLod.drawnTriangles,
+                              100.0 * static_cast<double>(st.entityLod.ratio()), st.entityLod.rungs[0],
+                              st.entityLod.rungs[1], st.entityLod.rungs[2], st.entityLod.rungs[3],
+                              st.entityLod.rungs[4], st.entityLod.changed, st.entityLod.held);
+                }
                 log::info("             workload: volumeSteps={} volumeTarget={}x{} cascades={} shadowRes={} aoTarget={}x{} "
                           "aoSlices={}x{} shadowMask={}x{}/{}L postPasses={} bloomLevels={} "
                           "sdf={}ray/{}mesh simGrids={} "

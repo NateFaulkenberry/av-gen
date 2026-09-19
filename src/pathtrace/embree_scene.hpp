@@ -3,7 +3,7 @@
 // The Embree side of the path tracer (spec section 74: Embree owns intersection, BVH and occlusion;
 // everything else is AV Gen's).
 //
-// Threading (ADR-348, spec section 36/39). Embree is given an explicit thread count and the BVH is
+// Threading (ADR-351, spec section 36/39). Embree is given an explicit thread count and the BVH is
 // committed with `rtcJoinCommitScene` from threads this process already owns, so Embree starts no
 // pool of its own. `app::JobSystem` cannot be used for this: it is a two-worker FIFO of whole jobs
 // with no parallel-for, and its header forbids waiting on it from a render thread.

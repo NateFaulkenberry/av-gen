@@ -8,7 +8,7 @@ and no frame graph with it.
 **It is not what this codebase calls "offline".** That word means `QualityTier::Offline` -- a
 higher-quality configuration of the rasteriser -- and the ADR-020 batch render pipeline. Both keep
 their meaning. This renderer is named for its technique: `avgen::pathtrace`, in `src/pathtrace/`.
-See **ADR-348**, which is the thing to cite when the two vocabularies are confused.
+See **ADR-351**, which is the thing to cite when the two vocabularies are confused.
 
 ## Where it sits
 
@@ -202,8 +202,8 @@ returns the input unchanged, because a denoise that silently did nothing is wors
 refusal.
 
 **Why prebuilt and not CPM-from-source:** OIDN's CPU device requires oneTBB *and* ISPC >= 1.21, a
-third-party **compiler toolchain** its CMake will not proceed without. See **ADR-350**, which also
-amends ADR-348's claim that this work would bring no oneTBB into the tree.
+third-party **compiler toolchain** its CMake will not proceed without. See **ADR-353**, which also
+amends ADR-351's claim that this work would bring no oneTBB into the tree.
 
 The albedo and normal **feature AOVs** arrived here rather than at Phase 6 because the denoiser
 needs them. Captured from the first hit, opt-in via `TraceSettings::captureFeatures`, and capturing
@@ -257,7 +257,7 @@ shows as darkened edges exactly where people look.
 **Known: the glTF BRDF gains energy at grazing angles.** A white, smooth, non-metallic surface
 reaches a directional albedo of 1.68. This is the specification's model behaving as specified, not a
 defect in this code -- metals conserve at 0.9988, so GGX/Smith/Fresnel are correct. It is kept
-faithful per section 19 and pinned as a band. **See ADR-349**, and check it first if an interior
+faithful per section 19 and pinned as a band. **See ADR-352**, and check it first if an interior
 render is ever inexplicably bright.
 
 `docs/pathtrace/phase2-metal-and-texture.png` shows the target scene with a real metal in the middle

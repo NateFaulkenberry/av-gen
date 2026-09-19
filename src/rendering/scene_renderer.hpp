@@ -37,6 +37,7 @@
 #include "rendering/post_processor.hpp"
 #include "rendering/procedural_renderer.hpp"
 #include "rendering/render_quality.hpp"
+#include "rendering/representation.hpp"
 #include "rendering/render_stats.hpp"
 #include "rendering/sdf_renderer.hpp"
 #include "rendering/shader_layer.hpp"
@@ -96,6 +97,26 @@ struct RenderStats {
     std::uint64_t visibleInstances = 0; // procedural instances that survived culling
     std::uint64_t culledInstances = 0;
     std::uint64_t lodCounts[4] = {0, 0, 0, 0};
+    // ADR-351: what the entity LOD selector did this frame. Separate from `lodCounts`, which is the
+    // *procedural scatter's* ladder: the two answer the same question about different populations,
+    // and folding them together would make "the tree demoted" and "eighty thousand ferns demoted"
+    // one number nobody could read. All zero in a scene with no chain, which is every scene that
+    // does not ask for one.
+    struct EntityLod {
+        std::uint32_t drawables = 0;       // entities whose mesh carries a chain
+        std::uint32_t demoted = 0;         // of those, drawn below LOD0
+        std::uint32_t changed = 0;         // rung differs from last frame's
+        std::uint32_t held = 0;            // the dead zone kept them where they were
+        std::uint64_t sourceTriangles = 0; // what LOD0 would have submitted for them
+        std::uint64_t drawnTriangles = 0;  // what the chosen rungs did
+        std::uint32_t rungs[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+        [[nodiscard]] float ratio() const {
+            return sourceTriangles == 0
+                       ? 1.0f
+                       : static_cast<float>(drawnTriangles) / static_cast<float>(sourceTriangles);
+        }
+    };
+    EntityLod entityLod{};
     // Triangles the frame submitted: `geometry.camera.triangles` -- entity meshes, procedural
     // instances at the LOD levels the cull pass chose, and meshed SDFs -- plus the one-triangle
     // fullscreen draws (the skybox and the tone map) this field has always counted. It used to
@@ -266,7 +287,7 @@ struct FrameUniforms {
     world::CometGpu comets[world::kMaxGpuComets];
     world::AuroraGpu auroras[world::kMaxGpuAuroras];
     world::SkyGroundGpu skyGround;
-    // ADR-348: the analytic sky's own parameters, so the background pass can evaluate it directly
+    // ADR-345: the analytic sky's own parameters, so the background pass can evaluate it directly
     // instead of sampling whatever cube the IBL happens to be built from. Appended at the very end
     // for the same reason `atmosCount` was appended after the world effects: no offset above moves,
     // so every other pass's view of this block is byte-identical to what it was.
@@ -286,7 +307,7 @@ struct FrameUniforms {
 // number.
 static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::kMaxGpuWorldEffects +
                                        16 + 160 * world::kMaxGpuComets + 224 * world::kMaxGpuAuroras + 48 +
-                                       64); // ADR-348: four vec4s of analytic sky, appended last
+                                       64); // ADR-345: four vec4s of analytic sky, appended last
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);
@@ -663,6 +684,19 @@ private:
         wgpu::Buffer skin;
         std::uint32_t indexCount = 0;
     };
+    // ADR-351: one mesh's coarser rungs on the GPU, and what the selector needs to cost them.
+    // `levels[0]` is LOD1 -- LOD0 is `meshes_[base]` and is never copied, which is what keeps the
+    // source mesh the only source mesh. Empty for every mesh with no chain, which is all of them
+    // until a scene asks.
+    struct GpuMeshLod {
+        std::vector<GpuMesh> levels;
+        // Rung 0 is the source, so this is one longer than `levels` and is indexed by the level the
+        // selector returns. Surface areas are in the mesh's own units; the instance's scale is
+        // applied where the record is built.
+        std::vector<LodRung> rungs;
+        float hysteresis = 0.0f;
+        float maxScreenError = -1.0f; // negative takes the policy's calibrated default
+    };
     enum class LitVariant : std::uint8_t { OpaqueCull, OpaqueNoCull, Blend };
     // One auxiliary colour target: its texture, its view and nothing else.
     struct AuxTarget {
@@ -883,6 +917,30 @@ private:
     IblResources ibl_;
 
     std::vector<GpuMesh> meshes_;
+    // ADR-351: parallel to `meshes_`, by MeshId. A mesh with no chain carries an empty GpuMeshLod,
+    // which costs three empty vectors and keeps the lookup a subscript rather than a map.
+    std::vector<GpuMeshLod> meshLods_;
+    // Whether this frame's scene had any chain at all. The whole selection pass is skipped when it
+    // did not, so a scene that never asked for LOD pays nothing and -- more to the point -- cannot
+    // be changed by it.
+    bool anyMeshLod_ = false;
+    RepresentationSelector representation_;
+    // What the selector's memory was last keyed to. Identity as well as count, because every fresh
+    // Scene starts at a recycled address and two different scenes can have the same entity count.
+    std::uint64_t lodSceneIdentity_ = 0;
+    std::size_t lodEntityCount_ = 0;
+    // What the selector actually decided this frame, for the diagnostics and the tests: one entry
+    // per rung of every chain-bearing mesh, counted across entities.
+    struct EntityLodStats {
+        std::uint32_t drawables = 0;      // entities offered to the selector
+        std::uint32_t demoted = 0;        // entities drawn at a rung below LOD0
+        std::uint32_t changed = 0;        // entities whose rung differs from last frame's
+        std::uint32_t held = 0;           // entities the dead zone kept where they were
+        std::uint64_t sourceTriangles = 0; // what LOD0 would have submitted for those entities
+        std::uint64_t drawnTriangles = 0;  // what the chosen rungs did submit
+        std::array<std::uint32_t, 8> rungCounts{};
+    };
+    EntityLodStats entityLod_{};
     // The scene the uploaded meshes/textures came from: its address AND its identity, because a
     // recycled address is not the same scene (scene::SceneIdentity).
     const scene::Scene* meshScene_ = nullptr;

@@ -1,6 +1,6 @@
 #pragma once
 
-// Path-tracer denoising through Open Image Denoise (ADR-350, spec section 51).
+// Path-tracer denoising through Open Image Denoise (ADR-353, spec section 51).
 //
 // OIDN is OPTIONAL and off by default (`AVGEN_PATHTRACE_DENOISE`). This header compiles and links
 // either way: with it off, `denoiseAvailable()` returns false and `denoise()` fails with a message

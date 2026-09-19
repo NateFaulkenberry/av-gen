@@ -5,9 +5,11 @@
 #include "core/json_keys.hpp"
 #include "core/log.hpp"
 #include "assets/asset_library.hpp"
+#include "assets/mesh_lod.hpp"
 #include "entity/obstacles.hpp"
 #include "scene/camera.hpp"
 #include "scene/mesh_generators.hpp"
+#include "scene/mesh_metrics.hpp"
 #include "scene/sky.hpp"
 
 #include <glm/gtc/quaternion.hpp>
@@ -3652,6 +3654,100 @@ void Composition::ensureBuilt() {
     }
 }
 
+// ADR-351: this asset's LOD chains, built once and cached. The returned chains' `base` is the
+// asset's own mesh index; the caller adds the offset the asset landed at in this scene.
+//
+// The chain builder is pure and deterministic, so the cache is keyed on everything that can change
+// its answer: the resolved path, the registry's version for that path (a reload bumps it), and the
+// ladder. Nothing else reaches it.
+std::shared_ptr<const std::vector<MeshLodChain>>
+Composition::lodChainsFor(const assets::SceneAsset& asset, const NodeLod& lod, const std::string& owner) {
+    assets::LodChainSettings settings = assets::foliageLodSettings();
+    if (!lod.ratios.empty()) {
+        settings.ratios = lod.ratios;
+    }
+    if (!lod.thinning) {
+        settings.thinning.fallback = 0.0f;
+    }
+    std::string ladder;
+    for (const float ratio : settings.ratios) {
+        ladder += fmt::format("{:.4f},", ratio);
+    }
+    ladder += lod.thinning ? "thin" : "nothin";
+
+    LodCacheKey key{asset.path.string(), asset.version, ladder};
+    if (const auto found = lodCache_.find(key); found != lodCache_.end()) {
+        return found->second;
+    }
+    if (auto problem = settings.validate(); !problem) {
+        log::warn("node '{}': lod ladder rejected ({}); no LOD built", owner, problem.error().message);
+        auto empty = std::make_shared<const std::vector<MeshLodChain>>();
+        lodCache_.emplace(key, empty);
+        return empty;
+    }
+
+    const auto started = std::chrono::steady_clock::now();
+    auto chains = std::make_shared<std::vector<MeshLodChain>>();
+    std::uint64_t sourceTriangles = 0;
+    std::uint64_t rungTriangles = 0;
+    for (std::size_t i = 0; i < asset.scene.meshes.size(); ++i) {
+        const MeshData& mesh = asset.scene.meshes[i];
+        // A skinned mesh is left alone. Every level is a re-indexed, re-ordered vertex buffer and
+        // MeshData::skin is parallel to the one it came from, so a rung of a skinned mesh would
+        // pose from the wrong joints -- which is §7 of the brief, enforced rather than promised.
+        if (mesh.skinned()) {
+            continue;
+        }
+        auto built = assets::buildLodChain(mesh, settings);
+        if (!built) {
+            log::warn("node '{}': mesh {} of '{}': {}", owner, i, asset.path.filename().string(),
+                      built.error().message);
+            continue;
+        }
+        MeshLodChain out;
+        out.base = static_cast<MeshId>(i);
+        out.sourceTriangles = built->sourceTriangles;
+        out.sourceShells = built->sourceShells;
+        out.sourceSurfaceArea = meshMetrics(mesh).surfaceArea;
+        out.hysteresis = lod.hysteresis;
+        out.maxScreenError = lod.maxScreenError;
+        sourceTriangles += built->sourceTriangles;
+        // levels[0] is the source and is deliberately not carried: scene.meshes[base] is LOD0 and
+        // there must be exactly one copy of it.
+        for (std::size_t level = 1; level < built->levels.size(); ++level) {
+            const assets::LodLevel& src = built->levels[level];
+            MeshLodLevel out_level;
+            out_level.targetRatio = src.targetRatio;
+            out_level.achievedRatio = src.achievedRatio;
+            out_level.error = src.error;
+            out_level.sloppy = src.sloppy;
+            out_level.thinned = src.thinned;
+            out_level.triangles = static_cast<std::uint32_t>(src.mesh.indices.size() / 3);
+            out_level.surfaceArea = meshMetrics(src.mesh).surfaceArea;
+            out_level.mesh = src.mesh;
+            out.levels.push_back(std::move(out_level));
+        }
+        if (!out.levels.empty()) {
+            rungTriangles += out.levels.back().triangles;
+            chains->push_back(std::move(out));
+        }
+    }
+    const double ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+    // The achieved ratio of the coarsest rung, over the whole asset, is the one number that says
+    // whether the ladder did anything -- a chain that reports five levels and reaches 0.98 at the
+    // bottom of them is the failure this log line exists to make visible.
+    log::info("node '{}': LOD for '{}': {} chain(s) over {} triangles, coarsest rung {:.3f} of the "
+              "source, built in {:.0f} ms",
+              owner, asset.path.filename().string(), chains->size(), sourceTriangles,
+              sourceTriangles == 0 ? 0.0
+                                   : static_cast<double>(rungTriangles) / static_cast<double>(sourceTriangles),
+              ms);
+    std::shared_ptr<const std::vector<MeshLodChain>> shared = std::move(chains);
+    lodCache_.emplace(key, shared);
+    return shared;
+}
+
 void Composition::rebuild() {
     ++flattens_;
     // Captured before anything clears the table, because `Scene::addTexture` moves the counter on
@@ -3756,6 +3852,7 @@ void Composition::rebuild() {
     }
     scene_.lights.clear();
     scene_.cameras.clear();
+    scene_.meshLods.clear();
     ranges_.clear();
     ranges_.reserve(nodes_.size());
 
@@ -3830,6 +3927,33 @@ void Composition::rebuild() {
                 it = assetOffsets.emplace(key, offsets).first;
             }
             const auto [meshOffset, textureOffset] = it->second;
+            // ADR-351: the coarser rungs, when this node asked for them. Built once per (asset,
+            // asset version, ladder) and shared by every node that asks for the same thing.
+            //
+            // The chain is attached to the *asset's* meshes, which every node on that asset shares,
+            // so two nodes on one asset asking for different ladders would be asking one MeshId for
+            // two answers. The first one to ask wins and the second is told why, rather than the
+            // two silently overwriting each other on alternate flattens.
+            if (node.lod.enabled) {
+                const auto built = lodChainsFor(asset, node.lod, node.name);
+                for (const MeshLodChain& chain : *built) {
+                    MeshLodChain moved = chain;
+                    moved.base += meshOffset;
+                    const auto existing =
+                        std::find_if(scene_.meshLods.begin(), scene_.meshLods.end(),
+                                     [&](const MeshLodChain& c) { return c.base == moved.base; });
+                    if (existing != scene_.meshLods.end()) {
+                        if (existing->levels.size() != moved.levels.size()) {
+                            log::warn("node '{}': mesh {} already has a {}-rung LOD chain from another "
+                                      "node on the same asset; this node's {}-rung ladder is ignored",
+                                      node.name, moved.base, existing->levels.size(),
+                                      moved.levels.size());
+                        }
+                        continue;
+                    }
+                    scene_.meshLods.push_back(std::move(moved));
+                }
+            }
             // ADR-086: rigs are copied per node instance, not per asset. Two nodes on the same
             // character file are two characters, and they must be able to be doing different
             // things; sharing one pose between them is the bug, not the saving.
@@ -4933,7 +5057,7 @@ void Composition::update(const FrameTime& time) {
         cameraAngle_ += cameraOrbitSpeed_->value() * dt;
     }
     applyParameters();
-    // ADR-349: after `applyParameters`, not before it. The day/night cycle asks for the map swap
+    // ADR-346: after `applyParameters`, not before it. The day/night cycle asks for the map swap
     // from inside that call, so resolving first meant the swap landed a frame late -- and in a
     // one-frame headless render it never landed at all, which is how this was found: the night map
     // simply stopped appearing in the log.
@@ -5892,7 +6016,7 @@ void Composition::applyParameters() {
     applyDayNight();
 }
 
-// ADR-349: resolving the environment map, on its own, so that changing it does not mean rebuilding
+// ADR-346: resolving the environment map, on its own, so that changing it does not mean rebuilding
 // the world.
 //
 // This used to live inline at the top of `rebuild()`, and `setEnvironmentMap` asked for a rebuild
@@ -6465,7 +6589,7 @@ void Composition::setEnvironmentMap(const std::filesystem::path& path) {
         return;
     }
     environmentPath_ = path;
-    // ADR-349: an environment change is an environment change. It used to set `dirty_`, and
+    // ADR-346: an environment change is an environment change. It used to set `dirty_`, and
     // `dirty_` has no granularity -- so swapping a map re-flattened 557 entities and 1,069 meshes
     // to change one texture id, 273-293 ms, twice per day/night cycle.
     environmentDirty_ = true;
@@ -6714,6 +6838,19 @@ nlohmann::json Composition::toJson() const {
         }
         n["emissiveBoost"] = node.emissiveBoost;
         n["roughnessScale"] = node.roughnessScale;
+        if (node.lod.enabled) { // ADR-351; written only when asked for, so nothing else grows a key
+            json lod;
+            lod["enabled"] = true;
+            lod["thinning"] = node.lod.thinning;
+            lod["hysteresis"] = node.lod.hysteresis;
+            if (node.lod.maxScreenError >= 0.0f) {
+                lod["maxScreenError"] = node.lod.maxScreenError;
+            }
+            if (!node.lod.ratios.empty()) {
+                lod["ratios"] = node.lod.ratios;
+            }
+            n["lod"] = std::move(lod);
+        }
         if (node.kind == NodeKind::Gltf && node.animation.authored()) { // ADR-086
             json anim = json::object();
             if (!node.animation.state.empty()) {
@@ -7305,7 +7442,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             }
             comp->showSkyboxSetting_ = e["skybox"].get<bool>();
         }
-        // ADR-348: light from the map, stand under the procedural sky. Off unless asked for.
+        // ADR-345: light from the map, stand under the procedural sky. Off unless asked for.
         if (e.contains("proceduralSkyBackground")) {
             if (!e["proceduralSkyBackground"].is_boolean()) {
                 return fail("'proceduralSkyBackground' must be a boolean");
@@ -7706,6 +7843,50 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             node.locked = *locked;
             node.emissiveBoost = *emissive;
             node.roughnessScale = *roughness;
+            if (item.contains("lod")) { // ADR-351: runtime LOD for this node's imported meshes
+                const json& lod = item.at("lod");
+                if (!lod.is_object()) {
+                    return fail("node '{}': 'lod' must be an object", node.name);
+                }
+                auto enabled = readBool(lod, "enabled", true);
+                auto thinning = readBool(lod, "thinning", true);
+                auto hysteresis = readFloat(lod, "hysteresis", 0.0f);
+                auto screenError = readFloat(lod, "maxScreenError", -1.0f);
+                if (!enabled) return std::unexpected(enabled.error());
+                if (!thinning) return std::unexpected(thinning.error());
+                if (!hysteresis) return std::unexpected(hysteresis.error());
+                if (!screenError) return std::unexpected(screenError.error());
+                node.lod.enabled = *enabled;
+                node.lod.thinning = *thinning;
+                node.lod.hysteresis = *hysteresis;
+                node.lod.maxScreenError = *screenError;
+                node.lod.ratios.clear();
+                if (lod.contains("ratios")) {
+                    const json& ratios = lod.at("ratios");
+                    if (!ratios.is_array()) {
+                        return fail("node '{}': 'lod.ratios' must be an array of numbers", node.name);
+                    }
+                    for (const json& r : ratios) {
+                        if (!r.is_number()) {
+                            return fail("node '{}': 'lod.ratios' must be an array of numbers", node.name);
+                        }
+                        node.lod.ratios.push_back(r.get<float>());
+                    }
+                }
+                // A key this block does not know is named rather than ignored, for the reason the
+                // animation block below gives: a misspelt setting that parses is a setting that is
+                // configured in the file and absent from the engine.
+                for (const auto& [key, unused] : lod.items()) {
+                    if (key != "enabled" && key != "thinning" && key != "hysteresis" &&
+                        key != "ratios" && key != "maxScreenError") {
+                        return fail("node '{}': unknown key 'lod.{}'", node.name, key);
+                    }
+                }
+                if (node.lod.enabled && node.kind != NodeKind::Gltf) {
+                    log::warn("node '{}': 'lod' is only read on a gltf node; this one is a {}",
+                              node.name, nodeKindName(node.kind));
+                }
+            }
             if (item.contains("animation")) { // ADR-086: a skinned character's opening state
                 const json& anim = item.at("animation");
                 if (!anim.is_object()) {

@@ -55,6 +55,82 @@ struct AttributeWeights {
     [[nodiscard]] bool any() const { return normal > 0.0f || uv > 0.0f; }
 };
 
+// Removing whole disconnected pieces instead of collapsing edges (ADR-351).
+//
+// The simplifier's failure mode has a floor nobody had measured until the Tree of Life: an
+// *8-triangle closed shell cannot be simplified at all*. There is no edge to collapse that does
+// not change the topology, so a preserving simplifier hands back 100% of the triangles at every
+// ratio it is asked for, and the sloppy one -- which quantises onto a grid -- collapses each leaf
+// into a speck and throws the canopy away. That is not a tree with a worse silhouette; it is a bare
+// branch structure. The Tree of Life's foliage is 1,046,400 triangles over 122,000 such shells
+// (8.5 triangles a leaf), and neither simplifier can touch it.
+//
+// What *can* be removed from geometry like that is whole leaves, which is exactly what §4 of the
+// brief asks for: "eliminate tiny leaves, preserve large masses, the canopy silhouette and its
+// visually important gaps". So:
+//
+//   * shells are found by union-find over shared vertex *positions* (not indices -- a hard-shaded
+//     leaf is one shell with several vertices per corner, and an index-space union would call it
+//     several);
+//   * each is scored `hash01(shell) / (area / meanArea)^sizeBias`, and the lowest scores are kept
+//     until the triangle budget is met. The hash makes the removal spatially uniform, so the
+//     canopy thins evenly rather than losing a region; the size term drops the smallest leaves
+//     first, which is the half of §4 a pure hash would miss;
+//   * every kept shell is then grown about its own centroid, because thinning alone does not
+//     preserve a canopy -- it perforates one. Keeping a fraction r of the leaves and growing each
+//     by r^-0.5 keeps the total leaf area constant, which is the quantity the canopy's opacity and
+//     its silhouette both depend on.
+//
+// Two things this is not. It is not a merge: no leaf is welded to another, and a thinned level is a
+// strict subset of the source's shells with a scale on each. And it is not for a mesh that is one
+// piece -- on a single connected shell it can only return everything or nothing, which is why it is
+// armed by a threshold rather than used unconditionally.
+struct ShellThinning {
+    // A level whose preserving simplification comes back this many times larger than its target is
+    // rebuilt by thinning instead. 0 never thins, which is the default: a mesh that decimates
+    // properly must keep doing so, and this is a different kind of approximation that a caller
+    // should ask for. 1.5 is what `foliageLodSettings` arms it at -- past a 50% overshoot the
+    // simplifier is not making progress towards the ratio, it is refusing.
+    float fallback = 0.0f;
+    // A mesh with fewer shells than this is never thinned however badly it simplified. Removing one
+    // of four pieces is a 25% step with a visible object missing at the end of it; removing one of
+    // 122,000 is a thinner canopy. The number is the point at which a per-shell decision starts
+    // behaving like a statistic instead of like an edit.
+    std::uint32_t minShells = 64;
+    // ...and a mesh whose *shells are large* is not thinned either, however many of them it has.
+    // This is the test that separates "the simplifier cannot work here" from "the simplifier
+    // happened to stall", and it is the one that matters, because the sloppy simplifier is a better
+    // answer than thinning whenever it is available.
+    //
+    // A shell has to be small before a preserving simplifier is out of moves on it: an 8-triangle
+    // closed shell has no edge whose collapse leaves the topology alone, and nor does a 16-triangle
+    // one in practice. Past roughly two dozen triangles a shell has interior structure to give up
+    // and the stall has some other cause, which thinning would paper over by deleting objects.
+    //
+    // Measured on the Tree of Life's five layers: mean triangles per shell is 7.6 on the foliage
+    // (122,000 leaves, and the preserving simplifier returns 100% at every rung), 35 on the
+    // tracery, 97 on the twigs, 125 on the lumens and 1,005 on the wood. 24 is the only round
+    // number that separates the layer that cannot be simplified from the four that can, and the
+    // gap either side of it is a factor of three.
+    std::uint32_t maxShellTriangles = 24;
+    // How much of the area lost to thinning is given back by growing the kept shells. 1 keeps the
+    // total shell area exactly constant (scale = r^-0.5); 0 grows nothing and leaves the canopy
+    // with holes in it. Fractions interpolate the exponent.
+    float areaCompensation = 1.0f;
+    // A ceiling on that growth, because the compensation diverges: at 2% of the leaves it asks for
+    // 7.1x, which is no longer a leaf. Past the cap the level is honestly sparser than the source
+    // and `boundsError` is not the measure that says so -- the bounding box does not move when a
+    // canopy thins, which is the one thing `boundsTolerance` cannot catch.
+    float maxScale = 3.0f;
+    // Larger shells are preferentially kept: the retention score divides by (area/meanArea) raised
+    // to this. 0 is a pure spatially-uniform thin; 1 makes a shell twice the mean area twice as
+    // likely to survive.
+    float sizeBias = 1.0f;
+    // Fixed, so a chain is the same chain on every machine and in every process. Changing it
+    // reshuffles which leaves survive and nothing else.
+    std::uint32_t seed = 0x9e3779b9u;
+};
+
 struct LodChainSettings {
     // Fractions of the *source* triangle count, strictly decreasing, each in (0, 1]. Every level
     // is simplified from the source rather than from the level above: errors do not compound, and
@@ -140,6 +216,9 @@ struct LodChainSettings {
     // a diagonal is a fraction of a pixel. A threshold in *projected* units would separate those
     // cases properly, and this function knows nothing about the ladder that would need.
     float boundsTolerance = 0.12f;
+    // Removing whole shells when the simplifier will not remove edges. Off by default; see the
+    // type's own comment for what it does and when it is the right answer.
+    ShellThinning thinning{};
 
     [[nodiscard]] Result<void> validate() const;
 };
@@ -178,6 +257,19 @@ struct LodLevel {
     // Whether the sloppy simplifier produced this level, either because `sloppyFallback` fired or
     // because the preserving one returned nothing at all.
     bool sloppy = false;
+    // Whether shell thinning produced this level: whole disconnected pieces removed, rather than
+    // edges collapsed. Separate from `sloppy` because it is a different kind of claim about the
+    // result. A sloppy level is the same object with worse corners; a thinned level is a *subset*
+    // of the source's pieces, possibly grown, whose triangles are the source's exactly. A
+    // diagnostic that reports one as the other sends a reader looking for shading artefacts that
+    // are not there, and past the missing leaves that are.
+    bool thinned = false;
+    // How many disconnected shells this level kept, out of `LodChain::sourceShells`. Zero on a
+    // level that was not thinned.
+    std::uint32_t shells = 0;
+    // The uniform scale each kept shell was grown by about its own centroid; 1.0 is none. See
+    // `ShellThinning::areaCompensation`.
+    float shellScale = 1.0f;
 };
 
 struct LodChain {
@@ -188,6 +280,10 @@ struct LodChain {
     // changes. Empty unless `generateShadowIndices` asked for it.
     std::vector<std::uint32_t> shadowIndices;
     std::uint32_t sourceTriangles = 0;
+    // Disconnected pieces of the source, by shared vertex position. 0 means nobody counted: the
+    // count is only taken when `ShellThinning` is armed, because it is a union-find over every
+    // triangle and the answer is 1 for most meshes in this engine.
+    std::uint32_t sourceShells = 0;
 };
 
 // Fails on a mesh that is not a valid indexed triangle list, on non-finite positions, and on
@@ -233,5 +329,15 @@ struct MeshCacheStats {
 // was measured and why the sloppy fallback is armed here and the overdraw pass is not.
 [[nodiscard]] LodChainSettings lod0Settings();
 [[nodiscard]] LodChainSettings vegetationLodSettings();
+// An imported hero asset that may be partly instanced foliage (ADR-351): the five rungs §3 of the
+// asset-LOD brief asks for, and shell thinning armed so the half of the asset that will not
+// decimate is reached by the only means that reaches it. The rungs are targets; every level
+// carries what it actually achieved.
+[[nodiscard]] LodChainSettings foliageLodSettings();
+
+// How many disconnected pieces a mesh has, by shared vertex position. O(indices) union-find. Public
+// because it is the measurement that says whether `ShellThinning` is the right tool for an asset,
+// and a caller deciding that should not have to build a chain to find out.
+[[nodiscard]] std::uint32_t countShells(const scene::MeshData& mesh);
 
 } // namespace avgen::assets

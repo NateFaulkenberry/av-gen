@@ -2314,6 +2314,23 @@ void ControlPanel::drawPerformanceDashboard(app::Engine& engine, const FrameStat
                     static_cast<unsigned long long>(pr.lodCounts[2]),
                     static_cast<unsigned long long>(pr.lodCounts[3]));
     }
+    // ADR-351: entity LOD, beside the scatter's ladder rather than folded into it. The two answer
+    // the same question about different populations, and one number covering "the hero tree
+    // demoted" and "eighty thousand ferns demoted" is a number nobody can read. Shown only when
+    // something in the scene has a chain, which is nothing until a node asks.
+    if (renderer != nullptr && renderer->stats().entityLod.drawables > 0) {
+        const auto& el = renderer->stats().entityLod;
+        ImGui::Text("entity lod: %u of %u demoted, %llu -> %llu triangles (%.1f%%)", el.demoted,
+                    el.drawables, static_cast<unsigned long long>(el.sourceTriangles),
+                    static_cast<unsigned long long>(el.drawnTriangles),
+                    100.0 * static_cast<double>(el.ratio()));
+        ImGui::Text("  rungs %u / %u / %u / %u / %u   %u changed   %u held", el.rungs[0], el.rungs[1],
+                    el.rungs[2], el.rungs[3], el.rungs[4], el.changed, el.held);
+        if (el.held > 0) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("(hysteresis is on: what you see depends on how the camera arrived)");
+        }
+    }
     if (stats.particles.systems > 0) {
         ImGui::Text("particles: %u systems, %u capacity, %u emitted this frame", stats.particles.systems,
                     stats.particles.capacity, stats.particles.emittedThisFrame);

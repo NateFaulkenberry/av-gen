@@ -1,6 +1,6 @@
 #pragma once
 
-// Directional-albedo probe (ADR-349, owner's request 2026-09-18).
+// Directional-albedo probe (ADR-352, owner's request 2026-09-18).
 //
 // The glTF metallic-roughness BRDF is kept FAITHFUL to the specification and gains energy at
 // grazing angles. The owner chose to keep it that way and asked instead for an instrument that

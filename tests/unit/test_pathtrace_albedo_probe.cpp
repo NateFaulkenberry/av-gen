@@ -1,4 +1,4 @@
-// The directional-albedo probe (ADR-349, owner's request).
+// The directional-albedo probe (ADR-352, owner's request).
 //
 // The owner froze the glTF BRDF and asked for an instrument that watches it. The instrument's
 // binding constraint is "must never modify rendering output", and the PRIMARY test here is not that
@@ -32,7 +32,7 @@ using Catch::Approx;
 
 namespace {
 
-// A bright, smooth, white, non-metallic room seen at glancing angles -- the exact case ADR-349
+// A bright, smooth, white, non-metallic room seen at glancing angles -- the exact case ADR-352
 // measured at 1.68. If the probe cannot find a gain here it cannot find one anywhere.
 scene::Scene grazingScene() {
     scene::Scene s;
@@ -156,7 +156,7 @@ TEST_CASE("CONTROL: a probe that touched the sampler WOULD change the image",
 
 TEST_CASE("directionalAlbedoAt computes the integral, and agrees with the white-furnace numbers",
           "[unit][pathtrace][probe]") {
-    // The probe must measure the same quantity ADR-349 measured, or its output is not comparable to
+    // The probe must measure the same quantity ADR-352 measured, or its output is not comparable to
     // the ADR's table. Same material, same angle, same answer.
     const glm::vec3 n{0.0f, 0.0f, 1.0f};
     pathtrace::SurfaceMaterial white;
@@ -168,7 +168,7 @@ TEST_CASE("directionalAlbedoAt computes the integral, and agrees with the white-
     const glm::vec3 v = glm::normalize(glm::vec3(std::sqrt(1.0f - vz * vz), 0.0f, vz));
     const float a = pathtrace::directionalAlbedoAt(white, n, v, 20000, 12345);
     INFO("grazing white dielectric albedo " << a);
-    REQUIRE(a > 1.5f);   // the ADR-349 band
+    REQUIRE(a > 1.5f);   // the ADR-352 band
     REQUIRE(a < 1.8f);
 
     // A metal conserves, at the same angle, which is the control that says the probe is measuring
@@ -209,7 +209,7 @@ TEST_CASE("the probe finds the gain, names the material, and records angle and d
     REQUIRE(report.hitsProbed > 0);
     REQUIRE(report.any());                   // the gain is really there
     REQUIRE(report.worstAlbedo > 1.0f);
-    // `worstAlbedo` is a confident LOWER bound, so it must sit at or below ADR-349's measured 1.68
+    // `worstAlbedo` is a confident LOWER bound, so it must sit at or below ADR-352's measured 1.68
     // for this material -- and comfortably above 1, or the probe is not finding the real gain.
     REQUIRE(report.worstAlbedo < 1.8f);
 
@@ -233,7 +233,7 @@ TEST_CASE("the probe finds the gain, names the material, and records angle and d
     // The report says what it measured, so its numbers cannot be misread as a throughput proxy.
     const std::string text = report.format();
     REQUIRE(text.find("TRUE hemispherical integral") != std::string::npos);
-    REQUIRE(text.find("ADR-349") != std::string::npos);
+    REQUIRE(text.find("ADR-352") != std::string::npos);
     REQUIRE(text.find("by depth") != std::string::npos);
 }
 

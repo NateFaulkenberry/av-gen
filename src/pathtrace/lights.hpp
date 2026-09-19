@@ -1,6 +1,6 @@
 #pragma once
 
-// Light sampling for MIS (ADR-348 Phase 3, spec sections 43-45).
+// Light sampling for MIS (ADR-351 Phase 3, spec sections 43-45).
 //
 // Multiple importance sampling needs each strategy to be able to answer two questions about the
 // SAME direction: "if you had sampled this, what would your PDF have been?" as well as "give me a

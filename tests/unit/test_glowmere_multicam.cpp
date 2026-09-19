@@ -1,4 +1,4 @@
-// Glowmere Valley 2 - Multi-Camera: the ported tree work and the ported cast (ADR-348).
+// Glowmere Valley 2 - Multi-Camera: the ported tree work and the ported cast (ADR-351).
 //
 // ADR-340 built `glowmere-valley-3` to answer two questions -- why Glowmere's hills are bare, and
 // whether a `decide` character can carry a world -- and the owner then cut the scene for its
@@ -179,7 +179,7 @@ TEST_CASE("The multicam and its sibling are generated from one terrain", "[glowm
 }
 
 // ---------------------------------------------------------------------------------------------
-// ADR-348 §2. Eight layers over eight models where there were three over three, and the counts
+// ADR-351 §2. Eight layers over eight models where there were three over three, and the counts
 // that buys, and the ceiling it does not move.
 TEST_CASE("The multicam's hills are wooded, and the tree line has not moved",
           "[glowmere][multicam]") {
@@ -421,7 +421,7 @@ TEST_CASE("probe: the multicam's river, and where each of the cast can get to",
 }
 
 // ---------------------------------------------------------------------------------------------
-// The cast, run. ADR-348 part 3.
+// The cast, run. ADR-351 part 3.
 //
 // The one failure mode a `decide` cast has that an `explore` cast does not is standing still: the
 // selector only hands out new actions when the committed option *changes*, so a body whose goal

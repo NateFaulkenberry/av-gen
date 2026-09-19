@@ -121,7 +121,7 @@ const std::map<std::string, float>& beforeFungi() {
 fs::path sourceDir() { return fs::path(AVGEN_SOURCE_DIR); }
 fs::path worldDir() { return sourceDir() / "examples" / "world"; }
 
-// The four valley-2-family scenes. Valley 3 was here too until ADR-348 retired it; what that
+// The four valley-2-family scenes. Valley 3 was here too until ADR-351 retired it; what that
 // scene proved about this file survives it, because the tree line below is *derived* from the
 // scatter layers rather than read off a list of names. `glowmere-valley-2-multicam` now carries
 // the eight-layer canopy valley 3 was built to try, so the case that motivated the derivation is

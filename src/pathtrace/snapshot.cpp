@@ -144,10 +144,10 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
     }
 
     // Renderer-level caveats, printed on every render whatever the scene holds. This one is here
-    // rather than only in ADR-349 because the ADR is not where somebody debugging an unexpectedly
+    // rather than only in ADR-352 because the ADR is not where somebody debugging an unexpectedly
     // bright interior would think to look, and the startup log is.
     snap.capabilities.caveat(
-        "the glTF metallic-roughness BRDF is kept faithful to the specification (ADR-349), and the "
+        "the glTF metallic-roughness BRDF is kept faithful to the specification (ADR-352), and the "
         "specification's model GAINS energy at grazing angles: up to 1.68x directional albedo on a "
         "bright, smooth, non-metallic surface. It compounds per bounce. If an interior render looks "
         "inexplicably bright, check this first.");

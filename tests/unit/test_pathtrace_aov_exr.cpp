@@ -1,4 +1,4 @@
-// Multi-layer AOV EXR (ADR-348 Phase 6, spec section 33).
+// Multi-layer AOV EXR (ADR-351 Phase 6, spec section 33).
 //
 // The rule being enforced: a normal is not a colour. Stored as R/G/B a downstream colour-managed
 // pipeline will apply a transform to it, and the result looks like a shading bug in a compositor

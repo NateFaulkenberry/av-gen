@@ -1,8 +1,8 @@
-# ADR-350: The denoiser ships as a prebuilt binary, because building it needs a compiler this project does not have
+# ADR-353: The denoiser ships as a prebuilt binary, because building it needs a compiler this project does not have
 
 **Status:** Accepted
 **Date:** 2026-09-18
-**Amends:** ADR-348, which said this renderer would not bring oneTBB into the tree
+**Amends:** ADR-351, which said this renderer would not bring oneTBB into the tree
 **Relates to:** ADR-001 (Dawn's prebuilt precedent), ADR-008 (dependency policy), spec sections 51, 80, 81
 
 ## Problem
@@ -50,9 +50,9 @@ option**, rather than returning its input unchanged. A denoise that silently did
 indistinguishable from one that ran and achieved little, and is far worse to debug than a refusal
 (spec section 54).
 
-## This amends ADR-348, which was wrong about TBB
+## This amends ADR-351, which was wrong about TBB
 
-ADR-348 states, of Embree: *"TBB is not used (`EMBREE_TASKING_SYSTEM=INTERNAL`), so no oneTBB
+ADR-351 states, of Embree: *"TBB is not used (`EMBREE_TASKING_SYSTEM=INTERNAL`), so no oneTBB
 dependency and no second scheduler."* That remains true **of Embree**. It is no longer true of the
 project once denoising is enabled: the OIDN dylib brings its own TBB and its own thread pool.
 

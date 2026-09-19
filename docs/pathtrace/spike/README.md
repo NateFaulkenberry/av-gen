@@ -1,7 +1,7 @@
 # Phase 0 Embree spike
 
 A standalone program, built **outside** AV Gen (spec §71), that validates Embree 4.4.0 on Apple
-Silicon before any engine code is written. Kept in the tree because the conclusions in ADR-348 are
+Silicon before any engine code is written. Kept in the tree because the conclusions in ADR-351 are
 only worth what they can be re-run for.
 
 ```
@@ -19,4 +19,4 @@ that, and the picture is in the repo so the next reader does not have to take th
 for it.
 
 **Do not set `CMAKE_CXX_STANDARD` globally here.** It overrides Embree's own `-std=c++11` and
-Embree 4.4.0 does not compile as C++23 under Apple clang 21. See ADR-348.
+Embree 4.4.0 does not compile as C++23 under Apple clang 21. See ADR-351.

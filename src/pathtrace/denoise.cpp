@@ -88,7 +88,7 @@ Result<void> denoise(const DenoiseInput& /*in*/, std::vector<glm::vec3>& /*out*/
     // Section 54: fail explicitly. Returning the input unchanged would look like a denoise that ran
     // and did very little, which is a far worse thing to debug than a refusal.
     return fail("pathtrace: this build has no denoiser. Configure with -DAVGEN_PATHTRACE_DENOISE=ON "
-                "to fetch Open Image Denoise (ADR-350)");
+                "to fetch Open Image Denoise (ADR-353)");
 }
 
 #endif

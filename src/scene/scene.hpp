@@ -101,6 +101,10 @@ struct Scene {
     // the same owner, for the same reason -- a comet's launch window is gated on the director's cut
     // and its spectrum comes from the analysis track, neither of which a renderer should know.
     world::AtmosphericFrame atmospherics;
+    // ADR-351: coarser rungs for the meshes that have them, by MeshId. Sparse and unordered -- a
+    // scene with no LOD carries an empty vector, which is every scene that does not ask for it.
+    // LOD0 is never in here; see MeshLodChain.
+    std::vector<MeshLodChain> meshLods;
     std::uint64_t meshVersion = 0;    // incremented when meshes change (renderer re-uploads)
     std::uint64_t textureVersion = 0; // incremented when textures change
     // Who this scene is, as distinct from where it lives (see mintSceneIdentity above). Never 0:
