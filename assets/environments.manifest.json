@@ -32,22 +32,22 @@
   },
   "decodeSource": {
    "role": "what the runtime file was derived from",
-   "path": "/Users/natefaulkenberry/blenderkit_data/hdrs/clouds_c854a031-b294-4493-91d9-aea89686256f/clouds_2K_8c62d55c-ad98-4d3f-ab5f-7a81abf7821e.exr",
-   "fileType": "resolution_2K",
+   "path": "/Users/natefaulkenberry/blenderkit_data/hdrs/clouds_c854a031-b294-4493-91d9-aea89686256f/clouds_9daa6770-a4a8-4860-ab32-a2209409c271.exr",
+   "fileType": "blend (the lossless original)",
    "bytes": 6480347,
    "sha256": "c94a85d6f165d32172de11f7c808df69e8269f16a55aed67db6a5765056bf8cb",
    "etag": "cb48104e6ef57197a470617e4a1823bc",
    "lastModified": "Fri, 18 Sep 2026 11:16:41 GMT",
    "pixels": "4500 x 2250",
-   "compression": "DWAA",
+   "compression": "PIZ",
    "channels": "R,G,B half",
-   "whyNotUsedDirectly": "tinyexr, this engine's EXR reader, rejects DWAA: 'Unknown compression type. (tinyexr -8)'."
+   "whyNotUsedDirectly": "tinyexr, this engine's EXR reader, reads neither of these at runtime: it rejects DWAA outright ('Unknown compression type. (tinyexr -8)') and the original is 18000x9000. Blender decodes both, which is why this tool is a Blender script."
   },
   "runtime": {
    "path": "assets/environments/tree_of_life_day.exr",
-   "derivation": "decoded with Blender, resampled 4500x2250 -> 2048x1024, re-encoded EXR half + ZIP via save_render with a Raw view transform.",
-   "bytes": 5674504,
-   "sha256": "3a6a8dcadd5dd8187a0ec8d95d782c8562470c2365c20a7595315110d010983d",
+   "derivation": "decoded with Blender, resampled 18000x9000 -> 2048x1024, re-encoded EXR half + ZIP via save_render with a Raw view transform.",
+   "bytes": 5968619,
+   "sha256": "00dfb1083f2bfe337529deb434d64275111c59e0cf10cd3084d162dc240125ec",
    "pixels": "2048 x 1024",
    "compression": "ZIP",
    "channels": "R,G,B half",
@@ -55,17 +55,17 @@
    "linearityCheck": {
     "measuredAfterResample": true,
     "sourceMeans": [
-     0.29381126165390015,
-     0.3431583046913147,
-     0.4430474042892456
+     0.29336607456207275,
+     0.34280964732170105,
+     0.442748486995697
     ],
     "derivedMeans": [
-     0.2938089966773987,
-     0.34316539764404297,
-     0.44304853677749634
+     0.2933688163757324,
+     0.34280526638031006,
+     0.4427502155303955
     ],
-    "sourceMax": 29520.736328125,
-    "derivedMax": 29520.0,
+    "sourceMax": 29312.0,
+    "derivedMax": 29312.0,
     "tolerance": "each channel mean within 8%"
    },
    "depicts": "open ocean under a blue sky with scattered cumulus and a low sun; water fills the lower hemisphere to the horizon in every direction. No beach and no shoreline, so the spec's shoreline-contradiction concern does not arise.",
@@ -106,22 +106,22 @@
   },
   "decodeSource": {
    "role": "what the runtime file was derived from",
-   "path": "/Users/natefaulkenberry/blenderkit_data/hdrs/moon-star_158063fa-a7ab-486d-accf-c48aee30a776/moon-star_2K_be053078-f5eb-442d-95f6-05a8f782205b.exr",
-   "fileType": "resolution_2K",
+   "path": "/Users/natefaulkenberry/blenderkit_data/hdrs/moon-star_158063fa-a7ab-486d-accf-c48aee30a776/moon-star_b12f2935-9c60-4cea-bd32-c89464a2988f.exr",
+   "fileType": "blend (the lossless original)",
    "bytes": 2942170,
    "sha256": "514b8c061a0030b9b06c38a603e87c87e0f7c6c135467b41934a497f156e3a63",
    "etag": null,
    "lastModified": null,
    "pixels": "4500 x 2250",
-   "compression": "DWAA",
+   "compression": "PIZ",
    "channels": "R,G,B half",
-   "whyNotUsedDirectly": "tinyexr, this engine's EXR reader, rejects DWAA: 'Unknown compression type. (tinyexr -8)'."
+   "whyNotUsedDirectly": "tinyexr, this engine's EXR reader, reads neither of these at runtime: it rejects DWAA outright ('Unknown compression type. (tinyexr -8)') and the original is 18000x9000. Blender decodes both, which is why this tool is a Blender script."
   },
   "runtime": {
    "path": "assets/environments/tree_of_life_night.exr",
-   "derivation": "decoded with Blender, resampled 4500x2250 -> 2048x1024, re-encoded EXR half + ZIP via save_render with a Raw view transform.",
-   "bytes": 4151808,
-   "sha256": "aa72526791008ebb5b95c504ae6018344f481f709154f28485ccb2fdb729b2d0",
+   "derivation": "decoded with Blender, resampled 18000x9000 -> 2048x1024, re-encoded EXR half + ZIP via save_render with a Raw view transform.",
+   "bytes": 4197570,
+   "sha256": "18ea7f1c022d1e528027e85b06366f81f21ef39bcf5f52b03323cfc87f826fbf",
    "pixels": "2048 x 1024",
    "compression": "ZIP",
    "channels": "R,G,B half",
@@ -129,17 +129,17 @@
    "linearityCheck": {
     "measuredAfterResample": true,
     "sourceMeans": [
-     0.23893485963344574,
-     0.21688750386238098,
-     0.21778921782970428
+     0.23837736248970032,
+     0.21651197969913483,
+     0.2174670547246933
     ],
     "derivedMeans": [
-     0.23893797397613525,
-     0.21688711643218994,
-     0.21779000759124756
+     0.23837585747241974,
+     0.21650049090385437,
+     0.21746286749839783
     ],
-    "sourceMax": 33032.4296875,
-    "derivedMax": 33024.0,
+    "sourceMax": 32866.9296875,
+    "derivedMax": 32864.0,
     "tolerance": "each channel mean within 8%"
    },
    "depicts": "open ocean at night under a deep blue sky with the Milky Way and high cirrus; a moon path runs across the water. No beach and no shoreline.",

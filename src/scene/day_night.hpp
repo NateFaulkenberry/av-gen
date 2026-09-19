@@ -109,6 +109,8 @@ struct DayNightSettings {
     std::vector<PhaseKey<float>> hdriIntensity;   // the IBL contribution, both maps
     std::vector<PhaseKey<float>> hdriBlend;       // 0 = day map, 1 = night map
     std::vector<PhaseKey<float>> glowScale;       // multiplies the tree's Glowmere channels
+    std::vector<PhaseKey<float>> waterReflection;  // scales the surface's environment sample
+    std::vector<PhaseKey<glm::vec3>> waterDeepColor;
     std::vector<PhaseKey<float>> fogDensity;
     std::vector<PhaseKey<glm::vec3>> fogColor;
 
@@ -119,6 +121,12 @@ struct DayNightSettings {
     float starBrightnessScale = 1.0f;
     float hdriIntensityScale = 1.0f;
     float glowInfluence = 1.0f;   // 0 = Glowmere ignores the cycle; 1 = full curve
+    // How much the fog colour is taken from the sky's own horizon rather than from the `fogColor`
+    // curve. 1 (the default) is what atmospheric perspective actually is: something receding fades
+    // into the colour the sky has where it meets the ground. Authoring the two separately is how
+    // the ocean world got a visible band -- distant water fully fogged to one colour, meeting a
+    // horizon of another, reading as a second horizon. 0 restores the hand-authored curve.
+    float fogHorizonBlend = 1.0f;
 
     // What the cycle drives, named rather than guessed. A system that looked for a light called
     // "sun" would work on this scene and quietly do nothing on the next one; naming the bindings
@@ -153,6 +161,8 @@ struct DayNightState {
     float hdriIntensity = 1.0f;
     float hdriBlend = 0.0f;
     float glowScale = 1.0f;
+    float waterReflection = 1.0f;
+    glm::vec3 waterDeepColor{0.0f};
     float fogDensity = 0.0f;
     glm::vec3 fogColor{0.0f};
     // True when the night map should be bound. The renderer holds one environment cube, so the

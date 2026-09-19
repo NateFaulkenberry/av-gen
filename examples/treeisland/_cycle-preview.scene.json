@@ -1,7 +1,7 @@
 {
   "format": "avgen-scene",
   "version": 1,
-  "name": "Tree of Life - Ocean World",
+  "name": "Tree of Life - Ocean World (60 s cycle preview)",
   "camera": {
     "mode": 1,
     "position": [185.0, 14.0, 178.0],
@@ -58,8 +58,8 @@
   "environment": {
     "dayNight": {
       "enabled": true,
-      "cycleSeconds": 240.0,
-      "phaseOffset": 0.0,
+      "cycleSeconds": 60.0,
+      "phaseOffset": 0.9,
       "paused": false,
       "dayPhase": 0.0,
       "sunLight": "celestial-key",

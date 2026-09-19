@@ -44,6 +44,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "fogDensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
     "skyBloom", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "skybox",
+    "proceduralSkyBackground",
     "lightFromEnvironment", "fogColor", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
@@ -4799,30 +4800,8 @@ void Composition::rebuild() {
         scene_.addLight(defaultKeyLight());
     }
 
-    scene_.environment.environmentMap = kInvalidTexture;
-    if (!environmentPath_.empty()) {
-        auto image = registry_.loadImage(environmentPath_, false);
-        if (!image) {
-            log::warn("composition '{}': environment map: {}", name_, image.error().message);
-        } else if (!(*image)->image.isHdr()) {
-            log::warn("composition '{}': environment map '{}' is not an HDR image", name_,
-                      environmentPath_.string());
-        } else {
-            scene_.environment.environmentMap = scene_.addTexture((*image)->image);
-            // ADR-049: find the sun/moon once, here, so `lightFromEnvironment` costs nothing per
-            // frame. Reported because an author aiming a sky wants to see the number move.
-            const glm::vec3 dominant = environmentDominantDirection((*image)->image);
-            envDominantDirection_ = dominant;
-            log::info("composition '{}': environment '{}' ({}x{}); brightest direction "
-                      "({:.3f}, {:.3f}, {:.3f}), elevation {:.1f} deg",
-                      name_, environmentPath_.string(), (*image)->image.width, (*image)->image.height,
-                      dominant.x, dominant.y, dominant.z,
-                      std::asin(std::clamp(dominant.y, -1.0f, 1.0f)) * 57.2957795f);
-        }
-    }
-    if (scene_.environment.environmentMap == kInvalidTexture) {
-        envDominantDirection_.reset();
-    }
+    environmentTextureCache_.clear();
+    resolveEnvironmentMap();
 
     // Framing: lit geometry when there is any, otherwise the particle emitters.
     const auto [lo, hi] = scene_.bounds();
@@ -4954,6 +4933,13 @@ void Composition::update(const FrameTime& time) {
         cameraAngle_ += cameraOrbitSpeed_->value() * dt;
     }
     applyParameters();
+    // ADR-345: after `applyParameters`, not before it. The day/night cycle asks for the map swap
+    // from inside that call, so resolving first meant the swap landed a frame late -- and in a
+    // one-frame headless render it never landed at all, which is how this was found: the night map
+    // simply stopped appearing in the log.
+    if (environmentDirty_) {
+        resolveEnvironmentMap();
+    }
     // After the parameters, because a node's position is one of them: a hero follows the object it
     // describes, and where that object is has only just been decided for this frame.
     syncHeroesToNodes();
@@ -5859,6 +5845,7 @@ void Composition::applyParameters() {
         envRotation_ != nullptr ? envRotation_->value() : envRotationSetting_;
     // ADR-049: the visible sky's own two controls, independent of the shading intensity above.
     scene_.environment.showSkybox = showSkyboxSetting_;
+    scene_.environment.proceduralSkyBackground = proceduralSkyBackgroundSetting_;
     scene_.environment.skyIntensity = skyIntensitySetting_;
     scene_.environment.skyBloom = skyBloomSetting_;
     scene_.environment.lightFromEnvironment = lightFromEnvironmentSetting_;
@@ -5905,6 +5892,55 @@ void Composition::applyParameters() {
     applyDayNight();
 }
 
+// ADR-345: resolving the environment map, on its own, so that changing it does not mean rebuilding
+// the world.
+//
+// This used to live inline at the top of `rebuild()`, and `setEnvironmentMap` asked for a rebuild
+// to make it run. `dirty_` has no granularity, so swapping a map re-flattened everything: on the
+// Tree of Life ocean world that is 273-293 ms for 557 entities and 1,069 meshes, to change one
+// texture id. A day/night cycle swaps twice per revolution and paid it both times.
+//
+// The texture ids are cached by path because `addTexture` appends: called repeatedly outside a
+// rebuild it would grow the scene's texture list without bound, and a cycle that runs for an hour
+// would leak a texture every two minutes. The cache is cleared by `rebuild()`, which clears the
+// scene and with it every id this could hand back.
+void Composition::resolveEnvironmentMap() {
+    environmentDirty_ = false;
+    scene_.environment.environmentMap = kInvalidTexture;
+    if (!environmentPath_.empty()) {
+        const std::string key = environmentPath_.generic_string();
+        const auto cached = std::find_if(environmentTextureCache_.begin(), environmentTextureCache_.end(),
+                                         [&key](const auto& e) { return e.path == key; });
+        if (cached != environmentTextureCache_.end()) {
+            scene_.environment.environmentMap = cached->texture;
+            envDominantDirection_ = cached->dominant;
+            return;
+        }
+        auto image = registry_.loadImage(environmentPath_, false);
+        if (!image) {
+            log::warn("composition '{}': environment map: {}", name_, image.error().message);
+        } else if (!(*image)->image.isHdr()) {
+            log::warn("composition '{}': environment map '{}' is not an HDR image", name_,
+                      environmentPath_.string());
+        } else {
+            scene_.environment.environmentMap = scene_.addTexture((*image)->image);
+            // ADR-049: find the sun/moon once, here, so `lightFromEnvironment` costs nothing per
+            // frame. Reported because an author aiming a sky wants to see the number move.
+            const glm::vec3 dominant = environmentDominantDirection((*image)->image);
+            envDominantDirection_ = dominant;
+            environmentTextureCache_.push_back({key, scene_.environment.environmentMap, dominant});
+            log::info("composition '{}': environment '{}' ({}x{}); brightest direction "
+                      "({:.3f}, {:.3f}, {:.3f}), elevation {:.1f} deg",
+                      name_, environmentPath_.string(), (*image)->image.width, (*image)->image.height,
+                      dominant.x, dominant.y, dominant.z,
+                      std::asin(std::clamp(dominant.y, -1.0f, 1.0f)) * 57.2957795f);
+        }
+    }
+    if (scene_.environment.environmentMap == kInvalidTexture) {
+        envDominantDirection_.reset();
+    }
+}
+
 // ADR-343: the cycle has the last word on the fields it owns. It runs after the sky block and the
 // environment block above deliberately -- an author's static sky colour is the value the cycle
 // starts from when it is off, and is overwritten when it is on, rather than the two fighting.
@@ -5929,6 +5965,12 @@ void Composition::applyDayNight() {
     sky.groundColor = s.groundColor;
     sky.hazeWidth = s.haze;
     sky.intensity = s.skyIntensity;
+    // Every water surface in the scene follows the cycle too, so the sea is part of the world
+    // changing state rather than a sheet the sky happens to fall on (brief §28).
+    for (WaterSurface& water : scene_.waters) {
+        water.settings.reflection = s.waterReflection;
+        water.settings.deepColor = s.waterDeepColor;
+    }
     // The sun and the moon are two directionals the scene named. The sun travels; the moon does
     // not, because its disc is a feature of the night environment map and the map does not move
     // unless `environmentRotation` moves all of it together.
@@ -6423,7 +6465,10 @@ void Composition::setEnvironmentMap(const std::filesystem::path& path) {
         return;
     }
     environmentPath_ = path;
-    dirty_ = true;
+    // ADR-345: an environment change is an environment change. It used to set `dirty_`, and
+    // `dirty_` has no granularity -- so swapping a map re-flattened 557 entities and 1,069 meshes
+    // to change one texture id, 273-293 ms, twice per day/night cycle.
+    environmentDirty_ = true;
 }
 
 nlohmann::json Composition::toJson() const {
@@ -7259,6 +7304,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return fail("'skybox' must be a boolean");
             }
             comp->showSkyboxSetting_ = e["skybox"].get<bool>();
+        }
+        // ADR-344: light from the map, stand under the procedural sky. Off unless asked for.
+        if (e.contains("proceduralSkyBackground")) {
+            if (!e["proceduralSkyBackground"].is_boolean()) {
+                return fail("'proceduralSkyBackground' must be a boolean");
+            }
+            comp->proceduralSkyBackgroundSetting_ = e["proceduralSkyBackground"].get<bool>();
         }
         if (e.contains("lightFromEnvironment")) {
             if (!e["lightFromEnvironment"].is_boolean()) {

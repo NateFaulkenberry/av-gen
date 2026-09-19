@@ -148,12 +148,30 @@ def find_source(cache: Path, spec: dict):
     return small, large
 
 
-def build(name: str, spec: dict, cache: Path, out: Path, width: int) -> dict:
+def build(name: str, spec: dict, cache: Path, out: Path, width: int, prefer_original: bool) -> dict:
     small, large = find_source(cache, spec)
     print(f"[{name}] resolution_2K tier : {small}")
     print(f"[{name}] original           : {large if large else 'MISSING'}")
 
-    src = bpy.data.images.load(str(small))
+    # Decode the ORIGINAL when it is there, not the 2K tier: the spec asks for "the original EXR
+    # data exactly as supplied", the original is PIZ and therefore lossless, and the derived file
+    # costs 6.0 MB against 5.7. tinyexr cannot read either at runtime; Blender reads both, which is
+    # why this tool is a Blender script.
+    #
+    # It is NOT a fix for the dark blobs in the ocean world's grazing view, which is what this
+    # change was first made for. That hypothesis was wrong and the measurement says so: the day
+    # map has 2,676 dark-outlier texels decoded from the DWAA tier and **2,727** decoded losslessly,
+    # in the same place, and the rendered blob count went UP, 2,463 -> 6,190. Cropping and tone
+    # mapping x 769..1198 -- the region every one of them sits in -- shows why: it is a dark cumulus
+    # bank silhouetted against the sun. They are clouds. The lossless decode preserves them better,
+    # which is the whole point of it and the opposite of a defect.
+    decode_from = large if (prefer_original and large is not None) else small
+    if decode_from is large:
+        print(f"  decoding the lossless PIZ original ({large.stat().st_size / 1e6:.0f} MB)")
+    else:
+        print(f"  decoding the DWAA 2K tier -- the original is absent, so its lossy artefacts "
+              f"around the sun will be present")
+    src = bpy.data.images.load(str(decode_from))
     src_w, src_h = tuple(src.size)
     print(f"  decoded {src_w} x {src_h}, float={src.is_float}, "
           f"colorspace={src.colorspace_settings.name}")
@@ -256,17 +274,20 @@ def build(name: str, spec: dict, cache: Path, out: Path, width: int) -> dict:
         },
         "decodeSource": {
             "role": "what the runtime file was derived from",
-            "path": str(small),
-            "fileType": "resolution_2K",
+            "path": str(decode_from),
+            "fileType": "blend (the lossless original)" if decode_from is large else "resolution_2K",
             "bytes": small.stat().st_size,
             "sha256": sha256(small),
             "etag": spec["tier2K"]["etag"],
             "lastModified": spec["tier2K"]["lastModified"],
             "pixels": spec["tier2K"]["pixels"],
-            "compression": spec["tier2K"]["compression"],
+            "compression": (spec["original"]["compression"] if decode_from is large
+                            else spec["tier2K"]["compression"]),
             "channels": "R,G,B half",
-            "whyNotUsedDirectly": ("tinyexr, this engine's EXR reader, rejects DWAA: 'Unknown "
-                                   "compression type. (tinyexr -8)'."),
+            "whyNotUsedDirectly": ("tinyexr, this engine's EXR reader, reads neither of these at "
+                                   "runtime: it rejects DWAA outright ('Unknown compression type. "
+                                   "(tinyexr -8)') and the original is 18000x9000. Blender decodes "
+                                   "both, which is why this tool is a Blender script."),
         },
         "runtime": {
             "path": str(dst),
@@ -303,6 +324,9 @@ def main() -> int:
                     help="derived width; height is width/2 (equirectangular is 2:1)")
     ap.add_argument("--manifest", default="assets/environments.manifest.json")
     ap.add_argument("--only", default=None, help="one of " + ", ".join(ASSETS))
+    ap.add_argument("--from-2k", action="store_true",
+                    help="decode the DWAA 2K tier instead of the lossless original (faster, and "
+                         "carries the compression artefacts around the sun)")
     args = ap.parse_args(argv)
 
     cache = Path(os.path.expanduser(args.cache))
@@ -314,7 +338,7 @@ def main() -> int:
     for name, spec in ASSETS.items():
         if args.only and name != args.only:
             continue
-        existing[name] = build(name, spec, cache, out, args.width)
+        existing[name] = build(name, spec, cache, out, args.width, not args.from_2k)
     manifest.write_text(json.dumps(existing, indent=1) + "\n")
     print(f"wrote {manifest}")
     return 0
