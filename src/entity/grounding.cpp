@@ -82,7 +82,11 @@ GroundResult GroundFollower::update(const Navigator& nav, glm::vec2 p, float yaw
     // body sits on its own clamp rather than needing a new one.
     const float seated = std::max(mean, centre);
     const float drop = std::clamp(settings.footDrop, 0.0f, 1.0f);
-    const float target = seated + (std::min(lowest, seated) - seated) * drop;
+    // Branched rather than multiplied by zero. `seated + (x - seated) * 0.0f` is the same number as
+    // `seated` for every finite input but one -- a `seated` of -0.0 comes back as +0.0 -- and the
+    // rule this setting ships under is that nothing moves unless it asks, which is a claim about
+    // bits and not about arithmetic.
+    const float target = drop > 0.0f ? seated + (std::min(lowest, seated) - seated) * drop : seated;
     // Sampled as wide as the body, so the lean comes from the slope the body spans rather than from
     // whatever the noise is doing at one point of it.
     const glm::vec3 normal = nav.groundNormal(p, std::max(radius, 0.25f));
