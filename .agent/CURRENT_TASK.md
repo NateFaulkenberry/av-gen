@@ -1,59 +1,75 @@
 # Current Task
 
 ## Objective
-Confirm or refute a suspected **colour regression in `glowmere-valley-2-multicam`**: shot t=48.5 is
-reported to have changed from dark blue to bright saturated cyan between a pre-merge and a
-post-merge binary.
+Two owner-priority tracks, both running as agents in worktrees:
+
+1. **`glowmere-valley-2-multicam` performance regression** (priority). The owner reports it "has
+   ground to a halt" since the project was ported to the new animation system. Also: get the
+   animations behaving correctly on that system.
+2. **Tree of Life COSMIC floating island art pass** (parallel). 26-phase owner spec: tree wind,
+   falling leaves, tree energy, canopy shimmer, tree particles, and a large world-space cosmic
+   vortex below the island. The owner has said this is likely the only Tree of Life variant they
+   will develop further.
 
 ## Why
-Raised by the agent that fixed the multicam cast defects, as *not its work*. It falls in the range
-covered by the path tracer, asset LOD and water/sky merges. If it is a regression it affects the
-flagship film and the owner has not seen it yet. If it is intended (the sky decoupling and fog
-changes were deliberate and did alter the look) it should be recorded as intended and dropped.
+Both are the owner's stated priorities as of 2026-09-19 ~10:00. The cinematic key-light work is
+**paused by owner instruction at its section 16** and is merged (`483cdaaa`); sections 17-20 are not
+done and are not to be continued without the owner saying so.
 
 ## Current Status
-- Reported, not investigated. No render pair has been produced by anyone to demonstrate it.
-- Main is green and all contributing work is merged, so an A/B needs two *builds*, not two branches.
+- `agent/mcperf` -- performance agent, running.
+- `agent/cosmicart` -- Tree of Life cosmic agent, running.
+- Main is at the cosmickey merge plus the Aurora cleanup. Three test failures in
+  `test_treeisland_example.cpp` are being fixed by the supervisor (build in flight).
 
-## In Progress
-Nothing. This task has not been started.
+## The strongest open lead on the performance regression
+**An app save silently drops the baked camera.** Observed live: at 10:07 the running app wrote
+`glowmere-valley-2-multicam.json` and the save removed two entire top-level keys --
+`cameraAimFollow` (37 entries) and `cameraShotSpans` (42 entries), the bake from `9433044d`.
+`parameters` went *up* 5502 -> 5530, so it is not a truncated write. Restored from git.
 
-## Remaining Work
-1. Identify the merge range: `e41660d5` (water/path-tracer era) back through the asset-LOD and
-   sky-decoupling merges.
-2. Build `src/avgen` at a pre-range commit and at `main`. **Build the app target, not just
-   `avgen_tests`** — see Known Problems.
-3. Render `glowmere-valley-2-multicam` at t=48.5 from both, same camera, same size.
-4. Compare. If they differ, bisect to the responsible merge.
-5. Decide: regression to fix, or intended change to record in the relevant ADR.
+Both versions kept for comparison:
+- `<scratchpad>/multicam-committed.json`   (good, has the bake)
+- `<scratchpad>/multicam-app-save-1007.json` (the drop)
+
+If the app destroys the bake on every save, the camera necessarily falls back to deriving the cut
+live, which is a plausible cause of "ground to a halt" and fits "after I asked you to fix animation"
+exactly. **This is a hypothesis, not a finding.** It must be shown that the absence of those keys
+actually costs frame time; if it does not, it is still a serious correctness bug but not this bug.
+
+## Owner decisions taken today
+- **ADR-091 is relaxed for particle systems**: scrub need not exactly replay particle animation.
+  Owner's words: "I think we can ease the scrub must exactly replay particle animations yeah?"
+  Still required: a render must be reproducible, and the relaxation does not extend to tree wind,
+  shimmer, energy or vortex density, which stay pure functions of time.
+- `glowmere-valley-2.json`'s 47 dead `atmos/Aurora/` parameters: **dropped**, not restored. The base
+  cut has no aurora, deliberately; the multicam cut does.
+- `nodes/tree-foliage/emissiveBoost` **left at the owner's 2.2**, not the key-light branch's 0.5.
+  Unresolved: 0.5 was the point of that branch (the foliage was lighting itself, so the key appeared
+  to cast nothing). The cosmic-art agent is to settle it with a render.
 
 ## Known Problems
-- **A render is evidence about the binary that produced it.** An agent lost an hour to byte-identical
-  render pairs because it had only ever built `--target avgen_tests`, so every render ran a stale
-  `src/avgen`. Build the app target explicitly.
-- ADR-345 (lighting/background decoupling) and ADR-347 (fog taking its colour from the sky) both
-  changed the look deliberately. A difference is not automatically a defect.
-- Renders re-simulate the cast only up to **90 s** (`SeekBudget{maxSeconds = 90}`). t=48.5 is inside
-  that, so the cast is valid at this time.
-
-## Files Involved
-- `examples/world/glowmere-valley-2-multicam.{json,scene.json}`
-- `src/rendering/scene_renderer.cpp`, `src/scene/composition.cpp` (sky/fog/env paths)
-- `docs/decisions/ADR-345-*`, `ADR-347-*` (the deliberate look changes)
+- **A render is evidence about the binary that produced it.** Build `--target avgen` explicitly; an
+  agent lost an hour to byte-identical pairs from a stale `src/avgen`.
+- **Reconfigure CMake after every merge** (`cmake -S . -B build/release`). The test glob is evaluated
+  at configure time, so an incremental build omits test files a merge added and the suite passes
+  without compiling them.
+- Do not `pkill -f avgen_tests`; it kills other agents' runs. Copy to a distinct name and
+  `codesign -s - -f` it, or the kernel SIGKILLs the copy silently.
+- The owner edits projects in the running app while agents work. A file can change under you.
 
 ## Tests
-Full `~[gpu]` suite green at 2,414 cases / 3,796,327 assertions before this merge; a run covering
-`3468d849` was in flight at handoff and should be re-confirmed. No test covers film colour.
+Main baseline **2436 cases**. One `[!shouldfail]` by design (`test_character_lab_slopes.cpp`,
+ADR-260). Three `test_treeisland_example.cpp` failures are the supervisor's to fix and are not a
+regression in anyone's branch.
+
+`python3 tools/check_project_integrity.py` -- new, read-only, exits non-zero. Checks stale scene
+fingerprints and `worldfx/`|`atmos/` parameters naming no effect. Run it before every commit that
+touches `examples/`.
 
 ## Next Action
-Build `src/avgen` at `main` and at the commit immediately before the sky-decoupling merge, render
-`glowmere-valley-2-multicam` at t=48.5 from each at the same size, and compare the two frames to
-establish whether the cyan shift is real.
-
-## Important Constraints
-- Do not "fix" the colour by editing the film. If a merge changed the renderer, fix or accept the
-  renderer change; the film's own data was not touched by those merges.
-- Do not revert ADR-345 or ADR-347 without the owner — both were commissioned deliberately.
+Finish the `test_treeisland_example.cpp` fix (build in flight), run the suite, confirm 2436 green
+minus the one expected failure. Then await the two agents.
 
 ## Last Updated
-2026-09-19 06:20
+2026-09-19 11:05

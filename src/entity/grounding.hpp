@@ -49,6 +49,20 @@ struct GroundSettings {
     float maxSink = 0.0f; // a body is never below the ground it stands on
     // 0 stays vertical, 1 lies along the surface normal. Something short of 1 is almost always
     // right: a walker leans into a slope, it does not become part of it.
+    // How far the body sits down from the footprint mean towards the lowest ground its own
+    // footprint covers. **Zero by default, and that default is the rule that nothing moves unless
+    // it asks**: at zero this is exactly the behaviour every scene in this repository already has.
+    //
+    // It exists for foot IK, and the reason is measured in ADR-359. A `scene::PoseLayerKind::Foot`
+    // layer can only put a foot where the leg reaches, and the farm pack binds its legs at 97.9% to
+    // 100.0% of their own span -- four millimetres of straightening in a bull's 0.90 m hind leg. A
+    // body sitting at the footprint *mean* is therefore asking its downhill feet to reach below the
+    // ground they cannot reach, and three of a bull's four hooves clamp. Seated at the footprint
+    // minimum, every foot has somewhere to lift from and the solver does the rest. That is the
+    // standard two-part move -- the body drops to the lowest contact, the limbs lift to the
+    // surface -- and it is split across two files here because a pose layer structurally cannot
+    // move a body (ADR-260) and this object structurally cannot pose one.
+    float footDrop = 0.0f;
     float slopeAlign = 0.55f;
     float slopeSmoothingMs = 240.0f;
     float maxTilt = 34.0f; // degrees, either axis
@@ -63,13 +77,33 @@ struct GroundResult {
     float pitch = 0.0f;  // degrees about the body's right axis, nose-up positive
     float roll = 0.0f;   // degrees about the body's forward axis
     bool grounded = true;
+    // ---- the surface itself, for foot IK (ADR-359) ------------------------------------------
+    // `height` above is the *body's* height: clamped into a band, temporally filtered, and short
+    // of the surface on purpose. A foot planted on it would be planted on the compromise. These
+    // two are the surface the body is standing over -- the footprint-filtered height under its own
+    // origin, and the normal sampled across its own width -- which is what a foot IK layer needs
+    // in order to put a hoof on the ground rather than on the body's idea of the ground.
+    //
+    // **The smoothing is here and not in the layer.** `surfaceNormal` runs through the same
+    // `slopeSmoothingMs` one-pole as `pitch` and `roll`, for two reasons: the feet and the body
+    // must lean off the same filtered normal or they fight each other, and a `scene::PoseLayer` is
+    // forbidden to remember anything across a frame (ADR-091, ADR-300). This object is allowed to,
+    // because it is re-simulated on a seek and `reset()` exists for the case where it is not.
+    float surfaceHeight = 0.0f;
+    glm::vec3 surfaceNormal{0.0f, 1.0f, 0.0f};
 };
 
 // One body's vertical state. Copyable and cheap; reset it when the character is teleported or the
 // timeline is seeked, or it will glide to its new home from its old one.
 class GroundFollower {
 public:
-    void reset() { primed_ = false; height_ = 0.0f; pitch_ = 0.0f; roll_ = 0.0f; }
+    void reset() {
+        primed_ = false;
+        height_ = 0.0f;
+        pitch_ = 0.0f;
+        roll_ = 0.0f;
+        normal_ = glm::vec3(0.0f, 1.0f, 0.0f);
+    }
 
     // `p` is the body's XZ, `yaw` its facing in radians about +Y, `speed` its horizontal m/s.
     // Samples the surface once, or twice when looking ahead.
@@ -81,6 +115,7 @@ private:
     float height_ = 0.0f;
     float pitch_ = 0.0f;
     float roll_ = 0.0f;
+    glm::vec3 normal_{0.0f, 1.0f, 0.0f};
 };
 
 } // namespace avgen::entity

@@ -1058,6 +1058,7 @@ public:
           homeDefault_(readFloat(s, "homeRadius", 0.0f)),
           runChanceDefault_(readFloat(s, "runChance", 0.18f)),
           slopeAlignDefault_(readFloat(s, "slopeAlign", 0.55f)),
+          footDropDefault_(readFloat(s, "footDrop", 0.0f)),
           wadeDragDefault_(readFloat(s, "wadeDrag", 0.55f)),
           bodyRadiusDefault_(readFloat(s, "bodyRadius", 0.0f)),
           headroomDefault_(readFloat(s, "headroom", 0.0f)),
@@ -1156,6 +1157,7 @@ public:
         home_ = &params.add(floatDesc(prefix + "homeRadius", homeDefault_, 0.0f, 4000.0f));
         runChance_ = &params.add(floatDesc(prefix + "runChance", runChanceDefault_, 0.0f, 1.0f));
         slopeAlign_ = &params.add(floatDesc(prefix + "slopeAlign", slopeAlignDefault_, 0.0f, 1.0f));
+        footDrop_ = &params.add(floatDesc(prefix + "footDrop", footDropDefault_, 0.0f, 1.0f));
         // How much the water slows this character down, at the deepest water it will enter. A
         // parameter rather than a constant for the same reason `speed` is one: it is the kind of
         // thing a scene modulates -- something heavy fords a river at a crawl and something
@@ -1183,7 +1185,8 @@ public:
                   prefix + "arrive",        prefix + "idleMin",    prefix + "idleMax",
                   prefix + "observeChance", prefix + "observeMin", prefix + "observeMax",
                   prefix + "minRange",      prefix + "maxRange",   prefix + "homeRadius",
-                  prefix + "runChance",     prefix + "slopeAlign",  prefix + "bodyRadius",
+                  prefix + "runChance",     prefix + "slopeAlign",  prefix + "footDrop",
+                  prefix + "bodyRadius",
                   prefix + "headroom",      prefix + "footprint",  prefix + "jumpRange",
                   prefix + "wadeDrag"};
     }
@@ -1723,11 +1726,16 @@ private:
 
     void applyGrounding(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion,
                         float speed) {
+        // ADR-359: cleared first, set below only when a surface was actually read. A foot IK layer
+        // reads this every frame and a stale `true` is a body planting its feet on ground it has
+        // left -- the same defect `airborne` exists to stop, one field along.
+        state.hasGroundPlane = false;
         if (ctx.nav == nullptr) {
             return;
         }
         GroundSettings settings;
         settings.slopeAlign = param(slopeAlign_, slopeAlignDefault_);
+        settings.footDrop = param(footDrop_, footDropDefault_); // ADR-359, zero unless asked
         // A body reads the ground over its own width. A ten-metre creature bridges what a person
         // trips on, and grounding it on a half-metre disc makes it follow detail it would not feel.
         settings.footprint = std::max(param(footprint_, footprintDefault_), 0.0f);
@@ -1735,6 +1743,9 @@ private:
         const GroundResult ground = ground_.update(*nav(ctx), glm::vec2(here.x, here.z), state.yaw,
                                                    speed, ctx.dt, settings);
         state.travel.y = ground.height - state.anchor.y;
+        state.groundPoint = glm::vec3(here.x, ground.surfaceHeight, here.z);
+        state.groundNormal = ground.surfaceNormal;
+        state.hasGroundPlane = ground.grounded;
         // Pitch and roll ride on the motion offset rather than on the state's yaw, because the
         // entity composes the two differently: yaw is the body's facing and these are a lean on top
         // of it, and an author's authored rotation has to survive both.
@@ -1847,6 +1858,7 @@ private:
     float speedDefault_, runSpeedDefault_, turnDefault_, arriveDefault_;
     float idleMinDefault_, idleMaxDefault_, observeDefault_, observeMinDefault_, observeMaxDefault_;
     float minRangeDefault_, maxRangeDefault_, homeDefault_, runChanceDefault_, slopeAlignDefault_;
+    float footDropDefault_ = 0.0f;
     float bodyRadiusDefault_, headroomDefault_, footprintDefault_, wadeDragDefault_;
     float strollChance_, waypointRadius_, repathSeconds_, stuckSeconds_;
     // The goal model (ADR-333). Held by value because it is configuration -- one taste, one source
@@ -1868,6 +1880,7 @@ private:
     params::Parameter<float>* home_ = nullptr;
     params::Parameter<float>* runChance_ = nullptr;
     params::Parameter<float>* slopeAlign_ = nullptr;
+    params::Parameter<float>* footDrop_ = nullptr;
     params::Parameter<float>* bodyRadius_ = nullptr;
     params::Parameter<float>* headroom_ = nullptr;
     params::Parameter<float>* footprint_ = nullptr;
@@ -1932,7 +1945,15 @@ public:
           smoothDefault_(readFloat(s, "smoothingMs", 85.0f)),
           floatDefault_(readFloat(s, "maxFloat", 0.22f)),
           tiltDefault_(readFloat(s, "maxTilt", 34.0f)),
-          bodyRadiusDefault_(readFloat(s, "bodyRadius", 0.0f)) {}
+          bodyRadiusDefault_(readFloat(s, "bodyRadius", 0.0f)),
+          // `GroundSettings`'s own default and not 0. Exposing a knob whose default is not the
+          // value the code already used is how a new setting silently changes every scene that
+          // never heard of it: at 0 the footprint filter is switched off, the body reads the ground
+          // under one point, and every grounded character in the repository starts tracing terrain
+          // noise it used to bridge. ADR-359 shipped that for one commit and the suite lost 16
+          // assertions to it.
+          footprintDefault_(readFloat(s, "footprint", GroundSettings{}.footprint)),
+          footDropDefault_(readFloat(s, "footDrop", 0.0f)) {}
 
     [[nodiscard]] std::string_view kind() const override { return "ground"; }
 
@@ -1942,8 +1963,11 @@ public:
         float_ = &params.add(floatDesc(prefix + "maxFloat", floatDefault_, 0.0f, 20.0f));
         tilt_ = &params.add(floatDesc(prefix + "maxTilt", tiltDefault_, 0.0f, 90.0f));
         bodyRadius_ = &params.add(floatDesc(prefix + "bodyRadius", bodyRadiusDefault_, 0.0f, 20.0f));
+        footprint_ = &params.add(floatDesc(prefix + "footprint", footprintDefault_, 0.0f, 20.0f));
+        footDrop_ = &params.add(floatDesc(prefix + "footDrop", footDropDefault_, 0.0f, 1.0f));
         paths_ = {prefix + "slopeAlign", prefix + "smoothingMs", prefix + "maxFloat",
-                  prefix + "maxTilt", prefix + "bodyRadius"};
+                  prefix + "maxTilt",    prefix + "bodyRadius",  prefix + "footprint",
+                  prefix + "footDrop"};
     }
     void collectParameterPaths(std::vector<std::string>& out) const override {
         out.insert(out.end(), paths_.begin(), paths_.end());
@@ -1984,6 +2008,12 @@ public:
         if (mine) {
             state.radius = declared;
         }
+        // ADR-359, and it goes above both yields rather than below them: a foot IK layer reads this
+        // every frame, and a body in a tractor beam that kept its last ground plane would plant its
+        // hooves on the hillside it was lifted off. That is the defect the comment below already
+        // names -- "a cow standing in a beam looking startled" -- arriving by a second route. Set
+        // true again only when a surface has actually been read.
+        state.hasGroundPlane = false;
         if (ctx.nav == nullptr) {
             return;
         }
@@ -1999,12 +2029,25 @@ public:
         settings.heightSmoothingMs = smooth_ != nullptr ? smooth_->value() : smoothDefault_;
         settings.maxFloat = float_ != nullptr ? float_->value() : floatDefault_;
         settings.maxTilt = tilt_ != nullptr ? tilt_->value() : tiltDefault_;
+        // ADR-359: how far the body sits down from the footprint mean towards its lowest point, so
+        // a foot IK layer has somewhere to lift from. Zero unless a scene asks.
+        settings.footDrop = footDrop_ != nullptr ? footDrop_->value() : footDropDefault_;
+        // A body reads the ground over its own width. A bull is 2.65 m long and a chick is 0.14 m,
+        // and grounding both on the same disc makes one of them follow detail it would not feel.
+        settings.footprint =
+            std::max(footprint_ != nullptr ? footprint_->value() : footprintDefault_, 0.0f);
         const glm::vec3 here = state.position();
         const GroundResult ground = follower_.update(*ctx.nav, glm::vec2(here.x, here.z), state.yaw,
                                                      state.speed, ctx.dt, settings);
         state.travel.y = ground.height - state.anchor.y;
         motion.rotation.x += ground.pitch;
         motion.rotation.z += ground.roll;
+        // ADR-359: the surface itself, for a foot IK layer. Not `ground.height` -- that is the
+        // *body's* height, clamped into a band and short of the surface on purpose, and a hoof
+        // planted on it would be planted on the compromise.
+        state.groundPoint = glm::vec3(here.x, ground.surfaceHeight, here.z);
+        state.groundNormal = ground.surfaceNormal;
+        state.hasGroundPlane = ground.grounded;
         // And out of anybody this body is standing in. After the height, so a push can never
         // leave a body off its ground -- `travel.y` is assigned above and the push is horizontal.
         if (mine) {
@@ -2014,9 +2057,12 @@ public:
 
 private:
     float alignDefault_, smoothDefault_, floatDefault_, tiltDefault_, bodyRadiusDefault_;
+    float footprintDefault_, footDropDefault_;
     // Unset until the first update has seen whether anything above declared a body.
     std::optional<bool> ownsBody_;
     params::Parameter<float>* bodyRadius_ = nullptr;
+    params::Parameter<float>* footprint_ = nullptr;
+    params::Parameter<float>* footDrop_ = nullptr;
     params::Parameter<float>* align_ = nullptr;
     params::Parameter<float>* smooth_ = nullptr;
     params::Parameter<float>* float_ = nullptr;

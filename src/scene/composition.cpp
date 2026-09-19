@@ -2314,10 +2314,30 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
     }
     glm::vec3 localTarget(0.0f);
     bool haveTarget = false;
-    if (state.hasLookTarget) {
-        const glm::mat4 inverse = glm::inverse(owner_.nodeWorldTransform(*node).matrix());
-        localTarget = glm::vec3(inverse * glm::vec4(state.lookTarget, 1.0f));
-        haveTarget = true;
+    glm::vec3 localGround(0.0f);
+    glm::vec3 localNormal(0.0f, 1.0f, 0.0f);
+    bool haveGround = false;
+    if (state.hasLookTarget || state.hasGroundPlane) {
+        const glm::mat4 world = owner_.nodeWorldTransform(*node).matrix();
+        const glm::mat4 inverse = glm::inverse(world);
+        if (state.hasLookTarget) {
+            localTarget = glm::vec3(inverse * glm::vec4(state.lookTarget, 1.0f));
+            haveTarget = true;
+        }
+        if (state.hasGroundPlane) {
+            // ADR-359. The point goes through the inverse like any point. The **normal does not**:
+            // a normal is a covector, so world-to-local for it is the transpose of the
+            // local-to-world basis rather than the inverse of it. The two agree only for a pure
+            // rotation, and Glowmere draws these bodies at 3.3x to 3.6x -- an error that is
+            // invisible on a uniform scale and a hoof rotated into the hillside the moment a scene
+            // squashes one axis. Normalised afterwards, because a scale leaves it unnormalised
+            // either way.
+            localGround = glm::vec3(inverse * glm::vec4(state.groundPoint, 1.0f));
+            const glm::vec3 n = glm::transpose(glm::mat3(world)) * state.groundNormal;
+            const float len = glm::length(n);
+            localNormal = len > 1e-6f ? n / len : glm::vec3(0.0f, 1.0f, 0.0f);
+            haveGround = true;
+        }
     }
     const float reaction = std::clamp(state.reaction, 0.0f, 1.0f);
     for (const RigId id : node->rigs) {
@@ -2335,6 +2355,16 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
                 break;
             case PoseLayerDrive::Reaction:
                 layer.weight = reaction;
+                break;
+            case PoseLayerDrive::Ground:
+                // The weight is the *grounded* bit and not a blend: a body standing on something
+                // gets its feet planted, and a body in a tractor beam does not. A scene that wants
+                // the correction eased in says so with a fade on the layer it authors, which is a
+                // decision about staging rather than one this seam may make for it.
+                layer.weight = haveGround ? 1.0f : 0.0f;
+                layer.groundPoint = localGround;
+                layer.groundNormal = localNormal;
+                layer.hasGround = haveGround;
                 break;
             }
         }
@@ -7234,6 +7264,30 @@ nlohmann::json Composition::toJson() const {
                     if (layer.drive != PoseLayerDrive::Manual) {
                         l["drive"] = poseLayerDriveName(layer.drive);
                     }
+                    // ADR-359: a foot layer is a different set of keys, not the same set with some
+                    // of them empty. Written through the shared path it came out with `"joints":
+                    // []` and `"clip": ""`, and the file it produced would not load -- a save that
+                    // breaks the scene it saved is worse than one that refuses.
+                    if (layer.kind == PoseLayerKind::Foot) {
+                        l["chain"] = json::array({layer.chainRoot, layer.chainMid, layer.chainTip});
+                        if (glm::dot(layer.poleDirection, layer.poleDirection) > 0.0f) {
+                            l["poleDirection"] = vecToJson(layer.poleDirection);
+                        }
+                        if (layer.footAlign != 1.0f) {
+                            l["footAlign"] = layer.footAlign;
+                        }
+                        if (layer.groundOffset != 0.0f) {
+                            l["groundOffset"] = layer.groundOffset;
+                        }
+                        if (layer.extension != 1.0f) {
+                            l["extension"] = layer.extension;
+                        }
+                        if (glm::dot(layer.soleUp, layer.soleUp) > 0.0f) {
+                            l["soleUp"] = vecToJson(layer.soleUp);
+                        }
+                        layers.push_back(std::move(l));
+                        continue;
+                    }
                     l["joints"] = layer.mask.joints;
                     if (!layer.mask.weights.empty()) {
                         l["weights"] = layer.mask.weights;
@@ -8365,7 +8419,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         }
                         if (!poseLayerDriveFromName(*drive, layer.drive)) {
                             return fail("node '{}': animation layer '{}': unknown drive '{}' (manual, look, "
-                                        "reaction)",
+                                        "reaction, ground)",
                                         node.name, layer.name, *drive);
                         }
                         layer.pivot = *pivot;
@@ -8420,15 +8474,63 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         auto descendants = readBool(entry, "descendants", false);
                         if (!descendants) return std::unexpected(descendants.error());
                         layer.mask.descendants = *descendants;
-                        if (layer.mask.joints.empty()) {
+                        // ADR-359: a foot layer is addressed by a chain and never by a mask, so it
+                        // reads a different set of keys and refuses a mask outright here rather
+                        // than letting `bind` report a no-op after the scene has loaded.
+                        if (layer.kind == PoseLayerKind::Foot) {
+                            if (!entry.contains("chain")) {
+                                return fail("node '{}': animation layer '{}': a foot layer needs a 'chain' "
+                                            "of exactly three joint names -- the hip, the knee and the foot",
+                                            node.name, layer.name);
+                            }
+                            const json& chain = entry.at("chain");
+                            if (!chain.is_array() || chain.size() != 3 ||
+                                !std::all_of(chain.begin(), chain.end(),
+                                             [](const json& j) { return j.is_string(); })) {
+                                return fail("node '{}': animation layer '{}': 'chain' must be exactly three "
+                                            "joint names -- the hip, the knee and the foot",
+                                            node.name, layer.name);
+                            }
+                            layer.chainRoot = chain[0].get<std::string>();
+                            layer.chainMid = chain[1].get<std::string>();
+                            layer.chainTip = chain[2].get<std::string>();
+                            if (!layer.mask.joints.empty()) {
+                                return fail("node '{}': animation layer '{}': a foot layer is driven by its "
+                                            "chain and has no use for 'joints'; a two-bone solve cannot be "
+                                            "applied to some of its joints and not others",
+                                            node.name, layer.name);
+                            }
+                            auto align = readFloat(entry, "footAlign", 1.0f);
+                            auto offset = readFloat(entry, "groundOffset", 0.0f);
+                            auto reach = readFloat(entry, "extension", 1.0f);
+                            if (!align) return std::unexpected(align.error());
+                            if (!offset) return std::unexpected(offset.error());
+                            if (!reach) return std::unexpected(reach.error());
+                            layer.footAlign = *align;
+                            layer.groundOffset = *offset;
+                            layer.extension = *reach;
+                            if (entry.contains("poleDirection")) {
+                                auto pole = readVec<3>(entry, "poleDirection", layer.poleDirection);
+                                if (!pole) return std::unexpected(pole.error());
+                                layer.poleDirection = *pole;
+                            }
+                            if (entry.contains("soleUp")) {
+                                auto sole = readVec<3>(entry, "soleUp", layer.soleUp);
+                                if (!sole) return std::unexpected(sole.error());
+                                layer.soleUp = *sole;
+                            }
+                        } else if (layer.mask.joints.empty()) {
                             return fail("node '{}': animation layer '{}' masks no joints, so it could only "
                                         "ever do nothing",
                                         node.name, layer.name);
                         }
                         for (const auto& key : entry.items()) {
-                            static constexpr std::array<std::string_view, 12> kLayerKeys{
-                                "name",  "kind",     "drive",    "joints",   "weights", "descendants",
-                                "pivot", "forward",  "maxYaw",   "maxPitch", "clip",    "clipRate"};
+                            static constexpr std::array<std::string_view, 19> kLayerKeys{
+                                "name",         "kind",     "drive",         "joints",
+                                "weights",      "descendants", "pivot",      "forward",
+                                "maxYaw",       "maxPitch", "clip",          "clipRate",
+                                "weight",       "chain",    "poleDirection", "footAlign",
+                                "groundOffset", "extension", "soleUp"};
                             if (std::find(kLayerKeys.begin(), kLayerKeys.end(), key.key()) ==
                                 kLayerKeys.end()) {
                                 log::warn("scene file '{}': node '{}': animation layer key '{}' is not one "

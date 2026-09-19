@@ -30,6 +30,7 @@
 // sets the intent does the world-to-entity conversion, because the entity is the only thing that
 // knows where this rig is standing.
 
+#include "scene/ik.hpp"
 #include "scene/skeleton.hpp"
 
 #include <glm/glm.hpp>
@@ -51,6 +52,12 @@ enum class PoseLayerKind : std::uint8_t {
     // clip is not played *instead of* the gait, it is played *on* it: the shoulders can perform a
     // reaction while the legs keep the stride they were in.
     Additive,
+    // Two-bone inverse kinematics on a named hip->knee->foot chain, so a foot lands on the ground
+    // that is actually under it rather than on the ground the walk cycle was authored over
+    // (ADR-359). The one kind here that reads a *chain* rather than a mask, for the reason ADR-359
+    // gives: a two-bone solve is not maskable per joint, because half a knee does not reach half a
+    // target. `weight` still blends the whole correction towards the animated pose.
+    Foot,
 };
 [[nodiscard]] const char* poseLayerKindName(PoseLayerKind kind);
 [[nodiscard]] bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out);
@@ -65,6 +72,11 @@ enum class PoseLayerDrive : std::uint8_t {
     Manual,
     Look,     // weight from `hasLookTarget`, target from `lookTarget`
     Reaction, // weight from `reaction`
+    // Weight 1 while the body is standing on something, and the ground plane under it -- the one
+    // the entity's own `GroundFollower` already smoothed -- handed down as `groundPoint` and
+    // `groundNormal`. ADR-359 §4: the smoothing lives up there, where it is re-simulated on a seek,
+    // and never down here, where it would be memory a pose layer is not allowed to have.
+    Ground,
 };
 [[nodiscard]] const char* poseLayerDriveName(PoseLayerDrive drive);
 [[nodiscard]] bool poseLayerDriveFromName(std::string_view name, PoseLayerDrive& out);
@@ -101,6 +113,75 @@ struct PoseLayer {
     // that a seek replays -- `entity::LocomotionState`, whose publish site is `entity.cpp`. ADR-300
     // §6 says what that costs and who owns the field.
 
+    // ---- Foot (ADR-359) -------------------------------------------------------------------------
+    // The chain, named outright and in order: the hip, the knee, and the joint that touches the
+    // ground. Three names rather than "the leg and its descendants", because the nine farm rigs
+    // spell the same anatomy three different ways -- the bull ends at `HoofB.L`, the goat runs
+    // `LowerLegB.L -> AnkleB.L -> FootB.L`, the chick stops at `Foot.L` -- and there is no rule
+    // that turns one into the others. Any joints *between* the named three ride along unchanged,
+    // which is what makes the goat's ankle a non-problem.
+    //
+    // `chainMid` must be a descendant of `chainRoot` and `chainTip` a descendant of `chainMid`;
+    // `bind` checks it and says so when it is not, because "these three names are a leg" is an
+    // assumption the alien pack disproves (its foot, thigh and leg are three separate branches).
+    std::string chainRoot;
+    std::string chainMid;
+    std::string chainTip;
+
+    // Which way the knee points, **as a direction in the rig's model space**, not a position: a
+    // position would have to be rewritten every frame by whoever moved the body, and this is a fact
+    // about the animal. Zero means "keep the bend plane the animation is already in", which is the
+    // right default whenever the clip bends the knee at all -- the solver has no better opinion
+    // than the animator. It is only needed for a chain the clip leaves straight, and there it is
+    // required: `IkStatus::DegenerateBend` refuses rather than picking a side.
+    glm::vec3 poleDirection{0.0f};
+    // How straight the limb may go, as a fraction of its own length. 1 by default, and ADR-359 has
+    // the measurement that says so: the farm pack binds its legs at 97.9% to 100.0% of their own
+    // span, so anything less clamps a hoof standing exactly where the artist put it.
+    float extension = 1.0f;
+
+    // ---- Foot: the ground, as a plane ----------------------------------------------------------
+    // Foot planting takes a plane rather than a point so that one piece of intent serves all four
+    // of a bull's feet: each foot drops onto the plane *underneath itself*, along model-space -Y,
+    // rather than all of them converging on one spot. An explicit `target` overrides it, which is
+    // how a test or a timeline drives one foot by hand.
+    //
+    // Entity-local, like every other target here (ADR-274).
+    glm::vec3 groundPoint{0.0f};
+    glm::vec3 groundNormal{0.0f, 1.0f, 0.0f};
+    bool hasGround = false;
+    // An extra nudge above the plane, in the rig's own model units, on top of the height the foot
+    // already stands at.
+    //
+    // It defaults to zero and usually stays there, because "on the ground" is not "the joint is on
+    // the plane": a hoof joint is not the sole of the hoof, and on this pack it sits 0.120 model
+    // units above it (0.097 on the front leg). A plant reads that height out of the **rest pose**
+    // and preserves it, so the rule is "stand on this slope the way you stand on the flat" and
+    // there is nothing to author and nothing to measure wrong. This field is for the cases the rest
+    // pose cannot know about -- a hoof sunk into mud, a foot on a step.
+    float groundOffset = 0.0f;
+    // 0 keeps the foot's animated orientation; 1 lays its sole flat on the plane. The same shape as
+    // `entity::GroundSettings::slopeAlign`, one level down, and complementary to it -- `slopeAlign`
+    // tilts the body, this tilts one foot -- but **not** the same argument, and the default is the
+    // other way round on purpose. A body leans part of the way into a hill; a hoof is flat on it.
+    //
+    // 1 rather than 0 because 0 is not the conservative default, it is the broken one: the tip
+    // joint rides whatever rotations the hip and the knee needed to reach the target, and on an
+    // 18-degree bank a bull's four hooves come out at 18, 27, 27 and 56 degrees from vertical --
+    // one of them on its edge -- while every distance assertion about them passes. The scene
+    // parser defaults this to 1 too; the two diverging is the kind of thing nobody finds twice.
+    float footAlign = 1.0f;
+    // Which way is *out of the sole*, as a direction in the tip joint's own bind frame.
+    //
+    // **Zero means "whatever was up when the animal was standing"**, resolved once by `bind` from
+    // the rig's rest pose, and that default is a measurement rather than a convenience. The obvious
+    // convention is a cardinal axis -- the tip joint's +Y -- and on this pack it is wrong on all
+    // nine: these joints are aligned along the *bone*, not along the ground. Not one of them has an
+    // axis within 26 degrees of vertical, and a bull's hind hoof is 42.8 degrees off, so a +Y
+    // convention lays the sole at 43 degrees to the slope and calls it aligned. Taking the rest
+    // pose's up needs no authoring and cannot be wrong about a rig it has read.
+    glm::vec3 soleUp{0.0f};
+
     // ---- intent, written per frame by whatever drives the layer --------------------------------
     float weight = 0.0f;         // 0 = this layer does nothing at all this frame
     glm::vec3 target{0.0f};      // ENTITY-LOCAL (the rig's model space), never world
@@ -115,6 +196,21 @@ enum class LayerResolution : std::uint8_t {
     NoPivot,  // an aim layer whose pivot joint is not in this rig
     NoSource, // an additive layer whose clip this rig does not have
     NoTarget, // an aim layer with no target this frame, or a target on top of its own pivot
+    // A foot layer whose three chain names this rig does not carry, or carries in something that is
+    // not a chain: the named knee is not below the named hip, or the named foot is not below the
+    // knee. The alien pack is the reason this is a first-class answer rather than an assertion --
+    // `foot.l` is a direct child of `root.x` and `leg_stretch.l` is not even under it, so the three
+    // names an author would reach for name three branches and not a limb.
+    NoChain,
+    // A foot layer that solved, but on a target its leg cannot reach: the limb is extended towards
+    // it and stopped at its own limit. Separate from `Applied` because it is the honest report of
+    // a foot that is *not* where it was asked to be, and a scene in which every foot says this is
+    // a scene whose ground intent is wrong by more than a leg length.
+    Clamped,
+    // A foot layer the solver refused: a zero-length bone, a target on top of the hip, or a
+    // straight chain with no pole to say which way the knee folds. `scene::ikStatusName` says
+    // which; this says that it happened.
+    Degenerate,
     Applied,  // it wrote at least one joint
 };
 [[nodiscard]] const char* layerResolutionName(LayerResolution r);
@@ -137,6 +233,10 @@ public:
     [[nodiscard]] const std::vector<PoseLayer>& layers() const { return layers_; }
     [[nodiscard]] const std::vector<JointMask>& masks() const { return masks_; }
     [[nodiscard]] const std::vector<LayerResolution>& results() const { return results_; }
+    // Per layer, what the two-bone solver said the last time a `Foot` layer ran. `Solved` on every
+    // layer that is not one, which is a lie a caller has to read alongside `results()` -- the point
+    // is to say *which* degeneracy, and `LayerResolution::Degenerate` only says that there was one.
+    [[nodiscard]] const std::vector<IkStatus>& ikStatuses() const { return ikStatus_; }
     // The layer with this role, or nullptr. Roles are how the animation-intent seam reaches a
     // layer; a name is how a person does.
     [[nodiscard]] PoseLayer* find(PoseLayerDrive drive);
@@ -166,6 +266,18 @@ private:
     std::vector<LayerResolution> results_;
     std::vector<int> clipIndex_;  // per layer, resolved once by bind
     std::vector<int> pivotIndex_; // per layer, resolved once by bind
+    // Per layer, the three joint indices of a `Foot` chain, or -1. Resolved once by bind, including
+    // the check that they are an ancestor chain rather than three names that happen to exist.
+    std::vector<glm::ivec3> chain_;
+    // Per layer, `PoseLayer::soleUp` resolved against this rig's rest pose. Held here rather than
+    // recomputed per frame because it is a fact about the asset, and read out of the *rest* pose
+    // rather than the current one because "up" has to mean the same thing on every frame of a walk.
+    std::vector<glm::vec3> soleUp_;
+    // Per layer, the tip joint's model-space height in the rest pose: how far off the ground this
+    // foot stands when the animal is standing on flat ground. Read once, for the same reason
+    // `soleUp_` is.
+    std::vector<float> restTipHeight_;
+    std::vector<IkStatus> ikStatus_;
     // Scratch, kept so a per-frame apply allocates nothing after the first.
     std::vector<glm::mat4> model_;
     std::vector<glm::mat4> updated_;
@@ -178,5 +290,21 @@ private:
 // of what an aim layer decides and a test that could only reach it through a posed rig would be
 // testing four things at once.
 [[nodiscard]] glm::quat aimRotation(const glm::vec3& from, const glm::vec3& to, float maxYaw, float maxPitch);
+
+// Where a foot standing at `tip` should stand, given the plane through `planePoint` with normal
+// `planeNormal` and a joint that rests `offset` above it. The drop is along model-space **-Y**
+// rather than along the plane normal, because the foot is over the ground it is over: sliding it
+// down the normal would move it sideways across the terrain, and on a 30-degree bank that is half a
+// hoof's width of drift for nothing. Exposed because it is the whole of what "plant" means and a
+// test that could only reach it through a posed rig would be testing four things at once.
+//
+// **Model-space -Y is not world down, and that is a known approximation.** The entity carrying this
+// rig is itself tilted by `GroundSettings::slopeAlign`, up to 0.55 x 34 degrees, so the drop leans
+// with the body and the foot slides along the plane by `tan(tilt) x drop` -- of the order of three
+// centimetres on a 0.2 m correction at a 10-degree lean. Fixing it means the caller handing down a
+// second direction (world down, in entity-local), and the number did not yet justify the field.
+// ADR-359 records it as a revisit trigger.
+[[nodiscard]] glm::vec3 plantOnPlane(const glm::vec3& tip, const glm::vec3& planePoint,
+                                     const glm::vec3& planeNormal, float offset);
 
 } // namespace avgen::scene

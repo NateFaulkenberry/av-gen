@@ -29,8 +29,11 @@
 #include <glm/gtx/norm.hpp>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <set>
 #include <string>
 
@@ -279,17 +282,25 @@ TEST_CASE("Only the island is animated, and it turns at a cinematic rate", "[tre
     }
     const json project = readJson(dir / kProjectRel);
 
-    // Brief §22: deterministic time-based motion only, no audio yet. Every source is an LFO, and
-    // `LfoSource::update` is `renderTime * rate + phase` with no integration -- which is why a
-    // render that starts at t = 40 s agrees with one that started at 0.
+    // Brief §22: the island's own motion is deterministic and time-based. `LfoSource::update` is
+    // `renderTime * rate + phase` with no integration, which is why a render that starts at t = 40 s
+    // agrees with one that started at 0 -- so the two sources that drive the island must be LFOs.
+    //
+    // This once asserted that EVERY source was an LFO. It is not the same claim, and the owner
+    // disproved it by working: the project now also carries a `control` source, a `beat.pulse` route
+    // onto the comet and a `state.progress` route onto the hue shift. A test that says "and there is
+    // nothing else in this project" is a photograph of one afternoon's art direction, and it fails
+    // the next time somebody adds a route -- which tells you nothing about the invariant it was
+    // written to protect.
     REQUIRE(project.contains("sources"));
-    std::set<std::string> lfos;
+    std::map<std::string, std::string> sourceKind;
     for (const json& s : project.at("sources")) {
-        CHECK(s.value("kind", std::string{}) == "lfo");
-        lfos.insert(s.value("name", std::string{}));
+        sourceKind[s.value("name", std::string{})] = s.value("kind", std::string{});
     }
-    CHECK(lfos.count("spin") == 1);
-    CHECK(lfos.count("bob") == 1);
+    CHECK(sourceKind.count("spin") == 1);
+    CHECK(sourceKind.count("bob") == 1);
+    CHECK(sourceKind["spin"] == "lfo");
+    CHECK(sourceKind["bob"] == "lfo");
 
     // Brief §20: nothing routes to the tree. This is the half of the hierarchy contract that lives
     // in the project rather than the scene, and the half a scene-only test cannot see.
@@ -299,8 +310,14 @@ TEST_CASE("Only the island is animated, and it turns at a cinematic rate", "[tre
     for (const json& r : project.at("routes")) {
         const auto target = r.value("target", std::string{});
         INFO("route " << r.value("source", std::string{}) << " -> " << target);
-        CHECK(target.rfind("nodes/", 0) == 0);
+        // The contract is about the *hierarchy*: the island is animated and the tree rides it. So
+        // nothing may aim at the tree, and any route that aims at a node must aim at the island.
+        // Routes onto post, atmospherics or world effects are a different subject entirely and this
+        // test has no business having an opinion about them.
         CHECK(target.find("tree") == std::string::npos);
+        if (target.rfind("nodes/", 0) != 0) {
+            continue;
+        }
         CHECK(target.rfind("nodes/floating-island/", 0) == 0);
         if (r.value("source", std::string{}) == "lfo.spin") {
             sawSpin = true;
@@ -364,12 +381,32 @@ TEST_CASE("The showcase camera is static and the cosmos is dark", "[treeisland][
     }
     const json& sky = env.at("sky");
     CHECK(sky.value("enabled", false));
-    for (const char* key : {"zenithColor", "horizonColor", "groundColor"}) {
+    // What the camera sees *behind* the subject keeps the strict ceiling.
+    for (const char* key : {"zenithColor", "horizonColor"}) {
         for (const float c : sky.at(key).get<std::vector<float>>()) {
             INFO("sky." << key);
             CHECK(c >= 0.0f);
             CHECK(c < kBackgroundCeiling);
         }
+    }
+    // The ground hemisphere is not backdrop, it is fill -- it is what lights the underside of an
+    // island that has no ground under it. ADR-358's lighting pass took it up in three deliberate
+    // doublings, 0.0052 -> 0.0105 -> 0.0210 -> 0.0360 on red, to lift that underside out of black,
+    // and nobody revisited this ceiling, so the test failed on the merge rather than on a defect.
+    //
+    // It gets its own bound, and the bound is weaker on purpose: at 0.096 on blue the "more than an
+    // order of magnitude below the subject" argument above no longer holds for this one value -- it
+    // is about five times below the lit canopy, not ten. That is a real loosening and it is written
+    // down rather than hidden by widening the shared constant.
+    //
+    // Brief §17 wants the island "emerging dramatically from deep environmental shadow" and warns
+    // against "flat HDRI illumination", which is an argument for taking this back down. That is an
+    // art decision with a render behind it, not a lint threshold, and it is open.
+    constexpr float kGroundFillCeiling = 0.12f;
+    for (const float c : sky.at("groundColor").get<std::vector<float>>()) {
+        INFO("sky.groundColor");
+        CHECK(c >= 0.0f);
+        CHECK(c < kGroundFillCeiling);
     }
     // No sun disc: this is space, and §12 forbids giant distracting objects.
     CHECK(sky.value("sunIntensity", 1.0) == Approx(0.0));
@@ -398,12 +435,27 @@ TEST_CASE("The showcase camera is static and the cosmos is dark", "[treeisland][
     const json& key = lights.at(0);
     CHECK(key.value("type", std::string{}) == "directional");
     CHECK(key.value("role", std::string{}) == "key");
-    // From above: the downward component dominates.
+    // From above, and at a cinematic angle rather than overhead.
+    //
+    // This once required the downward component to dominate *both* horizontal axes, which is the
+    // same as demanding an elevation above 45 degrees. ADR-358 deliberately moved the key to 35, a
+    // low raking angle that is the whole point of a key light -- an overhead key flattens the tree
+    // and puts its own shadow under itself. The old assertion was not protecting an invariant, it
+    // was recording the elevation the light happened to have.
+    //
+    // So: a band, not a floor (ADR-182). The key must come from above the horizon and must not be
+    // so shallow that it grazes, nor so steep that it is a toplight. Anything in 10..80 degrees is
+    // a key somebody chose; outside it, something has gone wrong rather than been art-directed.
     const auto dir3 = key.at("direction").get<std::vector<float>>();
     REQUIRE(dir3.size() == 3);
-    CHECK(dir3[1] < 0.0f);
-    CHECK(std::abs(dir3[1]) > std::abs(dir3[0]));
-    CHECK(std::abs(dir3[1]) > std::abs(dir3[2]));
+    CHECK(dir3[1] < 0.0f); // travels downward, i.e. the light is above the horizon
+    const float len = std::sqrt(dir3[0] * dir3[0] + dir3[1] * dir3[1] + dir3[2] * dir3[2]);
+    REQUIRE(len > 0.0f);
+    const float elevationDeg = std::asin(std::clamp(-dir3[1] / len, -1.0f, 1.0f)) * 180.0f
+                               / 3.14159265358979323846f;
+    INFO("key elevation " << elevationDeg << " degrees");
+    CHECK(elevationDeg > 10.0f);
+    CHECK(elevationDeg < 80.0f);
 }
 
 TEST_CASE("A procedural material can express alpha cutout", "[procedural][material]") {

@@ -220,6 +220,20 @@ ADR-161 decided root motion was not implemented because the content had none; th
 inventory test now requires that travelling clips exist, and `Landing`'s **−0.567 m** is discarded
 every time Glowmere plays it. The opt-in is what keeps the other 163 clips exactly as they are.
 
+### P12 — Foot IK  ·  needs P5 and P6  ·  one agent  ·  **done** (ADR-359)
+
+Added after the fact. This plan surveyed the animation layer and wrote down "no IK of any kind",
+and then did not schedule any -- so it is recorded here rather than left as the one absence the plan
+named and never returned to.
+
+**Delivers** a closed-form two-bone solver (`src/scene/ik.*`) and a `PoseLayerKind::Foot` that
+plants a named hip→knee→foot chain on a ground plane, inside the ADR-300 contract: pose-only, pure,
+no memory across a frame. The nine farm rigs have the chain; `alien-scout.glb` does not -- its foot,
+thigh and leg are three branches under two parents -- and `bind` reports that by name rather than
+solving a limb that is not there. The body drop the solve needs (`GroundSettings::footDrop`) lives
+in `entity::GroundFollower`, because a pose layer structurally cannot move a body and a grounding
+component structurally cannot pose one. Both halves default off.
+
 ### P11 — Route pricing  ·  independent  ·  needs P3  ·  small
 
 **Added by P3 (ADR-333), because P3 finished without it and the Character Intelligence Lab's case 9

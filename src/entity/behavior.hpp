@@ -61,6 +61,13 @@ struct EntityState {
     float reaction = 0.0f;    // 0..1, decaying
     glm::vec3 lookTarget{0.0f};
     bool hasLookTarget = false;
+    // The surface this body is standing on, in WORLD space: a point on it and its normal, as the
+    // body's own `GroundFollower` filtered them (ADR-359). Written by whichever behaviour grounds
+    // this entity and by nothing else; false on a body that is flying, swimming or in a scene with
+    // no terrain, which is the case a foot IK layer has to be able to tell from "flat ground".
+    glm::vec3 groundPoint{0.0f};
+    glm::vec3 groundNormal{0.0f, 1.0f, 0.0f};
+    bool hasGroundPlane = false;
     // How much of a full update this entity is getting. 1 = every frame. Behaviours that integrate
     // must scale by the real dt, which the context carries; this is for behaviours that want to
     // know they are being run coarsely and simplify.
