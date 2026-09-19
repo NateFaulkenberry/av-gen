@@ -1343,6 +1343,7 @@ private:
     params::Parameter<float>* vortexThickness_ = nullptr;
     params::Parameter<float>* vortexFilaments_ = nullptr;
     params::Parameter<float>* vortexSpill_ = nullptr;
+    params::Parameter<float>* vortexCometResponse_ = nullptr;
     params::Parameter<float>* vortexFunnelDepth_ = nullptr;
     params::Parameter<float>* vortexThroat_ = nullptr;
     params::Parameter<float>* vortexThroatDensity_ = nullptr;

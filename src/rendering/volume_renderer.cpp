@@ -378,6 +378,7 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
             u.vortexAccent = glm::vec4(v.colorAccent, 0.0f);
             u.vortex4 = glm::vec4(std::max(v.funnelDepth, 0.0f), std::clamp(v.throat, 0.02f, 1.0f),
                                   std::clamp(v.throatDensity, 0.0f, 1.0f), 0.0f);
+            u.vortex5 = glm::vec4(std::max(v.cometResponse, 0.0f), std::max(v.cometReach, 1.0f), 0.0f, 0.0f);
         } else {
             u.vortex0 = glm::vec4(0.0f);
             u.vortex1 = glm::vec4(0.0f);
@@ -387,6 +388,7 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
             u.vortexB = glm::vec4(0.0f);
             u.vortexAccent = glm::vec4(0.0f);
             u.vortex4 = glm::vec4(0.0f);
+            u.vortex5 = glm::vec4(0.0f);
         }
     }
     im.context.queue().WriteBuffer(im.uniforms, 0, &u, sizeof(u));
