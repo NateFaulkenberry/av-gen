@@ -634,3 +634,76 @@ TEST_CASE("The film's five characters all walk, at more than one seed",
         CHECK(statues == 0);
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Does a rendered frame show what the cast did to get there?
+//
+// This is a question about the *instrument*, and it decides whether a render can validate a cast
+// fix at all. An offline render of one frame at t seconds is `Engine::seekSeconds(t)` followed by
+// one `update` (`render_job.cpp`, the warm-up block), so everything a viewer sees about where the
+// bodies are is whatever `seekSeconds` leaves them at.
+//
+// `seekSeconds` calls `EntityWorld::seek`, which `reset()`s every body to its anchor and replays
+// forward under a `SeekBudget{maxSeconds = 90}` at a 1/60 step. So the answer should be "yes, up to
+// ninety seconds". This checks it rather than trusting it, because a render pair that came back
+// byte-identical across an engine change is exactly the shape of an instrument that is not
+// measuring what it is being asked about.
+//
+//   ./build/release/tests/avgen_tests "[.probe][multicam-defects]"
+TEST_CASE("probe: what a seek leaves the cast at, against what stepping there does",
+          "[.probe][multicam-defects]") {
+    std::map<std::string, glm::vec3> anchors;
+    std::map<std::string, glm::vec3> seeked;
+    std::map<std::string, glm::vec3> stepped;
+
+    for (const double t : {17.0, 48.5, 200.0}) {
+        app::Engine engine(app::EngineMode::Offline);
+        auto loaded = engine.loadProject(filmProject());
+        REQUIRE(loaded.has_value());
+        scene::Composition* comp = engine.composition();
+        REQUIRE(comp != nullptr);
+        comp->setViewport(1600, 900);
+        comp->scene().detailLimits.entityDistanceCull = false;
+        for (const char* n : kAliens) {
+            const entity::Entity* e = comp->entityWorld().find(n);
+            REQUIRE(e != nullptr);
+            anchors[n] = e->state().anchor;
+        }
+        // Exactly what the render does.
+        engine.seekSeconds(t);
+        FrameTime ft;
+        ft.renderTime = t;
+        ft.deltaTime = 1.0 / 60.0;
+        ft.frameIndex = 1;
+        engine.update(ft);
+        for (const char* n : kAliens) {
+            seeked[n] = comp->entityWorld().find(n)->state().position();
+        }
+
+        std::printf("\n===== t = %.1f s: seek against step =====\n", t);
+        std::printf("  %-7s %-26s %-26s %8s\n", "body", "anchor", "after seek",
+                    "moved");
+        for (const char* n : kAliens) {
+            const glm::vec3 a = anchors[n];
+            const glm::vec3 s = seeked[n];
+            std::printf("  %-7s (%7.1f,%7.1f)           (%7.1f,%7.1f)            %8.2f\n", n,
+                        static_cast<double>(a.x), static_cast<double>(a.z),
+                        static_cast<double>(s.x), static_cast<double>(s.z),
+                        static_cast<double>(glm::length(glm::vec2(s.x - a.x, s.z - a.z))));
+        }
+        std::fflush(stdout);
+    }
+
+    // And the same second reached by stepping, which is what the behaviour probe does. The two are
+    // different integrations (1/60 against 1/40) so they will not agree to the metre; what matters
+    // is whether they agree about a body having *gone somewhere*.
+    const auto run = playFilm(48.5, 0);
+    std::printf("\n  stepping to 48.5 s instead, for comparison:\n");
+    for (const char* n : kAliens) {
+        const Track& t = run.at(n);
+        std::printf("  %-7s travelled %7.1f m, ends (%7.1f,%7.1f)\n", n,
+                    static_cast<double>(t.travelled), static_cast<double>(t.end.x),
+                    static_cast<double>(t.end.z));
+    }
+    std::fflush(stdout);
+}
