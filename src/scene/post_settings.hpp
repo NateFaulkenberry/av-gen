@@ -24,6 +24,67 @@ namespace avgen::scene {
 
 enum class TonemapOperator : std::uint8_t { AcesFitted, AgX, Reinhard, PbrNeutral, Clamp };
 
+// ---- cinematic integration (Image/Look §52.1, §68) -----------------------------------------------
+//
+// The four controls that make the elements of a frame look like they were photographed together
+// rather than composited. They are the only genuinely new state in the Image/Look work; everything
+// else §52 asks for already exists above and below this struct under names that are kept.
+//
+// **Every field defaults to the value that means "do nothing", and a field at that value costs
+// nothing and changes nothing.** That is §60/§87 and it is the milestone, so it is enforced
+// structurally rather than by care: the two passes that carry these controls are *not encoded at
+// all* unless a control is off its default, so with integration at zero the command stream, the
+// shaders that run and therefore the float buffer handed to the tone map are bit-identical to a
+// build without this struct. Nothing here is folded into `fs_composite` -- which always runs -- for
+// exactly that reason. See docs/image-look-audit.md §1.4 and §5.
+//
+// The order is §68's: atmospheric, colour, local contrast, light wrap.
+struct ImageLookIntegration {
+    // §68.1 Atmospheric. Depth-driven aerial perspective *in the image*, as a fraction: 1 pushes a
+    // pixel at `atmosphericDistance` fully toward the scene's own horizon colour.
+    //
+    // ADR-347 already gives the scene real fog, taking its colour from the sky's horizon, at a
+    // density it also corrected (it was 15x too high). This control is deliberately NOT a second
+    // fog and must not be sold as one: it is applied in post, from depth, after the scene has been
+    // shaded, and its purpose is the one thing scene fog structurally cannot reach -- everything
+    // composited *after* shading. Measure ADR-347's fog before reaching for this. See
+    // docs/image-look-audit.md §5.1 for what was measured.
+    float atmospheric = 0.0f;         // 0..1
+    float atmosphericDistance = 200.0f; // metres at which `atmospheric` is reached in full
+    glm::vec3 atmosphericTint{0.55f, 0.68f, 0.85f}; // the colour distance tends toward
+
+    // §68.2 Colour. Pulls the frame's chroma toward a common axis, which is what a single film
+    // stock does to a scene lit by mixed sources. 0 is off.
+    float colour = 0.0f; // 0..1
+
+    // §68.3 Local contrast. A large-radius unsharp mask about the local mean -- "clarity", not
+    // sharpening, which is `post/output/sharpen` and is a one-pixel neighbourhood.
+    //
+    // ADR-352: the glTF BRDF gains up to 68% of its energy at grazing angles and compounds per
+    // bounce, so scene-referred values here may be hot. The gain is therefore applied about the
+    // local mean in *log* space and the result is clamped to a bounded multiple of the input, so a
+    // hot pixel cannot be amplified without limit. Verified against the `--pt-probe` diagnostic's
+    // worst measured directional albedo rather than against an assumed ceiling.
+    float localContrast = 0.0f;        // 0..1
+    float localContrastRadius = 24.0f; // pixels at 720p, scaled by height / 720 like every other
+                                       // radius in this struct's neighbours
+
+    // §68.4 Light wrap. A bright background bleeding around a foreground edge -- the single
+    // strongest cue that a subject is *in* a scene rather than in front of it. Reuses the bloom
+    // pyramid rather than building a third one, so it costs one texture fetch.
+    float lightWrap = 0.0f; // 0..1
+
+    // True when anything here is off its default, i.e. when the chain must encode the look passes.
+    // The single place that decision is made; the renderer and the tests both ask this and so
+    // cannot disagree about what "at zero" means.
+    [[nodiscard]] bool active() const {
+        return atmospheric > 0.0f || colour > 0.0f || localContrast > 0.0f || lightWrap > 0.0f;
+    }
+    // Split the same way the chain is: one pass needs depth and runs early, one runs late.
+    [[nodiscard]] bool atmosphericActive() const { return atmospheric > 0.0f; }
+    [[nodiscard]] bool lookActive() const { return colour > 0.0f || localContrast > 0.0f || lightWrap > 0.0f; }
+};
+
 struct PostSettings {
     // ---- exposure (ADR-037), applied first so every threshold below is in exposed units -------
     ExposureSettings exposure;
@@ -123,6 +184,11 @@ struct PostSettings {
     float chromaRetention = 0.0f;  // 0..1 how much hue to hold in compressed highlights, so a
                                    // bright narrow-band light stays coloured instead of going
                                    // white. 0 leaves the operator's own rolloff untouched.
+
+    // ---- cinematic integration (Image/Look §52.1, §68) --------------------------------------------
+    // A member of this object rather than a rival to it (§52). Zero throughout by default; see the
+    // struct's own comment for why that zero is enforced structurally.
+    ImageLookIntegration look;
 };
 
 struct PostParameters {
@@ -172,6 +238,14 @@ struct PostParameters {
     params::Parameter<float>* vignette = nullptr;
     params::Parameter<float>* grain = nullptr;
     params::Parameter<float>* chromaRetention = nullptr;
+    // ---- cinematic integration (§52.1, §54's namespaced IDs: post/look/*) -------------------------
+    params::Parameter<float>* lookAtmospheric = nullptr;
+    params::Parameter<float>* lookAtmosphericDistance = nullptr;
+    params::Parameter<glm::vec3>* lookAtmosphericTint = nullptr;
+    params::Parameter<float>* lookColour = nullptr;
+    params::Parameter<float>* lookLocalContrast = nullptr;
+    params::Parameter<float>* lookLocalContrastRadius = nullptr;
+    params::Parameter<float>* lookLightWrap = nullptr;
 };
 
 PostParameters registerPostParameters(params::ParameterSet& params, const PostSettings& defaults);

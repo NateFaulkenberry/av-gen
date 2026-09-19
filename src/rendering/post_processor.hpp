@@ -219,6 +219,10 @@ private:
     wgpu::RenderPipeline motionBlur_;
     wgpu::RenderPipeline velocityTileMax_;
     wgpu::RenderPipeline velocityNeighbourMax_;
+    // Cinematic integration (Image/Look §68); appended, never inserted.
+    wgpu::RenderPipeline lookAtmos_;
+    wgpu::RenderPipeline lookBlur_;
+    wgpu::RenderPipeline look_;
     wgpu::Sampler sampler_;
     wgpu::Buffer uniforms_;
     std::uint32_t slot_ = 0;

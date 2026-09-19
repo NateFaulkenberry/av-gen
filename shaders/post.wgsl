@@ -832,3 +832,135 @@ fn fs_fxaa(in: FsIn) -> @location(0) vec4<f32> {
     if (horizontal) { finalUv.y += finalOffset * stepLength; } else { finalUv.x += finalOffset * stepLength; }
     return vec4<f32>(textureSampleLevel(source, linearSampler, finalUv, 0.0).rgb, 1.0);
 }
+
+// ================================================================================================
+// Cinematic integration (Image/Look §52.1, §68): atmospheric, colour, local contrast, light wrap.
+// ================================================================================================
+//
+// These are the only passes in this file that are *not* part of the historical ADR-039 chain, and
+// the rule that governs them is §60/§87: with every amount at zero the image must be unchanged.
+// That is enforced by the encoder, not by arithmetic -- `PostProcessor::run` does not encode any of
+// the entry points below unless an amount is off its default, so at zero the shader binary that
+// runs, the command stream and therefore the float buffer handed to the tone map are bit-identical
+// to a build in which this section does not exist. Nothing here was folded into `fs_composite`,
+// which always runs, for exactly that reason: a `if (amount > 0.0)` inside a pass that always runs
+// still changes that pass's register allocation and instruction scheduling, and so cannot promise
+// bit-identity. See docs/image-look-audit.md §1.4.
+
+// ---- §68.1 atmospheric: depth-driven aerial perspective, in the image ---------------------------
+//
+// NOT a second fog. ADR-347 already gives the scene real fog that takes its colour from the sky's
+// own horizon, at a density it also corrected. This operates after shading, on the composed frame,
+// which is the one place scene fog structurally cannot reach.
+//
+// The background is deliberately excluded. A pixel at the far plane *is* the sky -- it already is
+// the horizon -- and tinting it toward the horizon colour a second time washes the whole frame and
+// destroys the very depth cue the control exists to create. `viewDistance` reports 1e6 for a miss,
+// so the test is on the raw depth and not on the distance.
+@fragment
+fn fs_look_atmos(in: FsIn) -> @location(0) vec4<f32> {
+    let amount = post.params0.x;
+    let fullDistance = max(post.params0.y, 1e-3);
+    let color = textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb;
+    let rawDepth = sampleDepth(in.uv);
+    if (rawDepth >= 1.0) {
+        return vec4<f32>(color, 1.0);    // the sky: already the horizon, leave it alone
+    }
+    let dist = length(worldFromDepth(in.uv, rawDepth) - post.cameraPos.xyz);
+    // Exponential extinction rather than a linear ramp, because that is what scattering does and a
+    // linear ramp puts a visible band at the far end. The 3.0 is chosen so `atmosphericDistance`
+    // is the distance at which the effect has reached 95% of `atmospheric` -- i.e. the parameter
+    // means what its name says to within a twentieth.
+    let t = amount * (1.0 - exp(-3.0 * dist / fullDistance));
+    return vec4<f32>(mix(color, post.tintA.rgb, clamp(t, 0.0, 1.0)), 1.0);
+}
+
+// ---- the low-pass the late stage is built on ----------------------------------------------------
+//
+// §68.2 colour, §68.3 local contrast and §68.4 light wrap all need the same thing: the image's
+// local mean over a wide neighbourhood. They share one, computed properly rather than gathered.
+//
+// "Properly" is not pedantry here, it is the lesson of docs/post-artifact-forensics.md: a gaussian
+// sampled more coarsely than its source's texel is not a blur, it is a comb, and it prints one copy
+// of every isolated highlight per tap. That is what produced the Glowmere water lattice out of the
+// anamorphic pass. So the low-pass is a quarter-resolution separable gaussian -- the quarter-res
+// downsample (the existing 13-tap `fs_downsample`) is a real prefilter, and a tap spacing of one
+// texel of *that* target is Nyquist-safe by construction, whatever radius the author asks for.
+//
+// params0 = (sigma in this target's texels, tap count a side, direction x, direction y)
+@fragment
+fn fs_look_blur(in: FsIn) -> @location(0) vec4<f32> {
+    let sigma = max(post.params0.x, 1e-3);
+    let taps = i32(post.params0.y);
+    let dir = post.params0.zw * post.texelSize;
+    var sum = textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb;
+    var weightSum = 1.0;
+    for (var i = 1; i <= taps; i = i + 1) {
+        let x = f32(i);
+        let w = exp(-0.5 * x * x / (sigma * sigma));
+        sum = sum + textureSampleLevel(source, linearSampler, in.uv + dir * x, 0.0).rgb * w;
+        sum = sum + textureSampleLevel(source, linearSampler, in.uv - dir * x, 0.0).rgb * w;
+        weightSum = weightSum + 2.0 * w;
+    }
+    return vec4<f32>(sum / weightSum, 1.0);
+}
+
+// ---- §68.2 colour + §68.3 local contrast + §68.4 light wrap, over that one low-pass -------------
+//
+// source = the composited frame, second = the low-pass above.
+// params0 = (colour, localContrast, lightWrap, 0)
+@fragment
+fn fs_look(in: FsIn) -> @location(0) vec4<f32> {
+    let colourAmount = post.params0.x;
+    let contrastAmount = post.params0.y;
+    let wrapAmount = post.params0.z;
+
+    var color = textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb;
+    let mean = textureSampleLevel(second, linearSampler, in.uv, 0.0).rgb;
+
+    // §68.3 local contrast: gain about the *local* mean in log space -- "clarity", not sharpening.
+    // `post/output/sharpen` is the one-pixel neighbourhood; this is the tens-of-pixels one.
+    //
+    // ADR-352: the glTF BRDF gains up to 68% of its energy at grazing angles and compounds per
+    // bounce, so a scene-referred value arriving here may be very hot. Log-space gain about the
+    // mean is unbounded on such a pixel -- a 20x ratio at gain 1.5 becomes 89x -- so the ratio is
+    // clamped before it is raised. The clamp is on the *ratio*, not on the result, so it bounds the
+    // amplification without imposing any ceiling on legitimately bright scene values.
+    if (contrastAmount > 0.0) {
+        let m = max(mean, vec3<f32>(1e-4));
+        let ratio = clamp(color / m, vec3<f32>(0.05), vec3<f32>(20.0));
+        color = m * pow(ratio, vec3<f32>(1.0 + contrastAmount));
+    }
+
+    // §68.2 colour: pull each pixel's chroma toward the chroma of its own neighbourhood, at
+    // constant luminance. This is what one film stock does to a scene lit by mixed sources -- it
+    // does not make the elements the same colour, it makes them share a colour *response*, so a
+    // foreground lit by one source stops reading as a separate photograph.
+    //
+    // Deliberately the *local* mean rather than a frame average: a frame average would need a
+    // reduction pass, and -- measured on this engine's material, which is a mostly-dark frame with
+    // a blazing centre -- would be dominated by the empty background, exactly the way ADR-037's
+    // metering note says a log-average would be. The same trap, one stage later.
+    if (colourAmount > 0.0) {
+        let lum = luminance(color);
+        let meanLum = max(luminance(mean), 1e-4);
+        let meanChroma = mean * (lum / meanLum);  // the neighbourhood's hue at *this* pixel's level
+        color = mix(color, meanChroma, colourAmount);
+    }
+
+    // §68.4 light wrap: a bright background bleeding around a foreground edge. The mask is where
+    // the neighbourhood is brighter than the pixel -- which is precisely an edge against something
+    // bright -- so a flat bright area does not lift and this stays a wrap rather than becoming a
+    // second bloom. It takes its blur from the low-pass above and not from the bloom pyramid, on
+    // purpose: the pyramid is thresholded, so a light wrap driven by it would silently do nothing
+    // whenever `post/bloom/threshold` was high, and would change with a slider that has no visible
+    // relationship to it.
+    if (wrapAmount > 0.0) {
+        let lum = luminance(color);
+        let meanLum = luminance(mean);
+        let edge = max(meanLum - lum, 0.0) / max(meanLum, 1e-4);
+        color = color + mean * (wrapAmount * edge);
+    }
+
+    return vec4<f32>(color, 1.0);
+}

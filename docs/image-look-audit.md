@@ -243,3 +243,142 @@ table omits `anamorphicEnabled`, `dofEnabled` and `dofPhysical`; and it handles 
 block. A scene naming any of them gets `log::warn("post.{}: unknown key, ignored")` — so it is
 **loud, not silent**, which is why it has survived. Recorded; anything this work adds to the block
 will be wired on both sides.
+
+---
+
+## 2. The colour-space map
+
+§51.2 asks for this in explicit names, with no "linear-ish". Every row was read off the source.
+
+| stage | encoding | primaries | where |
+|---|---|---|---|
+| base colour / emissive textures on disk | **sRGB, hardware-decoded on sample** (`RGBA8UnormSrgb`) | sRGB | `src/assets/gltf_loader.cpp:721`, `:731`; mapped at `src/gpu/texture.cpp:109` |
+| normal / metallic-roughness / occlusion textures | **linear** (`RGBA8Unorm`), never decoded | n/a | `gltf_loader.cpp:725`, `:728`, `:734` |
+| mip generation for sRGB textures | decoded to linear, filtered, re-encoded | sRGB | `src/gpu/texture.cpp:26–47` |
+| HDRI / environment map | **linear float throughout**; an LDR environment is rejected outright and the procedural sky used instead | sRGB (implicit) | `engine.cpp:2386` loads with `srgb=false`; `scene_renderer.cpp:518` requires `isHdr()`; uploaded `RGBA16Float` |
+| lighting / shading output | **scene-linear HDR**, uncalibrated units — an emissive of 30 means "30", not 30 cd/m² | sRGB/Rec.709 (implicit) | `kHdrFormat = RGBA16Float`, `scene_renderer.hpp:679` |
+| exposure applied | scene-linear, multiplicative | — | `fs_exposure`, chain stage 1 |
+| bloom extraction | **scene-linear, on Rec.709 luminance**, in *exposed* units | Rec.709 Y | `luminance()` = `(0.2126, 0.7152, 0.0722)`, `shaders/post.wgsl:56` |
+| **cinematic integration (new)** | scene-linear: atmospheric before defocus, colour/contrast/wrap after the grade | Rec.709 Y for the luminance terms | `shaders/post.wgsl`, `fs_look_atmos` / `fs_look` |
+| colour grade | **scene-linear**, contrast in log space about 0.18 | — | `fs_composite`, `shaders/post.wgsl:355` |
+| AgX in | scene-linear → inset matrix → log2 over `[-12.474, +4.026]` EV | AgX inset (real, not approximated) | `shaders/tonemap.wgsl:51–61` |
+| AgX curve | the **6th-order "approx" polynomial** (Wende), not the full sigmoid | — | `tonemap.wgsl:43–48` |
+| AgX out | outset matrix → **`pow(x, 2.2)` to return to display-linear** | — | `tonemap.wgsl:63–65` |
+| vignette | **display-linear, after the curve, before the OETF** — multiplicative | — | `tonemap.wgsl:141–144` |
+| film grain | **display-linear, after the curve, before the OETF** — additive, clamped to 0..1 | — | `tonemap.wgsl:145–148` |
+| display encode | **exact IEC 61966-2-1 piecewise sRGB OETF**, in the shader | sRGB | `linearToSrgb`, `tonemap.wgsl:110–114`, called at `:149` |
+| output surface | `BGRA8Unorm` / `RGBA8Unorm` — **never an `*Srgb` format** | sRGB | `src/gpu/surface.cpp:45`, `src/app/application.cpp:1981`, `src/app/render_job.cpp:294` |
+| HDR (Rec.2100 / PQ / scRGB) output | **does not exist** | — | no EDR/PQ/HDR10 handling anywhere; ADR-002 records the gap |
+
+### 2.1 The OETF is applied exactly once — checked, because it is the classic double
+
+There is **no `*Srgb` render target anywhere in the engine.** The only `RGBA8UnormSrgb` in the tree
+is the *input* texture format (`src/gpu/texture.cpp:109`), i.e. hardware decode on sampling.
+`tonemapPipelineFor` takes the target format verbatim (`scene_renderer.cpp:1365`) and every caller
+passes a non-sRGB `*Unorm`, so the hardware writes the shader's bytes through unchanged. **One
+encode, in `linearToSrgb`. No double.**
+
+### 2.2 Two findings in the colour map
+
+**AgX's round trip out of its own encoding is not its inverse.** `tonemap.wgsl:64–65` undoes AgX's
+sRGB-encoded output with a **pure `pow(x, 2.2)`**, and `linearToSrgb` at `:110–114` then re-encodes
+with the **exact piecewise IEC curve**. Those two are not inverses. The residual is largest in the
+toe, where the piecewise function's linear segment (`12.92·c` below 0.0031308) and `x^2.2` diverge
+most — a few code values on dark pixels. It affects **only** the AgX branch; ACES, Reinhard, PBR
+Neutral and clamp return display-linear directly and round-trip cleanly. AgX is the default
+operator, so this is on by default.
+
+Not fixed here, and deliberately so. §89 says do not replace AgX without evidence, and this is not a
+reason to replace it — it is a two-character change (`2.2` → a piecewise `srgbToLinear`) that would
+alter **every existing render's shadow values**, invalidating every committed reference frame in the
+repository. That is an owner's call about a re-baseline, not a side effect of the Image/Look work.
+**Recommended, costed, and left.**
+
+**Exposure is applied in two places, and neither reports the product.** The post chain's
+`fs_exposure` (`post_processor.cpp:493`) applies the ADR-037 auto/manual exposure scale; the tone-map
+pass separately multiplies by `scene.environment.brightness` (`scene_renderer.cpp:3055`, consumed at
+`tonemap.wgsl:126`). These are two different quantities in series and it is not a bug — but
+`PostStats::exposureScale` is only the first factor, so the number the UI and the profiler report is
+not the total scale reaching the curve. Worth knowing before tuning: a scene that looks two stops
+hot may have neither of its two exposure controls at fault individually.
+
+---
+
+## 3. The resource table
+
+Over the transient pool (`src/gpu/transient_pool.cpp`) unless marked persistent.
+
+| resource | producer | consumers | format | resolution | lifetime |
+|---|---|---|---|---|---|
+| HDR scene colour | scene pass | post chain, tonemap | `RGBA16Float` | output × `renderScale` | persistent, re-created on resize |
+| depth | scene pass | defocus, motion blur, composite depth grade, **`fs_look_atmos`** | `Depth24Plus` | as above | persistent |
+| normal + roughness | scene pass | AOV export, debug view | `RGBA16Float` | as above | persistent |
+| velocity | scene pass | motion blur tiles | `RG16Float` | as above | persistent |
+| emission | scene pass | bloom prefilter (selective bloom) | `RGBA16Float` | as above | persistent |
+| identifier | scene pass | *nothing* — never bound into post (§1.5) | `R32Uint` | as above | persistent |
+| linear depth | dedicated pass | AOV export | `R32Float` | as above | persistent |
+| shadow atlas | shadow pass | lit pass | `Depth24Plus`, 2D array | 1024² default | persistent |
+| shadow mask (ADR-087) | mask pass | lit pass | `RGBA16Float` | as above | persistent |
+| meter chain | `encodeMetering` | next meter level, then a 256-byte readback | `RGBA16Float` | ¼ then ÷4 to 1×1 | transient, one frame |
+| exposure result | `fs_exposure` | next stage | `RGBA16Float` | full | transient |
+| **look/atmos (new)** | `fs_look_atmos` | next stage | `RGBA16Float` | full | transient, **only when `atmospheric > 0`** |
+| defocus result | `fs_dof` | next stage | `RGBA16Float` | full | transient |
+| velocity tiles / neighbours | tile passes | motion blur | `RG16Float` | ⌈size/tile⌉ | transient, released in-pass |
+| lens result | `fs_lens` | next stage | `RGBA16Float` | full | transient |
+| bloom pyramid down 0..N | prefilter + downsample | upsample, anamorphic source | `RGBA16Float` | ½, ¼, … | transient |
+| bloom pyramid up | `fs_upsample` | composite | `RGBA16Float` | ½ | transient |
+| halation pyramid | halation prefilter + downsample/upsample | wide tier | `RGBA16Float` | ¼, … | transient |
+| wide tier | `fs_wide` | composite | `RGBA16Float` | ¼ | transient |
+| composite result | `fs_composite` | next stage | `RGBA16Float` | full | transient, **always allocated** |
+| **look/small (new)** | `fs_downsample` | look blur H | `RGBA16Float` | ¼ | transient, released in-stage |
+| **look/blur H, V (new)** | `fs_look_blur` ×2 | `fs_look` | `RGBA16Float` | ¼ | transient, released in-stage |
+| **look result (new)** | `fs_look` | next stage | `RGBA16Float` | full | transient, **only when colour/contrast/wrap > 0** |
+| fxaa result | `fs_fxaa` | sharpen / tonemap | `RGBA16Float` | full | transient |
+| sharpen result | `fs_sharpen` | tonemap | `RGBA16Float` | full | transient |
+| final LDR | `fs_main` (tonemap) | swapchain / readback / encoder | `BGRA8Unorm` or `RGBA8Unorm` | output | per-frame target |
+
+**Pool semantics**, because they decide what "transient" costs. The match key is the exact 4-tuple
+`(width, height, format, usage)` plus `!inUse` (`transient_pool.cpp:11–18`); any mismatch, *including
+a usage bit*, forces a fresh `CreateTexture`. Default usage is
+`RenderAttachment | TextureBinding | CopySrc`. `release()` only flips `inUse`. `endFrame(keepFrames =
+60)` is the sole reclaim point: it erases entries unused for 60 frames and then force-clears `inUse`
+on everything remaining, so a pass that forgets to `release()` leaks for the rest of that frame only.
+
+Note the consequence for the new look stage: it acquires four textures, and it `release()`s the three
+intermediates as soon as they are consumed, so the steady-state pool growth is one full-resolution
+target plus one quarter-resolution one.
+
+---
+
+## 4. Where the two renderers agree and differ
+
+§75 asks that both renderers produce compatible signals. **The names agree. Three of the shared
+quantities do not**, and the existing drift test could not have caught any of them because it
+compares spellings. It has been extended rather than forked
+(`tests/unit/test_pathtrace_aov_exr.cpp`).
+
+| signal | rasteriser | path tracer | compatible? |
+|---|---|---|---|
+| vocabulary | `{normal, emission, depth, velocity, id, shadow}`, `render_settings.cpp:61` | the same minus `velocity`/`shadow`, plus `albedo` | **yes**, and tested |
+| **beauty EXR** | `hdrOutputTexture()` — the **post-chain output**: past exposure, bloom, halation, grading, and now the cinematic integration; short only of the tone curve (`render_job.cpp:688`, `scene_renderer.cpp:3674`) | **raw radiance, no post at all** (`path_tracer.hpp:11`) | **no.** Both are truthfully "scene-linear before tone mapping". They are not the same image, and nothing reconciles them |
+| `depth` units | view-space metres along camera forward (`linear_depth.wgsl:34`) | the same (`path_tracer.hpp:106`) | **yes** |
+| `depth` background | **`1.0e7`** (`linear_depth.wgsl:28`) | **`-1`** (`path_tracer.hpp:106`) | **no.** `depth > 0` selects the whole frame in one and the geometry only in the other |
+| motion | `velocity`, `RG16Float`, **UV units** (`scene_targets.hpp:9`) | `motion.X/Y`, **pixels** (`path_tracer.hpp:111`) | **no** — different name *and* different unit, differing by the resolution |
+| `emission` | scene-pass target, pre-exposure | raw, pre-exposure | **yes** as a quantity; but it sits beside a beauty image that *is* post-exposure on one side and not the other |
+| `id` | `R32Uint`, low 16 object / high 16 material | float-encoded `packPickId`, `-1` for a miss | **no** |
+| `albedo` | none | present; the denoiser needs it | one-sided, recorded |
+| `shadow` | present; **recomputed, not captured**, at high/offline tiers | none | one-sided, recorded |
+| file layout | **one RGBA EXR per AOV**, so normals and velocity land in R/G/B | one multi-layer EXR with `normal.X/Y/Z`, `motion.X/Y` | **no** — the tracer applies the "a vector is not a colour" rule and the rasteriser does not. Debt already acknowledged at `render_settings.hpp:117` |
+| tone mapping | exactly once, `shaders/tonemap.wgsl:128` | **never** — no tone map exists in `src/pathtrace/` | consistent with "tone mapping happens exactly once" |
+
+The sharpest of these is `velocity`/`motion`, because `path_tracer.hpp:100` records `velocity` as
+having *"no counterpart here yet"* while `writeFramebufferAovExr` writes `motion.X/Y` — the gap is
+documented in the code as an **absence** when it is really a **rename plus a unit change**. That is
+the kind of thing that is invisible until a compositor's motion vectors are wrong by a factor of
+1920.
+
+**One loose end found while checking the tracer, reported and not touched:**
+`Framebuffer::worstAlbedo` (`path_tracer.hpp:110`) is allocated and filled but written to no EXR
+channel and read by nothing, and `AlbedoProbeReport::format()` — the per-material table ADR-352
+describes — is called only from tests, so a command-line `--pt-probe` run emits only a one-line
+`log::warn` summary. The ADR's per-material breakdown is unreachable from the CLI.

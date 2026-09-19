@@ -2,6 +2,8 @@
 // that change how a world renders without touching its geometry.
 
 #include "app/world_director.hpp"
+#include "scene/post_settings.hpp"
+#include "ui/ui_logic.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -204,4 +206,67 @@ TEST_CASE("The shipped looks and directors parse and are well formed", "[directo
         }
     }
 #endif
+}
+
+TEST_CASE("A look preset carries the cinematic integration (Image/Look §54, §55)",
+          "[unit][look][post]") {
+    // Reachability, which is a separate question from correctness. Four subsystems in one session
+    // were built, tested, measured and could not be reached by a person using the application --
+    // every one passed its suite, because the tests constructed the objects directly.
+    //
+    // §54 asked for namespaced parameter IDs and the cinematic integration took `post/look/*`. That
+    // choice is what makes this pass with no code change: `LookPreset::prefixes` already contains
+    // "post/", so the new controls are captured by the feature that is literally called a look, and
+    // `kBeginnerPrefixes` in src/ui/ui_logic.hpp already contains "post/", so they appear in the
+    // Parameters panel on every authoring layer including the one the editor opens on.
+    //
+    // Had they been registered under, say, `look/*` or `image/*`, both of those would silently have
+    // been false and the only sign would have been an owner wondering why their saved look did not
+    // bring the haze back. This test is the tripwire on that.
+    params::ParameterSet params;
+    scene::PostSettings defaults;
+    auto p = scene::registerPostParameters(params, defaults);
+    REQUIRE(p.lookAtmospheric != nullptr);
+
+    p.lookAtmospheric->setBase(0.45f);
+    p.lookColour->setBase(0.3f);
+    p.lookLocalContrast->setBase(0.55f);
+    p.lookLightWrap->setBase(0.2f);
+    p.lookAtmosphericTint->setBase(glm::vec3(0.3f, 0.4f, 0.6f));
+
+    const app::LookPreset captured = app::captureLook(params, "hazy");
+    const char* kPaths[] = {
+        "post/look/atmospheric",  "post/look/atmosphericDistance", "post/look/atmosphericTint",
+        "post/look/colour",       "post/look/localContrast",       "post/look/localContrastRadius",
+        "post/look/lightWrap",
+    };
+    for (const char* path : kPaths) {
+        INFO("captured path " << path);
+        CHECK(captured.preset.values.count(path) == 1);
+    }
+    // And `filtered()` -- the manifest check that runs on apply -- must not drop them again.
+    const params::Preset filtered = captured.filtered();
+    for (const char* path : kPaths) {
+        INFO("filtered path " << path);
+        CHECK(filtered.values.count(path) == 1);
+    }
+
+    // Applying it to a fresh world restores the values, and nothing is reported missing.
+    params::ParameterSet fresh;
+    auto q = scene::registerPostParameters(fresh, scene::PostSettings{});
+    const app::LookApplyResult result = app::applyLook(fresh, captured);
+    CHECK(result.missing == 0);
+    fresh.resetFinals();
+    scene::PostSettings live;
+    scene::applyPostParameters(q, live);
+    CHECK(live.look.atmospheric == 0.45f);
+    CHECK(live.look.colour == 0.3f);
+    CHECK(live.look.localContrast == 0.55f);
+    CHECK(live.look.lightWrap == 0.2f);
+    CHECK(live.look.active());
+
+    // The Parameters panel's own filter, asserted rather than assumed: `post/` is a beginner
+    // prefix, so the controls are visible on the layer the editor opens on.
+    CHECK(ui::layerShowsPath(ui::AuthoringLayer::Beginner, "post/look/atmospheric"));
+    CHECK(ui::layerShowsPath(ui::AuthoringLayer::Beginner, "post/look/lightWrap"));
 }
