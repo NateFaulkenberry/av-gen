@@ -110,6 +110,32 @@ void WorldEditor::update(app::Engine& engine, const assets::AssetLibrary* librar
         visuals_.selectionBoxes.push_back(std::move(box));
     }
 
+    // The authored lights, as objects in the world.
+    //
+    // Drawn whether or not anything is selected, and unconditionally rather than behind a toggle:
+    // a light is a thing the scene contains, and a Canvas that shows the trees but not what is
+    // lighting them is the "renderer with panels" the viewport brief is trying to stop this being.
+    // Selection changes how a marker is drawn, not whether it is.
+    //
+    // Read from `authoredLights()` and not from `scene().lights`, deliberately: the latter also
+    // carries the rig's lights, the ecology's up-to-224 glow points and a glTF asset's own lamps,
+    // none of which a person can select or move, and 224 markers is not a viewport.
+    for (const scene::Composition::AuthoredLight& a : composition->authoredLights()) {
+        EditorVisuals::LightMarker marker;
+        marker.name = a.light.name;
+        marker.type = a.light.type;
+        marker.position = a.light.position;
+        marker.direction = a.light.direction;
+        marker.color = a.light.color;
+        marker.range = a.light.range;
+        marker.outerConeDegrees = glm::degrees(a.light.outerConeAngle);
+        marker.width = a.light.width;
+        marker.height = a.light.height;
+        marker.enabled = a.light.enabled;
+        marker.selected = selection.contains(SelectionRef{SelectionRef::Kind::Light, a.light.name});
+        visuals_.lightMarkers.push_back(std::move(marker));
+    }
+
     // The heroes that are selected, and only those.
     //
     // A hero is the one piece of authored state with no appearance of its own, so the mark has to
@@ -588,13 +614,49 @@ void WorldEditor::commitStroke(app::Engine& engine) {
     static_cast<void>(engine);
 }
 
+void WorldEditor::collectSelectedLights(app::Engine& engine, std::vector<StartLight>& out) const {
+    out.clear();
+    const scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        return;
+    }
+    for (const SelectionRef& ref : selection.refs()) {
+        if (ref.kind != SelectionRef::Kind::Light) {
+            continue;
+        }
+        for (const scene::Composition::AuthoredLight& a : composition->authoredLights()) {
+            if (a.light.name != ref.name) {
+                continue;
+            }
+            StartLight start;
+            start.id = scene::Composition::authoredLightId(a);
+            start.position = a.light.position;
+            start.direction = a.light.direction;
+            start.aimed = a.light.type == scene::PunctualLight::Type::Directional ||
+                          a.light.type == scene::PunctualLight::Type::Spot;
+            out.push_back(std::move(start));
+            break;
+        }
+    }
+}
+
 bool WorldEditor::buildGizmoFrame(app::Engine& engine, const scene::Camera& camera) {
     scene::Composition* composition = engine.composition();
     if (composition == nullptr || selection.empty()) {
         return false;
     }
     const std::vector<std::string> moving = topmostOf(*composition, selection.nodes());
-    const scene::WorldBounds bounds = selectionBounds(*composition, moving);
+    scene::WorldBounds bounds = selectionBounds(*composition, moving);
+
+    // A selected light contributes its position to the gizmo's frame. Without this a selection that
+    // is only lights has no valid bounds and draws no gizmo at all -- which is the difference
+    // between a light you can see and a light you can move.
+    std::vector<StartLight> lights;
+    collectSelectedLights(engine, lights);
+    for (const StartLight& light : lights) {
+        bounds.include(light.position);
+    }
+
     if (!bounds.valid) {
         return false;
     }
@@ -620,6 +682,7 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
             history().commitDrag(engine);
             drag_ = GizmoDrag{};
             startTransforms_.clear();
+            startLights_.clear();
         }
         return;
     }
@@ -632,6 +695,58 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
         if (delta.valid) {
             visuals_.dragReadout = delta.readout;
             const glm::vec3 pivot = drag_.frame.origin;
+
+            // The selected lights, moved and turned by the same delta as the nodes beside them.
+            //
+            // Everything is re-derived from the press, as it is for a node: applying a delta on top
+            // of last frame's result accumulates rounding, and rounding in a transform tool is an
+            // object that does not come back when you drag the mouse back.
+            for (const StartLight& start : startLights_) {
+                const std::string base = "lights/" + start.id + "/";
+                switch (drag_.mode) {
+                case GizmoMode::Move: {
+                    // No parent frame to go back through: an authored light's position is world
+                    // space unless it names a node, and in that case the composition re-places it
+                    // every frame from the node's transform, so writing world here would fight it.
+                    const glm::vec3 moved = start.position + delta.translation;
+                    if (auto* p = engine.params().findAs<glm::vec3>(base + "position")) {
+                        p->setBase(moved);
+                    }
+                    break;
+                }
+                case GizmoMode::Rotate: {
+                    // Two things turn, and they are different quantities. The light swings about
+                    // the shared pivot like everything else in the selection, and -- if it aims --
+                    // its beam turns with it. A spot rotated in place must end up pointing
+                    // somewhere new, or "rotate the light" only orbits it.
+                    const glm::vec3 offset = start.position - pivot;
+                    const glm::vec3 moved = pivot + delta.rotation * offset;
+                    if (auto* p = engine.params().findAs<glm::vec3>(base + "position")) {
+                        p->setBase(moved);
+                    }
+                    if (start.aimed) {
+                        const glm::vec3 turned = glm::normalize(delta.rotation * start.direction);
+                        float azimuth = 0.0f;
+                        float elevation = 0.0f;
+                        scene::Composition::lightAngles(turned, azimuth, elevation);
+                        if (auto* p = engine.params().findAs<float>(base + "azimuth")) {
+                            p->setBase(azimuth);
+                        }
+                        if (auto* p = engine.params().findAs<float>(base + "elevation")) {
+                            p->setBase(elevation);
+                        }
+                    }
+                    break;
+                }
+                case GizmoMode::Scale:
+                    // A light has no scale. Its size is `width`/`height`/`radius` on the area kinds
+                    // and a cone angle on a spot, and silently reinterpreting a scale drag as one of
+                    // those would be a gesture whose meaning depends on the type -- so the scale
+                    // tool leaves lights alone and the panel owns those numbers.
+                    break;
+                }
+            }
+
             for (const StartTransform& start : startTransforms_) {
                 const scene::CompositionNode* node = composition->findNode(start.node);
                 if (node == nullptr) {
@@ -707,6 +822,7 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
             history().commitDrag(engine);
             drag_ = GizmoDrag{};
             startTransforms_.clear();
+            startLights_.clear();
         }
         return;
     }
@@ -738,11 +854,27 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
                 start.worldPosition = composition->nodeWorldTransform(*node).position;
                 startTransforms_.push_back(std::move(start));
             }
+            // The lights' state at the press, and their parameter paths in the drag's coalescing
+            // list -- a path the drag does not name is a change the single undo step does not
+            // carry, so the light would move and stay moved through an undo.
+            collectSelectedLights(engine, startLights_);
+            std::vector<std::string> dragPaths = transformParamPaths(topmostOf(*composition, selection.nodes()));
+            for (const StartLight& light : startLights_) {
+                dragPaths.push_back("lights/" + light.id + "/position");
+                if (light.aimed && gizmoMode == GizmoMode::Rotate) {
+                    dragPaths.push_back("lights/" + light.id + "/azimuth");
+                    dragPaths.push_back("lights/" + light.id + "/elevation");
+                }
+            }
+            const std::string what =
+                selection.size() == 1
+                    ? (selection.primaryRef().name.empty() ? std::string("selection")
+                                                           : selection.primaryRef().name)
+                    : std::to_string(selection.size()) + " objects";
             const std::string label = fmt::format(
                 "{} {}", gizmoMode == GizmoMode::Move ? "Move" : gizmoMode == GizmoMode::Rotate ? "Rotate" : "Scale",
-                selection.size() == 1 ? selection.primary() : std::to_string(selection.size()) + " objects");
-            history().beginDrag(engine, label, transformParamPaths(topmostOf(*composition, selection.nodes())),
-                              selection.nodes());
+                what);
+            history().beginDrag(engine, label, dragPaths, selection.nodes());
         }
     }
 }

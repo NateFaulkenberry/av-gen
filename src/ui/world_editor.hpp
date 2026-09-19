@@ -91,6 +91,32 @@ struct EditorVisuals {
     };
     std::vector<SelectedBox> selectionBoxes;
 
+    // ---- authored lights, as objects in the world ------------------------------------------------
+    //
+    // A light has no geometry, so without this it is invisible in the Canvas -- you can select it in
+    // the Lights panel and have nothing to look at, which is the half of the viewport brief that
+    // makes the other half worth having. What is drawn is what the light *is*: where it stands, what
+    // it is, which way it faces, and how far it reaches.
+    //
+    // Editor-only by construction. These are painted with `viewport_overlay.cpp`'s `Painter`, which
+    // is ImGui draw-list geometry inside the canvas window -- an offline render reloads the project
+    // and never runs a line of it. That is the viewport brief's §32 satisfied structurally rather
+    // than by testing for the absence of something.
+    struct LightMarker {
+        std::string name;
+        scene::PunctualLight::Type type = scene::PunctualLight::Type::Point;
+        glm::vec3 position{0.0f};
+        glm::vec3 direction{0.0f, -1.0f, 0.0f}; // the way the light travels
+        glm::vec3 color{1.0f};
+        float range = 0.0f;        // 0 = no cutoff; the ring is then drawn at a nominal radius
+        float outerConeDegrees = 0.0f;
+        float width = 0.0f;        // area kinds
+        float height = 0.0f;
+        bool enabled = true;
+        bool selected = false;
+    };
+    std::vector<LightMarker> lightMarkers;
+
     // The heroes this scene declares (ADR-104), drawn whether or not anything is selected.
     //
     // Designation has no other appearance -- a hero looks exactly like the object it was made from
@@ -337,6 +363,19 @@ private:
         glm::vec3 worldPosition{0.0f};
     };
     std::vector<StartTransform> startTransforms_;
+
+    // A selected light's state at the press. Separate from `StartTransform` because a light is not
+    // a node: it has no parent frame to go back through, no scale, and its rotation is a pair of
+    // world angles rather than a local Euler triple.
+    struct StartLight {
+        std::string id;                   // the parameter path's stem, not the display name
+        glm::vec3 position{0.0f};
+        glm::vec3 direction{0.0f, -1.0f, 0.0f};
+        bool aimed = false;               // directional or spot: has azimuth/elevation parameters
+    };
+    std::vector<StartLight> startLights_;
+    // The selected lights' positions and ids, rebuilt each frame for the gizmo and the drag.
+    void collectSelectedLights(app::Engine& engine, std::vector<StartLight>& out) const;
 
     // A paint stroke: one command however many clicks-worth of plants it laid down.
     bool stroking_ = false;

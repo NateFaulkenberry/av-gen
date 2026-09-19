@@ -1,5 +1,6 @@
 #include "ui/control_panel.hpp"
 #include "ui/cosmic_panel.hpp"
+#include "ui/lights_panel.hpp"
 
 #include <cstring>
 
@@ -640,6 +641,8 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     panel("World Effects", ImVec2(460, 620), [&] { worldEffects.draw(engine); });
     panel("Environment", ImVec2(460, 620), [&] { ui::drawEnvironmentPanel(engine); });
     panel("Tree", ImVec2(460, 680), [&] { ui::drawTreePanel(engine); });
+    panel("Lights", ImVec2(460, 700),
+          [&] { ui::drawLightsPanel(engine, editor.selection, editor.history()); });
     panel("Sequence", ImVec2(900, 420), [&] {
         // The transport across the top of the timeline, where the timeline is. Drawn here rather
         // than inside SequencePanel so that one TransportBar serves both places and the time format
