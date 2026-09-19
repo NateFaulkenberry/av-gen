@@ -32,6 +32,9 @@ struct Bounds {
     bool empty = true;
 };
 
+// World-space bounds of everything the snapshot will trace, INCLUDING instanced geometry, whose
+// source is in object space and only reaches the world through its transforms. A bounds helper that
+// ignored the transforms would report every scatter sitting at the origin.
 Bounds snapshotBounds(const pathtrace::Snapshot& s) {
     Bounds b;
     for (const auto& m : s.meshes) {
@@ -39,6 +42,16 @@ Bounds snapshotBounds(const pathtrace::Snapshot& s) {
             b.lo = glm::min(b.lo, p);
             b.hi = glm::max(b.hi, p);
             b.empty = false;
+        }
+    }
+    for (const auto& o : s.instanced) {
+        for (const auto& xf : o.transforms) {
+            for (const auto& p : o.source.positions) {
+                const glm::vec3 w = glm::vec3(xf * glm::vec4(p, 1.0f));
+                b.lo = glm::min(b.lo, w);
+                b.hi = glm::max(b.hi, w);
+                b.empty = false;
+            }
         }
     }
     return b;
@@ -158,9 +171,16 @@ TEST_CASE("procedural scatter reaches the tracer at its instance transforms",
     s.procedurals.push_back(std::move(proc));
 
     const pathtrace::Snapshot snap = pathtrace::buildSnapshot(s);
-    INFO("meshes " << snap.meshes.size() << " triangles " << snap.triangleCount());
-    REQUIRE(snap.meshes.size() == static_cast<std::size_t>(n));
-    REQUIRE(snap.triangleCount() == 12u * static_cast<std::size_t>(n)); // a cube is 12 triangles
+    INFO("instanced objects " << snap.instanced.size() << " instances " << snap.instanceCount()
+                              << " stored triangles " << snap.triangleCount());
+    // Since Phase 8 these are Embree instances, so the geometry is stored ONCE and the count of
+    // copies lives in `instanceCount`. The visible total is what the baked representation used to
+    // store, and the gap between the two is the memory this bought.
+    REQUIRE(snap.meshes.empty());
+    REQUIRE(snap.instanced.size() == 1);
+    REQUIRE(snap.instanceCount() == static_cast<std::size_t>(n));
+    REQUIRE(snap.triangleCount() == 12u);                                    // a cube, once
+    REQUIRE(snap.visibleTriangleCount() == 12u * static_cast<std::size_t>(n)); // seen n times
 
     const Bounds b = snapshotBounds(snap);
     REQUIRE_FALSE(b.empty);
