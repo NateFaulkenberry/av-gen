@@ -4,6 +4,7 @@
 // pipeline will apply a transform to it, and the result looks like a shading bug in a compositor
 // rather than a naming mistake in a renderer. Named layers make that impossible.
 
+#include "app/render_settings.hpp"
 #include "assets/exr.hpp"
 #include "pathtrace/path_tracer.hpp"
 #include "pathtrace/snapshot.hpp"
@@ -327,4 +328,139 @@ TEST_CASE("a ray that hits nothing has no depth and no id", "[unit][pathtrace][a
     const std::size_t centre = 16u * fb.width + 16u;
     REQUIRE(fb.rawDepth()[centre] > 0.0f);
     REQUIRE(fb.rawObjectId()[centre] >= 0.0f);
+}
+
+// ---- motion (spec section 62) ---------------------------------------------------------------
+
+TEST_CASE("the motion AOV measures where a surface point was, not where a pixel was",
+          "[unit][pathtrace][aov][motion]") {
+    // One object translated a known distance between two evaluations, with a static camera. The
+    // motion vector must be non-zero on the moving object, zero on the static one, and point the
+    // way the object went.
+    const auto makeScene = [](float ballX) {
+        scene::Scene s;
+        s.environment.sky.enabled = false;
+        s.environment.backgroundColor = glm::vec3(0.0f);
+        s.camera.position = glm::vec3(0.0f, 0.0f, 12.0f);
+        s.camera.target = glm::vec3(0.0f, 0.0f, 0.0f);
+        s.camera.lens.useExplicitFov = true;
+        s.camera.fovYRadians = 0.9f;
+
+        const scene::MeshId wallId = s.addMesh(scene::makePlane(8.0f, 1));
+        scene::Entity& wall = s.addEntity("wall", wallId);
+        wall.transform.position = glm::vec3(0.0f, 0.0f, -3.0f);
+        wall.transform.rotation = glm::angleAxis(1.5707963f, glm::vec3(1.0f, 0.0f, 0.0f));
+        wall.material.emissiveColor = glm::vec3(1.0f);
+        wall.material.emissiveIntensity = 1.0f;
+
+        const scene::MeshId ballId = s.addMesh(scene::makeIcosphere(1.5f, 2));
+        scene::Entity& ball = s.addEntity("ball", ballId);
+        ball.transform.position = glm::vec3(ballX, 0.0f, 2.0f);
+        ball.material.emissiveColor = glm::vec3(1.0f);
+        ball.material.emissiveIntensity = 1.0f;
+        return s;
+    };
+
+    const scene::Scene previous = makeScene(-0.6f);
+    const scene::Scene current = makeScene(0.0f);   // the ball moved +0.6 m in X
+    const pathtrace::Snapshot snap = pathtrace::buildSnapshot(current, &previous);
+    REQUIRE(snap.hasMotion);
+
+    pathtrace::TraceSettings t;
+    t.width = 96;
+    t.height = 96;
+    t.samplesPerPixel = 4;
+    t.maxDepth = 0;
+    t.captureFeatures = true;
+    pathtrace::PathTracer tr;
+    pathtrace::Framebuffer fb;
+    REQUIRE(tr.render(snap, t, fb).has_value());
+
+    const auto motion = fb.resolvedMotion();
+    REQUIRE(motion.size() == static_cast<std::size_t>(fb.width) * fb.height);
+    const auto at = [&](std::uint32_t x, std::uint32_t y) { return motion[y * fb.width + x]; };
+
+    // On the ball: it moved right in world X, and with the camera looking down -Z that is right on
+    // screen too, so the motion is positive X and several pixels long.
+    const glm::vec3 onBall = at(48, 48);
+    INFO("ball motion " << onBall.x << "," << onBall.y);
+    REQUIRE(onBall.x > 2.0f);
+    REQUIRE(std::abs(onBall.y) < 1.0f);   // it did not move vertically
+
+    // On the static wall: exactly nothing. This is the control -- a motion pass that returned the
+    // camera's own movement, or a constant, would fail here and nowhere else.
+    const glm::vec3 onWall = at(3, 3);
+    INFO("wall motion " << onWall.x << "," << onWall.y);
+    REQUIRE(std::abs(onWall.x) < 0.05f);
+    REQUIRE(std::abs(onWall.y) < 0.05f);
+
+    // Without a previous frame the channel is absent, not zero-filled: "not measured" and "measured
+    // and still" are different answers and a compositor acts on them differently.
+    const pathtrace::Snapshot noMotion = pathtrace::buildSnapshot(current);
+    REQUIRE_FALSE(noMotion.hasMotion);
+    pathtrace::PathTracer tr2;
+    pathtrace::Framebuffer fb2;
+    REQUIRE(tr2.render(noMotion, t, fb2).has_value());
+    REQUIRE(fb2.motion.empty());
+}
+
+TEST_CASE("a camera move alone produces motion on static geometry",
+          "[unit][pathtrace][aov][motion]") {
+    // The other half: a motion pass built only from object transforms would report zero here, and
+    // would be wrong in exactly the case a compositor most often needs.
+    const auto makeScene = [](float camX) {
+        scene::Scene s;
+        s.environment.sky.enabled = false;
+        s.camera.position = glm::vec3(camX, 0.0f, 12.0f);
+        s.camera.target = glm::vec3(camX, 0.0f, 0.0f);
+        s.camera.lens.useExplicitFov = true;
+        s.camera.fovYRadians = 0.9f;
+        const scene::MeshId wallId = s.addMesh(scene::makePlane(20.0f, 1));
+        scene::Entity& wall = s.addEntity("wall", wallId);
+        wall.transform.rotation = glm::angleAxis(1.5707963f, glm::vec3(1.0f, 0.0f, 0.0f));
+        wall.material.emissiveColor = glm::vec3(1.0f);
+        wall.material.emissiveIntensity = 1.0f;
+        return s;
+    };
+    const scene::Scene previous = makeScene(-0.5f);
+    const scene::Scene current = makeScene(0.0f);
+    const pathtrace::Snapshot snap = pathtrace::buildSnapshot(current, &previous);
+
+    pathtrace::TraceSettings t;
+    t.width = 64;
+    t.height = 64;
+    t.samplesPerPixel = 2;
+    t.maxDepth = 0;
+    t.captureFeatures = true;
+    pathtrace::PathTracer tr;
+    pathtrace::Framebuffer fb;
+    REQUIRE(tr.render(snap, t, fb).has_value());
+
+    const auto motion = fb.resolvedMotion();
+    const glm::vec3 m = motion[32 * fb.width + 32];
+    INFO("camera-only motion " << m.x << "," << m.y);
+    // The camera moved right, so the world slid left on screen.
+    REQUIRE(m.x < -1.0f);
+    REQUIRE(std::abs(m.y) < 0.5f);
+}
+
+TEST_CASE("the path tracer's AOV names extend the realtime vocabulary",
+          "[unit][pathtrace][aov]") {
+    // Spec section 31: extend `RenderSettings::aovNames()`, do not invent a rival vocabulary. This
+    // test is the thing that will notice if the two drift apart.
+    const auto realtime = app::RenderSettings::aovNames();
+    std::vector<std::string> realtimeNames;
+    for (const auto& n : realtime) realtimeNames.emplace_back(n);
+
+    // What the tracer produces, in the realtime spelling.
+    const std::vector<std::string> shared = {"normal", "emission", "depth", "velocity", "id"};
+    for (const auto& n : shared) {
+        INFO("shared AOV " << n);
+        REQUIRE(std::find(realtimeNames.begin(), realtimeNames.end(), n) != realtimeNames.end());
+    }
+    // `albedo` is the tracer's addition: the rasteriser has no equivalent and the denoiser needs it.
+    REQUIRE(std::find(realtimeNames.begin(), realtimeNames.end(), "albedo") == realtimeNames.end());
+    // `shadow` is the one realtime AOV with no path-traced counterpart, and it is a realtime pass
+    // rather than a quantity a path tracer produces. Named here so the gap is recorded, not lost.
+    REQUIRE(std::find(realtimeNames.begin(), realtimeNames.end(), "shadow") != realtimeNames.end());
 }

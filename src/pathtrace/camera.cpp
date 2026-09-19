@@ -47,4 +47,20 @@ Ray generateRay(const CameraBasis& basis, float px, float py, std::uint32_t widt
     return r;
 }
 
+
+bool projectToPixel(const CameraBasis& basis, const glm::vec3& world, std::uint32_t width,
+                    std::uint32_t height, glm::vec2& outPixel) {
+    const glm::vec3 d = world - basis.origin;
+    const float z = glm::dot(d, basis.forward);
+    if (z <= 1e-6f) return false;   // behind the camera, or exactly in its plane
+    const float sx = glm::dot(d, basis.right) / z;
+    const float sy = glm::dot(d, basis.up) / z;
+    // Inverts generateRay exactly: sx = (2px/w - 1) * aspect * tanHalf, sy = (1 - 2py/h) * tanHalf.
+    const float w = static_cast<float>(std::max(1u, width));
+    const float h = static_cast<float>(std::max(1u, height));
+    outPixel.x = 0.5f * w * (sx / (basis.aspect * basis.tanHalfFovY) + 1.0f);
+    outPixel.y = 0.5f * h * (1.0f - sy / basis.tanHalfFovY);
+    return true;
+}
+
 } // namespace avgen::pathtrace

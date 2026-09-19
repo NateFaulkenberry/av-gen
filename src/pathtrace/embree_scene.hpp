@@ -28,6 +28,12 @@ struct SurfaceHit {
     bool backface = false;            // the ray hit the far side of the triangle
     std::uint32_t meshIndex = 0;      // index into Snapshot::meshes
     std::uint32_t primIndex = 0;
+    // Barycentric weights of v0, v1, v2, kept so a caller can interpolate anything else the
+    // triangle carries -- the motion AOV interpolates the PREVIOUS frame's positions with these,
+    // which is what makes a motion vector track a point on the surface rather than a screen pixel.
+    float baryW = 0.0f;   // v0
+    float baryU = 0.0f;   // v1
+    float baryV = 0.0f;   // v2
 };
 
 class EmbreeScene {

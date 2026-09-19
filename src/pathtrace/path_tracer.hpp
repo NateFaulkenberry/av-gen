@@ -100,11 +100,17 @@ struct Framebuffer {
     // at the offending REGION of an image, which an aggregate table cannot. Empty unless the probe
     // ran; 0 where nothing was measured.
     std::vector<float> worstAlbedo;
+    // Screen-space motion in PIXELS: where this surface point is now, minus where it was one frame
+    // earlier, both projected with their own frame's camera. Empty unless the snapshot carried a
+    // previous frame. Stored as vec2 packed into a vec3 with z unused, so the EXR writer's planar
+    // deinterleave can treat it like the others.
+    std::vector<glm::vec3> motion;
 
     [[nodiscard]] std::vector<glm::vec3> resolvedRadiance() const;
     [[nodiscard]] std::vector<glm::vec3> resolvedAlbedo() const;
     [[nodiscard]] std::vector<glm::vec3> resolvedNormal() const;
     [[nodiscard]] std::vector<glm::vec3> resolvedEmission() const;
+    [[nodiscard]] std::vector<glm::vec3> resolvedMotion() const;
     // Depth and id are NOT averaged across samples: a mean of two depths at a silhouette is a
     // distance to nothing, and a mean of two ids is a third object. They take the first sample.
     [[nodiscard]] const std::vector<float>& rawDepth() const { return depth; }

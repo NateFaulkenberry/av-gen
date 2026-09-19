@@ -106,9 +106,13 @@ std::size_t Snapshot::triangleCount() const {
     return n;
 }
 
-Snapshot buildSnapshot(const scene::Scene& scene) {
+Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) {
     Snapshot snap;
     snap.camera = scene.camera;
+    if (previous != nullptr) {
+        snap.hasMotion = true;
+        snap.previousCamera = previous->camera;
+    }
     snap.backgroundColor = scene.environment.backgroundColor;
 
     // Environment. The sky is resolved against the scene's own lights by the project's own
@@ -163,6 +167,7 @@ Snapshot buildSnapshot(const scene::Scene& scene) {
     int water = 0;
     int grid = 0;
     int degenerate = 0;
+    int motionMismatched = 0;
 
     for (std::uint32_t ei = 0; ei < scene.entities.size(); ++ei) {
         const scene::Entity& e = scene.entities[ei];
@@ -225,6 +230,35 @@ Snapshot buildSnapshot(const scene::Scene& scene) {
         out.indices = src.indices;
 
         if (!out.valid()) { ++degenerate; continue; }
+
+        // Previous-frame positions for the motion AOV. Matched by entity index, then verified by
+        // vertex count: an index that now names a different object would otherwise produce a
+        // confident, meaningless vector.
+        if (previous != nullptr && ei < previous->entities.size()) {
+            const scene::Entity& pe = previous->entities[ei];
+            if (pe.mesh != scene::kInvalidMesh && pe.mesh < previous->meshes.size()) {
+                const scene::MeshData& psrc = previous->meshes[pe.mesh];
+                if (psrc.vertices.size() == src.vertices.size()) {
+                    const glm::mat4 pm = pe.transform.matrix();
+                    const std::vector<glm::mat4>* ppalette = nullptr;
+                    if (pe.rig != scene::kInvalidRig && pe.rig < previous->rigs.size() &&
+                        !previous->rigs[pe.rig].palette.empty() && !psrc.skin.empty()) {
+                        ppalette = &previous->rigs[pe.rig].palette;
+                    }
+                    out.previousPositions.reserve(psrc.vertices.size());
+                    for (std::size_t vi = 0; vi < psrc.vertices.size(); ++vi) {
+                        glm::vec3 pos = psrc.vertices[vi].position;
+                        if (ppalette != nullptr && vi < psrc.skin.size()) {
+                            pos = glm::vec3(skinMatrix(psrc.skin[vi], *ppalette) * glm::vec4(pos, 1.0f));
+                        }
+                        out.previousPositions.push_back(glm::vec3(pm * glm::vec4(pos, 1.0f)));
+                    }
+                } else {
+                    ++motionMismatched;
+                }
+            }
+        }
+
         snap.meshes.push_back(std::move(out));
     }
 
@@ -240,6 +274,13 @@ Snapshot buildSnapshot(const scene::Scene& scene) {
                                "SkinnedRig::cullDistance froze it), and its bind pose is not where the "
                                "character is; set cullDistance and updateHz to 0 for an offline trace",
                                skippedSkinned);
+    }
+    if (motionMismatched > 0) {
+        snap.capabilities.note("motion: mesh changed", Support::Degraded,
+                               "this mesh's vertex count differs between the two frames, so its "
+                               "vertices cannot be paired and it has no motion vector; it is left at "
+                               "zero rather than given a plausible wrong one",
+                               motionMismatched);
     }
     if (degenerate > 0) {
         snap.capabilities.note("degenerate mesh", Support::Unsupported, "empty or malformed index/vertex data", degenerate);

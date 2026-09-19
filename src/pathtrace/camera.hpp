@@ -42,4 +42,9 @@ struct CameraBasis {
 [[nodiscard]] Ray generateRay(const CameraBasis& basis, float px, float py, std::uint32_t width,
                               std::uint32_t height);
 
+// The inverse of `generateRay`: where a world point lands in pixel coordinates. Returns false if
+// the point is behind the camera, where a projection is meaningless rather than merely off-screen.
+[[nodiscard]] bool projectToPixel(const CameraBasis& basis, const glm::vec3& world,
+                                  std::uint32_t width, std::uint32_t height, glm::vec2& outPixel);
+
 } // namespace avgen::pathtrace

@@ -35,7 +35,7 @@ never reaches into the realtime post chain. Colour management is downstream of t
 | 3 | BSDF + light sampling, MIS, Russian roulette | **done** |
 | 4 | OIDN denoising | **done** (opt-in) |
 | 5 | Scene integration: CPU skinning, procedural scatter | **done** |
-| 6 | AOVs: albedo, normal, emission, depth, id | **done** |
+| 6 | AOVs: albedo, normal, emission, depth, id, motion | **done** |
 | 7 | Glowmere | not started |
 | 8 | Production features | not started |
 
@@ -113,11 +113,21 @@ tinyexr header always exposed `EXRHeader`/`EXRChannelInfo`/`SaveEXRImageToFile`.
 debt recorded at `src/app/render_settings.hpp`: *"the layered form is a better file and a bigger
 change; it is recorded as not done rather than half-built."*
 
+**Motion** (`motion.X/Y`) needs the previous frame, so `buildSnapshot(scene, &previousScene)` takes
+a second evaluation and the snapshot remembers **both the geometry and the camera** as they were --
+a motion pass built from object transforms alone is wrong whenever the camera moves, and one built
+from the camera alone is wrong whenever anything else does. Tests cover both halves separately.
+
+The previous positions are interpolated with the **current** hit's barycentrics, which is what makes
+the vector track a point on the surface rather than a screen position. A mesh whose vertex count
+changed between the two frames is refused and counted rather than paired arbitrarily: re-scattered
+foliage and re-tessellated terrain both do that, and a confident wrong vector is worse than none.
+
 The vocabulary **extends** `app::RenderSettings::aovNames()` rather than rivalling it (spec section
 31). Shared: `normal`, `emission`, `depth`, `id`. Added: `albedo`, which the realtime renderer has no
-equivalent of and the denoiser requires. **Not implemented:** `velocity`, which needs a previous-frame
-transform the snapshot does not carry, and `shadow`, which is a realtime pass rather than a quantity
-a path tracer naturally produces.
+equivalent of and the denoiser requires. **Not implemented:** `shadow`, which is a
+realtime pass rather than a quantity a path tracer naturally produces. A test asserts the shared
+names really are in `aovNames()`, so the two vocabularies cannot drift apart unnoticed.
 
 Two details that are decisions, not incidentals:
 

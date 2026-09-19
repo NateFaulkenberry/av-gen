@@ -229,12 +229,15 @@ struct PathResult {
     glm::vec3 emission{0.0f};
     float depth = -1.0f;      // view-space metres; negative means the ray hit nothing
     float objectId = -1.0f;
+    glm::vec2 motion{0.0f};   // pixels
 };
 
 [[nodiscard]] PathResult radiance(const Snapshot& snap, const EmbreeScene& embree, Ray ray,
                                   const TraceSettings& settings, Sampler& sampler, Counters& counters,
                                   const glm::vec3& viewOrigin, const glm::vec3& viewForward,
-                                  std::uint32_t pixelIndex, std::uint32_t sampleIndex) {
+                                  std::uint32_t pixelIndex, std::uint32_t sampleIndex,
+                                  const CameraBasis& currentBasis, const CameraBasis& previousBasis,
+                                  std::uint32_t imageWidth, std::uint32_t imageHeight) {
     PathResult path;
     glm::vec3 result{0.0f};
     glm::vec3 throughput{1.0f};
@@ -284,6 +287,25 @@ struct PathResult {
             path.depth = glm::dot(hit.position - viewOrigin, viewForward);
             path.objectId = static_cast<float>(
                 scene::packPickId(scene::PickSpace::Entity, snap.meshes[hit.meshIndex].entityIndex));
+
+            // Motion: the same surface POINT, one frame earlier, projected with the camera it was
+            // seen by then. Interpolating the previous positions with the CURRENT barycentrics is
+            // what makes it the same point on the surface rather than the same screen position.
+            const TriangleMesh& hm = snap.meshes[hit.meshIndex];
+            if (snap.hasMotion && !hm.previousPositions.empty()) {
+                const std::size_t tri = static_cast<std::size_t>(hit.primIndex) * 3;
+                if (tri + 2 < hm.indices.size()) {
+                    const glm::vec3 prev = hm.previousPositions[hm.indices[tri + 0]] * hit.baryW +
+                                           hm.previousPositions[hm.indices[tri + 1]] * hit.baryU +
+                                           hm.previousPositions[hm.indices[tri + 2]] * hit.baryV;
+                    glm::vec2 nowPx{};
+                    glm::vec2 thenPx{};
+                    if (projectToPixel(currentBasis, hit.position, imageWidth, imageHeight, nowPx) &&
+                        projectToPixel(previousBasis, prev, imageWidth, imageHeight, thenPx)) {
+                        path.motion = nowPx - thenPx;
+                    }
+                }
+            }
             firstHitRecorded = true;
         }
 
@@ -394,6 +416,7 @@ void Framebuffer::resize(std::uint32_t w, std::uint32_t h) {
     normal.clear();
     worstAlbedo.clear();
     emission.clear();
+    motion.clear();
     depth.clear();
     objectId.clear();
     sampleCount = 0;
@@ -420,6 +443,14 @@ std::vector<glm::vec3> Framebuffer::resolvedEmission() const {
     if (sampleCount == 0) return out;
     const float inv = 1.0f / static_cast<float>(sampleCount);
     for (std::size_t i = 0; i < emission.size(); ++i) out[i] = emission[i] * inv;
+    return out;
+}
+
+std::vector<glm::vec3> Framebuffer::resolvedMotion() const {
+    std::vector<glm::vec3> out(motion.size(), glm::vec3(0.0f));
+    if (sampleCount == 0) return out;
+    const float inv = 1.0f / static_cast<float>(sampleCount);
+    for (std::size_t i = 0; i < motion.size(); ++i) out[i] = motion[i] * inv;
     return out;
 }
 
@@ -494,10 +525,14 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
         out.albedo.assign(n, glm::vec3(0.0f));
         out.normal.assign(n, glm::vec3(0.0f));
         out.emission.assign(n, glm::vec3(0.0f));
+        if (snapshot.hasMotion) out.motion.assign(n, glm::vec3(0.0f));
         out.depth.assign(n, -1.0f);
         out.objectId.assign(n, -1.0f);
     }
     const CameraBasis basis = cameraBasis(snapshot.camera, settings.width, settings.height);
+    const CameraBasis prevBasis = snapshot.hasMotion
+                                      ? cameraBasis(snapshot.previousCamera, settings.width, settings.height)
+                                      : basis;
 
     const auto renderStart = std::chrono::steady_clock::now();
     std::atomic<bool> cancelled{false};
@@ -522,6 +557,7 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
                 glm::vec3 albedoSum{0.0f};
                 glm::vec3 normalSum{0.0f};
                 glm::vec3 emissionSum{0.0f};
+                glm::vec2 motionSum{0.0f};
                 for (std::uint32_t s = 0; s < settings.samplesPerPixel; ++s) {
                     Sampler sampler(settings.seed, pixelIndex, s);
                     const glm::vec2 jitter = sampler.next2D();
@@ -529,12 +565,14 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
                                                 static_cast<float>(y) + jitter.y, settings.width,
                                                 settings.height);
                     const PathResult p = radiance(snapshot, embree, ray, settings, sampler, counters,
-                                                  basis.origin, basis.forward, pixelIndex, s);
+                                                  basis.origin, basis.forward, pixelIndex, s,
+                                                  basis, prevBasis, settings.width, settings.height);
                     sum += p.radiance;
                     if (settings.captureFeatures) {
                         albedoSum += p.albedo;
                         normalSum += p.normal;
                         emissionSum += p.emission;
+                        motionSum += p.motion;
                         if (s == 0) {
                             // First sample only: a mean of two depths at a silhouette is a distance
                             // to nothing, and a mean of two ids is a third object.
@@ -549,6 +587,7 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
                     out.albedo[pixelIndex] = albedoSum;
                     out.normal[pixelIndex] = normalSum;
                     out.emission[pixelIndex] = emissionSum;
+                    if (snapshot.hasMotion) out.motion[pixelIndex] = glm::vec3(motionSum, 0.0f);
                 }
             }
         }
@@ -652,6 +691,13 @@ Result<void> writeFramebufferAovExr(const Framebuffer& fb, const std::filesystem
         planes.emplace_back(src);
         channels.push_back({name, {}, false});
     };
+    const std::vector<glm::vec3> motionAov = fb.resolvedMotion();
+    if (!motionAov.empty()) {
+        // `motion.X/Y`, never `motion.R/G` -- a displacement is not a colour (spec section 33).
+        // Float, because a motion vector can be tens of pixels and half quantises it visibly.
+        addVec3(motionAov, "motion.X", "motion.Y", "motion.Z", false);
+    }
+
     addScalar(fb.rawDepth(), "depth.Z");
     addScalar(fb.rawObjectId(), "id.X");
 

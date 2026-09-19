@@ -156,6 +156,9 @@ SurfaceHit EmbreeScene::intersect(const Snapshot& snapshot, const glm::vec3& ori
     out.meshIndex = static_cast<std::uint32_t>(mi);
     out.primIndex = rh.hit.primID;
     out.position = origin + direction * out.t;
+    out.baryW = w;
+    out.baryU = u;
+    out.baryV = v;
 
     glm::vec3 ng{rh.hit.Ng_x, rh.hit.Ng_y, rh.hit.Ng_z};
     const float ngLen = glm::length(ng);

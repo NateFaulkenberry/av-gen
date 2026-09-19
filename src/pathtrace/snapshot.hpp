@@ -75,6 +75,12 @@ struct TriangleMesh {
     std::vector<glm::vec2> uvs;        // may be empty
     std::vector<std::uint32_t> indices;
 
+    // The same vertices one frame earlier, in world space. Empty when motion was not requested or
+    // when this mesh could not be matched to the previous frame. A motion vector needs the vertex
+    // to exist at both times, and a mesh whose vertex count changed between frames is not the same
+    // mesh -- re-scattered foliage and re-tessellated terrain both do this.
+    std::vector<glm::vec3> previousPositions;
+
     scene::Material material;
     std::string entityName;            // for diagnostics only
     std::uint32_t entityIndex = 0;     // index into the source Scene::entities
@@ -122,6 +128,13 @@ struct Snapshot {
     // for the sky the GPU pass draws (ADR-036), so a realtime/offline comparison shows transport
     // differences rather than two different skies. An image-based environment arrives with
     // section 46's importance sampling and is not built yet.
+    // Motion (spec section 62). `previousCamera` is the camera one frame earlier; a motion vector is
+    // the screen-space difference between where a surface point is now and where it was then, so
+    // BOTH the geometry and the camera have to be remembered -- a camera-only or geometry-only
+    // motion pass is wrong in the half it omits.
+    bool hasMotion = false;
+    scene::Camera previousCamera;
+
     bool skyEnabled = false;
     scene::SkyRuntime sky;
     glm::vec3 backgroundColor{0.0f};
@@ -139,6 +152,10 @@ struct Snapshot {
 // Builds the snapshot from an already-evaluated scene. The caller is responsible for having called
 // `Engine::update(FrameTime)` first: this function does no evaluation of its own, by design
 // (section 7 -- the tracer must not duplicate scene evaluation).
-[[nodiscard]] Snapshot buildSnapshot(const scene::Scene& scene);
+// `previous` is the SAME scene evaluated one frame earlier. Pass null for no motion AOV. The two
+// evaluations must come from the same composition without a re-flatten in between, or entity
+// indices do not refer to the same objects; `buildSnapshot` checks vertex counts and refuses to
+// match a mesh whose shape changed rather than producing a plausible, wrong vector.
+[[nodiscard]] Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous = nullptr);
 
 } // namespace avgen::pathtrace
