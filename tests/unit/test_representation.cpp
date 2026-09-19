@@ -19,6 +19,8 @@
 
 #include <array>
 #include <cmath>
+#include <cstdlib>
+#include <limits>
 #include <vector>
 
 using namespace avgen;
@@ -512,4 +514,191 @@ TEST_CASE("a change is reported on the frame it happens and not afterwards", "[r
     CHECK(selector.select(recordWithRadius(200.0f), one, policy).changed == false); // already full
     CHECK(selector.select(recordWithRadius(20.0f), one, policy).changed == true);
     CHECK(selector.select(recordWithRadius(20.0f), one, policy).changed == false);
+}
+
+// ---- the quality floor, and a dolly across it (ADR-348) ------------------------------------------
+//
+// `maxScreenError` is a second family of thresholds on the rung ladder, and it needs what the kind
+// bands already have: an arm that shows it acts, a control that shows the arm is not a tautology,
+// and a moving camera that shows the boundaries do not strobe.
+
+namespace {
+
+// The Tree of Life's foliage layer, as the renderer builds its rungs: the triangle counts and the
+// measured errors of its largest part, with a surface area that barely moves between rungs because
+// shell thinning grows what it keeps. Real numbers, so a threshold tuned against frames is tested
+// against the ladder those frames were rendered from.
+const std::array<rendering::LodRung, 5> kFoliageLadder{{
+    {3000.0f, 250824, 0.00f},
+    {3000.0f, 125418, 0.77f},
+    {3000.0f, 50166, 2.50f},
+    {3000.0f, 17562, 8.80f},
+    {3000.0f, 5022, 14.24f},
+}};
+
+// One frame of a dolly: the object at `distance` world units, seen through the study's camera
+// (1080 tall, 36 degrees, so 1662 pixels per world unit at one unit) with a 62-unit radius.
+rendering::ImportanceRecord recordAtDistance(float distance, std::uint32_t index = 0) {
+    rendering::ImportanceRecord r;
+    r.index = index;
+    r.distance = distance;
+    r.pixelsPerUnit = 1662.0f / std::max(distance, 1e-3f);
+    r.projectedRadius = r.pixelsPerUnit * 62.0f;
+    r.projectedArea = 3.14159265f * r.projectedRadius * r.projectedRadius;
+    r.triangles = kFoliageLadder.front().triangles;
+    r.pixelsPerTriangle = r.projectedArea / static_cast<float>(r.triangles / 2);
+    return r;
+}
+
+struct DollyResult {
+    std::vector<std::uint8_t> levels;
+    int transitions = 0;
+    int skips = 0; // transitions that moved more than one rung
+    // The largest frame-to-frame change in submitted triangles, as a ratio of the smaller. This is
+    // the pop itself, in the units the eye reacts to: a rung change from 250,824 triangles to
+    // 125,418 is a jump of 2.0, and a change from 250,824 to 17,562 -- a skipped rung -- is 14.3.
+    // A transition count cannot tell those apart and both are "one transition".
+    float worstJump = 1.0f;
+};
+
+// A camera dollying from `far` to `near` over `frames`, breathing by `jitter` of its *distance* as
+// it goes. The breath is what makes this a test rather than a monotone ramp: a threshold with no
+// dead zone is crossed several times by a camera approaching it unevenly, which is what a hand on a
+// gimbal does and what an orbit around an off-centre hero does. A fraction of the distance rather
+// than of the step, because that is the shape a real wobble has and because a fraction of the step
+// is whatever the frame count happens to make it -- at 240 frames it was 0.25% of the distance,
+// far too small to re-cross anything, and the control duly reported the ladder as perfectly stable
+// with the mechanism switched off.
+DollyResult dolly(float hysteresis, float farDistance, float nearDistance, int frames, float jitter) {
+    rendering::RepresentationPolicy policy;
+    policy.hysteresis = hysteresis;
+    policy.proxyRadius = -1.0f;
+    policy.impostorRadius = -1.0f;
+    policy.cullRadius = -1.0f;
+    rendering::RepresentationSelector selector;
+    DollyResult out;
+    for (int f = 0; f < frames; ++f) {
+        const float t = static_cast<float>(f) / static_cast<float>(frames - 1);
+        const float step = (farDistance - nearDistance) / static_cast<float>(frames - 1);
+        (void)step;
+        const float ramp = farDistance + (nearDistance - farDistance) * t;
+        const float distance = ramp * (1.0f + (f % 2 == 0 ? -jitter : jitter));
+        const auto choice = selector.select(recordAtDistance(distance), kFoliageLadder, policy);
+        const auto level = choice.kind == rendering::Representation::FullMesh ? 0 : choice.lodLevel;
+        if (!out.levels.empty() && level != out.levels.back()) {
+            ++out.transitions;
+            out.skips += std::abs(static_cast<int>(level) - static_cast<int>(out.levels.back())) > 1 ? 1 : 0;
+            const float a = static_cast<float>(kFoliageLadder[out.levels.back()].triangles);
+            const float b = static_cast<float>(kFoliageLadder[level].triangles);
+            out.worstJump = std::max(out.worstJump, std::max(a, b) / std::max(std::min(a, b), 1.0f));
+        }
+        out.levels.push_back(static_cast<std::uint8_t>(level));
+    }
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("the quality floor refuses a rung whose error is large on screen", "[repr][selector][floor]") {
+    rendering::RepresentationPolicy policy;
+    policy.proxyRadius = -1.0f;
+    policy.impostorRadius = -1.0f;
+    policy.cullRadius = -1.0f;
+    // At the hero camera every rung is far under the px/triangle target, so the cost rule alone
+    // would take the last one. What it takes instead is rung 1, whose 0.77 units of error project
+    // to 5.8 px against the floor's 8.
+    const auto hero = rendering::RepresentationSelector::decide(recordAtDistance(219.4f), kFoliageLadder,
+                                                                policy, {});
+    CHECK(hero.lodLevel == 1);
+
+    // The control. Lift the floor and the same record takes the bottom rung, which is the behaviour
+    // the frames rejected -- so the arm above is measuring the floor and not the cost rule quietly
+    // agreeing with it.
+    rendering::RepresentationPolicy unfloored = policy;
+    unfloored.maxScreenError = std::numeric_limits<float>::infinity();
+    const auto unboundedHero =
+        rendering::RepresentationSelector::decide(recordAtDistance(219.4f), kFoliageLadder, unfloored, {});
+    CHECK(unboundedHero.lodLevel == 4);
+
+    // And the floor is a *screen-space* rule, not a distance one: the same object further away
+    // takes coarser rungs, in the order the errors say.
+    CHECK(rendering::RepresentationSelector::decide(recordAtDistance(600.0f), kFoliageLadder, policy, {})
+              .lodLevel == 2);
+    CHECK(rendering::RepresentationSelector::decide(recordAtDistance(2200.0f), kFoliageLadder, policy, {})
+              .lodLevel == 3);
+    CHECK(rendering::RepresentationSelector::decide(recordAtDistance(4000.0f), kFoliageLadder, policy, {})
+              .lodLevel == 4);
+}
+
+TEST_CASE("a rung with no measured error is admitted whatever its size", "[repr][selector][floor]") {
+    // Every LodRung built anywhere else in this repository leaves `error` at zero, and the floor
+    // must not quietly hold those callers at LOD0. This is the compatibility claim, asserted rather
+    // than assumed.
+    std::array<rendering::LodRung, 5> unmeasured = kFoliageLadder;
+    for (rendering::LodRung& rung : unmeasured) {
+        rung.error = 0.0f;
+    }
+    rendering::RepresentationPolicy policy;
+    policy.proxyRadius = -1.0f;
+    policy.impostorRadius = -1.0f;
+    policy.cullRadius = -1.0f;
+    const auto choice =
+        rendering::RepresentationSelector::decide(recordAtDistance(219.4f), unmeasured, policy, {});
+    CHECK(choice.lodLevel == 4);
+}
+
+TEST_CASE("a camera dollying through the ladder does not strobe", "[repr][selector][hysteresis][floor]") {
+    // §6 of the asset-LOD brief, and ADR-182's shape: an arm, a control, and a band rather than a
+    // floor. The dolly runs from 4 km to 120 m over 240 frames -- every threshold in the ladder --
+    // with the camera breathing 60% of a step either side as it comes.
+    const DollyResult armed = dolly(0.12f, 4000.0f, 120.0f, 240, 0.03f);
+    const DollyResult bare = dolly(0.0f, 4000.0f, 120.0f, 240, 0.03f);
+
+    // The control first, so the arm below cannot be a test that would pass with the mechanism
+    // removed. With no dead zone the breathing camera re-crosses every threshold it approaches.
+    CHECK(bare.transitions > 8);
+
+    // The arm. Four thresholds in the ladder, so four transitions is the floor of what a dolly
+    // through all of them can have; the band allows a couple more rather than pinning it, because
+    // which frame a threshold falls on is arithmetic nobody should be able to break by changing a
+    // ratio. What it must not do is cross the same threshold twice.
+    CHECK(armed.transitions >= 4);
+    CHECK(armed.transitions <= 6);
+    CHECK(armed.transitions < bare.transitions);
+
+    // No rung is skipped, and no single frame boundary changes the geometry by more than the
+    // ladder's own largest step. This is the popping assertion proper: a transition count says how
+    // *often* the geometry changed and this says how *far* it changed at once, and a system that
+    // pops visibly passes the first and fails the second. The ladder's steps are 2.0x, 2.5x, 2.86x
+    // and 3.5x, so 3.6 is one adjacent step plus a margin; the smallest skip available is 5.0x.
+    CHECK(armed.skips == 0);
+    CHECK(armed.worstJump < 3.6f);
+    CHECK(armed.worstJump > 1.0f); // ...and it did move, so the band above is not measuring a flat line
+
+    // The control for that band, and the one that matters most: with the dead zone removed the
+    // camera's breath re-crosses thresholds, and the same jump happens over and over. The magnitude
+    // of a single jump is a property of the ladder and is the same either way -- what hysteresis
+    // buys is that it happens four times instead of a dozen -- so the control is stated as the
+    // count, which is the quantity the mechanism actually moves.
+    CHECK(bare.transitions >= armed.transitions * 2);
+
+    // Monotone: a camera that only ever approaches must only ever refine. Stated separately from
+    // the transition count because a ladder that went 4-3-4-3-2 has the same count as one that went
+    // 4-3-2-1-0 and is the artefact.
+    for (std::size_t i = 1; i < armed.levels.size(); ++i) {
+        INFO("frame " << i << ": " << int(armed.levels[i - 1]) << " -> " << int(armed.levels[i]));
+        REQUIRE(armed.levels[i] <= armed.levels[i - 1]);
+    }
+}
+
+TEST_CASE("a camera dollying away is the same ladder in reverse", "[repr][selector][hysteresis][floor]") {
+    // The other direction, because hysteresis is deliberately one-sided and a mechanism that is
+    // stable approaching and strobes receding is half a mechanism.
+    const DollyResult armed = dolly(0.12f, 120.0f, 4000.0f, 240, 0.03f);
+    CHECK(armed.skips == 0);
+    for (std::size_t i = 1; i < armed.levels.size(); ++i) {
+        INFO("frame " << i << ": " << int(armed.levels[i - 1]) << " -> " << int(armed.levels[i]));
+        REQUIRE(armed.levels[i] >= armed.levels[i - 1]);
+    }
+    CHECK(armed.levels.front() < armed.levels.back()); // it did move; this is not a flat line
 }

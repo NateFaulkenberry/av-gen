@@ -50,11 +50,13 @@
 #include <cstdint>
 #include <chrono>
 #include <filesystem>
+#include <map>
 #include <memory>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 namespace avgen::params {
@@ -185,6 +187,35 @@ struct NodeAnimation {
     }
 };
 
+// What a scene file says about runtime LOD on a Gltf node (ADR-348). Serialised as a `lod` block.
+//
+// The ladder lives here rather than on the asset because it is a property of how the node is *used*
+// -- the same tree is a hero in one shot and scenery in another -- and because the chain is built
+// per node instance at flatten time, cached by asset path and settings, so two nodes on the same
+// asset asking for the same ladder build it once.
+struct NodeLod {
+    bool enabled = false;
+    // Fractions of the source triangle count, descending, LOD0 first. Empty means
+    // `assets::foliageLodSettings`'s five rungs, which is the calibration §3 of the asset-LOD brief
+    // asks for. These are *targets*: every level reports what it actually achieved and the ones
+    // that fall short say so.
+    std::vector<float> ratios;
+    // Remove whole disconnected shells on geometry the simplifier cannot touch. On by default,
+    // because the assets that need runtime LOD most are the ones made of instanced foliage and a
+    // chain that silently returns the source at every rung is not a chain. Turn it off to see the
+    // simplifier's own answer.
+    bool thinning = true;
+    // A dead zone around the selector's thresholds, as a fraction of them (rendering/
+    // representation.hpp). 0 is frame-independent and is the default everywhere in this engine.
+    float hysteresis = 0.0f;
+    // The quality floor, in pixels of projected deviation: a rung whose error projects to more than
+    // this is refused however cheap it would be. Negative takes `RepresentationPolicy`'s calibrated
+    // default, which is 8 px and is where the Tree of Life's rungs were measured to stop being
+    // distinguishable from the source. Raise it to trade the hero shot's detail for its frame time;
+    // this is the one number that decides that trade and it is authorable for that reason.
+    float maxScreenError = -1.0f;
+};
+
 struct CompositionNode {
     std::string name;
     NodeKind kind = NodeKind::Gltf;
@@ -232,6 +263,10 @@ struct CompositionNode {
     std::size_t cityCells = 0;         // what the last rebuild planned, for the editor to show
 
     NodeAnimation animation;       // ADR-086; Gltf nodes whose asset carries a skin
+    // ADR-348: runtime LOD for this node's imported meshes. Off unless the scene file asks, which
+    // is the whole of the opt-in: a behaviour that changes under every existing scene is not a fix,
+    // and nothing in this repository draws differently until a node writes `"lod": {...}`.
+    NodeLod lod;
 
     // Runtime (not serialised)
     std::shared_ptr<const assets::SceneAsset> sceneAsset; // Gltf
@@ -1296,6 +1331,28 @@ private:
     std::vector<MaterialProgram> materialPrograms_;
     std::vector<MaterialProgramParameters> materialParams_;
     std::size_t ownMaterialCount_ = 0; // this composition's programs come first in scene_.materialPrograms
+
+    // ADR-348: LOD chains built for imported assets, keyed by the asset path and the ladder asked
+    // for. A cache with a lifetime longer than a flatten, which this file is otherwise careful not
+    // to have -- justified because building the Tree of Life's chains takes 3.4 seconds of pure
+    // arithmetic and a flatten runs on every parameter edit. What makes it safe is that the value
+    // is a pure function of its key: `buildLodChain` is deterministic and reads nothing but the
+    // mesh, and the mesh comes from the registry, which is itself keyed on the path and bumps a
+    // version when a file is reloaded -- so the version is in the key too.
+    // ADR-348: this asset's LOD chains, built once per (path, version, ladder) and shared.
+    [[nodiscard]] std::shared_ptr<const std::vector<MeshLodChain>>
+    lodChainsFor(const assets::SceneAsset& asset, const NodeLod& lod, const std::string& owner);
+
+    struct LodCacheKey {
+        std::string asset;
+        std::uint64_t assetVersion = 0;
+        std::string ladder; // the settings, rendered; see `lodLadderKey`
+        [[nodiscard]] bool operator<(const LodCacheKey& other) const {
+            return std::tie(asset, assetVersion, ladder) <
+                   std::tie(other.asset, other.assetVersion, other.ladder);
+        }
+    };
+    std::map<LodCacheKey, std::shared_ptr<const std::vector<MeshLodChain>>> lodCache_;
 
     // Flattened bookkeeping: per node, the entity index range in scene_ and the rest transforms.
     struct NodeRange {

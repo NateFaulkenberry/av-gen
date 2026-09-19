@@ -812,3 +812,352 @@ TEST_CASE("The production tree keeps its trunk at the bottom rung", "[assets][lo
     CHECK(triangles(lastAfter.mesh) < triangles(after->levels.front().mesh) / 4);
 #endif
 }
+
+// ---- shell thinning (ADR-348) -------------------------------------------------------------------
+//
+// Every arm here has a control, because the failure this machinery is most likely to have is the
+// silent one: a setting that does nothing, on geometry where doing nothing and succeeding look
+// identical in a triangle count. The control in each case is the *same mesh* built with thinning
+// disarmed, and each control is asserted to fail the thing its arm passes.
+
+namespace {
+
+// `count` flat two-triangle cards, each too small for any simplifier to touch, on a tight lattice.
+// This is the Tree of Life's foliage in miniature and by the same mechanism: a leaf there is 7.6
+// triangles and a card here is 2, and in both cases there is no edge whose collapse leaves the
+// piece recognisable. The lattice is tight so that the cloud's bounding box barely moves when
+// shells are removed from it, which is the property that makes this a canopy rather than a handful
+// of objects, and it is spaced so that no two cards ever share a vertex position, so the shell
+// count is the card count exactly. (`fmod` over a coprime stride was the first attempt at that
+// spread, and it silently collided 200 shells down to 100.)
+scene::MeshData scatteredShells(int count, float size = 1.0f) {
+    scene::MeshData m;
+    m.name = "scattered-shells";
+    const int side = static_cast<int>(std::ceil(std::cbrt(static_cast<double>(count))));
+    const float step = size * 1.6f;
+    for (int i = 0; i < count; ++i) {
+        const auto base = static_cast<std::uint32_t>(m.vertices.size());
+        const glm::vec3 at{static_cast<float>(i % side) * step,
+                           static_cast<float>((i / side) % side) * step,
+                           static_cast<float>(i / (side * side)) * step};
+        const std::array<glm::vec3, 4> corners{glm::vec3{0, 0, 0}, glm::vec3{size, 0, 0},
+                                               glm::vec3{size, 0, size}, glm::vec3{0, 0, size}};
+        for (const glm::vec3& c : corners) {
+            scene::Vertex v;
+            v.position = at + c;
+            v.normal = glm::vec3(0.0f, 1.0f, 0.0f);
+            m.vertices.push_back(v);
+        }
+        for (const std::uint32_t index : {0u, 1u, 2u, 0u, 2u, 3u}) {
+            m.indices.push_back(base + index);
+        }
+    }
+    return m;
+}
+
+// `count` spheres, each far too large for `maxShellTriangles`. Shell-structured and simplifiable:
+// the case thinning must decline.
+scene::MeshData scatteredSpheres(int count) {
+    scene::MeshData m;
+    m.name = "scattered-spheres";
+    const scene::MeshData unit = scene::makeUvSphere(1.0f, 24, 16);
+    for (int i = 0; i < count; ++i) {
+        const auto base = static_cast<std::uint32_t>(m.vertices.size());
+        const auto fi = static_cast<float>(i);
+        const glm::vec3 at{fi * 5.0f, std::fmod(fi * 11.0f, 50.0f), std::fmod(fi * 17.0f, 50.0f)};
+        for (const scene::Vertex& v : unit.vertices) {
+            scene::Vertex moved = v;
+            moved.position = v.position + at;
+            m.vertices.push_back(moved);
+        }
+        for (const std::uint32_t i2 : unit.indices) {
+            m.indices.push_back(base + i2);
+        }
+    }
+    return m;
+}
+
+double surfaceArea(const scene::MeshData& m) {
+    double total = 0.0;
+    for (std::size_t t = 0; t + 2 < m.indices.size(); t += 3) {
+        const glm::vec3 a = m.vertices[m.indices[t]].position;
+        const glm::vec3 b = m.vertices[m.indices[t + 1]].position;
+        const glm::vec3 c = m.vertices[m.indices[t + 2]].position;
+        total += 0.5 * static_cast<double>(glm::length(glm::cross(b - a, c - a)));
+    }
+    return total;
+}
+
+} // namespace
+
+TEST_CASE("countShells finds the disconnected pieces of a mesh", "[assets][lod][thinning]") {
+    CHECK(assets::countShells(scene::makeUvSphere(1.0f, 16, 12)) == 1);
+    CHECK(assets::countShells(scatteredShells(200)) == 200);
+    CHECK(assets::countShells(scatteredSpheres(7)) == 7);
+    // Not a claim about an empty mesh's topology; a claim that asking is safe.
+    CHECK(assets::countShells(scene::MeshData{}) == 0);
+    // A hard-shaded shell carries several vertices per corner and is still one shell: the union is
+    // over positions, not indices. Splitting every vertex of one tetrahedron per triangle is the
+    // worst case of that, and an index-space union would call it four shells.
+    scene::MeshData split;
+    const scene::MeshData one = scatteredShells(1);
+    for (const std::uint32_t index : one.indices) {
+        split.indices.push_back(static_cast<std::uint32_t>(split.vertices.size()));
+        scene::Vertex v = one.vertices[index];
+        v.normal = glm::vec3(0.0f, 1.0f, 0.0f); // a different normal per copy, so no byte-weld helps
+        split.vertices.push_back(v);
+    }
+    CHECK(assets::countShells(split) == 1);
+}
+
+// A note that belongs in one place rather than in five test bodies.
+//
+// **No synthetic fixture in this file reproduces the refusal that motivates thinning.** Every small
+// shell tried here -- 4-triangle tetrahedra, 2-triangle cards -- meshoptimizer takes to 25% of its
+// triangles quite happily, and on the cards it does so by deleting 300 of the 400 shells outright,
+// which is thinning without the hashing or the area compensation and with no record that it
+// happened. A real leaf stops it and a synthetic one does not, and several rounds of trying to
+// build one that does produced only fixtures that were unrealistic in a different direction.
+//
+// So the synthetic tests below stop the simplifier by the means the settings already provide: a
+// `maxError` of a thousandth of the extent, which is a documented way to say "reduce only what you
+// can do almost exactly", and which the header already warns will leave levels short of their
+// ratio. That is the condition thinning exists for, reached honestly. What these tests then measure
+// is the thinning itself -- which shells it keeps, what it does to the area, whether it is
+// deterministic, what it reports -- and every one of them has a control with thinning disarmed.
+//
+// The *refusal* is tested where it actually happens, on the Tree of Life's foliage, in the last
+// test in this section. That one is the load-bearing claim; these are the mechanism.
+constexpr float kForceThinning = 0.5f;
+constexpr float kStallTheSimplifier = 0.001f;
+
+// The synthetic arms' settings: shells small enough to qualify, and a simplifier held still.
+assets::LodChainSettings thinningTestSettings() {
+    assets::LodChainSettings s = assets::foliageLodSettings();
+    s.thinning.fallback = kForceThinning;
+    s.maxError = kStallTheSimplifier;
+    return s;
+}
+
+TEST_CASE("thinning removes whole shells and reports that it did", "[assets][lod][thinning]") {
+    const scene::MeshData source = scatteredShells(400); // 800 triangles over 400 shells
+    assets::LodChainSettings armed = thinningTestSettings();
+    armed.ratios = {1.0f, 0.25f, 0.08f};
+    assets::LodChainSettings control = armed;
+    control.thinning.fallback = 0.0f;
+    control.sloppyFallback = 0.0f;
+
+    const auto thinned = assets::buildLodChain(source, armed);
+    const auto unthinned = assets::buildLodChain(source, control);
+    REQUIRE(thinned);
+    REQUIRE(unthinned);
+    REQUIRE(thinned->levels.size() == 3);
+    REQUIRE(unthinned->levels.size() == 3);
+    CHECK(thinned->sourceShells == 400);
+    // The control counts nothing, because nothing asked it to.
+    CHECK(unthinned->sourceShells == 0);
+
+    for (std::size_t level = 1; level < 3; ++level) {
+        const assets::LodLevel& arm = thinned->levels[level];
+        const assets::LodLevel& ctl = unthinned->levels[level];
+        INFO("level " << level << " asked for " << arm.targetRatio);
+        // The arm reaches the ratio...
+        CHECK(arm.thinned);
+        CHECK(arm.achievedRatio <= arm.targetRatio * 1.05f);
+        CHECK(arm.reachedTarget);
+        CHECK(arm.shells > 0);
+        CHECK(arm.shells < 400);
+        // ...and the control does not, which is what makes the arm a measurement of the code path
+        // rather than of the settings struct. Its levels are simplified, not thinned: same ratio,
+        // and every shell still present.
+        CHECK_FALSE(ctl.thinned);
+        CHECK(ctl.shells == 0);
+        CHECK(assets::countShells(ctl.mesh) == 400);
+        CHECK(assets::countShells(arm.mesh) < 400);
+    }
+}
+
+TEST_CASE("a thinned level keeps the shell area it removed", "[assets][lod][thinning]") {
+    const scene::MeshData source = scatteredShells(400);
+    const double sourceArea = surfaceArea(source);
+
+    assets::LodChainSettings compensated = thinningTestSettings();
+    compensated.ratios = {1.0f, 0.25f};
+    assets::LodChainSettings bare = compensated;
+    bare.thinning.areaCompensation = 0.0f;
+
+    const auto grown = assets::buildLodChain(source, compensated);
+    const auto flat = assets::buildLodChain(source, bare);
+    REQUIRE(grown);
+    REQUIRE(flat);
+    const double grownArea = surfaceArea(grown->levels[1].mesh);
+    const double flatArea = surfaceArea(flat->levels[1].mesh);
+
+    // The arm: a quarter of the leaves, grown by 4^0.5 = 2, is the same total leaf area. A band,
+    // not a floor -- the thin stops at the first shell past the budget, so the ratio is a quarter
+    // give or take one shell.
+    CHECK(grownArea > sourceArea * 0.9);
+    CHECK(grownArea < sourceArea * 1.1);
+    CHECK(grown->levels[1].shellScale > 1.9f);
+    CHECK(grown->levels[1].shellScale < 2.1f);
+    // The control: the same thin with no compensation keeps a quarter of the area, and *that* is
+    // what a canopy with holes in it looks like. Without this arm the one above would pass on a
+    // mesh that was not thinned at all.
+    CHECK(flatArea < sourceArea * 0.3);
+    CHECK(flat->levels[1].shellScale == 1.0f);
+    CHECK(triangles(flat->levels[1].mesh) == triangles(grown->levels[1].mesh));
+}
+
+TEST_CASE("thinning declines geometry whose shells can be simplified", "[assets][lod][thinning]") {
+    assets::LodChainSettings settings = thinningTestSettings();
+    settings.ratios = {1.0f, 0.25f};
+
+    // The arm. 80 spheres of 704 triangles each: shell-structured, well past `maxShellTriangles`,
+    // and perfectly simplifiable. Deleting 60 of the 80 to reach 25% would be a far worse answer
+    // than collapsing edges on all 80, and this says the strategy switch knows the difference.
+    const scene::MeshData spheres = scatteredSpheres(80);
+    REQUIRE(assets::countShells(spheres) == 80);
+    const auto simplified = assets::buildLodChain(spheres, settings);
+    REQUIRE(simplified);
+    CHECK(simplified->sourceShells == 80);
+    CHECK_FALSE(simplified->levels[1].thinned);
+    CHECK(simplified->levels[1].shells == 0);
+    CHECK(simplified->levels[1].achievedRatio <= 0.26f); // and it reached the ratio anyway
+
+    // The contrast. The same settings on shells small enough to qualify *do* thin, so the arm above
+    // is a decision about the geometry and not a code path that never runs.
+    const scene::MeshData leaves = scatteredShells(400);
+    const auto thinned = assets::buildLodChain(leaves, settings);
+    REQUIRE(thinned);
+    CHECK(thinned->levels[1].thinned);
+
+    // The control. `maxShellTriangles` is what separated them: drop it below the leaves' four
+    // triangles and they stop qualifying too, and stall at the half a tetrahedron can reach.
+    assets::LodChainSettings strict = settings;
+    strict.thinning.maxShellTriangles = 1;
+    strict.sloppyFallback = 0.0f;
+    const auto stalled = assets::buildLodChain(leaves, strict);
+    REQUIRE(stalled);
+    CHECK_FALSE(stalled->levels[1].thinned);
+    CHECK(stalled->levels[1].achievedRatio >= 0.9f);
+}
+
+TEST_CASE("a thinned chain is the same chain every time", "[assets][lod][thinning]") {
+    const scene::MeshData source = scatteredShells(300);
+    assets::LodChainSettings settings = thinningTestSettings();
+    settings.ratios = {1.0f, 0.25f, 0.1f};
+    const auto a = assets::buildLodChain(source, settings);
+    const auto b = assets::buildLodChain(source, settings);
+    REQUIRE(a);
+    REQUIRE(b);
+    REQUIRE(a->levels[1].thinned); // or the rest of this proves only that nothing happened twice
+    REQUIRE(a->levels.size() == b->levels.size());
+    for (std::size_t i = 0; i < a->levels.size(); ++i) {
+        INFO("level " << i);
+        REQUIRE(a->levels[i].mesh.indices == b->levels[i].mesh.indices);
+        REQUIRE(a->levels[i].mesh.vertices.size() == b->levels[i].mesh.vertices.size());
+        for (std::size_t v = 0; v < a->levels[i].mesh.vertices.size(); ++v) {
+            REQUIRE(a->levels[i].mesh.vertices[v].position == b->levels[i].mesh.vertices[v].position);
+        }
+        CHECK(a->levels[i].shells == b->levels[i].shells);
+    }
+    // And a different seed is a different chain, so "deterministic" above is not "the seed is
+    // ignored". Same triangle count, different leaves.
+    assets::LodChainSettings reseeded = settings;
+    reseeded.thinning.seed = settings.thinning.seed + 1u;
+    const auto c = assets::buildLodChain(source, reseeded);
+    REQUIRE(c);
+    CHECK(triangles(c->levels[1].mesh) == triangles(a->levels[1].mesh));
+    bool anyMoved = false;
+    for (std::size_t v = 0; v < c->levels[1].mesh.vertices.size() && !anyMoved; ++v) {
+        anyMoved = c->levels[1].mesh.vertices[v].position != a->levels[1].mesh.vertices[v].position;
+    }
+    CHECK(anyMoved);
+}
+
+TEST_CASE("a thinned level reports an error a selector will respect", "[assets][lod][thinning]") {
+    // The failure this guards: thinning does not move the bounding box -- a canopy thinned to a
+    // fifth still reaches exactly as far -- so `boundsError` says nothing about it, and a level
+    // reporting a near-zero error would be taken by the selector while the object filled the
+    // screen. The error must instead be of the order of a shell.
+    const scene::MeshData source = scatteredShells(400);
+    assets::LodChainSettings settings = thinningTestSettings();
+    settings.ratios = {1.0f, 0.25f, 0.08f};
+    const auto chain = assets::buildLodChain(source, settings);
+    REQUIRE(chain);
+    REQUIRE(chain->levels[1].thinned);
+    REQUIRE(chain->levels[2].thinned);
+    // A card of side 1 has an area of 1, so a disc of that area has a radius of about 0.56. The
+    // grown cards are larger than that, so the estimate rises with the thinning.
+    CHECK(chain->levels[1].error > 0.3f);
+    CHECK(chain->levels[2].error > 0.3f);
+    // Rising with aggressiveness, which is the property the selector's threshold depends on.
+    CHECK(chain->levels[2].error > chain->levels[1].error);
+    // The invariant the floor exists to keep: whatever the shell estimate says, the error is never
+    // below the measured bounding-box recession either. `error` is the larger of the two claims,
+    // always, so a selector thresholding on it is conservative rather than wrong.
+    CHECK(chain->levels[1].error >= chain->levels[1].boundsError);
+    CHECK(chain->levels[2].error >= chain->levels[2].boundsError);
+    // The control. LOD0 is not thinned and reports no error at all, so the numbers above are the
+    // thinning's and not a constant this function would print for anything.
+    CHECK_FALSE(chain->levels[0].thinned);
+    CHECK(chain->levels[0].error == 0.0f);
+}
+
+TEST_CASE("the Tree of Life's foliage cannot be simplified and can be thinned", "[assets][lod][thinning]") {
+    // The claim the whole mechanism rests on, tested against the geometry it is a claim about,
+    // because no synthetic shell in this file reproduces it. Skipped rather than faked when the
+    // asset is not in the checkout: assets/treeisle is gitignored.
+    const std::filesystem::path path =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "treeisle" / "tree-glowmere-foliage.glb";
+    if (!std::filesystem::is_regular_file(path)) {
+        SKIP("assets/treeisle/tree-glowmere-foliage.glb is not present in this checkout");
+    }
+    scene::Scene s;
+    REQUIRE(assets::loadGltf(path, s, {}));
+    REQUIRE_FALSE(s.meshes.empty());
+    // The largest part, which is where the argument has to hold.
+    const scene::MeshData* biggest = &s.meshes.front();
+    for (const scene::MeshData& mesh : s.meshes) {
+        if (mesh.indices.size() > biggest->indices.size()) {
+            biggest = &mesh;
+        }
+    }
+    const std::uint32_t shells = assets::countShells(*biggest);
+    CHECK(shells > 10000);
+    // Around eight triangles a leaf. The band is wide because this is a property of the asset and
+    // an asset re-export may move it; what must not happen is it quietly becoming large enough that
+    // `maxShellTriangles` stops firing and the canopy silently stops having a LOD at all.
+    const auto perShell = static_cast<float>(biggest->indices.size() / 3) / static_cast<float>(shells);
+    CHECK(perShell > 2.0f);
+    CHECK(perShell < 24.0f);
+
+    assets::LodChainSettings preserving = assets::heroLodSettings();
+    preserving.ratios = {1.0f, 0.2f};
+    const auto refused = assets::buildLodChain(*biggest, preserving);
+    REQUIRE(refused);
+    // The control, and the reason any of this exists: asked for a fifth, handed back all of it.
+    CHECK(refused->levels[1].achievedRatio > 0.95f);
+    CHECK_FALSE(refused->levels[1].reachedTarget);
+
+    assets::LodChainSettings thinning = assets::foliageLodSettings();
+    thinning.ratios = {1.0f, 0.2f};
+    const auto reached = assets::buildLodChain(*biggest, thinning);
+    REQUIRE(reached);
+    CHECK(reached->levels[1].thinned);
+    CHECK(reached->levels[1].achievedRatio <= 0.21f);
+    CHECK(reached->levels[1].reachedTarget);
+    CHECK(reached->levels[1].shells > 0);
+    CHECK(reached->levels[1].shells < shells);
+    // Grown to hold the canopy's area, and not past the cap.
+    CHECK(reached->levels[1].shellScale > 1.0f);
+    CHECK(reached->levels[1].shellScale <= thinning.thinning.maxScale);
+    // The silhouette is still roughly the canopy's. Thinning removes leaves from inside the
+    // envelope as well as from its edge, and the edge is where the loss shows: measured at 0.110 of
+    // the diagonal at a fifth of the leaves, against the 0.12 `boundsTolerance` allows a simplified
+    // level. The band is 0.15 rather than 0.12 because this number is not what `boundsTolerance`
+    // measures -- a canopy's box is set by its outermost leaf and losing that leaf moves it by a
+    // leaf, which is a different event from a trunk going missing -- and pinning it at the measured
+    // value would make an asset re-export look like a regression.
+    CHECK(boxDrift(*biggest, reached->levels[1].mesh) < 0.15f);
+}

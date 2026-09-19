@@ -250,6 +250,60 @@ struct MeshData {
 using MeshId = std::uint32_t;
 constexpr MeshId kInvalidMesh = 0xFFFFFFFFu;
 
+// ---- runtime LOD for an imported mesh (ADR-348) ------------------------------------------------
+//
+// A mesh's coarser rungs, held beside the scene's meshes rather than inside MeshData, and built by
+// `assets::buildLodChain`. Three decisions are worth naming, because each closes off a shape the
+// engine would otherwise have grown into.
+//
+// **LOD0 is the source mesh and is not stored here.** `scene.meshes[base]` is the authored geometry
+// exactly, untouched, and `levels` holds only what is below it. So the offline renderer, the
+// path tracer, the bounds, the mesh metrics and anything else that reads `scene.meshes` keep
+// reading the asset and cannot accidentally be handed a rung -- which is §1 of the asset-LOD brief
+// and is a property of the data layout rather than a rule somebody has to remember.
+//
+// **The chain is per mesh, not per entity.** Several entities share a MeshId -- a glTF part
+// instanced twice is two entities and one mesh -- and a chain on the entity would build the same
+// levels twice and let the two disagree.
+//
+// **The rungs are not entries in `scene.meshes`.** Appending them there would have been less
+// renderer code and would have silently inflated every count that walks the mesh list: the world's
+// triangle total, the mesh-bounds cache, the memory report, the offline renderer's idea of what the
+// scene contains. A LOD that changes what the scene *is* is not a LOD.
+struct MeshLodLevel {
+    MeshData mesh;
+    float targetRatio = 1.0f;   // what the chain builder was asked for
+    float achievedRatio = 1.0f; // what it produced, against the source's triangles
+    // Deviation from the source in the mesh's own units, as `assets::LodLevel::error` defines it:
+    // an upper bound that never understates. This is what a selector thresholds on.
+    float error = 0.0f;
+    // Measured from the level's own geometry, so the importance evaluator can cost this rung
+    // without the renderer keeping a second metrics table. Surface area is in the mesh's own units;
+    // the instance's scale is applied where it is used.
+    float surfaceArea = 0.0f;
+    std::uint32_t triangles = 0;
+    // How this level was produced, for the diagnostic that has to explain a frame. See
+    // `assets::LodLevel`.
+    bool sloppy = false;
+    bool thinned = false;
+};
+
+struct MeshLodChain {
+    MeshId base = kInvalidMesh;       // LOD0: scene.meshes[base], and never anything else
+    std::vector<MeshLodLevel> levels; // LOD1..N, coarsening; empty is a legal chain that does nothing
+    float sourceSurfaceArea = 0.0f;
+    std::uint32_t sourceTriangles = 0;
+    std::uint32_t sourceShells = 0;   // 0 when nobody counted; see assets::LodChain
+    // The dead zone the selector should use around its thresholds for drawables on this mesh, as a
+    // fraction of them. Carried here rather than in a renderer setting because it is authored per
+    // node and the renderer sees entities: this is the only place the two meet. 0 -- frame
+    // independence -- everywhere until a scene file says otherwise.
+    float hysteresis = 0.0f;
+    // The quality floor in pixels (rendering/representation.hpp), or negative for the calibrated
+    // default. Carried here for the reason `hysteresis` is.
+    float maxScreenError = -1.0f;
+};
+
 // A skinned rig in the scene (ADR-086; scene/animation.hpp holds the type). Lives here because
 // Entity names one and Entity is defined in this header.
 using RigId = std::uint32_t;
