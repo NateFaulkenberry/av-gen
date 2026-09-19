@@ -911,6 +911,10 @@ private:
     // be changed by it.
     bool anyMeshLod_ = false;
     RepresentationSelector representation_;
+    // What the selector's memory was last keyed to. Identity as well as count, because every fresh
+    // Scene starts at a recycled address and two different scenes can have the same entity count.
+    std::uint64_t lodSceneIdentity_ = 0;
+    std::size_t lodEntityCount_ = 0;
     // What the selector actually decided this frame, for the diagnostics and the tests: one entry
     // per rung of every chain-bearing mesh, counted across entities.
     struct EntityLodStats {

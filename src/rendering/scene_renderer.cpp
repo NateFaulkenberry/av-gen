@@ -2730,6 +2730,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         lodPolicy.forceTopRepresentation = true;
     }
     entityLod_ = EntityLodStats{};
+    // The selector remembers last frame's choice per *entity index*, so a renumbered entity list
+    // would have it reading one object's history against another -- the derived-copy defect this
+    // engine has found nine of. `uploadMeshes` resets it when the geometry changes, which covers
+    // most rebuilds; this covers the rest, because a flatten can reorder entities without touching
+    // a mesh. Cheap, and it fails towards forgetting rather than towards remembering wrongly.
+    if (scene.identity != lodSceneIdentity_ || scene.entities.size() != lodEntityCount_) {
+        representation_.reset();
+        lodSceneIdentity_ = scene.identity;
+        lodEntityCount_ = scene.entities.size();
+    }
     // Returns the geometry to draw for one entity, and records what it decided.
     const auto chooseGeometry = [&](const scene::Entity& entity,
                                     std::size_t thisEntity) -> const GpuMesh* {
