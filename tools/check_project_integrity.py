@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
-"""Report two things about `examples/` that nothing else reports.
+"""Report three things about `examples/` that nothing else reports.
 
 `refresh_scene_fingerprint.py` stamps; it never tells you a fingerprint has drifted, and it defaults
 to a single scene, so "1 fingerprint(s) refreshed" is compatible with three projects staying stale.
 And nothing at all checks that a `worldfx/<name>/...` parameter names an effect that exists -- the
 failure that once left 94 orphaned `atmos/*` parameters, and that a rename can recreate in one pass.
+
+A **modulation route** can name the same missing effect, and it is the quieter half of the same
+defect: an orphaned parameter is refused once at load with its own line, while an orphaned route is
+one line among fifty and then simply never fires. `glowmere-valley-2-multicam` carries
+`beat.pulse -> atmos/Bioluminescent Comet/coreIntensity` against a project whose only atmospheric
+effect is called `Aurora`; it has been reporting "1 modulation route(s) could not be bound" on
+every load, headless and windowed, and nothing was watching.
 
 Read-only. Exits non-zero if anything is wrong, so it can gate a commit.
 
@@ -89,6 +96,34 @@ def main():
                 n = sum(1 for k in params if k.startswith('%s/%s/' % (group, orphan)))
                 problems.append("%s: %d parameter(s) under '%s/%s/' name no effect"
                                 % (rel, n, group, orphan))
+
+        # The same question asked of the routes. A route's target is a parameter path, so an
+        # effect that is not there fails in exactly the way an orphaned parameter does -- except
+        # that `Modulator::bind` reports it once per load and then the route is silently inert for
+        # the rest of the session. Only the two effect groups are checked, for the reason GROUPS
+        # gives: a `nodes/...` target resolves against scene node ids and a removed node is an
+        # authored edit rather than a mistake.
+        for route in doc.get('routes') or []:
+            if not isinstance(route, dict):
+                continue
+            target = route.get('target')
+            if not isinstance(target, str) or target.count('/') < 2:
+                continue
+            group, effect = target.split('/')[0], target.split('/')[1]
+            key = GROUPS.get(group)
+            if key is None:
+                continue
+            names = set()
+            effect_names(doc, key, names)
+            scene, _ = scene_path(path, doc)
+            if scene and os.path.exists(scene):
+                try:
+                    effect_names(json.load(open(scene)), key, names)
+                except Exception:
+                    pass
+            if effect not in names:
+                problems.append("%s: modulation route '%s -> %s' names no effect"
+                                % (rel, route.get('source', '?'), target))
 
         scene, ref = scene_path(path, doc)
         if ref is None:
