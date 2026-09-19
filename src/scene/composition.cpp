@@ -51,7 +51,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "volumeSteps", "volumeDensityField", "volumeColorField", "sky"};
+    "shadowCascades", "shadowRange", "volumeSteps", "volumeDensityField", "volumeColorField", "sky"};
 constexpr std::string_view kSkyKeys[] = {
     "enabled", "background", "useKeyLight", "zenithColor", "horizonColor", "groundColor",
     "sunColor", "sunDirection", "haze", "sunIntensity", "sunSize", "sunGlow", "intensity"};
@@ -1569,6 +1569,27 @@ Result<void> Composition::setAtmosphericEffects(std::vector<world::AtmosphericEf
 // two lights that cannot be told apart in a warning, in an overlay or in a parameter path. Unlike
 // the effects this *is* dirty -- a light is part of the picture, and `rebuild` is where the picture
 // is assembled.
+// ADR-358. `direction` is the direction the light TRAVELS; the angles describe where it comes
+// FROM, which is the half a person can point at. Azimuth is measured clockwise from +Z through +X
+// so that 0 and 90 land on the two axes a scene file is usually written against, and elevation is
+// signed from the horizon. A light travelling straight down comes from elevation +90, where the
+// azimuth is degenerate and is reported as whatever the horizontal components say -- 0 for a
+// perfectly vertical light, which is the only value that round-trips.
+void Composition::lightAngles(const glm::vec3& travelDirection, float& azimuthDegrees,
+                              float& elevationDegrees) {
+    const float length = glm::length(travelDirection);
+    const glm::vec3 toSource = length > 1e-6f ? -travelDirection / length : glm::vec3(0.0f, 1.0f, 0.0f);
+    elevationDegrees = glm::degrees(std::asin(std::clamp(toSource.y, -1.0f, 1.0f)));
+    azimuthDegrees = glm::degrees(std::atan2(toSource.x, toSource.z));
+}
+
+glm::vec3 Composition::lightDirectionFromAngles(float azimuthDegrees, float elevationDegrees) {
+    const float a = glm::radians(azimuthDegrees);
+    const float e = glm::radians(std::clamp(elevationDegrees, -89.99f, 89.99f));
+    const float c = std::cos(e);
+    return -glm::vec3(c * std::sin(a), std::sin(e), c * std::cos(a));
+}
+
 Result<void> Composition::setAuthoredLights(std::vector<AuthoredLight> lights) {
     for (std::size_t i = 0; i < lights.size(); ++i) {
         if (lights[i].light.name.empty()) {
@@ -1580,7 +1601,18 @@ Result<void> Composition::setAuthoredLights(std::vector<AuthoredLight> lights) {
             }
         }
     }
+    // The knobs belong to the lights, so a new set of lights is a new set of knobs. Unregistered
+    // against the OLD names first -- `unregisterAuthoredLightParameters` walks `authoredLights_` --
+    // or the previous rig's paths stay in the set for ever, which is how a parameter panel comes to
+    // list a light the scene no longer has (ADR-358).
+    const bool attached = params_ != nullptr;
+    if (attached) {
+        unregisterAuthoredLightParameters();
+    }
     authoredLights_ = std::move(lights);
+    if (attached) {
+        registerAuthoredLightParameters(*params_);
+    }
     dirty_ = true;
     return {};
 }
@@ -3319,6 +3351,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         groundDesc.isColor = true;
         styledGroundAmbient_ = &params.add(groundDesc);
     }
+    // ADR-112's range is automatic unless the scene says otherwise. Registered unconditionally and
+    // defaulted to the scene's own value, so a scene that never sets it gets 0 -- automatic -- and
+    // the knob exists to be turned rather than to be discovered by editing a file.
+    shadowRange_ = &params.add(
+        floatDesc(prefix_ + "scene/shadowRange", volumeSetting_.shadowRange, 0.0f, 20000.0f, 0.0f, 1000.0f));
     gridIntensity_ = &params.add(floatDesc(prefix_ + "scene/gridIntensity", 0.6f, 0.0f, 4.0f, 0.0f, 2.0f));
     rootScale_ = &params.add(floatDesc(prefix_ + "root/scale", 1.0f, 0.05f, 8.0f, 0.2f, 3.0f));
     // Nested compositions do not spin on their own by default; the enclosing root does.
@@ -3328,6 +3365,7 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     if (lightRig_ && lightRigParams_.all.empty()) {
         lightRigParams_ = registerLightRigParameters(params, *lightRig_, prefix_);
     }
+    registerAuthoredLightParameters(params);
     for (auto& node : nodes_) {
         registerNodeParameters(*node);
     }
@@ -3339,6 +3377,56 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // Last, because an entity binds against the parameters every node above has just registered
     // and against the material part names the rebuild resolved.
     installEntities();
+}
+
+// ADR-358: the authored lights' live knobs. Every light gets intensity, colour and an enable;
+// an aimed one also gets the two angles and, when it casts, its angular size and shadow strength.
+//
+// Every default is the light's own authored value, so registering these changes no picture -- the
+// parameter set gains knobs whose value is what the file already said. That is what makes this
+// safe to do for every scene rather than only for the one that asked: the brief's rule is that a
+// behaviour which changes under everyone is not a fix, and a knob that starts where the file left
+// it changes nothing until somebody turns it.
+void Composition::registerAuthoredLightParameters(params::ParameterSet& params) {
+    authoredLightParams_.assign(authoredLights_.size(), AuthoredLightParams{});
+    for (std::size_t i = 0; i < authoredLights_.size(); ++i) {
+        const PunctualLight& l = authoredLights_[i].light;
+        const std::string base = prefix_ + "lights/" + sanitise(l.name) + "/";
+        AuthoredLightParams& p = authoredLightParams_[i];
+        p.enabled = &params.add(boolDesc(base + "enabled", l.enabled));
+        // The soft range tops out at three times the authored value or ten, whichever is more, so
+        // a key authored at 2.45 has somewhere to go and a practical at 0.05 is not stuck at the
+        // bottom of a slider calibrated for a sun.
+        p.intensity = &params.add(floatDesc(base + "intensity", l.intensity, 0.0f,
+                                            std::max(l.intensity * 20.0f, 200.0f), 0.0f,
+                                            std::max(l.intensity * 3.0f, 10.0f)));
+        p.color = &params.add(vec3Desc(base + "color", l.color, 0.0f, 8.0f, 0.0f, 1.0f));
+        const bool aimed = l.type == PunctualLight::Type::Directional || l.type == PunctualLight::Type::Spot;
+        if (aimed) {
+            float azimuth = 0.0f;
+            float elevation = 0.0f;
+            lightAngles(l.direction, azimuth, elevation);
+            p.azimuth = &params.add(floatDesc(base + "azimuth", azimuth, -180.0f, 180.0f, -180.0f, 180.0f));
+            p.elevation = &params.add(floatDesc(base + "elevation", elevation, -89.0f, 89.0f, -89.0f, 89.0f));
+        }
+        p.angularSize = &params.add(floatDesc(base + "angularSize", l.softness, 0.0f, 16.0f, 0.0f, 6.0f));
+        p.shadowStrength = &params.add(floatDesc(base + "shadowStrength", l.shadowStrength, 0.0f, 1.0f, 0.0f, 1.0f));
+    }
+}
+
+void Composition::unregisterAuthoredLightParameters() {
+    if (params_ == nullptr) {
+        authoredLightParams_.clear();
+        return;
+    }
+    for (const AuthoredLight& a : authoredLights_) {
+        const std::string base = prefix_ + "lights/" + sanitise(a.light.name) + "/";
+        for (const char* leaf : {"enabled", "intensity", "color", "azimuth", "elevation",
+                                 "angularSize", "shadowStrength"}) {
+            params_->remove(base + leaf);
+        }
+    }
+    authoredLightParams_.clear();
 }
 
 void Composition::registerNodeParameters(CompositionNode& node) {
@@ -3535,6 +3623,7 @@ void Composition::unregisterParameters() {
                                  "env/sky/horizonColor", "env/sky/groundColor", "env/sky/sunColor",
                                  "env/sky/haze", "env/sky/sunIntensity", "env/sky/sunSize",
                                  "env/sky/sunGlow", "env/sky/intensity",
+                                 "scene/shadowRange",
                                  "root/scale", "root/rotationSpeed", "root/impulse"}) {
             params_->remove(prefix_ + path);
         }
@@ -3542,6 +3631,7 @@ void Composition::unregisterParameters() {
             unregisterLightRigParameters(*params_, lightRigParams_);
             lightRigParams_ = {};
         }
+        unregisterAuthoredLightParameters();
         for (const auto& mp : materialParams_) {
             unregisterMaterialProgramParameters(*params_, mp);
         }
@@ -5856,6 +5946,39 @@ void Composition::applyParameters() {
         }
     }
 
+    // ADR-358: the authored lights' own parameters, into the scene copies `rebuild` made.
+    //
+    // Before the node-riding block below, not after: that block re-places a light expressed in a
+    // node's local frame, and it has to re-place the direction these parameters just set rather
+    // than one a rebuild left behind. `base()` back into `authoredLights_` for the reason the node
+    // loop above does it -- saving the scene has to see what the user set, not what the file said
+    // (ADR-225) -- and `value()`, which carries any modulation on top, into the render copy.
+    for (std::size_t i = 0; i < authoredLights_.size() && i < authoredLightParams_.size(); ++i) {
+        const AuthoredLightParams& p = authoredLightParams_[i];
+        PunctualLight& rest = authoredLights_[i].light;
+        if (p.enabled != nullptr) rest.enabled = p.enabled->base();
+        if (p.intensity != nullptr) rest.intensity = p.intensity->base();
+        if (p.color != nullptr) rest.color = p.color->base();
+        if (p.angularSize != nullptr) rest.softness = p.angularSize->base();
+        if (p.shadowStrength != nullptr) rest.shadowStrength = p.shadowStrength->base();
+        if (p.azimuth != nullptr && p.elevation != nullptr) {
+            rest.direction = lightDirectionFromAngles(p.azimuth->base(), p.elevation->base());
+        }
+        const std::size_t lightIndex = authoredLightFirst_ + i;
+        if (lightIndex >= scene_.lights.size()) {
+            continue;
+        }
+        PunctualLight& live = scene_.lights[lightIndex];
+        live.enabled = rest.enabled;
+        live.intensity = p.intensity != nullptr ? p.intensity->value() : rest.intensity;
+        live.color = p.color != nullptr ? p.color->value() : rest.color;
+        live.softness = p.angularSize != nullptr ? p.angularSize->value() : rest.softness;
+        live.shadowStrength = p.shadowStrength != nullptr ? p.shadowStrength->value() : rest.shadowStrength;
+        if (p.azimuth != nullptr && p.elevation != nullptr) {
+            live.direction = lightDirectionFromAngles(p.azimuth->value(), p.elevation->value());
+        }
+    }
+
     // ADR-278: an authored light that rides a node. Here rather than in `rebuild` for the reason
     // the node's *own* asset lights are scaled here -- `rebuild` runs when the scene changes and a
     // node moves every frame -- and before the ecology erase and the rig's resize-from-the-back, so
@@ -6074,6 +6197,7 @@ void Composition::applyParameters() {
         env.volumeEmission = pick(volumeEmission_, volumeSetting_.volumeEmission);
         env.volumeSteps = volumeSteps_ != nullptr ? volumeSteps_->value() : volumeSetting_.volumeSteps;
         env.shadowCascades = volumeSetting_.shadowCascades;
+        env.shadowRange = pick(shadowRange_, volumeSetting_.shadowRange);
         env.volumeMaxDistance = volumeSetting_.volumeMaxDistance;
         // Field names are prefixed like every other reference so a nested scene stays self-contained.
         env.volumeDensityField =
@@ -6873,6 +6997,21 @@ nlohmann::json Composition::toJson() const {
         environment["lightFromEnvironment"] = true;
     }
     environment["fogDensity"] = fogDensity_ != nullptr ? fogDensity_->base() : fogDensitySetting_;
+    {
+        // ADR-358. Out here rather than in the volumetric block below, which is where it was
+        // first written and where a test caught it: that block is guarded by the volume being ON,
+        // and this scene has no volume, so the save dropped the range and the reload cast no
+        // shadow again -- ADR-207/230's silent deletion, one field along. Written only when the
+        // scene has an opinion, so a file that never set it is byte-identical after a round trip.
+        //
+        // Note for whoever comes to `shadowCascades` next: it is still inside that guard, and a
+        // scene that sets cascades without a volume loses them on save for exactly this reason.
+        // Left alone here because fixing it changes files this branch does not own.
+        const float range = shadowRange_ != nullptr ? shadowRange_->base() : volumeSetting_.shadowRange;
+        if (range > 0.0f) {
+            environment["shadowRange"] = range;
+        }
+    }
     {
         // Procedural sky (ADR-036): written only when it differs from the defaults, so scene files
         // that never touched it stay byte-identical.
@@ -7762,7 +7901,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                       FloatKey{"volumeNoiseScale", &v.volumeNoiseScale},
                                       FloatKey{"volumeNoiseSpeed", &v.volumeNoiseSpeed},
                                       FloatKey{"volumeEmission", &v.volumeEmission},
-                                      FloatKey{"volumeMaxDistance", &v.volumeMaxDistance}}) {
+                                      FloatKey{"volumeMaxDistance", &v.volumeMaxDistance},
+                                      FloatKey{"shadowRange", &v.shadowRange}}) {
                 auto value = readFloat(e, fk.key, *fk.target);
                 if (!value) {
                     return std::unexpected(value.error());

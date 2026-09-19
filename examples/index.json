@@ -218,9 +218,15 @@
     },
     {
       "category": "Showcase",
-      "description": "The authored Tree of Life hero export -- 3.16 M triangles, seven meshes -- standing on a floating island in cosmic space, the island turning once every three minutes and breathing on a forty-second swell. The tree is a child of the island's transform and never moves of its own accord. Bare landmass, one overhead key, a shell of 1,700 points for stars; nothing else in frame.",
+      "description": "The authored Tree of Life hero export -- 3.16 M triangles, seven meshes -- standing on a floating island in cosmic space, the island turning once every three minutes and breathing on a forty-second swell. The tree is a child of the island's transform and never moves of its own accord. A celestial key falls diagonally across tree and island from a hundred degrees off the camera, throwing the canopy's shadow off the far edge of the plateau; the underside is left to the sky's ground hemisphere. Bare landmass, a shell of 1,700 points for stars; nothing else in frame.",
       "name": "Tree of Life - Floating Island",
       "project": "treeisland/tree-of-life-floating-island.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "The same island, the same three lights, the same parameters at their other values: the celestial key drops to a third of its daylight strength and turns cool blue, the fill follows it, the shadows deepen and the star shells come up. One framework, two states -- not two lighting systems. Also reachable as the 'Celestial Night' preset inside the day project.",
+      "name": "Tree of Life - Celestial Night",
+      "project": "treeisland/tree-of-life-floating-island-night.json"
     },
     {
       "category": "Showcase",
