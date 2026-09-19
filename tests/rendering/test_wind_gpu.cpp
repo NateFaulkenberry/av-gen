@@ -13,6 +13,7 @@
 #include "gpu/shader_library.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "scene/scene.hpp"
+#include "support/image_diff.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -269,13 +270,24 @@ TEST_CASE("Wind off is byte-identical to wind never having existed", "[gpu][wind
     const scene::Scene calm = stalkScene(wind::VegetationMotion{}, wind::WindParams{});
     const gpu::Image8 a = render(*ctx, calm, 0.0);
     const gpu::Image8 b = render(*ctx, calm, 4.0);
-    REQUIRE(a.rgba == b.rgba);
+    // ADR-362: a count and an offset, not `a.rgba == b.rgba`. This assertion has failed in a
+    // full-suite run and the equality form took the whole binary down with it (ADR-358), so the
+    // difference it found was never printed.
+    {
+        const auto d = testing::byteDiff(a.rgba, b.rgba);
+        INFO("calm at 0 s vs 4 s: " << d.describe());
+        REQUIRE(d.identical());
+    }
 
     // And a plant that *would* sway does not, when the air is still.
     const scene::Scene stillAir = stalkScene(softPlant(), wind::WindParams{});
     const gpu::Image8 c = render(*ctx, stillAir, 0.0);
     const gpu::Image8 d = render(*ctx, stillAir, 4.0);
-    REQUIRE(c.rgba == d.rgba);
+    {
+        const auto diff = testing::byteDiff(c.rgba, d.rgba);
+        INFO("still air at 0 s vs 4 s: " << diff.describe());
+        REQUIRE(diff.identical());
+    }
 }
 
 TEST_CASE("The GPU wind field is deterministic in time", "[gpu][wind][determinism]") {
@@ -289,8 +301,17 @@ TEST_CASE("The GPU wind field is deterministic in time", "[gpu][wind][determinis
     const scene::Scene s = stalkScene(softPlant(), w);
     const gpu::Image8 a = render(*ctx, s, 3.25);
     const gpu::Image8 b = render(*ctx, s, 3.25);
-    REQUIRE(a.rgba == b.rgba);
-    // ... and a different time gives a different frame, or nothing is moving at all.
+    {
+        const auto d = testing::byteDiff(a.rgba, b.rgba);
+        INFO("same time twice: " << d.describe());
+        REQUIRE(d.identical());
+    }
+    // ... and a different time gives a different frame, or nothing is moving at all. This is the
+    // control: it must report a non-zero count, and the count is worth seeing when it does not.
     const gpu::Image8 c = render(*ctx, s, 4.75);
-    REQUIRE_FALSE(a.rgba == c.rgba);
+    {
+        const auto d = testing::byteDiff(a.rgba, c.rgba);
+        INFO("3.25 s vs 4.75 s: " << d.describe());
+        REQUIRE_FALSE(d.identical());
+    }
 }

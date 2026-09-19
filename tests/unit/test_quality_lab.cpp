@@ -20,6 +20,7 @@
 #include "report/diagnostics.hpp"
 #include "report/vector.hpp"
 #include "validation/ladder.hpp"
+#include "support/image_diff.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -549,7 +550,11 @@ TEST_CASE("a frame survives a PNG round trip bit for bit", "[quality][capture]")
     REQUIRE(read.has_value());
     CHECK(read->width == source.width);
     CHECK(read->height == source.height);
-    CHECK(read->rgba == source.rgba);
+    {
+        const auto d = testing::byteDiff(read->rgba, source.rgba);
+        INFO("PNG round trip: " << d.describe());  // ADR-362
+        CHECK(d.identical());
+    }
     // Which makes the identity arm meaningful on real files and not only in memory.
     CHECK(std::isinf(quality::psnr(*read, source)));
 }

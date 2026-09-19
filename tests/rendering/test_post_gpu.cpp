@@ -9,6 +9,7 @@
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_types.hpp"
+#include "support/image_diff.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -395,5 +396,11 @@ TEST_CASE("FXAA antialiases, and does so without looking at the previous frame",
     FrameTime t{};
     auto again = second.renderToImage(s, t, 256, 256);
     REQUIRE(again.has_value());
-    CHECK(again->rgba == on.rgba);
+    {
+        // ADR-362: a count, not an equality -- a failing 256x256 equality is 256 KB per operand in
+        // the report, and the larger frames in this suite are what killed the run.
+        const auto d = testing::byteDiff(again->rgba, on.rgba);
+        INFO("fresh renderer vs warmed: " << d.describe());
+        CHECK(d.identical());
+    }
 }
