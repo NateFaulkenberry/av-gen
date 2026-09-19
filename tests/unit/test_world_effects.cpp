@@ -795,7 +795,7 @@ TEST_CASE("the Beat response slider owns an ordinary modulation route", "[world]
     // §13 and §16: no special-case audio hook. What the panel's one musical control writes is a
     // route the Modulation panel can see, curve, re-point and delete.
     CHECK(ui::beatResponseSource() == "beat.pulse");
-    CHECK(ui::beatResponseTarget("Hero Mushroom Pulse") == "worldfx/Hero Mushroom Pulse/intensity");
+    CHECK(ui::beatResponseTarget("Hero Pulse") == "worldfx/Hero Pulse/intensity");
     // A 0..1 slider has to mean something in the target's units: the whole of what the knob offers.
     CHECK_THAT(ui::beatResponseDepth(1.0f, 8.0f), WithinAbs(8.0f, 1e-6f));
     CHECK_THAT(ui::beatResponseDepth(0.25f, 8.0f), WithinAbs(2.0f, 1e-6f));

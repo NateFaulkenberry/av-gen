@@ -21968,7 +21968,7 @@
         "width": 1.0
       },
       "enabled": true,
-      "name": "Hero Mushroom Pulse",
+      "name": "Hero Pulse",
       "propagation": {
         "beamRadius": 0.0,
         "direction": "explicit",

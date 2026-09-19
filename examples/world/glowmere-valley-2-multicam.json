@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-2-multicam.scene.json",
-        "sha256": "e0fade6b06eb2d30fa41b3d29125a610014037576c458d369d8056aa21e81056",
-        "size": 229134
+        "sha256": "2e5e04574b5de3cb70beea74b8fd23526cfc648243d3b6b517edbdba01209871",
+        "size": 229125
       }
     }
   },
@@ -13218,48 +13218,48 @@
     "worldfx/Camera Travel Beam/trailLength": 24.0,
     "worldfx/Camera Travel Beam/verticalExtent": 40.0,
     "worldfx/Camera Travel Beam/width": 1.0,
-    "worldfx/Hero Mushroom Pulse/beamRadius": 0.0,
-    "worldfx/Hero Mushroom Pulse/color": [
+    "worldfx/Hero Pulse/beamRadius": 0.0,
+    "worldfx/Hero Pulse/color": [
       0.1599999964237213,
       0.9200000166893005,
       0.6200000047683716
     ],
-    "worldfx/Hero Mushroom Pulse/delay": 0.3499999940395355,
-    "worldfx/Hero Mushroom Pulse/edgeColor": [
+    "worldfx/Hero Pulse/delay": 0.3499999940395355,
+    "worldfx/Hero Pulse/edgeColor": [
       0.7799999713897705,
       1.0,
       0.8799999952316284
     ],
-    "worldfx/Hero Mushroom Pulse/edgeIntensity": 9.0,
-    "worldfx/Hero Mushroom Pulse/enabled": true,
-    "worldfx/Hero Mushroom Pulse/fadeIn": 0.6000000238418579,
-    "worldfx/Hero Mushroom Pulse/fadeOut": 1.2000000476837158,
-    "worldfx/Hero Mushroom Pulse/falloff": 1.5,
-    "worldfx/Hero Mushroom Pulse/frontWidth": 3.5,
-    "worldfx/Hero Mushroom Pulse/intensity": 5.0,
-    "worldfx/Hero Mushroom Pulse/lifetime": 0.0,
-    "worldfx/Hero Mushroom Pulse/rainbow": false,
-    "worldfx/Hero Mushroom Pulse/rainbowBrightness": 1.0,
-    "worldfx/Hero Mushroom Pulse/rainbowSaturation": 0.8500000238418579,
-    "worldfx/Hero Mushroom Pulse/rainbowScale": 0.012000000104308128,
-    "worldfx/Hero Mushroom Pulse/rainbowSpeed": 0.3499999940395355,
-    "worldfx/Hero Mushroom Pulse/range": 58.0,
-    "worldfx/Hero Mushroom Pulse/repeat": 4.5,
-    "worldfx/Hero Mushroom Pulse/response/emissive": 1.2999999523162842,
-    "worldfx/Hero Mushroom Pulse/response/foliage": 1.5,
-    "worldfx/Hero Mushroom Pulse/response/ground": 1.0,
-    "worldfx/Hero Mushroom Pulse/response/surface": 0.8999999761581421,
-    "worldfx/Hero Mushroom Pulse/ringCount": 2.0,
-    "worldfx/Hero Mushroom Pulse/sparkle": true,
-    "worldfx/Hero Mushroom Pulse/sparkleDensity": 1.399999976158142,
-    "worldfx/Hero Mushroom Pulse/sparkleIntensity": 2.5999999046325684,
-    "worldfx/Hero Mushroom Pulse/sparkleSize": 0.20000000298023224,
-    "worldfx/Hero Mushroom Pulse/sparkleSpeed": 0.6000000238418579,
-    "worldfx/Hero Mushroom Pulse/speed": 13.0,
-    "worldfx/Hero Mushroom Pulse/startOffset": 0.0,
-    "worldfx/Hero Mushroom Pulse/trailLength": 20.0,
-    "worldfx/Hero Mushroom Pulse/verticalExtent": 9.0,
-    "worldfx/Hero Mushroom Pulse/width": 1.0
+    "worldfx/Hero Pulse/edgeIntensity": 9.0,
+    "worldfx/Hero Pulse/enabled": true,
+    "worldfx/Hero Pulse/fadeIn": 0.6000000238418579,
+    "worldfx/Hero Pulse/fadeOut": 1.2000000476837158,
+    "worldfx/Hero Pulse/falloff": 1.5,
+    "worldfx/Hero Pulse/frontWidth": 3.5,
+    "worldfx/Hero Pulse/intensity": 5.0,
+    "worldfx/Hero Pulse/lifetime": 0.0,
+    "worldfx/Hero Pulse/rainbow": false,
+    "worldfx/Hero Pulse/rainbowBrightness": 1.0,
+    "worldfx/Hero Pulse/rainbowSaturation": 0.8500000238418579,
+    "worldfx/Hero Pulse/rainbowScale": 0.012000000104308128,
+    "worldfx/Hero Pulse/rainbowSpeed": 0.3499999940395355,
+    "worldfx/Hero Pulse/range": 58.0,
+    "worldfx/Hero Pulse/repeat": 4.5,
+    "worldfx/Hero Pulse/response/emissive": 1.2999999523162842,
+    "worldfx/Hero Pulse/response/foliage": 1.5,
+    "worldfx/Hero Pulse/response/ground": 1.0,
+    "worldfx/Hero Pulse/response/surface": 0.8999999761581421,
+    "worldfx/Hero Pulse/ringCount": 2.0,
+    "worldfx/Hero Pulse/sparkle": true,
+    "worldfx/Hero Pulse/sparkleDensity": 1.399999976158142,
+    "worldfx/Hero Pulse/sparkleIntensity": 2.5999999046325684,
+    "worldfx/Hero Pulse/sparkleSize": 0.20000000298023224,
+    "worldfx/Hero Pulse/sparkleSpeed": 0.6000000238418579,
+    "worldfx/Hero Pulse/speed": 13.0,
+    "worldfx/Hero Pulse/startOffset": 0.0,
+    "worldfx/Hero Pulse/trailLength": 20.0,
+    "worldfx/Hero Pulse/verticalExtent": 9.0,
+    "worldfx/Hero Pulse/width": 1.0
   },
   "presets": [],
   "render": {
@@ -13970,7 +13970,7 @@
       "op": "add",
       "polarity": "unipolar",
       "source": "beat.pulse",
-      "target": "worldfx/Hero Mushroom Pulse/intensity"
+      "target": "worldfx/Hero Pulse/intensity"
     },
     {
       "amount": 8.0,
@@ -24367,7 +24367,7 @@
         "width": 1.0
       },
       "enabled": true,
-      "name": "Hero Mushroom Pulse",
+      "name": "Hero Pulse",
       "propagation": {
         "beamRadius": 0.0,
         "direction": "explicit",

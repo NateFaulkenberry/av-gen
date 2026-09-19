@@ -249,7 +249,7 @@ bool applyPulseStyle(WorldEffect& effect, std::string_view style);
 // mushroom ground pulse. Exposed because "add the camera beam" should be one call from the UI and
 // one line in a test, not a page of field assignments that can drift from the shipped scene's.
 [[nodiscard]] WorldEffect cameraTravelBeam(std::string name = "Camera Travel Beam");
-[[nodiscard]] WorldEffect heroGroundPulse(std::string name = "Hero Mushroom Pulse");
+[[nodiscard]] WorldEffect heroGroundPulse(std::string name = "Hero Pulse");
 
 // ---- resolution --------------------------------------------------------------------------------
 

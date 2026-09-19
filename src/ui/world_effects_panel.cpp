@@ -170,11 +170,11 @@ void WorldEffectsPanel::draw(app::Engine& engine) {
     ImGui::SameLine();
     if (ImGui::Button("Add hero pulse")) {
         std::vector<world::WorldEffect> next = authored;
-        std::string name = "Hero Mushroom Pulse";
+        std::string name = "Hero Pulse";
         for (int n = 2; std::any_of(next.begin(), next.end(),
                                     [&](const world::WorldEffect& e) { return e.name == name; });
              ++n) {
-            name = "Hero Mushroom Pulse " + std::to_string(n);
+            name = "Hero Pulse " + std::to_string(n);
         }
         next.push_back(world::heroGroundPulse(name));
         if (auto ok = engine.setWorldEffects(std::move(next)); !ok) {
