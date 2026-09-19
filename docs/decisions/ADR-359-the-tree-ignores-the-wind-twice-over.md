@@ -147,3 +147,115 @@ boundaries, as set with it:
 - An imported tree arrives with per-vertex branch/tier attributes or a skeleton, at which point the
   world-space proxy should give way to `tree_rig`.
 - Anyone asks for scrub-exact particles again: the relaxation above is the reason they are not.
+
+---
+
+## Addendum, same day: what was built, and one thing this ADR got wrong
+
+### The fix, measured
+
+`scene/wind/enabled` and eleven more field parameters are registered; the two that existed keep
+their spelling so no project's value is orphaned. The scene writer emits the block whenever the
+field differs from its defaults instead of only when it is already on. `vs_main` in
+`shaders/common.wgsl` gained `meshWindOffset`, and a `Group` node may declare a wind body whose
+origin, height and radius are **measured from its combined world bounds at bake** — so all five of
+the Tree of Life's meshes are handed identical numbers and cannot separate at the joints between
+them, and moving or rescaling the tree keeps the wind attached to it.
+
+Four arms, same frame, same binary, `tools/gpu-lock.sh`:
+
+| arm | sha256 |
+|---|---|
+| **before any of this existed** | `15bed2be140aaaed` |
+| `nodes/tree-of-life/wind/strength = 0` | **`15bed2be140aaaed`** |
+| `strength = 1.0` | `bd0c9f2e6ab7771f` |
+| `strength = 2.0` | `f75280129f94ec8c` |
+
+The second row is the whole of ADR-350's "nothing that does not ask, moves", at the byte. Every
+shader in the engine now includes `wind.wgsl` and every mesh draw evaluates a gate, and with the
+gate off the frame is the same file it was.
+
+### The calibration that was wrong, and what it teaches
+
+The first coefficients read as fractions of the body's height: 0.05 for the lean, 0.014 for the
+flutter. "Five per cent" sounds modest. This tree is 138 metres, so it asked for seven metres of
+crown travel — and the render came back with **the canopy shredded into horizontal dashes**, every
+leaf card stretched because its own vertices had been pulled apart.
+
+The first correction — divide everything by eight — fixed the shredding and left the tree barely
+moving: 146 577 pixels changed by more than four luminance levels, and the crown's centroid moved
+0.04 px. Rustling leaves and no lean at all.
+
+The diagnosis was wrong in an instructive way, and the second measurement found it. The shredder is
+not the amplitude, it is **the flutter's spatial phase**: `WindSample::phase` is
+`tau/flutterScale * (0.7a + 0.71c)`, so at the authored `flutterScale = 3 m` the sine completes a
+full cycle every three metres of world distance. Across a half-metre leaf card the phase turns by
+about a radian, and the sine's value changes by up to its full range — so the flutter's *entire*
+amplitude appears as a difference between one end of a leaf and the other. The lean terms vary only
+through `pow(h, k)` and a `smoothstep` over the radius, which change by about one per cent across a
+leaf and shred nothing.
+
+So the lean went back up (0.045 and 0.030) and the flutter stayed down (0.0004), and the canopy is
+intact with a visible change of shape. **The amplitude that matters is not the one you can see at
+the crown; it is the gradient across the smallest piece of geometry the mesh is made of.** For any
+term whose phase is spatial, the ceiling is set by the leaf, not by the tree.
+
+### The emissiveBoost decision: the earlier measurement in this ADR was the wrong probe
+
+This ADR first recommended keeping 2.2, on the strength of a p90/p10 luminance ratio over foliage
+pixels: 2.79 at 2.2 against 2.54 at 0.5. **That recommendation is withdrawn.** The statistic
+measures spread within a hand-drawn region and cannot tell "the emission raised the highlights"
+apart from "the key light is doing the work" — it is a probe that could not fail in the sense
+ADR-182 means, because the region does not move when the light does.
+
+`tools/light_probe.py`, which ADR-358 wrote for exactly this and which partitions subject pixels by
+the sign of n·L against the key out of the **normal AOV**, says the opposite. Same frame, same
+binary, key at azimuth -50 / elevation 35, 416 444 subject pixels, 82 821 key-facing and 246 231
+away-facing in both arms:
+
+| | `emissiveBoost` 2.2 | 0.5 |
+|---|---|---|
+| key-facing mean luminance | 0.31697 | 0.29945 |
+| away-facing mean luminance | 0.05725 | 0.03578 |
+| **key_to_shadow** | **5.537** | **8.368** |
+| shadow_floor | 0.0001 | 0.0001 |
+| shadow_detail | 1.9024 | 1.9396 |
+
+The emission lifts the **shadow side by 60%** and the key side by 6%. Key-to-shadow contrast falls
+by 34%. That is §17's "evenly illuminated tree" as a number, and it is the same finding ADR-358 §5
+reported by a different route (18.5 against 9.3 with emission fully off).
+
+**Recommendation: 0.5**, which is what the key-light branch chose. It wins on every axis §17 names:
+higher key-to-shadow, unchanged `shadow_floor` at 0.0001 so the shadow side is *not* crushed to the
+"black silhouette tree" failure, and marginally better `shadow_detail` (1.940 against 1.902), so
+trunk and branch structure survive in shadow slightly better rather than worse.
+
+**The file is not changed.** 2.2 is the owner's live UI value and reverting it here is not this
+agent's call; ADR-338's values remain the "Glowmere Bloom" preset either way. This is the number and
+the criterion, for them to apply.
+
+### Key-light brief §18: what was added, and the one group still not built
+
+| §18 group | state |
+|---|---|
+| Cinematic Key | complete (ADR-358) — `lights/celestial-key/*` |
+| Environmental Fill | complete (ADR-358) — `lights/cosmic-fill/{intensity,color}` |
+| Cosmic Environment: Star Intensity | `nodes/cosmos-stars-{near,mid,far}/emissiveBoost` and `nodes/cosmos-motes/emissiveBoost` |
+| Cosmic Environment: Cosmic Ambient | `env/intensity`, plus `scene/styledSkyAmbient` / `scene/styledGroundAmbient` |
+| Cosmic Environment: Nebula Intensity | **added** — `shader/glowmere-cosmos/nebulaIntensity` |
+| Cosmic Environment: Background Brightness / Saturation | **added** — the same `nebulaIntensity`, plus `shader/glowmere-cosmos/backgroundSaturation` |
+| Volumetric Beam | **still not built**, and still deliberately |
+
+The two new ones are ISF inputs on the background layer rather than new engine parameters, because
+for this scene the background *is* that layer: the clear colour behind it is (0.0045, 0.0062,
+0.0185) and scaling that alone would be invisible. ISF inputs register as `shader/<layer>/<input>`
+automatically, so they are panel rows, modulation targets, timeline keys and project entries with
+no further work — and ADR-358 §4 is what makes a project able to set them at all.
+
+The Volumetric Beam decision is re-affirmed rather than reversed: `volume.wgsl` does not sample the
+shadow atlas, so a directional key in-scatters uniformly through the marched volume and a "beam"
+would be flat haze. Four knobs with nothing behind them is the defect one layer along. **The trigger
+to revisit is now named, though**: the cosmic vortex (the brief's Phase 8) wants a world-space
+raymarch and the volume pass is where it belongs, and once that pass is carrying a hero effect,
+teaching its march to sample the shadow atlas buys the vortex's own self-shadowing and the
+crepuscular ray in the same change. Do it then, not before.

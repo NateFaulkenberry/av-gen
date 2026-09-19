@@ -341,8 +341,18 @@ struct ObjectUniforms {
                    // y = material id, z = bloom weight of this object's emission,
                    // w = the skinned joint count. ADR-135: there is no free lane here for a
                    // per-draw material tier, which is why ADR-133's tier is frame-global.
+    // ADR-359: mesh wind. `windShape.y` is the gate and the amplitude at once; zero means
+    // `meshWindOffset` returns early and the draw is byte-identical to one from before this
+    // existed. Every entity of one body carries the SAME origin and extent -- that sharing is what
+    // makes the deformation continuous across meshes that touch, and it is why these live here
+    // rather than being derived per mesh from its own bounds.
+    glm::vec4 windOrigin{0.0f}; // xyz = the body's root in world space, w = 1 / body height
+    glm::vec4 windShape{0.0f};  // x = 1 / body radius, y = strength (0 = off), z = branch influence,
+                                // w = foliage influence
+    glm::vec4 windTune{0.0f};   // x = trunk influence, y = leaf flutter, z = response lag (s),
+                                // w = the previous frame's time
 };
-static_assert(sizeof(ObjectUniforms) == 272);
+static_assert(sizeof(ObjectUniforms) == 320);
 static_assert(offsetof(ObjectUniforms, model) == 0);
 static_assert(offsetof(ObjectUniforms, normalMatrix) == 64);
 static_assert(offsetof(ObjectUniforms, prevModel) == 128);
@@ -351,6 +361,9 @@ static_assert(offsetof(ObjectUniforms, emissive) == 208);
 static_assert(offsetof(ObjectUniforms, material) == 224);
 static_assert(offsetof(ObjectUniforms, flags) == 240);
 static_assert(offsetof(ObjectUniforms, ids) == 256);
+static_assert(offsetof(ObjectUniforms, windOrigin) == 272);
+static_assert(offsetof(ObjectUniforms, windShape) == 288);
+static_assert(offsetof(ObjectUniforms, windTune) == 304);
 
 struct TonemapUniforms {
     float exposure;

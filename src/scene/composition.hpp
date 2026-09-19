@@ -216,6 +216,23 @@ struct NodeLod {
     float maxScreenError = -1.0f;
 };
 
+// ADR-359: a wind body. Authored on a GROUP node, and stamped onto every mesh the group contains,
+// because the deformation is continuous in world space and two meshes that touch stay joined only
+// if they are given the same origin and extent. Putting it on the group rather than on each mesh is
+// what makes that impossible to get wrong from a scene file.
+//
+// The origin, height and radius are NOT authored: they are measured from the group's own combined
+// world bounds at bake, so moving or rescaling the tree keeps the wind attached to it. What is
+// authored is how much each tier moves.
+struct WindBodySettings {
+    float strength = 0.0f;  // overall amplitude; 0 is off, and off is the default
+    float trunk = 0.25f;    // the low, near-axis part
+    float branch = 1.0f;    // the mid, mid-radius part
+    float foliage = 1.0f;   // the high, far-out part
+    float flutter = 1.0f;   // the fast rattle at the tips
+    float lag = 0.25f;      // seconds the body's whole-mass lean trails the field
+};
+
 struct CompositionNode {
     std::string name;
     NodeKind kind = NodeKind::Gltf;
@@ -234,6 +251,17 @@ struct CompositionNode {
     bool locked = false;
     float emissiveBoost = 1.0f;
     float roughnessScale = 1.0f;
+    // ADR-359: the wind body this node's meshes belong to, when it is a Group that declares one.
+    // `windAuthored` distinguishes "the author wrote nothing" from "the author wrote the defaults",
+    // which is what keeps a scene written before this key existed byte-identical on a re-save.
+    WindBodySettings wind;
+    bool windAuthored = false;
+    params::Parameter<float>* windStrengthParam = nullptr;
+    params::Parameter<float>* windTrunkParam = nullptr;
+    params::Parameter<float>* windBranchParam = nullptr;
+    params::Parameter<float>* windFoliageParam = nullptr;
+    params::Parameter<float>* windFlutterParam = nullptr;
+    params::Parameter<float>* windLagParam = nullptr;
     ParticleSystem particles;      // settings for kind Particles (name is taken from the node)
     ProceduralGeometry procedural; // settings for kind Procedural (ADR-023; name is taken from the node)
     // ADR-044: whether the scene file wrote a `material` block for this node. A mesh source takes
@@ -1035,6 +1063,19 @@ private:
     void updateEcologyLights();
     void registerAuthoredLightParameters(params::ParameterSet& params);
     void unregisterAuthoredLightParameters();
+    // ADR-359: stamp each declared wind body's measured origin/extent onto every mesh it holds.
+    void applyWindBodies();
+    // ...and the entity spans it stamped, so the per-frame parameter pass can move `strength` and
+    // the three influences without re-measuring anything. The bounds are geometry and only change
+    // when the scene is rebuilt; the amounts are artist controls and change every frame they are
+    // dragged. Keeping them apart is what keeps a live slider off the bounds path -- the mistake
+    // ADR-355 cost 350 ms a frame for.
+    struct WindBodySpan {
+        std::size_t node = 0;
+        std::vector<std::pair<std::size_t, std::size_t>> entities; // [first, count)
+    };
+    std::vector<WindBodySpan> windBodies_;
+    void refreshWindBodyAmounts();
     void registerNodeParameters(CompositionNode& node);
     void unregisterNodeParameters(CompositionNode& node);
     void unregisterParameters(); // removes every parameter this composition registered, then detach()
@@ -1172,9 +1213,25 @@ private:
     nlohmann::json postJson_;
     params::Parameter<float>* fogHeight_ = nullptr;
     params::Parameter<float>* fogHeightFalloff_ = nullptr;
-    // ADR-055: the two wind controls worth touching live. The rest of the field is authored.
+    // ADR-055/ADR-359: the whole field, live. Two of these existed; the other twelve were authored
+    // only, and `enabled` -- the gate every other one hangs off -- was reachable from neither the
+    // UI nor a save, so `scene/windSpeed` could be dragged to its maximum and do nothing. The two
+    // original paths keep their spelling (`scene/windSpeed`, `scene/windDirection`): renaming them
+    // to `scene/wind/*` would orphan the value in every project that already has one.
+    params::Parameter<bool>* windEnabled_ = nullptr;
     params::Parameter<float>* windSpeed_ = nullptr;
     params::Parameter<float>* windDirection_ = nullptr;
+    params::Parameter<float>* windGustAmount_ = nullptr;
+    params::Parameter<float>* windGustScale_ = nullptr;
+    params::Parameter<float>* windGustSpeed_ = nullptr;
+    params::Parameter<float>* windGustSharpness_ = nullptr;
+    params::Parameter<float>* windTurbulence_ = nullptr;
+    params::Parameter<float>* windTurbulenceScale_ = nullptr;
+    params::Parameter<float>* windTurbulenceSpeed_ = nullptr;
+    params::Parameter<float>* windRegionScale_ = nullptr;
+    params::Parameter<float>* windRegionAmount_ = nullptr;
+    params::Parameter<float>* windRegionDrift_ = nullptr;
+    params::Parameter<float>* windFlutterScale_ = nullptr;
     params::Parameter<float>* volumeScattering_ = nullptr;
     params::Parameter<float>* volumeAbsorption_ = nullptr;
     params::Parameter<float>* volumeAnisotropy_ = nullptr;

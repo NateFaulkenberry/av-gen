@@ -2893,6 +2893,21 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             static_cast<float>(scene::packPickId(scene::PickSpace::Entity, thisEntity)),
             static_cast<float>(thisEntity + 1), 1.0f,
                             static_cast<float>(skin.jointCount));
+        // ADR-359: the wind body, if this mesh is part of one. Everything here is the body's, not
+        // the mesh's, so five meshes of one tree hand the shader identical numbers and cannot come
+        // apart at the joints between them. Off (strength 0) leaves all three lanes zero and the
+        // vertex stage returns before it reads them.
+        if (entity.wind.active()) {
+            const scene::Entity::WindBody& w = entity.wind;
+            obj.windOrigin = glm::vec4(w.origin, 1.0f / std::max(w.height, 1e-3f));
+            obj.windShape = glm::vec4(1.0f / std::max(w.radius, 1e-3f), w.strength, w.branch, w.foliage);
+            // On the first frame there is no previous time (-inf); using this frame's makes the
+            // velocity zero, which is what a first frame's velocity should be anyway.
+            const float prevTime = std::isfinite(previousRenderTime_)
+                                       ? static_cast<float>(previousRenderTime_)
+                                       : static_cast<float>(time.renderTime);
+            obj.windTune = glm::vec4(w.trunk, w.flutter, w.lag, prevTime);
+        }
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));
         const float depth = -(view * glm::vec4(entity.transform.position, 1.0f)).z;

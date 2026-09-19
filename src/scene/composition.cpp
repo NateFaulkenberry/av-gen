@@ -3293,11 +3293,44 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     stylized_ = &params.add(boolDesc(prefix_ + "scene/stylized", stylizedSetting_));
     fogDensity_ = &params.add(floatDesc(prefix_ + "scene/fogDensity", fogDensitySetting_, 0.0f, 2.0f, 0.0f, 0.2f));
     keyLight_ = &params.add(floatDesc(prefix_ + "scene/keyLight", 1.0f, 0.0f, 10.0f, 0.0f, 3.0f));
-    // ADR-055. Speed 0 is a genuine no-op: `WindParams::active()` is false and every draw's wind
-    // gate goes to 0, which is also how the A/B measurement of what this costs is taken.
+    // ADR-055/ADR-359. `WindParams::active()` is `enabled && speed > 0`, and until ADR-359 only
+    // `speed` was reachable -- the comment that used to sit here said "speed 0 is a genuine no-op:
+    // active() is false", reading the gate as speed alone, which is how a field nobody could switch
+    // on shipped. Both halves are parameters now. Speed 0 is still a genuine no-op, and so is
+    // enabled false, which is the default for every scene that does not say otherwise, so
+    // registering these moves no existing picture.
+    windEnabled_ = &params.add(boolDesc(prefix_ + "scene/wind/enabled", windSetting_.enabled));
     windSpeed_ = &params.add(floatDesc(prefix_ + "scene/windSpeed", windSetting_.speed, 0.0f, 4.0f, 0.0f, 1.5f));
     windDirection_ = &params.add(
         floatDesc(prefix_ + "scene/windDirection", windSetting_.direction, -6.2832f, 6.2832f, -3.1416f, 3.1416f));
+    // Gusts: fronts that travel downwind. Sharpness 1 is a smooth swell, 8 is distinct fronts with
+    // calm between them.
+    windGustAmount_ = &params.add(
+        floatDesc(prefix_ + "scene/wind/gustAmount", windSetting_.gustAmount, 0.0f, 4.0f, 0.0f, 1.5f));
+    windGustScale_ = &params.add(
+        floatDesc(prefix_ + "scene/wind/gustScale", windSetting_.gustScale, 0.5f, 500.0f, 5.0f, 120.0f));
+    windGustSpeed_ = &params.add(
+        floatDesc(prefix_ + "scene/wind/gustSpeed", windSetting_.gustSpeed, 0.0f, 80.0f, 0.0f, 25.0f));
+    windGustSharpness_ = &params.add(
+        floatDesc(prefix_ + "scene/wind/gustSharpness", windSetting_.gustSharpness, 0.25f, 16.0f, 1.0f, 8.0f));
+    // Turbulence turns the local direction rather than scaling it.
+    windTurbulence_ = &params.add(
+        floatDesc(prefix_ + "scene/wind/turbulence", windSetting_.turbulence, 0.0f, 3.1416f, 0.0f, 1.2f));
+    windTurbulenceScale_ = &params.add(
+        floatDesc(prefix_ + "scene/wind/turbulenceScale", windSetting_.turbulenceScale, 0.5f, 400.0f, 2.0f, 60.0f));
+    windTurbulenceSpeed_ = &params.add(
+        floatDesc(prefix_ + "scene/wind/turbulenceSpeed", windSetting_.turbulenceSpeed, 0.0f, 40.0f, 0.0f, 8.0f));
+    // Regional variation: which part of the map is windier at all.
+    windRegionScale_ = &params.add(
+        floatDesc(prefix_ + "scene/wind/regionScale", windSetting_.regionScale, 1.0f, 2000.0f, 10.0f, 300.0f));
+    windRegionAmount_ = &params.add(
+        floatDesc(prefix_ + "scene/wind/regionAmount", windSetting_.regionAmount, 0.0f, 1.0f, 0.0f, 0.8f));
+    windRegionDrift_ = &params.add(
+        floatDesc(prefix_ + "scene/wind/regionDrift", windSetting_.regionDrift, 0.0f, 4.0f, 0.0f, 0.5f));
+    // The fast rattle. Only its spatial scale is a property of the air; the rate a plant rings at
+    // is the plant's own resonance (`MotionResponse::flutterOmega`).
+    windFlutterScale_ = &params.add(
+        floatDesc(prefix_ + "scene/wind/flutterScale", windSetting_.flutterScale, 0.05f, 200.0f, 0.5f, 20.0f));
     // Volumetric atmosphere (ADR-032). volumeDensity 0 keeps the pass off, so these are free
     // until someone turns them up; every one is an ordinary parameter, so audio, the timeline,
     // presets, OSC/MIDI and macros drive fog through the usual routes.
@@ -3429,6 +3462,138 @@ void Composition::unregisterAuthoredLightParameters() {
     authoredLightParams_.clear();
 }
 
+// ADR-359. Hand every mesh inside a wind body the SAME origin and extent, measured from the body's
+// combined world bounds rather than authored, so the tree keeps its wind when it is moved or
+// rescaled and so no two of its meshes can disagree about where its root is. That sharing is the
+// whole reason the deformation is continuous across the five GLBs the Tree of Life is made of; see
+// `meshWindOffset` in shaders/common.wgsl.
+//
+// Bounds come from `Scene::meshBounds`, the caching accessor, never `MeshData::bounds()`: ADR-355
+// is three call sites that used the uncached one and rescanned 39.9M vertices about five times a
+// frame, for a 350 ms editor frame. This runs at bake, not per frame, and still uses the cache.
+void Composition::applyWindBodies() {
+    if (nodes_.size() != ranges_.size()) {
+        return; // mid-rebuild; the next bake will do it
+    }
+    // Which node each node's parent is, by name, so a descendant walk is a loop rather than a tree.
+    std::unordered_map<std::string, std::size_t> byName;
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+        byName.emplace(nodes_[i]->name, i);
+    }
+    auto insideBody = [&](std::size_t node, std::size_t body) {
+        for (std::size_t hops = 0; node != body && hops <= nodes_.size(); ++hops) {
+            const std::string& parent = nodes_[node]->parent;
+            if (parent.empty()) {
+                return false;
+            }
+            const auto it = byName.find(parent);
+            if (it == byName.end()) {
+                return false;
+            }
+            node = it->second;
+        }
+        return node == body;
+    };
+
+    for (std::size_t body = 0; body < nodes_.size(); ++body) {
+        const CompositionNode& owner = *nodes_[body];
+        if (!owner.windAuthored) {
+            continue;
+        }
+        auto pick = [](const params::Parameter<float>* p, float fallback) {
+            return p != nullptr ? p->value() : fallback;
+        };
+        Entity::WindBody w;
+        w.strength = pick(owner.windStrengthParam, owner.wind.strength);
+        w.trunk = pick(owner.windTrunkParam, owner.wind.trunk);
+        w.branch = pick(owner.windBranchParam, owner.wind.branch);
+        w.foliage = pick(owner.windFoliageParam, owner.wind.foliage);
+        w.flutter = pick(owner.windFlutterParam, owner.wind.flutter);
+        w.lag = pick(owner.windLagParam, owner.wind.lag);
+
+        // First pass: the body's world bounds, over every mesh it contains.
+        glm::vec3 lo(std::numeric_limits<float>::max());
+        glm::vec3 hi(std::numeric_limits<float>::lowest());
+        std::vector<std::size_t> members;
+        for (std::size_t n = 0; n < nodes_.size(); ++n) {
+            if (!insideBody(n, body)) {
+                continue;
+            }
+            members.push_back(n);
+            const NodeRange& r = ranges_[n];
+            for (std::size_t e = r.firstEntity; e < r.firstEntity + r.entityCount && e < scene_.entities.size();
+                 ++e) {
+                const Entity& entity = scene_.entities[e];
+                if (entity.mesh == kInvalidMesh) {
+                    continue;
+                }
+                const auto& [bmin, bmax] = scene_.meshBounds(entity.mesh);
+                const glm::mat4 m = entity.transform.matrix();
+                for (int corner = 0; corner < 8; ++corner) {
+                    const glm::vec3 local((corner & 1) != 0 ? bmax.x : bmin.x, (corner & 2) != 0 ? bmax.y : bmin.y,
+                                          (corner & 4) != 0 ? bmax.z : bmin.z);
+                    const glm::vec3 world = glm::vec3(m * glm::vec4(local, 1.0f));
+                    lo = glm::min(lo, world);
+                    hi = glm::max(hi, world);
+                }
+            }
+        }
+        if (lo.x > hi.x) {
+            continue; // the body contains no geometry; nothing to stamp
+        }
+        // The root is the centre of the footprint at the bottom of the body: where a trunk meets
+        // the ground, which is the one point the deformation must hold still.
+        w.origin = glm::vec3(0.5f * (lo.x + hi.x), lo.y, 0.5f * (lo.z + hi.z));
+        w.height = std::max(hi.y - lo.y, 1e-3f);
+        w.radius = std::max(std::max(0.5f * (hi.x - lo.x), 0.5f * (hi.z - lo.z)), 1e-3f);
+
+        WindBodySpan span;
+        span.node = body;
+        for (std::size_t n : members) {
+            const NodeRange& r = ranges_[n];
+            const std::size_t last = std::min(r.firstEntity + r.entityCount, scene_.entities.size());
+            if (last <= r.firstEntity) {
+                continue;
+            }
+            span.entities.emplace_back(r.firstEntity, last - r.firstEntity);
+            for (std::size_t e = r.firstEntity; e < last; ++e) {
+                scene_.entities[e].wind = w;
+            }
+        }
+        windBodies_.push_back(std::move(span));
+    }
+}
+
+// The cheap half, run every frame: the amounts, not the bounds.
+void Composition::refreshWindBodyAmounts() {
+    for (const WindBodySpan& span : windBodies_) {
+        if (span.node >= nodes_.size()) {
+            continue;
+        }
+        const CompositionNode& owner = *nodes_[span.node];
+        auto pick = [](const params::Parameter<float>* p, float fallback) {
+            return p != nullptr ? p->value() : fallback;
+        };
+        const float strength = pick(owner.windStrengthParam, owner.wind.strength);
+        const float trunk = pick(owner.windTrunkParam, owner.wind.trunk);
+        const float branch = pick(owner.windBranchParam, owner.wind.branch);
+        const float foliage = pick(owner.windFoliageParam, owner.wind.foliage);
+        const float flutter = pick(owner.windFlutterParam, owner.wind.flutter);
+        const float lag = pick(owner.windLagParam, owner.wind.lag);
+        for (const auto& [first, count] : span.entities) {
+            for (std::size_t e = first; e < first + count && e < scene_.entities.size(); ++e) {
+                Entity::WindBody& w = scene_.entities[e].wind;
+                w.strength = strength;
+                w.trunk = trunk;
+                w.branch = branch;
+                w.foliage = foliage;
+                w.flutter = flutter;
+                w.lag = lag;
+            }
+        }
+    }
+}
+
 void Composition::registerNodeParameters(CompositionNode& node) {
     if (params_ == nullptr) {
         return;
@@ -3452,6 +3617,19 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     node.lightIntensityParam =
         &params_->add(floatDesc(base + "lightIntensity", 1.0f, 0.0f, 20.0f, 0.0f, 4.0f));
     node.lightColorParam = &params_->add(vec3Desc(base + "lightColor", glm::vec3(1.0f), 0.0f, 4.0f, 0.0f, 1.0f));
+    // ADR-359: the wind body, when this node declares one. Registered only on a node that does, so
+    // a scene full of rocks does not grow six inert sliders each. Strength 0 is a genuine no-op and
+    // is the default, so a node that declares `"wind": {}` still moves nothing until it is turned
+    // up -- which is the point: "off" has to be somewhere a user can leave it.
+    if (node.windAuthored) {
+        const std::string w = base + "wind/";
+        node.windStrengthParam = &params_->add(floatDesc(w + "strength", node.wind.strength, 0.0f, 8.0f, 0.0f, 2.0f));
+        node.windTrunkParam = &params_->add(floatDesc(w + "trunk", node.wind.trunk, 0.0f, 4.0f, 0.0f, 1.0f));
+        node.windBranchParam = &params_->add(floatDesc(w + "branch", node.wind.branch, 0.0f, 4.0f, 0.0f, 2.0f));
+        node.windFoliageParam = &params_->add(floatDesc(w + "foliage", node.wind.foliage, 0.0f, 4.0f, 0.0f, 2.0f));
+        node.windFlutterParam = &params_->add(floatDesc(w + "flutter", node.wind.flutter, 0.0f, 4.0f, 0.0f, 2.0f));
+        node.windLagParam = &params_->add(floatDesc(w + "lag", node.wind.lag, 0.0f, 4.0f, 0.0f, 1.5f));
+    }
     if (node.kind == NodeKind::Particles) {
         // registerParticleParameters has no prefix: fold it into the system name instead
         // ("particles/nodes_a_sparks/..." for node "sparks" inside node "a").
@@ -3656,6 +3834,12 @@ void Composition::detach() {
         node->roughnessParam = nullptr;
         node->lightIntensityParam = nullptr;
         node->lightColorParam = nullptr;
+        node->windStrengthParam = nullptr;
+        node->windTrunkParam = nullptr;
+        node->windBranchParam = nullptr;
+        node->windFoliageParam = nullptr;
+        node->windFlutterParam = nullptr;
+        node->windLagParam = nullptr;
         node->terrainLodParam = nullptr;
         node->terrainCullParam = nullptr;
         node->terrainLodDistanceParam = nullptr;
@@ -3711,8 +3895,20 @@ void Composition::detach() {
     volumeDensity_ = nullptr;
     fogHeight_ = nullptr;
     fogHeightFalloff_ = nullptr;
+    windEnabled_ = nullptr;
     windSpeed_ = nullptr;
     windDirection_ = nullptr;
+    windGustAmount_ = nullptr;
+    windGustScale_ = nullptr;
+    windGustSpeed_ = nullptr;
+    windGustSharpness_ = nullptr;
+    windTurbulence_ = nullptr;
+    windTurbulenceScale_ = nullptr;
+    windTurbulenceSpeed_ = nullptr;
+    windRegionScale_ = nullptr;
+    windRegionAmount_ = nullptr;
+    windRegionDrift_ = nullptr;
+    windFlutterScale_ = nullptr;
     volumeScattering_ = nullptr;
     volumeAbsorption_ = nullptr;
     volumeAnisotropy_ = nullptr;
@@ -5070,6 +5266,9 @@ void Composition::rebuild() {
         ranges_.push_back(std::move(range));
     }
 
+    windBodies_.clear();
+    applyWindBodies();
+
     // Composition (ADR-038) contributes reserved fields, so density filters and effectors can
     // reference them by name like any other field.
     compositionData_.appendFields(scene_.fields);
@@ -6214,9 +6413,28 @@ void Composition::applyParameters() {
         env.styledGroundAmbient = styledGroundAmbient_ != nullptr ? styledGroundAmbient_->value()
                                                                   : volumeSetting_.styledGroundAmbient;
         env.styledAmbientFloor = volumeSetting_.styledAmbientFloor;
+        // ADR-359: every field of the wind is a live parameter now, not just two, so the whole
+        // field can be turned up, down, off, gustier or calmer from the UI, keyed on the timeline
+        // and driven by audio (`music.build -> scene/windSpeed` is the intended idiom).
         env.wind = windSetting_;
-        env.wind.speed = windSpeed_ != nullptr ? windSpeed_->value() : windSetting_.speed;
-        env.wind.direction = windDirection_ != nullptr ? windDirection_->value() : windSetting_.direction;
+        env.wind.enabled = windEnabled_ != nullptr ? windEnabled_->value() : windSetting_.enabled;
+        env.wind.speed = pick(windSpeed_, windSetting_.speed);
+        env.wind.direction = pick(windDirection_, windSetting_.direction);
+        env.wind.gustAmount = pick(windGustAmount_, windSetting_.gustAmount);
+        env.wind.gustScale = pick(windGustScale_, windSetting_.gustScale);
+        env.wind.gustSpeed = pick(windGustSpeed_, windSetting_.gustSpeed);
+        env.wind.gustSharpness = pick(windGustSharpness_, windSetting_.gustSharpness);
+        env.wind.turbulence = pick(windTurbulence_, windSetting_.turbulence);
+        env.wind.turbulenceScale = pick(windTurbulenceScale_, windSetting_.turbulenceScale);
+        env.wind.turbulenceSpeed = pick(windTurbulenceSpeed_, windSetting_.turbulenceSpeed);
+        env.wind.regionScale = pick(windRegionScale_, windSetting_.regionScale);
+        env.wind.regionAmount = pick(windRegionAmount_, windSetting_.regionAmount);
+        env.wind.regionDrift = pick(windRegionDrift_, windSetting_.regionDrift);
+        env.wind.flutterScale = pick(windFlutterScale_, windSetting_.flutterScale);
+    }
+    // ADR-359: and the per-body amounts, so `nodes/<tree>/wind/strength` is a live slider.
+    refreshWindBodyAmounts();
+    {
     }
     if (gridIntensity_ != nullptr) {
         scene_.environment.gridIntensity = gridIntensity_->value();
@@ -7144,11 +7362,33 @@ nlohmann::json Composition::toJson() const {
     if (navWadeDepth_ != 0.0f) {
         j["navWadeDepth"] = navWadeDepth_;
     }
-    if (windSetting_.enabled) {
-        json w = wind::windToJson(windSetting_);
-        w["speed"] = windSpeed_ != nullptr ? windSpeed_->base() : windSetting_.speed;
-        w["direction"] = windDirection_ != nullptr ? windDirection_->base() : windSetting_.direction;
-        j["wind"] = std::move(w);
+    // ADR-359. This used to be `if (windSetting_.enabled)`, which made the writer unreachable from
+    // the same place the reader was: `enabled` had no control, so it could only ever be true if the
+    // file already said so, and a scene that did not say so could never start saying it. A save now
+    // records whatever the parameters currently say, and emits nothing at all while the wind is
+    // still at its defaults -- so a scene written before this key existed is byte-identical.
+    {
+        wind::WindParams w = windSetting_;
+        auto base = [](const params::Parameter<float>* p, float fallback) {
+            return p != nullptr ? p->base() : fallback;
+        };
+        w.enabled = windEnabled_ != nullptr ? windEnabled_->base() : windSetting_.enabled;
+        w.speed = base(windSpeed_, windSetting_.speed);
+        w.direction = base(windDirection_, windSetting_.direction);
+        w.gustAmount = base(windGustAmount_, windSetting_.gustAmount);
+        w.gustScale = base(windGustScale_, windSetting_.gustScale);
+        w.gustSpeed = base(windGustSpeed_, windSetting_.gustSpeed);
+        w.gustSharpness = base(windGustSharpness_, windSetting_.gustSharpness);
+        w.turbulence = base(windTurbulence_, windSetting_.turbulence);
+        w.turbulenceScale = base(windTurbulenceScale_, windSetting_.turbulenceScale);
+        w.turbulenceSpeed = base(windTurbulenceSpeed_, windSetting_.turbulenceSpeed);
+        w.regionScale = base(windRegionScale_, windSetting_.regionScale);
+        w.regionAmount = base(windRegionAmount_, windSetting_.regionAmount);
+        w.regionDrift = base(windRegionDrift_, windSetting_.regionDrift);
+        w.flutterScale = base(windFlutterScale_, windSetting_.flutterScale);
+        if (wind::windToJson(w) != wind::windToJson(wind::WindParams{})) {
+            j["wind"] = wind::windToJson(w);
+        }
     }
 
     json nodes = json::array();
@@ -7189,6 +7429,22 @@ nlohmann::json Composition::toJson() const {
         }
         n["emissiveBoost"] = node.emissiveBoost;
         n["roughnessScale"] = node.roughnessScale;
+        // ADR-359. Written only when the node declares a wind body, so nothing else grows a key,
+        // and written from the parameters' BASE so a session's edits survive the save -- the
+        // failure this whole ADR is about was a reader whose writer could not be reached.
+        if (node.windAuthored) {
+            auto base = [](const params::Parameter<float>* p, float fallback) {
+                return p != nullptr ? p->base() : fallback;
+            };
+            json w;
+            w["strength"] = base(node.windStrengthParam, node.wind.strength);
+            w["trunk"] = base(node.windTrunkParam, node.wind.trunk);
+            w["branch"] = base(node.windBranchParam, node.wind.branch);
+            w["foliage"] = base(node.windFoliageParam, node.wind.foliage);
+            w["flutter"] = base(node.windFlutterParam, node.wind.flutter);
+            w["lag"] = base(node.windLagParam, node.wind.lag);
+            n["wind"] = std::move(w);
+        }
         if (node.lod.enabled) { // ADR-351; written only when asked for, so nothing else grows a key
             json lod;
             lod["enabled"] = true;
@@ -8225,6 +8481,22 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             auto locked = readBool(item, "locked", false);
             auto emissive = readFloat(item, "emissiveBoost", 1.0f);
             auto roughness = readFloat(item, "roughnessScale", 1.0f);
+            // ADR-359: the wind body. Absent is the ordinary state, not a fault.
+            if (item.contains("wind") && item.at("wind").is_object()) {
+                const nlohmann::json& w = item.at("wind");
+                node.windAuthored = true;
+                auto read = [&w](const char* key, float& out) {
+                    if (w.contains(key) && w.at(key).is_number()) {
+                        out = w.at(key).get<float>();
+                    }
+                };
+                read("strength", node.wind.strength);
+                read("trunk", node.wind.trunk);
+                read("branch", node.wind.branch);
+                read("foliage", node.wind.foliage);
+                read("flutter", node.wind.flutter);
+                read("lag", node.wind.lag);
+            }
             const Error* fieldError = nullptr;
             auto check = [&](const auto& r) {
                 if (!r && fieldError == nullptr) {

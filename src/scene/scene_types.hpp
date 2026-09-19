@@ -346,6 +346,27 @@ struct Entity {
     // shadow passes, which test it against each cascade's own frustum. Runtime only: never
     // serialised, and cleared every frame by whatever set it.
     bool cameraCulled = false;
+    // ADR-359: which wind body this mesh belongs to, if any. `strength` 0 -- the default, and the
+    // state of every entity in every scene that does not ask otherwise -- means the vertex stage
+    // returns before it evaluates anything, so this changes no existing picture.
+    //
+    // `origin`, `height` and `radius` describe the BODY, not this mesh, and every mesh of one body
+    // must be given identical values. That is not a convenience: the deformation is a continuous
+    // function of world position, and two meshes that touch stay joined only because a point in
+    // space maps to one displacement. Derive them once from the group's combined bounds.
+    struct WindBody {
+        glm::vec3 origin{0.0f}; // the body's root in world space
+        float height = 1.0f;    // metres, root to crown
+        float radius = 1.0f;    // metres, axis to the widest part of the crown
+        float strength = 0.0f;  // overall amplitude; 0 is off and is the default
+        float trunk = 0.25f;    // how much the low, near-axis part moves
+        float branch = 1.0f;    // how much the mid, mid-radius part moves
+        float foliage = 1.0f;   // how much the high, far-out part moves
+        float flutter = 1.0f;   // the fast rattle at the tips
+        float lag = 0.25f;      // seconds the body's whole-mass lean trails the field
+        [[nodiscard]] bool active() const { return strength > 0.0f; }
+    };
+    WindBody wind;
 };
 
 // ---- lights ---------------------------------------------------------------------------------

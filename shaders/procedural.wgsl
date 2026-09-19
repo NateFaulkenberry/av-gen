@@ -50,7 +50,8 @@ fn proceduralRungTier() -> f32 { return proc.prevInfo.z; }
 #include "pbr_shade.wgsl"
 #include "fields.wgsl"
 #include "spline.wgsl"
-#include "wind.wgsl"
+// ADR-359: wind.wgsl is included by common.wgsl now, because the mesh vertex stage deforms too.
+// The include directive does not de-duplicate, so it must not be included twice.
 #include "chroma.wgsl"
 
 struct InstanceRecord {

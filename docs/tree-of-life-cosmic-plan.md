@@ -94,16 +94,21 @@ functions of time except the particles.
 
 ## The `emissiveBoost` decision the owner left open
 
-Rendered both at t = 8.00 s, same batch, same binary, key light on (`celestial-key`, intensity 22,
-shadows at 0.95). Measured over the 525 719 foliage pixels:
+**Recommendation: 0.5. Superseded my own first answer of 2.2 within the same session** — see the
+addendum to ADR-359 for the numbers and for why the first probe was the wrong one. Short form:
+`tools/light_probe.py` partitions subject pixels by the sign of n.L against the key out of the
+normal AOV, and it reports key-to-shadow **5.537 at 2.2 against 8.368 at 0.5**, because the
+emission lifts the shadow side by 60% and the key side by 6%. `shadow_floor` stays at 0.0001 either
+way, so 0.5 does not crush the shadow side to the "black silhouette tree" failure, and
+`shadow_detail` is slightly better at 0.5. It wins on every axis the key-light brief's section 17
+names. The file is not changed: 2.2 is the owner's live value, and this is the number and the
+criterion for them to apply.
 
-| | mean L | p10 | p90 | p90/p10 | pixels >= 254 |
-|---|---|---|---|---|---|
-| `emissiveBoost = 2.2` (owner's) | 70.33 | 40.53 | 113.14 | **2.79** | 0 |
-| `emissiveBoost = 0.5` (key-light branch) | 64.14 | 37.58 | 95.62 | 2.54 | 0 |
+## Status
 
-The key-light branch's premise was that 2.2 makes the foliage light itself and halves key-to-shadow
-contrast. At this frame it does the opposite: 2.2 raises the p90 by 18% and the p10 by only 8%, so
-the canopy's luminance *range* is wider, and nothing clips. **Recommendation: keep 2.2.** Caveat,
-stated rather than buried: this is one frame, mid-comet, with the hue-shift automation well into its
-travel. It should be re-measured at a comet-free second before it is treated as settled.
+Landed: the wind reach (S1), the mesh deformation (S2), the key-light brief's section 18 gaps that
+were not a deliberate refusal. Still to come: leaf cards (S3), the cosmic vortex (S4), tree energy /
+shimmer / tree particles / island underside / comet coupling (S5), and the bespoke panel sections
+(S6) — every parameter added so far is a row in the generic Parameters panel, grouped by its prefix
+and visible at the default authoring layer, which satisfies reachability but is not yet the
+organised panel the brief's section 16 asks for.
