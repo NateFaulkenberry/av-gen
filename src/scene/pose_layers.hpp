@@ -150,8 +150,15 @@ struct PoseLayer {
     glm::vec3 groundPoint{0.0f};
     glm::vec3 groundNormal{0.0f, 1.0f, 0.0f};
     bool hasGround = false;
-    // How far above the plane the *tip joint* rests, in the rig's own model units. A hoof joint is
-    // not the sole of the hoof, and the difference is the gap or the sink.
+    // An extra nudge above the plane, in the rig's own model units, on top of the height the foot
+    // already stands at.
+    //
+    // It defaults to zero and usually stays there, because "on the ground" is not "the joint is on
+    // the plane": a hoof joint is not the sole of the hoof, and on this pack it sits 0.120 model
+    // units above it (0.097 on the front leg). A plant reads that height out of the **rest pose**
+    // and preserves it, so the rule is "stand on this slope the way you stand on the flat" and
+    // there is nothing to author and nothing to measure wrong. This field is for the cases the rest
+    // pose cannot know about -- a hoof sunk into mud, a foot on a step.
     float groundOffset = 0.0f;
     // 0 keeps the foot's animated orientation; 1 lays its sole flat on the plane. Deliberately the
     // same shape and the same argument as `entity::GroundSettings::slopeAlign`, one level down: a
@@ -260,6 +267,10 @@ private:
     // recomputed per frame because it is a fact about the asset, and read out of the *rest* pose
     // rather than the current one because "up" has to mean the same thing on every frame of a walk.
     std::vector<glm::vec3> soleUp_;
+    // Per layer, the tip joint's model-space height in the rest pose: how far off the ground this
+    // foot stands when the animal is standing on flat ground. Read once, for the same reason
+    // `soleUp_` is.
+    std::vector<float> restTipHeight_;
     std::vector<IkStatus> ikStatus_;
     // Scratch, kept so a per-frame apply allocates nothing after the first.
     std::vector<glm::mat4> model_;

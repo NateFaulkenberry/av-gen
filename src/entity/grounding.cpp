@@ -28,9 +28,12 @@ GroundResult GroundFollower::update(const Navigator& nav, glm::vec2 p, float yaw
         // refusing to ground, which would leave a character wherever the scene file put it.
         out.height = 0.0f;
         out.grounded = true;
+        out.surfaceHeight = 0.0f;
+        out.surfaceNormal = glm::vec3(0.0f, 1.0f, 0.0f);
         height_ = 0.0f;
         pitch_ = 0.0f;
         roll_ = 0.0f;
+        normal_ = glm::vec3(0.0f, 1.0f, 0.0f);
         primed_ = true;
         return out;
     }
@@ -73,7 +76,13 @@ GroundResult GroundFollower::update(const Navigator& nav, glm::vec2 p, float yaw
     // stands on it. Biasing toward the footprint maximum instead was tried and lifts a body off
     // every slope it climbs, because the high side of a footprint on a hill is just the hill.
     const float mean = sum / weight;
-    const float target = std::max(mean, centre);
+    // Where the body wants to be. `footDrop` slides it from the footprint mean down to the lowest
+    // ground the footprint covers, which is what gives a foot IK layer room to lift from (ADR-344).
+    // The floor clamp below already allows exactly this much and no more, so at `footDrop` 1 the
+    // body sits on its own clamp rather than needing a new one.
+    const float seated = std::max(mean, centre);
+    const float drop = std::clamp(settings.footDrop, 0.0f, 1.0f);
+    const float target = seated + (std::min(lowest, seated) - seated) * drop;
     // Sampled as wide as the body, so the lean comes from the slope the body spans rather than from
     // whatever the noise is doing at one point of it.
     const glm::vec3 normal = nav.groundNormal(p, std::max(radius, 0.25f));
@@ -81,6 +90,7 @@ GroundResult GroundFollower::update(const Navigator& nav, glm::vec2 p, float yaw
     if (!primed_) {
         primed_ = true;
         height_ = target;
+        normal_ = normal;
     } else {
         height_ += (target - height_) * lerpRate(settings.heightSmoothingMs, dt);
     }
@@ -122,6 +132,21 @@ GroundResult GroundFollower::update(const Navigator& nav, glm::vec2 p, float yaw
     roll_ += (wantRoll - roll_) * tiltRate;
     out.pitch = pitch_;
     out.roll = roll_;
+    // The surface, for anything that has to stand *on* it rather than lean with it (ADR-344). The
+    // height is the spatially-filtered surface and carries no temporal lag at all -- it is a pure
+    // function of position, which is the whole argument the footprint filter is built on -- while
+    // the normal rides the same one-pole as the lean, so a foot and the body it belongs to are
+    // never taking their slope from two different frames.
+    normal_ += (normal - normal_) * tiltRate;
+    const float len = glm::length(normal_);
+    normal_ = len > 1e-4f ? normal_ / len : glm::vec3(0.0f, 1.0f, 0.0f);
+    // `seated`, not `target`: the surface is where the ground is, and `target` is where the *body*
+    // has been asked to sit, which with `footDrop` on is deliberately below it. Publishing the
+    // dropped height here makes the plane pass exactly through the body's own origin on every
+    // slope, every foot's correction comes out as zero, and the whole mechanism is inert while
+    // looking like it is running.
+    out.surfaceHeight = seated;
+    out.surfaceNormal = normal_;
     return out;
 }
 

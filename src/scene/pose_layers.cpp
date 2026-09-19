@@ -195,6 +195,7 @@ void PoseLayerStack::clear() {
     pivotIndex_.clear();
     chain_.clear();
     soleUp_.clear();
+    restTipHeight_.clear();
     ikStatus_.clear();
 }
 
@@ -212,6 +213,7 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
     pivotIndex_.assign(layers_.size(), -1);
     chain_.assign(layers_.size(), glm::ivec3(-1));
     soleUp_.assign(layers_.size(), glm::vec3(0.0f, 1.0f, 0.0f));
+    restTipHeight_.assign(layers_.size(), 0.0f);
     ikStatus_.assign(layers_.size(), IkStatus::Solved);
     results_.assign(layers_.size(), LayerResolution::Inactive);
     masks_.reserve(layers_.size());
@@ -308,6 +310,7 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
                                                    ? glm::normalize(layer.soleUp)
                                                    : glm::inverse(bind) * glm::vec3(0.0f, 1.0f, 0.0f);
                     soleUp_[i] = safeNormalize(authored);
+                    restTipHeight_[i] = model_[static_cast<std::size_t>(tip)][3].y;
                     if (glm::dot(soleUp_[i], soleUp_[i]) < 0.5f) {
                         problems.push_back(fmt::format(
                             "layer '{}': joint '{}' has a degenerate rest transform, so there is no "
@@ -348,7 +351,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
     if (layers_.empty() || masks_.size() != layers_.size() || results_.size() != layers_.size() ||
         clipIndex_.size() != layers_.size() || pivotIndex_.size() != layers_.size() ||
         chain_.size() != layers_.size() || ikStatus_.size() != layers_.size() ||
-        soleUp_.size() != layers_.size() ||
+        soleUp_.size() != layers_.size() || restTipHeight_.size() != layers_.size() ||
         pose.size() != skeleton.jointCount()) {
         return stats;
     }
@@ -444,7 +447,8 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             if (layer.hasTarget) {
                 target = layer.target;
             } else if (layer.hasGround) {
-                target = plantOnPlane(chain.tip, layer.groundPoint, layer.groundNormal, layer.groundOffset);
+                target = plantOnPlane(chain.tip, layer.groundPoint, layer.groundNormal,
+                                      layer.groundOffset + restTipHeight_[i]);
             } else {
                 result = LayerResolution::NoTarget;
                 continue;

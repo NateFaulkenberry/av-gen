@@ -84,6 +84,21 @@ struct LocomotionState {
     glm::vec3 lookTarget{0.0f};
     bool hasLookTarget = false;
 
+    // The ground under this body, in WORLD space, and entity-local by the time it reaches a layer
+    // -- `Composition::AnimationSink::driveLayers` does the conversion, the same one and for the
+    // same reason as `lookTarget` (ADR-274). Read by any `scene::PoseLayer` whose `drive` is
+    // `Ground`: a foot layer plants its hoof on this plane instead of on the flat the walk cycle
+    // was authored over.
+    //
+    // ADR-344 draws the line here on purpose. Everything above this field is stateful and smoothed
+    // and re-simulated on a seek; everything below it -- the solver, the layer -- is a pure
+    // function of the pose and this plane. The engine already has a place where a filtered ground
+    // normal lives, and duplicating the filter one level down would have been a second answer to
+    // the same question with its own lag.
+    glm::vec3 groundPoint{0.0f};
+    glm::vec3 groundNormal{0.0f, 1.0f, 0.0f};
+    bool hasGroundPlane = false;
+
     // ---- what an action asked for (ADR-096) ----
     // The activity an action named -- "sit", "sleep", "pickUp" -- or empty when the gait is in
     // charge and `activity` above is the whole story. Still an activity *name* and never a clip

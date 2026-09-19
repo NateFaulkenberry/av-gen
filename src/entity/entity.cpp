@@ -1137,6 +1137,11 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         entity.locomotion_.reaction = entity.state_.reaction;
         entity.locomotion_.lookTarget = entity.state_.lookTarget;
         entity.locomotion_.hasLookTarget = entity.state_.hasLookTarget;
+        // ADR-344: the ground under this body, for a foot IK layer. Published here beside the look
+        // target, and by the same rule -- the entity owns the smoothing, the layer owns the solve.
+        entity.locomotion_.groundPoint = entity.state_.groundPoint;
+        entity.locomotion_.groundNormal = entity.state_.groundNormal;
+        entity.locomotion_.hasGroundPlane = entity.state_.hasGroundPlane;
     }
     // What the replay's sense stage cost, in the same structural terms an update reports it in.
     // A seek at 60 Hz over 90 s runs 5,400 steps; at 4 Hz a body senses on 360 of them, and the
@@ -1610,6 +1615,11 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         entity.locomotion_.reaction = entity.state_.reaction;
         entity.locomotion_.lookTarget = entity.state_.lookTarget;
         entity.locomotion_.hasLookTarget = entity.state_.hasLookTarget;
+        // ADR-344: the ground under this body, for a foot IK layer. Published here beside the look
+        // target, and by the same rule -- the entity owns the smoothing, the layer owns the solve.
+        entity.locomotion_.groundPoint = entity.state_.groundPoint;
+        entity.locomotion_.groundNormal = entity.state_.groundNormal;
+        entity.locomotion_.hasGroundPlane = entity.state_.hasGroundPlane;
         if (entity.pose_ != nullptr) {
             entity.pose_->setLocomotion(entity.locomotion_);
         }
