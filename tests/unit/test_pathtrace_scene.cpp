@@ -264,3 +264,171 @@ TEST_CASE("a scattered scene renders, and the scatter is visible in the picture"
     REQUIRE(mid.y > mid.x * 1.5f);
     REQUIRE(mid.y > mid.z * 1.5f);
 }
+
+// ---- Embree instancing (Phase 8) -----------------------------------------------------------
+
+TEST_CASE("procedural scatter is instanced: geometry stored once, drawn many times",
+          "[unit][pathtrace][procedural][instancing]") {
+    scene::Scene s;
+    scene::ProceduralGeometry proc;
+    proc.source.kind = scene::PrimitiveKind::Box;
+    proc.source.size = glm::vec3(0.4f);
+    proc.material.baseColor = glm::vec3(0.4f, 0.7f, 0.3f);
+    const int n = 500;
+    for (int i = 0; i < n; ++i) {
+        spatial::InstanceRecord r;
+        r.position = glm::vec4(static_cast<float>(i % 25) * 1.5f - 18.0f, 0.0f,
+                               static_cast<float>(i / 25) * 1.5f - 15.0f, 1.0f);
+        r.rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        r.scale = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+        proc.instances.push_back(r);
+    }
+    s.procedurals.push_back(std::move(proc));
+
+    const pathtrace::Snapshot snap = pathtrace::buildSnapshot(s);
+    REQUIRE(snap.instanced.size() == 1);
+    REQUIRE(snap.instanceCount() == static_cast<std::size_t>(n));
+
+    // The whole point: stored triangles do NOT grow with instance count.
+    REQUIRE(snap.triangleCount() == 12);                 // one cube, once
+    REQUIRE(snap.visibleTriangleCount() == 12u * n);     // but 500 of them are visible
+    // The baked representation would have stored 6000. A 500x difference in memory is the claim.
+    REQUIRE(snap.triangleCount() * 100 < snap.visibleTriangleCount());
+
+    // And the source stays in OBJECT space, centred, rather than at any instance's position.
+    float maxAbs = 0.0f;
+    for (const auto& p : snap.instanced[0].source.positions) {
+        maxAbs = std::max({maxAbs, std::abs(p.x), std::abs(p.y), std::abs(p.z)});
+    }
+    INFO("source extent " << maxAbs);
+    REQUIRE(maxAbs < 1.0f);
+    REQUIRE(snap.instanced[0].transforms.size() == static_cast<std::size_t>(n));
+}
+
+TEST_CASE("an instanced hit resolves to the right copy and the right normal",
+          "[unit][pathtrace][instancing]") {
+    // The classic instancing bug is reading Embree's geomID as a top-level id, which makes every
+    // instanced hit resolve to the first object. These arms fire a ray at each of three separated,
+    // DIFFERENTLY ORIENTED copies and check both which one was hit and which way it faces.
+    scene::Scene s;
+    scene::ProceduralGeometry proc;
+    proc.source.kind = scene::PrimitiveKind::Box;
+    proc.source.size = glm::vec3(1.0f);
+    proc.material.baseColor = glm::vec3(0.8f, 0.3f, 0.3f);
+    // Three cubes at x = -6, 0, +6, the middle one rotated 45 degrees about Y.
+    for (int i = 0; i < 3; ++i) {
+        spatial::InstanceRecord r;
+        r.position = glm::vec4(static_cast<float>(i - 1) * 6.0f, 0.0f, 0.0f, 1.0f);
+        const glm::quat q = (i == 1) ? glm::angleAxis(0.7853981f, glm::vec3(0, 1, 0))
+                                     : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+        r.rotation = glm::vec4(q.x, q.y, q.z, q.w);
+        r.scale = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+        proc.instances.push_back(r);
+    }
+    s.procedurals.push_back(std::move(proc));
+
+    const pathtrace::Snapshot snap = pathtrace::buildSnapshot(s);
+    pathtrace::EmbreeScene em;
+    REQUIRE(em.build(snap, 1).has_value());
+
+    std::vector<std::uint32_t> hitInstances;
+    for (int i = 0; i < 3; ++i) {
+        const glm::vec3 origin{static_cast<float>(i - 1) * 6.0f, 0.0f, 20.0f};
+        const auto hit = em.intersect(snap, origin, glm::vec3(0, 0, -1), 0.0f, 1e30f);
+        INFO("ray " << i << " at x " << origin.x);
+        REQUIRE(hit.hit);
+        REQUIRE(hit.instanced);
+        REQUIRE(hit.meshIndex == 0);   // one instanced object
+        hitInstances.push_back(hit.instanceIndex);
+        // The hit point must be near the cube that ray was aimed at, not near instance 0.
+        REQUIRE(hit.position.x == Approx(origin.x).margin(1.0f));
+        REQUIRE(glm::length(hit.shadingNormal) == Approx(1.0f).margin(1e-3));
+        // Facing the ray.
+        REQUIRE(glm::dot(hit.shadingNormal, glm::vec3(0, 0, -1)) < 0.0f);
+    }
+    // Three different copies, not the same one three times.
+    REQUIRE(hitInstances[0] != hitInstances[1]);
+    REQUIRE(hitInstances[1] != hitInstances[2]);
+
+    // The rotated middle cube's face normal must be rotated 45 degrees, while its neighbours' are
+    // axis-aligned. This is the arm that catches a normal matrix that was never applied.
+    const auto mid = em.intersect(snap, glm::vec3(0, 0, 20), glm::vec3(0, 0, -1), 0.0f, 1e30f);
+    const auto side = em.intersect(snap, glm::vec3(6, 0, 20), glm::vec3(0, 0, -1), 0.0f, 1e30f);
+    INFO("mid normal " << mid.shadingNormal.x << "," << mid.shadingNormal.z);
+    INFO("side normal " << side.shadingNormal.x << "," << side.shadingNormal.z);
+    REQUIRE(std::abs(side.shadingNormal.z) > 0.99f);          // axis-aligned
+    REQUIRE(std::abs(mid.shadingNormal.x) > 0.5f);            // rotated: it has real X now
+    REQUIRE(std::abs(mid.shadingNormal.z) < 0.95f);
+}
+
+TEST_CASE("instanced and non-instanced geometry share one scene and shade the same",
+          "[unit][pathtrace][instancing]") {
+    // A scatter and an ordinary entity in the same frame must both appear, with their own
+    // materials. If the top-level id table were wrong, one would take the other's material.
+    scene::Scene s;
+    s.environment.sky.enabled = false;
+    s.environment.backgroundColor = glm::vec3(0.0f);
+    s.camera.position = glm::vec3(0.0f, 4.0f, 12.0f);
+    s.camera.target = glm::vec3(0.0f, 0.5f, 0.0f);
+    s.camera.lens.useExplicitFov = true;
+    s.camera.fovYRadians = 0.9f;
+
+    scene::PunctualLight key;
+    key.type = scene::PunctualLight::Type::Directional;
+    key.direction = glm::vec3(-0.2f, -1.0f, -0.3f);
+    key.intensity = 3.0f;
+    key.temperature = 6500.0f;
+    s.addLight(key);
+
+    // An ordinary entity: a BLUE sphere on the left.
+    const scene::MeshId ballId = s.addMesh(scene::makeIcosphere(1.2f, 2));
+    scene::Entity& ball = s.addEntity("ball", ballId);
+    ball.transform.position = glm::vec3(-3.5f, 1.2f, 0.0f);
+    ball.material.baseColor = glm::vec3(0.1f, 0.2f, 0.9f);
+
+    // Instanced scatter: GREEN cubes on the right.
+    scene::ProceduralGeometry proc;
+    proc.source.kind = scene::PrimitiveKind::Box;
+    proc.source.size = glm::vec3(1.2f);
+    proc.material.baseColor = glm::vec3(0.15f, 0.85f, 0.2f);
+    for (int i = 0; i < 4; ++i) {
+        spatial::InstanceRecord r;
+        r.position = glm::vec4(2.0f + static_cast<float>(i) * 1.6f, 0.6f, 0.0f, 1.0f);
+        r.rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        r.scale = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+        proc.instances.push_back(r);
+    }
+    s.procedurals.push_back(std::move(proc));
+
+    const pathtrace::Snapshot snap = pathtrace::buildSnapshot(s);
+    REQUIRE(snap.meshes.size() == 1);
+    REQUIRE(snap.instanced.size() == 1);
+
+    pathtrace::TraceSettings t;
+    t.width = 160;
+    t.height = 100;
+    t.samplesPerPixel = 16;
+    t.maxDepth = 1;
+    pathtrace::PathTracer tr;
+    pathtrace::Framebuffer fb;
+    REQUIRE(tr.render(snap, t, fb).has_value());
+    REQUIRE_FALSE(fb.isBlack());
+
+    // Scan for the bluest and greenest pixels and check they are on opposite sides of the frame.
+    std::uint32_t bluestX = 0;
+    std::uint32_t greenestX = 0;
+    float bestBlue = 0.0f;
+    float bestGreen = 0.0f;
+    for (std::uint32_t y = 0; y < fb.height; ++y) {
+        for (std::uint32_t x = 0; x < fb.width; ++x) {
+            const glm::vec3 c = fb.pixel(x, y);
+            if (c.z > c.x && c.z > c.y && c.z > bestBlue) { bestBlue = c.z; bluestX = x; }
+            if (c.y > c.x && c.y > c.z && c.y > bestGreen) { bestGreen = c.y; greenestX = x; }
+        }
+    }
+    INFO("bluest at x " << bluestX << " greenest at x " << greenestX);
+    REQUIRE(bestBlue > 0.0f);
+    REQUIRE(bestGreen > 0.0f);
+    REQUIRE(bluestX < fb.width / 2);    // the entity, on the left
+    REQUIRE(greenestX > fb.width / 2);  // the scatter, on the right
+}

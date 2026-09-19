@@ -37,7 +37,7 @@ never reaches into the realtime post chain. Colour management is downstream of t
 | 5 | Scene integration: CPU skinning, procedural scatter | **done** |
 | 6 | AOVs: albedo, normal, emission, depth, id, motion | **done** |
 | 7 | Glowmere | not started |
-| 8 | Production features | not started |
+| 8 | Embree instancing | **partly** |
 
 ## Design
 
@@ -82,7 +82,7 @@ pixels rather than after somebody notices they are wrong.
 |---|---|---|
 | Particles | **unsupported** | GPU-only by construction (`src/scene/particles.hpp`): the CPU holds settings, the simulation is a compute shader, and no positions exist to intersect at any time |
 | Skinned characters | **supported** | four-influence linear blend skinning from `SkinnedRig::palette`. A rig with an EMPTY palette (frozen by `cullDistance`) is refused and counted, because its bind pose is not where the character is |
-| Procedural / scatter | **degraded** | placed correctly from the baked `instances`, but baked to world-space triangles rather than Embree instances, so memory grows with instance count; deformers and effectors are not applied |
+| Procedural / scatter | **degraded** | drawn as Embree instances, so geometry is stored once. Deformers and effectors are still not applied and LOD rung 0 is always used |
 | SDF in `Raymarch` mode | **unsupported** | no triangles exist; `spatial::SdfTree` is CPU-evaluable but sphere tracing is a separate integrator path |
 | Water surface | **degraded** | the mesh is a real CPU sheet, but ripples, swell, foam and refraction live in `shaders/water.wgsl` |
 | Point / spot lights | **degraded** | treated as delta positions, so their shadows are hard; the realtime path softens them |
@@ -97,6 +97,29 @@ inheriting them would be the ADR-146 mistake in a new place:
 * `Entity::cameraCulled`, which means "outside the realtime frustum", not "not in the scene";
   off-screen geometry still casts shadows and still bounces light into the frame;
 * procedural LOD rungs 2 and 3, which are camera-facing billboards.
+
+## Phase 8 in particular (partly)
+
+**Embree instancing for procedural scatter.** Each `ProceduralGeometry` becomes one child `RTCScene`
+holding its triangles once, plus one `RTC_GEOMETRY_TYPE_INSTANCE` per copy. Measured on Glowmere
+Valley: **6,832,682 stored triangles became 321,771** -- 21x less -- while still drawing 67,770
+instances.
+
+Two things this changed that are easy to get wrong:
+
+* **A hit must be resolved through `instID[0]`, not `geomID`.** Inside an instance, `geomID` is the
+  geometry within the *child* scene, so reading it as a top-level id makes every instanced hit
+  resolve to object zero. `EmbreeScene` keeps its own table from top-level id to
+  `(list, object, instance)`.
+* **Normals are computed from our own data and transformed by the instance's normal matrix**, not
+  read from `rh.hit.Ng`, which for an instanced hit is in the child's space. Doing it once, our way,
+  avoids a convention that is easy to get right in one branch and wrong in the other.
+* `RTC_FORMAT_FLOAT4X4_COLUMN_MAJOR`, **never** `FLOAT3X4`. `glm::mat4` is four columns of *four*
+  floats; a 3x4 layout reads each column's w as the next column's x and every instance lands
+  somewhere arbitrary. Caught because rays missed all three test cubes.
+
+Motion vectors are deliberately **not** tracked for instanced geometry: a scattered instance's
+previous transform is not carried, and pairing instances between frames by index would be a guess.
 
 ## Phase 6 in particular (partly)
 

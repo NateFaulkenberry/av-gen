@@ -103,6 +103,20 @@ bool TriangleMesh::valid() const {
 std::size_t Snapshot::triangleCount() const {
     std::size_t n = 0;
     for (const auto& m : meshes) n += m.triangleCount();
+    for (const auto& o : instanced) n += o.source.triangleCount();
+    return n;
+}
+
+std::size_t Snapshot::visibleTriangleCount() const {
+    std::size_t n = 0;
+    for (const auto& m : meshes) n += m.triangleCount();
+    for (const auto& o : instanced) n += o.source.triangleCount() * o.transforms.size();
+    return n;
+}
+
+std::size_t Snapshot::instanceCount() const {
+    std::size_t n = 0;
+    for (const auto& o : instanced) n += o.transforms.size();
     return n;
 }
 
@@ -328,46 +342,52 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
 
         // The instance transform is composed exactly as shaders/procedural.wgsl composes it --
         // `inst.position + quatRotate(inst.rotation, p * inst.scale)`, under the object model --
-        // and NOT with `ProceduralGeometry::instanceMatrix`, which re-derives placement from the
-        // distribution and ignores the baked `instances` array entirely. The realtime renderer
-        // uploads `object.instances` (procedural_renderer.cpp:1418), so that is what the tracer
-        // must read or the two renderers draw different worlds. Measured the hard way: using
-        // `instanceMatrix` put twelve cubes spanning 22 m into a 7 m span.
+        // and NOT with `ProceduralGeometry::instanceMatrix`, which derives placement from the
+        // distribution by contract and never reads `instances[i]`. The realtime renderer uploads
+        // `object.instances` (procedural_renderer.cpp:1418), so that is what the tracer must read
+        // or the two renderers draw different worlds. Measured the hard way: `instanceMatrix` put
+        // twelve cubes spanning 22 m into a 7 m span.
         const glm::mat4 objectModel = proc.distributionTransform.matrix();
         const glm::mat4 sourceXf = proc.sourceTransform.matrix();
-        for (std::uint32_t ii = 0; ii < proc.instances.size(); ++ii) {
-            const spatial::InstanceRecord& rec = proc.instances[ii];
-            const glm::quat q{rec.rotation.w, rec.rotation.x, rec.rotation.y, rec.rotation.z};
-            const glm::mat4 xf = objectModel *
-                                 glm::translate(glm::mat4(1.0f), glm::vec3(rec.position)) *
-                                 glm::mat4_cast(q) *
-                                 glm::scale(glm::mat4(1.0f), glm::vec3(rec.scale)) * sourceXf;
-            const glm::mat3 pnm = normalMatrix(xf);
 
-            TriangleMesh out;
-            out.entityIndex = static_cast<std::uint32_t>(pi);
-            out.entityName = fmt::format("procedural[{}]#{}", pi, ii);
-            out.material = proc.material;
-            out.positions.reserve(src.vertices.size());
-            out.normals.reserve(src.vertices.size());
-            out.uvs.reserve(src.vertices.size());
-            for (const scene::Vertex& v : src.vertices) {
-                out.positions.push_back(glm::vec3(xf * glm::vec4(v.position, 1.0f)));
-                const glm::vec3 n = pnm * v.normal;
-                const float len = glm::length(n);
-                out.normals.push_back(len > 1e-12f ? n / len : glm::vec3(0.0f, 1.0f, 0.0f));
-                out.uvs.push_back(v.uv);
-            }
-            out.indices = src.indices;
-            if (!out.valid()) continue;
-            snap.meshes.push_back(std::move(out));
-            ++proceduralInstances;
+        InstancedObject obj;
+        obj.name = proc.name.empty() ? fmt::format("procedural[{}]", pi) : proc.name;
+        obj.source.entityIndex = static_cast<std::uint32_t>(pi);
+        obj.source.entityName = obj.name;
+        obj.source.material = proc.material;
+        // The source keeps OBJECT space. `sourceTransform` is folded in here because it is the same
+        // for every instance; everything that differs per copy stays in the transform.
+        const glm::mat3 srcNormal = normalMatrix(sourceXf);
+        obj.source.positions.reserve(src.vertices.size());
+        obj.source.normals.reserve(src.vertices.size());
+        obj.source.uvs.reserve(src.vertices.size());
+        for (const scene::Vertex& v : src.vertices) {
+            obj.source.positions.push_back(glm::vec3(sourceXf * glm::vec4(v.position, 1.0f)));
+            const glm::vec3 n = srcNormal * v.normal;
+            const float len = glm::length(n);
+            obj.source.normals.push_back(len > 1e-12f ? n / len : glm::vec3(0.0f, 1.0f, 0.0f));
+            obj.source.uvs.push_back(v.uv);
         }
+        obj.source.indices = src.indices;
+        if (!obj.source.valid()) { ++proceduralFailed; continue; }
+
+        obj.transforms.reserve(proc.instances.size());
+        obj.normalMatrices.reserve(proc.instances.size());
+        for (const spatial::InstanceRecord& rec : proc.instances) {
+            const glm::quat q{rec.rotation.w, rec.rotation.x, rec.rotation.y, rec.rotation.z};
+            const glm::mat4 xf = objectModel * glm::translate(glm::mat4(1.0f), glm::vec3(rec.position)) *
+                                 glm::mat4_cast(q) *
+                                 glm::scale(glm::mat4(1.0f), glm::vec3(rec.scale));
+            obj.transforms.push_back(xf);
+            obj.normalMatrices.push_back(normalMatrix(xf));
+        }
+        proceduralInstances += static_cast<int>(obj.transforms.size());
+        snap.instanced.push_back(std::move(obj));
     }
     if (proceduralInstances > 0) {
         snap.capabilities.note("procedural instance", Support::Degraded,
-                               "baked to world-space triangles rather than Embree instances, so memory "
-                               "grows with instance count; deformers and effectors are not applied",
+                               "drawn as Embree instances, so the geometry is stored once; deformers "
+                               "and effectors are still not applied, and LOD rung 0 is always used",
                                proceduralInstances);
     }
     if (proceduralFailed > 0) {

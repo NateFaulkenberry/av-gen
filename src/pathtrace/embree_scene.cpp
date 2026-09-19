@@ -2,6 +2,8 @@
 
 #include <embree4/rtcore.h>
 
+#include <glm/gtc/type_ptr.hpp>
+
 #include "core/log.hpp"
 
 #include <fmt/format.h>
@@ -24,10 +26,23 @@ float shadowEpsilon(float t) {
     return std::max(1e-4f, std::abs(t) * 1e-4f);
 }
 
+// What a top-level geomID refers to. Embree hands back a flat id per top-level geometry, and an
+// instance is one of those, so the tracer needs its own table to get back to the snapshot.
+struct TopLevelRef {
+    bool instanced = false;
+    std::uint32_t objectIndex = 0;   // Snapshot::meshes or Snapshot::instanced
+    std::uint32_t instanceIndex = 0;
+};
+
 struct EmbreeScene::Impl {
     RTCDevice device = nullptr;
     RTCScene scene = nullptr;
+    std::vector<RTCScene> childScenes;   // one per InstancedObject, released with the device
+    std::vector<TopLevelRef> refs;
     ~Impl() {
+        for (RTCScene c : childScenes) {
+            if (c != nullptr) rtcReleaseScene(c);
+        }
         if (scene != nullptr) rtcReleaseScene(scene);
         if (device != nullptr) rtcReleaseDevice(device);
     }
@@ -37,7 +52,7 @@ EmbreeScene::EmbreeScene() = default;
 EmbreeScene::~EmbreeScene() = default;
 
 Result<void> EmbreeScene::build(const Snapshot& snapshot, unsigned buildThreads) {
-    if (snapshot.meshes.empty()) {
+    if (snapshot.meshes.empty() && snapshot.instanced.empty()) {
         return fail("pathtrace: cannot build an Embree scene from a snapshot with no geometry");
     }
 
@@ -86,14 +101,72 @@ Result<void> EmbreeScene::build(const Snapshot& snapshot, unsigned buildThreads)
         rtcCommitGeometry(geom);
         const unsigned id = rtcAttachGeometry(impl_->scene, geom);
         rtcReleaseGeometry(geom);
-        // The tracer indexes Snapshot::meshes by Embree's geomID, so the two orders must agree.
-        if (id != static_cast<unsigned>(mi)) {
-            return fail("pathtrace: embree assigned geomID {} to mesh {}; the snapshot's mesh order and the "
-                        "scene's geometry order must agree",
-                        id, mi);
+        if (id != static_cast<unsigned>(impl_->refs.size())) {
+            return fail("pathtrace: embree assigned geomID {} where {} was expected", id,
+                        impl_->refs.size());
+        }
+        impl_->refs.push_back(TopLevelRef{false, static_cast<std::uint32_t>(mi), 0});
+    }
+
+    // ---- instanced geometry --------------------------------------------------------------------
+    //
+    // Each InstancedObject becomes a child RTCScene holding its triangles ONCE, and one
+    // RTC_GEOMETRY_TYPE_INSTANCE per copy in the top-level scene. Embree transforms the ray into
+    // the child's space, so the triangles are never duplicated.
+    for (std::size_t oi = 0; oi < snapshot.instanced.size(); ++oi) {
+        const InstancedObject& obj = snapshot.instanced[oi];
+        if (!obj.valid()) {
+            return fail("pathtrace: instanced object {} ('{}') is not valid geometry", oi, obj.name);
+        }
+
+        RTCScene child = rtcNewScene(impl_->device);
+        if (child == nullptr) return fail("pathtrace: rtcNewScene failed for instanced object {}", oi);
+        impl_->childScenes.push_back(child);
+
+        RTCGeometry geom = rtcNewGeometry(impl_->device, RTC_GEOMETRY_TYPE_TRIANGLE);
+        auto* verts = static_cast<float*>(rtcSetNewGeometryBuffer(
+            geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, 4 * sizeof(float),
+            obj.source.positions.size()));
+        if (verts == nullptr) return fail("pathtrace: vertex buffer allocation failed for object {}", oi);
+        for (std::size_t v = 0; v < obj.source.positions.size(); ++v) {
+            verts[v * 4 + 0] = obj.source.positions[v].x;
+            verts[v * 4 + 1] = obj.source.positions[v].y;
+            verts[v * 4 + 2] = obj.source.positions[v].z;
+            verts[v * 4 + 3] = 0.0f;
+        }
+        auto* idx = static_cast<std::uint32_t*>(rtcSetNewGeometryBuffer(
+            geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, 3 * sizeof(std::uint32_t),
+            obj.source.indices.size() / 3));
+        if (idx == nullptr) return fail("pathtrace: index buffer allocation failed for object {}", oi);
+        std::copy(obj.source.indices.begin(), obj.source.indices.end(), idx);
+        rtcCommitGeometry(geom);
+        rtcAttachGeometry(child, geom);
+        rtcReleaseGeometry(geom);
+        rtcCommitScene(child);
+
+        for (std::size_t ii = 0; ii < obj.transforms.size(); ++ii) {
+            RTCGeometry inst = rtcNewGeometry(impl_->device, RTC_GEOMETRY_TYPE_INSTANCE);
+            if (inst == nullptr) return fail("pathtrace: rtcNewGeometry(INSTANCE) failed");
+            rtcSetGeometryInstancedScene(inst, child);
+            // FLOAT4X4, not FLOAT3X4. `glm::mat4` is four columns of FOUR floats; a 3x4 layout
+            // expects three floats per column, so handing it `value_ptr` makes it read each
+            // column's w as the next column's x. Every instance then lands somewhere arbitrary --
+            // measured as rays missing all three test cubes entirely, which is at least a loud
+            // failure rather than a subtle one. COLUMN_MAJOR because that is glm's storage order.
+            rtcSetGeometryTransform(inst, 0, RTC_FORMAT_FLOAT4X4_COLUMN_MAJOR,
+                                    glm::value_ptr(obj.transforms[ii]));
+            rtcCommitGeometry(inst);
+            const unsigned id = rtcAttachGeometry(impl_->scene, inst);
+            rtcReleaseGeometry(inst);
+            if (id != static_cast<unsigned>(impl_->refs.size())) {
+                return fail("pathtrace: embree assigned instance geomID {} where {} was expected", id,
+                            impl_->refs.size());
+            }
+            impl_->refs.push_back(TopLevelRef{true, static_cast<std::uint32_t>(oi),
+                                              static_cast<std::uint32_t>(ii)});
         }
     }
-    geometryCount_ = snapshot.meshes.size();
+    geometryCount_ = impl_->refs.size();
 
     // Build the BVH on threads this process owns (ADR-348). One `rtcJoinCommitScene` per thread;
     // they cooperate and all return when the build is done.
@@ -136,9 +209,24 @@ SurfaceHit EmbreeScene::intersect(const Snapshot& snapshot, const glm::vec3& ori
     rtcIntersect1(impl_->scene, &rh);
     if (rh.hit.geomID == RTC_INVALID_GEOMETRY_ID) return out;
 
-    const auto mi = static_cast<std::size_t>(rh.hit.geomID);
-    if (mi >= snapshot.meshes.size()) return out;
-    const TriangleMesh& mesh = snapshot.meshes[mi];
+    // Embree reports the TOP-LEVEL geometry in instID[0] when the hit is inside an instance, and
+    // geomID is then the geometry within the child scene. Reading geomID as a top-level id is the
+    // classic instancing bug: every instanced hit resolves to mesh 0.
+    const bool viaInstance = rh.hit.instID[0] != RTC_INVALID_GEOMETRY_ID;
+    const auto topId = static_cast<std::size_t>(viaInstance ? rh.hit.instID[0] : rh.hit.geomID);
+    if (topId >= impl_->refs.size()) return out;
+    const TopLevelRef& ref = impl_->refs[topId];
+
+    const TriangleMesh* meshPtr = nullptr;
+    if (ref.instanced) {
+        if (ref.objectIndex >= snapshot.instanced.size()) return out;
+        meshPtr = &snapshot.instanced[ref.objectIndex].source;
+    } else {
+        if (ref.objectIndex >= snapshot.meshes.size()) return out;
+        meshPtr = &snapshot.meshes[ref.objectIndex];
+    }
+    const TriangleMesh& mesh = *meshPtr;
+    const auto mi = static_cast<std::size_t>(ref.objectIndex);
 
     const std::size_t tri = static_cast<std::size_t>(rh.hit.primID) * 3;
     if (tri + 2 >= mesh.indices.size()) return out;
@@ -153,6 +241,8 @@ SurfaceHit EmbreeScene::intersect(const Snapshot& snapshot, const glm::vec3& ori
 
     out.hit = true;
     out.t = rh.ray.tfar;
+    out.instanced = ref.instanced;
+    out.instanceIndex = ref.instanceIndex;
     out.meshIndex = static_cast<std::uint32_t>(mi);
     out.primIndex = rh.hit.primID;
     out.position = origin + direction * out.t;
@@ -160,11 +250,20 @@ SurfaceHit EmbreeScene::intersect(const Snapshot& snapshot, const glm::vec3& ori
     out.baryU = u;
     out.baryV = v;
 
-    glm::vec3 ng{rh.hit.Ng_x, rh.hit.Ng_y, rh.hit.Ng_z};
+    // Normals are computed from our OWN data rather than read from `rh.hit.Ng`, because for an
+    // instanced hit Embree reports Ng in the child scene's space and it would need transforming --
+    // a convention that is easy to get wrong in one of the two branches and produces lighting that
+    // is subtly incorrect only on scattered objects.
+    glm::vec3 ng = glm::cross(mesh.positions[i1] - mesh.positions[i0],
+                              mesh.positions[i2] - mesh.positions[i0]);
+    glm::vec3 ns = w * mesh.normals[i0] + u * mesh.normals[i1] + v * mesh.normals[i2];
+    if (ref.instanced) {
+        const glm::mat3& nm = snapshot.instanced[ref.objectIndex].normalMatrices[ref.instanceIndex];
+        ng = nm * ng;
+        ns = nm * ns;
+    }
     const float ngLen = glm::length(ng);
     ng = ngLen > 1e-20f ? ng / ngLen : glm::vec3(0.0f, 1.0f, 0.0f);
-
-    glm::vec3 ns = w * mesh.normals[i0] + u * mesh.normals[i1] + v * mesh.normals[i2];
     const float nsLen = glm::length(ns);
     // An interpolated normal can cancel to zero across a fold. Fall back to the geometric normal
     // rather than normalising a zero vector into NaNs.
@@ -206,6 +305,11 @@ bool EmbreeScene::occluded(const glm::vec3& origin, const glm::vec3& direction, 
     rtcOccluded1(impl_->scene, &r);
     // Embree signals "occluded" by setting tfar negative.
     return r.tfar < 0.0f;
+}
+
+const scene::Material& EmbreeScene::materialOf(const Snapshot& snap, const SurfaceHit& hit) {
+    return hit.instanced ? snap.instanced[hit.meshIndex].source.material
+                         : snap.meshes[hit.meshIndex].material;
 }
 
 } // namespace avgen::pathtrace

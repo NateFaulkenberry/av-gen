@@ -111,10 +111,28 @@ struct EmissiveTriangle {
     float cdf = 0.0f;                   // cumulative area fraction, ending at 1
 };
 
+// One source mesh drawn many times (spec section 68). Embree instances it: the triangles exist once
+// and each copy is a 4x4 transform, which is the difference between Glowmere's scatter costing
+// 6.8 million triangles of memory and costing a few thousand plus 63,527 matrices.
+//
+// The source is in OBJECT space -- unlike `TriangleMesh`, which is world space -- because that is
+// the whole point: the geometry is shared and only the transforms differ.
+struct InstancedObject {
+    TriangleMesh source;                    // positions/normals in OBJECT space
+    std::vector<glm::mat4> transforms;      // object -> world, one per instance
+    std::vector<glm::mat3> normalMatrices;  // inverse transpose of each, precomputed once
+    std::string name;
+
+    [[nodiscard]] bool valid() const { return source.valid() && !transforms.empty(); }
+};
+
 // ---- the snapshot --------------------------------------------------------------------------------
 
 struct Snapshot {
     std::vector<TriangleMesh> meshes;
+    // Instanced geometry, kept separate from `meshes` because Embree builds it differently and a
+    // hit has to be resolved differently. Both end up in one top-level scene.
+    std::vector<InstancedObject> instanced;
     std::vector<scene::PunctualLight> lights;
 
     // Copied from the scene. `scene::Material`'s texture slots are indices into this, so the two
@@ -145,8 +163,12 @@ struct Snapshot {
 
     CapabilityReport capabilities;
 
+    // Triangles actually stored. With instancing this is much smaller than what the camera sees,
+    // which is the point; `visibleTriangleCount` is the other number.
     [[nodiscard]] std::size_t triangleCount() const;
-    [[nodiscard]] bool empty() const { return meshes.empty(); }
+    [[nodiscard]] std::size_t visibleTriangleCount() const;
+    [[nodiscard]] std::size_t instanceCount() const;
+    [[nodiscard]] bool empty() const { return meshes.empty() && instanced.empty(); }
 };
 
 // Builds the snapshot from an already-evaluated scene. The caller is responsible for having called

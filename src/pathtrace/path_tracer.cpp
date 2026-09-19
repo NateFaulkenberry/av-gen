@@ -270,7 +270,8 @@ struct PathResult {
             break;
         }
 
-        const scene::Material& mat = snap.meshes[hit.meshIndex].material;
+        // A hit can come from either list, so never index `meshes` directly.
+        const scene::Material& mat = EmbreeScene::materialOf(snap, hit);
         const SurfaceMaterial m = resolveMaterial(snap, mat, hit.uv);
         const glm::vec3 view = -ray.direction;
 
@@ -286,13 +287,19 @@ struct PathResult {
             // a flat wall, which makes a depth pass that looks curved.
             path.depth = glm::dot(hit.position - viewOrigin, viewForward);
             path.objectId = static_cast<float>(
-                scene::packPickId(scene::PickSpace::Entity, snap.meshes[hit.meshIndex].entityIndex));
+                scene::packPickId(scene::PickSpace::Entity,
+                                  hit.instanced ? snap.instanced[hit.meshIndex].source.entityIndex
+                                                : snap.meshes[hit.meshIndex].entityIndex));
 
             // Motion: the same surface POINT, one frame earlier, projected with the camera it was
             // seen by then. Interpolating the previous positions with the CURRENT barycentrics is
             // what makes it the same point on the surface rather than the same screen position.
-            const TriangleMesh& hm = snap.meshes[hit.meshIndex];
-            if (snap.hasMotion && !hm.previousPositions.empty()) {
+            // Motion is only tracked for non-instanced entities: a scattered instance's previous
+            // transform is not carried, and pairing instances between frames by index would be a
+            // guess. Reported rather than silently zero.
+            const TriangleMesh* hmPtr = hit.instanced ? nullptr : &snap.meshes[hit.meshIndex];
+            if (snap.hasMotion && hmPtr != nullptr && !hmPtr->previousPositions.empty()) {
+                const TriangleMesh& hm = *hmPtr;
                 const std::size_t tri = static_cast<std::size_t>(hit.primIndex) * 3;
                 if (tri + 2 < hm.indices.size()) {
                     const glm::vec3 prev = hm.previousPositions[hm.indices[tri + 0]] * hit.baryW +
@@ -338,7 +345,9 @@ struct PathResult {
         if (settings.albedoProbe.enabled) {
             probeAlbedo(settings.albedoProbe, m, hit.shadingNormal, view, depth,
                         static_cast<std::uint32_t>(scene::packPickId(
-                            scene::PickSpace::Entity, snap.meshes[hit.meshIndex].entityIndex)),
+                            scene::PickSpace::Entity,
+                            hit.instanced ? snap.instanced[hit.meshIndex].source.entityIndex
+                                          : snap.meshes[hit.meshIndex].entityIndex)),
                         pixelIndex, sampleIndex, counters);
         }
 

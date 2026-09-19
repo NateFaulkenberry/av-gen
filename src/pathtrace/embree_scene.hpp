@@ -26,7 +26,11 @@ struct SurfaceHit {
     glm::vec3 shadingNormal{0.0f};    // interpolated vertex normal, normalised, faces the ray
     glm::vec2 uv{0.0f};               // interpolated texture coordinate
     bool backface = false;            // the ray hit the far side of the triangle
-    std::uint32_t meshIndex = 0;      // index into Snapshot::meshes
+    // Where the hit is. `instanced` says which of the two lists `meshIndex` refers to:
+    // Snapshot::meshes when false, Snapshot::instanced when true.
+    bool instanced = false;
+    std::uint32_t instanceIndex = 0;  // which copy, when `instanced`
+    std::uint32_t meshIndex = 0;      // index into Snapshot::meshes or Snapshot::instanced
     std::uint32_t primIndex = 0;
     // Barycentric weights of v0, v1, v2, kept so a caller can interpolate anything else the
     // triangle carries -- the motion AOV interpolates the PREVIOUS frame's positions with these,
@@ -56,6 +60,9 @@ public:
 
     [[nodiscard]] bool valid() const { return impl_ != nullptr; }
     [[nodiscard]] std::size_t geometryCount() const { return geometryCount_; }
+
+    // The material of whatever a hit landed on, from either list. Callers should not have to know.
+    [[nodiscard]] static const scene::Material& materialOf(const Snapshot& snap, const SurfaceHit& hit);
 
 private:
     // Embree's types are held behind a pimpl so <embree4/rtcore.h> stays out of every translation
