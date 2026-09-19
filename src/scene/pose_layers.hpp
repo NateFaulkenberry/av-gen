@@ -291,6 +291,13 @@ private:
 // down the normal would move it sideways across the terrain, and on a 30-degree bank that is half a
 // hoof's width of drift for nothing. Exposed because it is the whole of what "plant" means and a
 // test that could only reach it through a posed rig would be testing four things at once.
+//
+// **Model-space -Y is not world down, and that is a known approximation.** The entity carrying this
+// rig is itself tilted by `GroundSettings::slopeAlign`, up to 0.55 x 34 degrees, so the drop leans
+// with the body and the foot slides along the plane by `tan(tilt) x drop` -- of the order of three
+// centimetres on a 0.2 m correction at a 10-degree lean. Fixing it means the caller handing down a
+// second direction (world down, in entity-local), and the number did not yet justify the field.
+// ADR-344 records it as a revisit trigger.
 [[nodiscard]] glm::vec3 plantOnPlane(const glm::vec3& tip, const glm::vec3& planePoint,
                                      const glm::vec3& planeNormal, float offset);
 

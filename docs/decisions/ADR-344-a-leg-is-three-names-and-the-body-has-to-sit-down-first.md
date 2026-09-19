@@ -208,3 +208,9 @@ lie on the slope and the uphill pair has stepped up onto the higher ground. The 
   retarget -- and not a solver question.
 * Anything needs more than two bones (a spine, a tail, a trunk). This solver is closed-form for
   exactly two and does not generalise; that is a new unit, not a parameter.
+* **The plant drops along model-space -Y, and the body it belongs to is tilted.** `slopeAlign` leans
+  the entity up to 0.55 x 34 degrees, so entity-local down is not world down and the foot slides
+  along the plane by `tan(tilt) x drop` -- around three centimetres on a 0.2 m correction at a
+  10-degree lean. The fix is the caller handing down world-down in entity-local as a second
+  direction; the number did not justify the field. Revisit if a scene leans a body harder, or if a
+  hoof is seen to drift across the terrain as the slope changes under a walk.

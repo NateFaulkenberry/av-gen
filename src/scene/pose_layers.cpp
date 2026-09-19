@@ -365,7 +365,12 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             continue;
         }
         if (mask.empty()) {
-            result = LayerResolution::NoJoints;
+            // A foot layer's mask is synthesised from its chain, so an empty one means this rig
+            // carries none of the three names -- which is `NoChain` and not `NoJoints`. The two
+            // answers send a reader to different places: one is a mask that missed, the other is a
+            // limb this rig does not have.
+            result = layer.kind == PoseLayerKind::Foot ? LayerResolution::NoChain
+                                                       : LayerResolution::NoJoints;
             continue;
         }
         if (layer.kind == PoseLayerKind::Aim) {

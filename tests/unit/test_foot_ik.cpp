@@ -16,6 +16,15 @@
 //                                                                (a solver that guesses a plane fails)
 //   not-a-chain    the alien rig's three leg-ish names bind to nothing and write nothing
 //                                                                (a solver that trusts names fails)
+//   footAlign      four hooves tilt 18 degrees on an 18-degree bank, measured against WORLD up --
+//                  against the slope normal the arm would be asking whether the layer did what it
+//                  had just done -- and with the alignment off the same four come out at 18, 27,
+//                  27 and 56                                     (a plant with no sole fails)
+//
+// Two more that are not solver arms at all and earn their place anyway: the bind-pose extension
+// measurement, which is the fact that decides what this layer can be used *for* on this content,
+// and a save-and-reload of the shipped lab scene, because a layer kind with its own key set is
+// exactly the thing a shared writer turns into a file that will not load.
 //
 // Bands, not floors. "The hoof went down" passes on a hoof that went to the centre of the earth;
 // every assertion below is an interval with a top as well as a bottom.
@@ -821,6 +830,20 @@ TEST_CASE("a foot layer says so when it is handed a mask or half a chain", "[ik]
         const auto problems = bull.rig->layers.bind({layer}, sk, bull.rig->clips);
         REQUIRE_FALSE(problems.empty());
         CHECK(problems.front().find("Hoof01.L") != std::string::npos);
+        bull.rig->layers.apply(sk, bull.rig->clips, 0.0, bull.rig->pose);
+        CHECK(bull.rig->layers.results().front() == scene::LayerResolution::NoChain);
+    }
+
+    SECTION("a chain of three names this rig carries none of is still NoChain") {
+        // Not `NoJoints`. A foot layer's mask is synthesised from its chain, so an empty one is a
+        // limb this rig does not have rather than a mask that missed, and the two answers send a
+        // reader to different places.
+        scene::PoseLayer layer = bullRearLeft();
+        layer.chainRoot = "LeftUpLeg";
+        layer.chainMid = "LeftLeg";
+        layer.chainTip = "LeftFoot"; // a Mixamo rig's names, on a Blender-derived bull
+        const auto problems = bull.rig->layers.bind({layer}, sk, bull.rig->clips);
+        CHECK(problems.size() >= 3);
         bull.rig->layers.apply(sk, bull.rig->clips, 0.0, bull.rig->pose);
         CHECK(bull.rig->layers.results().front() == scene::LayerResolution::NoChain);
     }
