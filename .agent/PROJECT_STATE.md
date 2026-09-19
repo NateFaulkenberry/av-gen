@@ -1,10 +1,10 @@
 # Project State
 
-**Updated:** 2026-09-19 06:20
-**Branch:** `main` @ `2bcc5606`
+**Updated:** 2026-09-19 14:30
+**Branch:** `main` @ `598082c1`
 **Build:** PASS (`cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release && cmake --build build/release`)
-**Tests:** `~[gpu]` green at `2bcc5606`: **2,417 cases / 3,796,474 assertions**, 4 skipped,
-`1 failed as expected`, exit 0.
+**Tests:** `~[gpu]` green at `ed5c39ec`: **2,459 cases**, 4 skipped, `1 failed as expected`, exit 0.
+A run covering `598082c1` was in flight at the time of writing and should be re-confirmed.
 
 > The single `FAILED:` in every run is `test_character_lab_slopes.cpp:187`, a `[!shouldfail]`
 > control. Catch2 reports it as *failed as expected* and exits 0. **It is a pass.**
@@ -22,8 +22,16 @@
 - **Scenes** — Glowmere Valley 2 family, Tree of Life floating island + ocean world.
 
 ## In development (unmerged worktrees)
-- `agent/cosmickey` — cinematic key light for the cosmic Tree of Life scene. 3 commits.
-- `agent/slicetool` — cmd-click slice tool for the sequence lanes, obeying active snapping.
+- `agent/cosmicart` — **the owner's priority.** Tree of Life cosmic pass. Phase 0/1 merged (wind,
+  ADR-360). In flight: the wind switched on with a calibrated default, `emissiveBoost` 0.5, a
+  groundColor ladder, then falling leaves and the cosmic vortex. Holds a soft-particle ADR to be
+  numbered **367**.
+- `agent/imagelook` — the Image/Look framework (`docs/image-look-spec.md`). Section 60 byte-identity
+  proved end-to-end. Holds an ADR to be numbered **368**.
+
+**Paused by the owner:** the multi-backend offline render upgrade, after its audit landed
+(`docs/offline-backend-audit.md`, 578 lines). Resume at step 5: extract `FrameRangeDriver` from
+`RenderJob` -- it is GPU-free, testable, and path-traced *sequences* fall out of it.
 
 ## Known regressions / unresolved
 - ~~**Possible colour regression** at multicam t=48.5~~ **CLOSED 2026-09-19.** The owner checked the
@@ -42,6 +50,28 @@
 - `--save-project` writes `heroes[].position` from the *last simulated frame* (ADR-344). Worked
   around in the film; not fixed in the engine.
 - `nodes/ember/position` is 68 m from its scene position and overrides it.
+- **The comet effect sometimes draws a hard straight line across the frame** (owner screenshot,
+  2026-09-19). Under investigation. Two causes ruled out with evidence: the aurora's
+  `h < 0.0 || h > 2.3` cut fires only where `body` is already zero, and the horizon `smoothstep` is
+  genuinely applied rather than being a decorative early-out. Leading hypothesis: the coma is
+  `(hr^2/(perp^2+hr^2))^2`, which **never reaches zero**, inside a hard rejection sphere of radius
+  `... + halo.w*2`, so the wash is clipped along that sphere's silhouette -- which across a narrow
+  field of view projects to very nearly a straight line. Note the effect named "Bioluminescent
+  Comet" carries **both** a comet and a camera-anchored aurora, so either half could be at fault.
+- **An app save destroys a baked camera.** Reaching for the viewport on an already-directed project
+  calls `releaseDirectedCamera`, which drops the six `directedCameraTargets()` plus
+  `cameraAimFollow` and `cameraShotSpans`; the next Save writes the loss. The serializer is fine --
+  a headless save round-trips both tables. Re-baking re-photographs the hero anchors (ADR-344), so
+  it cannot be undone casually.
+- **Metal ray tracing has no hardware behind it on this machine.** `supportsRaytracing: 1` but
+  `MTLGPUFamilyApple9: 0` -- the RT units arrive with M3 and this is an M2 Max, so Metal RT is
+  `intersect()` on the shader cores. Whether it beats a 12-core Embree is unmeasured.
+- **There is no CPU tone map.** AgX and the other four operators exist only in `tonemap.wgsl`, and
+  `render_job.cpp` refuses a CPU copy deliberately, so **a path-traced frame cannot become a video
+  frame without a GPU**.
+- **`--render-in-app` and `--pathtrace` rewrite the project they render**, deliberately (the save is
+  what makes a render reproducible). Pointing either at a checked-in example corrupts it, and
+  `check_project_integrity.py` will pass on the result because it is still valid. Copy to scratch.
 
 ## Constraints
 - **Project `parameters` are applied over the scene** (ADR-264). A scene edit alone may do nothing.
