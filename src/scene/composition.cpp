@@ -3173,6 +3173,61 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         skyHorizon_ = &params.add(colour(prefix_ + "env/sky/horizonColor", sky.horizonColor));
         skyGround_ = &params.add(colour(prefix_ + "env/sky/groundColor", sky.groundColor));
         skySunColor_ = &params.add(colour(prefix_ + "env/sky/sunColor", sky.sunColor));
+
+        // ---- ADR-348: the day/night cycle, made reachable -------------------------------------
+        //
+        // All of this existed and none of it was a parameter. The cycle ran, and `cycleSeconds`,
+        // `dayPhase`, the sun angles and every colour were editable only by hand-editing the scene
+        // JSON -- no UI, no modulation, no keyframing, no scrub. ADR-225: a setting the application
+        // does not keep is not a setting.
+        {
+            scene::DayNightSettings& dn = dayNight_;
+            dn.applyDefaults(); // so the stops below have real values to become the defaults of
+            DayNightParams& p = dayNightParams_;
+            const std::string base = prefix_ + "env/dayNight/";
+            p.enabled = &params.add(boolDesc(base + "enabled", dn.enabled));
+            p.paused = &params.add(boolDesc(base + "paused", dn.paused));
+            // Normalised 0..1 so that scrubbing it is obvious: 0 midnight, 0.25 sunrise, 0.5 noon,
+            // 0.75 sunset. This is the one an author reaches for first.
+            p.dayPhase = &params.add(floatDesc(base + "dayPhase", dn.manualPhase, 0.0f, 1.0f, 0.0f, 1.0f));
+            p.cycleSeconds =
+                &params.add(floatDesc(base + "cycleSeconds", dn.cycleSeconds, 1.0f, 86400.0f, 30.0f, 1200.0f));
+            p.phaseOffset =
+                &params.add(floatDesc(base + "phaseOffset", dn.phaseOffset, -1.0f, 1.0f, 0.0f, 1.0f));
+            // Degrees, not radians. `sunPeakElevation` at 0.78 rad means nothing on a slider;
+            // 45 degrees means something immediately. The settings stay in radians -- this is a
+            // presentation choice at the panel, converted on the way in and out.
+            constexpr float kRadToDeg = 57.2957795f;
+            p.sunPeakElevation = &params.add(floatDesc(base + "sun/peakElevationDeg",
+                                                       dn.sunPeakElevation * kRadToDeg, 0.0f, 90.0f, 5.0f, 85.0f));
+            p.sunAzimuthAtDawn = &params.add(floatDesc(base + "sun/azimuthAtDawnDeg",
+                                                       dn.sunAzimuthAtDawn * kRadToDeg, -360.0f, 360.0f, -180.0f, 180.0f));
+            p.sunAzimuthSweep = &params.add(floatDesc(base + "sun/azimuthSweepDeg",
+                                                      dn.sunAzimuthSweep * kRadToDeg, -360.0f, 360.0f, 0.0f, 360.0f));
+            // The `*Scale` multipliers over the authored curves. These already existed as fields
+            // and were simply unreachable, which is the whole of this defect in one line.
+            p.sunIntensityScale =
+                &params.add(floatDesc(base + "sun/intensityScale", dn.sunIntensityScale, 0.0f, 8.0f, 0.0f, 3.0f));
+            p.moonIntensityScale =
+                &params.add(floatDesc(base + "moon/intensityScale", dn.moonIntensityScale, 0.0f, 8.0f, 0.0f, 3.0f));
+            p.starBrightnessScale = &params.add(
+                floatDesc(base + "stars/brightnessScale", dn.starBrightnessScale, 0.0f, 8.0f, 0.0f, 3.0f));
+            p.hdriIntensityScale = &params.add(
+                floatDesc(base + "hdri/intensityScale", dn.hdriIntensityScale, 0.0f, 8.0f, 0.0f, 3.0f));
+            p.glowInfluence =
+                &params.add(floatDesc(base + "glow/influence", dn.glowInfluence, 0.0f, 2.0f, 0.0f, 1.0f));
+            p.fogHorizonBlend =
+                &params.add(floatDesc(base + "fog/horizonBlend", dn.fogHorizonBlend, 0.0f, 1.0f, 0.0f, 1.0f));
+        }
+        // ADR-348, the rest of the sweep: four more environment settings that the scene file could
+        // set and nothing else could reach. `skybox` and `proceduralSkyBackground` in particular
+        // decide what is drawn behind the world, which is not a thing to have to edit JSON for.
+        showSkybox_ = &params.add(boolDesc(prefix_ + "env/skybox", showSkyboxSetting_));
+        proceduralSkyBackground_ =
+            &params.add(boolDesc(prefix_ + "env/proceduralSkyBackground", proceduralSkyBackgroundSetting_));
+        lightFromEnvironment_ =
+            &params.add(boolDesc(prefix_ + "env/lightFromEnvironment", lightFromEnvironmentSetting_));
+        skyBloom_ = &params.add(floatDesc(prefix_ + "env/skyBloom", skyBloomSetting_, 0.0f, 1.0f, 0.0f, 1.0f));
         skyHaze_ = &params.add(floatDesc(prefix_ + "env/sky/haze", sky.hazeWidth, 0.001f, 4.0f, 0.02f, 1.0f));
         skySunIntensity_ = &params.add(
             floatDesc(prefix_ + "env/sky/sunIntensity", sky.sunIntensity, 0.0f, 200.0f, 0.0f, 40.0f));
@@ -3354,6 +3409,30 @@ void Composition::registerNodeParameters(CompositionNode& node) {
         node.waterFoamParam = &params_->add(floatDesc(base + "water/foam", w.foam, 0.0f, 10.0f, 0.0f, 2.0f));
         node.waterGlowColorParam =
             &params_->add(vec3Desc(base + "water/glowColor", w.glowColor, 0.0f, 20.0f, 0.0f, 1.0f));
+        // ADR-348: the nine the water-world spec names, which were all unreachable. `clarity` and
+        // `absorption` are the same idea from two ends -- metres of water the bed stays visible
+        // through -- so this exposes clarity and lets the spec's "Absorption" be its reciprocal
+        // rather than shipping two controls that fight.
+        node.waterClarityParam =
+            &params_->add(floatDesc(base + "water/clarity", w.clarity, 0.01f, 200.0f, 0.2f, 20.0f));
+        node.waterMaxOpacityParam =
+            &params_->add(floatDesc(base + "water/maxOpacity", w.maxOpacity, 0.0f, 1.0f, 0.5f, 1.0f));
+        node.waterFresnelParam =
+            &params_->add(floatDesc(base + "water/fresnel", w.fresnel, 0.0f, 1.0f, 0.0f, 0.5f));
+        node.waterReflectionParam =
+            &params_->add(floatDesc(base + "water/reflection", w.reflection, 0.0f, 32.0f, 0.0f, 8.0f));
+        node.waterRoughnessParam =
+            &params_->add(floatDesc(base + "water/roughness", w.roughness, 0.0f, 1.0f, 0.0f, 0.4f));
+        node.waterRefractionParam =
+            &params_->add(floatDesc(base + "water/refraction", w.refraction, 0.0f, 4.0f, 0.0f, 1.0f));
+        node.waterRippleScaleParam =
+            &params_->add(floatDesc(base + "water/rippleScale", w.rippleScale, 0.001f, 4.0f, 0.005f, 1.0f));
+        node.waterShallowDepthParam =
+            &params_->add(floatDesc(base + "water/shallowDepth", w.shallow, 0.01f, 200.0f, 0.2f, 20.0f));
+        node.waterShallowColorParam =
+            &params_->add(vec3Desc(base + "water/shallowColor", w.shallowColor, 0.0f, 8.0f, 0.0f, 1.0f));
+        node.waterDeepColorParam =
+            &params_->add(vec3Desc(base + "water/deepColor", w.deepColor, 0.0f, 8.0f, 0.0f, 1.0f));
     }
     if (node.kind == NodeKind::Scene && node.child) {
         node.child->attach(*params_, *modulator_, base);
@@ -5283,6 +5362,34 @@ void Composition::applyParameters() {
     // ADR-343. Resolved first because the node loop below needs `glowScale` and `starBrightness`,
     // and written last (at the end of this function) because the sky and the lights it owns are
     // set by the blocks in between. One phase, one state, one frame.
+    // ADR-348: the parameters are the authority and are pushed into the settings here, the same
+    // direction `sky.zenithColor = c(skyZenith_, ...)` already runs. One source of truth: the scene
+    // file supplies the defaults, the parameter carries them from then on.
+    {
+        DayNightParams& p = dayNightParams_;
+        const auto f = [](const params::Parameter<float>* q, float fallback) {
+            return q != nullptr ? q->value() : fallback;
+        };
+        const auto b = [](const params::Parameter<bool>* q, bool fallback) {
+            return q != nullptr ? q->value() : fallback;
+        };
+        scene::DayNightSettings& dn = dayNight_;
+        dn.enabled = b(p.enabled, dn.enabled);
+        dn.paused = b(p.paused, dn.paused);
+        dn.manualPhase = f(p.dayPhase, dn.manualPhase);
+        dn.cycleSeconds = f(p.cycleSeconds, dn.cycleSeconds);
+        dn.phaseOffset = f(p.phaseOffset, dn.phaseOffset);
+        constexpr float kDegToRad = 0.01745329252f;
+        if (p.sunPeakElevation != nullptr) dn.sunPeakElevation = p.sunPeakElevation->value() * kDegToRad;
+        if (p.sunAzimuthAtDawn != nullptr) dn.sunAzimuthAtDawn = p.sunAzimuthAtDawn->value() * kDegToRad;
+        if (p.sunAzimuthSweep != nullptr) dn.sunAzimuthSweep = p.sunAzimuthSweep->value() * kDegToRad;
+        dn.sunIntensityScale = f(p.sunIntensityScale, dn.sunIntensityScale);
+        dn.moonIntensityScale = f(p.moonIntensityScale, dn.moonIntensityScale);
+        dn.starBrightnessScale = f(p.starBrightnessScale, dn.starBrightnessScale);
+        dn.hdriIntensityScale = f(p.hdriIntensityScale, dn.hdriIntensityScale);
+        dn.glowInfluence = f(p.glowInfluence, dn.glowInfluence);
+        dn.fogHorizonBlend = f(p.fogHorizonBlend, dn.fogHorizonBlend);
+    }
     if (dayNight_.enabled) {
         dayNightState_ = resolveDayNight(dayNight_, phaseAt(dayNight_, currentTime_));
     }
@@ -5844,11 +5951,14 @@ void Composition::applyParameters() {
     scene_.environment.environmentRotation =
         envRotation_ != nullptr ? envRotation_->value() : envRotationSetting_;
     // ADR-049: the visible sky's own two controls, independent of the shading intensity above.
-    scene_.environment.showSkybox = showSkyboxSetting_;
-    scene_.environment.proceduralSkyBackground = proceduralSkyBackgroundSetting_;
+    scene_.environment.showSkybox = showSkybox_ != nullptr ? showSkybox_->value() : showSkyboxSetting_;
+    scene_.environment.proceduralSkyBackground = proceduralSkyBackground_ != nullptr
+                                                     ? proceduralSkyBackground_->value()
+                                                     : proceduralSkyBackgroundSetting_;
     scene_.environment.skyIntensity = skyIntensitySetting_;
-    scene_.environment.skyBloom = skyBloomSetting_;
-    scene_.environment.lightFromEnvironment = lightFromEnvironmentSetting_;
+    scene_.environment.skyBloom = skyBloom_ != nullptr ? skyBloom_->value() : skyBloomSetting_;
+    scene_.environment.lightFromEnvironment =
+        lightFromEnvironment_ != nullptr ? lightFromEnvironment_->value() : lightFromEnvironmentSetting_;
     if (lightFromEnvironmentSetting_ && envDominantDirection_.has_value()) {
         // Aim the key light away from the map's brightest pixel, after the rig has expanded, so
         // the moon in frame and the moonlight on the terrain are the same moon. The rig still owns
@@ -6126,6 +6236,16 @@ void Composition::updateWaterSurfaces() {
         if (node.waterSwellParam != nullptr) w.swell = node.waterSwellParam->value();
         if (node.waterFoamParam != nullptr) w.foam = node.waterFoamParam->value();
         if (node.waterGlowColorParam != nullptr) w.glowColor = node.waterGlowColorParam->value();
+        if (node.waterClarityParam != nullptr) w.clarity = node.waterClarityParam->value();
+        if (node.waterMaxOpacityParam != nullptr) w.maxOpacity = node.waterMaxOpacityParam->value();
+        if (node.waterFresnelParam != nullptr) w.fresnel = node.waterFresnelParam->value();
+        if (node.waterReflectionParam != nullptr) w.reflection = node.waterReflectionParam->value();
+        if (node.waterRoughnessParam != nullptr) w.roughness = node.waterRoughnessParam->value();
+        if (node.waterRefractionParam != nullptr) w.refraction = node.waterRefractionParam->value();
+        if (node.waterRippleScaleParam != nullptr) w.rippleScale = node.waterRippleScaleParam->value();
+        if (node.waterShallowDepthParam != nullptr) w.shallow = node.waterShallowDepthParam->value();
+        if (node.waterShallowColorParam != nullptr) w.shallowColor = node.waterShallowColorParam->value();
+        if (node.waterDeepColorParam != nullptr) w.deepColor = node.waterDeepColorParam->value();
     }
 }
 
@@ -6527,6 +6647,71 @@ nlohmann::json Composition::toJson() const {
     environment["skyIntensity"] = skyIntensitySetting_;
     environment["stylized"] = stylized_ != nullptr ? stylized_->base() : stylizedSetting_;
     environment["skybox"] = showSkyboxSetting_;
+    // ADR-348: `dayNight` was READ and never written. A scene that carried a cycle and was saved
+    // lost the entire block -- curves, bindings, cycle length, all of it. That is not a missing
+    // UI, it is data loss, and it is the same defect as the 94 orphaned `atmos/*` parameters this
+    // project has already been bitten by once.
+    {
+        const scene::DayNightSettings& dn = dayNight_;
+        const scene::DayNightSettings def{};
+        json d = json::object();
+        d["enabled"] = dn.enabled;
+        if (dn.paused != def.paused) d["paused"] = dn.paused;
+        if (dn.manualPhase != def.manualPhase) d["dayPhase"] = dn.manualPhase;
+        if (dn.cycleSeconds != def.cycleSeconds) d["cycleSeconds"] = dn.cycleSeconds;
+        if (dn.phaseOffset != def.phaseOffset) d["phaseOffset"] = dn.phaseOffset;
+        if (dn.sunPeakElevation != def.sunPeakElevation) d["sunPeakElevation"] = dn.sunPeakElevation;
+        if (dn.sunAzimuthAtDawn != def.sunAzimuthAtDawn) d["sunAzimuthAtDawn"] = dn.sunAzimuthAtDawn;
+        if (dn.sunAzimuthSweep != def.sunAzimuthSweep) d["sunAzimuthSweep"] = dn.sunAzimuthSweep;
+        if (dn.sunIntensityScale != def.sunIntensityScale) d["sunIntensityScale"] = dn.sunIntensityScale;
+        if (dn.moonIntensityScale != def.moonIntensityScale) d["moonIntensityScale"] = dn.moonIntensityScale;
+        if (dn.starBrightnessScale != def.starBrightnessScale) d["starBrightnessScale"] = dn.starBrightnessScale;
+        if (dn.hdriIntensityScale != def.hdriIntensityScale) d["hdriIntensityScale"] = dn.hdriIntensityScale;
+        if (dn.glowInfluence != def.glowInfluence) d["glowInfluence"] = dn.glowInfluence;
+        if (dn.fogHorizonBlend != def.fogHorizonBlend) d["fogHorizonBlend"] = dn.fogHorizonBlend;
+        if (!dn.sunLight.empty()) d["sunLight"] = dn.sunLight;
+        if (!dn.moonLight.empty()) d["moonLight"] = dn.moonLight;
+        if (!dn.dayMap.empty()) d["dayMap"] = dn.dayMap;
+        if (!dn.nightMap.empty()) d["nightMap"] = dn.nightMap;
+        if (!dn.starNodes.empty()) d["starNodes"] = dn.starNodes;
+        if (!dn.glowNodes.empty()) d["glowNodes"] = dn.glowNodes;
+        const auto writeVec3Curve = [&d](const char* key,
+                                         const std::vector<scene::PhaseKey<glm::vec3>>& keys) {
+            json a = json::array();
+            for (const auto& k : keys) {
+                a.push_back({{"phase", k.phase},
+                             {"value", json::array({k.value.x, k.value.y, k.value.z})}});
+            }
+            d[key] = std::move(a);
+        };
+        const auto writeFloatCurve = [&d](const char* key,
+                                          const std::vector<scene::PhaseKey<float>>& keys) {
+            json a = json::array();
+            for (const auto& k : keys) {
+                a.push_back({{"phase", k.phase}, {"value", k.value}});
+            }
+            d[key] = std::move(a);
+        };
+        if (dn.enabled) {
+            writeVec3Curve("zenithColor", dn.zenithColor);
+            writeVec3Curve("horizonColor", dn.horizonColor);
+            writeVec3Curve("groundColor", dn.groundColor);
+            writeVec3Curve("sunColor", dn.sunColor);
+            writeVec3Curve("fogColor", dn.fogColor);
+            writeVec3Curve("waterDeepColor", dn.waterDeepColor);
+            writeFloatCurve("sunIntensity", dn.sunIntensity);
+            writeFloatCurve("moonIntensity", dn.moonIntensity);
+            writeFloatCurve("skyIntensity", dn.skyIntensity);
+            writeFloatCurve("haze", dn.haze);
+            writeFloatCurve("starBrightness", dn.starBrightness);
+            writeFloatCurve("hdriIntensity", dn.hdriIntensity);
+            writeFloatCurve("hdriBlend", dn.hdriBlend);
+            writeFloatCurve("glowScale", dn.glowScale);
+            writeFloatCurve("fogDensity", dn.fogDensity);
+            writeFloatCurve("waterReflection", dn.waterReflection);
+        }
+        environment["dayNight"] = std::move(d);
+    }
     environment["skyBloom"] = skyBloomSetting_;
     if (ecologyLightGain_ > 0.0f) {
         environment["ecologyLight"] = ecologyLightGain_;
@@ -7237,8 +7422,60 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             rs("nightMap", dn.nightMap);
             rl("starNodes", dn.starNodes);
             rl("glowNodes", dn.glowNodes);
+            // ADR-348: read the curves back. The writer emits them, so without this a save and a
+            // reload would silently restore the defaults and an author's edited colour stop would
+            // vanish -- the same defect as the missing writer, one layer along.
+            const auto readFloatCurve = [&d](const char* key, std::vector<PhaseKey<float>>& out) {
+                if (!d.contains(key) || !d.at(key).is_array()) {
+                    return;
+                }
+                std::vector<PhaseKey<float>> keys;
+                for (const json& k : d.at(key)) {
+                    if (k.is_object() && k.contains("phase") && k.contains("value") &&
+                        k.at("phase").is_number() && k.at("value").is_number()) {
+                        keys.push_back({k.at("phase").get<float>(), k.at("value").get<float>()});
+                    }
+                }
+                if (!keys.empty()) {
+                    out = std::move(keys);
+                }
+            };
+            const auto readVec3Curve = [&d](const char* key, std::vector<PhaseKey<glm::vec3>>& out) {
+                if (!d.contains(key) || !d.at(key).is_array()) {
+                    return;
+                }
+                std::vector<PhaseKey<glm::vec3>> keys;
+                for (const json& k : d.at(key)) {
+                    if (k.is_object() && k.contains("phase") && k.at("phase").is_number() &&
+                        k.contains("value") && k.at("value").is_array() && k.at("value").size() == 3) {
+                        const json& v = k.at("value");
+                        keys.push_back({k.at("phase").get<float>(),
+                                        glm::vec3(v[0].get<float>(), v[1].get<float>(), v[2].get<float>())});
+                    }
+                }
+                if (!keys.empty()) {
+                    out = std::move(keys);
+                }
+            };
+            readVec3Curve("zenithColor", dn.zenithColor);
+            readVec3Curve("horizonColor", dn.horizonColor);
+            readVec3Curve("groundColor", dn.groundColor);
+            readVec3Curve("sunColor", dn.sunColor);
+            readVec3Curve("fogColor", dn.fogColor);
+            readVec3Curve("waterDeepColor", dn.waterDeepColor);
+            readFloatCurve("sunIntensity", dn.sunIntensity);
+            readFloatCurve("moonIntensity", dn.moonIntensity);
+            readFloatCurve("skyIntensity", dn.skyIntensity);
+            readFloatCurve("haze", dn.haze);
+            readFloatCurve("starBrightness", dn.starBrightness);
+            readFloatCurve("hdriIntensity", dn.hdriIntensity);
+            readFloatCurve("hdriBlend", dn.hdriBlend);
+            readFloatCurve("glowScale", dn.glowScale);
+            readFloatCurve("fogDensity", dn.fogDensity);
+            readFloatCurve("waterReflection", dn.waterReflection);
             // Curves the scene did not override get the Tree of Life defaults, so `enabled: true`
-            // on its own is a complete cycle rather than a black world.
+            // on its own is a complete cycle rather than a black world. `fill` only writes into an
+            // empty list, so anything read above survives this.
             dn.applyDefaults();
         }
         // Either a path to a rig file or the rig itself. Generated worlds write the latter, because

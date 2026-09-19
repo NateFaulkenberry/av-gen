@@ -329,6 +329,20 @@ struct CompositionNode {
     params::Parameter<float>* waterFlowSpeedParam = nullptr;
     params::Parameter<float>* waterSwellParam = nullptr;
     params::Parameter<float>* waterFoamParam = nullptr;
+    // ADR-348. ADR-099 chose six water properties as "the ones worth moving". The water-world
+    // spec's §17 and §23 ask for a different nine, and none of them were reachable: a scene could
+    // not change how clear its water was, what colour it went with depth, or how much sky it
+    // reflected, without editing JSON. Added rather than replacing the six.
+    params::Parameter<float>* waterClarityParam = nullptr;
+    params::Parameter<float>* waterMaxOpacityParam = nullptr;
+    params::Parameter<float>* waterFresnelParam = nullptr;
+    params::Parameter<float>* waterReflectionParam = nullptr;
+    params::Parameter<float>* waterRoughnessParam = nullptr;
+    params::Parameter<float>* waterRefractionParam = nullptr;
+    params::Parameter<float>* waterRippleScaleParam = nullptr;
+    params::Parameter<float>* waterShallowDepthParam = nullptr;
+    params::Parameter<glm::vec3>* waterShallowColorParam = nullptr;
+    params::Parameter<glm::vec3>* waterDeepColorParam = nullptr;
     params::Parameter<glm::vec3>* waterGlowColorParam = nullptr;
 };
 
@@ -1041,6 +1055,34 @@ private:
     // parameter, so "one environment changing state" is true by ordering rather than by care.
     scene::DayNightSettings dayNight_;
     scene::DayNightState dayNightState_;  // this frame's resolved environment
+    // ADR-348. Every one of these was a struct field the application read and never kept: no
+    // parameter, no UI, no modulation, no keyframing -- and no writer either, so a scene that
+    // loaded a `dayNight` block and was saved lost it. ADR-225 twice over.
+    struct DayNightParams {
+        params::Parameter<bool>* enabled = nullptr;
+        params::Parameter<bool>* paused = nullptr;
+        params::Parameter<float>* dayPhase = nullptr;      // the scrub target
+        params::Parameter<float>* cycleSeconds = nullptr;
+        params::Parameter<float>* phaseOffset = nullptr;
+        params::Parameter<float>* sunPeakElevation = nullptr;
+        params::Parameter<float>* sunAzimuthAtDawn = nullptr;
+        params::Parameter<float>* sunAzimuthSweep = nullptr;
+        params::Parameter<float>* sunIntensityScale = nullptr;
+        params::Parameter<float>* moonIntensityScale = nullptr;
+        params::Parameter<float>* starBrightnessScale = nullptr;
+        params::Parameter<float>* hdriIntensityScale = nullptr;
+        params::Parameter<float>* glowInfluence = nullptr;
+        params::Parameter<float>* fogHorizonBlend = nullptr;
+        // No colour parameters. The owner asked for the curves to stay scene-authored, and a wall
+        // of stops is a control surface nobody reaches for while looking at the scene. The sun
+        // angles below are in DEGREES for the same reason: a raw radian sweep is an inscrutable
+        // knob, and a slider from 0 to 90 is not.
+    };
+    DayNightParams dayNightParams_;
+    params::Parameter<bool>* showSkybox_ = nullptr;                 // ADR-348
+    params::Parameter<bool>* proceduralSkyBackground_ = nullptr;    // ADR-348
+    params::Parameter<bool>* lightFromEnvironment_ = nullptr;       // ADR-348
+    params::Parameter<float>* skyBloom_ = nullptr;                  // ADR-348
     bool dayNightNightMap_ = false;       // which map is currently bound
     Scene scene_;
     std::vector<std::unique_ptr<CompositionNode>> nodes_;
