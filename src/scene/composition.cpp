@@ -3397,7 +3397,15 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         vortexColorAccent_ = &params.add(vec3Desc(b + "colorAccent", vx.colorAccent, 0.0f, 8.0f, 0.0f, 2.0f));
     }
     windEnabled_ = &params.add(boolDesc(prefix_ + "scene/wind/enabled", windSetting_.enabled));
-    windSpeed_ = &params.add(floatDesc(prefix_ + "scene/windSpeed", windSetting_.speed, 0.0f, 4.0f, 0.0f, 1.5f));
+    // ADR-377: the hard maximum is 1.6 and not 4.0, and that is a measurement rather than a
+    // preference. The mesh deformation's usable range on a 138 m tree is bounded by LEAF SIZE: the
+    // lean's amplitude times the gentle gradient of its own height/radius weights becomes metres
+    // across a single leaf card, and the card smears. The twelve-shot review caught it at 3.4 and a
+    // sweep puts the onset around 1.8; the soft range already stopped the slider at 1.5, so this
+    // closes the other door -- a modulation route clamps to the hard range, and 4.0 let one drive
+    // the canopy apart. Raising it needs a per-leaf frame the GLB does not carry, not a bigger
+    // number here.
+    windSpeed_ = &params.add(floatDesc(prefix_ + "scene/windSpeed", windSetting_.speed, 0.0f, 1.6f, 0.0f, 1.5f));
     windDirection_ = &params.add(
         floatDesc(prefix_ + "scene/windDirection", windSetting_.direction, -6.2832f, 6.2832f, -3.1416f, 3.1416f));
     // Gusts: fronts that travel downwind. Sharpness 1 is a smooth swell, 8 is distinct fronts with

@@ -259,6 +259,7 @@ struct VertexOut {
 //
 // Pure function of (uniforms, position, time), per ADR-091: scrubbing to a frame and playing to it
 // put the crown in the same place. The owner's 2026-09-19 relaxation covers particles, not this.
+const kMeshBendLimit: f32 = 0.60; // ADR-377: crown travel ceiling, in body heights
 fn meshWindOffset(worldPos: vec3<f32>, t: f32) -> vec3<f32> {
     let strength = object.windShape.y;
     if (strength <= 0.0 || frame.windDir.w <= 0.0) {
@@ -306,8 +307,41 @@ fn meshWindOffset(worldPos: vec3<f32>, t: f32) -> vec3<f32> {
     // what keeps neighbouring leaves rattling out of step instead of shimmering together. Two
     // orders of magnitude below the lean, because this is centimetres of leaf, not metres of limb.
     let flutter = sin(wHere.phase + t * (5.5 + 3.0 * wHere.strength) + h * 9.0);
-    off = off + perp * (flutter * foliage * object.windTune.y * 0.0016 * (0.35 + wHere.strength));
+    // ADR-377. The flutter's amplitude SATURATES; the lean above does not, and the difference is
+    // the whole reason the canopy survives a gale. `WindSample::phase` turns a full cycle every
+    // `flutterScale` metres, so the flutter's amplitude appears as a difference between one end of
+    // a leaf card and the other (ADR-360 found this the first time). The lean varies only through
+    // pow(h,k) and a smoothstep over radius and shreds nothing however large it gets.
+    //
+    // Unbounded, `wHere.strength` reaches about 4.9 at the slider's own maximum -- regional
+    // variation multiplies the authored speed -- and at 3.4 the twelve-shot review caught the
+    // canopy smeared into streaks. A slider that destroys the asset inside its own range is a
+    // defect, so the flutter stops growing at 1.8 and the lean carries the rest. Below 1.8 this is
+    // exactly what it was, which is why the shipped scene at 1.319 is byte-identical.
+    let flutterDrive = min(wHere.strength, 2.2);
+    off = off + perp * (flutter * foliage * object.windTune.y * 0.0016 * (0.35 + flutterDrive));
 
+    // ADR-377. A SOFT CEILING on how far the crown may travel, as a fraction of the body's height.
+    // ADR-055 gives procedural plants exactly this (`bendLimit`) and the mesh path never got one,
+    // so the lean grew without bound: `wHere.strength` is the authored speed multiplied by the
+    // regional variation and reaches about 4.9 at the slider's own maximum, and the twelve-shot
+    // review caught the canopy smeared into streaks at 3.4 -- not from the flutter, which was the
+    // obvious suspect and which capping barely changed, but from the lean. A large enough lean
+    // makes even the smoothstep weights' gentle gradient amount to metres across a single leaf.
+    //
+    // The form is ADR-055's: identity for small offsets, asymptotic to the limit for large ones,
+    // and no corner anywhere for a hard clamp to show as a crease.
+    // A KNEE, not an asymptote. ADR-055's `off * L/(len+L)` is smooth but scales everything, even
+    // a tiny lean, so it moves frames that were never in danger -- measured, it changed 839,162
+    // channels of the shipped hero. This is exactly 1 below 0.7 of the limit, so a scene that never
+    // approached the ceiling is untouched, and saturates to the limit above it with a smoothstep
+    // across the join so there is no crease where the two halves meet.
+    let bend = length(off);
+    let s = bend / kMeshBendLimit;
+    if (s > 0.7) {
+        let hard = 1.0 / max(s, 1.0e-6);
+        off = off * mix(1.0, hard, smoothstep(0.7, 1.4, s));
+    }
     var disp = vec3<f32>(off.x, 0.0, off.y) * (strength * height);
     // A limb that bends keeps its length, so the tip drops. Without this the crown shears sideways,
     // which is the classic fake-wind read.
