@@ -281,15 +281,18 @@ fn meshWindOffset(worldPos: vec3<f32>, t: f32) -> vec3<f32> {
     // dashes: every leaf stretched, because its own vertices had been pulled apart. The amplitude
     // that matters is not the one you can see at the crown, it is the gradient across the smallest
     // piece of geometry the mesh is made of. A monument moves about one per cent of its height.
+    // Scaled so that `strength = 1` is a large tree in a light wind. The first calibration put the
+    // usable value at about 5, which is two and a half times the control's soft maximum -- a knob
+    // whose sane setting is off the end of its own slider is a mis-scaled knob, not a preference.
     let steady = wRoot.strength * (1.0 + 0.9 * wRoot.gust);
-    var off = dir * (steady * (trunk + 0.55 * branch) * 0.045);
+    var off = dir * (steady * (trunk + 0.55 * branch) * 0.18);
     // Secondary limbs travel on their own local front, so the crown is never in phase with itself.
-    off = off + wHere.direction * (wHere.strength * (0.35 + wHere.gust) * branch * 0.030);
+    off = off + wHere.direction * (wHere.strength * (0.35 + wHere.gust) * branch * 0.12);
     // Foliage flutter: fast, small, and decorrelated by the field's spatial phase term, which is
     // what keeps neighbouring leaves rattling out of step instead of shimmering together. Two
     // orders of magnitude below the lean, because this is centimetres of leaf, not metres of limb.
     let flutter = sin(wHere.phase + t * (5.5 + 3.0 * wHere.strength) + h * 9.0);
-    off = off + perp * (flutter * foliage * object.windTune.y * 0.0004 * (0.35 + wHere.strength));
+    off = off + perp * (flutter * foliage * object.windTune.y * 0.0016 * (0.35 + wHere.strength));
 
     var disp = vec3<f32>(off.x, 0.0, off.y) * (strength * height);
     // A limb that bends keeps its length, so the tip drops. Without this the crown shears sideways,
