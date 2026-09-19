@@ -6786,6 +6786,21 @@ nlohmann::json Composition::toJson() const {
     }
     environment["fogDensity"] = fogDensity_ != nullptr ? fogDensity_->base() : fogDensitySetting_;
     {
+        // ADR-354. Out here rather than in the volumetric block below, which is where it was
+        // first written and where a test caught it: that block is guarded by the volume being ON,
+        // and this scene has no volume, so the save dropped the range and the reload cast no
+        // shadow again -- ADR-207/230's silent deletion, one field along. Written only when the
+        // scene has an opinion, so a file that never set it is byte-identical after a round trip.
+        //
+        // Note for whoever comes to `shadowCascades` next: it is still inside that guard, and a
+        // scene that sets cascades without a volume loses them on save for exactly this reason.
+        // Left alone here because fixing it changes files this branch does not own.
+        const float range = shadowRange_ != nullptr ? shadowRange_->base() : volumeSetting_.shadowRange;
+        if (range > 0.0f) {
+            environment["shadowRange"] = range;
+        }
+    }
+    {
         // Procedural sky (ADR-036): written only when it differs from the defaults, so scene files
         // that never touched it stay byte-identical.
         const SkySettings def;
@@ -6880,7 +6895,6 @@ nlohmann::json Composition::toJson() const {
             environment["volumeEmission"] = base(volumeEmission_, volumeSetting_.volumeEmission);
             environment["volumeSteps"] = volumeSteps_ != nullptr ? volumeSteps_->base() : volumeSetting_.volumeSteps;
             environment["shadowCascades"] = volumeSetting_.shadowCascades;
-            environment["shadowRange"] = base(shadowRange_, volumeSetting_.shadowRange);
             environment["volumeMaxDistance"] = volumeSetting_.volumeMaxDistance;
             if (!volumeDensityFieldSetting_.empty()) {
                 environment["volumeDensityField"] = volumeDensityFieldSetting_;

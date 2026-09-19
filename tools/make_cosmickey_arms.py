@@ -24,6 +24,8 @@ deliverable has something it must fail on:
                     which is what tells a shadow measurement from a shading measurement.
   _ck-ctl-noglow    every emissiveBoost at 0. What the geometry looks like under the key alone --
                     brief §12's question, asked directly.
+  _ck-ctl-nofill    the fill light disabled. The shadow-side-detail probe must fail on this one,
+                    or it is measuring something the fill is not responsible for.
 """
 
 from __future__ import annotations
@@ -79,12 +81,18 @@ def main() -> None:
             light["castsShadow"] = False
     write("_ck-ctl-noshadow", project, s)
 
+    s = json.loads(json.dumps(scene))
+    for light in s["lights"]:
+        if light["role"] == "fill":
+            light["enabled"] = False
+    write("_ck-ctl-nofill", project, s)
+
     p = json.loads(json.dumps(project))
     for node in GLOW_NODES:
         p["parameters"][f"nodes/{node}/emissiveBoost"] = 0.0
     write("_ck-ctl-noglow", p, json.loads(json.dumps(scene)))
 
-    print(f"wrote {len(CAMERAS) + 3} arms to {EX}")
+    print(f"wrote {len(CAMERAS) + 4} arms to {EX}")
 
 
 if __name__ == "__main__":

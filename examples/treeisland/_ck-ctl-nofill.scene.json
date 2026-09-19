@@ -33,7 +33,7 @@
         0.78
       ],
       "intensity": 5.0,
-      "castsShadow": false,
+      "castsShadow": true,
       "shadowStrength": 0.95,
       "softness": 1.8
     },
@@ -73,7 +73,8 @@
       "intensity": 0.38,
       "castsShadow": false,
       "shadowStrength": 0.0,
-      "softness": 4.0
+      "softness": 4.0,
+      "enabled": false
     }
   ],
   "environment": {
