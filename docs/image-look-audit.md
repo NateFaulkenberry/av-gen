@@ -720,4 +720,48 @@ absolute floors, and they can only fail by an effect vanishing — never by one 
 direction ADR-378's form was blind to. The eight Phase 0 captures assert nothing at all; they are
 arms to be diffed.
 
-<!-- SIXTYSIX -->
+### 9.3 §66's CPU readback: measured, material, and a decision rather than a side-effect
+
+My first audit found the readback, reported it, and declined to touch it on the grounds that
+removing it would *"trade a measured determinism guarantee for an unmeasured frame-time gain"*. The
+gain is no longer unmeasured.
+
+`PostProcessor::takeMeasurement` (`post_processor.cpp:343`) calls `MapAsync` on the 256-byte
+metering buffer and then `context_.waitFor(future)` — a synchronous stall on the main thread —
+reads two halves out of the mapped range and unmaps. It runs **only in automatic exposure mode**;
+the manual path clears the pending flag and never maps.
+
+So the measurement is automatic against manual, which isolates metering-plus-readback from
+everything else. `examples/hero/hero.json`, live editor, `--ui-script idle --frames 420
+--profile-cpu`, **3066x1770 (5.43 Mpx)**, 12 861 triangles, through `tools/gpu-lock.sh`, arms
+interleaved three times. **Machine genuinely quiet** — zero other compiles, renders or test binaries
+above 50% CPU for the duration. Minima over repeats (ADR-170):
+
+| | `gpu.frame` medians | best | `FRAME` medians | best |
+|---|---|---|---|---|
+| manual | 22.020 / 22.020 / 22.086 | **22.020** | 23.132 / 23.134 / 23.251 | **23.132** |
+| automatic | 22.086 / 22.020 / 22.151 | **22.020** | 24.709 / 24.799 / 24.819 | **24.709** |
+
+- **GPU: +0.000 ms.** The six metering passes — a quarter-resolution prefilter and 4x4 reductions
+  to 1x1 — cost nothing measurable.
+- **CPU: +1.577 ms per frame**, and the two arms' three-sample ranges do not overlap (23.13–23.25
+  against 24.71–24.82), so this is signal, not spread.
+
+Since the GPU side is free, **the 1.58 ms is the blocking map**. On this frame that is **6.4% of a
+23 ms frame, on the main thread, in automatic exposure mode**. §66 says no CPU readback for
+exposure; there is one, and it costs that.
+
+**Not removed here, and this is a recommendation rather than a deferral.** The stall is what buys
+ADR-037's determinism: frame *N* consumes frame *N−1*'s measurement through a blocking map
+specifically so there is no timing race, and `test_image_formation_gpu.cpp` asserts two offline
+renders are bit-identical over 40 frames. Removing it means moving the exposure state GPU-side, or
+double-buffering the readback so a copy has two frames to land. **The double-buffer is the small
+one** — it stays a pure function of prior frames, so determinism survives — but it changes the
+documented "frame *N* uses frame *N−1*" to *N−2*, which changes the temporal response of every
+auto-exposure scene and is therefore a re-baseline of exactly the kind this project insists be taken
+deliberately.
+
+That is an ADR-sized change to the exposure loop, not the short tail this pass was scoped to.
+**Recommended, costed at 1.58 ms per frame, and handed over rather than taken.**
+
+
