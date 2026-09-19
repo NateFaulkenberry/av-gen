@@ -78,12 +78,24 @@ struct Framebuffer {
     // Feature buffers from the FIRST hit along each path (spec sections 51, 61). They are what lets
     // a denoiser keep an edge it would otherwise smooth away, and they are the first two AOVs.
     // Accumulated and averaged like radiance so they carry the same anti-aliasing.
+    // The vocabulary is `app::RenderSettings::aovNames()`'s -- normal, emission, depth, id -- plus
+    // `albedo`, which the realtime renderer has no equivalent of and the denoiser requires. It
+    // EXTENDS that list rather than inventing a rival one (spec section 31). `velocity` and
+    // `shadow` are the two realtime AOVs with no counterpart here yet; see the overview doc.
     std::vector<glm::vec3> albedo;
-    std::vector<glm::vec3> normal;   // world space, unit length after resolve
+    std::vector<glm::vec3> normal;    // world space, unit length after resolve
+    std::vector<glm::vec3> emission;  // linear radiance emitted by the first surface hit
+    std::vector<float> depth;         // VIEW-SPACE metres along the camera's forward axis
+    std::vector<float> objectId;      // packPickId(Entity, index), float-encoded; -1 for a miss
 
     [[nodiscard]] std::vector<glm::vec3> resolvedRadiance() const;
     [[nodiscard]] std::vector<glm::vec3> resolvedAlbedo() const;
     [[nodiscard]] std::vector<glm::vec3> resolvedNormal() const;
+    [[nodiscard]] std::vector<glm::vec3> resolvedEmission() const;
+    // Depth and id are NOT averaged across samples: a mean of two depths at a silhouette is a
+    // distance to nothing, and a mean of two ids is a third object. They take the first sample.
+    [[nodiscard]] const std::vector<float>& rawDepth() const { return depth; }
+    [[nodiscard]] const std::vector<float>& rawObjectId() const { return objectId; }
 
     void resize(std::uint32_t w, std::uint32_t h);
     // Mean radiance per pixel. Empty if no samples have landed.

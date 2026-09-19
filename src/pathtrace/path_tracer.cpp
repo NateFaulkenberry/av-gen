@@ -174,10 +174,14 @@ struct PathResult {
     glm::vec3 radiance{0.0f};
     glm::vec3 albedo{0.0f};
     glm::vec3 normal{0.0f};
+    glm::vec3 emission{0.0f};
+    float depth = -1.0f;      // view-space metres; negative means the ray hit nothing
+    float objectId = -1.0f;
 };
 
 [[nodiscard]] PathResult radiance(const Snapshot& snap, const EmbreeScene& embree, Ray ray,
-                                  const TraceSettings& settings, Sampler& sampler, Counters& counters) {
+                                  const TraceSettings& settings, Sampler& sampler, Counters& counters,
+                                  const glm::vec3& viewOrigin, const glm::vec3& viewForward) {
     PathResult path;
     glm::vec3 result{0.0f};
     glm::vec3 throughput{1.0f};
@@ -203,6 +207,8 @@ struct PathResult {
                 // giving it black would tell the filter there is an edge where there is only sky.
                 path.albedo = env;
                 path.normal = -ray.direction;
+                path.depth = -1.0f;      // a miss has no depth; 0 would read as "at the camera"
+                path.objectId = -1.0f;
                 firstHitRecorded = true;
             }
             break;
@@ -218,6 +224,13 @@ struct PathResult {
             // like a black hole in the albedo buffer and get smoothed into its surroundings.
             path.albedo = m.diffuseAlbedo() + m.f0() * m.metallic + m.emission;
             path.normal = hit.shadingNormal;
+            path.emission = m.emission;
+            // View-space depth in metres, matching what `linearDepthTexture` holds, NOT the ray's
+            // t: t is the distance travelled and grows toward the corners of the frame even across
+            // a flat wall, which makes a depth pass that looks curved.
+            path.depth = glm::dot(hit.position - viewOrigin, viewForward);
+            path.objectId = static_cast<float>(
+                scene::packPickId(scene::PickSpace::Entity, snap.meshes[hit.meshIndex].entityIndex));
             firstHitRecorded = true;
         }
 
@@ -317,6 +330,9 @@ void Framebuffer::resize(std::uint32_t w, std::uint32_t h) {
     radiance.assign(static_cast<std::size_t>(w) * h, glm::vec3(0.0f));
     albedo.clear();
     normal.clear();
+    emission.clear();
+    depth.clear();
+    objectId.clear();
     sampleCount = 0;
 }
 
@@ -333,6 +349,14 @@ std::vector<glm::vec3> Framebuffer::resolvedAlbedo() const {
     if (sampleCount == 0) return out;
     const float inv = 1.0f / static_cast<float>(sampleCount);
     for (std::size_t i = 0; i < albedo.size(); ++i) out[i] = albedo[i] * inv;
+    return out;
+}
+
+std::vector<glm::vec3> Framebuffer::resolvedEmission() const {
+    std::vector<glm::vec3> out(emission.size(), glm::vec3(0.0f));
+    if (sampleCount == 0) return out;
+    const float inv = 1.0f / static_cast<float>(sampleCount);
+    for (std::size_t i = 0; i < emission.size(); ++i) out[i] = emission[i] * inv;
     return out;
 }
 
@@ -403,6 +427,9 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
         const std::size_t n = static_cast<std::size_t>(settings.width) * settings.height;
         out.albedo.assign(n, glm::vec3(0.0f));
         out.normal.assign(n, glm::vec3(0.0f));
+        out.emission.assign(n, glm::vec3(0.0f));
+        out.depth.assign(n, -1.0f);
+        out.objectId.assign(n, -1.0f);
     }
     const CameraBasis basis = cameraBasis(snapshot.camera, settings.width, settings.height);
 
@@ -427,23 +454,33 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
                 glm::vec3 sum{0.0f};
                 glm::vec3 albedoSum{0.0f};
                 glm::vec3 normalSum{0.0f};
+                glm::vec3 emissionSum{0.0f};
                 for (std::uint32_t s = 0; s < settings.samplesPerPixel; ++s) {
                     Sampler sampler(settings.seed, pixelIndex, s);
                     const glm::vec2 jitter = sampler.next2D();
                     const Ray ray = generateRay(basis, static_cast<float>(x) + jitter.x,
                                                 static_cast<float>(y) + jitter.y, settings.width,
                                                 settings.height);
-                    const PathResult p = radiance(snapshot, embree, ray, settings, sampler, counters);
+                    const PathResult p = radiance(snapshot, embree, ray, settings, sampler, counters,
+                                                  basis.origin, basis.forward);
                     sum += p.radiance;
                     if (settings.captureFeatures) {
                         albedoSum += p.albedo;
                         normalSum += p.normal;
+                        emissionSum += p.emission;
+                        if (s == 0) {
+                            // First sample only: a mean of two depths at a silhouette is a distance
+                            // to nothing, and a mean of two ids is a third object.
+                            out.depth[pixelIndex] = p.depth;
+                            out.objectId[pixelIndex] = p.objectId;
+                        }
                     }
                 }
                 out.radiance[pixelIndex] = sum;
                 if (settings.captureFeatures) {
                     out.albedo[pixelIndex] = albedoSum;
                     out.normal[pixelIndex] = normalSum;
+                    out.emission[pixelIndex] = emissionSum;
                 }
             }
         }
@@ -524,6 +561,19 @@ Result<void> writeFramebufferAovExr(const Framebuffer& fb, const std::filesystem
     // `normal.X/Y/Z`, never `normal.R/G/B`: a direction is not a colour (spec section 33). Half is
     // enough for a unit vector and is what every renderer writes.
     if (!normal.empty()) addVec3(normal, "normal.X", "normal.Y", "normal.Z", true);
+
+    const std::vector<glm::vec3> emissionAov = fb.resolvedEmission();
+    if (!emissionAov.empty()) addVec3(emissionAov, "emission.R", "emission.G", "emission.B", true);
+
+    // Depth and id are single channels and both are FLOAT, never half: half quantises depth
+    // visibly past a few hundred metres, and an id is an integer that must survive exactly.
+    const auto addScalar = [&](const std::vector<float>& src, const char* name) {
+        if (src.size() != pixels) return;
+        planes.emplace_back(src);
+        channels.push_back({name, {}, false});
+    };
+    addScalar(fb.rawDepth(), "depth.Z");
+    addScalar(fb.rawObjectId(), "id.X");
 
     // Bind the spans only once `planes` has stopped growing, or a reallocation dangles them.
     for (std::size_t i = 0; i < channels.size(); ++i) {

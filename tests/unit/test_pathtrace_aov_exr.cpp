@@ -15,6 +15,8 @@
 
 #include <tinyexr.h>
 
+#include <glm/gtc/quaternion.hpp>
+
 #include <algorithm>
 #include <filesystem>
 #include <string>
@@ -139,7 +141,8 @@ TEST_CASE("the AOV EXR carries beauty as colour and features as named layers",
 
     const auto names = channelNames(path);
     INFO("channels: " << [&] { std::string j; for (const auto& n : names) j += n + " "; return j; }());
-    REQUIRE(names.size() == 9);
+    // 3 beauty + 3 albedo + 3 normal + 3 emission + depth + id.
+    REQUIRE(names.size() == 14);
     // Beauty IS colour and belongs under R/G/B.
     REQUIRE(has(names, "R"));
     REQUIRE(has(names, "G"));
@@ -210,4 +213,118 @@ TEST_CASE("writing AOVs without capturing them writes only the beauty pass",
     REQUIRE_FALSE(has(names, "normal.X"));
     REQUIRE_FALSE(has(names, "albedo.R"));
     std::filesystem::remove(path);
+}
+
+TEST_CASE("depth, emission and id AOVs carry what their names say",
+          "[unit][pathtrace][aov]") {
+    // A scene with two objects at KNOWN distances, one emissive and one not, so each AOV has an
+    // answer that can be checked rather than merely inspected.
+    scene::Scene s;
+    s.environment.sky.enabled = false;
+    s.environment.backgroundColor = glm::vec3(0.0f);
+    s.camera.position = glm::vec3(0.0f, 0.0f, 10.0f);
+    s.camera.target = glm::vec3(0.0f, 0.0f, 0.0f);
+    s.camera.up = glm::vec3(0.0f, 1.0f, 0.0f);
+    s.camera.lens.useExplicitFov = true;
+    s.camera.fovYRadians = 0.8f;
+
+    // A wall at z = 0, so every point on it is exactly 10 m from the camera in VIEW depth even
+    // though the corner rays travel further. That distinction is the point of the depth arm.
+    const scene::MeshId wallId = s.addMesh(scene::makePlane(6.0f, 1));
+    scene::Entity& wall = s.addEntity("wall", wallId);
+    wall.transform.rotation = glm::angleAxis(1.5707963f, glm::vec3(1.0f, 0.0f, 0.0f));
+    wall.material.baseColor = glm::vec3(0.5f);
+
+    // A small emissive ball 4 m nearer the camera.
+    const scene::MeshId ballId = s.addMesh(scene::makeIcosphere(0.8f, 2));
+    scene::Entity& ball = s.addEntity("ball", ballId);
+    ball.transform.position = glm::vec3(0.0f, 0.0f, 4.0f);
+    ball.material.emissiveColor = glm::vec3(0.1f, 0.8f, 0.4f);
+    ball.material.emissiveIntensity = 5.0f;
+
+    pathtrace::TraceSettings t;
+    t.width = 64;
+    t.height = 64;
+    t.samplesPerPixel = 4;
+    t.maxDepth = 0;
+    t.captureFeatures = true;
+
+    pathtrace::PathTracer tr;
+    pathtrace::Framebuffer fb;
+    REQUIRE(tr.render(pathtrace::buildSnapshot(s), t, fb).has_value());
+
+    const auto idx = [&](std::uint32_t x, std::uint32_t y) { return y * fb.width + x; };
+    const auto& depth = fb.rawDepth();
+    const auto& ids = fb.rawObjectId();
+    const auto emission = fb.resolvedEmission();
+
+    // --- depth: the ball is at 6 m, the wall at 10 m ---
+    REQUIRE(depth[idx(32, 32)] == Approx(6.0f).margin(0.9f));   // centre: the ball's near face
+    REQUIRE(depth[idx(2, 32)] == Approx(10.0f).margin(0.2f));   // edge: the wall
+    // VIEW depth, not ray length: the wall's corner must read the SAME 10 m as its centre, even
+    // though that ray travelled further. A depth pass built from `t` would bow outwards here.
+    REQUIRE(depth[idx(2, 2)] == Approx(depth[idx(2, 32)]).margin(0.2f));
+
+    // --- emission: only the ball emits, and it emits the colour it was given ---
+    const glm::vec3 centreEmission = emission[idx(32, 32)];
+    const glm::vec3 edgeEmission = emission[idx(2, 32)];
+    REQUIRE(centreEmission.y > 1.0f);
+    REQUIRE(centreEmission.y > centreEmission.x * 3.0f);  // it is green-cyan, as authored
+    REQUIRE(glm::length(edgeEmission) == Approx(0.0f).margin(1e-5));  // the wall does not emit
+
+    // --- id: two objects, two different ids, and neither is the miss value ---
+    const float ballId_ = ids[idx(32, 32)];
+    const float wallId_ = ids[idx(2, 32)];
+    INFO("ball id " << ballId_ << " wall id " << wallId_);
+    REQUIRE(ballId_ >= 0.0f);
+    REQUIRE(wallId_ >= 0.0f);
+    REQUIRE(ballId_ != wallId_);
+    // The id is an exact integer, not an average: it must survive a float round trip unchanged.
+    REQUIRE(ballId_ == Approx(std::round(ballId_)));
+
+    // --- and all of it reaches the EXR under names that say what they are ---
+    const auto path = tmp("avgen_pathtrace_all_aovs.exr");
+    std::filesystem::remove(path);
+    REQUIRE(pathtrace::writeFramebufferAovExr(fb, path).has_value());
+    const auto names = channelNames(path);
+    REQUIRE(has(names, "emission.R"));
+    REQUIRE(has(names, "depth.Z"));
+    REQUIRE(has(names, "id.X"));
+    // Depth and id are geometry, not colour, so they must not be sitting in R/G/B either.
+    REQUIRE_FALSE(has(names, "depth.R"));
+    REQUIRE_FALSE(has(names, "id.R"));
+    REQUIRE(names.size() == 14); // 3 beauty + 3 albedo + 3 normal + 3 emission + depth + id
+    std::filesystem::remove(path);
+}
+
+TEST_CASE("a ray that hits nothing has no depth and no id", "[unit][pathtrace][aov]") {
+    // A miss must not read as "at the camera" or "object 0". Both are plausible-looking values that
+    // a compositor would act on.
+    scene::Scene s;
+    s.environment.sky.enabled = true;
+    const scene::MeshId id = s.addMesh(scene::makeIcosphere(3.0f, 2)); // big enough to cover the centre
+    scene::Entity& tiny = s.addEntity("tiny", id);
+    tiny.transform.position = glm::vec3(0.0f, 0.0f, 0.0f);
+    s.camera.position = glm::vec3(0.0f, 0.0f, 20.0f);
+    s.camera.target = glm::vec3(0.0f, 0.0f, 0.0f);
+    s.camera.lens.useExplicitFov = true;
+    s.camera.fovYRadians = 1.2f;
+
+    pathtrace::TraceSettings t;
+    t.width = 32;
+    t.height = 32;
+    t.samplesPerPixel = 2;
+    t.maxDepth = 0;
+    t.captureFeatures = true;
+    pathtrace::PathTracer tr;
+    pathtrace::Framebuffer fb;
+    REQUIRE(tr.render(pathtrace::buildSnapshot(s), t, fb).has_value());
+
+    // A corner pixel misses the tiny sphere entirely.
+    REQUIRE(fb.rawDepth()[0] < 0.0f);
+    REQUIRE(fb.rawObjectId()[0] < 0.0f);
+    // CONTROL: the centre pixel hits it, so the negatives above are a miss and not a broken buffer.
+    const std::size_t centre = 16u * fb.width + 16u;
+    REQUIRE(fb.rawDepth()[centre] > 0.0f);
+    REQUIRE(fb.rawObjectId()[centre] >= 0.0f);
 }

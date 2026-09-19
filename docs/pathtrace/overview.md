@@ -35,7 +35,7 @@ never reaches into the realtime post chain. Colour management is downstream of t
 | 3 | BSDF + light sampling, MIS, Russian roulette | **done** |
 | 4 | OIDN denoising | **done** (opt-in) |
 | 5 | Scene integration: CPU skinning, procedural scatter | **done** |
-| 6 | AOVs: albedo, normal, multi-layer EXR | **partly** |
+| 6 | AOVs: albedo, normal, emission, depth, id | **done** |
 | 7 | Glowmere | not started |
 | 8 | Production features | not started |
 
@@ -113,8 +113,32 @@ tinyexr header always exposed `EXRHeader`/`EXRChannelInfo`/`SaveEXRImageToFile`.
 debt recorded at `src/app/render_settings.hpp`: *"the layered form is a better file and a bigger
 change; it is recorded as not done rather than half-built."*
 
-Still to do in Phase 6: depth, motion vectors, object and material IDs, and reconciling this
-vocabulary with `app::RenderSettings::aovNames()`.
+The vocabulary **extends** `app::RenderSettings::aovNames()` rather than rivalling it (spec section
+31). Shared: `normal`, `emission`, `depth`, `id`. Added: `albedo`, which the realtime renderer has no
+equivalent of and the denoiser requires. **Not implemented:** `velocity`, which needs a previous-frame
+transform the snapshot does not carry, and `shadow`, which is a realtime pass rather than a quantity
+a path tracer naturally produces.
+
+Two details that are decisions, not incidentals:
+
+* **Depth is view-space metres**, `dot(hit - eye, forward)`, not the ray's `t`. Using `t` makes a
+  flat wall's depth bow outwards toward the corners, because those rays travelled further. A test
+  pins the wall's corner and centre to the same value.
+* **Depth and id are not averaged across samples.** A mean of two depths at a silhouette is a
+  distance to nothing and a mean of two ids is a third object, so both take the first sample. A miss
+  writes -1, never 0 or object 0, because those are plausible values a compositor would act on.
+
+### `ProceduralGeometry::instanceMatrix` is not where instance *i* is
+
+It is where the **distribution** would have put it: `distributionTransform * placement(i) *
+variation * sourceTransform`, which is what its own documentation says and what
+`procedural_renderer.cpp:1725` uses it for as the CPU reference the GPU is verified against. It does
+**not** read `instances[i]`, and the baked array is what the renderer actually draws. Read
+`instances`; leave that function alone.
+
+The reusable lesson is the shape of the check that caught it: twelve cubes placed across 22 m came
+out spanning 7 m **with a correct triangle count**. Counting what arrived would have passed. Asking
+where it landed did not.
 
 ## Phase 5 in particular
 
