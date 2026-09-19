@@ -39,27 +39,77 @@ namespace avgen::ui {
 // Ordered rather than a set because the *last* thing selected is the active one: it is whose
 // numbers the inspector shows, and in a transform of several objects it is the one the others move
 // relative to. That is the convention every 3D tool uses and the one people arrive with.
+// What one selected thing is. A camera and a light are not `CompositionNode`s and deliberately
+// never became one: ADR-278 rejected `NodeKind::Light` against 148 switch sites in 16 files, each
+// of which would have had to decide what a node that draws no geometry means to the brush, the
+// context menu and the asset browser. That decision stands, so "the selection" cannot go on being
+// a list of node names.
+//
+// This is the viewport-authoring spec's `SelectionTarget`, and the reason it is one type rather
+// than a selection per panel is that the spec forbids the alternative in as many words: two
+// selection models means two gizmo paths, and the second one is always the one that misses the
+// undo coalescing, the multi-select or the Escape handling.
+//
+// `Node` is first so a default-constructed ref is the kind that already existed.
+struct SelectionRef {
+    enum class Kind : std::uint8_t { Node, Light, Camera };
+    Kind kind = Kind::Node;
+    std::string name;
+
+    friend bool operator==(const SelectionRef&, const SelectionRef&) = default;
+};
+[[nodiscard]] const char* selectionKindName(SelectionRef::Kind kind);
+
 class Selection {
 public:
-    [[nodiscard]] const std::vector<std::string>& nodes() const { return nodes_; }
-    [[nodiscard]] bool empty() const { return nodes_.empty(); }
-    [[nodiscard]] std::size_t size() const { return nodes_.size(); }
+    [[nodiscard]] const std::vector<SelectionRef>& refs() const { return refs_; }
+    // The node members, in selection order.
+    //
+    // **A filter over the one storage, not a second selection.** It returns the `Kind::Node`
+    // members, which is exactly what every existing caller means by "the selection": `deleteNodes`,
+    // `groupNodes`, `topmostOf` and `withDescendants` are all questions about the composition tree
+    // and none of them has an answer for a light. So a mixed selection of a lamp and a rock groups
+    // the rock and moves both, which is what every tool does and what needs no special case.
+    //
+    // Cached rather than computed because this returns a reference and the callers hold it across a
+    // frame; it is rebuilt on mutation, and the mutations are user gestures, not a loop.
+    [[nodiscard]] const std::vector<std::string>& nodes() const { return nodeNames_; }
+    [[nodiscard]] bool empty() const { return refs_.empty(); }
+    [[nodiscard]] std::size_t size() const { return refs_.size(); }
+    // Unqualified, `contains` asks about a node, because that is what every existing caller means.
     [[nodiscard]] bool contains(const std::string& name) const;
-    // The active object: the last one added. Empty when nothing is selected.
+    [[nodiscard]] bool contains(const SelectionRef& ref) const;
+    [[nodiscard]] std::size_t countOf(SelectionRef::Kind kind) const;
+    // The active object: the last one added. A default `SelectionRef{}` when nothing is selected,
+    // whose `name` is empty -- so `primary().empty()` stays the "nothing selected" test the
+    // existing callers already write, and keeps meaning it for a node.
+    [[nodiscard]] const SelectionRef& primaryRef() const;
     [[nodiscard]] const std::string& primary() const;
 
-    void clear() { nodes_.clear(); }
+    void clear() { refs_.clear(); nodeNames_.clear(); }
     void set(std::string name);
     void set(std::vector<std::string> names);
+    void set(SelectionRef ref);
+    void set(std::vector<SelectionRef> refs);
     void add(std::string name);          // no-op when already selected
+    void add(SelectionRef ref);
     void remove(const std::string& name);
+    void remove(const SelectionRef& ref);
     void toggle(std::string name);       // shift-click
+    void toggle(SelectionRef ref);
     // True when this changed anything, so a caller can avoid recording a selection edit that did
     // nothing.
-    bool retainOnly(const scene::Composition& composition); // drops names that no longer exist
+    //
+    // Nodes are checked against the composition, lights against its authored list. A camera ref is
+    // kept whatever happens: a camera's identity is a `CameraId` that the name only labels, so
+    // dropping one on a name miss would deselect the camera every time somebody renamed it.
+    bool retainOnly(const scene::Composition& composition); // drops entries that no longer exist
 
 private:
-    std::vector<std::string> nodes_;
+    void rebuildNodeNames();
+
+    std::vector<SelectionRef> refs_;
+    std::vector<std::string> nodeNames_; // the Kind::Node members, in order
 };
 
 // ---- group navigation --------------------------------------------------------------------------
