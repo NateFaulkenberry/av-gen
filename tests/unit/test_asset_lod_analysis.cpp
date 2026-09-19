@@ -198,14 +198,24 @@ TEST_CASE("what the chain builder achieves on Tree of Life geometry", "[.analysi
         std::uint64_t sourceTotal = 0;
         std::vector<std::uint64_t> rungTotals(settings.ratios.size(), 0);
         double buildMs = 0.0;
+        // §12 asks for memory. A rung's cost is its own vertex and index buffers, which the renderer
+        // uploads beside LOD0's and never instead of them, so this is added rather than traded.
+        std::uint64_t sourceBytes = 0;
+        std::uint64_t rungBytes = 0;
         for (std::size_t i = 0; i < s.meshes.size(); ++i) {
             const auto started = std::chrono::steady_clock::now();
             const auto chain = assets::buildLodChain(s.meshes[i], settings);
             buildMs += millisSince(started);
             REQUIRE(chain);
             sourceTotal += chain->sourceTriangles;
+            sourceBytes += s.meshes[i].vertices.size() * sizeof(scene::Vertex) +
+                           s.meshes[i].indices.size() * sizeof(std::uint32_t);
             for (std::size_t r = 0; r < chain->levels.size() && r < rungTotals.size(); ++r) {
                 rungTotals[r] += chain->levels[r].mesh.indices.size() / 3;
+                if (r > 0) { // rung 0 is the source, which the chain does not carry
+                    rungBytes += chain->levels[r].mesh.vertices.size() * sizeof(scene::Vertex) +
+                                 chain->levels[r].mesh.indices.size() * sizeof(std::uint32_t);
+                }
             }
             if (i != biggest) {
                 continue;
@@ -225,6 +235,10 @@ TEST_CASE("what the chain builder achieves on Tree of Life geometry", "[.analysi
         for (std::size_t r = 0; r < rungTotals.size(); ++r) {
             std::printf("  %5.3f", static_cast<double>(rungTotals[r]) / static_cast<double>(sourceTotal));
         }
-        std::printf("   (%.0f ms to build)\n", buildMs);
+        std::printf("   (%.0f ms to build; %.0f MB source, +%.0f MB of rungs, +%.0f%%)\n", buildMs,
+                    static_cast<double>(sourceBytes) / 1.0e6, static_cast<double>(rungBytes) / 1.0e6,
+                    sourceBytes == 0 ? 0.0
+                                     : 100.0 * static_cast<double>(rungBytes) /
+                                           static_cast<double>(sourceBytes));
     }
 }
