@@ -571,3 +571,54 @@ the batch launched. The tell was `upd.controller` reading 0.000 ms in one arm an
 other: the composition had not attached at all. A 3× "speed-up" from adding four post passes should
 never have been believable, and the number is recorded here because the next person to see a
 suspiciously good result should check the triangle count before the code.
+
+---
+
+## 7. Phase 0's eight captures — proposed, and mine rather than the owner's
+
+The spec's §3 asks for "the **Phase 0 baseline**: the eight captures §51.2 lists, as committed scene
+arms that regenerate". §51.2's text is **not in this repository** — only the revision, which names
+the deliverable without enumerating it. The first pass of this work therefore declined to invent
+eight and attribute them to the owner. This is the second pass, and the set below is **a proposal
+of mine**. If the original list turns up and disagrees, `tools/make_imagelook_captures.py` is the
+one file to change.
+
+They regenerate rather than being committed as scene files, which is the convention
+`tools/make_mcperf_arms.py` established and the reason it gives: the repository has already decided
+not to carry twenty near-identical scenes, and the recipe is the part worth keeping.
+
+```
+tools/make_imagelook_captures.py          # write them into examples/imagelook/
+tools/make_imagelook_captures.py --list   # the set and what each one pins
+tools/make_imagelook_captures.py --clean  # remove them
+```
+
+Each isolates **one** decision in the chain, so a frame that moves says which stage moved it. They
+are self-contained — procedural geometry, flat background, no external assets — so a missing asset
+cannot be mistaken for a regression.
+
+| arm | pins |
+|---|---|
+| `il-grey-ramp` | the tone curve: ten scene-linear greys from 0.002 to 50 |
+| `il-hue-wheel` | hue through AgX's inset — the measurement `chroma-retention` exists to answer |
+| `il-exposure` | the exposure stage at EV−2, far enough from 1 that the pass is definitely encoded |
+| `il-bloom` | the pyramid's energy: one bright emitter at the shipped threshold |
+| `il-defocus` | the shared gather with depth of field **and** the tilt-shift band on, which is the case that takes the larger circle |
+| `il-wide-tier` | halation and the anamorphic streak, both off by default so nothing else notices them |
+| `il-look` | the ADR-368 cinematic integration, all four controls non-zero |
+| `il-disabled` | **the tripwire** — every optional stage off. See below. |
+
+**Verified, not assumed.** All eight render, and all eight produce **distinct** hashes — a baseline
+whose arms are secretly the same image detects nothing. And the pair that matters is confirmed
+live: `il-look` against `il-disabled` is the same scene with only `post/look/*` differing, and it
+moves **54.5% of pixels, by up to +83 levels**. So the tripwire has something real to guard.
+
+`il-disabled` is the one to care about. Its job is to stay byte-identical across any change that
+claims to be off by default — §60/§87 as a standing check rather than a one-off measurement
+(ADR-368). A change there is either a real regression or a deliberate re-baseline, and there is no
+third case.
+
+**What this set does not cover**, said plainly so nobody reads it as complete: motion blur (it needs
+a moving camera and these arms are deliberately static, because an arm whose framing depends on the
+clock cannot be compared frame to frame), the volumetric march, the path tracer, and anything
+needing real assets. Those are gaps in the proposal, not in the engine.

@@ -1,0 +1,163 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "il-defocus",
+  "camera": {
+    "mode": 0,
+    "position": [
+      0,
+      0,
+      12
+    ],
+    "target": [
+      0,
+      0,
+      0
+    ],
+    "fov": 42.0,
+    "orbitSpeed": 0.0
+  },
+  "environment": {
+    "intensity": 0.0,
+    "background": [
+      0.01,
+      0.012,
+      0.02
+    ],
+    "fogDensity": 0.0
+  },
+  "nodes": [
+    {
+      "name": "depth0",
+      "kind": "procedural",
+      "position": [
+        -1.8,
+        0.0,
+        2.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.2,
+            1.2,
+            1.2
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.6,
+            0.25,
+            0.2
+          ],
+          "emissiveColor": [
+            0.6,
+            0.25,
+            0.2
+          ],
+          "emissiveIntensity": 0.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "depth1",
+      "kind": "procedural",
+      "position": [
+        0.0,
+        0.0,
+        -6.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.2,
+            1.2,
+            1.2
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.15,
+            0.55,
+            0.35
+          ],
+          "emissiveColor": [
+            0.15,
+            0.55,
+            0.35
+          ],
+          "emissiveIntensity": 0.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "depth2",
+      "kind": "procedural",
+      "position": [
+        1.8,
+        0.0,
+        -22.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.2,
+            1.2,
+            1.2
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.2,
+            0.3,
+            0.7
+          ],
+          "emissiveColor": [
+            0.2,
+            0.3,
+            0.7
+          ],
+          "emissiveIntensity": 0.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "key",
+      "kind": "light",
+      "light": {
+        "kind": "directional",
+        "direction": [
+          -0.4,
+          -0.8,
+          -0.45
+        ],
+        "color": [
+          1.0,
+          0.96,
+          0.9
+        ],
+        "intensity": 3.0
+      }
+    }
+  ]
+}

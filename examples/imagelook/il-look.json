@@ -1,0 +1,29 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "Image/Look capture: look"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "il-look.scene.json"
+    }
+  },
+  "parameters": {
+    "post/look/atmospheric": 0.45,
+    "post/look/colour": 0.35,
+    "post/look/localContrast": 0.5,
+    "post/look/lightWrap": 0.3
+  },
+  "routes": [],
+  "sources": [],
+  "presets": [],
+  "timeline": {},
+  "render": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "output": "sequence"
+  }
+}

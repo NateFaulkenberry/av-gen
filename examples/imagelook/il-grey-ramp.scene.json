@@ -1,0 +1,411 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "il-grey-ramp",
+  "camera": {
+    "mode": 0,
+    "position": [
+      0,
+      0,
+      12
+    ],
+    "target": [
+      0,
+      0,
+      0
+    ],
+    "fov": 42.0,
+    "orbitSpeed": 0.0
+  },
+  "environment": {
+    "intensity": 0.0,
+    "background": [
+      0.01,
+      0.012,
+      0.02
+    ],
+    "fogDensity": 0.0
+  },
+  "nodes": [
+    {
+      "name": "grey0",
+      "kind": "procedural",
+      "position": [
+        -5.625,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            0.002,
+            0.002,
+            0.002
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "grey1",
+      "kind": "procedural",
+      "position": [
+        -4.375,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            0.0056,
+            0.0056,
+            0.0056
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "grey2",
+      "kind": "procedural",
+      "position": [
+        -3.125,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            0.018,
+            0.018,
+            0.018
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "grey3",
+      "kind": "procedural",
+      "position": [
+        -1.875,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            0.045,
+            0.045,
+            0.045
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "grey4",
+      "kind": "procedural",
+      "position": [
+        -0.625,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            0.18,
+            0.18,
+            0.18
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "grey5",
+      "kind": "procedural",
+      "position": [
+        0.625,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "grey6",
+      "kind": "procedural",
+      "position": [
+        1.875,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "grey7",
+      "kind": "procedural",
+      "position": [
+        3.125,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            4.0,
+            4.0,
+            4.0
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "grey8",
+      "kind": "procedural",
+      "position": [
+        4.375,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            16.0,
+            16.0,
+            16.0
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    },
+    {
+      "name": "grey9",
+      "kind": "procedural",
+      "position": [
+        5.625,
+        0.0,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "subdivisions": 1
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissiveColor": [
+            50.0,
+            50.0,
+            50.0
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.5,
+          "metallic": 0.0
+        }
+      }
+    }
+  ]
+}

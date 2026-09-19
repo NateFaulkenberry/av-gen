@@ -1,0 +1,30 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "Image/Look capture: defocus"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "il-defocus.scene.json"
+    }
+  },
+  "parameters": {
+    "post/dof/enabled": true,
+    "post/dof/focusDistance": 8.0,
+    "post/dof/maxRadius": 10.0,
+    "post/tiltShift/enabled": true,
+    "post/tiltShift/bandWidth": 0.25
+  },
+  "routes": [],
+  "sources": [],
+  "presets": [],
+  "timeline": {},
+  "render": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "output": "sequence"
+  }
+}
