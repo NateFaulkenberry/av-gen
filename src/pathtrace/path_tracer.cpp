@@ -652,6 +652,12 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
         log::warn("pathtrace: directional albedo exceeded 1 at {} of {} measured shading events "
                   "(worst {:.3f}). The glTF BRDF is faithful to spec and gains at grazing; see ADR-352.",
                   probe_.exceedances, probe_.hitsProbed, probe_.worstAlbedo);
+        // ADR-372: and the per-material breakdown, which until now was reachable only from a test.
+        // `AlbedoProbeReport::format()` -- material, worst, exceedances, view angle, by-depth
+        // histogram -- was written for ADR-352 and called from `test_pathtrace_albedo_probe.cpp`
+        // and nowhere else, so a person running `--pt-probe` got the one-line summary above and
+        // none of the detail the ADR describes. A report only a test can read is not a report.
+        log::info("pathtrace: per-material directional albedo (ADR-352)\n{}", probe_.format());
     }
     for (const auto& c : perThread) {
         stats_.shadowRays += c.shadowRays;
@@ -733,6 +739,12 @@ Result<void> writeFramebufferAovExr(const Framebuffer& fb, const std::filesystem
 
     addScalar(fb.rawDepth(), "depth.Z");
     addScalar(fb.rawObjectId(), "id.X");
+    // ADR-352's per-pixel diagnostic, present only when `--pt-probe` ran. `.X` and not `.R`: a
+    // directional albedo is a ratio, not a colour (spec section 33), and a compositor that colour-
+    // manages it would be transforming a number. Until now this buffer was filled every probe run
+    // and written nowhere, so the "points at the offending region" the header promises could not be
+    // looked at; the aggregate table says a material gains energy and this says which pixels.
+    addScalar(fb.rawWorstAlbedo(), "worstAlbedo.X");
 
     // Bind the spans only once `planes` has stopped growing, or a reallocation dangles them.
     for (std::size_t i = 0; i < channels.size(); ++i) {

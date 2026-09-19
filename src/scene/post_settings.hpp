@@ -231,6 +231,11 @@ struct PostParameters {
     params::Parameter<float>* tiltShiftFalloff = nullptr;
     params::Parameter<float>* tiltShiftMaxRadius = nullptr;
     params::Parameter<float>* motionBlurAmount = nullptr;
+    // ADR-372: read by the shader every frame and registered nowhere, so no scene and no project
+    // could reach them. Same family as the unwired identifier target, one layer along.
+    params::Parameter<int>* motionBlurSamples = nullptr;
+    params::Parameter<float>* motionBlurMaxRadius = nullptr;
+    params::Parameter<int>* motionBlurTileSize = nullptr;
     params::Parameter<float>* antialias = nullptr;
     params::Parameter<float>* sharpen = nullptr;
     params::Parameter<int>* sharpenId = nullptr;

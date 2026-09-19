@@ -123,6 +123,10 @@ struct Framebuffer {
     // distance to nothing, and a mean of two ids is a third object. They take the first sample.
     [[nodiscard]] const std::vector<float>& rawDepth() const { return depth; }
     [[nodiscard]] const std::vector<float>& rawObjectId() const { return objectId; }
+    // ADR-372: empty unless `--pt-probe` ran, and written to the AOV EXR as `worstAlbedo.X` when it
+    // is not. It was filled and read by nothing, which reads as a capability and is worse than an
+    // absent field -- an aggregate table says a material gains energy, this says *where*.
+    [[nodiscard]] const std::vector<float>& rawWorstAlbedo() const { return worstAlbedo; }
 
     void resize(std::uint32_t w, std::uint32_t h);
     // Mean radiance per pixel. Empty if no samples have landed.
