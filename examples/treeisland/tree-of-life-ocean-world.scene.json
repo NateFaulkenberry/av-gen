@@ -212,7 +212,8 @@
       "scale": [1.0, 1.0, 1.0],
       "visible": true,
       "roughnessScale": 1.0,
-      "emissiveBoost": 1.0
+      "emissiveBoost": 1.0,
+      "lod": { "enabled": true, "maxScreenError": 16.0 }
     },
     {
       "name": "tree-twigs",
@@ -224,7 +225,8 @@
       "scale": [1.0, 1.0, 1.0],
       "visible": true,
       "roughnessScale": 1.0,
-      "emissiveBoost": 1.0
+      "emissiveBoost": 1.0,
+      "lod": { "enabled": true, "maxScreenError": 16.0 }
     },
     {
       "name": "tree-tracery",
@@ -236,7 +238,8 @@
       "scale": [1.0, 1.0, 1.0],
       "visible": true,
       "roughnessScale": 1.0,
-      "emissiveBoost": 1.0
+      "emissiveBoost": 1.0,
+      "lod": { "enabled": true, "maxScreenError": 16.0 }
     },
     {
       "name": "tree-foliage",
@@ -248,7 +251,8 @@
       "scale": [1.0, 1.0, 1.0],
       "visible": true,
       "roughnessScale": 1.0,
-      "emissiveBoost": 1.0
+      "emissiveBoost": 1.0,
+      "lod": { "enabled": true, "maxScreenError": 16.0 }
     },
     {
       "name": "tree-lumens",
@@ -260,7 +264,8 @@
       "scale": [1.0, 1.0, 1.0],
       "visible": true,
       "roughnessScale": 1.0,
-      "emissiveBoost": 1.0
+      "emissiveBoost": 1.0,
+      "lod": { "enabled": true, "maxScreenError": 16.0 }
     },
     {
       "name": "cosmos-motes",
