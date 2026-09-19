@@ -75,6 +75,28 @@ struct TriangleMesh {
     [[nodiscard]] bool valid() const;
 };
 
+// ---- emissive geometry (spec section 47) ---------------------------------------------------------
+//
+// An emissive triangle is a light a ray can actually HIT, which is what makes multiple importance
+// sampling possible at all: both strategies can find it, so their densities can be combined.
+//
+// This is a different thing from `scene::PunctualLight`. An analytic light has no geometry in the
+// BVH, so a BSDF ray can never find one, and MIS-weighting a sample of it against the BSDF's density
+// would down-weight the only strategy that can see it -- losing energy for nothing. Analytic lights
+// therefore take weight 1 and emissive geometry takes a real MIS weight. Keeping the two apart is
+// the whole reason this structure exists.
+struct EmissiveTriangle {
+    std::uint32_t meshIndex = 0;
+    std::uint32_t primIndex = 0;
+    glm::vec3 v0{0.0f};
+    glm::vec3 v1{0.0f};
+    glm::vec3 v2{0.0f};
+    glm::vec3 normal{0.0f, 1.0f, 0.0f}; // geometric, normalised
+    glm::vec3 emission{0.0f};           // radiance leaving the surface
+    float area = 0.0f;
+    float cdf = 0.0f;                   // cumulative area fraction, ending at 1
+};
+
 // ---- the snapshot --------------------------------------------------------------------------------
 
 struct Snapshot {
@@ -95,6 +117,10 @@ struct Snapshot {
     bool skyEnabled = false;
     scene::SkyRuntime sky;
     glm::vec3 backgroundColor{0.0f};
+
+    // Every emissive triangle in the scene, with an area CDF for uniform-by-area selection.
+    std::vector<EmissiveTriangle> emissiveTriangles;
+    float totalEmissiveArea = 0.0f;
 
     CapabilityReport capabilities;
 

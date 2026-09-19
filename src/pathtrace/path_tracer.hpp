@@ -14,6 +14,7 @@
 
 #include "core/error.hpp"
 #include "pathtrace/embree_scene.hpp"
+#include "pathtrace/lights.hpp"
 #include "pathtrace/snapshot.hpp"
 
 #include <atomic>
@@ -29,8 +30,25 @@ struct TraceSettings {
     std::uint32_t height = 400;
     std::uint32_t samplesPerPixel = 16;
 
-    // Number of surface interactions. 1 = direct lighting only, which is Phase 1's default.
-    std::uint32_t maxDepth = 1;
+    // Number of surface interactions. 1 = direct lighting only.
+    std::uint32_t maxDepth = 4;
+
+    // ---- Phase 3 ---------------------------------------------------------------------------
+    //
+    // Which estimators contribute. Both on is the normal path; the single-strategy modes exist so a
+    // test can assert that light sampling alone, BSDF sampling alone and the MIS combination all
+    // converge to the SAME answer. That is the arm that catches MIS weights which do not sum to 1 --
+    // a bug that leaves the combined image looking plausible while each strategy is separately wrong.
+    enum class Strategy { Mis, LightOnly, BsdfOnly };
+    Strategy strategy = Strategy::Mis;
+
+    // Russian roulette start depth. Paths shorter than this are never terminated, so the cheap and
+    // important first bounces are always taken. 0 disables roulette entirely.
+    std::uint32_t russianRouletteDepth = 3;
+
+    // Deliberately-wrong roulette compensation, for a control arm ONLY. At 1.0 the estimator is
+    // unbiased; at anything else it is not, and the energy test must notice. Never set in production.
+    float russianRouletteCompensation = 1.0f;
 
     // Determinism (spec section 27): the image is a pure function of the snapshot and these.
     std::uint64_t seed = 0x853c49e6748fea9bULL;
@@ -64,6 +82,8 @@ struct Framebuffer {
 struct TraceStats {
     std::uint64_t primaryRays = 0;
     std::uint64_t shadowRays = 0;
+    std::uint64_t pathsTerminatedByRoulette = 0;
+    std::uint64_t bsdfHitsOnLights = 0;
     std::uint64_t nonFiniteSamples = 0;   // only counted when debugCheckNonFinite is on
     std::uint64_t negativeSamples = 0;
     double buildSeconds = 0.0;

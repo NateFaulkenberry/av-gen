@@ -224,6 +224,46 @@ Snapshot buildSnapshot(const scene::Scene& scene) {
                                "participating media are a stated non-goal for now (spec section 72)", 1);
     }
 
+    // ---- emissive geometry ------------------------------------------------------------------
+    //
+    // Collected AFTER the meshes, because it indexes into them. A triangle is a light if its
+    // material emits; the emission is uniform over the triangle since there is no emissive texture
+    // lookup here (that would need per-sample UV interpolation, and is a refinement not a blocker).
+    for (std::uint32_t mi = 0; mi < snap.meshes.size(); ++mi) {
+        const TriangleMesh& mesh = snap.meshes[mi];
+        const scene::Material& mat = mesh.material;
+        const glm::vec3 emission = mat.emissiveColor * mat.emissiveIntensity;
+        if (emission.x <= 0.0f && emission.y <= 0.0f && emission.z <= 0.0f) continue;
+
+        for (std::size_t t = 0; t + 2 < mesh.indices.size(); t += 3) {
+            EmissiveTriangle e;
+            e.meshIndex = mi;
+            e.primIndex = static_cast<std::uint32_t>(t / 3);
+            e.v0 = mesh.positions[mesh.indices[t + 0]];
+            e.v1 = mesh.positions[mesh.indices[t + 1]];
+            e.v2 = mesh.positions[mesh.indices[t + 2]];
+            const glm::vec3 cross = glm::cross(e.v1 - e.v0, e.v2 - e.v0);
+            const float len = glm::length(cross);
+            if (len <= 1e-12f) continue;   // degenerate: zero area, would divide by zero
+            e.normal = cross / len;
+            e.area = 0.5f * len;
+            e.emission = emission;
+            snap.totalEmissiveArea += e.area;
+            snap.emissiveTriangles.push_back(e);
+        }
+    }
+    if (snap.totalEmissiveArea > 0.0f) {
+        float running = 0.0f;
+        for (auto& e : snap.emissiveTriangles) {
+            running += e.area;
+            e.cdf = running / snap.totalEmissiveArea;
+        }
+        snap.emissiveTriangles.back().cdf = 1.0f;   // exact, so a u of 0.999999 cannot fall off the end
+        snap.capabilities.note("emissive geometry", Support::Full,
+                               "sampled directly and combined with BSDF sampling by MIS",
+                               static_cast<int>(snap.emissiveTriangles.size()));
+    }
+
     return snap;
 }
 

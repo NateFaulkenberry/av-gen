@@ -32,7 +32,7 @@ never reaches into the realtime post chain. Colour management is downstream of t
 | 0 | Recon, Embree spike on Apple Silicon | done |
 | 1 | Primary rays, Lambertian, one area light, shadow rays, accumulation, EXR | **done** |
 | 2 | glTF metallic-roughness BRDF, textures, colour space | **done** |
-| 3 | BSDF + light sampling, MIS, Russian roulette, progressive | not started |
+| 3 | BSDF + light sampling, MIS, Russian roulette | **done** |
 | 4 | OIDN denoising | not started |
 | 5 | Full AV Gen scene integration (skinning, instancing, procedurals) | not started |
 | 6 | AOVs | not started |
@@ -98,6 +98,27 @@ inheriting them would be the ADR-146 mistake in a new place:
   off-screen geometry still casts shadows and still bounces light into the frame;
 * procedural LOD rungs 2 and 3, which are camera-facing billboards.
 
+## Phase 3 in particular
+
+Multiple importance sampling between light sampling and BSDF sampling, with the power heuristic
+(beta = 2), plus Russian roulette from a configurable depth.
+
+**Two kinds of emitter, deliberately treated differently.** `scene::PunctualLight` is analytic and
+has no geometry in the BVH, so a BSDF ray can never hit one -- light sampling is the only strategy
+that can find it and it takes **weight 1**. MIS-weighting it against the BSDF's density would
+down-weight the only estimator that works and lose energy nothing else supplies. **Emissive
+geometry** can be hit by both strategies, so it gets a real power-heuristic weight on both sides.
+`Snapshot::emissiveTriangles` carries an area CDF for uniform-by-area selection.
+
+`TraceSettings::Strategy` exposes `Mis`, `LightOnly` and `BsdfOnly`. That is not a feature; it is
+test apparatus. All three are unbiased estimators of the same integral, so they must converge to the
+same image, and a MIS weight error that leaves the combined estimator plausible is only visible when
+the strategies are compared **separately** -- both overall and region by region.
+
+`docs/pathtrace/phase3-fireflies-before-bsdf-only.png` and `-after-mis.png` are the same white room
+at the same 64 spp: **1250 outlier pixels become 1**, and the mean luminance agrees to within 4%,
+which is what makes it a variance reduction rather than a change of answer.
+
 ## Phase 2 in particular
 
 The glTF 2.0 metallic-roughness BSDF (`bsdf.hpp`): Lambertian diffuse plus Cook-Torrance specular
@@ -134,8 +155,8 @@ Primary rays, a Lambertian BSDF, direct lighting from the scene's lights with sh
 analytic sky as environment and miss colour, a cosine-weighted bounce per extra depth, progressive
 accumulation and linear float EXR out.
 
-Not yet at Phase 2: MIS, Russian roulette, adaptive sampling, denoising, instancing, normal mapping
-(there are no tangents in `scene::Vertex`, so they must be derived first). Emissive geometry is only found by rays that happen to hit
+Not yet at Phase 3: adaptive sampling, denoising, instancing, normal mapping (there are no tangents
+in `scene::Vertex`, so they must be derived first). Emissive geometry is only found by rays that happen to hit
 it, so its bounce light is noisy until MIS lands in Phase 3 -- visible in the target image below as
 speckle on the floor near the cyan sphere.
 
@@ -171,5 +192,10 @@ told anyone.
 * **Do not set `CMAKE_CXX_STANDARD` globally around Embree.** It overrides Embree's own
   `-std=c++11` and Embree 4.4.0 does not compile as C++23 under Apple clang 21. `Dependencies.cmake`
   saves, unsets and restores it; the comment there explains why.
+* **A shadow ray must clear the surface it leaves AND stop short of the one it aims at.** Offsetting
+  the origin by `eps` along the normal already consumes roughly `eps * (n.dir)` of the distance
+  budget, so subtracting `eps` from `tfar` as well cancels the gap to within 1e-5 and the ray reports
+  itself occluded by its own target. Use a relative shortfall measured from the offset origin. This
+  cost half of Phase 3: 200 of 200 shadow rays to an area emitter were blocked by that emitter.
 * A new ADR fails `test_repo_hygiene` until it is listed in `docs/decisions/README.md`. The suite
   reads that directory from disk, so it fails in a binary compiled before the ADR existed.

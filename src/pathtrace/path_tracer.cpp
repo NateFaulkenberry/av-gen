@@ -4,6 +4,7 @@
 #include "core/log.hpp"
 #include "pathtrace/bsdf.hpp"
 #include "pathtrace/camera.hpp"
+#include "pathtrace/lights.hpp"
 #include "pathtrace/sampler.hpp"
 #include "pathtrace/texture.hpp"
 
@@ -41,97 +42,13 @@ constexpr float kInvPi = 0.31830988618379067f;
     return w * w;
 }
 
-struct LightSample {
-    glm::vec3 direction{0.0f}; // from the surface toward the light, normalised
-    glm::vec3 radiance{0.0f};  // already includes attenuation and emitter area
-    float distance = 0.0f;     // for the shadow ray's tfar; infinite for directional
-    bool valid = false;
+struct Counters {
+    std::uint64_t shadowRays = 0;
+    std::uint64_t nonFinite = 0;
+    std::uint64_t negative = 0;
+    std::uint64_t roulette = 0;
+    std::uint64_t bsdfHitsOnLights = 0;
 };
-
-// One sample of one light. Area emitters are sampled over their surface -- that is what makes a
-// soft shadow -- while the realtime path samples the centre and widens the result.
-[[nodiscard]] LightSample sampleLight(const scene::PunctualLight& l, const glm::vec3& p, Sampler& sampler) {
-    LightSample s;
-    if (!l.enabled) return s;
-
-    const glm::vec3 emit = lightRadiance(l);
-    if (emit.x <= 0.0f && emit.y <= 0.0f && emit.z <= 0.0f) return s;
-
-    using T = scene::PunctualLight::Type;
-    if (l.type == T::Directional) {
-        // `direction` is the direction the light travels, so the surface looks back along it.
-        const float len = glm::length(l.direction);
-        if (len < 1e-9f) return s;
-        s.direction = -l.direction / len;
-        s.radiance = emit;                 // illuminance; no distance falloff
-        s.distance = std::numeric_limits<float>::infinity();
-        s.valid = true;
-        return s;
-    }
-
-    // Everything else has a position. Area kinds get a point sampled on the emitter.
-    glm::vec3 target = l.position;
-    float cosEmitter = 1.0f;
-    bool isArea = false;
-
-    if (l.type == T::Rect) {
-        isArea = true;
-        glm::vec3 n = glm::length(l.direction) > 1e-9f ? glm::normalize(l.direction) : glm::vec3(0, -1, 0);
-        glm::vec3 up = glm::length(l.up) > 1e-9f ? glm::normalize(l.up) : glm::vec3(0, 1, 0);
-        glm::vec3 tangent = glm::cross(n, up);
-        if (glm::length(tangent) < 1e-6f) tangent = glm::cross(n, glm::vec3(1, 0, 0));
-        tangent = glm::normalize(tangent);
-        const glm::vec3 bitangent = glm::normalize(glm::cross(tangent, n));
-        const glm::vec2 u = sampler.next2D();
-        target = l.position + tangent * ((u.x - 0.5f) * l.width) + bitangent * ((u.y - 0.5f) * l.height);
-        const glm::vec3 toSurface = glm::normalize(p - target);
-        cosEmitter = std::max(0.0f, glm::dot(n, toSurface));
-        if (cosEmitter <= 0.0f) return s;  // the surface is behind the emitter
-    } else if (l.type == T::Disk || l.type == T::Sphere || l.type == T::Tube) {
-        isArea = true;
-        // A uniform point in the emitter's bounding disc, oriented to face the shading point. Crude
-        // for a sphere and honest about it: section 44's proper solid-angle sampling is Phase 3.
-        const glm::vec3 toP = glm::normalize(p - l.position);
-        glm::vec3 t{};
-        glm::vec3 b{};
-        orthonormalBasis(toP, t, b);
-        const glm::vec2 d = sampleUniformDisc(sampler.next2D());
-        target = l.position + (t * d.x + b * d.y) * l.radius;
-        cosEmitter = 1.0f;
-    }
-
-    const glm::vec3 delta = target - p;
-    const float dist2 = glm::dot(delta, delta);
-    if (dist2 < 1e-12f) return s;
-    const float dist = std::sqrt(dist2);
-    s.direction = delta / dist;
-    s.distance = dist;
-
-    float attenuation = rangeWindow(dist2, l.range) / dist2;
-
-    if (l.type == T::Spot) {
-        const float len = glm::length(l.direction);
-        if (len < 1e-9f) return s;
-        const glm::vec3 axis = l.direction / len;
-        const float cosAngle = glm::dot(axis, -s.direction);
-        const float cosOuter = std::cos(l.outerConeAngle);
-        const float cosInner = std::cos(l.innerConeAngle);
-        const float denom = std::max(1e-4f, cosInner - cosOuter);
-        const float spot = std::clamp((cosAngle - cosOuter) / denom, 0.0f, 1.0f);
-        if (spot <= 0.0f) return s;
-        attenuation *= spot * spot;
-    }
-
-    if (isArea) {
-        // nits -> intensity. `emitterArea` is the project's own conversion and is shared with
-        // rendering::lightInfluenceRadius so a light's reach and its brightness agree.
-        attenuation *= scene::emitterArea(l) * cosEmitter;
-    }
-
-    s.radiance = emit * attenuation;
-    s.valid = attenuation > 0.0f;
-    return s;
-}
 
 [[nodiscard]] glm::vec3 environmentRadiance(const Snapshot& snap, const glm::vec3& dir) {
     if (!snap.skyEnabled) return snap.backgroundColor;
@@ -159,58 +76,114 @@ struct LightSample {
     m.emission = mat.emissiveColor * mat.emissiveIntensity * glm::vec3(em);
 
     const glm::vec4 ao = sampleSlot(textures, mat.occlusionTexture, uv, glm::vec4(1.0f));
-    // glTF: occlusion applies only to indirect light, and `occlusionStrength` interpolates it in.
     m.occlusion = glm::mix(1.0f, ao.x, glm::clamp(mat.occlusionStrength, 0.0f, 1.0f));
 
     return m;
 }
 
-struct Counters {
-    std::uint64_t shadowRays = 0;
-    std::uint64_t nonFinite = 0;
-    std::uint64_t negative = 0;
-};
+// A shadow ray must clear the surface it leaves AND stop short of the surface it aims at. Getting
+// the second half wrong is invisible in the code and total in the image.
+//
+// The bug this replaces: the origin was pushed off the surface by `eps` along the normal, and `tfar`
+// was set to `distance - eps` -- but `distance` was measured from the ORIGINAL point, and pushing
+// the origin forward already consumes about `eps * (n.dir)` of that budget. For a near-normal
+// direction the two cancel to within 1e-5 of the target, which is inside Embree's watertight
+// intersection tolerance at metre scale. Measured: 200 of 200 shadow rays to an area emitter
+// reported themselves occluded BY THAT EMITTER, so next-event estimation returned zero and the
+// emissive light sampler was 135x too dim while BSDF sampling -- which casts no shadow ray -- was
+// right. Both strategies looked internally consistent; only comparing them found it.
+//
+// The fix measures the distance from the offset origin and takes a RELATIVE shortfall, which stays
+// far above float precision at every scale.
+[[nodiscard]] bool visible(const EmbreeScene& embree, const SurfaceHit& hit, const glm::vec3& dir,
+                           float distance, Counters& counters) {
+    const float eps = shadowEpsilon(hit.t);
+    const glm::vec3 origin = hit.position + hit.geometricNormal * eps;
+    if (std::isinf(distance)) {
+        ++counters.shadowRays;
+        return !embree.occluded(origin, dir, 0.0f, std::numeric_limits<float>::infinity());
+    }
+    // How far the target actually is from the offset origin.
+    const float d = distance - glm::dot(hit.geometricNormal, dir) * eps;
+    const float tfar = d * (1.0f - 1e-4f);
+    if (!(tfar > 0.0f)) return true;   // the target is inside the epsilon shell
+    ++counters.shadowRays;
+    return !embree.occluded(origin, dir, 0.0f, tfar);
+}
 
-// Direct lighting at a hit, Lambertian only. Returns outgoing radiance toward the ray's origin.
-[[nodiscard]] glm::vec3 directLighting(const Snapshot& snap, const EmbreeScene& embree,
-                                       const SurfaceHit& hit, const SurfaceMaterial& m,
-                                       const glm::vec3& view, Sampler& sampler, Counters& counters) {
+// ---- next-event estimation, with MIS (spec sections 43-45) ---------------------------------------
+//
+// Two kinds of emitter, deliberately treated differently:
+//
+//   * ANALYTIC lights (`scene::PunctualLight`) have no geometry in the BVH. A BSDF ray can never
+//     hit one, so light sampling is the ONLY strategy that can find them and it takes MIS weight 1.
+//     Weighting them against the BSDF's density would down-weight the only estimator that works and
+//     lose energy that nothing else supplies.
+//   * EMISSIVE GEOMETRY can be hit. Both strategies find it, so both get a power-heuristic weight
+//     and the two halves sum to 1 for every direction.
+[[nodiscard]] glm::vec3 nextEventEstimate(const Snapshot& snap, const EmbreeScene& embree,
+                                          const SurfaceHit& hit, const SurfaceMaterial& m,
+                                          const glm::vec3& view, Sampler& sampler,
+                                          const TraceSettings& settings, Counters& counters) {
     glm::vec3 sum{0.0f};
-    for (const auto& light : snap.lights) {
-        const LightSample ls = sampleLight(light, hit.position, sampler);
-        if (!ls.valid) continue;
+    if (settings.strategy == TraceSettings::Strategy::BsdfOnly) return sum;
 
+    // --- analytic lights: weight 1, always ---
+    for (const auto& light : snap.lights) {
+        const LightSample ls = sampleLight(light, hit.position, sampler.next2D());
+        if (!ls.valid) continue;
         const float nDotL = glm::dot(hit.shadingNormal, ls.direction);
         if (nDotL <= 0.0f) continue;
-
         const glm::vec3 f = evaluateBsdf(m, hit.shadingNormal, view, ls.direction);
         if (f.x <= 0.0f && f.y <= 0.0f && f.z <= 0.0f) continue;
+        if (light.castsShadow && !visible(embree, hit, ls.direction, ls.distance, counters)) continue;
 
-        if (light.castsShadow) {
-            const float eps = shadowEpsilon(hit.t);
-            const float tfar = std::isinf(ls.distance) ? std::numeric_limits<float>::infinity()
-                                                       : ls.distance - eps;
-            if (tfar > eps) {
-                ++counters.shadowRays;
-                if (embree.occluded(hit.position + hit.geometricNormal * eps, ls.direction, eps, tfar)) {
-                    continue;
+        if (ls.delta) {
+            sum += f * ls.radiance * nDotL;
+        } else {
+            // An analytic AREA light still has a density, but no BSDF sample can find it, so the
+            // estimator is f * L * cos / pdf with no MIS weight.
+            if (ls.pdf > 0.0f) sum += f * ls.radiance * nDotL / ls.pdf;
+        }
+    }
+
+    // --- emissive geometry: MIS against BSDF sampling ---
+    if (!snap.emissiveTriangles.empty()) {
+        const EmissiveSample es = sampleEmissive(snap, hit.position, sampler.next2D(), sampler.next1D());
+        if (es.valid) {
+            const float nDotL = glm::dot(hit.shadingNormal, es.direction);
+            if (nDotL > 0.0f) {
+                const glm::vec3 f = evaluateBsdf(m, hit.shadingNormal, view, es.direction);
+                if (f.x > 0.0f || f.y > 0.0f || f.z > 0.0f) {
+                    if (visible(embree, hit, es.direction, es.distance, counters)) {
+                        const float bPdf = bsdfPdf(m, hit.shadingNormal, view, es.direction);
+                        const float w = settings.strategy == TraceSettings::Strategy::LightOnly
+                                            ? 1.0f
+                                            : powerHeuristic(es.pdf, bPdf);
+                        sum += f * es.radiance * nDotL * (w / es.pdf);
+                    }
                 }
             }
         }
-        sum += f * ls.radiance * nDotL;
     }
     return sum;
 }
 
-// One camera path. Phase 1: emission + direct lighting, then a cosine-weighted bounce per extra
-// depth. The cosine PDF cancels the cosine term exactly, which is why the throughput below is
-// multiplied by albedo alone -- written out because the cancellation is the thing people get wrong.
+// One camera path.
 [[nodiscard]] glm::vec3 radiance(const Snapshot& snap, const EmbreeScene& embree, Ray ray,
                                  const TraceSettings& settings, Sampler& sampler, Counters& counters) {
     glm::vec3 result{0.0f};
     glm::vec3 throughput{1.0f};
 
-    for (std::uint32_t depth = 0; depth <= settings.maxDepth; ++depth) {
+    // Carried from the previous bounce so an emitter found by a BSDF ray can be MIS-weighted
+    // against the light sampler that could also have found it. `specularBounce` starts true because
+    // a camera ray has no preceding BSDF density -- whatever it hits is seen directly and takes
+    // weight 1. Getting that wrong makes emitters invisible to the camera, which is very obvious,
+    // or double counted, which is not.
+    float prevBsdfPdf = 0.0f;
+    bool takeFullEmission = true;
+
+    for (std::uint32_t depth = 0;; ++depth) {
         const SurfaceHit hit =
             embree.intersect(snap, ray.origin, ray.direction, 0.0f, std::numeric_limits<float>::infinity());
 
@@ -223,32 +196,61 @@ struct Counters {
         const SurfaceMaterial m = resolveMaterial(snap, mat, hit.uv);
         const glm::vec3 view = -ray.direction;
 
-        // Emission. A surface that emits is visible whether or not anything lights it.
+        // --- emission, MIS-weighted against the light sampler that could also have found it ---
         if (m.emission.x > 0.0f || m.emission.y > 0.0f || m.emission.z > 0.0f) {
-            result += throughput * m.emission;
+            float w = 1.0f;
+            if (!takeFullEmission && settings.strategy != TraceSettings::Strategy::BsdfOnly) {
+                const float lPdf = emissivePdf(snap, hit.meshIndex, hit.primIndex, ray.direction, hit.t);
+                if (lPdf > 0.0f) {
+                    ++counters.bsdfHitsOnLights;
+                    // LightOnly must drop this entirely: the light sampler already counted this
+                    // emitter, and adding the BSDF path too would double count it.
+                    w = settings.strategy == TraceSettings::Strategy::LightOnly
+                            ? 0.0f
+                            : powerHeuristic(prevBsdfPdf, lPdf);
+                }
+            }
+            result += throughput * m.emission * w;
         }
 
         if (mat.unlit) {
-            // An unlit material is its base colour and nothing else -- no lighting, no bounce.
             result += throughput * m.baseColor;
             break;
         }
 
-        result += throughput * directLighting(snap, embree, hit, m, view, sampler, counters);
+        result += throughput * nextEventEstimate(snap, embree, hit, m, view, sampler, settings, counters);
 
-        if (depth == settings.maxDepth) break;
+        if (depth >= settings.maxDepth) break;
 
+        // --- extend the path ---
         const BsdfSample bs = sampleBsdf(m, hit.shadingNormal, view, sampler.next2D(), sampler.next1D());
         if (!bs.valid) break;
-        if (glm::dot(bs.direction, hit.geometricNormal) <= 0.0f) break; // below the geometric surface
+        if (glm::dot(bs.direction, hit.geometricNormal) <= 0.0f) break;
         throughput *= bs.weight;
+        prevBsdfPdf = bs.pdf;
+        takeFullEmission = false;
+
+        // --- Russian roulette (spec section 50) ---
+        //
+        // Terminate with probability (1 - q) and divide the survivors by q. The division is what
+        // keeps the estimator unbiased: without it, roulette removes energy and the image gets
+        // DARKER while also getting less noisy, which reads as an improvement and is not one.
+        // `russianRouletteCompensation` exists only so a test can set it wrong and watch the energy
+        // check fail; it is 1.0 everywhere else.
+        if (settings.russianRouletteDepth > 0 && depth + 1 >= settings.russianRouletteDepth) {
+            const float q = std::clamp(std::max({throughput.x, throughput.y, throughput.z}), 0.02f, 0.95f);
+            if (sampler.next1D() >= q) {
+                ++counters.roulette;
+                break;
+            }
+            throughput /= (q * settings.russianRouletteCompensation);
+        }
 
         const float eps = shadowEpsilon(hit.t);
         ray.origin = hit.position + hit.geometricNormal * eps;
         ray.direction = bs.direction;
 
-        const float maxThroughput = std::max({throughput.x, throughput.y, throughput.z});
-        if (maxThroughput <= 1e-6f) break; // nothing further can contribute
+        if (std::max({throughput.x, throughput.y, throughput.z}) <= 1e-6f) break;
     }
 
     if (settings.debugCheckNonFinite) {
@@ -393,6 +395,8 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
         static_cast<std::uint64_t>(settings.width) * settings.height * settings.samplesPerPixel;
     for (const auto& c : perThread) {
         stats_.shadowRays += c.shadowRays;
+        stats_.pathsTerminatedByRoulette += c.roulette;
+        stats_.bsdfHitsOnLights += c.bsdfHitsOnLights;
         stats_.nonFiniteSamples += c.nonFinite;
         stats_.negativeSamples += c.negative;
     }
