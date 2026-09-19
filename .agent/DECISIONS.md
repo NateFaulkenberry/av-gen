@@ -33,9 +33,16 @@ Compact index of decisions that shape work. Full reasoning lives in `docs/decisi
   directly and share the product's blind spot. Check reachability separately.
 - **ADR-182** — a probe that cannot fail proves nothing. Bands, not floors. A control that comes back
   byte-identical to its arm has proved *the control did not fire*, not that the arm is inert.
-- **A green suite can lie three ways**: a killed run prints `FAILED:` with no `with expansion:`
-  (SIGTERM, exit 143); an incremental build silently omits test files a merge added (reconfigure
-  CMake); and a crash can exit 133 with no summary line at all.
+- **A suite result can be absent rather than wrong, and absence looks like patience.** Four shapes
+  seen in one session: a killed run prints `FAILED:` with no `with expansion:` (SIGTERM, exit 143);
+  an incremental build silently omits test files a merge added (reconfigure CMake); a crash exits
+  133 with no summary line; and a task can "complete" having produced **no output at all**. The
+  check that settles it is not waiting longer — it is comparing the built binary's timestamp against
+  the commit under test.
+- **Name your test binary distinctly when other agents are running.** `pkill -f 'avgen_tests'`
+  matches every worktree's binary, and it has produced a phantom 878-case regression and killed at
+  least two verification builds. And **`cp` of a Mach-O invalidates its ad-hoc signature on Apple
+  silicon** — the kernel SIGKILLs the copy with no output whatsoever. `codesign -s - -f` the copy.
 - **A render is evidence about the binary that produced it.** `--target avgen_tests` does not build
   `src/avgen`.
 - Numerical agreement is not proof of visual alignment. Every serious bug this session was invisible
