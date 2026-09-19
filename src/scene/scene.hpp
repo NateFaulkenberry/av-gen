@@ -117,6 +117,12 @@ struct Scene {
     // shadow cascades; before terrain that was a handful of meshes and now it is a world's worth,
     // so the answer is cached against the version that already says when meshes changed.
     [[nodiscard]] const std::pair<glm::vec3, glm::vec3>& meshBounds(MeshId mesh) const;
+    // How many times that table has been rebuilt. Exposed for the same reason
+    // `MeshMetricsCache::rebuilds()` is -- so a test can assert that a cache asked the same question
+    // a hundred times answers it once -- and added after a caller that had the Scene in hand called
+    // `MeshData::bounds()` instead and cost the Tree of Life 90 ms a frame. A timing test would have
+    // caught that only on a quiet machine; a rebuild count catches it anywhere.
+    [[nodiscard]] std::uint64_t meshBoundsRebuilds() const { return meshBoundsRebuilds_; }
     TextureId addTexture(TextureData texture);
     Entity& addEntity(std::string name, MeshId mesh);
     PunctualLight& addLight(PunctualLight light);
@@ -127,6 +133,7 @@ struct Scene {
 private:
     mutable std::vector<std::pair<glm::vec3, glm::vec3>> meshBoundsCache_;
     mutable std::uint64_t meshBoundsVersion_ = ~0ULL;
+    mutable std::uint64_t meshBoundsRebuilds_ = 0;
 };
 
 // ---- culling bounds (ADR-046 culling, renderer forensics Phase 5.1) ----------------------------

@@ -24,3 +24,19 @@ tree-*-r2-nothin.json
 tree-*-r2-nothin.scene.json
 dolly-*.json
 dolly-*.scene.json
+
+# The ADR-355 measurement arms: `floor-*` (the maxScreenError ladder the 16 px choice was rendered
+# from) and `perf-*` (the before/after matrix). Each is the shipping Tree of Life scene with exactly
+# one key changed on its five tree nodes, so the ADR's table states everything needed to remake
+# them:
+#
+#   floor-off        no `lod` block
+#   floor-NN         "lod": { "enabled": true, "maxScreenError": NN.0 }
+#   perf-<scene>-lodoff / -lodon   the named scene with the block removed / set to 16.0
+#
+# Twenty files of 700-line JSON differing by one line each is not worth carrying, and the previous
+# round of this already cost the branch 48,000 lines of generated data before it was trimmed.
+floor-*.json
+floor-*.scene.json
+perf-*.json
+perf-*.scene.json

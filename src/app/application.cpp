@@ -4915,6 +4915,29 @@ int Application::runHeadless() {
                           st.visibleInstances + st.culledInstances, st.lodCounts[0], st.lodCounts[1],
                           st.lodCounts[2], st.lodCounts[3], st.particles.systems, st.particles.capacity,
                           st.particles.emittedThisFrame, st.procedural.cpuUpdateMs, lastEngineUpdateMs_);
+                // Where the CPU frame went, by stage, in the *headless* loop.
+                //
+                // These numbers already existed: `probe2` has recorded them since the
+                // ui-responsiveness investigation and `--profile-cpu` prints them -- but only from
+                // the live editor, so every diagnosis done from a headless run has been blind to
+                // them. That is how a scene whose GPU frame is 19 ms and whose CPU frame is 200 ms
+                // came to be reported as a 19 ms scene: the one number that was printed was the one
+                // that was fine.
+                //
+                // `controller` is `Composition::update` -- the scene evaluation, including any
+                // flatten. `meshUp`/`texUp` carry their pass counts as well as their times, because
+                // "the upload spiked" is a correlation and "it re-created 45 buffers" is an
+                // attribution.
+                {
+                    const probe2::Frame& pr = probe2::frame();
+                    log::info("             cpu(update): control={:.2f} signals={:.2f} modulation={:.2f} "
+                              "controller={:.2f} other={:.2f} | meshUp={:.2f}ms/{}pass/{}buf "
+                              "texUp={:.2f}ms/{} env={:.2f} analysisCatchup={:.2f}",
+                              pr.updControlMs, pr.updSignalsMs, pr.updModulationMs, pr.updControllerMs,
+                              pr.updOtherMs, pr.meshUploadMs, pr.meshUploadPasses, pr.meshesUploaded,
+                              pr.textureUploadMs, pr.texturesUploaded, pr.environmentMs,
+                              pr.analysisCatchupMs);
+                }
                 // The workload each measured phase was actually given. Without these an A/B that edits
                 // a scene cannot prove its two arms differ, and "no effect" reads exactly like a run
                 // whose edit never applied.

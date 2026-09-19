@@ -166,6 +166,7 @@ const std::pair<glm::vec3, glm::vec3>& Scene::meshBounds(MeshId mesh) const {
             meshBoundsCache_[i] = meshes[i].bounds();
         }
         meshBoundsVersion_ = meshVersion;
+        ++meshBoundsRebuilds_;
     }
     return meshBoundsCache_[mesh];
 }
@@ -235,7 +236,22 @@ CullBounds entityCullBounds(const Scene& scene, const Entity& entity, float padF
         return out;
     }
     const MeshData& mesh = scene.meshes[entity.mesh];
-    auto [lo, hi] = mesh.bounds();
+    // `scene.meshBounds`, not `mesh.bounds()`. The two return the same pair; the difference is that
+    // one of them scans every vertex of the mesh and the other remembers the answer against
+    // `meshVersion`, which is what that cache was added for.
+    //
+    // This function is called for every entity, every frame, by `Composition::cullEntityNodes`.
+    // With the uncached call the Tree of Life spent **91 ms of a 91.5 ms scene update** here: 45
+    // entities over meshes carrying 39.9 million vertices between them, rescanned sixty times a
+    // second to recompute a number that had not changed since the asset was loaded. That was 90 ms
+    // of a 204 ms CPU frame against a 22 ms GPU frame -- the whole reason the scene ran at about
+    // five frames a second while every GPU measurement of it looked healthy.
+    //
+    // The amplification is worth naming because it is not the tree's fault either: those 39.9M
+    // vertices are 4.4M distinct ones, duplicated ninefold because a multi-material glTF shares one
+    // POSITION accessor between its primitives and the importer copies it per primitive (ADR-348).
+    // Fixing that would make this loop nine times cheaper; caching it makes it free.
+    auto [lo, hi] = scene.meshBounds(entity.mesh);
 
     // The posed box, when there is a palette to pose with. Every vertex is transformed by its own
     // weighted joints -- the same arithmetic the skinning shader does -- so the box is the geometry
