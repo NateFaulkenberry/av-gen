@@ -18,7 +18,7 @@ constexpr int kFormatVersion = 1;
 // The panels, grouped the way the View menu reads them: what you build with on the left, what you
 // inspect and tune on the right, what runs underneath along the bottom. Nothing is assigned to the
 // centre -- see DockRegion.
-constexpr std::array<EditorPanel, 19> kPanels{{
+constexpr std::array<EditorPanel, 21> kPanels{{
     {"World Builder", "World Builder", DockRegion::Left, true,
      "recipe, Generate World and the job monitor"},
     // ADR-092. One panel, not two: the brush and the selection are the same job seen from two
@@ -45,6 +45,13 @@ constexpr std::array<EditorPanel, 19> kPanels{{
     // "why is my beam not firing" is nearly always "nothing is directing the camera".
     {"World Effects", "World Effects", DockRegion::Right, false,
      "waves propagating through the world: beams, ripples, their styles and what answers the beat"},
+    // ADR-373. Beside World Effects, because the question "why does the sky look like that" is
+    // asked in the same breath as "why is the beam not firing", and both were answered until now by
+    // scrolling the flat Parameters list.
+    {"Environment", "Environment", DockRegion::Right, false,
+     "the sky and what is under the island: cosmic atmosphere and the vortex"},
+    {"Tree", "Tree", DockRegion::Right, false,
+     "what the tree does: wind, the bodies that bend in it, and the leaves it sheds"},
     {"Control", "Control", DockRegion::Bottom, true, "transport, audio response and performance"},
     // §13. The data has been machine-readable since ADR-148 and had no surface: the answer to "why
     // is this frame expensive" lived in `--bench-json` and in the log. Closed by its own panel

@@ -3803,6 +3803,31 @@ void Composition::refreshWindBodyAmounts() {
     }
 }
 
+// ADR-373: give a node a wind body, or take it away, from the application.
+//
+// Until now `windAuthored` could only be set by hand-editing the scene file, so the wind was
+// tunable from the UI and not CREATABLE from it -- which is the same defect ADR-360 was written
+// about, one step earlier in the workflow. The parameters are structural, so this re-registers
+// them and the caller has to rebind the modulator afterwards (`Engine::rebind`), exactly as the
+// world-effect panel does for its own structural edits.
+bool Composition::setNodeWindBody(const std::string& name, bool present) {
+    const auto it = std::find_if(nodes_.begin(), nodes_.end(),
+                                 [&](const auto& n) { return n->name == name; });
+    if (it == nodes_.end() || (*it)->windAuthored == present) {
+        return false;
+    }
+    CompositionNode& node = **it;
+    unregisterNodeParameters(node);
+    node.windAuthored = present;
+    if (present && node.wind.strength <= 0.0f) {
+        // A body at strength 0 is the thing ADR-360 shipped by mistake and the owner reported as
+        // "it looks unchanged". Somebody who presses "add wind" means it to do something.
+        node.wind.strength = 1.0f;
+    }
+    registerNodeParameters(node);
+    return true;
+}
+
 void Composition::registerNodeParameters(CompositionNode& node) {
     if (params_ == nullptr) {
         return;
@@ -3939,6 +3964,22 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
         for (const char* suffix :
              {"position", "rotation", "scale", "visible", "emissiveBoost", "roughnessScale"}) {
             params_->remove(base + suffix);
+        }
+        // ADR-373: the wind body's leaves, by their exact paths. A suffix table and never a prefix
+        // sweep -- ADR-207 is explicit that an exact list is what stops an unregister taking
+        // something that happens to share a prefix.
+        if (node.windAuthored) {
+            for (const char* suffix :
+                 {"wind/strength", "wind/trunk", "wind/branch", "wind/foliage", "wind/flutter",
+                  "wind/lag"}) {
+                params_->remove(base + suffix);
+            }
+            node.windStrengthParam = nullptr;
+            node.windTrunkParam = nullptr;
+            node.windBranchParam = nullptr;
+            node.windFoliageParam = nullptr;
+            node.windFlutterParam = nullptr;
+            node.windLagParam = nullptr;
         }
         if (node.kind == NodeKind::Terrain) {
             for (const char* suffix :

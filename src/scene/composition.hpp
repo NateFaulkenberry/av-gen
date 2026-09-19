@@ -1087,6 +1087,9 @@ private:
     };
     std::vector<WindBodySpan> windBodies_;
     void refreshWindBodyAmounts();
+public:
+    bool setNodeWindBody(const std::string& name, bool present);
+private:
     void registerNodeParameters(CompositionNode& node);
     void unregisterNodeParameters(CompositionNode& node);
     void unregisterParameters(); // removes every parameter this composition registered, then detach()
