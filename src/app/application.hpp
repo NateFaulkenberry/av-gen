@@ -14,6 +14,7 @@
 #include "app/world_builder.hpp"
 #include "app/recent_files.hpp"
 #include "app/render_job.hpp"
+#include "app/trace_sequence.hpp"
 #include "pathtrace/trace_job.hpp"
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
@@ -312,6 +313,7 @@ private:
                                                                    RenderSettings settings);
     void startPathTraceFromUi();
     int runPathTrace();
+    int runTraceSequence(const std::filesystem::path& projectFile, const PathTraceSettings& authored);
     int runQueue(const std::filesystem::path& queueFile);
     void startRenderFromUi();
     bool renderInAppStarted_ = false; // `--render-in-app` fires once
@@ -358,6 +360,12 @@ private:
     // cannot drift apart in three call sites.
     PathTraceSettings uiPathTrace_;
     pathtrace::TraceProgress lastPathTrace_;
+    // ADR-382: a path-traced SEQUENCE, on its own thread for the reason `TraceJob` has one -- it
+    // is minutes of CPU and the editor has to keep its frame.
+    std::unique_ptr<TraceSequence> ptSequence_;
+    std::thread ptSeqThread_;
+    std::atomic<bool> ptSeqDone_{true};
+    std::string ptSeqError_;
     RenderSettings uiRender_;                     // the Render window's settings
     // ADR-364: how many frames the viewport has NOT drawn the world in, over the life of
     // this process. Shown in the Render panel, because a count that stays at zero while a

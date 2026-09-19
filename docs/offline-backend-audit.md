@@ -399,10 +399,10 @@ state. Revised, with the reason for each move:
 | **2** | **ImGui ID conflict** + audit the surrounding dynamic UI | unchanged; self-contained, the owner hits it |
 | **3** | **Make the path tracer's settings settings** (G1, G2) — reader, writer, round-trip test | ADR-350's defect, present today, cheap, and it is a precondition for *every* later setting this work adds. Adding a backend selector to a settings object that is never saved repeats the defect at a larger scale. |
 | **4** | **Render-state + viewport suspension** (W5) | The brief's one hard requirement that is genuinely absent. Independent of every renderer question. Needs an owner decision on the *default* (see R3). |
-| **5** | **Extract `FrameRangeDriver` from `RenderJob`** | The actual missing abstraction (W2). Small, testable without a GPU, and it is what makes step 6 possible at all. |
-| **6** | **Path-traced sequences** — a frame range of traces to EXR, then to video | The first genuinely new user-facing capability, and it falls out of step 5. Forces the W4 colour decision. |
-| **7** | **Colour tagging on video output** (W3.4) — **done, ADR-365** — plus the W4 tone-map decision, which is not | Small, overdue, and a prerequisite for anything HDR. |
-| **8** | **Expose the CLI-only render settings** (G3, G4) | UI PRINCIPLE, and they already exist below the UI. |
+| **5** | **Extract `FrameRangeDriver` from `RenderJob`** — **partly done, ADR-382** | The actual missing abstraction (W2). `FrameRange` + `FrameSequenceDriver` exist, are GPU-free and are unit-tested; `RenderSettings` delegates its arithmetic to them. `RenderJob` itself is **not** rebuilt on them — see the note below. |
+| **6** | **Path-traced sequences** — **done, ADR-382** | `app::TraceSequence`: one project load, the shared driver, EXR per frame or a movie. Reachable from `--range` and from a `range` checkbox in the Render panel. Gains motion vectors a single frame cannot have. |
+| **7** | **Colour tagging on video output** (W3.4) — **done, ADR-365**. The W4 tone-map decision — **taken by the owner and done, ADR-382** | Small, overdue, and a prerequisite for anything HDR. |
+| **8** | **Expose the CLI-only render settings** (G3, G4) — **done, ADR-382** | `supersample`, `aovs` and `encoderThreads` have widgets; the codec combo is filtered by what the machine can actually produce. |
 | **9** | **Extract `pathtrace::TraceBackend` from `EmbreeScene`** | Only now, when there is a second backend candidate worth measuring. Doing it earlier is an abstraction with one implementation. |
 | **10** | **Metal RT prototype, outside the tree, to decide** (section 5) | Under `tools/gpu-lock.sh`, minima over repeats, with a control. |
 | **11** | **Metal backend, or defer** | Gated on 10 |
@@ -415,7 +415,9 @@ branch touching the path tracer's internals before anything a person can see had
 
 ## 7. Decisions that are the owner's, with a recommendation
 
-**R1 — the CPU tone map (W4).** Path-traced video needs a display transform, and the only one that
+**R1 — the CPU tone map (W4). DECIDED by the owner: port them, with the parity test. Done in ADR-382.** The original framing is kept below because the reasoning is what makes the test's shape make sense.
+
+**R1 (original framing) — the CPU tone map (W4).** Path-traced video needs a display transform, and the only one that
 exists is a WGSL shader. Options: (a) route path-traced frames through the GPU for tone mapping,
 losing the tracer's "needs no GPU" property; (b) port the five operators to C++ with a 1e-4 parity
 test against the WGSL, in the style `test_material_gpu.cpp` already uses for `color.wgsl`.
@@ -498,6 +500,12 @@ works; the viewport resumes; colour management is now at least *stated* on the v
 there is no `TraceBackend` interface, no Metal prototype, no hybrid pass, no benchmark table. Those
 are steps 9-13 and step 10 is a decision point, not a task (section 5).
 
+**Met since, by ADR-382**: "Do not fake GI and call it path tracing" was never at issue, but the
+brief's *"Timeline -> Frame evaluation -> Offline renderer -> HDR frame -> Colour/output transform
+-> Video encoder -> MOV/MP4"* pipeline now exists end to end **for the path tracer**, which is the
+renderer it did not exist for. Colour management is one coherent path rather than two: the CPU
+transform is the WGSL one, anchored to measurements of it.
+
 **Not met, and newly understood as harder than the brief thinks**: "no code-only controls for
 user-facing features" — `aovs`, `supersample` and `encoderThreads` are still CLI-only (G3), and the
 codec combo still advertises codecs the machine may not have (G4). "Colour management is correct"
@@ -533,6 +541,26 @@ assertions: 3800104 | 3800103 passed | 1 failed as expected
 
 The only `FAILED:` line is `test_character_lab_slopes.cpp:187`, with its `with expansion:` present,
 which is the `[!shouldfail]` pass.
+
+### Why `RenderJob` was not rebuilt on the driver, and what it would take
+
+Recorded so the next person does not read step 5 as finished. The driver exists and the *arithmetic*
+is shared — `RenderSettings::frameCount` and `::resolvedEnd` delegate to `FrameRange`, so two
+renderers can no longer disagree about which frames a range contains, which was the part that
+actually mattered. The *loop* is still duplicated: `RenderJob` has its own.
+
+What stopped the rest, concretely: `test_render_job.cpp` alone pins the exact `step()` contract
+(bounded count, return-true-on-complete, cancel keeps partial output), the readback ring's hash
+agreeing frame-for-frame with the synchronous path, AOVs staying **out** of the hash chain, the
+drain-before-stop ordering in `finish()`, and the ADR-320 preview arriving *after* `resolveToOutput`.
+Another five files use `RenderJob` for determinism and certification checks. Every one needs an
+adapter, the GPU lock and a quiet machine, and two other agents were finishing the Tree of Life.
+
+Rewriting the rasteriser's sequencing without being able to run those tests is precisely the
+refactor this document warned against starting on an unverified assumption. The work is: implement
+`FrameSource` over `SceneRenderer` + the two `ReadbackRing`s, keep `resolveToOutput` and the AOV
+ring behind it, and re-run `avgen_render_tests` whole. It is a day with a quiet machine and it is
+not a day without one.
 
 ### An instrument that was built, could not be shown to fire, and was removed
 

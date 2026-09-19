@@ -19,6 +19,7 @@
 #include "app/render_job.hpp"
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
+#include "app/frame_range.hpp"
 #include "pathtrace/trace_job.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "rendering/sdf_renderer.hpp"
@@ -44,6 +45,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -146,6 +148,11 @@ public:
     app::PathTraceSettings* pathTraceSettings = nullptr;
     bool pathTraceDenoiseAvailable = false;   // false greys the checkbox and explains why
     std::function<pathtrace::TraceProgress()> pathTraceProgress;
+    // ADR-382: a path-traced SEQUENCE reports frames as well as samples, so it has its own reader
+    // rather than being squeezed into a single frame's progress. Empty optional means there is no
+    // sequence -- which is not the same as a sequence with no frames done.
+    std::function<std::optional<app::SequenceProgress>()> pathTraceSequenceProgress;
+    std::function<std::pair<std::uint32_t, std::uint32_t>()> pathTraceSequenceSamples;
     std::function<void()> onStartPathTrace;
     std::function<void()> onCancelPathTrace;
     std::function<void()> onChoosePathTraceOutput;
