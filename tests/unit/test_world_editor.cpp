@@ -2077,3 +2077,89 @@ TEST_CASE("the nav grid overlay collects the cells near the view and counts what
     CHECK(editor.visuals().navShore.size() == nav.grid()->shorePoints().size());
     CHECK(editor.visuals().navVistas.size() == nav.grid()->vistaPoints().size());
 }
+
+// ---- lights in the undo history ----------------------------------------------------------------
+
+TEST_CASE("adding and deleting a light is one undo step each") {
+    // The panel spec's §18: create -> modify -> delete -> undo restores the light. The record is
+    // the whole list before and after (`LightChange`), so the inverse of any light edit is the
+    // list it replaced -- there is no per-gesture inverse to get wrong.
+    Fixture f;
+    ui::EditHistory history;
+    auto* comp = f.engine.composition();
+    REQUIRE(comp != nullptr);
+
+    const auto lightNames = [&] {
+        std::vector<std::string> out;
+        for (const auto& a : comp->authoredLights()) {
+            out.push_back(a.light.name);
+        }
+        return out;
+    };
+
+    // Create.
+    {
+        ui::EditCommand add("Add light");
+        add.lights = std::make_unique<ui::LightChange>();
+        add.lights->before = comp->authoredLights();
+        scene::Composition::AuthoredLight lamp;
+        lamp.light.name = "Key";
+        lamp.light.type = scene::PunctualLight::Type::Spot;
+        lamp.light.intensity = 5.0f;
+        add.lights->after = add.lights->before;
+        add.lights->after.push_back(lamp);
+        REQUIRE(ui::applyEdit(f.engine, add, true).ok());
+        history.push(std::move(add));
+    }
+    REQUIRE(lightNames() == std::vector<std::string>{"Key"});
+    // Present *and* addressable: a light nobody can key is not authored.
+    CHECK(f.engine.params().find("lights/Key/intensity") != nullptr);
+
+    // Modify, through the parameter -- which is where a numeric edit belongs (ADR-271), not in
+    // the LightChange.
+    auto* intensity = f.engine.params().findAs<float>("lights/Key/intensity");
+    REQUIRE(intensity != nullptr);
+    intensity->setBase(9.0f);
+    // Then step a frame, because that is when `applyParameters` writes the base back into the
+    // authored light. Without it the delete below would capture the intensity the light was
+    // *created* with and the undo would restore 5.0 over the user's 9.0 -- which is what this test
+    // did before the tick was added, and is a real ordering dependency rather than a formality.
+    {
+        FrameTime time;
+        time.renderTime = 0.0;
+        time.deltaTime = 1.0 / 60.0;
+        f.engine.update(time);
+    }
+    REQUIRE_THAT(comp->authoredLights()[0].light.intensity, Catch::Matchers::WithinAbs(9.0, 1e-4));
+
+    // Delete.
+    {
+        ui::EditCommand del("Delete light");
+        del.lights = std::make_unique<ui::LightChange>();
+        del.lights->before = comp->authoredLights();
+        del.lights->after = {};
+        REQUIRE(ui::applyEdit(f.engine, del, true).ok());
+        history.push(std::move(del));
+    }
+    CHECK(comp->authoredLights().empty());
+    // The knobs go with it, or the Parameters window lists a light the scene no longer has.
+    CHECK(f.engine.params().find("lights/Key/intensity") == nullptr);
+
+    // Undo the delete.
+    REQUIRE(history.canUndo());
+    REQUIRE(history.undo(f.engine).ok());
+    REQUIRE(lightNames() == std::vector<std::string>{"Key"});
+    CHECK(f.engine.params().find("lights/Key/intensity") != nullptr);
+    // Back with what it was, not with a default: the deleted light carried a 9.0 the user set.
+    CHECK_THAT(comp->authoredLights()[0].light.intensity, Catch::Matchers::WithinAbs(9.0, 1e-4));
+
+    // Undo the add.
+    REQUIRE(history.undo(f.engine).ok());
+    CHECK(comp->authoredLights().empty());
+
+    // And redo brings it back, which is the arm that catches an inverse applied in one direction
+    // only.
+    REQUIRE(history.canRedo());
+    REQUIRE(history.redo(f.engine).ok());
+    CHECK(lightNames() == std::vector<std::string>{"Key"});
+}

@@ -833,3 +833,21 @@ TEST_CASE("The transport takes the arrow keys off ImGui, except where ImGui need
         CHECK(transportOwnsArrowKey(true, false, false, false, false));
     }
 }
+
+TEST_CASE("the arrows nudge only where the user is pointing", "[ui][logic][transport]") {
+    // The regression this prevents is a widening, not a new bug. `nudgeSelection` claimed the
+    // arrows whenever anything was selected, so the transport saw them only with an empty
+    // selection. Making lights and cameras selectable means a user can easily have something
+    // selected all the time -- and without this rule, selecting a light to read its intensity would
+    // stop the arrows scrubbing anywhere in the application until it was deselected.
+    CHECK(ui::editorOwnsArrowKey(true, true));
+
+    // Selected, but the pointer is in the sequencer: the transport keeps the arrows. This is the
+    // arm that matters and the one that was failing by construction before.
+    CHECK_FALSE(ui::editorOwnsArrowKey(true, false));
+
+    // THE CONTROLS: hovering the viewport with nothing selected is not a nudge either, so the
+    // function is not simply returning its second argument.
+    CHECK_FALSE(ui::editorOwnsArrowKey(false, true));
+    CHECK_FALSE(ui::editorOwnsArrowKey(false, false));
+}

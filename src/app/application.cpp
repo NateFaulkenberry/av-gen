@@ -2854,13 +2854,16 @@ bool Application::handleEditorShortcut(const SDL_Event& event) {
         editor.mode = ui::EditorMode::Select;
         return true;
     case SDLK_E:
-        // E is also "open environment" in the File menu's bindings. The editor takes it while
-        // something is selected, because that is when it means "rotate"; with nothing selected it
-        // falls through and still opens an HDR.
-        if (editor.selection.empty()) {
-            return false;
-        }
+        // E is Rotate, unconditionally, and it used to depend on the selection: with nothing
+        // selected it fell through to the File menu's "open environment" and put up an HDR file
+        // dialog. That was a coin-toss binding -- the same key did two unrelated things depending
+        // on hidden state -- and making lights and cameras selectable would have made the coin land
+        // differently far more often. W/E/R/Q are the tool keys the viewport spec names, and a tool
+        // key that sometimes opens a file browser is not a tool key.
+        //
+        // Opening an environment keeps its File menu item, which is where a file dialog belongs.
         editor.gizmoMode = ui::GizmoMode::Rotate;
+        editor.mode = ui::EditorMode::Select;
         return true;
     case SDLK_R:
         editor.gizmoMode = ui::GizmoMode::Scale;
@@ -2879,18 +2882,25 @@ bool Application::handleEditorShortcut(const SDL_Event& event) {
             return false;
         }
         return dispatch(EditAction::Delete);
+    // The arrows nudge only while the pointer is over the viewport; otherwise they fall through to
+    // the transport. See `ui::editorOwnsArrowKey` for why a selection alone is not enough -- making
+    // lights selectable would otherwise have stopped the arrows scrubbing across the whole
+    // application for as long as a light was selected.
     case SDLK_UP:
-        editor.nudgeSelection(*engine_, glm::vec3(0.0f, 0.0f, -step));
-        return !editor.selection.empty();
     case SDLK_DOWN:
-        editor.nudgeSelection(*engine_, glm::vec3(0.0f, 0.0f, step));
-        return !editor.selection.empty();
     case SDLK_LEFT:
-        editor.nudgeSelection(*engine_, glm::vec3(-step, 0.0f, 0.0f));
-        return !editor.selection.empty();
-    case SDLK_RIGHT:
-        editor.nudgeSelection(*engine_, glm::vec3(step, 0.0f, 0.0f));
-        return !editor.selection.empty();
+    case SDLK_RIGHT: {
+        if (!ui::editorOwnsArrowKey(!editor.selection.empty(), canvas_.hovered)) {
+            return false;
+        }
+        const auto pressed = event.key.key;
+        const glm::vec3 delta = pressed == SDLK_UP     ? glm::vec3(0.0f, 0.0f, -step)
+                                : pressed == SDLK_DOWN ? glm::vec3(0.0f, 0.0f, step)
+                                : pressed == SDLK_LEFT ? glm::vec3(-step, 0.0f, 0.0f)
+                                                       : glm::vec3(step, 0.0f, 0.0f);
+        editor.nudgeSelection(*engine_, delta);
+        return true;
+    }
     case SDLK_F: {
         if (editor.selection.empty()) {
             return false;

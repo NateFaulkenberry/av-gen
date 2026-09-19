@@ -30,6 +30,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <set>
 #include <vector>
 
 namespace avgen::gpu {
@@ -126,6 +127,10 @@ private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
     std::vector<ShadowView> views_;
+    // Names already warned about, so "this light casts no shadow" is said once rather than sixty
+    // times a second. Cleared never: a light that stops being second in the list stops warning
+    // because the warning stops being emitted, not because this is reset.
+    std::set<std::string> shadowWarned_;
     ShadowStats stats_;
 };
 

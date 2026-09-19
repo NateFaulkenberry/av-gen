@@ -550,3 +550,325 @@ TEST_CASE("A light rig's unknown key is reported too", "[scene][lights][json]") 
     CHECK(rigs >= 20);
     CHECK(findings == 0);
 }
+
+// ---- stable ids, and the rename that used to orphan every binding -----------------------------
+//
+// ADR-350 prescribes exactly two assertions for the "built but unreachable" class and neither
+// needs a GPU: every path is registered, with a negative control that an unregistered path is NOT
+// found; and a non-default value survives save -> load -> **save**. The second save is the one that
+// matters, because a writer that merely echoes what it just parsed still passes the first.
+
+namespace {
+
+bool registered(const params::ParameterSet& set, std::string_view path) {
+    return set.find(path) != nullptr;
+}
+
+// A scene with one light of `type`, written to `dir`. Deliberately not a copy of a fixture: the
+// area and spot arms need kinds no fixture in the repository authors.
+fs::path writeOneLightScene(const fs::path& dir, const char* type, json extra = json::object()) {
+    json light = json{{"name", "Key Light"}, {"type", type}, {"intensity", 7.5}};
+    for (auto& [k, v] : extra.items()) {
+        light[k] = v;
+    }
+    json doc = json{{"format", "avgen-scene"}, {"version", 1}, {"name", "one-light"},
+                    {"nodes", json::array()}, {"lights", json::array({light})}};
+    fs::create_directories(dir);
+    const fs::path file = dir / "one-light.scene.json";
+    std::ofstream out(file);
+    out << doc.dump(1);
+    return file;
+}
+
+} // namespace
+
+TEST_CASE("Every authored-light property is a real parameter", "[scene][lights][parameters]") {
+    const fs::path dir = fs::temp_directory_path() / "avgen-light-params";
+    fs::remove_all(dir);
+
+    SECTION("a spot light") {
+        auto built = buildScene(writeOneLightScene(dir, "spot"));
+        const params::ParameterSet& p = built->parameters;
+        // The id is derived from the sanitised name, so "Key Light" becomes "Key_Light".
+        for (const char* leaf : {"enabled", "intensity", "color", "azimuth", "elevation",
+                                 "angularSize", "shadowStrength", "position", "range", "innerCone",
+                                 "outerCone", "temperature", "tint", "castsShadow", "contactShadow",
+                                 "shadowBias", "volumetric"}) {
+            INFO(leaf);
+            CHECK(registered(p, std::string("lights/Key_Light/") + leaf));
+        }
+        // THE CONTROL: a path that does not exist is not found. Without it every CHECK above
+        // passes on a `find` that returns non-null for anything.
+        CHECK_FALSE(registered(p, "lights/Key_Light/nonesuch"));
+        CHECK_FALSE(registered(p, "lights/nonesuch/intensity"));
+        // A spot has no extent, so the area knobs are absent rather than present and inert --
+        // ADR-372's lesson, that a control which cannot move the picture should not be in the panel.
+        CHECK_FALSE(registered(p, "lights/Key_Light/width"));
+    }
+
+    SECTION("a directional light has no range, and an area light has an extent") {
+        auto sun = buildScene(writeOneLightScene(dir / "sun", "directional"));
+        // Range is the inverse-square cutoff and means nothing to a directional light.
+        CHECK_FALSE(registered(sun->parameters, "lights/Key_Light/range"));
+        CHECK_FALSE(registered(sun->parameters, "lights/Key_Light/innerCone"));
+        CHECK(registered(sun->parameters, "lights/Key_Light/azimuth"));
+
+        auto rect = buildScene(writeOneLightScene(dir / "rect", "rect"));
+        CHECK(registered(rect->parameters, "lights/Key_Light/width"));
+        CHECK(registered(rect->parameters, "lights/Key_Light/height"));
+        CHECK(registered(rect->parameters, "lights/Key_Light/range"));
+        // A Rect is not aimed the way a spot is, so it gets no azimuth/elevation pair.
+        CHECK_FALSE(registered(rect->parameters, "lights/Key_Light/azimuth"));
+    }
+}
+
+TEST_CASE("A light's parameters reach the renderer", "[scene][lights][parameters]") {
+    const fs::path dir = fs::temp_directory_path() / "avgen-light-reach";
+    fs::remove_all(dir);
+    auto built = buildScene(writeOneLightScene(dir, "point", json{{"position", json::array({1.0, 2.0, 3.0})}}));
+
+    REQUIRE(built->light("Key Light") != nullptr);
+    CHECK(built->light("Key Light")->position.x == Approx(1.0f));
+
+    // Move it the way a gizmo does -- by writing the parameter's base -- and step a frame.
+    auto* position = built->parameters.findAs<glm::vec3>("lights/Key_Light/position");
+    REQUIRE(position != nullptr);
+    position->setBase(glm::vec3(10.0f, 20.0f, 30.0f));
+    FrameTime time;
+    time.renderTime = 1.0 / 60.0;
+    time.deltaTime = 1.0 / 60.0;
+    time.frameIndex = 1;
+    built->parameters.resetFinals();
+    built->comp->update(time);
+
+    // The light the renderer is handed has moved, not merely the parameter.
+    REQUIRE(built->light("Key Light") != nullptr);
+    CHECK(built->light("Key Light")->position.x == Approx(10.0f));
+    CHECK(built->light("Key Light")->position.z == Approx(30.0f));
+    // And the authored copy moved with it, or the next save writes the old position (ADR-225).
+    REQUIRE(built->comp->authoredLights().size() == 1);
+    CHECK(built->comp->authoredLights()[0].light.position.y == Approx(20.0f));
+}
+
+TEST_CASE("A renamed light keeps the routes bound to it", "[scene][lights][parameters][rename]") {
+    // The whole point of separating the id from the display name. Under the old model this test
+    // could not be written: the route's target contained the name, so renaming re-pathed the
+    // parameter and `Modulator::bind` skipped the route without a word.
+    const fs::path dir = fs::temp_directory_path() / "avgen-light-rename";
+    fs::remove_all(dir);
+    auto built = buildScene(writeOneLightScene(dir, "point"));
+
+    built->bus.declare("audio.bass", 0.0f, 1.0f);
+    params::ModRoute route;
+    route.source = "audio.bass";
+    route.target = "lights/Key_Light/intensity";
+    built->modulator.addRoute(route);
+    built->modulator.bind(built->bus, built->parameters);
+
+    // Whether *this* route found its parameter, not whether every route in the scene did: `bind`
+    // reports failure for the whole set, and these fixtures carry routes to signals no test bus
+    // declares. A resolved route is one whose `targetParam` is no longer null.
+    const auto resolved = [&](std::string_view target) {
+        for (const params::ModRoute& r : built->modulator.routes()) {
+            if (r.target == target) {
+                return r.targetParam != nullptr;
+            }
+        }
+        return false;
+    };
+    REQUIRE(resolved("lights/Key_Light/intensity"));
+
+    // Rename it, the way the panel will: the display name changes, the id does not.
+    std::vector<scene::Composition::AuthoredLight> lights = built->comp->authoredLights();
+    REQUIRE(lights.size() == 1);
+    const std::string idBefore = lights[0].id;
+    lights[0].light.name = "Moon Key";
+    REQUIRE(built->comp->setAuthoredLights(std::move(lights)).has_value());
+
+    CHECK(built->comp->authoredLights()[0].id == idBefore);
+    CHECK(built->comp->authoredLights()[0].light.name == "Moon Key");
+    // The parameter is still there under the id, and still the one the route names.
+    CHECK(registered(built->parameters, "lights/Key_Light/intensity"));
+    built->modulator.bind(built->bus, built->parameters);
+    CHECK(resolved("lights/Key_Light/intensity"));
+    // The CONTROL: the display name is NOT a parameter path, so a rename that had re-keyed the
+    // parameters would have produced this one instead.
+    CHECK_FALSE(registered(built->parameters, "lights/Moon_Key/intensity"));
+}
+
+TEST_CASE("A renamed light writes its id, and an unrenamed one does not", "[scene][lights]") {
+    const fs::path dir = fs::temp_directory_path() / "avgen-light-idkey";
+    fs::remove_all(dir);
+    auto built = buildScene(writeOneLightScene(dir, "point"));
+
+    // Nobody has renamed it, so the id still equals the sanitised name and the key stays out of the
+    // file -- which is what keeps every scene in the repository byte-stable through this change.
+    CHECK_FALSE(built->comp->toJson().at("lights").at(0).contains("id"));
+
+    std::vector<scene::Composition::AuthoredLight> lights = built->comp->authoredLights();
+    lights[0].light.name = "Moon Key";
+    REQUIRE(built->comp->setAuthoredLights(std::move(lights)).has_value());
+
+    const json written = built->comp->toJson().at("lights").at(0);
+    REQUIRE(written.contains("id"));
+    CHECK(written.at("id") == "Key_Light");
+    CHECK(written.at("name") == "Moon Key");
+}
+
+TEST_CASE("A saved scene keeps its lights through two round trips", "[scene][lights]") {
+    // ADR-350's second arm. The second save is the one that matters.
+    const fs::path dir = fs::temp_directory_path() / "avgen-light-roundtrip";
+    fs::remove_all(dir);
+    const fs::path source = writeOneLightScene(
+        dir, "spot",
+        json{{"position", json::array({4.0, 5.0, 6.0})}, {"outerCone", 33.0}, {"temperature", 3200.0}});
+
+    auto first = buildScene(source);
+    const fs::path out1 = dir / "out1.scene.json";
+    REQUIRE(first->comp->saveFile(out1).has_value());
+
+    assets::AssetRegistry registry(source.parent_path());
+    auto reloaded = scene::Composition::loadFile(out1, registry);
+    REQUIRE(reloaded.has_value());
+    const fs::path out2 = dir / "out2.scene.json";
+    REQUIRE((*reloaded)->saveFile(out2).has_value());
+
+    std::ifstream in(out2);
+    json doc = json::parse(in);
+    REQUIRE(doc.contains("lights"));
+    REQUIRE(doc.at("lights").size() == 1);
+    const json& light = doc.at("lights").at(0);
+    // Named keys, not counts: a save was observed dropping two whole top-level keys while the
+    // parameter count went up.
+    CHECK(light.at("name") == "Key Light");
+    CHECK(light.at("type") == "spot");
+    CHECK(light.at("intensity").get<float>() == Approx(7.5f));
+    CHECK(light.at("outerCone").get<float>() == Approx(33.0f));
+    CHECK(light.at("temperature").get<float>() == Approx(3200.0f));
+    CHECK(light.at("position").at(1).get<float>() == Approx(5.0f));
+}
+
+TEST_CASE("The ecology's name prefix is refused to an author", "[scene][lights]") {
+    // `updateEcologyLights` erases last frame's glow by a prefix match over ALL of `scene_.lights`,
+    // so a light called "ecology.glow.x" would be deleted on the first frame the ecology ran and
+    // would shift every authored light after it relative to `authoredLightFirst_`. Unreachable
+    // while only a text editor could name a light; a Lights panel is what makes it reachable.
+    const fs::path dir = fs::temp_directory_path() / "avgen-light-reserved";
+    fs::remove_all(dir);
+    auto built = buildScene(writeOneLightScene(dir, "point"));
+
+    std::vector<scene::Composition::AuthoredLight> lights = built->comp->authoredLights();
+    lights[0].light.name = "ecology.glow.7";
+    lights[0].id.clear();
+    CHECK_FALSE(built->comp->setAuthoredLights(std::move(lights)).has_value());
+
+    // THE CONTROL: a name that merely resembles it is fine. A guard that refused everything would
+    // pass the arm above for the wrong reason.
+    std::vector<scene::Composition::AuthoredLight> ok = built->comp->authoredLights();
+    ok[0].light.name = "ecology glow";
+    ok[0].id.clear();
+    CHECK(built->comp->setAuthoredLights(std::move(ok)).has_value());
+}
+
+TEST_CASE("Two lights cannot share an id", "[scene][lights]") {
+    const fs::path dir = fs::temp_directory_path() / "avgen-light-dupid";
+    fs::remove_all(dir);
+    auto built = buildScene(writeOneLightScene(dir, "point"));
+
+    std::vector<scene::Composition::AuthoredLight> two = built->comp->authoredLights();
+    scene::Composition::AuthoredLight clone = two[0];
+    clone.light.name = "Second";  // a different name...
+    two.push_back(clone);         // ...but the same id, which is the parameter path
+    CHECK_FALSE(built->comp->setAuthoredLights(std::move(two)).has_value());
+
+    // THE CONTROL: distinct ids are accepted, so the refusal above is about the collision and not
+    // about having two lights at all.
+    std::vector<scene::Composition::AuthoredLight> good = built->comp->authoredLights();
+    scene::Composition::AuthoredLight other = good[0];
+    other.light.name = "Second";
+    other.id = "second";
+    good.push_back(other);
+    CHECK(built->comp->setAuthoredLights(std::move(good)).has_value());
+}
+
+TEST_CASE("uniqueAuthoredLightId avoids what is taken", "[scene][lights]") {
+    const std::vector<std::string> taken{"key", "key-2"};
+    CHECK(scene::Composition::uniqueAuthoredLightId("Fill", taken) == "Fill");
+    CHECK(scene::Composition::uniqueAuthoredLightId("key", taken) == "key-3");
+    // A name that sanitises to nothing still yields something addressable.
+    CHECK_FALSE(scene::Composition::uniqueAuthoredLightId("", taken).empty());
+}
+
+// ---- the project's record of its session's lights ----------------------------------------------
+//
+// ADR-207/230/276/330's family, a fifth time. A project saves its scene **by reference**, so a
+// light added in the editor and not written into the project document lives in the window and in
+// no document any render reads.
+
+TEST_CASE("authoredLightsAgainst records a difference and nothing else", "[scene][lights]") {
+    // `liveLights` is `Composition::toJson()["lights"]` -- already canonical -- so the arms below
+    // build it the way `Engine::saveProject` does rather than by hand. That is not a detail: the
+    // reader **normalises `direction`**, and the default (-0.4, -1, -0.35) is 1.1435 long, so a
+    // parsed light always differs from a default-constructed one and always writes a `direction`
+    // key. A hand-written "identical" array is therefore not identical, and comparing against one
+    // would have made every untouched project write a lights key.
+    const fs::path dir = fs::temp_directory_path() / "avgen-light-against";
+    fs::remove_all(dir);
+    const fs::path file = writeOneLightScene(dir, "directional");
+    std::ifstream in(file);
+    const json sceneDoc = json::parse(in);
+    auto built = buildScene(file);
+    const json live = built->comp->toJson().value("lights", json::array());
+
+    SECTION("an untouched list writes nothing") {
+        // THE CONTROL that makes every positive arm mean something: a project nobody edited stays
+        // byte-stable through a save (ADR-182).
+        CHECK(scene::authoredLightsAgainst(live, sceneDoc).is_null());
+    }
+
+    SECTION("a scene spelling out a default still reads as untouched") {
+        // Why the comparison canonicalises instead of comparing raw. 6500 K is the default, so
+        // `toJson` omits it; a scene that writes it anyway must not read as an edit, or every
+        // project carrying that scene starts writing a lights key it does not need.
+        json spelled = sceneDoc;
+        spelled["lights"][0]["temperature"] = 6500.0;
+        CHECK(scene::authoredLightsAgainst(live, spelled).is_null());
+    }
+
+    SECTION("a changed value is recorded whole") {
+        std::vector<scene::Composition::AuthoredLight> edited = built->comp->authoredLights();
+        edited[0].light.intensity = 9.0f;
+        REQUIRE(built->comp->setAuthoredLights(std::move(edited)).has_value());
+        const json record =
+            scene::authoredLightsAgainst(built->comp->toJson().value("lights", json::array()), sceneDoc);
+        REQUIRE_FALSE(record.is_null());
+        REQUIRE(record.is_array());
+        REQUIRE(record.size() == 1);
+        CHECK(record.at(0).at("intensity").get<float>() == Approx(9.0f));
+    }
+
+    SECTION("an added light is recorded, and so is an emptied list") {
+        std::vector<scene::Composition::AuthoredLight> two = built->comp->authoredLights();
+        scene::Composition::AuthoredLight fill;
+        fill.light.name = "fill";
+        fill.light.type = scene::PunctualLight::Type::Point;
+        two.push_back(fill);
+        REQUIRE(built->comp->setAuthoredLights(std::move(two)).has_value());
+        CHECK(scene::authoredLightsAgainst(built->comp->toJson().value("lights", json::array()), sceneDoc)
+                  .size() == 2);
+
+        // A deletion that only survives while the process does is the same defect pointing the
+        // other way, so an emptied list is a difference like any other.
+        REQUIRE(built->comp->setAuthoredLights({}).has_value());
+        const json emptied =
+            scene::authoredLightsAgainst(built->comp->toJson().value("lights", json::array()), sceneDoc);
+        REQUIRE_FALSE(emptied.is_null());
+        CHECK(emptied.empty());
+    }
+
+    SECTION("an unreadable scene document is not a deletion") {
+        // Mirrors `nodeEditsAgainst`'s "no document, no record" guard: a scene this build cannot
+        // parse is not evidence that the session deleted the lights.
+        CHECK(scene::authoredLightsAgainst(json::array(), json::object()).is_null());
+    }
+}

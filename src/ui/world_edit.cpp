@@ -51,53 +51,141 @@ void closeChange(app::Engine& engine, ParamChange change, std::vector<ParamChang
 
 // ---- Selection -----------------------------------------------------------------------------------
 
+const char* selectionKindName(SelectionRef::Kind kind) {
+    switch (kind) {
+    case SelectionRef::Kind::Node: return "object";
+    case SelectionRef::Kind::Light: return "light";
+    case SelectionRef::Kind::Camera: return "camera";
+    }
+    return "object";
+}
+
+namespace {
+const SelectionRef kNothingRef{};
+} // namespace
+
+void Selection::rebuildNodeNames() {
+    nodeNames_.clear();
+    for (const SelectionRef& ref : refs_) {
+        if (ref.kind == SelectionRef::Kind::Node) {
+            nodeNames_.push_back(ref.name);
+        }
+    }
+}
+
 bool Selection::contains(const std::string& name) const {
-    return std::find(nodes_.begin(), nodes_.end(), name) != nodes_.end();
+    return contains(SelectionRef{SelectionRef::Kind::Node, name});
+}
+
+bool Selection::contains(const SelectionRef& ref) const {
+    return std::find(refs_.begin(), refs_.end(), ref) != refs_.end();
+}
+
+std::size_t Selection::countOf(SelectionRef::Kind kind) const {
+    return static_cast<std::size_t>(
+        std::count_if(refs_.begin(), refs_.end(), [&](const SelectionRef& r) { return r.kind == kind; }));
+}
+
+const SelectionRef& Selection::primaryRef() const {
+    return refs_.empty() ? kNothingRef : refs_.back();
 }
 
 const std::string& Selection::primary() const {
-    return nodes_.empty() ? kNothing : nodes_.back();
+    // A node's name, or nothing. An active light or camera must NOT read as a node name to the
+    // callers that take this straight to `findNode` -- that would be the two-models failure
+    // arriving through the back door, and it would arrive as a null dereference.
+    const SelectionRef& ref = primaryRef();
+    return ref.kind == SelectionRef::Kind::Node ? ref.name : kNothing;
 }
 
 void Selection::set(std::string name) {
-    nodes_.clear();
-    if (!name.empty()) {
-        nodes_.push_back(std::move(name));
-    }
+    set(SelectionRef{SelectionRef::Kind::Node, std::move(name)});
 }
 
 void Selection::set(std::vector<std::string> names) {
-    nodes_.clear();
+    refs_.clear();
     for (std::string& name : names) {
         add(std::move(name));
     }
+    rebuildNodeNames();
+}
+
+void Selection::set(SelectionRef ref) {
+    refs_.clear();
+    if (!ref.name.empty()) {
+        refs_.push_back(std::move(ref));
+    }
+    rebuildNodeNames();
+}
+
+void Selection::set(std::vector<SelectionRef> refs) {
+    refs_.clear();
+    for (SelectionRef& ref : refs) {
+        add(std::move(ref));
+    }
+    rebuildNodeNames();
 }
 
 void Selection::add(std::string name) {
-    if (name.empty() || contains(name)) {
+    add(SelectionRef{SelectionRef::Kind::Node, std::move(name)});
+}
+
+void Selection::add(SelectionRef ref) {
+    if (ref.name.empty() || contains(ref)) {
         return;
     }
-    nodes_.push_back(std::move(name));
+    const bool isNode = ref.kind == SelectionRef::Kind::Node;
+    refs_.push_back(std::move(ref));
+    if (isNode) {
+        rebuildNodeNames();
+    }
 }
 
 void Selection::remove(const std::string& name) {
-    nodes_.erase(std::remove(nodes_.begin(), nodes_.end(), name), nodes_.end());
+    remove(SelectionRef{SelectionRef::Kind::Node, name});
+}
+
+void Selection::remove(const SelectionRef& ref) {
+    refs_.erase(std::remove(refs_.begin(), refs_.end(), ref), refs_.end());
+    rebuildNodeNames();
 }
 
 void Selection::toggle(std::string name) {
-    if (contains(name)) {
-        remove(name);
+    toggle(SelectionRef{SelectionRef::Kind::Node, std::move(name)});
+}
+
+void Selection::toggle(SelectionRef ref) {
+    if (contains(ref)) {
+        remove(ref);
     } else {
-        add(std::move(name));
+        add(std::move(ref));
     }
 }
 
 bool Selection::retainOnly(const scene::Composition& composition) {
-    const std::size_t before = nodes_.size();
-    nodes_.erase(std::remove_if(nodes_.begin(), nodes_.end(),
-                                [&](const std::string& n) { return composition.findNode(n) == nullptr; }),
-                 nodes_.end());
-    return nodes_.size() != before;
+    const std::size_t before = refs_.size();
+    refs_.erase(std::remove_if(refs_.begin(), refs_.end(),
+                               [&](const SelectionRef& r) {
+                                   switch (r.kind) {
+                                   case SelectionRef::Kind::Node:
+                                       return composition.findNode(r.name) == nullptr;
+                                   case SelectionRef::Kind::Light: {
+                                       const auto& lights = composition.authoredLights();
+                                       return std::none_of(lights.begin(), lights.end(),
+                                                           [&](const scene::Composition::AuthoredLight& a) {
+                                                               return a.light.name == r.name;
+                                                           });
+                                   }
+                                   case SelectionRef::Kind::Camera:
+                                       // Kept: the name labels a `CameraId`, it does not identify
+                                       // one, so a miss here would deselect on every rename.
+                                       return false;
+                                   }
+                                   return false;
+                               }),
+                refs_.end());
+    rebuildNodeNames();
+    return refs_.size() != before;
 }
 
 // ---- group navigation ------------------------------------------------------------------------------

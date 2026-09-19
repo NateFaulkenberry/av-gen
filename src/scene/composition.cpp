@@ -67,7 +67,7 @@ constexpr std::string_view kAuthoredLightKeys[] = {
     "up",          "color",         "intensity",      "temperature", "tint",      "range",
     "innerCone",   "outerCone",     "width",          "height",     "radius",     "castsShadow",
     "contactShadow", "shadowStrength", "shadowBias",  "softness",   "volumetric", "diffuseOnly",
-    "specularOnly", "enabled"};
+    "specularOnly", "enabled", "id"};
 
 std::span<const std::string_view> sceneFileKeys() { return kSceneKeys; }
 std::span<const std::string_view> sceneEnvironmentKeys() { return kEnvironmentKeys; }
@@ -738,6 +738,9 @@ Result<Composition::AuthoredLight> authoredLightFromJson(const json& e, std::str
     }
     Composition::AuthoredLight out;
     PunctualLight& l = out.light;
+    if (e.contains("id") && e["id"].is_string()) {
+        out.id = e["id"].get<std::string>();
+    }
     auto name = readString(e, "name", "");
     if (!name) {
         return std::unexpected(name.error());
@@ -867,6 +870,12 @@ json authoredLightToJson(const Composition::AuthoredLight& a) {
     json e = json::object();
     e["name"] = l.name;
     e["type"] = lightTypeName(l.type);
+    // Only when it has stopped matching the name -- i.e. only after a rename. A scene nobody has
+    // renamed therefore stays byte-identical, and the key shows up exactly when it is the only
+    // thing keeping the parameter paths pointing at this light.
+    if (!a.id.empty() && a.id != sanitise(l.name)) {
+        e["id"] = a.id;
+    }
     if (!a.node.empty()) {
         e["node"] = a.node;
     }
@@ -1633,12 +1642,73 @@ glm::vec3 Composition::lightDirectionFromAngles(float azimuthDegrees, float elev
     return -glm::vec3(c * std::sin(a), std::sin(e), c * std::cos(a));
 }
 
+// A light's identity, derived from its display name when the file gave none. See the note on
+// `AuthoredLight` for why the two are separate at all.
+std::string Composition::authoredLightId(const AuthoredLight& light) {
+    return light.id.empty() ? sanitise(light.light.name) : light.id;
+}
+
+std::string Composition::uniqueAuthoredLightId(std::string_view name, std::span<const std::string> taken) {
+    const std::string base = sanitise(std::string(name));
+    const auto used = [&](const std::string& candidate) {
+        return std::find(taken.begin(), taken.end(), candidate) != taken.end();
+    };
+    if (!base.empty() && !used(base)) {
+        return base;
+    }
+    // Suffixed rather than randomised, because an id reaches a project file and a person reading
+    // `lights/fill-2/intensity` can tell which light that is.
+    const std::string stem = base.empty() ? std::string("light") : base;
+    for (int n = 2; n < 100000; ++n) {
+        std::string candidate = stem + "-" + std::to_string(n);
+        if (!used(candidate)) {
+            return candidate;
+        }
+    }
+    return stem;
+}
+
 Result<void> Composition::setAuthoredLights(std::vector<AuthoredLight> lights) {
     for (std::size_t i = 0; i < lights.size(); ++i) {
         if (lights[i].light.name.empty()) {
             return fail("lights[{}]: a light needs a name", i);
         }
+        // The id is stamped here rather than left to be re-derived at every use, so that
+        // `authoredLights()` is self-describing and nothing downstream has to remember the rule.
+        if (lights[i].id.empty()) {
+            lights[i].id = sanitise(lights[i].light.name);
+        }
+        // `ecology.glow.` is reserved, and this guard is the whole of what stands between a user
+        // and a genuinely nasty failure. `updateEcologyLights` removes last frame's glow by
+        // `std::erase_if` over **all** of `scene_.lights` on this name prefix -- not over the
+        // ecology range -- so an authored light called "ecology.glow.x" would be deleted on the
+        // first frame the ecology produced anything, AND would shift every authored light after it
+        // relative to `authoredLightFirst_`, leaving the parameter block driving the wrong light.
+        // It was unreachable while only a text editor could name a light. A Lights panel is exactly
+        // what makes it reachable, so it is refused here rather than left as a trap.
+        // Normalised here as well as in the reader, so a light built in C++ and the same light
+        // round-tripped through a file are the same light. They were not: `PunctualLight`'s default
+        // direction is (-0.4, -1, -0.35), which is 1.1435 long, so a parsed light carried a unit
+        // vector and a constructed one did not -- and `toJson` then wrote `direction` for one and
+        // omitted it for the other. That made a light added in the editor differ from its own
+        // serialisation, which is the difference `authoredLightsAgainst` is measuring.
+        if (glm::length(lights[i].light.direction) > 1e-6f) {
+            lights[i].light.direction = glm::normalize(lights[i].light.direction);
+        }
+        if (lights[i].light.name.starts_with(kEcologyLightPrefix)) {
+            return fail("lights[{}]: '{}' is reserved for the procedural ecology; choose another name",
+                        i, lights[i].light.name);
+        }
         for (std::size_t k = 0; k < i; ++k) {
+            // Ids must be unique because they are the parameter path: two lights answering to
+            // `lights/key/intensity` is one knob driving whichever the loop reaches last.
+            if (lights[k].id == lights[i].id) {
+                return fail("lights[{}]: duplicate light id '{}'", i, lights[i].id);
+            }
+            // Names too, and this is a narrower claim than it looks. Under a stable id a display
+            // name could be anything, but `DayNight` binds its sun and its moon to lights **by
+            // name** (`sunLight`, `moonLight`), so two lights called "moon" is an ambiguity with a
+            // silent winner. Relaxing this means moving that binding onto ids first.
             if (lights[k].light.name == lights[i].light.name) {
                 return fail("lights[{}]: duplicate light name '{}'", i, lights[i].light.name);
             }
@@ -1653,6 +1723,7 @@ Result<void> Composition::setAuthoredLights(std::vector<AuthoredLight> lights) {
         unregisterAuthoredLightParameters();
     }
     authoredLights_ = std::move(lights);
+    authoredLightsRest_ = authoredLights_;
     if (attached) {
         registerAuthoredLightParameters(*params_);
     }
@@ -3529,7 +3600,11 @@ void Composition::registerAuthoredLightParameters(params::ParameterSet& params) 
     authoredLightParams_.assign(authoredLights_.size(), AuthoredLightParams{});
     for (std::size_t i = 0; i < authoredLights_.size(); ++i) {
         const PunctualLight& l = authoredLights_[i].light;
-        const std::string base = prefix_ + "lights/" + sanitise(l.name) + "/";
+        // Keyed on the **id**, not the display name. That is the whole of the rename fix: a route
+        // or a track bound to `lights/<id>/intensity` keeps resolving after the light is renamed,
+        // because nothing it names has moved. A single place keying on the name again would
+        // reintroduce the orphaning silently, which is what the rename regression test is for.
+        const std::string base = prefix_ + "lights/" + authoredLightId(authoredLights_[i]) + "/";
         AuthoredLightParams& p = authoredLightParams_[i];
         p.enabled = &params.add(boolDesc(base + "enabled", l.enabled));
         // The soft range tops out at three times the authored value or ten, whichever is more, so
@@ -3549,6 +3624,50 @@ void Composition::registerAuthoredLightParameters(params::ParameterSet& params) 
         }
         p.angularSize = &params.add(floatDesc(base + "angularSize", l.softness, 0.0f, 16.0f, 0.0f, 6.0f));
         p.shadowStrength = &params.add(floatDesc(base + "shadowStrength", l.shadowStrength, 0.0f, 1.0f, 0.0f, 1.0f));
+
+        // Position is registered for every kind including Directional. A directional light's
+        // position does not shade anything -- but it is where its gizmo is, and a sun you cannot
+        // pick up and put down beside the thing it lights is a sun nobody can aim.
+        p.position = &params.add(vec3Desc(base + "position", l.position, -100000.0f, 100000.0f,
+                                          -500.0f, 500.0f));
+        p.temperature = &params.add(floatDesc(base + "temperature", l.temperature, 1500.0f, 12000.0f,
+                                              1500.0f, 12000.0f));
+        p.tint = &params.add(floatDesc(base + "tint", l.tint, -1.0f, 1.0f, -1.0f, 1.0f));
+        p.castsShadow = &params.add(boolDesc(base + "castsShadow", l.castsShadow));
+        p.contactShadow = &params.add(boolDesc(base + "contactShadow", l.contactShadow));
+        p.shadowBias = &params.add(floatDesc(base + "shadowBias", l.shadowBias, 0.0f, 1.0f, 0.0f, 0.02f));
+        p.volumetric = &params.add(floatDesc(base + "volumetric", l.volumetricStrength, 0.0f, 4.0f, 0.0f, 1.0f));
+
+        // Range means nothing to a directional light -- it is the inverse-square cutoff -- so it is
+        // registered only where it does something. ADR-372's lesson is the opposite failure: a
+        // control that reaches the GPU and is ignored. A knob that cannot move the picture should
+        // not be in the panel at all.
+        const bool local = l.type != PunctualLight::Type::Directional;
+        if (local) {
+            p.range = &params.add(floatDesc(base + "range", l.range, 0.0f, 100000.0f, 0.0f, 200.0f));
+        }
+        if (l.type == PunctualLight::Type::Spot) {
+            // Degrees, matching the file and every other angle a person writes here.
+            // Hard max 90, not 180, and the distinction is not cosmetic: a modulation route
+            // clamps to the **hard** range, and `packLight` clamps both cone angles to pi/2 before
+            // it packs them. A hard range of 180 would therefore have given a route half a
+            // travel that cannot move the picture -- ADR-372's defect, arriving through the range
+            // rather than through the shader.
+            p.innerCone = &params.add(floatDesc(base + "innerCone", glm::degrees(l.innerConeAngle),
+                                                0.0f, 90.0f, 0.0f, 90.0f));
+            p.outerCone = &params.add(floatDesc(base + "outerCone", glm::degrees(l.outerConeAngle),
+                                                0.0f, 90.0f, 0.0f, 90.0f));
+        }
+        // Only the area kinds have an extent. `emitterArea` is what converts a nits-over-the-emitter
+        // intensity into the candela the shader wants, so these three are not cosmetic: changing a
+        // Rect's width changes how much light it throws.
+        const bool area = l.type == PunctualLight::Type::Rect || l.type == PunctualLight::Type::Disk ||
+                          l.type == PunctualLight::Type::Tube || l.type == PunctualLight::Type::Sphere;
+        if (area) {
+            p.width = &params.add(floatDesc(base + "width", l.width, 0.0f, 1000.0f, 0.0f, 10.0f));
+            p.height = &params.add(floatDesc(base + "height", l.height, 0.0f, 1000.0f, 0.0f, 10.0f));
+            p.radius = &params.add(floatDesc(base + "radius", l.radius, 0.0f, 1000.0f, 0.0f, 10.0f));
+        }
     }
 }
 
@@ -3558,9 +3677,14 @@ void Composition::unregisterAuthoredLightParameters() {
         return;
     }
     for (const AuthoredLight& a : authoredLights_) {
-        const std::string base = prefix_ + "lights/" + sanitise(a.light.name) + "/";
+        const std::string base = prefix_ + "lights/" + authoredLightId(a) + "/";
+        // Every leaf any kind of light can register, not only the ones this light has: a light
+        // whose *type* changed from Spot to Point would otherwise leave `outerCone` behind in the
+        // set for ever, which is the stale-path defect ADR-358 named.
         for (const char* leaf : {"enabled", "intensity", "color", "azimuth", "elevation",
-                                 "angularSize", "shadowStrength"}) {
+                                 "angularSize", "shadowStrength", "position", "range", "innerCone",
+                                 "outerCone", "temperature", "tint", "width", "height", "radius",
+                                 "castsShadow", "contactShadow", "shadowBias", "volumetric"}) {
             params_->remove(base + leaf);
         }
     }
@@ -6494,9 +6618,39 @@ void Composition::applyParameters() {
         if (p.color != nullptr) rest.color = p.color->base();
         if (p.angularSize != nullptr) rest.softness = p.angularSize->base();
         if (p.shadowStrength != nullptr) rest.shadowStrength = p.shadowStrength->base();
-        if (p.azimuth != nullptr && p.elevation != nullptr) {
+        // Only when somebody actually moved the angles.
+        //
+        // This guard is not an optimisation. `lightAngles` and `lightDirectionFromAngles` are a
+        // lossy pair -- a direction taken to azimuth/elevation and back lands about 6e-8 away --
+        // so rewriting the direction unconditionally rewrote it *differently* on every load, and
+        // `authoredLightsAgainst` then saw an edit in a scene nobody had touched. Every project
+        // whose scene has a directional or a spot light would have started writing a `lights` key
+        // on every save, which is precisely the byte-stability the record depends on not having.
+        // Measured: (-0.35320863, -0.88302159, -0.30905756) parsed, against
+        // (-0.35320857, -0.88302159, -0.30905750) after one angle round trip.
+        //
+        // The comparison is against the seed rather than the previous frame, because the seed is
+        // exactly "what the file said" -- so an untouched light keeps the file's own floats and a
+        // moved one is recomputed from the angles the user set.
+        const bool aimMoved = p.azimuth != nullptr && p.elevation != nullptr &&
+                              (p.azimuth->base() != p.azimuth->defaultComponent(0) ||
+                               p.elevation->base() != p.elevation->defaultComponent(0));
+        if (aimMoved) {
             rest.direction = lightDirectionFromAngles(p.azimuth->base(), p.elevation->base());
         }
+        if (p.position != nullptr) rest.position = p.position->base();
+        if (p.temperature != nullptr) rest.temperature = p.temperature->base();
+        if (p.tint != nullptr) rest.tint = p.tint->base();
+        if (p.castsShadow != nullptr) rest.castsShadow = p.castsShadow->base();
+        if (p.contactShadow != nullptr) rest.contactShadow = p.contactShadow->base();
+        if (p.shadowBias != nullptr) rest.shadowBias = p.shadowBias->base();
+        if (p.volumetric != nullptr) rest.volumetricStrength = p.volumetric->base();
+        if (p.range != nullptr) rest.range = p.range->base();
+        if (p.innerCone != nullptr) rest.innerConeAngle = glm::radians(p.innerCone->base());
+        if (p.outerCone != nullptr) rest.outerConeAngle = glm::radians(p.outerCone->base());
+        if (p.width != nullptr) rest.width = p.width->base();
+        if (p.height != nullptr) rest.height = p.height->base();
+        if (p.radius != nullptr) rest.radius = p.radius->base();
         const std::size_t lightIndex = authoredLightFirst_ + i;
         if (lightIndex >= scene_.lights.size()) {
             continue;
@@ -6507,9 +6661,32 @@ void Composition::applyParameters() {
         live.color = p.color != nullptr ? p.color->value() : rest.color;
         live.softness = p.angularSize != nullptr ? p.angularSize->value() : rest.softness;
         live.shadowStrength = p.shadowStrength != nullptr ? p.shadowStrength->value() : rest.shadowStrength;
-        if (p.azimuth != nullptr && p.elevation != nullptr) {
+        // The same rule for the render copy, against the *final* value so that a route or a
+        // keyframe driving the aim still turns the light -- but an unmodulated, unmoved light
+        // renders with the direction its file authored rather than a round trip of it.
+        if (p.azimuth != nullptr && p.elevation != nullptr &&
+            (p.azimuth->value() != p.azimuth->defaultComponent(0) ||
+             p.elevation->value() != p.elevation->defaultComponent(0))) {
             live.direction = lightDirectionFromAngles(p.azimuth->value(), p.elevation->value());
+        } else {
+            live.direction = rest.direction;
         }
+        // `value()` rather than `base()`, so each of these carries whatever modulation or timeline
+        // automation sits on top of it. That is the difference between a light a route can drive
+        // and a light a route merely names.
+        live.position = p.position != nullptr ? p.position->value() : rest.position;
+        live.temperature = p.temperature != nullptr ? p.temperature->value() : rest.temperature;
+        live.tint = p.tint != nullptr ? p.tint->value() : rest.tint;
+        live.castsShadow = rest.castsShadow;
+        live.contactShadow = rest.contactShadow;
+        live.shadowBias = p.shadowBias != nullptr ? p.shadowBias->value() : rest.shadowBias;
+        live.volumetricStrength = p.volumetric != nullptr ? p.volumetric->value() : rest.volumetricStrength;
+        if (p.range != nullptr) live.range = p.range->value();
+        if (p.innerCone != nullptr) live.innerConeAngle = glm::radians(p.innerCone->value());
+        if (p.outerCone != nullptr) live.outerConeAngle = glm::radians(p.outerCone->value());
+        if (p.width != nullptr) live.width = p.width->value();
+        if (p.height != nullptr) live.height = p.height->value();
+        if (p.radius != nullptr) live.radius = p.radius->value();
     }
 
     // ADR-278: an authored light that rides a node. Here rather than in `rebuild` for the reason
@@ -9743,6 +9920,31 @@ nlohmann::json nodeEditsAgainst(const nlohmann::json& liveNodes, const nlohmann:
 // edit, and **every untouched project would start writing a `lights` key it does not need** --
 // destroying the byte-stability control those four ADRs all rely on. So the scene's own list goes
 // out and back through the same converters the live list came from, and only then are they compared.
+Result<std::vector<Composition::AuthoredLight>> authoredLightsFromJson(const nlohmann::json& array,
+                                                                       std::string_view where) {
+    std::vector<Composition::AuthoredLight> out;
+    if (!array.is_array()) {
+        return fail("{}: 'lights' must be an array", where);
+    }
+    out.reserve(array.size());
+    for (std::size_t i = 0; i < array.size(); ++i) {
+        auto one = authoredLightFromJson(array[i], where);
+        if (!one) {
+            return fail("{}: lights[{}]: {}", where, i, one.error().message);
+        }
+        out.push_back(std::move(*one));
+    }
+    return out;
+}
+
+nlohmann::json Composition::authoredLightsRestJson() const {
+    nlohmann::json out = nlohmann::json::array();
+    for (const AuthoredLight& a : authoredLightsRest_) {
+        out.push_back(authoredLightToJson(a));
+    }
+    return out;
+}
+
 nlohmann::json authoredLightsAgainst(const nlohmann::json& liveLights, const nlohmann::json& sceneDoc) {
     // A scene document this build could not read is not evidence that the session's lights are an
     // edit -- it is no evidence at all, and recording the difference against nothing would bake a

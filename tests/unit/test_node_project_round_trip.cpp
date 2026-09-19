@@ -373,3 +373,89 @@ TEST_CASE("the node-edit record is a difference between two documents", "[nodes]
         CHECK(doc["nodes"][1]["kind"] == "orb");
     }
 }
+
+// ---- lights, the fifth instance of the same defect ---------------------------------------------
+
+TEST_CASE("a light added in the editor survives the save an offline render reloads",
+          "[lights][project]") {
+    // ADR-207's world effects, ADR-230's atmospherics, ADR-276's heroes and ADR-330's nodes were
+    // the first four. A project saves its scene **by reference**, so a light added through the
+    // Lights panel lived in the composition the window was drawing and in no document any render
+    // reads -- and an offline render builds its own `Engine` and loads the project, so the light
+    // would never have reached a deliverable at all.
+    Fixture f;
+    const std::string sceneBefore = bytesOf(f.scenePath);
+
+    std::vector<scene::Composition::AuthoredLight> lights;
+    scene::Composition::AuthoredLight lamp;
+    lamp.light.name = "Hero Key";
+    lamp.light.type = scene::PunctualLight::Type::Spot;
+    lamp.light.position = glm::vec3(2.0f, 6.0f, -1.0f);
+    lamp.light.intensity = 12.0f;
+    lamp.light.outerConeAngle = glm::radians(28.0f);
+    lights.push_back(lamp);
+    REQUIRE(f.engine.composition()->setAuthoredLights(std::move(lights)).has_value());
+    REQUIRE(f.engine.saveProject(f.projectPath).has_value());
+
+    {
+        const json doc = docOf(f.projectPath);
+        REQUIRE(doc.contains("lights"));
+        REQUIRE(doc["lights"].size() == 1);
+        CHECK(doc["lights"][0]["name"] == "Hero Key");
+        CHECK(doc["lights"][0]["type"] == "spot");
+    }
+
+    Reloaded back(f.projectPath);
+    const auto& reloaded = back.engine.composition()->authoredLights();
+    REQUIRE(reloaded.size() == 1);
+    // Not merely present: the same light. ADR-230's shape is a round trip that keeps the name and
+    // loses the numbers -- ninety-four parameter values kept and the aurora lost.
+    CHECK(reloaded[0].light.name == "Hero Key");
+    CHECK(reloaded[0].light.type == scene::PunctualLight::Type::Spot);
+    CHECK_THAT(reloaded[0].light.intensity, Catch::Matchers::WithinAbs(12.0, 1e-4));
+    CHECK_THAT(reloaded[0].light.position.y, Catch::Matchers::WithinAbs(6.0, 1e-4));
+    CHECK_THAT(glm::degrees(reloaded[0].light.outerConeAngle), Catch::Matchers::WithinAbs(28.0, 1e-3));
+    // The scene file is untouched: it is shared, and nothing but "Save Scene As..." may write it.
+    CHECK(bytesOf(f.scenePath) == sceneBefore);
+    // And the light's parameters exist under its id, so it is immediately keyable and modulatable
+    // rather than merely present.
+    CHECK(back.engine.params().find("lights/Hero_Key/intensity") != nullptr);
+}
+
+TEST_CASE("a project that only dims a light records no light list", "[lights][project]") {
+    // THE CONTROL for the case above, and the one that matters most in practice. A numeric edit is
+    // the `parameters` block's answer (ADR-271); if it also wrote a `lights` copy, every project
+    // would carry a second answer to the same question, and a later correction to the shared scene
+    // would never reach it again. Measured on the real thing first:
+    // `tree-of-life-floating-island.json` recorded all three of its lights because the per-frame
+    // parameter writeback had edited the authored list out from under the comparison.
+    Fixture f;
+    std::vector<scene::Composition::AuthoredLight> lights;
+    scene::Composition::AuthoredLight lamp;
+    lamp.light.name = "Key";
+    lamp.light.intensity = 3.0f;
+    lights.push_back(lamp);
+    REQUIRE(f.engine.composition()->setAuthoredLights(std::move(lights)).has_value());
+    REQUIRE(f.engine.saveComposition(f.scenePath).has_value());
+
+    // The scene on disk now authors the light, so the session's list IS the file's and the first
+    // save records nothing.
+    REQUIRE(f.engine.saveProject(f.projectPath).has_value());
+    CHECK_FALSE(docOf(f.projectPath).contains("lights"));
+
+    // Now dim it the way a slider does -- through the parameter, not by re-authoring -- and save
+    // again. The number belongs in `parameters`; the light list must stay out of the document.
+    Reloaded live(f.projectPath);
+    auto* intensity = live.engine.params().findAs<float>("lights/Key/intensity");
+    REQUIRE(intensity != nullptr);
+    intensity->setBase(0.4f);
+    const fs::path second = f.dir / "dimmed.json";
+    REQUIRE(live.engine.saveProject(second).has_value());
+
+    const json doc = docOf(second);
+    CHECK_FALSE(doc.contains("lights"));
+    REQUIRE(doc.contains("parameters"));
+    REQUIRE(doc["parameters"].contains("lights/Key/intensity"));
+    CHECK_THAT(doc["parameters"]["lights/Key/intensity"].get<float>(),
+               Catch::Matchers::WithinAbs(0.4, 1e-5));
+}

@@ -122,6 +122,28 @@ struct TimelineChange {
     bool clipsTouched = false;
 };
 
+// One object's authored-light list, before and after.
+//
+// Recorded **whole**, on `TimelineChange`'s argument rather than `NodeRecord`'s. The note at the
+// top of this file argues against snapshots and that argument is about the *composition*: 256
+// terrain chunks and a quarter of a million scattered instances are not something to copy so one
+// flower can be undone. **A light list is not that.** It is a handful of structs of plain floats
+// and two short strings -- so rather than a record type per gesture (add a light, delete one,
+// rename one, retype one, re-node one, reorder them), each needing its own inverse to get right,
+// one before-and-after reverses every edit the panel can make, including the ones nobody has
+// written yet.
+//
+// It also happens to be the exact shape `Composition::setAuthoredLights` already takes, which is
+// what makes applying it in either direction a single call rather than a merge.
+//
+// Note what is NOT here: a light's intensity, colour and position are `ParamChange`s like every
+// other transform in this editor, because they are registered parameters (ADR-271). This record is
+// for the *set* -- which lights exist and what kind they are.
+struct LightChange {
+    std::vector<scene::Composition::AuthoredLight> before;
+    std::vector<scene::Composition::AuthoredLight> after;
+};
+
 // One reversible change. Move-only, because it owns nodes.
 struct EditCommand {
     // What the user did, in their words, for the status bar and the history list: "Place 12 x fern",
@@ -135,6 +157,10 @@ struct EditCommand {
     // The sequencer's side of the same history, or null for the world edits that are most of it.
     // A pointer so that a command which moves eleven rocks does not carry a sequence-shaped hole.
     std::unique_ptr<TimelineChange> timeline;
+    // The authored lights either side, or null for the edits that are most of them. A pointer for
+    // the same reason `timeline` is one: a command that moves eleven rocks should not carry a
+    // light-list-shaped hole.
+    std::unique_ptr<LightChange> lights;
     // The selection either side, so undoing a delete gives you back what you had selected rather
     // than leaving you staring at a scene with nothing chosen and no idea what came back.
     std::vector<std::string> selectionBefore;
@@ -149,7 +175,7 @@ struct EditCommand {
 
     [[nodiscard]] bool empty() const {
         return params.empty() && parents.empty() && heroes.empty() && added.empty() &&
-               removed.empty() && timeline == nullptr;
+               removed.empty() && timeline == nullptr && lights == nullptr;
     }
     // How many things the user would say this touched, for the label and for tests.
     [[nodiscard]] std::size_t touched() const;
@@ -167,6 +193,9 @@ struct EditApply {
     std::size_t paramsWritten = 0;
     std::size_t parentsSet = 0;
     std::size_t heroesSet = 0;
+    // 1 when this command installed an authored-light list, 0 otherwise. Counted rather than
+    // flagged so the field reads like the others beside it.
+    std::size_t lightListsInstalled = 0;
     std::vector<std::string> problems;
     [[nodiscard]] bool ok() const { return problems.empty(); }
 };

@@ -740,11 +740,52 @@ public:
     // without a thirteenth case in a `NodeKind` switch that `nodeKindName`, the editor, the brush,
     // the context menu and the graph would each have to decide what "a node that is not geometry"
     // means for. An empty `node` is a world light, positioned where the file says.
+    // `id` is the light's identity; `light.name` is only what it is called.
+    //
+    // They were one string, and rename is what separated them. A parameter path, a modulation
+    // route's target and a timeline track's target are all `lights/<...>/<field>`, so while that
+    // `<...>` was the display name, renaming a light silently orphaned every route and track bound
+    // to it -- the "Hero Mushroom Pulse" defect, 511 occurrences across 22 files, one format over.
+    // The two answers were to re-point every binding on every rename, or to stop keying on a
+    // mutable string. This is the second: with an id there is nothing to re-point, because nothing
+    // moved.
+    //
+    // **An id is derived from the sanitised name when a scene file does not give one.** That is
+    // what keeps the 81 shipped projects keyed on `lights/celestial-key/intensity` resolving -- the
+    // id happens to equal the old name, so every existing binding still finds its light, and the
+    // first rename moves the name while the id stays put. `toJson` writes `id` only when it differs
+    // from `sanitise(name)`, so a scene nobody has renamed stays byte-identical and the key appears
+    // exactly when it has become load-bearing.
     struct AuthoredLight {
         PunctualLight light;  // world space, or the node's local space when `node` is set
         std::string node;     // the composition node this light rides, or empty
+        std::string id;       // stable parameter-path identity; empty means "derive from the name"
     };
+    // The id a light answers to: its own, or the one derived from its name. A free function because
+    // the loader, the editor and the tests all have to agree on the derivation, and because the
+    // rule must be checkable without a composition.
+    [[nodiscard]] static std::string authoredLightId(const AuthoredLight& light);
+    // An id not already in `taken`, derived from `name` and suffixed when it collides. What the
+    // editor mints for a new or a duplicated light.
+    [[nodiscard]] static std::string uniqueAuthoredLightId(std::string_view name,
+                                                           std::span<const std::string> taken);
     [[nodiscard]] const std::vector<AuthoredLight>& authoredLights() const { return authoredLights_; }
+    // The authored lights as *structure*: what `setAuthoredLights` was given, untouched by the
+    // per-frame parameter writeback.
+    //
+    // `authoredLights()` is deliberately not that. `applyParameters` writes each light's live base
+    // values back into it so that "Save Scene As..." records what the user set rather than what the
+    // file said (ADR-225) -- which is right for a scene and wrong for the project's record, because
+    // a project already answers every one of those numbers in its `parameters` block (ADR-271).
+    // Comparing the parameter-baked list against the scene made an untouched project write a whole
+    // copy of its lighting: measured on `tree-of-life-floating-island.json`, three lights differing
+    // only in the fields that project already overrides. So the project owes the **set** -- which
+    // lights exist, of what type, riding which node -- exactly as ADR-330 framed it for nodes.
+    [[nodiscard]] const std::vector<AuthoredLight>& authoredLightsRest() const { return authoredLightsRest_; }
+    // `authoredLightsRest()` in the serialisation a scene file would have given it, for
+    // `authoredLightsAgainst`. A method rather than a free function because the converter it needs
+    // is file-local.
+    [[nodiscard]] nlohmann::json authoredLightsRestJson() const;
 
     // The live knobs of one authored light (ADR-358). Registered under
     // "lights/<name>/", which is the path `GltfScene` already gave an *imported* light's
@@ -770,6 +811,27 @@ public:
         params::Parameter<float>* elevation = nullptr; // degrees above the horizon; aimed lights only
         params::Parameter<float>* angularSize = nullptr;
         params::Parameter<float>* shadowStrength = nullptr;
+        // The rest of what a person manipulates. `position` is the one that unblocked the editor:
+        // every transform here is a parameter write, and that is the whole of what makes a gizmo
+        // drag undoable, keyable and modulatable -- so until this existed no gizmo could move a
+        // light at all, whatever the viewport drew.
+        //
+        // Absolute, seeded from the scene, never multipliers over it. ADR-271 is the cautionary
+        // tale: a control displaying metres while writing a ratio put `0.0538` in a project file
+        // for a beam somebody had set to 0.42 m, and no one reading that file could tell.
+        params::Parameter<glm::vec3>* position = nullptr;   // metres, world or the node's local frame
+        params::Parameter<float>* range = nullptr;          // metres; 0 = infinite
+        params::Parameter<float>* innerCone = nullptr;      // DEGREES, like the file; spot only
+        params::Parameter<float>* outerCone = nullptr;      // degrees; spot only
+        params::Parameter<float>* temperature = nullptr;    // Kelvin
+        params::Parameter<float>* tint = nullptr;
+        params::Parameter<float>* width = nullptr;          // area emitters
+        params::Parameter<float>* height = nullptr;
+        params::Parameter<float>* radius = nullptr;
+        params::Parameter<bool>* castsShadow = nullptr;
+        params::Parameter<bool>* contactShadow = nullptr;
+        params::Parameter<float>* shadowBias = nullptr;
+        params::Parameter<float>* volumetric = nullptr;
     };
     // Where a light's source sits, as the two angles above, given the direction it travels.
     // Free functions rather than methods because the inverse pair has to be checkable without a
@@ -1446,6 +1508,7 @@ private:
     std::vector<world::AtmosphericEffect> atmosphericEffects_;
     // ADR-278: authored, round-tripped as the top-level "lights".
     std::vector<AuthoredLight> authoredLights_;
+    std::vector<AuthoredLight> authoredLightsRest_; // structure only; see authoredLightsRest()
     std::vector<AuthoredLightParams> authoredLightParams_; // parallel to `authoredLights_`
     // Where `rebuild` put them in `scene_.lights`, and the node index each one rides (or npos).
     // Resolved once at rebuild rather than by name every frame: the name is the author's handle on
@@ -1688,6 +1751,13 @@ private:
 // `worldEffects` and `heroes` use -- most of a light's fields are not parameters, so there is no
 // by-name difference to record the way `nodeEditsAgainst` can. Pure, so it is testable without an
 // engine; the converters it needs stay file-local.
+// Parses a `"lights"` array -- a scene file's or a project's -- into the list `setAuthoredLights`
+// takes. The whole block is refused on a bad member rather than the member skipped, for the reason
+// the heroes loader gives: a light that quietly failed to load looks exactly like a light nobody
+// authored.
+[[nodiscard]] Result<std::vector<Composition::AuthoredLight>> authoredLightsFromJson(
+    const nlohmann::json& array, std::string_view where);
+
 [[nodiscard]] nlohmann::json authoredLightsAgainst(const nlohmann::json& liveLights,
                                                    const nlohmann::json& sceneDoc);
 
