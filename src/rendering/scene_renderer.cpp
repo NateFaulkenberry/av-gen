@@ -2705,17 +2705,18 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     //     compromise, and `--render-limits unlimited` sets it too, because that is what the flag
     //     already means for every other ladder in the engine.
     const ViewContext lodView = [&] {
-        ViewContext v;
-        // The frozen camera when the view is frozen, which is what `view` already is: reading
-        // scene.camera.position here would choose rungs from where the camera is and draw the frame
-        // from where it was told to stay.
-        v.cameraPosition = toggles_.cameraMotion ? scene.camera.position : frozenCameraPosition_;
-        v.viewProjection = proj * view;
-        v.viewportWidth = static_cast<float>(hdr_.width());
-        v.viewportHeight = static_cast<float>(hdr_.height());
-        v.nearPlane = scene.camera.nearPlane;
-        const float fovY = scene.camera.effectiveFovY();
-        v.pixelsPerUnit = fovY > 0.0f ? v.viewportHeight / (2.0f * std::tan(fovY * 0.5f)) : 0.0f;
+        // `fromCamera` and not a second copy of its arithmetic: `pixelsPerUnit` is the same constant
+        // shaders/cull.wgsl packs into cameraPos.w, and two subsystems disagreeing about how big
+        // something is on screen is a defect that shows up as a seam between a scatter and the
+        // hand-placed copy of the same asset (ADR-122's own warning).
+        ViewContext v = ViewContext::fromCamera(scene.camera, hdr_.width(), hdr_.height());
+        // A frozen view chooses rungs from where the camera was told to stay, not from where it is.
+        // Everything else downstream reads `view` and `proj`; a selector reading scene.camera would
+        // be the one subsystem disagreeing about where the frame is drawn from.
+        if (!toggles_.cameraMotion) {
+            v.cameraPosition = frozenCameraPosition_;
+            v.viewProjection = proj * view;
+        }
         return v;
     }();
     RepresentationPolicy lodPolicy = RepresentationPolicy::forTier(tier_);
