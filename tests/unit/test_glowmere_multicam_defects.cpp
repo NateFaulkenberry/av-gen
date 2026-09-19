@@ -85,7 +85,50 @@ struct Track {
     // on the uphill side, which is what "clipping into a hill" looks like.
     float deepestSink = 0.0f;
     float radius = 0.0f;
+    // Defect 2, sharpened: a turn transient and a body walking backwards look identical in a mean
+    // and in a max. What tells them apart is how long it lasts.
+    std::size_t backwardsFrames = 0;   // |facing - travel| > 90 degrees
+    std::size_t backwardsRunMax = 0;   // the longest unbroken stretch of them
+    std::size_t backwardsRun = 0;
+    // The abduction scenario lifts an animal off the ground and spins it (`animalSpin` 230 deg/s).
+    // A body in a beam is not walking, and a facing error measured on one is not an off-axis walk,
+    // so the two are separated here rather than argued about.
+    float maxAirborne = 0.0f;
+    std::size_t backwardsAirborne = 0;
+    // Defect 2's other candidate, and the one a viewer would actually call "off axis": how far the
+    // body's own up axis leans from world up. `slopeAlign` 1 makes a walker *part of* the slope,
+    // and a quadruped rolled thirty degrees across a hillside reads as walking crooked long before
+    // anybody measures a yaw.
+    double maxLeanDeg = 0.0;
+    double leanSum = 0.0;
+    std::size_t leanSamples = 0;
 };
+
+// The body's own horizontal half-extent in world metres. `EntityState::radius` is the *crowd
+// field's* radius and is 0 on every body that never declared a `bodyRadius`, so using it to size a
+// ground query silently measures nothing -- which is what the first cut of this file did for all
+// sixteen farm animals. The node's scale times the asset's own bounds is the honest number.
+const scene::CompositionNode* nodeOf(const scene::Composition& comp, const entity::Entity& e) {
+    for (const auto& n : comp.nodes()) {
+        if (n->name == e.desc().driven()) {
+            return n.get();
+        }
+    }
+    return nullptr;
+}
+
+float bodyHalfExtent(scene::Composition& comp, const entity::Entity& e) {
+    const float declared = e.state().radius;
+    if (declared > 0.05f) {
+        return declared;
+    }
+    const scene::WorldBounds b = comp.nodeBounds(e.desc().driven());
+    if (!b.valid) {
+        return 0.0f;
+    }
+    const glm::vec3 size = b.size();
+    return 0.5f * std::max(size.x, size.z);
+}
 
 // One run of the film. `seedShift` is added to every entity seed in the *scene* before the project
 // is applied over it, so the world, the residue and the project's own 5,502 parameters are all
@@ -188,7 +231,7 @@ std::map<std::string, Track> playFilm(double seconds, std::uint32_t seedShift, d
             if (t.frames == 0) {
                 t.start = p;
                 last[name] = p;
-                t.radius = e->state().radius;
+                t.radius = bodyHalfExtent(*comp, *e);
             }
             const glm::vec2 delta(p.x - last[name].x, p.z - last[name].z);
             const float moved = glm::length(delta);
@@ -197,6 +240,7 @@ std::map<std::string, Track> playFilm(double seconds, std::uint32_t seedShift, d
             ++t.frames;
             const entity::NavSample sm = nav.sample(glm::vec2(p.x, p.z));
             t.deepest = std::max(t.deepest, sm.waterDepth);
+            t.maxAirborne = std::max(t.maxAirborne, p.y - sm.ground);
 
             // ---- defect 2: facing against travel -------------------------------------------
             // Only while the body is genuinely moving: 0.02 m in a 25 ms step is 0.8 m/s, which is
@@ -215,6 +259,16 @@ std::map<std::string, Track> playFilm(double seconds, std::uint32_t seedShift, d
                 t.yawErrorSum += deg;
                 t.yawErrorMax = std::max(t.yawErrorMax, deg);
                 ++t.yawSamples;
+                if (deg > 90.0) {
+                    ++t.backwardsFrames;
+                    ++t.backwardsRun;
+                    t.backwardsRunMax = std::max(t.backwardsRunMax, t.backwardsRun);
+                    if (p.y - sm.ground > 0.5f) {
+                        ++t.backwardsAirborne;
+                    }
+                } else {
+                    t.backwardsRun = 0;
+                }
             }
 
             // ---- defect 3: the body's own footprint against the ground it stands over -------
@@ -229,6 +283,18 @@ std::map<std::string, Track> playFilm(double seconds, std::uint32_t seedShift, d
                 }
             }
 
+            // `rooster-16` and `chicken-17` are entities whose nodes the project deletes
+            // (ADR-330), so an entity without a node is a legal state here and dereferencing one
+            // is a segfault -- which is how the first cut of this ended.
+            if (const scene::CompositionNode* node = nodeOf(*comp, *e); node != nullptr) {
+                const scene::Transform w = comp->nodeWorldTransform(*node);
+                const glm::vec3 up = glm::normalize(w.rotation * glm::vec3(0.0f, 1.0f, 0.0f));
+                const double lean =
+                    std::acos(static_cast<double>(std::clamp(up.y, -1.0f, 1.0f))) * 57.2957795;
+                t.maxLeanDeg = std::max(t.maxLeanDeg, lean);
+                t.leanSum += lean;
+                ++t.leanSamples;
+            }
             if (e->locomotion().activity == entity::Activity::Idle) {
                 ++t.idleFrames;
             }
@@ -306,14 +372,15 @@ void report(const char* label, const std::map<std::string, Track>& run,
                 top = option;
             }
         }
-        std::printf("  %-11s travelled %7.1f m  net %6.1f m  idle %4zu/%zu  stalls %2zu  "
-                    "yaw err mean %5.1f max %5.1f deg (%zu)  sink %5.2f m  r %.2f  '%s'\n",
-                    name, static_cast<double>(t.travelled),
-                    static_cast<double>(
-                        glm::length(glm::vec2(t.end.x - t.start.x, t.end.z - t.start.z))),
-                    t.idleFrames, t.frames, t.stalls,
+        std::printf("  %-11s went %6.1f m  idle %4zu/%zu  yaw mean %4.1f max %5.1f deg  "
+                    "backwards %4zu (run %3zu, airborne %3zu)  airborne max %5.1f m  "
+                    "lean mean %4.1f max %4.1f deg  sink %5.2f m over r %.2f  '%s'\n",
+                    name, static_cast<double>(t.travelled), t.idleFrames, t.frames,
                     t.yawSamples > 0 ? t.yawErrorSum / static_cast<double>(t.yawSamples) : 0.0,
-                    t.yawErrorMax, t.yawSamples, static_cast<double>(t.deepestSink),
+                    t.yawErrorMax, t.backwardsFrames, t.backwardsRunMax, t.backwardsAirborne,
+                    static_cast<double>(t.maxAirborne),
+                    t.leanSamples > 0 ? t.leanSum / static_cast<double>(t.leanSamples) : 0.0,
+                    t.maxLeanDeg, static_cast<double>(t.deepestSink),
                     static_cast<double>(t.radius), top.c_str());
     }
     std::fflush(stdout);

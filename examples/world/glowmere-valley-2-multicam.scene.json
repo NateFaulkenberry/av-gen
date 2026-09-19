@@ -8457,7 +8457,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 1.0
+          "slopeAlign": 0.55,
+          "footprint": 2.65,
+          "bodyRadius": 1.46
         }
       ],
       "clips": {
@@ -8516,7 +8518,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 1.0
+          "slopeAlign": 0.55,
+          "footprint": 2.29,
+          "bodyRadius": 1.26
         }
       ],
       "clips": {
@@ -8575,7 +8579,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 1.0
+          "slopeAlign": 0.55,
+          "footprint": 2.2,
+          "bodyRadius": 1.21
         }
       ],
       "clips": {
@@ -8634,7 +8640,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 1.0
+          "slopeAlign": 0.55,
+          "footprint": 1.27,
+          "bodyRadius": 0.7
         }
       ],
       "clips": {
@@ -8693,7 +8701,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 1.0
+          "slopeAlign": 0.55,
+          "footprint": 0.95,
+          "bodyRadius": 0.52
         }
       ],
       "clips": {
@@ -8752,7 +8762,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 1.0
+          "slopeAlign": 0.55,
+          "footprint": 1.29,
+          "bodyRadius": 0.71
         }
       ],
       "clips": {
@@ -8811,7 +8823,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 0.55
+          "slopeAlign": 0.55,
+          "footprint": 0.38,
+          "bodyRadius": 0.21
         }
       ],
       "clips": {
@@ -8870,7 +8884,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 0.55
+          "slopeAlign": 0.55,
+          "footprint": 0.33,
+          "bodyRadius": 0.18
         }
       ],
       "clips": {
@@ -8929,7 +8945,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 1.0
+          "slopeAlign": 0.55,
+          "footprint": 2.66,
+          "bodyRadius": 1.46
         }
       ],
       "clips": {
@@ -8988,7 +9006,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 1.0
+          "slopeAlign": 0.55,
+          "footprint": 2.11,
+          "bodyRadius": 1.16
         }
       ],
       "clips": {
@@ -9047,7 +9067,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 1.0
+          "slopeAlign": 0.55,
+          "footprint": 2.22,
+          "bodyRadius": 1.22
         }
       ],
       "clips": {
@@ -9106,7 +9128,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 1.0
+          "slopeAlign": 0.55,
+          "footprint": 1.26,
+          "bodyRadius": 0.69
         }
       ],
       "clips": {
@@ -9165,7 +9189,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 1.0
+          "slopeAlign": 0.55,
+          "footprint": 0.84,
+          "bodyRadius": 0.46
         }
       ],
       "clips": {
@@ -9224,7 +9250,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 1.0
+          "slopeAlign": 0.55,
+          "footprint": 1.23,
+          "bodyRadius": 0.68
         }
       ],
       "clips": {
@@ -9283,7 +9311,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 0.55
+          "slopeAlign": 0.55,
+          "footprint": 0.38,
+          "bodyRadius": 0.21
         }
       ],
       "clips": {
@@ -9342,7 +9372,9 @@
         },
         {
           "kind": "ground",
-          "slopeAlign": 0.55
+          "slopeAlign": 0.55,
+          "footprint": 0.33,
+          "bodyRadius": 0.18
         }
       ],
       "clips": {
