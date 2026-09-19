@@ -224,6 +224,12 @@
     },
     {
       "category": "Showcase",
+      "description": "The same Tree of Life and island, now suspended above an endless sea under a full day/night cycle. One dayPhase parameter drives sky, sun, moon, stars, atmosphere, water and the tree's bioluminescence together, wrapping seamlessly at midnight; the night sky and its moon are an HDRI the water reflects, and the moonlight is a real shadow-casting key aimed along that moon. Scrub the cycle or let it run.",
+      "name": "Tree of Life - Ocean World",
+      "project": "treeisland/tree-of-life-ocean-world.json"
+    },
+    {
+      "category": "Showcase",
       "description": "One scene, four presets: Cathedral, Temple, Helix, Hyperspace morph into each other on a timeline.",
       "name": "Worlds (preset morph)",
       "project": "worlds/worlds.json"
