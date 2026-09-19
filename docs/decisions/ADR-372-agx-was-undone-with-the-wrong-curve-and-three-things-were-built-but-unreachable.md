@@ -157,3 +157,33 @@ the new values trustworthy rather than merely different.
   existing frame moves because of them.
 - Fog-coupled particle frames change toward the corners and not at the centre, which is the
   signature to expect and the one to check a suspicious diff against.
+
+## 5. Suite state, and three failures that are main's
+
+Run to completion twice, both from a private `codesign`-ed copy so a concurrent rebuild could not
+touch the running binary:
+
+| | this branch | pristine main (`f3642f97`) |
+|---|---|---|
+| cases | 2483 | 2482 |
+| passed | 2475 | 2473 |
+| failed | **3** | **4** |
+| failed as expected | 1 (ADR-260) | 1 (ADR-260) |
+| SIGSEGV | **0** | **0** |
+
+The three failures are **identical on both sides** and are main's, not this branch's:
+`test_particles.cpp:47` (27 vs 23), `test_particles.cpp:73` (29 vs 25) and `test_scene.cpp:210`
+(38 vs 34). All three are count assertions short by the **same four particle parameters**, which
+somebody added without updating them — ADR-367's softness and ADR-370's leaves are the likely
+source. **Main is red by three.** Not fixed here: three count constants belonging to a subsystem
+this work does not otherwise touch do not belong in a commit about the tone curve.
+
+Main's fourth failure, `test_repo_hygiene.cpp:112`, was **my artefact**: the pristine run was taken
+with ADR-372's file untracked on disk, and that test scans the docs directory. Indexing the ADR
+fixed it, which is why this branch has three failures and pristine has four.
+
+**Two earlier runs of this suite died with SIGSEGV and neither was a real defect.** The first had
+its binary rebuilt underneath it; the second had `git stash pop` rewrite `shaders/*.wgsl` while it
+was running, and the tests load shaders from disk. Recorded because a bus error in a long suite is
+this repository's most-misread signal, and twice today the cause was the person watching it rather
+than the code.
