@@ -1960,6 +1960,8 @@ Result<void> Application::applyDebugDraw() {
         {"shadowCasters", &d.shadowCasters},
         {"lights", &d.lights},
         {"lightClusters", &d.lightClusters},
+        {"wind", &d.wind},          // ADR-382 section 19
+        {"vortex", &d.vortex},
     };
     std::string enabled;
     std::stringstream stream(options_.debugDraw);

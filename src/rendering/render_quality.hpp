@@ -146,6 +146,30 @@ struct QualitySettings {
     // Offline never scales either (§5.9).
     float volumeStepScale = 1.0f;
 
+    // ADR-382, the brief's §18 quality ladder. Multiplier on every particle system's `spawnRate`;
+    // capacity is untouched, because changing it destroys and recreates the pool (ADR-015) and a
+    // tier change would then empty every system mid-shot.
+    //
+    // WHAT NOT TO REACH FOR, and the reason this comment exists: **the volume's step count is not
+    // the lever it looks like.** Measured on the Tree of Life's cosmic vortex, minima of three runs
+    // at 1920x1080: 1 km march at 32 steps is 14.615 ms and at 48 steps is 14.549 -- inside the
+    // noise -- while a 4 km march at 48 steps is 12.911, *cheaper* than the 1 km one. The volume's
+    // cost is how many pixels have non-zero density and therefore evaluate their noise, not how far
+    // or how finely the ray is marched. `volumeResolutionScale` is what moves that number;
+    // `volumeStepScale` buys depth banding back and almost no time. Everybody reaches for the step
+    // count first, so it is written here rather than in an ADR nobody will open.
+    //
+    // ONLY PREVIEW REDUCES THIS. Realtime is the reference live picture, and a tier that silently
+    // removed 40% of every existing scene's particles would be changing what the engine looks like
+    // by default rather than offering a cheaper view of it -- `tests/rendering/test_particles_gpu`
+    // caught exactly that, its CPU emission model reading 18 alive where it predicted 31.
+    //
+    // §18 also forbids something these must not become: a tier may scale resolution, sample counts
+    // and particle counts, and may NOT remove an artistic control. A Preview that hides the
+    // vortex's colour knobs is a different product, not a cheaper one -- which is why every field
+    // here is a renderer setting and none of them is a parameter's visibility.
+    float particleSpawnScale = 1.0f;
+
     bool clusteredLighting = true;         // false = the 8-light uniform fallback path
     // Raymarched SDFs in the shadow-map pass. Was also unread until the same audit: the shader
     // derived its own budget as `maxSteps / 4` and these four numbers evaluated to nothing.
@@ -226,6 +250,10 @@ struct QualitySettings {
             q.flatTierFromRung = 1; // ADR-155
             q.volumeResolutionScale = 0.25f;
             q.volumeStepScale = 0.5f;
+            // A quarter of the particles. Deliberately not zero: the Tree of Life's motes take 30
+            // to 50 seconds of playback to reach the vortex (ADR-380), so a tier that cut them
+            // hard would make a working effect look broken to anyone previewing it.
+            q.particleSpawnScale = 0.25f;
             break;
         case QualityTier::Realtime:
             q.materialTiers = true;

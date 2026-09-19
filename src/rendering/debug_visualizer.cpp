@@ -1,5 +1,7 @@
 #include "rendering/debug_visualizer.hpp"
 
+#include "core/wind.hpp"
+
 #include "rendering/procedural_renderer.hpp"
 
 #include "rendering/light_data.hpp"
@@ -273,6 +275,110 @@ void drawEmitter(DebugDraw& draw, const scene::PunctualLight& light, const glm::
         drawSphere(draw, light.position, std::max(light.radius, 1e-3f), colour, 20);
         break;
     }
+}
+
+// ADR-382 §19. The wind field, drawn as it actually is rather than as it is described: an arrow per
+// grid point from `wind::sampleWind` -- the same CPU function `shaders/wind.wgsl` transliterates,
+// so a divergence between them shows up here as arrows that disagree with the foliage.
+void buildWindDebug(DebugDraw& draw, const scene::Scene& scene, double time) {
+    const wind::WindParams& w = scene.environment.wind;
+    if (!w.active()) {
+        // An honest nothing: a view that drew a default field for a scene with no wind would be the
+        // "diagnostic that shows the same picture whatever the state" this file's header forbids.
+        return;
+    }
+    const wind::WindUniforms u = wind::packWind(w);
+    // Centred on the first declared wind body if there is one, because that is what anybody turning
+    // this on is looking at; on the origin otherwise.
+    glm::vec3 centre(0.0f);
+    float span = 120.0f;
+    for (const scene::Entity& e : scene.entities) {
+        if (e.wind.active()) {
+            centre = e.wind.origin;
+            span = std::max(e.wind.radius * 3.0f, 40.0f);
+            break;
+        }
+    }
+    const int grid = 9;
+    const float step = span * 2.0f / static_cast<float>(grid - 1);
+    for (int z = 0; z < grid; ++z) {
+        for (int x = 0; x < grid; ++x) {
+            const glm::vec3 p(centre.x - span + step * static_cast<float>(x), centre.y,
+                              centre.z - span + step * static_cast<float>(z));
+            const wind::WindSample s = wind::sampleWind(u, p, static_cast<float>(time));
+            const float strength = s.strength * (1.0f + s.gust);
+            const glm::vec3 dir(s.direction.x, 0.0f, s.direction.y);
+            const glm::vec3 tip = p + dir * (step * 0.45f * std::min(strength, 3.0f));
+            // Hue by strength, so the regional variation and the travelling gust fronts are
+            // readable as bands rather than having to be inferred from arrow lengths.
+            const float t = std::clamp(strength / 3.0f, 0.0f, 1.0f);
+            const glm::vec4 colour(0.2f + 0.8f * t, 0.9f - 0.5f * t, 1.0f - 0.8f * t, 0.9f);
+            draw.line(p, tip, colour);
+            draw.point(tip, step * 0.06f, colour);
+        }
+    }
+    // Every body's frame: origin, height and radius are what the deformation is keyed on, and
+    // getting them wrong is invisible in the picture until the tree bends about the wrong point.
+    for (const scene::Entity& e : scene.entities) {
+        if (!e.wind.active()) {
+            continue;
+        }
+        const glm::vec4 c(1.0f, 0.75f, 0.25f, 0.9f);
+        draw.line(e.wind.origin, e.wind.origin + glm::vec3(0.0f, e.wind.height, 0.0f), c);
+        const int n = 32;
+        for (int i = 0; i < n; ++i) {
+            const float a0 = 6.2831853f * static_cast<float>(i) / n;
+            const float a1 = 6.2831853f * static_cast<float>(i + 1) / n;
+            const glm::vec3 p0 = e.wind.origin + glm::vec3(std::cos(a0), 0.0f, std::sin(a0)) * e.wind.radius;
+            const glm::vec3 p1 = e.wind.origin + glm::vec3(std::cos(a1), 0.0f, std::sin(a1)) * e.wind.radius;
+            draw.line(p0, p1, c);
+        }
+        break; // one is the point; a forest of them is a different view
+    }
+}
+
+// ADR-382 §19. The vortex: mouth, throat, depth and which way it turns. This is the view that would
+// have shown the funnel extending upward as a cylinder, and the camera being inside the mouth,
+// without a single render of the beauty pass.
+void buildVortexDebug(DebugDraw& draw, const scene::Scene& scene, double time) {
+    const scene::Environment::Vortex& v = scene.environment.vortex;
+    if (!v.active()) {
+        return;
+    }
+    const glm::vec4 mouthColour(0.35f, 0.85f, 1.0f, 0.95f);
+    const glm::vec4 throatColour(0.9f, 0.4f, 1.0f, 0.85f);
+    auto ring = [&](float y, float radius, const glm::vec4& c) {
+        const int n = 64;
+        for (int i = 0; i < n; ++i) {
+            const float a0 = 6.2831853f * static_cast<float>(i) / n;
+            const float a1 = 6.2831853f * static_cast<float>(i + 1) / n;
+            draw.line(v.center + glm::vec3(std::cos(a0) * radius, y, std::sin(a0) * radius),
+                      v.center + glm::vec3(std::cos(a1) * radius, y, std::sin(a1) * radius), c);
+        }
+    };
+    ring(0.0f, v.radius, mouthColour);
+    // The funnel's wall, sampled down the throat exactly as `vortexShape` narrows it, so this view
+    // and the shader cannot disagree about the shape.
+    const float depth = std::max(v.funnelDepth, 0.0f);
+    if (depth > 0.0f) {
+        const int rungs = 6;
+        for (int i = 1; i <= rungs; ++i) {
+            const float yn = static_cast<float>(i) / rungs;
+            const float mouth = glm::mix(1.0f, std::clamp(v.throat, 0.02f, 1.0f), yn * yn);
+            ring(-depth * yn, v.radius * mouth, glm::mix(mouthColour, throatColour, yn));
+        }
+        draw.line(v.center, v.center - glm::vec3(0.0f, depth, 0.0f), throatColour);
+    }
+    // Which way it turns, and how hard: tangents on the mouth ring, length by rotation speed.
+    const int arrows = 12;
+    for (int i = 0; i < arrows; ++i) {
+        const float a = 6.2831853f * static_cast<float>(i) / arrows;
+        const glm::vec3 p = v.center + glm::vec3(std::cos(a), 0.0f, std::sin(a)) * v.radius;
+        const glm::vec3 tangent(-std::sin(a), 0.0f, std::cos(a));
+        const float turn = v.rotationSpeed * 400.0f;
+        draw.line(p, p + tangent * turn, glm::vec4(1.0f, 0.9f, 0.4f, 0.9f));
+    }
+    (void)time;
 }
 
 void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugViewOptions& options, double time,
@@ -699,6 +805,12 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
                 }
             }
         }
+    }
+    if (options.wind) {
+        buildWindDebug(draw, scene, time);
+    }
+    if (options.vortex) {
+        buildVortexDebug(draw, scene, time);
     }
 }
 

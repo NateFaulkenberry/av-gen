@@ -1528,7 +1528,9 @@
     "worldfx/Hero Mushroom Pulse/startOffset": 0.0,
     "worldfx/Hero Mushroom Pulse/trailLength": 16.0,
     "worldfx/Hero Mushroom Pulse/verticalExtent": 4.5,
-    "worldfx/Hero Mushroom Pulse/width": 1.0
+    "worldfx/Hero Mushroom Pulse/width": 1.0,
+    "particles/falling-leaves/enabled": false,
+    "particles/tree-motes/enabled": false
   },
   "presets": [
     {
@@ -1712,7 +1714,7 @@
     "quality": 80,
     "start": 0.0,
     "supersample": 1.0,
-    "tier": "offline",
+    "tier": "high",
     "width": 1920
   },
   "routes": [

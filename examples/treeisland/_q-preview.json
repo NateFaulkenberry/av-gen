@@ -1712,7 +1712,7 @@
     "quality": 80,
     "start": 0.0,
     "supersample": 1.0,
-    "tier": "offline",
+    "tier": "preview",
     "width": 1920
   },
   "routes": [

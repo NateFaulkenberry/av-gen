@@ -1920,7 +1920,7 @@
         "thresholdLevel": 0.5
       },
       "component": -1,
-      "enabled": true,
+      "enabled": false,
       "op": "add",
       "polarity": "unipolar",
       "source": "audio.bass",
@@ -1950,7 +1950,7 @@
         "thresholdLevel": 0.5
       },
       "component": -1,
-      "enabled": true,
+      "enabled": false,
       "op": "add",
       "polarity": "unipolar",
       "source": "audio.bass",
@@ -1980,7 +1980,7 @@
         "thresholdLevel": 0.5
       },
       "component": -1,
-      "enabled": true,
+      "enabled": false,
       "op": "add",
       "polarity": "unipolar",
       "source": "audio.bass",
@@ -2010,7 +2010,7 @@
         "thresholdLevel": 0.5
       },
       "component": -1,
-      "enabled": true,
+      "enabled": false,
       "op": "add",
       "polarity": "unipolar",
       "source": "audio.mid",
@@ -2040,7 +2040,7 @@
         "thresholdLevel": 0.5
       },
       "component": -1,
-      "enabled": true,
+      "enabled": false,
       "op": "add",
       "polarity": "unipolar",
       "source": "audio.mid",
@@ -2070,7 +2070,7 @@
         "thresholdLevel": 0.5
       },
       "component": -1,
-      "enabled": true,
+      "enabled": false,
       "op": "add",
       "polarity": "unipolar",
       "source": "audio.mid",
@@ -2100,7 +2100,7 @@
         "thresholdLevel": 0.5
       },
       "component": -1,
-      "enabled": true,
+      "enabled": false,
       "op": "add",
       "polarity": "unipolar",
       "source": "audio.treble",
@@ -2130,7 +2130,7 @@
         "thresholdLevel": 0.5
       },
       "component": -1,
-      "enabled": true,
+      "enabled": false,
       "op": "add",
       "polarity": "unipolar",
       "source": "audio.treble",
@@ -2160,7 +2160,7 @@
         "thresholdLevel": 0.5
       },
       "component": -1,
-      "enabled": true,
+      "enabled": false,
       "op": "add",
       "polarity": "unipolar",
       "source": "beat.pulse",
@@ -2190,7 +2190,7 @@
         "thresholdLevel": 0.5
       },
       "component": -1,
-      "enabled": true,
+      "enabled": false,
       "op": "add",
       "polarity": "unipolar",
       "source": "state.progress",
@@ -2220,7 +2220,7 @@
         "thresholdLevel": 0.5
       },
       "component": -1,
-      "enabled": true,
+      "enabled": false,
       "op": "add",
       "polarity": "unipolar",
       "source": "state.progress",
@@ -2250,7 +2250,7 @@
         "thresholdLevel": 0.5
       },
       "component": -1,
-      "enabled": true,
+      "enabled": false,
       "op": "add",
       "polarity": "unipolar",
       "source": "state.progress",
