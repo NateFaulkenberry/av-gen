@@ -1,10 +1,15 @@
-# ADR-366: A disabled path is a property of the encoder, not of the arithmetic
+# ADR-368: A disabled path is a property of the encoder, not of the arithmetic
 
 - Status: Accepted (2026-09-19)
-- **Numbering:** ADR-360 was the stated high-water mark when this work started. By the time it
-  was written, 363, 364 and 365 had all been claimed — 363 and 364 twice each, from different
-  branches. 366 was free across every branch visible at the time. Expect it to be renumbered at
-  merge; nothing in the tree references it by number except this file's own name.
+- **Numbering:** this was written as ADR-366 and renumbered to **368** before merge, which is the
+  fourth renumber of the day. ADR-360 was the stated high-water mark when the work started; by the
+  time the file existed, 363, 364 and 365 had all been claimed — 363 and 364 twice each, from
+  different branches — and 366 then landed on main from the offline-render branch as
+  *the path tracer had no settings, only fields*. 367 is reserved for the Tree of Life branch, which
+  has its own pending collision. Renumbered by explicit per-file edit and verified by counting the
+  references before and after, not by a blanket `sed`: with another ADR of the same number live in
+  the tree, a tree-wide substitution is how `composition.cpp` ended up carrying two different
+  meanings of one number earlier today.
 - Builds on ADR-039 (image formation and the post chain), ADR-016 (post-processing), ADR-059
   (FXAA), ADR-079 (tilt-shift), ADR-182 (a diagnostic arm that cannot fail), ADR-345 (append,
   never insert), ADR-347 (fog takes its colour from the sky), ADR-350 (a system the application

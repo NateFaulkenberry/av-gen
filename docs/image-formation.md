@@ -70,7 +70,7 @@ clamps every channel up to `1e-5`, so a true black pixel does not leave the comp
 divide and multiply by 0.18 do not cancel in binary floating point. `post_processor.hpp`'s summary,
 "the input is returned unchanged", overstates this. A feature that must not change the image
 therefore has to prove it **differentially** -- against the same build without the feature -- rather
-than against the scene HDR, which is a comparison that could never pass. See ADR-366.
+than against the scene HDR, which is a comparison that could never pass. See ADR-368.
 
 Two notes on where the boundaries fall:
 

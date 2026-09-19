@@ -413,7 +413,7 @@ wanting physical haze should still use ADR-347's fog; this is the image-side con
 `tests/rendering/test_image_look_gpu.cpp`, hashing the pre-tonemap float buffer
 (`renderToImageFloat` → `hdrOutput_`) with `gpu::hashImage`, over float bit patterns.
 
-Arms and results are tabulated in ADR-366. In summary: the zero arm is stable across repeats; the
+Arms and results are tabulated in ADR-368. In summary: the zero arm is stable across repeats; the
 two *shape* parameters moved off their defaults while the amounts are zero do **not** move it; each
 of the four amounts on its own **does**; no two move it the same way; and it returns to the original
 value after all of them, which is the arm that would catch a dependence on transient-pool
