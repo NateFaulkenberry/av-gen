@@ -895,7 +895,7 @@ LodChainSettings vegetationLodSettings() {
     return s;
 }
 
-// An imported hero asset that is partly instanced foliage (ADR-348). Measured on the Tree of Life's
+// An imported hero asset that is partly instanced foliage (ADR-351). Measured on the Tree of Life's
 // five layers; see tests/unit/test_asset_lod_analysis.cpp "[.analysis][assetlod]" for the table.
 //
 // Five rungs, because §3 of the brief asks for five, and 1 / 0.5 / 0.2 / 0.07 / 0.02 rather than

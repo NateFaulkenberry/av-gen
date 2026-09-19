@@ -112,6 +112,73 @@ if(NOT MSVC)
 endif()
 add_library(tinyexr::tinyexr ALIAS tinyexr)
 
+# ---- Embree (ray/geometry intersection and BVH for the path tracer) ---------------------------
+# ADR-351. Embree owns intersection and acceleration only; the integrator, materials, sampling and
+# output are AV Gen's (spec section 74). Apache-2.0; it vendors sse2neon.h (MIT) for the NEON path.
+#
+# EMBREE_TASKING_SYSTEM=INTERNAL keeps oneTBB out of the build. The path tracer additionally
+# configures the device with an explicit thread count and commits with `rtcJoinCommitScene` from
+# AV Gen-owned threads, so Embree starts no pool of its own (spec section 36).
+#
+# The CMAKE_CXX_STANDARD dance is not optional and not cosmetic. Embree appends `-std=c++11` to
+# CMAKE_CXX_FLAGS, but a globally-set CMAKE_CXX_STANDARD (CMakeLists.txt sets 23) emits its own
+# `-std=` flag LATER on the same command line and wins. Embree 4.4.0 does not compile as C++23
+# under Apple clang 21: twenty errors in kernels/builders/priminfo_mb.h about PrimInfoMB "not a
+# direct or virtual base of embree::SetMB". Engine targets carry the standard themselves.
+set(_avgen_saved_cxx_standard "${CMAKE_CXX_STANDARD}")
+unset(CMAKE_CXX_STANDARD)
+unset(CMAKE_CXX_STANDARD CACHE)
+CPMAddPackage(
+    NAME embree
+    GITHUB_REPOSITORY RenderKit/embree
+    GIT_TAG v4.4.0
+    SYSTEM YES EXCLUDE_FROM_ALL YES
+    OPTIONS "EMBREE_TASKING_SYSTEM INTERNAL" "EMBREE_ISPC_SUPPORT OFF" "EMBREE_TUTORIALS OFF"
+            "EMBREE_STATIC_LIB ON" "EMBREE_MAX_ISA NEON"
+            "EMBREE_GEOMETRY_QUAD OFF" "EMBREE_GEOMETRY_CURVE OFF" "EMBREE_GEOMETRY_SUBDIVISION OFF"
+            "EMBREE_GEOMETRY_POINT OFF" "EMBREE_GEOMETRY_GRID OFF")
+set(CMAKE_CXX_STANDARD "${_avgen_saved_cxx_standard}")
+unset(_avgen_saved_cxx_standard)
+
+# ---- OpenImageDenoise (path-tracer denoise) ----------------------------------------------------
+# ADR-353. Prebuilt macOS arm64 archive, SHA256-pinned, exactly as Dawn is -- and for a sharper
+# reason than Dawn's. OIDN's CPU device cannot be built from source without TWO things this project
+# does not have and should not acquire for one feature:
+#
+#   * oneTBB, which `devices/cpu/CMakeLists.txt` marks REQUIRED with no alternative tasking backend;
+#   * ISPC >= 1.21, a *binary compiler toolchain* (not a library) that OIDN's CMake refuses to
+#     proceed without. Nothing else in this project needs a third-party compiler to build.
+#
+# The prebuilt archive carries both -- it ships its own `libtbb` -- and also carries the trained
+# weights, which are the 49 MB in `libOpenImageDenoise_core`. On Apple silicon OIDN runs its network
+# through BNNS (Accelerate), so no oneDNN is involved.
+#
+# OFF by default: it is a 51 MB download for a feature the renderer works without, and a build that
+# has not opted in must not pay for it. `AVGEN_PATHTRACE_DENOISE` gates the code as well as the
+# fetch, and the tracer reports denoising as unavailable rather than failing (spec section 54).
+option(AVGEN_PATHTRACE_DENOISE "Fetch Open Image Denoise and enable path-tracer denoising" OFF)
+if(AVGEN_PATHTRACE_DENOISE)
+    if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+        CPMAddPackage(
+            NAME oidn_prebuilt
+            URL "https://github.com/RenderKit/oidn/releases/download/v2.3.3/oidn-2.3.3.arm64.macos.tar.gz"
+            URL_HASH SHA256=b3c005ed437547fca5460ae43c8631ff46bc4ec4f9d5f219940ef941601a9d81
+            DOWNLOAD_ONLY YES)
+        add_library(oidn INTERFACE)
+        target_include_directories(oidn SYSTEM INTERFACE "${oidn_prebuilt_SOURCE_DIR}/include")
+        target_link_libraries(oidn INTERFACE
+            "${oidn_prebuilt_SOURCE_DIR}/lib/libOpenImageDenoise.dylib")
+        # The dylibs resolve each other by @rpath at load time, so the directory has to be on it.
+        target_link_options(oidn INTERFACE "-Wl,-rpath,${oidn_prebuilt_SOURCE_DIR}/lib")
+        add_library(oidn::oidn ALIAS oidn)
+        set(AVGEN_HAVE_OIDN ON)
+        message(STATUS "avgen: Open Image Denoise 2.3.3 (prebuilt arm64)")
+    else()
+        message(WARNING "avgen: AVGEN_PATHTRACE_DENOISE is ON but no prebuilt OIDN exists for this "
+                        "platform; denoising will report itself unavailable")
+    endif()
+endif()
+
 # ---- Catch2 (tests) ---------------------------------------------------------------------------
 if(AVGEN_BUILD_TESTS)
     CPMAddPackage(

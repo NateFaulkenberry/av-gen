@@ -97,7 +97,7 @@ struct RenderStats {
     std::uint64_t visibleInstances = 0; // procedural instances that survived culling
     std::uint64_t culledInstances = 0;
     std::uint64_t lodCounts[4] = {0, 0, 0, 0};
-    // ADR-348: what the entity LOD selector did this frame. Separate from `lodCounts`, which is the
+    // ADR-351: what the entity LOD selector did this frame. Separate from `lodCounts`, which is the
     // *procedural scatter's* ladder: the two answer the same question about different populations,
     // and folding them together would make "the tree demoted" and "eighty thousand ferns demoted"
     // one number nobody could read. All zero in a scene with no chain, which is every scene that
@@ -684,7 +684,7 @@ private:
         wgpu::Buffer skin;
         std::uint32_t indexCount = 0;
     };
-    // ADR-348: one mesh's coarser rungs on the GPU, and what the selector needs to cost them.
+    // ADR-351: one mesh's coarser rungs on the GPU, and what the selector needs to cost them.
     // `levels[0]` is LOD1 -- LOD0 is `meshes_[base]` and is never copied, which is what keeps the
     // source mesh the only source mesh. Empty for every mesh with no chain, which is all of them
     // until a scene asks.
@@ -917,7 +917,7 @@ private:
     IblResources ibl_;
 
     std::vector<GpuMesh> meshes_;
-    // ADR-348: parallel to `meshes_`, by MeshId. A mesh with no chain carries an empty GpuMeshLod,
+    // ADR-351: parallel to `meshes_`, by MeshId. A mesh with no chain carries an empty GpuMeshLod,
     // which costs three empty vectors and keeps the lookup a subscript rather than a map.
     std::vector<GpuMeshLod> meshLods_;
     // Whether this frame's scene had any chain at all. The whole selection pass is skipped when it

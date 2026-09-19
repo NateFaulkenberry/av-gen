@@ -55,7 +55,7 @@ struct AttributeWeights {
     [[nodiscard]] bool any() const { return normal > 0.0f || uv > 0.0f; }
 };
 
-// Removing whole disconnected pieces instead of collapsing edges (ADR-348).
+// Removing whole disconnected pieces instead of collapsing edges (ADR-351).
 //
 // The simplifier's failure mode has a floor nobody had measured until the Tree of Life: an
 // *8-triangle closed shell cannot be simplified at all*. There is no edge to collapse that does
@@ -329,7 +329,7 @@ struct MeshCacheStats {
 // was measured and why the sloppy fallback is armed here and the overdraw pass is not.
 [[nodiscard]] LodChainSettings lod0Settings();
 [[nodiscard]] LodChainSettings vegetationLodSettings();
-// An imported hero asset that may be partly instanced foliage (ADR-348): the five rungs §3 of the
+// An imported hero asset that may be partly instanced foliage (ADR-351): the five rungs §3 of the
 // asset-LOD brief asks for, and shell thinning armed so the half of the asset that will not
 // decimate is reached by the only means that reaches it. The rungs are targets; every level
 // carries what it actually achieved.

@@ -133,7 +133,7 @@ RepresentationChoice RepresentationSelector::decide(const ImportanceRecord& reco
                 continue; // a rung with no triangles is not a rung of the mesh ladder
             }
             const bool already = previousWasMesh && static_cast<std::size_t>(previous.lodLevel) >= k;
-            // The quality floor (ADR-348), applied before the cost rule gets a say. The dead zone
+            // The quality floor (ADR-351), applied before the cost rule gets a say. The dead zone
             // runs the other way round here from the one on the cost limit, and for the same
             // reason: a rung this drawable is *already* on is allowed a little more error before it
             // is taken away, so the boundary does not strobe.

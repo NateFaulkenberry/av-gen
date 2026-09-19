@@ -250,7 +250,7 @@ struct MeshData {
 using MeshId = std::uint32_t;
 constexpr MeshId kInvalidMesh = 0xFFFFFFFFu;
 
-// ---- runtime LOD for an imported mesh (ADR-348) ------------------------------------------------
+// ---- runtime LOD for an imported mesh (ADR-351) ------------------------------------------------
 //
 // A mesh's coarser rungs, held beside the scene's meshes rather than inside MeshData, and built by
 // `assets::buildLodChain`. Three decisions are worth naming, because each closes off a shape the

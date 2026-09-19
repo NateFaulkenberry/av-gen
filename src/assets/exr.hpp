@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <span>
+#include <string>
 
 namespace avgen::assets {
 
@@ -20,5 +21,28 @@ Result<void> writeExr(const std::filesystem::path& path, std::uint32_t width, st
 
 // Reads a single-part RGB(A) EXR as Rgba32Float (missing alpha reads as 1). For tests and tools.
 Result<scene::TextureData> readExr(const std::filesystem::path& path);
+
+// ---- multi-channel EXR with arbitrary named layers (ADR-351) -------------------------------------
+//
+// `writeExr` above writes exactly R/G/B/A, which is right for a beauty pass and wrong for an AOV.
+// Spec section 33 is explicit: normals and motion must NOT be stored as R/G/B, because a colour
+// managed pipeline downstream will treat those names as colour and transform them. They need named
+// layers -- `normal.X`, `normal.Y`, `normal.Z` -- which are then unambiguously not colour.
+//
+// This is new engine code, not a new dependency: the pinned tinyexr header has always exposed
+// `EXRHeader`, `EXRChannelInfo` and `SaveEXRImageToFile`. It also discharges the debt recorded at
+// `src/app/render_settings.hpp` -- "the layered form is a better file and a bigger change; it is
+// recorded as not done rather than half-built".
+struct ExrChannel {
+    std::string name;             // e.g. "R", "normal.X", "depth.Z"
+    std::span<const float> data;  // width * height values, row-major, top-left
+    bool half = false;            // per-channel precision, which `writeExr` cannot express
+};
+
+// Channels are written in the order given; OpenEXR itself sorts them alphabetically on read, which
+// is why the names matter more than the order. Fails if any channel is the wrong length or if two
+// channels share a name.
+Result<void> writeExrLayers(const std::filesystem::path& path, std::uint32_t width,
+                            std::uint32_t height, std::span<const ExrChannel> channels);
 
 } // namespace avgen::assets

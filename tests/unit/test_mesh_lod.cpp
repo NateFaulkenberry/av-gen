@@ -813,7 +813,7 @@ TEST_CASE("The production tree keeps its trunk at the bottom rung", "[assets][lo
 #endif
 }
 
-// ---- shell thinning (ADR-348) -------------------------------------------------------------------
+// ---- shell thinning (ADR-351) -------------------------------------------------------------------
 //
 // Every arm here has a control, because the failure this machinery is most likely to have is the
 // silent one: a setting that does nothing, on geometry where doing nothing and succeeding look

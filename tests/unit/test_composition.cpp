@@ -3165,7 +3165,7 @@ TEST_CASE("the texture digest answers to a single texel", "[scene][composition][
     CHECK(scene::textureTableDigest({}) != scene::textureTableDigest(table(0)));
 }
 
-// ---- runtime LOD on an imported node (ADR-348) ---------------------------------------------------
+// ---- runtime LOD on an imported node (ADR-351) ---------------------------------------------------
 
 TEST_CASE("a gltf node builds no LOD chain unless it asks", "[scene][composition][lod]") {
     // The opt-in rule, asserted rather than trusted. Two engine changes landed on this project in

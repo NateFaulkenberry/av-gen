@@ -1,5 +1,5 @@
 // What each rung of the Tree of Life's ladder actually *looks* like, against LOD0, at five
-// distances (ADR-348; §11 and §13 of the asset-LOD brief).
+// distances (ADR-351; §11 and §13 of the asset-LOD brief).
 //
 //   tools/make_assetlod_arms.py
 //   <render every arm to $AVGEN_LOD_FRAMES/<arm>/frame_000000.png>

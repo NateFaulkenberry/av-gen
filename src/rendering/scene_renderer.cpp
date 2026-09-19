@@ -1871,7 +1871,7 @@ void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
     probe2::frame().meshesUploaded += scene.meshes.size();
     meshes_.clear();
     meshes_.reserve(scene.meshes.size());
-    // ADR-348. Rebuilt with the meshes and from the same version, because a chain is geometry and
+    // ADR-351. Rebuilt with the meshes and from the same version, because a chain is geometry and
     // a chain left behind by a scene that has been re-flattened is the derived-copy defect this
     // engine has found nine of.
     meshLods_.assign(scene.meshes.size(), GpuMeshLod{});
@@ -2641,7 +2641,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ADR-099: which of the scene's water surfaces this entity draws with, resolved once here
         // from the material-program name rather than looked up per draw.
         std::uint32_t water = 0;
-        // ADR-348: which geometry this item draws. `meshes_[entity->mesh]` unless the selector
+        // ADR-351: which geometry this item draws. `meshes_[entity->mesh]` unless the selector
         // chose a rung, and a pointer rather than a level index so that every draw site reads one
         // field and none of them can look the choice up a second time and get a different answer.
         const GpuMesh* geometry = nullptr;
@@ -2700,7 +2700,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     };
     const std::span<const FrustumPlanes> viewPlanes(cascadePlanes.data(),
                                                     std::min(cascadePlanes.size(), shadowViewList.size()));
-    // ---- ADR-348: which rung each entity draws this frame ---------------------------------------
+    // ---- ADR-351: which rung each entity draws this frame ---------------------------------------
     //
     // The selector and the importance evaluator already existed (ADR-122 / ADR-123 / ADR-124) and
     // were consumed by nothing: this is the wiring, not a second system. Three properties are worth
@@ -4062,7 +4062,7 @@ void SceneRenderer::collectFrameTimings() {
     for (std::size_t i = 0; i < 4; ++i) {
         stats_.lodCounts[i] = stats_.procedural.lodCounts[i];
     }
-    // ADR-348. Copied rather than accumulated, for the reason the comment below gives about running
+    // ADR-351. Copied rather than accumulated, for the reason the comment below gives about running
     // twice per submitted frame.
     stats_.entityLod.drawables = entityLod_.drawables;
     stats_.entityLod.demoted = entityLod_.demoted;

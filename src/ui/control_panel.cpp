@@ -2314,7 +2314,7 @@ void ControlPanel::drawPerformanceDashboard(app::Engine& engine, const FrameStat
                     static_cast<unsigned long long>(pr.lodCounts[2]),
                     static_cast<unsigned long long>(pr.lodCounts[3]));
     }
-    // ADR-348: entity LOD, beside the scatter's ladder rather than folded into it. The two answer
+    // ADR-351: entity LOD, beside the scatter's ladder rather than folded into it. The two answer
     // the same question about different populations, and one number covering "the hero tree
     // demoted" and "eighty thousand ferns demoted" is a number nobody can read. Shown only when
     // something in the scene has a chain, which is nothing until a node asks.
@@ -2797,8 +2797,161 @@ void ControlPanel::drawTimelineTab(app::Engine& engine) {
 }
 
 
+// The path-tracing half of the Render panel. A view of `pathtrace::TraceJob` and nothing more:
+// every number shown comes from `pathTraceProgress()`, and the panel keeps no copy of it.
+void ControlPanel::drawPathTrace() {
+    if (pathTraceSettings == nullptr) return;
+    auto& t = *pathTraceSettings;
+
+    const pathtrace::TraceProgress p =
+        pathTraceProgress ? pathTraceProgress() : pathtrace::TraceProgress{};
+    const bool running = !p.finished() && p.state != pathtrace::TraceJobState::Queued;
+
+    ImGui::BeginDisabled(running);
+
+    // Resolution comes from the same control the realtime half uses, so the two cannot disagree
+    // about what "the output size" means.
+    if (renderSettings != nullptr) {
+        static_cast<void>(drawOutputResolutionControls(*renderSettings));
+        t.width = std::max(16u, renderSettings->width);
+        t.height = std::max(16u, renderSettings->height);
+    }
+
+    if (pathTraceSeconds != nullptr) {
+        auto seconds = static_cast<float>(*pathTraceSeconds);
+        if (ImGui::InputFloat("second", &seconds, 0.1f, 1.0f, "%.3f")) {
+            *pathTraceSeconds = std::max(0.0, static_cast<double>(seconds));
+        }
+        if (ImGui::IsItemHovered()) {
+            tooltip("The timeline second to trace. One frame, not a sequence -- a path-traced\n"
+                    "sequence is a queue of these and is not built yet.");
+        }
+    }
+
+    int samples = static_cast<int>(t.samplesPerPixel);
+    if (ImGui::SliderInt("samples", &samples, 1, 1024, "%d spp", ImGuiSliderFlags_Logarithmic)) {
+        t.samplesPerPixel = static_cast<std::uint32_t>(std::max(1, samples));
+    }
+    if (ImGui::IsItemHovered()) {
+        tooltip("Paths per pixel. Noise falls as the square root of this, so four times the\n"
+                "samples is half the noise and four times the wait.");
+    }
+
+    int depth = static_cast<int>(t.maxDepth);
+    if (ImGui::SliderInt("bounces", &depth, 0, 16)) {
+        t.maxDepth = static_cast<std::uint32_t>(std::max(0, depth));
+    }
+    if (ImGui::IsItemHovered()) {
+        tooltip("Surface interactions per path. 0 is direct lighting only; each further bounce\n"
+                "adds indirect light and costs time. Russian roulette ends long paths early.");
+    }
+
+    if (pathTraceDenoise != nullptr) {
+        ImGui::BeginDisabled(!pathTraceDenoiseAvailable);
+        ImGui::Checkbox("denoise", pathTraceDenoise);
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered()) {
+            tooltip(pathTraceDenoiseAvailable
+                        ? "Open Image Denoise, using the albedo and normal passes as guides.\n"
+                          "Turns a low-sample render into a usable one; it cannot invent detail\n"
+                          "that no path ever found."
+                        : "This build has no denoiser. Configure with\n"
+                          "-DAVGEN_PATHTRACE_DENOISE=ON to fetch it (ADR-353).");
+        }
+    }
+    if (pathTraceAovs != nullptr) {
+        ImGui::SameLine();
+        ImGui::Checkbox("AOVs", pathTraceAovs);
+        if (ImGui::IsItemHovered()) {
+            tooltip("Write albedo, normal, emission, depth and id as named layers in the same\n"
+                    "EXR. Normals go in normal.X/Y/Z, never R/G/B, so a colour-managed\n"
+                    "pipeline downstream does not transform them as if they were colour.");
+        }
+    }
+
+    ImGui::Checkbox("albedo probe", &t.albedoProbe.enabled);
+    if (ImGui::IsItemHovered()) {
+        tooltip("Report surfaces whose directional albedo exceeds 1 (ADR-352). The glTF BRDF is\n"
+                "kept faithful to the specification and gains energy at grazing angles; this\n"
+                "measures where. Diagnostic only -- it cannot change a pixel.");
+    }
+
+    ImGui::EndDisabled();
+    ImGui::Separator();
+
+    if (running) {
+        // PROGRESS HONESTY (spec section 36). A bar is drawn only for a stage that can actually
+        // measure itself. Rendering counts finished samples, so it gets one. Scene build, BVH,
+        // denoise and write emit no intermediate signal, so they get the STAGE NAME instead -- a
+        // bar sitting at 40% while nothing is known is a lie, and the usual place that discipline
+        // dies is exactly here, because a still bar looks broken and a creeping one looks fine.
+        if (p.fractionKnown) {
+            const std::string overlay =
+                fmt::format("{} / {} samples", p.samplesDone, p.samplesTotal);
+            ImGui::ProgressBar(std::clamp(p.fraction, 0.0f, 1.0f), ImVec2(-1, 0), overlay.c_str());
+            ImGui::Text("%s -- %s elapsed", p.stage.c_str(), elapsedClock(p.elapsedSeconds).c_str());
+        } else {
+            ImGui::TextColored(ImVec4(0.72f, 0.80f, 0.95f, 1.0f), "%s...", p.stage.c_str());
+            ImGui::SameLine();
+            ImGui::TextDisabled("(%s elapsed)", elapsedClock(p.elapsedSeconds).c_str());
+            if (ImGui::IsItemHovered()) {
+                tooltip("This stage reports no intermediate progress, so none is shown. A bar here\n"
+                        "would be an interpolation rather than a measurement.");
+            }
+        }
+        if (ImGui::Button("Cancel") && onCancelPathTrace) {
+            onCancelPathTrace();
+        }
+        if (ImGui::IsItemHovered()) {
+            tooltip("Stops after the current sample batch. A cancelled trace writes no file.");
+        }
+    } else {
+        if (ImGui::Button("Path trace") && onStartPathTrace) {
+            onStartPathTrace();
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("writes one EXR");
+        if (p.state == pathtrace::TraceJobState::Complete) {
+            ImGui::TextColored(ImVec4(0.55f, 0.85f, 0.55f, 1.0f), "done in %s",
+                               elapsedClock(p.elapsedSeconds).c_str());
+        } else if (p.state == pathtrace::TraceJobState::Cancelled) {
+            ImGui::TextDisabled("cancelled -- no file written");
+        } else if (p.state == pathtrace::TraceJobState::Failed) {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "failed: %s",
+                               p.error.empty() ? "unknown" : p.error.c_str());
+        }
+    }
+}
+
 void ControlPanel::drawRender(app::Engine& engine) {
     helpHeader("rendering/offline-render");
+
+    // ---- which renderer (spec section 67) --------------------------------------------------------
+    //
+    // Two renderers over one scene, so one panel with a choice at the top rather than two panels
+    // that would each need their own resolution, output path and progress line. "Path trace" rather
+    // than "offline": this codebase already spends that word on a quality tier of the rasteriser
+    // and on the batch pipeline, and a second meaning in the UI would be the same collision
+    // ADR-351 exists to avoid.
+    if (pathTraceSettings != nullptr) {
+        ImGui::TextUnformatted("Renderer");
+        ImGui::SameLine();
+        ImGui::RadioButton("Realtime", &rendererChoice_, 0);
+        ImGui::SameLine();
+        ImGui::RadioButton("Path trace", &rendererChoice_, 1);
+        if (ImGui::IsItemHovered()) {
+            tooltip(
+                "A CPU path tracer (ADR-351). Slower by a long way and not constrained by what a\n"
+                "frame budget allows: true soft shadows, real reflections and bounced light.\n\n"
+                "Writes one scene-linear EXR, never a tonemapped image -- the colour pipeline is\n"
+                "downstream of the file. Uses no GPU at all, so it runs while the viewport does.");
+        }
+        ImGui::Separator();
+        if (rendererChoice_ == 1) {
+            drawPathTrace();
+            return;
+        }
+    }
 
     if (renderSettings == nullptr) {
         ImGui::TextDisabled("render settings unavailable");
