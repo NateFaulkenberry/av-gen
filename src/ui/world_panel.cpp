@@ -1,5 +1,7 @@
 #include "ui/world_panel.hpp"
 
+#include "ui/param_widget.hpp"
+
 #include "ui/style.hpp"
 #include "params/preset.hpp"
 #include "scene/composition.hpp"
@@ -11,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <unordered_map>
 
 namespace avgen::ui {
 
@@ -266,6 +269,25 @@ void WorldPanel::drawOverview(app::Engine& engine) {
         }
         ImGui::PopID();
     };
+    // ADR-387: the composition's own nodes -- the things somebody placed and named. This list was
+    // missing, and its absence is half of why the Tree panel was written: every other kind of
+    // object in the scene could be selected here and inspected, and the authored nodes could only
+    // be reached by clicking them in the viewport, which does not work for a group whose children
+    // are what the click lands on. With the list here, "select the tree and open its wind group" is
+    // a thing somebody can do without knowing any parameter path.
+    if (scene::Composition* comp = engine.composition(); comp != nullptr) {
+        if (ImGui::TreeNodeEx("Objects", ImGuiTreeNodeFlags_DefaultOpen)) {
+            const auto& nodes = comp->nodes();
+            for (const auto& node : nodes) {
+                const std::string label = node->name + "  (" + scene::nodeKindName(node->kind) + ")";
+                select(WorldSelection::Kind::Node, node->name, label.c_str(), 0);
+            }
+            if (nodes.empty()) {
+                ImGui::TextDisabled("no authored objects");
+            }
+            ImGui::TreePop();
+        }
+    }
     if (ImGui::TreeNodeEx("Architecture", ImGuiTreeNodeFlags_DefaultOpen)) {
         for (const scene::ProceduralGeometry& pg : s.procedurals) {
             select(WorldSelection::Kind::Procedural, pg.name, pg.name.c_str(), pg.instances.size());
@@ -362,6 +384,68 @@ void WorldPanel::drawInspector(app::Engine& engine) {
             break;
         }
     }
+    // ADR-387: the selected object's own controls, editable, grouped by the sub-prefix the
+    // registration already gives them -- `nodes/<n>/wind/strength` sits under "wind", and every
+    // node that declares a wind body gets that group for free. Nothing here knows the name of any
+    // scene, any node or any effect: the grouping is read off the paths, which is what makes this
+    // the answer to the Tree panel rather than a second Tree panel. A node with no sub-groups shows
+    // one flat list, which is what a plain mesh should look like.
+    {
+        std::vector<params::IParameter*> plain;
+        std::vector<std::string> groupOrder;
+        std::unordered_map<std::string, std::vector<params::IParameter*>> groups;
+        for (params::IParameter* param : engine.params().ordered()) {
+            if (!param->flags().exposed || !detail::pathStartsWith(param->path(), prefix)) {
+                continue;
+            }
+            if (!shows(param->path())) {
+                continue;
+            }
+            const std::string rel = param->path().substr(prefix.size());
+            const std::size_t slash = rel.find('/');
+            if (slash == std::string::npos) {
+                plain.push_back(param);
+                continue;
+            }
+            const std::string group = rel.substr(0, slash);
+            auto [it, inserted] = groups.try_emplace(group);
+            if (inserted) {
+                groupOrder.push_back(group);
+            }
+            it->second.push_back(param);
+        }
+        if (!plain.empty() || !groupOrder.empty()) {
+            ImGui::SeparatorText("Properties");
+        }
+        const auto row = [&](params::IParameter* param, std::size_t cut) {
+            ImGui::PushID(param->path().c_str());
+            const std::string rel = param->path().substr(cut);
+            drawParameterValue(*param, rel.c_str());
+            if (ImGui::BeginPopupContextItem("reset")) {
+                if (ImGui::MenuItem("Reset to default")) {
+                    param->resetToDefault();
+                }
+                if (ImGui::MenuItem("Key at current time")) {
+                    engine.recordKey(param->path());
+                }
+                ImGui::EndPopup();
+            }
+            ImGui::PopID();
+        };
+        for (params::IParameter* param : plain) {
+            row(param, prefix.size());
+        }
+        for (const std::string& group : groupOrder) {
+            if (!ImGui::TreeNodeEx(group.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+                continue;
+            }
+            for (params::IParameter* param : groups[group]) {
+                row(param, prefix.size() + group.size() + 1);
+            }
+            ImGui::TreePop();
+        }
+    }
+
     ImGui::SeparatorText("Influences");
     ImGui::TextDisabled("Why is this moving? Timeline, routes and state changes are listed here,\n"
                         "including the ones that move this object by moving what it hangs off.");

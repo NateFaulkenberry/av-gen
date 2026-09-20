@@ -2506,8 +2506,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         frame.skySunRadiance = glm::vec4(resolved.sunColor, analyticBackground ? 1.0f : 0.0f);
     // ADR-379: the vortex's own light on what floats above it. Zero intensity when there is no
     // vortex, which is the gate the surface shader tests.
-    if (scene.environment.vortex.active()) {
-        const scene::Environment::Vortex& vx = scene.environment.vortex;
+    if (scene.atmospherics.hasVortex && scene.atmospherics.vortex.active()) {
+        const world::Vortex& vx = scene.atmospherics.vortex;
         frame.vortexGlow = glm::vec4(vx.center, std::max(vx.radius, 1.0f));
         // The colour the eye reads out of the funnel is the mid tone lifted toward the accent.
         //

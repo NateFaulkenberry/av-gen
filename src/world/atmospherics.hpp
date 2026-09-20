@@ -83,11 +83,18 @@ inline constexpr std::size_t kMaxGpuAuroras = 2;
 // curtain can show before the folds hide it.
 inline constexpr std::size_t kAuroraBands = 16;
 
-// ---- the two kinds -----------------------------------------------------------------------------
+// ---- the kinds ---------------------------------------------------------------------------------
 
 enum class AtmosphereKind : std::uint8_t {
     Comet,  // a bright head on a world-space curve, with a trail integrated along the view ray
     Aurora, // curtains on vertical shells, rising from a world height, shaped by the spectrum
+    // ADR-387. A cosmic vortex is a sky phenomenon a scene AUTHORS, so it belongs in this family
+    // for the same reasons the other two do: instances with names, an enable, a table of parameters
+    // under `atmos/<name>/`, serialisation in `atmosphericEffects`, a row in the World Effects
+    // panel, and modulation, all for free. That it is drawn by the volumetric pass rather than by
+    // `atmosphere_fx.wgsl` is a rendering detail -- this family is about authoring, not about which
+    // pass rasterises the result.
+    Vortex,
 };
 [[nodiscard]] const char* atmosphereKindName(AtmosphereKind k);
 [[nodiscard]] std::optional<AtmosphereKind> atmosphereKindFromName(std::string_view name);
@@ -285,6 +292,37 @@ struct Aurora {
 // One struct with both payloads rather than a variant: an effect changes kind when somebody picks a
 // different preset, and a variant would throw away the settings of the kind they left. Both are
 // small, both round-trip, and only the one `kind` names is ever read.
+// ADR-387: the cosmic vortex as an authored instance rather than a singleton on `Environment`.
+// Every field here was `Environment::Vortex` and means exactly what it did, which is what keeps
+// §10's "the Tree of Life must look the same" true by construction rather than by re-tuning.
+struct Vortex {
+    glm::vec3 center{0.0f};       // world space
+    float radius = 0.0f;          // metres; 0 is off and is the default
+    float thickness = 120.0f;     // vertical half-extent of the wall
+    float swirl = 3.2f;           // radians of shear per unit radius
+    float rotationSpeed = 0.035f; // radians per second
+    float density = 0.45f;        // extinction PER METRE (ADR-374)
+    float innerVoid = 0.18f;
+    float contrast = 1.9f;
+    float turbulence = 0.6f;
+    float turbulenceScale = 2.1f;
+    float breathAmount = 0.05f;
+    float breathSpeed = 0.18f;
+    float emission = 1.0f;        // emissive density PER METRE (ADR-374)
+    float filaments = 0.9f;
+    float spill = 2.5f;           // surface irradiance on what floats above it (ADR-379)
+    float cometResponse = 0.0f;   // ADR-381
+    float cometReach = 6.0f;
+    float funnelDepth = 0.0f;     // metres the throat descends; 0 keeps the flat slab
+    float throat = 0.25f;
+    float throatDensity = 0.6f;
+    glm::vec3 colorDeep{0.020f, 0.016f, 0.075f};
+    glm::vec3 colorMid{0.050f, 0.085f, 0.230f};
+    glm::vec3 colorAccent{0.090f, 0.320f, 0.420f};
+    [[nodiscard]] bool active() const { return radius > 0.0f; }
+    [[nodiscard]] Result<void> validate() const;
+};
+
 struct AtmosphericEffect {
     std::string name;
     bool enabled = true;
@@ -293,6 +331,7 @@ struct AtmosphericEffect {
     AtmosphereKind kind = AtmosphereKind::Comet;
     Comet comet;
     Aurora aurora;
+    Vortex vortex;
 
     GroundIllumination ground;
     Activation activation = Activation::Always; // ADR-207's, unchanged
@@ -315,15 +354,20 @@ struct AtmosphericEffect {
 
 [[nodiscard]] std::span<const std::string_view> cometStyleNames();
 [[nodiscard]] std::span<const std::string_view> auroraStyleNames();
+[[nodiscard]] std::span<const std::string_view> vortexStyleNames();
 // Applies a style's appearance and shape, leaving name, activation, timing and ground illumination
 // alone. False when the name is not a style of that kind.
 bool applyCometStyle(AtmosphericEffect& effect, std::string_view style);
 bool applyAuroraStyle(AtmosphericEffect& effect, std::string_view style);
+// ADR-387. A vortex style leaves `center` alone: where the funnel is in the world is a placement
+// decision the scene made, and a preset that moved it would silently unanchor it from the island.
+bool applyVortexStyle(AtmosphericEffect& effect, std::string_view style);
 
 // Ready-made effects, so "add a comet" is one call from the UI and one line in a test rather than a
 // page of field assignments that can drift from the shipped scene's.
 [[nodiscard]] AtmosphericEffect bioluminescentComet(std::string name = "Bioluminescent Comet");
 [[nodiscard]] AtmosphericEffect glowmereAurora(std::string name = "Glowmere Aurora");
+[[nodiscard]] AtmosphericEffect cosmicVortex(std::string name = "Cosmic Vortex");
 
 // ---- resolution --------------------------------------------------------------------------------
 
@@ -420,6 +464,13 @@ static_assert(sizeof(SkyGroundGpu) == 48);
 struct AtmosphericFrame {
     std::uint32_t cometCount = 0;
     std::uint32_t auroraCount = 0;
+    // ADR-387: the live vortex, if a scene authored one. ONE, not an array: the volumetric march
+    // evaluates three fBMs per sample inside it, and ADR-374 measured the single vortex at +5.5 ms
+    // of a 13.5 ms frame -- the most expensive term in the scene. A second is a deliberate future
+    // decision rather than an oversight, and the resolve counts what it dropped so the UI can say
+    // so instead of silently ignoring it.
+    bool hasVortex = false;
+    Vortex vortex{};
     // Samples the shader marches down each comet's tail. A quality control (§12): lowering it
     // costs smoothness and not brightness, because the accumulation is normalised by the count and
     // the sample width has a floor of the sample spacing.
@@ -439,6 +490,7 @@ struct AtmosphericFrame {
 struct AtmosphericCounts {
     std::size_t comets = 0;
     std::size_t auroras = 0;
+    std::size_t vortices = 0; // ADR-387; at most one is used, the rest count as dropped
     std::size_t dropped = 0;
 };
 AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> effects,

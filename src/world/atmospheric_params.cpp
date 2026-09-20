@@ -193,22 +193,67 @@ constexpr BoolField kAuroraBools[] = {
     {"rainbow", F_GET(e.aurora.rainbow.enabled), B_SET(e.aurora.rainbow.enabled)},
 };
 
+// ADR-387: the vortex's parameters, table-driven like the other two kinds so it gains
+// registration, apply, capture and default routes without a line of bespoke code.
+constexpr FloatField kVortexFloats[] = {
+    {"radius", 0.0f, 20000.0f, 0.0f, 1500.0f, F_GET(e.vortex.radius), F_SET(e.vortex.radius)},
+    {"thickness", 0.1f, 5000.0f, 5.0f, 600.0f, F_GET(e.vortex.thickness), F_SET(e.vortex.thickness)},
+    {"funnelDepth", 0.0f, 20000.0f, 0.0f, 3000.0f, F_GET(e.vortex.funnelDepth), F_SET(e.vortex.funnelDepth)},
+    {"throat", 0.02f, 1.0f, 0.05f, 1.0f, F_GET(e.vortex.throat), F_SET(e.vortex.throat)},
+    {"throatDensity", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.vortex.throatDensity), F_SET(e.vortex.throatDensity)},
+    {"swirl", -32.0f, 32.0f, -8.0f, 8.0f, F_GET(e.vortex.swirl), F_SET(e.vortex.swirl)},
+    {"rotationSpeed", -4.0f, 4.0f, -0.4f, 0.4f, F_GET(e.vortex.rotationSpeed), F_SET(e.vortex.rotationSpeed)},
+    {"turbulence", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.vortex.turbulence), F_SET(e.vortex.turbulence)},
+    {"turbulenceScale", 0.001f, 40.0f, 0.1f, 8.0f, F_GET(e.vortex.turbulenceScale), F_SET(e.vortex.turbulenceScale)},
+    {"density", 0.0f, 8.0f, 0.0f, 0.01f, F_GET(e.vortex.density), F_SET(e.vortex.density)},
+    {"emission", 0.0f, 20.0f, 0.0f, 0.2f, F_GET(e.vortex.emission), F_SET(e.vortex.emission)},
+    {"contrast", 0.05f, 12.0f, 0.5f, 5.0f, F_GET(e.vortex.contrast), F_SET(e.vortex.contrast)},
+    {"innerVoid", 0.0f, 0.95f, 0.0f, 0.6f, F_GET(e.vortex.innerVoid), F_SET(e.vortex.innerVoid)},
+    {"filaments", 0.0f, 4.0f, 0.0f, 2.0f, F_GET(e.vortex.filaments), F_SET(e.vortex.filaments)},
+    {"breathAmount", 0.0f, 1.0f, 0.0f, 0.3f, F_GET(e.vortex.breathAmount), F_SET(e.vortex.breathAmount)},
+    {"breathSpeed", 0.0f, 4.0f, 0.0f, 1.0f, F_GET(e.vortex.breathSpeed), F_SET(e.vortex.breathSpeed)},
+    {"spill", 0.0f, 20.0f, 0.0f, 6.0f, F_GET(e.vortex.spill), F_SET(e.vortex.spill)},
+    {"cometResponse", 0.0f, 8.0f, 0.0f, 2.0f, F_GET(e.vortex.cometResponse), F_SET(e.vortex.cometResponse)},
+    {"cometReach", 1.0f, 40.0f, 1.0f, 12.0f, F_GET(e.vortex.cometReach), F_SET(e.vortex.cometReach)},
+    {"centerX", -1e5f, 1e5f, -500.0f, 500.0f, F_GET(e.vortex.center.x), F_SET(e.vortex.center.x)},
+    {"centerY", -1e5f, 1e5f, -2000.0f, 500.0f, F_GET(e.vortex.center.y), F_SET(e.vortex.center.y)},
+    {"centerZ", -1e5f, 1e5f, -500.0f, 500.0f, F_GET(e.vortex.center.z), F_SET(e.vortex.center.z)},
+};
+constexpr ColorField kVortexColors[] = {
+    {"colorDeep", F_GET(e.vortex.colorDeep), C_SET(e.vortex.colorDeep)},
+    {"colorMid", F_GET(e.vortex.colorMid), C_SET(e.vortex.colorMid)},
+    {"colorAccent", F_GET(e.vortex.colorAccent), C_SET(e.vortex.colorAccent)},
+};
+
 #undef F_GET
 #undef F_SET
 #undef C_SET
 #undef B_SET
 
 std::span<const FloatField> floatFields(AtmosphereKind kind) {
-    return kind == AtmosphereKind::Comet ? std::span<const FloatField>(kCometFloats)
-                                         : std::span<const FloatField>(kAuroraFloats);
+    switch (kind) {
+    case AtmosphereKind::Comet: return std::span<const FloatField>(kCometFloats);
+    case AtmosphereKind::Vortex: return std::span<const FloatField>(kVortexFloats);
+    case AtmosphereKind::Aurora: break;
+    }
+    return std::span<const FloatField>(kAuroraFloats);
 }
 std::span<const ColorField> colorFields(AtmosphereKind kind) {
-    return kind == AtmosphereKind::Comet ? std::span<const ColorField>(kCometColors)
-                                         : std::span<const ColorField>(kAuroraColors);
+    switch (kind) {
+    case AtmosphereKind::Comet: return std::span<const ColorField>(kCometColors);
+    case AtmosphereKind::Vortex: return std::span<const ColorField>(kVortexColors);
+    case AtmosphereKind::Aurora: break;
+    }
+    return std::span<const ColorField>(kAuroraColors);
 }
 std::span<const BoolField> boolFields(AtmosphereKind kind) {
-    return kind == AtmosphereKind::Comet ? std::span<const BoolField>(kCometBools)
-                                         : std::span<const BoolField>(kAuroraBools);
+    switch (kind) {
+    case AtmosphereKind::Comet: return std::span<const BoolField>(kCometBools);
+    // A vortex has no booleans of its own: `enabled` is the effect's, and `radius` 0 is the gate.
+    case AtmosphereKind::Vortex: return {};
+    case AtmosphereKind::Aurora: break;
+    }
+    return std::span<const BoolField>(kAuroraBools);
 }
 
 // Desc builders, the same shape `effect_params.cpp` uses.

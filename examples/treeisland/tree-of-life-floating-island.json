@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "tree-of-life-floating-island.scene.json",
-        "sha256": "2b1d9ebacd174774049f4d78ec717d6430fdbe555d325131a1a947acc73153b8",
-        "size": 12133
+        "sha256": "5811388518cf170a79bbf0a806212636796f5f2a751f10416daa18e449550765",
+        "size": 12307
       }
     }
   },
@@ -172,6 +172,52 @@
         "repeatSeconds": 0.0,
         "windowSeconds": 10.0,
         "windowStart": 4.0
+      }
+    },
+    {
+      "name": "Cosmic Vortex",
+      "enabled": true,
+      "kind": "vortex",
+      "activation": "always",
+      "vortex": {
+        "center": [
+          0.0,
+          -70.0,
+          0.0
+        ],
+        "radius": 200.0,
+        "funnelDepth": 1500.0,
+        "throat": 0.1,
+        "throatDensity": 0.55,
+        "thickness": 70.0,
+        "swirl": 6.5,
+        "rotationSpeed": 0.028,
+        "density": 0.0013,
+        "innerVoid": 0.24,
+        "contrast": 3.6,
+        "turbulence": 0.65,
+        "turbulenceScale": 2.4,
+        "breathAmount": 0.05,
+        "breathSpeed": 0.18,
+        "emission": 0.04,
+        "filaments": 2.2,
+        "cometResponse": 0.6,
+        "cometReach": 6.0,
+        "colorDeep": [
+          0.016,
+          0.012,
+          0.062
+        ],
+        "colorMid": [
+          0.05,
+          0.085,
+          0.24
+        ],
+        "colorAccent": [
+          0.1,
+          0.34,
+          0.46
+        ]
       }
     }
   ],

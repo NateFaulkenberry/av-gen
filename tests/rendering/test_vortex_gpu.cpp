@@ -45,7 +45,11 @@ scene::Scene voidWorld(bool vortexOn, float fogDensity, glm::vec3 eye) {
     s.camera.position = eye;
     s.camera.target = {0.0f, -200.0f, 0.0f};
     if (vortexOn) {
-        auto& v = s.environment.vortex;
+        // ADR-387: the vortex is an authored atmospheric effect, and what the renderer reads is the
+        // resolved frame. Built here directly rather than through `resolveAtmospherics`, so this
+        // test still states the vortex it is rendering rather than an effect list and a second.
+        s.atmospherics.hasVortex = true;
+        world::Vortex& v = s.atmospherics.vortex;
         v.center = {0.0f, -600.0f, 0.0f};
         v.radius = 1500.0f;
         v.thickness = 300.0f;
@@ -83,8 +87,10 @@ TEST_CASE("A scene without a vortex marches exactly what it always marched", "[g
     const glm::vec3 eye{300.0f, 0.0f, 300.0f};
 
     // Radius 0 is the gate, and it is the default.
-    CHECK(scene::Environment::Vortex{}.radius == 0.0f);
-    CHECK_FALSE(scene::Environment::Vortex{}.active());
+    CHECK(world::Vortex{}.radius == 0.0f);
+    CHECK_FALSE(world::Vortex{}.active());
+    // ...and a scene that authors none says so, which is the gate one level above the radius.
+    CHECK_FALSE(scene::Scene{}.atmospherics.hasVortex);
 
     // With fog and no vortex, against the same scene built without ever touching the vortex struct.
     const scene::Scene fogOnly = voidWorld(false, 0.02f, eye);

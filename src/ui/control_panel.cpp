@@ -1,5 +1,7 @@
 #include "ui/control_panel.hpp"
-#include "ui/cosmic_panel.hpp"
+
+#include "ui/param_widget.hpp"
+#include "ui/environment_panel.hpp"
 #include "ui/lights_panel.hpp"
 
 #include <cstring>
@@ -641,7 +643,6 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     panel("Cameras", ImVec2(420, 560), [&] { drawCameras(engine); });
     panel("World Effects", ImVec2(460, 620), [&] { worldEffects.draw(engine); });
     panel("Environment", ImVec2(460, 620), [&] { ui::drawEnvironmentPanel(engine); });
-    panel("Tree", ImVec2(460, 680), [&] { ui::drawTreePanel(engine); });
     panel("Lights", ImVec2(460, 700),
           [&] { ui::drawLightsPanel(engine, editor.selection, editor.history()); });
     panel("Sequence", ImVec2(900, 420), [&] {
@@ -1905,46 +1906,8 @@ void ControlPanel::drawParameters(app::Engine& engine) {
       for (IParameter* param : grouped[group]) {
         ImGui::PushID(param->path().c_str());
         const std::size_t n = param->componentCount();
-        float values[4] = {};
-        for (std::size_t i = 0; i < n && i < 4; ++i) {
-            values[i] = param->baseComponent(i);
-        }
-        bool changed = false;
-        switch (param->kind()) {
-        case ParamKind::Bool: {
-            bool b = values[0] >= 0.5f;
-            changed = ImGui::Checkbox(param->label().c_str(), &b);
-            values[0] = b ? 1.0f : 0.0f;
-            break;
-        }
-        case ParamKind::Int: {
-            int v = static_cast<int>(std::lround(values[0]));
-            changed = ImGui::SliderInt(param->label().c_str(), &v, static_cast<int>(param->softMin(0)),
-                                       static_cast<int>(param->softMax(0)));
-            values[0] = static_cast<float>(v);
-            break;
-        }
-        case ParamKind::Color:
-            changed = n == 4 ? ImGui::ColorEdit4(param->label().c_str(), values, ImGuiColorEditFlags_Float)
-                             : ImGui::ColorEdit3(param->label().c_str(), values, ImGuiColorEditFlags_Float);
-            break;
-        case ParamKind::Float:
-            changed = ImGui::SliderFloat(param->label().c_str(), values, param->softMin(0), param->softMax(0));
-            break;
-        default: {
-            // ImGui dereferences the range pointers; use the component-0 soft range for all lanes.
-            const float lo = param->softMin(0);
-            const float hi = param->softMax(0);
-            changed = ImGui::SliderScalarN(param->label().c_str(), ImGuiDataType_Float, values, static_cast<int>(n),
-                                           &lo, &hi);
-            break;
-        }
-        }
-        if (changed) {
-            for (std::size_t i = 0; i < n && i < 4; ++i) {
-                param->setBaseComponent(i, values[i]);
-            }
-        }
+        // ADR-387: the one implementation, shared with the World panel's Inspector.
+        drawParameterValue(*param);
         // Show the modulated (final) value next to the slider when it differs.
         if (n == 1 && std::abs(param->finalComponent(0) - param->baseComponent(0)) > 1e-5f) {
             ImGui::SameLine();

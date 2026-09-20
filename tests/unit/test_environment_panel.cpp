@@ -1,4 +1,4 @@
-// ADR-375: the Environment and Tree panels, and the two ways a bespoke panel lies.
+// ADR-375, revised by ADR-387: the Environment panel, and the two ways a bespoke panel lies.
 //
 // A hand-written panel asks for parameters by string. If a path is wrong -- a typo, or a rename
 // somewhere else -- the row simply does not draw, and the section degrades to an empty box that
@@ -8,6 +8,17 @@
 // So: every path these panels reference must resolve in a scene that has the feature. That is this
 // file's job, and it is the findability half of ADR-350 -- which only ever asserted that a
 // parameter was *registered*, never that anything pointed at it.
+//
+// ADR-387 removed the Tree panel and cut the Environment panel back to what is generic, so the
+// sections this file used to cover moved:
+//
+//   * the vortex's rows  -> tests/unit/test_vortex_effect.cpp, against the World Effects panel
+//   * a node's wind      -> the World panel's Inspector, whose arithmetic is asserted below
+//   * the falling leaves -> the same Inspector, ditto
+//
+// The Inspector's arithmetic is asserted here rather than taken on trust, because it is the same
+// kind of string arithmetic the Tree panel got wrong: it splits a parameter path on the first '/'
+// after the selected object's prefix and uses the front half as a group heading.
 
 #include "assets/asset_registry.hpp"
 #include "params/modulation.hpp"
@@ -17,6 +28,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -38,23 +50,20 @@ TEST_CASE("Every path the Environment panel asks for exists", "[ui][panels][para
     comp.attach(params, modulator);
 
     for (const char* path : {"scene/volumeDensity", "scene/fogHeight", "scene/fogHeightFalloff",
-                             "env/intensity", "env/sky/intensity",
-                             "scene/vortex/radius", "scene/vortex/funnelDepth", "scene/vortex/throat",
-                             "scene/vortex/throatDensity", "scene/vortex/thickness",
-                             "scene/vortex/swirl", "scene/vortex/rotationSpeed",
-                             "scene/vortex/turbulence", "scene/vortex/density",
-                             "scene/vortex/emission", "scene/vortex/contrast",
-                             "scene/vortex/innerVoid", "scene/vortex/filaments",
-                             "scene/vortex/breathAmount", "scene/vortex/colorDeep",
-                             "scene/vortex/colorMid", "scene/vortex/colorAccent"}) {
+                             "env/intensity", "env/sky/intensity"}) {
         INFO(path);
         CHECK(registered(params, path));
     }
     // THE CONTROL. Without it the loop above passes against a set that answers yes to anything.
-    CHECK_FALSE(registered(params, "scene/vortex/nonesuch"));
+    CHECK_FALSE(registered(params, "scene/nonesuch"));
+    // ADR-387: and the vortex is no longer a field on the environment, so nothing registers these.
+    // A scene that still carries them in its file is migrated on load -- see test_vortex_effect.cpp.
+    CHECK_FALSE(registered(params, "scene/vortex/radius"));
+    CHECK_FALSE(registered(params, "scene/vortex/emission"));
 }
 
-TEST_CASE("Every path the Tree panel's wind section asks for exists", "[ui][panels][parameters][wind]") {
+TEST_CASE("Every path the Environment panel's wind section asks for exists",
+          "[ui][panels][parameters][wind]") {
     assets::AssetRegistry registry;
     params::ParameterSet params;
     params::Modulator modulator;
@@ -71,20 +80,70 @@ TEST_CASE("Every path the Tree panel's wind section asks for exists", "[ui][pane
         CHECK(registered(params, path));
     }
 
+    // ADR-387 §18: exactly one global wind. A second one registered anywhere -- on a node, on an
+    // effect -- would make "how windy is it" have two answers, which is the thing the consolidation
+    // is against. Anything ending in `windSpeed` other than the one is a failure.
+    int globals = 0;
+    for (const params::IParameter* p : params.ordered()) {
+        const std::string& path = p->path();
+        const std::string tail = "windSpeed";
+        if (path.size() >= tail.size() && path.compare(path.size() - tail.size(), tail.size(), tail) == 0) {
+            INFO(path);
+            CHECK(path == "scene/windSpeed");
+            ++globals;
+        }
+    }
+    CHECK(globals == 1);
+}
+
+TEST_CASE("A node's wind response is reachable through the Inspector's own arithmetic",
+          "[ui][panels][parameters][wind][inspector]") {
+    // ADR-387. The per-body half of the wind moved out of a bespoke panel and into the World
+    // panel's Inspector, which groups an object's parameters by the first path segment after its
+    // prefix. That is string arithmetic of exactly the kind ADR-382 records getting wrong, so it is
+    // done here the way the Inspector does it and checked against what registration produces.
+    assets::AssetRegistry registry;
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "composition");
+    comp.attach(params, modulator);
+
     scene::CompositionNode body;
     body.name = "tree";
     body.kind = scene::NodeKind::Group;
     body.windAuthored = true;
     REQUIRE(comp.addNode(std::move(body)).has_value());
-    for (const char* leaf : {"strength", "trunk", "branch", "foliage", "flutter", "lag"}) {
-        const std::string path = std::string("nodes/tree/wind/") + leaf;
-        INFO(path);
-        CHECK(registered(params, path));
+
+    const std::string prefix = "nodes/tree/"; // WorldSelection::parameterPrefix() for a node
+    std::vector<std::string> windGroup;
+    bool sawPlainRow = false;
+    for (const params::IParameter* p : params.ordered()) {
+        const std::string& path = p->path();
+        if (path.size() <= prefix.size() || path.compare(0, prefix.size(), prefix) != 0) {
+            continue;
+        }
+        const std::string rel = path.substr(prefix.size());
+        const std::size_t slash = rel.find('/');
+        if (slash == std::string::npos) {
+            sawPlainRow = true;
+            continue;
+        }
+        if (rel.substr(0, slash) == "wind") {
+            windGroup.push_back(rel.substr(slash + 1));
+        }
     }
-    CHECK_FALSE(registered(params, "nodes/tree/wind/nonesuch"));
+    for (const char* leaf : {"strength", "trunk", "branch", "foliage", "flutter", "lag"}) {
+        INFO(leaf);
+        CHECK(std::find(windGroup.begin(), windGroup.end(), leaf) != windGroup.end());
+    }
+    // THE CONTROL, twice over: the grouping does not swallow the node's ordinary rows, and it does
+    // not invent members.
+    CHECK(sawPlainRow);
+    CHECK(std::find(windGroup.begin(), windGroup.end(), "nonesuch") == windGroup.end());
 }
 
-TEST_CASE("Every path the Tree panel's leaf section asks for exists", "[ui][panels][parameters][leaf]") {
+TEST_CASE("A particle system's controls are reachable under its own prefix",
+          "[ui][panels][parameters][leaf][inspector]") {
     assets::AssetRegistry registry;
     params::ParameterSet params;
     params::Modulator modulator;
@@ -98,10 +157,9 @@ TEST_CASE("Every path the Tree panel's leaf section asks for exists", "[ui][pane
     leaves.particles.shape2d = scene::ParticleShape::Leaf;
     REQUIRE(comp.addNode(std::move(leaves)).has_value());
 
-    // The panel finds the system by the `/spawnRate` suffix on a path containing "leaf" or
-    // "leaves", because a nested composition prefixes the name. Assert the convention holds as well
-    // as the leaves, or the panel finds nothing in a sub-scene and says "this scene sheds no
-    // leaves" about a scene that does.
+    // ADR-387: found by selecting it -- `WorldSelection::Kind::Particles` is `particles/<name>/`
+    // -- rather than by sniffing paths for the substring "leaf", which is what the Tree panel did
+    // and which made the control's existence depend on what somebody named their node.
     const std::string base = "particles/falling-leaves/";
     for (const char* leaf : {"enabled", "spawnRate", "lifetime", "size", "gravity", "drag",
                              "windInfluence", "turbulence", "turbulenceScale", "tumbleRate",
@@ -159,22 +217,23 @@ TEST_CASE("A wind body can be created and removed from the application", "[ui][p
 // The owner opened the Tree panel and found "Tree energy" and "Canopy shimmer" empty on a scene
 // whose tree declares both a wind body and an energy block.
 //
-// Nothing was missing. `windBodies()` returns the node's *base* -- "nodes/tree-of-life/" -- because
-// it already strips the "/wind/strength" tail it matched on. The energy section then removed five
+// Nothing was missing. `windBodies()` returned the node's *base* -- "nodes/tree-of-life/" -- because
+// it already stripped the "/wind/strength" tail it matched on. The energy section then removed five
 // more characters on the assumption that it still ended in "wind/", which turned
 // "nodes/tree-of-life/" into "nodes/tree-of-" and asked for "nodes/tree-of-energy/intensity". No
-// scene has that, so `have()` said no and the section drew nothing.
+// scene has that, so the section drew nothing and said nothing.
 //
-// The section above it -- wind -- was fine, because it uses the base as given. So the two sections
-// disagreed about what `windBodies` returns, and only one of them was right.
+// **Why the tests before it did not catch it.** They assert the paths the *registration* produces.
+// The panel did not use those; it computed its own from a prefix, and the arithmetic in between was
+// never exercised.
 //
-// **Why the existing tests did not catch it.** They assert the paths the *registration* produces.
-// The panel does not use those; it computes its own from a prefix, and the arithmetic in between
-// was never exercised. A panel asks for parameters by string, so a wrong path neither fails to
-// compile nor throws -- it draws an empty box indistinguishable from a scene that has no energy.
-// This case does the panel's arithmetic and then asks whether the answer exists.
-TEST_CASE("The Tree panel's energy prefix resolves to parameters that exist",
-          "[ui][panels][parameters][energy]") {
+// ADR-387 deleted that panel, and the energy controls moved to the World panel's Inspector, which
+// derives its groups from the paths rather than from a wind prefix -- so the off-by-five cannot be
+// written again in that shape. The case is kept and pointed at the new arithmetic, because the
+// *blind spot* is what it guards and the blind spot survives a rewrite: a panel asks for parameters
+// by string, and a wrong one neither fails to compile nor throws.
+TEST_CASE("A node's energy controls resolve through the Inspector's own arithmetic",
+          "[ui][panels][parameters][energy][inspector]") {
     assets::AssetRegistry registry;
     params::ParameterSet params;
     params::Modulator modulator;
@@ -187,32 +246,34 @@ TEST_CASE("The Tree panel's energy prefix resolves to parameters that exist",
     body.windAuthored = true;   // energy registers on either flag
     REQUIRE(comp.addNode(std::move(body)).has_value());
 
-    // Step 1: what `windBodies()` hands the section, derived by its own rule rather than assumed.
-    const std::string tail = "/wind/strength";
-    std::string base;
+    // The Inspector's arithmetic, done here exactly as `WorldPanel::drawInspector` does it: the
+    // selection's prefix, then the first path segment after it as a group heading.
+    const std::string prefix = "nodes/tree-of-life/"; // WorldSelection::parameterPrefix(), Kind::Node
+    std::vector<std::string> energyGroup;
     for (const params::IParameter* p : params.ordered()) {
         const std::string& path = p->path();
-        if (path.size() > tail.size() &&
-            path.compare(path.size() - tail.size(), tail.size(), tail) == 0) {
-            base = path.substr(0, path.size() - tail.size() + 1);
+        if (path.size() <= prefix.size() || path.compare(0, prefix.size(), prefix) != 0) {
+            continue;
+        }
+        const std::string rel = path.substr(prefix.size());
+        const std::size_t slash = rel.find('/');
+        if (slash != std::string::npos && rel.substr(0, slash) == "energy") {
+            energyGroup.push_back(rel.substr(slash + 1));
         }
     }
-    REQUIRE(base == "nodes/tree-of-life/");
-
-    // Step 2: the prefix the section builds from it, and every leaf both sections ask for.
-    const std::string e = base + "energy/";
     for (const char* leaf : {"intensity", "pulseSpeed", "pulseWidth", "propagation", "root",
                              "trunk", "branch", "canopy", "noise", "bloom", "shimmer",
                              "shimmerSpeed", "shimmerScale", "colorNear", "colorFar"}) {
-        INFO(e + leaf);
-        CHECK(registered(params, e + leaf));
+        INFO(leaf);
+        CHECK(std::find(energyGroup.begin(), energyGroup.end(), leaf) != energyGroup.end());
     }
 
     // The control, and the whole point of the case: the arithmetic that shipped produced a path
-    // that resolves to nothing. If someone reintroduces it, this fails instead of the panel going
-    // quietly blank.
-    const std::string broken = base.substr(0, base.size() - 5) + "energy/";
+    // that resolves to nothing. It is asserted directly so that reintroducing it anywhere fails
+    // here rather than going quietly blank in a panel.
+    const std::string broken = prefix.substr(0, prefix.size() - 5) + "energy/";
     CHECK(broken == "nodes/tree-of-energy/");
+    CHECK(registered(params, prefix + "energy/intensity"));
     CHECK_FALSE(registered(params, broken + "intensity"));
-    CHECK_FALSE(registered(params, e + "nonesuch"));
+    CHECK(std::find(energyGroup.begin(), energyGroup.end(), "nonesuch") == energyGroup.end());
 }
