@@ -1490,4 +1490,25 @@ struct EffectRow {
     return kRows;
 }
 
+// ADR-420, §68. The field subscription, shared by every kind rather than belonging to one -- the
+// subscription is a member of `AtmosphericEffect`, not of any kind's payload, so every kind draws
+// this and a fourth kind draws it without anybody adding a line. One row, and the reason it is a
+// row at all is ADR-392's: a leaf five characters wrong draws an empty box and says nothing, so the
+// panel and `conformance::checkLeavesExist` have to read one table.
+//
+// The combo that chooses WHICH field is not here, and deliberately. It writes a `std::string` on
+// the effect rather than a parameter, so it is structural in exactly the way the two anchor combos
+// are -- and putting it in a row table would put a leaf here that registration does not produce.
+[[nodiscard]] inline std::span<const EffectRow> atmosphericFlowRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "flowInfluence", "Follows the field", "%.2f", false, false,
+         "How much of the subscribed field's motion this effect takes. 0 is off: the\n"
+         "effect moves at its own authored speed and does not know the field exists.\n"
+         "At 1 a gust front crossing the valley reaches this effect when it reaches\n"
+         "that place, and two effects subscribed to one field agree without anybody\n"
+         "typing the same number into both."},
+    };
+    return kRows;
+}
+
 } // namespace avgen::ui

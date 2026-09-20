@@ -8,7 +8,7 @@
 
 #include "core/vortex.hpp"
 #include "core/wind.hpp"
-#include "ui/world_effects_panel.hpp"
+#include "ui/ui_logic.hpp"
 #include "world/atmospherics.hpp"
 #include "world/world_effects/effect_conformance.hpp"
 #include "world/world_effects/field_bus.hpp"

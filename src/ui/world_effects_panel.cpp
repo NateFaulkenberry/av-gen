@@ -548,6 +548,35 @@ void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
 
     const std::vector<world::AtmosphericEffect>& authored = comp->atmosphericEffects();
 
+    // ADR-420, §68. Every subscription that names a field this scene does not publish, said out
+    // loud where an artist is standing.
+    //
+    // The engine already logs this once per name, and a CPU log is a diagnostic for whoever is
+    // reading a terminal -- which is never the person whose aurora has stopped moving. The whole
+    // point of the report is that a name resolving to nothing must not be indistinguishable from a
+    // setting nobody used, and it is indistinguishable from exactly that until it is on screen.
+    //
+    // Drawn at the top of the section rather than inside each effect because the question is "what
+    // in this sky is asking for something that is not here", which is one question about the scene.
+    // The per-effect combo says the same thing again in the place where it can be fixed.
+    {
+        std::vector<std::string> names;
+        std::vector<world::fields::Subscription> subs;
+        names.reserve(authored.size());
+        subs.reserve(authored.size());
+        for (const world::AtmosphericEffect& e : authored) {
+            names.push_back(e.name);
+            subs.push_back(e.flow);
+        }
+        const std::vector<world::fields::DeadSubscription> dead =
+            engine.fieldBus().unresolved(names, subs);
+        for (const world::fields::DeadSubscription& d : dead) {
+            ImGui::TextColored(kWarning, "'%s' follows a field called '%s', which this scene does "
+                                         "not publish -- it is standing still.",
+                               d.subscriber.c_str(), d.field.c_str());
+        }
+    }
+
     // A unique name, because a name is half of a parameter path and two effects sharing one is two
     // things writing the same path.
     const auto unique = [&](std::string base) {
