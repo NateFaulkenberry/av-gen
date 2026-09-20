@@ -1,0 +1,507 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Ashfall",
+ "_note": "Ashfall is three populations with opposite signs, and that is the whole idea. 'ash-fall' is DARK: alpha-blended cards at an emissive of 1 against a lit sky, so they are read as an absence of light, which is what a flake of ash is -- and which no additive particle system can produce. 'ash-embers' is the opposite: a tenth as many, additive, emissive 9, and rising, because an ember is buoyant while it is hot. ADR-520's pulse at sync 0 is what makes them individuals: every ember is on its own phase, so the bed shimmers rather than throbbing. 'ash-smoke' is the column the two of them come out of. The atmospheric illumination the brief asks for comes from two places at once: volumeGlow 0.35 on the embers injects their light into the volumetric march (ADR-040), so the smoke around a bright ember is lit by it, and scatterStrength on the ash makes the flakes catch the low sun as they pass in front of it. The temperature is authored as the colour curve on the embers -- white-hot at birth, orange, then a dull red as they cool and rise -- rather than as a separate parameter, because a temperature that does not change the colour is a number and not a temperature.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   1.7,
+   8.0
+  ],
+  "target": [
+   0.0,
+   2.6,
+   -6.0
+  ],
+  "fov": 44.0,
+  "orbitSpeed": 0.0
+ },
+ "wind": {
+  "enabled": true,
+  "direction": 2.1,
+  "speed": 0.8,
+  "regionScale": 55.0,
+  "regionAmount": 0.5,
+  "regionDrift": 0.04,
+  "turbulence": 0.45,
+  "turbulenceScale": 8.0,
+  "turbulenceSpeed": 0.6,
+  "gustAmount": 0.6,
+  "gustScale": 32.0,
+  "gustSpeed": 3.0,
+  "gustSharpness": 1.2
+ },
+ "environment": {
+  "intensity": 0.1,
+  "background": [
+   0.016,
+   0.007,
+   0.004
+  ],
+  "fogColor": [
+   0.055,
+   0.02,
+   0.01
+  ],
+  "fogDensity": 0.0018,
+  "fogHeight": 22.0,
+  "fogHeightFalloff": 0.06,
+  "volumeDensity": 0.0055,
+  "volumeScattering": 0.75,
+  "volumeAnisotropy": 0.5,
+  "volumeNoise": 0.55,
+  "volumeNoiseScale": 0.045,
+  "volumeSteps": 20,
+  "volumeMaxDistance": 90.0,
+  "volumeAbsorption": 1.1,
+  "sky": {
+   "zenithColor": [
+    0.007,
+    0.004,
+    0.005
+   ],
+   "horizonColor": [
+    0.62,
+    0.17,
+    0.035
+   ],
+   "groundColor": [
+    0.01,
+    0.005,
+    0.003
+   ],
+   "haze": 0.45,
+   "sunColor": [
+    1.0,
+    0.36,
+    0.1
+   ],
+   "sunIntensity": 2.0,
+   "sunSize": 6.0,
+   "sunGlow": 1.6,
+   "intensity": 0.8,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "stage",
+   "kind": "scene",
+   "asset": "_stage.scene.json"
+  },
+  {
+   "name": "ash-fall",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 24000,
+    "seed": 41,
+    "shape": "box",
+    "position": [
+     0.0,
+     10.0,
+     0.0
+    ],
+    "extent": [
+     32.0,
+     10.0,
+     32.0
+    ],
+    "volumeFollow": [
+     1.0,
+     0.0,
+     1.0
+    ],
+    "volumeWrap": true,
+    "spawnRate": 260000.0,
+    "lifetimeMin": 9000.0,
+    "lifetimeMax": 9000.0,
+    "direction": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "spread": 0.3,
+    "speedMin": 0.3,
+    "speedMax": 0.9,
+    "gravity": [
+     0.0,
+     -0.9,
+     0.0
+    ],
+    "drag": 0.9,
+    "dragSizeBias": 0.95,
+    "sizeVariance": 0.75,
+    "sizeSkew": 3.0,
+    "turbulence": 0.7,
+    "turbulenceScale": 0.22,
+    "turbulenceSpeed": 0.3,
+    "windInfluence": 1.4,
+    "shape2d": "leaf",
+    "tumbleRate": 3.2,
+    "leafAspect": 0.65,
+    "twoSided": 0.8,
+    "sizeStart": 0.038,
+    "sizeEnd": 0.038,
+    "colorStart": [
+     0.055,
+     0.045,
+     0.042,
+     0.92
+    ],
+    "colorEnd": [
+     0.055,
+     0.045,
+     0.042,
+     0.92
+    ],
+    "emissive": 1.0,
+    "blend": "alpha",
+    "softness": 0.25,
+    "velocityStretch": 0.0,
+    "scatterStrength": 0.5,
+    "scatterAnisotropy": 0.7,
+    "fogCoupling": 1.0
+   }
+  },
+  {
+   "name": "ash-embers",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 2600,
+    "seed": 43,
+    "shape": "box",
+    "position": [
+     0.0,
+     1.2,
+     -11.0
+    ],
+    "extent": [
+     18.0,
+     1.2,
+     10.0
+    ],
+    "volumeFollow": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "spawnRate": 300.0,
+    "lifetimeMin": 3.5,
+    "lifetimeMax": 9.0,
+    "direction": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "spread": 0.45,
+    "speedMin": 0.6,
+    "speedMax": 1.9,
+    "gravity": [
+     0.0,
+     0.32,
+     0.0
+    ],
+    "drag": 0.3,
+    "dragSizeBias": 0.6,
+    "sizeVariance": 0.8,
+    "sizeSkew": 3.0,
+    "turbulence": 1.5,
+    "turbulenceScale": 0.45,
+    "turbulenceSpeed": 0.55,
+    "windInfluence": 0.9,
+    "pulseRate": 2.6,
+    "pulseDepth": 0.62,
+    "pulseSync": 0.0,
+    "pulseSharpness": 2.4,
+    "sizeStart": 0.016,
+    "sizeEnd": 0.0048,
+    "colorStart": [
+     1.0,
+     0.4,
+     0.08,
+     1.0
+    ],
+    "colorEnd": [
+     0.4,
+     0.04,
+     0.01,
+     0.0
+    ],
+    "colorCurve": [
+     {
+      "t": 0.0,
+      "color": [
+       1.0,
+       0.42,
+       0.09
+      ]
+     },
+     {
+      "t": 0.25,
+      "color": [
+       1.0,
+       0.26,
+       0.04
+      ]
+     },
+     {
+      "t": 0.62,
+      "color": [
+       0.85,
+       0.11,
+       0.015
+      ]
+     },
+     {
+      "t": 1.0,
+      "color": [
+       0.35,
+       0.03,
+       0.005
+      ]
+     }
+    ],
+    "opacityCurve": [
+     {
+      "t": 0.0,
+      "value": 0.0
+     },
+     {
+      "t": 0.06,
+      "value": 1.0
+     },
+     {
+      "t": 0.72,
+      "value": 0.75
+     },
+     {
+      "t": 1.0,
+      "value": 0.0
+     }
+    ],
+    "emissive": 1.0,
+    "blend": "additive",
+    "softness": 0.2,
+    "velocityStretch": 0.6,
+    "stretchMax": 0.18,
+    "stretchMin": 0.01,
+    "volumeGlow": 0.35,
+    "fogCoupling": 0.85
+   }
+  },
+  {
+   "name": "ash-smoke",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 1200,
+    "seed": 47,
+    "shape": "box",
+    "position": [
+     0.0,
+     4.0,
+     -13.0
+    ],
+    "extent": [
+     14.0,
+     3.5,
+     5.0
+    ],
+    "spawnRate": 90.0,
+    "lifetimeMin": 9.0,
+    "lifetimeMax": 16.0,
+    "direction": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "spread": 0.5,
+    "speedMin": 0.25,
+    "speedMax": 0.8,
+    "gravity": [
+     0.0,
+     0.1,
+     0.0
+    ],
+    "drag": 0.35,
+    "sizeVariance": 0.7,
+    "sizeSkew": 1.4,
+    "turbulence": 0.9,
+    "turbulenceScale": 0.1,
+    "turbulenceSpeed": 0.12,
+    "windInfluence": 1.6,
+    "sizeStart": 1.2,
+    "sizeEnd": 5.5,
+    "colorStart": [
+     0.09,
+     0.065,
+     0.06,
+     0.0
+    ],
+    "colorEnd": [
+     0.055,
+     0.04,
+     0.038,
+     0.0
+    ],
+    "opacityCurve": [
+     {
+      "t": 0.0,
+      "value": 0.0
+     },
+     {
+      "t": 0.22,
+      "value": 0.22
+     },
+     {
+      "t": 0.7,
+      "value": 0.14
+     },
+     {
+      "t": 1.0,
+      "value": 0.0
+     }
+    ],
+    "emissive": 1.0,
+    "blend": "alpha",
+    "softness": 3.0,
+    "scatterStrength": 0.35,
+    "scatterAnisotropy": 0.68,
+    "fogCoupling": 1.0
+   }
+  },
+  {
+   "name": "ash-embers-near",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 700,
+    "seed": 44,
+    "shape": "box",
+    "position": [
+     -6.0,
+     0.9,
+     0.5
+    ],
+    "extent": [
+     5.0,
+     0.7,
+     3.0
+    ],
+    "volumeFollow": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "spawnRate": 55.0,
+    "lifetimeMin": 4.0,
+    "lifetimeMax": 11.0,
+    "direction": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "spread": 0.45,
+    "speedMin": 0.9,
+    "speedMax": 2.6,
+    "gravity": [
+     0.0,
+     0.32,
+     0.0
+    ],
+    "drag": 0.3,
+    "dragSizeBias": 0.6,
+    "sizeVariance": 0.8,
+    "sizeSkew": 3.2,
+    "turbulence": 2.2,
+    "turbulenceScale": 0.6,
+    "turbulenceSpeed": 0.55,
+    "windInfluence": 0.9,
+    "pulseRate": 2.0,
+    "pulseDepth": 0.62,
+    "pulseSync": 0.0,
+    "pulseSharpness": 2.0,
+    "sizeStart": 0.024,
+    "sizeEnd": 0.0072,
+    "colorStart": [
+     1.0,
+     0.4,
+     0.08,
+     1.0
+    ],
+    "colorEnd": [
+     0.4,
+     0.04,
+     0.01,
+     0.0
+    ],
+    "colorCurve": [
+     {
+      "t": 0.0,
+      "color": [
+       1.0,
+       0.42,
+       0.09
+      ]
+     },
+     {
+      "t": 0.25,
+      "color": [
+       1.0,
+       0.26,
+       0.04
+      ]
+     },
+     {
+      "t": 0.62,
+      "color": [
+       0.85,
+       0.11,
+       0.015
+      ]
+     },
+     {
+      "t": 1.0,
+      "color": [
+       0.35,
+       0.03,
+       0.005
+      ]
+     }
+    ],
+    "opacityCurve": [
+     {
+      "t": 0.0,
+      "value": 0.0
+     },
+     {
+      "t": 0.06,
+      "value": 1.0
+     },
+     {
+      "t": 0.72,
+      "value": 0.75
+     },
+     {
+      "t": 1.0,
+      "value": 0.0
+     }
+    ],
+    "emissive": 1.0,
+    "blend": "additive",
+    "softness": 0.2,
+    "velocityStretch": 0.9,
+    "stretchMax": 0.3,
+    "stretchMin": 0.01,
+    "volumeGlow": 0.55,
+    "fogCoupling": 0.85
+   },
+   "_note": "A second, nearer ember source. One emitter at one distance gives embers of one apparent size, and a field of identically sized sparks is the flat look the quality bar names; two sources thirteen metres apart give the eye the depth cue it needs to read the far ones as far."
+  }
+ ]
+}
