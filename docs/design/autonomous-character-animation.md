@@ -1538,6 +1538,14 @@ schedular, so here is what each one actually has to do.
 
 ### 12.1 Retargeting: what a pass that does not exist has to do
 
+> **Built, as ADR-548.** This section was written in Phase 0 as a specification for work that had
+> not started. It is kept as written, because comparing it against what the implementation actually
+> needed is the useful part: items 1, 2, 3 and 6 were right; item 5 was **backwards** for this rig —
+> translation could not be zeroed, it had to be carried, because the alien's motion largely *is* its
+> translation — and item 4 turned out to be handled by the same machinery rather than by a special
+> case. A third thing appeared that is not on the list at all: the clip time base (ADR-204).
+
+
 Today `Importer::importClips` pushes each glTF animation onto the rigs built in the same
 `loadGltf` call and nothing else (`src/assets/gltf_loader.cpp:342-364`). There is no joint-name
 map, no bind-pose reconciliation, no bone-length scaling, no hierarchy remap anywhere in `src/`.
