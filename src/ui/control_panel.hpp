@@ -60,6 +60,12 @@ struct FrameStats {
     std::uint32_t triangles = 0;
     std::uint32_t width = 0;
     std::uint32_t height = 0;
+    // §15-§17. The extent the *scene* pass shaded, which after the adaptive render scale is no
+    // longer derivable from the canvas size above it. Reported separately rather than instead,
+    // because "the canvas is 3.98 Mpx and the world was drawn at 1.0" is the whole statement and
+    // either half alone is misleading.
+    std::uint32_t sceneWidth = 0;
+    std::uint32_t sceneHeight = 0;
     std::string adapter;
     std::string backend;
     rendering::ProceduralStats procedural;

@@ -32,6 +32,13 @@ Result<GpuTexture> uploadTexture(Context& context, const scene::TextureData& dat
 // Uploads an Rgba32Float image as RGBA16Float (filterable on every backend) with a mip chain.
 Result<GpuTexture> uploadTextureAsHalf(Context& context, const scene::TextureData& data, bool mips = true);
 
+// The sRGB transfer function's decode, for one 8-bit channel, through a 256-entry table. Exposed
+// because the table is the whole of the mip chain's optimisation (ADR-481) and because a table
+// with 256 entries is the one kind of fast path that can be proved exhaustively rather than
+// argued about. Exact: `srgbToLinear8(v)` is the value `pow((v/255 + 0.055)/1.055, 2.4)` returns,
+// not an approximation of it.
+float srgbToLinear8(std::uint8_t value);
+
 std::uint16_t floatToHalf(float value); // round to nearest even
 float halfToFloat(std::uint16_t half);   // exact
 // Converts `count` halves to floats through a 64K-entry table (exact; for whole images).

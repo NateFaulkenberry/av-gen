@@ -85,8 +85,11 @@ TEST_CASE("Glowmere Valley 2 spore-fall flicker", "[.flicker][glowmere2]") {
         // The measurement must be of a spore-fall at steady state, not of one filling up. A 22 s
         // lifetime needs 24 s of simulated time before deaths balance births, so each arm is warmed
         // first, at the measurement's own resolution and on a clock that only moves forward --
-        // resizing the target and seeking backwards *both* call `resetTemporalHistory`, which resets
-        // the particle pools, and either one silently empties the emitter the arm is here to weigh.
+        // seeking backwards calls `resetTemporalHistory`, which resets the particle pools, and
+        // silently empties the emitter the arm is here to weigh. Resizing the target used to do
+        // the same and no longer does (ADR-480): a resize takes the narrower `resetScreenHistory()`
+        // now. Both arms still warm at the measurement's own resolution, because that is also what
+        // fills the screen-space history the first measured frame reads.
         {
             FixedStepClock warm(10.0);
             warm.restartAt(0.0);

@@ -163,3 +163,53 @@ TEST_CASE("Suspending the viewport during a render is remembered", "[settings][v
     REQUIRE(upgraded.has_value());
     CHECK(upgraded->suspendViewportDuringRender);
 }
+
+// ---- the adaptive render scale (ADR-480) --------------------------------------------------------
+//
+// ADR-225 again: a setting the application does not keep is not a setting. This one is a checkbox
+// and a slider that a person reaches for precisely when the editor is unusable, so "it was off
+// again after a restart" is the worst possible failure for it.
+TEST_CASE("the adaptive render scale round-trips, and its budget is clamped rather than refused",
+          "[app][settings][ui][resolution]") {
+    app::AppSettings settings;
+    // The default is on, which is the whole point of ADR-480: the manual lever it replaces was a
+    // slider nobody ever moved.
+    CHECK(settings.adaptiveCanvasScale);
+
+    settings.adaptiveCanvasScale = false;
+    settings.adaptiveCanvasBudgetMs = 33.3;
+    const auto document = settings.toJson();
+    REQUIRE(document.at("general").at("adaptiveCanvasScale") == false);
+    const auto loaded = app::AppSettings::fromJson(document);
+    REQUIRE(loaded.has_value());
+    CHECK_FALSE(loaded->adaptiveCanvasScale);
+    CHECK(loaded->adaptiveCanvasBudgetMs == 33.3);
+
+    // A settings file from a future build, or a hand-edited one. A budget of zero would pin the
+    // ladder at its floor for ever and a budget of an hour would make the controller dead weight;
+    // neither is worth refusing the whole file over, so both are clamped into the range.
+    {
+        auto doc = document;
+        doc["general"]["adaptiveCanvasBudgetMs"] = 0.0;
+        const auto out = app::AppSettings::fromJson(doc);
+        REQUIRE(out.has_value());
+        CHECK(out->adaptiveCanvasBudgetMs == 4.0);
+    }
+    {
+        auto doc = document;
+        doc["general"]["adaptiveCanvasBudgetMs"] = 5000.0;
+        const auto out = app::AppSettings::fromJson(doc);
+        REQUIRE(out.has_value());
+        CHECK(out->adaptiveCanvasBudgetMs == 200.0);
+    }
+    // A file written before this existed: the defaults are the answer, not a refusal.
+    {
+        auto doc = document;
+        doc["general"].erase("adaptiveCanvasScale");
+        doc["general"].erase("adaptiveCanvasBudgetMs");
+        const auto out = app::AppSettings::fromJson(doc);
+        REQUIRE(out.has_value());
+        CHECK(out->adaptiveCanvasScale);
+        CHECK(out->adaptiveCanvasBudgetMs == app::AppSettings{}.adaptiveCanvasBudgetMs);
+    }
+}
