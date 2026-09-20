@@ -683,6 +683,13 @@ public:
     [[nodiscard]] const analysis::AnalysisFrame& latestFrame() const { return latest_; }
     [[nodiscard]] bool hasFrame() const { return hasFrame_; }
     [[nodiscard]] const EngineStats& stats() const { return stats_; }
+
+    // ADR-410. The renderer publishes what the temporal ring actually holds; the Engine carries it
+    // so the World Effects panel can say "settling -- 3 of 8 frames" without `ui/` reaching into a
+    // renderer header. Set once a frame by whoever owns the SceneRenderer; default-constructed
+    // (and therefore "complete", because nothing is needed) when nobody does.
+    void setTemporalHistoryReport(const scene::TemporalHistoryReport& r) { temporalReport_ = r; }
+    [[nodiscard]] const scene::TemporalHistoryReport& temporalHistoryReport() const { return temporalReport_; }
     [[nodiscard]] const analysis::AnalyzerConfig& analyzerConfig() const { return analyzerConfig_; }
 
     // Per-route "response" convenience used by the UI: amount of the route targeting `path`.
@@ -783,6 +790,7 @@ private:
     // nothing registers is a parameter no panel can draw and no project can keep.
     scene::TemporalSettings temporal_;
     scene::TemporalParameters temporalParams_;
+    scene::TemporalHistoryReport temporalReport_;
     scene::LensSettings lens_;
     scene::ExposureSettings exposure_;
     scene::FocusSettings focus_;

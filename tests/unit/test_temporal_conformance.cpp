@@ -235,3 +235,57 @@ TEST_CASE("temporal parameters are findable on the layer the editor opens on", "
     // against a `layerShowsPath` that says yes to everything.
     CHECK_FALSE(ui::layerShowsPath(ui::AuthoringLayer::Beginner, std::string("nosuchgroup/thing")));
 }
+
+TEST_CASE("every row the temporal panel draws is a parameter the family registers", "[temporal][ui]") {
+    // ADR-382's rule, applied: the panel computes `prefix + row.leaf` and so does this, from the
+    // same `temporalParameterPrefix` and the same `temporalEchoRows()` table. A test that spelled
+    // the paths out again would agree with itself and with nothing the panel does.
+    TemporalSettings s;
+    params::ParameterSet params;
+    (void)registerTemporalParameters(params, s);
+
+    const std::string prefix = temporalParameterPrefix(TemporalEffectKind::FrameEcho);
+    const auto rows = ui::temporalEchoRows();
+    REQUIRE_FALSE(rows.empty());
+    for (const ui::EffectRow& r : rows) {
+        const std::string path = prefix + std::string(r.leaf);
+        INFO("panel row: " << r.label << " -> " << path);
+        const auto* p = params.find(path);
+        REQUIRE(p != nullptr);
+        // A row that draws a slider for a path nothing can modulate is a dead control.
+        CHECK(p->flags().modulatable);
+        CHECK(p->flags().serialized);
+    }
+
+    // The control: the table must not be trivially satisfiable. A leaf the family does not
+    // register has to be absent, or the loop above proves only that `find` says yes.
+    CHECK(params.find(prefix + "nosuchleaf") == nullptr);
+
+    // And the panel's checkbox, which is drawn outside the row table, is a real path too -- the
+    // exact shape of defect ADR-382 named, where the arithmetic lives in the draw call.
+    CHECK(params.find(prefix + "enabled") != nullptr);
+}
+
+TEST_CASE("the settling report says what the renderer holds, not what the settings want", "[temporal][ui]") {
+    // The badge's logic, tested where it lives rather than by looking at pixels.
+    TemporalHistoryReport r;
+    CHECK(r.complete());        // nothing needed, nothing missing
+    CHECK_FALSE(r.settling());
+    CHECK_FALSE(r.stalled);
+
+    r.framesNeeded = 8;
+    r.framesValid = 3;
+    CHECK(r.settling());        // "settling - 3 of 8 frames"
+    CHECK_FALSE(r.complete());
+
+    r.framesValid = 8;
+    CHECK(r.complete());
+    CHECK_FALSE(r.settling());
+
+    // Stalled is NOT settling: waiting will not fill it, so the badge must say something else.
+    r.framesValid = 4;
+    r.framesNeeded = 40;
+    r.stalled = true;
+    CHECK_FALSE(r.settling());
+    CHECK_FALSE(r.complete());
+}

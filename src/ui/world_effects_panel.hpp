@@ -60,6 +60,14 @@ private:
     void commitAtmospheric(app::Engine& engine, std::size_t index,
                            const std::function<void(world::AtmosphericEffect&)>& edit);
 
+    // ---- ADR-410, the Reality / Temporal / Digital family (brief §51) -------------------------
+    //
+    // A third section rather than a fourth panel: the owner's rule is that first-class UI
+    // represents reusable engine concepts, and a temporal effect is one of those. No add/remove
+    // pair, because unlike the two families above this is a fixed set of effects on the scene
+    // rather than a list of named instances -- so there is no `pendingTemporalRemove_`.
+    void drawTemporalSection(app::Engine& engine);
+
     std::string status_;
     int pendingRemove_ = -1;
     int pendingAtmosphericRemove_ = -1;

@@ -18,6 +18,7 @@
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "rendering/temporal_history.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 #include "assets/image.hpp"
@@ -25,6 +26,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
@@ -303,4 +305,164 @@ TEST_CASE("capture: the echo, the plain frame and the ring itself", "[.capture][
     // One frame in: the ring is empty, so this must look exactly like the plain frame. If it does
     // not, a cold history is being read and the whole disclosure argument is false.
     shoot(withEcho(movingLight(), 10, 0.85f), 1, "temporal-echo-cold.png");
+}
+
+TEST_CASE("the history debug view shows the ring, and is reachable by name", "[gpu][temporal][debug]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+
+    // The name is how `--debug-target` reaches it. A view whose name does not round-trip is
+    // reachable only by editing code, which is the state every other aux view is in.
+    CHECK(std::string(rendering::auxDebugViewName(rendering::AuxDebugView::TemporalHistory)) ==
+          "temporal history");
+
+    scene::Scene s = withEcho(movingLight(), 6, 0.9f);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FixedStepClock clock(60.0);
+    clock.restartAt(0.0);
+
+    // Fill the ring first, or the view is a picture of an empty ring and the assertions below
+    // would pass against a pass that draws nothing but the "no history" tint.
+    for (int i = 0; i < 8; ++i) {
+        placeAt(s, i);
+        REQUIRE(renderer.renderToImage(s, clock.tick(), 160, 160).has_value());
+    }
+    REQUIRE(renderer.stats().temporal.framesValid == 6u);
+
+    placeAt(s, 8);
+    const FrameTime t = clock.tick();
+    auto normal = renderer.renderToImage(s, t, 160, 160);
+    REQUIRE(normal.has_value());
+
+    renderer.setAuxDebugView(rendering::AuxDebugView::TemporalHistory);
+    auto debug = renderer.renderToImage(s, t, 160, 160);
+    REQUIRE(debug.has_value());
+
+    // It replaced the frame rather than leaving it alone...
+    CHECK_DIFFERS(*normal, *debug);
+
+    // ...and it drew something with structure, not a flat field. A black frame and a nearly-black
+    // frame are identical in a hash, so "it differs" alone would also be satisfied by a pass that
+    // cleared to a constant (ADR-182: the probe has to be able to fail the way the bug would).
+    std::uint8_t lo = 255;
+    std::uint8_t hi = 0;
+    for (std::size_t i = 0; i + 3 < debug->rgba.size(); i += 4) {
+        lo = std::min(lo, debug->rgba[i]);
+        hi = std::max(hi, debug->rgba[i]);
+    }
+    INFO("debug view red channel range " << int(lo) << ".." << int(hi));
+    CHECK(hi - lo > 24);
+
+    renderer.setAuxDebugView(rendering::AuxDebugView::None);
+    auto back = renderer.renderToImage(s, t, 160, 160);
+    REQUIRE(back.has_value());
+
+    // Switching it off must restore the picture -- a diagnostic that perturbs what it diagnoses is
+    // the instrument this repo keeps having to remove. But "identical to the frame two renders
+    // ago" is a claim about the RENDERER, not about this view, so it needs a control: the same
+    // three renders with the middle one left normal. If the control also differs, the drift is
+    // something else (auto-exposure metering advances per render and is not reset here) and
+    // blaming the debug view would be wrong.
+    rendering::SceneRenderer control(*ctx, shaders);
+    REQUIRE(control.init().has_value());
+    FixedStepClock cc(60.0);
+    cc.restartAt(0.0);
+    scene::Scene cs = withEcho(movingLight(), 6, 0.9f);
+    for (int i = 0; i < 8; ++i) {
+        placeAt(cs, i);
+        REQUIRE(control.renderToImage(cs, cc.tick(), 160, 160).has_value());
+    }
+    placeAt(cs, 8);
+    const FrameTime ct = cc.tick();
+    auto c1 = control.renderToImage(cs, ct, 160, 160);
+    REQUIRE(c1.has_value());
+    auto c2 = control.renderToImage(cs, ct, 160, 160);
+    REQUIRE(c2.has_value());
+    auto c3 = control.renderToImage(cs, ct, 160, 160);
+    REQUIRE(c3.has_value());
+
+    const auto controlDrift = ::avgen::testing::byteDiff(c1->rgba, c3->rgba);
+    const auto debugDrift = ::avgen::testing::byteDiff(normal->rgba, back->rgba);
+    INFO("control (three plain renders): " << controlDrift.describe());
+    INFO("with the debug view between:   " << debugDrift.describe());
+    // The claim that actually belongs to this view: inserting it changes nothing that three plain
+    // renders would not have changed anyway.
+    CHECK(debugDrift.differing == controlDrift.differing);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("capture: the history-state debug view", "[.capture][gpu][temporal]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    const std::filesystem::path out =
+        std::filesystem::path(std::getenv("AVGEN_CAPTURE_DIR") ? std::getenv("AVGEN_CAPTURE_DIR") : ".");
+
+    auto shootRing = [&](int frames, int ringFrames, const char* name) {
+        scene::Scene s = withEcho(movingLight(), ringFrames, 0.85f);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        FixedStepClock clock(60.0);
+        clock.restartAt(0.0);
+        for (int i = 0; i < frames; ++i) {
+            placeAt(s, i);
+            REQUIRE(renderer.renderToImage(s, clock.tick(), 420, 300).has_value());
+        }
+        renderer.setAuxDebugView(rendering::AuxDebugView::TemporalHistory);
+        placeAt(s, frames);
+        auto img = renderer.renderToImage(s, clock.tick(), 420, 300);
+        REQUIRE(img.has_value());
+        REQUIRE(assets::writePng(out / name, img->width, img->height, img->rgba).has_value());
+        UNSCOPED_INFO(name << ": framesValid=" << renderer.stats().temporal.framesValid);
+    };
+
+    // Full ring: nine tiles of the mover at nine past positions.
+    shootRing(12, 9, "temporal-ring-full.png");
+    // Partly filled: the layers beyond framesValid are tinted red, because an empty layer and a
+    // black frame are otherwise identical to the eye.
+    shootRing(3, 9, "temporal-ring-settling.png");
+}
+
+TEST_CASE("the ring costs what ADR-410 says it costs", "[gpu][temporal][memory]") {
+    // ADR-410 claims about 25 MB at 1080p against a naive 1.86 GB. That is arithmetic until
+    // something measures it, and `bytes()` reports the real allocation rather than recomputing the
+    // estimate -- so this is the renderer reporting back, not the claim restated.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::TemporalHistory history(*ctx, shaders);
+    REQUIRE(history.init().has_value());
+
+    const auto mb = [](std::uint64_t b) { return static_cast<double>(b) / (1024.0 * 1024.0); };
+
+    rendering::TemporalHistoryConfig cfg;
+    cfg.resolutionScale = 0.5f; // the Realtime tier
+    cfg.frames[static_cast<std::uint32_t>(rendering::TemporalChannel::Colour)] = 8;
+    REQUIRE(history.configure(1920, 1080, cfg).has_value());
+    const double eight = mb(history.bytes());
+    INFO("8 frames, half res, 1080p: " << eight << " MB (" << history.width() << "x" << history.height() << ")");
+    CHECK(history.width() == 960);
+    CHECK(history.height() == 540);
+    // RG11B10Ufloat gives 16.6 MB; the RGBA16Float fallback doubles it. Both are the ADR's claim,
+    // which is why the bound is stated as a range rather than a number -- the format is a device
+    // capability, not a choice (see `temporalChannelFormat`).
+    CHECK(eight > 8.0);
+    CHECK(eight < 40.0);
+
+    // The naive reading the ADR argues against: 32 frames at FULL resolution.
+    cfg.resolutionScale = 1.0f;
+    cfg.frames[static_cast<std::uint32_t>(rendering::TemporalChannel::Colour)] = 32;
+    REQUIRE(history.configure(1920, 1080, cfg).has_value());
+    const double naive = mb(history.bytes());
+    INFO("32 frames, full res: " << naive << " MB");
+    // Sixteen times the eight-frame default: four times the frames, four times the texels.
+    CHECK(naive > eight * 15.0);
+    CHECK(naive < eight * 17.0);
+
+    // And zero when nothing asks. This is the line that matters most in §8: a project with no
+    // temporal effect must pay nothing at all, not merely pay a little.
+    cfg.frames = {};
+    REQUIRE(history.configure(1920, 1080, cfg).has_value());
+    CHECK(history.bytes() == 0u);
+    CHECK_FALSE(history.active());
+    CHECK(ctx->errorCount() == 0);
 }

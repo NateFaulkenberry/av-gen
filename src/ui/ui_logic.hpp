@@ -1276,6 +1276,31 @@ struct EffectRow {
     std::string_view tip;
 };
 
+// ---- ADR-410: the Reality / Temporal / Digital family (brief §51) -----------------------------
+//
+// Rows rather than inline ImGui calls, for the reason the rest of this file exists: a test can walk
+// a table and prove every leaf it names is a parameter the family registers, and cannot walk a
+// sequence of `ImGui::SliderFloat` calls at all (ADR-382).
+//
+// Leaves here are appended to `temporal/<effect>/`, which `scene::temporalParameterPrefix` computes
+// -- the test computes it the same way rather than spelling the prefix a second time.
+[[nodiscard]] inline std::span<const EffectRow> temporalEchoRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "frames", "Reach", "%.0f frames", false, false,
+         "How many frames back the echo reaches, and the effect's declared history bound.\n"
+         "It sizes the ring: 32 frames of history costs real memory, and the panel shows what.\n"
+         "After a seek the echo is SHORTER until the history refills -- never wrong, and the\n"
+         "badge above says how far along it is."},
+        {"", "strength", "Amount", "", false, false,
+         "How much of the echo is added to the current frame. 0 is the identity: the pass still\n"
+         "runs and adds nothing."},
+        {"", "decay", "Falloff", "", false, false,
+         "How quickly each successive ghost fades. Near 0 is a single sharp double-image;\n"
+         "near 1 is an even smear across the whole reach."},
+    };
+    return kRows;
+}
+
 // What somebody reaches for first: what colour, how bright, how big, how fast.
 [[nodiscard]] inline std::span<const EffectRow> vortexRows() {
     static constexpr EffectRow kRows[] = {
