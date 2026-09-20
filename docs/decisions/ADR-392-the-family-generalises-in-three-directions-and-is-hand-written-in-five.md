@@ -202,5 +202,7 @@ saved project is what ADR-387 spent a day on, and a button must not be able to i
 **What this does not do.** It does not touch the ADR-207 family's three parallel lists --
 `effect_params.cpp` is still register, apply and capture written out separately, which is the
 failure the atmospheric tables were introduced to prevent, and `checkLeavesExist` is shaped to take
-that family next. It does not add a kind, touch a shader, or change a rendered pixel: no shipped
-scene gains a route, because every one of them already authors its own and the guard declines.
+that family next. It does not add a kind, touch a shader, or change a rendered pixel. No shipped
+scene or project gains a route, and the reason is simpler than the prefix guard: nothing on the
+load path calls `addDefaultAtmosphericRoutes` at all. Only the three "Add" buttons do. The guard is
+there for the person who presses one twice, not for the files.
