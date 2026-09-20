@@ -1926,7 +1926,35 @@ context: **an in-place clip has no ground frame**, so "planted means stationary"
 | STEP 10b 100STYLE subset experiment | **blocked** | the corpus is not in this repository; the reader and every code path it exercises are built and tested |
 | STEP 11 MotionPack | **done** | ADR-550; licence is a refusal, REQUIRES_REVIEW is the default |
 | STEP 12-13 offline tool, M2 Max benchmark | pending | |
-| STEP 15 visual validation | pending | the first non-numeric result |
+| STEP 14 per-foot ground planes | **newly identified as blocking** | one plane per body makes every foot target reachable by construction; terrain adaptation is not real until this lands |
+| STEP 15 visual validation | **partly done** | `alien-foot-lab.scene.json`: the alien's detached chains bind and both feet apply on real terrain, which was impossible before ADR-543 |
+
+### Why the alien lab does not exercise body compensation, and what that says
+
+`examples/labs/footik/alien-foot-lab.scene.json` stands three aliens on terrain measured at
+**0.3499 m of relief across their own 0.9 m footprint** (found with `tools/_slope_probe.cpp`). Both
+feet of every alien **apply** — never clamp — and body compensation never engages.
+
+That is not a fixture that is too flat. It is the architecture:
+
+* `entity::LocomotionState` carries **one** `groundPoint`/`groundNormal` for the whole body;
+* `GroundFollower` seats the body on that plane;
+* `plantOnPlane` drops each foot onto **the plane the body is already standing on**.
+
+So the foot target is reachable by construction, however rough the ground underneath actually is.
+**Body compensation cannot engage while the ground is a single plane through the body**, and neither
+can terrain adaptation in any meaningful sense — the feet are being planted on an idealised plane,
+not on the terrain.
+
+Per-foot ground sampling is the missing piece. The Phase 0 report listed it as §5.2 item 2 and put
+it in BUILD NOW; it is not built. `GroundFollower` already samples a footprint ring of four points
+(`grounding.cpp:60-65`) and throws the individual results away, so the data exists and the seam does
+not carry it.
+
+Until then, compensation is exercised by `tests/unit/test_body_compensation.cpp`, which hands the
+layer an explicit 10 cm step-down target on the real rig and measures the 0.0902 m of hip drop. That
+is the real case — a foot asked to go somewhere specific — and it is why the primitive is
+nonetheless validated.
 
 ### A pattern, not an incident: ADR-204 and the 1/30 s start
 

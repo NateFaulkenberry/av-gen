@@ -137,3 +137,6 @@ if(APPLE)
     target_link_libraries(avgen_metal_rt_probe PRIVATE avgen_core
         "-framework Metal" "-framework Foundation")
 endif()
+
+add_executable(avgen_slope_probe _slope_probe.cpp)
+target_link_libraries(avgen_slope_probe PRIVATE avgen_core)
