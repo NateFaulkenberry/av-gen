@@ -1,0 +1,382 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Rain",
+ "_note": "Rain as four layers, not one. (1) 'rain-fall' is the body of the shower: a 72 x 18 x 72 m box that follows the camera in x and z (ADR-520 volumeFollow) with wrapping on, so 26 k drops are always the 26 k drops that are in shot and none of them is two hundred metres behind the lens. Wrapping is what makes it STEADY: without it every drop has to be born and to die inside the frame, and a drop that fades in is the single most obvious tell of computer rain. (2) 'rain-near' is eleven hundred large, soft, nearly transparent drops in a 7 m box riding with the camera -- the out-of-focus foreground layer a real lens gives you, and the reason the shower has depth instead of being one wall of streaks. (3) 'rain-impacts' spawns drops 40 cm above the ground and lets ADR-520's splash response turn each one into an expanding ground ring where it lands; the ripples are therefore correlated in time with a fall, not sprinkled on. (4) 'rain-mist' is the air the rain has already wetted. dragSizeBias 0.85 is what stops the fall reading as a machine: the drops drawn large by sizeSkew are also drawn fast, so the field has a spread of speeds that is correlated with a spread of sizes the way it is in the world.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   1.7,
+   8.0
+  ],
+  "target": [
+   0.0,
+   1.35,
+   -6.0
+  ],
+  "fov": 44.0,
+  "orbitSpeed": 0.0
+ },
+ "wind": {
+  "enabled": true,
+  "direction": 1.05,
+  "speed": 2.4,
+  "regionScale": 60.0,
+  "regionAmount": 0.45,
+  "regionDrift": 0.05,
+  "turbulence": 0.35,
+  "turbulenceScale": 9.0,
+  "turbulenceSpeed": 1.1,
+  "gustAmount": 0.8,
+  "gustScale": 34.0,
+  "gustSpeed": 5.0,
+  "gustSharpness": 1.4
+ },
+ "environment": {
+  "intensity": 0.45,
+  "background": [
+   0.022,
+   0.026,
+   0.033
+  ],
+  "fogColor": [
+   0.03,
+   0.035,
+   0.044
+  ],
+  "fogDensity": 0.002,
+  "fogHeight": 18.0,
+  "fogHeightFalloff": 0.08,
+  "volumeDensity": 0.004,
+  "volumeScattering": 1.1,
+  "volumeAnisotropy": 0.35,
+  "volumeNoise": 0.45,
+  "volumeNoiseScale": 0.05,
+  "volumeSteps": 20,
+  "volumeMaxDistance": 70.0,
+  "volumeAbsorption": 0.7,
+  "sky": {
+   "zenithColor": [
+    0.028,
+    0.034,
+    0.045
+   ],
+   "horizonColor": [
+    0.055,
+    0.061,
+    0.072
+   ],
+   "groundColor": [
+    0.018,
+    0.02,
+    0.022
+   ],
+   "haze": 0.85,
+   "sunColor": [
+    0.42,
+    0.45,
+    0.5
+   ],
+   "sunIntensity": 0.35,
+   "sunSize": 3.2,
+   "sunGlow": 0.7,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "stage",
+   "kind": "scene",
+   "asset": "_stage.scene.json"
+  },
+  {
+   "name": "rain-fall",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 34000,
+    "seed": 7,
+    "shape": "box",
+    "position": [
+     0.0,
+     9.0,
+     0.0
+    ],
+    "extent": [
+     36.0,
+     9.0,
+     36.0
+    ],
+    "volumeFollow": [
+     1.0,
+     0.0,
+     1.0
+    ],
+    "volumeWrap": true,
+    "spawnRate": 340000.0,
+    "lifetimeMin": 9000.0,
+    "lifetimeMax": 9000.0,
+    "direction": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "spread": 0.015,
+    "speedMin": 7.0,
+    "speedMax": 9.5,
+    "gravity": [
+     0.0,
+     -2.6,
+     0.0
+    ],
+    "drag": 0.3,
+    "dragSizeBias": 0.85,
+    "sizeVariance": 0.55,
+    "sizeSkew": 2.4,
+    "turbulence": 0.1,
+    "turbulenceScale": 0.35,
+    "turbulenceSpeed": 0.5,
+    "windInfluence": 1.5,
+    "sizeStart": 0.007,
+    "sizeEnd": 0.007,
+    "colorStart": [
+     0.72,
+     0.78,
+     0.89,
+     0.46
+    ],
+    "colorEnd": [
+     0.72,
+     0.78,
+     0.89,
+     0.46
+    ],
+    "emissive": 1.6,
+    "blend": "alpha",
+    "softness": 0.3,
+    "velocityStretch": 3.2,
+    "stretchMax": 1.6,
+    "stretchMin": 0.03,
+    "scatterStrength": 0.45,
+    "scatterAnisotropy": 0.5,
+    "fogCoupling": 1.0
+   }
+  },
+  {
+   "name": "rain-near",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 420,
+    "seed": 11,
+    "shape": "box",
+    "position": [
+     0.0,
+     1.6,
+     -1.2
+    ],
+    "extent": [
+     3.6,
+     2.8,
+     3.2
+    ],
+    "volumeFollow": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "volumeWrap": true,
+    "spawnRate": 4800.0,
+    "lifetimeMin": 9000.0,
+    "lifetimeMax": 9000.0,
+    "direction": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "spread": 0.03,
+    "speedMin": 7.5,
+    "speedMax": 10.0,
+    "gravity": [
+     0.0,
+     -2.6,
+     0.0
+    ],
+    "drag": 0.3,
+    "dragSizeBias": 0.9,
+    "sizeVariance": 0.6,
+    "sizeSkew": 1.6,
+    "turbulence": 0.12,
+    "turbulenceScale": 0.5,
+    "turbulenceSpeed": 0.6,
+    "windInfluence": 1.6,
+    "sizeStart": 0.008,
+    "sizeEnd": 0.008,
+    "colorStart": [
+     0.72,
+     0.78,
+     0.88,
+     0.055
+    ],
+    "colorEnd": [
+     0.72,
+     0.78,
+     0.88,
+     0.055
+    ],
+    "emissive": 1.6,
+    "blend": "alpha",
+    "softness": 1.2,
+    "velocityStretch": 4.5,
+    "stretchMax": 3.0,
+    "stretchMin": 0.04,
+    "scatterStrength": 0.6,
+    "scatterAnisotropy": 0.55,
+    "fogCoupling": 1.0
+   }
+  },
+  {
+   "name": "rain-impacts",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 4200,
+    "seed": 13,
+    "shape": "box",
+    "position": [
+     0.0,
+     0.42,
+     -3.0
+    ],
+    "extent": [
+     16.0,
+     0.12,
+     12.0
+    ],
+    "volumeFollow": [
+     1.0,
+     0.0,
+     1.0
+    ],
+    "spawnRate": 1800.0,
+    "lifetimeMin": 0.3,
+    "lifetimeMax": 0.3,
+    "direction": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "spread": 0.02,
+    "speedMin": 7.0,
+    "speedMax": 9.0,
+    "gravity": [
+     0.0,
+     -2.6,
+     0.0
+    ],
+    "drag": 0.3,
+    "sizeVariance": 0.5,
+    "sizeSkew": 2.0,
+    "collision": "splash",
+    "collisionHeight": 0.005,
+    "splashLifetime": 0.62,
+    "splashSize": 9.0,
+    "ringThickness": 0.22,
+    "sizeStart": 0.012,
+    "sizeEnd": 0.012,
+    "colorStart": [
+     0.82,
+     0.87,
+     0.94,
+     0.42
+    ],
+    "colorEnd": [
+     0.82,
+     0.87,
+     0.94,
+     0.0
+    ],
+    "emissive": 1.2,
+    "blend": "alpha",
+    "softness": 0.0,
+    "velocityStretch": 1.0,
+    "stretchMax": 0.35,
+    "stretchMin": 0.02,
+    "fogCoupling": 1.0,
+    "windInfluence": 1.2
+   }
+  },
+  {
+   "name": "rain-mist",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 520,
+    "seed": 17,
+    "shape": "box",
+    "position": [
+     0.0,
+     1.2,
+     -6.0
+    ],
+    "extent": [
+     26.0,
+     1.6,
+     22.0
+    ],
+    "volumeFollow": [
+     1.0,
+     0.0,
+     1.0
+    ],
+    "volumeWrap": true,
+    "spawnRate": 7000.0,
+    "lifetimeMin": 9000.0,
+    "lifetimeMax": 9000.0,
+    "direction": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "spread": 1.0,
+    "speedMin": 0.02,
+    "speedMax": 0.1,
+    "gravity": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "drag": 0.4,
+    "sizeVariance": 0.7,
+    "sizeSkew": 1.3,
+    "turbulence": 0.22,
+    "turbulenceScale": 0.18,
+    "turbulenceSpeed": 0.25,
+    "windInfluence": 1.0,
+    "sizeStart": 2.6,
+    "sizeEnd": 2.6,
+    "colorStart": [
+     0.58,
+     0.63,
+     0.72,
+     0.018
+    ],
+    "colorEnd": [
+     0.58,
+     0.63,
+     0.72,
+     0.018
+    ],
+    "emissive": 1.0,
+    "blend": "alpha",
+    "softness": 3.0,
+    "scatterStrength": 0.35,
+    "scatterAnisotropy": 0.62,
+    "fogCoupling": 1.0
+   }
+  }
+ ]
+}
