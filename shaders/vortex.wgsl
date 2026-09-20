@@ -197,9 +197,24 @@ fn vortexEvaluate(v: VortexUniformsWgsl, p: vec3<f32>, t: f32, filterWidth: f32)
     // Turbulence breaks the spiral's symmetry, because a real nebula is not a mathematical spiral
     // and the brief says so.
     n = mix(n, n * (0.55 + 0.9 * n1), clamp(v.v2.z, 0.0, 1.0));
-    // Contrast pushes the midtones apart so the structure reads as filaments in a void rather than
-    // as an even wash. The dark centre and the rim are already folded into `envelope` above.
-    let shaped = pow(clamp(n, 0.0, 1.0), max(v.v2.y, 0.05));
+    // ADR-389: a smoothstep remap, not `pow`, and compensated for the mean it moves.
+    //
+    // An exponent above 1 on a noise sum crushes everything toward black and leaves sparse isolated
+    // peaks -- so every surviving aliased sample became a bright dot in a dark field, which is a
+    // third of the measured grain on its own. It also throws away the midtones that are what make a
+    // volume read as THICK rather than as sparks.
+    //
+    // The compensation is the part that is easy to forget and expensive to miss. `pow(n, c)` over a
+    // roughly uniform n has mean 1/(c+1) -- 0.22 at the shipped contrast of 3.6 -- while a
+    // smoothstep centred on 0.5 has mean 0.5 whatever its width. Swapping one for the other without
+    // this factor multiplies the medium's mean density by about six, and the authored `density` and
+    // `emission` are PER-METRE coefficients tuned against the old mean: the first render came back
+    // a blown-out cyan glow filling the lower frame. Same family as ADR-374, 379 and 381 -- a
+    // quantity changed underneath a coefficient that was calibrated against it.
+    let contrast = max(v.v2.y, 0.05);
+    let half = 0.5 / contrast;
+    let curve = smoothstep(0.5 - half, 0.5 + half, clamp(n, 0.0, 1.0));
+    let shaped = curve * (2.0 / (contrast + 1.0));
     s.density = shaped * envelope;
     return s;
 }
