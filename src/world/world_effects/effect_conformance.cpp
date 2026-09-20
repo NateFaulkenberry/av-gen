@@ -1,5 +1,7 @@
 #include "world/world_effects/effect_conformance.hpp"
 
+#include "core/wind.hpp"
+
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 #include "world/atmospheric_params.hpp"
@@ -7,13 +9,48 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstring>
+#include <type_traits>
 #include <utility>
 
 namespace avgen::world::conformance {
 namespace {
 
 constexpr std::string_view kProbeName = "conformance probe";
+
+// Whether two resolved frames differ in anything that reaches the GPU.
+//
+// **Not `memcmp` over the whole struct, and that is a finding rather than a style choice.** The
+// first version of check 6 did exactly that, and reported all three kinds as failing the
+// "influence 0 is exactly off" half. The difference was two bytes at offsets 10 and 11 -- the
+// PADDING between `AtmosphericFrame::hasVortex` and `AtmosphericFrame::vortex`. Value-initialising
+// the frame zeroes its padding, but member-wise assignment afterwards leaves it indeterminate, and
+// the optimiser is entitled to write through it with a wider store; it had, with the low half of a
+// float. Comparing indeterminate bytes reported a difference that was not one, which is the same
+// class of wrong answer as a check that cannot fail, arrived at from the opposite direction.
+//
+// So this compares the payload blocks -- each of which is an array of `vec4`s or of `float`s with
+// no padding in it, pinned by the `static_assert`s beside their declarations -- and the scalars,
+// one at a time. A member added to `AtmosphericFrame` and not added here weakens the check, which
+// is why the `sizeof` assertion below is here: it does not name the new member, but it does stop
+// the frame growing silently past what this function reads.
+[[nodiscard]] bool frameDiffers(const AtmosphericFrame& a, const AtmosphericFrame& b) {
+    static_assert(sizeof(AtmosphericFrame) == 1612,
+                  "AtmosphericFrame changed size: check that frameDiffers still reads all of it");
+    if (a.cometCount != b.cometCount || a.auroraCount != b.auroraCount || a.hasVortex != b.hasVortex ||
+        a.cometSteps != b.cometSteps) {
+        return true;
+    }
+    if (std::memcmp(&a.comets, &b.comets, sizeof(a.comets)) != 0) { return true; }
+    if (std::memcmp(&a.auroras, &b.auroras, sizeof(a.auroras)) != 0) { return true; }
+    if (std::memcmp(&a.ground, &b.ground, sizeof(a.ground)) != 0) { return true; }
+    // `Vortex` is floats and `vec3`s, all 4-byte aligned, so it has no interior padding either.
+    static_assert(sizeof(Vortex) % 4 == 0);
+    return std::memcmp(&a.vortex, &b.vortex, sizeof(a.vortex)) != 0;
+}
+
 
 void report(Report& out, AtmosphereKind kind, std::string_view rule, std::string detail) {
     out.findings.push_back(Finding{atmosphereKindName(kind), std::string(rule), std::move(detail)});
@@ -317,6 +354,80 @@ Report checkAtmospheric(AtmosphereKind kind) {
         } else if (total != 1) {
             report(out, kind, "resolve-dispatch",
                    "one live effect resolved as " + std::to_string(total) + " effects");
+        }
+    }
+
+    // 6. §68. The kind's subscription reaches its picture.
+    //
+    //    A shared table row buys registration, apply, capture, a panel row and a save entry for
+    //    every kind at once -- and buys NOTHING about whether the resolver for a given kind does
+    //    anything with the number. `flowInfluence` could be registered, modulated, keyed, saved and
+    //    reloaded for an aurora while `packAurora` never read it, and every other check in this
+    //    file would pass. That is ADR-387's "a correct value is not a reached value" in the one
+    //    shape the rest of this file cannot see.
+    //
+    //    So the check is a difference, not an inspection: build the frame this kind produces with
+    //    no subscription, build it again with a subscription to a field that is genuinely blowing,
+    //    and require the two to differ. It is kind-agnostic by construction -- it compares whole
+    //    `AtmosphericFrame`s -- so a fourth kind is covered on the day it is added, and covered
+    //    correctly, which a per-kind lane comparison would not be.
+    //
+    //    ADR-182: it is shown able to fail. With `packAurora`'s two uses of the flow removed, it
+    //    reports the aurora by name; with the whole of `resolveEffectFlow` stubbed to return {},
+    //    it reports all three.
+    {
+        AtmosphericEffect live = probe;
+        live.enabled = true;
+        live.activation = Activation::Always;
+        live.timing = Timing{};
+
+        // A wind strong enough that `strength` cannot be near zero anywhere. ADR-055's regional
+        // term is `max(1 + amount*0.5*(r1+r2), 0)` with each r in [-1, 1], so at amount 0.45 the
+        // strength is at least 0.55 of the speed at every point in the world -- which is what makes
+        // this probe incapable of passing by accident at a quiet spot.
+        wind::WindParams gale;
+        gale.enabled = true;
+        gale.speed = 3.0f;
+        gale.regionAmount = 0.45f;
+        gale.gustAmount = 0.9f;
+        fields::FieldBus bus;
+        bus.publishWind(std::string(fields::kWindField), wind::packWind(gale));
+
+        AtmosphericContext ctx;
+        ctx.seconds = 0.5;
+        ctx.cameraPosition = glm::vec3(120.0f, 40.0f, -260.0f); // off the origin, so `phase` is not 0
+        ctx.fieldBus = &bus;
+
+        AtmosphericFrame still{};
+        live.flow = fields::Subscription{};
+        buildAtmosphericFrame(std::span(&live, 1), ctx, still);
+
+        AtmosphericFrame blown{};
+        live.flow.field = std::string(fields::kWindField);
+        live.flow.influence = 1.0f;
+        buildAtmosphericFrame(std::span(&live, 1), ctx, blown);
+
+        // A comparison of the payload blocks, not of the struct -- see `frameDiffers`. And a
+        // comparison rather than `REQUIRE(a == b)` over the buffers themselves, because printing a
+        // kilobyte of vec4s on failure is ADR-362's killed run.
+        if (!frameDiffers(still, blown)) {
+            report(out, kind, "flow-reaches",
+                   "subscribing this kind to a field that is blowing hard changes nothing in the "
+                   "frame it builds -- `flowInfluence` is registered and saved for it but no "
+                   "resolver or packer reads it, so the row is a setting the picture does not keep");
+        }
+
+        // And the other end, which is the half that makes the first one mean something: with the
+        // subscription present but the influence at 0, the frame must be EXACTLY the unsubscribed
+        // one. A kind that responded to the mere presence of a name would pass the check above
+        // while making every scene that names a field change the moment it loaded.
+        AtmosphericFrame named{};
+        live.flow.influence = 0.0f;
+        buildAtmosphericFrame(std::span(&live, 1), ctx, named);
+        if (frameDiffers(still, named)) {
+            report(out, kind, "flow-zero-is-off",
+                   "naming a field with influence 0 changed the frame -- 0 must be exactly off, or "
+                   "every scene that records a subscription it is not using renders differently");
         }
     }
 

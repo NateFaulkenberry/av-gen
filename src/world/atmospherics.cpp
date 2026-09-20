@@ -358,6 +358,14 @@ json AtmosphericEffect::toJson() const {
                        {"radius", ground.radius},
                        {"falloff", ground.falloff}};
 
+    // §68. Written unconditionally, both halves, even when the subscription is the default -- which
+    // is the one thing ADR-392's round-trip check is specifically shaped to catch the absence of.
+    // `toJson(fromJson(toJson(e))) == toJson(e)` passes perfectly when a key is missing from BOTH
+    // directions, because the reader leaves the struct's default in place and the writer omits it
+    // again; writing it always is what makes the field visible in the file an artist can read, and
+    // what makes its deletion from either side a named failure rather than a silent agreement.
+    j["flow"] = json{{"field", flow.field}, {"influence", flow.influence}};
+
     j["comet"] = json{
         {"path", json{{"anchor", skyAnchorName(c.path.anchor)},
                       {"anchorPosition", vec3ToJson(c.path.anchorPosition)},
@@ -488,6 +496,17 @@ Result<AtmosphericEffect> AtmosphericEffect::fromJson(const json& j) {
         e.ground.intensity = readFloat(g, "intensity", e.ground.intensity);
         e.ground.radius = readFloat(g, "radius", e.ground.radius);
         e.ground.falloff = readFloat(g, "falloff", e.ground.falloff);
+    }
+
+    // §68. An absent block leaves the default, which is the unsubscribed effect every file written
+    // before this existed describes. A name that this scene does not publish is NOT rejected here:
+    // the scene's fields are not known at the point an effect is parsed, and refusing would make a
+    // project unloadable because a vortex it names is disabled. It is reported at resolve instead,
+    // by `fields::FieldBus::unresolved`, where the answer is actually known.
+    if (j.contains("flow") && j.at("flow").is_object()) {
+        const json& fl = j.at("flow");
+        e.flow.field = readString(fl, "field");
+        e.flow.influence = readFloat(fl, "influence", e.flow.influence);
     }
 
     if (j.contains("comet") && j.at("comet").is_object()) {
@@ -1051,10 +1070,49 @@ glm::vec3 cometPositionAt(const ResolvedAtmospheric& r, float arcLength) {
     return r.anchor + d * r.distance;
 }
 
+EffectFlow resolveEffectFlow(const AtmosphericEffect& effect, const glm::vec3& anchor,
+                             const AtmosphericContext& ctx) {
+    EffectFlow out;
+    if (ctx.fieldBus == nullptr || !effect.flow.active()) {
+        return out;
+    }
+    const fields::FieldHandle handle = ctx.fieldBus->resolve(effect.flow.field);
+    if (handle == fields::kNoField) {
+        // A name the scene does not publish. It answers as "no field" HERE, and is reported by name
+        // elsewhere (`FieldBus::unresolved`, the engine's log, `effect_conformance`). Both halves
+        // are needed and neither substitutes for the other: silently zero would be ADR-392's dead
+        // route again, and refusing to render would make a disabled vortex break a comet.
+        return out;
+    }
+    out.sample = ctx.fieldBus->sample(handle, anchor, static_cast<float>(ctx.seconds));
+    out.influence = effect.flow.influence;
+    return out;
+}
+
+float flowAmplitude(const fields::FlowSample& sample, float influence) {
+    // `strength + gust`, not `strength * (1 + gust)`: a gust must be able to move something that
+    // sits in a calm region, because a front arriving somewhere still is exactly what a gust is.
+    // Floored at 0 so a subscriber can never be driven backwards through zero into an inversion;
+    // `sanitise` already floors the influence, and this is the second line.
+    const float excess = std::max(influence, 0.0f) * std::max(sample.strength + sample.gust, 0.0f);
+    return 1.0f + excess;
+}
+
+float flowOffset(const fields::FlowSample& sample, float influence) {
+    // The wind's spatial phase is `wavenumber * distance`, so at a flutter scale of 2.2 m and a
+    // comet 4 km away it is in the thousands of radians. Wrapping here keeps the number a shader
+    // adds to its own phase well-conditioned in float, and costs nothing: every consumer of it
+    // takes a sine.
+    const float raw = influence * sample.phase;
+    const float wrapped = std::fmod(raw, fields::kFlowTau);
+    return wrapped < 0.0f ? wrapped + fields::kFlowTau : wrapped;
+}
+
 AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> effects,
                                             const AtmosphericContext& ctx,
                                             std::span<ResolvedAtmospheric> comets,
-                                            std::span<ResolvedAtmospheric> auroras) {
+                                            std::span<ResolvedAtmospheric> auroras,
+                                            std::span<ResolvedAtmospheric> vortices) {
     AtmosphericCounts counts;
     for (const AtmosphericEffect& e : effects) {
         if (!e.enabled) {
@@ -1129,6 +1187,11 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
             r.travelled = reparameterise(progress, p.acceleration) * r.pathLength;
             r.launch = r.anchor + r.dir0 * r.distance;
             r.destination = r.anchor + r.dir1 * r.distance;
+            {
+                const EffectFlow flow = resolveEffectFlow(e, r.anchor, ctx);
+                r.flow = flow.sample;
+                r.flowInfluence = flow.influence;
+            }
             comets[counts.comets++] = r;
             claimed = true;
             break;
@@ -1140,6 +1203,11 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
             }
             const AuroraShape& s = e.aurora.shape;
             r.anchor = anchorOf(s.anchor, s.anchorPosition, ctx.cameraPosition);
+            {
+                const EffectFlow flow = resolveEffectFlow(e, r.anchor, ctx);
+                r.flow = flow.sample;
+                r.flowInfluence = flow.influence;
+            }
             auroras[counts.auroras++] = r;
             claimed = true;
             break;
@@ -1152,6 +1220,19 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
             if (counts.vortices >= 1) {
                 ++counts.dropped;
                 continue;
+            }
+            // §68. A vortex's anchor is its own centre: the question "what is the air doing where
+            // this funnel stands" is asked at the funnel. `buildAtmosphericFrame` reads these two
+            // members back off the resolved record, which is why the vortex arm now writes them
+            // even though it stores no record in a span.
+            r.anchor = e.vortex.center;
+            {
+                const EffectFlow flow = resolveEffectFlow(e, r.anchor, ctx);
+                r.flow = flow.sample;
+                r.flowInfluence = flow.influence;
+            }
+            if (counts.vortices < vortices.size()) {
+                vortices[counts.vortices] = r;
             }
             ++counts.vortices;
             claimed = true;
@@ -1184,8 +1265,17 @@ CometGpu packComet(const ResolvedAtmospheric& r) {
     g.core = glm::vec4(a.coreColor * a.coreIntensity * r.envelope, a.headSize);
     g.halo = glm::vec4(a.haloColor * a.haloIntensity * r.envelope, a.haloSize);
     g.tail = glm::vec4(a.tailColor * a.tailIntensity * r.envelope, a.tailFalloff);
-    g.shape = glm::vec4(a.tailWidth, a.wispAmount, a.wispScale,
-                        static_cast<float>(r.elapsed) * a.flowSpeed);
+    // §68. The subscribed field reaches the comet through the two things its trail already has: how
+    // far the wisps are thrown sideways, and the phase they are thrown at.
+    //
+    // It is deliberately NOT the trajectory. A comet is a body on a ballistic arc four kilometres
+    // up; air that bends its path is a comet nobody would recognise, and ADR-230 made the arc's
+    // endpoints exactly what an artist typed for the reason that a control which is a suggestion is
+    // not a control. What the medium moves is the TRAIL -- which is what a comet's tail is made of,
+    // and which is the part that should know there is weather.
+    const float amp = flowAmplitude(r.flow, r.flowInfluence);
+    g.shape = glm::vec4(a.tailWidth, a.wispAmount * amp, a.wispScale,
+                        static_cast<float>(r.elapsed) * a.flowSpeed + flowOffset(r.flow, r.flowInfluence));
     const float fragments = c.sparkle.enabled ? std::max(c.sparkle.density, 0.0f) : 0.0f;
     g.sparkle = glm::vec4(fragments,
                           // Sparkle size is authored as a fraction of a cell; a cell here is
@@ -1212,9 +1302,15 @@ AuroraGpu packAurora(const ResolvedAtmospheric& r, std::span<const float> spectr
     const AuroraAudio& ad = au.audio;
 
     g.config = glm::vec4(std::clamp(s.curtainCount, 1.0f, 5.0f), s.radius, s.baseHeight, s.curtainHeight);
-    g.shape = glm::vec4(s.waveAmplitude, s.waveScale, s.turbulence, s.complexity);
+    // §68, the same two levers the comet's trail gets and for the same reason: the curtain's
+    // undulation is how hard the air is pushing it, and the fold phase is where it is standing.
+    // The height and the colours are left alone -- those answer to the music (ADR-230 §4.2), and an
+    // aurora that dimmed in a gust would be answering two masters with one number.
+    const float amp = flowAmplitude(r.flow, r.flowInfluence);
+    const float offset = flowOffset(r.flow, r.flowInfluence);
+    g.shape = glm::vec4(s.waveAmplitude * amp, s.waveScale, s.turbulence, s.complexity);
     g.flow = glm::vec4(static_cast<float>(r.elapsed) * s.flowSpeed,
-                       static_cast<float>(r.elapsed) * s.driftSpeed,
+                       static_cast<float>(r.elapsed) * s.driftSpeed + offset,
                        static_cast<float>(r.elapsed) * s.verticalSpeed, s.layerSpacing);
     const float scale = a.intensity * r.envelope;
     g.low = glm::vec4(a.lowColor * scale, std::clamp(a.opacity, 0.0f, 1.0f));
@@ -1246,22 +1342,66 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
                            AtmosphericFrame& out) {
     std::array<ResolvedAtmospheric, kMaxGpuComets> comets{};
     std::array<ResolvedAtmospheric, kMaxGpuAuroras> auroras{};
-    const AtmosphericCounts counts = resolveAtmosphericEffects(effects, ctx, comets, auroras);
+    std::array<ResolvedAtmospheric, 1> vortices{};
+    const AtmosphericCounts counts = resolveAtmosphericEffects(effects, ctx, comets, auroras, vortices);
 
     out.cometCount = static_cast<std::uint32_t>(counts.comets);
     out.auroraCount = static_cast<std::uint32_t>(counts.auroras);
-    // ADR-387: the first live vortex, copied through. Its `enabled`, activation and lifetime
-    // envelope were already applied by the resolve above, so a vortex inside a closed window
-    // arrives here switched off exactly as a comet does.
+
+    // ADR-387: the first live vortex. It is taken from the RESOLVE now, and that is a fix rather
+    // than a tidy-up.
+    //
+    // This loop used to walk `effects` a second time and test `e.enabled && e.vortex.active()`,
+    // under a comment stating that "its `enabled`, activation and lifetime envelope were already
+    // applied by the resolve above, so a vortex inside a closed window arrives here switched off
+    // exactly as a comet does." It did not. `resolveAtmosphericEffects` takes its effects by
+    // `span<const>` and cannot write anything back; the second walk consulted `counts` not at all.
+    // A vortex with `activation: window` therefore ignored its window, one with a `fadeIn` did not
+    // fade in, and one whose lifetime had expired kept marching -- while the comment said the
+    // opposite, which is ADR-385's stated reason that is not evidence, in the same family that ADR
+    // was written about. No shipped scene exhibits it: the one authored vortex in the repository
+    // (`examples/treeisland/tree-of-life-floating-island.scene.json`, "Cosmic Vortex") is
+    // `activation: always` with no `timing` block, so its envelope is exactly 1 and this change
+    // leaves its frame untouched. That is why it survived: the feature nobody used was the only
+    // one that was broken.
     out.hasVortex = false;
     out.vortex = Vortex{};
-    for (const AtmosphericEffect& e : effects) {
-        if (e.kind != AtmosphereKind::Vortex || !e.enabled || !e.vortex.active()) {
-            continue;
-        }
+    if (counts.vortices > 0 && vortices[0].effect != nullptr && vortices[0].effect->vortex.active()) {
+        const ResolvedAtmospheric& rv = vortices[0];
         out.hasVortex = true;
-        out.vortex = e.vortex;
-        break;
+        out.vortex = rv.effect->vortex;
+
+        // The lifetime envelope, applied to the two per-metre coefficients (ADR-374) and to
+        // nothing else. Fading a funnel means less of it in the air, which is what scaling an
+        // extinction and an emissive density does; fading its COLOURS would leave a full-strength
+        // grey funnel behind, and fading its radius would shrink it rather than dim it.
+        //
+        // ADR-389 is the reason this is worth a sentence: scaling density scales the distribution
+        // the march's coefficients were tuned against. It does so uniformly and only when an author
+        // asked for a fade, and at the envelope of 1 that every existing vortex has, both
+        // multiplications are exact identities.
+        out.vortex.density *= rv.envelope;
+        out.vortex.emission *= rv.envelope;
+
+        // §68. The funnel leans downwind. A translation, deliberately, rather than a change to the
+        // turbulence or the breath: those two are inputs to the filament noise whose distribution
+        // ADR-389 measured the march's cost against, and moving where a shape is costs the march
+        // nothing while changing what it is costs it everything.
+        //
+        // Scaled by the funnel's own radius so the lean means the same thing for a 200 m funnel and
+        // a 2 km one, and capped at a tenth of the radius per unit of influence so that an effect
+        // subscribed at the soft maximum leans by a fifth of its width rather than wandering off
+        // the island it was placed on (ADR-387's warning about a preset that moves a `center`).
+        if (rv.flowInfluence != 0.0f) {
+            const glm::vec3 lean(rv.flow.flow.x, 0.0f, rv.flow.flow.z);
+            const float len = glm::length(lean);
+            if (len > 1e-6f) {
+                constexpr float kLeanFraction = 0.10f; // of the radius, per unit influence
+                const float metres = std::min(len, 1.0f) * rv.flowInfluence * kLeanFraction *
+                                     std::max(out.vortex.radius, 0.0f);
+                out.vortex.center += (lean / len) * metres;
+            }
+        }
     }
     for (std::size_t i = 0; i < counts.comets; ++i) {
         out.comets[i] = packComet(comets[i]);

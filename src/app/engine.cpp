@@ -20,8 +20,12 @@
 #include "assets/image.hpp"
 #include "core/hash.hpp"
 #include "core/log.hpp"
+#include "core/vortex.hpp"
+#include "core/wind.hpp"
 #include "params/serialization.hpp"
 #include "world/atmospheric_params.hpp"
+
+#include <fmt/ranges.h>
 
 #include <nlohmann/json.hpp>
 
@@ -3672,6 +3676,85 @@ void Engine::updateAuroraSpectrum() {
     }
 }
 
+// §68, one field many subscribers: everything this scene publishes, rebuilt each frame.
+//
+// This function is the whole of why the field bus is not another thing that exists and is never
+// reached. `defaultAtmosphericRoutes` was correct for a year with no caller (ADR-385/392), and a
+// bus nobody published into would have been the same defect wearing a newer word. So it is called
+// from `updateAtmosphericEffects`, on the shipping path, before the resolve that reads it -- and
+// the test that proves an effect's subscription reaches its picture goes through this call rather
+// than around it.
+//
+// **The publish is of AUTHORED fields, before the resolve, and that ordering is a decision.** A
+// vortex's drawn centre may be leaned by its own subscription, which is not known until the resolve
+// has run -- so publishing the drawn funnel would need two passes, and a vortex that subscribed to
+// itself would need a third. Publishing the authored funnel makes the bus a function of the scene
+// rather than of the frame's own output, which is the only version of this with no fixed point in
+// it. The difference a subscriber sees is exactly the lean, which is zero unless that funnel is
+// itself subscribed, and is bounded at a fifth of its radius when it is.
+void Engine::publishFields() {
+    scene::Scene& live = controller_->scene();
+    fieldBus_.clear();
+
+    // ADR-055's wind, whatever the environment says -- including when it is off. A disabled wind
+    // packs to `dir.w == 0` and samples as a flat zero, so a subscriber to a calm world gets a
+    // still field rather than a dead name, and switching the wind on in the panel makes every
+    // subscriber move without anything being re-resolved.
+    fieldBus_.publishWind(std::string(world::fields::kWindField), wind::packWind(live.environment.wind));
+
+    // ADR-388's funnels. One per vortex EFFECT rather than one for "the vortex", because the name
+    // is the effect's and a scene may author several even though only the first is marched --
+    // subscribing to the second is then a thing an artist can express and a thing the report can
+    // explain, rather than a silent mismatch between what the panel lists and what resolves.
+    for (const world::AtmosphericEffect& e : atmosphericEffects_) {
+        if (e.kind != world::AtmosphereKind::Vortex || !e.enabled || !e.vortex.active()) {
+            continue;
+        }
+        vortex::VortexField f;
+        f.center = e.vortex.center;
+        f.radius = e.vortex.radius;
+        f.thickness = e.vortex.thickness;
+        f.funnelDepth = e.vortex.funnelDepth;
+        f.throat = e.vortex.throat;
+        f.throatDensity = e.vortex.throatDensity;
+        f.swirl = e.vortex.swirl;
+        f.rotationSpeed = e.vortex.rotationSpeed;
+        f.innerVoid = e.vortex.innerVoid;
+        f.contrast = e.vortex.contrast;
+        f.turbulence = e.vortex.turbulence;
+        f.turbulenceScale = e.vortex.turbulenceScale;
+        f.breathAmount = e.vortex.breathAmount;
+        f.breathSpeed = e.vortex.breathSpeed;
+        f.smokeWarp = e.vortex.smokeWarp;
+        f.smokeBillow = e.vortex.smokeBillow;
+        f.detail = e.vortex.detail;
+        fieldBus_.publishVortex(world::fields::vortexFieldName(e.name), vortex::packVortex(f));
+    }
+
+    // The loud half. A subscription naming a field nobody publishes is this repository's signature
+    // defect in a new place, so it is said out loud -- once per name, because a message repeated at
+    // frame rate is a message nobody reads, which is the same failure from the other end.
+    std::vector<std::string> names;
+    std::vector<world::fields::Subscription> subs;
+    names.reserve(atmosphericEffects_.size());
+    subs.reserve(atmosphericEffects_.size());
+    for (const world::AtmosphericEffect& e : atmosphericEffects_) {
+        names.push_back(e.name);
+        subs.push_back(e.flow);
+    }
+    for (const world::fields::DeadSubscription& dead : fieldBus_.unresolved(names, subs)) {
+        const std::string key = dead.subscriber + " -> " + dead.field;
+        if (std::find(reportedDeadFields_.begin(), reportedDeadFields_.end(), key) !=
+            reportedDeadFields_.end()) {
+            continue;
+        }
+        reportedDeadFields_.push_back(key);
+        log::warn("atmospheric effect '{}' subscribes to field '{}', which this scene does not "
+                  "publish; its flow influence does nothing. Published: {}",
+                  dead.subscriber, dead.field, fmt::join(fieldBus_.names(), ", "));
+    }
+}
+
 // Resolves this frame's atmospheric effects into the scene (ADR-230).
 //
 // Called from `update()` beside `updateWorldEffects`, for the same reasons: after the camera has
@@ -3685,12 +3768,14 @@ void Engine::updateAtmosphericEffects() {
     }
     world::applyAtmosphericParameters(atmosphericParams_, atmosphericEffects_);
     updateAuroraSpectrum();
+    publishFields();
 
     world::AtmosphericContext ctx;
     ctx.seconds = timelineClock_.seconds;
     ctx.cameraPosition = live.camera.position;
     ctx.shots = shotSpans_;
     ctx.spectrum = auroraSpectrum_;
+    ctx.fieldBus = &fieldBus_;
     world::buildAtmosphericFrame(atmosphericEffects_, ctx, live.atmospherics);
     // The §12 quality control. Offline renders get the full march; live playback takes two thirds of
     // it, which is a difference nobody sees on a moving comet and a third of the tail's cost.
