@@ -1468,15 +1468,25 @@ TEST_CASE("the camera lock decides who may stand the director down", "[camera][d
     // discard a cut, a deliberate request may.
     //
     // Locked and directed: a drag is refused. This is the arm that protects the bake.
-    CHECK_FALSE(ui::viewportMayReleaseDirector(/*directed=*/true, /*locked=*/true, /*deliberate=*/false));
+    CHECK_FALSE(ui::viewportMayReleaseDirector(/*directed=*/true, /*locked=*/true, /*deliberate=*/false,
+                                               /*hasBake=*/true));
     // Asked for in words -- the menu item, the panel's unlock -- and it goes through even locked.
-    CHECK(ui::viewportMayReleaseDirector(true, true, true));
+    CHECK(ui::viewportMayReleaseDirector(true, true, true, true));
     // Unlocked: the user has said this project's cut is theirs to break.
-    CHECK(ui::viewportMayReleaseDirector(true, false, false));
+    CHECK(ui::viewportMayReleaseDirector(true, false, false, true));
     // THE CONTROL: with nothing baked there is nothing to stand down, whatever the lock says. A
     // predicate that returned true here would make every undirected project announce a refusal.
-    CHECK_FALSE(ui::viewportMayReleaseDirector(false, true, false));
-    CHECK_FALSE(ui::viewportMayReleaseDirector(false, false, true));
+    CHECK_FALSE(ui::viewportMayReleaseDirector(false, true, false, true));
+    CHECK_FALSE(ui::viewportMayReleaseDirector(false, false, true, true));
+
+    // Directed, locked, incidental -- and NOTHING baked. The guard is on data loss, so with no data
+    // it must not fire. Shipped the other way this refused Option-drag on the Tree of Life, which
+    // carries 0 camera tracks, 0 aim-follow entries and 0 shot spans: a refusal that protected
+    // nothing and cost the user the gesture.
+    CHECK(ui::viewportMayReleaseDirector(true, true, false, /*hasBake=*/false));
+    // And the pair that proves the new argument is load-bearing rather than decorative: the SAME
+    // three flags decide opposite ways on the bake alone.
+    CHECK_FALSE(ui::viewportMayReleaseDirector(true, true, false, true));
 }
 
 TEST_CASE("a locked camera keeps its bake through a drag and a save", "[camera][director][lock]") {
@@ -1513,8 +1523,13 @@ TEST_CASE("a locked camera keeps its bake through a drag and a save", "[camera][
     // A drag, under the lock. `ensureFreeCamera` lives in application.cpp, which is not compiled
     // into this binary, so what is exercised is the predicate that gates it -- and then the call it
     // gates, made only when the predicate allows, exactly as the application does.
+    // `hasBake` comes from the real counter rather than a literal, so this also asserts that
+    // `directedCameraBakeSize` agrees with the fixture about there being something to protect. A
+    // counter that returned 0 here would silently unlock the one case the lock exists for.
+    REQUIRE(app::directedCameraBakeSize(engine) > 0);
     const bool mayRelease =
-        ui::viewportMayReleaseDirector(state.directed, /*locked=*/true, /*deliberate=*/false);
+        ui::viewportMayReleaseDirector(state.directed, /*locked=*/true, /*deliberate=*/false,
+                                       app::directedCameraBakeSize(engine) > 0);
     REQUIRE_FALSE(mayRelease);
     if (mayRelease) {
         static_cast<void>(app::releaseDirectedCamera(engine, state));
@@ -1548,11 +1563,15 @@ TEST_CASE("a locked camera keeps its bake through a drag and a save", "[camera][
     // THE CONTROL, and it is what makes every assertion above mean something: unlocked, the same
     // gesture does discard the cut. Without this arm the test passes against a
     // `releaseDirectedCamera` that had quietly stopped doing anything at all.
-    REQUIRE(ui::viewportMayReleaseDirector(state.directed, /*locked=*/false, /*deliberate=*/false));
+    REQUIRE(ui::viewportMayReleaseDirector(state.directed, /*locked=*/false, /*deliberate=*/false,
+                                           app::directedCameraBakeSize(engine) > 0));
     static_cast<void>(app::releaseDirectedCamera(engine, state));
     CHECK_FALSE(engine.timeline().isAutomated("camera/position"));
     CHECK(engine.composition()->aimFollow().empty());
     CHECK(engine.shotSpans().empty());
+    // And once it is gone the counter says so, which is what makes the lock stop firing on a
+    // project that has already been handed back.
+    CHECK(app::directedCameraBakeSize(engine) == 0);
 #endif
 }
 

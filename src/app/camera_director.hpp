@@ -269,6 +269,17 @@ enum class Redirect : std::uint8_t {
 // driving anything that is not the camera are somebody's work and are left alone.
 std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state);
 
+// How much a `releaseDirectedCamera` would actually destroy, without destroying it: camera-owned
+// timeline tracks, plus the `cameraAimFollow` and `cameraShotSpans` tables, plus the camera shots
+// the director wrote. Zero means handing the camera back costs nothing.
+//
+// This exists because ADR-386's lock is a guard on live data LOSS, and a guard with nothing to
+// guard is only a cost. Locked unconditionally, the viewport could not move the camera on any
+// directed project -- including the Tree of Life, which carries 0 tracks, 0 aim-follow entries and
+// 0 shot spans, so the gesture was being refused to protect nothing at all. The multicam film
+// carries 42 and 37 and is exactly the case the lock was written for.
+[[nodiscard]] std::size_t directedCameraBakeSize(Engine& engine);
+
 // Records that the shot standing on the timeline *now* was cut from the heroes as they are *now*.
 // Call after directing. One function rather than three assignments at every call site: a state that
 // remembers the cast but not where it stood re-cuts on the very next frame, which is a mistake worth

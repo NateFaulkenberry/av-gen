@@ -62,6 +62,27 @@ const scene::CompositionNode* terrainNodeOf(Engine& engine) {
 
 std::span<const std::string_view> directedCameraTargets() { return kCameraTargets; }
 
+std::size_t directedCameraBakeSize(Engine& engine) {
+    // Deliberately the same four things `releaseDirectedCamera` destroys, counted in the same order,
+    // so the two cannot drift apart into a lock that guards a different set than the one at risk.
+    std::size_t n = 0;
+    for (const params::Track& t : engine.timeline().tracks()) {
+        if (isCameraTarget(t.target)) {
+            ++n;
+        }
+    }
+    n += engine.shotSpans().size();
+    if (const scene::Composition* composition = engine.composition()) {
+        n += composition->aimFollow().size();
+        for (const scene::CameraShot& s : composition->cameraDirection().shots) {
+            if (s.origin == scene::CameraShot::Origin::Directed) {
+                ++n;
+            }
+        }
+    }
+    return n;
+}
+
 std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state) {
     auto& tracks = engine.timeline().tracks();
     const std::size_t before = tracks.size();

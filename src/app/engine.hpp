@@ -398,6 +398,20 @@ public:
     [[nodiscard]] const world::AtmosphericParameters& atmosphericParameters() const { return atmosphericParams_; }
     [[nodiscard]] Result<void> setAtmosphericEffects(std::vector<world::AtmosphericEffect> effects);
 
+    // ADR-392. Attaches an effect's default audio routes and returns how many were added.
+    //
+    // Called when somebody **adds** an effect, which is a gesture, not a load. It deliberately is
+    // not inside `setAtmosphericEffects`: that call also runs when a project is opened, and a
+    // project whose author deleted every route must not grow them back each time it is loaded.
+    // Same shape as `addDefaultPostRoutes` -- and, like it, a no-op when something already
+    // automates this effect, so pressing the button twice does not stack two sets of routes.
+    //
+    // A route whose target does not resolve is skipped rather than written. The conformance test
+    // guarantees that never happens for a kind that is wired; this is the belt for the one that is
+    // not yet, because a dead route in somebody's saved project is the failure ADR-387 spent a day
+    // on and it must not be introduced by a button.
+    std::size_t addDefaultAtmosphericRoutes(std::string_view effectName);
+
     // The director's cut, flattened to what an effect needs for time gating (ADR-207). Installed by
     // `app::installSequence` and cleared by `releaseDirectedCamera`; empty means nothing is directing
     // the camera, in which case `CameraTravel` and `HeroFocus` effects simply never activate.

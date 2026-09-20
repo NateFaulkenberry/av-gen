@@ -85,7 +85,10 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
         d.hardMax = 8;
         d.softMin = 3;
         d.softMax = 8;
-        d.label = "post/bloom/levels (pyramid depth; fewer is a tighter, harder glow)";
+        // The leaf, like every other row. Spelling the whole path here made this the one slider in
+        // the panel that shouted its own address -- and now that the section is headed "bloom", the
+        // prefix was saying a third time what the group and the heading already say.
+        d.label = "levels (pyramid depth; fewer is a tighter, harder glow)";
         p.bloomLevels = &params.add(std::move(d));
     }
     p.bloomEmissionWeight =
@@ -144,7 +147,7 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
         d.hardMax = 32;
         d.softMin = 4;
         d.softMax = 32;
-        d.label = "post/motionBlur/samples (taps along the smear; fewer bands a long streak)";
+        d.label = "samples (taps along the smear; fewer bands a long streak)";
         p.motionBlurSamples = &params.add(std::move(d));
     }
     p.motionBlurMaxRadius =
@@ -157,7 +160,7 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
         d.hardMax = 40;
         d.softMin = 8;
         d.softMax = 40;
-        d.label = "post/motionBlur/tileSize (velocity tile edge in pixels; also the reach in tiles)";
+        d.label = "tileSize (velocity tile edge in pixels; also the reach in tiles)";
         p.motionBlurTileSize = &params.add(std::move(d));
     }
     p.antialias = &params.add(f("post/output/antialias", s.antialias, 0.0f, 1.0f, 0.0f, 1.0f));
@@ -170,7 +173,7 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
         d.hardMax = 65535;
         d.softMin = 0;
         d.softMax = 64;
-        d.label = "post/output/sharpenId (0 = the whole image)";
+        d.label = "sharpenId (0 = the whole image)";
         p.sharpenId = &params.add(std::move(d));
     }
     {
@@ -179,7 +182,7 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
         d.defaultValue = static_cast<int>(s.tonemap);
         d.hardMin = 0;
         d.hardMax = 4;
-        d.label = "post/tonemap/operator (0 aces, 1 agx, 2 reinhard, 3 pbr-neutral, 4 clamp)";
+        d.label = "operator (0 aces, 1 agx, 2 reinhard, 3 pbr-neutral, 4 clamp)";
         p.tonemap = &params.add(std::move(d));
     }
     p.vignette = &params.add(f("post/output/vignette", s.vignette, 0.0f, 1.0f, 0.0f, 1.0f));

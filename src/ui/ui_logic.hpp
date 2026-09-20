@@ -68,6 +68,39 @@ inline constexpr std::string_view kIntermediatePrefixes[] = {
 }
 
 
+// The section a parameter belongs to inside its group: everything between the group and the leaf.
+//
+//   ("post/bloom/intensity",       "post")  -> "bloom"
+//   ("post/enabled",               "post")  -> ""        (a direct member of the group)
+//   ("nodes/tree-of-life/wind/lag", "nodes") -> "tree-of-life/wind"
+//
+// A parameter's `group()` is the FIRST path segment and its `label()` is the LAST, so without this
+// the middle is simply discarded -- which is how the Parameters panel came to show three checkboxes
+// all reading "enabled" under one "post" heading, with nothing to say which was bloom and which was
+// halation. The owner reported it as "I have no idea what I'm enabling when I click a checkbox."
+//
+// Pure and here rather than inline in the panel because panel string arithmetic is a repeat offender
+// in this repository: the Tree panel's sections drew empty boxes for months over five characters of
+// `substr`, and the tests passed because they asserted the REGISTRATION paths and never the ones the
+// panel computed. A wrong path neither fails to compile nor throws -- the section just renders
+// blank, which is indistinguishable from "this scene has no such effect".
+[[nodiscard]] inline std::string parameterSubGroup(std::string_view path, std::string_view group) {
+    std::string_view rest = path;
+    if (!group.empty() && path.size() > group.size() + 1 && path.starts_with(group) &&
+        path[group.size()] == '/') {
+        rest = path.substr(group.size() + 1);
+    }
+    const std::size_t slash = rest.rfind('/');
+    return slash == std::string_view::npos ? std::string{} : std::string(rest.substr(0, slash));
+}
+
+// The last path segment: the switch a section is gated on is found by its leaf being "enabled",
+// rather than by a list of subsystem names that goes stale the moment somebody adds an effect.
+[[nodiscard]] inline std::string_view parameterLeaf(std::string_view path) {
+    const std::size_t slash = path.rfind('/');
+    return slash == std::string_view::npos ? path : path.substr(slash + 1);
+}
+
 // Slider bounds for a route amount. They must NOT depend on the current amount: a range derived
 // from the value being dragged feeds back on itself (drag to the end -> range grows -> repeat)
 // until the float range overflows and ImGui asserts (regression: milestone 0.2 crash).
@@ -216,9 +249,20 @@ enum class ViewportIntent : std::uint8_t {
 // **navigating the view is not modifying the camera.** An incidental gesture -- a drag, a framing,
 // a dolly -- may not discard a cut. A deliberate one -- the menu's "take the camera back", the
 // Camera panel's unlock -- may, because the user said so in words rather than by moving a mouse.
-[[nodiscard]] inline bool viewportMayReleaseDirector(bool directed, bool locked, bool deliberate) {
+// `hasBake` is whether standing the director down would actually destroy anything --
+// `app::directedCameraBakeSize`, which counts the same four things `releaseDirectedCamera` removes.
+// A guard on data loss with no data to lose is only a cost, and shipped as one: locked
+// unconditionally, this refused the viewport on EVERY directed project. On the Tree of Life -- 0
+// camera tracks, 0 aim-follow entries, 0 shot spans -- Option-drag became a no-op and a status line
+// in order to protect nothing, which is how the owner found it. The multicam film carries 42 spans
+// and 37 follow entries, was the case the lock was written for, and still locks.
+[[nodiscard]] inline bool viewportMayReleaseDirector(bool directed, bool locked, bool deliberate,
+                                                     bool hasBake) {
     if (!directed) {
         return false; // nothing to stand down
+    }
+    if (!hasBake) {
+        return true; // nothing to lose, so nothing to defend
     }
     return deliberate || !locked;
 }
@@ -1179,9 +1223,15 @@ inline constexpr float kMinItemWidth = 60.0f;
 // test, and the test's question is the panel's question: does every leaf this asks for exist on a
 // vortex?
 //
-// Only the vortex's rows are here. The comet's and the aurora's predate this and are still written
-// out inline; moving them is a mechanical change with no decision in it, and doing it in the same
-// commit as the vortex would bury what this is for.
+// ADR-392: the comet's and the aurora's rows are here too now. They were the mechanical change
+// ADR-387 deferred, and deferring it had a cost -- for as long as those two kinds' rows were
+// string literals inside an ImGui call, `conformance::checkLeavesExist` could be pointed at one of
+// the family's three kinds and not at the other two. A leaf five characters wrong in either of
+// them still drew an empty box and said nothing.
+//
+// The anchor combo in each advanced section stays inline: it writes a `SkyAnchor` enum on the
+// effect, not a parameter, so it is not a row and pretending it were would put a leaf in the table
+// that registration does not produce.
 struct EffectRow {
     std::string_view section; // non-empty starts a new SeparatorText before this row
     std::string_view leaf;    // appended to `atmos/<name>/`
@@ -1291,6 +1341,122 @@ struct EffectRow {
         }
     }
     return out;
+}
+
+
+// ---- comet ---------------------------------------------------------------------------------------
+//
+// Above the fold: what somebody reaches for first. Every leaf here is checked against what a comet
+// actually registers by `tests/unit/test_effect_conformance.cpp`.
+[[nodiscard]] inline std::span<const EffectRow> cometRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "coreColor", "Core colour", "", false, true},
+        {"", "tailColor", "Tail colour", "", false, true},
+        {"", "coreIntensity", "Core brightness"},
+        {"", "headSize", "Head size", "%.0f m"},
+        {"", "tailLength", "Tail length", "%.0f m"},
+        {"", "tailWidth", "Tail width", "%.0f m"},
+        {"", "travelSeconds", "Crossing", "%.1f s"},
+    };
+    return kRows;
+}
+
+// The advanced rows, minus the two checkboxes and the anchor combo, which are not parameters of
+// this shape. The first row carries no section because the panel has already drawn "Trajectory"
+// above the anchor combo.
+[[nodiscard]] inline std::span<const EffectRow> cometAdvancedRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "startAzimuth", "Start bearing", "%.0f deg"},
+        {"", "startElevation", "Start height", "%.0f deg"},
+        {"", "endAzimuth", "End bearing", "%.0f deg"},
+        {"", "endElevation", "End height", "%.0f deg"},
+        {"", "distance", "Distance", "%.0f m", true},
+        {"", "speed", "Speed"},
+        {"", "acceleration", "Acceleration"},
+        {"", "arcLift", "Arc lift", "%.0f m"},
+        {"", "curvature", "Curvature", "%.0f m"},
+        {"Appearance", "haloColor", "Halo colour", "", false, true},
+        {"", "haloIntensity", "Halo brightness"},
+        {"", "haloSize", "Halo size", "%.0f m"},
+        {"", "tailIntensity", "Tail brightness"},
+        {"", "tailFalloff", "Tail falloff"},
+        {"", "wispAmount", "Wisp amount", "%.0f m"},
+        {"", "wispScale", "Wisp scale", "%.4f"},
+        {"", "flowSpeed", "Wisp flow"},
+        {"Fragments", "sparkleDensity", "Density", "%.3f /m"},
+        {"", "sparkleSize", "Size"},
+        {"", "sparkleIntensity", "Brightness"},
+        {"", "sparkleSpeed", "Twinkle"},
+    };
+    return kRows;
+}
+
+// ---- aurora --------------------------------------------------------------------------------------
+
+[[nodiscard]] inline std::span<const EffectRow> auroraRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "lowColor", "Base colour", "", false, true},
+        {"", "midColor", "Middle colour", "", false, true},
+        {"", "topColor", "Top colour", "", false, true},
+        {"", "intensity", "Brightness"},
+        {"", "curtainHeight", "Height", "%.0f m"},
+        {"", "curtains", "Curtains", "%.0f"},
+        {"", "flowSpeed", "Flow"},
+        {"", "audioSensitivity", "Audio response"},
+        {"", "spectrumShape", "Spectrum shape"},
+    };
+    return kRows;
+}
+
+[[nodiscard]] inline std::span<const EffectRow> auroraAdvancedRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "radius", "Distance", "%.0f m", true},
+        {"", "layerSpacing", "Layer spacing"},
+        {"", "baseHeight", "Base height", "%.0f m"},
+        {"", "waveAmplitude", "Wave amount"},
+        {"", "waveScale", "Wave scale"},
+        {"", "turbulence", "Turbulence"},
+        {"", "complexity", "Ray structure", "%.0f"},
+        {"", "driftSpeed", "Fold drift"},
+        {"", "verticalSpeed", "Vertical drift"},
+        {"Appearance", "emission", "Bloom weight"},
+        {"", "opacity", "Curtain opacity"},
+        {"", "edgeBrightness", "Edge brightness"},
+        {"", "filaments", "Filaments"},
+        {"", "sparkle", "Sparkle"},
+        {"", "horizonGlow", "Horizon glow"},
+        // Â§4.2's per-band depths. These scale the bands already in the frame block; they are not a
+        // second analyzer, and every one of them is itself an ordinary parameter a route can drive.
+        {"Audio response", "audioBass", "Bass -> height"},
+        {"", "audioLowMid", "Low-mid -> waves"},
+        {"", "audioMid", "Mid -> folds"},
+        {"", "audioHigh", "High -> filaments"},
+        {"", "audioBeat", "Beat -> pulse"},
+    };
+    return kRows;
+}
+
+// The hue-cycle rows, shared by the comet and the aurora. A vortex registers none of them, which is
+// why the panel returns before this rather than drawing five rows that would find nothing.
+[[nodiscard]] inline std::span<const EffectRow> skyRainbowRows() {
+    static constexpr EffectRow kRows[] = {
+        {"Rainbow", "rainbowSpeed", "Speed"},
+        {"", "rainbowScale", "Scale"},
+        {"", "rainbowHue", "Hue offset"},
+        {"", "rainbowSaturation", "Saturation"},
+        {"", "rainbowBrightness", "Brightness"},
+    };
+    return kRows;
+}
+
+// Offered only when the ground glow is not Off, so it is a separate table rather than a tail of the
+// rainbow's.
+[[nodiscard]] inline std::span<const EffectRow> skyGroundRows() {
+    static constexpr EffectRow kRows[] = {
+        {"Ground illumination", "groundRadius", "Radius", "%.0f m", true},
+        {"", "groundFalloff", "Falloff"},
+    };
+    return kRows;
 }
 
 } // namespace avgen::ui

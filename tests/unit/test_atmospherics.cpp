@@ -708,3 +708,56 @@ TEST_CASE("the shipped Glowmere Atmospherics scene declares what the demonstrati
     CHECK(ground);               // optional ground illumination, demonstrated
     CHECK(comets <= world::kMaxGpuComets);
 }
+
+// ---- the dispatch is exhaustive, and the vortex is not the `else` ------------------------------
+//
+// `resolveAtmosphericEffects` dispatched with `if comet / else if aurora / else vortex`, so the
+// vortex was not a *test* -- it was the fall-through. A kind the chain does not claim therefore did
+// not resolve as nothing; it resolved as a vortex, and was then dropped as "the second vortex in
+// the scene", which is a silent no-op wearing a limit's clothes.
+//
+// This is ADR-182's rule applied to a dispatch: a probe over the three kinds that exist proves
+// nothing about the fourth, because all three are named in the chain. The only probe that can fail
+// is one carrying a kind the chain does *not* name. `AtmosphereKind` has a fixed underlying type
+// (`std::uint8_t`), so a value no enumerator names is a well-defined value of the type rather than
+// undefined behaviour, and it is exactly the shape a forgotten `case` produces at runtime.
+//
+// `conformance::checkAtmospheric`'s check 4 cannot stand in for this one: it decides which counter
+// is "mine" with a ternary chain whose own `else` is `counts.vortices`, so a new kind falling into
+// the resolve's vortex arm is compared against the vortex counter and agrees with itself.
+TEST_CASE("a kind the resolve dispatch does not name resolves as nothing, not as a vortex",
+          "[world][atmospherics][dispatch]") {
+    auto resolveOne = [](world::AtmosphereKind kind) {
+        world::AtmosphericEffect e = world::cosmicVortex("probe");
+        e.kind = kind;
+        e.enabled = true;
+        e.activation = world::Activation::Always;
+        e.timing = world::Timing{};
+        e.timing.fadeIn = 0.0;
+        e.timing.fadeOut = 0.0;
+        const std::array<world::AtmosphericEffect, 1> set{e};
+        std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
+        std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
+        return world::resolveAtmosphericEffects(set, contextAt(0.5), comets, auroras);
+    };
+
+    SECTION("the control: a real vortex still resolves as one vortex") {
+        const auto counts = resolveOne(world::AtmosphereKind::Vortex);
+        CHECK(counts.vortices == 1);
+        CHECK(counts.comets == 0);
+        CHECK(counts.auroras == 0);
+        CHECK(counts.dropped == 0);
+    }
+
+    SECTION("a kind no arm claims is not silently attributed to another kind") {
+        const auto counts = resolveOne(static_cast<world::AtmosphereKind>(0xF0));
+        INFO("an unnamed kind resolved as " << counts.comets << " comet(s), " << counts.auroras
+                                            << " aurora(s), " << counts.vortices << " vortex/vortices");
+        CHECK(counts.vortices == 0);
+        CHECK(counts.comets == 0);
+        CHECK(counts.auroras == 0);
+        // Not zero: it is reported, because an effect the engine cannot draw is a thing the UI
+        // should be able to say out loud rather than a thing that quietly does not happen.
+        CHECK(counts.dropped == 1);
+    }
+}
