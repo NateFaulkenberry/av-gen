@@ -682,6 +682,10 @@ private:
         glm::vec3 from{0.0f};
         float span = 0.0f;   // the distance the tween has to cover
         float progress = 0.0f;
+        // MoveTo's clearance floor, carried between frames so it can be rate-limited. -1 means it
+        // has not been sampled yet, which is distinct from a floor of zero.
+        float floorY = -1.0f;
+        float easedPrev = -1.0f;
         double phase = 0.0;  // the wobble's own clock, so it is continuous across a step
         bool issued = false;      // an `Actions` step has handed its list over
         std::string reason;       // why the step failed, when it did

@@ -1391,11 +1391,42 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         // keeps `clearance` metres of air near its own two ends. At the start that is the altitude
         // the body already held; at the end it is the destination the shot asked for, which is the
         // one place a clearance floor has no business overruling the author.
+        //
+        // ## And why the floor is rate-limited, which that argument also does not predict
+        //
+        // `groundHeight` is not continuous. Measured on Glowmere at (-105.749, -94.734): 20.0112 m
+        // on one side and 21.5492 m on the other, **1.538 m apart over 0.0008 m of ground**, with
+        // the same slope either side -- a seam in the height function, not a ledge. It is not the
+        // block accelerator: with `Feature::blocks` cleared the unaccelerated walk returns the same
+        // two values to the last digit. So it is the world, and it is somebody else's to fix.
+        //
+        // What is this function's to fix is transmitting it. The floor is read from `groundHeight`
+        // every frame with no memory, so crossing that seam moved the craft **1.206 m in one frame
+        // on a 0.165 m step** -- the UFO twitching as it flew over a join, once in ninety seconds,
+        // and `the craft never teleports` is what found it.
+        //
+        // The floor may therefore not move faster than a steep hill would move it. `4x` the body's
+        // own travel is a slope of 76 degrees, steeper than anything this engine will fly a craft
+        // over, so on continuous ground the limit is arithmetically inert; the 5 cm is so that a
+        // tween which has almost stopped still converges rather than freezing its floor. Only a
+        // discontinuity is caught, which is the only thing it is for.
+        //
+        // Carried on the cue rather than recomputed because the limit is on the *change*, and it
+        // is the floor that is clamped rather than the lift: `w` is still applied afterwards, so
+        // `eased == 1` still contributes exactly zero and the arrival contract below is untouched.
         const float clearance = value(run, step.clearance);
         if (clearance > 0.0f && ctx.world->navigator().valid()) {
-            const float floorY = ctx.world->navigator().groundHeight(flat(p)) + clearance;
+            const float raw = ctx.world->navigator().groundHeight(flat(p)) + clearance;
+            if (cue.floorY < 0.0f || cue.easedPrev < 0.0f) {
+                cue.floorY = raw; // the first frame has nothing to have moved from
+            } else {
+                const float travelled = std::abs(eased - cue.easedPrev) * cue.span;
+                const float limit = 4.0f * travelled + 0.05f;
+                cue.floorY = std::clamp(raw, cue.floorY - limit, cue.floorY + limit);
+            }
+            cue.easedPrev = eased;
             const float w = 4.0f * eased * (1.0f - eased);
-            p.y += w * std::max(0.0f, floorY - p.y);
+            p.y += w * std::max(0.0f, cue.floorY - p.y);
         }
 
         // The arrival contract, as an assertion rather than as a comment. A `MoveTo` that reports

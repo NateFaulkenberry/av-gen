@@ -5,18 +5,18 @@
   },
   "assets": {
     "audio": {
-      "path": "../../../../../Desktop/Rebuild.mp3",
-      "sha256": "8610c7a1d8cc94303a630d4b90114556a3cb658bc7f218af2fc852af3f7f0f18",
-      "size": 527086
-    },
+               "path": "../../../../../Desktop/Rebuild.mp3",
+               "sha256": "53a7c00cbdca9a078338db1f5a1cc725fa6b926623dccb7728f55e948838a030",
+               "size": 5435776
+             },
     "scene": {
-      "kind": "composition",
-      "path": {
-        "path": "glowmere-valley-2-song.scene.json",
-        "sha256": "05788490ed6936b3c6388a50bea28e5f4f0fdfb943196eb0b3d9ea922e783c72",
-        "size": 525408
-      }
-    }
+               "kind": "composition",
+               "path": {
+                 "path": "glowmere-valley-2-song.scene.json",
+                 "sha256": "8610c7a1d8cc94303a630d4b90114556a3cb658bc7f218af2fc852af3f7f0f18",
+                 "size": 527086
+               }
+             }
   },
   "autoDirector": {
     "autonomy": "expressive",

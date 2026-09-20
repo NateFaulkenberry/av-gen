@@ -5,18 +5,18 @@
  },
  "assets": {
   "audio": {
-   "path": "../../../../../Desktop/Rebuild.mp3",
-   "sha256": "9bf5643993538158ab6584b20bb2ea359fe3f3fa83baca08a0386aa7e31942a8",
-   "size": 217522
-  },
+             "path": "../../../../../Desktop/Rebuild.mp3",
+             "sha256": "53a7c00cbdca9a078338db1f5a1cc725fa6b926623dccb7728f55e948838a030",
+             "size": 5435776
+           },
   "scene": {
-   "kind": "composition",
-   "path": {
-    "path": "glowmere-valley-2-multicam.scene.json",
-    "sha256": "f5e52e5cb7a25b2352d560ff52fdb9599a274609b3d4739a49fdf52296a6d9f3",
-    "size": 229834
-   }
-  }
+             "kind": "composition",
+             "path": {
+               "path": "glowmere-valley-2-multicam.scene.json",
+               "sha256": "9bf5643993538158ab6584b20bb2ea359fe3f3fa83baca08a0386aa7e31942a8",
+               "size": 217522
+             }
+           }
  },
  "atmosphericEffects": [
   {
