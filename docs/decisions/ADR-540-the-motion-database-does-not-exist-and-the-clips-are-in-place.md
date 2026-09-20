@@ -64,11 +64,34 @@ a `[frames × D]` float array:
 
 against ~2.97 µs to sample a clip and build this rig's joint palette.
 
-A second measurement from the same probe, worth recording because it contradicts the textbook: the
-**early-out** inner loop — abandon a row once its running cost exceeds the best so far — is
-**2.0× to 2.7× slower at every size tested** (20,000 frames, D=27: 132.1 µs plain vs 357.5 µs
-early-out). The branch defeats clang's autovectorisation, and on this machine the straight-line
-vectorised loop wins by more than the early-out saves.
+A second measurement from the same probe **produced a wrong conclusion and is recorded here because
+the shape of the error is the valuable part.** The probe found the textbook early-out — abandon a
+row once its running cost exceeds the best so far — to be 2.0× to 2.7× *slower* at every size
+tested. A second measurement on Holden's real `features.bin` found it a 12% *win*. Both are
+correct; the follow-up probe (`mmprobe2.cpp`, 53,500 × 27) isolates why:
+
+| database | query | plain | early-out | ratio |
+|---|---|---:|---:|---:|
+| white noise | far / random | 361.5 µs | 804.5 µs | 2.23× slower |
+| white noise | near | 356.5 µs | 486.5 µs | 1.36× slower |
+| random walk (motion-like) | far / random | 360.8 µs | 391.2 µs | 1.08× slower |
+| **random walk (motion-like)** | **near** | **359.7 µs** | **288.0 µs** | **0.80× — a win** |
+
+A motion database is a smooth trajectory through feature space and a motion-matching query is
+always near the frame currently playing, so the real case is the last row. The first probe used a
+Gaussian database and a random query — the first row — which does not occur. **The early-out's
+value is a property of the fixture, and it must be measured on real extracted features.**
+
+ADR-182 says a probe that cannot fail proves nothing. This probe could fail and did not, and the
+conclusion was still wrong. The corollary worth adding: **a probe on a synthetic fixture proves
+something about the synthetic fixture.**
+
+Two measurements that are *not* in doubt, from the same follow-up on real data: the **two-level AABB
+hierarchy** (boxes over groups of 16 and 64 consecutive frames, as in the LMM paper's Appendix B)
+is **4.9× faster** than scalar-with-early-out for **+15.6% memory**, because it keeps the linear
+scan's cache behaviour and merely declines to look inside boxes it can prove are too far; and
+**int16 quantisation was 1.4× *slower* than float32 on NEON**, because of the widening in the
+squared difference. Quantisation is a memory tool on Apple Silicon, not a speed tool.
 
 ## The second blocker
 
@@ -102,10 +125,18 @@ learned motion matching. Building the pipeline once makes both a later, additive
 * **Synthesise root trajectories from `GaitSettings::walkSpeed`.** Tempting, and it is arm 4 of the
   §16 probe rather than a plan — a constant-velocity synthetic trajectory makes every frame of a
   walk cycle look identical to the matcher, which is exactly the degenerate case.
-* **Add a nearest-neighbour acceleration structure.** Brute force is 132 µs at 20,000 frames; a
-  tree buys 5-10× and costs determinism risk in tie-breaking plus a build step.
-* **Skip the data problem by licensing a dataset.** See ADR-542: almost every open mocap corpus is
-  non-commercial, and AMASS-derived generative output inherits the restriction.
+* **Add a nearest-neighbour acceleration structure.** The two-level AABB is the right structure
+  when one is needed and is measured at 4.9× — but at 1,712 frames a plain search is 11.5 µs, so
+  it would buy nine microseconds for ~60 lines of traversal-order-dependent tie-breaking. Not a
+  KD-tree in any case: at 27-55 dimensions a KD-tree degenerates toward a linear scan and pays
+  random access for it, which is why both the LMM paper and Unreal only offer one paired with PCA.
+* **Skip the data problem by licensing a dataset.** Partly viable and better than expected, but it
+  does not remove the gate — it moves it. **100STYLE is CC BY 4.0 and is four million frames of
+  stylized locomotion**, roughly 2,300× this repository's entire corpus, with the starts, stops and
+  turns that are missing. ACCAD is CC BY 3.0 direct from Ohio State. CMU permits inclusion in
+  commercially-sold products. **But none of them can reach the alien rig, because retargeting does
+  not exist** (see "The second blocker"). So the licensed-dataset route is gated on exactly the same
+  unit as everything else. ADR-542 has the licensing analysis, including what cannot be used.
 
 ## Consequences
 
@@ -119,7 +150,9 @@ learned motion matching. Building the pipeline once makes both a later, additive
 
 ## Revisit triggers
 
-* A travelling locomotion dataset with starts, stops and planted turns is licensed or captured.
+* A retargeting pass exists and 100STYLE (or equivalent CC-BY locomotion) has been brought onto
+  the alien rig with measured foot contacts and extracted trajectories.
 * The motion database exceeds ~20,000 frames (11 minutes at 30 Hz), at which point the search
   becomes a real cost and the feature layout matters.
-* Anyone proposes an early-out or an acceleration structure: re-run `mmprobe.cpp` first.
+* Anyone proposes an early-out or an acceleration structure: re-run the probes **on real extracted
+  features**, not on `mmprobe.cpp`'s synthetic fixture.

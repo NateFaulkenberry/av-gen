@@ -5,13 +5,15 @@
 **Date:** 2026-09-20. **Machine for every measurement below:** Apple M2 Max, 8P+4E, 64 GB.
 
 Every claim about AV Gen in this document cites a file and a line that was read, and every number
-is either a measurement with its probe named or is labelled an estimate (ADR-385). Two claims I
-made early were wrong and are recorded as such in §1.9, because the shape of the mistake is worth
-more than the tidy version.
+is either a measurement with its probe named or is labelled an estimate (ADR-385). **Three claims I
+made during this research were wrong and are recorded as such** — two in §1.9 and one in §2.3a —
+because the shape of each mistake is worth more than the tidy version. The third is the most
+useful: it was a correct, reproducible measurement from a probe that could fail, and the conclusion
+was still wrong, because the fixture was.
 
 ---
 
-## 0. The three sentences
+## 0. The four sentences
 
 1. **AV Gen's animation engine is much further along than the brief assumes**, and the parts it is
    missing are not the parts the brief expects. It has a masked layer stack, analytic two-bone IK,
@@ -28,10 +30,18 @@ more than the tidy version.
    trajectory in this data to extract. The first blocker is not the algorithm; it is that AV Gen
    cannot load a motion dataset at all (§1.5).
 
-3. **What to build first is a motion-data foundation and two small quality fixes that pay for
-   themselves immediately** — cross-file clip binding + retargeting, phase-matched transitions, and
-   a leg the foot solver can actually solve. The smallest experiment that would validate or kill
-   the whole architecture is in §16 and takes one throwaway tool, no engine changes.
+3. **The data gate is openable and the engineering gate is not — which inverts the expected
+   order.** I expected licensing to be the wall; it is not. **100STYLE is CC BY 4.0 and is four
+   million frames of stylized locomotion** — starts, stops, turns, styles — roughly 2,300× AV Gen's
+   entire corpus, shippable as a derived database *and* trainable on (§8.3). ACCAD is CC BY 3.0 and
+   CMU permits embedding in a commercial product. What blocks it is that AV Gen cannot get any of it
+   onto a rig.
+
+4. **So build the motion-data foundation and the two small quality fixes that pay for themselves on
+   the 57 seconds that already exist** — cross-file clip binding + retargeting, phase-matched
+   transitions and inertialization, and a leg the foot solver can actually solve. The smallest
+   experiment that would validate or kill the whole architecture is in §16 and takes one throwaway
+   tool, no engine changes.
 
 ---
 
@@ -199,7 +209,7 @@ mocap. AV Gen has 57 seconds, and about 20 of those seconds are locomotion.
 
 ### 1.9 Two things I asserted and had to retract
 
-Recorded because the shape matters more than the conclusions.
+Recorded because the shape matters more than the conclusions. A third, larger one is in §2.3a.
 
 * I concluded from `node["layers"] == null` on all five aliens that **look-at and reaction layers
   were authored on nobody in the production scene**. They are authored under
@@ -325,12 +335,37 @@ f_t ∈ R^6   two foot positions, 3D, character space
 ḣ_t ∈ R^3   hip velocity
 ```
 
-Each column is normalised by its dataset standard deviation, then multiplied by a user weight —
-and production implementations fold the weight into the stored value at build time so the runtime
-query is a plain L2 distance. Every N frames (N ≈ 10, so 6 Hz at 60 fps) the controller builds a
-query from the user's desired trajectory plus the character's *current* foot/hip state, searches
-for the nearest database row, and if the winner beats the frame it would otherwise have played by
-a margin, jumps there and **inertializes** the discontinuity away.
+Four details that reimplementations usually get wrong, all read out of Holden's source:
+
+* **Normalise per *group*, not per scalar.** Offsets (means) are per-dimension; the **scale is one
+  number shared by the whole group**, computed as the mean of the group's per-dimension standard
+  deviations, so a 3D foot position stays isotropic and you do not accidentally stretch Z against
+  X. The user weight enters as a divisor: `scale = std / weight`. And `assert(std > 0)` — the
+  source's own comment is *"Features with no variation can have zero std which is almost always a
+  bug."*
+* **Everything is in *simulation-bone* space**, not hips space. The simulation bone is a
+  procedurally generated extra bone: an upper-spine bone projected to ground level and smoothed
+  (Savitzky-Golay, windows 31 and 61), with forward taken from the hips. It becomes bone 0 and is
+  the frame every feature is expressed in.
+* **Only the trajectory half of the query is synthesised.** The pose half is *copied out of the
+  database row for the frame currently playing* and de-normalised — not recomputed from the live
+  skeleton. That is a large practical simplification and it is what the LMM paper describes too.
+* **Search cadence is contested between the two primary sources, and both are "classical".**
+  Clavet (GDC 2016) searches **every frame**, with a post-hoc 0.2 s hysteresis window and a 0.25 s
+  blend. Holden searches on a timer (`search_time = 0.1f` → **10 Hz**) *plus* a forced search on
+  the **trailing edge** of a rapid input change — when the stick stops moving fast — and at the end
+  of a clip.
+
+Continuity is three mechanisms, not one, and production implementations use all three:
+
+1. **Seed the search with the current frame**, so every candidate must strictly beat the incumbent.
+2. **A transition cost added to every candidate** but not to the incumbent — a margin. (Holden's
+   shipped demo leaves this at 0; the mechanism is there and unused.)
+3. **An exclusion window**: skip candidates within ±20 frames (±0.33 s) of the current frame, and
+   refuse to return a frame within 20 frames of a clip end, "as this can result in re-triggering
+   the search too frequently".
+
+Then the discontinuity is **inertialized** away (§2.8).
 
 ### 2.2 The three things that make it work, none of which AV Gen has
 
@@ -364,36 +399,216 @@ arithmetic shape, *not* AV Gen's code — treat it as a lower bound). So a 20,00
 **44× the cost of posing the character it is for**, and a 60,000-frame search at D=51 is ~1 ms, or
 0.16 ms/frame amortised at a 6 Hz search rate.
 
-**The finding that surprised me, and is worth keeping:** the textbook early-out optimisation —
-abandon a row the moment its running cost exceeds the best so far — is **2.0× to 2.7× slower** on
-this machine at every size tested (e.g. 20,000 × D=27: 132.1 µs brute vs 357.5 µs early-out). The
-branch in the inner loop defeats clang's autovectorisation, and on Apple Silicon the vectorised
-straight-line loop wins by more than the early-out saves. Anyone implementing this should measure
-before adding the "obvious" optimisation.
+### 2.3a The early-out: I was wrong, and the shape of the error is the useful part
+
+My first conclusion from the table above was that the textbook early-out — abandon a row once its
+running cost exceeds the best so far — is **2.0-2.7× slower** on this machine, and that anyone
+implementing motion matching should not add it. A parallel measurement on Holden's *real*
+`features.bin` (53,500 × 27) found the opposite: 388 µs plain, 343 µs with the early-out, a 12%
+**win**.
+
+Both measurements are correct. The difference is the data, and the follow-up probe
+(`scratchpad/anim-research/mmprobe2.cpp`) isolates it. Same code, same machine, four conditions:
+
+| database | query | plain | early-out | ratio |
+|---|---|---:|---:|---:|
+| white noise | far / random | 361.5 µs | 804.5 µs | **2.23× slower** |
+| white noise | near (a real row + 0.35σ) | 356.5 µs | 486.5 µs | 1.36× slower |
+| random walk (motion-like) | far / random | 360.8 µs | 391.2 µs | 1.08× slower |
+| **random walk (motion-like)** | **near** | **359.7 µs** | **288.0 µs** | **0.80× — a 20% win** |
+
+`-O3 -march=native` does not change the picture (2.40× / 1.57× / 1.12× / 0.81×).
+
+**The early-out's value is entirely a property of the data's temporal locality and the query's
+closeness to it, and my original probe had neither.** A motion database is a smooth trajectory
+through feature space and a motion-matching query is always *near* the current frame, so the real
+case is the bottom row. My synthetic Gaussian database was the top row, which does not occur.
+
+This is the reason the house rule exists. I had a measurement, it was reproducible, the probe could
+fail and did not — and the conclusion was still wrong, because the *fixture* was wrong. A probe
+that cannot fail proves nothing (ADR-182); a probe that can fail but tests the wrong distribution
+proves something about the wrong thing.
+
+The corrected guidance: **measure the early-out on real extracted features, never on synthetic
+ones**, and expect a modest win rather than a large one either way — because the real speed comes
+from §2.4.
+
+### 2.4 Acceleration structures: the AABB hierarchy, not a KD-tree
+
+The LMM paper's Appendix B is the best published justification and it argues against the obvious
+choice:
+
+> *"Rather than a KD-Tree or clustering-based approach we use a simple axis-aligned bounding-box
+> (AABB) based method... We fit axis-aligned bounding boxes to groups of 16 and 64 frames
+> consecutively in X... Firstly, as we iterate over the database in order, we have excellent cache
+> performance and avoid the random access that can occur using structures such as KD-Trees.
+> Secondly, the squared distance to an AABB can be computed as a sum of the squared distance along
+> each dimension individually. This allows for an essential form of early-out..."*
+
+Measured on the real 53,500 × 27 database, this machine:
+
+| variant | µs/query |
+|---|---:|
+| scalar brute force, no early-out | 388 |
+| scalar brute force, with early-out | 343 |
+| **two-level AABB (16/64 frames), as in `database.h`** | **70** |
+| 4-wide auto-vectorised float32 | 155-198 |
+| int16-quantised, int32 accumulators, 4-wide | 213 |
+
+**4.9× over scalar-with-early-out, for +15.6% memory (0.86 MiB on 5.51 MiB).** It wins precisely
+because it is *brute force with skips*: it keeps the linear layout and the prefetcher and simply
+declines to look inside boxes it can prove are too far. A KD-tree at 27-55 dimensions is already
+in the regime where expected leaf visits approach linear, and it pays random access for the
+privilege — which is why Unreal pairs its `PCAKDTree` mode with PCA and also ships a plain
+`Brute Force` mode.
+
+**int16 quantisation was 1.4× *slower* than float32 on NEON**, because of the int16→int32 widening
+in the squared difference. On AVX2 with `_mm256_madd_epi16` it would probably invert. It is a
+memory tool here, not a speed tool, and that is an Apple-Silicon-specific finding.
+
+**The biggest lever is not a structure at all.** Both the LMM paper (precomputed *ranges*) and
+Epic (multiple small databases selected by a Chooser Table) reduce `n` by partitioning on tag,
+gait or manoeuvre before any index is considered. Epic's answer to database growth in the Game
+Animation Sample is explicitly "many small databases plus **pose warping** to fill in the gaps",
+not a better index.
+
+**For AV Gen: do not build any of this yet.** At 1,712 frames a plain search is 11.5 µs. The AABB
+hierarchy is ~60 lines and is the right structure *if* the database ever reaches tens of thousands
+of frames — but it is 60 lines of determinism surface (traversal order affects tie-breaking) bought
+for a saving of nine microseconds.
+
+### 2.5 Two numbers I could not reconcile, stated as such
+
+The LMM paper's Table 3 reports a per-frame cost for classical motion matching. Two independent
+extractions of the same PDF produced **90 µs** and **909 µs** for the Locomotion row (89,480
+frames, 27 features), and **62 µs** vs **626 µs** for Chair. One reading appends a digit the other
+drops; the memory columns agree in both readings and close against `frames × features × 4 bytes`.
+
+I did not resolve it and I am not going to guess. What I can say from this machine: scaling my own
+53,500-frame measurements to 89,480 frames gives ~594 µs scalar and ~117 µs with the AABB
+hierarchy on an M2 Max. **90 µs on a 2020-era CPU is implausible; 909 µs is plausible.** But the
+number that should drive an AV Gen decision is the one measured on AV Gen's hardware at AV Gen's
+database size, which is §2.3's table, and it does not depend on resolving this.
+
+### 2.6 The architectural fact worth carrying, whatever else is decided
+
+Parsed from the headers of Holden's shipped `features.bin` and `database.bin`:
+
+| | |
+|---|---|
+| frames | 53,500 (14.9 min at 60 Hz) |
+| `features.bin` | 5.51 MiB — **108 B/frame** (27 × float32) |
+| `database.bin` | 61.1 MiB — **~1,196 B/frame** of pose data |
+| **ratio** | **the thing you search is 0.9% of the thing you store** |
+
+That separation is why the motionpack in §9.4 has `features.bin` beside `clips.bin` rather than one
+blob, and it is why learned motion matching's compression targets the *pose* database (§3).
 
 At AV Gen's actual scale these numbers say motion matching is cheap. They also say the cheapness is
 irrelevant, because the database is 57 seconds.
 
-### 2.4 Acceleration structures: don't, yet
+### 2.8 Inertialization — the thing AV Gen is missing and the cheapest to add
 
-Holden's own C++ implementation uses a two-level AABB BVH over groups of 16 and 64 frames. At
-20,000 frames a brute-force search is 132 µs; a tree buys perhaps 5-10× and costs determinism risk
-(tie-breaking depends on traversal order and on how the tree was built) and a build step. The
-straight-line SIMD loop is the right default until the database passes ~100,000 frames, which AV
-Gen will not reach for years.
+`grep -rni "inertial" src/ docs/` is empty. Every transition in AV Gen is a cross-fade, which means
+two clips are evaluated for the duration and the cost of a transition scales with how many joints
+disagree. Inertialization replaces that with: **capture the pose difference at the moment of the
+switch, then decay it to zero as a post-process.** Only the target is evaluated. Fixed cost. Fire
+and forget.
 
-### 2.5 Reference implementations, assessed
+There are two formulations and AV Gen should take the second.
 
-| repo | license | LOC | verdict |
+**Bollo's quintic** (*Inertialization: High-Performance Animation Transitions in "Gears of War"*,
+GDC 2018). Per channel, with `x0` the offset magnitude and `v0` its finite-differenced velocity:
+
+```
+if (x0 == 0 || v0 > 0) skip                       // nothing to fix, or already separating
+t1 = min(t1_desired, -5 * x0 / v0)                // clamp so the curve cannot be forced to overshoot
+a0 = (-8 * v0 * t1 - 20 * x0) / (t1 * t1)         // zero jerk at t1
+A  = -( a0*t1*t1 +  6*v0*t1 + 12*x0) / (2*t1^5)
+B  =  (3*a0*t1*t1 + 16*v0*t1 + 30*x0) / (2*t1^4)
+C  = -(3*a0*t1*t1 + 12*v0*t1 + 20*x0) / (2*t1^3)
+x(t) = A t^5 + B t^4 + C t^3 + (a0/2) t^2 + v0 t + x0
+```
+
+Two details that are routinely missed: **do not inertialize x, y, z independently** — decompose a
+vector into direction and magnitude and inertialize the *magnitude*, because per-component time
+clamping produces visible artifacts when the component velocities differ; and for quaternions,
+decompose into axis and angle and inertialize the *angle*. And the pose history buffer must hold
+the **inertialized output**, not the raw graph output, so back-to-back transitions compose.
+
+**Holden's spring** (`spring.h`, MIT, 214 LOC) is a critically-damped exponential decay of the
+offset, parameterised by a half-life rather than a duration:
+
+```cpp
+float halflife_to_damping(float h) { return (4.0f * LN2f) / (h + 1e-5f); }
+void decay_spring_damper_exact(float& x, float& v, float halflife, float dt) {
+    float y = halflife_to_damping(halflife) / 2.0f;
+    float j1 = v + x*y;
+    float eydt = fast_negexpf(y*dt);
+    x = eydt*(x + j1*dt);
+    v = eydt*(v - j1*y*dt);
+}
+void inertialize_transition(vec3& off_x, vec3& off_v, vec3 src_x, vec3 src_v, vec3 dst_x, vec3 dst_v) {
+    off_x = (src_x + off_x) - dst_x;   // folds the OLD residual into the new offset
+    off_v = (src_v + off_v) - dst_v;
+}
+```
+Default half-life 0.1 s.
+
+**Take the spring.** The quintic reaches exactly zero in finite time and bounds overshoot
+explicitly; the spring never exactly reaches zero but retriggers trivially — `inertialize_transition`
+folds the old residual into the new offset, so a system that retriggers every ~10 frames needs no
+bookkeeping at all. More importantly for AV Gen: **the spring is a closed form in
+`(offset, offset velocity, half-life, elapsed)`**, which fits the engine's "store *when*, not how
+long" rule (`src/scene/animation.hpp:8-16`) exactly. It is state, so by ADR-541 it lives in
+`MotionMemory` in the entity tier — but it is three floats per channel and a pure function of them.
+
+A related and genuinely elegant idea worth recording: Holden's *Inertialization Transition Cost*
+defines the transition cost as **the total displacement the inertialized transition will cause**,
+which for a spring integrates to `(2·x·y + v)/y²` and reformulates as a **precomputable per-frame
+feature** — `(2·pos/y) + (vel/y²)`, with cost `|source − destination|`. It answers "how do I weight
+position against velocity" by deriving the weight from the blend you were going to do anyway.
+
+### 2.9 Reference implementations, assessed
+
+| repo | license | size | verdict |
 |---|---|---|---|
-| **[orangeduck/Motion-Matching](https://github.com/orangeduck/Motion-Matching)** | **MIT**, © 2021 Daniel Holden, real LICENSE file | 4,742 C++ (controller.cpp 2,486; database.h 732; lmm.h 257; **nnet.h 173**; spring.h 214) + 2,355 Python training | **The only artifact in this study that could be vendored.** Written by the paper's first author, last pushed 2025-02-06. Contains both classical MM and learned MM. raylib is the demo window only. |
-| [SaxonRah/OpenMotion](https://github.com/SaxonRah/OpenMotion) | see §7 | see §7 | see §7 |
-| [aaron1a12/wm-motion-matcher](https://github.com/aaron1a12/wm-motion-matcher) | see §7 | | |
-| [KamatMayur/UE5_MotionMatching](https://github.com/KamatMayur/UE5_MotionMatching) | see §7 | | |
+| **[orangeduck/Motion-Matching](https://github.com/orangeduck/Motion-Matching)** | **MIT**, © 2021 Daniel Holden, real LICENSE | 4,742 LOC C++ (`controller.cpp` 2,486; `database.h` 732; `lmm.h` 257; **`nnet.h` 173**; `spring.h` 214) + 2,355 LOC Python training | **The only artifact in this study that could be vendored.** By the paper's first author, last pushed 2025-02-06. Both classical and learned MM. raylib is the demo window only. |
+| **[orangeduck/Spring-It-On](https://github.com/orangeduck/Spring-It-On)** | **MIT**, © 2021 Daniel Holden | small | The damper/spring reference. This is where the inertialization arithmetic comes from. |
+| [SaxonRah/OpenMotion](https://github.com/SaxonRah/OpenMotion) | **NONE.** `license: null`, no LICENSE file in 1,004 files. One in-file comment says "MIT License" with no license text — **all rights reserved by default** | `MotionMatchingComponent.cpp` is **10.2 KB / 310 lines**; the repo's real content is FABRIK IK (`FabrikChain.cpp` 47.8 KB) | **A FABRIK IK plugin with a motion-matching sketch bolted on**, 6 commits total. The author's own README: *"I don't remember how much of the FK, Physical Anim, and Motion Matching systems were implemented, and I don't remember what was broken/needs fixes."* Its matcher has no character-space rotation removal, **no normalisation at all** (it sums squared distances and `1 − dot` in one cost), no early-out, no continuity bias, no transition cost, no current-frame seeding, no inertialization — and its query sets *the same* placeholder velocity for all five bones (`// uniform approx`). **Do not vendor. Read as a 310-line illustration if you like.** |
+| [aaron1a12/wm-motion-matcher](https://github.com/aaron1a12/wm-motion-matcher) | **MIT** | 187 KB / 39 files; `AnimNode_MotionMatcher.cpp` 1,554 LOC | 4 commits in 38 minutes in 2022, untouched since. Author's README: *"It's not tested in its current form... and might not even compile in Unreal."* **The best-informed design of the three UE repos**: proper per-feature running std with a precomputed inverse, and `TrajectoryTimings = {-0.25, 0.25, 0.5, 0.75, 1.0}` — note the **past sample at −0.25 s**, a real technique for penalising reversals that Holden's 27-dim layout omits. Worth reading for the schema. Expect it not to build. |
+| [KamatMayur/UE5_MotionMatching](https://github.com/KamatMayur/UE5_MotionMatching) | MIT | **15 files, 16,147 bytes total** of C++ | **There is no implementation in it.** `MotionSynthesis.h` (2.3 KB) is empty `UDataAsset` declarations; the rest is module boilerplate and the stock UE5 third-person character. The 435 MB is Manny/Quinn assets. Ignore. |
 
 **The data is the catch, not the code.** Holden's repo builds its database from Ubisoft **LAFAN1**,
 which its own README says is **CC BY-NC-ND 4.0** — "unlike the code, which is licensed under MIT".
-So the algorithm is free and the reference motion is not.
+So the algorithm is free and the reference motion is not, and `resources/*.bin` must not ship.
+
+One correction to the brief: **there is no int16-quantised database in Holden's repo.** Features and
+poses are float32 throughout, and the README says outright that it "does not contain some of the
+briefly mentioned optimizations to the animation database storage". Quantisation in this literature
+traces to Büttner (i3D 2019), who mapped features into a quantised space with product quantisation
+(Jégou et al. 2011).
+
+### 2.10 What Unreal shipped, and the one lesson worth stealing
+
+UE5's Pose Search plugin uses three assets — a **Schema** (what to match on), one or more
+**Databases**, and the **Motion Matching** anim-graph node — with a **Chooser Table** selecting
+*which database* to search from gameplay context. A new Schema arrives preconfigured with a
+Trajectory channel and a Pose channel, and the Pose channel defaults to `foot_l` and `foot_r`.
+Same schema as Clavet's and Holden's: feet plus trajectory.
+
+Its continuity settings are named versions of §2.1's three mechanisms: `Continuing Pose Cost Bias`
+(the margin), `Pose Jump Threshold Time` (the exclusion window), `Pose Reselect History`,
+`Search Throttle Time` (the cadence). Search modes are `Brute Force`, `PCAKDTree` and an
+experimental `VPTree` — note that Epic, like the LMM paper, only offers a KD-tree *paired with*
+PCA. **Epic publishes no millisecond or memory figures anywhere**; the guidance is "profile with
+Unreal Insights and partition your databases."
+
+**The lesson:** Epic's answer to database growth is not a better index. It is **many small
+databases selected by a decision table, plus pose warping to fill in what is not in the data**.
+AV Gen already owns the decision table — that is what `Selector` and the considerer list are
+(ADR-333) — and "pose warping" is what the IK/procedural layer is for. Both halves of Epic's
+scalability answer map onto systems this engine already has.
 
 ---
 
@@ -417,10 +632,16 @@ library:
 
 | scenario | frames | MM memory | LMM memory | reduction | MM µs/frame | LMM µs/frame |
 |---|---:|---:|---:|---:|---:|---:|
-| Locomotion | 89,480 | 52.1 MB | 5.3 MB | 9.8× | 90 | 197 |
-| Terrain | 170,534 | 104.7 MB | 5.5 MB | 19× | 213 | 200 |
-| Dog | 124,418 | 136.5 MB | 6.5 MB | 21× | 111 | 262 |
-| **Bear** | 694,272 | 995.6 MB | 7.1 MB | **140×** | 946 | 340 |
+| Locomotion | 89,480 | 52.1 MB | 5.3 MB | 9.8× | 90 or 909 † | 197 |
+| Terrain | 170,534 | 104.7 MB | 5.5 MB | 19× | 213 † | 200 |
+| Dog | 124,418 | 136.5 MB | 6.5 MB | 21× | 111 † | 262 |
+| **Bear** | 694,272 | 995.6 MB | 7.1 MB | **140×** | 946 † | 340 |
+
+† **The memory columns are solid and the MM timing column is not.** Two independent extractions of
+this PDF disagreed by a factor of ten on the classical-MM timings (§2.5); the memory figures agree
+in both readings and close against `frames × features × 4 bytes`. The LMM timings are confirmed by
+their own arithmetic (Locomotion: Decompressor 85 + Stepper 100 + Projector 127 run every 10th
+frame = 85 + 100 + 12.7 = 197.7 ✓). **Do not cite the MM µs column without re-reading the paper.**
 
 For comparison in the same table, **PFNN is 9.3 MB / 1,370 µs** and **MANN is 16.9 MB / 2,440 µs** —
 LMM is 4-7× faster than the phase-functioned family at comparable memory.
@@ -690,6 +911,50 @@ exact arithmetic including the inertialization springs.
 
 ---
 
+## 6a. Multiple characters, and the wall nobody has hit yet (Part 18)
+
+`Composition` **deep-copies the whole rig per node instance**, on purpose:
+
+> *"ADR-086: rigs are copied per node instance, not per asset. Two nodes on the same character file
+> are two characters, and they must be able to be doing different things; sharing one pose between
+> them is the bug, not the saving."*
+> — `src/scene/composition.cpp:4873-4878`, and the copy itself is `SkinnedRig rig = src;` at `:4879`
+
+The pose must be per-instance. The *clips* need not be, and today they are: each copy carries all
+26 animations. Measured from the file — 156,921 keys across 6,942 channels — each channel stores a
+`float` time and a `glm::vec4` value per key, so one alien's clip data is
+
+```
+156,921 × (4 + 16) B  ≈  3.14 MB   + ~0.33 MB of vector headers  ≈  3.5 MB per character instance
+```
+
+| characters | clip memory |
+|---:|---:|
+| 5 (today's Glowmere cast) | ~17.5 MB |
+| 50 | ~175 MB |
+| 200 | ~700 MB |
+
+`assets/aliens/ATTRIBUTION.md` already records the disk half of this (3.9 MB of each 4.5 MB file is
+animation) and attributes it to the same cause: there is no way to bind one file's clips to another
+file's skeleton (§1.5).
+
+**This is the real Part 18 finding, and it is not about LOD.** The LOD machinery already exists and
+is good: rig pose rate on a timeline grid with near/far/cull bands, entity cull and coarse bands,
+phase-shifted perception and decision cadences. What does not exist is **clip sharing**, and a
+motionpack fixes it for free — a pack is immutable, read-only, shared by every instance, and
+referenced rather than copied. `SkinnedRig` keeps its `Pose`, `palette`, `player` and `layers`;
+`clips` becomes a `const MotionPack*`.
+
+That is worth naming as a *second* reason to build the motionpack, independent of motion matching:
+**it is the fix for character memory scaling, and it is the only one.**
+
+Design for the impostor rung the brief describes (hero = full intelligence, background = cheap
+procedural, distant = baked) and do not build it. Nothing in the 21-character scene is measured as
+a problem, and the first measurement to take is `RigStats::cpuMs`, which already exists and has no
+reader.
+
+---
+
 ## 7. Generative and diffusion motion
 
 The question the brief asks — "should generative models run at runtime?" — has a clear answer:
@@ -704,9 +969,198 @@ RUNTIME:  motion database → matching/synthesis → IK → final pose
 ```
 
 with one addition: **a rejection stage with a measurable criterion**, because generated motion's
-characteristic failures (foot sliding, ground penetration, jitter) are exactly the things an
-offline pipeline can measure and an artist cannot be asked to eyeball across hundreds of clips.
-Foot-slide per frame, penetration depth, and joint-velocity spikes are all computable.
+characteristic failures are exactly the things an offline pipeline can measure and an artist cannot
+be asked to eyeball across hundreds of clips. Foot-slide per frame, penetration depth, and
+joint-velocity spikes are all computable.
+
+How bad the raw output is, for scale: measured on HumanML3D, **raw MDM floats 18.9 mm above the
+floor, penetrates 11.3 mm into it, and skates on roughly one frame in ten**. That is a rebuild, not
+a polish pass. And the practical blocker for automating the cleanup is sharp: **IK foot-locking
+needs better than 95% foot-contact prediction accuracy, and typical accuracy on complex motion is
+85-90%** — which is why a model that *ships its own per-frame contacts* is worth more here than a
+model with a better FID.
+
+None of these models knows terrain exists. Every one generates a lone body on a flat infinite floor
+at y = 0, so every clip would have to be re-grounded against AV Gen's actual terrain. And the
+stylistic ceiling is real for this project specifically: a human-mocap-trained model *"cannot
+generate cartoon or non-physically plausible motions"*, and the Glowmere cast is a stylized
+non-human biped.
+
+**The licensing answer is in §8.5 and it is decisive**: the entire MDM/MotionDiffuse/MLD/T2M-GPT/
+MoMask family is trained through HumanML3D to AMASS, which forbids commercial training outright, so
+their output is not shippable. There appears to be one exit — NVIDIA's 2026 Kimodo and ARDY,
+Apache-2.0 code on commercially-cleared mocap — and it is CUDA-only and unverified beyond the repo
+metadata. **Treat generative motion as a research item with a named revisit condition, not as a
+phase.**
+
+---
+
+## 8. Licensing, which decides more of this than the engineering does
+
+### 8.1 The rule
+
+Six categories must be tracked separately, and conflating them is how a research asset ships:
+
+| category | example | governs |
+|---|---|---|
+| **runtime code** | a motion-matching search | what AV Gen links |
+| **offline/training code** | a PyTorch training script | a build-time tool, like a shader compiler |
+| **raw mocap data** | LAFAN1's BVH files | what an artist may import |
+| **a derived motion database** | a `.motionpack` built from that mocap | **what AV Gen ships** |
+| **trained model weights** | a Decompressor `.bin` | **what AV Gen ships** |
+| **generated motion** | a diffusion model's output | **what AV Gen ships** |
+
+The last three are where the trap is. A permissively-licensed *algorithm* trained on or derived
+from a non-commercial *dataset* produces a non-commercial *artifact*, and several of the licences
+below say so explicitly rather than leaving it to inference.
+
+### 8.2 What was verified, with the text
+
+| thing | licence | verified? | may AV Gen ship a derived database? |
+|---|---|---|---|
+| **AV Gen's own alien pack** | **CC0 1.0** (owner's statement, `assets/aliens/ATTRIBUTION.md`) | read in repo | **yes** |
+| **AV Gen's farm pack** | same family, per the same statement | read in repo | **yes** |
+| `orangeduck/Motion-Matching` **code** | **MIT**, © 2021 Daniel Holden, real LICENSE file | read | **yes** |
+| `orangeduck/Spring-It-On` code | **MIT**, © 2021 Daniel Holden | read | **yes** |
+| **LAFAN1** (Holden's reference data, and `E1P3`'s) | **CC BY-NC-ND 4.0** — the repo's own README: *"The data required if you want to regenerate the animation database is from this dataset which is licensed under Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International Public License (unlike the code, which is licensed under MIT)."* | read | **no.** NonCommercial *and* **NoDerivatives** — a retargeted database is a derivative |
+| **AI4Animation** (all of it, 2017-2024) | **no LICENSE file.** README only: *"This project is only for research or education purposes, and not freely available for commercial use or redistribution. The motion capture data is available only under the terms of the Attribution-NonCommercial 4.0 International (CC BY-NC 4.0) license."* | read, 404 on the licence API | **no** |
+| **AI4AnimationPy** (2026 remake) | **CC BY-NC 4.0 applied to the code itself** | LICENSE read | **no** |
+| **SAMP code** | AI4Animation's terms **plus**: *"You may use, reproduce, modify, and display the research materials... solely for noncommercial purposes... **You may not redistribute the Research Materials.**"* | read | **no**, and it cannot even be redistributed |
+| **SAMP dataset** (Max-Planck) | *"Any other use, in particular, any use for commercial... purposes is prohibited... This license also prohibits the use of the Dataset to train methods/algorithms/neural networks/etc. for commercial... use... **No Distribution** — ... shall not be copied, shared, distributed... except that you may make one copy for archive purposes only."* | read | **no**, and the restriction is explicitly **viral onto trained weights** |
+| `pau1o-hs/Learned-Motion-Matching` | **no LICENSE file** — default copyright | API | **no** |
+| `E1P3/Learned_Motion_Matching_UE5` | **no LICENSE file** | API | **no** |
+| `E1P3/Learned_Motion_Matching_Training` | **MIT**, © 2024 | API | yes (the code) |
+| `SaxonRah/OpenMotion` | **no LICENSE file** in 1,004 files; one in-file "MIT License" comment with no licence text → all rights reserved | API + tree | **no** |
+| `aaron1a12/wm-motion-matcher` | **MIT** | API | yes |
+| `KamatMayur/UE5_MotionMatching` | MIT (but there is nothing in it) | API | n/a |
+
+### 8.3 The shippable list — this is the most valuable finding in the report
+
+A motion corpus AV Gen may legally ship a derived database of **does exist**, and it is large.
+
+| source | licence, verbatim where quoted | commercial? | ship a **derived** database? | train on it? |
+|---|---|---|---|---|
+| **100STYLE** — <https://zenodo.org/records/8127870> | **CC BY 4.0** (Zenodo API: `"license": {"id": "cc-by-4.0"}`). *"over four million frames of stylized motion capture data"*, BVH + processed, 100 styles | **yes** | **yes** | **yes** |
+| **ACCAD Open Motion Project** (Ohio State) | *"Open Motion Project by ACCAD/The Ohio State University is licensed under a Creative Commons Attribution 3.0 Unported License."* ~300 BVH across female1/male1/male2, martial arts, running, walking | **yes** | **yes** | **yes** |
+| **CMU Motion Capture Database** | *"This dataset of motions is free for all uses."* … *"You may include this data in commercially-sold products, but you may not resell this data directly, **even in converted form**."* | **yes** | **no if the database is the product**; yes embedded in AV Gen | not addressed |
+| **Kenney.nl** (already in `assets/kenney`) | **CC0.** *"Attribution is not required"* | yes | yes | yes |
+| **Mixamo (Adobe)** | Adobe: *"You can use both characters and animations royalty free for personal, commercial, and non-profit projects"*. Adobe General Terms §3.6: *"under no circumstances can you distribute the Content Files on a stand-alone basis, outside of the End Use."* §17: must not *"create, train, test, or otherwise improve any machine learning algorithms"* | **yes, embedded** | **no** — a retargeted pack is stand-alone | **no** |
+| **Quaternius** (already in `assets/quaternius`) | QAL v1.0: *"You just can't resell or redistribute the assets themselves as assets"*; §3(a): *"This restriction applies regardless of how much the Assets have been modified"* | yes, embedded | **no** | not addressed |
+| **AV Gen's own alien + farm packs** | **CC0 1.0** (owner's statement, `assets/aliens/ATTRIBUTION.md`) | yes | **yes** | yes |
+
+**Two traps worth naming explicitly.**
+
+1. **You cannot launder permissiveness out of AMASS.** AMASS unifies 15 datasets and the MPI umbrella
+   is the *floor*, not the ceiling — **CMU data inside AMASS is more restricted than CMU data from
+   CMU**. Same for ACCAD. If you want CMU or ACCAD commercially, go to the original site.
+2. **An MIT `LICENSE` on a motion-dataset repo almost always covers the processing scripts, not the
+   motion.** HumanML3D is MIT and *contains no motion data*: *"Due to the distribution policy of
+   AMASS dataset, we are not allowed to distribute the data directly."*
+
+### 8.4 The cannot-ship list
+
+**AMASS** (*"Any other use, in particular any use for commercial purposes, is prohibited… This
+license also prohibits the use of the Dataset to train methods/algorithms/neural networks/etc. for
+commercial use of any kind"*, plus a No-Distribution clause), **SMPL / SMPL-H / SMPL-X** (same MPI
+terms, *and patented* — US10395411B2 — and you cannot evaluate an AMASS pose without it),
+**LAFAN1** (CC BY-NC-**ND**: *"you do not have permission under this Public License to Share
+Adapted Material"* — a retargeted database is the textbook Adapted Material), **Human3.6M**
+(*"GRANT OF LICENSE FREE OF CHARGE FOR ACADEMIC USE ONLY"*), **KIT-ML** (no licence text exists
+anywhere — unlicensed is not permissive), **HumanML3D**, **HumanAct12/PHSPD**, **AIST/AIST++**,
+**Motorica**, **MoVi/BML**, **SFU**, **Bandai-Namco**, **Motion-X**, **MotionMillion**,
+**Nymeria**, **SnapMoGen** — all non-commercial, all out.
+
+Plus, from §4: **AI4Animation** (no licence file at all), **AI4AnimationPy** (CC BY-NC on the code),
+**SAMP** (*"You may not redistribute the Research Materials"*), and **SAMP's dataset** (viral onto
+trained weights).
+
+### 8.5 Generative motion: the chain, and the one exit
+
+**MDM, MotionDiffuse, MLD, T2M-GPT, MoMask, MotionGPT, MotionLCM, StableMoFusion, MotionCLR and
+MotionStreamer are all trained on HumanML3D and/or KIT-ML. HumanML3D derives from AMASS and is
+expressed in SMPL. AMASS forbids training for commercial use of any kind.** The MIT and Apache
+labels on those repos cover the code, not the weights and not the data. **The output of that entire
+family is not shippable.** That closes §7's generative-offline architecture for the models most
+people would reach for.
+
+There appears to be an exit, and it should be verified rather than trusted: two 2026 NVIDIA
+releases, **Kimodo** (`nv-tlabs/kimodo`, Apache-2.0 code, 282 M params, 2-5 s/clip) and **ARDY**
+(`nv-tlabs/ardy`, Apache-2.0, 156 M params, 33-63 ms/clip), are trained on **commercially-licensed
+optical mocap with stated IP clearance — no AMASS, no HumanML3D, no KIT-ML** — and their weights
+carry NVIDIA's Open Model licence (*"ready for commercial use"*, *"NVIDIA does not claim ownership
+to any outputs"*).
+
+**The detail that makes this credible is a negative one**: Kimodo's *SMPL-X* variant is released
+under a different, internal-research-only licence, while its SOMA and G1 variants are open. That is
+a well-resourced legal department declining to ship an SMPL-derived artifact commercially, and it
+is the strongest independent evidence that the AMASS/SMPL chain is real.
+
+Both are **CUDA-only**. Neither knows your terrain exists (*"Not aware of objects in the scene around
+a character"*), and both skate above ground truth (Kimodo 3.87 cm/s vs 2.21 cm/s GT).
+
+**Quality, for scale.** Raw MDM on HumanML3D floats **18.9 mm** off the floor, penetrates **11.3 mm**
+into it, and skates on roughly **1 frame in 10**. That is not a polish pass; it is a rebuild. The
+practical blocker for automated cleanup is sharp and worth recording: **IK foot-locking needs >95%
+contact-prediction accuracy and typical accuracy on complex motion is 85-90%** — which is exactly
+why Kimodo's 0.98 contact accuracy and ARDY's shipping per-frame contacts in its output matter more
+than either model's FID.
+
+### 8.4 The mechanism, not the policy
+
+A rule that lives in a document gets broken. Two enforcement points:
+
+1. **`pack.json` carries a required `license` field and the build fails without it.** Not a
+   warning — this codebase has a standing lesson that an unreported no-op is the failure
+   (`src/scene/pose_layers.hpp:255-259`).
+2. **The pack records its provenance**: every source file, its licence, and the transform chain
+   applied. A derived database whose ancestry cannot be printed is a database nobody can clear.
+
+### 8.6 The practical consequence, which is better than expected
+
+The content gate on ADR-540 is **openable**. **100STYLE alone is four million frames of stylized
+locomotion under CC BY 4.0** — roughly 2,300× AV Gen's entire current corpus, with the starts,
+stops, turns and style variation that §1.8 says are missing, and with a licence that permits a
+shipped derived database *and* training. ACCAD adds ~300 BVH under CC BY 3.0. CMU adds a very large
+corpus that may be embedded commercially but not resold "even in converted form" — which AV Gen
+satisfies, since the pack is part of the application rather than the product.
+
+So the sequencing is: **retargeting (§12.1) is the gate, not the data.** Get 100STYLE onto the alien
+rig and the motion-matching question becomes a real one. Until then it is not.
+
+Two things that are *not* solved by that: the alien is a stylized non-human biped at 1.94× scale,
+and human mocap retargeted onto it may fight the silhouette (Kimodo's card: *"Cannot generate
+cartoon or non-physically plausible motions"*); and nothing in any licensed corpus is Glowmere's
+motion. Owning travelling locomotion authored on the alien rig remains the highest-fidelity answer
+and is an art task.
+
+---
+
+## 8a. Audio-reactive animation (Part 19)
+
+**The seam already exists and is already used.** `BehaviorContext` carries the signal bus and hands
+behaviours two accessors — `signal(name)` for a continuous value and `event(name)` for a discrete
+one (`src/entity/behavior.hpp:140-141`). Three behaviours already consume it:
+
+* `spin` pushes its yaw rate on a named signal (`src/entity/behaviors.cpp:532`);
+* `interest` raises `reaction` from a named signal above a threshold, with a cooldown
+  (`src/entity/behaviors.cpp:943-944`) — and `reaction` is what drives the additive `startle` layer
+  on all five Glowmere aliens;
+* `explore` triggers a hop on `jumpSignal` (`src/entity/behaviors.cpp:1558-1559`).
+
+So "beat → motion accent" is already authorable today, in JSON, with no engine change.
+
+**The rule this architecture must preserve: audio reaches animation through the parameter and
+behaviour layers, never through the motion provider.** A provider that read the signal bus would be
+a provider whose output depends on something outside `(request, memory)`, which breaks ADR-541 and
+with it every determinism guarantee below it. What audio may do is:
+
+1. move a **parameter** that a considerer scores against (music energy → a `interest` weight, so a
+   character is more curious in a chorus);
+2. move a **field** of `MotionRequest` (`urgency`, `energy`, `caution`) — which is precisely why
+   those three fields are in §9.3 rather than being a style enum;
+3. move a **pose layer weight** directly, which it already does through `reaction`.
+
+All three go *into* the request. None of them reaches past it.
 
 ---
 
@@ -925,6 +1379,102 @@ honest ETA and prompt cancellation for exactly this.
 
 ---
 
+## 10. Apple Silicon: the neural runtime question, measured and closed
+
+The brief asks whether to use ONNX Runtime, Core ML, MPSGraph or something else if AV Gen ever runs
+a network. **The answer is none of them**, and it is settled by measurement on this machine rather
+than by preference.
+
+### 10.1 The measurements
+
+Apple M2 Max, batch 1, steady state, per inference. Target shape is the LMM family: 3-6 dense
+layers, 512 wide, 1-4 MB of fp32 weights, 1-4 evaluations per frame.
+
+| network | params | hand-written C | Accelerate `cblas_sgemv` | ONNX Runtime 1.30 CPU | ORT + CoreML EP |
+|---|---:|---:|---:|---:|---:|
+| 64→512→400 | 238 K / 0.91 MB | 13.4 µs | **6.4 µs** | 33.5 µs | 257 µs |
+| **64→512→512→400** (the Decompressor's shape) | 501 K / 1.91 MB | **23.9 µs** | **10.4 µs** | 41-98 µs | 381 µs |
+| 64→512×4→400 | 1.03 M / 3.92 MB | 51.4 µs | 17.5 µs | 184 µs | 545 µs |
+| 256→1024×3→512 | 2.89 M / 11.0 MB | 135.6 µs | 48.1 µs | — | — |
+
+Cache-cold (evicting the weights between inferences) costs about 2.2× — 22.8 µs vs 10.4 µs — so
+budget **10-25 µs per network per frame**, not 10.
+
+### 10.2 Why every offload path loses
+
+* **ANE / Core ML.** There is a **fixed dispatch floor of ~0.23 ms per evaluation on Apple Silicon,
+  independent of the work inside it** — a 64-element linear costs the same as a small convolution,
+  and ~98% of the wall time is host and firmware dispatch rather than engine compute. That is
+  **22-37× the entire CPU inference cost** for zero arithmetic. ANE is a low-latency device for
+  encoders at moderate batch; it is the wrong device for one 400-wide vector.
+* **Any GPU path (MPSGraph, Metal, Core ML on GPU).** Measured directly: a *trivial* Metal compute
+  kernel with synchronous `commit` + `waitUntilCompleted` costs **275-278 µs**, and **four kernels
+  in one command buffer cost the same as one** (195-274 µs). The round-trip is pure dispatch
+  latency and is completely insensitive to the work inside it. The only escape is fire-and-forget
+  with the result consumed next frame — which buys a frame of latency in a system whose whole point
+  is same-frame pose evaluation, and destroys deterministic frame ordering.
+* **ONNX Runtime.** MIT and clean, but the macOS arm64 dylib is **41.8 MiB**, it is 4-10× slower
+  than Accelerate on this shape, and — decisively — **it makes no reproducibility promise**. The
+  maintainers' position on record is that results "may vary within a certain tolerance level", with
+  1e-5 given as an example. Its CoreML EP silently demotes to fp16.
+
+AV Gen has exactly one precedent for a prebuilt ML-adjacent binary — OpenImageDenoise, whose network
+runs through BNNS/Accelerate — and ADR-353 records what it cost: a 51 MB download, `OFF` by default,
+and an inability to build from source without oneTBB and a third-party compiler toolchain. That ADR
+is both the precedent and the warning.
+
+### 10.3 Determinism, which is the actual deciding factor
+
+Measured on this machine, hashing a fixed input's 400-float output:
+
+| condition | result |
+|---|---|
+| run-to-run, same binary (hand-written **and** Accelerate) | **bit-identical over 1,000 runs** |
+| hand-written vs Accelerate, same input | **383 of 400 outputs differ in bits** (max abs 5.6e-8) |
+| `-O0` … `-O3` … `-Os`, ±vectorisation, `-mcpu=apple-m1`/`m2`, **all with `-ffp-contract=off`** | **one identical hash across every combination** |
+| `-O2` / `-O3` at clang's **default** | a *different* hash |
+| `-ffast-math` | a third hash |
+
+**Apple clang contracts to FMA by default**, which silently changes the bits between a debug and a
+release build. With **`-ffp-contract=off`** the result is bit-identical across optimisation level,
+vectorisation and `-mcpu` target. That is the strongest determinism guarantee available on this
+platform and it costs one flag.
+
+The delta from contraction is about 1 ulp. That is harmless in a feed-forward pass and it is *not*
+harmless in the Stepper, which **feeds its own output back in every frame**.
+
+**Accelerate is not safe cross-machine.** It dispatches different kernels per microarchitecture
+(NEON vs AMX vs SME), and a kernel change is a summation-order change. If an M1 and an M4 must
+produce the same bits, only the hand-written path gets there.
+
+### 10.4 The decision
+
+1. **A hand-written forward pass**, ~90 lines, `restrict`-qualified, with the ReLU zero-skip.
+   Holden's `nnet.h` is exactly this: **173 lines total, 123 non-blank, 86 for the forward pass**,
+   MIT, and it shipped in a AAA production at 197 µs/frame for three 512-wide networks on 2020
+   hardware. This machine is ~8× faster than that hardware.
+2. **`-ffp-contract=off` pinned in CMake on the inference translation unit specifically**, with a
+   golden-vector test that hashes a fixed input's output. That test is how a toolchain upgrade
+   announces that it moved the bits.
+3. **An optional `cblas_sgemv` fast path** behind a flag, cross-checked against the reference with a
+   stated tolerance — never mixed at runtime, because the two are *different implementations*, not
+   different optimisations.
+4. **No ONNX Runtime, no Core ML, no ANE, no GPU, ever, for this workload.**
+5. **Own the model file format.** Use ONNX only as the export path out of PyTorch and convert to a
+   flat versioned blob at bake time. Holden's own format is the cautionary tale: `nnet_load` reads
+   means, stds, a layer count and the arrays, with **no magic number, no version, no architecture
+   hash and no shape assertion** — feed it a file from a different training run and it produces
+   plausible garbage, silently. A model header must carry: magic + format version; an architecture
+   hash; the normalisation statistics (they *are* part of the model); the **feature schema** (bone
+   order, joint count, layout, latent dim, rotation convention, units); the **timestep assumption**
+   (`dt = 1/60` is baked into the velocity terms); a training-data provenance ID (§8); and the
+   numeric contract plus a golden hash.
+
+**Budget: 10-25 µs per network per frame; four networks ≈ 0.4-1% of a 60 Hz frame.** The network is
+free. Everything expensive in this problem is framework and dispatch.
+
+---
+
 ## 11. What to build: the classification (Part 23)
 
 Evidence-based, and several of these differ from the brief's own examples.
@@ -949,7 +1499,7 @@ Evidence-based, and several of these differ from the brief's own examples.
 |---|---|---|
 | **1D/2D blend spaces** (walk↔run, and directional) | phase extraction | Gives most of motion matching's smoothness for a fraction of the machinery, and works on 3 clips where MM needs 30 minutes. `docs/character-ai-research.md:677` rejected this on grounds that no longer hold |
 | **`IMotionProvider` + `MotionRequest`** | velocity vector | The seam. Cheap once the representation is right |
-| **Classical motion matching** | retargeting, a real dataset, inertialization | §2. The algorithm is easy; the data is not |
+| **Classical motion matching** | retargeting, a real dataset, inertialization | §2. The algorithm is easy; the data was assumed impossible and is not — **100STYLE is CC BY 4.0 and is 4 M frames of stylized locomotion** (§8.3). Retargeting is the gate, not the licence |
 | **Reach / hand IK, hip adjustment, spine look distribution** | per-foot planes | Pure extensions of the existing layer stack |
 | **Spring secondary motion (antennae, tails)** | — | ~100 lines, but it is *state*, so it must live in the entity tier |
 | **Scene-aware interaction goals** ("stand here, face this") | `MotionRequest` | Deterministic arithmetic first; a learned GoalNet only for non-obvious affordances |
@@ -973,7 +1523,8 @@ Evidence-based, and several of these differ from the brief's own examples.
 | **A physics character controller / ragdoll** | §6. No physics exists; the payoff is reactions the additive layer already fakes; determinism cost is severe |
 | **Runtime generative models** | Latency, determinism, licensing, and no runtime need |
 | **A new entity system, a behaviour tree, GOAP/HTN** | Already rejected with reasons in `docs/character-ai-research.md` §F.2, and the reasons still hold |
-| **ONNX Runtime for these networks** | §10 |
+| **ONNX Runtime, Core ML, the ANE, or any GPU path for these networks** | §10, measured on this machine: 41.8 MiB and 4-10× slower for ORT; a 0.23 ms dispatch floor for the ANE; a 275 µs Metal round-trip insensitive to its own payload; and no reproducibility promise from either ORT or Core ML |
+| **Any model from the MDM / MotionDiffuse / MLD / T2M-GPT / MoMask family** | §8.5. All trained on HumanML3D → AMASS, which forbids commercial training outright. Their MIT and Apache labels cover the code |
 | **An LLM anywhere in the animation core** | Explicit in the brief and correct |
 | **A nearest-neighbour acceleration structure** | §2.4: brute force wins at AV Gen's scale and costs no determinism |
 | **The early-out inner loop** | §2.3: measured 2.0-2.7× *slower* on this machine |
@@ -1149,7 +1700,7 @@ cost.
 | **3** | Advanced procedural layer: reach/hand IK, hip adjustment, spine look distribution, spring secondary motion (entity tier). | 1b | 5 |
 | **4** | Blend spaces (1D speed, 2D directional) as `BlendSpaceProvider`. | 1a, 1c | 6 |
 | **5** | Scene-aware motion: per-foot terrain sampling from `NavGrid`, step-over, interaction goal points ("stand here, face this"), obstacle-aware approach. | 1b, 3 | 9 |
-| **6** | Classical motion matching as `MatchingProvider`, **gated on a dataset existing**. | 2, 1a, 4 | 7 |
+| **6** | Classical motion matching as `MatchingProvider`, **gated on 100STYLE (or equivalent) having been retargeted onto the alien rig with measured contacts and trajectories**. Two-level AABB only if the database exceeds ~20k frames. | 2, 1a, 4 | 7 |
 | **7** | Offline motion variation (mirror, time-warp, trajectory edit) — DERIVED motion, labelled. | 2 | 6 quality |
 | **8** | Learned motion matching, **gated on the database exceeding ~100k frames**. | 6 | — |
 | **9** | Autonomous goals: extend the considerer set toward the brief's examples. Mostly already possible. | 5 | — |
@@ -1206,9 +1757,9 @@ six numbers a human can argue with.
 
 | risk | severity | what it looks like | mitigation |
 |---|---|---|---|
-| **Content, not code, is the binding constraint** | **high** | Motion matching is built and looks worse than the gait machine, because 57 s is not a database | §16 tests it before the build. Gate phase 6 on a dataset |
+| **Content, not code, is the binding constraint** | **medium** (was high) | Motion matching is built and looks worse than the gait machine, because 57 s is not a database | §16 tests it before the build. **100STYLE (CC BY 4.0, 4 M frames) closes the licensing half**; retargeting is what remains |
 | **The alien rig cannot be given feet** | **high** | §12.2 both options are expensive; the source `.blend` is not in the repo | §16 arm 6 answers it in a day |
-| **Licensing contaminates the deliverable** | **high** | A shipped motionpack derived from AMASS/LAFAN1/Mixamo | Mandatory `license` in `pack.json`; a build that fails without it. §8 |
+| **Licensing contaminates the deliverable** | **high** | A shipped motionpack derived from AMASS, LAFAN1, Mixamo, or any model trained on HumanML3D. **The trap is that the repos are MIT and the data is not** | Mandatory `license` + provenance in `pack.json`, a build that **fails** without it (ADR-542). Never take CMU or ACCAD *via AMASS* — go to the original site (§8.3) |
 | **Retargeting silently degrades motion** | medium | Clips play but the character is subtly wrong; no test catches it | Report-what-you-could-not-do; a byte-identity regression arm over the existing 26 clips when the pack is built from the same rig (the ADR-337 pattern: 159 of 165 bit-identical) |
 | **A stateful provider breaks the determinism contract** | medium | Scrub and render disagree; two renders disagree | `MotionMemory` lives in the entity tier by construction (§9.2 rule 2). Reuse `tools/charai_probe.cpp`'s play-vs-seek harness |
 | **Main-thread cost grows invisibly** | medium | The editor gets slower and nothing says why | Surface `RigStats::cpuMs` *before* building anything (§11 BUILD NOW) |
@@ -1245,14 +1796,20 @@ Explicit, so that a reviewer can point at it.
 
 1. **Motion matching of any kind** — gated on ADR-540's two gates.
 2. **Learned motion matching** — gated on a database exceeding ~100,000 frames.
-3. **Any neural network in the runtime** — there is nothing worth inferring yet.
+3. **Any neural network in the runtime** — there is nothing worth inferring yet. When there is,
+   §10 already decided the runtime (hand-written matmul, `-ffp-contract=off`), so this is a build
+   decision and not a research one.
 4. **Any mixture-of-experts / neural state machine / scene-interaction network** — the data cost is
    a mocap shoot with per-frame hand labelling including phase (§4.3), and the licence forbids the
    reference implementation.
 5. **Physics, ragdolls, partial ragdolls, dynamic balance** — §6.
 6. **Runtime generative or diffusion motion** — §7.
-7. **A nearest-neighbour acceleration structure** — §2.4, measured unnecessary.
-8. **The early-out search loop** — §2.3, measured 2.0-2.7× slower here.
+7. **A nearest-neighbour acceleration structure** — §2.4. The two-level AABB is the *right*
+   structure and is measured at 4.9× on real data, but it buys nine microseconds at AV Gen's
+   database size and costs determinism surface in tie-breaking. Build it when the database reaches
+   tens of thousands of frames, and build the AABB, not a KD-tree.
+8. **A KD-tree, ever, un-paired with PCA** — §2.4. Both the LMM paper and Epic reached the same
+   conclusion independently.
 9. **Threading the entity update** — two subsystems assume single-threadedness by documented
    contract (`nav_grid.hpp:349-351`, `perception.hpp:98-101`).
 10. **Threading rig posing** — until `RigStats::cpuMs` is surfaced and shows it matters.
@@ -1275,8 +1832,79 @@ the repository. Each is ADR-182-safe (every arm can fail, and the failure is det
 | `clipstats.py` | how much motion does AV Gen own? | 26 clips, 57.07 s, 267 channels each, 156,921 keys |
 | `rootpath.py` | do the locomotion clips travel? | no: `Walking` moves its root 3.2 cm in X over 1.03 s |
 | `mmprobe.cpp` | what does a brute-force MM query cost here? | 6.7 ns/frame at D=27; early-out is 2.0-2.7× **slower** |
+| `mmprobe2.cpp` | does the early-out win or lose, and on what? | it depends entirely on the fixture: 2.2× slower on white noise with a far query, **0.80× (a 20% win)** on motion-like data with a near query. §2.3a |
 | `poseprobe.cpp` | what does posing this rig cost, for scale? | 2.97 µs for 89 joints / 267 channels (arithmetic shape, not AV Gen's code — a lower bound) |
 
 `mmprobe.cpp`'s correctness arm plants an exact duplicate of the query at a known row and requires
 both search implementations to find it, then re-randomises that row so the timing run is not an
 early-out best case. `poseprobe.cpp`'s arm requires sampling at a key to reproduce that key.
+
+**And `mmprobe.cpp` still produced a wrong conclusion**, because a correct probe on the wrong
+fixture is a correct measurement of the wrong thing (§2.3a). `mmprobe2.cpp` exists because the
+finding was contradicted by a second measurement on real data, and the contradiction was worth more
+than either number.
+
+---
+
+## 21. References
+
+### Papers and talks
+
+| | |
+|---|---|
+| Büttner & Clavet, *Motion Matching — The Road to Next Gen Animation*, Nucl.ai 2015 | the origin, for *For Honor* |
+| Clavet, *Motion Matching and The Road to Next-Gen Animation*, GDC 2016 | <https://gdcvault.com/play/1023280/Motion-Matching-and-The-Road> · transcript <https://archive.org/stream/GDC2016Clavet/GDC2016-Clavet_djvu.txt> |
+| Bollo, *Inertialization: High-Performance Animation Transitions in "Gears of War"*, GDC 2018 | <https://media.gdcvault.com/gdc2018/presentations/bollo_david_inertialization_high_performance.pdf> |
+| Holden, Kanoun, Perepichka, Popa, *Learned Motion Matching*, ACM TOG 39(4), SIGGRAPH 2020 | <https://doi.org/10.1145/3386569.3392440> · PDF <https://theorangeduck.com/media/uploads/other_stuff/Learned_Motion_Matching.pdf>. §3 is also the best written spec of **classical** MM in existence |
+| Holden, Komura, Saito, *Phase-Functioned Neural Networks for Character Control*, TOG 36(4), 2017 | PFNN |
+| Zhang\*, Starke\*, Komura, Saito, *Mode-Adaptive Neural Networks for Quadruped Motion Control*, TOG 37(4), 2018 | MANN |
+| Starke\*, Zhang\*, Komura, Saito, *Neural State Machine for Character-Scene Interactions*, TOG 38(6), SIGGRAPH Asia 2019 | §4.3 |
+| Starke, Zhao, Komura, Zaman, *Local Motion Phases for Learning Multi-Contact Character Movements*, TOG 39(4), 2020 | written because NSM's per-frame phase labelling was untenable |
+| Starke, Mason, Komura, *DeepPhase: Periodic Autoencoders for Learning Motion Phase Manifolds*, TOG 41(4), 2022 | |
+| Starke et al., *Categorical Codebook Matching for Embodied Character Controllers*, TOG 43(4), 2024 | |
+| Hassan et al., *Stochastic Scene-Aware Motion Prediction*, ICCV 2021 | SAMP · <https://arxiv.org/abs/2108.08284> |
+| Yuan et al., *PhysDiff: Physics-Guided Human Motion Diffusion Model*, ICCV 2023 | the penetration/float/skate metrics in §7 · <https://arxiv.org/abs/2212.02500> |
+| Flash & Hogan, *The Coordination of Arm Movements*, J. Neuroscience 5(7), 1985 | the quintic in §2.8 |
+| Shoemake, *Fiber Bundle Twist Reduction*, Graphics Gems IV, 1994 | quaternion inertialization |
+| Jégou, Douze, Schmid, *Product Quantization for Nearest Neighbor Search*, 2011 | Büttner's 2019 quantised feature space |
+
+### Code
+
+| repo | licence | use |
+|---|---|---|
+| <https://github.com/orangeduck/Motion-Matching> | **MIT** | classical + learned MM, `nnet.h`, `spring.h`. **The only vendorable artifact in this study** |
+| <https://github.com/orangeduck/Spring-It-On> | **MIT** | the damper/spring reference |
+| <https://github.com/aaron1a12/wm-motion-matcher> | MIT | read the schema; expect it not to build |
+| <https://github.com/E1P3/Learned_Motion_Matching_Training> | MIT | ONNX export bolted onto Holden's scripts |
+| <https://github.com/SaxonRah/OpenMotion> | **none** | do not vendor |
+| <https://github.com/pau1o-hs/Learned-Motion-Matching> | **none** | do not vendor |
+| <https://github.com/E1P3/Learned_Motion_Matching_UE5> | **none** | do not vendor |
+| <https://github.com/KamatMayur/UE5_MotionMatching> | MIT | contains no implementation |
+| <https://github.com/sebastianstarke/AI4Animation> | **none; README says research/education only** | read the papers, not the repo |
+| <https://github.com/facebookresearch/ai4animationpy> | **CC BY-NC 4.0 on the code** | read only |
+| <https://github.com/mohamedhassanmus/SAMP> · `SAMP_Training` | **none, plus "may not redistribute"** | read only |
+
+### Articles
+
+Daniel Holden, <https://theorangeduck.com/>: *Code vs Data Driven Displacement* (the simulation
+bone, adjustment, foot locking) · *Spring-It-On: The Game Developer's Spring-Roll-Call* ·
+*Inertialization Transition Cost* · *Inverse Kinematics and Foot Locking* · *Propagating Velocities
+through Animation Systems* · *Dead Blending*.
+
+Epic, *Motion Matching in Unreal Engine*:
+<https://dev.epicgames.com/documentation/en-us/unreal-engine/motion-matching-in-unreal-engine> ·
+*Game Animation Sample*:
+<https://dev.epicgames.com/documentation/en-us/unreal-engine/game-animation-sample-project-in-unreal-engine>
+
+### Data
+
+| | licence |
+|---|---|
+| **100STYLE** <https://zenodo.org/records/8127870> | **CC BY 4.0** |
+| **ACCAD Open Motion Project** <https://accad.osu.edu/research/motion-lab/mocap-system-and-data> | **CC BY 3.0** (from OSU, *not* via AMASS) |
+| **CMU Mocap** <http://mocap.cs.cmu.edu/> | free for all uses; no resale "even in converted form" |
+| Mixamo <https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html> + Adobe General Terms §3.6, §17 | embed yes; redistribute no; train **no** |
+| AMASS <https://amass.is.tue.mpg.de/license.html> | non-commercial; no distribution; **no commercial training** |
+| LAFAN1 <https://github.com/ubisoft/ubisoft-laforge-animation-dataset> (`license.txt`, lowercase) | **CC BY-NC-ND 4.0** |
+| SMPL-X <https://smpl-x.is.tue.mpg.de/modellicense.html> | non-commercial; patented (US10395411B2) |
+| SAMP dataset <https://samp.is.tue.mpg.de/license.html> | non-commercial; viral onto trained weights |
