@@ -28,7 +28,8 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 500-519 | `agent/registry` -- the world-effect registry |
 | 520-539 | `agent/weather` -- weather and natural particle effects |
 | 540-559 | `agent/anim-research` -- autonomous character animation |
-| 560+ | unassigned; ask before taking |
+| 560-599 | `agent/anim-research` -- Phase B (procedural adaptation) and Phase C |
+| 600+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
 cheap failure: this index already skips 301-309, 311-319 and 321-329, and a non-contiguous index

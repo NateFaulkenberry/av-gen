@@ -2045,13 +2045,45 @@ Per-stage, minimum of 5 runs (ADR-170), on a single 4,323-frame file:
 **Import dominates**, and it is text parsing. Nothing here is on a frame path: a million frames
 build in 20 seconds offline and read back at 270,000 frames/s.
 
-#### The probe shape, stated once
+#### The zero-variance probe: a standing rule, not a lesson
 
 All three findings have the same form, and so did the `chains()[layerIndex]` off-by-one and the
 `TerrainReject` conflation before them: **a value that was computed correctly and measured the
 wrong thing.** The probe that catches it is not "is the output right" but *did the thing I was
-trying to move actually move* — zero variance in a number that must vary is the tell, and it is
-cheaper to assert than to notice.
+trying to move actually move*.
+
+**The rule, for every procedural layer from here on.** Before believing a layer works, name the
+scalar that has **zero variance if this layer is doing nothing**, and assert that it varies. Not
+that it is correct — that it *varies*. A layer writing impeccable numbers to a joint that does not
+carry them passes every correctness gate there is, silently, and `reach` found exactly that after
+the retarget had cleared a 0.056° orientation gate and a 0.000000 bone gate.
+
+| layer | the scalar that must vary |
+|---|---|
+| foot placement / leg IK | pelvis-to-ankle distance (`avgen-motion reach`) |
+| terrain adaptation | per-foot ground height *spread* across the footprint |
+| body compensation / balance | pelvis offset from its un-compensated position |
+| look-at | angle between head forward and target direction |
+| reach / hand IK | hand-to-target distance |
+| secondary motion | the added displacement's amplitude |
+| stride warping | stride length against the authored one |
+
+Zero variance in any of these is the tell, and it is far cheaper to assert than to notice.
+
+#### ADR-553 blocks Phase C, not Phase B
+
+Phase C needs a large corpus, and the corpus is unusable on this character until positional
+retargeting exists. Phase B does not: it is procedural adaptation layered **on top of** authored
+locomotion (§5), and the alien has 57 seconds of its own clips whose legs do articulate — reach
+0.69–0.96, against the retargeted 0.970 flat.
+
+Positional retargeting is therefore **deferred until after Phase B**, deliberately and not by
+omission. It depends on the leg IK layer, and B.G (foot placement) and B.I (body compensation) are
+the first things that exercise that layer against a real target. Designing retarget-through-IK
+before then would be designing against an untested dependency.
+
+**C is gated on it.** Nothing in Phase C that consumes corpus motion on the Glowmere alien can
+proceed until it exists.
 
 ### Why the alien lab does not exercise body compensation, and what that says
 
