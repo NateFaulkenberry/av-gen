@@ -1928,6 +1928,9 @@ context: **an in-place clip has no ground frame**, so "planted means stationary"
 | STEP 12-13 offline tool, M2 Max benchmark | **done** | `avgen-motion` has 8 verbs; measured on real corpus data at four scales, linear above ~50k frames |
 | STEP 14 per-foot ground planes | **done** | ADR-551; built as Phase B §17's `IGroundQuery`, not as a widened seam. Found two shipping bugs on the way |
 | STEP 15 visual validation | **partly done** | `alien-foot-lab.scene.json`: the alien's detached chains bind and both feet apply on real terrain, which was impossible before ADR-543 |
+| STEP 16 performance | **done** | A.13 above; import dominates, nothing on a frame path, a million frames offline in 20 s |
+| STEP 17 multi-character readiness | **not started** | Phase B work; the seam (`LocomotionState`, `IGroundQuery`) is per-entity already |
+| STEP 18 no UI yet | **held** | nothing added to the editor |
 
 ### A.10b: what the corpus did to the code that was written before it arrived
 
