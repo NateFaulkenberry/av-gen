@@ -147,7 +147,9 @@ int usage() {
                "  retarget  <src> <dst> --map s:t,s:t     move motion between skeletons\n"
                "  pack      <file...> --out <dir>         build a MotionPack\n"
                "  validate  <pack>                        the report; exit 2 on FAIL\n"
-               "  benchmark <file> [--repeat n]           what each stage costs here\n\n"
+               "  benchmark <file> [--repeat n]           what each stage costs here\n"
+               "  survey    <dir>                         per-FILE rotation orders, up axis,\n"
+               "                                          skeleton consistency across a corpus\n\n"
                "  --scale <f>       BVH units to metres (0.01 for centimetres)\n"
                "  --contacts a,b    joints to analyse; the first is the phase reference\n"
                "  --license <id>    SPDX identifier, REQUIRED by `pack`\n"
@@ -377,6 +379,109 @@ int cmdValidate(const Args& args) {
     return validation.ok() ? 0 : 2;
 }
 
+// A per-FILE survey of a corpus. Not a sample: "the corpus is Y-up and uses ZXY" is a claim about
+// every file in it, and a corpus assembled over time is exactly the kind of thing that has one odd
+// file. Reports the two facts that would silently corrupt every downstream number -- the rotation
+// orders declared, and which axis the skeleton actually stands up in -- plus the skeleton's shape,
+// so that "one retarget profile covers all of this" can be checked rather than assumed.
+int cmdSurvey(const Args& args) {
+    if (args.positional.empty()) {
+        return usage();
+    }
+    const float scale = std::stof(args.option("scale", "1.0"));
+    std::vector<fs::path> files;
+    for (const std::string& entry : args.positional) {
+        if (fs::is_directory(entry)) {
+            for (const auto& item : fs::recursive_directory_iterator(entry)) {
+                if (item.is_regular_file() && item.path().extension() == ".bvh") {
+                    files.push_back(item.path());
+                }
+            }
+        } else {
+            files.push_back(entry);
+        }
+    }
+    std::sort(files.begin(), files.end());
+    fmt::print("surveying {} file(s)\n", files.size());
+
+    std::map<std::string, std::size_t> orderCounts;
+    std::map<std::string, std::size_t> skeletonCounts; // digest -> files
+    std::map<std::string, std::string> skeletonExample;
+    std::map<char, std::size_t> upAxisCounts;
+    std::map<std::size_t, std::size_t> jointCounts;
+    std::size_t failed = 0;
+    std::size_t totalFrames = 0;
+    double totalSeconds = 0.0;
+    std::map<float, std::size_t> frameTimes;
+
+    for (const fs::path& file : files) {
+        assets::BvhLoadOptions options;
+        options.scale = scale;
+        auto bvh = assets::loadBvh(file, options);
+        if (!bvh) {
+            ++failed;
+            if (failed <= 5) {
+                fmt::print(stderr, "  FAILED {}: {}\n", file.filename().string(), bvh.error().message);
+            }
+            continue;
+        }
+        for (const std::string& order : bvh->rotationOrders) {
+            ++orderCounts[order];
+        }
+        ++jointCounts[bvh->skeleton.jointCount()];
+        ++frameTimes[bvh->frameSeconds];
+        totalFrames += bvh->frames;
+        totalSeconds += static_cast<double>(bvh->frames) * bvh->frameSeconds;
+        const std::string digest = scene::skeletonDigest(bvh->skeleton);
+        ++skeletonCounts[digest];
+        if (skeletonExample.find(digest) == skeletonExample.end()) {
+            skeletonExample[digest] = file.filename().string();
+        }
+        // Which way is up, from the REST pose's shape: a standing skeleton's largest extent is its
+        // height. Measured per file rather than assumed, because nothing in BVH declares it.
+        scene::Pose rest = scene::restPose(bvh->skeleton);
+        std::vector<glm::mat4> model;
+        scene::poseToModel(bvh->skeleton, rest, model);
+        glm::vec3 lo(1e30f);
+        glm::vec3 hi(-1e30f);
+        for (const glm::mat4& m : model) {
+            const glm::vec3 p(m[3]);
+            lo = glm::min(lo, p);
+            hi = glm::max(hi, p);
+        }
+        const glm::vec3 extent = hi - lo;
+        const char up = (extent.y >= extent.x && extent.y >= extent.z) ? 'Y'
+                        : (extent.z >= extent.x)                      ? 'Z'
+                                                                      : 'X';
+        ++upAxisCounts[up];
+    }
+
+    fmt::print("\nROTATION ORDERS declared (file count per order)\n");
+    for (const auto& [order, count] : orderCounts) {
+        fmt::print("  {}  {} file(s)\n", order, count);
+    }
+    fmt::print("\nUP AXIS, from each file's own rest-pose extent\n");
+    for (const auto& [axis, count] : upAxisCounts) {
+        fmt::print("  {}  {} file(s)\n", axis, count);
+    }
+    fmt::print("\nSKELETON: {} distinct skeleton(s) across {} readable file(s)\n",
+               skeletonCounts.size(), files.size() - failed);
+    for (const auto& [digest, count] : skeletonCounts) {
+        fmt::print("  {}  {:6} file(s)   e.g. {}\n", digest, count, skeletonExample[digest]);
+    }
+    fmt::print("\nJOINT COUNTS\n");
+    for (const auto& [joints, count] : jointCounts) {
+        fmt::print("  {:4} joints  {} file(s)\n", joints, count);
+    }
+    fmt::print("\nFRAME TIMES\n");
+    for (const auto& [seconds, count] : frameTimes) {
+        fmt::print("  {:.6f} s ({:.1f} Hz)  {} file(s)\n", seconds, 1.0f / seconds, count);
+    }
+    fmt::print("\nTOTAL: {} frames, {:.1f} s ({:.2f} hours), {} unreadable\n", totalFrames,
+               totalSeconds, totalSeconds / 3600.0, failed);
+    return failed > 0 ? 1 : 0;
+}
+
 int cmdBenchmark(const Args& args) {
     if (args.positional.empty()) {
         return usage();
@@ -485,6 +590,9 @@ int main(int argc, char** argv) {
     }
     if (args.command == "validate") {
         return cmdValidate(args);
+    }
+    if (args.command == "survey") {
+        return cmdSurvey(args);
     }
     if (args.command == "benchmark") {
         return cmdBenchmark(args);

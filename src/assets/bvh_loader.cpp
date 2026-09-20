@@ -209,6 +209,19 @@ Result<BvhClip> parseBvh(std::string_view text, const BvhLoadOptions& options) {
     std::size_t total = 0;
     for (const JointChannels& jc : channels) {
         total += jc.order.size();
+        // The rotation order this joint declares, as a three-letter word. Collected per file
+        // because an assumed order is a different pose, not a rounding error.
+        std::string order;
+        for (const Channel c : jc.order) {
+            if (c == Channel::Xrot) { order += 'X'; }
+            if (c == Channel::Yrot) { order += 'Y'; }
+            if (c == Channel::Zrot) { order += 'Z'; }
+        }
+        if (order.size() == 3 &&
+            std::find(out.rotationOrders.begin(), out.rotationOrders.end(), order) ==
+                out.rotationOrders.end()) {
+            out.rotationOrders.push_back(order);
+        }
     }
     out.channels = static_cast<std::uint32_t>(total);
     if (total == 0) {

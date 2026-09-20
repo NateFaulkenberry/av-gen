@@ -57,6 +57,11 @@ struct BvhClip {
     // because a caller mapping joints by name needs to know they are unnamed in the file.
     std::uint32_t endSites = 0;
     std::vector<std::string> warnings;
+    // The distinct rotation channel orders the file declares, as they appear: "ZXY", "XYZ". A
+    // corpus with more than one is a corpus a reader that assumed an order is wrong about -- and
+    // the same six numbers under ZXY and XYZ are poses five units apart, so it is not a small
+    // error. Reported per file because "the corpus uses ZXY" is a claim about every file in it.
+    std::vector<std::string> rotationOrders;
 };
 
 // Reads `path` as a BVH. Fails on a malformed hierarchy or a frame count that disagrees with the
