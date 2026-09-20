@@ -1,10 +1,11 @@
 # ADR-388: The Cosmic Ocean is an atmospheric effect, and the sky can afford to be procedural
 
-- Status: Proposed (2026-09-19) — design only; no code written yet, pending sequencing against the
-  agent that currently owns `src/world/atmospherics.*`.
+- Status: Accepted (2026-09-19). Design approved; implementation in progress. The four shared
+  per-kind switch arms land last, after the vortex branch merges — see "Sequencing".
 - Extends ADR-230 (atmospheric effects), ADR-387 (the vortex became one), ADR-207 (world effects),
   ADR-011 (parameters), ADR-382 (a path a panel computes needs a test that computes it the same way),
-  ADR-350 (reachability), ADR-170/182 (measurement).
+  ADR-350 (reachability and the round-trip test), ADR-170/182 (measurement),
+  ADR-343 (the day/night star channel).
 - Supersedes, for the Tree of Life, the four `cosmos-*` procedural nodes and the
   `glowmere-cosmos.wgsl` background shader layer (ADR-338 / ADR-339 / ADR-360).
 
@@ -61,6 +62,24 @@ So the instrument was tested rather than trusted. The same run at 3840×2160:
 | `volume.march` | 5.177 | 16.056 | 3.10× |
 | `scene` | 7.012 | 15.663 | 2.23× |
 | gpu frame (min) | 14.22 | 38.86 | 2.73× |
+
+> ### A 0.000 in `gpuPassMedianMs` means "below 65.536 µs", not "free"
+>
+> Worth its own box because it is the most re-learnable fact in this document. Every small number
+> in that record is an exact multiple of **65.536 µs** — 0.065536, 0.131072, 0.196608, 0.327680 —
+> because that is this timeline's timestamp quantum. A pass whose median frame lands on the first
+> bucket reports **0.000**, and that report is indistinguishable from a pass that did not run.
+>
+> Two wrong conclusions sit one step away from it: *"this pass is free, so I can afford anything
+> here"*, and *"this pass is not running, so the feature is broken"*. Both were live options for
+> `background` this morning, and the second would have sent someone hunting a shader-layer loading
+> bug that does not exist.
+>
+> **The check that separates all three takes one run: re-measure at 4× the pixels.** A pass that is
+> timed and cheap scales. A pass that is not timed stays at 0.000. A pass that is not running stays
+> at 0.000 *and* leaves the frame unchanged. Same family as ADR-385's false comment — a reading
+> that stops anyone checking — except that here the alibi is a number rather than a sentence, which
+> makes it more convincing and no more true.
 
 The pass is timed, it does scale, and the 1080p median was a quantisation artefact rather than a
 free pass. Reading back linearly — right for a fullscreen ALU-bound draw — **glowmere-cosmos costs
@@ -142,9 +161,17 @@ Glowmere Valley 2.
 
 Three things the family does **not** give for free, all of which this design must write:
 
-1. **`toJson`/`fromJson` are hand-written per kind** (`atmospherics.cpp:344-618`) and the JSON key
-   set is a second, independently maintained list beside the field-table leaves. They already
-   disagree — the JSON says `speedScale`/`curtainCount` where the tables say `speed`/`curtains`.
+1. **`toJson`/`fromJson` are hand-written per kind** (`atmospherics.cpp:344-618`), so the JSON key
+   set is a second list maintained by hand beside the field-table leaves, and a field added to one
+   can be forgotten by the other.
+
+   **What this is not:** the JSON's `speedScale`/`curtainCount` against the tables' `speed`/`curtains`
+   is *not* that failure. Both spellings resolve to the same C++ field —
+   `atmospherics.cpp:370` and `atmospheric_params.cpp:118` are both `e.comet.path.speedScale`. They
+   are two namespaces, the file format and the parameter path, not two spellings of one name. My
+   first draft proposed asserting the two key sets are equal; that test would fail on working code
+   and its only fixes would be renaming the file format or renaming every authored route target,
+   both breaking changes for nothing. The right assertion is the round trip — see §12.
 2. **`defaultAtmosphericRoutes` has no vortex branch**: a vortex falls into the comet `else` and is
    handed three routes aimed at `coreIntensity`, `tailIntensity` and `sparkleIntensity`, none of
    which a vortex registers. The test loops only over `{Aurora, Comet}`, so it does not see this,
@@ -152,7 +179,7 @@ Three things the family does **not** give for free, all of which this design mus
    test must loop over every enumerator.
 3. **`AtmosphericFrame::any()` is `cometCount > 0 || auroraCount > 0`** — it does not mention
    `hasVortex`. Harmless today because the vortex is drawn by the volumetric pass, and *not*
-   harmless for a kind drawn by the atmosphere pass.
+   harmless for a kind drawn by the atmosphere pass. See §8 for exactly how far to fix it.
 
 ## 3. Rendering approach selected
 
@@ -385,10 +412,31 @@ the same deliberate asymmetry ADR-387 chose for the vortex and for a stronger re
 cosmos is not a composition, it is a mistake. Extra instances are counted in
 `AtmosphericCounts::dropped` so the UI can say so rather than silently ignoring them.
 
-`AtmosphericFrame::any()` must gain `|| hasCosmicOcean`. This is the bug ADR-387 left behind: the
-predicate gates the whole atmosphere draw, and a scene whose only atmospheric effect is a Cosmic
-Ocean would render nothing at all. **This is the single highest-risk line in the change**, because
-it fails silently and looks exactly like "this scene has no such effect".
+### `any()` gains the ocean and deliberately not the vortex
+
+`AtmosphericFrame::any()` gates the *whole* atmosphere draw, so a scene whose only atmospheric
+effect is a Cosmic Ocean would render nothing at all. **This is the single highest-risk line in the
+change**, because it fails silently and looks exactly like "this scene has no such effect".
+
+It gains `|| hasCosmicOcean` and **nothing else**. Adding `|| hasVortex` at the same time looks
+like finishing the job and is the opposite: the vortex is drawn by the volumetric pass, so a
+vortex-only scene would switch on a fullscreen atmosphere draw that evaluates two empty loops and
+adds zero to every sky pixel. That is a cost, not a fix.
+
+So the predicate ships with the asymmetry spelled out in a comment at the line:
+
+```cpp
+// True when anything drawn BY THE ATMOSPHERE PASS is live. The vortex is deliberately absent:
+// ADR-387 put it in this family for authoring, and it is rasterised by the volumetric march
+// instead -- so a vortex-only scene must NOT switch this draw on, because the draw would add
+// nothing to every sky pixel and charge for it. Add a kind here only if it is drawn by
+// shaders/atmosphere.wgsl.
+[[nodiscard]] bool any() const { return cometCount > 0 || auroraCount > 0 || hasCosmicOcean; }
+```
+
+The comment is the point. Without it the next reader sees three kinds in the family and two in the
+predicate, calls it an oversight, and "fixes" it into a pointless pass. An omission with no stated
+reason is how ADR-385 happened, running the other way.
 
 ~95 floats is 2.6× the vortex's 22 and comfortably inside what the tables demonstrably carry
 (comet 30, aurora 31); the count comes from §28's panel outline, which is the contract.
@@ -442,11 +490,26 @@ one entry in the "Add" menu, one style-list case, one beat-target leaf, and — 
 ground-glow combo**, because a cosmic background does not light the island and a combo that changed
 nothing would be worse than no combo.
 
-One reachability note found while auditing, not caused by this change: `"atmos/"` appears in neither
-`kBeginnerPrefixes` nor `kIntermediatePrefixes`, so every atmospheric parameter is invisible in the
-Parameters panel below the Advanced authoring layer. The World Effects panel is the intended surface
-and is unaffected, but a flagship artist-facing effect whose parameters vanish on two of three
-layers is worth a decision rather than an accident.
+### `"atmos/"` joins `kBeginnerPrefixes`
+
+Found while auditing and not caused by this change: `"atmos/"` appears in neither
+`kBeginnerPrefixes` nor `kIntermediatePrefixes` (`ui_logic.hpp:43-46`), so **every atmospheric
+parameter is invisible in the Parameters panel below the Advanced authoring layer** — the comet,
+the aurora, the vortex, and the Cosmic Ocean.
+
+It is added to the beginner list, and the reason is the owner's standing rule: *if it is visible in
+the picture, an artist must be able to find it and change it.* These are not internals. They are
+the sky, the comet crossing it and the funnel under the island — the largest things in the frame.
+A parameter that paints a quarter of a million pixels and cannot be found without switching
+authoring layer is the same failure the deleted Tree panel produced from the other direction, where
+a travelling band of light on the tree had no control anybody could locate.
+
+The argument against, stated so it is on the record rather than skipped: the beginner layer is
+meant to be short, and an effect with ~110 parameters is not short. That is real, and it is
+answered by where the list is *ordered* rather than by hiding it — the World Effects panel remains
+the curated surface with ~35 rows in front and the rest behind "Advanced", and the Parameters panel
+is the exhaustive one that should not lie about what exists. Hiding a parameter from a panel whose
+whole job is to enumerate parameters is the wrong lever.
 
 ## 11. Modulation architecture
 
@@ -473,10 +536,13 @@ The beat-response slider's leaf for this kind is `intensity`.
 - `validate()` rejects every out-of-range field; round-trip `toJson`/`fromJson` is the identity on a
   fully-populated effect **and on a default-constructed one**, which is what catches a leaf added to
   the struct and forgotten in the serialiser.
-- **The table and the serialiser agree.** A test that every `kCosmicFloats`/`kCosmicColors` leaf
-  appears as a key in `toJson`'s output, and vice versa. The comet's `speedScale`/`speed` and the
-  aurora's `curtainCount`/`curtains` are the existing evidence that two hand-maintained lists drift;
-  this is the assertion that stops the third instance.
+- **The table survives the round trip** (ADR-350). Walk `kCosmicFloats`/`kCosmicColors`/`kCosmicBools`,
+  `set()` every entry to a distinct non-default value, `toJson`, `fromJson`, then `get()` each one
+  back and require it survived. This fails loudly when the serialiser forgets a field the table
+  has, and stays quiet when a JSON key is deliberately spelled differently from its parameter leaf
+  — which is the case for the comet's `speedScale`/`speed` and the aurora's `curtainCount`/`curtains`
+  and is not a defect. Asserting the two *key sets* are equal, which is what I first proposed, would
+  fail on working code.
 - **ADR-382, the panel's paths.** `cosmicOceanRows()` and `cosmicOceanAdvancedRows()` are walked by
   the test exactly as the panel walks them, and every leaf must resolve to a registered, modulatable,
   serialized parameter. A path a panel computes needs a test that computes it the same way; asserting
@@ -552,16 +618,43 @@ What exists, and what replaces it:
    nodes and of the shader layer, and ~35 `_`-prefixed treeisland arms do too. They are fixtures for
    a different measurement and should be left alone rather than swept.
 
-**One audit finding I could not confirm and am not relying on.** The four nodes' authored
-`emissiveBoost` — which the brief flags as owner-tuned, and which two presets set to 1.15–2.2 —
-appears to be **inert for these nodes**. `emissiveBoost` is applied at `composition.cpp:6411` in a
-loop over `scene_.entities`, and a procedural node produces no entities (it pushes into
-`scene_.procedurals`). What actually carries their emission is
-`procedural/cosmos-*/material/emissive` (0.55 / 1.3 / 2.0 / 3.4) and `materialVariation.emissiveRandom`.
-If that reading is right, ADR-343's star-dimming path is also inert for them and only its
-visibility override reaches them. **This is a code read, not a measurement**, and ADR-385's lesson is
-that a stated reason is not evidence — including this one. It is a ten-line check and it must be run
-before anything in the migration leans on it either way.
+### `nodes/cosmos-*/emissiveBoost` is inert — measured, not read
+
+The four nodes' authored `emissiveBoost` is the parameter the brief flags as owner-tuned and warns
+against deleting something that depends on. It depends on nothing, because it does nothing.
+
+The code path says so: `emissiveBoost` is applied at `composition.cpp:6411` inside a loop over
+`range.entityCount`; `entityCount` is assigned in exactly one place (`composition.cpp:5733`) as
+`scene_.entities.size() - range.firstEntity`; and a procedural node pushes into
+`scene_.procedurals` and never into `scene_.entities`, so the count is zero and the loop runs zero
+times.
+
+But a code read is not evidence, so it was measured, with a control that could fail. Three renders
+of the night project at 1280×720, t = 6.00, presets emptied so only the `parameters` block speaks:
+
+| arm | `nodes/cosmos-*/emissiveBoost` | `procedural/cosmos-*/material/emissive` | sequence hash |
+| --- | --- | --- | --- |
+| as shipped | 2.2 / 2.2 / 2.1 / 1.9 | authored | `fbad443494f09a12` |
+| **test** | **0.0 / 0.0 / 0.0 / 0.0** | authored | `fbad443494f09a12` |
+| **control** | as shipped | **0.0** | `cad7441b56d49a12` |
+
+Zeroing the boost on all four nodes changes **not one bit** of the frame. Zeroing the parameter
+that genuinely carries their emission changes it. The probe can detect the thing it is looking for,
+and the thing is not there.
+
+So: `nodes/cosmos-*/emissiveBoost` is **a fifth instance of the built-but-unreachable family** — a
+writer with no reader. It is registered, serialized, modulatable, keyable, and carried by three
+presets across two shipped projects at values from 1.15 to 2.2, and it cannot move a pixel. It is
+worth naming as that rather than quietly routing around it, because the family's whole lesson is
+that these are found one at a time by somebody who happened to check, and the ones nobody checks
+stay. Two consequences follow: what actually carries the stars' brightness is
+`procedural/cosmos-*/material/emissive` (0.55 / 1.3 / 2.0 / 3.4) with
+`materialVariation.emissiveRandom`, and ADR-343's star-*dimming* path is inert for these nodes too —
+only its `starBrightness <= 1e-3` visibility override reaches them.
+
+For the migration this is good news and must not become an excuse: it removes the "owner-tuned
+values we might lose" risk from the boosts specifically, and it does not touch the four numbers that
+do matter, which have to be matched by eye in the new effect.
 
 ---
 
