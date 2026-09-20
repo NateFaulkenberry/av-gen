@@ -812,9 +812,22 @@ fn scatterGain(world: vec3<f32>) -> vec3<f32> {
     let gg = g * g;
     let denom = max(1.0 + gg - 2.0 * g * cosTheta, 1e-4);
     let hg = (1.0 - gg) / (4.0 * 3.14159265 * pow(denom, 1.5));
-    // 4*pi*hg is 1 for an isotropic phase, so strength 1 with g = 0 is exactly "no change" and the
-    // control has a meaningful zero AND a meaningful one.
-    let lit = 1.0 + strength * (4.0 * 3.14159265 * hg - 1.0);
+    // The term is ADDED to the particle's own brightness, never subtracted from it.
+    //
+    // The first version of this was `1 + strength * (4*pi*hg - 1)`, which normalises the phase
+    // function so that an isotropic phase at strength 1 is exactly no change. That is the correct
+    // normalisation and it is the wrong control: a phase function redistributes a fixed amount of
+    // light, so anything outside the forward lobe comes out DARKER, and at the strengths this
+    // effect wants -- 5 and up, because the whole point is a mote that blazes -- the bracket goes
+    // below -1/strength and every mote outside a narrow cone renders at exactly zero. Measured:
+    // the dust-motes scene rendered 74 pixels above 200 with scatterStrength 0 and 0 pixels with
+    // scatterStrength 1; the motes had not got dimmer, they had been multiplied by a negative
+    // number and clamped away.
+    //
+    // A real mote is lit by the whole sky as well as by the sun. So: it keeps what it had, and the
+    // key light ADDS. `strength` is then monotone -- more is always more -- and 0 is still exactly
+    // off, which is the property that keeps every existing system bit-identical.
+    let lit = 1.0 + strength * (4.0 * 3.14159265 * hg);
     // The light's HUE, not its radiance: `sunColor` is already multiplied by an intensity that is
     // routinely 8, and multiplying a particle by that would make "tint it slightly like the sun"
     // into "make it eight times brighter", which is the unit bug this repository keeps paying for.

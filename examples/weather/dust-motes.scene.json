@@ -1,0 +1,369 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Dust motes",
+ "_note": "The instruction about dust motes is that they must not look like random snow, and that they should become dramatically visible when lit. Those are the same requirement seen from two sides, and the answer to both is that a mote is not visible because it is bright -- it is visible because it is BETWEEN you and a light. 'motes-air' carries scatterStrength 5.5 at an anisotropy of 0.86 (ADR-520): a Henyey-Greenstein phase function of the angle between the view ray and the key light, so the same population is nearly invisible looking across the sun and blazes looking into it. Nothing about the particles changes across the frame; only the angle does, which is why this cannot be faked with a brightness gradient. Snow has no such response, which is exactly why this does not read as snow. The second half is 'motes-shaft': the same motes again, four times denser, with emitMaskField naming a box field lying along the light's direction, so the beam has a population of its own and the shaft has grain rather than being a smooth cone. A spawn survives the mask with probability equal to the field's scalar there, so the shaft's edge is a density gradient and not a wall. Motion is deliberately almost nothing -- speeds under 4 cm/s and a very low-frequency curl -- because dust does not fall, it hangs; anything faster is snow again.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   1.2,
+   1.55,
+   6.2
+  ],
+  "target": [
+   -2.6,
+   2.4,
+   -7.0
+  ],
+  "fov": 40.0,
+  "orbitSpeed": 0.0
+ },
+ "lights": [
+  {
+   "name": "raking-sun",
+   "type": "directional",
+   "role": "key",
+   "direction": [
+    0.3,
+    -0.16,
+    -0.94
+   ],
+   "color": [
+    1.0,
+    0.86,
+    0.62
+   ],
+   "intensity": 4.2,
+   "castsShadow": true,
+   "shadowStrength": 0.95,
+   "softness": 1.2,
+   "volumetric": 2.2
+  },
+  {
+   "name": "sky-fill",
+   "type": "directional",
+   "role": "fill",
+   "direction": [
+    -0.2,
+    -0.9,
+    0.35
+   ],
+   "color": [
+    0.42,
+    0.55,
+    0.78
+   ],
+   "intensity": 0.5,
+   "castsShadow": false,
+   "shadowStrength": 0.0,
+   "softness": 4.0
+  }
+ ],
+ "wind": {
+  "enabled": true,
+  "direction": 0.9,
+  "speed": 0.12,
+  "regionScale": 30.0,
+  "regionAmount": 0.6,
+  "regionDrift": 0.015,
+  "turbulence": 0.25,
+  "turbulenceScale": 5.0,
+  "turbulenceSpeed": 0.18,
+  "gustAmount": 0.18,
+  "gustScale": 20.0,
+  "gustSpeed": 0.8,
+  "gustSharpness": 1.0
+ },
+ "environment": {
+  "intensity": 0.14,
+  "background": [
+   0.01,
+   0.013,
+   0.02
+  ],
+  "fogColor": [
+   0.022,
+   0.024,
+   0.03
+  ],
+  "fogDensity": 0.0012,
+  "fogHeight": 12.0,
+  "fogHeightFalloff": 0.1,
+  "volumeDensity": 0.013,
+  "volumeScattering": 1.5,
+  "volumeAnisotropy": 0.8,
+  "volumeNoise": 0.45,
+  "volumeNoiseScale": 0.05,
+  "volumeSteps": 22,
+  "volumeMaxDistance": 60.0,
+  "volumeAbsorption": 0.45,
+  "sky": {
+   "zenithColor": [
+    0.0035,
+    0.0045,
+    0.0075
+   ],
+   "horizonColor": [
+    0.01,
+    0.01,
+    0.012
+   ],
+   "groundColor": [
+    0.003,
+    0.0033,
+    0.004
+   ],
+   "haze": 0.5,
+   "sunColor": [
+    1.0,
+    0.82,
+    0.58
+   ],
+   "sunIntensity": 1.6,
+   "sunSize": 0.7,
+   "sunGlow": 1.1,
+   "intensity": 0.3,
+   "background": true,
+   "useKeyLight": true
+  }
+ },
+ "nodes": [
+  {
+   "name": "stage",
+   "kind": "scene",
+   "asset": "_stage.scene.json"
+  },
+  {
+   "name": "colonnade",
+   "_note": "Six slabs across the light's path, four metres apart. They exist so the raking key light arrives as bands rather than as a wash: a mote is dramatic because it is in a beam and the mote beside it is not, and on an open plain nothing makes that difference.",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.1,
+      5.4,
+      1.1
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 6,
+     "start": [
+      -13.5,
+      2.7,
+      -9.0
+     ],
+     "end": [
+      7.5,
+      2.7,
+      -9.0
+     ],
+     "orientAlong": false
+    },
+    "variation": {
+     "seed": 907,
+     "randomRotation": [
+      0.0,
+      0.25,
+      0.0
+     ],
+     "randomUniformScale": 0.22
+    },
+    "material": {
+     "baseColor": [
+      0.03,
+      0.031,
+      0.034
+     ],
+     "roughness": 0.88,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.18,
+     "roughnessRandom": 0.1
+    }
+   }
+  },
+  {
+   "name": "beam-volume",
+   "kind": "field",
+   "position": [
+    -1.5,
+    2.6,
+    -3.0
+   ],
+   "field": {
+    "kind": "box",
+    "size": [
+     2.6,
+     2.4,
+     16.0
+    ],
+    "softness": 1.6,
+    "strength": 1.0,
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 0.0,
+     "outer": 1.0
+    }
+   }
+  },
+  {
+   "name": "motes-air",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 2200,
+    "seed": 61,
+    "shape": "box",
+    "position": [
+     0.0,
+     1.9,
+     -0.5
+    ],
+    "extent": [
+     5.5,
+     1.7,
+     6.0
+    ],
+    "volumeFollow": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "volumeWrap": true,
+    "spawnRate": 26000.0,
+    "lifetimeMin": 9000.0,
+    "lifetimeMax": 9000.0,
+    "direction": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "spread": 1.0,
+    "speedMin": 0.004,
+    "speedMax": 0.03,
+    "gravity": [
+     0.0,
+     -0.004,
+     0.0
+    ],
+    "drag": 0.35,
+    "dragSizeBias": 0.8,
+    "sizeVariance": 0.8,
+    "sizeSkew": 3.2,
+    "turbulence": 0.055,
+    "turbulenceScale": 0.14,
+    "turbulenceSpeed": 0.07,
+    "windInfluence": 0.1,
+    "sizeStart": 0.013,
+    "sizeEnd": 0.013,
+    "colorStart": [
+     1.0,
+     0.92,
+     0.78,
+     0.55
+    ],
+    "colorEnd": [
+     1.0,
+     0.92,
+     0.78,
+     0.55
+    ],
+    "emissive": 1.0,
+    "blend": "additive",
+    "softness": 0.12,
+    "velocityStretch": 0.0,
+    "scatterStrength": 0.55,
+    "scatterAnisotropy": 0.86,
+    "fogCoupling": 0.25
+   }
+  },
+  {
+   "name": "motes-shaft",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 2400,
+    "seed": 67,
+    "shape": "box",
+    "position": [
+     -1.5,
+     2.6,
+     -3.0
+    ],
+    "extent": [
+     3.4,
+     3.0,
+     16.0
+    ],
+    "emitMaskField": "beam-volume",
+    "spawnRate": 900.0,
+    "lifetimeMin": 1.6,
+    "lifetimeMax": 3.4,
+    "direction": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "spread": 1.0,
+    "speedMin": 0.006,
+    "speedMax": 0.04,
+    "gravity": [
+     0.0,
+     -0.006,
+     0.0
+    ],
+    "drag": 0.3,
+    "dragSizeBias": 0.8,
+    "sizeVariance": 0.85,
+    "sizeSkew": 3.4,
+    "turbulence": 0.09,
+    "turbulenceScale": 0.22,
+    "turbulenceSpeed": 0.11,
+    "windInfluence": 0.14,
+    "sizeStart": 0.016,
+    "sizeEnd": 0.016,
+    "colorStart": [
+     1.0,
+     0.9,
+     0.72,
+     0.6
+    ],
+    "colorEnd": [
+     1.0,
+     0.9,
+     0.72,
+     0.6
+    ],
+    "opacityCurve": [
+     {
+      "t": 0.0,
+      "value": 0.0
+     },
+     {
+      "t": 0.15,
+      "value": 1.0
+     },
+     {
+      "t": 0.85,
+      "value": 1.0
+     },
+     {
+      "t": 1.0,
+      "value": 0.0
+     }
+    ],
+    "emissive": 1.0,
+    "blend": "additive",
+    "softness": 0.12,
+    "velocityStretch": 0.0,
+    "scatterStrength": 1.1,
+    "scatterAnisotropy": 0.88,
+    "fogCoupling": 0.25
+   }
+  }
+ ]
+}

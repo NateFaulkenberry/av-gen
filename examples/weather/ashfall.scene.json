@@ -162,7 +162,7 @@
     "blend": "alpha",
     "softness": 0.25,
     "velocityStretch": 0.0,
-    "scatterStrength": 0.5,
+    "scatterStrength": 0.125,
     "scatterAnisotropy": 0.7,
     "fogCoupling": 1.0
    }
@@ -370,7 +370,7 @@
     "emissive": 1.0,
     "blend": "alpha",
     "softness": 3.0,
-    "scatterStrength": 0.35,
+    "scatterStrength": 0.087,
     "scatterAnisotropy": 0.68,
     "fogCoupling": 1.0
    }

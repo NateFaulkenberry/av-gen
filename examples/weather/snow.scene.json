@@ -207,7 +207,7 @@
     "blend": "alpha",
     "softness": 0.3,
     "velocityStretch": 0.0,
-    "scatterStrength": 0.85,
+    "scatterStrength": 0.212,
     "scatterAnisotropy": 0.4,
     "fogCoupling": 1.0
    }
@@ -278,7 +278,7 @@
     "blend": "alpha",
     "softness": 4.5,
     "velocityStretch": 0.0,
-    "scatterStrength": 1.1,
+    "scatterStrength": 0.275,
     "scatterAnisotropy": 0.45,
     "fogCoupling": 0.7
    }
@@ -353,7 +353,7 @@
     "blend": "alpha",
     "softness": 0.25,
     "velocityStretch": 0.0,
-    "scatterStrength": 0.9,
+    "scatterStrength": 0.225,
     "scatterAnisotropy": 0.45,
     "fogCoupling": 1.0
    }

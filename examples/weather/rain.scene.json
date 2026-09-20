@@ -160,7 +160,7 @@
     "velocityStretch": 3.2,
     "stretchMax": 1.6,
     "stretchMin": 0.03,
-    "scatterStrength": 0.45,
+    "scatterStrength": 0.113,
     "scatterAnisotropy": 0.5,
     "fogCoupling": 1.0
    }
@@ -233,7 +233,7 @@
     "velocityStretch": 4.5,
     "stretchMax": 3.0,
     "stretchMin": 0.04,
-    "scatterStrength": 0.6,
+    "scatterStrength": 0.15,
     "scatterAnisotropy": 0.55,
     "fogCoupling": 1.0
    }
@@ -373,7 +373,7 @@
     "emissive": 1.0,
     "blend": "alpha",
     "softness": 3.0,
-    "scatterStrength": 0.35,
+    "scatterStrength": 0.087,
     "scatterAnisotropy": 0.62,
     "fogCoupling": 1.0
    }
