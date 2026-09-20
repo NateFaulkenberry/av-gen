@@ -188,6 +188,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       procedurals_(std::make_unique<ProceduralRenderer>(context, shaders)),
       sdfs_(std::make_unique<SdfRenderer>(context, shaders)),
       volumes_(std::make_unique<VolumeRenderer>(context, shaders)),
+      cosmicOcean_(std::make_unique<CosmicOceanRenderer>(context, shaders)),
       debug_(std::make_unique<DebugDraw>(context, shaders)),
       simulation_(std::make_unique<Simulation>(context, shaders)),
       shadows_(std::make_unique<ShadowRenderer>(context)),
@@ -487,6 +488,12 @@ Result<void> SceneRenderer::init() {
     // particles light the dust around them (one-directional: the fog never touches the sim).
     if (auto r = volumes_->init(kHdrFormat, kDepthFormat, frameLayout_, fields_->buffer(), particles_->glowBuffer());
         !r) {
+        return r;
+    }
+    // ADR-390. Its own pipeline and its own uniform, drawn inside the scene pass after the
+    // atmospheric sky layer. A failure here is not fatal to the frame: a scene with no Cosmic Ocean
+    // must still render, so the error is reported and the draw simply never happens.
+    if (auto r = cosmicOcean_->init(kHdrFormat, kDepthFormat, frameLayout_); !r) {
         return r;
     }
     if (auto r = simulation_->init(fields_->buffer(), fields_->gridBuffer()); !r) {
@@ -1754,6 +1761,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     }
     if (auto r = volumes_->reload(); !r) {
         keep("volume.wgsl", r);
+    }
+    if (auto r = cosmicOcean_->reload(); !r) {
+        keep("cosmic_ocean.wgsl", std::unexpected(r.error()));
     }
     if (auto r = simulation_->reload(); !r) {
         keep("simulate.wgsl", r);
@@ -3577,6 +3587,39 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             ++stats_.triangles;
             ++stats_.state.pipelineBinds;
             stats_.state.bindGroupBinds += 2;
+        }
+        // ---- the Cosmic Ocean (ADR-390) ----
+        //
+        // SEQUENCING, and the reason this draw does not fire in any shipped frame yet: its source
+        // is `scene.atmospherics.cosmicOcean`, and `AtmosphericFrame` is one of the four shared
+        // files waiting on the vortex branch. Until that lands, the only caller of
+        // `CosmicOceanRenderer::update` is `tests/rendering/test_cosmic_ocean_gpu.cpp`, so
+        // `stats().drawn` is false in every real frame. The effect is **deliberately** unreachable
+        // rather than accidentally so, and this comment is the entire difference between the two --
+        // ADR-350's family is a list of things that were built, tested, and quietly reached
+        // nothing, and every one of them looked exactly like this with no note attached.
+        //
+        // Immediately after the atmospheric layer and before the water, for the same reason that
+        // one is where it is: it is behind everything that is not sky, and the things composited
+        // over it -- water, motes, spores -- have to be able to composite over it.
+        //
+        // After rather than before the comet and the aurora, and it matters: both are additive, so
+        // the order does not change the colour, but the ocean is a *background* and drawing it
+        // second means its own depth attenuation cannot dim a comet that is supposed to be in front
+        // of it. Additive composition is associative; the artistic ordering is not, and this is the
+        // one that keeps a comet reading as nearer than the nebula.
+        //
+        // It shares group 0 with the pass and binds only its own group 1, so the bind groups the
+        // draws after it need are the ones they already set for themselves.
+        if (toggles_.cosmicOcean && cosmicOcean_->stats().drawn) {
+            cosmicOcean_->draw(rp);
+            ++stats_.drawCalls;
+            // Counted with the sky and not with the geometry, as the atmosphere draw above is: one
+            // triangle of sky-sized fragment work, and a geometry budget a resolution change moves
+            // is not one.
+            ++stats_.triangles;
+            ++stats_.state.pipelineBinds;
+            ++stats_.state.bindGroupBinds;
         }
         // ---- water (ADR-099) ----
         // After the sky and before the particles: the surface has to composite over the bed and
