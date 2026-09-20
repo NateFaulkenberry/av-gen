@@ -1108,58 +1108,89 @@ void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
                           "painted after the picture and reaches nothing but this window.");
     }
 
-    // ---- who owns the viewport ------------------------------------------------------------------
+    // ---- what the viewport is looking through (ADR-391) -----------------------------------------
     //
     // **The state has to be visible, and leaving it must not be a gesture you have to know about.**
-    // The viewport and the director's camera are two concepts; this is the one control that says
-    // which of them owns what is on screen, and it is in the canvas toolbar because that is where a
-    // person is looking when they wonder why they cannot fly.
+    // The viewport and the film's camera are two things now, and this is the one control that says
+    // which of them is on screen. In the canvas toolbar because that is where a person is looking
+    // when they wonder why the view will not move -- or why their drag did not stick.
     //
-    // Only shown when there is a director to stand down: on a one-camera project the viewport has
-    // always been free and a toggle offering to free it would be a question about nothing.
+    // Always shown, unlike the free-roam toggle it replaces. That toggle appeared only on projects
+    // with more than one camera, which was right when the only thing it could do was stand a
+    // director down; it is wrong now, because on a one-camera project the difference between
+    // "flying" and "moving the camera this project renders" is exactly what a person needs told.
     if (scene::Composition* comp = engine.composition(); comp != nullptr) {
-        const bool multi = comp->cameraDirection().cameras.size() > 1 ||
-                           !comp->cameraDirection().shots.empty();
-        if (multi) {
-            ImGui::SameLine();
-            const bool free = comp->viewportFreeRoam();
-            const scene::ActiveCameraState& live = comp->activeCamera();
-            if (free) {
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.85f, 0.65f, 1.0f));
+        ImGui::SameLine();
+        const scene::ViewportView view = viewportView;
+        const bool film = viewportViewForced || view.showsFilm();
+        const scene::ActiveCameraState& live = comp->activeCamera();
+        std::string label = "film camera";
+        if (!film) {
+            if (view.mode == scene::ViewportCamera::Editor) {
+                label = "editor view";
+            } else if (const scene::CameraRig* rig = comp->cameraDirection().find(view.camera)) {
+                label = "through: " + rig->name;
+            } else {
+                label = "through: (gone)";
             }
-            if (ImGui::SmallButton(free ? "free roam" : "following director")) {
-                if (free) {
-                    // Back to the film: the director's answer takes the frame again.
-                    comp->setViewportFreeRoam(false);
-                    setStatus("viewport is following the director");
-                } else if (onFreeCamera) {
-                    // Through the host, because taking the camera back is more than a flag -- a
-                    // directed *main* camera also has timeline tracks that would overwrite the next
-                    // drag, and `ensureFreeCamera` is the one place that knows both halves.
-                    onFreeCamera();
-                }
-            }
-            if (free) {
-                ImGui::PopStyleColor();
-            }
-            if (ImGui::IsItemHovered()) {
-                // Two separate calls rather than a ternary inside one: only the following branch
-                // has a substitution, and a format string chosen at runtime whose arguments do not
-                // match every branch is the shape of bug that waits for the other branch.
-                if (free) {
-                    tooltip(
-                        "The viewport is yours. Fly anywhere; the director still owns the film,\n"
-                        "and switching shots or cameras will not move you.\n\n"
-                        "Click to look through the director's camera again.");
-                } else {
-                    tooltip(
-                        "The canvas is showing '%s' -- whichever camera the director has live,\n"
-                        "so changing shots changes what you see.\n\n"
-                        "Click to take the viewport back and fly freely. Nothing about the film\n"
-                        "changes; you just stop riding its camera.",
+        }
+        if (!film) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.85f, 0.65f, 1.0f));
+        } else if (viewportViewForced) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.75f, 0.45f, 1.0f));
+        }
+        if (ImGui::SmallButton(label.c_str())) {
+            ImGui::OpenPopup("viewport-view");
+        }
+        if (!film || viewportViewForced) {
+            ImGui::PopStyleColor();
+        }
+        if (ImGui::IsItemHovered()) {
+            if (viewportViewForced) {
+                tooltip("The canvas is showing the film because %s.\n\n"
+                        "Your choice is remembered and comes back when it does.",
+                        viewportViewNote.empty() ? "something else is watching it"
+                                                 : viewportViewNote.c_str());
+            } else if (film) {
+                tooltip("The canvas is showing '%s' -- what this project renders. Moving the view\n"
+                        "here MOVES THAT CAMERA, which is how a shot is composed and also how a\n"
+                        "baked cut gets discarded.\n\n"
+                        "Click for the editor's own viewpoint, which the film does not own.",
                         live.name.empty() ? "the main camera" : live.name.c_str());
+            } else {
+                tooltip("The viewport is yours. Fly anywhere: nothing you do here reaches\n"
+                        "camera/position, the render or the file.\n\n"
+                        "The film is still on '%s' and still renders from it.",
+                        live.name.empty() ? "the main camera" : live.name.c_str());
+            }
+        }
+        if (ImGui::BeginPopup("viewport-view")) {
+            ImGui::TextDisabled("the canvas shows");
+            if (ImGui::MenuItem("Editor viewpoint", nullptr, view.mode == scene::ViewportCamera::Editor)) {
+                if (onViewportView) {
+                    onViewportView({scene::ViewportCamera::Editor, scene::kNoCamera});
+                }
+                setStatus("the canvas is the editor's viewpoint -- flying it changes nothing the "
+                          "project renders");
+            }
+            if (ImGui::MenuItem("The film's camera", nullptr, view.showsFilm())) {
+                if (onViewportView) {
+                    onViewportView({});
+                }
+                setStatus("the canvas is showing the film's camera");
+            }
+            ImGui::Separator();
+            ImGui::TextDisabled("through a camera");
+            for (const scene::CameraRig& rig : comp->cameraDirection().cameras) {
+                const bool on = view.mode == scene::ViewportCamera::Through && view.camera == rig.id;
+                if (ImGui::MenuItem(rig.name.c_str(), nullptr, on)) {
+                    if (onViewportView) {
+                        onViewportView({scene::ViewportCamera::Through, rig.id});
+                    }
+                    setStatus("looking through '" + rig.name + "' -- the film is unchanged");
                 }
             }
+            ImGui::EndPopup();
         }
     }
 
@@ -1182,11 +1213,14 @@ void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
     ImGui::SameLine();
     ImGui::TextDisabled("%s", previewCameraLabel.c_str());
     if (ImGui::IsItemHovered()) {
-        tooltip("Which camera this frame was rendered through. There is one camera in this\n"
-                          "engine -- the scene's -- and the shot system writes it by keying\n"
-                          "camera/position and camera/target on the timeline. So the preview,\n"
-                          "the viewport and the deliverable cannot be looking through different\n"
-                          "cameras: there is only the one to look through.");
+        // The old text here said "there is only one camera to look through, so the preview, the
+        // viewport and the deliverable cannot be looking through different ones". That stopped
+        // being true at ADR-245 (a shot can put an authored rig on screen) and is the opposite of
+        // true at ADR-391 (the viewport has its own viewpoint). A tooltip that states an invariant
+        // the code has since abandoned is worse than none: it is the sentence somebody reasons from.
+        tooltip("Which camera this frame was rendered through -- the film's, unless the toolbar\n"
+                          "to the left says the canvas is showing the editor's own viewpoint or is\n"
+                          "pinned through a camera. A render always uses the film's.");
     }
 }
 
@@ -3952,7 +3986,9 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         }
         if (locked) {
             ImGui::TextColored(ImVec4(0.62f, 0.66f, 0.72f, 1.0f),
-                               "  Navigating the viewport will not change the authored cut.");
+                               "  The film's camera cannot be moved by hand. Navigating the canvas\n"
+                               "  never could change the cut anyway -- the editor's viewpoint is\n"
+                               "  not the film's camera (ADR-391).");
         } else {
             ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.4f, 1.0f),
                                "  Unlocked: moving the viewport camera DISCARDS the director's cut\n"
@@ -3998,42 +4034,45 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         if (selected) {
             ImGui::Indent();
             if (rig.id != scene::kMainCamera) {
-                // "Go to camera": the editor viewpoint moves to match this camera. It is NOT
-                // the brief's §6 "look through camera" and is deliberately not labelled as one.
+                // **Look through** (the brief's §6), which could not be built until there was a
+                // viewpoint the film did not own. It pins the canvas to this rig: the director goes
+                // on cutting, the film goes on rendering from whatever it chose, and what is on
+                // screen is this camera until you say otherwise. Moving the view takes you off it
+                // and onto the editor's viewpoint, starting from here (`setViewportPose`).
                 //
-                // Looking *through* a camera would mean pinning the viewport to this rig, and
-                // there is no such concept: `viewportFreeRoam` pins the frame to the MAIN camera
-                // and nothing pins it to an authored one. Worse, under a directed project the
-                // timeline drives `camera/*` every frame, so a pose written here is replaced
-                // before it is seen unless the director is stood down -- which is exactly the
-                // destruction the lock exists to prevent.
-                //
-                // So the button does the honest, useful subset and says so. Disabled while the cut
-                // is locked, because there it would visibly do nothing, and a control that appears
-                // to work and does not is the defect this branch has spent its time removing.
-                const bool goToBlocked = cameraDirected && cameraLocked != nullptr && *cameraLocked;
-                ImGui::BeginDisabled(goToBlocked);
+                // No longer blocked by the lock. There is nothing to protect: this writes no
+                // parameter, no track and no file.
+                const bool through = viewportView.mode == scene::ViewportCamera::Through &&
+                                     viewportView.camera == rig.id;
+                if (ImGui::Button(through ? "Stop looking through" : "Look through")) {
+                    if (onViewportView) {
+                        onViewportView(through ? scene::ViewportView{}
+                                               : scene::ViewportView{scene::ViewportCamera::Through, rig.id});
+                    }
+                    setStatus(through ? "the canvas is showing the film again"
+                                      : "looking through '" + rig.name + "' -- the film is unchanged");
+                }
+                if (ImGui::IsItemHovered()) {
+                    tooltip("Pin the canvas to this camera. Nothing about the film changes:\n"
+                            "the director still decides what renders.");
+                }
+                ImGui::SameLine();
+                // "Go to camera": the *viewport* moves to match this camera and stays where it is
+                // put. Through the host's one navigation seam, so it writes whatever a drag would
+                // write -- the editor's viewpoint, ordinarily; `camera/*` only where a drag would
+                // also have written it (an output frame preview, an open output).
                 if (ImGui::Button("Go to camera")) {
                     const std::string prefix = rig.channelPrefix();
                     const auto* pos = engine.params().find(prefix + "position");
                     const auto* tgt = engine.params().find(prefix + "target");
-                    if (auto* vp = engine.params().find("camera/position"); vp != nullptr && pos != nullptr) {
-                        for (std::size_t c = 0; c < 3; ++c) {
-                            vp->setBaseComponent(c, pos->baseComponent(c));
-                        }
+                    if (onMoveViewport && pos != nullptr && tgt != nullptr) {
+                        onMoveViewport(glm::vec3(pos->baseComponent(0), pos->baseComponent(1),
+                                                 pos->baseComponent(2)),
+                                       glm::vec3(tgt->baseComponent(0), tgt->baseComponent(1),
+                                                 tgt->baseComponent(2)));
+                        setStatus("the view moved to '" + rig.name + "' -- it is not pinned to it; "
+                                  "use Look through for that");
                     }
-                    if (auto* vt = engine.params().find("camera/target"); vt != nullptr && tgt != nullptr) {
-                        for (std::size_t c = 0; c < 3; ++c) {
-                            vt->setBaseComponent(c, tgt->baseComponent(c));
-                        }
-                    }
-                    setStatus("viewport moved to '" + rig.name + "' -- this is the editor camera, "
-                              "not a binding to that one");
-                }
-                ImGui::EndDisabled();
-                if (goToBlocked && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    ImGui::SetTooltip("The director drives the viewport camera every frame while "
-                                      "the cut is locked, so this would not stick.");
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Place here")) {
