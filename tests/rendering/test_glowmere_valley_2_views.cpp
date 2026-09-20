@@ -127,10 +127,15 @@ TEST_CASE("Glowmere Valley 2 from several viewpoints", "[.capture][glowmere2]") 
     //      written was a frame with **no particles at all** -- not only the new spore-fall, but the
     //      river motes and the visitor's beam that have been in the scene since the first handover.
     //      An empty emitter renders as clean sky, which is why it went unnoticed.
-    //   2. *The resolution must not change.* Resizing the render target calls
+    //   2. *The resolution must not change.* Resizing the render target called
     //      `resetTemporalHistory`, which calls `ParticleRenderer::resetAll`. Warming at 320x180 and
     //      then capturing at 1920x1080 threw the whole simulation away between the two. So the
     //      warm-up runs at the capture size; 240 full-size frames costs a few seconds.
+    //      **ADR-480 fixed this** -- a resize now takes the narrower `resetScreenHistory()` and
+    //      leaves the pools alone -- so the warm-up no longer *has* to be at the capture size. It
+    //      still is, because a warm-up at the capture size is also the one that populates the
+    //      screen-space history the first captured frame reads, and because changing a working
+    //      fixture to prove a fix belongs in the fix's own test.
     //   3. *Time must not go backwards.* `renderTime < previousRenderTime_` is a seek, and a seek
     //      resets the same history. Warming to 24 s and then restarting the capture clock at 6 s
     //      wiped the pools a second time. So the captures continue the warm-up's own clock.

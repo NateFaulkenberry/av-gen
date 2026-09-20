@@ -10,7 +10,13 @@ void InteractiveResolution::configure(const InteractiveResolutionSettings& s) {
     settings_ = s;
     settings_.floorRung = std::min(settings_.floorRung, kRenderScaleRungs.size() - 1);
     settings_.windowFrames = std::clamp(settings_.windowFrames, 1, static_cast<int>(gpu_.size()));
-    settings_.dwellFrames = std::max(1, settings_.dwellFrames);
+    // The dwell must cover the window, and this is load-bearing rather than tidiness. After a rung
+    // change the ring still holds the *previous* rung's costs; if a decision could be taken before
+    // the window had refilled, the controller would read the old rung's cost, conclude it was still
+    // over budget and drop again -- a double step on stale evidence, every time, all the way to the
+    // floor. Clamped here so that a settings file or a test cannot express the configuration in
+    // which that happens.
+    settings_.dwellFrames = std::max({1, settings_.dwellFrames, settings_.windowFrames});
     if (!settings_.enabled) {
         reset();
     }

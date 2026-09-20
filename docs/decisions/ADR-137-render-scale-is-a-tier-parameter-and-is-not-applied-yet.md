@@ -1,6 +1,10 @@
 # ADR-137: Render scale is a tier parameter, and the thing that stops it being applied is the tonemap binding
 
-**Status:** Accepted
+**Status:** Accepted; steps 1-3 of "What remains" were subsequently built, and the deferral of
+dynamic resolution is **superseded by ADR-480** -- which measured the cost curve across the range
+an editor canvas occupies and found a local slope of 0.80 where this ADR's figure of 0.44 was
+taken at 640x400. Both are right; the frame is affine in pixel count (4.63 ms + 8.45 ms/Mpx on the
+multicam film) and 640x400 is in the part of the curve the fixed term dominates.
 **Date:** 2026-09-13
 
 ## Problem

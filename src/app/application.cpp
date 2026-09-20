@@ -3931,6 +3931,22 @@ int Application::runLive() {
                 renderHeight_ = ch;
             }
         }
+        // The Settings panel writes `adaptiveCanvasScale` and the budget straight through, so there
+        // is no hook to set a dirty bit in and the honest thing is to compare -- the same shape
+        // and the same reason as `serviceLayoutStore` and the preview's view state below. Without
+        // this the checkbox would be a setting that does nothing until the next launch, which is
+        // the class of defect ADR-225 exists about. A `--adaptive-scale` on the command line
+        // outranks the file and is not overwritten by it.
+        if (panel_ != nullptr && !options_.adaptiveScale.has_value() &&
+            (autoResolution_.settings().enabled != settings_.adaptiveCanvasScale ||
+             autoResolution_.settings().budgetMs != settings_.adaptiveCanvasBudgetMs)) {
+            InteractiveResolutionSettings rs = autoResolution_.settings();
+            rs.enabled = settings_.adaptiveCanvasScale;
+            rs.budgetMs = settings_.adaptiveCanvasBudgetMs;
+            // Switching it off resets the ladder to rung 0, and the block below then puts the
+            // renderer back to full resolution on the same frame.
+            autoResolution_.configure(rs);
+        }
         // ---- the adaptive render scale (§15-§17) ------------------------------------------------
         //
         // Applied here, after `renderWidth_`/`renderHeight_` are settled, because the rung is a
@@ -4192,6 +4208,8 @@ int Application::runLive() {
 
         stats.width = renderWidth_;
         stats.height = renderHeight_;
+        stats.sceneWidth = renderer_->stats().width;
+        stats.sceneHeight = renderer_->stats().height;
         stats.drawCalls = renderer_->stats().drawCalls;
         stats.triangles = renderer_->stats().triangles;
         stats.procedural = renderer_->stats().procedural;

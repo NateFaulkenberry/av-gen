@@ -444,6 +444,50 @@ image.
 
 See §7. Default 1.0, so nothing changes unless asked.
 
+**And that was the problem (ADR-480, 2026-09-20).** The slider shipped, and in the ten days after
+it shipped nobody moved it. The same diagnosis — "the editor is slow; the canvas is several times
+the benchmark's pixel count; the lever exists" — was filed twice, on two different scenes, and
+both times the finding was *awaiting the owner*. A lever that has to be found is a defect with a
+knob.
+
+So the editor now chooses a **scene** render scale for itself, from the GPU frame time, while
+`canvasRenderScale` stays exactly where it is as the manual control. The two are different levers
+and they compose: ADR-084's reduces the canvas target, which the person chooses; ADR-480's reduces
+the scene target below the canvas, which is the renderer's own business
+(`QualitySettings::renderScale`, ADR-137).
+
+What made it decidable is that the cost curve was finally measured across the range an editor
+canvas actually occupies. On the multicam film, minima over three repeats under the GPU lock:
+
+> **GPU ms = 4.63 + 8.45 × Mpx**, maximum residual 0.24 ms from 2.74 down to 0.69 Mpx.
+
+Between 2.74 and 1.38 Mpx the local slope is **0.80** — where ADR-137 had deferred dynamic
+resolution behind a measurement of 0.44 taken at 640×400. Both are right: below about 1 Mpx the
+fixed 4.63 ms dominates and the slope collapses, and that is the region the old figure came from.
+
+Measured end to end, 300 frames of the live editor, a 2452×1624 canvas (3.98 Mpx):
+
+| | GPU median | FRAME median | `gpu.acquire WAIT` median |
+|---|---:|---:|---:|
+| `--adaptive-scale off` | 42.01 ms | 42.78 ms | 35.42 ms |
+| `--adaptive-scale on` | **15.79 ms** | **18.69 ms** | **11.34 ms** |
+
+23 fps to 53 fps, and the main thread's own work — `engine.update` 2.4, `ui.build` 0.5,
+`render.record` 2.8, `gpu.submit` 1.3 — is the same in both arms. Every millisecond of the
+difference comes out of the wait, which is §1's finding restated: on this project the editor's
+frame is **83% blocked on the GPU**.
+
+New instruments: `tools/resolution_sweep.sh` and `tools/resolution_sweep_report.py`, and four
+`scale*` quality arms so the same lever is reachable from `--ab`. New flags: `--adaptive-scale
+on|off` and `--adaptive-budget <ms>`. New profiler rows: `scene Mpx` and `# render-scale moves`.
+
+One thing found on the way past and worth its own line: **the editor's first frames render the
+world at the whole window's resolution, not the canvas's.** Before the first frame is laid out
+there is no canvas and the window is the best guess, so on a 3840×2400 window the first frames are
+9.2 Mpx against the 3.98 Mpx the canvas settles at — 2.3× the steady-state cost, paid exactly
+where time-to-first-usable-frame is measured. Not fixed here; recorded because `scene Mpx` now
+makes it visible in every `--profile-cpu` run's `max` column.
+
 ---
 
 ## 10. Determinism

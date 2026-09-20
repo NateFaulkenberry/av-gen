@@ -186,6 +186,31 @@ TEST_CASE("a disabled controller is the identity", "[unit][resolution]") {
     CHECK(c.stats().framesSeen == 0);
 }
 
+TEST_CASE("a decision is never taken on the previous rung's measurements", "[unit][resolution]") {
+    app::InteractiveResolution c;
+    app::InteractiveResolutionSettings s = fast();
+    // Ask for a dwell shorter than the window. `configure` must refuse it, because after a rung
+    // change the ring still holds the old rung's costs -- and a decision taken before the window
+    // refilled would read them, conclude the new rung is still over budget, and drop again on
+    // evidence about a resolution it is no longer rendering at. All the way to the floor, every
+    // time, on a canvas one step would have fixed.
+    s.dwellFrames = 1;
+    s.windowFrames = 20;
+    c.configure(s);
+    CHECK(c.settings().dwellFrames >= c.settings().windowFrames);
+
+    // And the consequence, measured: a canvas that one rung fixes settles on one rung. The cost
+    // handed back is the cost of the rung the controller chose, so a controller reading stale
+    // samples would walk past it.
+    constexpr double kCanvasMpx = 1.6; // 4.63 + 8.45*1.6 = 18.15 ms at rung 0; 0.85 brings it in
+    for (int i = 0; i < 1500; ++i) {
+        const double gpu = measuredCost(kCanvasMpx, c.scale());
+        c.note(gpu, gpu + 4.0);
+    }
+    INFO("settled at rung " << c.rung() << " (" << measuredCost(kCanvasMpx, c.scale()) << " ms)");
+    CHECK(c.rung() == 1);
+}
+
 TEST_CASE("the floor is honoured", "[unit][resolution]") {
     app::InteractiveResolution c;
     app::InteractiveResolutionSettings s = fast();

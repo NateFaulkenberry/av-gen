@@ -889,7 +889,10 @@ Result<void> SceneRenderer::createAuxTargets(std::uint32_t width, std::uint32_t 
 
 void SceneRenderer::setQuality(QualityTier tier) {
     tier_ = tier;
-    qualitySettings_ = QualitySettings::forTier(tier);
+    // Through the setter, not by assignment, so a tier that ever sets `renderScale` below 1 is
+    // applied rather than silently ignored on a renderer whose targets already exist. No tier does
+    // today, so this changes nothing today -- which is exactly when it is cheap to make right.
+    setQualitySettings(QualitySettings::forTier(tier));
     if (ao_) {
         ao_->resetHistory();
     }
