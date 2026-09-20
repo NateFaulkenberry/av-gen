@@ -18,6 +18,12 @@ bool isAimed(scene::PunctualLight::Type type) {
 
 } // namespace
 
+std::string lightParameterBase(const scene::Composition::AuthoredLight& light) {
+    // Must match `Composition::registerAuthoredLightParameters`, which keys on the id and not the
+    // display name, so a rename does not re-path the light's knobs.
+    return "lights/" + scene::Composition::authoredLightId(light) + "/";
+}
+
 std::vector<std::string_view> lightParameterLeaves(scene::PunctualLight::Type type) {
     using T = scene::PunctualLight::Type;
     // Registered for every kind.

@@ -198,6 +198,31 @@ enum class ViewportIntent : std::uint8_t {
     return hasSelection && viewportHasPointer;
 }
 
+// May this gesture stand the director down?
+//
+// **This is a guard on live data loss, not a preference.** `releaseDirectedCamera` destroys six
+// `directedCameraTargets()` worth of timeline tracks, the whole `cameraAimFollow` table and the
+// whole `cameraShotSpans` table -- 37 and 42 entries on the multicam film -- and the next Save
+// writes the loss into the project. It was observed happening for real: the app was open, it saved,
+// and the bake was gone. Re-baking is not a recovery either, because it re-photographs the hero
+// anchors (ADR-344), so the cut comes back different.
+//
+// While that could only be reached by dragging the viewport under a directed camera it was a defect
+// you had to know the sequence for. The moment a camera is a draggable object in the Canvas it is
+// one click away from anybody composing a shot, which is why the lock lands with the dragging and
+// not after it.
+//
+// The distinction is the one every DCC makes and the viewport brief's §7 asks for by name:
+// **navigating the view is not modifying the camera.** An incidental gesture -- a drag, a framing,
+// a dolly -- may not discard a cut. A deliberate one -- the menu's "take the camera back", the
+// Camera panel's unlock -- may, because the user said so in words rather than by moving a mouse.
+[[nodiscard]] inline bool viewportMayReleaseDirector(bool directed, bool locked, bool deliberate) {
+    if (!directed) {
+        return false; // nothing to stand down
+    }
+    return deliberate || !locked;
+}
+
 // Labels for a list of file paths: the file name where that is enough to tell them apart, and as
 // much of the trailing path as it takes where it is not.
 //

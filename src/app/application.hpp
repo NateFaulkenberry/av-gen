@@ -495,7 +495,14 @@ private:
     void setViewportPose(const CameraPose& pose);
     // Puts the camera in free mode, because position and target are ignored in orbit mode and a
     // gesture that silently moves nothing is indistinguishable from a dead input.
-    void ensureFreeCamera();
+    // `deliberate` is whether the user asked for the camera in words rather than by moving the
+    // mouse. Only a deliberate gesture may stand the director down while the camera is locked; see
+    // `ui::viewportMayReleaseDirector` for what that protects and why it is not a preference.
+    void ensureFreeCamera(bool deliberate = false);
+    // Locked by default, because the destructive direction is the one worth defending. Nothing
+    // reads this but `ensureFreeCamera`; the Camera panel toggles it.
+    bool cameraLocked_ = true;
+    bool cameraLockAnnounced_ = false; // the log line is once a session, not once a frame
     // One raw SDL event on its way to ImGui, the viewport and the shortcut table.
     void handleInputEvent(const SDL_Event& event);
     void handleViewportEvent(const SDL_Event& event);

@@ -93,7 +93,16 @@ TEST_CASE("every control the Lights panel draws points at a real parameter", "[u
     for (const Arm& arm : arms) {
         INFO(arm.json);
         auto built = sceneWithLight(dir / arm.json, arm.json);
-        const std::string base = "lights/Key_Light/";
+        REQUIRE(built->comp->authoredLights().size() == 1);
+        // **The panel's own arithmetic, not a string this test happens to agree with.**
+        //
+        // It was `"lights/Key_Light/"` written out here, which asserts that the parameters exist
+        // and says nothing about whether the panel can reach them: change how an id is derived and
+        // the panel would ask under a prefix that resolves to nothing, every row would silently
+        // fail to draw, and this test would still pass. That is the Tree panel's defect, where a
+        // wrongly computed prefix rendered two sections as an empty box indistinguishable from a
+        // scene without the feature.
+        const std::string base = ui::lightParameterBase(built->comp->authoredLights()[0]);
 
         // Every leaf the panel asks for, for this kind.
         for (const std::string_view leaf : ui::lightParameterLeaves(arm.type)) {
@@ -117,6 +126,30 @@ TEST_CASE("every control the Lights panel draws points at a real parameter", "[u
             CHECK_FALSE(registered(built->parameters, base + "width"));
         }
     }
+}
+
+TEST_CASE("the panel asks under the id, so a rename does not silence every row",
+          "[ui][lights][panel]") {
+    // The other half of the arithmetic check. The panel's prefix must follow the *id*; if it
+    // followed the display name, renaming a light would re-path every row it draws and the whole
+    // property section would go blank while the parameters sat there untouched.
+    const fs::path dir = fs::temp_directory_path() / "avgen-lights-panel-rename";
+    fs::remove_all(dir);
+    auto built = sceneWithLight(dir, "spot");
+
+    const std::string before = ui::lightParameterBase(built->comp->authoredLights()[0]);
+    REQUIRE(registered(built->parameters, before + "intensity"));
+
+    std::vector<scene::Composition::AuthoredLight> lights = built->comp->authoredLights();
+    lights[0].light.name = "Moon Key";
+    REQUIRE(built->comp->setAuthoredLights(std::move(lights)).has_value());
+
+    const std::string after = ui::lightParameterBase(built->comp->authoredLights()[0]);
+    CHECK(after == before);                                  // the prefix did not move...
+    CHECK(registered(built->parameters, after + "intensity")); // ...and it still resolves
+    // THE CONTROL: the display name is not a prefix. If the panel ever went back to computing one
+    // from the name, this is the path it would ask under and it does not exist.
+    CHECK_FALSE(registered(built->parameters, "lights/Moon_Key/intensity"));
 }
 
 TEST_CASE("a new light lands where the camera is looking", "[ui][lights][panel]") {
