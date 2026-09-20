@@ -274,10 +274,16 @@ Report checkAtmospheric(AtmosphereKind kind) {
         }
     }
 
-    // 4. Resolution attributes the effect to its own kind. `resolveAtmosphericEffects` dispatches
-    //    with `if comet / else if aurora / else`, so a kind added to the enum and forgotten there
-    //    is silently counted as a vortex and dropped past the first. This check is the reason the
-    //    file exists: nothing else in the suite would notice.
+    // 4. Resolution attributes the effect to its own kind. This check is the reason the file
+    //    exists: nothing else in the suite would notice a kind resolving as a neighbour.
+    //
+    //    `resolveAtmosphericEffects` used to dispatch with `if comet / else if aurora / else`, so
+    //    the vortex was the fall-through and a forgotten kind was counted as one. That is now an
+    //    exhaustive `switch`, and the check below must not reintroduce the same shape: picking
+    //    `mine` with a ternary chain whose own `else` is `counts.vortices` would compare a new
+    //    kind's result against the vortex counter and agree with itself, which is how this check
+    //    silently stopped being able to fail for a fourth kind. Hence the exhaustive switch here
+    //    too, and a "no counter" arm for a kind that is resolved by nothing.
     {
         AtmosphericEffect live = probe;
         live.enabled = true;
@@ -293,16 +299,21 @@ Report checkAtmospheric(AtmosphereKind kind) {
         const AtmosphericCounts counts =
             resolveAtmosphericEffects(std::span(&live, 1), ctx, comets, auroras);
 
-        const std::size_t mine = kind == AtmosphereKind::Comet    ? counts.comets
-                                 : kind == AtmosphereKind::Aurora ? counts.auroras
-                                                                  : counts.vortices;
+        // Exhaustive, no `default` -- see the note above.
+        std::size_t mine = 0;
+        switch (kind) {
+        case AtmosphereKind::Comet: mine = counts.comets; break;
+        case AtmosphereKind::Aurora: mine = counts.auroras; break;
+        case AtmosphereKind::Vortex: mine = counts.vortices; break;
+        }
         const std::size_t total = counts.comets + counts.auroras + counts.vortices;
         if (mine != 1) {
             report(out, kind, "resolve-dispatch",
                    "one live effect of this kind resolved as " + std::to_string(counts.comets) +
                        " comet(s), " + std::to_string(counts.auroras) + " aurora(s), " +
-                       std::to_string(counts.vortices) + " vortex/vortices -- it fell through the "
-                       "if/else chain in resolveAtmosphericEffects into another kind's arm");
+                       std::to_string(counts.vortices) + " vortex/vortices, " +
+                       std::to_string(counts.dropped) + " dropped -- it is not claimed by its own "
+                       "arm of the switch in resolveAtmosphericEffects");
         } else if (total != 1) {
             report(out, kind, "resolve-dispatch",
                    "one live effect resolved as " + std::to_string(total) + " effects");
