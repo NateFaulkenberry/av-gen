@@ -54,6 +54,11 @@
 // frame (x = binormal, y = normal, z = tangent), so the default (0, 1, 0) rises along the
 // sample normal and (0, 0, 1) follows the tangent. The CPU falls back to the Point shape when
 // the spline is missing.
+// ADR-370: the wind field itself, with no bindings in it. `wind.wgsl` is the frame-bound
+// wrapper and this shader has no frame group, so it takes the arithmetic and passes its own
+// copy of the sixteen floats. There used to be a hand-maintained transliteration here
+// instead, and it had already dropped `WindSample::phase`.
+#include "wind_field.wgsl"
 #include "fields.wgsl"
 #include "spline.wgsl"
 
@@ -102,7 +107,9 @@ struct Params {
     // ADR-370: the ADR-055 wind field, copied into the particle uniforms rather than reached
     // through the frame group. `particles.wgsl` binds no frame uniform at all -- it never has --
     // and adding one would change the bind-group layout of every particle pipeline for four
-    // vectors. Same bytes, same meaning, same `windSampleAt` arithmetic, no layout churn.
+    // vectors. Same bytes and the same meaning as `FrameUniforms`', and -- since the copy of the
+    // ARITHMETIC that used to sit below them was deleted -- literally the same function:
+    // `wind_field.wgsl`'s `windSampleFrom`, which is what `wind.wgsl` calls too.
     windDir: vec4<f32>,
     windRegion: vec4<f32>,
     windGust: vec4<f32>,
@@ -196,38 +203,18 @@ fn potential(p: vec3<f32>) -> vec3<f32> {
     return vec3<f32>(turbValueNoise(p), turbValueNoise(p + vec3<f32>(31.4, 47.1, 12.9)), turbValueNoise(p + vec3<f32>(-17.2, 5.3, 29.8))) - vec3<f32>(0.5);
 }
 
-// ADR-370: ADR-055's field sampler, reading the particle uniforms instead of the frame block. The
-// expressions are `shaders/wind.wgsl`'s, term for term and in the same order, because the whole
-// value of that field is that every consumer agrees about what the air is doing at a point.
-struct ParticleWind {
-    direction: vec2<f32>,
-    strength: f32,
-    gust: f32,
-};
-
-fn particleWindAt(pos: vec3<f32>, t: f32) -> ParticleWind {
-    let d = params.windDir.xy;
-    let perp = vec2<f32>(-d.y, d.x);
-    let a = dot(pos.xz, d);
-    let c = dot(pos.xz, perp);
-    let kr = params.windRegion.x;
-    let drift = params.windRegion.z;
-    let r1 = sin(kr * (0.94 * a + 0.34 * c) - t * drift);
-    let r2 = sin(kr * 1.63 * (0.61 * a - 0.79 * c) + t * drift * 0.61 + 2.1);
-    let region = max(1.0 + params.windRegion.y * 0.5 * (r1 + r2), 0.0);
-    let kg = params.windGust.x;
-    let gp = kg * (a - t * params.windGust.y) + 0.8 * sin(c * kg * 0.37);
-    let envelope = pow(max(0.5 + 0.5 * sin(gp), 0.0), params.windGust.w);
-    let kt = params.windTurb.x;
-    let ts = params.windTurb.y;
-    let s1 = sin(kt * (0.31 * a + 0.95 * c) - t * ts * kt);
-    let s2 = sin(kt * 1.41 * (-0.87 * a + 0.5 * c) + t * ts * kt * 0.83 + 1.3);
-    let turn = params.windRegion.w * 0.5 * (s1 + s2);
-    var out: ParticleWind;
-    out.direction = d * cos(turn) + perp * sin(turn);
-    out.strength = params.windDir.z * region;
-    out.gust = envelope * params.windGust.z;
-    return out;
+// ADR-370: the frame's wind, as this shader's uniforms carry it. `particles.wgsl` binds no frame
+// uniform at all -- it never has -- so the field is copied into these five vectors by
+// `ParticleRenderer::update` straight out of `ParticleFrameContext::wind`, which is the same
+// `wind::WindUniforms` `FrameUniforms` gets. Gathering them is all this function does; the
+// sampling is `wind_field.wgsl`'s, which is also what `wind.wgsl` calls.
+fn particleWindField() -> WindField {
+    var w: WindField;
+    w.dir = params.windDir;
+    w.region = params.windRegion;
+    w.gust = params.windGust;
+    w.turbulence = params.windTurb;
+    return w;
 }
 
 fn turbCurl(p: vec3<f32>) -> vec3<f32> {
@@ -356,7 +343,7 @@ fn cs_simulate(@builtin(global_invocation_id) gid: vec3<u32>) {
     // so two leaves ten metres apart catch different air and a gust front arrives at one before the
     // other, which is what stops a shower drifting as a single sheet.
     if (params.windMix.x > 0.0 && params.windDir.w > 0.5) {
-        let w = particleWindAt(p.position, params.sim.y);
+        let w = windSampleFrom(particleWindField(), p.position, params.sim.y);
         let flow = vec3<f32>(w.direction.x, 0.0, w.direction.y) * (w.strength * (1.0 + w.gust));
         // A force toward matching the air, not a shove: a leaf accelerates until it is travelling
         // with the wind and then stops accelerating, which is what drag against moving air does.
