@@ -40,5 +40,24 @@ fn atmosphereGroundAt(worldPos: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
         let falloff = pow(clamp(1.0 - d / max(p.w, 1.0), 0.0, 1.0), pointColor.w);
         out = out + pointColor.rgb * falloff * (0.4 + 0.6 * clamp(normal.y, 0.0, 1.0));
     }
+    // ADR-379: light spilling UP out of the cosmic vortex. The brief's §10 asks for the island's
+    // underside to catch "subtle colored light from below" and §11 for the island to be visibly
+    // part of a chain from tree to vortex; this is the half of that which costs nothing, because it
+    // is the same shape as the comet pool above with the sign of the normal term reversed.
+    //
+    // Weighted by how much of the surface faces DOWN, so the island's flat top is untouched and its
+    // underside takes nearly all of it -- which is the whole point, and is why this reads as the
+    // vortex lighting the rock rather than as ambient being turned up.
+    let vortexColor = frame.vortexGlowColor;
+    if (vortexColor.w > 0.0) {
+        let v = frame.vortexGlow;
+        let radial = length(worldPos.xz - v.xz) / max(v.w, 1.0);
+        // Above the mouth only: the vortex lights what floats over it, and a surface below the
+        // mouth plane is inside the funnel rather than above it.
+        let above = clamp((worldPos.y - v.y) / max(v.w, 1.0), 0.0, 1.0);
+        let reach = clamp(1.0 - radial * 0.8, 0.0, 1.0) * (1.0 - smoothstep(0.0, 1.0, above));
+        let facing = clamp(-normal.y, 0.0, 1.0);
+        out = out + vortexColor.rgb * (vortexColor.w * reach * reach * (0.12 + 0.88 * facing));
+    }
     return out;
 }

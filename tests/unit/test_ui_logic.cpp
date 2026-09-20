@@ -851,3 +851,55 @@ TEST_CASE("the arrows nudge only where the user is pointing", "[ui][logic][trans
     CHECK_FALSE(ui::editorOwnsArrowKey(false, true));
     CHECK_FALSE(ui::editorOwnsArrowKey(false, false));
 }
+
+TEST_CASE("The codec list is what this machine can actually produce", "[ui][video]") {
+    // ADR-383, audit G4. The Render panel offered a hardcoded eight -- four of them ffmpeg-only --
+    // whether or not an ffmpeg existed anywhere, so choosing one was a render that failed when the
+    // output was opened, after the project had already been saved to disk.
+    const std::vector<std::string> native = {"prores4444", "prores422", "h264", "hevc"};
+    const auto has = [](const std::vector<std::string>& v, const std::string& n) {
+        return std::find(v.begin(), v.end(), n) != v.end();
+    };
+
+    SECTION("auto with both offers everything, and it is really everything") {
+        const auto all = avgen::ui::availableCodecs(native, true, "auto");
+        CHECK(all.size() == 8);
+        for (const char* n : {"prores4444", "prores422", "h264", "hevc", "libx264", "libx265",
+                              "prores_ks", "libvpx-vp9"}) {
+            INFO(n);
+            CHECK(has(all, n));
+        }
+    }
+
+    SECTION("no ffmpeg means no ffmpeg-only codec, which is the whole point") {
+        const auto some = avgen::ui::availableCodecs(native, false, "auto");
+        CHECK(some.size() == 4);
+        CHECK(has(some, "h264"));
+        // THE CONTROL: these four must disappear. An implementation that returned everything
+        // regardless would pass every "is h264 there" assertion above.
+        CHECK_FALSE(has(some, "libx264"));
+        CHECK_FALSE(has(some, "libx265"));
+        CHECK_FALSE(has(some, "prores_ks"));
+        CHECK_FALSE(has(some, "libvpx-vp9"));
+    }
+
+    SECTION("asking for one backend narrows to that backend") {
+        const auto nativeOnly = avgen::ui::availableCodecs(native, true, "native");
+        CHECK(nativeOnly.size() == 4);
+        CHECK_FALSE(has(nativeOnly, "libx265"));
+
+        const auto ffmpegOnly = avgen::ui::availableCodecs(native, true, "ffmpeg");
+        CHECK(has(ffmpegOnly, "libx265"));
+        // ffmpeg understands the four the native backend shares with it, so they stay offered
+        // rather than vanishing when somebody pins the backend.
+        CHECK(has(ffmpegOnly, "prores4444"));
+        CHECK(has(ffmpegOnly, "h264"));
+    }
+
+    SECTION("a machine with nothing offers nothing, rather than a list that cannot work") {
+        const auto none = avgen::ui::availableCodecs({}, false, "auto");
+        CHECK(none.empty());
+        // And pinning ffmpeg on a machine without one is also empty, not the native four.
+        CHECK(avgen::ui::availableCodecs(native, false, "ffmpeg").empty());
+    }
+}

@@ -49,6 +49,7 @@ struct VolumeUniforms {
     vortexB: vec4<f32>,   // mid colour
     vortexAccent: vec4<f32>, // luminous accent
     vortex4: vec4<f32>,   // ADR-374: funnel depth, throat radius fraction, throat density, 0
+    vortex5: vec4<f32>,   // ADR-381: x = comet response, yzw = 0
 };
 
 @group(1) @binding(1) var<uniform> vol: VolumeUniforms;
@@ -458,6 +459,41 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
         // ...and the vortex brings its own light. Emissive rather than lit, because nothing in this
         // scene could illuminate something that size and because the reference is a nebula.
         emission = emission + vortexEmissionAt(p, vortex, vol.noiseParams.w);
+        // ADR-381, phase 13: the COMET, and only the comet, is allowed to light the vortex.
+        //
+        // ADR-374 established that letting the scene's lights scatter in this medium turns the
+        // frame into flat haze -- the key at intensity 22 accumulated over a 2.6 km march returned
+        // mean luminance 131 of 255 with the vortex's own emission at zero. So this is not a
+        // relaxation of that: it is one small, moving, distance-limited source, taken from the same
+        // `skyGroundPoint` description the SURFACES are lit from, so the rock and the fog brighten
+        // from one account of where the comet is rather than two that can disagree.
+        //
+        // Weighted by the vortex's own density, so it reads as the comet finding the cloud rather
+        // than as a light in empty space, and gated by a parameter that is zero by default.
+        if (vol.vortex5.x > 0.0 && vortex > 0.0) {
+            let lit = frame.skyGroundPointColor;
+            if (lit.r + lit.g + lit.b > 0.0) {
+                // XZ ONLY, and a wider reach than the surfaces get. `atmosphere_ground.wgsl` says
+                // why for the first: the comet is kilometres up, so the distance that matters is
+                // how far a point is from the spot *under* it, not from the spot itself. My first
+                // version used the 3D distance and measured nothing at all -- the ground pool's
+                // 220 m radius is the right size for the island's rock and the vortex is hundreds
+                // of metres below the ground plane, so every sample fell outside a sphere of it.
+                //
+                // And the second: the fog is kilometres across where the pool is metres, so the
+                // radius is scaled by `vortex5.y`. A light that reaches the rock and stops dead at
+                // the cloud beside it is the discontinuity ADR-369 was about, one object along.
+                let d = length(p.xz - frame.skyGroundPoint.xz) /
+                        max(frame.skyGroundPoint.w * max(vol.vortex5.y, 1.0), 1.0);
+                let fall = pow(clamp(1.0 - d, 0.0, 1.0), max(lit.w, 0.5));
+                // The 0.005 is the per-metre conversion, and it is the THIRD time in this branch
+                // that adding a radiance to a march without it has produced a number two orders of
+                // magnitude wrong (ADR-374's density, ADR-379's spill). `lit.rgb` is a surface
+                // radiance; this loop integrates over metres. Without it, cometResponse 0.6 lifted
+                // the whole frame by 125 luminance levels.
+                emission = emission + lit.rgb * (fall * vortex * vol.vortex5.x * 0.005);
+            }
+        }
         // The particle glow arrives as light to scatter, not as fog emission, so denser dust
         // catches more of it - which is what reads as "the sparks are lighting the dust".
         let local = localInScatterAt(p, screenUv, max(t * depthAlongRay, 1e-3), direction, anisotropy);

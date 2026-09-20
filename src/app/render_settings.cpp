@@ -1,5 +1,7 @@
 #include "app/render_settings.hpp"
 
+#include "app/frame_range.hpp"
+
 #include "scene/scene.hpp"
 
 #include "rendering/render_quality.hpp"
@@ -40,23 +42,20 @@ void RenderSettings::normalisePattern() {
     }
 }
 
+// ADR-383: the range arithmetic has one home now. `RenderSettings` carried its own copy of these
+// two, and a second renderer growing a third copy is how two deliverables of one project end up a
+// frame apart. `frameRange()` is the seam; the behaviour is unchanged, and the assertions in
+// `test_render_settings.cpp` that predate this are what say so.
+FrameRange RenderSettings::frameRange() const {
+    return FrameRange{startSeconds, endSeconds, fps};
+}
+
 std::uint64_t RenderSettings::frameCount(double resolvedEndSeconds) const {
-    const double span = std::max(0.0, resolvedEndSeconds - startSeconds);
-    const auto n = static_cast<std::uint64_t>(std::ceil(span * fps - 1e-9));
-    return std::max<std::uint64_t>(1, n);
+    return frameRange().frameCount(resolvedEndSeconds);
 }
 
 double RenderSettings::resolvedEnd(double audioSeconds, double timelineSeconds) const {
-    if (endSeconds >= 0.0) {
-        return std::max(endSeconds, startSeconds);
-    }
-    if (audioSeconds > 0.0) {
-        return audioSeconds;
-    }
-    if (timelineSeconds > 0.0) {
-        return timelineSeconds;
-    }
-    return startSeconds + 10.0;
+    return frameRange().resolvedEnd(audioSeconds, timelineSeconds);
 }
 
 std::span<const std::string_view> RenderSettings::aovNames() {
@@ -399,6 +398,22 @@ Result<void> PathTraceSettings::validate() const {
         return fail("pathtrace: 'threads' of {} is not a machine (max 1024; 0 means all of them)",
                     threads);
     }
+    if (!std::isfinite(fps) || fps <= 0.0) {
+        return fail("pathtrace: 'fps' must be a finite positive number, got {}", fps);
+    }
+    if (isSequence()) {
+        if (auto ok = frameRange().validate(); !ok) {
+            return ok;
+        }
+        // A range that would trace more frames than anyone meant. At 24 fps this is a little over
+        // twelve minutes of footage, and a path tracer spends minutes per frame: a typo in an end
+        // time should not commit the machine for a month without saying anything.
+        if (frameRange().frameCount(endSeconds) > 18000) {
+            return fail("pathtrace: {:.3f}s..{:.3f}s at {:g} fps is {} frames, which is not a range "
+                        "anybody typed on purpose (max 18000)",
+                        seconds, endSeconds, fps, frameRange().frameCount(endSeconds));
+        }
+    }
     if (!outputPath.empty() && outputPath.extension() != ".exr") {
         // The tracer writes scene-linear EXR and nothing else. A '.png' here would be accepted by
         // the filesystem and would contain float EXR bytes, which is the silently-corrupt output
@@ -409,8 +424,18 @@ Result<void> PathTraceSettings::validate() const {
     return {};
 }
 
+FrameRange PathTraceSettings::frameRange() const {
+    // A single frame is a range of exactly one: end = start + one frame time, which `frameCount`
+    // resolves to 1. Expressing it that way rather than special-casing it means the sequence path
+    // and the single-frame path are the same code, and a one-frame sequence is a real test of it.
+    const double end = isSequence() ? endSeconds : seconds + 1.0 / std::max(fps, 1e-6);
+    return FrameRange{seconds, end, fps};
+}
+
 nlohmann::json PathTraceSettings::toJson() const {
     return nlohmann::json{{"seconds", seconds},
+                          {"endSeconds", endSeconds},
+                          {"fps", fps},
                           {"samples", samplesPerPixel},
                           {"bounces", maxDepth},
                           {"seed", seed},
@@ -449,6 +474,18 @@ Result<PathTraceSettings> PathTraceSettings::fromJson(const nlohmann::json& j) {
             return fail("pathtrace.seconds must be a number");
         }
         s.seconds = it->get<double>();
+    }
+    if (const auto it = j.find("endSeconds"); it != j.end()) {
+        if (!it->is_number()) {
+            return fail("pathtrace.endSeconds must be a number");
+        }
+        s.endSeconds = it->get<double>();
+    }
+    if (const auto it = j.find("fps"); it != j.end()) {
+        if (!it->is_number()) {
+            return fail("pathtrace.fps must be a number");
+        }
+        s.fps = it->get<double>();
     }
     if (auto r = number("samples", s.samplesPerPixel); !r) return std::unexpected(r.error());
     if (auto r = number("bounces", s.maxDepth); !r) return std::unexpected(r.error());

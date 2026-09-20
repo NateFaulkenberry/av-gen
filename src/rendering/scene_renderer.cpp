@@ -2504,6 +2504,25 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const bool analyticBackground =
             scene::skyBackgroundFor(scene.environment, ibl, skyIbl) == scene::SkyBackground::Analytic;
         frame.skySunRadiance = glm::vec4(resolved.sunColor, analyticBackground ? 1.0f : 0.0f);
+    // ADR-379: the vortex's own light on what floats above it. Zero intensity when there is no
+    // vortex, which is the gate the surface shader tests.
+    if (scene.environment.vortex.active()) {
+        const scene::Environment::Vortex& vx = scene.environment.vortex;
+        frame.vortexGlow = glm::vec4(vx.center, std::max(vx.radius, 1.0f));
+        // The colour the eye reads out of the funnel is the mid tone lifted toward the accent.
+        //
+        // The strength is `spill` ALONE and is deliberately not derived from `emission`. My first
+        // version multiplied the two, and that is a units error: `emission` is an emissive density
+        // PER METRE integrated along a march, while this is a surface irradiance. Scaling one by
+        // the other gave 0.24 where about 2.5 was wanted, and the island brightened by 0.09 of 255
+        // -- invisible, and it took an A/B with the vortex on in both arms to see that, because
+        // switching the vortex off to get a baseline moves the whole background and swamps it.
+        const glm::vec3 tint = glm::mix(vx.colorMid, vx.colorAccent, 0.45f);
+        frame.vortexGlowColor = glm::vec4(tint, std::max(vx.spill, 0.0f));
+    } else {
+        frame.vortexGlow = glm::vec4(0.0f);
+        frame.vortexGlowColor = glm::vec4(0.0f);
+    }
     }
     frame.fogParams = glm::vec4(scene.environment.fogColor, std::max(scene.environment.fogDensity, 0.0f));
     // ADR-058: the surface fog borrows the volumetric's mist layer rather than declaring one of
@@ -3142,6 +3161,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ADR-370: the same packed field the mesh vertex stage bends the tree with, so a leaf and
         // the branch it fell from are reading one description of the air.
         particleFrame.wind = wind::packWind(scene.environment.wind);
+        particleFrame.spawnScale = std::max(qualitySettings_.particleSpawnScale, 0.0f); // ADR-382
         particleFrame.shutterSeconds = static_cast<float>(std::clamp(time.deltaTime, 0.0, 0.1)) *
                                        std::clamp(scene.camera.lens.shutterAngle, 0.0f, 360.0f) / 360.0f;
         if (VolumeRenderer::enabled(scene.environment)) {

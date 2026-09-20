@@ -483,7 +483,7 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
             continue;
         }
         const double dt = std::clamp(time.deltaTime, 0.0, 0.1);
-        pool.emitCarry += static_cast<double>(sys.spawnRate) * dt;
+        pool.emitCarry += static_cast<double>(sys.spawnRate) * static_cast<double>(frame_.spawnScale) * dt;
         std::uint32_t emitCount = static_cast<std::uint32_t>(std::floor(pool.emitCarry));
         pool.emitCarry -= emitCount;
         emitCount += static_cast<std::uint32_t>(std::max(0.0f, sys.burst));

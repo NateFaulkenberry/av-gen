@@ -27,6 +27,8 @@ struct TraceSettings;
 
 namespace avgen::app {
 
+struct FrameRange;
+
 // PngSequence: display-referred 8-bit PNGs after tone mapping. ExrSequence: scene-linear half
 // EXRs from the HDR target before tone mapping (compositing/grading). Video: see VideoWriter.
 enum class RenderOutput : std::uint8_t { PngSequence, Video, ExrSequence };
@@ -142,6 +144,9 @@ struct RenderSettings {
 
     // Frame count for a resolved end time (endSeconds >= startSeconds); the last frame is the one
     // whose time is < end (end exclusive), at least 1.
+    // This render's range, as the one type that owns the arithmetic (ADR-383). The two calls below
+    // delegate to it and are kept because every existing caller and test uses them.
+    [[nodiscard]] FrameRange frameRange() const;
     [[nodiscard]] std::uint64_t frameCount(double resolvedEndSeconds) const;
     [[nodiscard]] double resolvedEnd(double audioSeconds, double timelineSeconds) const;
     // Output file for frame `index` of a sequence.
@@ -206,7 +211,15 @@ struct RenderSettings {
 // translates one into the other in one place, and a test asserts the defaults of the two agree so
 // the translation cannot drift silently.
 struct PathTraceSettings {
-    double seconds = 0.0;             // the timeline second to trace; one frame, not a sequence
+    double seconds = 0.0;             // the first (or only) timeline second to trace
+    // ADR-383: the range, and the reason the Render panel's tooltip no longer says "one frame, not
+    // a sequence". Below zero means exactly one frame, at `seconds`, which is what every existing
+    // project says and what a person asking for a look at one moment wants. A value at or above
+    // `seconds` makes it a range, walked at `fps`, end exclusive -- the same arithmetic the
+    // rasteriser's range uses, through the same `FrameRange`, so the two renderers cannot disagree
+    // about which frames a range contains.
+    double endSeconds = -1.0;
+    double fps = 24.0;
     std::uint32_t samplesPerPixel = 32;
     std::uint32_t maxDepth = 3;       // surface interactions; 0 is direct lighting only
     // Determinism (ADR-351): the image is a pure function of the snapshot and these. It is
@@ -222,6 +235,13 @@ struct PathTraceSettings {
     // unreachable while the trace was selected, and an unset one landed in $TMPDIR without saying
     // so. Always written with an `.exr` extension.
     std::filesystem::path outputPath;
+
+    // True when this describes more than one frame. Spelled as a question rather than left to
+    // every caller to compare two doubles, because "is this a sequence" is asked in the panel, in
+    // the job and in the CLI and three spellings of it is three chances to disagree.
+    [[nodiscard]] bool isSequence() const { return endSeconds >= seconds; }
+    // The range this traces, or a single frame's worth when it is not a sequence.
+    [[nodiscard]] FrameRange frameRange() const;
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] nlohmann::json toJson() const;

@@ -164,6 +164,42 @@ int rightmostLit(const gpu::Image8& img) {
     return -1;
 }
 
+// ADR-378. The rightmost lit column within `rows` rows of THIS image's own topmost lit row.
+//
+// `rightmostLit` scans the whole frame, and that is wrong for comparing a bent stalk with an
+// upright one: the upright stalk's rightmost pixel is its full radius, found at mid-height, while
+// the bent stalk's is the TIP, and a capped stalk's apex is narrower than its barrel. Differencing
+// the two subtracts the tip's half-width from the barrel's radius as well as measuring the travel,
+// which under-reports by that difference -- about 2 px here, systematically and always downward.
+//
+// Taking both from each image's own top rows measures the same part of the silhouette in both, so
+// the radius genuinely cancels, which is what the test always claimed it did.
+int rightmostLitAtTop(const gpu::Image8& img, int rows) {
+    int top = -1;
+    for (std::uint32_t y = 0; y < img.height && top < 0; ++y) {
+        for (std::uint32_t x = 0; x < img.width; ++x) {
+            const auto* p = img.pixel(x, y);
+            if (p[0] + p[1] + p[2] > 30) {
+                top = static_cast<int>(y);
+                break;
+            }
+        }
+    }
+    if (top < 0) {
+        return -1;
+    }
+    const auto last = static_cast<std::uint32_t>(std::min<int>(top + rows, static_cast<int>(img.height)));
+    for (int x = static_cast<int>(img.width) - 1; x >= 0; --x) {
+        for (auto y = static_cast<std::uint32_t>(top); y < last; ++y) {
+            const auto* p = img.pixel(static_cast<std::uint32_t>(x), y);
+            if (p[0] + p[1] + p[2] > 30) {
+                return x;
+            }
+        }
+    }
+    return -1;
+}
+
 // The leftmost column holding a lit pixel (image width when nothing is lit).
 int leftmostLit(const gpu::Image8& img) {
     for (std::uint32_t x = 0; x < img.width; ++x) {
@@ -225,8 +261,8 @@ TEST_CASE("A stalk in a steady wind bends by exactly what the CPU model predicts
     // between the two images is the tip's travel with the radius cancelled out. A band centroid
     // would instead measure the average of the bend curve over whatever slice of the stalk the band
     // happened to catch, which is a different quantity and one that moves when the tip drops.
-    const int tipStill = rightmostLit(still);
-    const int tipBent = rightmostLit(bent);
+    const int tipStill = rightmostLitAtTop(still, 6);
+    const int tipBent = rightmostLitAtTop(bent, 6);
     REQUIRE(tipStill > 0);
     REQUIRE(tipBent > tipStill);
 
@@ -239,11 +275,38 @@ TEST_CASE("A stalk in a steady wind bends by exactly what the CPU model predicts
     REQUIRE(predicted.x > 0.05f); // the CPU model says it leans, or this test proves nothing
 
     const float measured = static_cast<float>(tipBent - tipStill) / pixelsPerMetre;
-    // 6%: every point of the stalk sits at z = 0, so the projection scale is uniform and the only
-    // slack left is the pixel quantisation of two silhouette edges. It measures 0.331 m against a
-    // predicted 0.333 -- the shader really is running the same arithmetic as core/wind.cpp.
-    REQUIRE(measured > predicted.x * 0.94f);
-    REQUIRE(measured < predicted.x * 1.06f);
+    // ADR-378. The tolerance is in PIXELS, not per cent, because the error is in pixels.
+    //
+    // This used to be +-6% of the prediction, and it failed at 8.3% -- measured 24 px against a
+    // predicted 26.2. Two hypotheses were wrong before the right one: not ADR-372's AgX curve (the
+    // old tonemap swapped in through AVGEN_SHADER_DIR gives the same value byte for byte), and not
+    // the per-instance random (forcing the shader to use the CPU model's `(0,0,0.5,0)` also gives
+    // the same value byte for byte -- `amplitudeVariance` is 0 here, so it cannot matter).
+    //
+    // What it is: `tipBent - tipStill` is a difference of two THRESHOLDED silhouette edges, so its
+    // error is roughly a pixel each way however large the displacement is. Run with the ceiling
+    // made inert the same scene measures 30 px against 31.4 -- 1.4 px short and comfortably inside
+    // 6%. Run with the ceiling active the displacement is only 24 px, the same ~2 px of edge
+    // quantisation is now 8.3% of it, and a relative tolerance fails a shader that is doing exactly
+    // the right arithmetic. The bug was in the tolerance's FORM: a percentage of a quantity that
+    // shrinks, guarding an error that does not.
+    //
+    // With both edges taken from the apex the residual is -1.17 px, which is edge quantisation and
+    // nothing else. 2.5 px is what that can resolve, and it is a SYMMETRIC guard: perturbing the
+    // shader'"'"'s amplitude by +15% gives +2.83 px and by -15% gives -3.17 px, and both fail. The old
+    // relative form passed +15%, because the 2 px bias cancelled the error -- a guard that is blind
+    // in one direction is worse than a loose one, and that is the part worth keeping in mind.
+    const float measuredPx = static_cast<float>(tipBent - tipStill);
+    const float predictedPx = predicted.x * pixelsPerMetre;
+    INFO("measured " << measuredPx << " px, predicted " << predictedPx << " px");
+    REQUIRE(std::abs(measuredPx - predictedPx) < 2.5f);
+
+    // ...and the claim this test exists to make is that the SHADER runs `core/wind.cpp`'s
+    // arithmetic, so it has to fail when it does not. A 15% error in the shader's amplitude moves
+    // the tip by about 4 px here, which this catches and which the old +-6% also would have. The
+    // point of stating it is that 2.5 px is not a licence: anything that changes the transfer
+    // function by more than a few per cent still trips it.
+    REQUIRE(predictedPx > 20.0f); // or 2.5 px would be a loose relative bound after all
 }
 
 TEST_CASE("A stalk bends the way the wind is pointing", "[gpu][wind]") {

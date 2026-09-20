@@ -311,14 +311,37 @@ TEST_CASE("Only the island is animated, and it turns at a cinematic rate", "[tre
         const auto target = r.value("target", std::string{});
         INFO("route " << r.value("source", std::string{}) << " -> " << target);
         // The contract is about the *hierarchy*: the island is animated and the tree rides it. So
-        // nothing may aim at the tree, and any route that aims at a node must aim at the island.
-        // Routes onto post, atmospherics or world effects are a different subject entirely and this
-        // test has no business having an opinion about them.
-        CHECK(target.find("tree") == std::string::npos);
+        // nothing may move the tree, and any route that moves a node must move the island.
+        //
+        // ADR-382 narrowed this. It used to be `target.find("tree") == npos` -- no route may
+        // mention the tree at all -- which is broader than the rationale above and came to
+        // contradict the brief itself: §14 asks in as many words for bass to drive "Tree energy
+        // intensity", and §16 puts leaf and tree-particle emission under audio response. Those
+        // cannot detach anything, because they are emission and emission rate rather than a
+        // transform. What would detach the tree is animating its POSITION, ROTATION or SCALE
+        // independently of the island, and that is what is forbidden here now.
+        //
+        // ADR-382 also claimed this was "stricter in the way that matters", on the grounds that the
+        // previous form let a route onto `nodes/anything-else/position` pass whenever the word
+        // "tree" was absent. **That was false** -- the previous form tested every `nodes/` target
+        // against the island prefix, so such a route already failed. The narrowing is a genuine
+        // *relaxation* for non-transform targets and that is fine, because emission cannot detach
+        // anything; it just is not also a tightening, and it should not be recorded as one.
+        //
+        // And as first written the transform check ran before the `nodes/` scoping, which made it
+        // far too broad: 522 parameters in this repository end in `/position`, `/rotation` or
+        // `/scale` without being node transforms at all -- `camera/position`, `env/rotation`,
+        // every `particles/<system>/position`. A perfectly ordinary route onto any of them would
+        // have failed a test about the tree's hierarchy. The scoping comes first now.
         if (target.rfind("nodes/", 0) != 0) {
-            continue;
+            continue; // not a node transform, and so none of this contract's business
         }
-        CHECK(target.rfind("nodes/floating-island/", 0) == 0);
+        const bool movesSomething = target.find("/position") != std::string::npos ||
+                                    target.find("/rotation") != std::string::npos ||
+                                    target.find("/scale") != std::string::npos;
+        if (movesSomething) {
+            CHECK(target.rfind("nodes/floating-island/", 0) == 0);
+        }
         if (r.value("source", std::string{}) == "lfo.spin") {
             sawSpin = true;
             CHECK(target == "nodes/floating-island/rotation");

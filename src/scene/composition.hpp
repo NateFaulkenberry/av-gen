@@ -292,6 +292,11 @@ struct CompositionNode {
     // height, so leaves do not fall out of the trunk.
     std::string canopySource;
     float canopyFrom = 0.45f;
+    // ADR-380: this system's attractor is the cosmic vortex, taken from the environment at bake
+    // rather than copied into the file. `vortexReach` scales the vortex's radius into the
+    // attractor's radius of influence.
+    bool vortexAttractor = false;
+    float vortexReach = 3.0f;
     params::Parameter<float>* windStrengthParam = nullptr;
     params::Parameter<float>* windTrunkParam = nullptr;
     params::Parameter<float>* windBranchParam = nullptr;
@@ -1337,6 +1342,8 @@ private:
     params::Parameter<float>* vortexBreath_ = nullptr;
     params::Parameter<float>* vortexThickness_ = nullptr;
     params::Parameter<float>* vortexFilaments_ = nullptr;
+    params::Parameter<float>* vortexSpill_ = nullptr;
+    params::Parameter<float>* vortexCometResponse_ = nullptr;
     params::Parameter<float>* vortexFunnelDepth_ = nullptr;
     params::Parameter<float>* vortexThroat_ = nullptr;
     params::Parameter<float>* vortexThroatDensity_ = nullptr;

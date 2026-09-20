@@ -3460,6 +3460,8 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         vortexBreath_ = &params.add(floatDesc(b + "breathAmount", vx.breathAmount, 0.0f, 1.0f, 0.0f, 0.3f));
         vortexThickness_ = &params.add(floatDesc(b + "thickness", vx.thickness, 0.1f, 5000.0f, 5.0f, 600.0f));
         vortexFilaments_ = &params.add(floatDesc(b + "filaments", vx.filaments, 0.0f, 4.0f, 0.0f, 2.0f));
+        vortexSpill_ = &params.add(floatDesc(b + "spill", vx.spill, 0.0f, 20.0f, 0.0f, 6.0f));
+        vortexCometResponse_ = &params.add(floatDesc(b + "cometResponse", vx.cometResponse, 0.0f, 8.0f, 0.0f, 2.0f));
         vortexFunnelDepth_ = &params.add(floatDesc(b + "funnelDepth", vx.funnelDepth, 0.0f, 20000.0f, 0.0f, 3000.0f));
         vortexThroat_ = &params.add(floatDesc(b + "throat", vx.throat, 0.02f, 1.0f, 0.05f, 1.0f));
         vortexThroatDensity_ = &params.add(floatDesc(b + "throatDensity", vx.throatDensity, 0.0f, 1.0f, 0.0f, 1.0f));
@@ -3771,6 +3773,33 @@ void Composition::applyCanopyEmitters() {
     std::unordered_map<std::string, std::size_t> byName;
     for (std::size_t i = 0; i < nodes_.size(); ++i) {
         byName.emplace(nodes_[i]->name, i);
+    }
+    // ADR-380: a particle system may say that its attractor IS the vortex, rather than carrying a
+    // copy of the vortex's coordinates. The brief's §9 asks for the vortex's relationship to the
+    // island to survive the island moving, and §11 makes particles entrained by the vortex the
+    // scene's "visual storytelling mechanism" -- neither survives a hand-typed position that stops
+    // describing the thing it was copied from. Same argument as the measured canopy emitter above.
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+        CompositionNode& node = *nodes_[i];
+        if (node.kind != NodeKind::Particles || !node.vortexAttractor) {
+            continue;
+        }
+        const Environment::Vortex& vx = volumeSetting_.vortex;
+        if (!vx.active()) {
+            continue;
+        }
+        const std::string full = sanitise(prefix_) + node.name;
+        for (ParticleSystem& ps : scene_.particles) {
+            if (ps.name != full && ps.name != node.name) {
+                continue;
+            }
+            // The mouth, and a reach that covers it. The particles have to feel the pull well
+            // before they arrive or they fall past it rather than spiralling in.
+            ps.attractorPosition = vx.center;
+            ps.attractorRadius = std::max(vx.radius * node.vortexReach, 1.0f);
+            node.particleRest.attractorPosition = ps.attractorPosition;
+            node.particleRest.attractorRadius = ps.attractorRadius;
+        }
     }
     for (std::size_t i = 0; i < nodes_.size(); ++i) {
         CompositionNode& node = *nodes_[i];
@@ -4350,6 +4379,8 @@ void Composition::detach() {
     vortexSwirl_ = nullptr; vortexRotation_ = nullptr; vortexTurbulence_ = nullptr;
     vortexInnerVoid_ = nullptr; vortexContrast_ = nullptr; vortexBreath_ = nullptr;
     vortexThickness_ = nullptr; vortexFilaments_ = nullptr;
+    vortexSpill_ = nullptr;
+    vortexCometResponse_ = nullptr;
     vortexFunnelDepth_ = nullptr; vortexThroat_ = nullptr; vortexThroatDensity_ = nullptr;
     vortexColorDeep_ = nullptr; vortexColorMid_ = nullptr; vortexColorAccent_ = nullptr;
     windEnabled_ = nullptr;
@@ -6941,6 +6972,8 @@ void Composition::applyParameters() {
         env.vortex.breathAmount = pick(vortexBreath_, volumeSetting_.vortex.breathAmount);
         env.vortex.thickness = pick(vortexThickness_, volumeSetting_.vortex.thickness);
         env.vortex.filaments = pick(vortexFilaments_, volumeSetting_.vortex.filaments);
+        env.vortex.spill = pick(vortexSpill_, volumeSetting_.vortex.spill);
+        env.vortex.cometResponse = pick(vortexCometResponse_, volumeSetting_.vortex.cometResponse);
         env.vortex.funnelDepth = pick(vortexFunnelDepth_, volumeSetting_.vortex.funnelDepth);
         env.vortex.throat = pick(vortexThroat_, volumeSetting_.vortex.throat);
         env.vortex.throatDensity = pick(vortexThroatDensity_, volumeSetting_.vortex.throatDensity);
@@ -7968,6 +8001,11 @@ nlohmann::json Composition::toJson() const {
             n["canopySource"] = node.canopySource;
             n["canopyFrom"] = node.canopyFrom;
         }
+        // ADR-380.
+        if (node.vortexAttractor) {
+            n["vortexAttractor"] = true;
+            n["vortexReach"] = node.vortexReach;
+        }
         // ADR-376: the tree's emissive life, written only when declared.
         if (node.energyAuthored) {
             auto eb = [](const params::Parameter<float>* p, float fallback) {
@@ -8785,6 +8823,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 f("breathSpeed", vx.breathSpeed);
                 f("emission", vx.emission);
                 f("filaments", vx.filaments);
+                f("spill", vx.spill);
+                f("cometResponse", vx.cometResponse);
+                f("cometReach", vx.cometReach);
                 f("funnelDepth", vx.funnelDepth);
                 f("throat", vx.throat);
                 f("throatDensity", vx.throatDensity);
@@ -9114,6 +9155,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             }
             if (item.contains("canopyFrom") && item.at("canopyFrom").is_number()) {
                 node.canopyFrom = item.at("canopyFrom").get<float>();
+            }
+            if (item.contains("vortexAttractor") && item.at("vortexAttractor").is_boolean()) {
+                node.vortexAttractor = item.at("vortexAttractor").get<bool>();
+            }
+            if (item.contains("vortexReach") && item.at("vortexReach").is_number()) {
+                node.vortexReach = item.at("vortexReach").get<float>();
             }
             // ADR-376: the tree's emissive life. Absent is off.
             if (item.contains("energy") && item.at("energy").is_object()) {
