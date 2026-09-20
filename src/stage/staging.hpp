@@ -322,6 +322,12 @@ struct StepDesc {
     Value to;
     Value from;
     bool hasFrom = false; // false: ramp from wherever the parameter already is
+    // The brief's "Fade Curve", and it is one bool rather than a curve library because the director
+    // already has exactly one easing function and a second spelling of smoothstep would be a second
+    // thing to keep in step. False -- the default, and what every `set` written before this did --
+    // is linear. True eases in and out, which is the difference between an opacity that stops dead
+    // at zero and one that settles into it.
+    bool ease = false;
 
     // ---- Play ----
     std::string activity; // an activity name ("walk", "idle"); `EntityDesc::clips` maps it
@@ -584,6 +590,45 @@ public:
     // The entity a running scenario has bound to a role, or "".
     [[nodiscard]] std::string_view binding(std::string_view scenario, std::string_view role) const;
 
+    // ---- what an overlay needs to diagnose a sequencing bug (ADR-385) ---------------------------
+    //
+    // The brief asks for an animation debug overlay that can answer "why did it do that", and the
+    // list it gives -- state, time, world position, velocity, beam state, abduction state, lift and
+    // fade progress -- is a list of things this class already knows and had no way of being asked.
+    // Published as a reading of the frame rather than as a panel, for the same reason
+    // `ActiveCameraState` is: `stage/` decides what actors do and does not know what ImGui is.
+    //
+    // One entry per *cue* of the running beat, because a cue is the thing that has a step and a
+    // progress. The craft's row and the animal's row are two cues of the same beat.
+    struct CueState {
+        std::string role;       // "actor", "actor.beam", "target"
+        std::string entity;     // what the role resolved to, or "" if it did not
+        std::string step;       // the step's name, or its kind when it has none
+        std::string kind;       // the step kind, always
+        std::size_t index = 0;  // which step of the cue
+        std::size_t steps = 0;  // how many it has
+        double elapsed = 0.0;   // seconds this step has been running
+        double duration = 0.0;  // what it was authored for; 0 = until its own completion test
+        float progress = 0.0f;  // 0..1 where the step has one; a `moveTo`'s tween, a `set`'s ramp
+        bool done = false;
+        glm::vec3 position{0.0f}; // the body's simulated world position
+        float speed = 0.0f;       // measured frame to frame, the same number the gate reads
+    };
+    struct SequenceState {
+        std::string scenario;
+        bool running = false;
+        std::string beat;      // the state, in the only vocabulary the director has
+        double beatStart = 0.0;
+        double time = 0.0;     // the timeline second this reading was taken at
+        int cycle = 0;
+        int maxCycles = 0;
+        bool gated = false;    // the beat is waiting for a body to stop
+        std::string gatedOn;   // which body, and how fast, when it is
+        std::vector<CueState> cues;
+    };
+    // A reading of the last `update`. One entry per scenario, running or not.
+    [[nodiscard]] const std::vector<SequenceState>& sequenceStates() const { return states_; }
+
     // One director parameter, by scenario and name. The same value the parameter set holds; this is
     // the spelling for a caller that does not want to build the path.
     [[nodiscard]] float parameter(std::string_view scenario, std::string_view name) const;
@@ -661,13 +706,21 @@ private:
         // frame and the abduction hung in `beam` for the rest of the film, which is what the first
         // cut of this did and what measuring it immediately showed.
         bool gateOpen = false;
-        bool gated = false; // currently held; latched separately so the Waiting event fires once
+        bool gated = false; // currently held, for the overlay
+        bool said = false;  // the Waiting event has been emitted for this hold, so it fires once
     };
     struct Written {
         std::string path;
         std::vector<float> base; // what it held before this director first wrote it
         std::string scenario;    // which scenario reached this path
         std::string role;        // the role whose entity resolved it, empty for an absolute path
+        // *Which body* the role resolved to at the moment of the write. The role is not enough:
+        // `target` binds a different animal every cycle, so "every path this scenario wrote through
+        // `target`" is every animal it has ever taken. Retiring the second one restored the first
+        // one's visibility and put it back in the shot -- caught by `test_abduction_poc`'s "the UFO
+        // abducts several animals", which checks each retired animal's node is hidden, on all eight
+        // of them (ADR-385).
+        std::string entity;
     };
 
     enum class StepStatus : std::uint8_t { Running, Done, Failed };
@@ -738,8 +791,10 @@ private:
         double time = 0.0;
     };
     std::vector<Seen> seen_;
+    std::vector<SequenceState> states_;
     [[nodiscard]] float measuredSpeed(const entity::Entity& e, const StageContext& ctx) const;
     void rememberPositions(const Run& run, const StageContext& ctx);
+    void publishState(const Run& run, const StageContext& ctx);
 
     std::vector<Written> written_;
     std::vector<std::string> registered_;
