@@ -391,3 +391,80 @@ TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
         CHECK(doc["meteors"].size() == 6);
     }
 }
+
+TEST_CASE("a shower authored in a file, with no comet block, still flies",
+          "[world][atmospherics][registry][resolve]") {
+    // This test exists because the render said otherwise, and the render was right.
+    //
+    // A meteor shower's streak aliases `e.comet`, so a hand-written scene that declares only a
+    // `meteors` block gets the *struct defaults* for the trajectory rather than a preset's. That is
+    // correct and is what "an effect keeps the settings of the kind it is not" means -- but it is
+    // also the case nothing else in this file covers, because every other probe comes from the
+    // factory, which has run a preset.
+    const nlohmann::json doc = nlohmann::json{
+        {"name", "authored shower"},
+        {"enabled", true},
+        {"kind", "meteors"},
+        {"activation", "always"},
+        {"timing", {{"delay", 0.0}, {"lifetime", 0.0}, {"fadeIn", 0.0}, {"fadeOut", 0.0},
+                    {"windowStart", 0.0}, {"windowSeconds", 0.0}, {"repeatSeconds", 8.0}}},
+        {"ground", {{"mode", "off"}}},
+        {"flow", {{"field", ""}}},
+        {"meteors", {{"meteors", 6.0}, {"spread", 52.0}, {"stagger", 0.35},
+                     {"sizeVariation", 0.5}, {"radiantDrift", 8.0}, {"seed", 3.0}}}};
+
+    const auto loaded = world::AtmosphericEffect::fromJson(doc);
+    REQUIRE(loaded.has_value());
+    CHECK(loaded->kind == world::AtmosphereKind::MeteorShower);
+    CHECK(loaded->values.getFloat("meteors/meteors", -1.0f) == 6.0f);
+    CHECK(loaded->values.getFloat("meteors/stagger", -1.0f) == 0.35f);
+
+    world::AtmosphericContext ctx;
+    ctx.seconds = 0.6;
+    std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
+    std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
+    world::AtmosphericEffect live = *loaded;
+    const world::AtmosphericCounts counts =
+        world::resolveAtmosphericEffects(std::span(&live, 1), ctx, comets, auroras);
+    INFO("comets " << counts.comets << " dropped " << counts.dropped);
+    CHECK(counts.comets > 0);
+
+    // ...and it reaches a frame the renderer would draw, which is the half the resolve count does
+    // not prove: `AtmosphericFrame::any()` gates the whole sky draw.
+    world::AtmosphericFrame frame{};
+    world::buildAtmosphericFrame(std::span(&live, 1), ctx, frame);
+    CHECK(frame.cometCount > 0);
+    CHECK(frame.any());
+    // A head with a real radius and a real radiance, rather than the zero struct a mis-bucketed
+    // record would leave behind.
+    CHECK(frame.comets[0].core.w > 0.0f);
+    CHECK((frame.comets[0].core.x + frame.comets[0].core.y + frame.comets[0].core.z) > 0.0f);
+
+    SECTION("and at a second inside a later repeat pass, on a world-anchored track") {
+        // The case a render disagreed about, pinned here so the disagreement has a witness. A
+        // shower with `repeatSeconds` 6 at t = 6.8 is 0.8 s into its second pass, which is
+        // mid-flight for the first meteors and nothing at all for the last.
+        nlohmann::json later = doc;
+        later["timing"]["repeatSeconds"] = 6.0;
+        later["comet"] = nlohmann::json{
+            {"path", {{"anchor", "world"}, {"anchorPosition", {0.0, 0.0, 0.0}},
+                      {"startAzimuth", -70.0}, {"startElevation", 34.0},
+                      {"endAzimuth", 55.0}, {"endElevation", 9.0},
+                      {"distance", 2600.0}, {"travelSeconds", 2.2}, {"speedScale", 1.0},
+                      {"acceleration", 0.3}, {"curvature", 0.0}, {"arcLift", 180.0}}},
+            {"appearance", {{"coreIntensity", 40.0}, {"headSize", 22.0}, {"tailLength", 1400.0},
+                            {"tailWidth", 40.0}, {"tailIntensity", 16.0}}}};
+        const auto e2 = world::AtmosphericEffect::fromJson(later);
+        REQUIRE(e2.has_value());
+        CHECK(e2->comet.path.travelSeconds == 2.2f);
+        CHECK(e2->comet.appearance.coreIntensity == 40.0f);
+
+        world::AtmosphericEffect live2 = *e2;
+        world::AtmosphericContext ctx2;
+        ctx2.seconds = 6.8;
+        world::AtmosphericFrame f2{};
+        world::buildAtmosphericFrame(std::span(&live2, 1), ctx2, f2);
+        INFO("cometCount at t=6.8 is " << f2.cometCount);
+        CHECK(f2.cometCount > 0);
+    }
+}

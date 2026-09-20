@@ -19,6 +19,22 @@
 // that needs a *new integrator* needs shader work, and a `.wgsl` file is not a `.cpp` file. What
 // the registry removes is everything either side of the pixels.
 //
+// **What has and has not been seen.** The plumbing is proved three ways: the resolve puts one
+// record per meteor in the comet bucket and each one packs (`test_effect_registry.cpp`), a shower
+// authored in a file with no `comet` block still flies (same file, and that test exists because a
+// render disagreed), and the engine's own log says "3 comet(s) live" for a scene with one shower in
+// it. Pixel diffs against the same frame with the shower switched off range from 999 pixels to
+// 124,812 depending purely on where the radiant is aimed.
+//
+// What has NOT been done is see it read as a shower. Every attempt was staged in the Tree of Life
+// scene, whose camera looks at a tree: the sky it shows is a narrow band, and meteors that land in
+// it do so at the frame edge. Forcing them into view by enlarging the head turned them into blobs
+// -- a 30 m head with a 120 m halo at 1600 m is an angular size that reads as a light, not as a
+// meteor -- and the preset's own thin-streak shape put a faint line down the right edge. The
+// missing piece is a scene composed FOR a shower, with sky in frame and a radiant chosen against
+// that camera, which is scene authoring rather than engine work. The presets below are therefore
+// tuned by reasoning, not by eye, and should be looked at before anyone relies on them.
+//
 // **Where its numbers live.** The trail's appearance is `e.comet` -- the same struct the Comet kind
 // uses, aliased on purpose so the packer needs no change and the file format gains no second copy
 // of thirteen colours (the rows below say so with an absolute `/comet/...` JSON path). The
