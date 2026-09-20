@@ -231,3 +231,33 @@ and B.D is *designed, tested, and not yet load-bearing*.
 
 Scheduled before B.G, because B.G's foot placement is the first thing a person can look at, and a
 visual milestone that bypasses the seam it is supposed to validate would prove the wrong thing.
+
+
+---
+
+## Verification at the B.A–B.D checkpoint
+
+**CPU suite green.** `avgen_tests`: 2796 cases, 2791 passed, 4 skipped, **1 failed as expected**
+(the `[!shouldfail]` slopes test). Contamination guards: exactly one `^test cases:` line, only
+`av-gen-wt-anim-research/` in the log, exit code 0 taken from the binary.
+
+**GPU suite: 2 failures, and they are not from this branch.**
+
+```
+test_gpu.cpp:209          CHECK( cornerSum < 90 )   ->  100 < 90
+test_hdr_lab_gpu.cpp:556  CHECK( metered > 7.0f )   ->  0.0f > 7.0f
+```
+
+Established in three steps rather than assumed, because misattributing another branch's reds is a
+mistake this agent has already made once:
+
+1. **Not contention.** The first run overlapped the CPU suite — my error, ADR-170's territory. A
+   clean re-run alone under the lock reproduced *the same two failures with identical values*, so
+   they are deterministic.
+2. **Not in anything this branch touched.** The diff since the Phase A close contains no rendering,
+   GPU or shader file. A lit-cube background and an HDR auto-exposure meter have no path to the
+   animation tier.
+3. **Present on `main`.** A separate worktree at `c14a7644`, built from scratch, fails **both**
+   with the same numbers.
+
+So: pre-existing on `main`, reported rather than fixed, since neither is in this phase's subject.
