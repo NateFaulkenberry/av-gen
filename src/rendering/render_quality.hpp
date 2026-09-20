@@ -114,7 +114,7 @@ struct QualitySettings {
     bool ambientOcclusion = true;
     float aoResolutionScale = 0.5f;        // half resolution + bilateral upsample
     std::uint32_t aoHistoryFrames = 8;     // temporal accumulation length
-    // ADR-400: the fraction of the scene's resolution the temporal history ring is stored at.
+    // ADR-410: the fraction of the scene's resolution the temporal history ring is stored at.
     // Placed here beside `aoHistoryFrames` and `volumeResolutionScale` because those two are the
     // existing precedents for exactly this pair -- a temporal accumulation count and a
     // fraction-of-scene-resolution auxiliary buffer -- and the header's own opening sentence has

@@ -83,7 +83,7 @@ struct TemporalHistory::Impl {
     wgpu::PipelineLayout pipelineLayout;
     wgpu::RenderPipeline captureColour;
 
-    // ---- the determinism state machine (ADR-400) ----
+    // ---- the determinism state machine (ADR-410) ----
     //
     // Copied deliberately from `AoRenderer::update`, which solved this once. Two cases that look
     // alike and need opposite treatment -- treating them the same is the bug this repo calls
@@ -369,7 +369,7 @@ void TemporalHistory::beginFrame(std::uint64_t frameIndex) {
     state_.framesValid = std::min(im.framesValid, capacity);
     state_.framesNeeded = im.framesNeeded;
     // Stalled, not settling: the ring is smaller than what the live effects ask for, so no amount
-    // of waiting fills it. The two need different words in the UI (ADR-400).
+    // of waiting fills it. The two need different words in the UI (ADR-410).
     state_.stalled = im.framesNeeded > capacity;
 }
 

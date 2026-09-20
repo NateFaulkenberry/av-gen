@@ -40,7 +40,7 @@ inline bool pathStartsWith(const std::string& s, std::string_view prefix) {
 // no list at all, so it showed only on Advanced, while the Shaders window told everyone
 // unconditionally that "inputs appear in the Parameters window under 'shader'" -- a promise that
 // was false on the layer the editor opens on.
-// `temporal/` is on the BEGINNER list rather than the intermediate one (ADR-400). Frame echo and
+// `temporal/` is on the BEGINNER list rather than the intermediate one (ADR-410). Frame echo and
 // the rest of that family are flagship effects that are plainly visible in the picture, and the
 // owner's standing rule is that if it is visible an artist must be able to find it -- a rule this
 // project has now broken twice by leaving a group off this list, where the defect is not a missing

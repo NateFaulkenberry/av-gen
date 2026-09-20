@@ -1,6 +1,6 @@
-// Conformance for the temporal effect family (ADR-400).
+// Conformance for the temporal effect family (ADR-410).
 //
-// The check this file exists for is **bounded-k**: ADR-400's entire argument is that no temporal
+// The check this file exists for is **bounded-k**: ADR-410's entire argument is that no temporal
 // effect is an accumulator, and that promise is a convention a kind can forget silently. So the
 // first thing proved here is that the check CAN FAIL -- ADR-182, a probe that cannot fail proves
 // nothing. Only then does a pass over the real family mean anything.
@@ -40,7 +40,7 @@ TEST_CASE("the bounded-k check fails for an effect that cannot state a bound", "
     // The control that makes every other assertion in this file mean something. A checker that
     // computed the bounds itself could never be made to report, and its green would say only that
     // it ran.
-    SECTION("enabled with no declared depth is the accumulator ADR-400 forbids") {
+    SECTION("enabled with no declared depth is the accumulator ADR-410 forbids") {
         const std::vector<conf::DeclaredBound> bounds{
             {"echo", true, 6},
             {"unbounded", true, 0}, // the kind that forgot

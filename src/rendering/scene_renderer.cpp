@@ -1639,7 +1639,7 @@ void SceneRenderer::resetTemporalHistory() {
     if (particles_ != nullptr) {
         particles_->resetAll();
     }
-    // ADR-400: the temporal ring is history in exactly the sense this function means. It rides the
+    // ADR-410: the temporal ring is history in exactly the sense this function means. It rides the
     // existing hook rather than a second one, so a seek, a cut, a resize and a scene swap all
     // invalidate it without anyone having to remember a new call.
     if (temporal_ != nullptr) {
@@ -3698,12 +3698,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         }
     }
 
-    // ---- temporal media: capture the clean radiance, apply the temporal effects (ADR-400) ----
+    // ---- temporal media: capture the clean radiance, apply the temporal effects (ADR-410) ----
     //
     // Deliberately BEFORE the post chain. The ring must hold the scene's own radiance, not a
     // graded, bloomed, tone-mapped frame: post is a look, it changes when a grade changes, and a
     // history of looks cannot be rebuilt by re-rendering. Capturing here is what makes the family
-    // a cache of a pure function rather than an accumulator, which is the whole of ADR-400.
+    // a cache of a pure function rather than an accumulator, which is the whole of ADR-410.
     {
         TemporalFrameInputs temporalIn;
         temporalIn.sceneHdr = finalHdr;

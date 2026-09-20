@@ -1,4 +1,4 @@
-# ADR-400: temporal history is a cache of a pure function
+# ADR-410: temporal history is a cache of a pure function
 
 **Status:** proposed
 **Date:** 2026-09-20

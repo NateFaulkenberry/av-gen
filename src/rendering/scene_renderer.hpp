@@ -179,7 +179,7 @@ struct RenderStats {
     SimulationStats simulation; // ADR-032; the simulated grid fields stepped this frame
     SkinningStats skinning;     // ADR-086; the skinned rigs whose palettes reached the GPU
     PostStats post;
-    TemporalStats temporal;     // ADR-400; ring occupancy, settling state, and what it costs
+    TemporalStats temporal;     // ADR-410; ring occupancy, settling state, and what it costs
     std::uint32_t transientTextures = 0;
     std::uint32_t worldEffects = 0; // ADR-207: effects live in the frame block this frame
     std::uint32_t comets = 0;       // ADR-230: comets live in the frame block this frame
@@ -794,7 +794,7 @@ private:
     std::unique_ptr<ShadowMaskRenderer> shadowMask_; // ADR-087
     std::unique_ptr<WaterRenderer> water_;           // ADR-099
     std::unique_ptr<PostProcessor> postProcessor_;
-    // ADR-400. Runs between the scene pass and the post chain: captures the clean scene radiance
+    // ADR-410. Runs between the scene pass and the post chain: captures the clean scene radiance
     // into a bounded ring and applies whatever temporal effects the scene authored. Reset by
     // `resetTemporalHistory()` along with the AO history and the particle pools -- one hook for
     // every temporal consumer, never a second one.

@@ -1,12 +1,12 @@
 #pragma once
 
-// The reusable temporal media system (ADR-400, brief §8): a bounded ring of previous frames that
+// The reusable temporal media system (ADR-410, brief §8): a bounded ring of previous frames that
 // temporal effects read.
 //
 // **It is a cache, not an accumulator.** Nothing here integrates. A channel's ring holds the last
 // K frames of a signal the renderer already produces, and K is declared by whichever effects are
 // live. That is what makes the whole family scrub-safe: a cache can be rebuilt by re-rendering the
-// frames that filled it, where an accumulator cannot be rebuilt at all. See ADR-400 for why this
+// frames that filled it, where an accumulator cannot be rebuilt at all. See ADR-410 for why this
 // is the central constraint rather than an implementation detail.
 //
 // **Memory is the design problem, not ALU** (§8: "do not blindly retain expensive full-resolution
@@ -91,7 +91,7 @@ constexpr std::uint32_t kMaxTemporalFrames = 32;
         return rg11b10Renderable ? wgpu::TextureFormat::RG11B10Ufloat : wgpu::TextureFormat::RGBA16Float;
     // Matches SceneRenderer::kVelocityFormat exactly, so a capture is a copy rather than a
     // conversion. Measured adequate: the half-float ulp in UV units at 1920 px is 0.117 px at
-    // 150 px of motion, so an eight-frame advection chain drifts under a pixel (ADR-400 §45).
+    // 150 px of motion, so an eight-frame advection chain drifts under a pixel (ADR-410 §45).
     case TemporalChannel::Motion: return wgpu::TextureFormat::RG16Float;
     case TemporalChannel::Count: break;
     }
@@ -112,7 +112,7 @@ struct TemporalHistoryConfig {
     [[nodiscard]] bool operator==(const TemporalHistoryConfig&) const = default;
 };
 
-// What the artist is told (ADR-400). `framesValid < framesNeeded` means the picture on screen is
+// What the artist is told (ADR-410). `framesValid < framesNeeded` means the picture on screen is
 // not yet the picture a render would produce.
 //
 // This is the disclosure the whole design turns on, so it is a value the renderer reports rather

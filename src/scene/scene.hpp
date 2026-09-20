@@ -93,7 +93,7 @@ struct Scene {
     // is the default; an offline render lifts them. Not serialised -- policy, not content.
     DetailLimits detailLimits{};
     PostSettings post;                // built-in post-processing (copied in by the Engine)
-    TemporalSettings temporal;        // ADR-400: frame echo and the rest of the temporal family
+    TemporalSettings temporal;        // ADR-410: frame echo and the rest of the temporal family
     // ADR-207: the world effects live *this frame*, already resolved and packed. Copied in by the
     // Engine the way `post` is, and for the same reason: resolving a source to a world position
     // needs the hero table and the director's cut, neither of which a renderer has any business

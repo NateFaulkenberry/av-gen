@@ -1,4 +1,4 @@
-// ADR-400: the temporal history ring and frame echo.
+// ADR-410: the temporal history ring and frame echo.
 //
 // Four properties, and the order matters because each makes the next mean something:
 //

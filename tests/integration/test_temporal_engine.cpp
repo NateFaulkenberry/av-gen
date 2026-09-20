@@ -1,4 +1,4 @@
-// ADR-400: the temporal family has to be REACHED, not merely registered.
+// ADR-410: the temporal family has to be REACHED, not merely registered.
 //
 // This repo's most expensive recurring defect is a subsystem that is built, tested and
 // unreachable -- ADR-039's selective bloom and ADR-035's identifier mask both shipped with every
