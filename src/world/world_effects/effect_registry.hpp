@@ -33,6 +33,37 @@
 // Everything else -- and it was about twenty edits across six files that every other agent also
 // had open -- is now the one file the effect lives in.
 //
+// ---- adding an effect, start to finish -----------------------------------------------------------
+//
+// 1. Write `src/world/world_effects/effects/<kind>_effect.cpp`. Copy the smallest existing one --
+//    `volumetric_fog_effect.cpp` -- and replace its contents. It needs:
+//
+//      constexpr EffectField kFields[] = { ... };   // the rows, in panel order, `.main()` first
+//      constexpr EffectStyle kStyles[] = { ... };   // at least one preset
+//      constexpr EffectRoute kRoutes[] = { ... };   // at least one default audio route
+//      AtmosphericEffect make(std::string name);    // what the "Add" button produces
+//      bool fill(...);                              // one record's worth of resolve
+//      EffectSchema buildSchema();                  // the five above, plus key/enumName/beatLeaf
+//      const EffectSchema& <kind>Schema();          // a function-local static over buildSchema()
+//
+// 2. Add the enumerator to `AtmosphereKind` in `world/atmospherics.hpp`.
+// 3. Add it to `kAtmosphereKinds` below.
+// 4. Declare `<kind>Schema()` in `effect_registry.cpp` and reference it in `builtinSchemas()`.
+//
+// Then run `avgen_tests "[registry],[conformance]"`. Anything you have missed is a named failure:
+// a leaf your default route aims at and does not declare, a default outside its hard range, a
+// `beatLeaf` that is not yours, a kind that resolves into somebody else's bucket, a value that does
+// not survive the file. You do not need to touch `atmospherics.cpp`, `atmospheric_params.cpp`,
+// `world_effects_panel.cpp`, `ui_logic.hpp` or `effect_conformance.cpp` -- and if you find yourself
+// wanting to, that is a gap in this registry worth reporting rather than working around.
+//
+// **What is NOT free.** `EffectResolve::bucket` says which of the three integrators the engine
+// already has your kind reaches the picture through: the view-ray trail and the vertical-shell
+// curtains in `shaders/atmosphere_fx.wgsl`, and the placed volumetric medium in
+// `shaders/volume.wgsl`. A look one of those three can produce is one file. A look that needs a
+// NEW integrator needs WGSL, a GPU struct and a renderer change, and none of that is something a
+// registry can move into a `.cpp`.
+//
 // **Where an effect's numbers live.** A kind ported from before this ADR keeps its typed struct on
 // `AtmosphericEffect` (`Comet`, `Aurora`, `Vortex`) and its rows carry ordinary member accessors,
 // which is what makes the port provably behaviour-neutral: the same expression reads the same
