@@ -147,3 +147,38 @@ clip at a steady rate, tolerance 1e-4.
 * **An empty entry style was a wildcard**, so a request for a style nothing carries resolved
   silently to the default walk. A style typo, or a pack that shipped without its styled clips,
   would have been invisible. Now matched exactly; a catch-all is authored explicitly (§64).
+
+---
+
+## B.D — acceleration, deceleration and the vector layer
+
+`entity/motion_controller.{hpp,cpp}`. §34 and §35.
+
+**What already existed.** `Gait::approach(current, desired, accel, decel, dt)` limits how fast a
+*scalar* speed may change, with separate limits up and down, and `Gait::select` owns mode selection
+with hysteresis and a dwell timer. B.D does not duplicate either.
+
+**What was missing is the vector layer.** A scalar speed along a heading describes a body that
+walks where it looks and nothing else. A body that strafes, backs up or circles a target has a
+velocity and a facing that disagree, and "how fast may that change" is then two questions:
+
+| | limited by | why |
+|---|---|---|
+| along the heading | `maxAcceleration` / `maxDeceleration` | stopping is not the reverse of starting |
+| across it | `maxTurnRate` (rad/s) | a body at 5 m/s and one at 0.5 m/s take about the same time to come round |
+| the body's facing | `maxFacingRate` (rad/s) | turning the shoulders costs less than turning the momentum |
+
+**The obvious implementation is wrong and the test says so.** Lerping the velocity vector toward
+the desired one at `maxAcceleration` turns a slow body almost instantly and a fast body barely at
+all — backwards. The discriminating case is two bodies, at 1 m/s and 8 m/s, both asked to turn 90°:
+they must turn by the same angle in one step, and they do (`maxTurnRate * dt`, to 1e-4).
+
+Three more properties the tests pin: a standing body may set off in any direction without turning
+first (`headingFloor` — otherwise a body asked to walk backwards from rest drifts visibly for a
+quarter second first); steering is **added**, not blended (§39), so a correction that exactly
+cancels the request stops the body; and `dt <= 0` changes nothing and divides by nothing (ADR-521).
+
+Like `MotionMemory`, `MotionState` is a plain value the entity owns, so a seek replays it.
+`MotionSolution` reports `accelerationLimited` and `turnLimited` rather than clamping silently —
+B.A found exactly that failure in `Gait::playbackRate`, where the shipping cast has been sitting on
+the clamp floor with nothing saying so.
