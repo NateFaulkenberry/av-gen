@@ -1,304 +1,304 @@
 {
- "examples": [
-  {
-   "category": "Benchmark",
-   "description": "100 / 1,000 / 10,000 instances with no, one, three and noise deformers as presets.",
-   "name": "Procedural Benchmark",
-   "project": "benchmark/benchmark.json"
-  },
-  {
-   "category": "Benchmark",
-   "description": "Point and box swarms from 1,000 to 1,000,000 instances with GPU culling and LOD, driven by curl noise and vortex fields.",
-   "name": "Stress Test (1K to 1M)",
-   "project": "stress/stress.json"
-  },
-  {
-   "category": "Lab",
-   "description": "Three copies of one CC0 character, idling, walking and running from the same glTF skin: 49 joints, three clips, GPU skinning through the shared PBR shading. Each node declares its own opening state, and the pose is a pure function of the timeline, so the window and an offline render agree.",
-   "name": "Alien - Skinned Character",
-   "project": "characters/alien.json"
-  },
-  {
-   "category": "Lab",
-   "description": "Six modular aliens from one 89-joint rig, each playing a different one of its 26 clips: idle, walking, crazy, jet flight, a fight stance and a run. Six independent skeletons in one frame.",
-   "name": "Alien Squad - Modular Characters",
-   "project": "characters/alien-squad.json"
-  },
-  {
-   "category": "Lab",
-   "description": "The diagnostic environment for character problems: clip playback, root motion made visible (an in-place clip beside Dying_forward and Landing, each on its own origin pip), four yaws, three scales, and the farm pack for telling an asset bug from a systemic one. Neutral ground and studio light on purpose -- the character is the subject. Contracts and regression tests in docs/character-animation-lab.md.",
-   "name": "Character Animation Lab",
-   "project": "lab/character-animation-lab.json"
-  },
-  {
-   "category": "Lab",
-   "description": "One instance of every animal in the imported farm pack, in profile and to scale: a 1.77 m bull down to a 0.11 m chick, each playing the one clip its rig carries. The validation scene for the conversion, not a dressed environment.",
-   "name": "Farm Animals - Imported Pack",
-   "project": "farm/farm-animals.json"
-  },
-  {
-   "category": "Lab",
-   "description": "Every primitive, distribution, variation control, deformer and stack, with audio routes and a performance readout.",
-   "name": "Procedural Geometry Lab",
-   "project": "lab/lab.json"
-  },
-  {
-   "category": "Lab",
-   "description": "A deliberately difficult renderer test scene with near/far/behind-camera geometry, a skinned alien, transparency and particles.",
-   "name": "Renderer QA",
-   "project": "qa/renderer-qa.json"
-  },
-  {
-   "category": "Lab",
-   "description": "The entity layer end to end (ADR-088): a character picks navigable destinations from the same WorldMap the terrain mesh was built from, stops to look at a hovering scout, and walks faster as the track opens up -- because a behaviour's speed is an ordinary parameter and the music can reach it. The scout's four materials answer four different bands.",
-   "name": "Wanderer - Behaviour and Navigation",
-   "project": "characters/alien-wander.json"
-  },
-  {
-   "category": "Look development",
-   "description": "Procedural organism look-dev: the tube primitive and the gill structure, kept as a test rather than a showcase.",
-   "name": "Bioluminescent World",
-   "project": "world/world.json"
-  },
-  {
-   "category": "Look development",
-   "description": "Five glowing fungi: a stem and a domed cap, both the same swept-curve primitive with a radius profile.",
-   "name": "Fungi",
-   "project": "organic/fungi.json"
-  },
-  {
-   "category": "Look development",
-   "description": "The same painterly scene and camera using the PBR surface mode, for controlled style comparisons.",
-   "name": "Glowmere Valley - Matched PBR",
-   "project": "world/glowmere-stylized-pbr.json"
-  },
-  {
-   "category": "Look development",
-   "description": "A cool alien valley with a warm luminous crown, broad foliage shapes, soft lighting bands and an analytic night sky.",
-   "name": "Glowmere Valley - Painterly",
-   "project": "world/glowmere-stylized.json"
-  },
-  {
-   "category": "Look development",
-   "description": "One machined part on a plinth under two softboxes: the benchmark for whether a single object can be made to look photographed rather than generated.",
-   "name": "Hero Metal",
-   "project": "hero/hero.json"
-  },
-  {
-   "category": "Look development",
-   "description": "Trunk, boughs and tendrils, all one swept-curve primitive: the geometry foundation for the ecosystem work.",
-   "name": "Organic Curves",
-   "project": "organic/organic.json"
-  },
-  {
-   "category": "Look development",
-   "description": "Three individuals of one species from the same grammar and different seeds -- recursive branching with no bespoke code.",
-   "name": "Plant Grammar",
-   "project": "organic/plants.json"
-  },
-  {
-   "category": "Performance",
-   "description": "The same valley spread over 840 m: 99,515 placed, 1,352 visible, 27.6 ms. Identical art direction, four times the ground.",
-   "name": "Glowmere Density - Dense",
-   "recipe": "recipes/glowmere-dense.recipe.json"
-  },
-  {
-   "category": "Performance",
-   "description": "1,100 m of the same valley: 160,766 placed, 3,111 visible, 33.6 ms -- heavier than the authored showcase scene. The renderer's stress rung.",
-   "name": "Glowmere Density - Extreme",
-   "recipe": "recipes/glowmere-extreme.recipe.json"
-  },
-  {
-   "category": "Performance",
-   "description": "Glowmere thinned to 40% of its density weights over the same 420 m of ground: 1,665 instances placed, 94 visible, 10.7 ms at 1440x900. The lightest rung of the renderer's density ladder.",
-   "name": "Glowmere Density - Low",
-   "recipe": "recipes/glowmere-low.recipe.json"
-  },
-  {
-   "category": "Performance",
-   "description": "Glowmere at its shipped density over 420 m: 10,123 placed, 595 visible, 14.1 ms. The reference rung -- every other rung is this one scaled.",
-   "name": "Glowmere Density - Medium",
-   "recipe": "recipes/glowmere-medium.recipe.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "Photogrammetry rocks, roots and vegetation from Poly Haven, placed and varied procedurally under a nocturne rig.",
-   "name": "Bioluminescent Grove",
-   "project": "world/grove.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "A world built in order: geography, then biomes derived from it, then an ecology that reads the same biome weights the ground is coloured with. 38,000 instances of a CC0 library, lit by a low moon.",
-   "name": "Glowmere Valley",
-   "project": "world/terrain.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "The bioluminescent valley with a finished 2D composition over it: a tracked-out title card, four lyric lines with staggered entrances and exits, and a thin border that fades up over the first two and a half seconds. The beat reaches the type through an ordinary modulation route, the same way it reaches the world.",
-   "name": "Glowmere Valley - Lyrics",
-   "project": "composition/glowmere-lyrics.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "The successor valley: a river that enters at one edge of the map, meanders 700 m down a descending course and leaves at the opposite edge, with the terrain shaped against it rather than around it. Same palette, same moon, same emission ladder as the painterly scene; new geography, and the three heroes that were a torus, a tube and nine spheres are gone.",
-   "name": "Glowmere Valley 2",
-   "project": "world/glowmere-valley-2.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "Glowmere Valley 2 directed by three cameras (ADR-245). Hero Free Roam is the Auto-director's camera, unchanged. Valley Wide is an authored establishing shot, keyframed on the ordinary timeline and placed by authored shots. UFO Watch rides the saucer and takes the frame whenever the abduction scenario reaches its beam -- an event claiming the cut, not a special case in the code.",
-   "name": "Glowmere Valley 2 - Multi-Camera",
-   "project": "world/glowmere-valley-2-multicam.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "Glowmere at night with ADR-230's atmospheric effects: an audio-reactive aurora rising from the horizon, and bioluminescent comets crossing the sky -- one hero, one rainbow, and a three-comet burst, all launched by sequencer events.",
-   "name": "Glowmere Atmospherics",
-   "project": "world/glowmere-atmospherics.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "Combined procedural geometry and audio modulation, timeline-driven.",
-   "name": "Hyperspace",
-   "project": "hyperspace/hyperspace.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "Nested procedural geometry at extreme scale differences, camera inside.",
-   "name": "Impossible Chamber",
-   "project": "chamber/chamber.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "A metallic assembly that separates into thousands of parts, floats, gathers and locks back together, then detonates; disassembly is a field, so assembled is simply zero strength.",
-   "name": "Metallic Reassembly",
-   "project": "reassembly/reassembly.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "A sequenced music video (ADR-089): five shots cut to a generated song's own sections, a recurring character who walks a stylised miniature city from dusk to night, a camera that follows and then reveals, sixteen lyric lines, a title, a border, and four small audio-reactive relationships. The whole piece is one seq::Sequence baked onto the ordinary timeline, so the frame at any second is a pure evaluation.",
-   "name": "Night Shift",
-   "project": "city/night-shift.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "Large-scale radial architectural composition with arches and a free camera.",
-   "name": "The Cathedral",
-   "project": "cathedral/cathedral.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "Spiral instancing and continuous deformation with a travelling camera.",
-   "name": "The Helix",
-   "project": "helix/helix.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "The flagship world: radial colonnades, rings, arches, spiral corridors and recursive chambers driven by fields, with seven world macros, eight states and a four-minute cue arc.",
-   "name": "The Infinite Temple",
-   "project": "infinite/infinite.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "A particle sculpture that performs its own score. Three logarithmic spiral arms authored as splines, carried by a differentially rotating field around a hot core; an onset launches a radial wave that crosses the sculpture at 19 m/s, so a beat reaches the rim a second and a half after the centre. 190,000 particles, no C++.",
-   "name": "The Living Constellation",
-   "project": "constellation/constellation.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "A forty-second shot: a cast-iron vessel with a furnace belt, on a deck in a dark hall. Manual exposure, a re-aimed IndustrialCold rig, layered materials and a four-beat cue arc.",
-   "name": "The Living Machine",
-   "project": "machine/machine.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "Audio-reactive procedural architecture: radial colonnade, rings, fog, particles, bloom.",
-   "name": "The Temple",
-   "project": "temple/temple.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "The authored Tree of Life hero export -- 3.16 M triangles, seven meshes -- standing on a floating island in cosmic space, the island turning once every three minutes and breathing on a forty-second swell. The tree is a child of the island's transform and never moves of its own accord. A celestial key falls diagonally across tree and island from a hundred degrees off the camera, throwing the canopy's shadow off the far edge of the plateau; the underside is left to the sky's ground hemisphere. Bare landmass, a shell of 1,700 points for stars; nothing else in frame.",
-   "name": "Tree of Life - Floating Island",
-   "project": "treeisland/tree-of-life-floating-island.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "The same island, the same three lights, the same parameters at their other values: the celestial key drops to a third of its daylight strength and turns cool blue, the fill follows it, the shadows deepen and the star shells come up. One framework, two states -- not two lighting systems. Also reachable as the 'Celestial Night' preset inside the day project.",
-   "name": "Tree of Life - Celestial Night",
-   "project": "treeisland/tree-of-life-floating-island-night.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "The same Tree of Life and island, now suspended above an endless sea under a full day/night cycle. One dayPhase parameter drives sky, sun, moon, stars, atmosphere, water and the tree's bioluminescence together, wrapping seamlessly at midnight; the night sky and its moon are an HDRI the water reflects, and the moonlight is a real shadow-casting key aimed along that moon. Scrub the cycle or let it run.",
-   "name": "Tree of Life - Ocean World",
-   "project": "treeisland/tree-of-life-ocean-world.json"
-  },
-  {
-   "category": "Showcase",
-   "description": "One scene, four presets: Cathedral, Temple, Helix, Hyperspace morph into each other on a timeline.",
-   "name": "Worlds (preset morph)",
-   "project": "worlds/worlds.json"
-  },
-  {
-   "category": "Lab",
-   "description": "Quality Lab benchmark 1: thin fence slats, a receding tile grid, shallow diagonal edges and small emissive spheres, all crossing the sampling limit inside one frame. Static free camera.",
-   "name": "Quality Lab: aliasing",
-   "project": "quality/aliasing.json"
-  },
-  {
-   "category": "Lab",
-   "description": "Quality Lab benchmark 2: the aliasing subject on a lateral spline dolly, so the velocity AOV, the disocclusion mask and the motion-compensated residual have real motion to measure.",
-   "name": "Quality Lab: aliasing dolly",
-   "project": "quality/aliasing-dolly.json"
-  },
-  {
-   "category": "Weather",
-   "description": "Four layers of one shower: 34 k wrapping drops in a camera-following volume, an out-of-focus near layer, a ripple for every drop that lands, and the mist it has already wetted. Particle size drives fall speed, so the streaks have a spread of lengths rather than one.",
-   "name": "Rain",
-   "project": "weather/rain.json"
-  },
-  {
-   "category": "Weather",
-   "description": "A flake is a tumbling card, not a streak; small dense flakes fall fast and large ones hang, so the field reads as falling rather than scrolling. A hundred and fifty huge out-of-focus flakes ride with the lens.",
-   "name": "Snow",
-   "project": "weather/snow.json"
-  },
-  {
-   "category": "Weather",
-   "description": "Dark ash read as an absence of light against a burning sky, embers on independent flicker phases from two sources at different distances, and the smoke they rise out of. Temperature is the ember colour curve.",
-   "name": "Ashfall",
-   "project": "weather/ashfall.json"
-  },
-  {
-   "category": "Weather",
-   "description": "A planar travelling wave field IS the squall line: rain spawns where it is, lifted dust spawns where it is not, and both subscribe to the same field, so the moment the rain arrives is the moment the dust stops.",
-   "name": "Weather front",
-   "project": "weather/weather-front.json"
-  },
-  {
-   "category": "Weather",
-   "description": "Motes lit by a Henyey-Greenstein phase against the key light: quiet across the sun and blazing into it, with a colonnade to cut the light into bands. The same population, and only the angle changes.",
-   "name": "Dust motes",
-   "project": "weather/dust-motes.json"
-  },
-  {
-   "category": "Weather",
-   "description": "Nine and fourteen persistent swarms that dart and hang on their own phases; one chorus flashes almost together and one twinkles at random, and the only difference between them is pulseSync.",
-   "name": "Fireflies",
-   "project": "weather/fireflies.json"
-  },
-  {
-   "category": "Weather",
-   "description": "One airborne biological system authored three ways -- buoyancy as a positive gravity against a high drag, so a grain finds a level and hangs there instead of falling.",
-   "name": "Pollen, spores and seeds",
-   "project": "weather/pollen.json"
-  },
-  {
-   "category": "Weather",
-   "description": "One continuous knob from high summer to deep winter: canopy, undergrowth, ground, sky, fog, pollen, leaf fall and snow are all targets of a single world macro. No winter scene exists.",
-   "name": "Season shift",
-   "project": "weather/season.json"
-  }
- ]
+  "examples": [
+    {
+      "category": "Benchmark",
+      "description": "100 / 1,000 / 10,000 instances with no, one, three and noise deformers as presets.",
+      "name": "Procedural Benchmark",
+      "project": "benchmark/benchmark.json"
+    },
+    {
+      "category": "Benchmark",
+      "description": "Point and box swarms from 1,000 to 1,000,000 instances with GPU culling and LOD, driven by curl noise and vortex fields.",
+      "name": "Stress Test (1K to 1M)",
+      "project": "stress/stress.json"
+    },
+    {
+      "category": "Lab",
+      "description": "Three copies of one CC0 character, idling, walking and running from the same glTF skin: 49 joints, three clips, GPU skinning through the shared PBR shading. Each node declares its own opening state, and the pose is a pure function of the timeline, so the window and an offline render agree.",
+      "name": "Alien - Skinned Character",
+      "project": "characters/alien.json"
+    },
+    {
+      "category": "Lab",
+      "description": "Six modular aliens from one 89-joint rig, each playing a different one of its 26 clips: idle, walking, crazy, jet flight, a fight stance and a run. Six independent skeletons in one frame.",
+      "name": "Alien Squad - Modular Characters",
+      "project": "characters/alien-squad.json"
+    },
+    {
+      "category": "Lab",
+      "description": "The diagnostic environment for character problems: clip playback, root motion made visible (an in-place clip beside Dying_forward and Landing, each on its own origin pip), four yaws, three scales, and the farm pack for telling an asset bug from a systemic one. Neutral ground and studio light on purpose -- the character is the subject. Contracts and regression tests in docs/character-animation-lab.md.",
+      "name": "Character Animation Lab",
+      "project": "lab/character-animation-lab.json"
+    },
+    {
+      "category": "Lab",
+      "description": "One instance of every animal in the imported farm pack, in profile and to scale: a 1.77 m bull down to a 0.11 m chick, each playing the one clip its rig carries. The validation scene for the conversion, not a dressed environment.",
+      "name": "Farm Animals - Imported Pack",
+      "project": "farm/farm-animals.json"
+    },
+    {
+      "category": "Lab",
+      "description": "Every primitive, distribution, variation control, deformer and stack, with audio routes and a performance readout.",
+      "name": "Procedural Geometry Lab",
+      "project": "lab/lab.json"
+    },
+    {
+      "category": "Lab",
+      "description": "A deliberately difficult renderer test scene with near/far/behind-camera geometry, a skinned alien, transparency and particles.",
+      "name": "Renderer QA",
+      "project": "qa/renderer-qa.json"
+    },
+    {
+      "category": "Lab",
+      "description": "The entity layer end to end (ADR-088): a character picks navigable destinations from the same WorldMap the terrain mesh was built from, stops to look at a hovering scout, and walks faster as the track opens up -- because a behaviour's speed is an ordinary parameter and the music can reach it. The scout's four materials answer four different bands.",
+      "name": "Wanderer - Behaviour and Navigation",
+      "project": "characters/alien-wander.json"
+    },
+    {
+      "category": "Look development",
+      "description": "Procedural organism look-dev: the tube primitive and the gill structure, kept as a test rather than a showcase.",
+      "name": "Bioluminescent World",
+      "project": "world/world.json"
+    },
+    {
+      "category": "Look development",
+      "description": "Five glowing fungi: a stem and a domed cap, both the same swept-curve primitive with a radius profile.",
+      "name": "Fungi",
+      "project": "organic/fungi.json"
+    },
+    {
+      "category": "Look development",
+      "description": "The same painterly scene and camera using the PBR surface mode, for controlled style comparisons.",
+      "name": "Glowmere Valley - Matched PBR",
+      "project": "world/glowmere-stylized-pbr.json"
+    },
+    {
+      "category": "Look development",
+      "description": "A cool alien valley with a warm luminous crown, broad foliage shapes, soft lighting bands and an analytic night sky.",
+      "name": "Glowmere Valley - Painterly",
+      "project": "world/glowmere-stylized.json"
+    },
+    {
+      "category": "Look development",
+      "description": "One machined part on a plinth under two softboxes: the benchmark for whether a single object can be made to look photographed rather than generated.",
+      "name": "Hero Metal",
+      "project": "hero/hero.json"
+    },
+    {
+      "category": "Look development",
+      "description": "Trunk, boughs and tendrils, all one swept-curve primitive: the geometry foundation for the ecosystem work.",
+      "name": "Organic Curves",
+      "project": "organic/organic.json"
+    },
+    {
+      "category": "Look development",
+      "description": "Three individuals of one species from the same grammar and different seeds -- recursive branching with no bespoke code.",
+      "name": "Plant Grammar",
+      "project": "organic/plants.json"
+    },
+    {
+      "category": "Performance",
+      "description": "The same valley spread over 840 m: 99,515 placed, 1,352 visible, 27.6 ms. Identical art direction, four times the ground.",
+      "name": "Glowmere Density - Dense",
+      "recipe": "recipes/glowmere-dense.recipe.json"
+    },
+    {
+      "category": "Performance",
+      "description": "1,100 m of the same valley: 160,766 placed, 3,111 visible, 33.6 ms -- heavier than the authored showcase scene. The renderer's stress rung.",
+      "name": "Glowmere Density - Extreme",
+      "recipe": "recipes/glowmere-extreme.recipe.json"
+    },
+    {
+      "category": "Performance",
+      "description": "Glowmere thinned to 40% of its density weights over the same 420 m of ground: 1,665 instances placed, 94 visible, 10.7 ms at 1440x900. The lightest rung of the renderer's density ladder.",
+      "name": "Glowmere Density - Low",
+      "recipe": "recipes/glowmere-low.recipe.json"
+    },
+    {
+      "category": "Performance",
+      "description": "Glowmere at its shipped density over 420 m: 10,123 placed, 595 visible, 14.1 ms. The reference rung -- every other rung is this one scaled.",
+      "name": "Glowmere Density - Medium",
+      "recipe": "recipes/glowmere-medium.recipe.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "Photogrammetry rocks, roots and vegetation from Poly Haven, placed and varied procedurally under a nocturne rig.",
+      "name": "Bioluminescent Grove",
+      "project": "world/grove.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "A world built in order: geography, then biomes derived from it, then an ecology that reads the same biome weights the ground is coloured with. 38,000 instances of a CC0 library, lit by a low moon.",
+      "name": "Glowmere Valley",
+      "project": "world/terrain.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "The bioluminescent valley with a finished 2D composition over it: a tracked-out title card, four lyric lines with staggered entrances and exits, and a thin border that fades up over the first two and a half seconds. The beat reaches the type through an ordinary modulation route, the same way it reaches the world.",
+      "name": "Glowmere Valley - Lyrics",
+      "project": "composition/glowmere-lyrics.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "The successor valley: a river that enters at one edge of the map, meanders 700 m down a descending course and leaves at the opposite edge, with the terrain shaped against it rather than around it. Same palette, same moon, same emission ladder as the painterly scene; new geography, and the three heroes that were a torus, a tube and nine spheres are gone.",
+      "name": "Glowmere Valley 2",
+      "project": "world/glowmere-valley-2.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "Glowmere Valley 2 directed by three cameras (ADR-245). Hero Free Roam is the Auto-director's camera, unchanged. Valley Wide is an authored establishing shot, keyframed on the ordinary timeline and placed by authored shots. UFO Watch rides the saucer and takes the frame whenever the abduction scenario reaches its beam -- an event claiming the cut, not a special case in the code.",
+      "name": "Glowmere Valley 2 - Multi-Camera",
+      "project": "world/glowmere-valley-2-multicam.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "Glowmere at night with ADR-230's atmospheric effects: an audio-reactive aurora rising from the horizon, and bioluminescent comets crossing the sky -- one hero, one rainbow, and a three-comet burst, all launched by sequencer events.",
+      "name": "Glowmere Atmospherics",
+      "project": "world/glowmere-atmospherics.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "Combined procedural geometry and audio modulation, timeline-driven.",
+      "name": "Hyperspace",
+      "project": "hyperspace/hyperspace.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "Nested procedural geometry at extreme scale differences, camera inside.",
+      "name": "Impossible Chamber",
+      "project": "chamber/chamber.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "A metallic assembly that separates into thousands of parts, floats, gathers and locks back together, then detonates; disassembly is a field, so assembled is simply zero strength.",
+      "name": "Metallic Reassembly",
+      "project": "reassembly/reassembly.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "A sequenced music video (ADR-089): five shots cut to a generated song's own sections, a recurring character who walks a stylised miniature city from dusk to night, a camera that follows and then reveals, sixteen lyric lines, a title, a border, and four small audio-reactive relationships. The whole piece is one seq::Sequence baked onto the ordinary timeline, so the frame at any second is a pure evaluation.",
+      "name": "Night Shift",
+      "project": "city/night-shift.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "Large-scale radial architectural composition with arches and a free camera.",
+      "name": "The Cathedral",
+      "project": "cathedral/cathedral.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "Spiral instancing and continuous deformation with a travelling camera.",
+      "name": "The Helix",
+      "project": "helix/helix.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "The flagship world: radial colonnades, rings, arches, spiral corridors and recursive chambers driven by fields, with seven world macros, eight states and a four-minute cue arc.",
+      "name": "The Infinite Temple",
+      "project": "infinite/infinite.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "A particle sculpture that performs its own score. Three logarithmic spiral arms authored as splines, carried by a differentially rotating field around a hot core; an onset launches a radial wave that crosses the sculpture at 19 m/s, so a beat reaches the rim a second and a half after the centre. 190,000 particles, no C++.",
+      "name": "The Living Constellation",
+      "project": "constellation/constellation.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "A forty-second shot: a cast-iron vessel with a furnace belt, on a deck in a dark hall. Manual exposure, a re-aimed IndustrialCold rig, layered materials and a four-beat cue arc.",
+      "name": "The Living Machine",
+      "project": "machine/machine.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "Audio-reactive procedural architecture: radial colonnade, rings, fog, particles, bloom.",
+      "name": "The Temple",
+      "project": "temple/temple.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "The authored Tree of Life hero export -- 3.16 M triangles, seven meshes -- standing on a floating island in cosmic space, the island turning once every three minutes and breathing on a forty-second swell. The tree is a child of the island's transform and never moves of its own accord. A celestial key falls diagonally across tree and island from a hundred degrees off the camera, throwing the canopy's shadow off the far edge of the plateau; the underside is left to the sky's ground hemisphere. Bare landmass, a shell of 1,700 points for stars; nothing else in frame.",
+      "name": "Tree of Life - Floating Island",
+      "project": "treeisland/tree-of-life-floating-island.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "The same island, the same three lights, the same parameters at their other values: the celestial key drops to a third of its daylight strength and turns cool blue, the fill follows it, the shadows deepen and the star shells come up. One framework, two states -- not two lighting systems. Also reachable as the 'Celestial Night' preset inside the day project.",
+      "name": "Tree of Life - Celestial Night",
+      "project": "treeisland/tree-of-life-floating-island-night.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "The same Tree of Life and island, now suspended above an endless sea under a full day/night cycle. One dayPhase parameter drives sky, sun, moon, stars, atmosphere, water and the tree's bioluminescence together, wrapping seamlessly at midnight; the night sky and its moon are an HDRI the water reflects, and the moonlight is a real shadow-casting key aimed along that moon. Scrub the cycle or let it run.",
+      "name": "Tree of Life - Ocean World",
+      "project": "treeisland/tree-of-life-ocean-world.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "One scene, four presets: Cathedral, Temple, Helix, Hyperspace morph into each other on a timeline.",
+      "name": "Worlds (preset morph)",
+      "project": "worlds/worlds.json"
+    },
+    {
+      "category": "Lab",
+      "description": "Quality Lab benchmark 1: thin fence slats, a receding tile grid, shallow diagonal edges and small emissive spheres, all crossing the sampling limit inside one frame. Static free camera.",
+      "name": "Quality Lab: aliasing",
+      "project": "quality/aliasing.json"
+    },
+    {
+      "category": "Lab",
+      "description": "Quality Lab benchmark 2: the aliasing subject on a lateral spline dolly, so the velocity AOV, the disocclusion mask and the motion-compensated residual have real motion to measure.",
+      "name": "Quality Lab: aliasing dolly",
+      "project": "quality/aliasing-dolly.json"
+    },
+    {
+      "category": "Weather",
+      "description": "Four layers of one shower: 34 k wrapping drops in a camera-following volume, an out-of-focus near layer, a ripple for every drop that lands, and the mist it has already wetted. Particle size drives fall speed, so the streaks have a spread of lengths rather than one.",
+      "name": "Rain",
+      "project": "weather/rain.json"
+    },
+    {
+      "category": "Weather",
+      "description": "A flake is a tumbling card, not a streak; small dense flakes fall fast and large ones hang, so the field reads as falling rather than scrolling. A hundred and fifty huge out-of-focus flakes ride with the lens.",
+      "name": "Snow",
+      "project": "weather/snow.json"
+    },
+    {
+      "category": "Weather",
+      "description": "Dark ash read as an absence of light against a burning sky, embers on independent flicker phases from two sources at different distances, and the smoke they rise out of. Temperature is the ember colour curve.",
+      "name": "Ashfall",
+      "project": "weather/ashfall.json"
+    },
+    {
+      "category": "Weather",
+      "description": "A planar travelling wave field IS the squall line: rain spawns where it is, lifted dust spawns where it is not, and both subscribe to the same field, so the moment the rain arrives is the moment the dust stops.",
+      "name": "Weather front",
+      "project": "weather/weather-front.json"
+    },
+    {
+      "category": "Weather",
+      "description": "Motes lit by a Henyey-Greenstein phase against the key light: quiet across the sun and blazing into it, with a colonnade to cut the light into bands. The same population, and only the angle changes.",
+      "name": "Dust motes",
+      "project": "weather/dust-motes.json"
+    },
+    {
+      "category": "Weather",
+      "description": "Nine and fourteen persistent swarms that dart and hang on their own phases; one chorus flashes almost together and one twinkles at random, and the only difference between them is pulseSync.",
+      "name": "Fireflies",
+      "project": "weather/fireflies.json"
+    },
+    {
+      "category": "Weather",
+      "description": "One airborne biological system authored three ways -- buoyancy as a positive gravity against a high drag, so a grain finds a level and hangs there instead of falling.",
+      "name": "Pollen, spores and seeds",
+      "project": "weather/pollen.json"
+    },
+    {
+      "category": "Weather",
+      "description": "One continuous knob from high summer to deep winter: canopy, undergrowth, ground, sky, fog, pollen, leaf fall and snow are all targets of a single world macro. No winter scene exists.",
+      "name": "Season shift",
+      "project": "weather/season.json"
+    }
+  ]
 }
