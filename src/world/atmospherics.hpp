@@ -308,9 +308,26 @@ struct Vortex {
     float turbulenceScale = 2.1f;
     float breathAmount = 0.05f;
     float breathSpeed = 0.18f;
+    // ADR-389: what makes it read as SMOKE rather than as noise. The three octaves used to be
+    // independent fBMs summed at fixed rates, and uncorrelated detail sitting on top of a spiral is
+    // exactly what the eye calls grain. Smoke reads as smoke because the fine detail is ADVECTED by
+    // the coarse flow -- dragged into the sheets and curls of the big structure.
+    float smokeWarp = 0.0f;   // domain-warp amount; the one that does the work
+    float smokeBillow = 0.0f; // 0 wispy fBM, 1 rounded billowing masses
+    float detail = 0.2f;      // the fine octave's weight; was a hardcoded 0.2
     float emission = 1.0f;        // emissive density PER METRE (ADR-374)
     float filaments = 0.9f;
     float spill = 2.5f;           // surface irradiance on what floats above it (ADR-379)
+    // ADR-388, at the owner's request: how much of the SCENE's light this medium scatters.
+    //
+    // 0 is off and is the default, and the default is load-bearing rather than cautious. ADR-371
+    // measured what 1 does: at the shipped density, with the key light at intensity 22 over a 2.6 km
+    // march, the frame came back at mean luminance 131 of 255 **with the vortex's own emission set
+    // to zero** -- an even wash, the flat haze ADR-358 refused to build. So the funnel is
+    // self-luminous by construction and this is the controlled way back in, for the one thing that
+    // needs it: an upward spotlight whose beam should read INSIDE the funnel rather than stopping
+    // at its edge.
+    float scattering = 0.0f;
     float cometResponse = 0.0f;   // ADR-381
     float cometReach = 6.0f;
     float funnelDepth = 0.0f;     // metres the throat descends; 0 keeps the flat slab

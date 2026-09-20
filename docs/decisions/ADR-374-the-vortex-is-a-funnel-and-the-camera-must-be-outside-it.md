@@ -23,6 +23,29 @@ through `tools/gpu-lock.sh`:
 1 km**. The cost is not march length and is not sample count — it is *how many pixels have non-zero
 density and therefore evaluate three fBMs*. A near vortex covers more of the frame than a far one.
 
+> **Correction, ADR-389 (2026-09-19).** The half-sentence "step count is within noise" is **no
+> longer true and should not be quoted**. It has already misled one investigation today.
+>
+> Re-measured on the shipped scene at 1920×1080, `volume.march` alone, two runs per arm, GPU
+> serialised:
+>
+> | steps | 32 | 48 | 96 |
+> |---|---|---|---|
+> | march | 4.78 ms | 8.20 ms | 17.5 ms |
+>
+> Superlinear. Ninety-six steps would spend the whole 16.7 ms frame budget on the march, so raising
+> the step count is not available at Realtime.
+>
+> The claim was true when it was written, and the reason is the sentence beside it: cost is *how
+> many samples land inside non-zero density*. At the time of measurement the funnel was newly cut
+> out of a slab, most rays missed it, and the extra samples fell almost entirely in the region the
+> 1e-6 early-out rejects — so doubling them cost nothing. The same early-out that made the
+> measurement true is what makes it false now that the funnel fills the lower frame from the hero
+> camera: the extra samples land *inside* it and each one evaluates three fBMs.
+>
+> The general fact survives and the number attached to it did not. That is the shape of ADR-385's
+> stated reason that is not evidence, one ADR later and in an accepted document.
+
 So the gate's premise is inverted: raising `volumeMaxDistance` is close to free, and the proposed
 fallback of "bring the disc closer" is the **more** expensive direction, not the cheaper one.
 

@@ -105,8 +105,16 @@ TEST_CASE("A scene without a vortex marches exactly what it always marched", "[g
     // ...and the vortex can switch the march ON where the fog alone would have left it off, which
     // is the reason `VolumeRenderer::enabled` had to change: the scene this is for runs with no fog
     // at all, and gating the vortex behind the fog's density would have made it unreachable there.
-    CHECK_FALSE(rendering::VolumeRenderer::enabled(voidWorld(false, 0.0f, eye).environment));
-    CHECK(rendering::VolumeRenderer::enabled(voidWorld(true, 0.0f, eye).environment));
+    //
+    // ADR-387 moved the vortex off the environment, so the gate that knows about it is the one that
+    // takes the whole SCENE. The `Environment` overload is kept for the fog-only callers and this
+    // case now asserts the difference between them, because a caller reading the wrong one is
+    // exactly the defect that shipped for one commit: the particle fog coupling kept asking the
+    // environment and silently stopped being filled.
+    CHECK_FALSE(rendering::VolumeRenderer::enabled(voidWorld(false, 0.0f, eye)));
+    CHECK(rendering::VolumeRenderer::enabled(voidWorld(true, 0.0f, eye)));
+    CHECK_FALSE(rendering::VolumeRenderer::enabled(voidWorld(true, 0.0f, eye).environment));
+    CHECK(rendering::VolumeRenderer::enabled(voidWorld(false, 0.02f, eye).environment));
     CHECK(ctx->errorCount() == 0);
 }
 

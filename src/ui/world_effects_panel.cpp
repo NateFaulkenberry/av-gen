@@ -504,6 +504,9 @@ void drawEffectRows(app::Engine& engine, const std::string& prefix, std::span<co
         const std::string format(r.format);
         paramSlider(engine, prefix, leaf.c_str(), label.c_str(),
                     format.empty() ? "%.2f" : format.c_str(), r.logarithmic);
+        if (!r.tip.empty() && ImGui::IsItemHovered()) {
+            tooltipUnformatted(std::string(r.tip).c_str());
+        }
     }
 }
 const char* const kSkyAnchorNames[] = {"a fixed world point", "the camera"};
@@ -663,12 +666,9 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
         // "opacity" and "glow", which is how they got confused in the first place. The rows are
         // `ui::vortexRows()` rather than a page of calls, so that a test can ask the same question
         // this code asks: does every leaf named here exist?
+        // Each row carries its own tooltip (ADR-388); the panel used to attach one to whatever it
+        // had drawn last, which meant appending a row moved somebody else's explanation.
         drawEffectRows(engine, prefix, vortexRows());
-        if (ImGui::IsItemHovered()) {
-            tooltip("How much of the funnel's light lands on the surfaces above it.\n"
-                              "Separate from Brightness so it can be tuned against the island\n"
-                              "without changing the funnel itself (ADR-379).");
-        }
     } else if (isComet) {
         paramColor(engine, prefix, "coreColor", "Core colour");
         paramColor(engine, prefix, "tailColor", "Tail colour");
@@ -789,11 +789,6 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
 
     if (isVortex) {
         drawEffectRows(engine, prefix, vortexAdvancedRows());
-        if (ImGui::IsItemHovered()) {
-            tooltip("How much of a comet's light this medium takes, and how far past the\n"
-                              "comet's ground pool it reaches. Off by default: ADR-374 is emphatic\n"
-                              "that the funnel must not scatter the scene's ordinary lights.");
-        }
     } else if (isComet) {
         ImGui::SeparatorText("Trajectory");
         int anchor = static_cast<int>(authored.comet.path.anchor);
