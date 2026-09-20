@@ -528,7 +528,12 @@ the debug flag. `[gpu]` tests take `tools/gpu-lock.sh`.
     "every Nth frame" is a rate, not a seed — and the alternative needs a frame rate the shader does
     not have. **Not a defect; written down so the next reader finds the answer.** **Owner: Particle
     Lab**, §6.2 of its document.
-11. **The vortex shader disagrees with `core/vortex.cpp`.** `gpu.the-vortex-shader-agrees-with-core-vortex-cpp`
+11. ~~**The vortex shader disagrees with `core/vortex.cpp`.**~~ **Not a shader defect. Closed by
+    ADR-401, 2026-09-20.** The engine was right on both sides throughout; the parity HARNESS copied
+    the uniform block field by field and ADR-389's `v6` (smokeWarp, smokeBillow, detail) was added
+    to the real struct on both sides and to that list on neither, so the GPU ran with the domain
+    warp, the billow and the third octave switched off. The original finding, kept because the
+    diagnosis it invited was wrong and that is the part worth remembering: `gpu.the-vortex-shader-agrees-with-core-vortex-cpp`
     (ADR-388) fails 83 of its assertions at 9084db5d — at t = 41.7, p = (140, −90, 0), GPU density
     0.05383 against CPU 0.06640, twelve times the test's own 1e-3 margin. Re-run after merging
     today's main (which changed both `core/vortex.cpp` and `shaders/vortex.wgsl` via `agent/cosmic6`)
