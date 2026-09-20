@@ -1072,6 +1072,11 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             // could not reproduce (ADR-267 defect 3). The events it raises are collected and thrown
             // away -- they belong to the moment they happened, and the moment is eighty seconds ago.
             entity.schedule_.update(now, entity.actions_);
+            // The activity this action wants played, kept across the loop so the publish below can
+            // carry it. It has to survive the iteration rather than be read at the end, because on
+            // the final step the queue may have nothing pending and the answer is still whatever
+            // the last step decided.
+            entity.locomotion_.action.clear();
             if (entity.actions_.pending() > 0) {
                 seekEvents_.clear();
                 ActionContext ac;
@@ -1083,7 +1088,16 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
                 ac.path = &pathProvider();
                 ac.gait = &entity.desc_.gait;
                 ac.events = &seekEvents_;
-                (void)entity.actions_.update(ac, entity.state_);
+                // **The result was discarded here, with a literal `(void)`.** `update` captures it
+                // and publishes `locomotion_.action`, which is what picks the clip -- an action's
+                // activity first, the gait's second. Throwing it away meant a body that sits while
+                // the timeline runs stood up and walked the moment anyone scrubbed to the same
+                // frame: an ADR-360 violation in the one tier ADR-267 defect 3 had already had to
+                // teach this function to replay.
+                const ActionOutput out = entity.actions_.update(ac, entity.state_);
+                if (entity.locomotion_.action != out.activity) {
+                    entity.locomotion_.action.assign(out.activity);
+                }
             }
 
             if (perceiving_) {
@@ -1145,6 +1159,12 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         // the pair, and until now the seam could only carry one of them.
         entity.locomotion_.velocity = entity.state_.velocity;
         entity.locomotion_.facing = entity.state_.facing();
+        // Published on BOTH paths, deliberately. The sweep that added these asked, for every
+        // field of the seam, which of `seek` and `update` writes it -- and two of the answers
+        // were wrong: `velocity`/`facing` were written only by `seek`, and `action` only by
+        // `update`. `grounded` was written by neither and read by nobody.
+        entity.locomotion_.grounded = !entity.state_.airborne;
+        entity.locomotion_.dt = static_cast<float>(dt);
         entity.locomotion_.reaction = entity.state_.reaction;
         entity.locomotion_.lookTarget = entity.state_.lookTarget;
         entity.locomotion_.hasLookTarget = entity.state_.hasLookTarget;
@@ -1646,6 +1666,22 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         entity.locomotion_.yaw = entity.state_.yaw;
         entity.locomotion_.speed = entity.state_.speed;
         entity.locomotion_.turnRate = entity.state_.turnRate;
+        // ADR-545's measurement, across the seam -- **and this line was missing**. `seek` published
+        // it and `update` did not, so a pose layer got the right velocity while scrubbing and a
+        // zero one while playing: an ADR-360 violation in a field the animation layer reads, and
+        // backwards from every other kind of staleness bug.
+        //
+        // It survived because every velocity test asserted on `Entity::state()`, which is the
+        // measurement, and none asserted on `Entity::locomotion()`, which is what anything
+        // downstream actually receives. Same shape as ADR-553.
+        entity.locomotion_.velocity = entity.state_.velocity;
+        entity.locomotion_.facing = entity.state_.facing();
+        // Published on BOTH paths, deliberately. The sweep that added these asked, for every
+        // field of the seam, which of `seek` and `update` writes it -- and two of the answers
+        // were wrong: `velocity`/`facing` were written only by `seek`, and `action` only by
+        // `update`. `grounded` was written by neither and read by nobody.
+        entity.locomotion_.grounded = !entity.state_.airborne;
+        entity.locomotion_.dt = static_cast<float>(ctx.dt);
         entity.locomotion_.reaction = entity.state_.reaction;
         entity.locomotion_.lookTarget = entity.state_.lookTarget;
         entity.locomotion_.hasLookTarget = entity.state_.hasLookTarget;

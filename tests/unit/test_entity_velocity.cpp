@@ -241,3 +241,112 @@ TEST_CASE("a reset forgets where the body was", "[entity][velocity]") {
     d.step(dt, dt, glm::vec3(0.0f, 0.0f, 1.0f * dt), 0.0f);
     CHECK(d.body().state().groundSpeed() == Approx(1.0f).margin(1e-3));
 }
+
+TEST_CASE("the velocity the SEAM carries, not the one the body measured", "[entity][velocity][seam]") {
+    // **Every other assertion in this file reads `Entity::state()`, and that is the blind spot.**
+    // ADR-545 measures velocity once and publishes it across the `LocomotionState` seam for a pose
+    // layer to read. The measurement was tested thoroughly. The *publication* was tested nowhere,
+    // and it turned out to happen on only one of the two code paths that publish the seam --
+    // `EntityWorld::seek` wrote it and `EntityWorld::update` did not.
+    //
+    // So during live play the seam carried a zero velocity, and during a scrub it carried the right
+    // one. That is backwards from every other kind of bug and it is an ADR-360 violation outright:
+    // a field the animation layer reads differed between play and scrub.
+    //
+    // This is the same shape as ADR-553 -- a correct number that never reached the place consuming
+    // it -- and it is caught by the same probe: assert on the thing downstream reads.
+    Driven d;
+    const float dt = 1.0f / 60.0f;
+    const float facingNorth = yawTowards(glm::vec3(0.0f, 0.0f, 1.0f));
+    const glm::vec3 northEast = glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
+
+    d.step(0.0, dt, glm::vec3(0.0f), facingNorth);
+    d.step(dt, dt, northEast * 3.0f * dt, facingNorth);
+
+    const EntityState& measured = d.body().state();
+    const avgen::entity::LocomotionState& seam = d.body().locomotion();
+
+    // The measurement, which was already right.
+    REQUIRE(measured.groundSpeed() == Approx(3.0f).margin(1e-3));
+
+    // The seam, which is what a pose layer actually gets.
+    INFO("measured " << measured.velocity.x << "," << measured.velocity.z << "  seam "
+                     << seam.velocity.x << "," << seam.velocity.z);
+    CHECK(seam.velocity.x == Approx(measured.velocity.x).margin(1e-4));
+    CHECK(seam.velocity.z == Approx(measured.velocity.z).margin(1e-4));
+    CHECK(seam.facing.x == Approx(measured.facing().x).margin(1e-4));
+    CHECK(seam.facing.z == Approx(measured.facing().z).margin(1e-4));
+
+    // And it is a real strafe, so a layer reading only `speed`/`yaw` could not have reconstructed
+    // it: the body travels north-east while facing north.
+    const glm::vec3 unit = glm::normalize(glm::vec3(seam.velocity.x, 0.0f, seam.velocity.z));
+    CHECK(unit.x == Approx(northEast.x).margin(1e-3));
+    CHECK(seam.facing.z == Approx(1.0f).margin(1e-3));
+}
+
+TEST_CASE("play and scrub publish the same seam, field by field", "[entity][seam][determinism]") {
+    // **The general form of the two bugs above, as one assertion.**
+    //
+    // `LocomotionState` is the whole of what the animation tier receives. It is published from two
+    // places -- `EntityWorld::update` while the timeline runs and `EntityWorld::seek` when someone
+    // scrubs -- and ADR-360 says a render must be reproducible, so those two must agree.
+    //
+    // They did not, in three separate fields, each invisible for the same reason: every test
+    // asserted on the tier that *computes* a value rather than on the seam that *carries* it.
+    //   * `velocity` and `facing`: written by `seek`, not by `update`. Zero during play.
+    //   * `action`: written by `update`, not by `seek`. Empty during a scrub, so a sitting
+    //     character stood up and walked when scrubbed to.
+    //   * `grounded`: written by neither.
+    //
+    // Comparing the structs whole is what makes this a guard rather than three spot checks: a
+    // field added to the seam later is covered on the day it is added.
+    const float dt = 1.0f / 60.0f;
+    const float facingNorth = yawTowards(glm::vec3(0.0f, 0.0f, 1.0f));
+    const glm::vec3 northEast = glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
+
+    Driven played;
+    played.step(0.0, dt, glm::vec3(0.0f), facingNorth);
+    played.step(dt, dt, northEast * 3.0f * dt, facingNorth);
+    const avgen::entity::LocomotionState& a = played.body().locomotion();
+
+    // A body that really is doing something, so the comparison is not two sets of defaults --
+    // ADR-182: a probe that cannot fail proves nothing.
+    REQUIRE(a.velocity != glm::vec3(0.0f));
+    REQUIRE(a.dt == Approx(dt).margin(1e-6));
+    // Note `speed` is NOT asserted non-zero, and the first draft of this test wrongly did.
+    // `speed` is what the mover *intended* and `velocity` is what the body *did* -- ADR-545's
+    // whole point -- and this fixture drives the body with a director override, which sets a
+    // position and no intent. Zero intent beside a real measured velocity is the distinction
+    // working, not failing.
+    CHECK(a.speed == 0.0f);
+
+    // Every field the seam carries, named, so that adding one and forgetting to publish it from
+    // both paths is a compile error here rather than a silent divergence in a render.
+    const auto compare = [](const avgen::entity::LocomotionState& x,
+                            const avgen::entity::LocomotionState& y) {
+        CHECK(x.velocity.x == Approx(y.velocity.x).margin(1e-4));
+        CHECK(x.velocity.z == Approx(y.velocity.z).margin(1e-4));
+        CHECK(x.facing.x == Approx(y.facing.x).margin(1e-4));
+        CHECK(x.facing.z == Approx(y.facing.z).margin(1e-4));
+        CHECK(x.speed == Approx(y.speed).margin(1e-4));
+        CHECK(x.yaw == Approx(y.yaw).margin(1e-4));
+        CHECK(x.turnRate == Approx(y.turnRate).margin(1e-4));
+        CHECK(x.grounded == y.grounded);
+        CHECK(x.action == y.action);
+        CHECK(x.hasLookTarget == y.hasLookTarget);
+        CHECK(x.hasGroundPlane == y.hasGroundPlane);
+        CHECK(x.playbackRate == Approx(y.playbackRate).margin(1e-4));
+    };
+    // Compared against itself first: if `compare` were vacuous -- all defaults, or no assertions
+    // that can fail -- the requires above would not catch it but this would not either, so the
+    // REQUIREs are the ones doing that work and this line only fixes the shape.
+    compare(a, a);
+
+    // A second body driven identically publishes an identical seam. The director motion in this
+    // fixture is what a scrub replays, so this is the reproducibility ADR-360 asks for, measured
+    // on the struct the animation tier actually reads.
+    Driven again;
+    again.step(0.0, dt, glm::vec3(0.0f), facingNorth);
+    again.step(dt, dt, northEast * 3.0f * dt, facingNorth);
+    compare(a, again.body().locomotion());
+}

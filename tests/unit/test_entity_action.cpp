@@ -1324,3 +1324,40 @@ TEST_CASE("the wanderer does not strand itself over a long walk", "[.probe][enti
     CHECK(worstStall < 120.0);
 #endif
 }
+
+TEST_CASE("a scrubbed frame publishes the action it is performing, not the gait's guess",
+          "[entity][action][seek][determinism]") {
+    // **ADR-360: a render must be reproducible, and scrub may differ from play only where a
+    // decision says it may.** This is not one of those places.
+    //
+    // `LocomotionState::action` is what `Composition::AnimationSink::setLocomotion` reads to choose
+    // a clip -- an action's activity first, the gait's second. `EntityWorld::update` publishes it.
+    // `EntityWorld::seek` replays the whole action tier and then **discards the result**, with a
+    // literal `(void)` on the call. So a body that is sitting plays its sit clip while the timeline
+    // runs and stands up and walks the moment somebody scrubs to the same frame.
+    //
+    // It is the mirror of the velocity gap in `test_entity_velocity.cpp`: one seam field published
+    // on one path and not the other, invisible because every test asserted on the tier that
+    // computes it rather than on the seam that carries it.
+    entity::EntityDesc hero = heroDesc();
+    entity::ActionDesc sit = wait(5.0, "sit");
+    sit.activity = "Sit"; // an ACTIVITY name; the asset's own `clips` map turns it into a clip
+    hero.actions = {sit};
+
+    World played({hero}, {{"hero", glm::vec3(0.0f)}});
+    played.tick(1.0);
+    const std::string duringPlay = played.actor().locomotion().action;
+    INFO("during play: '" << duringPlay << "'");
+    REQUIRE(duringPlay == "Sit"); // the half that already worked
+
+    // The same moment, reached by scrubbing instead of by playing.
+    World scrubbed({hero}, {{"hero", glm::vec3(0.0f)}});
+    scrubbed.world.seek(1.0, &scrubbed.params, &scrubbed.bus, 1.0 / 60.0, {});
+    const std::string duringScrub = scrubbed.actor().locomotion().action;
+
+    INFO("play published '" << duringPlay << "', scrub published '" << duringScrub << "'");
+    // The action tier really did replay -- the queue is on the same step -- so this is a
+    // publication gap and not a simulation one, which is the distinction that says where to fix it.
+    CHECK(scrubbed.actor().actions().authority() == entity::Authority::Routine);
+    CHECK(duringScrub == duringPlay);
+}

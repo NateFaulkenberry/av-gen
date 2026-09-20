@@ -70,7 +70,17 @@ struct LocomotionState {
     // difference against there.
     glm::vec3 velocity{0.0f}; // world
     glm::vec3 facing{0.0f, 0.0f, 1.0f};
+    // **Written by nobody and read by nobody** until Phase B looked for the same publication gap
+    // that hid `velocity` and `action`. Its source is `EntityState::airborne`, which the jump/fall
+    // machinery maintains; a foot placement layer must not plant a foot on a body in mid-air, so it
+    // is published now rather than deleted. The sweep that found it is worth more than the field:
+    // *for each seam field, which paths write it* is a question with an answer, and two of the
+    // three answers were wrong.
     bool grounded = true;
+    // Seconds since the previous step. Carried because `MotionContext` needs it and the entity is
+    // the only tier that knows it: deriving it downstream by differencing `time` would be memory
+    // in the composition, which is exactly what ADR-359 put the smoothing up here to avoid.
+    float dt = 0.0f;
     // 0..1, decaying. A reaction the animation layer may blend a one-shot over (a flinch, a
     // head snap). The behaviour layer says how strongly and when; the animation layer says what.
     //
