@@ -474,7 +474,15 @@ std::vector<params::ModRoute> defaultAtmosphericRoutes(std::string_view effectNa
         r.chain.decayMs = decayMs;
         routes.push_back(std::move(r));
     };
-    if (kind == AtmosphereKind::Aurora) {
+    // A switch with no `default`, not an if/else chain. This function is where the chain cost
+    // something: a vortex fell into the comet's `else` and was handed three routes aimed at
+    // `coreIntensity`, `tailIntensity` and `sparkleIntensity`, none of which a vortex registers.
+    // Nothing failed -- a route that names an unregistered path binds to nothing, warns once at
+    // load and is thereafter indistinguishable from an effect nobody automated. The arms below are
+    // exhaustive so the next kind is at least a diagnostic, and
+    // `tests/unit/test_effect_conformance.cpp` fails by name whatever the warning level.
+    switch (kind) {
+    case AtmosphereKind::Aurora:
         // §4.2's proposed mapping, as the default rather than as the only answer. The depths are
         // fractions of each parameter's soft range, and the smoothing is what stops the curtain
         // jittering: a 40 ms attack and a ~400 ms release is a curtain that answers the music
@@ -485,12 +493,34 @@ std::vector<params::ModRoute> defaultAtmosphericRoutes(std::string_view effectNa
         add("audio.mid", "turbulence", 0.20f, 40.0f, 320.0f);
         add("audio.treble", "filaments", 0.55f, 25.0f, 240.0f);
         add("beat.pulse", "edgeBrightness", 1.1f, 10.0f, 260.0f);
-    } else {
+        break;
+    case AtmosphereKind::Vortex:
+        // ADR-387 records the five routes the shipped Tree of Life project authors on its funnel --
+        // bass to density and breath, mid to turbulence, treble to filaments -- and those are the
+        // mapping here, because a default taken from the one scene that has tuned a vortex is
+        // evidence and a default invented for this function is not.
+        //
+        // The one departure: the shipped project drives emission from `time.progress`, which ramps
+        // the funnel's brightness across the song. That is a composition decision rather than a
+        // property of vortices, so the brightness route here is `beat.pulse` -- the same leaf
+        // `ui::atmosphericBeatTarget` picks for this kind, so the Beat response slider finds the
+        // route this function wrote instead of writing a second one beside it.
+        //
+        // Every depth is a fraction of the leaf's soft range: density's soft range ends at 0.01 /m
+        // and emission's at 0.2, which is why these numbers look small next to an aurora's.
+        add("audio.bass", "density", 0.0020f, 70.0f, 450.0f);
+        add("audio.bass", "breathAmount", 0.080f, 90.0f, 520.0f);
+        add("audio.mid", "turbulence", 0.150f, 45.0f, 340.0f);
+        add("audio.treble", "filaments", 0.400f, 25.0f, 240.0f);
+        add("beat.pulse", "emission", 0.030f, 10.0f, 260.0f);
+        break;
+    case AtmosphereKind::Comet:
         // A comet is an event, and most of its shape is authored rather than played. What answers
         // the music is its brightness and its sparkle -- the two that read at a glance.
         add("audio.rms", "coreIntensity", 6.0f, 60.0f, 400.0f);
         add("beat.pulse", "tailIntensity", 1.4f, 10.0f, 280.0f);
         add("audio.treble", "sparkleIntensity", 4.0f, 20.0f, 220.0f);
+        break;
     }
     return routes;
 }
