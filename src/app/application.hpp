@@ -31,6 +31,7 @@
 #include "rendering/transform_history.hpp"
 #include "ui/editor_layout.hpp"
 #include "ui/output_preview.hpp"
+#include "ui/unsaved_changes.hpp"
 #include "share/texture_share.hpp"
 
 #include <webgpu/webgpu_cpp.h>
@@ -38,6 +39,8 @@
 #include "core/file_watcher.hpp"
 #include "core/log.hpp"
 
+#include <chrono>
+#include <functional>
 #include <cstdint>
 #include <filesystem>
 #include <deque>
@@ -286,7 +289,51 @@ private:
     void servicePendingOpen();
     // The blocking half of `loadAny`.
     void performOpen(const std::filesystem::path& path);
+    // `loadAny` past the unsaved-changes gate: remember the request and paint "Opening ..." first.
+    void beginOpen(const std::filesystem::path& path);
     std::optional<std::filesystem::path> pendingOpen_;
+
+    // ---- unsaved changes (ADR-440) --------------------------------------------------------------
+    //
+    // Every path that discards the current project goes through `requestClose`: File > New, File >
+    // Open, Open Recent, Examples, Engineering Labs, a project dropped on the window, and quit. A
+    // prompt on one path and not another is worse than none, because it teaches that the
+    // application protects you.
+    //
+    // `closeGate_` holds only the state machine (see ui/unsaved_changes.hpp); `pendingClose_` holds
+    // the effect, because performing a close touches the engine, the window and the panel and a
+    // gate that could do any of that could not be tested without all three.
+    ui::UnsavedChangesGate closeGate_;
+    std::function<void()> pendingClose_;
+    // True while `pendingClose_` is a quit, so the frame loop can leave after the modal has been
+    // answered. `events.quit` cannot carry it: the event is a per-frame local and the answer
+    // arrives at least one frame later.
+    bool quitting_ = false;
+    // Asks to discard the current project. Runs `action` immediately when there is nothing to lose,
+    // and otherwise raises the modal and remembers it. Returns true when `action` has already run.
+    bool requestClose(ui::CloseIntent intent, std::function<void()> action,
+                      const std::filesystem::path& path = {});
+    // Draws the modal and applies the answer. Called from inside the ImGui frame.
+    void serviceCloseGate();
+    // True when opening `path` would replace the current project rather than add to it. A .wav, a
+    // .hdr or a .wgsl modifies the open project; a project document replaces it.
+    [[nodiscard]] static bool opensADifferentProject(const std::filesystem::path& path);
+    // Writes the project, reporting whether anything reached the disk. Shared by Cmd-S and by the
+    // modal's Yes, so the two cannot disagree about what a successful save is.
+    void saveProjectTo(const std::filesystem::path& path);
+    // Save As on behalf of the modal: the native dialog is asynchronous, so the gate stays in
+    // `AwaitingSave` until its callback arrives and a cancel there cancels the whole close.
+    void saveProjectAsForGate();
+    // The window title, with the project name and an unsaved marker. The prompt is the last line of
+    // defence, not the only signal.
+    void refreshWindowTitle();
+    // Anything that touched the application since the last dirty sample -- a pointer, a key, a menu
+    // pick, a drop. Not a dirty flag: it never decides that something changed, only whether a
+    // measured change could be the user's. See `Engine::sampleProjectDirty`.
+    bool touchedSinceDirtySample_ = false;
+    std::chrono::steady_clock::time_point lastDirtySample_{};
+    double lastDirtySampleMs_ = 0.0;
+    void sampleProjectDirtyIfIdle();
     void rememberProject(const std::filesystem::path& path); // recent list + window title
     // Input diagnostics (AVGEN_UI_SELFTEST=1): raw SDL mouse events seen this run.
     std::uint64_t uiMotionEvents_ = 0;

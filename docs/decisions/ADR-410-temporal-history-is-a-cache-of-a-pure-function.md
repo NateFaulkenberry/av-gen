@@ -211,6 +211,14 @@ Resulting default (Realtime tier, 1080p):
 | | | | | **≈ 25 MB** |
 
 Against a scene-target baseline of about 91 MB, that is a quarter added, not a quadrupling.
+
+**Measured, at 1080p**: eight frames of half-resolution colour is **15.82 MiB** (16.6 MB decimal),
+at 960x540 in RG11B10Ufloat. `tests/rendering/test_temporal_gpu.cpp` asks the ring rather than
+recomputing the estimate, and the same test pins the two ends that matter: 32 frames at full
+resolution is sixteen times that, and a project with no temporal effect allocates **zero** -- which
+is the line in §8 that matters most, because "pays a little" and "pays nothing" are different
+promises. The numbers above are decimal MB and the test reports MiB; the two differ by 5% and that
+is the whole of the discrepancy.
 K = 32 at full-resolution colour remains reachable, gated behind an explicit setting that shows
 its own cost, and driven by the quality tier (§48) exactly as `aoHistoryFrames` already is —
 `QualitySettings`' own header comment has said since it was written that a tier scales "sample

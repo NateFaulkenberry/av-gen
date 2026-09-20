@@ -5,6 +5,7 @@
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
+#include "scene/temporal_settings.hpp"
 #include "ui/help_panel.hpp"
 #include "ui/ui_logic.hpp"
 #include "world/atmospheric_params.hpp"
@@ -228,6 +229,7 @@ void WorldEffectsPanel::draw(app::Engine& engine) {
         pendingRemove_ = -1;
     }
     drawAtmosphericSection(engine);
+    drawTemporalSection(engine);
 }
 
 void WorldEffectsPanel::drawEffect(app::Engine& engine, const world::WorldEffect& authored, std::size_t index) {
@@ -511,6 +513,10 @@ void drawEffectRows(app::Engine& engine, const std::string& prefix, std::span<co
 }
 const char* const kSkyAnchorNames[] = {"a fixed world point", "the camera"};
 
+// §68. The word for "subscribed to nothing", first in the combo so index 0 is always the empty
+// subscription whatever the scene publishes.
+const char* const kNoFieldLabel = "nothing (still air)";
+
 } // namespace
 
 void WorldEffectsPanel::commitAtmospheric(app::Engine& engine, std::size_t index,
@@ -543,6 +549,35 @@ void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
     ImGui::SeparatorText("Atmospheric");
 
     const std::vector<world::AtmosphericEffect>& authored = comp->atmosphericEffects();
+
+    // ADR-420, §68. Every subscription that names a field this scene does not publish, said out
+    // loud where an artist is standing.
+    //
+    // The engine already logs this once per name, and a CPU log is a diagnostic for whoever is
+    // reading a terminal -- which is never the person whose aurora has stopped moving. The whole
+    // point of the report is that a name resolving to nothing must not be indistinguishable from a
+    // setting nobody used, and it is indistinguishable from exactly that until it is on screen.
+    //
+    // Drawn at the top of the section rather than inside each effect because the question is "what
+    // in this sky is asking for something that is not here", which is one question about the scene.
+    // The per-effect combo says the same thing again in the place where it can be fixed.
+    {
+        std::vector<std::string> names;
+        std::vector<world::fields::Subscription> subs;
+        names.reserve(authored.size());
+        subs.reserve(authored.size());
+        for (const world::AtmosphericEffect& e : authored) {
+            names.push_back(e.name);
+            subs.push_back(e.flow);
+        }
+        const std::vector<world::fields::DeadSubscription> dead =
+            engine.fieldBus().unresolved(names, subs);
+        for (const world::fields::DeadSubscription& d : dead) {
+            ImGui::TextColored(kWarning, "'%s' follows a field called '%s', which this scene does "
+                                         "not publish -- it is standing still.",
+                               d.subscriber.c_str(), d.field.c_str());
+        }
+    }
 
     // A unique name, because a name is half of a parameter path and two effects sharing one is two
     // things writing the same path.
@@ -767,6 +802,71 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
     const bool isComet = authored.kind == world::AtmosphereKind::Comet;
     const bool isVortex = authored.kind == world::AtmosphereKind::Vortex;
 
+    // ---- §68: which field this effect follows ----
+    //
+    // The rule the owner states is that if it is visible in the picture an artist must be able to
+    // find it and change it, and that findable is not reachable-in-principle. A subscription that
+    // could only be typed into a scene file would be exactly the sixteen-parameter travelling band
+    // of light ADR-375 was written about. So: a combo of the names this scene actually publishes --
+    // never a text box, because a typo in a text box and a field nobody has made yet look the same
+    // -- and the one slider, from the row table above so that a test computes its path the way this
+    // does (ADR-382).
+    {
+        ImGui::SeparatorText("Field");
+        const world::fields::FieldBus& bus = engine.fieldBus();
+        const std::vector<std::string_view> published = bus.names();
+
+        std::vector<const char*> labels;
+        std::vector<std::string> storage;
+        labels.reserve(published.size() + 1);
+        storage.reserve(published.size());
+        labels.push_back(kNoFieldLabel);
+        int current = 0;
+        for (std::size_t i = 0; i < published.size(); ++i) {
+            storage.emplace_back(published[i]);
+            if (storage.back() == authored.flow.field) {
+                current = static_cast<int>(i) + 1;
+            }
+        }
+        for (const std::string& name : storage) {
+            labels.push_back(name.c_str());
+        }
+
+        // The case that must not be silent: the effect names a field this scene does not publish.
+        // Showing "nothing" would be a lie an artist could not act on, so the dead name is offered
+        // as its own entry, marked, and selected -- which is how somebody discovers that the vortex
+        // they subscribed to has been renamed or switched off.
+        std::string dead;
+        if (!authored.flow.field.empty() && current == 0) {
+            dead = authored.flow.field + "  (not published by this scene)";
+            labels.push_back(dead.c_str());
+            current = static_cast<int>(labels.size()) - 1;
+        }
+
+        rowLabel("Follows");
+        if (ImGui::Combo("##flowfield", &current, labels.data(), static_cast<int>(labels.size()))) {
+            std::string chosen;
+            if (current > 0 && current <= static_cast<int>(storage.size())) {
+                chosen = storage[static_cast<std::size_t>(current) - 1];
+            }
+            commitAtmospheric(engine, index, [chosen](world::AtmosphericEffect& e) {
+                e.flow.field = chosen;
+            });
+            return;
+        }
+        if (ImGui::IsItemHovered()) {
+            tooltip("The spatial field this effect's motion answers to: the world's wind, or\n"
+                    "the medium inside a cosmic vortex. Two effects that follow the same field\n"
+                    "move together because they are asking one question, not because somebody\n"
+                    "matched two speeds by hand.");
+        }
+        if (!dead.empty()) {
+            ImGui::TextColored(kMuted, "'%s' is not published by this scene -- nothing follows it.",
+                               authored.flow.field.c_str());
+        }
+        drawEffectRows(engine, prefix, atmosphericFlowRows());
+    }
+
     ImGui::SeparatorText("Lifetime");
     int activation = static_cast<int>(authored.activation);
     rowLabel("Activation");
@@ -832,6 +932,46 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
     }
 
     ImGui::TextColored(kMuted, "Every control here is the parameter atmos/%s/...", authored.name.c_str());
+}
+
+
+// ---- ADR-410: temporal media -------------------------------------------------------------------
+void WorldEffectsPanel::drawTemporalSection(app::Engine& engine) {
+    ImGui::SeparatorText("Reality / Temporal / Digital");
+
+    const std::string prefix = scene::temporalParameterPrefix(scene::TemporalEffectKind::FrameEcho);
+    const bool open = ImGui::CollapsingHeader("Frame echo", ImGuiTreeNodeFlags_DefaultOpen);
+    if (ImGui::IsItemHovered()) {
+        // The limitation an author needs at the moment of choosing, not in an ADR they will never
+        // open (ADR-410). A mosh or an echo over fog advecting with the surface behind it looks
+        // exactly like a bug, and finding out afterwards costs an afternoon.
+        tooltipUnformatted(
+            "Reaches back over previous frames, so a moving object leaves a trail of where it was.\n\n"
+            "Describes OPAQUE surfaces only. Fog, aurora and the vortex are composited after the\n"
+            "scene pass and carry no motion of their own, so an echo over them follows whatever\n"
+            "solid surface is behind them rather than the effect itself.");
+    }
+    if (!open) {
+        return;
+    }
+
+    paramCheckbox(engine, prefix, "enabled", "Enabled");
+
+    // The disclosure ADR-410 turns on. Phrased as what to DO -- "settling, 3 of 8" tells somebody
+    // the picture is on its way; "not what will be rendered" tells them only that they are stuck.
+    // The stuck wording is kept for the case that genuinely is stuck.
+    const scene::TemporalHistoryReport& report = engine.temporalHistoryReport();
+    if (report.stalled) {
+        ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), "Temporal: cold - this is not the rendered picture");
+    } else if (report.settling()) {
+        ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.35f, 1.0f), "Temporal: settling - %u of %u frames",
+                           report.framesValid, report.framesNeeded);
+    } else if (report.framesNeeded > 0) {
+        ImGui::TextDisabled("Temporal: %u frames, %.1f MB at %ux%u", report.framesValid,
+                            static_cast<double>(report.bytes) / (1024.0 * 1024.0), report.width, report.height);
+    }
+
+    drawEffectRows(engine, prefix, temporalEchoRows());
 }
 
 } // namespace avgen::ui

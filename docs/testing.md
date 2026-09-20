@@ -147,6 +147,20 @@ list` and is not on disk.
 far less than suite logs in practice, because a build takes minutes and finishes while several
 suites run for an hour and overlap.
 
+A census of one session's scratchpad found **438 `.log` files**, about **120 of them on names two
+agents could pick independently** — `suite*` 12, `build*` 14, `gpu*` 16, `base*` 12, `final*` 10.
+Roughly **135 were already namespaced** by worktree or pid, so a third of the session had arrived at
+this rule unprompted.
+
+**Bumping a numeric suffix makes a collision MORE likely, not less.** `suite.log`, `suite2.log` …
+`suite7.log` all existed simultaneously, because re-running and incrementing a digit is what
+everybody does — so the next agent that needs a fresh name reaches for the same next digit. A pid or
+a timestamp is not a tidier version of `suite2`; it is the only part that makes the name unique.
+
+**Do not clean the directory to fix this.** Some of those files are other agents' live runs, and one
+was the evidence that a log had been written by another worktree entirely. Deleting a file somebody
+is tailing is a worse failure than clutter.
+
 ## Determinism requirements
 
 GPU particle systems use stable stream compaction since 1.0 (ADR-015 revision), so headless

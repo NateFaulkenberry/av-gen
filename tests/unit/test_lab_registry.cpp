@@ -165,20 +165,20 @@ TEST_CASE("every lab states what it owns and what it does not", "[labs][registry
 }
 
 TEST_CASE("an inert debug overlay is in no lab's profile", "[labs][overlays]") {
-    // `DebugViewOptions::culling` has a checkbox in `world_panel.cpp` and `debug_visualizer.cpp`
-    // reads the field nowhere, so it draws nothing. A lab profile that switched it on would be the
-    // suite showing a person a control that does nothing -- ADR-225, committed by the thing built
-    // to prevent it. When the Visibility Lab wires it up, this test is what says the prohibition
-    // can be lifted.
+    // `DebugViewOptions::culling` used to be asserted off in every profile: it had a checkbox in
+    // `world_panel.cpp`, `debug_visualizer.cpp` read the field nowhere, and a lab profile that
+    // switched it on would have been the suite showing a person a control that does nothing --
+    // ADR-225, committed by the thing built to prevent it.
+    //
+    // ADR-421 deleted the field instead of waiting for the Visibility Lab to wire it up, so that
+    // assertion has nothing to stand on and is gone. What it promised to draw is what `::lod`
+    // already draws, colouring culled instances purple.
+    // `tests/unit/test_debug_overlay_reachability.cpp` now asserts the general rule this was one
+    // instance of: every switch on that struct has both a reader and a checkbox.
     //
     // `::lod` was here too and is not any more: the LOD Lab wired it to the rung the cull pass
     // writes for each record (`ProceduralRenderer::readLodLevels`), so its profile is allowed to
     // turn it on and the assertion below is now the opposite one.
-    for (const labs::LabDescriptor& d : labs::labs()) {
-        const rendering::DebugViewOptions o = labs::overlaysFor(d.id);
-        INFO("lab: " << d.key);
-        CHECK_FALSE(o.culling);
-    }
     // The LOD profile does switch the rung overlay on, and it is the only one that does: an
     // overlay every profile enabled would be a decoration rather than a selection.
     std::size_t withLod = 0;

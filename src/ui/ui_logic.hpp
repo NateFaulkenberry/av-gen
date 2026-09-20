@@ -3,6 +3,7 @@
 // UI-facing pure helpers that can be unit-tested without Dear ImGui.
 
 #include "params/modulation.hpp"
+#include "scene/procedural.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1276,6 +1277,31 @@ struct EffectRow {
     std::string_view tip;
 };
 
+// ---- ADR-410: the Reality / Temporal / Digital family (brief §51) -----------------------------
+//
+// Rows rather than inline ImGui calls, for the reason the rest of this file exists: a test can walk
+// a table and prove every leaf it names is a parameter the family registers, and cannot walk a
+// sequence of `ImGui::SliderFloat` calls at all (ADR-382).
+//
+// Leaves here are appended to `temporal/<effect>/`, which `scene::temporalParameterPrefix` computes
+// -- the test computes it the same way rather than spelling the prefix a second time.
+[[nodiscard]] inline std::span<const EffectRow> temporalEchoRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "frames", "Reach", "%.0f frames", false, false,
+         "How many frames back the echo reaches, and the effect's declared history bound.\n"
+         "It sizes the ring: 32 frames of history costs real memory, and the panel shows what.\n"
+         "After a seek the echo is SHORTER until the history refills -- never wrong, and the\n"
+         "badge above says how far along it is."},
+        {"", "strength", "Amount", "", false, false,
+         "How much of the echo is added to the current frame. 0 is the identity: the pass still\n"
+         "runs and adds nothing."},
+        {"", "decay", "Falloff", "", false, false,
+         "How quickly each successive ghost fades. Near 0 is a single sharp double-image;\n"
+         "near 1 is an even smear across the whole reach."},
+    };
+    return kRows;
+}
+
 // What somebody reaches for first: what colour, how bright, how big, how fast.
 [[nodiscard]] inline std::span<const EffectRow> vortexRows() {
     static constexpr EffectRow kRows[] = {
@@ -1507,6 +1533,128 @@ struct EffectRow {
     static constexpr EffectRow kRows[] = {
         {"Ground illumination", "groundRadius", "Radius", "%.0f m", true},
         {"", "groundFalloff", "Falloff"},
+    };
+    return kRows;
+}
+
+// ---- ADR-421: the deformer stack's rows -------------------------------------------------------
+//
+// Which registered `deform/<slot>/<leaf>` parameters each `DeformerKind` actually uses.
+//
+// This exists because registration is **not** per-kind: `registerProceduralParameters` writes the
+// same nine leaves for every slot whatever its kind, plus three more for a Path. So a Noise
+// deformer has a registered `frequency` that its arithmetic never reads, and a Bend has a `speed`
+// that does nothing. Drawing all nine for every kind would be nine controls of which four move
+// nothing -- which is worse than a missing control, because a control that does nothing teaches an
+// artist that the system is broken.
+//
+// The semantics are `scene/procedural.hpp`'s, copied from the comment above `struct Deformer` and
+// checked against it by `test_deformer_panel.cpp`, which asserts every leaf here is a parameter the
+// object really registers. A leaf five characters wrong draws an empty box and says nothing
+// (ADR-382); a leaf that is right but unused draws a control that lies.
+struct DeformerRow {
+    std::string_view leaf;
+    std::string_view label;
+    std::string_view format; // empty = the panel's default
+    std::string_view tip;
+};
+
+[[nodiscard]] inline std::span<const DeformerRow> deformerRowsFor(scene::DeformerKind kind) {
+    // Shared by everything that has a direction and an origin.
+    static constexpr DeformerRow kAxisCenter[] = {
+        {"axis", "axis", "%.2f", "The direction the deformation is measured along."},
+        {"center", "centre", "%.2f m", "The point it is measured from, in the deformer's space."},
+    };
+    static constexpr DeformerRow kBend[] = {
+        {"amount", "curvature", "%.3f rad/m", "Radians of bend per metre along the axis."},
+        {"axis", "axis", "%.2f", "The direction the shape is bent along."},
+        {"center", "centre", "%.2f m", "The point the bend is measured from."},
+        {"falloff", "falloff", "%.2f m", "Metres over which the bend ramps in from the centre. 0 is no ramp."},
+    };
+    static constexpr DeformerRow kTwist[] = {
+        {"amount", "twist", "%.3f rad/m", "Radians of rotation about the axis per metre along it."},
+        {"axis", "axis", "%.2f", "The axis rotated about."},
+        {"center", "centre", "%.2f m", "The point the twist is measured from."},
+        {"speed", "spin", "%.2f rad/s", "Radians per second the whole twist rotates. 0 holds still."},
+    };
+    static constexpr DeformerRow kSine[] = {
+        {"amount", "amplitude", "%.3f m", "Metres of displacement at the wave's peak."},
+        {"axis", "along", "%.2f", "The direction the wave travels."},
+        {"center", "centre", "%.2f m", "Where the wave's phase is measured from."},
+        {"frequency", "frequency", "%.3f /m", "Cycles per metre along the axis."},
+        {"phase", "phase", "%.2f rad", "Where in the cycle it starts."},
+        {"speed", "speed", "%.2f rad/s", "Radians per second the wave travels. 0 is a standing wave."},
+    };
+    static constexpr DeformerRow kNoise[] = {
+        {"amount", "amount", "%.3f m", "Metres of displacement at full noise."},
+        {"scale", "scale", "%.3f /m", "Cycles per metre. Larger is finer."},
+        {"speed", "speed", "%.2f /s", "How fast the pattern churns. 0 freezes it."},
+    };
+    static constexpr DeformerRow kDisplacement[] = {
+        {"amount", "amount", "%.3f m", "Metres of displacement along the vertex normal."},
+        {"scale", "scale", "%.3f /m", "Cycles per metre of the pattern."},
+        {"speed", "speed", "%.2f /s", "How fast the pattern churns."},
+    };
+    static constexpr DeformerRow kField[] = {
+        {"amount", "amount", "%.3f", "How much of the field's answer is taken."},
+        {"axis", "along", "%.2f", "The direction a SCALAR field pushes, when it is not along the normal."},
+    };
+    static constexpr DeformerRow kPath[] = {
+        {"amount", "blend", "%.2f", "0 leaves the shape alone, 1 places it fully on the curve."},
+        {"axis", "along", "%.2f", "The object axis that maps to arc length."},
+        {"center", "centre", "%.2f m", "The object point that maps to the offset below."},
+        {"pathOffset", "offset", "%.2f m", "Arc length along the spline that the centre lands at."},
+        {"pathScale", "scale", "%.2f", "Metres of arc per object metre. 0 fits the object to the whole curve."},
+        {"pathRoll", "roll", "%.2f rad", "Extra rotation about the curve's tangent."},
+    };
+    // Exhaustive, no `default`: a new kind is a -Wswitch diagnostic, and `test_deformer_panel.cpp`
+    // reads the enum out of the header and fails by name, because -Werror is off for this category
+    // (see cmake/Warnings.cmake) and a warning nobody reads is not a guard. ADR-392's construction.
+    switch (kind) {
+    case scene::DeformerKind::Bend: return kBend;
+    case scene::DeformerKind::Twist: return kTwist;
+    case scene::DeformerKind::Sine: return kSine;
+    case scene::DeformerKind::Noise: return kNoise;
+    case scene::DeformerKind::Displacement: return kDisplacement;
+    case scene::DeformerKind::Field: return kField;
+    case scene::DeformerKind::Path: return kPath;
+    }
+    return kAxisCenter; // unreachable for a declared enumerator
+}
+
+// Every kind, in the order the "Add" menu offers them. Beside `deformerRowsFor`, whose switch is
+// exhaustive, so the two cannot disagree about which kinds exist.
+inline constexpr scene::DeformerKind kDeformerKinds[] = {
+    scene::DeformerKind::Bend,  scene::DeformerKind::Twist,        scene::DeformerKind::Sine,
+    scene::DeformerKind::Noise, scene::DeformerKind::Displacement, scene::DeformerKind::Field,
+    scene::DeformerKind::Path,
+};
+
+// The parameter path one row names, for the object `prefix` (`procedural/<name>/`) and a 0-based
+// slot. One function, used by the panel AND by the test, which is ADR-382's rule: a path a panel
+// computes needs a test that computes it the same way.
+[[nodiscard]] inline std::string deformerParameterPath(const std::string& prefix, std::size_t slot,
+                                                       std::string_view leaf) {
+    return prefix + "deform/" + std::to_string(slot + 1) + "/" + std::string(leaf);
+}
+
+// ADR-420, §68. The field subscription, shared by every kind rather than belonging to one -- the
+// subscription is a member of `AtmosphericEffect`, not of any kind's payload, so every kind draws
+// this and a fourth kind draws it without anybody adding a line. One row, and the reason it is a
+// row at all is ADR-392's: a leaf five characters wrong draws an empty box and says nothing, so the
+// panel and `conformance::checkLeavesExist` have to read one table.
+//
+// The combo that chooses WHICH field is not here, and deliberately. It writes a `std::string` on
+// the effect rather than a parameter, so it is structural in exactly the way the two anchor combos
+// are -- and putting it in a row table would put a leaf here that registration does not produce.
+[[nodiscard]] inline std::span<const EffectRow> atmosphericFlowRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "flowInfluence", "Follows the field", "%.2f", false, false,
+         "How much of the subscribed field's motion this effect takes. 0 is off: the\n"
+         "effect moves at its own authored speed and does not know the field exists.\n"
+         "At 1 a gust front crossing the valley reaches this effect when it reaches\n"
+         "that place, and two effects subscribed to one field agree without anybody\n"
+         "typing the same number into both."},
     };
     return kRows;
 }

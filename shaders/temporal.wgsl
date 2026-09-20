@@ -139,8 +139,14 @@ fn fs_debug_history(in: FsIn) -> @location(0) vec4<f32> {
     }
     let writeLayer = i32(temporal.ring.y + 0.5);
     let valid = i32(temporal.ring.z + 0.5);
-    // Layer index counted backwards from the write cursor, so the tiles read oldest-to-newest
-    // left to right rather than jumping around as the ring rotates.
+    // Counted backwards from the write cursor, so tile 0 (top left) is the MOST RECENT captured
+    // frame and the tiles run newest -> oldest in reading order. Anchoring to the cursor is what
+    // stops the tiles shuffling every frame as the ring rotates.
+    //
+    // This comment said "oldest-to-newest" until the capture was looked at: the mover's position
+    // within each tile decreases monotonically from tile 0, which is the opposite. Nothing failed,
+    // and nothing would have -- the ordering is a reading convention, not a computation, so only
+    // rendering it and looking could have caught it (ADR-385).
     let layer = ((writeLayer - 1 - index) % depth + depth) % depth;
     let local = fract(cell);
     var c = textureSampleLevel(colourHistory, linearSampler, local, layer, 0.0).rgb;

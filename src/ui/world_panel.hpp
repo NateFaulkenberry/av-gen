@@ -79,11 +79,23 @@ public:
     // is still waiting when it is opened.
     std::string focusRouteSource;
     std::string focusRouteTarget;
+
+private:
+    // ADR-421: why the last structural deformer edit was refused, if it was. Held rather than
+    // logged, for the reason ADR-420's dead-subscription line is: a refusal an artist cannot see is
+    // a refusal that looks like the button not working.
+    std::string deformerStatus_;
+
+public:
     [[nodiscard]] bool wantsRouteFocus() const { return !focusRouteTarget.empty(); }
 
     // The tabs; each is drawn inside the caller's window/tab bar.
     void drawOverview(app::Engine& engine);
     void drawInspector(app::Engine& engine);
+    // ADR-421: the deformer stack of the selected procedural object, as a stack rather than as
+    // eight anonymous groups of numbers. Drawn from `drawInspector`; separate so a test can ask
+    // what leaves it names (`deformerRowLeaves`, in ui_logic.hpp) without an ImGui context.
+    void drawDeformerStack(app::Engine& engine, const scene::ProceduralGeometry& object);
     void drawStates(app::Engine& engine);
     void drawMacros(app::Engine& engine);
     // The debug tab. `editor` is where the navigation overlay's toggles live (ADR-197) -- the

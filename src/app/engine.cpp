@@ -20,8 +20,12 @@
 #include "assets/image.hpp"
 #include "core/hash.hpp"
 #include "core/log.hpp"
+#include "core/vortex.hpp"
+#include "core/wind.hpp"
 #include "params/serialization.hpp"
 #include "world/atmospheric_params.hpp"
+
+#include <fmt/ranges.h>
 
 #include <nlohmann/json.hpp>
 
@@ -915,7 +919,7 @@ void visitSceneFileAssets(const std::filesystem::path& sceneFile,
 
 } // namespace
 
-Result<void> Engine::saveProject(const std::filesystem::path& path) {
+nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     nlohmann::json doc = params::saveProject(params_, modulator_, &sources_, &presets_);
     const auto dir = std::filesystem::absolute(path).parent_path();
     doc["app"] = {{"name", "avgen"}, {"version", kAppVersion}};
@@ -1374,14 +1378,98 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
     }
     assets["scene"] = std::move(sceneRef);
     doc["assets"] = std::move(assets);
+    return doc;
+}
 
+Result<void> Engine::saveProject(const std::filesystem::path& path) {
+    nlohmann::json doc = projectDocument(path);
     std::ofstream out(path);
     if (!out) {
         return fail("cannot write '{}'", path.string());
     }
     out << doc.dump(2) << '\n';
     projectPath_ = path;
+    // What is now on disk, in the shape the comparison uses. `doc` is the bytes that were just
+    // written, so this cannot disagree with them (ADR-440).
+    projectBaseline_ = std::move(doc);
+    projectBaselineValid_ = true;
+    projectDirty_ = false;
     return {};
+}
+
+// ---- unsaved changes (ADR-440) ---------------------------------------------------------------
+//
+// **Why there is no `bool dirty_` set by every mutation.** This codebase has a documented family of
+// defects where a hand-maintained list drifts from the thing it describes -- a visitor that skipped
+// seven struct members, an unregister table missing two fields, a test harness copying a uniform
+// block field by field. A dirty flag is the same shape, and its failure is silent in the direction
+// that loses work: every new mutation site is one more chance to forget it. The honest basis is
+// that a project is dirty when serialising it now differs from what a save would have written the
+// last time it agreed with the disk.
+//
+// **Why that is not a comparison against the file.** Measured, on 2026-09-20, by loading eight
+// example projects, changing nothing, and diffing an immediate save against the file it came from:
+//
+//     glowmere-valley-2        347 differing JSON paths   610 KB -> 618 KB
+//     glowmere-valley-2-multicam  279                     675 KB -> 689 KB
+//     temple                   801                        6.5 KB -> 60 KB
+//     hero                    1069                        1.3 KB -> 67 KB
+//     chamber                 1576                        3.1 KB -> 113 KB
+//     fungi                   1584                        0.8 KB -> 92 KB
+//     lab                     1879                        3.4 KB -> 121 KB
+//     night-shift            19798                        33 KB -> 1.6 MB
+//
+// Not one project round-trips. A hand-written file records the handful of parameters somebody
+// changed; a save writes every parameter the live session has registered, which is why night-shift
+// grows forty-nine times. A prompt built on "differs from the file" fires on every project, every
+// time, and a prompt that always fires trains the reflex that dismisses it.
+//
+// **So the baseline is a serialisation, not the file.** It is taken at the end of `loadProject` and
+// again in `saveProject`, from the same builder the save uses, so both sides of the comparison are
+// the same function of the same engine and the load's own lossiness cancels out. What is being
+// measured is "has anything changed since this project was opened or saved", which is the question
+// the dialog asks.
+//
+// **The one thing that still moves on its own**, from the same measurement, playing 600 frames
+// (20 s) with no input at all and saving again from the same engine:
+//
+//     glowmere-valley-2-multicam   18 paths: heroes[0,2,3,4,5,6]/position[0..2]
+//                                   2 paths: parameters/particles/visitor-beam/{spawnRate,emissive}
+//     glowmere-valley-2             1 path:  heroes  (the key appears once the herd has walked)
+//     the other six                 0 paths
+//
+// That is ADR-386's per-frame parameter writeback and the entity simulation, and it is the whole of
+// it -- twenty paths across eight projects. `sampleDirty` absorbs it **by measuring it rather than
+// naming it**: on a sample where the host reports that nothing touched the application, every
+// difference is by definition the engine's own, so the baseline simply moves. No list of noisy keys
+// exists to drift out of date, which is the property the flag could not have.
+//
+// And it is monotone: once dirty, dirty until a save or a load. Otherwise a quiet second after an
+// edit would absorb the edit, which is the flag's failure mode reintroduced by the back door.
+void Engine::sampleProjectDirty(bool touchedSinceLastSample) {
+    if (projectDirty_ || !projectBaselineValid_) {
+        return;
+    }
+    nlohmann::json doc = projectDocument(projectPath_);
+    if (doc == projectBaseline_) {
+        return;
+    }
+    if (touchedSinceLastSample) {
+        projectDirty_ = true;
+    } else {
+        projectBaseline_ = std::move(doc);
+    }
+}
+
+bool Engine::projectDirty(bool touchedSinceLastSample) {
+    sampleProjectDirty(touchedSinceLastSample);
+    return projectDirty_;
+}
+
+void Engine::markProjectSaved() {
+    projectBaseline_ = projectDocument(projectPath_);
+    projectBaselineValid_ = true;
+    projectDirty_ = false;
 }
 
 Result<void> Engine::loadProject(const std::filesystem::path& path) {
@@ -2164,6 +2252,12 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     transport_.stop();
     seekSeconds(transport_.positionSeconds());
     reportCuePresetOverrides();
+    // The baseline for "has anything changed since this was opened" (ADR-440). Taken here, at the
+    // end of the load and from the same builder a save uses, rather than from `doc` -- the document
+    // that was read is not the document this engine would write, by between 279 and 19,798 JSON
+    // paths depending on the project, and a baseline taken from it would report every project dirty
+    // the instant it opened. The comment on `sampleProjectDirty` has the measurement.
+    markProjectSaved();
     log::info("project '{}' loaded: {} parameters, {} routes, {} sources, {} presets, {} timeline tracks, {} cues, {} warning(s)",
               path.filename().string(), params_.size(), modulator_.routes().size(), sources_.sources().size(),
               presets_.presets().size(), timeline_.tracks().size(), timeline_.cues().size(), projectWarnings_.size());
@@ -2220,6 +2314,10 @@ void Engine::newProject() {
     transport_.clearLoop();
     refreshTransport();
     transport_.stop();
+    // A new project is clean: there is nothing in it yet to lose (ADR-440). Last, so the baseline
+    // photographs the engine this function has finished resetting rather than the one it started
+    // with -- taken at the top it would make File > New produce an immediately-dirty project.
+    markProjectSaved();
 }
 
 std::vector<std::filesystem::path> Engine::referencedFiles() const {
@@ -3672,6 +3770,85 @@ void Engine::updateAuroraSpectrum() {
     }
 }
 
+// §68, one field many subscribers: everything this scene publishes, rebuilt each frame.
+//
+// This function is the whole of why the field bus is not another thing that exists and is never
+// reached. `defaultAtmosphericRoutes` was correct for a year with no caller (ADR-385/392), and a
+// bus nobody published into would have been the same defect wearing a newer word. So it is called
+// from `updateAtmosphericEffects`, on the shipping path, before the resolve that reads it -- and
+// the test that proves an effect's subscription reaches its picture goes through this call rather
+// than around it.
+//
+// **The publish is of AUTHORED fields, before the resolve, and that ordering is a decision.** A
+// vortex's drawn centre may be leaned by its own subscription, which is not known until the resolve
+// has run -- so publishing the drawn funnel would need two passes, and a vortex that subscribed to
+// itself would need a third. Publishing the authored funnel makes the bus a function of the scene
+// rather than of the frame's own output, which is the only version of this with no fixed point in
+// it. The difference a subscriber sees is exactly the lean, which is zero unless that funnel is
+// itself subscribed, and is bounded at a fifth of its radius when it is.
+void Engine::publishFields() {
+    scene::Scene& live = controller_->scene();
+    fieldBus_.clear();
+
+    // ADR-055's wind, whatever the environment says -- including when it is off. A disabled wind
+    // packs to `dir.w == 0` and samples as a flat zero, so a subscriber to a calm world gets a
+    // still field rather than a dead name, and switching the wind on in the panel makes every
+    // subscriber move without anything being re-resolved.
+    fieldBus_.publishWind(std::string(world::fields::kWindField), wind::packWind(live.environment.wind));
+
+    // ADR-388's funnels. One per vortex EFFECT rather than one for "the vortex", because the name
+    // is the effect's and a scene may author several even though only the first is marched --
+    // subscribing to the second is then a thing an artist can express and a thing the report can
+    // explain, rather than a silent mismatch between what the panel lists and what resolves.
+    for (const world::AtmosphericEffect& e : atmosphericEffects_) {
+        if (e.kind != world::AtmosphereKind::Vortex || !e.enabled || !e.vortex.active()) {
+            continue;
+        }
+        vortex::VortexField f;
+        f.center = e.vortex.center;
+        f.radius = e.vortex.radius;
+        f.thickness = e.vortex.thickness;
+        f.funnelDepth = e.vortex.funnelDepth;
+        f.throat = e.vortex.throat;
+        f.throatDensity = e.vortex.throatDensity;
+        f.swirl = e.vortex.swirl;
+        f.rotationSpeed = e.vortex.rotationSpeed;
+        f.innerVoid = e.vortex.innerVoid;
+        f.contrast = e.vortex.contrast;
+        f.turbulence = e.vortex.turbulence;
+        f.turbulenceScale = e.vortex.turbulenceScale;
+        f.breathAmount = e.vortex.breathAmount;
+        f.breathSpeed = e.vortex.breathSpeed;
+        f.smokeWarp = e.vortex.smokeWarp;
+        f.smokeBillow = e.vortex.smokeBillow;
+        f.detail = e.vortex.detail;
+        fieldBus_.publishVortex(world::fields::vortexFieldName(e.name), vortex::packVortex(f));
+    }
+
+    // The loud half. A subscription naming a field nobody publishes is this repository's signature
+    // defect in a new place, so it is said out loud -- once per name, because a message repeated at
+    // frame rate is a message nobody reads, which is the same failure from the other end.
+    std::vector<std::string> names;
+    std::vector<world::fields::Subscription> subs;
+    names.reserve(atmosphericEffects_.size());
+    subs.reserve(atmosphericEffects_.size());
+    for (const world::AtmosphericEffect& e : atmosphericEffects_) {
+        names.push_back(e.name);
+        subs.push_back(e.flow);
+    }
+    for (const world::fields::DeadSubscription& dead : fieldBus_.unresolved(names, subs)) {
+        const std::string key = dead.subscriber + " -> " + dead.field;
+        if (std::find(reportedDeadFields_.begin(), reportedDeadFields_.end(), key) !=
+            reportedDeadFields_.end()) {
+            continue;
+        }
+        reportedDeadFields_.push_back(key);
+        log::warn("atmospheric effect '{}' subscribes to field '{}', which this scene does not "
+                  "publish; its flow influence does nothing. Published: {}",
+                  dead.subscriber, dead.field, fmt::join(fieldBus_.names(), ", "));
+    }
+}
+
 // Resolves this frame's atmospheric effects into the scene (ADR-230).
 //
 // Called from `update()` beside `updateWorldEffects`, for the same reasons: after the camera has
@@ -3685,12 +3862,14 @@ void Engine::updateAtmosphericEffects() {
     }
     world::applyAtmosphericParameters(atmosphericParams_, atmosphericEffects_);
     updateAuroraSpectrum();
+    publishFields();
 
     world::AtmosphericContext ctx;
     ctx.seconds = timelineClock_.seconds;
     ctx.cameraPosition = live.camera.position;
     ctx.shots = shotSpans_;
     ctx.spectrum = auroraSpectrum_;
+    ctx.fieldBus = &fieldBus_;
     world::buildAtmosphericFrame(atmosphericEffects_, ctx, live.atmospherics);
     // The §12 quality control. Offline renders get the full march; live playback takes two thirds of
     // it, which is a difference nobody sees on a moving comet and a third of the tail's cost.

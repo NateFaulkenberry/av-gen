@@ -18,6 +18,9 @@
 
 namespace avgen::ui {
 
+// The same red every other panel uses for "this names something that is not there".
+constexpr ImVec4 kPanelWarning(1.0f, 0.45f, 0.35f, 1.0f);
+
 std::string WorldSelection::parameterPrefix() const {
     switch (kind) {
     case Kind::Node: return "nodes/" + name + "/";
@@ -359,8 +362,8 @@ void WorldPanel::drawInspector(app::Engine& engine) {
             if (pg.name != selection.name) {
                 continue;
             }
-            ImGui::Text("%zu instances, %d deformer(s), %zu op(s), %zu effector(s)", pg.instances.size(),
-                        static_cast<int>(pg.deformers.size()), pg.pointOps.size(), pg.effectors.size());
+            ImGui::Text("%zu instances, %zu op(s), %zu effector(s)", pg.instances.size(),
+                        pg.pointOps.size(), pg.effectors.size());
             ImGui::Text("bounds (%.1f %.1f %.1f) .. (%.1f %.1f %.1f)", static_cast<double>(pg.boundsMin.x),
                         static_cast<double>(pg.boundsMin.y), static_cast<double>(pg.boundsMin.z),
                         static_cast<double>(pg.boundsMax.x), static_cast<double>(pg.boundsMax.y),
@@ -382,6 +385,7 @@ void WorldPanel::drawInspector(app::Engine& engine) {
                 }
                 ImGui::TreePop();
             }
+            drawDeformerStack(engine, pg);
             break;
         }
     }
@@ -409,6 +413,14 @@ void WorldPanel::drawInspector(app::Engine& engine) {
                 continue;
             }
             const std::string group = rel.substr(0, slash);
+            // ADR-421: the deformer stack has its own editor above, which draws these same
+            // parameters labelled by the kind that owns them. Left in the generic list they would
+            // appear a second time as `1/amount`, `2/amount`, with nothing saying that slot 1 is a
+            // Twist -- two controls on one path, one of which explains itself and one of which does
+            // not. Only suppressed for a procedural, because that is the only owner of the prefix.
+            if (group == "deform" && selection.kind == WorldSelection::Kind::Procedural) {
+                continue;
+            }
             auto [it, inserted] = groups.try_emplace(group);
             if (inserted) {
                 groupOrder.push_back(group);
@@ -512,6 +524,359 @@ void WorldPanel::drawInspector(app::Engine& engine) {
     }
     if (!any) {
         ImGui::TextDisabled("nothing modulates this object; its parameters are static.");
+    }
+}
+
+// ADR-421. The deformer stack, as a stack.
+//
+// **What was wrong.** `scene::Deformer` is an ordered, eight-slot, GPU-evaluated, serialised stack
+// with seven kinds, authored in eight shipped scenes -- and the entire user interface for it was
+// the words `"%d deformer(s)"` on the line above this function. Its numbers were *reachable*: the
+// Inspector's generic grouping put every `deform/<n>/<leaf>` under one tree node called "deform",
+// flattened to `1/amount`, `2/axis`, with nothing anywhere saying that slot 1 is a Twist and slot 2
+// is a Bend. That is precisely the owner's distinction -- reachable in principle is not findable --
+// and it is ADR-375's travelling band of light again, on a feature that shipped.
+//
+// **The structure was not reachable at all.** Which kind a slot is, which space it acts in, its
+// order, whether it exists: all of those are read from the file by
+// `registerProceduralParameters` and none of them had a writer outside the scene parser. Nor did
+// the per-kind fields that registration does not cover -- a Sine's `displacementAxis`, which is the
+// direction it actually pushes vertices, a Noise's `axisMask` and `seed`, a Field deformer's field
+// name. Those are visible in the picture and were unreachable in the application.
+//
+// **Two rules shape what is drawn.** Only the leaves the kind's arithmetic reads
+// (`ui::deformerRowsFor`), because registration writes the same nine leaves for every slot and a
+// Bend's registered `speed` moves nothing -- a control that does nothing teaches an artist the
+// system is broken, which is worse than a control that is absent. And every leaf comes from that
+// one table, which `test_deformer_panel.cpp` holds against what the object really registers
+// (ADR-382).
+void WorldPanel::drawDeformerStack(app::Engine& engine, const scene::ProceduralGeometry& object) {
+    scene::Composition* composition = engine.composition();
+    const std::string prefix = "procedural/" + object.name + "/";
+
+    ImGui::SeparatorText("Deformers");
+    if (!deformerStatus_.empty()) {
+        ImGui::TextColored(kPanelWarning, "%s", deformerStatus_.c_str());
+    }
+
+    // Every structural edit goes through here: it rewrites the authored stack and re-registers, so
+    // the `deform/<n>/*` paths describe the stack that is actually there. Per ADR-387, a parameter
+    // path is storage, a project's `parameters` block and a route target at once -- so a slot that
+    // moved and did not take its paths with it would leave three things pointing at the wrong
+    // deformer, silently.
+    const auto commit = [&](std::vector<scene::Deformer> next) {
+        if (composition == nullptr) {
+            return;
+        }
+        if (auto ok = composition->setNodeDeformers(object.name, std::move(next)); !ok) {
+            deformerStatus_ = ok.error().message;
+        } else {
+            deformerStatus_.clear();
+        }
+    };
+
+    if (object.deformers.empty()) {
+        ImGui::TextDisabled("No deformers. Add one to bend, twist, wave or displace this object.");
+    }
+
+    for (std::size_t slot = 0; slot < object.deformers.size(); ++slot) {
+        const scene::Deformer& d = object.deformers[slot];
+        ImGui::PushID(static_cast<int>(slot));
+
+        // The header says what the slot IS, which is the whole complaint about `1/amount`.
+        const std::string title =
+            fmt::format("{}. {}{}", slot + 1, scene::deformerKindName(d.kind), d.enabled ? "" : "  [off]");
+        const bool open = ImGui::TreeNodeEx(title.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+
+        // Reorder and remove, on the header's line: a stack whose order cannot be changed is a list.
+        // Order is load-bearing here -- a twist then a bend is not a bend then a twist -- and until
+        // now it could only be changed by editing the scene file.
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 74.0f);
+        ImGui::BeginDisabled(slot == 0);
+        if (ImGui::SmallButton("up")) {
+            std::vector<scene::Deformer> next = object.deformers;
+            std::swap(next[slot - 1], next[slot]);
+            commit(std::move(next));
+            ImGui::EndDisabled();
+            if (open) {
+                ImGui::TreePop();
+            }
+            ImGui::PopID();
+            return; // the stack we are walking has been replaced
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(slot + 1 >= object.deformers.size());
+        if (ImGui::SmallButton("dn")) {
+            std::vector<scene::Deformer> next = object.deformers;
+            std::swap(next[slot], next[slot + 1]);
+            commit(std::move(next));
+            ImGui::EndDisabled();
+            if (open) {
+                ImGui::TreePop();
+            }
+            ImGui::PopID();
+            return;
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::SmallButton("x")) {
+            std::vector<scene::Deformer> next = object.deformers;
+            next.erase(next.begin() + static_cast<std::ptrdiff_t>(slot));
+            commit(std::move(next));
+            if (open) {
+                ImGui::TreePop();
+            }
+            ImGui::PopID();
+            return;
+        }
+
+        if (!open) {
+            ImGui::PopID();
+            continue;
+        }
+
+        // `enabled` is an ordinary registered parameter, so it is keyable and modulatable like
+        // anything else and does NOT go through `commit`. Muting a deformer is a performance and an
+        // animation gesture, not a structural one.
+        if (params::IParameter* p = engine.params().find(prefix + "deform/" +
+                                                         std::to_string(slot + 1) + "/enabled")) {
+            drawParameterValue(*p, "enabled");
+        }
+
+        // Kind and space are structural: registration labels every leaf by kind and
+        // `applyProceduralParameters` reads both off the rest copy every frame.
+        int kindIndex = 0;
+        std::vector<const char*> kindNames;
+        kindNames.reserve(std::size(kDeformerKinds));
+        for (std::size_t k = 0; k < std::size(kDeformerKinds); ++k) {
+            kindNames.push_back(scene::deformerKindName(kDeformerKinds[k]));
+            if (kDeformerKinds[k] == d.kind) {
+                kindIndex = static_cast<int>(k);
+            }
+        }
+        if (ImGui::Combo("kind", &kindIndex, kindNames.data(), static_cast<int>(kindNames.size()))) {
+            std::vector<scene::Deformer> next = object.deformers;
+            next[slot].kind = kDeformerKinds[static_cast<std::size_t>(kindIndex)];
+            commit(std::move(next));
+            ImGui::TreePop();
+            ImGui::PopID();
+            return;
+        }
+        static const char* const kSpaceNames[] = {"local (with the object)", "world"};
+        int spaceIndex = d.space == scene::DeformSpace::World ? 1 : 0;
+        if (ImGui::Combo("space", &spaceIndex, kSpaceNames, 2)) {
+            std::vector<scene::Deformer> next = object.deformers;
+            next[slot].space = spaceIndex == 1 ? scene::DeformSpace::World : scene::DeformSpace::Local;
+            commit(std::move(next));
+            ImGui::TreePop();
+            ImGui::PopID();
+            return;
+        }
+        if (ImGui::IsItemHovered()) {
+            tooltip("Local deforms the object before it is placed, so it travels with it.\n"
+                    "World deforms the placed position, so the object moves through a\n"
+                    "standing pattern as it travels.");
+        }
+
+        // The kind's own numbers, from the one table the test also reads.
+        for (const DeformerRow& r : deformerRowsFor(d.kind)) {
+            params::IParameter* p = engine.params().find(deformerParameterPath(prefix, slot, r.leaf));
+            if (p == nullptr) {
+                // Never silent. A leaf this table names and registration does not produce is the
+                // empty-box defect, and the panel says so rather than drawing nothing (ADR-375).
+                ImGui::TextColored(kPanelWarning, "%.*s: no such parameter", static_cast<int>(r.leaf.size()),
+                                   r.leaf.data());
+                continue;
+            }
+            drawParameterValue(*p, std::string(r.label).c_str());
+            if (!r.tip.empty() && ImGui::IsItemHovered()) {
+                tooltipUnformatted(std::string(r.tip).c_str());
+            }
+        }
+
+        // The per-kind fields registration does not cover. These are structural and, before this,
+        // had no writer anywhere in the application -- a Sine deformer's push direction was a
+        // number in a file.
+        switch (d.kind) {
+        case scene::DeformerKind::Sine: {
+            glm::vec3 v = d.displacementAxis;
+            if (ImGui::DragFloat3("pushes along", &v.x, 0.01f, -1.0f, 1.0f, "%.2f")) {
+                std::vector<scene::Deformer> next = object.deformers;
+                next[slot].displacementAxis = v;
+                commit(std::move(next));
+                ImGui::TreePop();
+                ImGui::PopID();
+                return;
+            }
+            if (ImGui::IsItemHovered()) {
+                tooltip("The direction vertices are pushed. The axis above is the direction the\n"
+                        "wave TRAVELS; this is the direction it moves things in. Set them\n"
+                        "perpendicular for a wave, parallel for a squeeze.");
+            }
+            break;
+        }
+        case scene::DeformerKind::Noise: {
+            glm::vec3 m = d.axisMask;
+            if (ImGui::DragFloat3("axis mask", &m.x, 0.01f, 0.0f, 1.0f, "%.2f")) {
+                std::vector<scene::Deformer> next = object.deformers;
+                next[slot].axisMask = m;
+                commit(std::move(next));
+                ImGui::TreePop();
+                ImGui::PopID();
+                return;
+            }
+            if (ImGui::IsItemHovered()) {
+                tooltip("Which axes the noise is allowed to move things along. (1,0,1) jitters\n"
+                        "sideways and leaves height alone.");
+            }
+            int seed = static_cast<int>(d.seed);
+            if (ImGui::InputInt("seed", &seed)) {
+                std::vector<scene::Deformer> next = object.deformers;
+                next[slot].seed = static_cast<std::uint32_t>(std::max(seed, 0));
+                commit(std::move(next));
+                ImGui::TreePop();
+                ImGui::PopID();
+                return;
+            }
+            break;
+        }
+        case scene::DeformerKind::Field: {
+            // The field name is a name, so it is a combo over what exists rather than a text box --
+            // the same refusal ADR-420 makes for a subscription. A typo and a field nobody has made
+            // yet look identical in a text box.
+            std::vector<std::string> names;
+            for (const spatial::FieldSpec& f : engine.scene().fields.fields) {
+                names.push_back(f.name);
+            }
+            std::vector<const char*> labels{"(none)"};
+            int current = 0;
+            for (std::size_t i = 0; i < names.size(); ++i) {
+                labels.push_back(names[i].c_str());
+                if (names[i] == d.field) {
+                    current = static_cast<int>(i) + 1;
+                }
+            }
+            std::string dead;
+            if (!d.field.empty() && current == 0) {
+                dead = d.field + "  (no such field)";
+                labels.push_back(dead.c_str());
+                current = static_cast<int>(labels.size()) - 1;
+            }
+            if (ImGui::Combo("field", &current, labels.data(), static_cast<int>(labels.size()))) {
+                std::vector<scene::Deformer> next = object.deformers;
+                next[slot].field = (current > 0 && current <= static_cast<int>(names.size()))
+                                       ? names[static_cast<std::size_t>(current) - 1]
+                                       : std::string();
+                commit(std::move(next));
+                ImGui::TreePop();
+                ImGui::PopID();
+                return;
+            }
+            if (!dead.empty()) {
+                ImGui::TextColored(kPanelWarning, "'%s' is not a field in this scene -- it displaces nothing.",
+                                   d.field.c_str());
+            }
+            bool alongNormal = d.alongNormal;
+            if (ImGui::Checkbox("scalar fields push along the normal", &alongNormal)) {
+                std::vector<scene::Deformer> next = object.deformers;
+                next[slot].alongNormal = alongNormal;
+                commit(std::move(next));
+                ImGui::TreePop();
+                ImGui::PopID();
+                return;
+            }
+            break;
+        }
+        case scene::DeformerKind::Path: {
+            std::vector<std::string> names;
+            for (const spatial::Spline& sp : engine.scene().splines.splines) {
+                names.push_back(sp.name);
+            }
+            std::vector<const char*> labels{"(none)"};
+            int current = 0;
+            for (std::size_t i = 0; i < names.size(); ++i) {
+                labels.push_back(names[i].c_str());
+                if (names[i] == d.spline) {
+                    current = static_cast<int>(i) + 1;
+                }
+            }
+            std::string dead;
+            if (!d.spline.empty() && current == 0) {
+                dead = d.spline + "  (no such spline)";
+                labels.push_back(dead.c_str());
+                current = static_cast<int>(labels.size()) - 1;
+            }
+            if (ImGui::Combo("spline", &current, labels.data(), static_cast<int>(labels.size()))) {
+                std::vector<scene::Deformer> next = object.deformers;
+                next[slot].spline = (current > 0 && current <= static_cast<int>(names.size()))
+                                        ? names[static_cast<std::size_t>(current) - 1]
+                                        : std::string();
+                commit(std::move(next));
+                ImGui::TreePop();
+                ImGui::PopID();
+                return;
+            }
+            if (!dead.empty()) {
+                ImGui::TextColored(kPanelWarning, "'%s' is not a spline in this scene -- the object stays "
+                                             "where it is.", d.spline.c_str());
+            }
+            // World-space Path deformers are skipped by the implementation
+            // (`scene/procedural.hpp`'s note), so say so rather than letting somebody set a
+            // combination that silently does nothing.
+            if (d.space == scene::DeformSpace::World) {
+                ImGui::TextColored(kPanelWarning, "A path deformer only works in local space; this one is "
+                                             "skipped.");
+            }
+            break;
+        }
+        case scene::DeformerKind::Bend:
+        case scene::DeformerKind::Twist:
+        case scene::DeformerKind::Displacement:
+            break;
+        }
+
+        ImGui::TreePop();
+        ImGui::PopID();
+    }
+
+    // Adding. Capped at `kMaxDeformers`, and the cap is stated rather than enforced by a button
+    // that quietly stops working.
+    if (object.deformers.size() >= static_cast<std::size_t>(scene::kMaxDeformers)) {
+        ImGui::TextDisabled("%d deformers is the limit.", scene::kMaxDeformers);
+        return;
+    }
+    ImGui::SetNextItemWidth(160.0f);
+    if (ImGui::BeginCombo("##adddeform", "Add deformer")) {
+        for (const scene::DeformerKind kind : kDeformerKinds) {
+            if (!ImGui::Selectable(scene::deformerKindName(kind))) {
+                continue;
+            }
+            std::vector<scene::Deformer> next = object.deformers;
+            scene::Deformer add;
+            add.kind = kind;
+            // A deformer added at amount 0 is the thing ADR-360 shipped by mistake and the owner
+            // reported as "it looks unchanged". Somebody who presses Add means it to do something,
+            // so each kind starts at a value that is visible and small. `setNodeWindBody` made the
+            // same decision for the same reason.
+            switch (kind) {
+            case scene::DeformerKind::Bend: add.amount = 0.05f; add.falloff = 1.0f; break;
+            case scene::DeformerKind::Twist: add.amount = 0.25f; break;
+            case scene::DeformerKind::Sine:
+                add.amount = 0.1f;
+                add.frequency = 1.0f;
+                add.displacementAxis = glm::vec3(1.0f, 0.0f, 0.0f);
+                break;
+            case scene::DeformerKind::Noise: add.amount = 0.1f; add.scale = 0.5f; break;
+            case scene::DeformerKind::Displacement: add.amount = 0.1f; add.scale = 0.5f; break;
+            case scene::DeformerKind::Field: add.amount = 1.0f; break;
+            case scene::DeformerKind::Path: add.amount = 1.0f; break;
+            }
+            next.push_back(add);
+            commit(std::move(next));
+            break;
+        }
+        ImGui::EndCombo();
     }
 }
 
@@ -836,8 +1201,6 @@ void WorldPanel::drawDebugOptions(app::Engine& engine, WorldEditor* editor) {
                           "Grey means the pass did not run for that object this frame, so there is\n"
                           "no decision to show. Costs one buffer readback per scattered object.");
     }
-    ImGui::SameLine();
-    ImGui::Checkbox("Culling", &debug.culling);
     ImGui::Checkbox("Entity bounds", &debug.entityBounds);
     ImGui::SameLine();
     ImGui::Checkbox("Entity origins", &debug.entityOrigins);
@@ -898,6 +1261,36 @@ void WorldPanel::drawDebugOptions(app::Engine& engine, WorldEditor* editor) {
         tooltip("Green casts. Amber casts although the camera cannot see it -- the second cull\n"
                           "kept it (ADR-046). Red does not cast: not drawable, castsShadow off, a style the\n"
                           "shadow passes skip, or outside every cascade.");
+    }
+    // ADR-421, §54: do not make the artist guess what an invisible field is doing.
+    //
+    // These four overlays were all fully implemented, all read by `debug_visualizer.cpp`, and all
+    // reachable ONLY from `--debug-draw` -- which is to say, not from the application at all. The
+    // wind arrow grid in particular has been there since ADR-055 and is the one thing that answers
+    // "which way is the air moving here", which is the question every subscriber to the field bus
+    // (ADR-420) now raises. A field nobody can see is a field nobody can tune.
+    ImGui::Checkbox("Wind field", &debug.wind);
+    if (ImGui::IsItemHovered()) {
+        tooltip("Arrows on a grid showing which way the air is moving and how hard, sampled from\n"
+                "the same function the vertex shader and the field bus use. Plus each declared\n"
+                "wind body's origin, height and radius.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Vortex", &debug.vortex);
+    if (ImGui::IsItemHovered()) {
+        tooltip("The funnel's mouth, throat, depth and the direction it turns -- the geometry the\n"
+                "volumetric march is sampling, drawn as lines so you can see where it actually is\n"
+                "rather than inferring it from the haze.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Lights", &debug.lights);
+    if (ImGui::IsItemHovered()) {
+        tooltip("Every light's position, type and reach.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Light clusters", &debug.lightClusters);
+    if (ImGui::IsItemHovered()) {
+        tooltip("The cluster grid the forward pass assigns lights to, and how many landed in each.");
     }
     ImGui::SliderInt("Cascade shown", &debug.shadowCascade, -1, 7);
     if (ImGui::IsItemHovered()) {

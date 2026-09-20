@@ -86,6 +86,25 @@ struct TemporalSettings {
 [[nodiscard]] std::uint32_t temporalEffectHistoryFrames(TemporalEffectKind kind, const TemporalSettings& s);
 [[nodiscard]] bool temporalEffectEnabled(TemporalEffectKind kind, const TemporalSettings& s);
 
+// What the renderer reports back about the ring, mirrored here so the UI can read it without
+// `scene/` or `ui/` depending on a WebGPU header. The renderer's `TemporalHistoryState` is the
+// source; this is the copy the Engine carries for a panel to draw.
+//
+// It exists because the disclosure is the point of ADR-410: "what you are looking at is not what
+// will be rendered" has to be *visible*, and a value the renderer publishes is the only honest way
+// to say it. A panel that inferred settling from the settings alone would be guessing.
+struct TemporalHistoryReport {
+    std::uint32_t framesValid = 0;
+    std::uint32_t framesNeeded = 0;
+    bool stalled = false;           // asks for more than the ring can hold; waiting will not help
+    std::uint64_t bytes = 0;        // measured, not estimated
+    std::uint32_t width = 0;
+    std::uint32_t height = 0;
+
+    [[nodiscard]] bool complete() const { return framesValid >= framesNeeded; }
+    [[nodiscard]] bool settling() const { return !complete() && !stalled; }
+};
+
 // ---- parameters --------------------------------------------------------------------------------
 
 struct TemporalParameters {

@@ -30,7 +30,6 @@ struct DebugViewOptions {
     bool entityOrigins = false;   // world-space origins and axes of ordinary mesh entities
     std::string selectedEntity;   // restrict entity diagnostics when non-empty
     bool lod = false;             // colour by LOD level (ADR-029)
-    bool culling = false;         // draw culled instances in red
     // Renderer forensics, Phase 4.3. Each of these isolates or shows one thing, and each is checked
     // in `[debug]` to draw only for the case it names -- the plan's rule is that a diagnostic which
     // shows the same picture whatever the state is worse than none, because somebody trusts it.

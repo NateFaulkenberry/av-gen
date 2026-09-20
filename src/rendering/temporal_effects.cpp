@@ -45,6 +45,12 @@ struct TemporalEffects::Impl {
     wgpu::TextureFormat echoFormat = wgpu::TextureFormat::Undefined;
     wgpu::TextureFormat debugFormat = wgpu::TextureFormat::Undefined;
     wgpu::ShaderModule module;
+    // A 1x1 2D texture for the debug pass's `source` binding. The history-state view samples only
+    // the ring, but binding 2 is declared `texture_2d<f32>` and a bind group must satisfy every
+    // entry -- passing the ring's e2DArray view there invalidates the whole command buffer, not
+    // just the pass, which is how one wrong binding blanked an entire frame.
+    wgpu::Texture placeholder2dTexture;
+    wgpu::TextureView placeholder2d;
 
     [[nodiscard]] Result<wgpu::RenderPipeline> makePipeline(const char* entry, wgpu::TextureFormat format,
                                                             const char* label);
@@ -159,6 +165,19 @@ Result<void> TemporalEffects::init() {
         desc.bindGroupLayoutCount = 1;
         desc.bindGroupLayouts = &im.layout;
         im.pipelineLayout = device.CreatePipelineLayout(&desc);
+    }
+    {
+        wgpu::TextureDescriptor desc{};
+        desc.label = "temporal-effect-placeholder-2d";
+        desc.usage = wgpu::TextureUsage::TextureBinding;
+        desc.dimension = wgpu::TextureDimension::e2D;
+        desc.size = {1, 1, 1};
+        desc.format = wgpu::TextureFormat::RGBA16Float;
+        im.placeholder2dTexture = device.CreateTexture(&desc);
+        if (im.placeholder2dTexture == nullptr) {
+            return fail("temporal 2d placeholder");
+        }
+        im.placeholder2d = im.placeholder2dTexture.CreateView();
     }
     if (auto r = reload(); !r) return r;
     im.initialised = true;
@@ -312,8 +331,7 @@ void TemporalEffects::encodeDebugView(wgpu::CommandEncoder& encoder, const wgpu:
               static_cast<float>(state.framesValid), 0.0f};
     im.context.queue().WriteBuffer(im.uniforms, 0, &u, sizeof(u));
 
-    wgpu::BindGroup group = im.makeGroup(history_->arrayView(TemporalChannel::Colour),
-                                         history_->arrayView(TemporalChannel::Colour));
+    wgpu::BindGroup group = im.makeGroup(im.placeholder2d, history_->arrayView(TemporalChannel::Colour));
     wgpu::RenderPassColorAttachment colour{};
     colour.view = target;
     colour.loadOp = wgpu::LoadOp::Clear;
