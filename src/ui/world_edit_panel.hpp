@@ -13,35 +13,14 @@
 
 #include "app/engine.hpp"
 #include "assets/asset_library.hpp"
+#include "ui/particle_weather_rows.hpp"
 #include "ui/world_editor.hpp"
 
 #include <optional>
 #include <set>
-#include <span>
 #include <string>
 
 namespace avgen::ui {
-
-// ADR-520: the weather rows the particle section draws, as data rather than as twenty hand-written
-// ImGui calls.
-//
-// This exists because of the defect §77 names and this repository has paid for repeatedly: a panel
-// asks the parameter set for a path by string, and a path that resolves to nothing draws an EMPTY
-// BOX rather than failing. ADR-375 found sixteen parameters no panel named; ADR-392 found a
-// modulation route aimed at three paths that do not exist. Both were silent.
-//
-// The panel walks this table and the test walks this table, so "the panel asks for
-// particles/<node>/pulseRate" and "particles/<node>/pulseRate is registered" are the same string
-// in one place instead of two strings in two files that agree until one is renamed.
-struct ParticleWeatherRow {
-    const char* leaf;  // appended to "particles/<node>/"
-    const char* label; // the caption on the control
-    float lo;
-    float hi;
-    const char* fmt;
-    const char* tip;
-};
-[[nodiscard]] std::span<const ParticleWeatherRow> particleWeatherRows();
 
 class WorldEditPanel {
 public:
