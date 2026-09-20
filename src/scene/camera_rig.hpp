@@ -320,6 +320,30 @@ struct ActiveCameraState {
     friend bool operator==(const ActiveCameraState&, const ActiveCameraState&) = default;
 };
 
+// ---- what the viewport is looking through (ADR-391) ---------------------------------------------
+//
+// Editor state, and the type exists so that "the viewport is not showing the film" is one concept
+// with three values rather than a scatter of booleans. See `Composition::setViewportView` for the
+// rule that makes a render immune to it; this header only says what the three are.
+enum class ViewportCamera : std::uint8_t {
+    Film,   // the director's answer -- what this project renders. The default, and every render.
+    Editor, // the editor's own pose, which the film neither owns nor can see.
+    Through // pinned to one authored rig, whatever the director is doing.
+};
+
+[[nodiscard]] const char* viewportCameraName(ViewportCamera mode);
+
+struct ViewportView {
+    ViewportCamera mode = ViewportCamera::Film;
+    // Which rig, when `mode == Through`. `kNoCamera` (or an id that has since been deleted) falls
+    // back to the film rather than to a black frame -- a camera that is gone cannot be looked
+    // through, and the frame has to come from somewhere.
+    CameraId camera = kNoCamera;
+
+    [[nodiscard]] bool showsFilm() const { return mode == ViewportCamera::Film; }
+    friend bool operator==(const ViewportView&, const ViewportView&) = default;
+};
+
 // ---- the collection ----------------------------------------------------------------------------
 
 // Every camera a composition has, the shots that place them in time, and who gets the frame when

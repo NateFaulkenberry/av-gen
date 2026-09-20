@@ -91,7 +91,28 @@ public:
     // Take the camera back for the viewport. Through the host because it is more than a flag: a
     // directed *main* camera also carries timeline tracks that would overwrite the next drag, and
     // `Application::ensureFreeCamera` is the one place that knows both halves.
+    //
+    // ADR-391 left this **deliberate hand-back only**. Navigating no longer needs it -- the editor
+    // viewpoint is not the film's camera -- so the only caller left is somebody saying, in words,
+    // "give me the film's camera and discard its cut".
     std::function<void()> onFreeCamera;
+    // ---- what the viewport is looking through (ADR-391) ----------------------------------------
+    //
+    // The user's choice, published by the host each frame, and the way back. The panel does not own
+    // it: the rule that narrows it (an output frame preview, an open output) is the host's, and a
+    // panel that kept its own copy would be a second answer to "what is on screen".
+    scene::ViewportView viewportView;
+    // True when the choice above is being overruled and the canvas is showing the film whatever the
+    // user picked, with `viewportViewNote` saying why. The control has to explain itself rather than
+    // silently disagree with its own state -- a toggle that reads "editor" over a frame that is the
+    // film's is the defect this whole change is about.
+    bool viewportViewForced = false;
+    std::string viewportViewNote;
+    std::function<void(scene::ViewportView)> onViewportView;
+    // Move the viewport to a pose, through the host's one seam (`Application::setViewportPose`), so
+    // "go to camera" lands wherever navigation lands and cannot become a second way to write the
+    // film's camera by accident.
+    std::function<void(glm::vec3 /*eye*/, glm::vec3 /*target*/)> onMoveViewport;
     // The camera lock (viewport brief §7). Read and written by the Cameras panel; owned by the
     // application, because what it guards is the application's `releaseDirectedCamera`.
     bool* cameraLocked = nullptr;
