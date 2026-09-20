@@ -1223,9 +1223,15 @@ inline constexpr float kMinItemWidth = 60.0f;
 // test, and the test's question is the panel's question: does every leaf this asks for exist on a
 // vortex?
 //
-// Only the vortex's rows are here. The comet's and the aurora's predate this and are still written
-// out inline; moving them is a mechanical change with no decision in it, and doing it in the same
-// commit as the vortex would bury what this is for.
+// ADR-392: the comet's and the aurora's rows are here too now. They were the mechanical change
+// ADR-387 deferred, and deferring it had a cost -- for as long as those two kinds' rows were
+// string literals inside an ImGui call, `conformance::checkLeavesExist` could be pointed at one of
+// the family's three kinds and not at the other two. A leaf five characters wrong in either of
+// them still drew an empty box and said nothing.
+//
+// The anchor combo in each advanced section stays inline: it writes a `SkyAnchor` enum on the
+// effect, not a parameter, so it is not a row and pretending it were would put a leaf in the table
+// that registration does not produce.
 struct EffectRow {
     std::string_view section; // non-empty starts a new SeparatorText before this row
     std::string_view leaf;    // appended to `atmos/<name>/`
@@ -1335,6 +1341,122 @@ struct EffectRow {
         }
     }
     return out;
+}
+
+
+// ---- comet ---------------------------------------------------------------------------------------
+//
+// Above the fold: what somebody reaches for first. Every leaf here is checked against what a comet
+// actually registers by `tests/unit/test_effect_conformance.cpp`.
+[[nodiscard]] inline std::span<const EffectRow> cometRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "coreColor", "Core colour", "", false, true},
+        {"", "tailColor", "Tail colour", "", false, true},
+        {"", "coreIntensity", "Core brightness"},
+        {"", "headSize", "Head size", "%.0f m"},
+        {"", "tailLength", "Tail length", "%.0f m"},
+        {"", "tailWidth", "Tail width", "%.0f m"},
+        {"", "travelSeconds", "Crossing", "%.1f s"},
+    };
+    return kRows;
+}
+
+// The advanced rows, minus the two checkboxes and the anchor combo, which are not parameters of
+// this shape. The first row carries no section because the panel has already drawn "Trajectory"
+// above the anchor combo.
+[[nodiscard]] inline std::span<const EffectRow> cometAdvancedRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "startAzimuth", "Start bearing", "%.0f deg"},
+        {"", "startElevation", "Start height", "%.0f deg"},
+        {"", "endAzimuth", "End bearing", "%.0f deg"},
+        {"", "endElevation", "End height", "%.0f deg"},
+        {"", "distance", "Distance", "%.0f m", true},
+        {"", "speed", "Speed"},
+        {"", "acceleration", "Acceleration"},
+        {"", "arcLift", "Arc lift", "%.0f m"},
+        {"", "curvature", "Curvature", "%.0f m"},
+        {"Appearance", "haloColor", "Halo colour", "", false, true},
+        {"", "haloIntensity", "Halo brightness"},
+        {"", "haloSize", "Halo size", "%.0f m"},
+        {"", "tailIntensity", "Tail brightness"},
+        {"", "tailFalloff", "Tail falloff"},
+        {"", "wispAmount", "Wisp amount", "%.0f m"},
+        {"", "wispScale", "Wisp scale", "%.4f"},
+        {"", "flowSpeed", "Wisp flow"},
+        {"Fragments", "sparkleDensity", "Density", "%.3f /m"},
+        {"", "sparkleSize", "Size"},
+        {"", "sparkleIntensity", "Brightness"},
+        {"", "sparkleSpeed", "Twinkle"},
+    };
+    return kRows;
+}
+
+// ---- aurora --------------------------------------------------------------------------------------
+
+[[nodiscard]] inline std::span<const EffectRow> auroraRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "lowColor", "Base colour", "", false, true},
+        {"", "midColor", "Middle colour", "", false, true},
+        {"", "topColor", "Top colour", "", false, true},
+        {"", "intensity", "Brightness"},
+        {"", "curtainHeight", "Height", "%.0f m"},
+        {"", "curtains", "Curtains", "%.0f"},
+        {"", "flowSpeed", "Flow"},
+        {"", "audioSensitivity", "Audio response"},
+        {"", "spectrumShape", "Spectrum shape"},
+    };
+    return kRows;
+}
+
+[[nodiscard]] inline std::span<const EffectRow> auroraAdvancedRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "radius", "Distance", "%.0f m", true},
+        {"", "layerSpacing", "Layer spacing"},
+        {"", "baseHeight", "Base height", "%.0f m"},
+        {"", "waveAmplitude", "Wave amount"},
+        {"", "waveScale", "Wave scale"},
+        {"", "turbulence", "Turbulence"},
+        {"", "complexity", "Ray structure", "%.0f"},
+        {"", "driftSpeed", "Fold drift"},
+        {"", "verticalSpeed", "Vertical drift"},
+        {"Appearance", "emission", "Bloom weight"},
+        {"", "opacity", "Curtain opacity"},
+        {"", "edgeBrightness", "Edge brightness"},
+        {"", "filaments", "Filaments"},
+        {"", "sparkle", "Sparkle"},
+        {"", "horizonGlow", "Horizon glow"},
+        // Â§4.2's per-band depths. These scale the bands already in the frame block; they are not a
+        // second analyzer, and every one of them is itself an ordinary parameter a route can drive.
+        {"Audio response", "audioBass", "Bass -> height"},
+        {"", "audioLowMid", "Low-mid -> waves"},
+        {"", "audioMid", "Mid -> folds"},
+        {"", "audioHigh", "High -> filaments"},
+        {"", "audioBeat", "Beat -> pulse"},
+    };
+    return kRows;
+}
+
+// The hue-cycle rows, shared by the comet and the aurora. A vortex registers none of them, which is
+// why the panel returns before this rather than drawing five rows that would find nothing.
+[[nodiscard]] inline std::span<const EffectRow> skyRainbowRows() {
+    static constexpr EffectRow kRows[] = {
+        {"Rainbow", "rainbowSpeed", "Speed"},
+        {"", "rainbowScale", "Scale"},
+        {"", "rainbowHue", "Hue offset"},
+        {"", "rainbowSaturation", "Saturation"},
+        {"", "rainbowBrightness", "Brightness"},
+    };
+    return kRows;
+}
+
+// Offered only when the ground glow is not Off, so it is a separate table rather than a tail of the
+// rainbow's.
+[[nodiscard]] inline std::span<const EffectRow> skyGroundRows() {
+    static constexpr EffectRow kRows[] = {
+        {"Ground illumination", "groundRadius", "Radius", "%.0f m", true},
+        {"", "groundFalloff", "Falloff"},
+    };
+    return kRows;
 }
 
 } // namespace avgen::ui

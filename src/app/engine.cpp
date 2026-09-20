@@ -21,6 +21,7 @@
 #include "core/hash.hpp"
 #include "core/log.hpp"
 #include "params/serialization.hpp"
+#include "world/atmospheric_params.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -422,6 +423,36 @@ comp::Layer* Engine::duplicateLayer(std::uint32_t id) {
 void Engine::resetCameraState() {
     focusState_.reset();
     cameraStateReset_ = true;
+}
+
+std::size_t Engine::addDefaultAtmosphericRoutes(std::string_view effectName) {
+    // The kind decides the routes, so an effect that is not there has none to add.
+    const auto it = std::find_if(atmosphericEffects_.begin(), atmosphericEffects_.end(),
+                                 [&](const world::AtmosphericEffect& e) { return e.name == effectName; });
+    if (it == atmosphericEffects_.end()) {
+        return 0;
+    }
+    const std::string prefix = world::atmosphericParameterPrefix(effectName);
+    for (const params::ModRoute& r : modulator_.routes()) {
+        if (r.target.starts_with(prefix)) {
+            return 0; // already automated; leave whatever somebody set up alone
+        }
+    }
+    std::size_t added = 0;
+    for (params::ModRoute& r : world::defaultAtmosphericRoutes(effectName, it->kind)) {
+        if (params_.find(r.target) == nullptr) {
+            log::warn("default route for '{}' targets '{}', which is not a parameter; skipped",
+                      effectName, r.target);
+            continue;
+        }
+        modulator_.addRoute(std::move(r));
+        ++added;
+    }
+    if (added > 0) {
+        rebind(); // the routes hold pointers into the parameter set, and bind is what fills them
+        log::debug("attached {} default audio route(s) to atmospheric effect '{}'", added, effectName);
+    }
+    return added;
 }
 
 void Engine::addDefaultPostRoutes() {
