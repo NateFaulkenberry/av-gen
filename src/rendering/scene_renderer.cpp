@@ -189,6 +189,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       procedurals_(std::make_unique<ProceduralRenderer>(context, shaders)),
       sdfs_(std::make_unique<SdfRenderer>(context, shaders)),
       volumes_(std::make_unique<VolumeRenderer>(context, shaders)),
+      cosmicOcean_(std::make_unique<CosmicOceanRenderer>(context, shaders)),
       debug_(std::make_unique<DebugDraw>(context, shaders)),
       simulation_(std::make_unique<Simulation>(context, shaders)),
       shadows_(std::make_unique<ShadowRenderer>(context)),
@@ -489,6 +490,12 @@ Result<void> SceneRenderer::init() {
     // particles light the dust around them (one-directional: the fog never touches the sim).
     if (auto r = volumes_->init(kHdrFormat, kDepthFormat, frameLayout_, fields_->buffer(), particles_->glowBuffer());
         !r) {
+        return r;
+    }
+    // ADR-390. Its own pipeline and its own uniform, drawn inside the scene pass after the
+    // atmospheric sky layer. A failure here is not fatal to the frame: a scene with no Cosmic Ocean
+    // must still render, so the error is reported and the draw simply never happens.
+    if (auto r = cosmicOcean_->init(kHdrFormat, kDepthFormat, frameLayout_); !r) {
         return r;
     }
     if (auto r = simulation_->init(fields_->buffer(), fields_->gridBuffer()); !r) {
@@ -1472,6 +1479,12 @@ std::span<const SceneRenderer::PassArm> SceneRenderer::passArms() {
         // ADR-230. Off: the sky-layer draw is skipped entirely, which is what makes the "effects
         // disabled" arm in §12 a real arm rather than a frame that renders the same pixels.
         {"atmospherics", &T::atmospherics},
+        // ADR-390. Off: the Cosmic Ocean's `Draw(3)` is not recorded AND its uniform is not
+        // uploaded, because `update` is gated on the same toggle -- the arm removes the fragment
+        // work and the uniform content together rather than measuring the same frame through one
+        // more branch (ADR-182). This arm is also ADR-390 §39's acceptance test: "then disable
+        // Cosmic Ocean; the scene should suddenly feel dramatically emptier".
+        {"cosmic", &T::cosmicOcean},
     };
     return kArms;
 }
@@ -1493,6 +1506,19 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         // of an existing contract rather than a new one.
         {"shadowrange", [](QualitySettings& q) { q.shadowTexelTarget = 0.0f; },
          "shadowTexelTarget=0 (the pre-ADR-112 range: three scene radii)"},
+        // ADR-450. The Cosmic Ocean's two sample levers, separately, so that "what does an octave
+        // of nebula cost" and "what does a cell of dust cost" are two measurements rather than one
+        // tier that moved both and a guess about which mattered.
+        {"cosmicoct", [](QualitySettings& q) { q.cosmicOctaveScale = 0.5f; },
+         "cosmicOctaveScale=0.5 (nebula field octaves halved, and the domain warp down to one)"},
+        {"cosmicsamples", [](QualitySettings& q) { q.cosmicSampleScale = 0.34f; },
+         "cosmicSampleScale=0.34 (planet cells 3x3 -> 1x1, dust off)"},
+        // ADR-450. Two arms and not one, because "is half enough" and "is quarter too far" are two
+        // questions and the fraction was picked by measuring both rather than by choosing one.
+        {"cosmicnebhalf", [](QualitySettings& q) { q.cosmicNebulaScale = 0.5f; },
+         "cosmicNebulaScale=0.5 (the nebulae at half of each axis, a quarter of the pixels)"},
+        {"cosmicnebquarter", [](QualitySettings& q) { q.cosmicNebulaScale = 0.25f; },
+         "cosmicNebulaScale=0.25 (the nebulae at a quarter of each axis, a sixteenth of the pixels)"},
         // The screen-space contact march, off. It is the one shadow term the mask does not cover,
         // so it is the term that is still evaluated per pixel per directional light.
         {"contact", [](QualitySettings& q) { q.contactShadows = false; q.contactSteps = 0; },
@@ -1821,6 +1847,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     }
     if (auto r = volumes_->reload(); !r) {
         keep("volume.wgsl", r);
+    }
+    if (auto r = cosmicOcean_->reload(); !r) {
+        keep("cosmic_ocean.wgsl", std::unexpected(r.error()));
     }
     if (auto r = simulation_->reload(); !r) {
         keep("simulate.wgsl", r);
@@ -2708,6 +2737,39 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         stats_.comets = 0;
         stats_.auroras = 0;
     }
+    // ADR-390: the Cosmic Ocean, gated on its OWN predicate and not on `any()`.
+    //
+    // This line is what makes the effect reachable at all, and it is the one to check if the sky
+    // comes up empty -- `CosmicOceanRenderer::update` had exactly one caller before it, a GPU test,
+    // which is what "built, tested and unreachable" looks like from the inside. It is deliberately
+    // not folded into the `any()` branch above: `any()` gates the fullscreen *atmosphere* draw, and
+    // the ocean is a separate pipeline with a separate `Draw(3)`, so an ocean-only scene must not
+    // switch the atmosphere draw on and an atmosphere-only scene must not upload an ocean block.
+    // `AtmosphericFrame::any()` carries the same note at its declaration.
+    //
+    // Packing happens here rather than in `buildAtmosphericFrame` because the quality tier is the
+    // renderer's to know: `cosmicOctaveScale` and `cosmicSampleScale` are a rendering decision and
+    // the world has no business carrying them.
+    {
+        const auto& atmos = scene.atmospherics;
+        const bool live = toggles_.cosmicOcean && atmos.anyCosmicOcean();
+        // All three fields. The third was missing for exactly one build and the symptom is worth
+        // recording: the reduced nebula pass ran, wrote its pair, and the composite ignored them,
+        // because `nebulaScale` stayed at its default 1.0 and the shader's "sample rather than
+        // evaluate" flag is packed from it. Full, half and quarter then rendered BYTE-IDENTICAL
+        // frames -- same sequence hash, three times -- which is what caught it. An aggregate
+        // initialiser that silently leaves a new field at its default is the reader-without-a-
+        // writer family again, and a hash comparison is what makes it loud.
+        const world::CosmicQualityScale quality{qualitySettings_.cosmicOctaveScale,
+                                                qualitySettings_.cosmicSampleScale,
+                                                qualitySettings_.cosmicNebulaScale};
+        const world::CosmicOceanGpu block =
+            live ? world::packCosmicOcean(atmos.cosmicOcean, atmos.cosmicOceanEnvelope,
+                                          time.renderTime, quality)
+                 : world::CosmicOceanGpu{};
+        cosmicOcean_->update(block, live, 0, qualitySettings_.cosmicNebulaScale, hdr_.width(),
+                             hdr_.height());
+    }
     queue.WriteBuffer(frameUniforms_, 0, &frame, sizeof(frame));
     // Each shadow view is the same block with its own light-space matrix, so the depth-only passes
     // reuse the ordinary vertex shaders (ADR-034).
@@ -3522,6 +3584,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         depth.depthLoadOp = needsDepthPrepass ? wgpu::LoadOp::Load : wgpu::LoadOp::Clear;
         depth.depthStoreOp = wgpu::StoreOp::Store;
         depth.depthClearValue = 1.0f;
+        // ADR-450: the Cosmic Ocean's reduced-resolution nebula pair, recorded BEFORE the scene
+        // pass opens, because a render pass cannot be nested inside another. A no-op unless an
+        // ocean is live and the resolution lever is on, and it is its own pass on purpose -- it
+        // writes two small attachments the scene pass then samples, which is a dependency a single
+        // pass cannot express.
+        cosmicOcean_->renderNebula(encoder, frameBindGroup_);
+
         wgpu::RenderPassDescriptor pass{};
         pass.label = "scene-pass";
         pass.colorAttachmentCount = kSceneTargetCount;
@@ -3654,6 +3723,39 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             ++stats_.triangles;
             ++stats_.state.pipelineBinds;
             stats_.state.bindGroupBinds += 2;
+        }
+        // ---- the Cosmic Ocean (ADR-390) ----
+        //
+        // SEQUENCING, and the reason this draw does not fire in any shipped frame yet: its source
+        // is `scene.atmospherics.cosmicOcean`, and `AtmosphericFrame` is one of the four shared
+        // files waiting on the vortex branch. Until that lands, the only caller of
+        // `CosmicOceanRenderer::update` is `tests/rendering/test_cosmic_ocean_gpu.cpp`, so
+        // `stats().drawn` is false in every real frame. The effect is **deliberately** unreachable
+        // rather than accidentally so, and this comment is the entire difference between the two --
+        // ADR-350's family is a list of things that were built, tested, and quietly reached
+        // nothing, and every one of them looked exactly like this with no note attached.
+        //
+        // Immediately after the atmospheric layer and before the water, for the same reason that
+        // one is where it is: it is behind everything that is not sky, and the things composited
+        // over it -- water, motes, spores -- have to be able to composite over it.
+        //
+        // After rather than before the comet and the aurora, and it matters: both are additive, so
+        // the order does not change the colour, but the ocean is a *background* and drawing it
+        // second means its own depth attenuation cannot dim a comet that is supposed to be in front
+        // of it. Additive composition is associative; the artistic ordering is not, and this is the
+        // one that keeps a comet reading as nearer than the nebula.
+        //
+        // It shares group 0 with the pass and binds only its own group 1, so the bind groups the
+        // draws after it need are the ones they already set for themselves.
+        if (toggles_.cosmicOcean && cosmicOcean_->stats().drawn) {
+            cosmicOcean_->draw(rp);
+            ++stats_.drawCalls;
+            // Counted with the sky and not with the geometry, as the atmosphere draw above is: one
+            // triangle of sky-sized fragment work, and a geometry budget a resolution change moves
+            // is not one.
+            ++stats_.triangles;
+            ++stats_.state.pipelineBinds;
+            ++stats_.state.bindGroupBinds;
         }
         // ---- water (ADR-099) ----
         // After the sky and before the particles: the surface has to composite over the bed and

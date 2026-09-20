@@ -304,6 +304,12 @@ enum class EffectBucket : std::uint8_t {
     Comet,  // the view-ray trail integrator in shaders/atmosphere_fx.wgsl
     Aurora, // the vertical-shell curtains in the same shader
     Vortex, // the placed volumetric medium in shaders/volume.wgsl
+    // ADR-390's cosmos, drawn by `rendering::CosmicOceanRenderer` and a pass of its own. This is
+    // the case this header's own preamble says the registry does not and cannot collapse into one
+    // C++ file: a kind needing a NEW integrator needs shader work, a GPU struct and a renderer
+    // change, and all three arrived with it. What the registry still buys it is everything above
+    // the draw -- its fields, its panel, its JSON, its presets, its routes and its Add button.
+    CosmicOcean,
 };
 
 // How one authored effect becomes records in that bucket.
@@ -386,12 +392,13 @@ struct EffectSchema {
 // enumerators declared there, failing **by the name of the one that is missing**. That is the guard,
 // and it is the only one that fires: `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`), so a
 // `-Wswitch` diagnostic is a line in a five-thousand-line log.
-inline constexpr std::array<AtmosphereKind, 5> kAtmosphereKinds{
+inline constexpr std::array<AtmosphereKind, 6> kAtmosphereKinds{
     AtmosphereKind::Comet,         //
     AtmosphereKind::Aurora,        //
     AtmosphereKind::Vortex,        //
     AtmosphereKind::MeteorShower,  //
     AtmosphereKind::VolumetricFog, //
+    AtmosphereKind::CosmicOcean,   //
 };
 
 // The kind's position in `kAtmosphereKinds`, or `size()` for an enumerator that is not in it --
@@ -416,6 +423,7 @@ inline constexpr std::array<AtmosphereKind, 5> kAtmosphereKinds{
 
 static_assert(atmosphereKindIndex(AtmosphereKind::Comet) == 0);
 static_assert(atmosphereKindIndex(AtmosphereKind::VolumetricFog) == 4);
+static_assert(atmosphereKindIndex(AtmosphereKind::CosmicOcean) == 5);
 
 [[nodiscard]] inline std::span<const AtmosphereKind> declaredAtmosphereKinds() { return kAtmosphereKinds; }
 

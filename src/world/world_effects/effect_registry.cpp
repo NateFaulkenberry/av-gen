@@ -36,6 +36,7 @@ const EffectSchema& auroraSchema();
 const EffectSchema& vortexSchema();
 const EffectSchema& meteorShowerSchema();
 const EffectSchema& volumetricFogSchema();
+const EffectSchema& cosmicOceanSchema();
 
 namespace {
 
@@ -46,6 +47,7 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &vortexSchema(),       //
         &meteorShowerSchema(), //
         &volumetricFogSchema(),
+        &cosmicOceanSchema(),
     };
     return kSchemas;
 }

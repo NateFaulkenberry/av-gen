@@ -159,6 +159,33 @@ struct QualitySettings {
     // Offline never scales either (§5.9).
     float volumeStepScale = 1.0f;
 
+    // ADR-390 §7. Multipliers on the Cosmic Ocean's sample counts: `cosmicOctaveScale` on the
+    // nebula octave ceiling, `cosmicSampleScale` on the planet and dust cell neighbourhoods.
+    //
+    // A tier may scale sample counts and may NOT remove an artistic control -- the same rule
+    // `volumeStepScale` states above. Preview turning the dust off is a sample count of zero
+    // reached through a field an artist can also reach; it does not hide a knob.
+    //
+    // Deliberately absent: a `cosmicResolutionScale`. ADR-390 §6 measured that the resolution lever
+    // is not needed here, and a lever whose only justification is symmetry with the volume pass is
+    // a lever that will be tuned by somebody who has measured neither.
+    float cosmicOctaveScale = 1.0f;
+    float cosmicSampleScale = 1.0f;
+
+    // ADR-450. The fraction of the frame's resolution the Cosmic Ocean's two nebulae are evaluated
+    // at. 1.0 evaluates them in the main draw; below that they go through a small offscreen pair
+    // and are sampled back bilinearly.
+    //
+    // ADR-390 §6 rejected this lever on an estimate and ADR-450 reverses that with a measurement:
+    // the nebulae are 1.44 ms of the effect's 2.56 ms at 1080p, 56% of it, and they are also the
+    // lowest-frequency thing in the frame -- which is the combination a resolution lever is for.
+    // The other strata stay at full resolution because a star IS a high-frequency feature and
+    // halving its resolution is how a star field starts to crawl.
+    //
+    // Deliberately a fraction and not a bool, so that quarter and half are two arms a measurement
+    // can compare rather than one switch somebody guessed at.
+    float cosmicNebulaScale = 1.0f;
+
     // ADR-382, the brief's §18 quality ladder. Multiplier on every particle system's `spawnRate`;
     // capacity is untouched, because changing it destroys and recreates the pool (ADR-015) and a
     // tier change would then empty every system mid-shot.
@@ -264,12 +291,19 @@ struct QualitySettings {
             q.volumeResolutionScale = 0.25f;
             q.temporalHistoryScale = 0.25f;
             q.volumeStepScale = 0.5f;
+            q.cosmicOctaveScale = 0.75f; // 4 nebula octaves -> 3
+            q.cosmicSampleScale = 0.34f; // 3x3 planet cells -> 1x1, and the dust off
+            q.cosmicNebulaScale = 0.25f; // the nebulae at a quarter of each axis
             // A quarter of the particles. Deliberately not zero: the Tree of Life's motes take 30
             // to 50 seconds of playback to reach the vortex (ADR-380), so a tier that cut them
             // hard would make a working effect look broken to anyone previewing it.
             q.particleSpawnScale = 0.25f;
             break;
         case QualityTier::Realtime:
+            // ADR-450: the nebulae at a quarter of each axis. Measured against a control in which
+            // they paint 81% of the frame, quarter moves 0.83% of it -- 0.007% of pixels by more
+            // than two levels -- so this is a resolution the eye cannot find and the clock can.
+            q.cosmicNebulaScale = 0.25f;
             q.materialTiers = true;
             // ADR-155: procedural draws below the foreground rung shade flat. Measured at +1.11 ms
             // (7.46%) on Glowmere with 3.07% of pixels differing and no visible change at full
@@ -297,6 +331,7 @@ struct QualitySettings {
             // tier exists to say what the frame looks like with no auxiliary pass downsampled.
             q.temporalHistoryScale = 0.5f;
             q.volumeResolutionScale = 1.0f;
+            q.cosmicOctaveScale = 1.25f; // 4 nebula octaves -> 5
             break;
         case QualityTier::Offline:
             q.shadowResolution = 4096;
@@ -310,6 +345,8 @@ struct QualitySettings {
             q.shadowMaskScale = 1.0f;
             q.aoHistoryFrames = 16;
             q.sdfShadowSteps = 48;
+            q.cosmicOctaveScale = 1.5f;  // 4 nebula octaves -> 6
+            q.cosmicSampleScale = 1.67f; // 3x3 planet and dust cells -> 5x5
             // §5.9: offline takes no representation or shading shortcut, and says so as data.
             q.materialTiers = false;
             q.forcedMaterialTier = MaterialTier::Full;

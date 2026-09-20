@@ -65,6 +65,15 @@ scene::MeshData cubeMesh(float h) {
 
 scene::Scene cubeScene() {
     scene::Scene s;
+    // The background is part of what this fixture asserts, so it is stated rather than inherited.
+    // `SkySettings::enabled` and `showSkybox` both default to TRUE (ADR-036), which arrived after
+    // the corner assertion below was written against a black background -- so the corner has been
+    // showing tone-mapped procedural sky, not `environment.backgroundColor`, and drifted with every
+    // change to exposure since. `waterTestScene()` in this same file already opts out for exactly
+    // this reason; this one now does too.
+    s.environment.showSkybox = false;
+    s.environment.sky.enabled = false;
+    s.environment.environmentIntensity = 0.0f;
     const auto mesh = s.addMesh(cubeMesh(1.0f));
     auto& e = s.addEntity("cube", mesh);
     e.transform.position = {0.0f, 1.0f, 0.0f};
@@ -204,9 +213,21 @@ TEST_CASE("SceneRenderer renders a lit cube deterministically", "[gpu][renderer]
     const auto* corner = image->pixel(1, 1);
     const int centreSum = centre[0] + centre[1] + centre[2];
     const int cornerSum = corner[0] + corner[1] + corner[2];
-    // Background 0.012 linear encodes to ~19/255 in sRGB, so the corner is dark but not black.
+    // The corner is `environment.backgroundColor` {0.012, 0.012, 0.02} and nothing else, now that
+    // the fixture turns the sky off. That encodes to 29 + 29 + 39 = **97**, not the 57 the old
+    // comment's "0.012 encodes to ~19/255" implied: sRGB encode of 0.012 is 1.055*0.012^(1/2.4) -
+    // 0.055 = 0.112, which is 29/255, and the blue channel is 0.02 rather than 0.012. So the bound
+    // of 90 was below the number the authored background can produce, and no render could satisfy
+    // it -- the arithmetic was wrong when it was written, and the tone mapper later stopped
+    // darkening the gap away.
+    //
+    // A band rather than a ceiling, because both directions are defects worth catching: below it
+    // the background has stopped reaching the frame, above it something is lighting a corner that
+    // should see only background. Measured at 99 with the tone mapper's small lift on top of 97.
+    INFO("centreSum " << centreSum << ", cornerSum " << cornerSum);
     CHECK(centreSum > cornerSum + 60);
-    CHECK(cornerSum < 90);
+    CHECK(cornerSum > 80);
+    CHECK(cornerSum < 120);
     CHECK(centre[0] > centre[2]); // reddish material
     if (const char* dumpDir = std::getenv("AVGEN_DUMP_DIR")) {
         REQUIRE(gpu::writePpm(*image, std::filesystem::path(dumpDir) / "cube.ppm").has_value());

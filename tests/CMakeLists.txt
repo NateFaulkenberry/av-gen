@@ -137,6 +137,9 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         # it: this executable is only built on request, the binary already on disk kept running, and
         # a build wrapper reports the shell line's status rather than the compiler's. What it was
         # hiding, for the record: the vortex CPU/GPU parity test (ADR-388) was red underneath.
+        #
+        # ADR-393 hit it a third time from the other side: build all three targets and check the
+        # binaries' mtimes against your sources before trusting a green run (docs/testing.md).
         "${CMAKE_SOURCE_DIR}/src/app/frame_range.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/render_job.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"

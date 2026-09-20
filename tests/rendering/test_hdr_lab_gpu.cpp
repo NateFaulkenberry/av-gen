@@ -547,7 +547,14 @@ TEST_CASE("a reset meter reports the frame it was reset for", "[hdr][lab][gpu]")
     bench.pool->endFrame();
     CHECK(bench.post->stats().meteredLuminance == -1.0f);
 
-    // Two frames of the bright image: the first encodes the reduction, the second reads it back.
+    // Three frames of the bright image, not two. ADR-379 made the metering readback a two-slot
+    // ring to take a 1.58 ms stall to zero, and the cost of that is one more frame of latency:
+    // frame N used to adopt frame N-1's measurement and now adopts N-2's. This case was written
+    // against the old depth and kept asserting it -- with two frames the value read back is still
+    // the dark control's, so `metered` came out 0.0 rather than the 8.0 the bright canvas carries.
+    // The number of frames here IS the ring's depth, and it is the only thing that changed.
+    bench.run(brightHdr, settings);
+    bench.pool->endFrame();
     bench.run(brightHdr, settings);
     bench.pool->endFrame();
     bench.run(brightHdr, settings);

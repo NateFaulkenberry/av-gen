@@ -4,6 +4,7 @@
 #include "world/world_effects/effect_registry.hpp"
 
 #include <algorithm>
+#include <vector>
 
 namespace avgen::world {
 namespace {

@@ -7,6 +7,7 @@
 #include "scene/composition.hpp"
 #include "scene/temporal_settings.hpp"
 #include "ui/help_panel.hpp"
+#include "ui/cosmic_ocean_rows.hpp"
 #include "ui/ui_logic.hpp"
 #include "world/atmospheric_params.hpp"
 #include "world/atmospherics.hpp"
@@ -683,6 +684,15 @@ void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
                 tooltipUnformatted(schema->addTip);
             }
         }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Add cosmic ocean")) {
+        append(world::cosmicOceanEffect(unique("Cosmic Ocean")));
+    }
+    if (ImGui::IsItemHovered()) {
+        tooltip("A procedural deep-space background: nebulae, star strata, planets, dust\n"
+                          "and galaxies, each on its own shell with its own parallax, so the sky\n"
+                          "separates by depth as the camera travels. One per scene.");
     }
 
     if (authored.empty()) {
