@@ -2696,8 +2696,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     {
         const auto& atmos = scene.atmospherics;
         const bool live = toggles_.cosmicOcean && atmos.anyCosmicOcean();
+        // All three fields. The third was missing for exactly one build and the symptom is worth
+        // recording: the reduced nebula pass ran, wrote its pair, and the composite ignored them,
+        // because `nebulaScale` stayed at its default 1.0 and the shader's "sample rather than
+        // evaluate" flag is packed from it. Full, half and quarter then rendered BYTE-IDENTICAL
+        // frames -- same sequence hash, three times -- which is what caught it. An aggregate
+        // initialiser that silently leaves a new field at its default is the reader-without-a-
+        // writer family again, and a hash comparison is what makes it loud.
         const world::CosmicQualityScale quality{qualitySettings_.cosmicOctaveScale,
-                                                qualitySettings_.cosmicSampleScale};
+                                                qualitySettings_.cosmicSampleScale,
+                                                qualitySettings_.cosmicNebulaScale};
         const world::CosmicOceanGpu block =
             live ? world::packCosmicOcean(atmos.cosmicOcean, atmos.cosmicOceanEnvelope,
                                           time.renderTime, quality)
