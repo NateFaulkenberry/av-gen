@@ -664,3 +664,104 @@ the loader said `unknown node kind 'light'`, the boxes were unlit, the frame was
 there was nothing for fog to tint. **The render log said so and the frame did not** — a black frame
 and a nearly-black frame are indistinguishable in a hash, and I would have reported a false defect
 in someone else's subsystem if I had trusted the number over the log.
+
+---
+
+## 9. What is actually left (scoping against main at `414fb765`)
+
+Asked to say plainly what remains rather than invent work. **Phases 0, 1 and 2 are done.** The tail
+is three items, two of them small, and four candidates that are properly closed rather than
+deferred.
+
+### 9.1 Real, and done in this pass
+
+**`bloomLevels` was a working control nobody could reach — the sixth instance of that family, and
+the one that hid behind a plausible reason.** `applyPostJson` accepted the key and dropped it,
+saying *"Fixed when the bloom pyramid is created, so there is no parameter to move."* That sentence
+is false. `PostProcessor::run` clamps and reads `s.bloomLevels` **on every frame**, at
+`post_processor.cpp:612` for the bloom pyramid and `:649` for halation's — both inside `run()`,
+which begins at `:456`. And `tests/rendering/test_image_formation_gpu.cpp:362` has set it to 3 and
+asserted the energy is unchanged since ADR-039, which is a test that only means anything if the
+setting is live.
+
+So it was not a control that could not work; it was a control nobody had wired, protected by a
+reason that sounded sufficient. It is now `post/bloom/levels`, with the range equal to the clamp
+`run()` already applies, a reader, a writer, an ADR-350 round trip and a GPU test that the pyramid
+actually changes depth.
+
+**`post_processor.hpp`'s disabled-path sentence is corrected.** It said *"with everything off and a
+unit exposure the input is returned unchanged"*, and `docs/image-look-spec.md` quoted exactly that
+as proof the spec's own no-change guarantee already existed. It did not, and the misquotation set
+the shape of the whole §60 argument. The header now says what is true — a single composite pass,
+identity only to within a float ulp — and points at the differential proof.
+
+### 9.2 Closed, with the reason rather than a deferral
+
+**§89, the AgX question: closed.** The brief says do not replace AgX without evidence. What the
+engine had was not a bad operator but a broken **inverse** — `agx()` undid its own sRGB encode with
+`pow(v, 2.2)` against a piecewise `linearToSrgb` (ADR-372). That is fixed, and fixing it removed
+the only evidence that had ever been offered against AgX. **§89 asked for evidence before replacing
+the operator; the evidence turned out to be a bug in the code around it.** Nothing further is owed.
+
+**§56, versioning: closed, and adding a version would be the wrong move.** `LookPreset::fromJson`
+is fully permissive — every field optional with a default, `format` never checked, unknown keys
+ignored — so the look format has no migration surface to version, and a `version` field nothing
+reads is the "built but unreachable" family again. Versioning that matters happens where
+`post/look/*` actually lives: the **project** format, which has `kProjectFormatVersion` and real
+migrations, and which already carries every parameter this work added.
+
+**ADR-378's trap does not apply to this work.** That failure was an absolute error measured against
+a relative tolerance, and the old form passed a shader perturbed by +15%. Checked every assertion in
+`tests/rendering/test_image_look_gpu.cpp`: there is no `Approx`, no `epsilon`, no `margin` and no
+percentage bound anywhere in the file. The §60 arms compare **hash equality**, `byteDiff::identical()`,
+**exact float equality** on corner pixels and **exact integer** pass counts. The two threshold
+assertions that exist (`changed > 200`, `towardTint > changed / 2`) are absolute counts against
+absolute floors, and they can only fail by an effect vanishing — never by one growing, which is the
+direction ADR-378's form was blind to. The eight Phase 0 captures assert nothing at all; they are
+arms to be diffed.
+
+### 9.3 §66's CPU readback: measured, material, and a decision rather than a side-effect
+
+My first audit found the readback, reported it, and declined to touch it on the grounds that
+removing it would *"trade a measured determinism guarantee for an unmeasured frame-time gain"*. The
+gain is no longer unmeasured.
+
+`PostProcessor::takeMeasurement` (`post_processor.cpp:343`) calls `MapAsync` on the 256-byte
+metering buffer and then `context_.waitFor(future)` — a synchronous stall on the main thread —
+reads two halves out of the mapped range and unmaps. It runs **only in automatic exposure mode**;
+the manual path clears the pending flag and never maps.
+
+So the measurement is automatic against manual, which isolates metering-plus-readback from
+everything else. `examples/hero/hero.json`, live editor, `--ui-script idle --frames 420
+--profile-cpu`, **3066x1770 (5.43 Mpx)**, 12 861 triangles, through `tools/gpu-lock.sh`, arms
+interleaved three times. **Machine genuinely quiet** — zero other compiles, renders or test binaries
+above 50% CPU for the duration. Minima over repeats (ADR-170):
+
+| | `gpu.frame` medians | best | `FRAME` medians | best |
+|---|---|---|---|---|
+| manual | 22.020 / 22.020 / 22.086 | **22.020** | 23.132 / 23.134 / 23.251 | **23.132** |
+| automatic | 22.086 / 22.020 / 22.151 | **22.020** | 24.709 / 24.799 / 24.819 | **24.709** |
+
+- **GPU: +0.000 ms.** The six metering passes — a quarter-resolution prefilter and 4x4 reductions
+  to 1x1 — cost nothing measurable.
+- **CPU: +1.577 ms per frame**, and the two arms' three-sample ranges do not overlap (23.13–23.25
+  against 24.71–24.82), so this is signal, not spread.
+
+Since the GPU side is free, **the 1.58 ms is the blocking map**. On this frame that is **6.4% of a
+23 ms frame, on the main thread, in automatic exposure mode**. §66 says no CPU readback for
+exposure; there is one, and it costs that.
+
+**Not removed here, and this is a recommendation rather than a deferral.** The stall is what buys
+ADR-037's determinism: frame *N* consumes frame *N−1*'s measurement through a blocking map
+specifically so there is no timing race, and `test_image_formation_gpu.cpp` asserts two offline
+renders are bit-identical over 40 frames. Removing it means moving the exposure state GPU-side, or
+double-buffering the readback so a copy has two frames to land. **The double-buffer is the small
+one** — it stays a pure function of prior frames, so determinism survives — but it changes the
+documented "frame *N* uses frame *N−1*" to *N−2*, which changes the temporal response of every
+auto-exposure scene and is therefore a re-baseline of exactly the kind this project insists be taken
+deliberately.
+
+That is an ADR-sized change to the exposure loop, not the short tail this pass was scoped to.
+**Recommended, costed at 1.58 ms per frame, and handed over rather than taken.**
+
+
