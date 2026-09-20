@@ -335,7 +335,10 @@ json saveProject(const ParameterSet& params, const Modulator& modulator, const s
         // file's `reactions` (ADR-088). Writing them here would mean a project that grows a
         // duplicate of every one of them each time it is saved, and a route the author cannot
         // delete because the thing that owns it puts it straight back.
-        if (route.fromGraph || route.fromEntity) {
+        // ADR-522: a world macro is the third such owner -- `Engine::applyWorldMacros` rebuilds
+        // its routes from `worldMacros` on every load, so writing them here would give a project
+        // a duplicate of every macro route each time it was saved.
+        if (route.fromGraph || route.fromEntity || route.fromMacro) {
             continue;
         }
         routes.push_back(routeToJson(route));
@@ -544,10 +547,17 @@ Result<void> loadProject(const json& original, ParameterSet& params, Modulator& 
     // reactions (ADR-088) were installed when the composition attached and deleted a few hundred
     // lines later by the project's own second parameter pass -- bound, counted in the log, and
     // then gone, which is exactly the shape of failure this codebase keeps shipping.
+    //
+    // ADR-522: and it was still shipping it, for the third member of the family. A world macro's
+    // routes (`app::WorldMacro::routes`) are installed by `Engine::applyWorldMacros`, which runs
+    // sixty lines before the SECOND `params::loadProject` pass -- so `examples/machine/machine.json`
+    // loaded with exactly its twelve authored LFO and audio routes and none of its three macros'
+    // eight, and the log said twelve. The knobs existed, appeared in the panel, took part in cue
+    // presets and moved nothing at all.
     {
         std::vector<ModRoute>& live = modulator.routes();
         live.erase(std::remove_if(live.begin(), live.end(),
-                                  [](const ModRoute& r) { return !r.fromGraph && !r.fromEntity; }),
+                                  [](const ModRoute& r) { return !r.fromGraph && !r.fromEntity && !r.fromMacro; }),
                    live.end());
     }
     for (auto& route : routes) {

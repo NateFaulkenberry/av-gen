@@ -288,13 +288,21 @@ TEST_CASE("ADR-520 CollisionResponse::None is byte-identical to no collision cod
     CHECK_IDENTICAL(ia, ib);
 }
 
-TEST_CASE("ADR-520 a pulse changes the picture over time and rate 0 does not",
+TEST_CASE("ADR-520 a synchronised pulse takes the whole field bright and then dark",
           "[gpu][particles][weather][pulse]") {
     auto ctx = makeContext();
     gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
 
-    // Fully synchronised, so the whole cloud is at one phase and the frame brightness IS the
-    // pulse. Sampled at two times a quarter cycle apart.
+    // The measurement is the RATIO of the pulsed arm to the unpulsed one at the same frame, not
+    // the change in either of them over time. The first version of this case compared brightness
+    // at two times within one arm and failed honestly: the pool is still filling over the first
+    // frames, so BOTH arms brightened by about the same amount (2.35M -> 4.06M pulsed,
+    // 2.58M -> 4.16M unpulsed) and the pulse was a rounding error on top of the fill. Two arms at
+    // one frame have the identical pool -- the pulse is a shading term and changes no simulation
+    // state -- so the fill cancels exactly and what is left is the gain.
+    //
+    // sync 1, depth 1, sharpness 1, rate 1 Hz: gain(t) = 0.5 + 0.5 sin(2*pi*t), so t = 0.25 s is
+    // the peak and t = 0.75 s is the trough, and the trough is zero.
     const auto pulsed = [](float rate) {
         scene::Scene s = cloudScene();
         s.particles[0].pulseRate = rate;
@@ -305,19 +313,39 @@ TEST_CASE("ADR-520 a pulse changes the picture over time and rate 0 does not",
     };
     const scene::Scene on = pulsed(1.0f);
     const scene::Scene off = pulsed(0.0f);
+    // FixedStepClock's first tick is t = 0, so n ticks ends at t = (n - 1) / 60.
+    constexpr int kPeak = 16;   // t = 0.25 s
+    constexpr int kTrough = 46; // t = 0.75 s
 
-    const gpu::Image8 onEarly = render(*ctx, shaders, on, 6);
-    const gpu::Image8 onLate = render(*ctx, shaders, on, 21); // +15 frames = a quarter second
-    const gpu::Image8 offEarly = render(*ctx, shaders, off, 6);
-    const gpu::Image8 offLate = render(*ctx, shaders, off, 21);
+    const double onPeak = static_cast<double>(totalBrightness(render(*ctx, shaders, on, kPeak)));
+    const double onTrough = static_cast<double>(totalBrightness(render(*ctx, shaders, on, kTrough)));
+    const double offPeak = static_cast<double>(totalBrightness(render(*ctx, shaders, off, kPeak)));
+    const double offTrough = static_cast<double>(totalBrightness(render(*ctx, shaders, off, kTrough)));
     CHECK(ctx->errorCount() == 0);
 
-    REQUIRE(litPixels(offEarly, 20) > 200); // the premise
-    INFO("pulse on: " << totalBrightness(onEarly) << " -> " << totalBrightness(onLate)
-                      << "   off: " << totalBrightness(offEarly) << " -> " << totalBrightness(offLate));
-    // The particles do not move, so with the pulse off the only difference between two times is
-    // whatever else the renderer does; with it on, the brightness must have moved a lot.
-    const double onDelta = std::abs(static_cast<double>(totalBrightness(onLate) - totalBrightness(onEarly)));
-    const double offDelta = std::abs(static_cast<double>(totalBrightness(offLate) - totalBrightness(offEarly)));
-    CHECK(onDelta > 4.0 * offDelta + 1000.0);
+    // The premise: the unpulsed cloud is on screen at both times, so neither ratio is 0/0.
+    REQUIRE(offPeak > 1.0e5);
+    REQUIRE(offTrough > 1.0e5);
+
+    const double atPeak = onPeak / offPeak;
+    const double atTrough = onTrough / offTrough;
+    INFO("gain at the peak " << atPeak << ", at the trough " << atTrough);
+    CHECK(atPeak > 0.75);   // near 1: the pulse is at full brightness
+    CHECK(atTrough < 0.25); // near 0: the field is dark
+}
+
+TEST_CASE("ADR-520 pulseRate 0 is byte-identical to no pulse at all",
+          "[gpu][particles][weather][pulse][determinism]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    scene::Scene a = cloudScene();
+    scene::Scene b = cloudScene();
+    b.particles[0].pulseRate = 0.0f;
+    b.particles[0].pulseDepth = 1.0f;   // set, and must be ignored
+    b.particles[0].pulseSync = 1.0f;
+    b.particles[0].pulseSharpness = 12.0f;
+    const gpu::Image8 ia = render(*ctx, shaders, a);
+    const gpu::Image8 ib = render(*ctx, shaders, b);
+    REQUIRE(litPixels(ia, 20) > 200);
+    CHECK_IDENTICAL(ia, ib);
 }
