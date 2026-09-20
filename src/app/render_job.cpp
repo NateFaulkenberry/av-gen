@@ -200,6 +200,9 @@ Result<void> RenderJob::start() {
     // to an interactive one, so every promise the Offline tier makes (no temporal shortcut, no
     // representation or shading shortcut, full-resolution auxiliary passes) was stated in the tier
     // table and not kept by the path that produces the output anyone ships.
+    // ADR-521: ADR-360's warm-up, on the renderer that actually produces the output. Clamped by
+    // the renderer itself (kMaxWarmUpFrames); asking for more cannot buy anything.
+    renderer_->setParticleWarmUpFrames(settings_.particleWarmUpFrames);
     {
         rendering::QualityTier tier = rendering::QualityTier::Offline;
         if (!rendering::qualityTierFromName(settings_.tier, tier)) {

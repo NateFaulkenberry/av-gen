@@ -3246,6 +3246,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             particleFrame.fogMaxDistance = scene.environment.volumeMaxDistance;
         }
         particleFrame.linearDepth = needsDepthPrepass ? linearDepth_.view : nullptr;
+        // ADR-520: the key light, for the scattering phase function. `resolveSky` again, for the
+        // reason the sky block above gives: it is pure and cheap, and one rule about which light
+        // the sun is beats a second rule that can disagree with the first. A dust mote and the disc
+        // it blazes at are then reading the same answer.
+        {
+            const scene::SkyRuntime sun = scene::resolveSky(scene.environment.sky, scene.lights);
+            particleFrame.sunDirection = sun.sunDirection;
+            particleFrame.sunColor = sun.sunColor;
+        }
         particles_->setFrameContext(particleFrame);
     }
     // Off means no simulation either, not merely no draw: a particle system stepped but not drawn

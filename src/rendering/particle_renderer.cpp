@@ -635,7 +635,35 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
                 ++forceCount;
             }
         }
-        u.fieldInfo = glm::uvec4(forceCount, static_cast<std::uint32_t>(splineSlot + 1), 0u, 0u);
+        // ADR-520: the emission mask. A name the scene does not define resolves to slot -1 and the
+        // mask is then *off* rather than zero -- a mask that resolves to nothing must not silently
+        // delete the system, because "I typed the field name wrong" and "it is raining nowhere"
+        // would then look identical. The unresolved name is reported by the field bus's
+        // `unresolved()` list, which is where a dead subscription is already a stated problem.
+        int maskSlot = -1;
+        if (fields != nullptr && !sys.emitMaskField.empty()) {
+            maskSlot = fields->slotOf(sys.emitMaskField);
+        }
+        u.fieldInfo = glm::uvec4(forceCount, static_cast<std::uint32_t>(splineSlot + 1),
+                                 static_cast<std::uint32_t>(maskSlot + 1), 0u);
+        // ---- ADR-520 ----
+        u.volume = glm::vec4(glm::clamp(sys.volumeFollow, glm::vec3(0.0f), glm::vec3(1.0f)),
+                             sys.volumeWrap ? 1.0f : 0.0f);
+        u.collide = glm::vec4(static_cast<float>(sys.collision), sys.collisionHeight,
+                              std::clamp(sys.collisionRestitution, 0.0f, 1.0f), std::max(0.0f, sys.splashSize));
+        u.collide2 = glm::vec4(std::max(1e-3f, sys.splashLifetime), std::clamp(sys.ringThickness, 0.01f, 1.0f),
+                               std::clamp(sys.dragSizeBias, 0.0f, 1.0f), 0.0f);
+        u.pulse = glm::vec4(std::max(0.0f, sys.pulseRate), std::clamp(sys.pulseDepth, 0.0f, 1.0f),
+                            std::clamp(sys.pulseSync, 0.0f, 1.0f), std::max(0.05f, sys.pulseSharpness));
+        u.cluster = glm::vec4(static_cast<float>(sys.clusterCount), std::max(0.0f, sys.clusterRadius),
+                              std::max(0.0f, sys.pauseRate), std::clamp(sys.pauseFraction, 0.0f, 1.0f));
+        u.scatter = glm::vec4(std::max(0.0f, sys.scatterStrength), std::clamp(sys.scatterAnisotropy, -0.95f, 0.95f),
+                              std::clamp(sys.sizeVariance, 0.0f, 1.0f), std::max(0.05f, sys.sizeSkew));
+        // The key light. An all-zero direction -- a scene that never set one -- switches the phase
+        // term off in the shader rather than normalising a zero vector.
+        const float sunLen = glm::length(frame_.sunDirection);
+        u.sun = sunLen > 1e-4f ? glm::vec4(frame_.sunDirection / sunLen, 1.0f) : glm::vec4(0.0f);
+        u.sunColor = glm::vec4(frame_.sunColor, 0.0f);
         context_.queue().WriteBuffer(pool.uniforms, 0, &u, sizeof(u));
 
         // Pass order (see particles.wgsl): emit -> simulate -> reduce -> top scan -> scatter.

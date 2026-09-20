@@ -251,6 +251,54 @@
       "description": "Quality Lab benchmark 2: the aliasing subject on a lateral spline dolly, so the velocity AOV, the disocclusion mask and the motion-compensated residual have real motion to measure.",
       "name": "Quality Lab: aliasing dolly",
       "project": "quality/aliasing-dolly.json"
+    },
+    {
+      "category": "Weather",
+      "description": "Four layers of one shower: 34 k wrapping drops in a camera-following volume, an out-of-focus near layer, a ripple for every drop that lands, and the mist it has already wetted. Particle size drives fall speed, so the streaks have a spread of lengths rather than one.",
+      "name": "Rain",
+      "project": "weather/rain.json"
+    },
+    {
+      "category": "Weather",
+      "description": "A flake is a tumbling card, not a streak; small dense flakes fall fast and large ones hang, so the field reads as falling rather than scrolling. A hundred and fifty huge out-of-focus flakes ride with the lens.",
+      "name": "Snow",
+      "project": "weather/snow.json"
+    },
+    {
+      "category": "Weather",
+      "description": "Dark ash read as an absence of light against a burning sky, embers on independent flicker phases from two sources at different distances, and the smoke they rise out of. Temperature is the ember colour curve.",
+      "name": "Ashfall",
+      "project": "weather/ashfall.json"
+    },
+    {
+      "category": "Weather",
+      "description": "A planar travelling wave field IS the squall line: rain spawns where it is, lifted dust spawns where it is not, and both subscribe to the same field, so the moment the rain arrives is the moment the dust stops.",
+      "name": "Weather front",
+      "project": "weather/weather-front.json"
+    },
+    {
+      "category": "Weather",
+      "description": "Motes lit by a Henyey-Greenstein phase against the key light: quiet across the sun and blazing into it, with a colonnade to cut the light into bands. The same population, and only the angle changes.",
+      "name": "Dust motes",
+      "project": "weather/dust-motes.json"
+    },
+    {
+      "category": "Weather",
+      "description": "Nine and fourteen persistent swarms that dart and hang on their own phases; one chorus flashes almost together and one twinkles at random, and the only difference between them is pulseSync.",
+      "name": "Fireflies",
+      "project": "weather/fireflies.json"
+    },
+    {
+      "category": "Weather",
+      "description": "One airborne biological system authored three ways -- buoyancy as a positive gravity against a high drag, so a grain finds a level and hangs there instead of falling.",
+      "name": "Pollen, spores and seeds",
+      "project": "weather/pollen.json"
+    },
+    {
+      "category": "Weather",
+      "description": "One continuous knob from high summer to deep winter: canopy, undergrowth, ground, sky, fog, pollen, leaf fall and snow are all targets of a single world macro. No winter scene exists.",
+      "name": "Season shift",
+      "project": "weather/season.json"
     }
   ]
 }

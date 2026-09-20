@@ -86,6 +86,19 @@ struct RenderSettings {
     // reason and same defect as `disablePasses`: it was applied to the interactive renderer only,
     // so a quality arm on a `--render` was a third flag that validated and then did nothing.
     std::string qualityArms;
+    // ADR-521: ADR-360's particle warm-up, in frames, for THIS render. Same reason and the same
+    // defect as the two fields above it, and the fourth time the same defect has been found:
+    // `--particle-warmup` was applied to the interactive renderer in `Application::init` and the
+    // offline engine builds its own, so a warm-up asked for on a `--render` validated, logged
+    // nothing and did nothing. Measured: `--composition examples/labs/particle-vfx-lab.scene.json
+    // --range 2:2 --particle-warmup 120` produced sequence hash e52b7fefaa395bcc, byte-identical
+    // to the same command with no warm-up at all, and a frame in which three of the lab's four
+    // systems are empty.
+    //
+    // This is a property of the deliverable rather than a diagnostic: a single-frame render of a
+    // continuous emitter without it is not a shot at t, it is a shot of the first 1/60th of a
+    // second of a field that should have been running for minutes.
+    std::uint32_t particleWarmUpFrames = 0;
     // ADR-186: which distance-based detail reductions this render is under. "tier" (the default)
     // takes the tier's answer -- offline lifts them all, every other tier keeps live playback's;
     // "live" keeps them whatever the tier, which is what a quick proof render wants; "unlimited"

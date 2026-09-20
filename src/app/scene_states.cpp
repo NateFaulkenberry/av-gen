@@ -467,6 +467,10 @@ std::vector<params::ModRoute> WorldMacro::routes() const {
         r.chain.remapInMax = 1.0f;
         r.chain.remapOutMin = t.min;
         r.chain.remapOutMax = t.max;
+        // ADR-522: so `params::loadProject`'s replacement of the authored routes keeps it. Without
+        // this the route is installed, bound and then erased by the second parameter pass, and the
+        // knob is a control that moves nothing.
+        r.fromMacro = true;
         out.push_back(std::move(r));
     }
     return out;

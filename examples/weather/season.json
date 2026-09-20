@@ -1,0 +1,309 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Season shift"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "season.scene.json"
+  }
+ },
+ "sources": [
+  {
+   "kind": "macro",
+   "name": "macros",
+   "settings": {
+    "knobs": [
+     {
+      "name": "season",
+      "default": 0.0
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "tracks": [],
+  "cues": []
+ },
+ "parameters": {
+  "camera/lens/focalLength": 32.0,
+  "camera/lens/aperture": 2.8,
+  "camera/lens/focusDistance": 9.0,
+  "camera/lens/shutterAngle": 172.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.35,
+  "post/bloom/threshold": 1.1,
+  "post/bloom/radius": 1.1,
+  "post/dof/enabled": true,
+  "post/dof/physical": true,
+  "post/grade/contrast": 1.12,
+  "post/grade/saturation": 1.0,
+  "post/grade/temperature": 0.0,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.035
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 60,
+  "output": "sequence",
+  "path": "renders/season"
+ },
+ "worldMacros": [
+  {
+   "name": "season",
+   "label": "SEASON",
+   "default": 0.0,
+   "targets": [
+    {
+     "path": "procedural/canopy/material/baseColor",
+     "component": 0,
+     "min": 0.065,
+     "max": 0.085,
+     "op": "replace"
+    },
+    {
+     "path": "procedural/canopy/material/baseColor",
+     "component": 1,
+     "min": 0.15,
+     "max": 0.072,
+     "op": "replace"
+    },
+    {
+     "path": "procedural/canopy/material/baseColor",
+     "component": 2,
+     "min": 0.052,
+     "max": 0.06,
+     "op": "replace"
+    },
+    {
+     "path": "procedural/canopy-far/material/baseColor",
+     "component": 0,
+     "min": 0.048,
+     "max": 0.07,
+     "op": "replace"
+    },
+    {
+     "path": "procedural/canopy-far/material/baseColor",
+     "component": 1,
+     "min": 0.11,
+     "max": 0.064,
+     "op": "replace"
+    },
+    {
+     "path": "procedural/canopy-far/material/baseColor",
+     "component": 2,
+     "min": 0.042,
+     "max": 0.058,
+     "op": "replace"
+    },
+    {
+     "path": "procedural/undergrowth/material/baseColor",
+     "component": 0,
+     "min": 0.07,
+     "max": 0.115,
+     "op": "replace"
+    },
+    {
+     "path": "procedural/undergrowth/material/baseColor",
+     "component": 1,
+     "min": 0.135,
+     "max": 0.108,
+     "op": "replace"
+    },
+    {
+     "path": "procedural/undergrowth/material/baseColor",
+     "component": 2,
+     "min": 0.048,
+     "max": 0.098,
+     "op": "replace"
+    },
+    {
+     "path": "procedural/ground/material/baseColor",
+     "component": 0,
+     "min": 0.055,
+     "max": 0.19,
+     "op": "replace"
+    },
+    {
+     "path": "procedural/ground/material/baseColor",
+     "component": 1,
+     "min": 0.085,
+     "max": 0.2,
+     "op": "replace"
+    },
+    {
+     "path": "procedural/ground/material/baseColor",
+     "component": 2,
+     "min": 0.038,
+     "max": 0.215,
+     "op": "replace"
+    },
+    {
+     "path": "env/sky/zenithColor",
+     "component": 0,
+     "min": 0.052,
+     "max": 0.048,
+     "op": "replace"
+    },
+    {
+     "path": "env/sky/zenithColor",
+     "component": 1,
+     "min": 0.088,
+     "max": 0.054,
+     "op": "replace"
+    },
+    {
+     "path": "env/sky/zenithColor",
+     "component": 2,
+     "min": 0.17,
+     "max": 0.066,
+     "op": "replace"
+    },
+    {
+     "path": "env/sky/horizonColor",
+     "component": 0,
+     "min": 0.22,
+     "max": 0.098,
+     "op": "replace"
+    },
+    {
+     "path": "env/sky/horizonColor",
+     "component": 1,
+     "min": 0.215,
+     "max": 0.104,
+     "op": "replace"
+    },
+    {
+     "path": "env/sky/horizonColor",
+     "component": 2,
+     "min": 0.18,
+     "max": 0.116,
+     "op": "replace"
+    },
+    {
+     "path": "env/sky/sunColor",
+     "component": 0,
+     "min": 1.0,
+     "max": 0.62,
+     "op": "replace"
+    },
+    {
+     "path": "env/sky/sunColor",
+     "component": 1,
+     "min": 0.88,
+     "max": 0.66,
+     "op": "replace"
+    },
+    {
+     "path": "env/sky/sunColor",
+     "component": 2,
+     "min": 0.62,
+     "max": 0.74,
+     "op": "replace"
+    },
+    {
+     "path": "env/sky/sunIntensity",
+     "component": -1,
+     "min": 3.2,
+     "max": 0.45,
+     "op": "replace"
+    },
+    {
+     "path": "env/sky/haze",
+     "component": -1,
+     "min": 0.45,
+     "max": 0.85,
+     "op": "replace"
+    },
+    {
+     "path": "env/intensity",
+     "component": -1,
+     "min": 0.85,
+     "max": 0.55,
+     "op": "replace"
+    },
+    {
+     "path": "scene/fogDensity",
+     "component": -1,
+     "min": 0.0022,
+     "max": 0.0075,
+     "op": "replace"
+    },
+    {
+     "path": "scene/fogColor",
+     "component": 0,
+     "min": 0.085,
+     "max": 0.115,
+     "op": "replace"
+    },
+    {
+     "path": "scene/fogColor",
+     "component": 1,
+     "min": 0.105,
+     "max": 0.122,
+     "op": "replace"
+    },
+    {
+     "path": "scene/fogColor",
+     "component": 2,
+     "min": 0.12,
+     "max": 0.136,
+     "op": "replace"
+    },
+    {
+     "path": "scene/fogHeight",
+     "component": -1,
+     "min": 12.0,
+     "max": 22.0,
+     "op": "replace"
+    },
+    {
+     "path": "particles/season-pollen/spawnRate",
+     "component": -1,
+     "min": 36000.0,
+     "max": 0.0,
+     "op": "replace",
+     "curve": "exp",
+     "curveAmount": 2.0
+    },
+    {
+     "path": "particles/season-snow/spawnRate",
+     "component": -1,
+     "min": 0.0,
+     "max": 240000.0,
+     "op": "replace",
+     "curve": "exp",
+     "curveAmount": 3.0
+    },
+    {
+     "path": "particles/season-leaves/spawnRate",
+     "component": -1,
+     "min": 0.0,
+     "max": 560.0,
+     "op": "replace",
+     "curve": "linear",
+     "curveAmount": 1.0
+    },
+    {
+     "path": "particles/season-leaves/spawnRate",
+     "component": -1,
+     "min": 1.0,
+     "max": 0.0,
+     "op": "multiply",
+     "curve": "exp",
+     "curveAmount": 2.6
+    }
+   ]
+  }
+ ]
+}

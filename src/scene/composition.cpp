@@ -236,6 +236,21 @@ void forEachParticleParam(ParticleParameters& p, F&& f) {
     f(p.twoSided);
     f(p.stretch);
     f(p.trailWidth);
+    // ADR-520, in declaration order. See the paragraph above: an omission here is silent.
+    f(p.collisionHeight);
+    f(p.splashSize);
+    f(p.sizeVariance);
+    f(p.sizeSkew);
+    f(p.dragSizeBias);
+    f(p.pulseRate);
+    f(p.pulseDepth);
+    f(p.pulseSync);
+    f(p.pulseSharpness);
+    f(p.clusterRadius);
+    f(p.pauseRate);
+    f(p.pauseFraction);
+    f(p.scatterStrength);
+    f(p.scatterAnisotropy);
     f(p.enabled);
 }
 
@@ -477,6 +492,55 @@ json particlesToJson(const ParticleSystem& s) {
         j["trailFade"] = s.trailFade;
         j["trailTint"] = vecToJson(s.trailTint);
     }
+    // ---- ADR-520 ----
+    // Written only when they do something, for the reason ADR-367 gives above: a default nobody
+    // chose, written unconditionally, becomes a value baked into every file the editor ever saves.
+    if (s.volumeFollow != glm::vec3(0.0f)) {
+        j["volumeFollow"] = vecToJson(s.volumeFollow);
+    }
+    if (s.volumeWrap) {
+        j["volumeWrap"] = true;
+    }
+    if (s.collision != CollisionResponse::None) {
+        j["collision"] = collisionResponseName(s.collision);
+        j["collisionHeight"] = s.collisionHeight;
+        j["collisionRestitution"] = s.collisionRestitution;
+        if (s.collision == CollisionResponse::Splash) {
+            j["splashLifetime"] = s.splashLifetime;
+            j["splashSize"] = s.splashSize;
+            j["ringThickness"] = s.ringThickness;
+        }
+    }
+    if (s.sizeVariance != 0.3f) {
+        j["sizeVariance"] = s.sizeVariance;
+    }
+    if (s.sizeSkew != 1.0f) {
+        j["sizeSkew"] = s.sizeSkew;
+    }
+    if (s.dragSizeBias != 0.0f) {
+        j["dragSizeBias"] = s.dragSizeBias;
+    }
+    if (s.pulseRate != 0.0f) {
+        j["pulseRate"] = s.pulseRate;
+        j["pulseDepth"] = s.pulseDepth;
+        j["pulseSync"] = s.pulseSync;
+        j["pulseSharpness"] = s.pulseSharpness;
+    }
+    if (s.clusterCount != 0u) {
+        j["clusterCount"] = s.clusterCount;
+        j["clusterRadius"] = s.clusterRadius;
+    }
+    if (s.pauseRate != 0.0f) {
+        j["pauseRate"] = s.pauseRate;
+        j["pauseFraction"] = s.pauseFraction;
+    }
+    if (s.scatterStrength != 0.0f) {
+        j["scatterStrength"] = s.scatterStrength;
+        j["scatterAnisotropy"] = s.scatterAnisotropy;
+    }
+    if (!s.emitMaskField.empty()) {
+        j["emitMaskField"] = s.emitMaskField;
+    }
     if (s.fogCoupling != 1.0f) {
         j["fogCoupling"] = s.fogCoupling;
     }
@@ -624,7 +688,45 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
     AVGEN_READ(trailTint, readVec<3>);
     AVGEN_READ(fogCoupling, readFloat);
     AVGEN_READ(volumeGlow, readFloat);
+    // ---- ADR-520 ----
+    AVGEN_READ(volumeFollow, readVec<3>);
+    AVGEN_READ(volumeWrap, readBool);
+    AVGEN_READ(collisionHeight, readFloat);
+    AVGEN_READ(collisionRestitution, readFloat);
+    AVGEN_READ(splashLifetime, readFloat);
+    AVGEN_READ(splashSize, readFloat);
+    AVGEN_READ(ringThickness, readFloat);
+    AVGEN_READ(sizeVariance, readFloat);
+    AVGEN_READ(sizeSkew, readFloat);
+    AVGEN_READ(dragSizeBias, readFloat);
+    AVGEN_READ(pulseRate, readFloat);
+    AVGEN_READ(pulseDepth, readFloat);
+    AVGEN_READ(pulseSync, readFloat);
+    AVGEN_READ(pulseSharpness, readFloat);
+    AVGEN_READ(clusterRadius, readFloat);
+    AVGEN_READ(pauseRate, readFloat);
+    AVGEN_READ(pauseFraction, readFloat);
+    AVGEN_READ(scatterStrength, readFloat);
+    AVGEN_READ(scatterAnisotropy, readFloat);
+    AVGEN_READ(emitMaskField, readString);
 #undef AVGEN_READ
+    if (j.contains("collision")) {
+        auto name = readString(j, "collision", "");
+        if (!name) {
+            return std::unexpected(name.error());
+        }
+        auto mode = collisionResponseFromName(*name);
+        if (!mode) {
+            return fail("unknown collision response '{}' (expected none, kill, bounce or splash)", *name);
+        }
+        s.collision = *mode;
+    }
+    if (j.contains("clusterCount")) {
+        if (!j.at("clusterCount").is_number_unsigned()) {
+            return fail("'clusterCount' must be a positive integer");
+        }
+        s.clusterCount = j.at("clusterCount").get<std::uint32_t>();
+    }
     for (const auto& [key, target] : {std::pair<const char*, std::uint32_t*>{"trailLength", &s.trailLength},
                                       std::pair<const char*, std::uint32_t*>{"trailStride", &s.trailStride}}) {
         if (j.contains(key)) {
