@@ -74,6 +74,38 @@ t= 80.450       beam -> beam      step= 11.004  agl  34.00 ->  23.00
 The first cycle's 2.175 m at t=0.850 is the same event from the scene's authored start height
 (`nodes/visitor/position` y 29.5, 31.83 m above ground) rather than from 23.
 
+## The spec's Phase 2 table
+
+The craft's state at T-1.0, T-0.5, the last frame before T, T and T+0.1, where T is the frame
+`nodes/visitor-beam/visible` goes up. `speed` is the frame-to-frame delta times 60.
+
+```
+---- beam activation at T = 7.850 s ----
+  offset       beat        craft world position      agl   yaw deg    speed     beam
+  -1.000   approach  (    1.87,   40.35,    7.12)    34.00   -172.77   16.488      off
+  -0.500   approach  (    1.29,   38.57,    0.90)    34.00   -173.00    9.152      off
+  -0.017       beam  (    1.19,   37.99,   -1.32)    34.00   -173.59    0.571      off
+  +0.000       beam  (    1.21,   26.99,   -1.02)    22.92   -173.59  660.180       ON
+  +0.100       beam  (    1.31,   26.99,   -1.05)    22.89   -173.59    0.820       ON
+```
+
+Three things it settles:
+
+* **The craft does stop, and it stops in the wrong place.** The approach eases out properly --
+  16.5, 9.2, 0.57 m/s -- and holds `agl 34.00` to two decimals for the whole last second. The
+  settle the brief asks for is already there; what is missing is that the position it settled on is
+  not the position the next beat wants.
+* **The discontinuity is purely vertical and purely one frame.** Yaw is identical across it
+  (-173.59 either side, all five cycles), x and z move centimetres, y moves 11.000 m, and the frame
+  after is back to 0.82 m/s. 660 m/s is the arithmetic of one frame, not a velocity anything
+  integrated.
+* **In one cycle of five the craft had not stopped at all.** At T-0.017 of the T=62.300 activation
+  it is still travelling at 4.264 m/s. So the brief's "there must be no frame where UFO moving AND
+  beam deploying" is violated on its own terms, separately from the teleport, in 20% of cycles --
+  because nothing in the description couples the beam's start to the approach's arrival; they are
+  two cues in two beats whose durations happen to be authored compatibly, and `approachSeconds` 7.0
+  is a *minimum*, not a guarantee of arrival.
+
 ## The control arm (ADR-182)
 
 Same film, one parameter changed: `staging/abduction/cruiseClearance` 34 -> 23.

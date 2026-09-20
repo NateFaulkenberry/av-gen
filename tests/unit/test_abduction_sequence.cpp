@@ -302,3 +302,32 @@ TEST_CASE("the same teleport happens in the Tractor Beam Lab", "[.abduction-inst
     fmt::print("\nworst single-frame craft step: lab {:.3f} m, lab control {:.3f} m\n",
                worstStepOf(lab), worstStepOf(labFlat));
 }
+
+// The spec's Phase 2 table: the craft's state at T-1.0, T-0.5, T and T+0.1 around every tractor
+// beam activation, where T is the frame `nodes/visitor-beam/visible` goes up.
+TEST_CASE("the craft's state around every beam activation", "[.abduction-instrument]") {
+    const double hz = 60.0;
+    const std::vector<Sample> run = playFilm(90.0, hz);
+    const auto at = [&](double t) -> const Sample& {
+        auto i = static_cast<std::size_t>(std::llround(t * hz));
+        i = std::min(i, run.size() - 1);
+        return run[i];
+    };
+    for (std::size_t i = 1; i < run.size(); ++i) {
+        if (!(run[i].beamVisible > 0.5f && run[i - 1].beamVisible <= 0.5f)) {
+            continue;
+        }
+        const double T = run[i].t;
+        fmt::print("\n---- beam activation at T = {:.3f} s ----\n", T);
+        fmt::print("{:>8}  {:>9}  {:>26}  {:>7}  {:>8}  {:>7}  {:>7}\n", "offset", "beat",
+                   "craft world position", "agl", "yaw deg", "speed", "beam");
+        for (const double d : {-1.0, -0.5, -1.0 / hz, 0.0, 0.1}) {
+            const Sample& s = at(T + d);
+            fmt::print("{:+8.3f}  {:>9}  ({:8.2f},{:8.2f},{:8.2f})  {:7.2f}  {:8.2f}  {:7.3f}  "
+                       "{:>7}\n",
+                       d, s.beat.empty() ? "-" : s.beat, s.pos.x, s.pos.y, s.pos.z,
+                       s.pos.y - s.ground, s.yaw * 57.2957795f, s.step * static_cast<float>(hz),
+                       s.beamVisible > 0.5f ? "ON" : "off");
+        }
+    }
+}
