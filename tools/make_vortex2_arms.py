@@ -166,6 +166,7 @@ def main() -> int:
     for key, value in MACRO.items():
         macro = set_vortex(macro, key, value)
     noisy = macro
+    macro_noisy = set_vortex(noisy, "cloudNoise", 1.0)
     macro = set_vortex(macro, "cloudNoise", 0.0)
     (EX / "_vx2-macro.json").write_text(macro)
     (EX / "_vx2-macro-noise.json").write_text(set_vortex(noisy, "cloudNoise", 1.0))
@@ -200,6 +201,26 @@ def main() -> int:
         (EX / f"_vx2-place-{name}.json").write_text(
             set_centre(set_vortex(noisy, "cloudNoise", 1.0), centre))
 
+    # The scaled arms. ADR-461: every macro parameter is a FRACTION of the radius or an angle, and
+    # only `thickness` and `funnelDepth` are in metres, so scaling those three together gives a
+    # geometrically identical field N times larger -- and `periodBase = radius / effScale0` scales
+    # with it, so the noise's world period does too. Against an unchanged 125 m march step that is a
+    # free N-fold rise in the effective sample rate: measured at N = 3 with the camera scaled to
+    # match, grain fell 3.630 to 1.458 at identical composition and identical cost.
+    #
+    # `_vx2-hero` is the best hero-camera candidate found: the x3 field at 1400 m along the view
+    # axis. It is a luminous backdrop the tree is silhouetted against, and it is NOT a cyclone seen
+    # from above -- ADR-461 measures why the shipped frame cannot hold one.
+    hero = macro_noisy
+    for key, value in (("radius", 600.0), ("thickness", 210.0), ("funnelDepth", 4500.0)):
+        hero = set_vortex(hero, key, value)
+    hero = set_centre(hero, (-1095.0, -304.0, -455.0))
+    (EX / "_vx2-hero.json").write_text(hero)
+    # The jitter pair, which is the whole of ADR-461 in two frames: the same field at 32 steps with
+    # the march's start jitter on and off. 0.7312 against 0.5172, and 256 steps with it off is
+    # 0.5196 -- so the eighth of the cost buys the same picture.
+    (EX / "_vx2-hero-jitter.json").write_text(set_parameter(hero, "scene/volumeJitter", 1.0))
+
     above = macro
     for key, value in ABOVE_CAMERA.items():
         above = set_parameter(above, key, value)
@@ -208,13 +229,14 @@ def main() -> int:
     # ADR-182: the arms have to be shown to differ from the thing they are derived from, or a
     # regex that matched nothing produces three identical files and a checkpoint that passes.
     for name in ("_vx2-before", "_vx2-macro", "_vx2-macro-noise", "_vx2-above",
-                 "_vx2-place-far", "_vx2-place-mid", "_vx2-place-near"):
+                 "_vx2-place-far", "_vx2-place-mid", "_vx2-place-near",
+                 "_vx2-hero", "_vx2-hero-jitter"):
         text = (EX / f"{name}.json").read_text()
         if text == src:
             raise SystemExit(f"{name}.json is identical to the deliverable: nothing was changed")
     if (EX / "_vx2-macro.json").read_text() == (EX / "_vx2-before.json").read_text():
         raise SystemExit("_vx2-macro.json is identical to _vx2-before.json: the macro edits missed")
-    print("wrote _vx2-before.json, _vx2-macro.json, _vx2-macro-noise.json")
+    print("wrote the _vx2-* arms")
     return 0
 
 
