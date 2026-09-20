@@ -222,6 +222,28 @@ TEST_CASE("an embedded tempo never locks the project tempo", "[tempo][engine]") 
     REQUIRE(engine.transport().tempoBpm() == Approx(128.0));
 }
 
+TEST_CASE("clearing the audio clears the tempo it brought, but not the override",
+          "[tempo][engine]") {
+    // A tempo attributed to a file that is no longer loaded, still outranking the analyzer for
+    // whatever is loaded next. The override is a property of the project and must survive.
+    Fixture fx("embedded-tempo-clear");
+    const auto tagged = writeClickWav(fx.dir / "tagged.wav", 128.0, 6.0, "128");
+
+    auto engine = makeEngine();
+    REQUIRE(engine.loadAudio(tagged).has_value());
+    REQUIRE(engine.embeddedTempo().available);
+
+    REQUIRE(engine.setAudioClips({}).has_value());
+    REQUIRE_FALSE(engine.embeddedTempo().available);
+    REQUIRE_FALSE(engine.tempo().available);
+
+    engine.setTempoOverride(112.0);
+    REQUIRE(engine.loadAudio(tagged).has_value());
+    REQUIRE(engine.setAudioClips({}).has_value());
+    REQUIRE(engine.tempoOverride().available);
+    REQUIRE(engine.tempo().bpm == Approx(112.0));
+}
+
 TEST_CASE("tempo precedence is override > embedded > detected > none", "[tempo][engine]") {
     Fixture fx("embedded-tempo-precedence");
     const auto tagged = writeClickWav(fx.dir / "tagged.wav", 128.0, 6.0, "128");

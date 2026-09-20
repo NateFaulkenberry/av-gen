@@ -2670,6 +2670,11 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
         track_.reset();
         audioFile_.reset();
         audioPath_.clear();
+        // The tempo the audio brought with it goes when the audio does. Left standing it would be a
+        // tempo attributed to a file that is no longer loaded -- and, worse, one that would keep
+        // outranking the analyzer for whatever was loaded next. The override is NOT cleared here:
+        // that belongs to the project, not to the audio.
+        embeddedTempo_ = {};
         offlineFrameCursor_ = 0;
         hasFrame_ = false;
         ++audioRevision_;
