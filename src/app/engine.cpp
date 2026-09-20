@@ -1705,8 +1705,91 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             effects.push_back(std::move(*one));
         }
         if (readable) {
+            // ADR-387 §19, the second half of the migration. A project's `atmosphericEffects` block
+            // is a COPY of the scene's list and REPLACES it (ADR-264), so a project saved before the
+            // vortex was an effect carries a list that cannot contain one -- and the vortex the
+            // scene's own migration just produced would be thrown away by a project that is exactly
+            // as legacy as the scene it names. Measured: the intermediate state where only the scene
+            // had been migrated rendered 97.96% of pixels different, with the funnel gone.
+            //
+            // Carried over by KIND rather than by name, because the thing being migrated is a format
+            // that predates the kind. A project that authors its own vortex is not legacy and is left
+            // alone, which is the control: this can only ever add the one the file could not express.
+            const bool projectHasVortex =
+                std::any_of(effects.begin(), effects.end(), [](const world::AtmosphericEffect& e) {
+                    return e.kind == world::AtmosphereKind::Vortex;
+                });
+            if (!projectHasVortex) {
+                for (const world::AtmosphericEffect& e : atmosphericEffects_) {
+                    if (e.kind == world::AtmosphereKind::Vortex) {
+                        effects.push_back(e);
+                        break;
+                    }
+                }
+            }
             if (auto ok = setAtmosphericEffects(std::move(effects)); !ok) {
                 warn("atmosphericEffects: " + ok.error().message);
+            }
+        }
+    }
+    // ADR-387 §19, the third and last half of the migration: the PATHS. Moving the vortex from
+    // `scene/vortex/*` to `atmos/<name>/*` orphans every route, key, preset member and macro that
+    // named the old one -- silently, because a route whose target does not resolve is dropped with
+    // a warning nobody reads and the picture simply stops answering the music.
+    //
+    // This was not theory. The shipped Tree of Life project carries five of them (bass -> density
+    // and breath, mid -> turbulence, treble -> filaments, progress -> emission), and without this
+    // the migrated scene rendered 95.35% of its pixels differently from the scene it replaced --
+    // an unmodulated funnel, dimmest exactly where the vortex is brightest. Three renders and a
+    // uniform probe said the values reaching the GPU were correct to the last decimal before the
+    // routes turned out to be what had moved.
+    //
+    // Rewritten over the WHOLE document rather than over `routes`, because a path is a string in
+    // six places (a route target, a timeline track, a cue, a preset member, a macro target, a
+    // control binding) and a migration that knows about one of them is a migration that fails
+    // quietly in the other five.
+    if (!atmosphericEffects_.empty()) {
+        std::string vortexName;
+        for (const world::AtmosphericEffect& e : atmosphericEffects_) {
+            if (e.kind == world::AtmosphereKind::Vortex) {
+                vortexName = e.name;
+                break;
+            }
+        }
+        if (!vortexName.empty()) {
+            const std::string from = "scene/vortex/";
+            const std::string to = world::atmosphericParameterPrefix(vortexName);
+            std::size_t moved = 0;
+            const auto rewrite = [&](auto&& self, nlohmann::json& node) -> void {
+                if (node.is_string()) {
+                    const std::string& v = node.get_ref<const std::string&>();
+                    if (v.compare(0, from.size(), from) == 0) {
+                        node = to + v.substr(from.size());
+                        ++moved;
+                    }
+                    return;
+                }
+                if (node.is_array()) {
+                    for (nlohmann::json& child : node) { self(self, child); }
+                    return;
+                }
+                if (!node.is_object()) { return; }
+                nlohmann::json rebuilt = nlohmann::json::object();
+                for (auto& [key, value] : node.items()) {
+                    self(self, value);
+                    if (key.size() > from.size() && key.compare(0, from.size(), from) == 0) {
+                        rebuilt[to + key.substr(from.size())] = std::move(value);
+                        ++moved;
+                    } else {
+                        rebuilt[key] = std::move(value);
+                    }
+                }
+                node = std::move(rebuilt);
+            };
+            rewrite(rewrite, doc);
+            if (moved > 0) {
+                log::info("project: migrated {} reference(s) from 'scene/vortex/' to '{}' (ADR-387)",
+                          moved, to);
             }
         }
     }

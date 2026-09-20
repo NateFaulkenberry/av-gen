@@ -63,7 +63,7 @@ a second would be a second full-screen march term. The resolve pass counts extra
 `dropped`, the same way it reports any other effect it refused. The data model does not prevent a
 second one; the renderer declines to draw it, and says so.
 
-### Legacy data is migrated, not discarded (§19)
+### Legacy data is migrated in three places, not one (§19)
 
 A scene file carrying `environment.vortex` is read into a `world::Vortex` and converted into an
 enabled `Activation::Always` effect named `vortex`, after the `atmosphericEffects` array is read so
@@ -74,12 +74,45 @@ A legacy vortex with `radius == 0` is **not** migrated. Zero was ADR-371's "off"
 scene in the repository but one has; turning those into disabled effect instances would put a row
 in the World Effects panel for something nobody authored.
 
-The shipped Tree of Life scene and project were migrated in the same commit, because a project
-carries its own copy of `atmosphericEffects` and that copy **replaces** the scene's (ADR-264). That
-is not a defect and was not worked around: it is why the migrated effect had to be written into
-both files. The intermediate state — scene migrated, project not — is what caught it, and it is
-worth recording as the control it turned out to be: it rendered with **97.96% of pixels different**
-from the baseline, because the funnel had silently vanished.
+A project carries its own copy of `atmosphericEffects` and that copy **replaces** the scene's
+(ADR-264), so the migration has to happen there too: a project saved before the vortex was an effect
+carries a list that could not contain one, and it would throw away the vortex the scene's own
+migration had just produced. Carried over by **kind**, because what is being migrated is a format
+that predates the kind; a project that authors its own vortex is not legacy and is left alone.
+
+**And the paths, which is the one that nearly shipped broken.** Renaming `scene/vortex/*` to
+`atmos/<name>/*` orphans every route, timeline key, preset member, cue and macro that named the old
+path. The shipped project has five such routes — bass → density and breath, mid → turbulence,
+treble → filaments, progress → emission — and losing them does not fail, does not throw, and warns
+only in a line nobody reads. The document is rewritten over its **whole tree**, string values and
+object keys alike, because a parameter path appears in six places and a migration that knows about
+one of them fails quietly in the other five.
+
+#### A parameter path is three things at once, and a correct value is not a reached value
+
+This is the general fact, and it is worth stating on its own because the next instance of it will
+not look like a vortex. **A parameter path is three things at once: where a value is stored, what a
+project's `parameters` block names, and what a modulation route targets.** Renaming one moves the
+first. Nothing in the build, the loader or the renderer notices that the other two were left behind.
+
+It was proved here the expensive way. A one-shot probe on the uniform upload reported every field
+of the vortex arriving at the GPU correct to the last decimal — radius 200, density 0.0013, emission
+0.04, every colour — while 95.35% of the frame's pixels were wrong. **A correct value is not a
+reached value.** What had been renamed was not the number but the *permission to change it*.
+
+The same family as ADR-385's stated reason that was not evidence, and as the reader with no writer:
+a thing that is present, correct, and reaching nothing. What makes this one worth its own paragraph
+is the shape of the alibi — the measurement that says "the value is right" is exactly the
+measurement that cannot see the failure, and it is the first one anybody reaches for.
+
+Two measurements are worth keeping, because they are what each half cost:
+
+- scene migrated, project's effect list not: **97.96% of pixels different** — the funnel gone.
+- both migrated, routes not: **95.35% of pixels different** — the funnel there and unmodulated,
+  dimmest exactly where it is brightest. Three renders and a one-shot uniform probe confirmed every
+  value reaching the GPU was correct to the last decimal before the routes turned out to be what
+  had moved. **A correct value is not a reached value**, and the thing that had been renamed was not
+  the number but the permission to change it.
 
 ### The Tree panel is deleted, and its sections go where the taxonomy puts them
 
@@ -127,9 +160,15 @@ systems, and the Inspector's groups by splitting a path.
 
 ## Consequences
 
-**The Tree of Life is byte-identical.** Two frames at 960×540, t = 6.00 and 6.05, rendered before
-and after: `0 of 518400 pixels differ, max channel delta 0`, sequence hash `fa205bf543c0f6f6` in
-both arms. §10 is satisfied by the values being the same values, not by re-tuning to match.
+**The Tree of Life is byte-identical.** Two frames at 960×540, t = 6.00 and 6.05, rendered by a
+build of the merge base against a build of this branch: `0 of 518400 pixels differ, max channel
+delta 0` on both frames, sequence hash `89be5e9d72ed8d49` in both arms. The same hash comes back
+three ways — old code on old files, new code on old files (all three migrations firing), and new
+code on the migrated files — which is what makes it a statement about the migration rather than
+about one pair of runs. §10 is satisfied by the values being the same values, not by re-tuning to
+match. The control that the comparison can fail: switching the vortex off in both arms gives a
+different, also-identical hash, and each of the three migration halves, omitted, moved 95–98% of
+the frame.
 
 **Glowmere is byte-identical.** `glowmere-atmospherics` and `glowmere-valley-2-multicam`, three
 frames each, same hashes before and after. §13's precedent — Aurora, Comets, Hero FX, Beam FX — is
@@ -147,6 +186,13 @@ mechanical and would bury what this is for.
 terrain; this one hangs under a floating island with no terrain beneath it. Its light on the world
 is ADR-379's `spill`, which is a field on the vortex. A combo that changed nothing would be worse
 than no combo — and the same reasoning removes the rainbow rows, which a vortex registers none of.
+
+**A second caller read the gate the fog-only way.** `VolumeRenderer::enabled(const Environment&)`
+could no longer see the vortex, and the particle fog coupling (ADR-040) still called that overload —
+so in the one scene whose `volumeDensity` is zero and whose volume pass exists only because of the
+vortex, the coupling silently stopped being filled. It happens not to move this picture, because the
+fog density it would carry is zero; it is fixed anyway, and recorded, because the next scene to put
+a vortex in real fog would have found it as an image bug with no obvious cause.
 
 **What this does not do.** §16's Canvas integration is not touched: another agent owns viewport
 drawing, selection and picking, and the Objects list added here is a panel list, not a picker.

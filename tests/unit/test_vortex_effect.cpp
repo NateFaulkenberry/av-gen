@@ -265,3 +265,54 @@ TEST_CASE("the Tree panel is gone and the Environment panel is generic", "[ui][p
     CHECK(blurb.find("island") == std::string::npos);
     CHECK(blurb.find("vortex") == std::string::npos);
 }
+
+// ADR-387 §19, the half that nearly shipped broken: the PATHS.
+//
+// Moving the vortex from `scene/vortex/*` to `atmos/<name>/*` orphans every route, key, preset
+// member and macro that named the old one. The shipped Tree of Life project has five such routes,
+// and without the rewrite the migrated scene rendered 95.35% of its pixels differently -- an
+// unmodulated funnel. Nothing failed, nothing warned loudly, and a uniform probe confirmed that
+// every value reaching the GPU was correct to the last decimal. What had moved was what was
+// allowed to move them.
+//
+// The rewrite is a pure transformation over a project document, so it is asserted here as one,
+// over every shape a path appears in.
+TEST_CASE("the shipped project drives the vortex through a path that exists",
+          "[vortex][atmospherics][migration][routes]") {
+    const std::filesystem::path project =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "treeisland" / "tree-of-life-floating-island.json";
+    REQUIRE(std::filesystem::exists(project));
+    std::ifstream in(project);
+    const json doc = json::parse(in, nullptr, false);
+    REQUIRE_FALSE(doc.is_discarded());
+
+    // Every target the project names for the vortex, collected the way a reader has to: by looking
+    // at the strings, not by trusting a section name.
+    std::vector<std::string> vortexTargets;
+    bool sawLegacy = false;
+    REQUIRE(doc.contains("routes"));
+    for (const json& r : doc.at("routes")) {
+        const std::string target = r.value("target", std::string());
+        if (target.rfind("scene/vortex/", 0) == 0) {
+            sawLegacy = true;
+        }
+        if (target.rfind("atmos/", 0) == 0 && target.find("Vortex") != std::string::npos) {
+            vortexTargets.push_back(target);
+        }
+    }
+    CHECK_FALSE(sawLegacy);
+    // THE CONTROL: the project really does route to the vortex, so the line above is a fact about
+    // the migration rather than about a project that never mentioned it.
+    CHECK(vortexTargets.size() == 5);
+
+    // And every one of them resolves against a registered vortex of that name.
+    params::ParameterSet params;
+    std::vector<world::AtmosphericEffect> effects{world::cosmicVortex("Cosmic Vortex")};
+    world::registerAtmosphericParameters(params, effects);
+    for (const std::string& target : vortexTargets) {
+        INFO(target);
+        CHECK(params.find(target) != nullptr);
+    }
+    // ...and the paths they replaced do not, which is what made the breakage silent.
+    CHECK(params.find("scene/vortex/density") == nullptr);
+}
