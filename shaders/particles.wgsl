@@ -18,7 +18,8 @@
 //                       alive slot its rank r; aliveList[r] = slot, and every dead slot its rank
 //                       slot - r; deadList[slot - r] = slot. Both lists are therefore in slot order.
 //   Render: vs_particle reads aliveList[instance_index], so instances are drawn in slot order.
-// Randomness is a hash of (slot, frameIndex, seed, salt) - deterministic for a frame sequence.
+// Randomness is a hash of (slot, frameNonce, seed, salt): keyed to the timeline second (ADR-360),
+// not to the frame index, so the same second seeds the same spawns wherever the render began.
 //
 // Field forces (ADR-025): params.fieldForces holds up to 4 (mode, slot, strength, mix) + (axis, 0)
 // pairs sampled from the FieldBlock (binding 8, fields.wgsl) at the particle position after the
@@ -53,6 +54,11 @@
 // frame (x = binormal, y = normal, z = tangent), so the default (0, 1, 0) rises along the
 // sample normal and (0, 0, 1) follows the tangent. The CPU falls back to the Point shape when
 // the spline is missing.
+// ADR-370: the wind field itself, with no bindings in it. `wind.wgsl` is the frame-bound
+// wrapper and this shader has no frame group, so it takes the arithmetic and passes its own
+// copy of the sixteen floats. There used to be a hand-maintained transliteration here
+// instead, and it had already dropped `WindSample::phase`.
+#include "wind_field.wgsl"
 #include "fields.wgsl"
 #include "spline.wgsl"
 
@@ -84,6 +90,12 @@ struct Params {
     colorStart: vec4<f32>,
     colorEnd: vec4<f32>,
     sim: vec4<f32>,         // dt, time, frameIndex, seed
+    // ADR-360: the spawn key. x = FrameTime::frameNonce(), which is derived from the position on
+    // the TIMELINE (round(renderTime * 240), wrapped at 2^24) and not from how many frames have
+    // been drawn since this render started. `sim.z` is still the frame index and is still what the
+    // trail stride counts, because "every Nth frame" is a rate and not a seed; nothing else in this
+    // shader may key randomness to it. yzw = 0.
+    nonce: vec4<u32>,
     stretch: vec4<f32>,     // velocityStretch, stretchMax, stretchMin, 0
     trail: vec4<f32>,       // history points (0 = trails off), stride, width, taper
     trail2: vec4<f32>,      // tail alpha fraction, tail tint rgb
@@ -95,7 +107,9 @@ struct Params {
     // ADR-370: the ADR-055 wind field, copied into the particle uniforms rather than reached
     // through the frame group. `particles.wgsl` binds no frame uniform at all -- it never has --
     // and adding one would change the bind-group layout of every particle pipeline for four
-    // vectors. Same bytes, same meaning, same `windSampleAt` arithmetic, no layout churn.
+    // vectors. Same bytes and the same meaning as `FrameUniforms`', and -- since the copy of the
+    // ARITHMETIC that used to sit below them was deleted -- literally the same function:
+    // `wind_field.wgsl`'s `windSampleFrom`, which is what `wind.wgsl` calls too.
     windDir: vec4<f32>,
     windRegion: vec4<f32>,
     windGust: vec4<f32>,
@@ -189,38 +203,18 @@ fn potential(p: vec3<f32>) -> vec3<f32> {
     return vec3<f32>(turbValueNoise(p), turbValueNoise(p + vec3<f32>(31.4, 47.1, 12.9)), turbValueNoise(p + vec3<f32>(-17.2, 5.3, 29.8))) - vec3<f32>(0.5);
 }
 
-// ADR-370: ADR-055's field sampler, reading the particle uniforms instead of the frame block. The
-// expressions are `shaders/wind.wgsl`'s, term for term and in the same order, because the whole
-// value of that field is that every consumer agrees about what the air is doing at a point.
-struct ParticleWind {
-    direction: vec2<f32>,
-    strength: f32,
-    gust: f32,
-};
-
-fn particleWindAt(pos: vec3<f32>, t: f32) -> ParticleWind {
-    let d = params.windDir.xy;
-    let perp = vec2<f32>(-d.y, d.x);
-    let a = dot(pos.xz, d);
-    let c = dot(pos.xz, perp);
-    let kr = params.windRegion.x;
-    let drift = params.windRegion.z;
-    let r1 = sin(kr * (0.94 * a + 0.34 * c) - t * drift);
-    let r2 = sin(kr * 1.63 * (0.61 * a - 0.79 * c) + t * drift * 0.61 + 2.1);
-    let region = max(1.0 + params.windRegion.y * 0.5 * (r1 + r2), 0.0);
-    let kg = params.windGust.x;
-    let gp = kg * (a - t * params.windGust.y) + 0.8 * sin(c * kg * 0.37);
-    let envelope = pow(max(0.5 + 0.5 * sin(gp), 0.0), params.windGust.w);
-    let kt = params.windTurb.x;
-    let ts = params.windTurb.y;
-    let s1 = sin(kt * (0.31 * a + 0.95 * c) - t * ts * kt);
-    let s2 = sin(kt * 1.41 * (-0.87 * a + 0.5 * c) + t * ts * kt * 0.83 + 1.3);
-    let turn = params.windRegion.w * 0.5 * (s1 + s2);
-    var out: ParticleWind;
-    out.direction = d * cos(turn) + perp * sin(turn);
-    out.strength = params.windDir.z * region;
-    out.gust = envelope * params.windGust.z;
-    return out;
+// ADR-370: the frame's wind, as this shader's uniforms carry it. `particles.wgsl` binds no frame
+// uniform at all -- it never has -- so the field is copied into these five vectors by
+// `ParticleRenderer::update` straight out of `ParticleFrameContext::wind`, which is the same
+// `wind::WindUniforms` `FrameUniforms` gets. Gathering them is all this function does; the
+// sampling is `wind_field.wgsl`'s, which is also what `wind.wgsl` calls.
+fn particleWindField() -> WindField {
+    var w: WindField;
+    w.dir = params.windDir;
+    w.region = params.windRegion;
+    w.gust = params.windGust;
+    w.turbulence = params.windTurb;
+    return w;
 }
 
 fn turbCurl(p: vec3<f32>) -> vec3<f32> {
@@ -247,7 +241,12 @@ fn cs_emit(@builtin(global_invocation_id) gid: vec3<u32>) {
     // Spawn i takes the i-th free slot (lowest slot first). Clamped to last frame's dead count.
     if (i >= params.counts.x || i >= counters.deadCount) { return; }
     let slot = deadList[i];
-    let frame = u32(params.sim.z);
+    // ADR-360. This used to be `u32(params.sim.z)` -- the frame index -- so the same second of the
+    // same scene seeded different spawns in a full render, in a re-render of a section, and in the
+    // live application, whose RealtimeClock never resets the counter at all. Measured before this
+    // changed: two fresh renderers handed the same renderTime and frame indices 0 and 97 differed
+    // over 7656 of 147456 bytes, max delta 235.
+    let frame = params.nonce.x;
     let r1 = rand3(slot, frame, 1u);
     let r2 = rand3(slot, frame, 2u);
     let r3 = rand3(slot, frame, 3u);
@@ -344,7 +343,7 @@ fn cs_simulate(@builtin(global_invocation_id) gid: vec3<u32>) {
     // so two leaves ten metres apart catch different air and a gust front arrives at one before the
     // other, which is what stops a shower drifting as a single sheet.
     if (params.windMix.x > 0.0 && params.windDir.w > 0.5) {
-        let w = particleWindAt(p.position, params.sim.y);
+        let w = windSampleFrom(particleWindField(), p.position, params.sim.y);
         let flow = vec3<f32>(w.direction.x, 0.0, w.direction.y) * (w.strength * (1.0 + w.gust));
         // A force toward matching the air, not a shove: a leaf accelerates until it is travelling
         // with the wind and then stops accelerating, which is what drag against moving air does.

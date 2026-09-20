@@ -120,10 +120,16 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
-        # ADR-383 split the range out of RenderSettings; the unit-test list gained it and this one
-        # did not, so `avgen_render_tests` stopped linking. Not caught by a build of the default
-        # target, which is why it is worth a line: this executable is only built on request, and
-        # this is the second time a merge has dropped it.
+        # ADR-383 split the range out of `RenderSettings`; the unit-test list gained
+        # `frame_range.cpp` and this one did not, so `avgen_render_tests` stopped linking --
+        # `render_settings.cpp` is on both lists and calls FrameRange::frameCount, ::resolvedEnd and
+        # ::validate. Three undefined symbols at the last step of a 100% build, from 61c8117a
+        # (2026-09-19) until it was fixed on two branches at once.
+        #
+        # Worth the lines, because nothing said so and this is the second time a merge has dropped
+        # it: this executable is only built on request, the binary already on disk kept running, and
+        # a build wrapper reports the shell line's status rather than the compiler's. What it was
+        # hiding, for the record: the vortex CPU/GPU parity test (ADR-388) was red underneath.
         "${CMAKE_SOURCE_DIR}/src/app/frame_range.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/render_job.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"

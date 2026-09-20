@@ -182,6 +182,15 @@ Result<void> RenderJob::start() {
             }
         }
     }
+    // ADR-398. The warm-up above is a PIPELINE warm-up on a throwaway renderer, for a 1-LSB Metal
+    // effect; it is not a history warm-up and the two should not be confused. But it drives the
+    // real engine to get a scene to render, and `Engine::update` consumes the one-shot
+    // `exposureReset` -- so the first frame this job actually ships used to see it already false,
+    // and the meter opened the render on whatever the throwaway frame had left behind. Today's
+    // `seekSeconds` sets the flag again, and today's job is saved anyway because that throwaway
+    // renderer is default-constructed and meters nothing; neither of those is a reason to leave a
+    // one-shot being consumed by a frame nobody keeps.
+    engine_->resetCameraState();
     renderer_ = std::make_unique<rendering::SceneRenderer>(context_, shaders_);
     if (auto r = renderer_->init(); !r) {
         return r;

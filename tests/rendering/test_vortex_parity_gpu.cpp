@@ -49,12 +49,20 @@ std::unique_ptr<gpu::Context> makeContext() {
 
 // One thread per sample. Output per sample: (density, radialT, depthT, envelope) and (velocity, 0).
 constexpr const char* kKernel = R"(
+// ADR-401: the WHOLE uniform block, as one member, and not a field list.
+//
+// It was a field list -- `v0: vec4<f32>` through `v4` -- copied member by member into a
+// `VortexUniformsWgsl` in the kernel below. ADR-389 then added `v6` (smokeWarp, smokeBillow,
+// detail) to the real struct on both sides and to this harness on neither, so `var v:
+// VortexUniformsWgsl` left it zero-initialised and this test spent a day comparing a GPU vortex
+// with the domain warp, the billow and the third octave all switched OFF against a CPU vortex with
+// them on. 75 assertions failed and none of them was a disagreement about arithmetic.
+//
+// Naming the type instead of its fields is what makes that unrepeatable: a seventh vec4 added to
+// `VortexUniformsWgsl` is carried here with no edit, and one added on only one side fails the
+// `sizeof` assertion below or Dawn's minBindingSize check rather than silently reading zero.
 struct Args {
-    v0: vec4<f32>,
-    v1: vec4<f32>,
-    v2: vec4<f32>,
-    v3: vec4<f32>,
-    v4: vec4<f32>,
+    v: VortexUniformsWgsl,
     time: vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> args: Args;
@@ -65,13 +73,7 @@ struct Args {
 fn cs_sample(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
     if (i >= arrayLength(&samples)) { return; }
-    var v: VortexUniformsWgsl;
-    v.v0 = args.v0;
-    v.v1 = args.v1;
-    v.v2 = args.v2;
-    v.v3 = args.v3;
-    v.v4 = args.v4;
-    let s = sampleVortex(v, samples[i].xyz, args.time.x);
+    let s = sampleVortex(args.v, samples[i].xyz, args.time.x);
     results[i * 2u] = vec4<f32>(s.density, s.radialT, s.depthT, s.envelope);
     results[i * 2u + 1u] = vec4<f32>(s.velocity, 0.0);
 }
@@ -126,9 +128,13 @@ public:
     std::vector<Gpu> run(const vortex::VortexUniforms& u, float time,
                          const std::vector<glm::vec3>& positions) {
         const auto& device = ctx_.device();
+        // The uniform block by VALUE, so this harness has no list of fields to fall behind.
         struct Args {
-            glm::vec4 v0, v1, v2, v3, v4, time;
-        } args{u.v0, u.v1, u.v2, u.v3, u.v4, glm::vec4(time, 0.0f, 0.0f, 0.0f)};
+            vortex::VortexUniforms v;
+            glm::vec4 time;
+        } args{u, glm::vec4(time, 0.0f, 0.0f, 0.0f)};
+        static_assert(sizeof(Args) == sizeof(vortex::VortexUniforms) + sizeof(glm::vec4),
+                      "the kernel's Args must be the uniform block plus the time vector");
         wgpu::BufferDescriptor adesc{};
         adesc.size = sizeof(Args);
         adesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
@@ -313,3 +319,190 @@ TEST_CASE("a vortex with no radius is off, and costs nothing to ask", "[gpu][vor
     }
     CHECK_FALSE(vortex::VortexField{}.active());
 }
+
+// ---- ADR-401 -----------------------------------------------------------------------------------
+
+namespace {
+
+// The shipped funnel with ADR-389's smoke on. Nothing in `examples/` authors `smokeWarp` or
+// `smokeBillow` yet -- they are new and default to 0 -- so the arm above, which is deliberately the
+// configuration that ships, exercises neither the domain warp nor the billow. This one does. A
+// parity test that covers only the paths already in use is a parity test that goes red the first
+// time somebody turns a feature on.
+vortex::VortexField smoky() {
+    vortex::VortexField f = shipped();
+    f.smokeWarp = 0.35f;
+    f.smokeBillow = 0.2f;
+    f.detail = 0.8f;
+    return f;
+}
+
+// A spread that lands INSIDE the wall, densely, which `positions()` deliberately does not: that one
+// covers every branch including the four early-outs, so most of it sits where the answer is zero.
+// Zero agrees with zero for reasons that have nothing to do with the noise or the curve, so a probe
+// about the transfer function needs samples where there is something to transfer.
+std::vector<glm::vec3> wallPositions() {
+    std::vector<glm::vec3> out;
+    // Placed from the geometry rather than by eye. `wall` is `exp(-rel.y^2 / thickness^2)` with the
+    // centre at y = -70 and thickness 70, so the band that is actually dense is y in [-140, 0] --
+    // NOT deep down the funnel, where `wall` has decayed to nothing and only the narrow throat term
+    // survives. A first version of this spread ran to y = -716 and produced 37 live samples out of
+    // 480; this one is the same count of points aimed at the shell they are meant to be in.
+    for (int i = 0; i < 160; ++i) {
+        const float a = static_cast<float>(i) * 0.61803f * 6.2831853f;
+        // 0.32..0.92 of the 200 m radius: outside the 0.24 void, inside the rim's 0.72 fade.
+        const float rr = 0.32f + 0.60f * (static_cast<float>(i % 20) / 19.0f);
+        const float r = 200.0f * rr;
+        // Across the wall's own thickness, centred on it.
+        const float y = -70.0f + (static_cast<float>(i % 17) - 8.0f) * 8.0f;
+        out.emplace_back(std::cos(a) * r, y, std::sin(a) * r);
+    }
+    return out;
+}
+
+// How many of `a` differ from `b` by more than a float's worth of rounding.
+std::size_t movedCount(const std::vector<Gpu>& a, const std::vector<Gpu>& b) {
+    std::size_t n = 0;
+    for (std::size_t i = 0; i < a.size() && i < b.size(); ++i) {
+        if (std::abs(a[i].density - b[i].density) > 1e-4f) {
+            ++n;
+        }
+    }
+    return n;
+}
+
+} // namespace
+
+TEST_CASE("the vortex shader agrees with core/vortex.cpp with the smoke on", "[gpu][vortex][parity]") {
+    auto ctx = makeContext();
+    Harness harness(*ctx);
+    const vortex::VortexUniforms u = vortex::packVortex(smoky());
+    const std::vector<glm::vec3> pts = wallPositions();
+
+    int warped = 0;
+    for (const float t : {0.0f, 6.0f, 41.7f}) {
+        const std::vector<Gpu> gpu = harness.run(u, t, pts);
+        REQUIRE(gpu.size() == pts.size());
+        for (std::size_t i = 0; i < pts.size(); ++i) {
+            const vortex::VortexSample cpu = vortex::sampleVortex(u, pts[i], t);
+            INFO("t=" << t << " p=(" << pts[i].x << ", " << pts[i].y << ", " << pts[i].z << ")");
+            CHECK(gpu[i].density == Approx(cpu.density).margin(1e-3));
+            CHECK(gpu[i].envelope == Approx(cpu.envelope).margin(1e-3));
+            if (cpu.density > 1e-4) {
+                ++warped;
+            }
+        }
+    }
+    // The smoke arm has to be a different field from the shipped one, or it is the shipped arm
+    // again under another name and covers nothing new.
+    CHECK(warped > 250);
+    const std::vector<Gpu> plain = harness.run(vortex::packVortex(shipped()), 6.0f, pts);
+    const std::vector<Gpu> smoke = harness.run(u, 6.0f, pts);
+    INFO("smoke against shipped: " << movedCount(plain, smoke) << " of " << pts.size() << " samples move");
+    CHECK(movedCount(plain, smoke) > 100);
+}
+
+TEST_CASE("every number the vortex uniform carries reaches the shader", "[gpu][vortex][parity]") {
+    // **This is the probe that would have caught ADR-401's defect, and the obvious one would not.**
+    //
+    // The harness used to copy the uniform block into the kernel field by field, and ADR-389 added
+    // `v6` -- smokeWarp, smokeBillow, detail -- to the real struct on both sides and to that list on
+    // neither. `var v: VortexUniformsWgsl` zero-initialises, so the GPU ran with the domain warp,
+    // the billow and the third octave switched off while the CPU ran with them on, and 75
+    // assertions failed with no arithmetic disagreeing anywhere.
+    //
+    // A probe that perturbs the CONTRAST CURVE -- the natural suspicion, since that is what changed
+    // last -- passes straight through that defect, because both sides had the same contrast. What
+    // catches it is ADR-387's rule stated per field: a correct value is not a reached value, so
+    // every number the block carries must be shown to move the GPU's answer. A field that reaches
+    // nothing is indistinguishable, from inside the parity comparison, from a field that agrees.
+    auto ctx = makeContext();
+    Harness harness(*ctx);
+    const std::vector<glm::vec3> pts = wallPositions();
+    constexpr float kT = 6.0f;
+
+    const vortex::VortexField base = smoky();
+    const std::vector<Gpu> reference = harness.run(vortex::packVortex(base), kT, pts);
+
+    struct Knob {
+        const char* name;
+        float vortex::VortexField::*field;
+        float to;
+    };
+    // Every authored number `vortexEvaluate` reads. `detail`, `smokeWarp` and `smokeBillow` are the
+    // three that were unreachable; the rest are here because the next field to go missing will not
+    // be one of those three.
+    const Knob knobs[] = {
+        {"radius", &vortex::VortexField::radius, 260.0f},
+        {"thickness", &vortex::VortexField::thickness, 95.0f},
+        {"swirl", &vortex::VortexField::swirl, 3.1f},
+        {"rotationSpeed", &vortex::VortexField::rotationSpeed, 0.14f},
+        {"innerVoid", &vortex::VortexField::innerVoid, 0.42f},
+        {"contrast", &vortex::VortexField::contrast, 2.1f},
+        {"turbulence", &vortex::VortexField::turbulence, 0.15f},
+        {"turbulenceScale", &vortex::VortexField::turbulenceScale, 4.8f},
+        {"breathAmount", &vortex::VortexField::breathAmount, 0.6f},
+        {"funnelDepth", &vortex::VortexField::funnelDepth, 700.0f},
+        {"throat", &vortex::VortexField::throat, 0.45f},
+        {"throatDensity", &vortex::VortexField::throatDensity, 0.95f},
+        {"smokeWarp", &vortex::VortexField::smokeWarp, 0.9f},
+        {"smokeBillow", &vortex::VortexField::smokeBillow, 0.15f},
+        {"detail", &vortex::VortexField::detail, 0.05f},
+    };
+
+    for (const Knob& k : knobs) {
+        vortex::VortexField f = base;
+        f.*(k.field) = k.to;
+        const std::vector<Gpu> moved = harness.run(vortex::packVortex(f), kT, pts);
+        const std::size_t n = movedCount(reference, moved);
+        INFO("changing " << k.name << " moved " << n << " of " << pts.size() << " GPU samples");
+        CHECK(n > 0);
+    }
+
+    // The control for the loop itself: re-running the SAME field must move nothing. Without it,
+    // a harness that returned fresh noise every call would satisfy every assertion above.
+    const std::vector<Gpu> again = harness.run(vortex::packVortex(base), kT, pts);
+    INFO("the same field twice moved " << movedCount(reference, again) << " samples");
+    CHECK(movedCount(reference, again) == 0);
+}
+
+TEST_CASE("the vortex parity comparison can fail on the transfer function", "[gpu][vortex][parity]") {
+    // ADR-401, and the check the coordinator asked for: the margin is 1e-3 because three octaves of
+    // value noise accumulate rounding, and a margin chosen for rounding has to be shown to still
+    // reject a real difference in the curve. So the GPU runs one contrast and the CPU is asked
+    // about another, by 5%, and the comparison has to say no.
+    //
+    // `contrast` is the right knob for this because ADR-389 changed the transfer function itself --
+    // `pow(n, c)` became a smoothstep of width `1/c` with a `2/(c+1)` compensation -- and a drift
+    // between the two sides there is exactly the failure that would look like correct shape and
+    // wrong magnitude.
+    auto ctx = makeContext();
+    Harness harness(*ctx);
+    const std::vector<glm::vec3> pts = wallPositions();
+    constexpr float kT = 6.0f;
+
+    vortex::VortexField perturbed = smoky();
+    perturbed.contrast = smoky().contrast * 1.05f;
+
+    const std::vector<Gpu> gpu = harness.run(vortex::packVortex(smoky()), kT, pts);
+    const vortex::VortexUniforms cpuUniforms = vortex::packVortex(perturbed);
+
+    int rejected = 0;
+    int live = 0;
+    for (std::size_t i = 0; i < pts.size(); ++i) {
+        const vortex::VortexSample cpu = vortex::sampleVortex(cpuUniforms, pts[i], kT);
+        if (cpu.density > 1e-3 || gpu[i].density > 1e-3) {
+            ++live;
+            if (gpu[i].density != Approx(cpu.density).margin(1e-3)) {
+                ++rejected;
+            }
+        }
+    }
+    INFO("a 5% error in the contrast curve: " << rejected << " of " << live
+                                              << " live samples rejected");
+    // Live samples only: most of this spread is outside the funnel, where both sides are zero and
+    // agree for a reason that has nothing to do with the curve.
+    REQUIRE(live > 100);
+    CHECK(rejected > live / 2);
+}
+

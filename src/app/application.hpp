@@ -125,6 +125,11 @@ struct AppOptions {
     float canvasScale = 1.0f; // --canvas-scale: the world's share of the canvas's pixels
     // --supersample: an offline render's multiple of the output size (ADR-212). 1 = off.
     float supersample = 1.0f;
+    // --particle-warmup: ADR-360's bounded particle warm-up, in frames. 0 = off, which is the
+    // behaviour every render has had: a range that starts at t > 0 opens with empty particle pools
+    // and the field blooms in over one lifetime. Set it to at least the longest particle lifetime
+    // in the scene, in frames, and the head of the range holds what a full render would have held.
+    std::uint32_t particleWarmUpFrames = 0;
     std::optional<std::string> aovs; // ADR-242: --aov, auxiliary passes beside the beauty frames
     // ADR-277: --post-stages, every intermediate the post chain rendered, as scene-linear EXRs.
     std::filesystem::path postStages;

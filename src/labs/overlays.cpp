@@ -88,10 +88,29 @@ rendering::DebugViewOptions overlaysFor(LabId id) {
         // boundary the Lighting Lab drew in code. See docs/hdr-lab/README.md.
         break;
     case LabId::Volumetric:
-        // Nothing. Judged on the frame, not on geometry drawn over it; `--debug-target` and
-        // `--aov` are its instruments.
+        // Nothing, and it stays nothing, for the reason the HDR Lab's profile is empty: every
+        // question here is about a VALUE at a pixel -- what transmittance survived to this slab,
+        // how much was in-scattered on the way -- and a line drawn over that pixel is a value
+        // somebody then measures. The march is additive into the same HDR target, so an overlay
+        // would not merely sit beside the measurement, it would be inside it.
+        //
+        // The instruments are elsewhere and are not overlays: `--debug-target` and `--aov depth`
+        // give the distance every reading is taken against, `--disable volume` is the arm that
+        // says what the pass contributed at all, and `VolumeStats` reports the march's real size
+        // and the two halves of its cost. See docs/volumetric-lab/README.md.
         break;
     case LabId::Particle:
+        // Where the particles are and how big the system thinks it is. `points` is the one overlay
+        // that answers this lab's first question -- "how many are alive, and where" -- without
+        // reading pixels, which matters because an additive billboard field saturates and a
+        // saturated region no longer reports its own population.
+        //
+        // `bounds` is here for the second one: an indirect draw whose instance count is right and
+        // whose geometry is somewhere else looks identical to an empty pool from the frame alone.
+        //
+        // Deliberately NOT `transformTrail`: particles are not entities, the trail overlay draws
+        // from the recorded entity history and would draw nothing here, and an overlay that draws
+        // nothing is worse than one that is off -- it reads as a measurement that came back empty.
         o.points = true;
         o.bounds = true;
         break;

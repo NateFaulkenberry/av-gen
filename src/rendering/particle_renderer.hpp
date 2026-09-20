@@ -46,6 +46,10 @@ struct ParticleUniforms {
     glm::vec4 colorStart;
     glm::vec4 colorEnd;
     glm::vec4 sim;
+    // ADR-360: x = FrameTime::frameNonce(), the spawn RNG's key. Keyed to the timeline second
+    // rather than to frames-since-render-start, so a live frame, an offline render and a re-render
+    // of a section all seed the same spawns at the same second. yzw = 0.
+    glm::uvec4 nonce;
     glm::vec4 stretch;    // ADR-040: velocityStretch, stretchMax, stretchMin, 0
     glm::vec4 trail;      // history points (0 = off), stride, width, taper
     glm::vec4 trail2;     // tail alpha fraction, tail tint rgb
@@ -67,12 +71,20 @@ struct ParticleUniforms {
     glm::vec4 opacityKeys[scene::kMaxCurveKeys]; // (t, value, 0, 0)
     glm::vec4 colorKeys[scene::kMaxCurveKeys];   // (t, r, g, b)
 };
-static_assert(sizeof(ParticleUniforms) == 128 + 16 * 28 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys);
+static_assert(sizeof(ParticleUniforms) == 128 + 16 * 29 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys);
 
 // Everything the draw needs that is not a per-system parameter (ADR-040). Set once per frame.
 struct ParticleFrameContext {
     // ADR-370: the frame's wind, packed by wind::packWind, exactly as FrameUniforms carries it.
     wind::WindUniforms wind{};
+    // ADR-360's bounded, opt-in warm-up, in frames. 0 -- the default -- is the behaviour this
+    // renderer has always had: a seek, and the head of a render range, start with empty pools and
+    // the field blooms in over one particle lifetime. Non-zero runs that many emit/simulate steps
+    // at the timeline seconds immediately BEFORE the frame about to be drawn, so the pools hold
+    // what a render that had played up to here would hold. Capped at kMaxWarmUpFrames, and
+    // deliberately not the default: it costs that many extra compute submits on every seek, and
+    // ADR-360 chose not to put that in front of a scrub click.
+    std::uint32_t warmUpFrames = 0;
     // ADR-382: the quality tier's multiplier on every system's spawn rate. Capacity is deliberately
     // not scaled -- changing it destroys and recreates the pool (ADR-015), so a tier change would
     // empty every system mid-shot.
@@ -135,8 +147,13 @@ public:
                 const SplineBuffers* splines = nullptr);
     // Draws every enabled system into the current render pass (additive/alpha, depth test only).
     void draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene);
-    // Resets all pools (kills every particle); used on seek/offline restarts.
+    // Resets all pools (kills every particle); used on seek/offline restarts. The next update()
+    // then runs the warm-up, if ParticleFrameContext::warmUpFrames asked for one.
     void resetAll();
+    // ADR-360: the ceiling on the warm-up. Four seconds at 60 fps, which is longer than any
+    // particle lifetime this engine's authoring range allows, so asking for more cannot buy
+    // anything and can only stall a seek.
+    static constexpr std::uint32_t kMaxWarmUpFrames = 240;
     // Pumps the compute-pass timer after the frame's command buffer was submitted (update() also
     // does this at the start of the next frame).
     // The shared frame timeline (gpu/frame_timeline.hpp) this renderer's passes mark themselves
@@ -182,12 +199,18 @@ private:
         wgpu::BindGroup computeGroup;
         wgpu::BindGroup renderGroup;
         wgpu::TextureView renderDepthView; // the linear-depth view renderGroup was built against
-        double emitCarry = 0.0;
         bool needsReset = true;
         bool trailWarned = false; // the memory budget refusal is logged once per pool
     };
 
     Result<void> createPipelines(const wgpu::ShaderModule& module);
+    // ADR-360: encodes and submits `frame_.warmUpFrames` emit/simulate steps ending just before
+    // `time`, each in its own command buffer. Its own buffer per step is not an optimisation
+    // oversight: the per-system uniforms live in ONE buffer per pool, and queue writes are ordered
+    // against submits rather than interleaved inside an encoder, so W steps sharing one encoder
+    // would all read the last uniform written.
+    void runWarmUp(const scene::Scene& scene, const FrameTime& time, const glm::mat4& view,
+                   const glm::mat4& proj, const FieldUniforms* fields, const SplineBuffers* splines);
     void ensurePool(std::size_t index, std::uint32_t capacity, std::uint32_t historyPoints);
     void ensureRenderGroup(Pool& pool);
     void resetPool(Pool& pool);
@@ -201,6 +224,8 @@ private:
     double lastSimulateMs_ = -1.0;
     bool passThisFrame_ = false;
     bool initialised_ = false;
+    bool warmUpPending_ = false; // ADR-360: a reset happened; the next update() warms if asked
+    bool warming_ = false; // inside runWarmUp: no stats, no timeline marks, no recursion
     ParticleFrameContext frame_;
     wgpu::Texture depthPlaceholder_;
     wgpu::TextureView depthPlaceholderView_;

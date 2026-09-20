@@ -325,8 +325,8 @@ the copy that a test checks.
 | Shadow **(built)** | cascade fitting, the caster list, the atlas, the mask, the contact march | the light's position and intensity → Lighting; which LOD rung an instance draws at → LOD; how the camera frustum is built → Camera | `shadow_math.cpp:casterState` |
 | Lighting **(built)** | light packing, the reach a light is given, cluster assignment and the froxel a fragment reads, LTC, IBL | whether a light is occluded → Shadow; what post does with the radiance → HDR | `light_data.cpp:assignClusters` |
 | HDR / Exposure / Bloom **(built)** | metering, the exposure state, the bright pass, the bloom and halation pyramids, the wide tier, the composite and the tonemap operator | the radiance that entered → Lighting | `post_processor.cpp:PostProcessor::run` |
-| Volumetric / Atmosphere | the march, its scaling, the composite, atmospheric effects | the bloom the in-scatter feeds → HDR | `src/rendering/volume_renderer.cpp` |
-| Particle / VFX | emission, simulation, compaction, indirect draw, velocity writes | the fields that push them — authored data | `src/rendering/particle_renderer.cpp` |
+| Volumetric / Atmosphere **(built)** | the march, its scaling, the composite, atmospheric effects | the bloom the in-scatter feeds → HDR | `volume_renderer.cpp:VolumeRenderer::update` — [its own document](volumetric-lab/README.md) |
+| Particle / VFX **(built)** | emission, simulation, compaction, indirect draw, velocity writes | the fields that push them — authored data | `particle_renderer.cpp:ParticleRenderer::update` — [its own document](particle-lab/README.md) |
 | Temporal Stability | every piece of state crossing a frame: GTAO history, LOD hysteresis and spread, the 1–3 frame cull readback lag, the exposure meter | how loudly it reads to a person → Rendering | `src/rendering/ao_renderer.cpp` |
 | AOV / Diagnostics | the five targets, linear depth, `--aov`, `--debug-target` | what the numbers mean about quality → Rendering | `src/app/render_job.cpp` |
 | Rendering | measuring a finished frame: the quality vector, the ladder, the detectors, the report | *why* the renderer produced it — every other lab owns a piece | `tools/quality-lab/report/vector.cpp` |
@@ -513,6 +513,47 @@ the debug flag. `[gpu]` tests take `tools/gpu-lock.sh`.
    owner.**
 8. **`indtune.cpp` at the repository root is a 0-byte file** referenced by no CMakeLists, and
    `avgen_bench_flatten` is marked temporary and slated for deletion with its investigation.
+9. ~~**An authored particle `burst` is inert.**~~ **Fixed, 2026-09-20 (ADR-399).**
+   `registerParticleParameters` (`src/scene/particles.cpp`) seeded `particles/<name>/burst` with a
+   hard-coded `0.0f` while every neighbour — `spawnRate`, `spread`, `position` — was seeded from the
+   scene's authored value, so the first `applyParticleParameters` deleted whatever the file said.
+   The key parsed, round-tripped through `particlesToJson` and appeared in the panel, and did
+   nothing. This is item 6's shape in a different parser, and the comment three lines below it in
+   the same function already describes the same defect about `extent`. **Found by the Particle
+   Lab's fixture**, whose burst system rendered zero particles on its first frame; every scene that
+   ships authors `burst: 0`, so no existing frame moved.
+10. **The particle trail stride is still keyed to the frame index.** `shaders/particles.wgsl` writes
+    a history sample when `u32(params.sim.z) % stride == 0`, so the ribbon's sample *phase* depends
+    on where the render started. It is inside ADR-360's relaxation and it is not keyed randomness —
+    "every Nth frame" is a rate, not a seed — and the alternative needs a frame rate the shader does
+    not have. **Not a defect; written down so the next reader finds the answer.** **Owner: Particle
+    Lab**, §6.2 of its document.
+11. ~~**The vortex shader disagrees with `core/vortex.cpp`.**~~ **Not a shader defect. Closed by
+    ADR-401, 2026-09-20.** The engine was right on both sides throughout; the parity HARNESS copied
+    the uniform block field by field and ADR-389's `v6` (smokeWarp, smokeBillow, detail) was added
+    to the real struct on both sides and to that list on neither, so the GPU ran with the domain
+    warp, the billow and the third octave switched off. The original finding, kept because the
+    diagnosis it invited was wrong and that is the part worth remembering: `gpu.the-vortex-shader-agrees-with-core-vortex-cpp`
+    (ADR-388) fails 83 of its assertions at 9084db5d — at t = 41.7, p = (140, −90, 0), GPU density
+    0.05383 against CPU 0.06640, twelve times the test's own 1e-3 margin. Re-run after merging
+    today's main (which changed both `core/vortex.cpp` and `shaders/vortex.wgsl` via `agent/cosmic6`)
+    it is **still red and wider**: 0.10505 against 0.16074 at the same sample, 75 assertions.
+    **Owner: whoever owns the vortex.**
+12. **The HDR Lab's metering-reset arm has been red since the readback became a ring.**
+    `gpu.a-reset-meter-reports-the-frame-it-was-reset-for` (`test_hdr_lab_gpu.cpp:556`) gets
+    `metered = 0.0` where it requires `> 7.0`. The test says "two frames of the bright image: the
+    first encodes the reduction, the second reads it back" — which was true of the one-slot
+    readback it was written against on 2026-09-18, and stopped being true when ADR-385 made it a
+    **two-slot ring** at c5c50b7d, 2026-09-19 18:59. **Owner: HDR Lab.** The fix is almost
+    certainly one more frame in the arm, but it is that lab's call, because the alternative reading
+    is that the ring costs a frame of adaptation that ADR-385 measured as costing none.
+
+**Items 11 and 12 share a cause, and it is the one worth keeping.** Both were invisible because
+`avgen_render_tests` did not link from 61c8117a (2026-09-19 19:08) until 2026-09-20 — nine minutes
+after the ring landed and nine hours after the vortex work. A test binary that is only built on
+request, in a repository where the previous binary stays on disk and a build wrapper reports the
+shell line's status rather than the compiler's, is a suite that can go red silently for a day.
+Whatever else changes, `avgen_render_tests` should be built by whatever builds `avgen`.
 
 ---
 
@@ -528,16 +569,18 @@ see [camera-lab.md](camera-lab.md). They share no file. Visibility must land bef
 
 **Wave 2 — one shared file each, no overlap.**
 *LOD* (`cull.wgsl`, `representation.cpp`) · *Shadow* (`shadow_math.cpp`, `shadow_renderer.cpp`) ·
-*Particle* (`particle_renderer.cpp`). Three agents, three subsystems, disjoint.
+*Particle* (`particle_renderer.cpp`). Three agents, three subsystems, disjoint. **All three are
+built**; Particle is [particle-lab](particle-lab/README.md), and it found a defect on its fixture's
+first render (§8 item 9).
 
 **Wave 3 — the shading chain, which must be serialised against itself.**
 *Lighting* → *HDR* → *Volumetric*, in that order and preferably not concurrently: all three write to
 `post_processor.cpp` or the scene pass's uniforms, and an exposure change and a bloom change landing
 together cannot be told apart. This is the one group where parallelism costs more than it buys.
-**Lighting and HDR are built** ([lighting-lab](lighting-lab/README.md),
-[hdr-lab](hdr-lab/README.md)); neither changed a shader, and HDR's only edit to
-`post_processor.cpp` is one line in `resetExposure` (ADR-277 §2), so Volumetric still enters a post
-chain it can measure against main.
+**All three are built** ([lighting-lab](lighting-lab/README.md), [hdr-lab](hdr-lab/README.md),
+[volumetric-lab](volumetric-lab/README.md)); none changed a shader, and HDR's only edit to
+`post_processor.cpp` is one line in `resetExposure` (ADR-277 §2), so Volumetric entered a post chain
+it could measure against main -- which is the serialisation this paragraph asked for, kept.
 
 **Wave 4 — the two that consume everything above.**
 *AOV* (`render_job.cpp`, `render_settings.cpp`) and *Temporal* (`ao_renderer.cpp`, and the LOD
