@@ -269,6 +269,52 @@ float PhaseTrack::at(float clipSeconds) const {
     return out;
 }
 
+float PhaseTrack::timeAt(float target) const {
+    if (phase.empty()) {
+        return 0.0f;
+    }
+    const float rate = std::max(sampleRate, 1.0f);
+    float want = target - std::floor(target);
+    // Walk the grid and take the first interval that brackets the target, following the same
+    // shortest-way-round rule `at()` uses so the two are inverses of one another across the wrap.
+    for (std::size_t i = 0; i + 1 < phase.size(); ++i) {
+        const float a = phase[i];
+        float d = phase[i + 1] - a;
+        if (d > 0.5f) {
+            d -= 1.0f;
+        } else if (d < -0.5f) {
+            d += 1.0f;
+        }
+        if (std::fabs(d) < 1e-9f) {
+            continue;
+        }
+        // Where `want` sits inside this interval, in the interval's own direction.
+        float delta = want - a;
+        if (delta > 0.5f) {
+            delta -= 1.0f;
+        } else if (delta < -0.5f) {
+            delta += 1.0f;
+        }
+        const float u = delta / d;
+        if (u >= 0.0f && u <= 1.0f) {
+            return (static_cast<float>(i) + u) / rate;
+        }
+    }
+    // No interval contained it, which happens on a track that does not cover the whole range --
+    // an acyclic one asked for a phase past its end. The nearest sample is the honest answer.
+    std::size_t best = 0;
+    float bestErr = 2.0f;
+    for (std::size_t i = 0; i < phase.size(); ++i) {
+        float e = std::fabs(phase[i] - want);
+        e = std::min(e, 1.0f - e);
+        if (e < bestErr) {
+            bestErr = e;
+            best = i;
+        }
+    }
+    return static_cast<float>(best) / rate;
+}
+
 PhaseTrack extractPhase(std::span<const ContactTrack> tracks, int referenceTrack, float clipLength,
                         const ContactSettings& settings) {
     PhaseTrack out;

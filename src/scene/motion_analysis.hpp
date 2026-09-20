@@ -159,6 +159,14 @@ struct PhaseTrack {
 
     // The phase at a clip second, interpolated on the grid. Clamped outside the clip.
     [[nodiscard]] float at(float clipSeconds) const;
+    // The inverse: the first clip second at which this track reaches `phase`. This is what a
+    // phase-matched transition asks for -- "where in the run cycle is the walk's left foot about
+    // to land" -- and it is a search rather than a formula because the phase grid is data.
+    //
+    // Returns 0 for an empty track. For a cyclic track the answer is always within one cycle of
+    // the start, which is the useful one: a caller rebasing a clip's clock wants the *earliest*
+    // time with that phase, not the last.
+    [[nodiscard]] float timeAt(float phase) const;
     [[nodiscard]] bool empty() const { return phase.empty(); }
 };
 

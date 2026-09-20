@@ -1911,8 +1911,8 @@ context: **an in-place clip has no ground frame**, so "planted means stationary"
 | STEP 3 velocity vector | **done** | ADR-545 Accepted; measured once, not authored at 20+ sites |
 | STEP 4 contact extraction | **done** | ADR-546 Accepted; the in-place finding |
 | STEP 5 phase extraction | **done** | ADR-546; every clip in the pack yields a phase |
-| STEP 6 phase-aware transitions | next | |
-| STEP 7 inertialization | next | |
+| STEP 6 phase-aware transitions | **done** | ADR-547; ramp fixture measures 100.0 -> 106.0 |
+| STEP 7 inertialization | **done** | ADR-547; one clip evaluated, offset recomputed not stored |
 | STEP 8-9 decoupling, retarget profile | pending | the largest unit (§12.1) |
 | STEP 10 100STYLE subset | pending | gated on 9 |
 | STEP 11-13 MotionPack, offline tool, benchmark | pending | |

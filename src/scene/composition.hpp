@@ -177,6 +177,15 @@ struct NodeAnimation {
     // may drop its hips is a fact about the character and the staging, not about the engine.
     // Disabled by default -- it moves a joint nothing else moves.
     BodyCompensationSpec bodyCompensation;
+    // ---- contacts, phase and inertialization (ADR-546, ADR-547) ---------------------------------
+    // The joints this character's clips are analysed for ground contact on, in the order that makes
+    // the first one the phase reference. Empty means no analysis, and phase matching then falls
+    // back to frame zero -- the behaviour every scene had before this existed.
+    std::vector<std::string> contacts;
+    // Enter every state at the outgoing state's phase rather than at its clip's frame zero.
+    bool matchPhase = false;
+    // Seconds for an inertialized transition's offset to halve. 0 keeps the cross-fade.
+    float inertialize = 0.0f;
     // ---- root motion (ADR-337) -----------------------------------------------------------------
     // Which of this character's clips hand their root displacement to the simulation instead of
     // drawing it. Per clip and per node, because it is an art decision twice over: whether a clip

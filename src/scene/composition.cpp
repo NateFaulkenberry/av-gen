@@ -4891,6 +4891,32 @@ void Composition::rebuild() {
                 // joint the rig does not have used to be indistinguishable from a mask that did
                 // nothing because nothing asked it to, which is the same failure as a socket
                 // returning `true` on its fallback (ADR-274).
+                // ADR-546/547, bound here for the same reason the layers are: the authored names
+                // and the asset that has to carry them are only both in scope at this point.
+                if (!node.animation.contacts.empty()) {
+                    rig.contactJoints.clear();
+                    for (const std::string& joint : node.animation.contacts) {
+                        if (rig.skeleton.find(joint) < 0) {
+                            log::warn("node '{}' rig '{}': contact joint '{}' is not in this rig, so no "
+                                      "clip will be analysed for it",
+                                      node.name, src.name, joint);
+                            continue;
+                        }
+                        rig.contactJoints.push_back(ContactJoint{joint, ContactKind::Foot});
+                    }
+                    if (!rig.contactJoints.empty()) {
+                        const std::uint32_t cyclic = rig.analyse();
+                        if (cyclic == 0) {
+                            log::warn("node '{}' rig '{}': none of its {} clip(s) came back cyclic, so "
+                                      "phase matching has nothing to align to",
+                                      node.name, src.name, rig.clips.size());
+                        }
+                    }
+                }
+                if (node.animation.matchPhase) {
+                    rig.player.setMatchPhase(true);
+                }
+                rig.player.inertializeHalflife = node.animation.inertialize;
                 if (!node.animation.layers.empty() || node.animation.bodyCompensation.enabled) {
                     // ADR-544. Set BEFORE `bind`, because `bind` is what resolves the body joint
                     // against this rig and reports a name it does not carry.
@@ -6060,7 +6086,10 @@ void Composition::updateCharacters(const FrameTime& time) {
             const float blend = node.animation.blend >= 0.0f
                                     ? node.animation.blend
                                     : rig.player.blendTimeFor(rig.player.currentState(), node.animation.state);
-            if (rig.player.play(node.animation.state, node.animationAppliedAt, blend)) {
+            // ADR-547: phase-matched when the target state asks for it and this rig has been
+            // analysed. The overload falls back to frame zero on its own when either is missing,
+            // so this is the only call site and there is no second code path to keep in step.
+            if (rig.player.play(node.animation.state, node.animationAppliedAt, blend, rig.phaseMatch())) {
                 if (node.animationRebase) {
                     // play() returns true without restarting a state it is already in, which is
                     // exactly right for a behaviour and exactly wrong for a timeline cue (ADR-089).
@@ -8274,6 +8303,15 @@ nlohmann::json Composition::toJson() const {
                 }
                 anim["layers"] = std::move(layers);
             }
+            if (!node.animation.contacts.empty()) { // ADR-546
+                anim["contacts"] = node.animation.contacts;
+            }
+            if (node.animation.matchPhase) { // ADR-547
+                anim["matchPhase"] = true;
+            }
+            if (node.animation.inertialize != 0.0f) {
+                anim["inertialize"] = node.animation.inertialize;
+            }
             if (node.animation.bodyCompensation.enabled) { // ADR-544
                 const BodyCompensationSpec& bc = node.animation.bodyCompensation;
                 const BodyCompensationLimits defaults;
@@ -9494,7 +9532,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 // ADR-278 generalised this loop out of here; what is left is the key list.
                 static constexpr std::string_view kAnimationKeys[] = {
                     "state", "blend",        "speed",  "updateHz",  "nearDistance",
-                    "farHz", "cullDistance", "layers", "rootMotion", "bodyCompensation"};
+                    "farHz",   "cullDistance", "layers",    "rootMotion",
+                    "bodyCompensation", "contacts", "matchPhase", "inertialize"};
                 json_keys::warnUnknownKeys(anim, kAnimationKeys,
                                            where + ": node '" + node.name + "': animation");
                 node.animation.state = *state;
@@ -9508,6 +9547,34 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 // every rig names its joints differently -- `head.x` on the alien pack, `Head01` on
                 // the bull, `Head` on the chicken. A name this rig does not carry is warned about
                 // when the rig is built, never silently dropped.
+                // ADR-546/547: which joints to analyse, and what to do with the result.
+                if (anim.contains("contacts")) {
+                    const json& contacts = anim.at("contacts");
+                    if (!contacts.is_array() ||
+                        !std::all_of(contacts.begin(), contacts.end(),
+                                     [](const json& j) { return j.is_string(); })) {
+                        return fail("node '{}': animation 'contacts' must be an array of joint names",
+                                    node.name);
+                    }
+                    node.animation.contacts.clear();
+                    for (const json& entry : contacts) {
+                        node.animation.contacts.push_back(entry.get<std::string>());
+                    }
+                }
+                node.animation.matchPhase = anim.value("matchPhase", false);
+                {
+                    auto inert = readFloat(anim, "inertialize", 0.0f);
+                    if (!inert) {
+                        return fail("node '{}': animation 'inertialize': {}", node.name,
+                                    inert.error().message);
+                    }
+                    if (*inert < 0.0f) {
+                        return fail("node '{}': animation 'inertialize' is a half-life in seconds and "
+                                    "cannot be negative (got {})",
+                                    node.name, *inert);
+                    }
+                    node.animation.inertialize = *inert;
+                }
                 // ADR-544: reachable contact solving. Parsed before the layers so a scene that
                 // enables it and authors no foot layer still gets its body joint resolved and
                 // still hears about a joint name this rig does not carry.
