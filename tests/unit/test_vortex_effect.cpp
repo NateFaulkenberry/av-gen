@@ -316,3 +316,41 @@ TEST_CASE("the shipped project drives the vortex through a path that exists",
     // ...and the paths they replaced do not, which is what made the breakage silent.
     CHECK(params.find("scene/vortex/density") == nullptr);
 }
+
+// ADR-388: the scattering coefficient the owner asked for, at both ends.
+TEST_CASE("the vortex's scene-light scattering is off by default and reachable",
+          "[vortex][atmospherics][params][scattering]") {
+    // Off by default is the guarantee that makes adding the field safe: every frame rendered before
+    // it existed renders identically after it, because the term it multiplies is zero.
+    CHECK(world::Vortex{}.scattering == 0.0f);
+    CHECK(world::cosmicVortex("V").vortex.scattering == 0.0f);
+    for (const std::string_view style : world::vortexStyleNames()) {
+        world::AtmosphericEffect e = world::cosmicVortex("V");
+        REQUIRE(world::applyVortexStyle(e, style));
+        INFO(style);
+        CHECK(e.vortex.scattering == 0.0f);
+    }
+
+    // It round-trips, so a scene that turns it on keeps it turned on.
+    world::AtmosphericEffect e = world::cosmicVortex("V");
+    e.vortex.scattering = 0.42f;
+    const auto back = world::AtmosphericEffect::fromJson(e.toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->vortex.scattering == Approx(0.42f));
+
+    // And the slider is scaled to the measured range rather than to a round number. The ladder in
+    // `atmospheric_params.cpp` shows the effect is near-linear and usable across the whole of
+    // 0..1, so 1.0 is the soft maximum; the hard maximum is higher because that is what a
+    // modulation route clamps to.
+    params::ParameterSet params;
+    std::vector<world::AtmosphericEffect> effects{world::cosmicVortex("V")};
+    world::registerAtmosphericParameters(params, effects);
+    params::IParameter* p = params.find("atmos/V/scattering");
+    REQUIRE(p != nullptr);
+    CHECK(p->softMin(0) == Approx(0.0f));
+    CHECK(p->softMax(0) == Approx(1.0f));
+    CHECK(p->hardMax(0) > p->softMax(0));
+    // THE CONTROL for "the soft range is not a rounding of the hard range": the two differ, which
+    // is the whole reason a mis-scaled knob is possible in the first place.
+    CHECK(p->hardMax(0) == Approx(4.0f));
+}

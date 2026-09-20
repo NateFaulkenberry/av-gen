@@ -68,6 +68,39 @@ inline constexpr std::string_view kIntermediatePrefixes[] = {
 }
 
 
+// The section a parameter belongs to inside its group: everything between the group and the leaf.
+//
+//   ("post/bloom/intensity",       "post")  -> "bloom"
+//   ("post/enabled",               "post")  -> ""        (a direct member of the group)
+//   ("nodes/tree-of-life/wind/lag", "nodes") -> "tree-of-life/wind"
+//
+// A parameter's `group()` is the FIRST path segment and its `label()` is the LAST, so without this
+// the middle is simply discarded -- which is how the Parameters panel came to show three checkboxes
+// all reading "enabled" under one "post" heading, with nothing to say which was bloom and which was
+// halation. The owner reported it as "I have no idea what I'm enabling when I click a checkbox."
+//
+// Pure and here rather than inline in the panel because panel string arithmetic is a repeat offender
+// in this repository: the Tree panel's sections drew empty boxes for months over five characters of
+// `substr`, and the tests passed because they asserted the REGISTRATION paths and never the ones the
+// panel computed. A wrong path neither fails to compile nor throws -- the section just renders
+// blank, which is indistinguishable from "this scene has no such effect".
+[[nodiscard]] inline std::string parameterSubGroup(std::string_view path, std::string_view group) {
+    std::string_view rest = path;
+    if (!group.empty() && path.size() > group.size() + 1 && path.starts_with(group) &&
+        path[group.size()] == '/') {
+        rest = path.substr(group.size() + 1);
+    }
+    const std::size_t slash = rest.rfind('/');
+    return slash == std::string_view::npos ? std::string{} : std::string(rest.substr(0, slash));
+}
+
+// The last path segment: the switch a section is gated on is found by its leaf being "enabled",
+// rather than by a list of subsystem names that goes stale the moment somebody adds an effect.
+[[nodiscard]] inline std::string_view parameterLeaf(std::string_view path) {
+    const std::size_t slash = path.rfind('/');
+    return slash == std::string_view::npos ? path : path.substr(slash + 1);
+}
+
 // Slider bounds for a route amount. They must NOT depend on the current amount: a range derived
 // from the value being dragged feeds back on itself (drag to the end -> range grows -> repeat)
 // until the float range overflows and ImGui asserts (regression: milestone 0.2 crash).
@@ -216,9 +249,20 @@ enum class ViewportIntent : std::uint8_t {
 // **navigating the view is not modifying the camera.** An incidental gesture -- a drag, a framing,
 // a dolly -- may not discard a cut. A deliberate one -- the menu's "take the camera back", the
 // Camera panel's unlock -- may, because the user said so in words rather than by moving a mouse.
-[[nodiscard]] inline bool viewportMayReleaseDirector(bool directed, bool locked, bool deliberate) {
+// `hasBake` is whether standing the director down would actually destroy anything --
+// `app::directedCameraBakeSize`, which counts the same four things `releaseDirectedCamera` removes.
+// A guard on data loss with no data to lose is only a cost, and shipped as one: locked
+// unconditionally, this refused the viewport on EVERY directed project. On the Tree of Life -- 0
+// camera tracks, 0 aim-follow entries, 0 shot spans -- Option-drag became a no-op and a status line
+// in order to protect nothing, which is how the owner found it. The multicam film carries 42 spans
+// and 37 follow entries, was the case the lock was written for, and still locks.
+[[nodiscard]] inline bool viewportMayReleaseDirector(bool directed, bool locked, bool deliberate,
+                                                     bool hasBake) {
     if (!directed) {
         return false; // nothing to stand down
+    }
+    if (!hasBake) {
+        return true; // nothing to lose, so nothing to defend
     }
     return deliberate || !locked;
 }
@@ -1189,6 +1233,10 @@ struct EffectRow {
     std::string_view format;    // empty = the panel's default
     bool logarithmic = false;
     bool color = false;
+    // ADR-388: the row's own tooltip, empty for none. Per row rather than "whatever the panel last
+    // drew", which is how it worked for one release and which meant adding a row at the end of a
+    // list silently stole the tooltip off the row above it.
+    std::string_view tip;
 };
 
 // What somebody reaches for first: what colour, how bright, how big, how fast.
@@ -1204,7 +1252,24 @@ struct EffectRow {
         {"", "rotationSpeed", "Rotation", "%.3f rad/s"},
         {"", "swirl", "Swirl", ""},
         {"", "filaments", "Filaments", ""},
-        {"", "spill", "Light spill", ""},
+        {"", "smokeWarp", "Smoke", "", false, false,
+         "Drags the fine detail into the big swirl instead of letting it sit on top as speckle.\n"
+         "The single control that decides whether this reads as smoke or as noise -- raise it\n"
+         "first, before reaching for anything else here."},
+        {"", "smokeBillow", "Billow", "", false, false,
+         "0 is wispy and filamentary; 1 is rounded, puffy masses with creases between them.\n"
+         "The difference between a nebula and a smoke column."},
+        {"", "detail", "Fine detail", "", false, false,
+         "Weight of the finest noise octave. Detail below what the volume march can sample is\n"
+         "faded out automatically, so raising this past the point where it stops changing the\n"
+         "picture means the march is the limit, not this."},
+        {"", "spill", "Light spill", "", false, false,
+         "How much of the funnel's own light lands on the surfaces above it. Separate from\n"
+         "Brightness so it can be tuned against the island without changing the funnel."},
+        {"", "scattering", "Scene light inside", "", false, false,
+         "At 0 the funnel makes its own light and the scene's lights do not appear inside it --\n"
+         "a spotlight aimed up through it stops at its edge. Above 0 they do; watch the tree's\n"
+         "key light, which is bright enough to flatten the whole funnel if this goes far."},
     };
     return kRows;
 }
@@ -1213,7 +1278,10 @@ struct EffectRow {
     static constexpr EffectRow kRows[] = {
         {"Placement", "centerX", "Centre X", "%.1f m"},
         {"", "centerY", "Centre Y", "%.1f m"},
-        {"", "centerZ", "Centre Z", "%.1f m"},
+        {"", "centerZ", "Centre Z", "%.1f m", false, false,
+         "Where the mouth of the funnel sits in the world. A particle system that names this\n"
+         "vortex as its attractor follows it here, so the island and the funnel stay related\n"
+         "when either of them moves."},
         {"Shape", "thickness", "Wall thickness", "%.0f m", true},
         {"", "throat", "Throat", "%.2f of mouth"},
         {"", "throatDensity", "Throat thickness", ""},
@@ -1224,7 +1292,10 @@ struct EffectRow {
         {"", "breathAmount", "Breath amount", ""},
         {"", "breathSpeed", "Breath speed", ""},
         {"Comet response", "cometResponse", "Comet light", ""},
-        {"", "cometReach", "Comet reach", "%.1f x"},
+        {"", "cometReach", "Comet reach", "%.1f x", false, false,
+         "How much of a comet's light this medium takes, and how far past the comet's ground\n"
+         "pool it reaches. Off by default: the funnel must not scatter the scene's ordinary\n"
+         "lights, which is what the control above is for."},
     };
     return kRows;
 }

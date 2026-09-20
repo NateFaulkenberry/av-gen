@@ -77,9 +77,10 @@ struct VolumeUniforms {
     glm::vec4 vortexB;
     glm::vec4 vortexAccent;
     glm::vec4 vortex4;     // ADR-374: funnel depth, throat fraction, throat density, 0
-    glm::vec4 vortex5;     // ADR-381: x = comet response, yzw = 0
+    glm::vec4 vortex5;     // ADR-381: x = comet response, y = reach, z = scene scattering (388), w = 0
+    glm::vec4 vortex6;     // ADR-389: smokeWarp, smokeBillow, detail, 0
 };
-static_assert(sizeof(VolumeUniforms) == 272);
+static_assert(sizeof(VolumeUniforms) == 288);
 
 class VolumeRenderer {
 public:

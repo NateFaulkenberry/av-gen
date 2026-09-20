@@ -2334,7 +2334,10 @@ void Application::ensureFreeCamera(bool deliberate) {
     // viewport cannot move the camera at all. There is no separate editor camera in this engine --
     // the viewport IS `camera/*` -- so "navigate without modifying" is not something this
     // architecture can offer yet, and pretending otherwise would be the harder lie to unpick.
-    if (cameraDirection_.directed && !ui::viewportMayReleaseDirector(true, cameraLocked_, deliberate)) {
+    // The lock asks what would actually be lost rather than assuming there is something.
+    if (cameraDirection_.directed &&
+        !ui::viewportMayReleaseDirector(true, cameraLocked_, deliberate,
+                                        directedCameraBakeSize(*engine_) > 0)) {
         if (panel_ != nullptr) {
             panel_->setStatus("camera is locked: this project's cut is baked. Unlock in the Cameras "
                               "panel to edit it (that discards the director's cut).");

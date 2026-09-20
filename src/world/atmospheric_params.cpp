@@ -212,7 +212,37 @@ constexpr FloatField kVortexFloats[] = {
     {"filaments", 0.0f, 4.0f, 0.0f, 2.0f, F_GET(e.vortex.filaments), F_SET(e.vortex.filaments)},
     {"breathAmount", 0.0f, 1.0f, 0.0f, 0.3f, F_GET(e.vortex.breathAmount), F_SET(e.vortex.breathAmount)},
     {"breathSpeed", 0.0f, 4.0f, 0.0f, 1.0f, F_GET(e.vortex.breathSpeed), F_SET(e.vortex.breathSpeed)},
+    // ADR-389, the smoke controls. Soft ranges are the whole of the useful span in each case, for
+    // the reason the scattering row gives: a modulation route clamps to the HARD range, and a
+    // slider whose interesting region is in its first hair is the `scene/windSpeed` defect.
+    //
+    // `smokeWarp` is the one that does the work -- it advects the finer octaves through a coarse
+    // flow, which is the difference between detail sitting ON the spiral and detail carried BY it.
+    {"smokeWarp", 0.0f, 8.0f, 0.0f, 2.0f, F_GET(e.vortex.smokeWarp), F_SET(e.vortex.smokeWarp)},
+    {"smokeBillow", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.vortex.smokeBillow), F_SET(e.vortex.smokeBillow)},
+    {"detail", 0.0f, 2.0f, 0.0f, 1.0f, F_GET(e.vortex.detail), F_SET(e.vortex.detail)},
     {"spill", 0.0f, 20.0f, 0.0f, 6.0f, F_GET(e.vortex.spill), F_SET(e.vortex.spill)},
+    // ADR-388, and the range is a measurement rather than a guess. Laddered on the shipped Tree of
+    // Life at t=6, mean frame luminance of 255:
+    //
+    //     0.00  65.5      0.10  67.2      0.50  73.4
+    //     0.02  65.9      0.20  68.9      1.00  80.3
+    //     0.05  66.4
+    //
+    // Nearly linear, and usable across the whole of 0..1 -- so 0..1 IS the soft range, and putting
+    // it at 0..0.2 "to be safe" would have been the mis-scaled-knob defect this branch already
+    // fixed once on `scene/windSpeed`, arrived at from the cautious direction.
+    //
+    // Worth saying plainly, because the first version of this comment got it wrong: ADR-371's
+    // catastrophic 131-of-255 was measured on the PRE-FUNNEL slab, before ADR-374 gave the vortex a
+    // throat, a void and a rim. Against today's shape, full scattering costs +15 luminance levels,
+    // not a wash. The refusal ADR-371 records is still right as a default; the number it records is
+    // no longer what this setting does, and quoting it as though it were would be exactly ADR-385's
+    // stated reason that is not evidence.
+    //
+    // The hard maximum is 4 rather than 1 because that is what a modulation route clamps to, and
+    // somebody driving this from a drop is entitled to overshoot on purpose.
+    {"scattering", 0.0f, 4.0f, 0.0f, 1.0f, F_GET(e.vortex.scattering), F_SET(e.vortex.scattering)},
     {"cometResponse", 0.0f, 8.0f, 0.0f, 2.0f, F_GET(e.vortex.cometResponse), F_SET(e.vortex.cometResponse)},
     {"cometReach", 1.0f, 40.0f, 1.0f, 12.0f, F_GET(e.vortex.cometReach), F_SET(e.vortex.cometReach)},
     {"centerX", -1e5f, 1e5f, -500.0f, 500.0f, F_GET(e.vortex.center.x), F_SET(e.vortex.center.x)},
