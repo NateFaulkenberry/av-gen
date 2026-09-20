@@ -121,9 +121,13 @@ struct PoseLayer {
     // that turns one into the others. Any joints *between* the named three ride along unchanged,
     // which is what makes the goat's ankle a non-problem.
     //
-    // `chainMid` must be a descendant of `chainRoot` and `chainTip` a descendant of `chainMid`;
-    // `bind` checks it and says so when it is not, because "these three names are a leg" is an
-    // assumption the alien pack disproves (its foot, thigh and leg are three separate branches).
+    // The three need NOT be an ancestor chain (ADR-543). They were required to be, and the
+    // requirement was measured wrong: `tools/motion_probe.cpp` solved the alien's three detached
+    // leg joints and wrote them back faithful to 1.2e-7 with bone lengths preserved to 0.000000,
+    // while the ancestor-only write-back missed by 0.206 and moved the foot not at all. What
+    // ancestry decides is which model-space transform each written joint's *parent* has undergone,
+    // and `apply` works that out per joint instead of assuming it. `bind` records the linkage and
+    // `PoseLayerStats::detachedChains` reports it; the only refusal left is naming one joint twice.
     std::string chainRoot;
     std::string chainMid;
     std::string chainTip;
@@ -219,6 +223,36 @@ struct PoseLayerStats {
     std::uint32_t layers = 0;  // layers in the stack
     std::uint32_t applied = 0; // layers that wrote a joint
     std::uint32_t joints = 0;  // joint writes, summed over the layers that applied
+    // ADR-543: foot layers that solved this frame on a chain with at least one DETACHED link --
+    // a knee that is not beneath its hip, or a foot not beneath its knee. Zero on every properly
+    // nested rig in this repository and non-zero on every Glowmere alien, which is the point: a
+    // reader can tell which write-back rule a character is exercising without reading the rig.
+    std::uint32_t detachedChains = 0;
+    // ADR-544: 1 when reachable-contact solving moved the body this frame, 0 otherwise. The
+    // translation itself and why it was that size are in `PoseLayerStack::bodyCompensation()`;
+    // this is the count a stats line can carry beside the others.
+    std::uint32_t bodyCompensations = 0;
+};
+
+// Reachable contact solving, as a property of the whole stack rather than of one layer (ADR-544).
+//
+// It is not a layer because it is not about one limb. Every `Foot` layer on this rig is asking the
+// same body to be somewhere, and the body has one answer; a per-layer version would have four feet
+// each translating the pelvis by their own amount. So the stack gathers the demands, solves once,
+// and moves the body before any limb runs.
+//
+// **Off by default**, because it moves a joint that no layer moved before it and a scene that did
+// not ask for that must not get it.
+struct BodyCompensationSpec {
+    bool enabled = false;
+    // The joint that carries the body. Empty means the skeleton's own root -- joint 0, whose parent
+    // is -1 -- which is the right default for the same reason `root_motion.hpp` compensates there:
+    // translating a parentless joint's local IS a rigid model-space translation of everything
+    // beneath it, and on a nearly flat rig like the alien's that is the only joint every limb and
+    // the spine share. Naming one is for a rig with a real pelvis.
+    std::string joint;
+    BodyCompensationLimits limits;
+    friend bool operator==(const BodyCompensationSpec&, const BodyCompensationSpec&) = default;
 };
 
 // An ordered stack of layers over one skeleton. Lives on `SkinnedRig`; copied with it, because
@@ -237,6 +271,25 @@ public:
     // layer that is not one, which is a lie a caller has to read alongside `results()` -- the point
     // is to say *which* degeneracy, and `LayerResolution::Degenerate` only says that there was one.
     [[nodiscard]] const std::vector<IkStatus>& ikStatuses() const { return ikStatus_; }
+    // Per layer, the chain's three joint indices, or -1 (ADR-543).
+    [[nodiscard]] const std::vector<glm::ivec3>& chains() const { return chain_; }
+    // Per layer, whether each link is an ancestor link: x = mid beneath root, y = tip beneath mid.
+    [[nodiscard]] const std::vector<glm::ivec2>& chainLinkage() const { return chainLinked_; }
+
+    // ---- reachable contact solving (ADR-544) ---------------------------------------------------
+    // Installed with the layers and resolved against the same skeleton. **It takes effect at the
+    // next `bind`/`rebind`**, which is where the body joint is looked up and where a name this rig
+    // does not carry is reported -- the same rule the masks follow, and for the same reason: a
+    // setter that resolved names would need a skeleton it has not been given. Set it first, then
+    // bind.
+    [[nodiscard]] const BodyCompensationSpec& bodyCompensationSpec() const { return bodySpec_; }
+    void setBodyCompensation(BodyCompensationSpec spec) { bodySpec_ = std::move(spec); }
+    // What the last `apply()` decided. `NotNeeded` with a zero translation on a stack that is not
+    // using it, which is the same answer as "every foot could reach" and is deliberately not
+    // distinguished: neither moved the body.
+    [[nodiscard]] const BodyCompensation& bodyCompensation() const { return bodyResult_; }
+    // The joint the body translation is applied to, or -1 when the stack is not compensating.
+    [[nodiscard]] int bodyJoint() const { return bodyJoint_; }
     // The layer with this role, or nullptr. Roles are how the animation-intent seam reaches a
     // layer; a name is how a person does.
     [[nodiscard]] PoseLayer* find(PoseLayerDrive drive);
@@ -269,6 +322,11 @@ private:
     // Per layer, the three joint indices of a `Foot` chain, or -1. Resolved once by bind, including
     // the check that they are an ancestor chain rather than three names that happen to exist.
     std::vector<glm::ivec3> chain_;
+    // Per layer, whether each link of the chain is an ancestor link: x = mid is beneath root,
+    // y = tip is beneath mid. Recorded by `bind` (ADR-543) rather than required by it. It changes
+    // nothing about the solve and everything about what the intermediate joints do: on a linked
+    // chain they ride along, on a detached one they stay where the clip put them.
+    std::vector<glm::ivec2> chainLinked_;
     // Per layer, `PoseLayer::soleUp` resolved against this rig's rest pose. Held here rather than
     // recomputed per frame because it is a fact about the asset, and read out of the *rest* pose
     // rather than the current one because "up" has to mean the same thing on every frame of a walk.
@@ -278,12 +336,24 @@ private:
     // `soleUp_` is.
     std::vector<float> restTipHeight_;
     std::vector<IkStatus> ikStatus_;
+    BodyCompensationSpec bodySpec_;
+    int bodyJoint_ = -1;
+    BodyCompensation bodyResult_;
+    // Scratch for the demands gathered from the foot layers, kept so the pre-pass allocates nothing
+    // after the first frame.
+    std::vector<ReachDemand> demands_;
     // Scratch, kept so a per-frame apply allocates nothing after the first.
     std::vector<glm::mat4> model_;
     std::vector<glm::mat4> updated_;
     Pose reference_;
     Pose sampled_;
 };
+
+// Is `joint` beneath `ancestor` in this skeleton? False for either index negative, and false for a
+// joint compared with itself -- "beneath" is strict. Exposed because ADR-543 made chain ancestry a
+// recorded property rather than a precondition, and `bind` and `apply` must not each own a copy of
+// the test: two ancestry predicates is two chances to disagree about a rig.
+[[nodiscard]] bool descendsFrom(const Skeleton& skeleton, int joint, int ancestor);
 
 // The rotation that takes `from` to `to`, limited to `maxYaw` radians of azimuth and `maxPitch`
 // radians of elevation away from `from`, about model-space up (+Y). Exposed because it is the whole

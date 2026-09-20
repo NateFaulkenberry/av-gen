@@ -171,6 +171,12 @@ struct NodeAnimation {
     // fields reach a pose; without one authored on the node they go on reaching nothing, which is
     // the honest behaviour -- there is no joint name this engine may assume.
     std::vector<PoseLayer> layers;
+    // ---- reachable contact solving (ADR-544) ---------------------------------------------------
+    // Whether, and how far, this character's body may move when a foot layer is asked for ground
+    // its leg cannot reach. Authored per node for the same reason the layers are: how much a body
+    // may drop its hips is a fact about the character and the staging, not about the engine.
+    // Disabled by default -- it moves a joint nothing else moves.
+    BodyCompensationSpec bodyCompensation;
     // ---- root motion (ADR-337) -----------------------------------------------------------------
     // Which of this character's clips hand their root displacement to the simulation instead of
     // drawing it. Per clip and per node, because it is an art decision twice over: whether a clip

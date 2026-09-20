@@ -853,6 +853,12 @@ void EntityWorld::reset() {
         // steps, so a reset must forget it. Keeping it would make the first step of a seek a
         // difference between two unrelated clips -- the whole of `Landing` backwards, in one
         // step, as a teleport, which is exactly the class of thing `reset` exists to remove.
+        // ADR-545: the measured velocity is a backward difference, so a reset must forget where
+        // the body was. Keeping it would make the first step of a seek a difference between two
+        // unrelated places -- the same class of mistake the root-motion sample below it makes, and
+        // for the same reason.
+        entity->lastPosition_ = glm::vec3(0.0f);
+        entity->hasLastPosition_ = false;
         entity->rootMotionLast_ = glm::vec3(0.0f);
         entity->rootMotionGeneration_ = 0;
         entity->rootMotionHeld_ = false;
@@ -1134,6 +1140,11 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         entity.locomotion_.yaw = entity.state_.yaw;
         entity.locomotion_.speed = entity.state_.speed;
         entity.locomotion_.turnRate = entity.state_.turnRate;
+        // ADR-545. Both halves cross the seam: `speed`/`yaw` are what the mover intended, and these
+        // two are what the body did. An animation layer that has to tell a strafe from a walk needs
+        // the pair, and until now the seam could only carry one of them.
+        entity.locomotion_.velocity = entity.state_.velocity;
+        entity.locomotion_.facing = entity.state_.facing();
         entity.locomotion_.reaction = entity.state_.reaction;
         entity.locomotion_.lookTarget = entity.state_.lookTarget;
         entity.locomotion_.hasLookTarget = entity.state_.hasLookTarget;
@@ -1563,6 +1574,29 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
                 entity.state_.speed = 0.0f;
                 entity.state_.turnRate = 0.0f;
             }
+        }
+
+        // ---- the measured velocity (ADR-545) ----------------------------------------------
+        //
+        // Taken HERE, after `applyOffsets`, because this is the first instant at which the body's
+        // place for this step is settled: every behaviour has run, the action tier and the director
+        // have had their say, root motion has been added and crowd separation has pushed. One
+        // backward difference at one site is correct for all of them, and it is the only thing in
+        // this file that measures rather than decides.
+        //
+        // `dt <= 0` leaves the previous velocity alone rather than dividing by it. That is not
+        // hypothetical: ADR-521 records that `FixedStepClock::tick()` hands out `deltaTime = 0` on
+        // the first tick of every render, so a naive division would publish an infinity into the
+        // pose layer on frame one of every offline job.
+        {
+            const glm::vec3 settled = entity.state_.position();
+            if (entity.hasLastPosition_ && ctx.dt > 0.0) {
+                entity.state_.velocity = (settled - entity.lastPosition_) / static_cast<float>(ctx.dt);
+            } else {
+                entity.state_.velocity = glm::vec3(0.0f);
+            }
+            entity.lastPosition_ = settled;
+            entity.hasLastPosition_ = true;
         }
 
         // A character doing nothing else, with a reaction still ringing, is reacting. Resolved

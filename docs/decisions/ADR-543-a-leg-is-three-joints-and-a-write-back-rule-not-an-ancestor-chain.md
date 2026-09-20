@@ -1,6 +1,10 @@
 # ADR-543: A leg is three joints and a write-back rule, not an ancestor chain
 
-**Status:** Proposed. Becomes Accepted when the `PoseLayerStack` change lands with its regression arm.
+**Status:** Accepted (2026-09-20). It was Proposed pending the implementation; the `PoseLayerStack`
+change has landed and `tests/unit/test_foot_ik.cpp` now carries the positive regression arm --
+the alien's detached chain binds, the foot moves to a reachable target, and an unreachable one
+clamps and says so. The farm rigs take the same branch they always took and their arms are
+unchanged.
 **Date:** 2026-09-20
 **Related:** ADR-274 (a joint transform is entity-local), ADR-300 (the layer stack), ADR-359 (a leg
 is three names and the body has to sit down first), ADR-385 (a stated reason is not evidence),
@@ -144,3 +148,5 @@ multicam. Recorded, not fixed.
 * The 3.152e-4 near-straight residual becomes visible — a close-up, a much larger draw scale, or a
   contact test tighter than a millimetre.
 * Hip lowering lands: re-run this probe, because the slack figure is what sets its range.
+  **Landed as ADR-544**, and the probe's 0.0902 is now asserted by the engine rather than by the
+  probe.

@@ -1854,6 +1854,56 @@ than either number.
 
 ---
 
+## 20a. Phase A implementation log
+
+Phase 0 ended with this document. Phase A is the implementation, and this section records what has
+landed and what each step *changed about the plan*, because two of the first three did.
+
+### Step 1 — arbitrary IK chains · **DONE** (ADR-543, Accepted)
+
+`PoseLayerStack::bind` no longer refuses a foot chain whose joints are not each other's ancestors.
+It records the linkage instead, and `apply` works out per joint which model-space transform that
+joint's *parent* has undergone rather than assuming it.
+
+The implementation is smaller than the proposal in §12.2 expected. §12.2 described relaxing the
+ancestor check and fixing one lambda; what it did not see is that **the shipped code was already
+the general rule with its answers hardcoded**. On an ancestor chain the knee's parent is under the
+hip and the tip's parent is under the knee, so the general predicate returns exactly what the old
+code assumed. The change is therefore not a special case bolted on — it is the removal of one.
+
+One thing §12.2 missed entirely: **the tip's local was only written when `footAlign > 0`**. On a
+nested rig that omission is invisible, because the tip's parent receives the same rigid
+pre-multiply the tip does and the recovered local is unchanged. On a detached chain it is the
+whole difference between a solve and a no-op. The tip is now written unconditionally.
+
+### Step 2 — body compensation · **DONE** (ADR-544, Accepted)
+
+Promoted ahead of velocity, contacts and phase, because the §9 probe measured the alien's leg at
+**98.5% extension with 0.0098 of slack** and that makes foot IK upward-only without it. §5.2 of
+this document ranked hip adjustment sixth in "what is missing"; that ranking was wrong and the
+measurement is why.
+
+`scene::solveBodyCompensation` is a pure function from a list of `ReachDemand{root, target, reach}`
+to one translation, applied by the stack before any limb runs. Authored as
+`animation.bodyCompensation`. Measured on the real rig: a 10 cm step down clamps short with it off
+and arrives with the body 0.0902 lower with it on.
+
+### Corrections to this document, recorded rather than edited away
+
+| §  | what it said | what the implementation found |
+|---|---|---|
+| §5.2 | hip adjustment is sixth in "what is missing" | it is second, behind the chain rule it depends on. 0.0098 m of slack is the reason |
+| §12.2 | the fix is "one lambda" plus relaxing two checks | also the unconditional tip write, which nothing in the Phase 0 reading surfaced because it is invisible on a nested rig |
+| §12.2 | the alien "needs a hand-authored map per rig pair" was the worst case | still open — the retarget work has not started — but the chain half of it is now data, not code |
+
+### Still to come in Phase A
+
+Steps 3-18 of the phase brief: velocity vector, contact extraction, phase extraction, phase-aware
+transitions, inertialization, animation/asset decoupling, retarget profiles, the 100STYLE subset
+experiment, the MotionPack, the offline tool, the M2 Max benchmark, and the visual lab scene.
+
+---
+
 ## 21. References
 
 ### Papers and talks

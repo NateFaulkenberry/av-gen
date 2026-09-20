@@ -4891,7 +4891,10 @@ void Composition::rebuild() {
                 // joint the rig does not have used to be indistinguishable from a mask that did
                 // nothing because nothing asked it to, which is the same failure as a socket
                 // returning `true` on its fallback (ADR-274).
-                if (!node.animation.layers.empty()) {
+                if (!node.animation.layers.empty() || node.animation.bodyCompensation.enabled) {
+                    // ADR-544. Set BEFORE `bind`, because `bind` is what resolves the body joint
+                    // against this rig and reports a name it does not carry.
+                    rig.layers.setBodyCompensation(node.animation.bodyCompensation);
                     for (const std::string& problem :
                          rig.layers.bind(node.animation.layers, rig.skeleton, rig.clips)) {
                         log::warn("node '{}' rig '{}': {}", node.name, src.name, problem);
@@ -8271,6 +8274,31 @@ nlohmann::json Composition::toJson() const {
                 }
                 anim["layers"] = std::move(layers);
             }
+            if (node.animation.bodyCompensation.enabled) { // ADR-544
+                const BodyCompensationSpec& bc = node.animation.bodyCompensation;
+                const BodyCompensationLimits defaults;
+                json bcJson;
+                bcJson["enabled"] = true;
+                if (!bc.joint.empty()) {
+                    bcJson["joint"] = bc.joint;
+                }
+                if (bc.limits.maxDown != defaults.maxDown) {
+                    bcJson["maxDown"] = bc.limits.maxDown;
+                }
+                if (bc.limits.maxUp != defaults.maxUp) {
+                    bcJson["maxUp"] = bc.limits.maxUp;
+                }
+                if (bc.limits.maxLateral != defaults.maxLateral) {
+                    bcJson["maxLateral"] = bc.limits.maxLateral;
+                }
+                if (bc.limits.compliance != defaults.compliance) {
+                    bcJson["compliance"] = vecToJson(bc.limits.compliance);
+                }
+                if (bc.limits.iterations != defaults.iterations) {
+                    bcJson["iterations"] = bc.limits.iterations;
+                }
+                anim["bodyCompensation"] = std::move(bcJson);
+            }
             if (!node.animation.rootMotion.empty()) { // ADR-337
                 json rm = json::array();
                 for (const RootMotionSpec& spec : node.animation.rootMotion) {
@@ -9466,7 +9494,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 // ADR-278 generalised this loop out of here; what is left is the key list.
                 static constexpr std::string_view kAnimationKeys[] = {
                     "state", "blend",        "speed",  "updateHz",  "nearDistance",
-                    "farHz", "cullDistance", "layers", "rootMotion"};
+                    "farHz", "cullDistance", "layers", "rootMotion", "bodyCompensation"};
                 json_keys::warnUnknownKeys(anim, kAnimationKeys,
                                            where + ": node '" + node.name + "': animation");
                 node.animation.state = *state;
@@ -9480,6 +9508,56 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 // every rig names its joints differently -- `head.x` on the alien pack, `Head01` on
                 // the bull, `Head` on the chicken. A name this rig does not carry is warned about
                 // when the rig is built, never silently dropped.
+                // ADR-544: reachable contact solving. Parsed before the layers so a scene that
+                // enables it and authors no foot layer still gets its body joint resolved and
+                // still hears about a joint name this rig does not carry.
+                if (anim.contains("bodyCompensation")) {
+                    const json& bc = anim.at("bodyCompensation");
+                    if (!bc.is_object()) {
+                        return fail("node '{}': animation 'bodyCompensation' must be an object", node.name);
+                    }
+                    static constexpr std::string_view kBodyKeys[] = {
+                        "enabled", "joint", "maxDown", "maxUp", "maxLateral", "compliance", "iterations"};
+                    json_keys::warnUnknownKeys(bc, kBodyKeys,
+                                               where + ": node '" + node.name + "': bodyCompensation");
+                    BodyCompensationSpec spec;
+                    spec.enabled = bc.value("enabled", true);
+                    spec.joint = bc.value("joint", std::string());
+                    auto down = readFloat(bc, "maxDown", spec.limits.maxDown);
+                    auto up = readFloat(bc, "maxUp", spec.limits.maxUp);
+                    auto lateral = readFloat(bc, "maxLateral", spec.limits.maxLateral);
+                    if (!down || !up || !lateral) {
+                        return fail("node '{}': animation bodyCompensation: {}", node.name,
+                                    (!down ? down : (!up ? up : lateral)).error().message);
+                    }
+                    if (*down < 0.0f || *up < 0.0f || *lateral < 0.0f) {
+                        return fail("node '{}': animation bodyCompensation: a limit is a distance and "
+                                    "cannot be negative (down {}, up {}, lateral {})",
+                                    node.name, *down, *up, *lateral);
+                    }
+                    spec.limits.maxDown = *down;
+                    spec.limits.maxUp = *up;
+                    spec.limits.maxLateral = *lateral;
+                    if (bc.contains("compliance")) {
+                        auto compliance = readVec<3>(bc, "compliance", spec.limits.compliance);
+                        if (!compliance) {
+                            return fail("node '{}': animation bodyCompensation: 'compliance' must be three "
+                                        "numbers, one per axis ({})",
+                                        node.name, compliance.error().message);
+                        }
+                        spec.limits.compliance = *compliance;
+                    }
+                    if (bc.contains("iterations")) {
+                        if (!bc.at("iterations").is_number_unsigned()) {
+                            return fail("node '{}': animation bodyCompensation: 'iterations' must be a "
+                                        "positive whole number of solver sweeps",
+                                        node.name);
+                        }
+                        spec.limits.iterations =
+                            std::max(1u, bc.at("iterations").get<std::uint32_t>());
+                    }
+                    node.animation.bodyCompensation = std::move(spec);
+                }
                 if (anim.contains("layers")) {
                     const json& layers = anim.at("layers");
                     if (!layers.is_array()) {

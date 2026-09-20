@@ -20,6 +20,9 @@
 #include "signals/signal_bus.hpp"
 
 #include <glm/glm.hpp>
+
+#include <algorithm>
+#include <cmath>
 #include <nlohmann/json.hpp>
 
 #include <cstddef>
@@ -51,8 +54,26 @@ struct EntityState {
     glm::vec3 anchor{0.0f};   // where the scene put it: the point motion is relative to
     glm::vec3 travel{0.0f};   // how far the entity has walked from its anchor (navigation writes this)
     float yaw = 0.0f;         // radians about +Y, the body's facing
-    float speed = 0.0f;       // horizontal m/s
+    float speed = 0.0f;       // horizontal m/s -- INTENT: how fast the mover means to go
     float turnRate = 0.0f;    // rad/s, signed
+    // ---- the measured velocity (ADR-545) --------------------------------------------------------
+    // World-space metres per second, over the step that just ran. **Measured, not authored**: it is
+    // the backward difference of `position()` taken once at the end of the entity update, so it is
+    // correct for every mover at once -- a behaviour's steering, an action's walk, root motion, the
+    // director tier, crowd separation and grounding -- without any of them being asked to maintain
+    // a second number that could disagree with the first.
+    //
+    // It says something `speed` and `yaw` together cannot: **which way the body actually went**.
+    // `speed` is a scalar along `yaw`, so the pair can only describe a body facing the way it is
+    // travelling. A strafe, a backward step, a body circling a target while watching it, and the
+    // future trajectory features motion matching wants are all velocity-with-a-direction, and none
+    // of them is expressible as (speed, yaw).
+    //
+    // Zero on the first step of a body's life and across a transport discontinuity, because a
+    // backward difference has nothing to difference against -- and zero rather than a guess, for
+    // the reason ADR-521 exists: the first tick of a render reports `deltaTime = 0`, and dividing
+    // by it would publish an infinity into the pose layer.
+    glm::vec3 velocity{0.0f};
     Activity activity = Activity::Idle;
     // How wide this thing is, in metres. 0 means "not a body": it takes part in nothing that
     // separates crowds, which is right for a craft that flies over them. A behaviour that knows its
@@ -88,6 +109,25 @@ struct EntityState {
     // lift is a cow standing in a beam looking startled.
     bool airborne = false;
     [[nodiscard]] glm::vec3 position() const { return anchor + travel; }
+    // The unit vector the body is facing, from `yaw`. This engine's convention, stated in one place
+    // rather than re-derived at each call site: `yaw = atan2(direction.x, direction.z)`
+    // (`entity/behaviors.cpp`), so yaw zero is +Z and the inverse is (sin, 0, cos).
+    [[nodiscard]] glm::vec3 facing() const { return {std::sin(yaw), 0.0f, std::cos(yaw)}; }
+    // The horizontal magnitude of the MEASURED velocity, which is not `speed`: `speed` is what the
+    // mover intended this step and this is what the body did. They differ whenever something
+    // downstream had an opinion -- a crowd push, a penetration resolve, a director, an obstacle.
+    [[nodiscard]] float groundSpeed() const { return std::sqrt(velocity.x * velocity.x + velocity.z * velocity.z); }
+    // How far the body's travel is from its facing, in radians, 0 when standing still. Zero for a
+    // body walking where it looks, pi for one backing up, pi/2 for a pure strafe.
+    [[nodiscard]] float strafeAngle() const {
+        const float ground = groundSpeed();
+        if (ground < 1e-4f) {
+            return 0.0f;
+        }
+        const glm::vec3 f = facing();
+        const float dot = std::clamp((velocity.x * f.x + velocity.z * f.z) / ground, -1.0f, 1.0f);
+        return std::acos(dot);
+    }
 };
 
 // A place worth walking to (ADR-093, §6). §6 lists what a character should find interesting --

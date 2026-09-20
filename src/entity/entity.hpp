@@ -425,6 +425,12 @@ private:
     std::uint32_t seed_ = 0;
     Rng rng_;
     EntityState state_{};
+    // ADR-545: where this body was at the end of the previous step, and whether there was one.
+    // The measured velocity is a backward difference and this is the thing it differences against;
+    // `EntityWorld::reset` clears both, so a seek rebuilds them by replay rather than carrying a
+    // difference across a discontinuity.
+    glm::vec3 lastPosition_{0.0f};
+    bool hasLastPosition_ = false;
     MotionOffset motion_{};
     DirectorMotion director_{};
     LocomotionState locomotion_{};

@@ -59,6 +59,17 @@ struct LocomotionState {
     float yaw = 0.0f;         // radians about +Y; the facing the body should adopt
     float speed = 0.0f;       // horizontal m/s -- selects the gait and its playback rate
     float turnRate = 0.0f;    // rad/s, signed -- selects a turn-in-place clip and its direction
+    // ---- what the body DID, beside what it meant to (ADR-545) ----------------------------------
+    // `speed` and `yaw` above are intent, and they are a polar pair: a scalar along a heading. They
+    // can describe a body walking where it looks and nothing else. These two are the measurement --
+    // world-space metres per second, and the unit vector the body is facing -- and the difference
+    // between them is the whole of strafing, backing up, circling a target while watching it, and
+    // the future-trajectory features a motion matcher would query on.
+    //
+    // Zero on a body's first step and across a seek, because a backward difference has nothing to
+    // difference against there.
+    glm::vec3 velocity{0.0f}; // world
+    glm::vec3 facing{0.0f, 0.0f, 1.0f};
     bool grounded = true;
     // 0..1, decaying. A reaction the animation layer may blend a one-shot over (a flinch, a
     // head snap). The behaviour layer says how strongly and when; the animation layer says what.
