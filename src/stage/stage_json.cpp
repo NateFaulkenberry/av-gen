@@ -336,6 +336,22 @@ namespace {
     b.then = readString(j, "then");
     b.otherwise = readString(j, "otherwise");
     b.release = readBool(j, "release", false);
+    // The gate (ADR-385). A beat that names nobody keeps the default empty list and behaves exactly
+    // as every beat written before this did.
+    if (j.contains("stillRoles")) {
+        if (!j.at("stillRoles").is_array()) {
+            return fail("beat '{}': `stillRoles` must be an array of role names", b.name);
+        }
+        for (const nlohmann::json& item : j.at("stillRoles")) {
+            if (!item.is_string()) {
+                return fail("beat '{}': every `stillRoles` entry must be a role name", b.name);
+            }
+            b.stillRoles.push_back(item.get<std::string>());
+        }
+    }
+    if (auto r = readValue(j, "stillSpeed", b.stillSpeed, "a beat's stillSpeed"); !r) {
+        return std::unexpected(r.error());
+    }
     if (j.contains("find")) {
         if (!j.at("find").is_array()) {
             return fail("beat '{}': `find` must be an array", b.name);
@@ -377,6 +393,10 @@ namespace {
     if (!b.then.empty()) j["then"] = b.then;
     if (!b.otherwise.empty()) j["otherwise"] = b.otherwise;
     if (b.release) j["release"] = true;
+    if (!b.stillRoles.empty()) {
+        j["stillRoles"] = b.stillRoles;
+        j["stillSpeed"] = valueToJson(b.stillSpeed);
+    }
     return j;
 }
 

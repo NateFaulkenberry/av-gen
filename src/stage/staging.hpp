@@ -348,6 +348,31 @@ struct BeatDesc {
     std::string then;      // the beat to continue from when this one ends; "" = the next one
     std::string otherwise; // where a failed `find` goes; "" = end the cycle
     bool release = false;  // drop every claim this scenario holds as the beat ends
+
+    // ---- the gate: this beat does not start until these bodies have actually stopped (ADR-385) --
+    //
+    // The brief's Critical Rule is "there must be no frame where the UFO is moving and the tractor
+    // beam is active or deploying", and the shipped film broke it in one cycle of five -- 4.264 m/s
+    // on the last frame before the beam lit -- for a reason no amount of authoring care would have
+    // caught. Beats are *sequential*, so `beam` began the frame `approach` ended, and `approach`
+    // ended when its `moveTo` said `Done`. A `moveTo` whose goal is a walking animal is glued to
+    // that animal at `progress == 1` and is therefore travelling at the animal's speed, exactly on
+    // time, having genuinely arrived. Every individual claim was true and the invariant was still
+    // false.
+    //
+    // So the transition is gated on the *measured* fact rather than on the ordering. While any
+    // named role's body is moving faster than `stillSpeed`, the beat's cues do not advance and do
+    // not consume their durations -- the beat waits, for as long as it takes, and then runs. This
+    // is the brief's "sequence transitions based on actual animation completion" rather than on a
+    // delay somebody tuned, and it is the whole of why a future authored abduction cannot put the
+    // beam up under a moving craft: the beat that shows the beam declares what has to be still.
+    //
+    // Empty means no gate, which is what every beat written before this did.
+    std::vector<std::string> stillRoles;
+    // Metres per second that count as stopped. Measured frame to frame on the body's own position,
+    // so it is the speed the body actually travelled and not a speed anything claimed. The default
+    // is deliberately tight: a craft the director has parked reads exactly 0.
+    Value stillSpeed = literal(0.05f);
 };
 
 // A director parameter. Registered under `<prefix><scenario>/<name>`.
@@ -476,6 +501,7 @@ struct StageReport {
     std::size_t cycles = 0;     // completed scenario cycles, across every scenario
     std::size_t stepsDone = 0;
     std::size_t stepsFailed = 0;
+    std::size_t gated = 0;      // frames a beat spent waiting for a body to actually stop
 };
 
 enum class StageEventKind : std::uint8_t {
@@ -483,6 +509,7 @@ enum class StageEventKind : std::uint8_t {
     Bound,     // a query bound a role; `detail` is the entity
     Unbound,   // a query found nothing
     Beat,      // a beat was entered
+    Waiting,   // a beat is gated on a body that has not stopped; `detail` is which and how fast
     StepDone,
     StepFailed,
     Retired,
@@ -627,6 +654,14 @@ private:
         std::vector<params::Parameter<float>*> params;
         std::optional<signals::SignalId> startId;
         std::optional<signals::SignalId> stopId;
+        // The gate's two flags, and they are different questions. `gateOpen` latches: once the
+        // beat's `stillRoles` have been observed still, the beat has *started* and nothing it does
+        // afterwards closes it again. Without the latch the craft's own authored wobble -- 0.85 m/s
+        // at the top of its sway against a 0.05 m/s threshold -- re-gated the beat on its second
+        // frame and the abduction hung in `beam` for the rest of the film, which is what the first
+        // cut of this did and what measuring it immediately showed.
+        bool gateOpen = false;
+        bool gated = false; // currently held; latched separately so the Waiting event fires once
     };
     struct Written {
         std::string path;
@@ -656,8 +691,12 @@ private:
                                     const StageContext& ctx) const;
     [[nodiscard]] glm::vec3 placementOffset(const entity::Entity& e, Anchor place,
                                             const StageContext& ctx) const;
-    [[nodiscard]] bool resolvePoint(const Run& run, const StepDesc& step, const StageContext& ctx,
-                                    glm::vec3& out) const;
+    // `role` is the step's *resolved* role -- its own, or the cue's when the step named none. Taking
+    // `step.role` here was a bug of exactly the kind the note on `parameterPath` records: every
+    // `relative` step in a cue that relied on the cue's role resolved against no entity at all and
+    // measured its offset from the world origin, silently.
+    [[nodiscard]] bool resolvePoint(const Run& run, std::string_view role, const StepDesc& step,
+                                    const StageContext& ctx, glm::vec3& out) const;
     [[nodiscard]] std::string parameterPath(const Run& run, std::string_view role,
                                             std::string_view target, const StageContext& ctx) const;
     void writeParameter(const Run& run, std::string_view role, const std::string& path,
@@ -686,6 +725,21 @@ private:
     spatial::PointGrid grid_;
     double lastSearch_ = -1.0e30;
     bool needSearch_ = true;
+
+    // Where each body a running scenario has bound was on the previous frame, so `BeatDesc::
+    // stillRoles` can ask how fast it *actually travelled* rather than how fast anything claimed it
+    // was going. `EntityState::speed` is the wrong number for this: on a director-driven body it is
+    // whatever `DirectorMotion::speed` was set to, which on the craft is nothing at all and on a
+    // carried animal is the gait rate the shot wanted its legs to run at. Cleared by `reset`, so a
+    // seek does not inherit a frame from however the playhead got there (ADR-091).
+    struct Seen {
+        std::string entity;
+        glm::vec3 position{0.0f};
+        double time = 0.0;
+    };
+    std::vector<Seen> seen_;
+    [[nodiscard]] float measuredSpeed(const entity::Entity& e, const StageContext& ctx) const;
+    void rememberPositions(const Run& run, const StageContext& ctx);
 
     std::vector<Written> written_;
     std::vector<std::string> registered_;

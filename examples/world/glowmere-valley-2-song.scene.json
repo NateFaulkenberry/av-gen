@@ -21647,18 +21647,32 @@
           },
           {
             "name": "beam",
+            "stillRoles": [
+              "actor"
+            ],
             "cues": [
+              {
+                "role": "target",
+                "steps": [
+                  {
+                    "kind": "follow",
+                    "name": "caught",
+                    "relative": true,
+                    "hold": true,
+                    "duration": {
+                      "param": "hoverSeconds"
+                    }
+                  }
+                ]
+              },
               {
                 "role": "actor",
                 "steps": [
                   {
                     "kind": "follow",
                     "name": "hover",
-                    "to": "target",
-                    "height": {
-                      "param": "hoverHeight"
-                    },
-                    "aboveGround": true,
+                    "relative": true,
+                    "hold": true,
                     "duration": {
                       "param": "hoverSeconds"
                     },
@@ -21712,12 +21726,8 @@
                   {
                     "kind": "follow",
                     "name": "hold",
-                    "to": "target",
+                    "relative": true,
                     "hold": true,
-                    "height": {
-                      "param": "hoverHeight"
-                    },
-                    "aboveGround": true,
                     "duration": {
                       "param": "abductSeconds"
                     },
