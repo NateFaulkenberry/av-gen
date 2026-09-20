@@ -131,6 +131,38 @@ void SettingsPanel::drawRendering() {
         "fill it. Below 1.0 trades sharpness for frame rate, which on a high-density display is "
         "often the better trade.");
 
+    // §15-§17. The slider above has existed since ADR-084 and, being a manual control that nobody
+    // finds, has never once been the thing that fixed a slow editor -- the same diagnosis was
+    // filed twice, on two different scenes, and both times the answer was "the lever exists".
+    // This is the same lever driven by the frame time instead of by a person.
+    if (settings != nullptr) {
+        ImGui::Spacing();
+        propertyLabel("Adapt automatically", "Keep the frame rate up on heavy scenes");
+        bool adaptive = settings->adaptiveCanvasScale;
+        if (ImGui::Checkbox("##adaptive-canvas-scale", &adaptive)) {
+            settings->adaptiveCanvasScale = adaptive;
+            if (onChanged) {
+                onChanged();
+            }
+        }
+        ImGui::TextWrapped(
+            "When the GPU cannot keep up, render the world at a lower resolution and sharpen it "
+            "back up into the viewport, down to half size. It only engages on a frame that is "
+            "missing its budget and that the GPU -- not the interface -- is what is holding up; "
+            "it never changes a render, and it goes back to full resolution when the scene gets "
+            "cheaper. The Performance panel shows the resolution it settled on.");
+        ImGui::BeginDisabled(!adaptive);
+        propertyLabel("Frame budget", "The GPU time it aims at");
+        auto budget = static_cast<float>(settings->adaptiveCanvasBudgetMs);
+        if (ImGui::SliderFloat("##adaptive-canvas-budget", &budget, 8.0f, 50.0f, "%.1f ms")) {
+            settings->adaptiveCanvasBudgetMs = budget;
+            if (onChanged) {
+                onChanged();
+            }
+        }
+        ImGui::EndDisabled();
+    }
+
     // ADR-364. Here rather than in the Render panel because it is a property of how this person
     // works on this machine, like the render scale above it, and not of the piece -- opening
     // someone else's project must not change whether your viewport keeps running.

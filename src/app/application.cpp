@@ -212,6 +212,11 @@ std::string usageText() {
            "                      '+seeknow' (the playhead's re-simulation back inside the gesture),\n"
            "                      so each fix has a before arm in the same process\n"
            "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
+           "  --adaptive-scale <on|off>  let the editor choose the scene's resolution from the GPU\n"
+           "                      frame time, filtering it up into the canvas the person asked for.\n"
+           "                      Overrides the settings file for this run; never applies to a\n"
+           "                      render, where the Offline tier pins the scale to 1\n"
+           "  --adaptive-budget <ms>  the GPU frame time --adaptive-scale aims at (default 16.67)\n"
            "  --supersample <f>   offline render only: render the scene at this multiple of the output\n"
            "  --particle-warmup <n>  step the particle pools n frames before the first frame of a\n"
            "                      render range or after a seek, so the range does not open on an\n"
@@ -676,6 +681,25 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             ++i;
         } else if (arg == "--viewport-matches-render") {
             options.liftViewportLimits = true;
+        } else if (arg == "--adaptive-scale") {
+            auto v = need(i, "--adaptive-scale");
+            if (!v) return std::unexpected(v.error());
+            if (*v == "on" || *v == "1" || *v == "true") {
+                options.adaptiveScale = true;
+            } else if (*v == "off" || *v == "0" || *v == "false") {
+                options.adaptiveScale = false;
+            } else {
+                return fail("--adaptive-scale expects on or off, got '{}'", *v);
+            }
+            ++i;
+        } else if (arg == "--adaptive-budget") {
+            auto v = need(i, "--adaptive-budget");
+            if (!v) return std::unexpected(v.error());
+            options.adaptiveBudgetMs = std::strtod(v->c_str(), nullptr);
+            if (options.adaptiveBudgetMs < 4.0 || options.adaptiveBudgetMs > 200.0) {
+                return fail("--adaptive-budget must be between 4 and 200 ms, got '{}'", *v);
+            }
+            ++i;
         } else if (arg == "--preview-mode") {
             // ADR-246. Exists so the output preview can be driven by the scripted-interaction
             // driver and by a benchmark arm: the mode is otherwise only reachable from a toolbar,
@@ -1297,6 +1321,20 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         edits_.addContext(panel_->editor);
         panel_->canvasRenderScale =
             options_.canvasScale != 1.0f ? options_.canvasScale : settings_.canvasRenderScale;
+        // §15-§17. Configured here, inside the `panel_ != nullptr` branch, which is the live
+        // editor and nothing else: `runHeadless` never reaches this and so never constructs a
+        // controller, and a render job sizes its own targets from `RenderSettings` at the Offline
+        // tier, whose `renderScale` is pinned to 1 and tested to be.
+        {
+            InteractiveResolutionSettings rs;
+            rs.enabled = options_.adaptiveScale.value_or(settings_.adaptiveCanvasScale);
+            rs.budgetMs = options_.adaptiveBudgetMs > 0.0 ? options_.adaptiveBudgetMs
+                                                          : settings_.adaptiveCanvasBudgetMs;
+            autoResolution_.configure(rs);
+            log::info("adaptive render scale: {} (budget {:.2f} ms GPU, floor {:.2f}x)",
+                      rs.enabled ? "on" : "off", rs.budgetMs,
+                      static_cast<double>(kRenderScaleRungs[rs.floorRung]));
+        }
         panel_->preview = settings_.preview;
         panel_->renderPreview.enabled = settings_.renderFramePreview || options_.renderPreview; // ADR-320
         // The flag outranks the remembered state, and only when it was given: a benchmark arm has
@@ -3904,6 +3942,12 @@ int Application::runLive() {
     const int kPhProcGen = prof.phase("# procedural regen");
     const int kPhFlatten = prof.phase("# scene flattens");
     const int kPhEnvBuild = prof.phase("# IBL builds");
+    // §15-§17 / §42. Two rows, because "what did it render at" and "how often did it change its
+    // mind" are different questions and the second is the one that catches an oscillating
+    // controller. `scene Mpx` is the pixel count the scene pass actually shaded, which after the
+    // adaptive scale is no longer derivable from the canvas size the run logs at frame 60.
+    const int kPhSceneMpx = prof.phase("scene Mpx");
+    const int kPhScaleChanges = prof.phase("# render-scale moves");
     std::uint64_t lastProcGen = scene::proceduralRebuildCount();
     std::uint64_t lastEnvBuild = rendering::environmentBuildCount();
     // Seeded from the composition as it stands *after* the load, so the first frame reports the
@@ -4128,6 +4172,43 @@ int Application::runLive() {
                 renderWidth_ = cw;
                 renderHeight_ = ch;
             }
+        }
+        // The Settings panel writes `adaptiveCanvasScale` and the budget straight through, so there
+        // is no hook to set a dirty bit in and the honest thing is to compare -- the same shape
+        // and the same reason as `serviceLayoutStore` and the preview's view state below. Without
+        // this the checkbox would be a setting that does nothing until the next launch, which is
+        // the class of defect ADR-225 exists about. A `--adaptive-scale` on the command line
+        // outranks the file and is not overwritten by it.
+        if (panel_ != nullptr && !options_.adaptiveScale.has_value() &&
+            (autoResolution_.settings().enabled != settings_.adaptiveCanvasScale ||
+             autoResolution_.settings().budgetMs != settings_.adaptiveCanvasBudgetMs)) {
+            InteractiveResolutionSettings rs = autoResolution_.settings();
+            rs.enabled = settings_.adaptiveCanvasScale;
+            rs.budgetMs = settings_.adaptiveCanvasBudgetMs;
+            // Switching it off resets the ladder to rung 0, and the block below then puts the
+            // renderer back to full resolution on the same frame.
+            autoResolution_.configure(rs);
+        }
+        // ---- the adaptive render scale (§15-§17) ------------------------------------------------
+        //
+        // Applied here, after `renderWidth_`/`renderHeight_` are settled, because the rung is a
+        // fraction *of* the canvas: `setQualitySettings` re-resolves the scene target from the
+        // output size the renderer already holds. It is deliberately downstream of the canvas
+        // sizing and upstream of everything that reads the frame, so the picture the canvas shows
+        // is the output size whatever rung is in force -- that is what makes this a presentation
+        // change and not a change to what the frame is *of* (§33/§34).
+        //
+        // Rung 0 is the identity: no call is made at all, and an editor whose GPU keeps up is
+        // byte-identical to one built before this existed.
+        if (renderWidth_ > 0 && autoResolutionRung_ != autoResolution_.rung()) {
+            autoResolutionRung_ = autoResolution_.rung();
+            rendering::QualitySettings q = renderer_->qualitySettings();
+            q.renderScale = autoResolution_.scale();
+            renderer_->setQualitySettings(q);
+            log::info("render scale: rung {} ({:.2f}) -- scene {}x{} into a {}x{} canvas",
+                      autoResolutionRung_, static_cast<double>(q.renderScale),
+                      renderer_->stats().width, renderer_->stats().height, renderWidth_,
+                      renderHeight_);
         }
         // The final texture has to exist before the panel draws, because the canvas window shows it
         // and ImGui records the texture id while it lays the frame out -- the drawing into it
@@ -4381,6 +4462,8 @@ int Application::runLive() {
 
         stats.width = renderWidth_;
         stats.height = renderHeight_;
+        stats.sceneWidth = renderer_->stats().width;
+        stats.sceneHeight = renderer_->stats().height;
         stats.drawCalls = renderer_->stats().drawCalls;
         stats.triangles = renderer_->stats().triangles;
         stats.procedural = renderer_->stats().procedural;
@@ -4838,6 +4921,16 @@ int Application::runLive() {
             if (stats.gpuFrameMs >= 0.0) {
                 prof.add(kPhGpuFrame, stats.gpuFrameMs);
             }
+            // The scene's own extent, not the canvas's. `SceneRenderer::stats()` reports the
+            // resolution the scene pass shaded deliberately (ADR-137 step 2), which is the number
+            // every per-pixel figure in this document is a figure about.
+            prof.count(kPhSceneMpx, static_cast<double>(renderer_->stats().width) *
+                                        renderer_->stats().height / 1.0e6);
+            // Fed the *interval*, not the CPU time: the controller is deciding whether a smaller
+            // world would make frames arrive sooner, and `cpuFrameMs` excludes the swapchain wait
+            // that a GPU-bound frame spends most of itself in.
+            const auto decision = autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs);
+            prof.count(kPhScaleChanges, decision.changed ? 1.0 : 0.0);
         }
         // ---- the interaction log's end of frame -------------------------------------------------
         // Everything this frame caused is attributed to whatever interaction is open, then T6 is

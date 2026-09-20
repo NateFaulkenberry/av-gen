@@ -26,6 +26,10 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/scene_states.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/profile_capture.cpp"
+    # The adaptive render-scale controller (§15-§17). Deliberately GPU-free and clock-free -- it
+    # takes a GPU time and a wall time per frame and returns a rung -- so the control law can be
+    # checked for the thing a benchmark cannot show it: that it settles instead of oscillating.
+    "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/asset_browser.cpp"
     # The example index is JSON and paths. It is here so the menu the application builds is the one
     # the test reads: checking the raw JSON instead passed on an index the application then refused.
