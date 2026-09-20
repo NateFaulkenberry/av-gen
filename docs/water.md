@@ -203,3 +203,28 @@ reflect in the water. No copy of the frame, so the only refraction is a wobble i
 shoreline is read at. No underwater post-processing when the camera dips below the surface — the
 surface shades itself differently from beneath and that is all. No caustics. Each of those is another
 pass, and the brief asked for a beautiful stylized surface rather than an ocean simulator.
+
+And one more, which is a *defect* rather than a scope decision: **the cube the reflection samples is
+not the sky the camera sees.** Since ADR-345 a scene may light itself from a baked HDRI while
+drawing the procedural sky behind it, and `water.wgsl` gates its reflection only on "an IBL is
+live" — so at the warm ends of a day/night cycle the sky is a sunset and the water is still
+reflecting a photograph of noon. Measured 2026-09-20 on `tree-of-life-ocean-world`, as R−B in sRGB
+bytes over bands either side of frame:
+
+| phase | sky R−B | water R−B | gap |
+|---|---|---|---|
+| dawn | +45.4 | −13.1 | **+58.5** |
+| noon | −34.5 | −41.9 | +7.4 |
+| sunset | +47.7 | −9.6 | **+57.3** |
+| twilight | −7.4 | −34.6 | +27.2 |
+
+Noon is the control: when the map and the procedural sky agree about the sky, the gap is an eighth
+of what it is at the ends. ADR-347's `waterReflection` curve turns the reflection down at dawn and
+sunset to carry the colour in the water's body instead, and calls itself a workaround.
+
+It is **not fixed**, and ADR-400 has the three costed options and why each is wrong today — the
+short version being that the cheap fix would make `water.wgsl` a third hand-copy of the analytic
+sky, and the correct fix is a second prefiltered cube with a per-phase re-bake budget. The
+measurement above re-runs as
+`tools/gpu-lock.sh ./build/release/tests/avgen_render_tests "[water][sky][.probe]"`; it is a
+before-table for whoever fixes it and deliberately asserts nothing about the gap.
