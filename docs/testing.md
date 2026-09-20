@@ -78,6 +78,75 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
+## Eight ways a green suite has lied
+
+Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
+were building concurrently. They divide into two families: **the run did not happen as you think**,
+and **the run happened and you read it wrong.**
+
+### The run did not happen as you think
+
+1. **Stale binary.** The test glob is *configure-time*, so an incremental build after a merge
+   silently omits test files the merge added and the suite passes without ever compiling them.
+   Always `cmake -S . -B build/release` after a merge.
+2. **Stale object.** Worse, and the binary-level guard misses it. A merge wrote a source in the same
+   second the compiler read it, the timestamp comparison tied, and one `.o` was never rebuilt — so
+   the binary was *newer than every source* and still contained an old compiled test. It ran against
+   new code and **manufactured three plausible failures**, with full `with expansion:` output,
+   pointing at a line that is a closing brace, for a test name that no longer exists in the file.
+   The tell is that the failure text does not match source you can read. `git clean` the test object
+   directory after a merge is cheaper than the check.
+3. **A log written by somebody else's process.** See the next section; this is the severe one.
+
+### The run happened and you read it wrong
+
+4. **`FAILED:` with no `with expansion:`** — a killed process, not a failure. `REQUIRE(a == b)` over
+   a multi-megabyte buffer kills Catch2 inside the assertion handler (ADR-362). Use `byteDiff`.
+5. **A truthful summary above a non-zero exit code.** SIGABRT *after* the summary prints is the trap:
+   the summary honestly describes the assertions that ran and the process still died. "Read the
+   summary" and "read the exit code" are not redundant — one describes the run, the other the
+   process. Capture `$?` explicitly; a pipeline's exit code is the last command's, usually `grep`.
+6. **Your own `kill` appears as a named failure.** A SIGTERM you issued yourself shows up as a
+   `FAILED:` entry with a plausible test name.
+7. **A genuinely flaky test.** `tests/integration/test_ai_control_plane.cpp` races under machine
+   load: its wait loop exits on `finished()` and *then* cancels, so a loaded machine completes the
+   task in the gap and the state comes back `Completed` where the test wants `Cancelled`.
+8. **A `[!shouldfail]` test prints a full `FAILED:` block, with `with expansion:`, on every healthy
+   run.** `test_character_lab_slopes.cpp:187` asserts an invariant the engine does not satisfy — the
+   file says so — and is tagged so Catch2 expects it. In isolation it reports `1 failed as expected`
+   and **exits 0**. This is the "1 failed as expected" in every summary here, and it looks exactly
+   like a real failure if you are reading `FAILED:` blocks rather than the summary and exit code.
+
+**So `grep -c FAILED` is not a failure count.** Two of the eight cases above put a well-formed
+`FAILED:` block into a perfectly healthy log. Read the **exit code first, the summary second, and
+`FAILED:` blocks only as a pointer to what to go and look at** — not the other way round.
+
+## The scratchpad is shared by every agent in a session
+
+**"Session-specific" does not mean "yours alone."** Every agent spawned by a session inherits the
+same scratchpad path, so two agents that both write `suite.log` are writing the same inode. Observed:
+two `avgen_tests` PIDs holding one file open for write, two Catch2 summaries interleaved into it, and
+a third file containing **zero lines from the agent that created it** — one clean summary, start to
+finish, from a different worktree entirely. `/tmp` has the same problem for the same reason.
+
+That last case is why the summary count is not sufficient on its own. Before trusting a suite log:
+
+```sh
+grep -c '^test cases:' LOG                        # must be exactly 1
+grep -oE 'GitHub/av-gen[a-z0-9-]*/tests' LOG      # must show ONLY your own worktree
+echo $?                                            # captured from the binary, not a pipeline
+```
+
+The worktree check is the one that catches a log that is entirely somebody else's, because such a
+log has exactly one summary and looks perfect. Note that it must tolerate worktrees that no longer
+exist: one contaminating process ran in `av-gen-wt-songdirector`, which is not in `git worktree
+list` and is not on disk.
+
+**Name scratchpad files by agent or worktree, never by purpose alone.** `suite.log`, `gate.log` and
+`build.log` are collision bait; `temporal-suite-<timestamp>-<pid>.log` is not. Build logs collided
+far less than suite logs in practice, because a build takes minutes and finishes while several
+suites run for an hour and overlap.
+
 ## Determinism requirements
 
 GPU particle systems use stable stream compaction since 1.0 (ADR-015 revision), so headless

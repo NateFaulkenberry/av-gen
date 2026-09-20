@@ -749,6 +749,11 @@ private:
     void updateAuroraSpectrum();
     [[nodiscard]] glm::vec3 cameraVelocityOnTimeline() const;
     scene::PostParameters postParams_;
+    // ADR-410. Registered beside the post parameters and applied beside them, because the failure
+    // this repo keeps paying for is a system that is built, tested and unreachable: a parameter
+    // nothing registers is a parameter no panel can draw and no project can keep.
+    scene::TemporalSettings temporal_;
+    scene::TemporalParameters temporalParams_;
     scene::LensSettings lens_;
     scene::ExposureSettings exposure_;
     scene::FocusSettings focus_;
