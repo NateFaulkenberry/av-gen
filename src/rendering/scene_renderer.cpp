@@ -195,7 +195,8 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       ao_(std::make_unique<AoRenderer>(context, shaders)),
       shadowMask_(std::make_unique<ShadowMaskRenderer>(context, shaders)),
       water_(std::make_unique<WaterRenderer>()),
-      postProcessor_(std::make_unique<PostProcessor>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
+      postProcessor_(std::make_unique<PostProcessor>(context, shaders)),
+      temporal_(std::make_unique<TemporalEffects>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
 }
 
 SceneRenderer::~SceneRenderer() = default;
@@ -493,6 +494,9 @@ Result<void> SceneRenderer::init() {
         return r;
     }
     if (auto r = postProcessor_->init(); !r) {
+        return r;
+    }
+    if (auto r = temporal_->init(); !r) {
         return r;
     }
     if (context_.errorCount() > 0) {
@@ -1634,6 +1638,12 @@ void SceneRenderer::resetTemporalHistory() {
     // so a seek that kept the same scene kept the simulation.
     if (particles_ != nullptr) {
         particles_->resetAll();
+    }
+    // ADR-394: the temporal ring is history in exactly the sense this function means. It rides the
+    // existing hook rather than a second one, so a seek, a cut, a resize and a scene swap all
+    // invalidate it without anyone having to remember a new call.
+    if (temporal_ != nullptr) {
+        temporal_->reset();
     }
 }
 
@@ -3686,6 +3696,30 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             hdrOutput_ = post_[ping].colorTexture();
             ping = 1 - ping;
         }
+    }
+
+    // ---- temporal media: capture the clean radiance, apply the temporal effects (ADR-394) ----
+    //
+    // Deliberately BEFORE the post chain. The ring must hold the scene's own radiance, not a
+    // graded, bloomed, tone-mapped frame: post is a look, it changes when a grade changes, and a
+    // history of looks cannot be rebuilt by re-rendering. Capturing here is what makes the family
+    // a cache of a pure function rather than an accumulator, which is the whole of ADR-394.
+    {
+        TemporalFrameInputs temporalIn;
+        temporalIn.sceneHdr = finalHdr;
+        temporalIn.velocity = velocity_.view;
+        temporalIn.width = hdr_.width();
+        temporalIn.height = hdr_.height();
+        // The frame index, not the render time: `beginFrame` distinguishes a repeat from a jump by
+        // comparing indices, and a float second cannot be compared for equality to do that.
+        temporalIn.frameIndex = time.frameIndex;
+        temporalIn.settings = &scene.temporal;
+        temporalIn.resolutionScale = qualitySettings_.temporalHistoryScale;
+        temporalIn.hdrFormat = kHdrFormat;
+        if (toggles_.post) {
+            finalHdr = temporal_->run(encoder, temporalIn, *pool_);
+        }
+        stats_.temporal = temporal_->stats();
     }
 
     // ---- built-in post chain: DoF, motion blur, bloom, grading ----
