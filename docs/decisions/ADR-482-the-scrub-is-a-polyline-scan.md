@@ -127,6 +127,32 @@ determinism captures cannot: they compare two runs of one build, and both runs u
 accelerated and unaccelerated answers **bit for bit** over 4,225 heights per terrain style, and its
 control collapses every box to a point outside the world and requires the heights to move.
 
+## Decision 3: §6 and §7 are already done, and the number says do not build cancellation
+
+The brief asks for obsolete work and latest-request-wins, and warns that they are hypotheses rather
+than a plan. They are also already implemented -- `Engine::requestSeek(t, gestureHeld)` defers, and
+`InteractionLog::noteSuperseded` folds a new request into the open one. What nobody had was the
+ratio. `--ui-script drag`, 600 frames, the real pointer path through `SequencePanel`:
+
+| interaction | begun | done | abandoned | input->ack | input->first visual | input->final visual | seeks | **coalesced** |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| timeline-click | 10 | 10 | 0 | 2.6 ms | 6.7 ms | 1334.9 ms | 10 | 0 |
+| timeline-drag | 9 | 9 | 0 | 2.9 ms | 7.6 ms | 2857.0 ms | 9 | **343** |
+
+**352 requests became 9 evaluations. 97.4% of what a held drag asks for is discarded before any
+work is started for it.** Not cancelled -- never begun, which is the strictly better thing and the
+one a cancellation architecture cannot improve on. Without it a forty-frame drag would issue 352
+seeks at about 2.4 s each, which is a quarter of an hour for one gesture.
+
+So the honest reading of §6/§7 on this application is: **the mechanism exists, it is measured, it
+works at 39:1, and there is nothing to build.** What is left is not obsolete work. It is that the
+one evaluation which does survive costs 2.4 seconds, which is Decision 2 and what remains after it.
+
+The other half of that table is worth keeping beside it: `input->first visual` is **7.6 ms**. The
+playhead moves, the picture updates, and the editor is responsive throughout the gesture -- what
+takes 2.9 s is the *settled* frame. That is the ratio ADR-084's deferral was built to produce and
+this is the first time it has been quoted from the real path.
+
 ## Consequences
 
 * A scrub on the owner's film goes from about 3.0 s to about 2.4 s. **It is still far too slow**,
@@ -138,6 +164,14 @@ control collapses every box to a point outside the world and requires the height
   lever, and the one this pass did not take, is that `WorldMap::height` is a pure function of
   (x, z) evaluated thousands of times per step over a walker's small neighbourhood. That is a cache
   with a real hit rate, and it is a bigger change than a cutoff.
+* **Two `--ui-script` arms are named after interactions they do not drive.** `camera` pushes a
+  plain left drag, which `ui::viewportIntent` maps to `EditorPointer` -- only `left && alt` is a
+  camera gesture -- so for its whole life it measured the selection and gizmo path under the
+  camera's name. `scrub` calls `engine.seekSeconds` directly, so it reaches neither the interaction
+  log nor `requestSeek`'s deferral, and a figure taken from it is the cost of one seek rather than
+  the latency of a drag. Both were found by instrumenting the interaction and noticing the arm
+  produced no records. In this harness **an arm's name is a hypothesis**, and it is also why two
+  interaction kinds could sit in the log with no call site and nobody notice.
 * One thing found on the way past and not fixed: the editor also reports that **the walkable ground
   of this world is in four disconnected pieces, and 9,788 of 20,180 walkable cells (49%) cannot be
   reached from the largest.** That is a world-authoring defect, not a performance one, and it is
