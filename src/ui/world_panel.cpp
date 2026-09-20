@@ -1201,8 +1201,6 @@ void WorldPanel::drawDebugOptions(app::Engine& engine, WorldEditor* editor) {
                           "Grey means the pass did not run for that object this frame, so there is\n"
                           "no decision to show. Costs one buffer readback per scattered object.");
     }
-    ImGui::SameLine();
-    ImGui::Checkbox("Culling", &debug.culling);
     ImGui::Checkbox("Entity bounds", &debug.entityBounds);
     ImGui::SameLine();
     ImGui::Checkbox("Entity origins", &debug.entityOrigins);
@@ -1263,6 +1261,36 @@ void WorldPanel::drawDebugOptions(app::Engine& engine, WorldEditor* editor) {
         tooltip("Green casts. Amber casts although the camera cannot see it -- the second cull\n"
                           "kept it (ADR-046). Red does not cast: not drawable, castsShadow off, a style the\n"
                           "shadow passes skip, or outside every cascade.");
+    }
+    // ADR-421, §54: do not make the artist guess what an invisible field is doing.
+    //
+    // These four overlays were all fully implemented, all read by `debug_visualizer.cpp`, and all
+    // reachable ONLY from `--debug-draw` -- which is to say, not from the application at all. The
+    // wind arrow grid in particular has been there since ADR-055 and is the one thing that answers
+    // "which way is the air moving here", which is the question every subscriber to the field bus
+    // (ADR-420) now raises. A field nobody can see is a field nobody can tune.
+    ImGui::Checkbox("Wind field", &debug.wind);
+    if (ImGui::IsItemHovered()) {
+        tooltip("Arrows on a grid showing which way the air is moving and how hard, sampled from\n"
+                "the same function the vertex shader and the field bus use. Plus each declared\n"
+                "wind body's origin, height and radius.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Vortex", &debug.vortex);
+    if (ImGui::IsItemHovered()) {
+        tooltip("The funnel's mouth, throat, depth and the direction it turns -- the geometry the\n"
+                "volumetric march is sampling, drawn as lines so you can see where it actually is\n"
+                "rather than inferring it from the haze.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Lights", &debug.lights);
+    if (ImGui::IsItemHovered()) {
+        tooltip("Every light's position, type and reach.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Light clusters", &debug.lightClusters);
+    if (ImGui::IsItemHovered()) {
+        tooltip("The cluster grid the forward pass assigns lights to, and how many landed in each.");
     }
     ImGui::SliderInt("Cascade shown", &debug.shadowCascade, -1, 7);
     if (ImGui::IsItemHovered()) {

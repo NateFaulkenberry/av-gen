@@ -10,10 +10,11 @@
 // selectively enable relevant overlays."* That selection is this file, and it is the only thing
 // here.
 //
-// **One switch is still absent from every profile.** `DebugViewOptions::culling` has a checkbox in
-// `world_panel.cpp` and `debug_visualizer.cpp` reads the field nowhere, so it draws nothing -- and
-// turning it on in the Visibility profile would make the suite's own launcher the place that defect
-// was hidden (§37, ADR-225).
+// **The switch that was absent from every profile is gone.** `DebugViewOptions::culling` had a
+// checkbox in `world_panel.cpp` and no reader in `debug_visualizer.cpp`, so it drew nothing, and
+// turning it on in the Visibility profile would have made the suite's own launcher the place that
+// defect was hidden (§37, ADR-225). ADR-421 deleted the field rather than implementing it: what it
+// promised is what `::lod` already draws, colouring culled instances purple.
 //
 // `::lod` was in the same state and is not any more: the LOD Lab wired it to
 // `ProceduralRenderer::readLodLevels`, which is the rung the cull pass wrote for each record, and

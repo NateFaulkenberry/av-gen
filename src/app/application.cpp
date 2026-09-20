@@ -264,7 +264,7 @@ std::string usageText() {
            "  --disable <list>    switch phases off for cost attribution, or subsystems off for\n"
            "                      forensic isolation:\n"
            "                      shadows,ao,volume,post,shadowmask,\n"
-           "                      culling,water,transparency,particles,animation,cameramotion,fxaa\n"
+           "                      water,transparency,particles,animation,cameramotion,fxaa\n"
            "  --ab <phase>        headless A/B: run baseline and <phase>-disabled interleaved in\n"
            "                      this one process (A/B/A/B) and report the paired difference.\n"
            "                      --ab none compares the baseline with itself: the noise floor\n"
@@ -1995,9 +1995,10 @@ Result<void> Application::applyDebugDraw() {
         // the one context where a checkbox does not exist. An overlay a file cannot ask for is an
         // overlay nobody diagnosing from a rendered frame can use.
         //
-        // `culling` is deliberately NOT here. It is still a field nothing reads (ADR-225), and a
-        // command-line name for an inert flag is a promise the application does not keep -- worse
-        // on a CLI than in a panel, because a script cannot see that nothing happened.
+        // (`culling` used to be named here as a deliberate omission -- a field nothing read, whose
+        // command-line name would have been a promise the application does not keep. ADR-421
+        // deleted the field: the same argument applies to the checkbox that DID exist for it, and
+        // what it promised to draw is what the `lod` overlay already draws, in purple.)
         {"lod", &d.lod},
         {"shadowCascades", &d.shadowCascades},
         {"shadowCascadeSlices", &d.shadowCascadeSlices},
