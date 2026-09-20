@@ -377,9 +377,13 @@ fn coNebula(co: CosmicOceanBlock, ro: vec3<f32>, rd: vec3<f32>, l0: vec4<f32>, l
     let warpAmount = l1.z;
     var warp = vec3<f32>(0.0);
     if (warpAmount > 1.0e-4) {
-        warp = vec3<f32>(coFbm(base + w, 2.0, 0.5, l2.y),
-                         coFbm(base + w.yzx + vec3<f32>(17.3), 2.0, 0.5, l2.y),
-                         coFbm(base + w.zxy + vec3<f32>(31.1), 2.0, 0.5, l2.y)) - vec3<f32>(0.5);
+        // `l3.z` octaves, not a literal 2: this is three fBM calls, so an octave here costs three
+        // noise samples where the field's costs one, and the warp is a low-frequency displacement
+        // by construction. The tier scales it (ADR-450).
+        let wo = max(l3.z, 1.0);
+        warp = vec3<f32>(coFbm(base + w, wo, 0.5, l2.y),
+                         coFbm(base + w.yzx + vec3<f32>(17.3), wo, 0.5, l2.y),
+                         coFbm(base + w.zxy + vec3<f32>(31.1), wo, 0.5, l2.y)) - vec3<f32>(0.5);
         warp = warp * warpAmount * 1.8;
     }
     // `evolve` moves the field through a fourth dimension rather than translating it, so the nebula

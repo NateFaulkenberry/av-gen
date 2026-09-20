@@ -299,7 +299,7 @@ struct CosmicOceanGpu {
     glm::vec4 nebFar0{0.0f};     // x depth, y parallax, z density, w scale
     glm::vec4 nebFar1{0.0f};     // x octaves, y turbulence, z warp, w brightness
     glm::vec4 nebFar2{0.0f};     // x flow phase, y softness, z contrast, w colour mix
-    glm::vec4 nebFar3{0.0f};     // x evolve phase, y shimmer, zw rgb-less spare -> tint packed below
+    glm::vec4 nebFar3{0.0f};     // x evolve phase, y shimmer, z domain-warp octaves, w spare
     glm::vec4 nebMid0{0.0f};
     glm::vec4 nebMid1{0.0f};
     glm::vec4 nebMid2{0.0f};

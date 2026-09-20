@@ -347,7 +347,13 @@ void TransportBar::drawTempo(app::Engine& engine, const app::TransportSnapshot& 
     detail += "\n\nA tempo gives seconds per beat. The beat grid -- phase, downbeat, bars --\n"
               "comes from analysis, not from the number.";
     if (ImGui::IsItemHovered()) {
-        tooltip(detail.c_str());
+        // `tooltipUnformatted`, not `tooltip`. `detail` is a runtime string, and part of it comes
+        // from the audio file's own metadata (`metadataFormat`, `metadataKey`) -- so passing it as
+        // a printf format string means a file whose tag contains a per-cent sign reads arguments
+        // off an empty varargs list. Caught by `-Werror=format`, which ADR-393 turned on by name
+        // after the same mistake in `control_panel.cpp`; this is the second instance and the first
+        // one whose format string an outside file could choose.
+        tooltipUnformatted(detail.c_str());
     }
     if (overridden && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
         engine.clearTempoOverride();

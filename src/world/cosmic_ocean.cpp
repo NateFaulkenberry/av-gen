@@ -406,7 +406,15 @@ CosmicOceanGpu packCosmicOcean(const CosmicOcean& ocean, float envelope, double 
         b = glm::vec4(std::min(n.detail, octaveCeiling), n.turbulence, n.warp, n.stratum.brightness);
         c = glm::vec4(phase(t, n.flowSpeed), std::clamp(n.softness, 0.0f, 1.0f), std::max(n.contrast, 0.0f),
                       std::clamp(n.colorMix, 0.0f, 1.0f));
-        d = glm::vec4(phase(t, n.evolveSpeed), std::max(n.shimmer, 0.0f), 0.0f, 0.0f);
+        // z: the octave count of the DOMAIN WARP, which is not the same lever as the field's own
+        // and is the cheaper one. The warp is three separate fBM calls -- one per component of the
+        // displacement vector -- so an octave here costs three noise samples against the field's
+        // one, and the warp is a low-frequency displacement by construction: its second octave
+        // moves the sample point by a fraction of a cell. Scaled by the tier's `octaveScale` and
+        // floored at one, so Preview warps with three samples where Offline warps with nine.
+        d = glm::vec4(phase(t, n.evolveSpeed), std::max(n.shimmer, 0.0f),
+                      std::clamp(std::round(2.0f * std::max(quality.octaveScale, 0.05f)), 1.0f, 3.0f),
+                      0.0f);
     };
     packNebula(o.nebulaFar, g.nebFar0, g.nebFar1, g.nebFar2, g.nebFar3);
     packNebula(o.nebulaMid, g.nebMid0, g.nebMid1, g.nebMid2, g.nebMid3);

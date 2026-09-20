@@ -1500,6 +1500,13 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         // of an existing contract rather than a new one.
         {"shadowrange", [](QualitySettings& q) { q.shadowTexelTarget = 0.0f; },
          "shadowTexelTarget=0 (the pre-ADR-112 range: three scene radii)"},
+        // ADR-450. The Cosmic Ocean's two sample levers, separately, so that "what does an octave
+        // of nebula cost" and "what does a cell of dust cost" are two measurements rather than one
+        // tier that moved both and a guess about which mattered.
+        {"cosmicoct", [](QualitySettings& q) { q.cosmicOctaveScale = 0.5f; },
+         "cosmicOctaveScale=0.5 (nebula field octaves halved, and the domain warp down to one)"},
+        {"cosmicsamples", [](QualitySettings& q) { q.cosmicSampleScale = 0.34f; },
+         "cosmicSampleScale=0.34 (planet cells 3x3 -> 1x1, dust off)"},
         // The screen-space contact march, off. It is the one shadow term the mask does not cover,
         // so it is the term that is still evaluated per pixel per directional light.
         {"contact", [](QualitySettings& q) { q.contactShadows = false; q.contactSteps = 0; },
