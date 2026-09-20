@@ -21,6 +21,7 @@
 #include "graph/graph.hpp"
 #include "scene/day_night.hpp"
 #include "scene/field_params.hpp"
+#include "scene/ground_query.hpp"
 #include "scene/camera_rig.hpp"
 #include "scene/light_rig.hpp"
 #include "scene/material_params.hpp"
@@ -1024,6 +1025,13 @@ public:
     // obstacle field says so through `hasObstacles()` rather than pretending the world is empty.
     [[nodiscard]] world::TerrainQuery terrainQuery() const;
 
+    // ---- environmental contact queries (ADR-551, Phase B §17) -----------------------------------
+    // What a procedural layer asks about the world, behind an abstraction that hides where the
+    // answer came from. Defaults to this composition's own terrain; a caller may install another
+    // source -- a collision system, a baked field, a test's plane -- without the layers knowing.
+    [[nodiscard]] const IGroundQuery& groundQuery() const;
+    void setGroundQuery(const IGroundQuery* query) { groundQuery_ = query; }
+
     // ---- entities (ADR-088) ------------------------------------------------------------------
     //
     // The `entities` array of a scene file: what in this scene moves on its own and how it answers
@@ -1537,6 +1545,18 @@ private:
     double currentTime_ = 0.0;
     void updateCharacters(const FrameTime& time); // ADR-086
     RigStats rigStats_;   // ADR-086: what the last update() spent posing skinned characters
+    // ADR-551. `terrainGround_` adapts this composition's own terrain to `IGroundQuery`;
+    // `groundQuery_` is what the layers actually ask, and is null until something installs one.
+    class TerrainGroundQuery final : public IGroundQuery {
+    public:
+        explicit TerrainGroundQuery(const Composition& owner) : owner_(owner) {}
+        [[nodiscard]] GroundSample sampleAt(const glm::vec3& worldPoint) const override;
+
+    private:
+        const Composition& owner_;
+    };
+    TerrainGroundQuery terrainGround_{*this};
+    const IGroundQuery* groundQuery_ = nullptr;
     // Scene-level material programs (ADR-030): "materialPrograms" in the file, parameters
     // "material/<name>/…", referenced by Material::program.
     CompositionData compositionData_;

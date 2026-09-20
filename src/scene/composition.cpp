@@ -2364,6 +2364,36 @@ entity::Navigator Composition::buildNavigator() const {
     return {};
 }
 
+GroundSample Composition::TerrainGroundQuery::sampleAt(const glm::vec3& worldPoint) const {
+    GroundSample out;
+    const world::TerrainQuery terrain = owner_.terrainQuery();
+    if (!terrain.valid()) {
+        return out; // no terrain in this scene: no answer, which is not the same as flat ground
+    }
+    const world::TerrainPoint point = terrain.at(glm::vec2(worldPoint.x, worldPoint.z));
+    // **`TerrainReject` answers a different question from this one.** Its values -- `TooSteep`,
+    // `Submerged`, `NoHeadroom`, `InsideHero`, `Obstructed` -- are about whether a character may
+    // WALK here. Every one of those places still has a surface with a height, and a foot standing
+    // on a steep bank, in shallow water or under a canopy is standing on something.
+    //
+    // Treating a reject as "no ground" was measured doing exactly the wrong thing: an alien's right
+    // foot fell back to the body's plane precisely where the terrain was steep enough to be worth
+    // sampling. Only `OutOfBounds` is genuinely no answer.
+    if (point.reject == world::TerrainReject::OutOfBounds) {
+        return out;
+    }
+    out.point = glm::vec3(worldPoint.x, point.height, worldPoint.z);
+    out.normal = point.normal;
+    out.distance = worldPoint.y - point.height;
+    out.category = point.water ? GroundCategory::Water : GroundCategory::Terrain;
+    out.valid = true;
+    return out;
+}
+
+const IGroundQuery& Composition::groundQuery() const {
+    return groundQuery_ != nullptr ? *groundQuery_ : terrainGround_;
+}
+
 world::TerrainQuery Composition::terrainQuery() const {
     for (const auto& nodePtr : nodes_) {
         if (nodePtr->kind != NodeKind::Terrain) {
@@ -2445,14 +2475,18 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
     if (!wanted) {
         return; // no node authored a layer: the conversion below is not worth a matrix inverse
     }
+    // ADR-551. Hoisted: the per-foot ground sampling below needs the node's world transform and
+    // its inverse whether or not there is a look target, which the original condition did not
+    // guarantee.
+    const glm::mat4 world = owner_.nodeWorldTransform(*node).matrix();
+    const glm::mat4 inverse = glm::inverse(world);
+    const IGroundQuery& ground = owner_.groundQuery();
     glm::vec3 localTarget(0.0f);
     bool haveTarget = false;
     glm::vec3 localGround(0.0f);
     glm::vec3 localNormal(0.0f, 1.0f, 0.0f);
     bool haveGround = false;
     if (state.hasLookTarget || state.hasGroundPlane) {
-        const glm::mat4 world = owner_.nodeWorldTransform(*node).matrix();
-        const glm::mat4 inverse = glm::inverse(world);
         if (state.hasLookTarget) {
             localTarget = glm::vec3(inverse * glm::vec4(state.lookTarget, 1.0f));
             haveTarget = true;
@@ -2477,7 +2511,14 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
         if (id >= owner_.scene_.rigs.size()) {
             continue;
         }
+        std::size_t layerIndex = 0;
         for (PoseLayer& layer : owner_.scene_.rigs[id].layers.layers()) {
+            // This layer's index, taken BEFORE the increment. Reading `layerIndex` here instead
+            // indexes the NEXT layer -- which silently gave the left foot the right foot's chain
+            // and read one past the end for the right foot. The bounds check above is belt as well
+            // as braces: `chains()` is parallel to `layers()` by construction, and a loop that
+            // trusted that without checking is how this went unnoticed.
+            const std::size_t thisLayer = layerIndex++;
             switch (layer.drive) {
             case PoseLayerDrive::Manual:
                 break;
@@ -2489,7 +2530,7 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
             case PoseLayerDrive::Reaction:
                 layer.weight = reaction;
                 break;
-            case PoseLayerDrive::Ground:
+            case PoseLayerDrive::Ground: {
                 // The weight is the *grounded* bit and not a blend: a body standing on something
                 // gets its feet planted, and a body in a tractor beam does not. A scene that wants
                 // the correction eased in says so with a fade on the layer it authors, which is a
@@ -2498,7 +2539,46 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
                 layer.groundPoint = localGround;
                 layer.groundNormal = localNormal;
                 layer.hasGround = haveGround;
+                // ADR-551: the ground under THIS foot, where the terrain can say.
+                //
+                // The body's plane above is one plane for the whole character, and a foot dropped
+                // onto the plane its own body is standing on is reachable by construction -- so
+                // foot IK on a single plane can never need the body to move, and never plants on
+                // anything but an idealised surface. Measured: three aliens on 0.3499 m of relief
+                // across their own footprint, and not one foot clamped or compensated.
+                //
+                // So each foot layer that can be placed asks the terrain under its own tip.
+                if (haveGround && layer.kind == PoseLayerKind::Foot &&
+                    thisLayer < owner_.scene_.rigs[id].layers.chains().size()) {
+                    const glm::ivec3 chain = owner_.scene_.rigs[id].layers.chains()[thisLayer];
+                    if (chain.z >= 0) {
+                        // The tip's LAST posed position. `EntityWorld::update` runs a whole stage
+                        // before the rigs are posed (ADR-274 §5), so this is one frame old -- the
+                        // same frame of lag an attachment carries, and for the same reason. A foot
+                        // moves a centimetre or two in 16.7 ms and the ground under it does not
+                        // move at all, so the staleness costs a centimetre of horizontal sampling
+                        // position rather than a centimetre of foot height.
+                        const SkinnedRig& rig = owner_.scene_.rigs[id];
+                        if (static_cast<std::size_t>(chain.z) < rig.pose.size()) {
+                            std::vector<glm::mat4> model;
+                            poseToModel(rig.skeleton, rig.pose, model);
+                            const glm::vec3 tipLocal(model[static_cast<std::size_t>(chain.z)][3]);
+                            const glm::vec3 tipWorld = glm::vec3(world * glm::vec4(tipLocal, 1.0f));
+                            const GroundSample under = ground.sampleAt(tipWorld);
+                            // An invalid sample is "no answer", not "no ground" -- off the edge of
+                            // a height field, or a scene with no terrain at all. The body's plane
+                            // remains, which is the behaviour every scene had before this.
+                            if (under.valid) {
+                                layer.groundPoint = glm::vec3(inverse * glm::vec4(under.point, 1.0f));
+                                const glm::vec3 n = glm::transpose(glm::mat3(world)) * under.normal;
+                                const float len = glm::length(n);
+                                layer.groundNormal = len > 1e-6f ? n / len : localNormal;
+                            }
+                        }
+                    }
+                }
                 break;
+            }
             }
         }
     }

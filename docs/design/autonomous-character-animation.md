@@ -1926,7 +1926,7 @@ context: **an in-place clip has no ground frame**, so "planted means stationary"
 | STEP 10b 100STYLE subset experiment | **blocked** | the corpus is not in this repository; the reader and every code path it exercises are built and tested |
 | STEP 11 MotionPack | **done** | ADR-550; licence is a refusal, REQUIRES_REVIEW is the default |
 | STEP 12-13 offline tool, M2 Max benchmark | pending | |
-| STEP 14 per-foot ground planes | **newly identified as blocking** | one plane per body makes every foot target reachable by construction; terrain adaptation is not real until this lands |
+| STEP 14 per-foot ground planes | **done** | ADR-551; built as Phase B §17's `IGroundQuery`, not as a widened seam. Found two shipping bugs on the way |
 | STEP 15 visual validation | **partly done** | `alien-foot-lab.scene.json`: the alien's detached chains bind and both feet apply on real terrain, which was impossible before ADR-543 |
 
 ### Why the alien lab does not exercise body compensation, and what that says

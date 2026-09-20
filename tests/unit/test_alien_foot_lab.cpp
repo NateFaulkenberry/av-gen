@@ -204,6 +204,50 @@ TEST_CASE("body compensation is what puts the alien's feet on the ground", "[ali
         return out;
     };
 
+    // ADR-551: do the two feet actually get DIFFERENT ground planes? If they do not, the per-foot
+    // sampling is not reaching them and any conclusion about compensation is about the wrong thing.
+    {
+        const scene::CompositionNode* node = nodeNamed(comp, "alien-on");
+        REQUIRE(node != nullptr);
+        REQUIRE_FALSE(node->rigs.empty());
+        const scene::SkinnedRig& rig = comp.scene().rigs[node->rigs.front()];
+        REQUIRE(rig.layers.layers().size() == 2);
+        const glm::vec3 a = rig.layers.layers()[0].groundPoint;
+        const glm::vec3 b = rig.layers.layers()[1].groundPoint;
+        INFO("left plane (" << a.x << "," << a.y << "," << a.z << ")  right plane (" << b.x << ","
+                            << b.y << "," << b.z << ")  apart " << glm::length(a - b));
+        CHECK(rig.layers.layers()[0].hasGround);
+        // The two feet stand in different places, so their ground points must differ. Identical
+        // points mean the body's single plane is still being written to both.
+        CHECK(glm::length(a - b) > 1e-4f);
+
+        // Which half is failing: ask the ground query directly under each foot's posed tip.
+        std::vector<glm::mat4> model;
+        scene::poseToModel(rig.skeleton, rig.pose, model);
+        const glm::mat4 nodeWorld = comp.nodeWorldTransform(*node).matrix();
+        for (std::size_t i = 0; i < 2; ++i) {
+            const glm::ivec3 chain = rig.layers.chains()[i];
+            INFO("layer " << i << " chain (" << chain.x << "," << chain.y << "," << chain.z << ")");
+            REQUIRE(chain.z >= 0);
+            const glm::vec3 tipLocal(model[static_cast<std::size_t>(chain.z)][3]);
+            const glm::vec3 tipWorld = glm::vec3(nodeWorld * glm::vec4(tipLocal, 1.0f));
+            const scene::GroundSample under = comp.groundQuery().sampleAt(tipWorld);
+            INFO("  tip world (" << tipWorld.x << "," << tipWorld.y << "," << tipWorld.z
+                                 << ") ground valid " << under.valid << " height " << under.point.y
+                                 << " category " << scene::groundCategoryName(under.category));
+            CHECK(under.valid);
+        }
+        for (std::size_t i = 0; i < 2; ++i) {
+            const scene::PoseLayer& l = rig.layers.layers()[i];
+            INFO("layer " << i << " name '" << l.name << "' drive " << scene::poseLayerDriveName(l.drive)
+                          << " kind " << scene::poseLayerKindName(l.kind) << " weight " << l.weight
+                          << " hasGround " << l.hasGround << " gp (" << l.groundPoint.x << ","
+                          << l.groundPoint.y << "," << l.groundPoint.z << ")"
+                          << " result " << scene::layerResolutionName(rig.layers.results()[i]));
+            CHECK(l.hasGround);
+        }
+    }
+
     const auto off = stateOf("alien-off");
     const auto on = stateOf("alien-on");
     REQUIRE(off.found);
@@ -221,25 +265,28 @@ TEST_CASE("body compensation is what puts the alien's feet on the ground", "[ali
     // alien moved its body, or the ground under it happened to be within a centimetre of its rest
     // pose -- and if that is so, the arm below says which rather than passing quietly.
     if (on.compensated == 0) {
-        // **This is the expected result today, and the reason is architectural rather than a
-        // fixture that is too flat.** It was investigated: the aliens stand on a spot measured at
-        // 0.3499 m of relief across their own 0.9 m footprint, and they STILL never clamp and never
-        // compensate.
+        // **This was investigated twice and the explanation changed both times.**
         //
-        // The cause is that `entity::LocomotionState` carries ONE ground plane for the whole body,
-        // and `GroundFollower` seats the body on that plane. `plantOnPlane` then drops each foot
-        // onto the plane the body is already standing on, so the target is reachable by
-        // construction -- however rough the terrain underneath actually is. Body compensation
-        // cannot engage while the ground is a single plane through the body.
+        // First reading: "the fixture is too flat". Refuted by measurement -- `tools/_slope_probe.cpp`
+        // put these aliens on ground with 0.3499 m of relief across their own 0.9 m footprint and
+        // nothing changed.
         //
-        // Per-foot ground sampling is the missing piece (the Phase 0 report's §5.2 item 2, listed
-        // there as a BUILD NOW and not yet built). Until it lands, compensation is exercised by
-        // `test_body_compensation.cpp`, which hands the layer an explicit 10 cm step-down target --
-        // the real case, a foot asked to go somewhere specific rather than onto a plane it is
-        // already on.
-        SUCCEED("no compensation needed: one ground plane per body makes every foot target "
-                "reachable by construction. See the comment above -- this is the architecture, not "
-                "the fixture.");
+        // Second reading: "one ground plane per body makes every foot target reachable by
+        // construction". That was true and is now fixed (ADR-551): each foot asks an `IGroundQuery`
+        // under its own posed tip, and the two feet of this alien receive planes 0.54 apart in its
+        // own units, sampled from terrain 5.5 cm apart in height.
+        //
+        // Third reading, which is the current one: both feet reach anyway. `plantOnPlane` preserves
+        // each foot's rest height above the ground, the body is seated at the footprint mean, and
+        // the resulting targets are inside what the knee's bend in `Idle` can give -- the 0.0098 of
+        // slack ADR-544 measured is the REST-POSE figure, and a bent knee has more. That is a
+        // correct result for this terrain rather than a missing feature.
+        //
+        // Compensation stays validated by `test_body_compensation.cpp`, which hands the layer an
+        // explicit 10 cm step-down on the real rig and measures 0.0902 m of hip drop.
+        SUCCEED("both feet reach on this terrain; per-foot planes are 0.54 apart and the knee's "
+                "bend covers the difference. See the comment above -- three explanations, two of "
+                "them wrong, and only the measurements told them apart.");
     } else {
         CHECK(on.drop < 0.0f);          // it went DOWN, which is the only direction that helps
         CHECK(on.drop > -0.36f);        // and no further than the scene allowed
