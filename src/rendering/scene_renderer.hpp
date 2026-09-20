@@ -45,6 +45,7 @@
 #include "rendering/skinning.hpp"
 #include "rendering/simulation.hpp"
 #include "rendering/spline_buffers.hpp"
+#include "rendering/cosmic_ocean_renderer.hpp"
 #include "rendering/volume_renderer.hpp"
 #include "rendering/debug_draw.hpp"
 #include "scene/rebuild_deferral.hpp"
@@ -450,6 +451,7 @@ public:
     [[nodiscard]] ProceduralRenderer& procedurals() { return *procedurals_; }
     [[nodiscard]] SdfRenderer& sdfs() { return *sdfs_; } // ADR-027
     [[nodiscard]] VolumeRenderer& volumes() { return *volumes_; } // ADR-032
+    [[nodiscard]] CosmicOceanRenderer& cosmicOcean() { return *cosmicOcean_; } // ADR-390
     [[nodiscard]] Simulation& simulation() { return *simulation_; } // ADR-032
     [[nodiscard]] FieldUniforms& fields() { return *fields_; } // the per-frame field block (ADR-025)
     [[nodiscard]] MaterialPrograms& materialPrograms() { return *materialPrograms_; } // ADR-030
@@ -513,6 +515,12 @@ public:
         // whole draw is skipped. The arm §12 asks for: "Glowmere + effects disabled" measured
         // against "Glowmere baseline" is vacuous unless the two really differ in what runs.
         bool atmospherics = true;
+        // ADR-390. Off: the Cosmic Ocean's draw is not recorded and its uniform is not uploaded.
+        // Its own arm rather than sharing `atmospherics`, because that one removes the comet and
+        // the aurora too -- and the question this answers is what the *sky environment* costs, not
+        // what all of ADR-230 costs. It is also the brief's own acceptance test: disable it and the
+        // scene should suddenly feel dramatically emptier.
+        bool cosmicOcean = true;
         // ADR-187. Off: the FXAA output stage does not run, whatever `post/output/antialias` says.
         // Its own arm rather than part of `post`, because the whole-post arm removes the tone map
         // too -- the frame's transfer function moves with it and every threshold in a measurement
@@ -782,6 +790,7 @@ private:
     std::unique_ptr<ProceduralRenderer> procedurals_;
     std::unique_ptr<SdfRenderer> sdfs_;
     std::unique_ptr<VolumeRenderer> volumes_;
+    std::unique_ptr<CosmicOceanRenderer> cosmicOcean_;
     std::unique_ptr<DebugDraw> debug_;
     FrameOverlay* overlay_ = nullptr;
     bool debugDepthTest_ = true;
