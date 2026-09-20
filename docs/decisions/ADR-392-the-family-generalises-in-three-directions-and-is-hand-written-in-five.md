@@ -175,11 +175,17 @@ the thing it guards arrives rather than landing with it. When `AtmosphereKind::C
 added, the enum test fails by name, and then the five checks fail one at a time until the kind is
 wired — routes, serialisation, ranges, dispatch — which is the order somebody would want to be told.
 
-**What this does not do.** It does not convert the comet's and the aurora's panel rows to data.
-`ui_logic.hpp` says that conversion is mechanical, and it is; until it happens, those two kinds'
-panel rows remain string literals that no check can reach, and `checkLeavesExist` is written to take
-any row table precisely so that the day they become data is the day they are covered. It does not
-touch the ADR-207 family's three parallel lists. It does not make `defaultAtmosphericRoutes`
+**The comet's and the aurora's panel rows became data, and that is what took the row check from one
+kind to three.** ADR-387 called that conversion mechanical and deferred it so it would not bury the
+point it was making. It was mechanical, and deferring it had a cost that was invisible until there
+was a mechanism to measure it: `checkLeavesExist` could be pointed at one of the family's three
+kinds and not at the other two, because the other two's leaves were string literals inside an ImGui
+call. Four things stay inline on purpose -- the two anchor combos, which write a `SkyAnchor` enum
+rather than a parameter, and the sparkle and rainbow checkboxes, which are `enabled`-shaped bools
+rather than value rows. Putting any of them in a table would put a leaf there that registration
+does not produce, which is the opposite of the point.
+
+**What this does not do.** It does not touch the ADR-207 family's three parallel lists. It does not make `defaultAtmosphericRoutes`
 reachable: the function is now correct for every kind and still has no caller in `src/`, so "Add
 aurora" still produces a silent aurora. Wiring it into the World Effects panel's `append` is a
 decision about what a newly-created effect should do by default, and it belongs to whoever owns that
