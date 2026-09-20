@@ -237,7 +237,9 @@ Result<void> Vortex::validate() const {
     for (const float f : {radius, thickness, swirl, rotationSpeed, density, innerVoid, contrast,
                           turbulence, turbulenceScale, breathAmount, breathSpeed, emission,
                           filaments, spill, scattering, cometResponse, cometReach, funnelDepth,
-                          throat, throatDensity, smokeWarp, smokeBillow, detail}) {
+                          throat, throatDensity, smokeWarp, smokeBillow, detail,
+                          eyeWallWidth, eyeWallGain, bandArms, bandPitchDegrees,
+                          bandDepth, bandHarmonic, cloudNoise}) {
         if (!finite(f)) { return fail("a vortex control is not finite"); }
     }
     if (radius < 0.0f) { return fail("the vortex radius may not be negative (0 is off)"); }
@@ -441,6 +443,13 @@ json AtmosphericEffect::toJson() const {
                        {"smokeWarp", vx.smokeWarp},
                        {"smokeBillow", vx.smokeBillow},
                        {"detail", vx.detail},
+                       {"eyeWallWidth", vx.eyeWallWidth},
+                       {"eyeWallGain", vx.eyeWallGain},
+                       {"bandArms", vx.bandArms},
+                       {"bandPitchDegrees", vx.bandPitchDegrees},
+                       {"bandDepth", vx.bandDepth},
+                       {"bandHarmonic", vx.bandHarmonic},
+                       {"cloudNoise", vx.cloudNoise},
                        {"emission", vx.emission},
                        {"filaments", vx.filaments},
                        {"spill", vx.spill},
@@ -604,6 +613,13 @@ Result<AtmosphericEffect> AtmosphericEffect::fromJson(const json& j) {
         vx.smokeWarp = readFloat(vj, "smokeWarp", vx.smokeWarp);
         vx.smokeBillow = readFloat(vj, "smokeBillow", vx.smokeBillow);
         vx.detail = readFloat(vj, "detail", vx.detail);
+        vx.eyeWallWidth = readFloat(vj, "eyeWallWidth", vx.eyeWallWidth);
+        vx.eyeWallGain = readFloat(vj, "eyeWallGain", vx.eyeWallGain);
+        vx.bandArms = readFloat(vj, "bandArms", vx.bandArms);
+        vx.bandPitchDegrees = readFloat(vj, "bandPitchDegrees", vx.bandPitchDegrees);
+        vx.bandDepth = readFloat(vj, "bandDepth", vx.bandDepth);
+        vx.bandHarmonic = readFloat(vj, "bandHarmonic", vx.bandHarmonic);
+        vx.cloudNoise = readFloat(vj, "cloudNoise", vx.cloudNoise);
         vx.emission = readFloat(vj, "emission", vx.emission);
         vx.filaments = readFloat(vj, "filaments", vx.filaments);
         vx.spill = readFloat(vj, "spill", vx.spill);

@@ -221,6 +221,30 @@ constexpr FloatField kVortexFloats[] = {
     {"smokeWarp", 0.0f, 8.0f, 0.0f, 2.0f, F_GET(e.vortex.smokeWarp), F_SET(e.vortex.smokeWarp)},
     {"smokeBillow", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.vortex.smokeBillow), F_SET(e.vortex.smokeBillow)},
     {"detail", 0.0f, 2.0f, 0.0f, 1.0f, F_GET(e.vortex.detail), F_SET(e.vortex.detail)},
+    // Vortex 2.0 §7-§11, the macro structure. Soft ranges are the usable span, hard ranges wider,
+    // for the reason the rows above give: a modulation route clamps to the HARD range.
+    //
+    // There is no `eyeRadius`: `innerVoid` is the eye's radius. A second control would have left
+    // one of the two doing nothing, which the parity test's reachability probe reported as
+    // `changing innerVoid moved 0 of 160 GPU samples` the first time this was written.
+    {"eyeWallWidth", 0.005f, 0.6f, 0.02f, 0.4f, F_GET(e.vortex.eyeWallWidth),
+     F_SET(e.vortex.eyeWallWidth)},
+    {"eyeWallGain", 0.0f, 8.0f, 0.0f, 3.0f, F_GET(e.vortex.eyeWallGain),
+     F_SET(e.vortex.eyeWallGain)},
+    // Arm count is a float because every parameter in this table is, and because a route sweeping
+    // it continuously is a legitimate thing to want -- the band term is a cosine and does not care
+    // whether the count is whole.
+    {"bandArms", 0.0f, 24.0f, 0.0f, 8.0f, F_GET(e.vortex.bandArms), F_SET(e.vortex.bandArms)},
+    // Clamped to 2..80 degrees where it is packed: 0 degrees is a circle and 90 is a radial spoke,
+    // and neither of those is a band. The hard range says so rather than letting a route find out.
+    {"bandPitchDegrees", 2.0f, 80.0f, 8.0f, 40.0f, F_GET(e.vortex.bandPitchDegrees),
+     F_SET(e.vortex.bandPitchDegrees)},
+    {"bandDepth", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.vortex.bandDepth), F_SET(e.vortex.bandDepth)},
+    {"bandHarmonic", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.vortex.bandHarmonic),
+     F_SET(e.vortex.bandHarmonic)},
+    // §53's failure test as a control. The whole of 0..1 is usable and 0 is the diagnostic §5 asks
+    // to be shown, so the soft range is the hard range.
+    {"cloudNoise", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.vortex.cloudNoise), F_SET(e.vortex.cloudNoise)},
     {"spill", 0.0f, 20.0f, 0.0f, 6.0f, F_GET(e.vortex.spill), F_SET(e.vortex.spill)},
     // ADR-388, and the range is a measurement rather than a guess. Laddered on the shipped Tree of
     // Life at t=6, mean frame luminance of 255:

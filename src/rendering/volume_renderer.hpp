@@ -79,8 +79,12 @@ struct VolumeUniforms {
     glm::vec4 vortex4;     // ADR-374: funnel depth, throat fraction, throat density, 0
     glm::vec4 vortex5;     // ADR-381: x = comet response, y = reach, z = scene scattering (388), w = 0
     glm::vec4 vortex6;     // ADR-389: smokeWarp, smokeBillow, detail, 0
+    // Vortex 2.0 §7-§11, the macro structure. Written from `vortex::packVortex`, which is now the
+    // ONE place `world::Vortex` becomes the field's bytes -- see the note at the packing site.
+    glm::vec4 vortex7;     // eyeWallWidth, eyeWallGain, cloudNoise, 0
+    glm::vec4 vortex8;     // bandArms, cot(bandPitch), bandDepth, bandHarmonic
 };
-static_assert(sizeof(VolumeUniforms) == 288);
+static_assert(sizeof(VolumeUniforms) == 320);
 
 class VolumeRenderer {
 public:

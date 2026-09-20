@@ -54,6 +54,11 @@ struct VolumeUniforms {
     vortex4: vec4<f32>,   // ADR-374: funnel depth, throat radius fraction, throat density, 0
     vortex5: vec4<f32>,   // ADR-381/388: comet response, reach, scene scattering, 0
     vortex6: vec4<f32>,   // ADR-389: smokeWarp, smokeBillow, detail, 0
+    // Vortex 2.0 §7-§11, the macro structure -- eye, eye wall and spiral bands. All zero means
+    // the field evaluates ADR-389's envelope exactly, so this is additive in the same sense
+    // `vortex0.w == 0` is: a scene that asks for nothing gets the frame it got before.
+    vortex7: vec4<f32>,   // eyeWallWidth, eyeWallGain, cloudNoise, 0
+    vortex8: vec4<f32>,   // bandArms, cot(bandPitch), bandDepth, bandHarmonic
 };
 
 @group(1) @binding(1) var<uniform> vol: VolumeUniforms;
@@ -133,7 +138,8 @@ fn vortexFilterWidth() -> f32 {
 
 fn vortexShape(p: vec3<f32>, t: f32) -> f32 {
     return vortexShapeAt(VortexUniformsWgsl(vol.vortex0, vol.vortex1, vol.vortex2, vol.vortex3,
-                                            vol.vortex4, vol.vortex6), p, t, vortexFilterWidth());
+                                            vol.vortex4, vol.vortex6, vol.vortex7, vol.vortex8),
+                         p, t, vortexFilterWidth());
 }
 
 // The vortex's own light. It is emissive rather than lit: nothing in this scene could illuminate

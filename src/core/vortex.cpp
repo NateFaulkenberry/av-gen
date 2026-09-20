@@ -35,6 +35,82 @@ struct Shape {
     bool inside = false;
 };
 
+// ---- the macro structure (§7-§11) ------------------------------------------------------------
+//
+// Analytic: trigonometry and smoothsteps, no noise. Band-limited by construction, so unlike the
+// fBM stack below it survives the march's 125-metre sample spacing intact -- which is the whole
+// reason the picture is built here rather than there.
+
+// §8/§9. The radial profile: a clear eye, a wall standing around it, and the body of the storm
+// falling away to the rim. Returns the radial factor of the envelope.
+//
+// At `eyeWallWidth` 0.22 and `eyeWallGain` 0 this is ADR-374's profile exactly, to the bit.
+float radialProfile(const VortexUniforms& v, float rr) {
+    const float rim = 1.0f - smoothstepf(0.72f, 1.3f, rr);
+    // The eye. `innerVoid` IS its radius -- see core/vortex.hpp on why this is not a second
+    // control -- and `eyeWallWidth` is the 0.22 ADR-374 hardcoded, now authored. At the default
+    // 0.22 and a gain of 0 this is `smoothstep(innerVoid, innerVoid + 0.22, rr) * rim`, which is
+    // ADR-374's profile to the bit.
+    const float eyeR = std::clamp(v.v2.x, 0.0f, 0.95f);
+    const float wallW = std::max(v.v7.x, 1e-3f);
+    // A HOLE, so its boundary is a rise and not a fade: density is ~0 inside `eyeR` and reaches
+    // the body of the storm over `wallW`. Smoothstep and not a step, because ADR-369's rule is
+    // that there must be no edge anywhere for a hard line to live on.
+    const float eye = smoothstepf(eyeR, eyeR + wallW, rr);
+    // §9: the wall itself -- a ring of extra density whose crest sits just outside the eye. This
+    // is what makes the silhouette read as a hurricane rather than as a hole in a cloud.
+    //
+    // ADR-389's family rule, and this one is NOT neutralised, deliberately: `eyeWallGain` raises
+    // the field's mean, because a storm with an eye wall really does hold more air there. It is
+    // the caller's business, and `density` is re-tuned beside it in the same commit rather than
+    // the gain being secretly normalised away -- normalising it would make the slider do nothing
+    // to the picture's overall weight, which is half of what it is for.
+    const float crest = eyeR + wallW;
+    const float d = (rr - crest) / std::max(wallW * 1.5f, 1e-3f);
+    const float ring = std::exp(-d * d);
+    return eye * rim * (1.0f + std::max(v.v7.y, 0.0f) * ring);
+}
+
+// §10/§11. Logarithmic spiral bands, at three nested scales.
+//
+// A logarithmic spiral is r = a e^{b(theta)}, so a point's arm index is `theta - ln(r) / b`, which
+// is constant along an arm -- that expression IS the band coordinate and everything else is
+// shaping. `b` is the cotangent of the pitch angle, packed on the CPU so the shader does no
+// trigonometry to recover it.
+//
+// Returns a MULTIPLIER whose mean over angle is exactly 1 at any depth (ADR-389's family rule:
+// `density` and `emission` are per-metre coefficients calibrated against this field's mean, and a
+// band function with a mean of 0.5 would silently halve the medium under them).
+float spiralBands(const VortexUniforms& v, float rr, float angle, float t) {
+    const float arms = v.v8.x;
+    if (arms < 0.5f) {
+        return 1.0f;
+    }
+    const float depth = std::clamp(v.v8.z, 0.0f, 1.0f);
+    const float harmonic = std::clamp(v.v8.w, 0.0f, 1.0f);
+    // Clamped away from the axis: ln(rr) diverges there, and the eye has removed that region from
+    // the picture anyway. Without the clamp the bands wind infinitely fast at the centre and alias
+    // no matter how many steps the march takes -- which would be this ADR's own mistake repeated.
+    const float rClamped = std::max(rr, 0.06f);
+    const float arm = angle - std::log(rClamped) * v.v8.y;
+    // The arms turn with the structure. Same `rotationSpeed` the noise uses, so the bands and the
+    // filaments cannot drift apart into two storms.
+    const float spin = t * v.v1.z;
+    float band = std::cos(arms * (arm - spin));
+    // §11's nested scales. Three of them, at 3x and 7x the primary arm count and a third and a
+    // ninth of its depth -- a structural hierarchy rather than an octave sum, because summing
+    // equal-weight sinusoids is how you build noise, which is the thing §0 forbids.
+    if (harmonic > 0.0f) {
+        band += harmonic * (std::cos(arms * 3.0f * (arm - spin * 1.3f)) / 3.0f +
+                            std::cos(arms * 7.0f * (arm - spin * 1.7f)) / 9.0f);
+    }
+    // Bands wash out at the eye wall, where the flow is a solid ring, and at the outer edge, where
+    // the storm frays. Applied to the DEPTH rather than to the density, so the mean stays 1.
+    const float reach = smoothstepf(0.0f, 0.22f, rr - std::clamp(v.v2.x, 0.0f, 0.95f)) *
+                        (1.0f - smoothstepf(0.85f, 1.25f, rr));
+    return 1.0f + depth * reach * band;
+}
+
 Shape evaluate(const VortexUniforms& v, const glm::vec3& p, float t, float filterWidth) {
     Shape s;
     const float radius = v.v0.w;
@@ -68,15 +144,19 @@ Shape evaluate(const VortexUniforms& v, const glm::vec3& p, float t, float filte
     // ADR-374: the cheap masks BEFORE the noise. The cost of this function is how many samples
     // reach the three fBMs, not how many are taken; the void and everything past the rim are where
     // the answer is already zero and were paying full price for it.
-    const float voidMask = smoothstepf(v.v2.x, v.v2.x + 0.22f, rr);
-    const float rim = 1.0f - smoothstepf(0.72f, 1.3f, rr);
-    const float envelope = voidMask * rim * vert;
+    //
+    // §7-§11: the macro structure lives HERE, in the envelope, above the early-out and below any
+    // noise. That ordering is the brief's hierarchy expressed as control flow -- macro cyclone
+    // structure, then density, then detail -- and it is what makes §52-§56's failure tests passable:
+    // turn every noise term off and the eye, the wall, the bands and the funnel are still here.
+    const float angle = std::atan2(s.rel.z, s.rel.x);
+    const float envelope =
+        radialProfile(v, rr) * spiralBands(v, rr, angle, t) * vert;
     if (envelope < 1.0e-6f) {
         return s;
     }
     s.envelope = envelope;
     s.inside = true;
-    const float angle = std::atan2(s.rel.z, s.rel.x);
     // Angle advanced by radius makes a spiral; advanced by time makes it turn.
     const float warped = angle + rr * v.v1.y + t * v.v1.z;
     const glm::vec3 q(std::cos(warped) * rr, s.rel.y / std::max(v.v1.x, 1e-3f), std::sin(warped) * rr);
@@ -128,7 +208,15 @@ Shape evaluate(const VortexUniforms& v, const glm::vec3& p, float t, float filte
     const float half = 0.5f / contrast;
     const float curve = smoothstepf(0.5f - half, 0.5f + half, std::clamp(n, 0.0f, 1.0f));
     const float shaped = curve * (2.0f / (contrast + 1.0f));
-    s.density = shaped * envelope;
+    // §53, and §5's diagnostic: `cloudNoise` is the weight of the whole fBM stack against a FLAT
+    // field of the same mean. At 0 the density is the macro envelope alone and nothing else, which
+    // is the render the owner asks to be shown before any detail is added; at 1 it is ADR-389's
+    // field exactly. Blended toward the noise's own mean (2 / (contrast + 1) times a half) rather
+    // than toward 1, so turning the detail down does not brighten the medium -- the ADR-389 family
+    // again, and the reason this is a mix and not a multiply.
+    const float flat = 0.5f * (2.0f / (contrast + 1.0f));
+    const float weight = std::clamp(v.v7.z, 0.0f, 1.0f);
+    s.density = std::lerp(flat, shaped, weight) * envelope;
     return s;
 }
 
@@ -145,6 +233,15 @@ VortexUniforms packVortex(const VortexField& f) {
                      std::clamp(f.throatDensity, 0.0f, 1.0f), 0.0f);
     v.v6 = glm::vec4(std::max(f.smokeWarp, 0.0f), std::clamp(f.smokeBillow, 0.0f, 1.0f),
                      std::max(f.detail, 0.0f), 0.0f);
+    v.v7 = glm::vec4(std::max(f.eyeWallWidth, 1e-3f), std::max(f.eyeWallGain, 0.0f),
+                     std::clamp(f.cloudNoise, 0.0f, 1.0f), 0.0f);
+    // The pitch angle is packed as its COTANGENT, which is the `b` of r = a e^{b theta}: the
+    // shader then needs no trigonometry to recover the spiral, and the artist still types an angle.
+    // Clamped away from 0 and 90 degrees because both are degenerate -- 0 is a circle and 90 is a
+    // straight radial spoke, and neither is a band.
+    const float pitch = std::clamp(f.bandPitchDegrees, 2.0f, 80.0f) * 3.14159265358979f / 180.0f;
+    v.v8 = glm::vec4(std::max(f.bandArms, 0.0f), std::cos(pitch) / std::sin(pitch),
+                     std::clamp(f.bandDepth, 0.0f, 1.0f), std::clamp(f.bandHarmonic, 0.0f, 1.0f));
     return v;
 }
 
