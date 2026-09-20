@@ -457,7 +457,12 @@ TEST_CASE("Composition registers parameters that drive instances, materials and 
         CHECK(comp.removeNode("sparks"));
         CHECK(params.find("nodes/sparks/position") == nullptr);
         CHECK(params.find("particles/sparks/spawnRate") == nullptr);
-        CHECK(params.size() == before - 26); // 6 node parameters + 20 particle parameters
+        // 7 node parameters + 20 particle parameters. The seventh is `nodes/<name>/opacity`,
+        // added by `agent/ufo`'s merge, which registered and unregistered it correctly and
+        // left this count at 6 -- so `main` has been red here since that merge. A hardcoded
+        // total is the only thing that catches a parameter registered and never removed, so
+        // the number is worth keeping and worth updating with the thing it counts.
+        CHECK(params.size() == before - 27);
         CHECK(comp.removeNode("b"));
         CHECK(params.find("nodes/b/position") == nullptr);
         CHECK(params.find("nodes/a/position") != nullptr);
