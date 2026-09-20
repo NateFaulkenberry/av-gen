@@ -103,7 +103,9 @@ constexpr EffectField kFields[] = {
     // ---- Advanced: where the radiant is and what the streaks look like.
     floatField("startAzimuth", "Radiant bearing", -720.0f, 720.0f, -180.0f, 180.0f,
                GET(e.comet.path.startAzimuth), SETF(e.comet.path.startAzimuth))
-        .json("/comet/path/startAzimuth").fmt("%.0f deg").sec("Radiant")
+        // No `.sec("Radiant")`: the anchor combo above already draws that header, exactly as the
+        // comet's first advanced row carries none because the panel has drawn "Trajectory".
+        .json("/comet/path/startAzimuth").fmt("%.0f deg")
         .tooltip("Where the shower comes FROM. Every meteor's track starts within Spread of\n"
                  "this bearing, which is what makes a shower read as having a source."),
     floatField("startElevation", "Radiant height", -20.0f, 89.0f, 0.0f, 80.0f,

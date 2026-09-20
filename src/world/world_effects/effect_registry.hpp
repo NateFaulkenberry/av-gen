@@ -345,12 +345,16 @@ struct EffectSchema {
 
 // Every enumerator of `AtmosphereKind`, in declaration order.
 //
-// ADR-392's construction, kept and moved here so there is one such list rather than two. It sits
-// beside an exhaustive `switch` with no `default`, so a new enumerator is at minimum a `-Wswitch`
-// diagnostic -- and because `AVGEN_WARNINGS_AS_ERRORS` is OFF in this build and a warning in a
-// five-thousand-line log is not a guard, `tests/unit/test_effect_registry.cpp` reads
-// `enum class AtmosphereKind` out of `atmospherics.hpp` and requires this array to cover exactly
-// the enumerators declared there, failing **by the name of the missing one**.
+// ADR-392's construction, kept and moved here so there is one such list rather than two.
+//
+// It is a **second, independent list** on purpose, and that is what it is for. Deriving it from
+// `effectSchemas()` would save a line per effect and would make "every enumerator has a schema" a
+// check asking the schemas about the schemas -- the self-agreeing shape ADR-392 spent its length
+// warning about. Because it is independent, `tests/unit/test_effect_conformance.cpp` can read
+// `enum class AtmosphereKind` out of `atmospherics.hpp` and require this array to cover exactly the
+// enumerators declared there, failing **by the name of the one that is missing**. That is the guard,
+// and it is the only one that fires: `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`), so a
+// `-Wswitch` diagnostic is a line in a five-thousand-line log.
 inline constexpr std::array<AtmosphereKind, 5> kAtmosphereKinds{
     AtmosphereKind::Comet,         //
     AtmosphereKind::Aurora,        //
