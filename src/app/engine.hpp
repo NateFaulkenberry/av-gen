@@ -396,6 +396,10 @@ public:
         return atmosphericEffects_;
     }
     [[nodiscard]] const world::AtmosphericParameters& atmosphericParameters() const { return atmosphericParams_; }
+    // §68. The fields this scene publishes, as of the last `update()`. Read by the World Effects
+    // panel so the subscription combo offers names that exist rather than a free-text box in which
+    // a typo is indistinguishable from a field somebody has not made yet.
+    [[nodiscard]] const world::fields::FieldBus& fieldBus() const { return fieldBus_; }
     [[nodiscard]] Result<void> setAtmosphericEffects(std::vector<world::AtmosphericEffect> effects);
 
     // ADR-392. Attaches an effect's default audio routes and returns how many were added.

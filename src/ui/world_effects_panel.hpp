@@ -22,12 +22,14 @@
 // ordinary `beat.pulse -> worldfx/<name>/intensity` modulation route, visible and editable in the
 // Modulation panel like any other, rather than a hidden audio hook inside the effect.
 
+#include "ui/ui_logic.hpp"
 #include "world/atmospheric_params.hpp"
 #include "world/effect_params.hpp"
 
 #include <algorithm>
 #include <cstddef>
 #include <functional>
+#include <span>
 #include <string>
 
 namespace avgen::app {
@@ -35,6 +37,30 @@ class Engine;
 }
 
 namespace avgen::ui {
+
+// §68's rows, as data, for the reason ADR-392 gives: a leaf spelled five characters wrong draws an
+// empty box and says nothing, so the panel's rows and `conformance::checkLeavesExist` must read the
+// same table. This one lives here rather than beside the kind tables in `ui/ui_logic.hpp` only
+// because that file is being edited on another branch; it belongs with them and should move when
+// that lands.
+//
+// One row, not three: the subscription is a member of `AtmosphericEffect` rather than of any kind's
+// payload, so every kind draws it and a fourth kind draws it without anybody adding a line.
+//
+// `inline` in the header, like every other row table: the CPU test binary does not link the ImGui
+// side of the editor, so a row list that lived in a `.cpp` could not be held to
+// `conformance::checkLeavesExist` -- which is the entire reason for a row list.
+[[nodiscard]] inline std::span<const EffectRow> atmosphericFlowRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "flowInfluence", "Follows the field", "%.2f", false, false,
+         "How much of the subscribed field's motion this effect takes. 0 is off: the\n"
+         "effect moves at its own authored speed and does not know the field exists.\n"
+         "At 1 a gust front crossing the valley reaches this effect when it reaches\n"
+         "that place, and two effects subscribed to one field agree without anybody\n"
+         "typing the same number into both."},
+    };
+    return kRows;
+}
 
 class WorldEffectsPanel {
 public:
