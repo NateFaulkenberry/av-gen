@@ -1,0 +1,1587 @@
+{
+  "schema": "avgen.benchmark/1",
+  "definitions": {
+    "percentile": "nearest rank: the element at ceil(q*n)-1 of the ascending sample, no interpolation",
+    "low1Percent": "the MEAN of the slowest ceil(n/100) frames -- not p99, which is a single frame",
+    "low01Percent": "the mean of the slowest ceil(n/1000) frames; with ~108 measured frames this is one frame and equals max",
+    "deltaMs": "baseline minus arm: positive means the arm was faster",
+    "cpuFrameMs": "SceneRenderer::render() plus, on the offline path, Finish/Submit and the block on the queue -- so it includes waiting for the GPU; see cpuStageMedianMs.queueWait before calling a frame CPU-bound",
+    "comparability": "records may only be compared when their conditions.sessionId is the same"
+  },
+  "records": [
+    {
+      "conditions": {
+        "scene": "examples/treeisland/_oc-noneb.json",
+        "sceneKind": "project",
+        "arm": "baseline",
+        "camera": "",
+        "cameraPosition": [
+          197.67652893066406,
+          45.33953094482422,
+          83.45803833007813
+        ],
+        "cameraTarget": [
+          -16.906749725341797,
+          9.354751586914063,
+          -5.985854148864746
+        ],
+        "fovYDegrees": 36.00000100179127,
+        "width": 1920,
+        "height": 1080,
+        "qualityTier": "default",
+        "gitRevision": "9fccba10da48",
+        "gitDirty": false,
+        "buildType": "Release",
+        "backend": "Metal",
+        "platform": "Apple M2 Max",
+        "sessionId": "2026-09-20T10:34:10-44307",
+        "startedAt": "2026-09-20T10:34:10",
+        "framesRendered": 200,
+        "warmupFrames": 12,
+        "measuredFrames": 188,
+        "offlineFps": 60.0,
+        "clusterStatsPerturbsWallClock": false
+      },
+      "wallMs": {
+        "frames": 188,
+        "min": 16.90625,
+        "p10": 17.944833,
+        "p50": 18.988916,
+        "p90": 22.40275,
+        "p95": 23.957917,
+        "p99": 26.408334,
+        "max": 26.868916,
+        "mean": 19.754079127659573,
+        "low1Percent_meanOfSlowest1Pct": 26.638624999999998,
+        "low01Percent_meanOfSlowest01Pct": 26.868916,
+        "varianceMs2": 4.052732162452674,
+        "stddevMs": 2.0131398765243995
+      },
+      "gpuMs": {
+        "frames": 188,
+        "min": 13.107199999999999,
+        "p10": 14.155776,
+        "p50": 15.073279999999999,
+        "p90": 18.415616,
+        "p95": 19.529728,
+        "p99": 21.168128,
+        "max": 21.62688,
+        "mean": 15.772911659574474,
+        "low1Percent_meanOfSlowest1Pct": 21.397503999999998,
+        "low01Percent_meanOfSlowest01Pct": 21.62688,
+        "varianceMs2": 3.004631355212139,
+        "stddevMs": 1.733387249062407
+      },
+      "cpuFrameMs": {
+        "frames": 188,
+        "min": 16.742625,
+        "p10": 17.802000999999997,
+        "p50": 18.827956999999998,
+        "p90": 22.134459999999997,
+        "p95": 23.799875,
+        "p99": 25.722251,
+        "max": 26.14979,
+        "mean": 19.55827104787235,
+        "low1Percent_meanOfSlowest1Pct": 25.936020499999998,
+        "low01Percent_meanOfSlowest01Pct": 26.14979,
+        "varianceMs2": 3.8778514515304496,
+        "stddevMs": 1.9692261047250135
+      },
+      "gpuPassMedianMs": [
+        {
+          "label": "scene",
+          "medianMs": 6.946816
+        },
+        {
+          "label": "volume.march",
+          "medianMs": 4.718592
+        },
+        {
+          "label": "particles",
+          "medianMs": 0.786432
+        },
+        {
+          "label": "post/dof",
+          "medianMs": 0.524288
+        },
+        {
+          "label": "ao",
+          "medianMs": 0.458752
+        },
+        {
+          "label": "shadow",
+          "medianMs": 0.393216
+        },
+        {
+          "label": "depth",
+          "medianMs": 0.196608
+        },
+        {
+          "label": "shadowmask",
+          "medianMs": 0.131072
+        },
+        {
+          "label": "post/bloom",
+          "medianMs": 0.131072
+        },
+        {
+          "label": "post/composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "post/fxaa",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "tonemap",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "volume.composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "clusters",
+          "medianMs": 0.0
+        },
+        {
+          "label": "background",
+          "medianMs": 0.0
+        }
+      ],
+      "cpuStageMedianMs": {
+        "uploads": 0.035,
+        "lights": 1.918083,
+        "objects": 0.031,
+        "fields": 0.004333,
+        "simulation": 0.000291,
+        "particles": 0.017125,
+        "procedural": 0.010667,
+        "sdf": 0.000291,
+        "shadowEncode": 0.056583,
+        "backgroundEncode": 0.009792,
+        "depthEncode": 0.035417,
+        "sceneEncode": 0.0335,
+        "volumeEncode": 0.008583,
+        "postEncode": 0.051375,
+        "tonemapEncode": 0.025125,
+        "finish": 0.004417,
+        "submit": 0.42575,
+        "queueWait": 16.101375,
+        "total": 18.828501,
+        "unattributed": 0.059794000000000125
+      },
+      "counters": {
+        "medianOverMeasuredWindow": true,
+        "varied": true,
+        "draws": 43.0,
+        "shadowDraws": 33.0,
+        "submittedTriangles": 566268.0,
+        "logicalTriangles": 8984.0,
+        "visibleInstances": 0.0,
+        "culledInstances": 0.0,
+        "lod": [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "shadowCasters": 33.0,
+        "lights": 3.0,
+        "directionalLights": 3.0,
+        "clusteredLights": 0.0,
+        "uniformFallbackPathLights": 3.0,
+        "particleSystems": 2.0,
+        "particleCapacity": 10240.0,
+        "particlesEmittedPerFrame": 3.0,
+        "transientTextures": 14.0,
+        "entities": 33.0,
+        "computeDispatches": 3.0,
+        "gpuPasses": 30.0
+      }
+    },
+    {
+      "conditions": {
+        "scene": "examples/treeisland/_oc-noneb.json",
+        "sceneKind": "project",
+        "arm": "no-cosmic",
+        "camera": "",
+        "cameraPosition": [
+          197.67652893066406,
+          45.33953094482422,
+          83.45803833007813
+        ],
+        "cameraTarget": [
+          -16.906749725341797,
+          9.354751586914063,
+          -5.985854148864746
+        ],
+        "fovYDegrees": 36.00000100179127,
+        "width": 1920,
+        "height": 1080,
+        "qualityTier": "default",
+        "gitRevision": "9fccba10da48",
+        "gitDirty": false,
+        "buildType": "Release",
+        "backend": "Metal",
+        "platform": "Apple M2 Max",
+        "sessionId": "2026-09-20T10:34:10-44307",
+        "startedAt": "2026-09-20T10:34:10",
+        "framesRendered": 200,
+        "warmupFrames": 12,
+        "measuredFrames": 188,
+        "offlineFps": 60.0,
+        "clusterStatsPerturbsWallClock": false
+      },
+      "wallMs": {
+        "frames": 188,
+        "min": 15.930833,
+        "p10": 16.606917,
+        "p50": 17.61775,
+        "p90": 19.6165,
+        "p95": 20.268,
+        "p99": 23.035875,
+        "max": 23.56225,
+        "mean": 17.865425526595747,
+        "low1Percent_meanOfSlowest1Pct": 23.299062499999998,
+        "low01Percent_meanOfSlowest01Pct": 23.56225,
+        "varianceMs2": 1.4979229869024302,
+        "stddevMs": 1.2238966406124459
+      },
+      "gpuMs": {
+        "frames": 188,
+        "min": 11.993088,
+        "p10": 12.976128,
+        "p50": 13.762559999999999,
+        "p90": 15.40096,
+        "p95": 16.05632,
+        "p99": 17.825792,
+        "max": 18.939904,
+        "mean": 13.969277276595731,
+        "low1Percent_meanOfSlowest1Pct": 18.382848,
+        "low01Percent_meanOfSlowest01Pct": 18.939904,
+        "varianceMs2": 1.0248186418907952,
+        "stddevMs": 1.0123332662176006
+      },
+      "cpuFrameMs": {
+        "frames": 188,
+        "min": 15.785499,
+        "p10": 16.4495,
+        "p50": 17.456293000000002,
+        "p90": 19.435290999999996,
+        "p95": 20.060584,
+        "p99": 22.854374000000004,
+        "max": 23.350835000000004,
+        "mean": 17.69967704787233,
+        "low1Percent_meanOfSlowest1Pct": 23.102604500000005,
+        "low01Percent_meanOfSlowest01Pct": 23.350835000000004,
+        "varianceMs2": 1.4674899960139076,
+        "stddevMs": 1.2114000148645812
+      },
+      "gpuPassMedianMs": [
+        {
+          "label": "scene",
+          "medianMs": 5.701632
+        },
+        {
+          "label": "volume.march",
+          "medianMs": 4.718592
+        },
+        {
+          "label": "particles",
+          "medianMs": 0.786432
+        },
+        {
+          "label": "post/dof",
+          "medianMs": 0.524288
+        },
+        {
+          "label": "shadow",
+          "medianMs": 0.458752
+        },
+        {
+          "label": "ao",
+          "medianMs": 0.393216
+        },
+        {
+          "label": "shadowmask",
+          "medianMs": 0.393216
+        },
+        {
+          "label": "depth",
+          "medianMs": 0.196608
+        },
+        {
+          "label": "post/bloom",
+          "medianMs": 0.131072
+        },
+        {
+          "label": "post/composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "post/fxaa",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "tonemap",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "volume.composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "clusters",
+          "medianMs": 0.0
+        },
+        {
+          "label": "background",
+          "medianMs": 0.0
+        }
+      ],
+      "cpuStageMedianMs": {
+        "uploads": 0.034375,
+        "lights": 1.910708,
+        "objects": 0.030875,
+        "fields": 0.004375,
+        "simulation": 0.00025,
+        "particles": 0.017292,
+        "procedural": 0.010542,
+        "sdf": 0.000291,
+        "shadowEncode": 0.055625,
+        "backgroundEncode": 0.009333,
+        "depthEncode": 0.035208,
+        "sceneEncode": 0.032875,
+        "volumeEncode": 0.008375,
+        "postEncode": 0.051042,
+        "tonemapEncode": 0.0245,
+        "finish": 0.004375,
+        "submit": 0.415416,
+        "queueWait": 14.738375,
+        "total": 17.459958,
+        "unattributed": 0.07612600000000214
+      },
+      "counters": {
+        "medianOverMeasuredWindow": true,
+        "varied": true,
+        "draws": 42.0,
+        "shadowDraws": 33.0,
+        "submittedTriangles": 566267.0,
+        "logicalTriangles": 8984.0,
+        "visibleInstances": 0.0,
+        "culledInstances": 0.0,
+        "lod": [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "shadowCasters": 33.0,
+        "lights": 3.0,
+        "directionalLights": 3.0,
+        "clusteredLights": 0.0,
+        "uniformFallbackPathLights": 3.0,
+        "particleSystems": 2.0,
+        "particleCapacity": 10240.0,
+        "particlesEmittedPerFrame": 3.0,
+        "transientTextures": 14.0,
+        "entities": 33.0,
+        "computeDispatches": 3.0,
+        "gpuPasses": 30.0
+      }
+    },
+    {
+      "conditions": {
+        "scene": "examples/treeisland/_oc-noneb.json",
+        "sceneKind": "project",
+        "arm": "no-cosmic",
+        "camera": "",
+        "cameraPosition": [
+          197.67652893066406,
+          45.33953094482422,
+          83.45803833007813
+        ],
+        "cameraTarget": [
+          -16.906749725341797,
+          9.354751586914063,
+          -5.985854148864746
+        ],
+        "fovYDegrees": 36.00000100179127,
+        "width": 1920,
+        "height": 1080,
+        "qualityTier": "default",
+        "gitRevision": "9fccba10da48",
+        "gitDirty": false,
+        "buildType": "Release",
+        "backend": "Metal",
+        "platform": "Apple M2 Max",
+        "sessionId": "2026-09-20T10:34:10-44307",
+        "startedAt": "2026-09-20T10:34:10",
+        "framesRendered": 200,
+        "warmupFrames": 12,
+        "measuredFrames": 188,
+        "offlineFps": 60.0,
+        "clusterStatsPerturbsWallClock": false
+      },
+      "wallMs": {
+        "frames": 188,
+        "min": 16.03025,
+        "p10": 16.665542,
+        "p50": 17.347542,
+        "p90": 18.986542,
+        "p95": 19.641875,
+        "p99": 20.703,
+        "max": 21.131917,
+        "mean": 17.632687510638306,
+        "low1Percent_meanOfSlowest1Pct": 20.917458500000002,
+        "low01Percent_meanOfSlowest01Pct": 21.131917,
+        "varianceMs2": 0.9464955378226114,
+        "stddevMs": 0.9728800223165297
+      },
+      "gpuMs": {
+        "frames": 188,
+        "min": 12.451839999999999,
+        "p10": 12.976128,
+        "p50": 13.500416,
+        "p90": 14.614528,
+        "p95": 15.728639999999999,
+        "p99": 16.973824,
+        "max": 17.301503999999998,
+        "mean": 13.738855489361702,
+        "low1Percent_meanOfSlowest1Pct": 17.137664,
+        "low01Percent_meanOfSlowest01Pct": 17.301503999999998,
+        "varianceMs2": 0.7044524086996535,
+        "stddevMs": 0.8393166319689213
+      },
+      "cpuFrameMs": {
+        "frames": 188,
+        "min": 15.891209,
+        "p10": 16.495875,
+        "p50": 17.182833,
+        "p90": 18.810416,
+        "p95": 19.505417,
+        "p99": 20.475500000000004,
+        "max": 20.951582999999996,
+        "mean": 17.475087914893628,
+        "low1Percent_meanOfSlowest1Pct": 20.713541499999998,
+        "low01Percent_meanOfSlowest01Pct": 20.951582999999996,
+        "varianceMs2": 0.9178802345132696,
+        "stddevMs": 0.958060663274132
+      },
+      "gpuPassMedianMs": [
+        {
+          "label": "scene",
+          "medianMs": 5.701632
+        },
+        {
+          "label": "volume.march",
+          "medianMs": 4.718592
+        },
+        {
+          "label": "particles",
+          "medianMs": 0.851968
+        },
+        {
+          "label": "post/dof",
+          "medianMs": 0.524288
+        },
+        {
+          "label": "shadow",
+          "medianMs": 0.458752
+        },
+        {
+          "label": "ao",
+          "medianMs": 0.32767999999999997
+        },
+        {
+          "label": "depth",
+          "medianMs": 0.196608
+        },
+        {
+          "label": "post/bloom",
+          "medianMs": 0.131072
+        },
+        {
+          "label": "shadowmask",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "post/composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "post/fxaa",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "tonemap",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "volume.composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "clusters",
+          "medianMs": 0.0
+        },
+        {
+          "label": "background",
+          "medianMs": 0.0
+        }
+      ],
+      "cpuStageMedianMs": {
+        "uploads": 0.032875,
+        "lights": 1.898292,
+        "objects": 0.029584,
+        "fields": 0.004208,
+        "simulation": 0.00025,
+        "particles": 0.016292,
+        "procedural": 0.010125,
+        "sdf": 0.00025,
+        "shadowEncode": 0.05425,
+        "backgroundEncode": 0.009041,
+        "depthEncode": 0.03475,
+        "sceneEncode": 0.032167,
+        "volumeEncode": 0.008125,
+        "postEncode": 0.050417,
+        "tonemapEncode": 0.023875,
+        "finish": 0.004208,
+        "submit": 0.412167,
+        "queueWait": 14.555125,
+        "total": 17.222042000000002,
+        "unattributed": 0.04604100000000244
+      },
+      "counters": {
+        "medianOverMeasuredWindow": true,
+        "varied": true,
+        "draws": 42.0,
+        "shadowDraws": 33.0,
+        "submittedTriangles": 566267.0,
+        "logicalTriangles": 8984.0,
+        "visibleInstances": 0.0,
+        "culledInstances": 0.0,
+        "lod": [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "shadowCasters": 33.0,
+        "lights": 3.0,
+        "directionalLights": 3.0,
+        "clusteredLights": 0.0,
+        "uniformFallbackPathLights": 3.0,
+        "particleSystems": 2.0,
+        "particleCapacity": 10240.0,
+        "particlesEmittedPerFrame": 3.0,
+        "transientTextures": 14.0,
+        "entities": 33.0,
+        "computeDispatches": 3.0,
+        "gpuPasses": 30.0
+      }
+    },
+    {
+      "conditions": {
+        "scene": "examples/treeisland/_oc-noneb.json",
+        "sceneKind": "project",
+        "arm": "baseline",
+        "camera": "",
+        "cameraPosition": [
+          197.67652893066406,
+          45.33953094482422,
+          83.45803833007813
+        ],
+        "cameraTarget": [
+          -16.906749725341797,
+          9.354751586914063,
+          -5.985854148864746
+        ],
+        "fovYDegrees": 36.00000100179127,
+        "width": 1920,
+        "height": 1080,
+        "qualityTier": "default",
+        "gitRevision": "9fccba10da48",
+        "gitDirty": false,
+        "buildType": "Release",
+        "backend": "Metal",
+        "platform": "Apple M2 Max",
+        "sessionId": "2026-09-20T10:34:10-44307",
+        "startedAt": "2026-09-20T10:34:10",
+        "framesRendered": 200,
+        "warmupFrames": 12,
+        "measuredFrames": 188,
+        "offlineFps": 60.0,
+        "clusterStatsPerturbsWallClock": false
+      },
+      "wallMs": {
+        "frames": 188,
+        "min": 16.987833,
+        "p10": 17.83425,
+        "p50": 18.786375,
+        "p90": 21.204542,
+        "p95": 21.76775,
+        "p99": 24.158917,
+        "max": 24.527125,
+        "mean": 19.290720728723404,
+        "low1Percent_meanOfSlowest1Pct": 24.343021,
+        "low01Percent_meanOfSlowest01Pct": 24.527125,
+        "varianceMs2": 1.9566580718786974,
+        "stddevMs": 1.3988059450398034
+      },
+      "gpuMs": {
+        "frames": 188,
+        "min": 13.43488,
+        "p10": 14.09024,
+        "p50": 14.876672,
+        "p90": 17.36704,
+        "p95": 17.891327999999998,
+        "p99": 18.743296,
+        "max": 18.874368,
+        "mean": 15.38109004255319,
+        "low1Percent_meanOfSlowest1Pct": 18.808832000000002,
+        "low01Percent_meanOfSlowest01Pct": 18.874368,
+        "varianceMs2": 1.6274663266872316,
+        "stddevMs": 1.275721884537234
+      },
+      "cpuFrameMs": {
+        "frames": 188,
+        "min": 16.843,
+        "p10": 17.675874,
+        "p50": 18.579293,
+        "p90": 21.000125,
+        "p95": 21.553334000000003,
+        "p99": 22.67025,
+        "max": 24.314542999999997,
+        "mean": 19.11337098936171,
+        "low1Percent_meanOfSlowest1Pct": 23.492396499999998,
+        "low01Percent_meanOfSlowest01Pct": 24.314542999999997,
+        "varianceMs2": 1.8532300446578511,
+        "stddevMs": 1.3613339210707456
+      },
+      "gpuPassMedianMs": [
+        {
+          "label": "scene",
+          "medianMs": 6.946816
+        },
+        {
+          "label": "volume.march",
+          "medianMs": 4.718592
+        },
+        {
+          "label": "particles",
+          "medianMs": 0.7864319999999999
+        },
+        {
+          "label": "post/dof",
+          "medianMs": 0.524288
+        },
+        {
+          "label": "shadow",
+          "medianMs": 0.393216
+        },
+        {
+          "label": "ao",
+          "medianMs": 0.32767999999999997
+        },
+        {
+          "label": "depth",
+          "medianMs": 0.196608
+        },
+        {
+          "label": "shadowmask",
+          "medianMs": 0.196608
+        },
+        {
+          "label": "post/bloom",
+          "medianMs": 0.131072
+        },
+        {
+          "label": "post/composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "post/fxaa",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "tonemap",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "volume.composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "clusters",
+          "medianMs": 0.0
+        },
+        {
+          "label": "background",
+          "medianMs": 0.0
+        }
+      ],
+      "cpuStageMedianMs": {
+        "uploads": 0.034708,
+        "lights": 1.915875,
+        "objects": 0.03075,
+        "fields": 0.004291,
+        "simulation": 0.00025,
+        "particles": 0.017042,
+        "procedural": 0.010583,
+        "sdf": 0.000292,
+        "shadowEncode": 0.056167,
+        "backgroundEncode": 0.009542,
+        "depthEncode": 0.035208,
+        "sceneEncode": 0.033334,
+        "volumeEncode": 0.008333,
+        "postEncode": 0.050916,
+        "tonemapEncode": 0.02475,
+        "finish": 0.004292,
+        "submit": 0.423375,
+        "queueWait": 15.900292,
+        "total": 18.602335000000004,
+        "unattributed": 0.042335000000004896
+      },
+      "counters": {
+        "medianOverMeasuredWindow": true,
+        "varied": true,
+        "draws": 43.0,
+        "shadowDraws": 33.0,
+        "submittedTriangles": 566268.0,
+        "logicalTriangles": 8984.0,
+        "visibleInstances": 0.0,
+        "culledInstances": 0.0,
+        "lod": [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "shadowCasters": 33.0,
+        "lights": 3.0,
+        "directionalLights": 3.0,
+        "clusteredLights": 0.0,
+        "uniformFallbackPathLights": 3.0,
+        "particleSystems": 2.0,
+        "particleCapacity": 10240.0,
+        "particlesEmittedPerFrame": 3.0,
+        "transientTextures": 14.0,
+        "entities": 33.0,
+        "computeDispatches": 3.0,
+        "gpuPasses": 30.0
+      }
+    },
+    {
+      "conditions": {
+        "scene": "examples/treeisland/_oc-noneb.json",
+        "sceneKind": "project",
+        "arm": "baseline",
+        "camera": "",
+        "cameraPosition": [
+          197.67652893066406,
+          45.33953094482422,
+          83.45803833007813
+        ],
+        "cameraTarget": [
+          -16.906749725341797,
+          9.354751586914063,
+          -5.985854148864746
+        ],
+        "fovYDegrees": 36.00000100179127,
+        "width": 1920,
+        "height": 1080,
+        "qualityTier": "default",
+        "gitRevision": "9fccba10da48",
+        "gitDirty": false,
+        "buildType": "Release",
+        "backend": "Metal",
+        "platform": "Apple M2 Max",
+        "sessionId": "2026-09-20T10:34:10-44307",
+        "startedAt": "2026-09-20T10:34:10",
+        "framesRendered": 200,
+        "warmupFrames": 12,
+        "measuredFrames": 188,
+        "offlineFps": 60.0,
+        "clusterStatsPerturbsWallClock": false
+      },
+      "wallMs": {
+        "frames": 188,
+        "min": 17.064833,
+        "p10": 18.029,
+        "p50": 19.02975,
+        "p90": 21.193125,
+        "p95": 21.55275,
+        "p99": 24.029,
+        "max": 24.437958,
+        "mean": 19.36565093085106,
+        "low1Percent_meanOfSlowest1Pct": 24.233479,
+        "low01Percent_meanOfSlowest01Pct": 24.437958,
+        "varianceMs2": 1.727580299890437,
+        "stddevMs": 1.3143744899724876
+      },
+      "gpuMs": {
+        "frames": 188,
+        "min": 13.43488,
+        "p10": 14.221312,
+        "p50": 15.204352,
+        "p90": 17.301503999999998,
+        "p95": 17.629184,
+        "p99": 20.054016,
+        "max": 20.643839999999997,
+        "mean": 15.54737021276597,
+        "low1Percent_meanOfSlowest1Pct": 20.348928,
+        "low01Percent_meanOfSlowest01Pct": 20.643839999999997,
+        "varianceMs2": 1.5894509324465083,
+        "stddevMs": 1.260734283045602
+      },
+      "cpuFrameMs": {
+        "frames": 188,
+        "min": 16.903125,
+        "p10": 17.853334,
+        "p50": 18.863082,
+        "p90": 20.966667,
+        "p95": 21.351833,
+        "p99": 23.826459,
+        "max": 24.2395,
+        "mean": 19.195008218085114,
+        "low1Percent_meanOfSlowest1Pct": 24.0329795,
+        "low01Percent_meanOfSlowest01Pct": 24.2395,
+        "varianceMs2": 1.7065445581282455,
+        "stddevMs": 1.3063477937089516
+      },
+      "gpuPassMedianMs": [
+        {
+          "label": "scene",
+          "medianMs": 7.077888
+        },
+        {
+          "label": "volume.march",
+          "medianMs": 4.718592
+        },
+        {
+          "label": "particles",
+          "medianMs": 0.7864319999999999
+        },
+        {
+          "label": "post/dof",
+          "medianMs": 0.524288
+        },
+        {
+          "label": "shadow",
+          "medianMs": 0.458752
+        },
+        {
+          "label": "ao",
+          "medianMs": 0.393216
+        },
+        {
+          "label": "depth",
+          "medianMs": 0.196608
+        },
+        {
+          "label": "post/bloom",
+          "medianMs": 0.131072
+        },
+        {
+          "label": "shadowmask",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "post/composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "post/fxaa",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "tonemap",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "volume.composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "clusters",
+          "medianMs": 0.0
+        },
+        {
+          "label": "background",
+          "medianMs": 0.0
+        }
+      ],
+      "cpuStageMedianMs": {
+        "uploads": 0.035584,
+        "lights": 1.914875,
+        "objects": 0.031042,
+        "fields": 0.004375,
+        "simulation": 0.00025,
+        "particles": 0.017791,
+        "procedural": 0.010875,
+        "sdf": 0.00025,
+        "shadowEncode": 0.057041,
+        "backgroundEncode": 0.009833,
+        "depthEncode": 0.035584,
+        "sceneEncode": 0.034,
+        "volumeEncode": 0.008584,
+        "postEncode": 0.051959,
+        "tonemapEncode": 0.025583,
+        "finish": 0.004458,
+        "submit": 0.430167,
+        "queueWait": 16.191416,
+        "total": 18.87825,
+        "unattributed": 0.014583000000001789
+      },
+      "counters": {
+        "medianOverMeasuredWindow": true,
+        "varied": true,
+        "draws": 43.0,
+        "shadowDraws": 33.0,
+        "submittedTriangles": 566268.0,
+        "logicalTriangles": 8984.0,
+        "visibleInstances": 0.0,
+        "culledInstances": 0.0,
+        "lod": [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "shadowCasters": 33.0,
+        "lights": 3.0,
+        "directionalLights": 3.0,
+        "clusteredLights": 0.0,
+        "uniformFallbackPathLights": 3.0,
+        "particleSystems": 2.0,
+        "particleCapacity": 10240.0,
+        "particlesEmittedPerFrame": 3.0,
+        "transientTextures": 14.0,
+        "entities": 33.0,
+        "computeDispatches": 3.0,
+        "gpuPasses": 30.0
+      }
+    },
+    {
+      "conditions": {
+        "scene": "examples/treeisland/_oc-noneb.json",
+        "sceneKind": "project",
+        "arm": "no-cosmic",
+        "camera": "",
+        "cameraPosition": [
+          197.67652893066406,
+          45.33953094482422,
+          83.45803833007813
+        ],
+        "cameraTarget": [
+          -16.906749725341797,
+          9.354751586914063,
+          -5.985854148864746
+        ],
+        "fovYDegrees": 36.00000100179127,
+        "width": 1920,
+        "height": 1080,
+        "qualityTier": "default",
+        "gitRevision": "9fccba10da48",
+        "gitDirty": false,
+        "buildType": "Release",
+        "backend": "Metal",
+        "platform": "Apple M2 Max",
+        "sessionId": "2026-09-20T10:34:10-44307",
+        "startedAt": "2026-09-20T10:34:10",
+        "framesRendered": 200,
+        "warmupFrames": 12,
+        "measuredFrames": 188,
+        "offlineFps": 60.0,
+        "clusterStatsPerturbsWallClock": false
+      },
+      "wallMs": {
+        "frames": 188,
+        "min": 16.170584,
+        "p10": 16.709375,
+        "p50": 17.554458,
+        "p90": 19.552917,
+        "p95": 20.566667,
+        "p99": 23.330666,
+        "max": 23.519708,
+        "mean": 17.929237138297868,
+        "low1Percent_meanOfSlowest1Pct": 23.425187,
+        "low01Percent_meanOfSlowest01Pct": 23.519708,
+        "varianceMs2": 1.7611844657920237,
+        "stddevMs": 1.3270962534013966
+      },
+      "gpuMs": {
+        "frames": 188,
+        "min": 12.517375999999999,
+        "p10": 12.910592,
+        "p50": 13.762559999999999,
+        "p90": 15.204352,
+        "p95": 16.318464,
+        "p99": 18.808832,
+        "max": 19.267584,
+        "mean": 14.009714382978729,
+        "low1Percent_meanOfSlowest1Pct": 19.038207999999997,
+        "low01Percent_meanOfSlowest01Pct": 19.267584,
+        "varianceMs2": 1.3910477228661504,
+        "stddevMs": 1.179426862025005
+      },
+      "cpuFrameMs": {
+        "frames": 188,
+        "min": 16.016041,
+        "p10": 16.548584,
+        "p50": 17.427209,
+        "p90": 19.358373999999998,
+        "p95": 20.266208999999996,
+        "p99": 23.127501000000002,
+        "max": 23.323165,
+        "mean": 17.754784627659564,
+        "low1Percent_meanOfSlowest1Pct": 23.225333,
+        "low01Percent_meanOfSlowest01Pct": 23.323165,
+        "varianceMs2": 1.6993802779611376,
+        "stddevMs": 1.3036028068246621
+      },
+      "gpuPassMedianMs": [
+        {
+          "label": "scene",
+          "medianMs": 5.701632
+        },
+        {
+          "label": "volume.march",
+          "medianMs": 4.718592
+        },
+        {
+          "label": "particles",
+          "medianMs": 0.786432
+        },
+        {
+          "label": "post/dof",
+          "medianMs": 0.524288
+        },
+        {
+          "label": "shadow",
+          "medianMs": 0.458752
+        },
+        {
+          "label": "ao",
+          "medianMs": 0.32767999999999997
+        },
+        {
+          "label": "shadowmask",
+          "medianMs": 0.262144
+        },
+        {
+          "label": "depth",
+          "medianMs": 0.196608
+        },
+        {
+          "label": "post/bloom",
+          "medianMs": 0.131072
+        },
+        {
+          "label": "post/composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "post/fxaa",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "tonemap",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "volume.composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "clusters",
+          "medianMs": 0.0
+        },
+        {
+          "label": "background",
+          "medianMs": 0.0
+        }
+      ],
+      "cpuStageMedianMs": {
+        "uploads": 0.034292,
+        "lights": 1.907333,
+        "objects": 0.030875,
+        "fields": 0.004291,
+        "simulation": 0.00025,
+        "particles": 0.016875,
+        "procedural": 0.010541,
+        "sdf": 0.00025,
+        "shadowEncode": 0.055875,
+        "backgroundEncode": 0.0095,
+        "depthEncode": 0.035375,
+        "sceneEncode": 0.033042,
+        "volumeEncode": 0.008667,
+        "postEncode": 0.051209,
+        "tonemapEncode": 0.024333,
+        "finish": 0.004334,
+        "submit": 0.418709,
+        "queueWait": 14.757958,
+        "total": 17.427791,
+        "unattributed": 0.024081999999999937
+      },
+      "counters": {
+        "medianOverMeasuredWindow": true,
+        "varied": true,
+        "draws": 42.0,
+        "shadowDraws": 33.0,
+        "submittedTriangles": 566267.0,
+        "logicalTriangles": 8984.0,
+        "visibleInstances": 0.0,
+        "culledInstances": 0.0,
+        "lod": [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "shadowCasters": 33.0,
+        "lights": 3.0,
+        "directionalLights": 3.0,
+        "clusteredLights": 0.0,
+        "uniformFallbackPathLights": 3.0,
+        "particleSystems": 2.0,
+        "particleCapacity": 10240.0,
+        "particlesEmittedPerFrame": 3.0,
+        "transientTextures": 14.0,
+        "entities": 33.0,
+        "computeDispatches": 3.0,
+        "gpuPasses": 30.0
+      }
+    },
+    {
+      "conditions": {
+        "scene": "examples/treeisland/_oc-noneb.json",
+        "sceneKind": "project",
+        "arm": "no-cosmic",
+        "camera": "",
+        "cameraPosition": [
+          197.67652893066406,
+          45.33953094482422,
+          83.45803833007813
+        ],
+        "cameraTarget": [
+          -16.906749725341797,
+          9.354751586914063,
+          -5.985854148864746
+        ],
+        "fovYDegrees": 36.00000100179127,
+        "width": 1920,
+        "height": 1080,
+        "qualityTier": "default",
+        "gitRevision": "9fccba10da48",
+        "gitDirty": false,
+        "buildType": "Release",
+        "backend": "Metal",
+        "platform": "Apple M2 Max",
+        "sessionId": "2026-09-20T10:34:10-44307",
+        "startedAt": "2026-09-20T10:34:10",
+        "framesRendered": 200,
+        "warmupFrames": 12,
+        "measuredFrames": 188,
+        "offlineFps": 60.0,
+        "clusterStatsPerturbsWallClock": false
+      },
+      "wallMs": {
+        "frames": 188,
+        "min": 15.928167,
+        "p10": 16.59675,
+        "p50": 17.434375,
+        "p90": 18.773208,
+        "p95": 19.616834,
+        "p99": 21.01825,
+        "max": 22.501375,
+        "mean": 17.57996984574468,
+        "low1Percent_meanOfSlowest1Pct": 21.7598125,
+        "low01Percent_meanOfSlowest01Pct": 22.501375,
+        "varianceMs2": 0.9463506214689708,
+        "stddevMs": 0.9728055414464757
+      },
+      "gpuMs": {
+        "frames": 188,
+        "min": 12.255232,
+        "p10": 12.845056,
+        "p50": 13.631488,
+        "p90": 14.876672,
+        "p95": 15.794175999999998,
+        "p99": 16.777216,
+        "max": 17.69472,
+        "mean": 13.820426893617022,
+        "low1Percent_meanOfSlowest1Pct": 17.235968,
+        "low01Percent_meanOfSlowest01Pct": 17.69472,
+        "varianceMs2": 0.8101821960835418,
+        "stddevMs": 0.9001012143551089
+      },
+      "cpuFrameMs": {
+        "frames": 188,
+        "min": 15.777916000000001,
+        "p10": 16.436042,
+        "p50": 17.281166000000002,
+        "p90": 18.607582,
+        "p95": 19.457624000000003,
+        "p99": 20.892167000000004,
+        "max": 22.35296,
+        "mean": 17.431884329787245,
+        "low1Percent_meanOfSlowest1Pct": 21.622563500000002,
+        "low01Percent_meanOfSlowest01Pct": 22.35296,
+        "varianceMs2": 0.9384154021132847,
+        "stddevMs": 0.9687184328344768
+      },
+      "gpuPassMedianMs": [
+        {
+          "label": "scene",
+          "medianMs": 5.701632
+        },
+        {
+          "label": "volume.march",
+          "medianMs": 4.718592
+        },
+        {
+          "label": "particles",
+          "medianMs": 0.786432
+        },
+        {
+          "label": "post/dof",
+          "medianMs": 0.524288
+        },
+        {
+          "label": "shadow",
+          "medianMs": 0.458752
+        },
+        {
+          "label": "ao",
+          "medianMs": 0.393216
+        },
+        {
+          "label": "shadowmask",
+          "medianMs": 0.32767999999999997
+        },
+        {
+          "label": "depth",
+          "medianMs": 0.196608
+        },
+        {
+          "label": "post/bloom",
+          "medianMs": 0.131072
+        },
+        {
+          "label": "post/composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "post/fxaa",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "tonemap",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "volume.composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "clusters",
+          "medianMs": 0.0
+        },
+        {
+          "label": "background",
+          "medianMs": 0.0
+        }
+      ],
+      "cpuStageMedianMs": {
+        "uploads": 0.031208,
+        "lights": 1.897291,
+        "objects": 0.030125,
+        "fields": 0.004208,
+        "simulation": 0.000209,
+        "particles": 0.016375,
+        "procedural": 0.009875,
+        "sdf": 0.00025,
+        "shadowEncode": 0.053083,
+        "backgroundEncode": 0.008917,
+        "depthEncode": 0.034667,
+        "sceneEncode": 0.032208,
+        "volumeEncode": 0.008083,
+        "postEncode": 0.05,
+        "tonemapEncode": 0.023084,
+        "finish": 0.004125,
+        "submit": 0.408291,
+        "queueWait": 14.636791,
+        "total": 17.282541,
+        "unattributed": 0.033750999999998754
+      },
+      "counters": {
+        "medianOverMeasuredWindow": true,
+        "varied": true,
+        "draws": 42.0,
+        "shadowDraws": 33.0,
+        "submittedTriangles": 566267.0,
+        "logicalTriangles": 8984.0,
+        "visibleInstances": 0.0,
+        "culledInstances": 0.0,
+        "lod": [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "shadowCasters": 33.0,
+        "lights": 3.0,
+        "directionalLights": 3.0,
+        "clusteredLights": 0.0,
+        "uniformFallbackPathLights": 3.0,
+        "particleSystems": 2.0,
+        "particleCapacity": 10240.0,
+        "particlesEmittedPerFrame": 3.0,
+        "transientTextures": 14.0,
+        "entities": 33.0,
+        "computeDispatches": 3.0,
+        "gpuPasses": 30.0
+      }
+    },
+    {
+      "conditions": {
+        "scene": "examples/treeisland/_oc-noneb.json",
+        "sceneKind": "project",
+        "arm": "baseline",
+        "camera": "",
+        "cameraPosition": [
+          197.67652893066406,
+          45.33953094482422,
+          83.45803833007813
+        ],
+        "cameraTarget": [
+          -16.906749725341797,
+          9.354751586914063,
+          -5.985854148864746
+        ],
+        "fovYDegrees": 36.00000100179127,
+        "width": 1920,
+        "height": 1080,
+        "qualityTier": "default",
+        "gitRevision": "9fccba10da48",
+        "gitDirty": false,
+        "buildType": "Release",
+        "backend": "Metal",
+        "platform": "Apple M2 Max",
+        "sessionId": "2026-09-20T10:34:10-44307",
+        "startedAt": "2026-09-20T10:34:10",
+        "framesRendered": 200,
+        "warmupFrames": 12,
+        "measuredFrames": 188,
+        "offlineFps": 60.0,
+        "clusterStatsPerturbsWallClock": false
+      },
+      "wallMs": {
+        "frames": 188,
+        "min": 16.578292,
+        "p10": 17.687167,
+        "p50": 18.209459,
+        "p90": 19.101667,
+        "p95": 19.365208,
+        "p99": 19.884042,
+        "max": 20.424375,
+        "mean": 18.29702017553191,
+        "low1Percent_meanOfSlowest1Pct": 20.154208500000003,
+        "low01Percent_meanOfSlowest01Pct": 20.424375,
+        "varianceMs2": 0.3265329597383894,
+        "stddevMs": 0.5714306254816847
+      },
+      "gpuMs": {
+        "frames": 188,
+        "min": 13.172735999999999,
+        "p10": 14.09024,
+        "p50": 14.614528,
+        "p90": 15.466496,
+        "p95": 15.728639999999999,
+        "p99": 16.187392,
+        "max": 16.449536,
+        "mean": 14.73200476595746,
+        "low1Percent_meanOfSlowest1Pct": 16.318464,
+        "low01Percent_meanOfSlowest01Pct": 16.449536,
+        "varianceMs2": 0.28129544649439187,
+        "stddevMs": 0.5303729315249712
+      },
+      "cpuFrameMs": {
+        "frames": 188,
+        "min": 16.490251,
+        "p10": 17.588167,
+        "p50": 18.110083000000003,
+        "p90": 19.012376,
+        "p95": 19.264667,
+        "p99": 19.719,
+        "max": 20.275918,
+        "mean": 18.1935995106383,
+        "low1Percent_meanOfSlowest1Pct": 19.997459,
+        "low01Percent_meanOfSlowest01Pct": 20.275918,
+        "varianceMs2": 0.31979695668479236,
+        "stddevMs": 0.5655059298405211
+      },
+      "gpuPassMedianMs": [
+        {
+          "label": "scene",
+          "medianMs": 6.881279999999999
+        },
+        {
+          "label": "volume.march",
+          "medianMs": 4.653055999999999
+        },
+        {
+          "label": "particles",
+          "medianMs": 0.7864319999999999
+        },
+        {
+          "label": "shadow",
+          "medianMs": 0.524288
+        },
+        {
+          "label": "post/dof",
+          "medianMs": 0.524288
+        },
+        {
+          "label": "ao",
+          "medianMs": 0.32767999999999997
+        },
+        {
+          "label": "depth",
+          "medianMs": 0.196608
+        },
+        {
+          "label": "post/bloom",
+          "medianMs": 0.131072
+        },
+        {
+          "label": "shadowmask",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "post/composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "post/fxaa",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "tonemap",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "volume.composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "clusters",
+          "medianMs": 0.0
+        },
+        {
+          "label": "background",
+          "medianMs": 0.0
+        }
+      ],
+      "cpuStageMedianMs": {
+        "uploads": 0.020041,
+        "lights": 1.814667,
+        "objects": 0.025042,
+        "fields": 0.004125,
+        "simulation": 0.000125,
+        "particles": 0.012417,
+        "procedural": 0.006667,
+        "sdf": 0.000166,
+        "shadowEncode": 0.040541,
+        "backgroundEncode": 0.005583,
+        "depthEncode": 0.030834,
+        "sceneEncode": 0.027916,
+        "volumeEncode": 0.006291,
+        "postEncode": 0.041833,
+        "tonemapEncode": 0.018,
+        "finish": 0.002875,
+        "submit": 0.329917,
+        "queueWait": 15.715083,
+        "total": 18.119041,
+        "unattributed": 0.016918000000000433
+      },
+      "counters": {
+        "medianOverMeasuredWindow": true,
+        "varied": true,
+        "draws": 43.0,
+        "shadowDraws": 33.0,
+        "submittedTriangles": 566268.0,
+        "logicalTriangles": 8984.0,
+        "visibleInstances": 0.0,
+        "culledInstances": 0.0,
+        "lod": [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "shadowCasters": 33.0,
+        "lights": 3.0,
+        "directionalLights": 3.0,
+        "clusteredLights": 0.0,
+        "uniformFallbackPathLights": 3.0,
+        "particleSystems": 2.0,
+        "particleCapacity": 10240.0,
+        "particlesEmittedPerFrame": 3.0,
+        "transientTextures": 14.0,
+        "entities": 33.0,
+        "computeDispatches": 3.0,
+        "gpuPasses": 30.0
+      }
+    }
+  ],
+  "ab": {
+    "arm": "no-cosmic",
+    "pairedBlocks": 4,
+    "gpu": {
+      "baselineMs": 15.073279999999999,
+      "armMs": 13.762559999999999,
+      "deltaMs": 1.3762559999999997,
+      "deltaPercent": 9.130434782608694,
+      "noiseFloorPercent": 3.9130434782608705,
+      "noiseFloorComponents": {
+        "calibratedPercent": 2.0,
+        "baselineBlockSpreadPercent": 3.9130434782608705,
+        "armBlockSpreadPercent": 1.9047619047618998,
+        "perPairDeltaSpreadPercent": 3.043478260869569
+      },
+      "clearsNoiseFloor": true
+    },
+    "wall": {
+      "baselineMs": 18.988916,
+      "armMs": 17.554458,
+      "deltaMs": 1.438832999999999,
+      "deltaPercent": 7.577225577278866,
+      "noiseFloorPercent": 4.3198411115200095,
+      "noiseFloorComponents": {
+        "calibratedPercent": 4.0,
+        "baselineBlockSpreadPercent": 4.3198411115200095,
+        "armBlockSpreadPercent": 1.5392557263801607,
+        "perPairDeltaSpreadPercent": 3.6874564087807857
+      },
+      "clearsNoiseFloor": true
+    },
+    "gpuBlockDeltaMs": [
+      1.3107199999999999,
+      1.3762559999999997,
+      1.4417920000000013,
+      0.9830400000000008
+    ],
+    "wallBlockDeltaMs": [
+      1.3711659999999988,
+      1.438832999999999,
+      1.4752919999999996,
+      0.7750839999999997
+    ],
+    "baselineGpuSpreadPercent": 3.9130434782608705,
+    "baselineWallSpreadPercent": 4.3198411115200095
+  }
+}
