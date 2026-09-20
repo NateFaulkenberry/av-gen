@@ -347,7 +347,12 @@ void TransportBar::drawTempo(app::Engine& engine, const app::TransportSnapshot& 
     detail += "\n\nA tempo gives seconds per beat. The beat grid -- phase, downbeat, bars --\n"
               "comes from analysis, not from the number.";
     if (ImGui::IsItemHovered()) {
-        tooltip(detail.c_str());
+        // `tooltip` is `IM_FMTARGS(1)` -- printf-style -- and `detail` carries
+        // `tempo.metadataFormat` and `tempo.metadataKey`, which are read out of the audio file's
+        // own ID3 frames. So the format string was being chosen by the file: an `.mp3` with `%n`
+        // in a frame id reaches `vsnprintf` as a conversion. The first instance in this tree whose
+        // format string an outside document could pick, and the reason `-Werror=format` is on.
+        tooltipUnformatted(detail.c_str());
     }
     if (overridden && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
         engine.clearTempoOverride();
