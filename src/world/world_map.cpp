@@ -6,6 +6,9 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <array>
+#include <cstdio>
+#include <cstdlib>
 #include <cmath>
 #include <limits>
 
@@ -61,6 +64,11 @@ constexpr std::size_t kPathBlock = 8;
 
 // Distance from p to an axis-aligned box, or 0 inside it. Conservative by construction: every point
 // of the block's polyline is inside the box, so no segment in it can be nearer than this.
+// How far past `cutoff` a block's box has to be before skipping it is safe. Relative, because the
+// two expressions being reconciled are both a `sqrt` of a sum of squares over world coordinates
+// that reach a thousand metres, and absolute as well so that a cutoff of zero still has a margin.
+float kCutoffSlack(float cutoff) { return std::abs(cutoff) * 1.0e-5f + 1.0e-3f; }
+
 float boxDistance(const glm::vec4& box, glm::vec2 p) {
     const float dx = std::max({box.x - p.x, 0.0f, p.x - box.z});
     const float dz = std::max({box.y - p.y, 0.0f, p.y - box.w});
@@ -82,10 +90,76 @@ PathHit closestOnPath(const std::vector<glm::vec3>& path, glm::vec2 p,
         return {glm::distance(p, glm::vec2(path[0].x, path[0].z)), path[0].y};
     }
     const bool blocked = blocks.size() * kPathBlock >= path.size() - 1;
+    // ---- a cutoff, so the skip bites from the first block (interactive-performance pass) --------
+    //
+    // The skip below is a comparison against `best.distance`, and `best.distance` starts at
+    // infinity -- so the first block is always walked in full, and for a query point far from the
+    // start of the path many more are walked before `best` shrinks enough to reject anything. On
+    // Glowmere this function is **62% of an entire timeline scrub**: it is reached from
+    // `WorldMap::height` for every terrain feature, `height` is reached from `WorldMap::sample`,
+    // and that is what `Navigator::pathClear` asks per walker per step of a 5,400-step replay.
+    //
+    // So: find the block whose box is nearest `p` -- boxes only, no segment arithmetic -- and walk
+    // just that one to get `cutoff`, a distance some segment actually achieves. Every block whose
+    // box is **strictly** further than that cannot contain the answer.
+    //
+    // **Why this returns the identical PathHit, not merely an equally good one.** `cutoff` is a
+    // distance achieved by a real segment, so `cutoff >= trueMin`. The block holding the true
+    // minimum therefore has `boxDistance <= trueMin <= cutoff` and is never skipped. Every segment
+    // this skips has `d >= boxDistance > cutoff >= trueMin`, so `d > trueMin`: it could only ever
+    // have been an *intermediate* update of `best`, never the final one, because the update is a
+    // strict `<` and the result is decided by the first segment reaching the global minimum.
+    // Intermediate updates are invisible in the return value.
+    //
+    // **And why the comparison carries slack, which that argument does not predict.** `boxDistance`
+    // and the segment distance are different expressions, so when the nearest point on a segment
+    // *is* the corner of its own block's box the two are mathematically equal and numerically need
+    // not be: the box came out a few ULPs larger, `box > cutoff` fired on the block holding the
+    // answer, every other block was already further, and the function returned FLT_MAX. Measured,
+    // with the slack removed: heights differing from the unaccelerated walk by up to **8.0 m** on
+    // four of the terrain styles, which `the path block accelerator returns the identical height`
+    // in tests/unit/test_terrain_gen.cpp is what caught. The slack is one-sided on purpose -- it
+    // can only ever skip *fewer* blocks, and the worst case it degrades to is the behaviour before
+    // this paragraph existed.
+    //
+    // The distances are computed once and kept, because the loop below needs the same numbers: a
+    // feature is a river of about fifteen blocks and a world has a dozen features, so recomputing
+    // them was the larger half of what this pass cost. 64 blocks is 512 segments; past that the
+    // buffer is declined and the function behaves exactly as it did before this paragraph existed,
+    // which is also the fallback that keeps this correct rather than merely bounded.
+    constexpr std::size_t kMaxCachedBlocks = 64;
+    std::array<float, kMaxCachedBlocks> boxDist{};
+    float cutoff = std::numeric_limits<float>::max();
+    const bool cached = blocked && blocks.size() > 1 && blocks.size() <= kMaxCachedBlocks;
+    if (cached) {
+        std::size_t nearest = 0;
+        float nearestBox = std::numeric_limits<float>::max();
+        for (std::size_t b = 0; b < blocks.size(); ++b) {
+            boxDist[b] = boxDistance(blocks[b], p);
+            if (boxDist[b] < nearestBox) {
+                nearestBox = boxDist[b];
+                nearest = b;
+            }
+        }
+        const std::size_t from = nearest * kPathBlock;
+        const std::size_t to = std::min(from + kPathBlock, path.size() - 1);
+        for (std::size_t i = from; i < to; ++i) {
+            const glm::vec2 a(path[i].x, path[i].z);
+            const glm::vec2 b(path[i + 1].x, path[i + 1].z);
+            const glm::vec2 ab = b - a;
+            const float len2 = glm::dot(ab, ab);
+            const float t = len2 > 1e-12f ? glm::clamp(glm::dot(p - a, ab) / len2, 0.0f, 1.0f) : 0.0f;
+            cutoff = std::min(cutoff, glm::distance(p, a + ab * t));
+        }
+    }
     for (std::size_t i = 0; i + 1 < path.size(); ++i) {
-        if (blocked && i % kPathBlock == 0 && boxDistance(blocks[i / kPathBlock], p) >= best.distance) {
-            i += kPathBlock - 1;
-            continue;
+        if (blocked && i % kPathBlock == 0) {
+            const std::size_t b = i / kPathBlock;
+            const float box = cached ? boxDist[b] : boxDistance(blocks[b], p);
+            if (box >= best.distance || box > cutoff + kCutoffSlack(cutoff)) {
+                i += kPathBlock - 1;
+                continue;
+            }
         }
         const glm::vec2 a(path[i].x, path[i].z);
         const glm::vec2 b(path[i + 1].x, path[i + 1].z);
