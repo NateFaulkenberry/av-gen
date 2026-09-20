@@ -481,6 +481,21 @@ New instruments: `tools/resolution_sweep.sh` and `tools/resolution_sweep_report.
 `scale*` quality arms so the same lever is reachable from `--ab`. New flags: `--adaptive-scale
 on|off` and `--adaptive-budget <ms>`. New profiler rows: `scene Mpx` and `# render-scale moves`.
 
+### 9.5 The mip chain (ADR-481)
+
+The other half of the load waterfall, found by asking what the 2.1 seconds of texture upload was.
+`uploadTexture` builds the mip chain on the CPU and filters sRGB data in linear light by calling
+`std::pow` on every source channel of every level and again on every destination channel — about
+1.3 million calls per 512x512 texture. The decode's input is a byte, so 256 answers exist and a
+table of them is the function rather than an approximation of it. Measured, minima over three
+repeats:
+
+    texUp   2145.02 ms / 58 uploads   ->   851.66 ms / 58     (-60%, -1.29 s)
+
+The saving lands on the **first frame**, not on the load: the upload was never part of the
+`project load: 3214 ms` breakdown, which is unchanged. That is where time to first usable frame is
+measured, so it is the right 1.29 seconds to have.
+
 One thing found on the way past and worth its own line: **the editor's first frames render the
 world at the whole window's resolution, not the canvas's.** Before the first frame is laid out
 there is no canvas and the window is the best guess, so on a 3840×2400 window the first frames are
