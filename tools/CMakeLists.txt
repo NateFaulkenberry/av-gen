@@ -141,5 +141,3 @@ endif()
 add_executable(avgen_slope_probe _slope_probe.cpp)
 target_link_libraries(avgen_slope_probe PRIVATE avgen_core)
 
-add_executable(avgen_extent _extent.cpp)
-target_link_libraries(avgen_extent PRIVATE avgen_core)
