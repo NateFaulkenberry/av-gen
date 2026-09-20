@@ -116,8 +116,23 @@ Result<void> CosmicOcean::validate() const {
     if (!finite(quality.dustCells) || quality.dustCells < 0.0f || quality.dustCells > 5.0f) {
         return fail("cosmic ocean: dust cell neighbourhood must be 0..5");
     }
-    if (!finite(mask.innerAngle) || !finite(mask.outerAngle) || mask.outerAngle < mask.innerAngle) {
-        return fail("cosmic ocean: the mask's outer angle must be at least its inner angle");
+    // Finiteness only. The ordering `outerAngle >= innerAngle` is deliberately NOT validated here,
+    // and `effect_conformance` is what found out why.
+    //
+    // The two angles are independent registered parameters, each with its own hard range of 0..180.
+    // Nothing stops a modulation route, a timeline key or a slider from putting the outer inside the
+    // inner -- and `validate()` runs inside `fromJson`, so refusing that combination means the
+    // engine can reach an authored state whose saved file will not load again. A control the
+    // application does not keep is not a control (ADR-225/350), and a control it keeps but cannot
+    // read back is worse: the failure lands on the next person to open the project.
+    //
+    // The ordering is resolved where the value is used instead, twice over:
+    // `sanitiseCosmicOcean` pushes the outer past the inner after any route has driven a final, and
+    // `packCosmicOcean` clamps both angles before the cosines reach the shader. So an inverted pair
+    // is a degenerate mask rather than an unloadable file, which is the right shape for a soft
+    // artistic constraint between two knobs.
+    if (!finite(mask.innerAngle) || !finite(mask.outerAngle)) {
+        return fail("cosmic ocean: the mask's angles must be finite");
     }
     if (!finite(events.lifetime) || events.lifetime <= 0.0f) {
         return fail("cosmic ocean: event lifetime must be > 0 seconds");

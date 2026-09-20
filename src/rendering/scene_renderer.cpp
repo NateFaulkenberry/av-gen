@@ -1469,6 +1469,12 @@ std::span<const SceneRenderer::PassArm> SceneRenderer::passArms() {
         // ADR-230. Off: the sky-layer draw is skipped entirely, which is what makes the "effects
         // disabled" arm in §12 a real arm rather than a frame that renders the same pixels.
         {"atmospherics", &T::atmospherics},
+        // ADR-390. Off: the Cosmic Ocean's `Draw(3)` is not recorded AND its uniform is not
+        // uploaded, because `update` is gated on the same toggle -- the arm removes the fragment
+        // work and the uniform content together rather than measuring the same frame through one
+        // more branch (ADR-182). This arm is also ADR-390 §39's acceptance test: "then disable
+        // Cosmic Ocean; the scene should suddenly feel dramatically emptier".
+        {"cosmic", &T::cosmicOcean},
     };
     return kArms;
 }

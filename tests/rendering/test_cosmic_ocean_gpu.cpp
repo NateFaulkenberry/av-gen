@@ -15,10 +15,19 @@
 //    switch -- is asserted as equality on purpose, because that is the proof it is complete rather
 //    than merely quiet.
 //
-// Note `CosmicOceanRenderer::update` is called directly. Until `AtmosphericFrame` carries the ocean
-// -- one of ADR-390's four shared switch arms, waiting on the vortex branch -- this test is the only
-// caller, and that is the sequencing rather than an oversight. When the scene-authored path lands,
-// these tests should keep passing unchanged: they drive the same entry point the engine will.
+// These tests used to call `CosmicOceanRenderer::update` directly, because until ADR-390's shared
+// switch arms landed nothing else did, and the note here said they would "keep passing unchanged"
+// once the scene-authored path arrived.
+//
+// They did not, and the reason is worth keeping: `SceneRenderer::render` now calls `update` itself,
+// every frame, from `scene.atmospherics`. A direct call before `renderToImage` is therefore
+// overwritten with `live = false` before a single fragment runs, and every assertion here reported
+// zero differing pixels -- which reads exactly like a shader that draws nothing. It was not a
+// prediction that turned out to be wrong so much as a prediction that could not be checked: the
+// path it was predicting about did not exist yet.
+//
+// So the ocean is authored on the scene, which is what an artist does and what the engine reads,
+// and the transport second is `FrameTime::renderTime`, which is where the renderer takes it from.
 
 #include "core/log.hpp"
 #include "core/time.hpp"
@@ -139,18 +148,30 @@ TEST_CASE("the cosmic ocean reaches the frame and its off switch is complete", "
     REQUIRE(renderer.init().has_value());
     REQUIRE(renderer.cosmicOcean().ready());
 
-    const scene::Scene scene = oceanScene();
-    const FrameTime time{.renderTime = 1.0, .deltaTime = 1.0 / 60.0, .frameIndex = 1};
+    scene::Scene scene = oceanScene();
+    double seconds = 1.0;
     auto render = [&]() {
+        const FrameTime time{.renderTime = seconds, .deltaTime = 1.0 / 60.0, .frameIndex = 1};
         auto image = renderer.renderToImage(scene, time, kWidth, kHeight);
         REQUIRE(image.has_value());
         return std::move(*image);
     };
-    auto setOcean = [&](const world::CosmicOcean& o, double seconds) {
-        renderer.cosmicOcean().update(world::packCosmicOcean(o, 1.0f, seconds), true, 0);
+    // Authored on the scene, exactly as `buildAtmosphericFrame` leaves it: the renderer packs it
+    // with the tier's quality scale and uploads it. Setting `CosmicOceanRenderer` by hand no longer
+    // survives a frame -- see the note at the top of this file.
+    auto setOcean = [&](const world::CosmicOcean& o, double at) {
+        scene.atmospherics.hasCosmicOcean = true;
+        scene.atmospherics.cosmicOcean = o;
+        scene.atmospherics.cosmicOceanEnvelope = 1.0f;
+        seconds = at;
+    };
+    auto clearOcean = [&]() {
+        scene.atmospherics.hasCosmicOcean = false;
+        scene.atmospherics.cosmicOcean = world::CosmicOcean{};
+        scene.atmospherics.cosmicOceanEnvelope = 0.0f;
     };
 
-    renderer.cosmicOcean().update(world::CosmicOceanGpu{}, false, 0);
+    clearOcean();
     const gpu::Image8 none = render();
 
     SECTION("a live ocean changes most of the sky") {
@@ -178,7 +199,8 @@ TEST_CASE("the cosmic ocean reaches the frame and its off switch is complete", "
         setOcean(visibleOcean(), 4.0);
         const gpu::Image8 with = render();
         REQUIRE(differingPixels(none, with) > 0);
-        renderer.cosmicOcean().update(world::CosmicOceanGpu{}, false, 0);
+        clearOcean();
+        seconds = 1.0;
         const gpu::Image8 off = render();
         // Equality on purpose. The arm that measures this effect's cost has to remove all of it,
         // and an off switch that leaves a few pixels behind is an arm that measures the wrong
@@ -272,12 +294,13 @@ TEST_CASE("parallax separates the strata rather than sliding the sky", "[gpu][co
 
     auto movedUnderTranslation = [&](bool near) {
         scene::Scene scene = oceanScene();
-        renderer.cosmicOcean().update(world::packCosmicOcean(onlyStratum(near), 1.0f, 2.0), true, 0);
+        scene.atmospherics.hasCosmicOcean = true;
+        scene.atmospherics.cosmicOcean = onlyStratum(near);
+        scene.atmospherics.cosmicOceanEnvelope = 1.0f;
         auto a = renderer.renderToImage(scene, time, kWidth, kHeight);
         REQUIRE(a.has_value());
         scene.camera.position += glm::vec3(120.0f, 0.0f, 0.0f);
         scene.camera.target += glm::vec3(120.0f, 0.0f, 0.0f); // pure translation: the aim is parallel
-        renderer.cosmicOcean().update(world::packCosmicOcean(onlyStratum(near), 1.0f, 2.0), true, 0);
         auto b = renderer.renderToImage(scene, time, kWidth, kHeight);
         REQUIRE(b.has_value());
         return differingPixels(*a, *b);
