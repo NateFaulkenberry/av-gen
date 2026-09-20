@@ -20,13 +20,17 @@
 #include "scene/composition.hpp"
 #include "stage/staging.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -52,6 +56,16 @@ struct Sample {
     float step = 0.0f;   // |pos - previous pos|
     float stepY = 0.0f;
     int camera = 0;      // the camera holding the frame, for the cut test
+    // The bound target's fade, for Test 5. -1 = no target bound, or it has no such parameter.
+    float targetOpacity = -1.0f;
+    float targetVisible = -1.0f;
+    float targetY = 0.0f;
+    // What reached the *renderer*, not the parameter: how many of the scene's drawable entities are
+    // in the blend pipeline this frame, and the least opaque of them. A parameter that moves while
+    // these do not is a fade nobody can see (`pbr_shade.wgsl` throws an OPAQUE material's alpha
+    // away), which is the whole reason this pair is recorded alongside the number.
+    int blended = 0;
+    float minOpacity = 1.0f;
 };
 
 std::vector<Sample> playFilm(double seconds, double hz,
@@ -103,6 +117,27 @@ std::vector<Sample> playFilm(double seconds, double hz,
         s.beamVisible = beamVisible->baseComponent(0);
         s.beamRate = beamRate->baseComponent(0);
         s.camera = static_cast<int>(comp->activeCamera().camera);
+        if (!s.target.empty()) {
+            if (const params::IParameter* o =
+                    engine.params().find("nodes/" + s.target + "/opacity");
+                o != nullptr) {
+                s.targetOpacity = o->baseComponent(0);
+            }
+            if (const params::IParameter* v =
+                    engine.params().find("nodes/" + s.target + "/visible");
+                v != nullptr) {
+                s.targetVisible = v->baseComponent(0);
+            }
+            if (const entity::Entity* prey = comp->entityWorld().find(s.target); prey != nullptr) {
+                s.targetY = prey->state().position().y;
+            }
+        }
+        for (const scene::Entity& e : comp->scene().entities) {
+            if (e.material.alphaMode == scene::AlphaMode::Blend) {
+                ++s.blended;
+                s.minOpacity = std::min(s.minOpacity, e.material.opacity);
+            }
+        }
         if (i > 0) {
             s.step = glm::length(s.pos - last);
             s.stepY = s.pos.y - last.y;
@@ -283,6 +318,12 @@ std::vector<Sample> playLab(double seconds, double hz, float cruiseClearance) {
         s.drawn = s.pos;
         const entity::Navigator& nav = comp->entityWorld().navigator();
         s.ground = nav.valid() ? nav.groundHeight(glm::vec2(s.pos.x, s.pos.z)) : 0.0f;
+        for (const scene::Entity& e : comp->scene().entities) {
+            if (e.material.alphaMode == scene::AlphaMode::Blend) {
+                ++s.blended;
+                s.minOpacity = std::min(s.minOpacity, e.material.opacity);
+            }
+        }
         if (i > 0) {
             s.step = glm::length(s.pos - last);
             s.stepY = s.pos.y - last.y;
@@ -610,4 +651,222 @@ TEST_CASE("the lab follows the same sequencing contract", "[stage][abduction][se
     }
     INFO(fmt::format("the lab's fastest honest frame: {:.3f} m", fastest));
     CHECK(fastest > 1.0f);
+}
+
+// Test 5 -- the animal dissolves rather than popping.
+//
+// Before ADR-385 `StepKind::Retire` wrote the role's `visible` parameter to 0 and that was the
+// whole disappearance: one frame, fully lit, gone. There was nothing to fade it *with* --
+// `nodes/<name>/` registered position, rotation, scale, visible, emissiveBoost, roughnessScale and
+// the two light controls, and the only `opacityScale` in the parameter set was on procedural
+// sub-parts, which the farm animals are not. And even a number would not have been enough:
+// `pbr_shade.wgsl` reads `let alpha = select(1.0, baseColor.a, alphaMode > 1.5)`, so an OPAQUE
+// material's alpha is discarded, and every farm GLB is authored OPAQUE.
+//
+// What this asserts is the sequencing, which is the half a test can see without a GPU: the opacity
+// reaches zero continuously, and the hard `visible` toggle happens only after it has.
+TEST_CASE("the abducted animal fades out before it is hidden", "[stage][abduction][sequence]") {
+    const std::vector<Sample>& run = film();
+    // Per abducted animal: the opacity trace while it was the bound target.
+    std::map<std::string, std::vector<std::pair<double, float>>> trace;
+    std::map<std::string, double> hiddenAt;
+    for (const Sample& s : run) {
+        if (s.target.empty() || s.targetOpacity < 0.0f) {
+            continue;
+        }
+        trace[s.target].push_back({s.t, s.targetOpacity});
+        if (s.targetVisible >= 0.0f && s.targetVisible < 0.5f && hiddenAt.count(s.target) == 0) {
+            hiddenAt[s.target] = s.t;
+        }
+    }
+    // Three, not five. Two of the film's abduction targets -- `rooster-16` and `chicken-17` --
+    // are entities the scene has no node for, which the loader says out loud at every load
+    // ("entity 'rooster-16' drives node 'rooster-16', which this scene has no node for"). They
+    // have no transform parameters, no opacity and nothing drawn: the director walks them around
+    // and abducts them invisibly. That is a production-data gap and not this work's to close, but
+    // it is why this number is three.
+    std::set<std::string> nodeless;
+    for (const Sample& s : run) {
+        if (!s.target.empty() && s.targetOpacity < 0.0f) {
+            nodeless.insert(s.target);
+        }
+    }
+    INFO(fmt::format("targets with no node and therefore nothing to fade: {}",
+                     fmt::join(nodeless, ", ")));
+    REQUIRE(trace.size() >= 3);
+
+    std::size_t faded = 0;
+    for (const auto& [animal, samples] : trace) {
+        float lowest = 1.0f;
+        float worstStep = 0.0f;
+        double lowestAt = 0.0;
+        double firstBelowOne = 0.0;
+        for (std::size_t i = 1; i < samples.size(); ++i) {
+            if (samples[i].second < lowest) {
+                lowest = samples[i].second;
+                lowestAt = samples[i].first;
+            }
+            if (firstBelowOne == 0.0 && samples[i].second < 0.999f) {
+                firstBelowOne = samples[i].first;
+            }
+            // Up to the bottom of the fade and no further. `Retire` puts every parameter it drove
+            // through this role back to the value it found, so the frame *after* the fade reaches
+            // zero legitimately shows a 1.0 step back to opaque -- on a body it hides in the same
+            // step, so nothing is drawn at either value. Measuring past the bottom would be
+            // measuring the cleanup and calling it a pop.
+            if (lowest > 0.001f) {
+                worstStep = std::max(worstStep,
+                                     std::fabs(samples[i].second - samples[i - 1].second));
+            }
+        }
+        if (lowest > 0.999f) {
+            continue; // never abducted in this window -- claimed, then the run ended
+        }
+        ++faded;
+        INFO(fmt::format("{}: opacity fell to {:.4f} by t={:.3f}, starting at t={:.3f}; worst "
+                         "single-frame change {:.4f}; hidden at t={:.3f}",
+                         animal, lowest, lowestAt, firstBelowOne, worstStep,
+                         hiddenAt.count(animal) != 0 ? hiddenAt.at(animal) : -1.0));
+        // It got all the way out.
+        CHECK(lowest <= 0.01f);
+        // And it got there gradually. A hard toggle is a single-frame change of 1.0; the authored
+        // `fadeSeconds` is 1.4 s, so a 60 Hz frame moves about 0.012 even at the eased curve's
+        // steepest. 0.1 is an order of magnitude above that and an order of magnitude below a pop.
+        CHECK(worstStep <= 0.1f);
+        // The fade took real time rather than being a ramp with one frame in it.
+        CHECK(lowestAt - firstBelowOne > 0.5);
+        // And the hard `visible` toggle came after the fade, never before it. This is the ordering
+        // the data buys by putting `retire` last in the same cue as the fade rather than in the
+        // parallel one: a `retire` in another cue fires on its own schedule and can beat the fade.
+        if (hiddenAt.count(animal) != 0) {
+            CHECK(hiddenAt.at(animal) >= lowestAt);
+        }
+    }
+    INFO(fmt::format("{} of {} bound targets with a node faded", faded, trace.size()));
+    CHECK(faded >= 3);
+}
+
+// Test 5b -- the fade reaches the renderer, and lets go of it again.
+//
+// "Numbers are not frames." The parameter moving proves nothing on its own: `pbr_shade.wgsl` reads
+// `let alpha = select(1.0, baseColor.a, alphaMode > 1.5)`, so an OPAQUE material's alpha is
+// discarded outright and every farm GLB in the repository is authored OPAQUE. Driving
+// `nodes/<animal>/opacity` alone rendered a perfectly solid cow.
+//
+// So this asserts the other half, at the last point a CPU test can see: the *flattened scene's*
+// entities. During a fade some are in the blend pipeline with an opacity under 1; when no fade is
+// running none of them are, which is the control -- a promotion that never came back would leave
+// the whole cast in a blend pipeline it never asked for, and a test that only looked at the fade
+// would call that a pass.
+TEST_CASE("the fade reaches the flattened scene and is given back", "[stage][abduction][sequence]") {
+    const std::vector<Sample>& run = film();
+    // Frame zero's count is the *baseline*, and taking it is the whole reason this case is not
+    // the trivially-passing thing it first was: this scene already draws seven blended entities
+    // before anything fades -- water, foliage cards and the like -- so "something is in the blend
+    // pipeline" is true of every frame of the film and proves nothing at all (ADR-182). What the
+    // fade adds is a body that was not there before.
+    REQUIRE(!run.empty());
+    const int baseline = run.front().blended;
+    INFO(fmt::format("the scene draws {} blended entities before anything fades", baseline));
+    int mostBlended = 0;
+    float leastOpaque = 1.0f;
+    std::size_t framesBlended = 0;
+    std::size_t framesClear = 0;
+    double firstBlend = -1.0;
+    for (const Sample& s : run) {
+        if (s.blended > baseline) {
+            ++framesBlended;
+            mostBlended = std::max(mostBlended, s.blended - baseline);
+            leastOpaque = std::min(leastOpaque, s.minOpacity);
+            if (firstBlend < 0.0) {
+                firstBlend = s.t;
+            }
+        } else {
+            ++framesClear;
+        }
+    }
+    INFO(fmt::format("{} frame(s) with something in the blend pipeline (first at t={:.3f}), "
+                     "{} with nothing; most blended at once {}, least opaque {:.4f}",
+                     framesBlended, firstBlend, framesClear, mostBlended, leastOpaque));
+    CHECK(framesBlended > 0);
+    CHECK(mostBlended > 0);
+    CHECK(leastOpaque <= 0.01f);
+    // And it is not permanent: most of the film has nothing fading, and a promotion that never
+    // came back would leave the cast in a blend pipeline it never asked for.
+    CHECK(framesClear > framesBlended);
+}
+
+// The overlay's data, exercised (ADR-385).
+//
+// `Staging::sequenceStates()` is the reading the World window's Scenarios tab draws. A published
+// state nothing reads is the failure mode this repository has an index entry about, so this asserts
+// the reading is populated, agrees with the beat the director is actually in, and carries the two
+// numbers the brief singled out -- world position and velocity -- for the craft.
+TEST_CASE("the director publishes the state an overlay needs", "[stage][abduction][sequence]") {
+    app::Engine engine(app::EngineMode::Offline);
+    auto loaded = engine.loadProject(filmProject());
+    REQUIRE(loaded.has_value());
+    scene::Composition* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+    comp->setViewport(1600, 900);
+    comp->scene().detailLimits.entityDistanceCull = false;
+
+    std::set<std::string> beatsSeen;
+    std::set<std::string> rolesSeen;
+    std::size_t framesWithCues = 0;
+    std::size_t framesGated = 0;
+    bool sawCraftPosition = false;
+    bool sawNonZeroSpeed = false;
+    FrameTime time;
+    for (int i = 0; i < 60 * 30; ++i) {
+        time.renderTime = static_cast<double>(i) / 60.0;
+        time.deltaTime = i == 0 ? 0.0 : 1.0 / 60.0;
+        time.frameIndex = static_cast<std::uint64_t>(i);
+        engine.update(time);
+
+        const auto& states = comp->director().sequenceStates();
+        REQUIRE(states.size() == 1);
+        const stage::Staging::SequenceState& st = states.front();
+        CHECK(st.scenario == "abduction");
+        CHECK(st.time == Catch::Approx(time.renderTime));
+        // The published beat is the beat, not a copy that drifted.
+        CHECK(st.beat == std::string(comp->director().beat("abduction")));
+        if (!st.beat.empty()) {
+            beatsSeen.insert(st.beat);
+        }
+        if (st.gated) {
+            ++framesGated;
+            CHECK(!st.gatedOn.empty()); // it says *what* it is waiting for
+        }
+        if (!st.cues.empty()) {
+            ++framesWithCues;
+        }
+        for (const stage::Staging::CueState& c : st.cues) {
+            rolesSeen.insert(c.role);
+            CHECK(c.index <= c.steps);
+            CHECK(c.progress >= 0.0f);
+            CHECK(c.progress <= 1.0f + 1e-4f);
+            if (c.role == "actor" && !c.entity.empty()) {
+                CHECK(c.entity == "visitor");
+                sawCraftPosition = sawCraftPosition || glm::length(c.position) > 1.0f;
+                sawNonZeroSpeed = sawNonZeroSpeed || c.speed > 0.1f;
+            }
+        }
+    }
+    INFO(fmt::format("beats {}; roles {}; {} frame(s) with cues, {} gated",
+                     fmt::join(beatsSeen, "/"), fmt::join(rolesSeen, "/"), framesWithCues,
+                     framesGated));
+    // The film reaches all four working beats inside thirty seconds.
+    CHECK(beatsSeen.count("approach") == 1);
+    CHECK(beatsSeen.count("beam") == 1);
+    CHECK(beatsSeen.count("abduct") == 1);
+    CHECK(beatsSeen.count("depart") == 1);
+    CHECK(rolesSeen.count("actor") == 1);
+    CHECK(rolesSeen.count("actor.beam") == 1);
+    CHECK(rolesSeen.count("target") == 1);
+    CHECK(framesWithCues > 1000);
+    // The gate fired at least once, so `gated`/`gatedOn` are not fields that are always empty.
+    CHECK(framesGated > 0);
+    CHECK(sawCraftPosition);
+    CHECK(sawNonZeroSpeed);
 }

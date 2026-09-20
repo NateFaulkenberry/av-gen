@@ -38,6 +38,7 @@
 // audible on music and the honest fix is to convert the file.
 
 #include "audio/audio_file.hpp"
+#include "audio/tempo_metadata.hpp"
 #include "core/error.hpp"
 
 #include <cstdint>
@@ -96,12 +97,33 @@ public:
     // that failed, which the caller reports; a missing file is not a reason to refuse the mix.
     std::vector<std::string> sync(std::span<const AudioClip> clips);
     [[nodiscard]] std::shared_ptr<const AudioFile> find(const std::filesystem::path& path) const;
+    // The tempo embedded in that source file's metadata, read once when it was loaded. Unavailable
+    // for a file with no tempo tag, and for a path this holds nothing for.
+    //
+    // It is read here, beside the decode, because this is the only place in the engine that opens
+    // a real audio file on disk. By the time the arrangement reaches `Engine::installAudio` it is
+    // a *mixdown* -- a buffer built by `fromInterleaved`, with no path and no container -- so a
+    // tempo not captured at this point is gone.
+    [[nodiscard]] AudioTempo embeddedTempo(const std::filesystem::path& path) const;
     [[nodiscard]] std::size_t size() const { return files_.size(); }
     void clear() { files_.clear(); }
 
 private:
-    std::vector<std::pair<std::filesystem::path, std::shared_ptr<const AudioFile>>> files_;
+    struct Source {
+        std::filesystem::path path;
+        std::shared_ptr<const AudioFile> file;
+        AudioTempo tempo; // from the container's metadata; see embeddedTempo()
+    };
+    std::vector<Source> files_;
 };
+
+// The embedded tempo of a whole arrangement: the one belonging to the earliest-starting enabled
+// clip that has one. An arrangement is several files and they can disagree; the piece starts where
+// it starts, so the clip the listener hears first is the one whose tempo names the piece. Clips
+// that disagree are logged, not merged -- averaging two producers' BPMs would invent a third
+// number nobody wrote.
+[[nodiscard]] AudioTempo arrangementEmbeddedTempo(std::span<const AudioClip> clips,
+                                                  const ClipSources& sources);
 
 // Mixes the enabled clips into one file.
 //

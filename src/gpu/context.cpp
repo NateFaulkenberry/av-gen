@@ -160,7 +160,12 @@ Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
     adapterLimits.nextInChain = nullptr;
 
     // ---- device ----
+    ctx->caps_.rg11b10Renderable = ctx->adapter_.HasFeature(wgpu::FeatureName::RG11B10UfloatRenderable);
+
     std::vector<wgpu::FeatureName> features;
+    if (ctx->caps_.rg11b10Renderable) {
+        features.push_back(wgpu::FeatureName::RG11B10UfloatRenderable);
+    }
     if (ctx->caps_.timestampQuery) {
         features.push_back(wgpu::FeatureName::TimestampQuery);
     }

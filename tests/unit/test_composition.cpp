@@ -19,6 +19,7 @@
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -453,11 +454,47 @@ TEST_CASE("Composition registers parameters that drive instances, materials and 
         CHECK(sc.environment.environmentRotation == 1.0f);
     }
     SECTION("removeNode unregisters its parameters and rebuilds") {
+        // Counted, not hard-coded. This asserted `before - 26` with a comment reading "6 node
+        // parameters + 20 particle parameters", and went red the moment a node gained a seventh --
+        // reporting a leak where there was none. A literal here tests how many parameters a node
+        // happens to register today; the contract is that removing a node removes EXACTLY its own
+        // and nothing else, which is what this measures instead.
+        const auto owned = [&](std::string_view name) {
+            const std::string a = "nodes/" + std::string(name) + "/";
+            const std::string b = "particles/" + std::string(name) + "/";
+            std::size_t n = 0;
+            for (const params::IParameter* q : params.ordered()) {
+                if (q->path().starts_with(a) || q->path().starts_with(b)) {
+                    ++n;
+                }
+            }
+            return n;
+        };
         const std::size_t before = params.size();
+        const std::size_t mine = owned("sparks");
+        const std::size_t others = owned("b") + owned("a");
+        // The premise: "sparks" really does own parameters, so removing it has something to do.
+        // Without this the equality below would hold for a node that registered none (ADR-182).
+        REQUIRE(mine > 0);
+        REQUIRE(others > 0);
         CHECK(comp.removeNode("sparks"));
         CHECK(params.find("nodes/sparks/position") == nullptr);
         CHECK(params.find("particles/sparks/spawnRate") == nullptr);
-        CHECK(params.size() == before - 26); // 6 node parameters + 20 particle parameters
+        {
+            // Name them rather than count them: a bare count says a leak exists and not what it is,
+            // and the suffix tables in `unregisterNodeParameters` are exactly the kind of list that
+            // goes stale silently when a registrar gains a field.
+            std::string leaked;
+            for (const params::IParameter* q : params.ordered()) {
+                if (q->path().starts_with("nodes/sparks/") || q->path().starts_with("particles/sparks/")) {
+                    leaked += q->path() + " ";
+                }
+            }
+            INFO("survived removeNode: " << leaked);
+            CHECK(owned("sparks") == 0);                // all of its own went
+        }
+        CHECK(owned("b") + owned("a") == others);       // and none of anybody else's
+        CHECK(params.size() == before - mine);
         CHECK(comp.removeNode("b"));
         CHECK(params.find("nodes/b/position") == nullptr);
         CHECK(params.find("nodes/a/position") != nullptr);

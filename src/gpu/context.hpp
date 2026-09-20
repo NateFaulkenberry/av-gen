@@ -32,6 +32,11 @@ struct Capabilities {
     std::string adapterType;
     std::string vendor;
     bool timestampQuery = false;
+    // ADR-410: RG11B10Ufloat as a RENDER TARGET, which is an optional feature rather than a given
+    // -- sampling it is always allowed, drawing into it is not. The temporal history ring wants it
+    // because it halves the ring's memory against RGBA16Float; it falls back to RGBA16Float where
+    // the adapter says no, so this cap changes a cost and never a picture.
+    bool rg11b10Renderable = false;
     bool sharedTextureIOSurface = false;   // SharedTextureMemoryIOSurface + SharedFenceMTLSharedEvent
     wgpu::Limits limits{};
 };

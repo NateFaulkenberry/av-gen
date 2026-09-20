@@ -114,6 +114,19 @@ struct QualitySettings {
     bool ambientOcclusion = true;
     float aoResolutionScale = 0.5f;        // half resolution + bilateral upsample
     std::uint32_t aoHistoryFrames = 8;     // temporal accumulation length
+    // ADR-410: the fraction of the scene's resolution the temporal history ring is stored at.
+    // Placed here beside `aoHistoryFrames` and `volumeResolutionScale` because those two are the
+    // existing precedents for exactly this pair -- a temporal accumulation count and a
+    // fraction-of-scene-resolution auxiliary buffer -- and the header's own opening sentence has
+    // always said a tier scales "sample counts, resolutions and history lengths".
+    //
+    // Halving the linear resolution quarters the memory, and the ring's contents are about to be
+    // blurred, smeared or advected, so this is the cheapest lever the family has. The *length* of
+    // the history is NOT a tier setting: it is the effect's declared bound, and shortening it
+    // between a preview and a final would change the picture rather than its sampling. §18 allows
+    // a tier to scale resolution and sample counts; it does not allow it to remove an artistic
+    // control, and how far an echo reaches is one.
+    float temporalHistoryScale = 0.5f;
     // ADR-087: the fraction of the scene's resolution the directional lights' combined shadow term
     // (cascade lookup + contact march) is computed at, before a bilateral upsample in the lit
     // pass. 1.0 means "no mask pass": the lit pass computes the term per pixel, exactly as it did
@@ -262,6 +275,7 @@ struct QualitySettings {
             q.flatTierLocalLights = 1;
             q.flatTierFromRung = 1; // ADR-155
             q.volumeResolutionScale = 0.25f;
+            q.temporalHistoryScale = 0.25f;
             q.volumeStepScale = 0.5f;
             q.cosmicOctaveScale = 0.75f; // 4 nebula octaves -> 3
             q.cosmicSampleScale = 0.34f; // 3x3 planet cells -> 1x1, and the dust off
@@ -296,6 +310,7 @@ struct QualitySettings {
             q.flatTierLocalLights = 12;
             // The reference live picture, for the same reason `shadowMaskScale` is 1.0 here: the
             // tier exists to say what the frame looks like with no auxiliary pass downsampled.
+            q.temporalHistoryScale = 0.5f;
             q.volumeResolutionScale = 1.0f;
             q.cosmicOctaveScale = 1.25f; // 4 nebula octaves -> 5
             break;
@@ -319,6 +334,9 @@ struct QualitySettings {
             q.renderScale = 1.0f;
             // §5.9: an offline render takes no temporal or resolution shortcut. The march runs
             // per pixel at the authored step count, and the composite is then an exact copy.
+            // §5.9: offline takes no temporal shortcut -- the ring is full resolution, so an
+            // offline echo is the preview's echo without its downsample.
+            q.temporalHistoryScale = 1.0f;
             q.volumeResolutionScale = 1.0f;
             q.volumeStepScale = 1.0f;
             // §5.9 / ADR-146: and it carries no history in the LOD ladder either, so the frame

@@ -256,6 +256,7 @@ namespace {
         if (auto r = readValue(j, "from", s.from, where); !r) return std::unexpected(r.error());
         s.hasFrom = true;
     }
+    s.ease = readBool(j, "ease", false);
     if (j.contains("actions")) {
         auto actions = entity::actionsFromJson(j.at("actions"));
         if (!actions) return std::unexpected(actions.error());
@@ -293,6 +294,7 @@ namespace {
         writeValue(j, "to", s.to, 0.0f);
     }
     if (s.hasFrom) j["from"] = valueToJson(s.from);
+    if (s.ease) j["ease"] = true;
     if (!s.actions.empty()) j["actions"] = entity::actionsToJson(s.actions);
     return j;
 }

@@ -5,6 +5,7 @@
 #include "ui/style.hpp"
 #include "params/preset.hpp"
 #include "scene/composition.hpp"
+#include "stage/staging.hpp"
 #include "ui/world_editor.hpp"
 
 #include <fmt/format.h>
@@ -648,6 +649,90 @@ void WorldPanel::drawMacros(app::Engine& engine) {
         m.label = macroName_;
         engine.setWorldMacro(std::move(m));
     }
+}
+
+// The staging director's own state, as distinct from `app::WorldDirector`'s artistic knobs below
+// (two unrelated things called "director"; see `src/stage/staging.hpp`). ADR-385: the brief asked
+// for an overlay that could diagnose a sequencing bug, and the list it gave -- state, time, world
+// position, velocity, beam state, abduction state, lift and fade progress -- is exactly what
+// `Staging::sequenceStates()` publishes. Read-only: this window reports the frame and never steers
+// it.
+void WorldPanel::drawScenarios(app::Engine& engine) {
+    scene::Composition* comp = engine.composition();
+    if (comp == nullptr) {
+        ImGui::TextDisabled("No composition.");
+        return;
+    }
+    const auto& states = comp->director().sequenceStates();
+    if (states.empty()) {
+        ImGui::TextDisabled("This world has no staging scenarios.");
+        ImGui::TextWrapped("A scenario is a cast of actors and a list of beats, authored in the "
+                           "scene file under `staging`. Glowmere Valley 2's abduction is one.");
+        return;
+    }
+    for (const stage::Staging::SequenceState& st : states) {
+        ImGui::PushID(st.scenario.c_str());
+        ImGui::Text("%s", st.scenario.c_str());
+        ImGui::SameLine();
+        if (!st.running) {
+            ImGui::TextDisabled("(not running)");
+        } else if (st.gated) {
+            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "WAITING  %s",
+                               st.gatedOn.c_str());
+        } else {
+            ImGui::TextDisabled("beat '%s' for %.2fs", st.beat.c_str(), st.time - st.beatStart);
+        }
+        if (st.maxCycles > 0) {
+            ImGui::TextDisabled("cycle %d of %d      t = %.3f s", st.cycle + 1, st.maxCycles,
+                                st.time);
+        } else {
+            ImGui::TextDisabled("cycle %d            t = %.3f s", st.cycle + 1, st.time);
+        }
+        if (st.running && !st.cues.empty()
+            && ImGui::BeginTable("cues", 6, ImGuiTableFlags_SizingStretchProp
+                                                | ImGuiTableFlags_RowBg)) {
+            ImGui::TableSetupColumn("role");
+            ImGui::TableSetupColumn("entity");
+            ImGui::TableSetupColumn("step");
+            ImGui::TableSetupColumn("progress");
+            ImGui::TableSetupColumn("world position");
+            ImGui::TableSetupColumn("speed");
+            ImGui::TableHeadersRow();
+            for (const stage::Staging::CueState& c : st.cues) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(c.role.empty() ? "-" : c.role.c_str());
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(c.entity.empty() ? "-" : c.entity.c_str());
+                ImGui::TableNextColumn();
+                if (c.done) {
+                    ImGui::TextDisabled("done");
+                } else {
+                    ImGui::Text("%s (%zu/%zu)", c.step.c_str(), c.index + 1, c.steps);
+                }
+                ImGui::TableNextColumn();
+                if (c.done) {
+                    ImGui::TextDisabled("-");
+                } else if (c.duration > 0.0) {
+                    ImGui::Text("%.0f%%  %.2f/%.2fs", static_cast<double>(c.progress) * 100.0,
+                                c.elapsed, c.duration);
+                } else {
+                    ImGui::Text("%.2fs", c.elapsed);
+                }
+                ImGui::TableNextColumn();
+                ImGui::Text("%.2f, %.2f, %.2f", static_cast<double>(c.position.x),
+                            static_cast<double>(c.position.y), static_cast<double>(c.position.z));
+                ImGui::TableNextColumn();
+                // The number `BeatDesc::stillRoles` gates on, in the place somebody would look to
+                // find out why a beat is waiting.
+                ImGui::Text("%.3f m/s", static_cast<double>(c.speed));
+            }
+            ImGui::EndTable();
+        }
+        ImGui::Separator();
+        ImGui::PopID();
+    }
+    ImGui::TextDisabled("Read-only. The contract these beats keep is docs/abduction-authoring.md.");
 }
 
 void WorldPanel::drawDirector(app::Engine& engine) {
