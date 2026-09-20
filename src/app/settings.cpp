@@ -35,6 +35,8 @@ json AppSettings::toJson() const {
     doc["format"] = kFormatName;
     doc["version"] = kFormatVersion;
     doc["general"] = json{{"canvasRenderScale", canvasRenderScale},
+                          {"adaptiveCanvasScale", adaptiveCanvasScale},
+                          {"adaptiveCanvasBudgetMs", adaptiveCanvasBudgetMs},
                           {"appearance", appearanceThemeName(appearance)},
                           {"renderFramePreview", renderFramePreview},
                           {"suspendViewportDuringRender", suspendViewportDuringRender}};
@@ -71,6 +73,13 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
     AppSettings out;
     if (const auto general = doc.find("general"); general != doc.end() && general->is_object()) {
         out.canvasRenderScale = std::clamp(general->value("canvasRenderScale", 1.0f), 0.25f, 2.0f);
+        out.adaptiveCanvasScale = general->value("adaptiveCanvasScale", out.adaptiveCanvasScale);
+        // Clamped rather than refused: a budget of zero would pin the ladder at its floor forever
+        // and a budget of a second would make the controller dead weight, and neither is worth
+        // refusing a settings file over. 4 ms is below the measured fixed cost of a frame, so the
+        // bottom of the range is already "as fast as the resolution can make it".
+        out.adaptiveCanvasBudgetMs =
+            std::clamp(general->value("adaptiveCanvasBudgetMs", out.adaptiveCanvasBudgetMs), 4.0, 200.0);
         out.renderFramePreview = general->value("renderFramePreview", out.renderFramePreview);
         out.suspendViewportDuringRender =
             general->value("suspendViewportDuringRender", out.suspendViewportDuringRender);

@@ -2307,6 +2307,25 @@ void ControlPanel::drawPerformanceDashboard(app::Engine& engine, const FrameStat
     ImGui::Text("cpu work %.2f ms   gpu %s   %ux%u", stats.cpuFrameMs,
                 stats.gpuFrameMs >= 0.0 ? fmt::format("{:.2f} ms", stats.gpuFrameMs).c_str() : "n/a",
                 stats.width, stats.height);
+    // §15-§17 / §41. The line that answers "why does this look softer than it did a moment ago",
+    // and the one a reader needs before any per-pixel figure on this panel means anything. Shown
+    // only when the two extents differ, so an editor keeping up says nothing new.
+    if (stats.sceneWidth > 0 && stats.sceneHeight > 0 &&
+        (stats.sceneWidth != stats.width || stats.sceneHeight != stats.height)) {
+        const double canvasMpx = static_cast<double>(stats.width) * stats.height / 1.0e6;
+        const double sceneMpx = static_cast<double>(stats.sceneWidth) * stats.sceneHeight / 1.0e6;
+        ImGui::TextColored(ImVec4(0.95f, 0.78f, 0.35f, 1.0f),
+                           "world drawn at %ux%u (%.2f of %.2f Mpx) and sharpened up",
+                           stats.sceneWidth, stats.sceneHeight, sceneMpx, canvasMpx);
+        if (ImGui::IsItemHovered()) {
+            tooltip("The viewport's adaptive render scale (Settings > Rendering). The scene is\n"
+                    "rendered below the canvas's resolution and filtered back up into it, which\n"
+                    "is a change to this picture and to nothing else -- the scene, its\n"
+                    "parameters and every render are unaffected. It engages only when the GPU is\n"
+                    "both over its budget and what the frame is waiting for, and it goes back up\n"
+                    "when the scene gets cheaper.");
+        }
+    }
     if (filled > 2) {
         const float ceiling = std::max(sorted.back() * 1.1f, 20.0f);
         ImGui::PlotLines("##frame", frameMsHistory_.data(), static_cast<int>(kPerfHistory),
