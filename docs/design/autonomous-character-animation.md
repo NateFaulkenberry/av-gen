@@ -172,7 +172,7 @@ whose workflow assumes an artist tuning weights.
 
 ### 1.8 The measurement that decides the motion-matching question
 
-Probe: `scratchpad/anim-research/clipstats.py` and `rootpath.py`, reading
+Probe: `docs/design/anim-research-probes/clipstats.py` and `rootpath.py`, reading
 `assets/aliens/alien-scout.glb` directly.
 
 ```
@@ -379,7 +379,7 @@ Then the discontinuity is **inertialized** away (§2.8).
 
 ### 2.3 What a search actually costs — measured
 
-Probe: `scratchpad/anim-research/mmprobe.cpp`, standalone, linking nothing from AV Gen. It is
+Probe: `docs/design/anim-research-probes/mmprobe.cpp`, standalone, linking nothing from AV Gen. It is
 ADR-182-safe: a known-best row is planted in the database and the search must find it, in both
 arms, before any timing runs; the planted row is then re-randomised so the timing is not an
 early-out best case. Minima over 200 repeats (ADR-170), Apple M2 Max, `clang++ -std=c++20 -O2`.
@@ -394,7 +394,7 @@ early-out best case. Minima over 200 repeats (ADR-170), Apple M2 Max, `clang++ -
 | 540,000 | 55.62 | 3,640.1 | 105.06 | 8,833.2 | 6.74 |
 
 For scale, a full clip sample + `poseToModel` + `jointPalette` for the 89-joint alien costs
-**2.97 µs** (`scratchpad/anim-research/poseprobe.cpp`; a faithful reimplementation of the
+**2.97 µs** (`docs/design/anim-research-probes/poseprobe.cpp`; a faithful reimplementation of the
 arithmetic shape, *not* AV Gen's code — treat it as a lower bound). So a 20,000-frame search is
 **44× the cost of posing the character it is for**, and a 60,000-frame search at D=51 is ~1 ms, or
 0.16 ms/frame amortised at a 6 Hz search rate.
@@ -408,7 +408,7 @@ implementing motion matching should not add it. A parallel measurement on Holden
 **win**.
 
 Both measurements are correct. The difference is the data, and the follow-up probe
-(`scratchpad/anim-research/mmprobe2.cpp`) isolates it. Same code, same machine, four conditions:
+(`docs/design/anim-research-probes/mmprobe2.cpp`) isolates it. Same code, same machine, four conditions:
 
 | database | query | plain | early-out | ratio |
 |---|---|---:|---:|---:|
@@ -1732,6 +1732,11 @@ exists and which its own plan says to *delete when the plan it priced is built*)
 5. **Builds the 27-feature database** from the resulting 1,712 frames and runs a query loop.
 6. **Solves the alien's left leg as a non-ancestor chain** (§12.2b) in model space, off to one
    side, and reports the `IkStatus` and the tip error.
+7. **Prints all 89 joints with their rest-pose model-space positions and their parent**, and
+   attempts a **humanoid role map** — hips, spine, neck, head, upper/lower arm, hand, upper/lower
+   leg, foot, toe — against them, reporting which roles it can and cannot fill. This is the first
+   concrete step of §12.1 and the cheapest possible read on whether retargeting onto this rig is a
+   mapping problem or a rig problem.
 
 ### What it proves or kills
 
@@ -1743,10 +1748,12 @@ exists and which its own plan says to *delete when the plan it priced is built*)
 | It cannot | The alien needs a re-export (§12.2a) and the whole contact half of the roadmap is gated on an asset pipeline change with a full-content regression |
 | The 1,712-frame feature database gives plausible nearest neighbours for a synthetic query | Motion matching's *machinery* is sound; only the data is missing, and the roadmap is right |
 | It does not — the matches are arbitrary because the synthesised trajectories are degenerate | Confirms §1.8 decisively: **motion matching is not reachable from in-place clips, at any effort**, and phases 6 and 8 should be cut until there is travelling content |
+| Every humanoid role fills unambiguously from the rest pose | Retargeting 100STYLE onto this rig is a mapping table plus bind-pose conjugation plus bone-length scaling — the textbook pass of §12.1. Phase 2 is priceable |
+| Roles are ambiguous or unfillable (three separate leg branches, 18 joints hanging off the armature, `leg_stretch` vs `thigh_stretch`) | The retarget needs a **hand-authored** map per rig pair and cannot be inferred, and §12.1 item 4 ("a rig whose joints are not a hierarchy") is the dominant cost rather than a footnote |
 
-**Why this is the right probe** (ADR-182): every arm can fail, and three of the six failure modes
-would change the plan. It runs on the CPU with no GPU lock, costs no engine risk, and its output is
-six numbers a human can argue with.
+**Why this is the right probe** (ADR-182): every arm can fail, and four of the eight outcomes would
+change the plan. It runs on the CPU with no GPU lock (`avgen_tests` territory, never the lock), it
+costs no engine risk, and its output is a handful of numbers a human can argue with.
 
 **What it must NOT do:** touch `src/scene/animation.*`, `src/scene/pose_layers.*`,
 `src/entity/*`, or any scene file. It reads assets and prints.
@@ -1824,8 +1831,9 @@ Explicit, so that a reviewer can point at it.
 
 ## 20. Appendix: probes used in this document
 
-All under `scratchpad/anim-research/`. None links or includes anything from AV Gen; none touches
-the repository. Each is ADR-182-safe (every arm can fail, and the failure is detected).
+All committed under **`docs/design/anim-research-probes/`**, with a README giving the exact commands.
+None links or includes anything from AV Gen and none is in the build; they read assets and print.
+Each is ADR-182-safe (every arm can fail, and the failure is detected).
 
 | probe | question | key result |
 |---|---|---|
