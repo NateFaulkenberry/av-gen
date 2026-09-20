@@ -58,16 +58,21 @@ public:
     explicit Refuser(entity::MotionStatus why, std::string name)
         : why_(why), name_(std::move(name)) {}
     [[nodiscard]] std::string_view name() const override { return name_; }
-    [[nodiscard]] entity::MotionResult evaluate(const entity::MotionRequest&,
-                                                const entity::MotionMemory& in, double, float,
-                                                const scene::Skeleton&, scene::Pose&,
-                                                entity::MotionMemory& next) const override {
+    [[nodiscard]] entity::MotionResult advance(const entity::MotionRequest&,
+                                               const entity::MotionMemory& in, double, float,
+                                               entity::MotionMemory& next) const override {
         // Deliberately scribbles on the memory before declining. A chain that handed `next`
         // straight to a failing provider would leave this behind, and the character's clip clock
-        // would be replaced by a number from something that did not pose it.
+        // would be replaced by a number from something that did not drive it.
         next = in;
         next.localTime = -999.0f;
         next.selection = 4242;
+        entity::MotionResult r;
+        r.status = why_;
+        return r;
+    }
+    [[nodiscard]] entity::MotionResult pose(const entity::MotionMemory&, const scene::Skeleton&,
+                                            scene::Pose&) const override {
         entity::MotionResult r;
         r.status = why_;
         return r;
@@ -94,6 +99,22 @@ struct Fixture {
     }
 };
 
+// The two halves, called together. `advance` runs in the simulation and `pose` in the drawing,
+// and a test that only ever calls them together would not notice if the split were fake -- so the
+// determinism tests below call `advance` alone, thousands of times, the way a seek does.
+entity::MotionResult evaluateBoth(const entity::ClipMotionProvider& provider,
+                                  const entity::MotionRequest& request,
+                                  const entity::MotionMemory& in, double time, float dt,
+                                  const scene::Skeleton& skeleton, scene::Pose& out,
+                                  entity::MotionMemory& next) {
+    const entity::MotionResult advanced = provider.advance(request, in, time, dt, next);
+    if (!advanced.ok()) {
+        return advanced;
+    }
+    const entity::MotionResult posed = provider.pose(next, skeleton, out);
+    return posed.ok() ? advanced : posed;
+}
+
 entity::MotionRequest at(float speed) {
     entity::MotionRequest r;
     r.desiredVelocity = glm::vec3(0.0f, 0.0f, speed);
@@ -118,12 +139,12 @@ TEST_CASE("the clip provider keeps nothing: the same memory gives the same pose"
     entity::MotionMemory nextB;
     const entity::MotionRequest req = at(1.6f);
 
-    REQUIRE(f.provider.evaluate(req, memory, 10.0, 1.0f / 60.0f, f.skeleton, a, nextA).ok());
+    REQUIRE(evaluateBoth(f.provider, req, memory, 10.0, 1.0f / 60.0f, f.skeleton, a, nextA).ok());
     // Call it again with the SAME input memory, out of order, after other work.
     scene::Pose junk;
     entity::MotionMemory junkNext;
-    (void)f.provider.evaluate(at(4.0f), nextA, 99.0, 0.5f, f.skeleton, junk, junkNext);
-    REQUIRE(f.provider.evaluate(req, memory, 10.0, 1.0f / 60.0f, f.skeleton, b, nextB).ok());
+    (void)evaluateBoth(f.provider, at(4.0f), nextA, 99.0, 0.5f, f.skeleton, junk, junkNext);
+    REQUIRE(evaluateBoth(f.provider, req, memory, 10.0, 1.0f / 60.0f, f.skeleton, b, nextB).ok());
 
     REQUIRE(a.size() == b.size());
     for (std::size_t j = 0; j < a.size(); ++j) {
@@ -149,7 +170,7 @@ TEST_CASE("the clock is the memory, so a replay at a fixed step reproduces a pla
         scene::Pose pose;
         for (int i = 0; i < steps; ++i) {
             entity::MotionMemory next;
-            REQUIRE(f.provider.evaluate(req, m, static_cast<double>(i) / 60.0, 1.0f / 60.0f,
+            REQUIRE(evaluateBoth(f.provider, req, m, static_cast<double>(i) / 60.0, 1.0f / 60.0f,
                                         f.skeleton, pose, next)
                         .ok());
             m = next;
@@ -173,7 +194,7 @@ TEST_CASE("selection follows the body's speed, and a style that matches nothing 
     entity::MotionMemory next;
 
     const auto chosen = [&](float speed) {
-        const entity::MotionResult r = f.provider.evaluate(at(speed), m, 0.0, 0.0f, f.skeleton, pose, next);
+        const entity::MotionResult r = evaluateBoth(f.provider, at(speed), m, 0.0, 0.0f, f.skeleton, pose, next);
         REQUIRE(r.ok());
         return std::string(r.content);
     };
@@ -187,7 +208,7 @@ TEST_CASE("selection follows the body's speed, and a style that matches nothing 
     // been invisible forever. §64: do not hide failures.
     entity::MotionRequest styled = at(1.6f);
     styled.style = "limp";
-    const entity::MotionResult r = f.provider.evaluate(styled, m, 0.0, 0.0f, f.skeleton, pose, next);
+    const entity::MotionResult r = evaluateBoth(f.provider, styled, m, 0.0, 0.0f, f.skeleton, pose, next);
     CHECK_FALSE(r.ok());
     CHECK(r.status == entity::MotionStatus::NoContent);
 
@@ -195,7 +216,7 @@ TEST_CASE("selection follows the body's speed, and a style that matches nothing 
     // at somebody falling.
     entity::MotionRequest air = at(1.6f);
     air.mode = entity::MovementMode::Airborne;
-    CHECK(f.provider.evaluate(air, m, 0.0, 0.0f, f.skeleton, pose, next).status ==
+    CHECK(evaluateBoth(f.provider, air, m, 0.0, 0.0f, f.skeleton, pose, next).status ==
           entity::MotionStatus::NoContent);
 }
 
@@ -216,7 +237,7 @@ TEST_CASE("the chain falls through to the provider that can answer", "[motion][c
     scene::Pose pose;
     entity::MotionMemory next;
     const entity::MotionChainResult r =
-        chain.resolve(at(1.6f), m, 1.0, 1.0f / 60.0f, f.skeleton, pose, next);
+        chain.advance(at(1.6f), m, 1.0, 1.0f / 60.0f, next);
 
     CHECK(r.ok());
     CHECK(r.provider == 2);                 // the clip player answered
@@ -248,7 +269,7 @@ TEST_CASE("a chain whose every provider declines says so instead of posing a bin
     scene::Pose pose;
     entity::MotionMemory next;
     const scene::Skeleton sk = twoJoint();
-    const entity::MotionChainResult r = chain.resolve({}, m, 0.0, 0.0f, sk, pose, next);
+    const entity::MotionChainResult r = chain.advance({}, m, 0.0, 0.0f, next);
 
     CHECK_FALSE(r.ok());
     CHECK(r.provider == -1);
@@ -265,7 +286,7 @@ TEST_CASE("an empty chain is a distinguishable state, not a crash", "[motion][ch
     entity::MotionMemory next;
     scene::Pose pose;
     const scene::Skeleton sk = twoJoint();
-    const entity::MotionChainResult r = chain.resolve({}, m, 0.0, 0.0f, sk, pose, next);
+    const entity::MotionChainResult r = chain.advance({}, m, 0.0, 0.0f, next);
     CHECK_FALSE(r.ok());
     CHECK(r.provider == -1);
     CHECK(r.fellThrough == 0);
@@ -300,13 +321,13 @@ TEST_CASE("the clip provider agrees with AnimationPlayer joint by joint", "[moti
     // The engine calls every frame including the first, so priming is what actually happens; the
     // fixture was wrong, not the provider. (ADR-204's one-frame family, again.)
     entity::MotionMemory primed;
-    REQUIRE(f.provider.evaluate(req, m, 0.0, 0.0f, f.skeleton, fromProvider, primed).ok());
+    REQUIRE(evaluateBoth(f.provider, req, m, 0.0, 0.0f, f.skeleton, fromProvider, primed).ok());
     m = primed;
 
     for (int i = 1; i <= 90; ++i) {
         const double now = static_cast<double>(i) / 60.0;
         entity::MotionMemory next;
-        REQUIRE(f.provider.evaluate(req, m, now, 1.0f / 60.0f, f.skeleton, fromProvider, next).ok());
+        REQUIRE(evaluateBoth(f.provider, req, m, now, 1.0f / 60.0f, f.skeleton, fromProvider, next).ok());
         m = next;
         player.evaluate(f.clips, f.skeleton, now, fromPlayer, scratch);
 

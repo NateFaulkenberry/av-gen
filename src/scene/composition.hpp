@@ -22,6 +22,8 @@
 #include "scene/day_night.hpp"
 #include "scene/field_params.hpp"
 #include "scene/ground_query.hpp"
+#include "entity/clip_motion_provider.hpp"
+#include "entity/motion_chain.hpp"
 #include "scene/motion_context.hpp"
 #include "scene/camera_rig.hpp"
 #include "scene/light_rig.hpp"
@@ -1596,6 +1598,7 @@ private:
         // world transform. Valid only after `driveLayers` has run for this frame.
         [[nodiscard]] const MotionContext& motion() const { return motion_; }
         [[nodiscard]] const std::string& nodeName() const { return node_; }
+        [[nodiscard]] const std::string& entityName() const { return entity_.desc().name; }
         // The joint's transform in the entity's own frame -- the rig's model space. False when
         // this node carries no rig, no rig of its carries the joint, or the rig has not been posed.
         [[nodiscard]] bool jointTransform(std::string_view joint, scene::Transform& out) const override;
@@ -1618,6 +1621,30 @@ private:
         mutable std::uint64_t modelVersion_ = 0;
         mutable bool modelValid_ = false;
         MotionContext motion_;
+
+        // Phase B. The provider chain for THIS body, and the clip provider at the bottom of it.
+        // Owned here because the entries index this rig's clips; the memory that distinguishes one
+        // frame from the next is owned by the `Entity` (ADR-541) and replayed by a seek.
+        //
+        // Built lazily on the first frame the rig exists: a rig is not loaded when the sink is
+        // constructed, so building it at bind time would build it against nothing.
+        entity::ClipMotionProvider clipProvider_;
+        entity::MotionChain chain_;
+        bool chainBuilt_ = false;
+        RigId chainRig_ = kInvalidRig;
+        void buildChain(const SkinnedRig& rig);
+
+    public:
+        // Whether this body's base pose came from the chain on the last frame, and what the chain
+        // said. Reported so that "is the opt-in actually doing anything" is answerable from
+        // outside -- which is the question a seam called by nothing cannot answer.
+        [[nodiscard]] const entity::MotionChain& chain() const { return chain_; }
+        [[nodiscard]] bool posedByProvider() const { return posedByProvider_; }
+        [[nodiscard]] const entity::MotionChainResult& chainResult() const { return chainResult_; }
+
+    private:
+        bool posedByProvider_ = false;
+        entity::MotionChainResult chainResult_;
     };
     std::vector<std::unique_ptr<AnimationSink>> animationSinks_;
 
@@ -1627,6 +1654,26 @@ public:
     // check that the seam arrived, which is the only way to catch a field published into a
     // context nobody reads.
     [[nodiscard]] const MotionContext* motionContext(std::string_view node) const;
+
+    // Phase B §50/§64. What the motion seam did for `node` on the frame just drawn.
+    //
+    // Exists because "did the provider actually drive this body" has to be answerable from
+    // outside the sink. A seam whose only evidence is its own internal state is a seam that can
+    // stop working silently, which is the failure this whole stage was closing.
+    struct MotionDebug {
+        bool found = false;            // this node drives an entity at all
+        bool optedIn = false;          // the scene asked for procedural motion
+        bool posedByProvider = false;  // ...and it actually happened, this frame
+        entity::MotionStatus status = entity::MotionStatus::NoContent;
+        int provider = -1;             // which one answered, as a chain index
+        std::uint32_t fellThrough = 0; // how many declined before it
+        std::uint32_t generation = 0;  // the memory's, so "it never ran" is visible
+        float localTime = 0.0f;
+        // How many frames the RIG actually consumed an external pose on. Counted by the consumer,
+        // which is the only party whose answer cannot be a claim -- see `externalPoseFrames`.
+        std::uint64_t externalPoseFrames = 0;
+    };
+    [[nodiscard]] MotionDebug motionDebug(std::string_view node) const;
 
 private:
 

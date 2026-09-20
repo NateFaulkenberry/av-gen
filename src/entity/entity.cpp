@@ -837,6 +837,26 @@ void EntityWorld::bind(params::ParameterSet& params, const std::string& prefix) 
     bindFields();
 }
 
+// Phase B. One step of the provider memory, from the state the body is already in.
+//
+// **Deliberately reads `state_` rather than taking arguments.** The request is a view of what the
+// body is doing and wants, and both halves already live on the entity (ADR-545); building it from
+// parameters would give a caller a way to advance the memory with something other than the truth,
+// and a seek would then replay a different request from the one a play used.
+void Entity::advanceMotion(double time, float dt) {
+    if (motionChain_ == nullptr || !desc_.proceduralMotion) {
+        return;
+    }
+    MotionRequest request;
+    request.desiredVelocity = glm::vec3(std::sin(state_.yaw), 0.0f, std::cos(state_.yaw)) * state_.speed;
+    request.desiredFacing = glm::vec3(std::sin(state_.yaw), 0.0f, std::cos(state_.yaw));
+    request.desiredTurnRate = state_.turnRate;
+    request.mode = state_.airborne ? MovementMode::Airborne : MovementMode::Ground;
+    MotionMemory next;
+    motionChainResult_ = motionChain_->advance(request, motionMemory_, time, dt, next);
+    motionMemory_ = next;
+}
+
 void EntityWorld::reset() {
     actionEvents_.clear();
     pendingEvents_.clear();
@@ -905,6 +925,11 @@ void EntityWorld::reset() {
         entity->actions_.reset();
         entity->schedule_.reset();
         entity->gait_.reset();
+        // ADR-541: the provider memory is reset with everything else, and rebuilt by the replay.
+        // A seek that kept it would carry a clip clock from a timeline the scrub has abolished.
+        entity->motionMemory_.reset();
+        entity->motionState_.reset();
+        entity->motionChainResult_ = MotionChainResult{};
         entity->attachments_ = entity->desc_.attachments;
         entity->claims_.clear();
         for (std::size_t i = 0; i < entity->desc_.properties.size() && i < entity->propertyValues_.size(); ++i) {
@@ -1165,6 +1190,10 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         // `update`. `grounded` was written by neither and read by nobody.
         entity.locomotion_.grounded = !entity.state_.airborne;
         entity.locomotion_.dt = static_cast<float>(dt);
+        // Phase B: the provider memory, advanced on this path as on the other one. Both, for
+        // ADR-560's reason -- and this is the field that rule was discovered by, so getting it
+        // wrong here would be the same bug in the same struct twice.
+        entity.advanceMotion(entity.locomotion_.time, static_cast<float>(dt));
         entity.locomotion_.reaction = entity.state_.reaction;
         entity.locomotion_.lookTarget = entity.state_.lookTarget;
         entity.locomotion_.hasLookTarget = entity.state_.hasLookTarget;
@@ -1682,6 +1711,10 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // `update`. `grounded` was written by neither and read by nobody.
         entity.locomotion_.grounded = !entity.state_.airborne;
         entity.locomotion_.dt = static_cast<float>(ctx.dt);
+        // Phase B: the provider memory, advanced on this path as on the other one. Both, for
+        // ADR-560's reason -- and this is the field that rule was discovered by, so getting it
+        // wrong here would be the same bug in the same struct twice.
+        entity.advanceMotion(entity.locomotion_.time, static_cast<float>(ctx.dt));
         entity.locomotion_.reaction = entity.state_.reaction;
         entity.locomotion_.lookTarget = entity.state_.lookTarget;
         entity.locomotion_.hasLookTarget = entity.state_.hasLookTarget;
@@ -2324,6 +2357,13 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
     if (j.contains("cullDistance") && j["cullDistance"].is_number()) {
         desc.cullDistance = j["cullDistance"].get<float>();
     }
+    // Phase B's opt-in. Absent means false, which is every scene that exists today: the change
+    // this key turns on touches the path every shipping scene renders through, and "default off
+    // is inert" is measured by rendering the Glowmere project with and without this branch and
+    // comparing sequence hashes, not asserted.
+    if (j.contains("proceduralMotion") && j["proceduralMotion"].is_boolean()) {
+        desc.proceduralMotion = j["proceduralMotion"].get<bool>();
+    }
     if (j.contains("tags")) {
         if (!j["tags"].is_array()) {
             return fail("entity '{}': 'tags' must be an array of strings", desc.name);
@@ -2655,6 +2695,12 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
     }
     if (entity.cullDistance > 0.0f) {
         j["cullDistance"] = entity.cullDistance;
+    }
+    // Written only when true, so saving a scene that never opted in produces the same bytes it
+    // had. A writer that emitted `false` everywhere would rewrite every entity in every project
+    // the first time anyone saved -- the diff-noise failure ADR-225 already had to fix once.
+    if (entity.proceduralMotion) {
+        j["proceduralMotion"] = true;
     }
     if (entity.behaviors.size() > entity.profileBehaviors) {
         nlohmann::json behaviors = nlohmann::json::array();

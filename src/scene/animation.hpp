@@ -324,6 +324,34 @@ struct SkinnedRig {
     // "previous" from the pose it lands on rather than the one it left.
     bool reseedPrevious = false;
 
+    // ---- an externally supplied base pose (Phase B) ---------------------------------------------
+    //
+    // When `hasExternalPose` is set, `evaluate` uses `externalPose` as the base instead of asking
+    // `player`. **Everything after that is unchanged**: root motion compensation, the layer stack
+    // and the palette all run exactly as they do over a clip, which is the point -- a procedurally
+    // driven character is still a character, and foot IK does not care where its base pose came
+    // from.
+    //
+    // **The scene tier deliberately does not know what put it there.** It is a pose, not a
+    // provider: `entity::MotionChain` and its providers live one tier up, own their own memory,
+    // and are replayed by `EntityWorld::seek` (ADR-541). If this field knew about them, the layer
+    // module would have a way to reach the simulation, which ADR-300 exists to prevent.
+    //
+    // Set every frame by whoever is driving, and **consumed** by `evaluate`, which clears the flag.
+    // One frame's silence therefore falls back to the clip player rather than freezing on a stale
+    // pose -- a driver that stops driving should hand the body back, not abandon it.
+    Pose externalPose;
+    bool hasExternalPose = false;
+    // **Evidence from the consumer, not a claim from the producer.** Incremented by `evaluate`
+    // each time it actually uses an external pose.
+    //
+    // This exists because the first probe for this seam was vacuous and a deliberate break caught
+    // it: the sink's own "I posed it" flag was true while the pose was computed and dropped, and
+    // the drawn result was indistinguishable, because a clip provider and the clip player agree by
+    // design (ADR-541 corollary 1). A flag set by whoever *claims* to have done the work cannot
+    // tell that apart. A counter incremented by whoever *consumed* it can.
+    std::uint64_t externalPoseFrames = 0;
+
     // Scratch, kept so a per-frame evaluation allocates nothing.
     Pose scratchPose;
     std::vector<glm::mat4> scratchModel;

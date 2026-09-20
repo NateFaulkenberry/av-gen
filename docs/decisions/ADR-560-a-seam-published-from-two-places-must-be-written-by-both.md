@@ -13,6 +13,22 @@ publishes the action it is performing"
 
 ---
 
+## These are product defects, not architecture findings
+
+Recorded plainly because the distinction decides who cares. Two of the three had a **user-visible
+symptom on the shipping cast**:
+
+| defect | what a person sees |
+|---|---|
+| `action` not published by `seek` | **a character performing an action stands up and walks the moment you scrub to it.** `sit`, `sleep`, `pickUp` — anything an action names — plays correctly while the timeline runs and reverts to the gait's walk on a scrubbed frame. This is an editor-facing defect, and the editor is where this project's owner works. |
+| `velocity`/`facing` not published by `update` | nothing today, because the only consumer arrived in Phase B. It would have been a strafing character whose animation layers believed it was standing still — and it would have looked *correct while scrubbing*, which is the hardest kind of report to act on. |
+| `grounded` published by neither | nothing; a dead field. |
+
+**Where the fix belongs:** they are fixed in their own commit, separate from any stage
+(`1d0f3ab9`), with their own guard, because folding a user-visible determinism bug into a feature
+stage is how it becomes invisible in a changelog. The work that *found* them was Phase B.B; the
+fix is not Phase B.B.
+
 ## Context
 
 `entity::LocomotionState` is the whole of what the animation tier receives from the simulation. It

@@ -45,9 +45,8 @@ int ClipMotionProvider::select(const MotionRequest& request) const {
     return best;
 }
 
-MotionResult ClipMotionProvider::evaluate(const MotionRequest& request, const MotionMemory& in,
-                                          double time, float dt, const scene::Skeleton& skeleton,
-                                          scene::Pose& out, MotionMemory& next) const {
+MotionResult ClipMotionProvider::advance(const MotionRequest& request, const MotionMemory& in,
+                                         double time, float dt, MotionMemory& next) const {
     MotionResult result;
     // The memory is written on every path, including the failing ones. A chain that falls through
     // discards this copy, but a caller using the provider directly must not be handed a stale
@@ -84,7 +83,8 @@ MotionResult ClipMotionProvider::evaluate(const MotionRequest& request, const Mo
 
     // Advance. **The clock is the memory, not the wall and not the timeline**: a provider that
     // computed `now - start` would need a start, which is state it does not own, and a provider
-    // that used the timeline directly could not be played at a rate at all.
+    // that used the timeline directly could not be played at a rate at all. This is also what
+    // makes a seek's fixed-step replay land where a play landed.
     const std::uint32_t selection = entry.clip;
     const bool changed = in.selection != selection || in.generation == 0;
     float local = changed ? 0.0f : in.localTime + (dt * rate);
@@ -93,9 +93,6 @@ MotionResult ClipMotionProvider::evaluate(const MotionRequest& request, const Mo
     } else {
         local = std::clamp(local, 0.0f, clip.length());
     }
-
-    scene::setRestPose(skeleton, out);
-    scene::sampleClip(clip, clip.start + local, out);
 
     next.localTime = local;
     next.selection = selection;
@@ -107,6 +104,32 @@ MotionResult ClipMotionProvider::evaluate(const MotionRequest& request, const Mo
     result.status = MotionStatus::Produced;
     result.content = clip.name;
     result.playbackRate = rate;
+    return result;
+}
+
+MotionResult ClipMotionProvider::pose(const MotionMemory& memory, const scene::Skeleton& skeleton,
+                                      scene::Pose& out) const {
+    MotionResult result;
+    if (clips_ == nullptr) {
+        result.status = MotionStatus::NotReady;
+        return result;
+    }
+    // `selection` is a clip index in THIS provider's space. It is validated rather than trusted:
+    // a memory that came from a different provider would index this vector with a database frame,
+    // and the chain's `provider` field exists to stop that -- this is the second lock on the door.
+    if (static_cast<std::size_t>(memory.selection) >= clips_->size()) {
+        result.status = MotionStatus::NoContent;
+        return result;
+    }
+    const scene::AnimationClip& clip = (*clips_)[static_cast<std::size_t>(memory.selection)];
+    if (clip.length() <= 0.0f) {
+        result.status = MotionStatus::NoContent;
+        return result;
+    }
+    scene::setRestPose(skeleton, out);
+    scene::sampleClip(clip, clip.start + memory.localTime, out);
+    result.status = MotionStatus::Produced;
+    result.content = clip.name;
     return result;
 }
 

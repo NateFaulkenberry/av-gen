@@ -63,21 +63,23 @@ public:
         return i < count_ ? providers_[i] : nullptr;
     }
 
-    // Try each in order until one produces a pose.
+    // **The simulation half.** Try each in order until one advances the memory.
     //
-    // `next` is written by whichever provider answered. A provider that declines has still written
-    // its own `next`, and that write is **discarded**: the memory belongs to the character and to
-    // whatever is actually posing it, so a failed neural provider must not leave its latent state
-    // where the clip player's local time should be. That is why the scratch copy exists.
-    [[nodiscard]] MotionChainResult resolve(const MotionRequest& request, const MotionMemory& in,
-                                            double time, float dt, const scene::Skeleton& skeleton,
-                                            scene::Pose& out, MotionMemory& next) const {
+    // `next` is written by whichever provider answered, and records *which* one in
+    // `MotionMemory::provider` so that `pose` below goes back to the same one. A provider that
+    // declines has still written its own `next`, and that write is **discarded**: the memory
+    // belongs to the character and to whatever is actually driving it, so a failed neural
+    // provider must not leave its latent state where the clip player's local time should be.
+    // That is why the scratch copy exists.
+    [[nodiscard]] MotionChainResult advance(const MotionRequest& request, const MotionMemory& in,
+                                            double time, float dt, MotionMemory& next) const {
         MotionChainResult chain;
         for (std::size_t i = 0; i < count_; ++i) {
             MotionMemory scratch = in;
-            const MotionResult r = providers_[i]->evaluate(request, in, time, dt, skeleton, out, scratch);
+            const MotionResult r = providers_[i]->advance(request, in, time, dt, scratch);
             if (r.ok()) {
                 next = scratch;
+                next.provider = static_cast<int>(i);
                 chain.result = r;
                 chain.provider = static_cast<int>(i);
                 return chain;
@@ -88,11 +90,26 @@ public:
             ++chain.fellThrough;
         }
         // Nobody answered. `next` is left as it came in rather than zeroed: the character keeps
-        // the pose and the memory it had, which is a frozen body -- bad, and enormously better
-        // than a body snapped to its bind pose because a provider was still loading.
+        // the memory it had, which is a frozen body -- bad, and enormously better than a body
+        // snapped to its bind pose because a provider was still loading.
         next = in;
         chain.result.status = count_ == 0 ? MotionStatus::NoContent : chain.firstDeclined;
         return chain;
+    }
+
+    // **The presentation half.** Ask the provider that settled this memory to draw it.
+    //
+    // No fallback here, deliberately. If the provider that advanced the memory cannot pose it,
+    // that is a bug in that provider, and quietly asking a different provider to interpret another
+    // one's memory would turn it into a wrong pose instead of a visible failure (§64).
+    [[nodiscard]] MotionResult pose(const MotionMemory& memory, const scene::Skeleton& skeleton,
+                                    scene::Pose& out) const {
+        MotionResult r;
+        if (memory.provider < 0 || static_cast<std::size_t>(memory.provider) >= count_) {
+            r.status = MotionStatus::NoContent;
+            return r;
+        }
+        return providers_[static_cast<std::size_t>(memory.provider)]->pose(memory, skeleton, out);
     }
 
 private:

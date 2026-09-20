@@ -370,3 +370,163 @@ TEST_CASE("the motion context reaches the alien, in the alien's own space",
     CHECK(ctx->strideRatio > 0.0f);
 #endif
 }
+
+TEST_CASE("the opt-in body is posed by its provider chain, and the others are not",
+          "[aliens][lab][motion][provider][seam]") {
+    // **The probe for the seam closure.** `MotionChain`, `ClipMotionProvider` and the memory on
+    // `Entity` were tested thoroughly and called by nothing, which is this repository's most
+    // expensive recurring failure: four subsystems shipped unreachable in one session and the
+    // suite was green throughout, because every test asserted on the tier that computes rather
+    // than the seam that carries.
+    //
+    // So this asserts on the product, through a real scene, on the real alien:
+    //
+    //   * `alien-provider` opted in and its base pose came from the chain;
+    //   * `alien-walk`, identical but for the opt-in, did **not** -- which is the control arm that
+    //     makes the first assertion mean something (ADR-182);
+    //   * the provider's memory actually advanced, rather than sitting at frame zero.
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    if (!fs::exists(labScene())) {
+        SKIP("the alien foot lab scene is not present");
+    }
+    assets::AssetRegistry registry(labScene().parent_path());
+    auto loaded = scene::Composition::loadFile(labScene(), registry);
+    INFO((loaded.has_value() ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+    scene::Composition& comp = **loaded;
+
+    params::ParameterSet params;
+    params::Modulator modulator;
+    signals::SignalBus bus;
+    comp.attach(params, modulator);
+    comp.setViewport(1920, 1080);
+    comp.scene().detailLimits.entityDistanceCull = false;
+    for (int frame = 0; frame <= 90; ++frame) {
+        FrameTime time;
+        time.renderTime = static_cast<double>(frame) / 60.0;
+        time.deltaTime = frame == 0 ? 0.0 : 1.0 / 60.0;
+        time.frameIndex = static_cast<std::uint64_t>(frame);
+        params.resetFinals();
+        comp.updateFields(time, bus, modulator);
+        modulator.applyRoutes(bus, params, time.deltaTime);
+        comp.updateBehaviour(time, bus);
+        comp.update(time);
+    }
+
+    const entity::Entity* opted = comp.entityWorld().find("alien-provider");
+    const entity::Entity* control = comp.entityWorld().find("alien-walk");
+    REQUIRE(opted != nullptr);
+    REQUIRE(control != nullptr);
+
+    // The opt-in is read from the scene file at all.
+    CHECK(opted->desc().proceduralMotion);
+    CHECK_FALSE(control->desc().proceduralMotion);
+
+    // **The memory advanced.** A chain that was never called leaves generation 0 and localTime 0,
+    // which is exactly what "built but unreachable" looks like from here.
+    const entity::MotionMemory& memory = opted->motionMemory();
+    INFO("generation " << memory.generation << " localTime " << memory.localTime << " provider "
+                       << memory.provider);
+    CHECK(memory.generation > 0);
+    CHECK(memory.provider == 0);          // the clip provider, at the bottom of the chain
+    CHECK(memory.hasPhase);
+    CHECK(memory.localTime > 0.0f);       // it is not sitting on frame zero
+
+    // And the chain reports that the clip provider answered without anything above it declining,
+    // because nothing above it is installed yet.
+    CHECK(opted->motionChainResult().ok());
+    CHECK(opted->motionChainResult().provider == 0);
+    CHECK(opted->motionChainResult().fellThrough == 0);
+
+    // **The control arm.** The body that did not opt in has an untouched memory, so the first
+    // assertion above is measuring the opt-in rather than something every entity gets.
+    CHECK(control->motionMemory().generation == 0);
+    CHECK(control->motionMemory().provider == -1);
+    CHECK(control->motionMemory().localTime == Approx(0.0f));
+#endif
+}
+
+TEST_CASE("the provider's pose actually reaches the drawn rig", "[aliens][lab][motion][provider][seam]") {
+    // The **other** half of the seam, and it needs its own probe: the memory above can advance
+    // perfectly while the pose it describes is computed and dropped on the floor. That is the
+    // failure mode this whole exercise is about -- work that happens and reaches nothing -- so it
+    // is asserted on the thing the renderer actually draws.
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    if (!fs::exists(labScene())) {
+        SKIP("the alien foot lab scene is not present");
+    }
+    assets::AssetRegistry registry(labScene().parent_path());
+    auto loaded = scene::Composition::loadFile(labScene(), registry);
+    REQUIRE(loaded.has_value());
+    scene::Composition& comp = **loaded;
+
+    params::ParameterSet params;
+    params::Modulator modulator;
+    signals::SignalBus bus;
+    comp.attach(params, modulator);
+    comp.setViewport(1920, 1080);
+    comp.scene().detailLimits.entityDistanceCull = false;
+
+    const auto poseOf = [&](const char* nodeName) {
+        const scene::CompositionNode* node = nodeNamed(comp, nodeName);
+        REQUIRE(node != nullptr);
+        REQUIRE_FALSE(node->rigs.empty());
+        return comp.scene().rigs[node->rigs.front()].pose;
+    };
+
+    for (int frame = 0; frame <= 90; ++frame) {
+        FrameTime time;
+        time.renderTime = static_cast<double>(frame) / 60.0;
+        time.deltaTime = frame == 0 ? 0.0 : 1.0 / 60.0;
+        time.frameIndex = static_cast<std::uint64_t>(frame);
+        params.resetFinals();
+        comp.updateFields(time, bus, modulator);
+        modulator.applyRoutes(bus, params, time.deltaTime);
+        comp.updateBehaviour(time, bus);
+        comp.update(time);
+    }
+
+    // The opt-in body's rig was posed from the chain on the frame just drawn. `hasExternalPose` is
+    // consumed by `evaluate`, so what survives to here is the sink's own report.
+    const scene::Composition::MotionDebug debug = comp.motionDebug("alien-provider");
+    INFO("posedByProvider " << debug.posedByProvider << " externalPoseFrames "
+                            << debug.externalPoseFrames << " status "
+                            << entity::motionStatusName(debug.status));
+    CHECK(debug.found);
+    CHECK(debug.status == entity::MotionStatus::Produced);
+
+    // **The assertion that is evidence rather than a claim.** `posedByProvider` is the sink saying
+    // it did the work; `externalPoseFrames` is the RIG counting the frames it actually used an
+    // external pose on. The first version of this test asserted only the former and passed
+    // against a deliberately broken hand-off that computed the pose and dropped it -- vacuous,
+    // exactly the way ADR-182 warns about, and only the deliberate break revealed it.
+    //
+    // It cannot be caught by comparing the drawn pose either: a clip provider and the clip player
+    // agree by design (ADR-541 corollary 1), so the wrong answer and the right one look identical.
+    CHECK(debug.posedByProvider);
+    CHECK(debug.externalPoseFrames > 50);
+
+    // The control arm: the identical alien that did not opt in is posed by its clip player, and
+    // its rig has never consumed an external pose at all.
+    const scene::Composition::MotionDebug control = comp.motionDebug("alien-walk");
+    CHECK(control.found);
+    CHECK_FALSE(control.posedByProvider);
+    CHECK(control.externalPoseFrames == 0);
+
+    // And the pose is a real pose, not a bind pose: the provider drove it somewhere.
+    const scene::Pose posed = poseOf("alien-provider");
+    scene::Pose rest;
+    scene::setRestPose(comp.scene().rigs[nodeNamed(comp, "alien-provider")->rigs.front()].skeleton, rest);
+    REQUIRE(posed.size() == rest.size());
+    float worst = 0.0f;
+    for (std::size_t j = 0; j < posed.size(); ++j) {
+        worst = std::max(worst, glm::length(posed.local[j].position - rest.local[j].position));
+    }
+    INFO("worst joint displacement from rest: " << worst);
+    CHECK(worst > 1e-3f);
+#endif
+}

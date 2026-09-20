@@ -564,7 +564,17 @@ bool SkinnedRig::evaluate(double now, float hz) {
     if (!reseed) {
         previousPalette = palette;
     }
-    player.evaluate(clips, skeleton, t, pose, scratchPose);
+    // Phase B: an externally supplied base pose replaces the clip player's, and nothing else
+    // changes. Consumed rather than latched -- see `hasExternalPose` -- so a driver that stops
+    // driving hands the body back to its clips on the next frame instead of freezing it.
+    if (hasExternalPose && externalPose.size() == skeleton.joints.size()) {
+        pose = externalPose;
+        hasExternalPose = false;
+        ++externalPoseFrames;
+    } else {
+        hasExternalPose = false;
+        player.evaluate(clips, skeleton, t, pose, scratchPose);
+    }
     // ADR-300, and the order is the whole of it: the player first, the layers on top of what it
     // produced, and only then the palette. `t` rather than `now`, so a rate-limited rig's layers
     // move on the same fixed grid its clips do -- a look that updated every frame on a rig posed at

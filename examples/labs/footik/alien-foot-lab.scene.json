@@ -1841,6 +1841,70 @@
      "maxLateral": 0.04
     }
    }
+  },
+  {
+   "name": "alien-provider",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-scout.glb",
+   "position": [
+    -184.96,
+    39.959,
+    -161.02
+   ],
+   "rotation": [
+    0.0,
+    -10.7,
+    0.0
+   ],
+   "scale": [
+    1.94,
+    1.94,
+    1.94
+   ],
+   "visible": true,
+   "animation": {
+    "state": "Walking",
+    "speed": 1.0,
+    "blend": 0.3,
+    "nearDistance": 60.0,
+    "cullDistance": 400.0,
+    "contacts": [
+     "foot.l",
+     "foot.r"
+    ],
+    "matchPhase": true,
+    "inertialize": 0.12,
+    "layers": [
+     {
+      "name": "left",
+      "kind": "foot",
+      "drive": "ground",
+      "chain": [
+       "thigh_twist.l",
+       "leg_stretch.l",
+       "foot.l"
+      ],
+      "footAlign": 1.0
+     },
+     {
+      "name": "right",
+      "kind": "foot",
+      "drive": "ground",
+      "chain": [
+       "thigh_twist.r",
+       "leg_stretch.r",
+       "foot.r"
+      ],
+      "footAlign": 1.0
+     }
+    ],
+    "bodyCompensation": {
+     "enabled": true,
+     "maxDown": 0.35,
+     "maxUp": 0.05,
+     "maxLateral": 0.04
+    }
+   }
   }
  ],
  "entities": [
@@ -1891,6 +1955,32 @@
      "footDrop": 0.0
     }
    ]
+  },
+  {
+   "name": "alien-provider",
+   "node": "alien-provider",
+   "seed": 911,
+   "cullDistance": 400.0,
+   "behaviors": [
+    {
+     "kind": "ground",
+     "slopeAlign": 0.55,
+     "bodyRadius": 0.9,
+     "maxTilt": 34.0,
+     "footprint": 0.7,
+     "footDrop": 0.0
+    }
+   ],
+   "proceduralMotion": true,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running"
+   },
+   "gait": {
+    "walkSpeed": 3.07,
+    "runSpeed": 7.39
+   }
   }
  ],
  "post": {

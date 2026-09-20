@@ -13,7 +13,7 @@
 | B. MotionContext | **done** | ADR-561; found three seam publication defects on the way (ADR-560) |
 | C. MotionController — provider seam | **done** | ADR-541 built as written; chain + clip provider held to parity |
 | D. acceleration / deceleration | **done** | the vector layer `Gait::approach` does not have |
-| E. locomotion adaptation | next | **stride warping first, not rate blending** — see B.A |
+| E. locomotion adaptation | next | **stride warping first, not rate blending** — accepted reordering, see below |
 | F. turn / directional movement | pending | |
 | G. foot placement | pending | the first visually checkable milestone |
 | H. terrain adaptation | pending | |
@@ -23,6 +23,18 @@
 | N-O. validation metrics, profiling | pending | |
 | P. Glowmere vertical slice | pending | |
 | Q. documentation / ADRs | continuous | this file |
+
+### An accepted departure from the spec's ordering
+
+Phase B §6 treats speed adaptation as interpolating between clips and §7 treats stride warping as a
+refinement. **Measured, that ordering is inverted, and this is recorded as a decision rather than
+left to look like drift.** 97 of 100 foot-slip warnings across the shipping cast are the body
+moving *slower* than its own stride, median ratio 0.250, with the Glowmere aliens at 0.016–0.042×
+and `rateMin` already 7.5× below default and still saturating. There is no clip to interpolate
+*toward* in those cases and playback rate is exhausted.
+
+So for this phase: **§7 stride warping is the load-bearing piece and §6 clip interpolation is the
+3% case.** B.E is scheduled accordingly. The evidence is in B.A below.
 
 **Blocked, and recorded so the dependency is visible:** ADR-553 (positional retargeting) gates
 **Phase C**, not Phase B. Phase B runs on the alien's own 57 seconds of authored clips, whose legs
@@ -210,54 +222,107 @@ the clamp floor with nothing saying so.
 
 ---
 
-## Known limitation, stated before it sets: B.C and B.D are not yet reachable
+## The seam, closed
 
-`MotionContext` **is** wired: `driveLayers` builds it every frame, and the integration test reads
-it out of a real scene through `Composition::motionContext`.
+`MotionContext` was wired from the start. `MotionChain`, `ClipMotionProvider` and the controller
+were tested and **called by nothing**, which is this repository's most expensive recurring failure.
+They are reachable now.
 
-`MotionChain`, `ClipMotionProvider` and `stepMotion` **are not**. They are tested thoroughly and
-called by nothing in the product. That is precisely the failure mode this repository has recorded
-before — four subsystems shipped unreachable in one session, and *tests share the product's blind
-spot*, because a test constructs the thing directly and therefore cannot notice that nothing else
-does.
+### The split the wiring forced
 
-It is written down here rather than left to be discovered because the gap is easiest to close now
-and hardest to close after two more layers are built on top of it.
+ADR-541 specified one `evaluate` that advanced the memory and posed the skeleton together. That
+cannot work here, for a measured reason: `EntityWorld::seek` reproduces a scrubbed frame by
+replaying the simulation at a fixed 1/60 step for up to **ninety seconds** — 5,400 steps per body —
+and then poses the rigs **once**. A seam that posed an 89-joint skeleton on every replay step would
+multiply the worst interactive cost in the product by 5,400.
 
-**What closing it looks like:** an opt-in per entity — default off, so no shipping scene changes
-behaviour — that routes a character's pose through the chain instead of through `AnimationPlayer`,
-with the alien foot lab as the first consumer. Until that exists, the correct description of B.C
-and B.D is *designed, tested, and not yet load-bearing*.
+So `IMotionProvider` has two methods:
 
-Scheduled before B.G, because B.G's foot placement is the first thing a person can look at, and a
-visual milestone that bypasses the seam it is supposed to validate would prove the wrong thing.
+| | runs | may touch | why |
+|---|---|---|---|
+| `advance` | every step, including every replay step | no skeleton | it is what makes a scrubbed frame reproduce a played one |
+| `pose` | once per drawn frame | the skeleton | a pure function of memory `advance` already settled |
 
+This is not a compromise. It is the shape these algorithms already have — learned motion matching is
+a Stepper that advances a latent and a Decompressor that turns it into a pose; classical matching is
+a search then a lookup. ADR-541's single call was hiding that seam, not simplifying it.
 
----
+`MotionMemory` records **which provider** settled it, so `pose` returns to the one that won
+`advance`. A chain that re-selected at pose time could hand a matcher's database frame to the clip
+player, which would read it as a clip index and draw a different animation entirely.
 
-## Verification at the B.A–B.D checkpoint
+### Where each piece lives
 
-**CPU suite green.** `avgen_tests`: 2796 cases, 2791 passed, 4 skipped, **1 failed as expected**
-(the `[!shouldfail]` slopes test). Contamination guards: exactly one `^test cases:` line, only
-`av-gen-wt-anim-research/` in the log, exit code 0 taken from the binary.
+- **`Entity` owns the memory** (ADR-541) and `Entity::advanceMotion` steps it. Called from **both**
+  publish paths — ADR-560's rule, applied to the very struct that rule was discovered by.
+- **`SkinnedRig::externalPose`** is a pose, not a provider. The scene tier deliberately does not
+  learn what put it there; if it did, the layer module would have a route to the simulation, which
+  ADR-300 exists to prevent. It is **consumed** rather than latched, so a driver that stops driving
+  hands the body back to its clips instead of freezing it.
+- **Everything after the base pose is unchanged**: root motion, the layer stack, foot IK and the
+  palette all run exactly as they do over a clip. That is the point — foot IK does not care where
+  its base pose came from.
+- **The opt-in is `EntityDesc::proceduralMotion`**, absent in every scene that exists. It is written
+  back only when true, so saving an untouched project produces the bytes it had.
 
-**GPU suite: 2 failures, and they are not from this branch.**
+### Condition 1 — default-off is provably inert
+
+60 frames of `glowmere-valley-2-multicam`, rendered **through the project** (ADR-264: a project's
+parameters are applied over its scene, so a measurement from the scene file measures a file nobody
+renders). Sequence hash = sha256 of the per-frame sha256 list.
+
+| arm | binary | opt-in | sequence hash |
+|---|---|---|---|
+| before | `main` @ `c14a7644` | — | `94a86f3db7a6198c…` |
+| after | this branch | off (default) | `94a86f3db7a6198c…` |
+| **control** | this branch | **on**, 5 aliens | `f4a477b7c5efe1c4…` |
+
+**Byte-identical before and after. Different when the opt-in is on**, so the comparison is not
+vacuous (ADR-182). Reproducibility established first: the same build rendered twice gives the same
+hash, or none of the above would mean anything.
+
+**A near-miss worth recording.** The first "before" render came from a second worktree and produced
+`087bba328f8f…` — a different hash, which read as *my change is not inert*. It was the second
+worktree's own asset copies. Running **`main`'s binary against this worktree's files** gave
+`94a86f3db7a6198c…`, isolating the binary as the only variable. The lesson is the one ADR-170 already
+teaches about the GPU: change one thing, not two.
+
+### Condition 2 — the probes fail when they should
+
+Two probes, each shown red against a deliberate break.
+
+**Probe 1 — the memory advances.** Break: delete the `advanceMotion` call from the live path (the
+wiring that genuinely was missing before this stage).
+```
+CHECK( memory.generation > 0 )   ->  0 > 0
+CHECK( memory.provider == 0 )    -> -1 == 0
+CHECK( memory.hasPhase )         -> false
+CHECK( memory.localTime > 0.0f ) -> 0.0f > 0.0f
+```
+That is exactly what "built but unreachable" looks like from the outside.
+
+**Probe 2 — the pose reaches the drawn rig. The first version of this probe was vacuous, and only
+the deliberate break revealed it.** Break: compute the pose and never hand it over. The probe
+asserted `posedByProvider`, which is *the sink's own claim*, and passed. Comparing the drawn pose
+could not have caught it either: a clip provider and the clip player agree by design (ADR-541
+corollary 1), so the wrong answer and the right one are the same picture.
+
+The fix is evidence from the **consumer**: `SkinnedRig::externalPoseFrames`, counted by `evaluate`
+each time it actually uses an external pose. Against the same break:
+```
+CHECK( debug.externalPoseFrames > 50 )
+  with expansion:  0 > 50
+  with message:    posedByProvider 1 externalPoseFrames 0 status produced
+```
+A flag set by whoever *claims* to have done the work cannot tell that apart. A counter incremented
+by whoever *consumed* it can.
+
+### And it fires on the real cast
 
 ```
-test_gpu.cpp:209          CHECK( cornerSum < 90 )   ->  100 < 90
-test_hdr_lab_gpu.cpp:556  CHECK( metered > 7.0f )   ->  0.0f > 7.0f
+entity 'rook': procedural motion on, 3 clip entry(s), chain of 1
+entity 'tide': procedural motion on, 3 clip entry(s), chain of 1
+entity 'sage': ...   'ember': ...   'vane': ...
 ```
-
-Established in three steps rather than assumed, because misattributing another branch's reds is a
-mistake this agent has already made once:
-
-1. **Not contention.** The first run overlapped the CPU suite — my error, ADR-170's territory. A
-   clean re-run alone under the lock reproduced *the same two failures with identical values*, so
-   they are deterministic.
-2. **Not in anything this branch touched.** The diff since the Phase A close contains no rendering,
-   GPU or shader file. A lit-cube background and an HDR auto-exposure meter have no path to the
-   animation tier.
-3. **Present on `main`.** A separate worktree at `c14a7644`, built from scratch, fails **both**
-   with the same numbers.
-
-So: pre-existing on `main`, reported rather than fixed, since neither is in this phase's subject.
+A chain that resolves **zero** entries warns rather than falling silently back, because a silent
+fallback is the failure this whole stage was closing.

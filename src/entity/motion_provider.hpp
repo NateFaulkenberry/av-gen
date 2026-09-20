@@ -99,9 +99,36 @@ struct MotionMemory {
     // The timeline second the current transition began, for inertialization. A *time*, never an
     // elapsed count, for the reason ADR-086 gives.
     double transitionStart = 0.0;
+    // **Which provider settled this memory**, as an index into the chain, or -1 for none. Recorded
+    // because `advance` and `pose` are separate calls and the second must go to the provider that
+    // won the first: a chain that re-selected at pose time could hand a motion matcher's database
+    // frame to the clip player, which would read it as a clip index and pose a different animation
+    // entirely. It is part of the memory, so a replay reconstructs it like everything else.
+    int provider = -1;
 
     void reset() { *this = MotionMemory{}; }
 };
+
+// **The two halves, and why the seam has two methods rather than ADR-541's one.**
+//
+// ADR-541 specified a single `evaluate` that advanced the memory and posed the skeleton together.
+// Wiring it found the reason that cannot work here, and the reason is measured rather than
+// aesthetic: `EntityWorld::seek` reproduces a scrubbed frame by **replaying the simulation at a
+// fixed 1/60 step, for up to ninety seconds** -- 5,400 steps per body -- and then poses the rigs
+// **once**, at the target time. Scrub latency is already this repository's worst interactive cost.
+// A seam that posed an 89-joint skeleton on every replay step would multiply that by 5,400.
+//
+// So the seam splits where the work splits:
+//
+//   * `advance` is the **simulation** half. It runs on every step, including every replay step, and
+//     it is what makes a scrubbed frame reproduce a played one. It may not touch a skeleton.
+//   * `pose` is the **presentation** half. It runs once per drawn frame, from memory `advance`
+//     already settled, and it is a pure function of that memory.
+//
+// This is not a compromise; it is the shape these algorithms already have. Learned motion matching
+// is a Stepper that advances a latent and a Decompressor that turns it into a pose (Phase 0 §3);
+// classical motion matching is a search that picks a database frame and a lookup that reads it.
+// The single-call version was hiding that seam, not simplifying it.
 
 // Why a provider declined.
 //
@@ -138,13 +165,20 @@ public:
     virtual ~IMotionProvider() = default;
     // A name for logs and for the debug view. Stable across frames.
     [[nodiscard]] virtual std::string_view name() const = 0;
-    // Pose `out` for `request`. `in` is what this character remembered last frame and `next` is
-    // what it will remember; a provider must write `next` whether it succeeds or not, because a
-    // chain that falls through must not leave the memory holding a failed provider's state.
-    [[nodiscard]] virtual MotionResult evaluate(const MotionRequest& request, const MotionMemory& in,
-                                                double time, float dt,
-                                                const scene::Skeleton& skeleton, scene::Pose& out,
-                                                MotionMemory& next) const = 0;
+
+    // **The simulation half.** Advance `in` to `next` for `request`. Runs on every step, including
+    // every step of a seek's replay, and touches no skeleton.
+    //
+    // A provider must write `next` whether it succeeds or not, because a chain that falls through
+    // must not leave the memory holding a failed provider's state.
+    [[nodiscard]] virtual MotionResult advance(const MotionRequest& request, const MotionMemory& in,
+                                               double time, float dt, MotionMemory& next) const = 0;
+
+    // **The presentation half.** Write the pose `memory` describes into `out`. Runs once per drawn
+    // frame and must be a pure function of (`memory`, `skeleton`) -- if it needed anything else,
+    // that thing belongs in `MotionMemory` and therefore in the replay.
+    [[nodiscard]] virtual MotionResult pose(const MotionMemory& memory, const scene::Skeleton& skeleton,
+                                            scene::Pose& out) const = 0;
 };
 
 } // namespace avgen::entity

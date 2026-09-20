@@ -56,9 +56,10 @@ public:
 
     [[nodiscard]] std::string_view name() const override { return name_; }
 
-    [[nodiscard]] MotionResult evaluate(const MotionRequest& request, const MotionMemory& in,
-                                        double time, float dt, const scene::Skeleton& skeleton,
-                                        scene::Pose& out, MotionMemory& next) const override;
+    [[nodiscard]] MotionResult advance(const MotionRequest& request, const MotionMemory& in,
+                                       double time, float dt, MotionMemory& next) const override;
+    [[nodiscard]] MotionResult pose(const MotionMemory& memory, const scene::Skeleton& skeleton,
+                                    scene::Pose& out) const override;
 
     // Which entry this request resolves to, or -1. Exposed because "which clip did it pick" is the
     // first question of any bug report about this provider, and re-deriving it in a debug view

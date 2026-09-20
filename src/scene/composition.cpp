@@ -2293,6 +2293,11 @@ void Composition::installEntities() {
         // own frame. One line, and it is the line between the engine and every socket, attachment,
         // carried prop and aim.
         live->setSkeleton(animationSinks_.back().get());
+        // Phase B. The chain the entity advances, and the sink draws from. Installed
+        // unconditionally for the same reason `setSkeleton` is: whether a body opted in is a
+        // question `Entity::advanceMotion` answers per frame, and a pointer installed only for
+        // opted-in bodies would have to be reinstalled every time a scene was edited.
+        live->setMotionChain(&animationSinks_.back()->chain());
         // ADR-337: the third. Installed unconditionally, like the other two, because whether a
         // clip was opted in is a question about the *rig* -- which may not be built yet when this
         // runs -- and the source answers "nothing" for a body playing a clip nobody named. A
@@ -2564,6 +2569,82 @@ void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& st
 // **Which position (ADR-260).** It reads the *drawn* transform: the node parameters' finals, which
 // `applyOffsets` wrote earlier in this same `EntityWorld::update` -- so there is no frame of lag
 // here, unlike attachments. It writes `SkinnedRig::layers`, which is pose intent and nothing else.
+// Phase B. Build this body's provider chain against the rig it actually has.
+//
+// The entries come from the entity's own `clips` map and `GaitSettings` -- the two places a scene
+// already authors "which clip is this body's walk" and "how fast was it authored for". Deriving
+// them anywhere else would be a third answer to a question with two (ADR-260), and inventing an
+// authored speed would be inventing the number ADR-540 measured as underivable.
+void Composition::AnimationSink::buildChain(const SkinnedRig& rig) {
+    clipProvider_.clearEntries();
+    clipProvider_.setClips(&rig.clips);
+    chain_.clear();
+
+    const auto entryFor = [&](entity::Activity activity, float authored) {
+        const std::string& want = entity_.clipFor(activity);
+        if (want.empty()) {
+            return;
+        }
+        const int index = findClip(rig.clips, want);
+        if (index < 0) {
+            return;
+        }
+        entity::ClipEntry entry;
+        entry.clip = static_cast<std::uint32_t>(index);
+        entry.mode = entity::MovementMode::Ground;
+        entry.authoredSpeed = authored;
+        entry.loop = true;
+        clipProvider_.addEntry(std::move(entry));
+    };
+    entryFor(entity::Activity::Idle, 0.0f);
+    entryFor(entity::Activity::Walk, entity_.desc().gait.walkSpeed);
+    entryFor(entity::Activity::Run, entity_.desc().gait.runSpeed);
+
+    // **The fallback chain, with its one implementation.** Phase C's matcher and Phase E's neural
+    // provider are added in front of this; the clip provider stays at the back, because ADR-541
+    // corollary 1 says every character can run in Clip mode and Clip mode is the fallback for
+    // every failure.
+    chain_.add(&clipProvider_);
+    chainBuilt_ = true;
+    // §50/§64: a body whose base pose stops coming from its clips is a large enough change that
+    // it says so once, with the entries it resolved. A chain built with zero entries is the
+    // silent-no-op this whole stage exists to prevent, so that case is a warning.
+    if (clipProvider_.entries().empty()) {
+        log::warn("entity '{}': procedural motion is on but no clip entry resolved; the body will "
+                  "fall back to its clip player",
+                  entity_.desc().name);
+    } else {
+        log::info("entity '{}': procedural motion on, {} clip entry(s), chain of {}",
+                  entity_.desc().name, clipProvider_.entries().size(), chain_.size());
+    }
+}
+
+Composition::MotionDebug Composition::motionDebug(std::string_view node) const {
+    MotionDebug out;
+    for (const auto& sink : animationSinks_) {
+        if (sink->nodeName() != node) {
+            continue;
+        }
+        const entity::Entity* live = entityWorld_.find(sink->entityName());
+        out.found = true;
+        out.posedByProvider = sink->posedByProvider();
+        if (const CompositionNode* n = findNode(std::string(node));
+            n != nullptr && !n->rigs.empty() && n->rigs.front() < scene_.rigs.size()) {
+            out.externalPoseFrames = scene_.rigs[n->rigs.front()].externalPoseFrames;
+        }
+        out.status = sink->chainResult().result.status;
+        if (live != nullptr) {
+            out.optedIn = live->desc().proceduralMotion;
+            out.provider = live->motionMemory().provider;
+            out.fellThrough = live->motionChainResult().fellThrough;
+            out.generation = live->motionMemory().generation;
+            out.localTime = live->motionMemory().localTime;
+        }
+        return out;
+    }
+    return out;
+}
+
 const MotionContext* Composition::motionContext(std::string_view node) const {
     for (const auto& sink : animationSinks_) {
         if (sink->nodeName() == node) {
@@ -2578,6 +2659,39 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
     if (node == nullptr || node->rigs.empty()) {
         return;
     }
+
+    // ---- Phase B: the base pose, when this body opted in ----------------------------------------
+    //
+    // **The split that makes this legal.** `Entity::advanceMotion` has already moved the provider
+    // memory this frame, on whichever path published the seam -- so on a scrub it was advanced once
+    // per replay step and holds the value a play would have reached. All that is left here is to
+    // *draw* it, which is a pure function of that memory and the skeleton, and cheap enough to do
+    // once per frame rather than 5,400 times per seek.
+    //
+    // A pose that fails to arrive leaves `hasExternalPose` false, and `SkinnedRig::evaluate` falls
+    // back to the clip player. Not hidden: `posedByProvider()` and `chainResult()` report it, and
+    // the lab test asserts on them.
+    posedByProvider_ = false;
+    if (entity_.desc().proceduralMotion) {
+        const RigId id = node->rigs.front();
+        if (id < owner_.scene_.rigs.size()) {
+            SkinnedRig& rig = owner_.scene_.rigs[id];
+            if (rig.skeleton.valid()) {
+                if (!chainBuilt_ || chainRig_ != id) {
+                    buildChain(rig);
+                    chainRig_ = id;
+                }
+                chainResult_.result =
+                    chain_.pose(entity_.motionMemory(), rig.skeleton, rig.externalPose);
+                if (chainResult_.result.ok() &&
+                    rig.externalPose.size() == rig.skeleton.joints.size()) {
+                    rig.hasExternalPose = true;
+                    posedByProvider_ = true;
+                }
+            }
+        }
+    }
+
     bool wanted = false;
     for (const RigId id : node->rigs) {
         if (id < owner_.scene_.rigs.size() && !owner_.scene_.rigs[id].layers.empty()) {
