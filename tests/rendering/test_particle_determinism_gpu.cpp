@@ -230,3 +230,70 @@ TEST_CASE("A bounded warm-up gives a partial render the pool a full render would
     // born inside the warm-up window, so the two arms ran the same emissions and the same kills.
     REQUIRE(warmAlive == fullAlive);
 }
+
+// ---- a resize is not a seek (the interactive-performance pass) -----------------------------------
+//
+// `SceneRenderer::resize` ends in `resetTemporalHistory()`, and that call resets the particle pools
+// along with the screen-space history, because ADR-360's fix for a seek that kept the same scene
+// put `particles_->resetAll()` there. A resize is not a seek. The pools hold world state -- alive
+// lists, emit carry, trail rings -- and nothing in them is indexed by a screen pixel, so a new
+// render-target extent has no more claim on them than a new window title does.
+//
+// It matters twice. Today, every splitter drag and every window resize in the editor empties the
+// particle field, and on Glowmere the motes take 30 to 50 seconds of playback to reach the vortex
+// (ADR-380), so what is lost is half a minute of simulation. And it is the thing that stops the
+// render scale from being adaptive at all: a controller that changes the scene's resolution changes
+// the target extent, and a resolution change that wipes the particles is not a presentation change,
+// which is precisely what §33/§34 forbid.
+//
+// Arm 2 is the control (ADR-182): the same playback with the extent held still. Without it a probe
+// that read zero at the end would be satisfied by particles that had simply died.
+TEST_CASE("changing the render target extent does not empty the particle pools",
+          "[gpu][particles][resize]") {
+    auto ctx = makeContext();
+    // Long enough that the pool is in steady state well before the resize, so "alive" is a
+    // population rather than a transient.
+    constexpr float kLife = 0.5f;
+    constexpr std::uint64_t kPlayFrames = 60;
+    const scene::Scene s = drizzle(kLife);
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+
+    // One renderer per arm. The two arms differ in exactly one thing: the extent of the frame
+    // rendered after the playback.
+    const auto playThenRenderAt = [&](std::uint32_t w, std::uint32_t h) {
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        for (std::uint64_t f = 1; f <= kPlayFrames; ++f) {
+            auto img = renderer.renderToImage(s, at(static_cast<double>(f) * kDt, f), 64, 64);
+            REQUIRE(img.has_value());
+        }
+        auto settled = renderer.particles().readCounts(0);
+        REQUIRE(settled.has_value());
+        auto img = renderer.renderToImage(s, at(static_cast<double>(kPlayFrames + 1) * kDt,
+                                                kPlayFrames + 1),
+                                          w, h);
+        REQUIRE(img.has_value());
+        auto after = renderer.particles().readCounts(0);
+        REQUIRE(after.has_value());
+        return std::pair{settled->alive, after->alive};
+    };
+
+    const auto [heldSettled, heldAfter] = playThenRenderAt(64, 64);   // control: same extent
+    const auto [movedSettled, movedAfter] = playThenRenderAt(96, 72); // the resize
+
+    INFO("alive: control " << heldSettled << " -> " << heldAfter << ";  resized " << movedSettled
+                           << " -> " << movedAfter);
+
+    // Both arms reached the same steady state before they diverged. If they did not, the comparison
+    // below is between two different populations and means nothing.
+    REQUIRE(heldSettled > 2000);
+    REQUIRE(movedSettled == heldSettled);
+
+    // The control: one more frame at the same extent keeps the field. A build in which this fails
+    // has a particle problem that has nothing to do with resizing, and the assertion after it would
+    // be measuring that instead.
+    REQUIRE(heldAfter > heldSettled / 2);
+
+    // The claim. A resize is a presentation change; the simulation is not presentation.
+    CHECK(movedAfter > movedSettled / 2);
+}

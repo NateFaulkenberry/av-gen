@@ -1429,7 +1429,9 @@ Result<void> SceneRenderer::resize(std::uint32_t width, std::uint32_t height) {
         return r;
     }
     rebuildFrameBindGroups();
-    resetTemporalHistory();
+    // Screen-space history only. Everything invalidated here was invalidated by the reallocation a
+    // few lines above; the particle simulation was not, and used to be reset anyway.
+    resetScreenHistory();
     tonemapBindGroup_ = nullptr;
     tonemapBoundView_ = nullptr;
     tonemapGroups_.clear();
@@ -1570,6 +1572,26 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         // banding along the ray, separated from the one that trades detail at silhouettes.
         {"volumesteps", [](QualitySettings& q) { q.volumeStepScale = 0.5f; },
          "volumeStepScale=0.5 (half the authored march steps, resolution unchanged)"},
+        // ---- the render scale (ADR-137, §15-§17) -------------------------------------------------
+        //
+        // The scene rendered below the output resolution, with the tonemap filtering it back up.
+        // ADR-137 shipped the parameter and left it unset by every tier, and ADR-212 uses it only
+        // above 1 for offline supersampling -- so until these arms existed the *downward* half of
+        // the mechanism was reachable from one GPU test and from nothing a measurement could drive.
+        //
+        // They are the rungs of `app::kRenderScaleRungs`, so an A/B here and the adaptive
+        // controller in the editor are moving the same lever by the same amounts, and a number
+        // taken with one describes the other. Note these only do anything because
+        // `setQualitySettings` now re-sizes: a quality arm is applied per block, after the targets
+        // have been sized, which is precisely the ordering ADR-212 records as a silent no-op.
+        {"scale85", [](QualitySettings& q) { q.renderScale = 0.85f; },
+         "renderScale=0.85 (the scene at 72% of the canvas's pixels, filtered up)"},
+        {"scale71", [](QualitySettings& q) { q.renderScale = 0.71f; },
+         "renderScale=0.71 (half the pixels)"},
+        {"scale58", [](QualitySettings& q) { q.renderScale = 0.58f; },
+         "renderScale=0.58 (a third of the pixels)"},
+        {"scale50", [](QualitySettings& q) { q.renderScale = 0.50f; },
+         "renderScale=0.50 (a quarter of the pixels -- the adaptive ladder's floor)"},
     };
     return kArms;
 }
@@ -1620,15 +1642,23 @@ void SceneRenderer::setPassToggles(const PassToggles& toggles) {
     toggles_ = toggles;
 }
 
-void SceneRenderer::resetTemporalHistory() {
-    havePrevViewProj_ = false;
-    prevModels_.clear();
-    prevModelsNext_.clear();
-    previousRenderTime_ = -std::numeric_limits<double>::infinity();
-    temporalScene_ = nullptr;
-    if (ao_ != nullptr) {
-        ao_->resetHistory();
+void SceneRenderer::setQualitySettings(const QualitySettings& settings) {
+    const float before = qualitySettings_.renderScale;
+    qualitySettings_ = settings;
+    // Only when it actually moved, and only when there is something to re-size. `resize()` is
+    // idempotent for an unchanged extent, but it is not free -- it reallocates the HDR target and
+    // every auxiliary target and throws away the screen-space history -- so it must not run on
+    // every per-frame settings assignment.
+    if (before != settings.renderScale && hdr_.valid() && outputWidth_ > 0 && outputHeight_ > 0) {
+        if (auto r = resize(outputWidth_, outputHeight_); !r) {
+            log::error("render scale {:.2f}: {}", static_cast<double>(settings.renderScale),
+                       r.error().message);
+        }
     }
+}
+
+void SceneRenderer::resetTemporalHistory() {
+    resetScreenHistory();
     // The particle pools are temporal history too, and they were the one kind this call did not
     // reset. A pool carries alive lists, emit carry and trail rings across frames, so a renderer
     // that had played forty frames and then seeked back to half a second did not agree with a fresh
@@ -1636,8 +1666,31 @@ void SceneRenderer::resetTemporalHistory() {
     // and is not. `ParticleRenderer::resetAll` has said in its own comment since it was written that
     // it is "used on seek/offline restarts"; nothing was calling it except the scene-pointer change,
     // so a seek that kept the same scene kept the simulation.
+    //
+    // It is HERE and not in `resetScreenHistory()` deliberately. A seek restarts the world's clock
+    // and the pools are the world's state at that clock; a resize changes how many pixels the world
+    // is drawn into and is not a world event at all.
     if (particles_ != nullptr) {
         particles_->resetAll();
+    }
+    // Forgetting which scene was last rendered belongs here for the same reason. `render()` reads
+    // it as "has the scene been swapped under me", and answering yes makes the next frame call
+    // this function again -- which is idempotent, and is how an external `resetTemporalHistory()`
+    // on a seek is meant to work. Clearing it from the *screen* reset was the whole defect: a
+    // resize left it null, the next frame concluded the scene had been swapped, and reset the
+    // particle pools by that route instead of directly. The probe in
+    // `test_particle_determinism_gpu.cpp` still read 101 alive out of 2,912 after the direct call
+    // had been removed, which is the only reason this line was found.
+    temporalScene_ = nullptr;
+}
+
+void SceneRenderer::resetScreenHistory() {
+    havePrevViewProj_ = false;
+    prevModels_.clear();
+    prevModelsNext_.clear();
+    previousRenderTime_ = -std::numeric_limits<double>::infinity();
+    if (ao_ != nullptr) {
+        ao_->resetHistory();
     }
     // ADR-410: the temporal ring is history in exactly the sense this function means. It rides the
     // existing hook rather than a second one, so a seek, a cut, a resize and a scene swap all

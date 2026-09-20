@@ -7,6 +7,7 @@
 #include "app/edit_system.hpp"
 #include "app/camera_director.hpp"
 #include "app/engine.hpp"
+#include "app/interactive_resolution.hpp"
 #include "app/viewport_camera.hpp"
 #include "scene/camera_rig.hpp"
 #include "app/placement.hpp"
@@ -123,6 +124,14 @@ struct AppOptions {
     std::string aiPrompt;
     std::optional<std::filesystem::path> aiScript;
     float canvasScale = 1.0f; // --canvas-scale: the world's share of the canvas's pixels
+    // --adaptive-scale on|off: override the settings file's `adaptiveCanvasScale` for this run.
+    // Unset means "whatever this machine's settings say", which is what a person launching the
+    // editor gets; a benchmark arm has to be able to state which of the two it is measuring
+    // without depending on how a settings file happens to be left (the reason `--preview-mode`
+    // exists and is written the same way).
+    std::optional<bool> adaptiveScale;
+    // --adaptive-budget <ms>: the GPU frame time the controller aims at. 0 = use the setting.
+    double adaptiveBudgetMs = 0.0;
     // --supersample: an offline render's multiple of the output size (ADR-212). 1 = off.
     float supersample = 1.0f;
     // --particle-warmup: ADR-360's bounded particle warm-up, in frames. 0 = off, which is the
@@ -452,6 +461,12 @@ private:
     std::uint32_t pendingWidth_ = 0;  // a canvas size waiting to settle before it is acted on
     std::uint32_t pendingHeight_ = 0;
     int pendingFrames_ = 0;
+    // §15-§17: the editor's own render scale, chosen from the GPU frame time rather than from a
+    // slider. It holds rung 0 (no reduction at all) unless the GPU is both over budget and the
+    // thing the frame is waiting for. Live editor only -- `runHeadless` and `RenderJob` never
+    // construct a decision, and the Offline tier pins `renderScale` to 1 regardless.
+    InteractiveResolution autoResolution_;
+    std::size_t autoResolutionRung_ = 0; // the rung currently applied to the renderer
 
     ViewportGesture viewportGesture_ = ViewportGesture::None;
     glm::vec2 viewportLastMouse_{0.0f};

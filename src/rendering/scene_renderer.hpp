@@ -416,7 +416,16 @@ public:
     [[nodiscard]] Result<void> resize(std::uint32_t width, std::uint32_t height);
     // Invalidates camera/model/AO temporal state after an in-place scene reload or camera cut.
     // The next frame is treated as a new temporal sequence rather than as motion from the old one.
+    // This is the *seek* reset: it also restarts the particle pools, because a seek moves the
+    // world's clock and the pools are the world's state at that clock.
     void resetTemporalHistory();
+    // The same invalidation without the particle pools: what a change of render-target extent
+    // needs, and nothing more. A resize throws away screen-space history because the buffers
+    // holding it were reallocated at a new size; it has no claim on the simulation, whose alive
+    // lists, emit carry and trail rings are not indexed by a pixel. Keeping the two apart is what
+    // makes a render-scale change a presentation change (§33/§34) rather than a world event, and
+    // it fixes the editor defect that every splitter drag emptied the particle field.
+    void resetScreenHistory();
 
     // Encodes the scene and tonemap passes. `target` must match the size passed to resize().
     [[nodiscard]] Result<void> render(wgpu::CommandEncoder& encoder, const scene::Scene& scene,
@@ -487,7 +496,13 @@ public:
     [[nodiscard]] QualityTier quality() const { return tier_; }
     [[nodiscard]] const QualitySettings& qualitySettings() const { return qualitySettings_; }
     // Overrides individual counts without changing the named tier (tests and benchmarks).
-    void setQualitySettings(const QualitySettings& settings) { qualitySettings_ = settings; }
+    // Out of line because `renderScale` is consumed by `resize()` and by nothing else, so a caller
+    // that changes it on a renderer whose targets already exist has to be re-sized or the change is
+    // a silent no-op. ADR-212 hit exactly that and fixed it at one call site by ordering the two
+    // statements; the benchmark harness sets a quality arm per block, *after* the targets are
+    // sized, so the ordering fix did not reach it. Resolving it here makes the setter mean what it
+    // says for every caller, which is also what the adaptive render scale needs.
+    void setQualitySettings(const QualitySettings& settings);
 
     // A/B switches for attributing cost. The only trustworthy way to know what a phase costs is
     // to run the frame without it and diff the medians, so the phases the frame timeline reports
