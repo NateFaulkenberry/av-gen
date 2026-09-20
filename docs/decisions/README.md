@@ -4,6 +4,34 @@ Each record follows: Status, Context/Problem, Alternatives considered, Decision,
 Consequences, Rejected alternatives (with the decisive reason), and Revisit triggers. Records are
 immutable once Accepted; a change is a new record that supersedes the old one.
 
+## ADR number ranges, assigned per branch
+
+**The minting rate outran the check.** "Re-verify the next free number immediately before landing"
+is sound advice that stopped working on 2026-09-20, when concurrent branches were producing an ADR
+every six to ten minutes -- shorter than the interval between checking and committing. Three
+branches minted **ADR-394** independently; one agent renumbered to 395, found it taken, moved to
+400, and found that taken too, within six minutes. Thirteen collisions in two days, none of them
+carelessness. The protocol was the defect, not the agents.
+
+So numbers are **assigned by range** rather than claimed by checking:
+
+| range | holder |
+|---|---|
+| ..394 | landed, or held by a branch that is merging |
+| 395-409 | `agent/defects` |
+| 410-419 | `agent/temporal` |
+| 420-439 | `agent/wfx2` -- World Effects phases and the deformation half |
+| 440+ | unassigned; ask before taking |
+
+Take the next free number **inside your range** and do not look outside it. A range with gaps is the
+cheap failure: this index already skips 301-309, 311-319 and 321-329, and a non-contiguous index
+costs a reader nothing, whereas two ADRs sharing a number costs another agent a rewrite of every
+citation.
+
+**When you must renumber, match the FILENAME, never the bare number.** A blanket `sed` over a bare
+`ADR-382` rewrote seven other branches' files. Before rewriting, diff each file against `main` to
+confirm the citation you are about to change is your own.
+
 | ADR | Title | Status |
 |---|---|---|
 | [001](ADR-001-rendering-backend.md) | Rendering backend: WebGPU via Dawn behind a thin `gpu` module | Accepted |
