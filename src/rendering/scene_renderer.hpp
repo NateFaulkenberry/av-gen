@@ -450,6 +450,12 @@ public:
     [[nodiscard]] std::uint32_t engineShaderReloads() const { return engineReloads_; }
     [[nodiscard]] ShaderStack& shaderStack() { return *shaderStack_; }
     [[nodiscard]] ParticleRenderer& particles() { return *particles_; }
+    // ADR-360's bounded, opt-in particle warm-up, in frames (capped at
+    // ParticleRenderer::kMaxWarmUpFrames). 0 -- the default -- keeps the seek behaviour this
+    // renderer has always had: pools are emptied and the field refills over one lifetime. Set it
+    // on an offline render so the head of a range is not required to accept that bloom.
+    void setParticleWarmUpFrames(std::uint32_t frames) { particleWarmUpFrames_ = frames; }
+    [[nodiscard]] std::uint32_t particleWarmUpFrames() const { return particleWarmUpFrames_; }
     [[nodiscard]] ProceduralRenderer& procedurals() { return *procedurals_; }
     [[nodiscard]] SdfRenderer& sdfs() { return *sdfs_; } // ADR-027
     [[nodiscard]] VolumeRenderer& volumes() { return *volumes_; } // ADR-032
@@ -789,6 +795,8 @@ private:
     std::unique_ptr<MaterialPrograms> materialPrograms_;
     std::unique_ptr<SplineBuffers> splines_;
     std::unique_ptr<ParticleRenderer> particles_;
+    std::uint32_t particleWarmUpFrames_ = 0; // ADR-360, opt-in
+
     std::unique_ptr<ProceduralRenderer> procedurals_;
     std::unique_ptr<SdfRenderer> sdfs_;
     std::unique_ptr<VolumeRenderer> volumes_;

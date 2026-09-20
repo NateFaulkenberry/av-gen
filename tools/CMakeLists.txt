@@ -29,6 +29,12 @@ if(TARGET avgen_platform)
         "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
+        # ADR-383 split the frame range out of RenderSettings, and `render_settings.cpp` above calls
+        # three of its symbols. A target that lists one and not the other links fine until somebody
+        # builds it -- which for these tools is rarely, and for `avgen_render_tests` was a day.
+        # Third target to need this line; the other two are `avgen_render_tests` and
+        # `avgen_metal_rt_probe`. They go together.
+        "${CMAKE_SOURCE_DIR}/src/app/frame_range.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/scene_states.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/world_director.cpp"

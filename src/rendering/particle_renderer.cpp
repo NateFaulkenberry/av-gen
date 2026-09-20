@@ -6,6 +6,7 @@
 #include "rendering/spline_buffers.hpp"
 
 #include "core/log.hpp"
+#include "core/pre_roll.hpp" // ADR-397: the bounded pre-roll this warm-up is one consumer of
 #include "gpu/context.hpp"
 #include "gpu/frame_timeline.hpp"
 #include "gpu/readback.hpp"
@@ -424,7 +425,6 @@ void ParticleRenderer::resetPool(Pool& pool) {
                                           0);
         context_.queue().WriteBuffer(pool.history, 0, history.data(), history.size());
     }
-    pool.emitCarry = 0.0;
     pool.needsReset = false;
 }
 
@@ -432,13 +432,50 @@ void ParticleRenderer::resetAll() {
     for (auto& pool : pools_) {
         pool.needsReset = true;
     }
+    // ADR-360. A reset is the one moment the pools do not hold what a render that had played up to
+    // here would hold, which is the whole of the "partial renders bloom in from nothing" half of
+    // that ADR. Whether anything is done about it is the caller's, through warmUpFrames.
+    warmUpPending_ = true;
+}
+
+void ParticleRenderer::runWarmUp(const scene::Scene& scene, const FrameTime& time, const glm::mat4& view,
+                                 const glm::mat4& proj, const FieldUniforms* fields,
+                                 const SplineBuffers* splines) {
+    // ADR-397: the schedule is shared, the work is not. `planPreRoll` decides which timeline
+    // seconds this roll consists of and what frame indices they carry; re-running the emit and
+    // simulate passes over them is this renderer's own business. The temporal-media history
+    // buffers take the same plan and re-run theirs.
+    PreRoll roll;
+    roll.frames = frame_.warmUpFrames;
+    roll.cap = kMaxWarmUpFrames;
+    const PreRollPlan plan = planPreRoll(roll, time);
+    if (plan.frames.empty()) {
+        return;
+    }
+    // `plan.arrivalFrameIndex` is deliberately ignored: nothing in the particle path keys history
+    // continuity to the frame index (the compaction carries the pools across frames by itself), so
+    // rewriting the arriving frame's index would change the trail stride's phase for no gain.
+    const ParticleStats savedStats = stats_;
+    const bool savedPass = passThisFrame_;
+    warming_ = true;
+    for (const FrameTime& warm : plan.frames) {
+        wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();
+        update(encoder, scene, warm, view, proj, fields, splines);
+        wgpu::CommandBuffer commands = encoder.Finish();
+        context_.queue().Submit(1, &commands);
+    }
+    warming_ = false;
+    stats_ = savedStats;
+    passThisFrame_ = savedPass;
 }
 
 void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
                               const glm::mat4& view, const glm::mat4& proj, const FieldUniforms* fields,
                               const SplineBuffers* splines) {
-    stats_ = ParticleStats{};
-    passThisFrame_ = false;
+    if (!warming_) {
+        stats_ = ParticleStats{};
+        passThisFrame_ = false;
+    }
     if (!initialised_) {
         return;
     }
@@ -446,7 +483,15 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         resetAll();
         scene_ = &scene;
     }
-    collectTimings(); // the previous frame's measurement (its command buffer was submitted by now)
+    if (!warming_) {
+        collectTimings(); // the previous frame's measurement (its command buffer is submitted by now)
+        if (warmUpPending_) {
+            // Cleared before the call, not after: runWarmUp re-enters update() and a flag still set
+            // would warm the warm-up.
+            warmUpPending_ = false;
+            runWarmUp(scene, time, view, proj, fields, splines);
+        }
+    }
     std::size_t encoded = 0;
     const glm::mat4 invView = glm::inverse(view);
     const glm::vec3 right = glm::normalize(glm::vec3(invView[0]));
@@ -483,9 +528,19 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
             continue;
         }
         const double dt = std::clamp(time.deltaTime, 0.0, 0.1);
-        pool.emitCarry += static_cast<double>(sys.spawnRate) * static_cast<double>(frame_.spawnScale) * dt;
-        std::uint32_t emitCount = static_cast<std::uint32_t>(std::floor(pool.emitCarry));
-        pool.emitCarry -= emitCount;
+        // ADR-360. How many spawns this frame owes, as a function of WHERE ON THE TIMELINE it is
+        // rather than of a carry accumulated since the render started. The total emitted by time t
+        // is floor(rate * t), so a frame owes the difference across its own interval.
+        //
+        // At a constant rate from t = 0 this is arithmetically identical to the carry it replaces
+        // -- the carry's running total IS floor(rate * t) -- so no render that starts at zero
+        // changes by a particle. What it fixes is the case the carry could not express: a render,
+        // or a warm-up, that starts at t > 0 and has no carry to inherit. It is also partition
+        // independent, so a stalled frame and two short ones emit the same total.
+        const double rate = static_cast<double>(sys.spawnRate) * static_cast<double>(frame_.spawnScale);
+        const double owed = std::floor(rate * time.renderTime) - std::floor(rate * (time.renderTime - dt));
+        std::uint32_t emitCount =
+            owed > 0.0 ? static_cast<std::uint32_t>(std::min(owed, static_cast<double>(pool.capacity))) : 0u;
         emitCount += static_cast<std::uint32_t>(std::max(0.0f, sys.burst));
         emitCount = std::min(emitCount, pool.capacity);
 
@@ -528,6 +583,9 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         u.colorEnd = sys.colorEnd;
         u.sim = glm::vec4(static_cast<float>(dt), static_cast<float>(time.renderTime),
                           static_cast<float>(time.frameIndex), static_cast<float>(sys.seed));
+        // ADR-360: the spawn key. `sim.z` stays the frame index because the trail stride counts
+        // frames; nothing in particles.wgsl seeds randomness from it any more.
+        u.nonce = glm::uvec4(time.frameNonce(), 0u, 0u, 0u);
         u.stretch = glm::vec4(std::max(0.0f, sys.velocityStretch), std::max(0.0f, sys.stretchMax),
                               std::max(0.0f, sys.stretchMin), 0.0f);
         u.trail = glm::vec4(static_cast<float>(pool.historyPoints),
@@ -587,7 +645,7 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         cdesc.label = "particles-compute";
         // One mark per system's pass; the timeline sums them under the one label, so a scene with
         // several systems reports what all of them cost rather than what the last one did.
-        cdesc.timestampWrites = timeline_ != nullptr ? timeline_->mark("particles") : nullptr;
+        cdesc.timestampWrites = (timeline_ != nullptr && !warming_) ? timeline_->mark("particles") : nullptr;
         ++encoded;
         ++stats_.dispatches;
         wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&cdesc);
