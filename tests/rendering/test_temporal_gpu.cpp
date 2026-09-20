@@ -390,3 +390,34 @@ TEST_CASE("the history debug view shows the ring, and is reachable by name", "[g
     CHECK(debugDrift.differing == controlDrift.differing);
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("capture: the history-state debug view", "[.capture][gpu][temporal]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    const std::filesystem::path out =
+        std::filesystem::path(std::getenv("AVGEN_CAPTURE_DIR") ? std::getenv("AVGEN_CAPTURE_DIR") : ".");
+
+    auto shootRing = [&](int frames, int ringFrames, const char* name) {
+        scene::Scene s = withEcho(movingLight(), ringFrames, 0.85f);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        FixedStepClock clock(60.0);
+        clock.restartAt(0.0);
+        for (int i = 0; i < frames; ++i) {
+            placeAt(s, i);
+            REQUIRE(renderer.renderToImage(s, clock.tick(), 420, 300).has_value());
+        }
+        renderer.setAuxDebugView(rendering::AuxDebugView::TemporalHistory);
+        placeAt(s, frames);
+        auto img = renderer.renderToImage(s, clock.tick(), 420, 300);
+        REQUIRE(img.has_value());
+        REQUIRE(assets::writePng(out / name, img->width, img->height, img->rgba).has_value());
+        UNSCOPED_INFO(name << ": framesValid=" << renderer.stats().temporal.framesValid);
+    };
+
+    // Full ring: nine tiles of the mover at nine past positions.
+    shootRing(12, 9, "temporal-ring-full.png");
+    // Partly filled: the layers beyond framesValid are tinted red, because an empty layer and a
+    // black frame are otherwise identical to the eye.
+    shootRing(3, 9, "temporal-ring-settling.png");
+}
