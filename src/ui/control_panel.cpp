@@ -3907,6 +3907,44 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         if (selected) {
             ImGui::Indent();
             if (rig.id != scene::kMainCamera) {
+                // "Go to camera": the editor viewpoint moves to match this camera. It is NOT
+                // the brief's §6 "look through camera" and is deliberately not labelled as one.
+                //
+                // Looking *through* a camera would mean pinning the viewport to this rig, and
+                // there is no such concept: `viewportFreeRoam` pins the frame to the MAIN camera
+                // and nothing pins it to an authored one. Worse, under a directed project the
+                // timeline drives `camera/*` every frame, so a pose written here is replaced
+                // before it is seen unless the director is stood down -- which is exactly the
+                // destruction the lock exists to prevent.
+                //
+                // So the button does the honest, useful subset and says so. Disabled while the cut
+                // is locked, because there it would visibly do nothing, and a control that appears
+                // to work and does not is the defect this branch has spent its time removing.
+                const bool goToBlocked = cameraDirected && cameraLocked != nullptr && *cameraLocked;
+                ImGui::BeginDisabled(goToBlocked);
+                if (ImGui::Button("Go to camera")) {
+                    const std::string prefix = rig.channelPrefix();
+                    const auto* pos = engine.params().find(prefix + "position");
+                    const auto* tgt = engine.params().find(prefix + "target");
+                    if (auto* vp = engine.params().find("camera/position"); vp != nullptr && pos != nullptr) {
+                        for (std::size_t c = 0; c < 3; ++c) {
+                            vp->setBaseComponent(c, pos->baseComponent(c));
+                        }
+                    }
+                    if (auto* vt = engine.params().find("camera/target"); vt != nullptr && tgt != nullptr) {
+                        for (std::size_t c = 0; c < 3; ++c) {
+                            vt->setBaseComponent(c, tgt->baseComponent(c));
+                        }
+                    }
+                    setStatus("viewport moved to '" + rig.name + "' -- this is the editor camera, "
+                              "not a binding to that one");
+                }
+                ImGui::EndDisabled();
+                if (goToBlocked && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    ImGui::SetTooltip("The director drives the viewport camera every frame while "
+                                      "the cut is locked, so this would not stick.");
+                }
+                ImGui::SameLine();
                 if (ImGui::Button("Place here")) {
                     // The viewport's pose onto this camera's *base* values. A parameter, never the
                     // derived scene camera: ADR-218's rule, and the reason this does not evaporate
