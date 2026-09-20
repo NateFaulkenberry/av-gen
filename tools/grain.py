@@ -12,6 +12,16 @@ different measures.
 that is not a defect -- it is why `spatial_stats.py` says the same thing about its own measure. A
 number from one scene means nothing against a number from another.
 
+**And only between arms at the SAME EXPOSURE, which is the harder half and is not in ADR-389.**
+Measured here (ADR-560): a fog bank's density laddered 0.0016 -> 0.0036 raises the lower frame's
+mean luminance 186.7 -> 197.6 and drops this number 0.3221 -> 0.2753 with the field's own content
+unchanged in kind. The tone curve compresses contrast as it approaches white, so a brighter arm
+scores lower for nothing, and **normalising by the local mean does not fix it** -- the normalised
+figure falls too, 0.2637% -> 0.2039% over the same ladder. Two arms whose mean luminance differs by
+more than a luminance level or so are not comparable by this number, and an arm pair that moves the
+medium's brightness must be re-shot at matched exposure before its grain is quoted. Both figures are
+printed for that reason.
+
 **The window is not a detail.** ADR-389: "a metric that measures the whole frame would have missed
 it -- the tree's foliage dominates the high-frequency energy of this shot, and the whole-frame
 number moves by 3% across arms that move the medium's own grain by 54%." So `lower` (the default,
@@ -37,6 +47,7 @@ def grain(path, window="lower"):
         x0, y0, x1, y1 = (int(v) for v in window.split(","))
     x0 = max(x0, 1); y0 = max(y0, 1); x1 = min(x1, w - 1); y1 = min(y1, h - 1)
     total = 0.0
+    relative = 0.0
     n = 0
     for y in range(y0, y1):
         row = y * w
@@ -45,9 +56,15 @@ def grain(path, window="lower"):
             box = (lum[i - w - 1] + lum[i - w] + lum[i - w + 1] +
                    lum[i - 1] + lum[i] + lum[i + 1] +
                    lum[i + w - 1] + lum[i + w] + lum[i + w + 1]) / 9.0
-            total += abs(lum[i] - box)
+            d = abs(lum[i] - box)
+            total += d
+            relative += d / max(box, 1.0)
             n += 1
-    return total / max(n, 1), (x1 - x0) * (y1 - y0)
+    # Absolute (what ADR-389/460/461 quote) and normalised by the local mean, as a percentage.
+    # The second is NOT an exposure-proof version of the first -- see the note above -- it is a
+    # second view of the same quantity, and an arm pair that disagrees between them is an arm pair
+    # whose exposure moved.
+    return total / max(n, 1), 100.0 * relative / max(n, 1)
 
 
 def mean_luma(path, window="lower"):
@@ -77,10 +94,11 @@ def main(argv):
     if not paths:
         print(__doc__)
         return 2
-    print(f"{'arm':<28} {'grain':>9} {'mean luma':>10}   window={window}")
+    print(f"{'arm':<28} {'grain':>9} {'grain/mean %':>13} {'mean luma':>10}   window={window}")
     for p in paths:
-        g, _ = grain(p, window)
-        print(f"{os.path.basename(os.path.dirname(p)) or os.path.basename(p):<28} {g:9.4f} {mean_luma(p, window):10.3f}")
+        g, r = grain(p, window)
+        print(f"{os.path.basename(os.path.dirname(p)) or os.path.basename(p):<28} "
+              f"{g:9.4f} {r:13.4f} {mean_luma(p, window):10.3f}")
     return 0
 
 
