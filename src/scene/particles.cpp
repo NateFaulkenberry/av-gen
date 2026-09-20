@@ -167,7 +167,14 @@ ParticleParameters registerParticleParameters(params::ParameterSet& params, cons
     const std::string base = "particles/" + s.name + "/";
     ParticleParameters p;
     p.spawnRate = &params.add(f(base, "spawnRate", s.spawnRate, 0.0f, 2000000.0f, 0.0f, std::max(s.spawnRate * 4.0f, 1000.0f)));
-    p.burst = &params.add(f(base, "burst", 0.0f, 0.0f, 100000.0f, 0.0f, 500.0f));
+    // Seeded from the scene, like `spawnRate` above and `spread` and `position` below. It was a
+    // hard-coded 0, which is the same defect the comment under `extent` describes -- a parameter
+    // whose default ignores the authored value silently deletes it on the first
+    // `applyParticleParameters`, so a scene key that parses, round-trips through
+    // `particlesToJson` and appears in the panel does nothing at all. Found by the Particle Lab
+    // fixture (ADR-399), whose burst system rendered nothing. Every scene that ships authors 0,
+    // so no existing frame moves.
+    p.burst = &params.add(f(base, "burst", s.burst, 0.0f, 100000.0f, 0.0f, 500.0f));
     p.lifetime = &params.add(f(base, "lifetime", 1.0f, 0.01f, 20.0f, 0.1f, 4.0f));
     p.speed = &params.add(f(base, "speed", 1.0f, 0.0f, 50.0f, 0.0f, 5.0f));
     p.spread = &params.add(f(base, "spread", s.spread, 0.0f, 1.0f, 0.0f, 1.0f));

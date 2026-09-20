@@ -1,0 +1,116 @@
+{
+ "format": "avgen-lab-cases",
+ "version": 1,
+ "lab": "particle",
+ "_note": "The Particle / VFX Lab's reproductions. The fixture is examples/labs/particle-vfx-lab.scene.json: four systems, each isolating ONE decision of the compute pipeline, with no field forces, no wind and no curl turbulence on the two systems the counting cases read -- the fields that push particles about are authored scene data and belong to the World Effects work, and a fixture that stirred the counts with a noise field would make every reading a joint measurement. Cases 2, 3 and 4 have assertions in tests/rendering/test_particle_lab_gpu.cpp; case 5 is the defect this lab found on its first render; case 6 is ADR-395's mitigation seen from here. Every case that asserts something names its control, and in cases 2, 4 and 5 the control is a second system in the same frame rather than a second run -- a control that shares the frame cannot be explained away by the frame. A case cannot set a parameter (docs/engineering-labs.md); parameter arms live in the test file.",
+ "cases": [
+  {
+   "lab": "particle",
+   "number": 1,
+   "title": "The bench: four systems, one frame",
+   "question": "What does each of the four decisions the compute pipeline makes look like on its own?",
+   "expectation": "Nothing asserted. This is the frame docs/particle-lab/README.md was read from. Four systems left to right: 'metered' (rate 3000/s, lifetime 0.5 s, capacity 8192 -- settles at rate*lifetime = 1500 alive), 'saturated' (the same emitter into a capacity of 256, which cannot hold a lifetime's worth), 'trailed' (ADR-040 ribbons at stride 1) and 'burst' (spawnRate 0, burst 64, so the per-frame impulse is separable from the per-frame rate). Run it again with the lab's own overlay profile -- `points` and `bounds` -- to see the population where the additive billboards have saturated and no longer report it.",
+   "fixture": "examples/labs/particle-vfx-lab.scene.json",
+   "timeSeconds": 1.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0
+  },
+  {
+   "lab": "particle",
+   "number": 2,
+   "title": "The pool settles where the arithmetic says",
+   "question": "Does a system in steady state hold spawnRate * lifetime particles?",
+   "expectation": "It does, and this is the case that makes every later count mean something. 'metered' emits 3000 a second and each particle lives exactly 0.5 s, so after half a second the pool holds 1500 and stops growing; capacity is 8192 and is not the binding constraint. 'saturated' beside it is the control and it is the SAME emitter: identical rate, identical lifetime, capacity 256. It must settle at 256 and not at 1500, because cs_emit clamps the emission to the free slots the previous frame's compaction left. If both settle at the same number, the count is reporting something other than the pool. Asserted in tests/rendering/test_particle_lab_gpu.cpp through ParticleRenderer::readCounts, which reads the GPU's own counters rather than the request.",
+   "fixture": "examples/labs/particle-vfx-lab.scene.json",
+   "timeSeconds": 1.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0
+  },
+  {
+   "lab": "particle",
+   "number": 3,
+   "title": "Alive plus dead is the capacity, every frame",
+   "question": "Does the compaction account for every slot?",
+   "expectation": "It must. The prefix-sum compaction (ADR-015 revision 2) writes the alive list and the dead list from the same scan, so alive + dead == capacity is an invariant of the pass and not a property of the scene -- it has to hold on the frame a pool is full, on the frame it is empty, and on every frame between. A pool that loses slots leaks capacity that no later frame can recover, and the symptom is a system that quietly stops emitting after a minute. Checked on all four systems at several times, which is the point: one of them is saturated and one is empty at t = 0, and an accounting bug that only shows at one of those extremes is the likely kind.",
+   "fixture": "examples/labs/particle-vfx-lab.scene.json",
+   "timeSeconds": 1.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0
+  },
+  {
+   "lab": "particle",
+   "number": 4,
+   "title": "The indirect draw carries the alive count",
+   "question": "Does the number the GPU was told to draw match the number it says is alive?",
+   "expectation": "The billboard draw's instanceCount must equal counters.aliveCount, and the ribbon draw's must be the same count for a system with trails and ZERO for one without. That second half is the control and it is the one that can fire the other way: three of the four systems here author no trail at all, so a ribbon draw with a non-zero instance count on those is an indirect argument written by a pass that should not have run. ADR-387 -- a correct value is not a reached value: the count being right in the counters proves nothing about what DrawIndirect was handed.",
+   "fixture": "examples/labs/particle-vfx-lab.scene.json",
+   "timeSeconds": 1.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0
+  },
+  {
+   "lab": "particle",
+   "number": 5,
+   "title": "An authored burst",
+   "question": "Does a burst written in a scene file emit anything?",
+   "expectation": "It does now; it did not when this lab was built. 'burst' authors spawnRate 0 and burst 64, so every frame owes exactly 64 particles and nothing else -- and the system rendered nothing at all, because `registerParticleParameters` seeded `particles/<name>/burst` with a hard-coded 0 instead of the scene's value, and the first applyParticleParameters overwrote it. The key parsed, round-tripped through particlesToJson and appeared in the panel, and was inert. Every scene that ships authors 0, so nothing else moved. The control is the neighbouring 'metered' system, whose rate is authored the same way through a parameter that WAS seeded correctly: if both were empty the fixture would be wrong, and only one of them was.",
+   "fixture": "examples/labs/particle-vfx-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0
+  },
+  {
+   "lab": "particle",
+   "number": 6,
+   "title": "The same second, reached two ways",
+   "question": "Does the frame at t = 1.0 s depend on how the render got there?",
+   "expectation": "Its spawns must not. ADR-360 relaxed exact scrub replay for particles, and ADR-395 built what it traded for: the spawn hash is keyed to FrameTime::frameNonce -- the timeline second -- and not to the frame index, so the same second seeds the same spawns in a full render, in a re-render of a section and in the live application, whose frame counter is never 0. Render this case, then render it again with --particle-warmup 36 and a range that opens here, and compare the pool occupancy rather than the pixels: the counts must agree exactly. The pixels will not, and ADR-395 says why -- slot assignment still comes from the compaction's dead list, which is a function of pool history rather than of time.",
+   "fixture": "examples/labs/particle-vfx-lab.scene.json",
+   "timeSeconds": 1.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "--particle-warmup is capped at 240 frames and is off by default; a seek in the editor keeps the hard pool reset ADR-360 chose to keep."
+  },
+  {
+   "lab": "particle",
+   "number": 7,
+   "title": "One million particles",
+   "question": "What does the compute pipeline cost when the pool is the size a hero effect wants?",
+   "expectation": "Nothing asserted about the time -- a wall-clock magnitude is not robust under GPU contention (tests/CMakeLists.txt on [.perf]) and this lab does not own the frame budget. What IS asserted, in tests/rendering/test_particles_gpu.cpp, is that a pool of that size still reaches steady state and still draws: the five compute dispatches are O(capacity) and the scan is two levels, so the failure mode at a million is a compaction that silently truncates rather than one that is slow. Run it under tools/gpu-lock.sh and read the minimum over repeats, never the mean.",
+   "fixture": "examples/labs/particle-vfx-lab.scene.json",
+   "timeSeconds": 1.0,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "Capacity here is the fixture's; the million-particle arm lives in the test, because a scene file that allocated it would make every other case in this lab slow.",
+   "blockedBy": ""
+  }
+ ]
+}

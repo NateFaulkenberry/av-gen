@@ -1,0 +1,106 @@
+{
+ "format": "avgen-lab-cases",
+ "version": 1,
+ "lab": "volumetric",
+ "_note": "The Volumetric / Atmosphere Lab's reproductions. The fixture is examples/labs/volumetric-atmosphere-lab.scene.json: one subject at five known distances inside a volume with known parameters and nothing else -- height falloff off, noise off, anisotropy 0, no sky, no IBL and no vortex. Those are all off deliberately rather than by omission: each is multiplicative on density or dominant in the frame, and a fixture carrying them cannot state the density at a point, so the arms that want them switch them on through scene/volume* and read against this file as the zero. Cases 3 and 4 are the two independent routes to 'the pass did not run' and must agree at the byte; case 2 is the measurement they make trustworthy. Case 6 names the arm this fixture cannot carry and says why. A case cannot set a parameter (docs/engineering-labs.md); parameter arms live in tests/rendering/test_volumetric_lab_gpu.cpp.",
+ "cases": [
+  {
+   "lab": "volumetric",
+   "number": 1,
+   "title": "The bench: one subject at five distances",
+   "question": "What does the air actually do to a surface as a function of how much of it is in the way?",
+   "expectation": "Nothing asserted. This is the frame docs/volumetric-lab/README.md was read from. Five identical unlit white slabs at 4, 12, 24, 40 and 60 m, in a volume of density 0.02 with height falloff off, noise off and anisotropy 0, so the only thing that differs between them is path length. The slabs are unlit, so a slab's radiance before the volume is the number in the fixture and a reading here is not also a measurement of the Lighting Lab's code.",
+   "fixture": "examples/labs/volumetric-atmosphere-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0
+  },
+  {
+   "lab": "volumetric",
+   "number": 2,
+   "title": "The transmittance ladder",
+   "question": "Does what survives to each slab fall the way the extinction says it should?",
+   "expectation": "Monotonically, and the near slab is the control. Transmittance along a homogeneous medium is exp(-sigma_t * d), so the five slabs are five samples of one exponential; at 4 m the volume should barely touch the nearest slab, and an arm in which the near slab moves as much as the far one is measuring something other than distance -- an ambient term, an exposure change, a composite that is not depth aware. The ORDERING is what this lab owns and what is asserted (tests/rendering/test_volumetric_lab_gpu.cpp); the absolute level belongs to the post chain and the HDR Lab.",
+   "fixture": "examples/labs/volumetric-atmosphere-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0
+  },
+  {
+   "lab": "volumetric",
+   "number": 3,
+   "title": "The pass, switched off",
+   "question": "How much of what case 2 measures is the volume, and how much was already in the frame?",
+   "expectation": "All of it should be the volume. `--disable volume` is the boundary the Lighting Lab drew in code and the HDR Lab uses the same way: with the march and the composite gone, the five slabs must read as five copies of one number, because they are identical geometry with identical unlit material at the same screen size. If they differ with the pass off, the ladder in case 2 is partly a measurement of something else and every reading taken through it is suspect. This is the case that makes the fixture's own claim falsifiable.",
+   "fixture": "examples/labs/volumetric-atmosphere-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "disable": [
+    "volume"
+   ]
+  },
+  {
+   "lab": "volumetric",
+   "number": 4,
+   "title": "Zero density is the frame with no volume in it",
+   "question": "Does a volume of density 0 cost nothing and change nothing?",
+   "expectation": "Nothing, at the byte. `VolumeRenderer::enabled` is false when volumeDensity <= 0 and no vortex asks otherwise, so update() allocates nothing and no pass is encoded -- which means this case must be byte-identical to case 3, where the pass exists and was disabled by hand. Two different routes to 'the volume did not run' that disagree would mean one of them is not what it says. ADR-387's rule stated as a frame: a correct value is not a reached value, and the only proof a gate is a gate is that the gated frame is the ungated one.",
+   "fixture": "examples/labs/volumetric-atmosphere-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "The density is set through scene/volumeDensity in the test; a case cannot set a parameter, which is why this one names the arm rather than carrying it."
+  },
+  {
+   "lab": "volumetric",
+   "number": 5,
+   "title": "The march at half and at full resolution",
+   "question": "What does volumeResolutionScale change, and what must it not change?",
+   "expectation": "It changes the cost and the sharpness of the composite's edges; it must not change the transmittance ladder. The march runs at QualitySettings::volumeResolutionScale (ADR-139) -- 0.5 is the half-res march the pass shipped with, and 1.0 is what the Offline tier renders. The slabs here are large, flat and at right angles to the view, so there is no spatial frequency for a resolution change to reach and the five readings must survive it: this is the control for any future arm about the depth-aware upsample, whose whole subject is the edges. VolumeStats reports marchWidth and marchHeight, so a scale that was CLAMPED away by a small viewport is distinguishable from one that was applied -- which is the reason those fields exist.",
+   "fixture": "examples/labs/volumetric-atmosphere-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "qualityArms": [
+    "offline"
+   ]
+  },
+  {
+   "lab": "volumetric",
+   "number": 6,
+   "title": "The step count",
+   "question": "How few samples can the march take before the answer changes?",
+   "expectation": "The fixture is at the shipped default of 32 steps deliberately, because the step count is one of the things this lab measures rather than a setting it should quietly improve. A homogeneous medium with no noise is the easy case for a raymarch -- the integral is analytic and any step count should land near it -- so a ladder that moves between 8 and 64 steps here is reporting a march that is not integrating what it claims. The hard case is the one this fixture deliberately does not have: switch volumeNoise on through scene/volumeNoise and the same step count is a different question, and that is where an under-sampled march shows as banding rather than as bias. Named as the next arm, not run here.",
+   "fixture": "examples/labs/volumetric-atmosphere-lab.scene.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1280,
+    720
+   ],
+   "fps": 60.0,
+   "seed": 0,
+   "notes": "ADR-393 measured a related sampling failure one system along (the cosmic vortex's grain at 32 samples over four kilometres); the finding is about sample SPACING against feature size, and it applies to this pass whenever the density stops being uniform."
+  }
+ ]
+}
