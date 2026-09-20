@@ -15,6 +15,7 @@
 #include <glm/gtc/matrix_inverse.hpp>
 
 #include <algorithm>
+#include <set>
 #include <vector>
 #include <limits>
 #include <array>
@@ -387,6 +388,10 @@ struct ProceduralRenderer::Impl {
     std::uint64_t frame = 0;
     bool initialised = false;
     bool warnedLimit = false;
+    // ADR-422: effector skips already reported, as "<object>/<field>/<op>/<reason>", so the log
+    // says it once rather than sixty times a second. A message repeated at frame rate is a message
+    // nobody reads, which is the same failure as no message at all seen from the other end.
+    std::set<std::string> warnedEffectors;
 };
 
 ProceduralRenderer::ProceduralRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
@@ -1466,11 +1471,38 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                 if (effectorCount >= static_cast<std::uint32_t>(spatial::kMaxEffectors)) {
                     break;
                 }
-                if (!e.enabled || e.op == spatial::EffectorOp::Velocity || e.op == spatial::EffectorOp::Attribute) {
+                if (!e.enabled) {
+                    continue;
+                }
+                // ADR-422. Three silent skips used to live on this line, and a silently skipped op
+                // is the hook somebody reaches for first. `EffectorOp::Velocity` and
+                // `::Attribute` exist, serialise, round-trip, appear in the World panel's effector
+                // list and are implemented on the CPU path in `spatial::applyEffectors` -- and this
+                // pass, which is the only one that runs in a rendered frame, drops them on the
+                // floor. An author who sets one gets an effector that is listed, saved, and inert.
+                //
+                // They are still skipped, because making them work is a real piece of work -- a
+                // velocity effector needs somewhere to put a velocity, which is the deformation
+                // contract's whole subject (ADR-422's `VertexCorrespondence`) -- but they are no
+                // longer skipped QUIETLY. That is the distinction ADR-225 draws: a setting the
+                // application does not keep is not a setting, and the honest interim state of one
+                // is a stated problem rather than a still picture.
+                const auto skip = [&](const char* reason) {
+                    const std::string key = object.name + "/" + e.field + "/" +
+                                            spatial::effectorOpName(e.op) + "/" + reason;
+                    if (im.warnedEffectors.insert(key).second) {
+                        log::warn("procedural '{}': effector {} -> {} is skipped by the GPU pass: {}",
+                                  object.name, e.field, spatial::effectorOpName(e.op), reason);
+                    }
+                };
+                if (e.op == spatial::EffectorOp::Velocity || e.op == spatial::EffectorOp::Attribute) {
+                    skip("this op has no GPU implementation; it runs only on the CPU effector path, "
+                         "which no rendered frame takes");
                     continue;
                 }
                 const int fieldSlot = fields->slotOf(e.field);
                 if (fieldSlot < 0) {
+                    skip("no field of that name reached the GPU field table");
                     continue;
                 }
                 spatial::EffectorGpu& g = eff.effectors[effectorCount++];
