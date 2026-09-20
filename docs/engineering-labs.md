@@ -529,11 +529,26 @@ the debug flag. `[gpu]` tests take `tools/gpu-lock.sh`.
     not have. **Not a defect; written down so the next reader finds the answer.** **Owner: Particle
     Lab**, §6.2 of its document.
 11. **The vortex shader disagrees with `core/vortex.cpp`.** `gpu.the-vortex-shader-agrees-with-core-vortex-cpp`
-    (ADR-388) fails 83 of its assertions — at t = 47.7, p = (140, −90, 0), GPU density 0.05383
-    against CPU 0.06640, twelve times the test's own 1e-3 margin. It was invisible because
-    `avgen_render_tests` had not linked since 2026-09-19 (`frame_range.cpp` was on the CPU target's
-    source list and not the GPU one). The link is fixed; the parity is not. **Owner: whoever owns
-    the vortex.**
+    (ADR-388) fails 83 of its assertions at 9084db5d — at t = 41.7, p = (140, −90, 0), GPU density
+    0.05383 against CPU 0.06640, twelve times the test's own 1e-3 margin. Re-run after merging
+    today's main (which changed both `core/vortex.cpp` and `shaders/vortex.wgsl` via `agent/cosmic6`)
+    it is **still red and wider**: 0.10505 against 0.16074 at the same sample, 75 assertions.
+    **Owner: whoever owns the vortex.**
+12. **The HDR Lab's metering-reset arm has been red since the readback became a ring.**
+    `gpu.a-reset-meter-reports-the-frame-it-was-reset-for` (`test_hdr_lab_gpu.cpp:556`) gets
+    `metered = 0.0` where it requires `> 7.0`. The test says "two frames of the bright image: the
+    first encodes the reduction, the second reads it back" — which was true of the one-slot
+    readback it was written against on 2026-09-18, and stopped being true when ADR-385 made it a
+    **two-slot ring** at c5c50b7d, 2026-09-19 18:59. **Owner: HDR Lab.** The fix is almost
+    certainly one more frame in the arm, but it is that lab's call, because the alternative reading
+    is that the ring costs a frame of adaptation that ADR-385 measured as costing none.
+
+**Items 11 and 12 share a cause, and it is the one worth keeping.** Both were invisible because
+`avgen_render_tests` did not link from 61c8117a (2026-09-19 19:08) until 2026-09-20 — nine minutes
+after the ring landed and nine hours after the vortex work. A test binary that is only built on
+request, in a repository where the previous binary stays on disk and a build wrapper reports the
+shell line's status rather than the compiler's, is a suite that can go red silently for a day.
+Whatever else changes, `avgen_render_tests` should be built by whatever builds `avgen`.
 
 ---
 
