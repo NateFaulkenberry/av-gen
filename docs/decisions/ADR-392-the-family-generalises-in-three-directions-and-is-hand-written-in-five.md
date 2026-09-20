@@ -185,9 +185,22 @@ rather than a parameter, and the sparkle and rainbow checkboxes, which are `enab
 rather than value rows. Putting any of them in a table would put a leaf there that registration
 does not produce, which is the opposite of the point.
 
-**What this does not do.** It does not touch the ADR-207 family's three parallel lists. It does not make `defaultAtmosphericRoutes`
-reachable: the function is now correct for every kind and still has no caller in `src/`, so "Add
-aurora" still produces a silent aurora. Wiring it into the World Effects panel's `append` is a
-decision about what a newly-created effect should do by default, and it belongs to whoever owns that
-panel — it is named here so it is not lost, because a function that is correct and unreached is the
-exact defect this repository keeps finding.
+**`defaultAtmosphericRoutes` got a caller.** Being correct for every kind is not enough when nothing
+calls it, and a function that is correct and unreached is the exact defect this repository keeps
+finding. `Engine::addDefaultAtmosphericRoutes` is the same shape as `addDefaultPostRoutes` --
+guarded on nothing already targeting the effect's prefix, so pressing the button twice does not
+stack two sets -- and the World Effects panel's "Add" buttons call it. It is deliberately **not**
+inside `setAtmosphericEffects`: that call also runs when a project is opened, and a project whose
+author deleted every route must not grow them back each time it loads. Adding an effect is a
+gesture; loading one is not.
+
+A route whose target does not resolve is skipped and logged rather than written, and that guard was
+exercised rather than assumed: with the pre-ADR-392 defect put back, the vortex's three
+comet-shaped targets were refused by name and nothing dead reached the project. A dead route in a
+saved project is what ADR-387 spent a day on, and a button must not be able to introduce one.
+
+**What this does not do.** It does not touch the ADR-207 family's three parallel lists --
+`effect_params.cpp` is still register, apply and capture written out separately, which is the
+failure the atmospheric tables were introduced to prevent, and `checkLeavesExist` is shaped to take
+that family next. It does not add a kind, touch a shader, or change a rendered pixel: no shipped
+scene gains a route, because every one of them already authors its own and the guard declines.
