@@ -376,6 +376,10 @@ public:
     // only. Beat phase, the beat count and the whole beat grid still come from analysis, because a
     // BPM tag does not contain them. Metadata supplies the scalar; analysis supplies the grid.
     [[nodiscard]] audio::AudioTempo tempo() const;
+    // The resolved tempo's bpm and provenance without the diagnostic strings. Identical precedence
+    // -- it IS the precedence, which `tempo()` then decorates -- and it allocates nothing, which
+    // matters because the beat clock asks every frame and a metadata format string is past SSO.
+    [[nodiscard]] std::pair<audio::TempoProvenance, double> resolvedTempo() const;
     // The tempo embedded in the loaded arrangement's audio, whether or not it is the one in force.
     // Kept separately so the UI can say "the file says 128, you have set 130".
     [[nodiscard]] const audio::AudioTempo& embeddedTempo() const { return embeddedTempo_; }

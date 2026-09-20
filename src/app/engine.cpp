@@ -3000,30 +3000,47 @@ double Engine::audioDurationSeconds() const { return audioFile_ ? audioFile_->du
 
 double Engine::durationSeconds() const { return transport_.durationSeconds(); }
 
-audio::AudioTempo Engine::tempo() const {
-    // Precedence, highest first. Each arm returns immediately: a lower source can never overwrite
-    // a higher one, which is the whole point -- an import must not silently replace a tempo the
-    // artist typed.
+std::pair<audio::TempoProvenance, double> Engine::resolvedTempo() const {
+    // The precedence chain, and the only copy of it. Highest first; each arm returns immediately,
+    // so a lower source can never overwrite a higher one. That is the whole point -- an import
+    // must not silently replace a tempo the artist typed, and making it structural beats making it
+    // a rule somebody has to remember.
     if (tempoOverride_.available) {
-        return tempoOverride_;
+        return {audio::TempoProvenance::UserOverride, tempoOverride_.bpm};
     }
     if (midiClockActive_) {
-        const double bpm = controlHub_.midiClock().bpm();
-        if (bpm > 0.0) {
-            return audio::AudioTempo{.available = true,
-                                     .bpm = bpm,
-                                     .source = audio::TempoProvenance::ExternalClock,
-                                     .confidence = 1.0};
+        if (const double bpm = controlHub_.midiClock().bpm(); bpm > 0.0) {
+            return {audio::TempoProvenance::ExternalClock, bpm};
         }
     }
     if (embeddedTempo_.available) {
-        return embeddedTempo_;
+        return {audio::TempoProvenance::EmbeddedMetadata, embeddedTempo_.bpm};
     }
     if (hasFrame_ && latest_.tempoBpm > 0.0f) {
+        return {audio::TempoProvenance::Detected, static_cast<double>(latest_.tempoBpm)};
+    }
+    return {audio::TempoProvenance::None, 0.0};
+}
+
+audio::AudioTempo Engine::tempo() const {
+    // `resolvedTempo()` decides; this only dresses the answer with the diagnostics belonging to
+    // whichever source won. Not a second precedence chain -- there is exactly one.
+    const auto [source, bpm] = resolvedTempo();
+    switch (source) {
+    case audio::TempoProvenance::UserOverride:
+        return tempoOverride_;
+    case audio::TempoProvenance::EmbeddedMetadata:
+        return embeddedTempo_;
+    case audio::TempoProvenance::ExternalClock:
+        return audio::AudioTempo{
+            .available = true, .bpm = bpm, .source = source, .confidence = 1.0};
+    case audio::TempoProvenance::Detected:
         return audio::AudioTempo{.available = true,
-                                 .bpm = static_cast<double>(latest_.tempoBpm),
-                                 .source = audio::TempoProvenance::Detected,
+                                 .bpm = bpm,
+                                 .source = source,
                                  .confidence = static_cast<double>(latest_.tempoConfidence)};
+    case audio::TempoProvenance::None:
+        break;
     }
     return {};
 }
@@ -3062,7 +3079,7 @@ void Engine::refreshTransport() {
     // The tempo is for the bars/beats readout and for beat stepping with no analyzed grid. It comes
     // from wherever the beat clock came from this frame, so the display cannot disagree with the
     // signals.
-    transport_.setTempo(tempo().bpm, 4);
+    transport_.setTempo(resolvedTempo().second, 4);
     // The project's frame rate *is* the render settings' frame rate. Not a second one: the frames a
     // person steps through have to be the frames the project exports, and two numbers that are
     // nearly always equal are two numbers that will one day not be.
@@ -3306,7 +3323,7 @@ void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
     // The same resolution the transport readout uses, so the picture and the display cannot be
     // driven by different numbers (ADR-394). The *phase* below still comes from the analyzer even
     // when the bpm came from a tag, because a BPM tag has no phase in it.
-    double bpm = tempo().bpm;
+    double bpm = resolvedTempo().second;
     bool pulse = false;
     if (midiClockActive_) {
         // The MIDI clock owns the beat clock: phase and count come straight from the tracker
