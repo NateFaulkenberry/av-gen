@@ -4085,6 +4085,15 @@ int Application::runLive() {
             renderer_->resetTemporalHistory();
             lastTransportDiscontinuity_ = discontinuity;
         }
+        // ADR-410: publish what the ring holds, so the panel's settling badge is the renderer
+        // reporting rather than the UI guessing. Pushed every frame because the whole point is
+        // that it changes as the history refills after a seek.
+        {
+            const auto& t = renderer_->stats().temporal;
+            engine_->setTemporalHistoryReport(scene::TemporalHistoryReport{
+                .framesValid = t.framesValid, .framesNeeded = t.framesNeeded, .stalled = t.stalled,
+                .bytes = t.historyBytes, .width = t.historyWidth, .height = t.historyHeight});
+        }
         engine_->setViewport(renderWidth_, renderHeight_);
         // ADR-391, and *before* the update: the composition decides the frame's camera inside
         // `update`, so a mode pushed after it would be one frame late -- which is exactly long
