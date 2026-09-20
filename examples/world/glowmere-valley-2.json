@@ -6,8 +6,8 @@
   "assets": {
     "audio": {
       "path": "../../../../../Desktop/Rebuild.mp3",
-      "sha256": "53a7c00cbdca9a078338db1f5a1cc725fa6b926623dccb7728f55e948838a030",
-      "size": 5435776
+      "sha256": "853c1c8930f6e6f6dde3efc2ac99850a67ba1bbd1a0f0ef00dffd2ec66f046f4",
+      "size": 211997
     },
     "scene": {
       "kind": "composition",
@@ -12612,7 +12612,7 @@
     "staging/abduction/approachSeconds": 7.0,
     "staging/abduction/beamDrainSeconds": 5.0,
     "staging/abduction/beamEmissive": 1.5499999523162842,
-    "staging/abduction/beamFadeSeconds": 0.8999999761581421,
+    "staging/abduction/beamFadeSeconds": 0.15,
     "staging/abduction/beamRestEmissive": 0.44999998807907104,
     "staging/abduction/beamRestRate": 0.0,
     "staging/abduction/beamSeconds": 1.100000023841858,
@@ -12621,7 +12621,7 @@
     "staging/abduction/craftWobbleRate": 0.44999998807907104,
     "staging/abduction/cruiseClearance": 34.0,
     "staging/abduction/gapSeconds": 3.200000047683716,
-    "staging/abduction/glowFadeSeconds": 1.899999976158142,
+    "staging/abduction/glowFadeSeconds": 1.2,
     "staging/abduction/glowIntensity": 6.5,
     "staging/abduction/glowRiseSeconds": 1.2999999523162842,
     "staging/abduction/hoverHeight": 23.0,

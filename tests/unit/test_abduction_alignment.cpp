@@ -541,8 +541,10 @@ TEST_CASE("A step's anchor and hold round-trip, and default to what existed",
 // rainbow shader to the animal as its being abducted")
 //
 // The scenario drives `emissiveBoost` on whatever `target` is bound to, rising over
-// `glowRiseSeconds` and falling to zero over `glowFadeSeconds` -- 1.3 s and 1.9 s of a 4.6 s lift,
-// so the glow is spent at 70% of the way up, which is what was asked for.
+// `glowRiseSeconds`, holding for `glowHoldSeconds` and falling to zero over `glowFadeSeconds` --
+// 1.3 + 2.0 + 1.2 s of a 4.6 s lift, so the animal is at full glow for the climb and the glow goes
+// out with the body at the top rather than halfway up. The hold is what the retiming added: the
+// glow used to be spent at 70% of the way up because the fade it accompanied was over by then.
 //
 // Asserted rather than eyeballed, because a `set` step whose target resolves to nothing logs a
 // warning and carries on: a glow that was never applied and one that is simply dim look identical
