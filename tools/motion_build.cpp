@@ -408,6 +408,7 @@ int cmdSurvey(const Args& args) {
     std::map<std::string, std::size_t> skeletonCounts; // digest -> files
     std::map<std::string, std::string> skeletonExample;
     std::map<char, std::size_t> upAxisCounts;
+    std::vector<glm::vec3> extents;
     std::map<std::size_t, std::size_t> jointCounts;
     std::size_t failed = 0;
     std::size_t totalFrames = 0;
@@ -437,8 +438,15 @@ int cmdSurvey(const Args& args) {
         if (skeletonExample.find(digest) == skeletonExample.end()) {
             skeletonExample[digest] = file.filename().string();
         }
-        // Which way is up, from the REST pose's shape: a standing skeleton's largest extent is its
-        // height. Measured per file rather than assumed, because nothing in BVH declares it.
+        // Which way is up, from the REST pose's shape. Measured per file rather than assumed,
+        // because nothing in BVH declares it.
+        //
+        // **"The largest extent is the height" is wrong on a T-pose, and 100STYLE is T-posed.**
+        // Measured on it: fingertip to fingertip is **1.896 m** and head to toe is **1.790 m**, so
+        // the naive rule reported a Y-up corpus as X-up -- a claim that, believed, would have made
+        // every retarget number meaningless. The extents are printed and the classification is
+        // allowed to say it does not know, because a diagnostic that is confidently wrong is worse
+        // than one that abstains.
         scene::Pose rest = scene::restPose(bvh->skeleton);
         std::vector<glm::mat4> model;
         scene::poseToModel(bvh->skeleton, rest, model);
@@ -450,9 +458,20 @@ int cmdSurvey(const Args& args) {
             hi = glm::max(hi, p);
         }
         const glm::vec3 extent = hi - lo;
-        const char up = (extent.y >= extent.x && extent.y >= extent.z) ? 'Y'
-                        : (extent.z >= extent.x)                      ? 'Z'
-                                                                      : 'X';
+        extents.push_back(extent);
+        float first = std::max({extent.x, extent.y, extent.z});
+        float second = 0.0f;
+        for (const float e : {extent.x, extent.y, extent.z}) {
+            if (e < first) {
+                second = std::max(second, e);
+            }
+        }
+        char up = extent.y >= first ? 'Y' : (extent.z >= first ? 'Z' : 'X');
+        // Within a quarter of each other, the two largest extents cannot tell a standing rig from
+        // a T-posed one. Say so rather than picking.
+        if (first > 0.0f && second / first > 0.75f) {
+            up = '?';
+        }
         ++upAxisCounts[up];
     }
 
@@ -462,7 +481,21 @@ int cmdSurvey(const Args& args) {
     }
     fmt::print("\nUP AXIS, from each file's own rest-pose extent\n");
     for (const auto& [axis, count] : upAxisCounts) {
-        fmt::print("  {}  {} file(s)\n", axis, count);
+        fmt::print("  {}  {} file(s){}\n", axis, count,
+                   axis == '?' ? "   <- AMBIGUOUS: the two largest extents are within 25%, which is "
+                                 "what a T-pose looks like. Read the extents below and decide."
+                               : "");
+    }
+    if (!extents.empty()) {
+        glm::vec3 lo = extents.front();
+        glm::vec3 hi = extents.front();
+        for (const glm::vec3& e : extents) {
+            lo = glm::min(lo, e);
+            hi = glm::max(hi, e);
+        }
+        fmt::print("  rest-pose extents, min..max over the corpus: x {:.3f}..{:.3f}  y {:.3f}..{:.3f}  "
+                   "z {:.3f}..{:.3f}\n",
+                   lo.x, hi.x, lo.y, hi.y, lo.z, hi.z);
     }
     fmt::print("\nSKELETON: {} distinct skeleton(s) across {} readable file(s)\n",
                skeletonCounts.size(), files.size() - failed);
