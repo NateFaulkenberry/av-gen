@@ -15,9 +15,18 @@ with `--ui-script scrub --profile-cpu`, so it is this build and not a remembered
       entity re-sim ms   median 2800.7
     # seeks/frame        1.000
     # resim ksteps       118.801
-    FRAME                median 2842.0
 
-**All of it is `EntityWorld::seek`, and all of that is the entity re-simulation.** ADR-273 bounded
+**All of it is `EntityWorld::seek`, and all of that is the entity re-simulation.**
+
+**What that arm does and does not measure, because it took a second look to see it.**
+`--ui-script scrub` is one line -- `engine.seekSeconds(...)`, called directly. It does not go
+through `SequencePanel`, so it creates no interaction record, and it does not go through
+`Engine::requestSeek(t, gestureHeld)`, which is where the deferral and the coalescing live. So the
+figures above are **the cost of one seek**, measured on the same path before and after, and that is
+what this ADR's numbers are about. They are *not* the latency of a held drag, which coalesces:
+`# seeks/frame 1.000` beside a frame time equal to the seek is the symptom of the bypass and not a
+finding about dragging. The arm that drives the real path is `drag`, and `--ui-ab drag:drag+seeknow`
+is the comparison that prices the deferral. ADR-273 bounded
 the work in the right currency and said plainly that it did not make Glowmere's own click faster;
 this is the part it left, and it named where to look: *"the per-step cost is dominated by
 `Navigator::sample`."*
