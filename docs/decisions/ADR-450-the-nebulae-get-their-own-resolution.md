@@ -136,17 +136,48 @@ nebulae paint 81% of the frame. Rendering them at a sixteenth of the pixels move
 Quarter is barely distinguishable from half, and half is barely distinguishable from full, so the
 fraction is chosen at the cheap end. **I would ship quarter.**
 
-## 6. What is still open
+## 6. What it actually bought: 0.72 ms, not the 1.35 I predicted
 
-The timing of the two arms is **not yet measured cleanly**. The machine has been disturbed
-continuously — a performance regression is being bisected on it, and the two attempts so far came
-back with the minima themselves spread by 19 and 20 ms, which is a number with no relationship to
-the effect. The retry is queued. On the attribution above, quarter should recover most of the
-nebulae's 1.44 ms and land the effect near the 1.2 ms target, but *should* is an estimate and this
-ADR has already recorded what estimates are worth here.
+Measured as one paired run per configuration, which is the only sound way to compare them: within a
+single `--ab` the machine state cancels, and a delta from one run minus a delta from another is not
+a measurement of anything. Realtime's `cosmicNebulaScale` was set to 0.25 and the ocean's whole cost
+re-measured against the same `--ab cosmic` arm as before.
 
-Preview's `cosmicNebulaScale` is 0.25 and Realtime's is 1.0 pending that measurement; the point of
-this ADR is that the lever exists, is correct, and is free to the eye.
+| configuration | ocean total | lowest two blocks agree to |
+| --- | --- | --- |
+| nebulae at full resolution | **2.556 ms** | 0.262 ms |
+| nebulae at quarter resolution | **1.835 ms** | 0.131 ms |
+
+**The saving is 0.72 ms, and I predicted 1.35.** The arithmetic that produced the prediction —
+nebulae 1.44 ms, a sixteenth of the pixels, therefore about 1.35 recovered — assumed the pass was
+free. It is not: it clears and stores two attachments, and then every sky pixel in the main draw
+does two texture fetches to read them back. At 1.64 Mpx of sky that is bandwidth, not ALU, and it
+eats roughly 0.63 of the 1.35. The evaluation itself did fall by the sixteen-fold the arithmetic
+promised; the cost that replaced it was the one the arithmetic left out.
+
+That is worth stating plainly because it is the same shape as §1: **a saving estimated from the
+term you are removing, with no term for what replaces it, is an estimate of half the problem.**
+
+### So the target is not met yet, and the next lever is named
+
+**1.835 ms against a 1.2 ms target.** What is left, on the §2 attribution:
+
+| component | ms at quarter |
+| --- | --- |
+| cosmic dust | 0.79 |
+| nebulae (evaluation + the pass that carries it) | 0.72 |
+| base: the draw, deep space, palette, recede | 0.33 |
+| star strata | 0.13 |
+
+**Cosmic dust is now the largest single component**, and it is a 3x3x3 lattice — twenty-seven
+iterations, two `coHash33` each, over the whole sky — which is a sample-count lever of exactly the
+kind `cosmicSampleScale` already exposes and nobody has yet measured. It is the next thing to
+measure, not the next thing to assume.
+
+One worry that the final run disposes of: a disturbed period had suggested the refactor might have
+made the FULL-resolution path about 1 ms slower (a baseline of 15.86 against 14.81 earlier). The
+final run's baseline is 14.03, below both, so there is no such regression -- those readings were the
+machine, again.
 
 ## 7. Found on the way: three identical hashes
 

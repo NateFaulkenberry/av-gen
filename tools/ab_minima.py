@@ -24,10 +24,24 @@ def main(path):
     (an, av), (bn, bv) = sorted(arms.items(), key=lambda kv: -min(kv[1]))
     print(f"  {an:<18} min {min(av):7.3f}  blocks {' '.join(f'{x:.2f}' for x in sorted(av))}")
     print(f"  {bn:<18} min {min(bv):7.3f}  blocks {' '.join(f'{x:.2f}' for x in sorted(bv))}")
-    # The spread of the minima is the honest floor: if the least-disturbed frame of each block
-    # varies, the machine moved under the measurement and the delta is worth that much less.
-    spread = max(max(av) - min(av), max(bv) - min(bv))
-    print(f"  delta on minima  {min(av) - min(bv):+7.3f} ms   (worst spread within an arm {spread:.3f} ms)")
+    # How much to trust it, and the statistic here is deliberately NOT max - min over the blocks.
+    #
+    # Taking the minimum over blocks means contention can only ever make an arm look SLOWER: a
+    # disturbed block raises its own minimum and is then discarded by the outer `min`. So one bad
+    # block among four does not corrupt the answer, and a spread that max-minus-min reports as
+    # 18 ms can sit on top of three blocks that agree to 0.06. That happened, and reading the
+    # spread as "this run is worthless" threw away a good measurement.
+    #
+    # What does matter is whether the LOWEST TWO blocks of each arm agree. If they do, the floor
+    # was reached twice independently and is real; if only one block is low, it might itself be an
+    # artefact and there is nothing to corroborate it.
+    def floorGap(v):
+        lo = sorted(v)
+        return lo[1] - lo[0] if len(lo) > 1 else float("inf")
+    gap = max(floorGap(av), floorGap(bv))
+    verdict = "corroborated" if gap < 0.35 else "NOT CORROBORATED -- the floor was reached once"
+    print(f"  delta on minima  {min(av) - min(bv):+7.3f} ms   "
+          f"(lowest two blocks agree to {gap:.3f} ms -- {verdict})")
     return 0
 
 if __name__ == "__main__":

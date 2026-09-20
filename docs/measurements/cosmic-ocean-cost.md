@@ -43,3 +43,30 @@ the minimum frame is the one that got the machine to itself. The first reading w
 that the half-resolution nebula buffer would not pay, and it argued the opposite of the truth.
 
 ADR-170 says minima over repeats and never means. This is what it costs to ignore that.
+
+## End to end, one paired run per configuration
+
+A delta from one `--ab` run minus a delta from another is not a measurement of anything: within a
+single run the machine state cancels, across runs it does not. So the lever was measured by setting
+Realtime's `cosmicNebulaScale` and re-running the same arm.
+
+| configuration | ocean total | lowest two blocks agree to |
+| --- | --- | --- |
+| nebulae at full resolution | 2.556 ms | 0.262 ms |
+| nebulae at quarter resolution | **1.835 ms** | 0.131 ms |
+
+Saving 0.72 ms against a prediction of 1.35. The prediction costed the term being removed and left
+out the one replacing it -- the pass clears and stores two attachments and every sky pixel then
+does two texture fetches to read them back, which is bandwidth rather than ALU and eats ~0.63 ms.
+
+Against a 1.2 ms target that leaves 0.635 ms to find, and cosmic dust at 0.79 ms is now the largest
+single component.
+
+## A note on the trust metric
+
+`ab_minima.py` reports the gap between the two LOWEST blocks of each arm, not max minus min.
+Taking the minimum over blocks means contention can only ever make an arm look slower -- a disturbed
+block raises its own minimum and is then discarded by the outer `min` -- so one bad block among
+four does not corrupt the answer. Reading max-minus-min as the floor threw away a good measurement
+whose three clean blocks agreed to 0.06 ms while a fourth had been hit for 12. What matters is
+whether the floor was reached twice independently.

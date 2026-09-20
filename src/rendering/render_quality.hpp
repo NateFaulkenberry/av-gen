@@ -300,6 +300,10 @@ struct QualitySettings {
             q.particleSpawnScale = 0.25f;
             break;
         case QualityTier::Realtime:
+            // ADR-450: the nebulae at a quarter of each axis. Measured against a control in which
+            // they paint 81% of the frame, quarter moves 0.83% of it -- 0.007% of pixels by more
+            // than two levels -- so this is a resolution the eye cannot find and the clock can.
+            q.cosmicNebulaScale = 0.25f;
             q.materialTiers = true;
             // ADR-155: procedural draws below the foreground rung shade flat. Measured at +1.11 ms
             // (7.46%) on Glowmere with 3.07% of pixels differing and no visible change at full
