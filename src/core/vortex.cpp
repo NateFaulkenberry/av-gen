@@ -119,7 +119,15 @@ Shape evaluate(const VortexUniforms& v, const glm::vec3& p, float t, float filte
     const float wSum = std::max(w0 + 0.45f * w1 + detail * w2, 1e-4f);
     float n = (n0 * w0 + 0.45f * n1 * w1 + detail * n2 * w2) / wSum;
     n = std::lerp(n, n * (0.55f + 0.9f * n1), std::clamp(v.v2.z, 0.0f, 1.0f));
-    const float shaped = std::pow(std::clamp(n, 0.0f, 1.0f), std::max(v.v2.y, 0.05f));
+    // ADR-389: a smoothstep remap, not `pow`, and compensated for the mean it moves. See the long
+    // note in `shaders/vortex.wgsl`: `pow(n, c)` has mean 1/(c+1) and a centred smoothstep has mean
+    // 0.5 whatever its width, so swapping them without this factor multiplies the medium's mean
+    // density by about six and blows the frame out -- the authored `density` and `emission` are
+    // per-metre coefficients calibrated against the old mean.
+    const float contrast = std::max(v.v2.y, 0.05f);
+    const float half = 0.5f / contrast;
+    const float curve = smoothstepf(0.5f - half, 0.5f + half, std::clamp(n, 0.0f, 1.0f));
+    const float shaped = curve * (2.0f / (contrast + 1.0f));
     s.density = shaped * envelope;
     return s;
 }
