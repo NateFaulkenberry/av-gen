@@ -341,8 +341,8 @@ vortex::VortexField smoky() {
 // three nested sets of spiral arms. For the same reason `smoky()` exists one function up, and it is
 // the same reason ADR-401 was written: a parity test that only covers the configuration that ships
 // goes red the first time somebody turns a new thing on, and a per-field reachability probe cannot
-// see a field whose effect is gated behind another field that is off. `eyeWallWidth` moves nothing
-// at `eyeWallGain` 0, and `bandPitchDegrees` moves nothing at `bandArms` 0.
+// see a field whose effect is gated behind another field that is off. `bandPitchDegrees`,
+// `bandDepth` and `bandHarmonic` all move nothing at `bandArms` 0.
 vortex::VortexField cyclonic() {
     vortex::VortexField f = smoky();
     f.eyeWallWidth = 0.14f;
@@ -439,7 +439,7 @@ TEST_CASE("every number the vortex uniform carries reaches the shader", "[gpu][v
     const std::vector<glm::vec3> pts = wallPositions();
     constexpr float kT = 6.0f;
 
-    // The macro structure on, or eight of the twenty-three knobs below would be gated off and the
+    // The macro structure on, or three of the twenty-two knobs below would be gated off and the
     // loop would pass while proving nothing about them -- which is ADR-401's defect in its other
     // form: not a field that fails to reach the shader, but a probe that cannot see whether it did.
     const vortex::VortexField base = cyclonic();

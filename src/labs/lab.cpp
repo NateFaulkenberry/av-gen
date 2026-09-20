@@ -106,21 +106,21 @@ constexpr std::array<LabDescriptor, 15> kLabs{{
      "src/rendering/post_processor.cpp:PostProcessor::run", "docs/hdr-lab/README.md",
      "examples/labs/hdr-lab.scene.json", "examples/labs/hdr/cases.json"},
 
-    {LabId::Volumetric, "volumetric", "Volumetric / Atmosphere Lab", LabStatus::Planned,
+    {LabId::Volumetric, "volumetric", "Volumetric / Atmosphere Lab", LabStatus::Built,
      "What is the air doing between the camera and the subject?",
      "the volumetric march, its resolution and step scaling, the depth-aware composite, and the "
      "atmospheric effects",
      "the bloom that the in-scatter later feeds -- that is the HDR Lab",
-     "src/rendering/volume_renderer.cpp", "docs/engineering-labs.md",
-     "examples/world/glowmere-atmospherics.json", ""},
+     "src/rendering/volume_renderer.cpp:VolumeRenderer::update", "docs/volumetric-lab/README.md",
+     "examples/labs/volumetric-atmosphere-lab.scene.json", "examples/labs/volumetric/cases.json"},
 
-    {LabId::Particle, "particle", "Particle / VFX Lab", LabStatus::Planned,
+    {LabId::Particle, "particle", "Particle / VFX Lab", LabStatus::Built,
      "How many particles are alive, where, and what are they writing?",
      "emission, simulation, compaction and the indirect draw -- and what particles write into the "
      "velocity target",
      "the world-effect fields that push them -- those are authored scene data",
-     "src/rendering/particle_renderer.cpp", "docs/engineering-labs.md",
-     "examples/qa/renderer-qa.scene.json", ""},
+     "src/rendering/particle_renderer.cpp:ParticleRenderer::update", "docs/particle-lab/README.md",
+     "examples/labs/particle-vfx-lab.scene.json", "examples/labs/particle/cases.json"},
 
     {LabId::Temporal, "temporal", "Temporal Stability Lab", LabStatus::Planned,
      "Why does this pixel change when nothing moved?",

@@ -1,0 +1,100 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Volumetric / Atmosphere Lab",
+ "_note": "The question is what the air is doing between the camera and the subject, so the fixture is a subject at known distances inside a volume with known parameters, and nothing else. Five identical unlit white slabs at z = -4, -12, -24, -40, -60 m, all 2.4 x 6 m, all the same material: the only thing that differs between them is how much air is in front of them, which is exactly the quantity the march integrates. A case reads them as a transmittance ladder -- five samples of exp(-sigma * d) along one axis -- and the NEAREST slab is the control: at 4 m the volume should barely touch it, so an arm that moves the near slab as much as the far one is measuring something other than distance. The slabs are unlit and emissive-free (pbr_shade.wgsl's unlit branch), so a slab's radiance before the volume is the number written in this file, and a reading is not also a measurement of the Lighting Lab's code. Height falloff is OFF (fogHeightAmount 0) and the noise is OFF, deliberately: both are multiplicative on density and a fixture with them on cannot state the density at a point, so the arms that want them switch them on through the env/* parameters and read against this file as the zero. volumeSteps is 32, the shipped default, because the step count is one of the things this lab measures rather than a setting it should quietly improve. There is no sky and no IBL: `background` is pure black so the transmittance of the empty frame is readable at the edges, and every pixel not on a slab is fog against nothing. Nothing here authors the vortex (ADR-371/388) -- that is a hero effect with its own parity test and it would dominate every reading in this file.",
+ "camera": {
+  "mode": 1,
+  "position": [0.0, 1.0, 6.0],
+  "target": [0.0, 1.0, -30.0],
+  "fov": 40.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [0.0, 0.0, 0.0],
+  "skyIntensity": 0.0,
+  "skybox": false,
+  "lightFromEnvironment": false,
+  "intensity": 0.0,
+  "fogDensity": 0.0,
+  "fogColor": [0.55, 0.62, 0.75],
+  "volumeDensity": 0.02,
+  "fogHeightAmount": 0.0,
+  "fogHeight": 0.0,
+  "fogHeightFalloff": 0.0,
+  "volumeScattering": 1.0,
+  "volumeAbsorption": 1.0,
+  "volumeAnisotropy": 0.0,
+  "volumeNoise": 0.0,
+  "volumeEmission": 0.0,
+  "volumeMaxDistance": 200.0,
+  "volumeSteps": 32
+ },
+ "lights": [
+  {
+   "name": "key",
+   "type": "directional",
+   "direction": [-0.55, -0.62, -0.56],
+   "color": [1.0, 0.97, 0.92],
+   "intensity": 3.0,
+   "castsShadow": false
+  }
+ ],
+ "nodes": [
+  {
+   "name": "slab-004",
+   "kind": "procedural",
+   "position": [0.0, 1.0, -4.0],
+   "procedural": {
+    "source": {"kind": "box", "size": [2.4, 6.0, 0.2], "subdivisions": 1},
+    "distribution": {"kind": "single"},
+    "castsShadow": false,
+    "material": {"baseColor": [0.8, 0.8, 0.8], "roughness": 1.0, "metallic": 0.0, "unlit": true}
+   }
+  },
+  {
+   "name": "slab-012",
+   "kind": "procedural",
+   "position": [0.0, 1.0, -12.0],
+   "procedural": {
+    "source": {"kind": "box", "size": [2.4, 6.0, 0.2], "subdivisions": 1},
+    "distribution": {"kind": "single"},
+    "castsShadow": false,
+    "material": {"baseColor": [0.8, 0.8, 0.8], "roughness": 1.0, "metallic": 0.0, "unlit": true}
+   }
+  },
+  {
+   "name": "slab-024",
+   "kind": "procedural",
+   "position": [0.0, 1.0, -24.0],
+   "procedural": {
+    "source": {"kind": "box", "size": [2.4, 6.0, 0.2], "subdivisions": 1},
+    "distribution": {"kind": "single"},
+    "castsShadow": false,
+    "material": {"baseColor": [0.8, 0.8, 0.8], "roughness": 1.0, "metallic": 0.0, "unlit": true}
+   }
+  },
+  {
+   "name": "slab-040",
+   "kind": "procedural",
+   "position": [0.0, 1.0, -40.0],
+   "procedural": {
+    "source": {"kind": "box", "size": [2.4, 6.0, 0.2], "subdivisions": 1},
+    "distribution": {"kind": "single"},
+    "castsShadow": false,
+    "material": {"baseColor": [0.8, 0.8, 0.8], "roughness": 1.0, "metallic": 0.0, "unlit": true}
+   }
+  },
+  {
+   "name": "slab-060",
+   "kind": "procedural",
+   "position": [0.0, 1.0, -60.0],
+   "procedural": {
+    "source": {"kind": "box", "size": [2.4, 6.0, 0.2], "subdivisions": 1},
+    "distribution": {"kind": "single"},
+    "castsShadow": false,
+    "material": {"baseColor": [0.8, 0.8, 0.8], "roughness": 1.0, "metallic": 0.0, "unlit": true}
+   }
+  }
+ ]
+}
