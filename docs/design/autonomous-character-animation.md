@@ -1989,6 +1989,10 @@ rotation retarget moves a joint by rotating its ancestors; the foot's only anima
 `root.x`. The alien's own clips move the foot by **translation**, and ADR-548 carries translation
 only where the source has it — BVH translates `Hips` alone.
 
+Rebuilt with an explicit nine-joint map naming every leg joint the rig has — including
+`LeftHip:thigh_twist.l`, which the guesser had left unmapped — the numbers are **identical to three
+decimals**. It is the hierarchy, not the map.
+
 **Every quality gate passed**, because each of them asks whether the numbers written were the
 numbers meant, and none asks whether the joint moved. ADR-553 records the result and declines to
 repair it inside the rotation retarget: the repair is positional retargeting through IK, which is a

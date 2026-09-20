@@ -70,6 +70,23 @@ identity retarget exact — but only where the *source* has a translation channe
 translation on `Hips` alone. So a BVH source produces, on this rig, a body that translates and
 rotates above a pair of legs that do not articulate.
 
+### It is not a bad joint map
+
+The obvious objection is that the map was wrong — that `Hips` mapping to nothing, which the guesser
+reported, is the whole story. It is not. Rebuilt with an explicit nine-joint map naming every leg
+joint the rig has, `Hips:root.x, LeftHip:thigh_twist.l, LeftKnee:leg_stretch.l, LeftAnkle:foot.l,
+LeftToe:toes_01.l` and the mirror:
+
+```
+Neutral_FW/foot.l   3949 frames   mean 0.970   p99 0.970   worst 0.970
+Neutral_FW/foot.r   3949 frames   mean 0.970   p99 0.970   worst 0.970
+```
+
+Identical to three decimals. Naming the thigh changes nothing, because rotating `thigh_twist.l`
+moves `thigh_stretch.l` and `thigh_twist_2.l`, which are its children, and `foot.l` is not among
+them. The result is a property of the hierarchy and not of the map, and it is measured here rather
+than argued from the diagram above.
+
 ADR-548's title is precise and was not enough: the retarget carries the channels *the source*
 animates, which is not the same as the channels *the rig* animates.
 
