@@ -1,4 +1,4 @@
-# ADR-394: One field, many subscribers — and the vortex that ignored its own window
+# ADR-420: One field, many subscribers — and the vortex that ignored its own window
 
 - Status: Accepted (2026-09-20)
 - Extends ADR-055 (the wind field), ADR-388 (the vortex field), ADR-230/387/392 (the atmospheric
