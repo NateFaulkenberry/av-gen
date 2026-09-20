@@ -150,6 +150,13 @@ struct CosmicOceanBlock {
 };
 
 @group(1) @binding(0) var<uniform> cosmic: CosmicOceanBlock;
+// ADR-450. The two nebulae, rendered once at a fraction of the frame's resolution and sampled back
+// here. `.rgb` is radiance and `.a` is coverage -- coverage travels because it is not decoration:
+// it occludes the galaxies and the star strata behind each nebula, so a buffer carrying only colour
+// would drop the occlusion and let stars shine through a cloud.
+@group(1) @binding(1) var cosmicNebFarTex: texture_2d<f32>;
+@group(1) @binding(2) var cosmicNebMidTex: texture_2d<f32>;
+@group(1) @binding(3) var cosmicNebSamp: sampler;
 
 // ---- hashing and noise ---------------------------------------------------------------------------
 
@@ -847,7 +854,7 @@ fn coRecede(colour: vec3<f32>, tint: vec3<f32>, amount: f32, fade: f32, desat: f
 // over it, the sparse foreground last, and the atmosphere unifying all three. It is also back to
 // front in depth, which is what lets each stratum be attenuated by the haze in front of it.
 fn cosmicOceanAt(co: CosmicOceanBlock, ro: vec3<f32>, rd: vec3<f32>, sunDir: vec3<f32>,
-                 pixelAngle: f32) -> AtmosResult {
+                 pixelAngle: f32, nebFar: CoLayer, nebMid: CoLayer) -> AtmosResult {
     var out: AtmosResult;
     out.radiance = vec3<f32>(0.0);
     out.bloom = 0.0;
@@ -875,7 +882,10 @@ fn cosmicOceanAt(co: CosmicOceanBlock, ro: vec3<f32>, rd: vec3<f32>, sunDir: vec
     var far = coGalaxies(co, ro, rd, pixelAngle);
 
     // ---- layer 2 and 3: the two nebulae ----
-    let nebFar = coNebula(co, ro, rd, co.nebFar0, co.nebFar1, co.nebFar2, co.nebFar3, pixelAngle);
+    // Passed in rather than evaluated here (ADR-450): at Realtime and below they were rasterised
+    // once into a small offscreen pair and are arriving through a bilinear sample. Everything below
+    // composites them exactly as it did when they were computed in place, which is the point -- the
+    // resolution lever changes where the numbers come from and not what is done with them.
     far = far * (1.0 - nebFar.coverage * 0.6) + nebFar.radiance;
 
     // ---- layers 4-7: the star strata, far to near, occluded by the nebulae in front of them ----
@@ -894,7 +904,6 @@ fn cosmicOceanAt(co: CosmicOceanBlock, ro: vec3<f32>, rd: vec3<f32>, sunDir: vec
     far = coRecede(far, co.colorAtmos.rgb, hazeDensity, clamp(co.atmos0.z, 0.0, 0.95),
                    clamp(co.atmos0.w, 0.0, 1.0), clamp(co.atmos1.x, 0.0, 1.0));
 
-    let nebMid = coNebula(co, ro, rd, co.nebMid0, co.nebMid1, co.nebMid2, co.nebMid3, pixelAngle);
     var mid = far * (1.0 - nebMid.coverage * 0.7) + nebMid.radiance;
 
     // ---- layer 8: planets ----
@@ -972,6 +981,58 @@ fn vs_cosmic(@builtin(vertex_index) index: u32) -> CosmicOut {
     return out;
 }
 
+// The ray this pass is asking about, and the angular size of one of ITS pixels.
+//
+// `pixelAngle` is taken from the derivative of the direction, so in the low-resolution pass it is
+// automatically two or four times larger -- which is the whole reason the reduced buffer does not
+// alias. Every point-like term inside `coNebula` (the shimmer, above all) is faded by its own
+// solid-angle ratio, so evaluating at a quarter of the resolution fades the fine detail *more*
+// rather than point-sampling it and magnifying the aliasing on the way back up. This is the
+// upsampling cousin of ADR-393's cell-boundary rule: the cap belongs at the profile, and here the
+// profile already carries it.
+struct CosmicRay {
+    dir: vec3<f32>,
+    pixelAngle: f32,
+};
+
+fn cosmicRayFor(ndc: vec2<f32>) -> CosmicRay {
+    let near = frame.invViewProj * vec4<f32>(ndc, 0.0, 1.0);
+    let far = frame.invViewProj * vec4<f32>(ndc, 1.0, 1.0);
+    var out: CosmicRay;
+    out.dir = normalize(far.xyz / far.w - near.xyz / near.w);
+    out.pixelAngle = max(length(dpdx(out.dir)) + length(dpdy(out.dir)), 1.0e-7);
+    return out;
+}
+
+// ---- the low-resolution nebula pass (ADR-450) ------------------------------------------------
+//
+// Two attachments and not one, because the compositing in `cosmicOceanAt` puts the star strata
+// BETWEEN the two nebulae: the far one occludes the galaxies and the stars, the near one occludes
+// the receded result of all of that. Packing both into one target would mean choosing an order at
+// this pass and losing the layer that sits between them.
+struct CosmicNebulaOut {
+    @location(0) far: vec4<f32>,
+    @location(1) mid: vec4<f32>,
+};
+
+@fragment
+fn fs_cosmic_nebula(in: CosmicOut) -> CosmicNebulaOut {
+    var out: CosmicNebulaOut;
+    out.far = vec4<f32>(0.0);
+    out.mid = vec4<f32>(0.0);
+    if (cosmic.master.x <= 1.0e-5) { return out; }
+
+    let ray = cosmicRayFor(in.ndc);
+    let ro = frame.cameraPos.xyz;
+    let f = coNebula(cosmic, ro, ray.dir, cosmic.nebFar0, cosmic.nebFar1, cosmic.nebFar2,
+                     cosmic.nebFar3, ray.pixelAngle);
+    let m = coNebula(cosmic, ro, ray.dir, cosmic.nebMid0, cosmic.nebMid1, cosmic.nebMid2,
+                     cosmic.nebMid3, ray.pixelAngle);
+    out.far = vec4<f32>(f.radiance, f.coverage);
+    out.mid = vec4<f32>(m.radiance, m.coverage);
+    return out;
+}
+
 @fragment
 fn fs_cosmic(in: CosmicOut) -> SceneOut {
     // The same unprojection the skybox and the atmosphere layer use. The two unprojected points
@@ -993,7 +1054,30 @@ fn fs_cosmic(in: CosmicOut) -> SceneOut {
     // they sit in the scene rather than on top of it.
     let sunDir = normalize(frame.skySun.xyz + vec3<f32>(0.0, 1.0e-5, 0.0));
 
-    let result = cosmicOceanAt(cosmic, frame.cameraPos.xyz, dir, sunDir, pixelAngle);
+    // The nebulae: sampled from the reduced buffer, or evaluated here when the lever is off.
+    //
+    // The branch is on a uniform, so it is uniform across the draw and costs one compare. UV comes
+    // from the same NDC the ray did, with Y flipped for texture space; the sampler clamps to edge,
+    // so a bilinear tap at the frame's border reads the border texel rather than wrapping the sky
+    // round to the other side of the screen.
+    var nebFar: CoLayer;
+    var nebMid: CoLayer;
+    if (cosmic.nebFar3.w > 0.5) {
+        let uv = vec2<f32>(in.ndc.x * 0.5 + 0.5, 0.5 - in.ndc.y * 0.5);
+        let f = textureSampleLevel(cosmicNebFarTex, cosmicNebSamp, uv, 0.0);
+        let m = textureSampleLevel(cosmicNebMidTex, cosmicNebSamp, uv, 0.0);
+        nebFar.radiance = f.rgb;
+        nebFar.coverage = f.a;
+        nebMid.radiance = m.rgb;
+        nebMid.coverage = m.a;
+    } else {
+        nebFar = coNebula(cosmic, frame.cameraPos.xyz, dir, cosmic.nebFar0, cosmic.nebFar1,
+                          cosmic.nebFar2, cosmic.nebFar3, pixelAngle);
+        nebMid = coNebula(cosmic, frame.cameraPos.xyz, dir, cosmic.nebMid0, cosmic.nebMid1,
+                          cosmic.nebMid2, cosmic.nebMid3, pixelAngle);
+    }
+
+    let result = cosmicOceanAt(cosmic, frame.cameraPos.xyz, dir, sunDir, pixelAngle, nebFar, nebMid);
 
     var out: SceneOut;
     out.color = vec4<f32>(result.radiance, 1.0);

@@ -36,6 +36,11 @@ namespace avgen::rendering {
 struct CosmicOceanStats {
     bool drawn = false;
     std::uint32_t dropped = 0; // effects past the first; the UI reports them rather than hiding them
+    // ADR-450. The size the nebulae were actually rasterised at, which is not always the size that
+    // was asked for -- a scale of 1.0, or a frame too small to halve, keeps them in the main draw.
+    std::uint32_t nebulaWidth = 0;
+    std::uint32_t nebulaHeight = 0;
+    bool nebulaReduced = false;
 };
 
 class CosmicOceanRenderer {
@@ -54,7 +59,16 @@ public:
     // draw happens at all. `block` is `world::packCosmicOcean`'s output; `live` is false when no
     // scene authored an ocean, when it is disabled, or when the renderer's toggle is off -- and on
     // false nothing is uploaded and nothing is drawn.
-    void update(const world::CosmicOceanGpu& block, bool live, std::uint32_t dropped);
+    // `nebulaScale` is the fraction of (width, height) the two nebulae are rasterised at; 1.0
+    // keeps them in the main draw and allocates nothing. Sizing happens here rather than in `draw`
+    // because the offscreen pair may have to be (re)created, which cannot happen inside a pass.
+    void update(const world::CosmicOceanGpu& block, bool live, std::uint32_t dropped,
+                float nebulaScale, std::uint32_t width, std::uint32_t height);
+
+    // Records the reduced-resolution nebula pass. Must be called on the encoder BEFORE the scene
+    // pass is begun -- it is its own render pass and a pass cannot be nested in another. A no-op
+    // when the ocean is not live or the lever is off.
+    void renderNebula(wgpu::CommandEncoder& encoder, const wgpu::BindGroup& frameBindGroup);
 
     // Records the draw. A no-op when the last `update` said the ocean is not live, so a scene
     // without one pays nothing -- not even a uniform branch.

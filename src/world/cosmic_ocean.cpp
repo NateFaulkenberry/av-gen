@@ -412,9 +412,14 @@ CosmicOceanGpu packCosmicOcean(const CosmicOcean& ocean, float envelope, double 
         // one, and the warp is a low-frequency displacement by construction: its second octave
         // moves the sample point by a fraction of a cell. Scaled by the tier's `octaveScale` and
         // floored at one, so Preview warps with three samples where Offline warps with nine.
+        // w: whether the main draw should SAMPLE the nebulae rather than evaluate them. It is the
+        // renderer's quality scale and not an authored field, which is why it arrives through
+        // `CosmicQualityScale` -- an artist has no business knowing which buffer their nebula was
+        // rasterised into, and a parameter they could set would be a rendering decision wearing a
+        // control's clothes.
         d = glm::vec4(phase(t, n.evolveSpeed), std::max(n.shimmer, 0.0f),
                       std::clamp(std::round(2.0f * std::max(quality.octaveScale, 0.05f)), 1.0f, 3.0f),
-                      0.0f);
+                      quality.nebulaScale < 0.999f ? 1.0f : 0.0f);
     };
     packNebula(o.nebulaFar, g.nebFar0, g.nebFar1, g.nebFar2, g.nebFar3);
     packNebula(o.nebulaMid, g.nebMid0, g.nebMid1, g.nebMid2, g.nebMid3);

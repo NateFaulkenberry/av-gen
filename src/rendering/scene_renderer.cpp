@@ -1507,6 +1507,12 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
          "cosmicOctaveScale=0.5 (nebula field octaves halved, and the domain warp down to one)"},
         {"cosmicsamples", [](QualitySettings& q) { q.cosmicSampleScale = 0.34f; },
          "cosmicSampleScale=0.34 (planet cells 3x3 -> 1x1, dust off)"},
+        // ADR-450. Two arms and not one, because "is half enough" and "is quarter too far" are two
+        // questions and the fraction was picked by measuring both rather than by choosing one.
+        {"cosmicnebhalf", [](QualitySettings& q) { q.cosmicNebulaScale = 0.5f; },
+         "cosmicNebulaScale=0.5 (the nebulae at half of each axis, a quarter of the pixels)"},
+        {"cosmicnebquarter", [](QualitySettings& q) { q.cosmicNebulaScale = 0.25f; },
+         "cosmicNebulaScale=0.25 (the nebulae at a quarter of each axis, a sixteenth of the pixels)"},
         // The screen-space contact march, off. It is the one shadow term the mask does not cover,
         // so it is the term that is still evaluated per pixel per directional light.
         {"contact", [](QualitySettings& q) { q.contactShadows = false; q.contactSteps = 0; },
@@ -2696,7 +2702,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             live ? world::packCosmicOcean(atmos.cosmicOcean, atmos.cosmicOceanEnvelope,
                                           time.renderTime, quality)
                  : world::CosmicOceanGpu{};
-        cosmicOcean_->update(block, live, 0);
+        cosmicOcean_->update(block, live, 0, qualitySettings_.cosmicNebulaScale, hdr_.width(),
+                             hdr_.height());
     }
     queue.WriteBuffer(frameUniforms_, 0, &frame, sizeof(frame));
     // Each shadow view is the same block with its own light-space matrix, so the depth-only passes
@@ -3503,6 +3510,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         depth.depthLoadOp = needsDepthPrepass ? wgpu::LoadOp::Load : wgpu::LoadOp::Clear;
         depth.depthStoreOp = wgpu::StoreOp::Store;
         depth.depthClearValue = 1.0f;
+        // ADR-450: the Cosmic Ocean's reduced-resolution nebula pair, recorded BEFORE the scene
+        // pass opens, because a render pass cannot be nested inside another. A no-op unless an
+        // ocean is live and the resolution lever is on, and it is its own pass on purpose -- it
+        // writes two small attachments the scene pass then samples, which is a dependency a single
+        // pass cannot express.
+        cosmicOcean_->renderNebula(encoder, frameBindGroup_);
+
         wgpu::RenderPassDescriptor pass{};
         pass.label = "scene-pass";
         pass.colorAttachmentCount = kSceneTargetCount;

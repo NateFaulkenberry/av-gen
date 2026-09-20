@@ -299,7 +299,8 @@ struct CosmicOceanGpu {
     glm::vec4 nebFar0{0.0f};     // x depth, y parallax, z density, w scale
     glm::vec4 nebFar1{0.0f};     // x octaves, y turbulence, z warp, w brightness
     glm::vec4 nebFar2{0.0f};     // x flow phase, y softness, z contrast, w colour mix
-    glm::vec4 nebFar3{0.0f};     // x evolve phase, y shimmer, z domain-warp octaves, w spare
+    glm::vec4 nebFar3{0.0f};     // x evolve phase, y shimmer, z domain-warp octaves,
+                                 // w 1 when the nebulae come from the low-resolution buffer (ADR-450)
     glm::vec4 nebMid0{0.0f};
     glm::vec4 nebMid1{0.0f};
     glm::vec4 nebMid2{0.0f};
@@ -349,6 +350,11 @@ static_assert(sizeof(CosmicOceanGpu) == 16 * 46);
 struct CosmicQualityScale {
     float octaveScale = 1.0f; // multiplier on the nebula's octave ceiling
     float sampleScale = 1.0f; // multiplier on the planet and dust cell neighbourhoods
+    // ADR-450. The fraction of the frame's resolution the nebulae are evaluated at. 1.0 evaluates
+    // them in the main draw as everything else is; below 1.0 they are rendered once into a small
+    // offscreen pair and sampled back, and this value only reaches the pack so that the shader
+    // knows which of the two it is looking at.
+    float nebulaScale = 1.0f;
 };
 [[nodiscard]] CosmicOceanGpu packCosmicOcean(const CosmicOcean& ocean, float envelope, double seconds,
                                              CosmicQualityScale quality = {});

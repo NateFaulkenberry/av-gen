@@ -172,6 +172,20 @@ struct QualitySettings {
     float cosmicOctaveScale = 1.0f;
     float cosmicSampleScale = 1.0f;
 
+    // ADR-450. The fraction of the frame's resolution the Cosmic Ocean's two nebulae are evaluated
+    // at. 1.0 evaluates them in the main draw; below that they go through a small offscreen pair
+    // and are sampled back bilinearly.
+    //
+    // ADR-390 §6 rejected this lever on an estimate and ADR-450 reverses that with a measurement:
+    // the nebulae are 1.44 ms of the effect's 2.56 ms at 1080p, 56% of it, and they are also the
+    // lowest-frequency thing in the frame -- which is the combination a resolution lever is for.
+    // The other strata stay at full resolution because a star IS a high-frequency feature and
+    // halving its resolution is how a star field starts to crawl.
+    //
+    // Deliberately a fraction and not a bool, so that quarter and half are two arms a measurement
+    // can compare rather than one switch somebody guessed at.
+    float cosmicNebulaScale = 1.0f;
+
     // ADR-382, the brief's §18 quality ladder. Multiplier on every particle system's `spawnRate`;
     // capacity is untouched, because changing it destroys and recreates the pool (ADR-015) and a
     // tier change would then empty every system mid-shot.
@@ -279,6 +293,7 @@ struct QualitySettings {
             q.volumeStepScale = 0.5f;
             q.cosmicOctaveScale = 0.75f; // 4 nebula octaves -> 3
             q.cosmicSampleScale = 0.34f; // 3x3 planet cells -> 1x1, and the dust off
+            q.cosmicNebulaScale = 0.25f; // the nebulae at a quarter of each axis
             // A quarter of the particles. Deliberately not zero: the Tree of Life's motes take 30
             // to 50 seconds of playback to reach the vortex (ADR-380), so a tier that cut them
             // hard would make a working effect look broken to anyone previewing it.
