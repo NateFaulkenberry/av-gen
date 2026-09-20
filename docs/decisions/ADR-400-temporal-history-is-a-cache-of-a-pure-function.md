@@ -243,6 +243,36 @@ pass and never touches it. So a datamosh or displacement over fog, aurora or vor
 whatever opaque surface is behind it. That is a correct consequence of ADR-035 and it must be
 stated where an author chooses the effect, not found in a render.
 
+## The warm-up is ADR-397's, not this ADR's
+
+While this was being written the defects agent built `src/core/pre_roll.hpp` (ADR-397) for
+ADR-360's particle warm-up, and deliberately built it as a **shared schedule** rather than
+something private to particles. It is the mechanism this ADR asked for and it is not duplicated
+here:
+
+- `classifyStep(havePrevious, previous, current) -> First | Repeat | Continuous | Jump`
+- `planPreRoll(roll, time) -> PreRollPlan` — which timeline seconds the roll covers and what frame
+  indices they carry. **The schedule is shared; the work is not.** Each subsystem re-runs its own
+  simulation over the plan's steps.
+
+**And its analysis finds a real bug in this implementation.** `TemporalHistory::beginFrame`
+currently distinguishes a repeat from a jump on the **frame index alone**, copying `AoRenderer`.
+ADR-397 points out that this is not sufficient in the live application: `RealtimeClock::seek` moves
+`renderTime` and leaves the frame counter climbing, so the frame after a scrub arrives as
+`index + 1` carrying a second from somewhere else — and an index-only test calls that
+`Continuous`. The ring would keep history across a seek and smear the pre-seek trail into the
+post-seek frame, which is precisely the silent divergence this whole document exists to prevent.
+
+Today that is masked rather than fixed: `application.cpp:4083` resets the history explicitly on a
+transport discontinuity, so the ring is dropped before the classification is ever consulted. A
+correctness argument that depends on a *different* subsystem calling a reset first is not one to
+keep — it is ADR-385's shape, a stated reason standing in for a mechanism. `beginFrame` adopts
+`classifyStep` when ADR-397 reaches main.
+
+Two ADRs reaching the same conclusion from opposite ends — that history after a discontinuity is a
+schedule of re-run frames rather than state to be repaired — is the reason it is worth one
+implementation.
+
 ## What this obliges
 
 - **The declaration is checked, not trusted.** ADR-392's conformance mechanism
