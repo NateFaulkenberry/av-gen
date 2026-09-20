@@ -41,6 +41,7 @@ enum class TempoProvenance {
     None,             // nothing knows the tempo
     EmbeddedMetadata, // read from the container's metadata by readEmbeddedTempo()
     Detected,         // estimated from the waveform by the analysis path
+    ExternalClock,    // an incoming MIDI clock is driving the beat (app::TempoSource::MidiClock)
     UserOverride,     // the artist typed it; outranks everything and is never overwritten
 };
 
@@ -105,6 +106,18 @@ inline constexpr double kMaxPlausibleBpm = 999.0;
 // ("127.5", "128.25") and does not round it. Always parses '.' as the decimal point regardless of
 // the process locale. Returns the value, or nullopt if it is not a usable BPM.
 [[nodiscard]] std::optional<double> parseBpmString(std::string_view text);
+
+// ---- seeding the estimator ---------------------------------------------------------------------
+
+// The tempogram prior's width, in octaves, once an embedded BPM is known. The default
+// (BeatTrackerConfig::priorWidthOctaves, 1.0, centred on 120) exists to break half/double-tempo
+// ties with no other information. With a tag in hand the prior is re-centred on it and narrowed
+// to this, which makes an octave error weigh e^-22 -- effectively impossible -- while still
+// accepting a tag that is a few percent off (a 5% error keeps 90% of its weight).
+//
+// Narrowing is NOT skipping. The onset pass and the beat search still run in full: a BPM has no
+// beat phase in it, and the grid is what everything downstream actually consumes.
+inline constexpr float kSeededPriorWidthOctaves = 0.15f;
 
 // ---- extraction -----------------------------------------------------------------------------
 

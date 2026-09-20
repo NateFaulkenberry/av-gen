@@ -390,6 +390,8 @@ std::string_view tempoProvenanceName(TempoProvenance source) {
         return "Embedded Metadata";
     case TempoProvenance::Detected:
         return "Detected";
+    case TempoProvenance::ExternalClock:
+        return "MIDI Clock";
     case TempoProvenance::UserOverride:
         return "User Override";
     }
@@ -404,6 +406,8 @@ std::string_view tempoProvenanceToken(TempoProvenance source) {
         return "embedded";
     case TempoProvenance::Detected:
         return "detected";
+    case TempoProvenance::ExternalClock:
+        return "midi";
     case TempoProvenance::UserOverride:
         return "user";
     }
@@ -416,6 +420,9 @@ TempoProvenance tempoProvenanceFromToken(std::string_view token) {
     }
     if (token == "detected") {
         return TempoProvenance::Detected;
+    }
+    if (token == "midi") {
+        return TempoProvenance::ExternalClock;
     }
     if (token == "user") {
         return TempoProvenance::UserOverride;
