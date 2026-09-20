@@ -2,8 +2,22 @@
  "format": "avgen-scene",
  "version": 1,
  "name": "Season shift",
- "_note": "Season as ONE continuous number, not four presets. The scene here is authored at high summer and every seasonal difference is expressed as a target of the `season` world macro in season.json -- so there is no winter scene, no autumn scene and no switch anywhere that says which one is showing. Move the knob from 0 to 1 and the canopy goes from green through ochre to bare grey, the undergrowth desaturates, the sky cools and loses its sun, the fog thickens and rises, the leaf fall starts and then stops as the trees empty, and the snow starts late on an exponential curve so that it is absent for most of the travel and then arrives. A macro target is a linear remap with a curve, which means a quantity that PEAKS in the middle -- leaf fall does -- cannot be one target; it is two systems whose spawn rates cross, which is also what actually happens (the leaves run out as the snow starts). The one thing a macro cannot express is a shape with an interior maximum, and rather than add a curve type for it the authoring says so out loud. Everything a season touches here is a parameter that already existed: procedural material colour, the sky's four colours, scene fog, particle spawn rates and sizes. No season subsystem, no seasonal branch in any shader.",
- "camera": {"mode": 1, "position": [0.6, 1.8, 7.5], "target": [-1.0, 2.2, -7.0], "fov": 46.0, "orbitSpeed": 0.0},
+ "_note": "Season as ONE continuous number, not four presets. The scene here is authored at high summer and every seasonal difference is expressed as a target of the `season` world macro in season.json -- so there is no winter scene, no autumn scene and no switch anywhere that says which one is showing. Move the knob from 0 to 1 and the canopy goes from green through ochre to bare grey, the undergrowth desaturates, the sky cools and loses its sun, the fog thickens and rises, the leaf fall starts and then stops as the trees empty, and the snow starts late on an exponential curve so that it is absent for most of the travel and then arrives. A macro target is a linear remap with a curve, so a quantity that PEAKS in the middle -- leaf fall does, because the trees run out of leaves -- cannot be ONE target. It is two targets on one path: a linear `replace` that rises with the season, and an exponential `multiply` that falls away at the top. The product rises through autumn and returns to nothing by deep winter, and it is built out of the ops the modulation system already has rather than out of a new curve type. The first version used a single s-curve and the trees shed leaves hardest in January, which is what a monotone remap of a non-monotone quantity always gives you. Everything a season touches here is a parameter that already existed: procedural material colour, the sky's four colours, scene fog, particle spawn rates and sizes. No season subsystem, no seasonal branch in any shader.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.6,
+   1.8,
+   7.5
+  ],
+  "target": [
+   -1.0,
+   2.2,
+   -7.0
+  ],
+  "fov": 46.0,
+  "orbitSpeed": 0.0
+ },
  "wind": {
   "enabled": true,
   "direction": 0.95,
@@ -21,8 +35,16 @@
  },
  "environment": {
   "intensity": 0.85,
-  "background": [0.075, 0.092, 0.115],
-  "fogColor": [0.085, 0.105, 0.120],
+  "background": [
+   0.075,
+   0.092,
+   0.115
+  ],
+  "fogColor": [
+   0.085,
+   0.105,
+   0.12
+  ],
   "fogDensity": 0.0022,
   "fogHeight": 12.0,
   "fogHeightFalloff": 0.12,
@@ -35,11 +57,27 @@
   "volumeMaxDistance": 70.0,
   "volumeAbsorption": 0.5,
   "sky": {
-   "zenithColor": [0.052, 0.088, 0.170],
-   "horizonColor": [0.220, 0.215, 0.180],
-   "groundColor": [0.030, 0.034, 0.028],
+   "zenithColor": [
+    0.052,
+    0.088,
+    0.17
+   ],
+   "horizonColor": [
+    0.22,
+    0.215,
+    0.18
+   ],
+   "groundColor": [
+    0.03,
+    0.034,
+    0.028
+   ],
    "haze": 0.45,
-   "sunColor": [1.0, 0.88, 0.62],
+   "sunColor": [
+    1.0,
+    0.88,
+    0.62
+   ],
    "sunIntensity": 3.2,
    "sunSize": 1.0,
    "sunGlow": 1.0,
@@ -53,46 +91,209 @@
    "name": "ground",
    "kind": "procedural",
    "procedural": {
-    "source": {"kind": "box", "size": [400.0, 0.6, 400.0], "subdivisions": 2},
-    "distribution": {"kind": "single"},
-    "distributionTransform": {"position": [0, -0.3, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
-    "material": {"baseColor": [0.055, 0.085, 0.038], "roughness": 0.85, "metallic": 0.0}
+    "source": {
+     "kind": "box",
+     "size": [
+      400.0,
+      0.6,
+      400.0
+     ],
+     "subdivisions": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      -0.3,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.055,
+      0.085,
+      0.038
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0
+    }
    }
   },
   {
    "name": "undergrowth",
    "kind": "procedural",
    "procedural": {
-    "source": {"kind": "mesh", "asset": "../../assets/kenney/plant_bushLarge.glb"},
-    "distribution": {"kind": "radial", "count": 40, "radius": 11.0, "plane": "xz", "orientation": "none", "center": [0.0, 0.0, -6.0]},
-    "ops": [{"kind": "scatter", "range": [7.0, 0.0, 7.0], "seed": 401}],
-    "variation": {"seed": 401, "randomRotation": [0.04, 3.14159, 0.04], "randomUniformScale": 0.55},
-    "material": {"baseColor": [0.070, 0.135, 0.048], "roughness": 0.82, "metallic": 0.0},
-    "materialVariation": {"valueRandom": 0.28, "roughnessRandom": 0.12}
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/kenney/plant_bushLarge.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 40,
+     "radius": 11.0,
+     "plane": "xz",
+     "orientation": "none",
+     "center": [
+      0.0,
+      0.0,
+      -6.0
+     ]
+    },
+    "ops": [
+     {
+      "kind": "scatter",
+      "range": [
+       7.0,
+       0.0,
+       7.0
+      ],
+      "seed": 401
+     }
+    ],
+    "variation": {
+     "seed": 401,
+     "randomRotation": [
+      0.04,
+      3.14159,
+      0.04
+     ],
+     "randomUniformScale": 0.55
+    },
+    "material": {
+     "baseColor": [
+      0.07,
+      0.135,
+      0.048
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.28,
+     "roughnessRandom": 0.12
+    }
    }
   },
   {
    "name": "canopy",
    "kind": "procedural",
    "procedural": {
-    "source": {"kind": "mesh", "asset": "../../assets/kenney/tree_tall.glb"},
-    "distribution": {"kind": "radial", "count": 22, "radius": 16.0, "plane": "xz", "orientation": "none", "center": [0.0, 0.0, -8.0]},
-    "ops": [{"kind": "scatter", "range": [5.0, 0.0, 5.0], "seed": 411}],
-    "variation": {"seed": 411, "randomRotation": [0.03, 3.14159, 0.03], "randomUniformScale": 0.45},
-    "material": {"baseColor": [0.065, 0.150, 0.052], "roughness": 0.80, "metallic": 0.0},
-    "materialVariation": {"valueRandom": 0.26, "roughnessRandom": 0.14}
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/kenney/tree_tall.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 22,
+     "radius": 16.0,
+     "plane": "xz",
+     "orientation": "none",
+     "center": [
+      0.0,
+      0.0,
+      -8.0
+     ]
+    },
+    "ops": [
+     {
+      "kind": "scatter",
+      "range": [
+       5.0,
+       0.0,
+       5.0
+      ],
+      "seed": 411
+     }
+    ],
+    "variation": {
+     "seed": 411,
+     "randomRotation": [
+      0.03,
+      3.14159,
+      0.03
+     ],
+     "randomUniformScale": 0.45
+    },
+    "material": {
+     "baseColor": [
+      0.065,
+      0.15,
+      0.052
+     ],
+     "roughness": 0.8,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.26,
+     "roughnessRandom": 0.14
+    }
    }
   },
   {
    "name": "canopy-far",
    "kind": "procedural",
    "procedural": {
-    "source": {"kind": "mesh", "asset": "../../assets/kenney/tree_plateau.glb"},
-    "distribution": {"kind": "radial", "count": 30, "radius": 34.0, "plane": "xz", "orientation": "none", "center": [0.0, 0.0, -9.0]},
-    "ops": [{"kind": "scatter", "range": [11.0, 0.0, 11.0], "seed": 419}],
-    "variation": {"seed": 419, "randomRotation": [0.03, 3.14159, 0.03], "randomUniformScale": 0.5},
-    "material": {"baseColor": [0.048, 0.110, 0.042], "roughness": 0.82, "metallic": 0.0},
-    "materialVariation": {"valueRandom": 0.22, "roughnessRandom": 0.12}
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/kenney/tree_plateau.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 30,
+     "radius": 34.0,
+     "plane": "xz",
+     "orientation": "none",
+     "center": [
+      0.0,
+      0.0,
+      -9.0
+     ]
+    },
+    "ops": [
+     {
+      "kind": "scatter",
+      "range": [
+       11.0,
+       0.0,
+       11.0
+      ],
+      "seed": 419
+     }
+    ],
+    "variation": {
+     "seed": 419,
+     "randomRotation": [
+      0.03,
+      3.14159,
+      0.03
+     ],
+     "randomUniformScale": 0.5
+    },
+    "material": {
+     "baseColor": [
+      0.048,
+      0.11,
+      0.042
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.22,
+     "roughnessRandom": 0.12
+    }
    }
   },
   {
@@ -103,16 +304,32 @@
     "capacity": 2600,
     "seed": 97,
     "shape": "box",
-    "position": [0.0, 3.2, -7.0],
-    "extent": [15.0, 2.4, 11.0],
+    "position": [
+     0.0,
+     3.2,
+     -7.0
+    ],
+    "extent": [
+     15.0,
+     2.4,
+     11.0
+    ],
     "spawnRate": 1.0,
     "lifetimeMin": 6.0,
     "lifetimeMax": 11.0,
-    "direction": [0.0, -1.0, 0.0],
+    "direction": [
+     0.0,
+     -1.0,
+     0.0
+    ],
     "spread": 0.55,
     "speedMin": 0.25,
     "speedMax": 0.85,
-    "gravity": [0.0, -0.85, 0.0],
+    "gravity": [
+     0.0,
+     -0.85,
+     0.0
+    ],
     "drag": 0.65,
     "dragSizeBias": 0.9,
     "sizeVariance": 0.6,
@@ -124,17 +341,27 @@
     "shape2d": "leaf",
     "tumbleRate": 3.0,
     "leafAspect": 0.44,
-    "twoSided": 0.60,
+    "twoSided": 0.6,
     "sizeStart": 0.075,
     "sizeEnd": 0.075,
-    "colorStart": [0.85, 0.42, 0.10, 0.95],
-    "colorEnd": [0.55, 0.22, 0.05, 0.95],
+    "colorStart": [
+     0.85,
+     0.42,
+     0.1,
+     0.95
+    ],
+    "colorEnd": [
+     0.55,
+     0.22,
+     0.05,
+     0.95
+    ],
     "emissive": 1.3,
     "blend": "alpha",
     "softness": 0.35,
     "velocityStretch": 0.0,
     "scatterStrength": 0.35,
-    "scatterAnisotropy": 0.60,
+    "scatterAnisotropy": 0.6,
     "fogCoupling": 1.0
    }
   },
@@ -146,18 +373,38 @@
     "capacity": 14000,
     "seed": 101,
     "shape": "box",
-    "position": [0.0, 8.0, 0.0],
-    "extent": [28.0, 8.0, 28.0],
-    "volumeFollow": [1.0, 0.0, 1.0],
+    "position": [
+     0.0,
+     8.0,
+     0.0
+    ],
+    "extent": [
+     28.0,
+     8.0,
+     28.0
+    ],
+    "volumeFollow": [
+     1.0,
+     0.0,
+     1.0
+    ],
     "volumeWrap": true,
     "spawnRate": 1.0,
     "lifetimeMin": 9000.0,
     "lifetimeMax": 9000.0,
-    "direction": [0.0, -1.0, 0.0],
+    "direction": [
+     0.0,
+     -1.0,
+     0.0
+    ],
     "spread": 0.25,
     "speedMin": 0.5,
     "speedMax": 1.2,
-    "gravity": [0.0, -0.85, 0.0],
+    "gravity": [
+     0.0,
+     -0.85,
+     0.0
+    ],
     "drag": 0.85,
     "dragSizeBias": 0.95,
     "sizeVariance": 0.7,
@@ -170,16 +417,26 @@
     "tumbleRate": 1.1,
     "leafAspect": 1.0,
     "twoSided": 0.55,
-    "sizeStart": 0.030,
-    "sizeEnd": 0.030,
-    "colorStart": [0.93, 0.95, 1.0, 0.85],
-    "colorEnd": [0.93, 0.95, 1.0, 0.85],
+    "sizeStart": 0.03,
+    "sizeEnd": 0.03,
+    "colorStart": [
+     0.93,
+     0.95,
+     1.0,
+     0.85
+    ],
+    "colorEnd": [
+     0.93,
+     0.95,
+     1.0,
+     0.85
+    ],
     "emissive": 1.5,
     "blend": "alpha",
-    "softness": 0.30,
+    "softness": 0.3,
     "velocityStretch": 0.0,
     "scatterStrength": 0.21,
-    "scatterAnisotropy": 0.40,
+    "scatterAnisotropy": 0.4,
     "fogCoupling": 1.0
    }
   },
@@ -191,36 +448,66 @@
     "capacity": 3000,
     "seed": 103,
     "shape": "box",
-    "position": [0.0, 1.8, -3.0],
-    "extent": [13.0, 1.8, 11.0],
-    "volumeFollow": [1.0, 0.0, 1.0],
+    "position": [
+     0.0,
+     1.8,
+     -3.0
+    ],
+    "extent": [
+     13.0,
+     1.8,
+     11.0
+    ],
+    "volumeFollow": [
+     1.0,
+     0.0,
+     1.0
+    ],
     "volumeWrap": true,
     "spawnRate": 36000.0,
     "lifetimeMin": 9000.0,
     "lifetimeMax": 9000.0,
-    "direction": [0.0, 1.0, 0.0],
+    "direction": [
+     0.0,
+     1.0,
+     0.0
+    ],
     "spread": 1.0,
     "speedMin": 0.02,
     "speedMax": 0.18,
-    "gravity": [0.0, 0.055, 0.0],
+    "gravity": [
+     0.0,
+     0.055,
+     0.0
+    ],
     "drag": 0.85,
     "dragSizeBias": 0.9,
     "sizeVariance": 0.7,
     "sizeSkew": 2.6,
-    "turbulence": 0.40,
+    "turbulence": 0.4,
     "turbulenceScale": 0.35,
     "turbulenceSpeed": 0.35,
     "windInfluence": 1.5,
     "sizeStart": 0.012,
     "sizeEnd": 0.012,
-    "colorStart": [1.0, 0.92, 0.55, 1.0],
-    "colorEnd": [1.0, 0.92, 0.55, 1.0],
+    "colorStart": [
+     1.0,
+     0.92,
+     0.55,
+     1.0
+    ],
+    "colorEnd": [
+     1.0,
+     0.92,
+     0.55,
+     1.0
+    ],
     "emissive": 1.3,
     "blend": "additive",
     "softness": 0.15,
     "velocityStretch": 0.0,
     "scatterStrength": 0.55,
-    "scatterAnisotropy": 0.80,
+    "scatterAnisotropy": 0.8,
     "fogCoupling": 0.6
    }
   }

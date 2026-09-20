@@ -277,15 +277,6 @@
      "curveAmount": 2.0
     },
     {
-     "path": "particles/season-leaves/spawnRate",
-     "component": -1,
-     "min": 0.0,
-     "max": 260.0,
-     "op": "replace",
-     "curve": "scurve",
-     "curveAmount": 2.2
-    },
-    {
      "path": "particles/season-snow/spawnRate",
      "component": -1,
      "min": 0.0,
@@ -293,6 +284,24 @@
      "op": "replace",
      "curve": "exp",
      "curveAmount": 3.0
+    },
+    {
+     "path": "particles/season-leaves/spawnRate",
+     "component": -1,
+     "min": 0.0,
+     "max": 560.0,
+     "op": "replace",
+     "curve": "linear",
+     "curveAmount": 1.0
+    },
+    {
+     "path": "particles/season-leaves/spawnRate",
+     "component": -1,
+     "min": 1.0,
+     "max": 0.0,
+     "op": "multiply",
+     "curve": "exp",
+     "curveAmount": 2.6
     }
    ]
   }
