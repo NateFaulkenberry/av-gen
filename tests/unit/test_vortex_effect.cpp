@@ -16,7 +16,7 @@
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
 #include "ui/editor_layout.hpp"
-#include "ui/ui_logic.hpp"
+#include "world/world_effects/effect_registry.hpp"
 #include "ui/world_effects_panel.hpp"
 #include "world/atmospheric_params.hpp"
 #include "world/atmospherics.hpp"
@@ -223,11 +223,13 @@ TEST_CASE("every parameter the World Effects panel asks a vortex for exists",
         CHECK(p->flags().modulatable);
         CHECK(p->flags().serialized);
     };
-    for (const ui::EffectRow& r : ui::vortexRows()) {
-        requireLeaf(r.leaf);
-    }
-    for (const ui::EffectRow& r : ui::vortexAdvancedRows()) {
-        requireLeaf(r.leaf);
+    // ADR-500: the vortex's rows are its schema's, which is also what the panel walks -- so this
+    // asks the same question of the same data the panel asks (ADR-382).
+    const world::EffectSchema* schema = world::effectSchema(world::AtmosphereKind::Vortex);
+    REQUIRE(schema != nullptr);
+    REQUIRE(schema->fields.size() > 10);
+    for (const world::EffectField& f : schema->fields) {
+        requireLeaf(f.leaf);
     }
     // The lifetime rows the panel draws for every kind, and the enable toggle on its header.
     for (const char* leaf : {"enabled", "delay", "fadeIn", "fadeOut", "lifetime", "repeat",

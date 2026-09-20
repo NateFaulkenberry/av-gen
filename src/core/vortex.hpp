@@ -64,6 +64,60 @@ struct VortexField {
     float smokeBillow = 0.0f;
     float detail = 0.2f;
 
+    // ---- the macro structure (Vortex 2.0 brief §7-§11) -------------------------------------
+    //
+    // Why these exist, stated once and here because it is the load-bearing finding of the audit:
+    // BEFORE them, this field's envelope was `voidMask * rim * vert` -- monotone in radius,
+    // *completely uniform in angle*, and smooth in height. It contained no structure whatever.
+    // Every feature anybody has ever seen in this effect came out of the three fBMs below, which
+    // is why the owner reads it as "procedural noise / stippled particles": structurally that is
+    // exactly what it is, noise draped on a smooth cone. No step count and no band-limit can fix
+    // that, because there is nothing underneath to resolve -- which is also why ADR-389's strict
+    // Nyquist clamp came back a flat teal wash rather than a coarse cyclone.
+    //
+    // Everything below is ANALYTIC: trigonometry and smoothsteps, no noise, a handful of ALU per
+    // sample. That matters twice over. It is band-limited by construction, so it survives the
+    // 125-metre sample spacing the march actually has; and it costs nothing, so it does not move
+    // the measurement the architecture decision turns on.
+    //
+    // All of it defaults off (`bandArms` and `eyeWallGain` at 0, `eyeWallWidth` at the 0.22
+    // ADR-374 hardcoded), so a scene that
+    // does not ask for a cyclone gets byte-for-byte ADR-389's funnel.
+
+    // §8: the eye. NOT a new radius -- `innerVoid` above already is one, and adding a second
+    // would have left whichever of the two was not in charge as a slider that silently does
+    // nothing. The per-field reachability probe in the parity test caught exactly that on the
+    // first attempt (`changing innerVoid moved 0 of 160 GPU samples`) and it is the reason this
+    // is written the way it is: the eye is `innerVoid` given a WALL, not a second control.
+    //
+    // §9: the wall itself. `eyeWallWidth` is how far, as a fraction of the mouth radius, the
+    // density takes to climb out of the eye -- it replaces a hardcoded 0.22, and 0.22 is its
+    // default, so nothing moves until somebody asks. `eyeWallGain` is how much denser the crest
+    // of the ring is than the body of the storm; a hurricane's silhouette from orbit IS that
+    // ring, and without it the densest place in frame is wherever the noise happens to peak.
+    float eyeWallWidth = 0.22f;
+    float eyeWallGain = 0.0f;
+    // §10/§11: logarithmic spiral bands, in the ENVELOPE rather than in the noise. `bandArms` is
+    // the primary arm count and 0 is off. `bandPitchDegrees` is the spiral's pitch angle -- the
+    // angle the arm makes with the circle it crosses, which is the quantity a meteorologist and an
+    // artist both name; real rainbands run 10 to 25 degrees. `bandDepth` is the contrast, and
+    // `bandHarmonic` the weight of the two finer nested scales §11 asks for (3x and 7x the arm
+    // count, at a third and a ninth of the depth).
+    //
+    // ADR-389's family rule, obeyed on purpose: the band term is written `1 + depth * cos(...)`
+    // and not `mix(1, 0.5 + 0.5 cos(...), depth)`, so its mean over angle is EXACTLY 1 whatever
+    // the depth. `density` and `emission` are per-metre coefficients calibrated against the mean
+    // of this field, and a band function with mean 0.5 would have halved the medium under them.
+    float bandArms = 0.0f;
+    float bandPitchDegrees = 18.0f;
+    float bandDepth = 0.0f;
+    float bandHarmonic = 0.0f;
+    // §53, the owner's second failure test, as a control rather than as a code edit: the weight of
+    // the whole fBM stack against a flat field. At 0 the density IS the macro envelope, which is
+    // both the diagnostic §5 demands before any detail is added and the arm §53 will be judged
+    // on. One parameter, so the test and the tool are the same thing.
+    float cloudNoise = 1.0f;
+
     [[nodiscard]] bool active() const { return radius > 0.0f; }
 };
 
@@ -78,8 +132,10 @@ struct VortexUniforms {
     glm::vec4 v3{0.0f}; // x = breathAmount, y = breathSpeed, z/w = (appearance, unused here)
     glm::vec4 v4{0.0f}; // x = funnelDepth, y = throat, z = throatDensity, w = 0
     glm::vec4 v6{0.0f}; // ADR-389: smokeWarp, smokeBillow, detail, 0
+    glm::vec4 v7{0.0f}; // §9/§53: eyeWallWidth, eyeWallGain, cloudNoise, 0
+    glm::vec4 v8{0.0f}; // §10/§11: bandArms, band cotangent, bandDepth, bandHarmonic
 };
-static_assert(sizeof(VortexUniforms) == 96);
+static_assert(sizeof(VortexUniforms) == 128);
 
 [[nodiscard]] VortexUniforms packVortex(const VortexField& field);
 
@@ -103,8 +159,10 @@ struct VortexSample {
     // 0 at the mouth, 1 at the throat. Above the mouth it is 0, which is a fact worth stating
     // because assuming otherwise is precisely ADR-374's upward-cylinder bug.
     float depthT = 0.0f;
-    // The envelope alone, without the filament noise: the smooth funnel wall. Cheap for a consumer
-    // that wants containment rather than appearance (a spawn test, a debug overlay).
+    // The envelope alone, without the filament noise: the smooth funnel wall -- now including the
+    // eye, the eye wall and the spiral bands, because those are macro STRUCTURE and not detail.
+    // Cheap for a consumer that wants containment rather than appearance (a spawn test, a debug
+    // overlay), and it is exactly what §5's diagnostic render shows.
     float envelope = 0.0f;
 };
 

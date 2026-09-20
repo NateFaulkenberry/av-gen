@@ -8,7 +8,7 @@
 
 #include "core/vortex.hpp"
 #include "core/wind.hpp"
-#include "ui/ui_logic.hpp"
+#include "world/world_effects/effect_registry.hpp"
 #include "world/atmospherics.hpp"
 #include "world/world_effects/effect_conformance.hpp"
 #include "world/world_effects/field_bus.hpp"
@@ -268,12 +268,14 @@ TEST_CASE("the subscription survives save and load, both halves",
 
 TEST_CASE("every kind registers the leaf the panel's field row names",
           "[world][atmospherics][fields][conformance][ui]") {
-    // ADR-382, and the reason `atmosphericFlowRows()` is a table rather than a literal inside an
-    // ImGui call: a leaf five characters wrong draws an empty box and says nothing. The panel and
-    // this test read the same data, so they cannot disagree.
+    // ADR-382, and ADR-500's form of it: the shared rows are a table the panel walks by leaf, so
+    // the panel and this test read the same data and cannot disagree. A leaf five characters wrong
+    // draws an empty box and says nothing.
     std::vector<std::string_view> leaves;
-    for (const ui::EffectRow& r : ui::atmosphericFlowRows()) {
-        leaves.push_back(r.leaf);
+    for (const world::EffectField& f : world::sharedEffectFields()) {
+        if (std::string_view(f.leaf) == "flowInfluence") {
+            leaves.push_back(f.leaf);
+        }
     }
     REQUIRE_FALSE(leaves.empty());
 

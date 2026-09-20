@@ -5129,6 +5129,8 @@ RenderSettings Application::renderSettingsFromOptions() const {
     // on a `--render` produced a byte-identical sequence -- an attribution arm that cannot fail.
     s.disablePasses = options_.disablePasses;
     s.qualityArms = options_.qualityArms;
+    // ADR-521: and the warm-up, for the same reason. See RenderSettings::particleWarmUpFrames.
+    s.particleWarmUpFrames = options_.particleWarmUpFrames;
     // `--tier` used to reach the interactive renderer and stop there, so `--render out --tier
     // realtime` -- the fast proof everyone wants before committing an hour to a sequence -- still
     // rendered at the offline tier. Exactly ADR-147's defect one flag over.

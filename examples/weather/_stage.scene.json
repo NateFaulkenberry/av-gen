@@ -1,0 +1,71 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Weather stage",
+ "_note": "The backdrop every weather scene in this directory includes as a `scene` node, so that the rain, the snow and the ashfall are being judged against the same geometry, the same distances and the same silhouettes. Nothing here is weather. It is: a ground plane whose top face is exactly y = 0 (which is the number every collision response in this directory uses), three rings of trees at 17 m, 27 m and 44 m so a particle field has near, middle and far silhouettes to be read against, and a scatter of rocks the camera can see the ground response land on. The camera, the environment and the sky belong to the individual scenes, because an overcast downpour and a still snowfall do not want the same sky and pretending they do is how one lighting setup gets called four effects.",
+ "camera": {"mode": 1, "position": [0.0, 1.7, 8.0], "target": [0.0, 1.4, -6.0], "fov": 44.0, "orbitSpeed": 0.0},
+ "environment": {"intensity": 1.0},
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "procedural",
+   "procedural": {
+    "source": {"kind": "box", "size": [400.0, 0.6, 400.0], "subdivisions": 2},
+    "distribution": {"kind": "single"},
+    "distributionTransform": {"position": [0, -0.3, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
+    "material": {"baseColor": [0.026, 0.030, 0.024], "roughness": 0.78, "metallic": 0.0}
+   }
+  },
+  {
+   "name": "rocks",
+   "kind": "procedural",
+   "procedural": {
+    "source": {"kind": "mesh", "asset": "../../assets/kenney/rock_largeA.glb"},
+    "distribution": {"kind": "radial", "count": 14, "radius": 9.0, "plane": "xz", "orientation": "none", "center": [0.0, 0.0, -4.0]},
+    "ops": [{"kind": "scatter", "range": [4.2, 0.0, 4.2], "seed": 601}],
+    "variation": {"seed": 601, "randomRotation": [0.05, 3.14159, 0.05], "randomUniformScale": 0.5},
+    "material": {"baseColor": [0.043, 0.045, 0.048], "roughness": 0.85, "metallic": 0.0},
+    "materialVariation": {"valueRandom": 0.22, "roughnessRandom": 0.12}
+   }
+  },
+  {
+   "name": "treesNear",
+   "kind": "procedural",
+   "procedural": {
+    "source": {"kind": "mesh", "asset": "../../assets/kenney/tree_tall.glb"},
+    "distribution": {"kind": "radial", "count": 16, "radius": 17.0, "plane": "xz", "orientation": "none", "center": [0.0, 0.0, -7.0]},
+    "ops": [
+     {"kind": "scatter", "range": [3.7, 0.0, 3.7], "seed": 211},
+     {"kind": "filterDistance", "pivot": [0.0, 0.0, 8.0], "minDistance": 0.0, "maxDistance": 7.0, "invert": true}
+    ],
+    "variation": {"seed": 211, "randomRotation": [0.03, 3.14159, 0.03], "randomUniformScale": 0.4},
+    "material": {"baseColor": [0.022, 0.048, 0.026], "roughness": 0.82, "metallic": 0.0},
+    "materialVariation": {"valueRandom": 0.24, "roughnessRandom": 0.15}
+   }
+  },
+  {
+   "name": "treesMid",
+   "kind": "procedural",
+   "procedural": {
+    "source": {"kind": "mesh", "asset": "../../assets/kenney/tree_thin.glb"},
+    "distribution": {"kind": "radial", "count": 22, "radius": 28.0, "plane": "xz", "orientation": "none", "center": [0.0, 0.0, -7.0]},
+    "ops": [{"kind": "scatter", "range": [6.0, 0.0, 6.0], "seed": 223}],
+    "variation": {"seed": 223, "randomRotation": [0.03, 3.14159, 0.03], "randomUniformScale": 0.4},
+    "material": {"baseColor": [0.019, 0.040, 0.030], "roughness": 0.84, "metallic": 0.0},
+    "materialVariation": {"valueRandom": 0.24, "roughnessRandom": 0.15}
+   }
+  },
+  {
+   "name": "treesFar",
+   "kind": "procedural",
+   "procedural": {
+    "source": {"kind": "mesh", "asset": "../../assets/kenney/tree_plateau.glb"},
+    "distribution": {"kind": "radial", "count": 28, "radius": 46.0, "plane": "xz", "orientation": "none", "center": [0.0, 0.0, -7.0]},
+    "ops": [{"kind": "scatter", "range": [9.7, 0.0, 9.7], "seed": 227}],
+    "variation": {"seed": 227, "randomRotation": [0.03, 3.14159, 0.03], "randomUniformScale": 0.45},
+    "material": {"baseColor": [0.016, 0.031, 0.024], "roughness": 0.85, "metallic": 0.0},
+    "materialVariation": {"valueRandom": 0.24, "roughnessRandom": 0.15}
+   }
+  }
+ ]
+}

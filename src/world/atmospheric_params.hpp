@@ -51,9 +51,11 @@ struct AtmosphericParams {
     std::string name;
     AtmosphereKind kind = AtmosphereKind::Comet;
     params::Parameter<bool>* enabled = nullptr;
-    std::vector<params::IParameter*> floats; // parallel to floatFields(kind)
-    std::vector<params::IParameter*> colors; // parallel to colorFields(kind)
-    std::vector<params::IParameter*> flags;  // parallel to boolFields(kind)
+    // ADR-500: one entry per row of `effectSchema(kind)->fields`, then one per row of
+    // `sharedEffectFields()`, in that order. A single vector rather than three because the schema is
+    // a single ordered list -- three would reintroduce the positional bookkeeping that made
+    // `copyParameters` count floats, colours and bools separately and get it right by inspection.
+    std::vector<params::IParameter*> values;
 };
 
 struct AtmosphericParameters {
@@ -80,6 +82,11 @@ void applyAtmosphericParameters(const AtmosphericParameters& registered,
 // this frame's beat on them, and writing those back would bake the music into the file.
 void captureAtmosphericParameters(const AtmosphericParameters& registered,
                                   std::vector<AtmosphericEffect>& authored);
+
+// ADR-500: every one of the functions below is now one loop over the kind's schema. The five
+// hand-written per-kind lists ADR-392 counted -- `toJson`, `fromJson`, `sanitise`, the style presets
+// and this file's own `defaultAtmosphericRoutes` -- are gone; each effect declares its own in
+// `world_effects/effects/<name>_effect.cpp`.
 
 // The default modulation routes for an effect of this kind, as data.
 //

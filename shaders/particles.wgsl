@@ -70,7 +70,11 @@ struct Particle {
     seed: f32,
     size: f32,
     trailWrites: f32, // history samples written since birth (ADR-040); 0 at emit
-    pad: f32,
+    // ADR-520: which life the particle is living. 0 = the primary one, 1 = the splash ring it
+    // became when it hit the ground. This was `pad`, so the struct's size and layout are
+    // unchanged and every existing pool is bit-identical: a system with no collision response
+    // writes 0 here exactly where it used to write 0 there.
+    stage: f32,
 };
 
 struct Params {
@@ -115,6 +119,15 @@ struct Params {
     windGust: vec4<f32>,
     windTurb: vec4<f32>,
     windMix: vec4<f32>, // x = how much of the flow a particle catches, yzw = 0
+    // ---- ADR-520 ----
+    volume: vec4<f32>,   // volumeFollow.xyz (per-axis 0..1), w = 1 when the box wraps
+    collide: vec4<f32>,  // response (0 none, 1 kill, 2 bounce, 3 splash), height, restitution, splashSize
+    collide2: vec4<f32>, // splashLifetime, ringThickness, dragSizeBias, 0
+    pulse: vec4<f32>,    // rate (Hz, 0 = off), depth, sync, sharpness
+    cluster: vec4<f32>,  // cluster count (0 = off), cluster radius, pause rate, pause fraction
+    scatter: vec4<f32>,  // scatter strength, HG anisotropy, size variance, size skew
+    sun: vec4<f32>,      // xyz = unit direction TOWARDS the key light, w = 1 when it is usable
+    sunColor: vec4<f32>, // rgb = the key light's colour times its intensity
     curves: vec4<u32>,      // size key count, colour key count, opacity key count, glow slot
     counts: vec4<u32>,      // emitCount, capacity, blend (0 additive, 1 alpha), scan blocks
     fieldInfo: vec4<u32>,   // x = field force count, y = spline slot + 1 (0 = none)
@@ -173,6 +186,22 @@ struct Counters {
 fn rand3(slot: u32, frame: u32, salt: u32) -> vec3<f32> {
     let h = pcg3d(vec3<u32>(slot, frame + u32(params.sim.w) * 7919u, salt));
     return vec3<f32>(h) * (1.0 / 4294967296.0);
+}
+
+// ADR-520: a hash that does NOT mix the frame. A cluster centre has to be the same place at every
+// time the shot can be scrubbed to, so a firefly swarm is a swarm over a second rather than a
+// uniform field resampled sixty times. rand3 above deliberately mixes `frame`, which is exactly
+// wrong here, and using it was the first version of this and the clusters strobed.
+fn clusterRand(cluster: u32, salt: u32) -> vec3<f32> {
+    let h = pcg3d(vec3<u32>(cluster * 2654435761u, u32(params.sim.w) * 7919u, salt));
+    return vec3<f32>(h) * (1.0 / 4294967296.0);
+}
+
+// ADR-520: where the emitter box actually is this frame. `volumeFollow` is per axis so rain can
+// track the camera across the valley (x, z) while staying pinned to the sky (y) if that is what
+// the author wants -- and all-zero, the default, is the world-anchored emitter this always had.
+fn emitterCentre() -> vec3<f32> {
+    return params.emitterPos.xyz + params.cameraPos.xyz * params.volume.xyz;
 }
 
 fn hash3(p: vec3<f32>) -> f32 {
@@ -253,6 +282,7 @@ fn cs_emit(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     var p: Particle;
     let shape = params.emitterPos.w;
+    let centre = emitterCentre();
     var offset = vec3<f32>(0.0);
     var baseDir = normalize(params.direction.xyz + vec3<f32>(1e-5, 0.0, 0.0));
     if (shape > 3.5) {
@@ -285,7 +315,23 @@ fn cs_emit(@builtin(global_invocation_id) gid: vec3<u32>) {
     } else if (shape > 0.5) {
         offset = sphereDir(r1.xy) * pow(r1.z, 1.0 / 3.0) * params.extent.x;
     }
-    p.position = params.emitterPos.xyz + offset;
+    // ADR-520: clustering. The offset the emitter shape just produced is re-used as the CLUSTER's
+    // place rather than the particle's -- so the clusters are distributed exactly the way the
+    // author shaped the emitter, and the particles are distributed about them. Drawing the cluster
+    // centre from its own uniform box instead would have quietly ignored the emitter shape, which
+    // is how a disc emitter ends up spawning a cube of fireflies.
+    let clusterCount = u32(max(params.cluster.x, 0.0));
+    if (clusterCount > 0u) {
+        let c = slot % clusterCount;
+        let cr = clusterRand(c, 17u);
+        var cOffset = (cr * 2.0 - 1.0) * params.extent.xyz;
+        if (shape > 0.5 && shape < 1.5) {
+            cOffset = sphereDir(cr.xy) * pow(cr.z, 1.0 / 3.0) * params.extent.x;
+        }
+        let jitter = sphereDir(r1.xy) * pow(r1.z, 1.0 / 3.0) * params.cluster.y;
+        offset = cOffset + jitter;
+    }
+    p.position = centre + offset;
     let randomDir = sphereDir(r2.xy);
     let dir = normalize(mix(baseDir, randomDir, params.extent.w) + vec3<f32>(1e-5));
     let speed = mix(params.speedLife.x, params.speedLife.y, r2.z);
@@ -295,9 +341,26 @@ fn cs_emit(@builtin(global_invocation_id) gid: vec3<u32>) {
     // fixed lifetime dies on a predictable frame.
     p.life = params.speedLife.z + (params.speedLife.w - params.speedLife.z) * r3.x;
     p.seed = r3.y;
-    p.size = mix(0.7, 1.3, r3.z);
+    // ADR-520: layered scale. variance 0.3 with skew 1 is exactly the mix(0.7, 1.3, r) this was,
+    // bit for bit, so nothing that does not ask changes; skew above 1 pushes the distribution down
+    // and gives a population of many small and a few large, which is what drops, flakes, motes and
+    // embers actually look like and what uniform randomness never does.
+    let sizeVariance = clamp(params.scatter.z, 0.0, 1.0);
+    let sizeSkew = max(params.scatter.w, 0.05);
+    let sizeRoll = select(pow(r3.z, sizeSkew), r3.z, abs(sizeSkew - 1.0) < 1e-6);
+    p.size = mix(1.0 - sizeVariance, 1.0 + sizeVariance, sizeRoll);
     p.trailWrites = 0.0; // a fresh particle has no history, so its ribbon grows from nothing
-    p.pad = 0.0;
+    p.stage = 0.0;      // ADR-520: born into its primary life
+    // ADR-520: the emission mask. The spawn survives with probability equal to the field's scalar
+    // at the spawn point, so a front's leading edge is a gradient of density rather than a wall.
+    // A slot that loses the roll is born dead and is returned to the free list by this frame's
+    // compaction, so the pool is not held hostage by a mask that is currently zero everywhere.
+    let maskSlot = i32(params.fieldInfo.z) - 1;
+    if (maskSlot >= 0) {
+        if (rand3(slot, frame, 9u).x >= clamp(fieldScalar(maskSlot, p.position), 0.0, 1.0)) {
+            p.life = 0.0;
+        }
+    }
     particles[slot] = p;
 }
 
@@ -316,6 +379,14 @@ fn cs_simulate(@builtin(global_invocation_id) gid: vec3<u32>) {
         p.life = 0.0;
         particles[slot] = p;
         scratch[slot] = 0u;
+        return;
+    }
+    // ADR-520: a splash ring is not a particle in flight. It sits on the ground, it does not fall,
+    // and above all it cannot collide a second time -- gravity pulling it back through the plane
+    // it is lying on would re-trigger the response every frame and it would never die.
+    if (p.stage > 0.5) {
+        particles[slot] = p;
+        scratch[slot] = 1u;
         return;
     }
     // Trail history (ADR-040): record where the particle *was* at the start of this step, so the
@@ -387,8 +458,58 @@ fn cs_simulate(@builtin(global_invocation_id) gid: vec3<u32>) {
             p.velocity += fv * (a.z * dt);
         }
     }
-    p.velocity *= max(0.0, 1.0 - params.direction.w * dt);
+    // ADR-520: drag that knows how big the particle is. bias 0 -- the default -- is exactly
+    // `params.direction.w`, so this multiply changes nothing for a system that has not asked.
+    let dragBias = clamp(params.collide2.z, 0.0, 1.0);
+    let effectiveDrag = params.direction.w * mix(1.0, 1.0 / max(p.size, 0.05), dragBias);
+    p.velocity *= max(0.0, 1.0 - effectiveDrag * dt);
+    // ADR-520: dart and hover. Real flying insects do not cruise; they move, stop, hang, and move
+    // again, and a field of particles all moving at once is the "identical particle motion" the
+    // quality bar names. The phase is per particle, so at any instant some of the swarm is still
+    // and some is not -- which is the readable difference between a swarm and a snowfall.
+    if (params.cluster.z > 0.0) {
+        let phase = fract(params.sim.y * params.cluster.z + p.seed * 7.13 + f32(slot % 101u) * 0.0099);
+        let share = clamp(params.cluster.w, 0.0, 1.0);
+        let paused = 1.0 - smoothstep(max(share - 0.06, 0.0), share + 0.06, phase);
+        p.velocity *= max(0.0, 1.0 - paused * 9.0 * dt);
+    }
     p.position += p.velocity * dt;
+    // ADR-520: the ground. Tested after integration, so the contact is found on the step that
+    // crossed the plane rather than one step late.
+    let collideMode = u32(params.collide.x + 0.5);
+    if (collideMode > 0u && p.position.y < params.collide.y) {
+        if (collideMode == 1u) { // kill
+            p.life = 0.0;
+            particles[slot] = p;
+            scratch[slot] = 0u;
+            return;
+        } else if (collideMode == 2u) { // bounce
+            let e = clamp(params.collide.z, 0.0, 1.0);
+            p.position.y = params.collide.y + (params.collide.y - p.position.y) * e;
+            p.velocity.y = abs(p.velocity.y) * e;
+            // Tangential friction scaled by the same number: a dead bounce also stops sliding.
+            p.velocity.x *= mix(0.35, 1.0, e);
+            p.velocity.z *= mix(0.35, 1.0, e);
+        } else { // splash: the second life
+            p.position.y = params.collide.y;
+            p.velocity = vec3<f32>(0.0);
+            p.age = 0.0;
+            p.life = max(params.collide2.x, 1e-3);
+            p.stage = 1.0;
+            particles[slot] = p;
+            scratch[slot] = 1u;
+            return;
+        }
+    }
+    // ADR-520: the wrapping volume. A particle that leaves the box re-enters on the opposite face,
+    // so the field is steady instead of blooming in and fading out once per lifetime. Pure function
+    // of position: no accumulation, nothing to diverge between two renders of the same second.
+    if (params.volume.w > 0.5) {
+        let c = emitterCentre();
+        let half = max(params.extent.xyz, vec3<f32>(1e-3));
+        let rel = p.position - c + half;
+        p.position = c - half + (rel - floor(rel / (2.0 * half)) * (2.0 * half));
+    }
     particles[slot] = p;
     scratch[slot] = 1u;
 }
@@ -658,7 +779,62 @@ struct VsOut {
     @location(4) nowClip: vec4<f32>,  // this frame's clip position; @builtin(position) is in
                                       // framebuffer pixels with w = 1 / clip.w, so dividing that
                                       // by its own w would not give NDC (see common.wgsl).
+    // ADR-520: which silhouette the fragment stage should cut. 0 = the shape `params.leaf.x`
+    // selects, 1 = the splash ring, whose stage is a property of the PARTICLE and not of the
+    // system -- which is why it cannot be read from the uniforms the way `leaf` is.
+    @location(5) ringMask: f32,
 };
+
+// ---- ADR-520: the flash and the light ------------------------------------------------------
+// One oscillator. `sync` is the whole reason this is one feature and not two: at 0 the phase is
+// the particle's own and the field twinkles at random, at 1 every particle shares one phase and
+// the field flashes as a chorus. `sharpness` is the exponent that turns the sine into a blink.
+fn pulseGain(seed: f32, slot: u32) -> f32 {
+    let rate = params.pulse.x;
+    if (rate <= 0.0) { return 1.0; }
+    let own = seed * 6.28318530718 + f32(slot % 257u) * 0.3917;
+    let phase = params.sim.y * rate * 6.28318530718 + own * (1.0 - clamp(params.pulse.z, 0.0, 1.0));
+    let wave = pow(max(0.5 + 0.5 * sin(phase), 0.0), max(params.pulse.w, 0.05));
+    return mix(1.0, wave, clamp(params.pulse.y, 0.0, 1.0));
+}
+
+// Henyey-Greenstein. `g` -> 1 concentrates the scattered light into the forward direction, which
+// is why a mote is nearly invisible across the sun and blazes when you look into it. `cosTheta` is
+// between the direction the light TRAVELS and the direction the view ray travels.
+fn scatterGain(world: vec3<f32>) -> vec3<f32> {
+    let strength = params.scatter.x;
+    if (strength <= 0.0 || params.sun.w < 0.5) { return vec3<f32>(1.0); }
+    let toEye = normalize(params.cameraPos.xyz - world);
+    // params.sun.xyz points TOWARDS the light, so the light travels along -sun; the view ray
+    // travels along -toEye. cos between them is dot(-sun, -toEye) = dot(sun, toEye).
+    let cosTheta = clamp(dot(params.sun.xyz, toEye), -1.0, 1.0);
+    let g = clamp(params.scatter.y, -0.95, 0.95);
+    let gg = g * g;
+    let denom = max(1.0 + gg - 2.0 * g * cosTheta, 1e-4);
+    let hg = (1.0 - gg) / (4.0 * 3.14159265 * pow(denom, 1.5));
+    // The term is ADDED to the particle's own brightness, never subtracted from it.
+    //
+    // The first version of this was `1 + strength * (4*pi*hg - 1)`, which normalises the phase
+    // function so that an isotropic phase at strength 1 is exactly no change. That is the correct
+    // normalisation and it is the wrong control: a phase function redistributes a fixed amount of
+    // light, so anything outside the forward lobe comes out DARKER, and at the strengths this
+    // effect wants -- 5 and up, because the whole point is a mote that blazes -- the bracket goes
+    // below -1/strength and every mote outside a narrow cone renders at exactly zero. Measured:
+    // the dust-motes scene rendered 74 pixels above 200 with scatterStrength 0 and 0 pixels with
+    // scatterStrength 1; the motes had not got dimmer, they had been multiplied by a negative
+    // number and clamped away.
+    //
+    // A real mote is lit by the whole sky as well as by the sun. So: it keeps what it had, and the
+    // key light ADDS. `strength` is then monotone -- more is always more -- and 0 is still exactly
+    // off, which is the property that keeps every existing system bit-identical.
+    let lit = 1.0 + strength * (4.0 * 3.14159265 * hg);
+    // The light's HUE, not its radiance: `sunColor` is already multiplied by an intensity that is
+    // routinely 8, and multiplying a particle by that would make "tint it slightly like the sun"
+    // into "make it eight times brighter", which is the unit bug this repository keeps paying for.
+    let sc = params.sunColor.rgb;
+    let peak = max(max(sc.r, sc.g), max(sc.b, 1e-4));
+    return mix(vec3<f32>(1.0), sc / peak, 0.35) * max(lit, 0.0);
+}
 
 // The scene pass writes five colour targets (ADR-035); particles fill the colour and the velocity
 // and leave the surface targets to the geometry behind them (their write masks are off).
@@ -675,6 +851,7 @@ fn vs_particle(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32)
     let slot = aliveRead[ii];
     let p = particlesRead[slot];
     let t = clamp(p.age / max(p.life, 1e-4), 0.0, 1.0);
+    let isRing = p.stage > 0.5; // ADR-520
     let size = particleSize(t) * p.size;
     var corners = array<vec2<f32>, 6>(vec2<f32>(-1.0, -1.0), vec2<f32>(1.0, -1.0), vec2<f32>(-1.0, 1.0),
                                       vec2<f32>(-1.0, 1.0), vec2<f32>(1.0, -1.0), vec2<f32>(1.0, 1.0));
@@ -726,7 +903,22 @@ fn vs_particle(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32)
         let shutterTravel = screenSpeed * params.cameraPos.w;
         motionLeft = clamp(1.0 - added / max(shutterTravel, 1e-6), 0.0, 1.0);
     }
-    let world = p.position + axisX * (c.x * halfLength) + axisY * (c.y * size * out_size_scale);
+    // ADR-520: the splash ring. It lies FLAT on the ground rather than facing the camera, because
+    // a ripple is a thing on a surface and a camera-facing ring at a grazing angle reads as a
+    // floating hoop. It expands as sqrt(t) -- fast, then slowing -- which is what a disturbance
+    // spreading on a surface does, and is the difference between a ripple and a growing circle.
+    var ringFade = 1.0;
+    if (isRing) {
+        axisX = vec3<f32>(1.0, 0.0, 0.0);
+        axisY = vec3<f32>(0.0, 0.0, 1.0);
+        let radius = params.attractor2.z * p.size * max(params.collide.w, 0.0) * sqrt(t);
+        halfLength = radius;
+        out_size_scale = 1.0;
+        // Guaranteed to die invisible. Without this a ring whose opacity curve ends above zero
+        // would vanish on a frame boundary, which is exactly the pop a ripple must not have.
+        ringFade = 1.0 - t;
+    }
+    let world = p.position + axisX * (c.x * halfLength) + axisY * (c.y * select(size * out_size_scale, halfLength, isRing));
     var out: VsOut;
     out.clip = params.viewProj * vec4<f32>(world, 1.0);
     out.nowClip = out.clip;
@@ -734,7 +926,11 @@ fn vs_particle(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32)
     out.prevClip = params.prevViewProj * vec4<f32>(prevWorld, 1.0);
     out.uv = c;
     out.world = world;
-    out.color = vec4<f32>(particleTint(t, p.seed) * faceLit, particleAlpha(t));
+    // ADR-520: the flash and the light. Both are multipliers on the tint, so a system that asks
+    // for neither (rate 0, strength 0) gets exactly 1 from both and is bit-identical.
+    let lit = faceLit * pulseGain(p.seed, slot);
+    out.color = vec4<f32>(particleTint(t, p.seed) * lit * scatterGain(world), particleAlpha(t) * ringFade);
+    out.ringMask = select(0.0, 1.0, isRing);
     if (p.life <= 0.0) { out.clip = vec4<f32>(0.0, 0.0, 2.0, 1.0); } // cull dead (never drawn)
     return out;
 }
@@ -797,6 +993,7 @@ fn vs_ribbon(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -
     let tint = mix(vec3<f32>(1.0), params.trail2.yzw, u);
     let alpha = particleAlpha(t) * mix(1.0, clamp(params.trail2.x, 0.0, 1.0), u);
     out.color = vec4<f32>(particleTint(t, p.seed) * tint, alpha);
+    out.ringMask = 0.0; // ADR-520: a ribbon is never a ring
     if (p.life <= 0.0) { out.clip = vec4<f32>(0.0, 0.0, 2.0, 1.0); }
     return out;
 }
@@ -899,10 +1096,29 @@ fn leafCoverage(uv: vec2<f32>) -> f32 {
     return cover * rib;
 }
 
+// ADR-520: the ring a splash leaves. An annulus with a soft inner and outer wall, brightest at
+// its crest. `ringThickness` 1 collapses it to a filled disc, which is the other useful shape a
+// landing makes (a spreading bloom rather than a ripple) and costs no second code path.
+fn ringCoverage(uv: vec2<f32>, thickness: f32) -> f32 {
+    let r = length(uv);
+    if (r > 1.0) { return 0.0; }
+    let w = clamp(thickness, 0.01, 1.0);
+    if (w >= 0.999) { return 1.0 - r * r; }
+    // Distance from the crest, which sits just inside the rim so the ring's leading edge is the
+    // outer one -- that is the direction a ripple travels and the eye reads the bright edge as
+    // the front.
+    let crest = 1.0 - w * 0.5;
+    let d = abs(r - crest) / max(w * 0.5, 1e-3);
+    return clamp(1.0 - d * d, 0.0, 1.0);
+}
+
 @fragment
 fn fs_particle(in: VsOut) -> ParticleOut {
     var falloff: f32;
-    if (params.leaf.x > 0.5) {
+    if (in.ringMask > 0.5) {
+        falloff = ringCoverage(in.uv, params.collide2.y);
+        if (falloff <= 0.0) { discard; }
+    } else if (params.leaf.x > 0.5) {
         falloff = leafCoverage(in.uv);
         if (falloff <= 0.0) { discard; }
     } else {

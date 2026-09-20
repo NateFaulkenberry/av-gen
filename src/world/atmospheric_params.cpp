@@ -1,301 +1,21 @@
 #include "world/atmospheric_params.hpp"
 
 #include "params/parameter_set.hpp"
+#include "world/world_effects/effect_registry.hpp"
 
 #include <algorithm>
 
 namespace avgen::world {
 namespace {
 
-using Effect = AtmosphericEffect;
-
-// ---- the tables ----------------------------------------------------------------------------------
+// ADR-500. This file used to hold the tables: four `constexpr FloatField[]`s, three `switch`es to
+// pick one, `sanitise` as a list of fifteen clamps, and `defaultAtmosphericRoutes` as a `switch`
+// with an arm per kind. All four are gone. Each effect declares its rows, its clamps and its routes
+// in its own file, and what is left here is the three loops -- register, apply, capture -- that
+// ADR-387 correctly identified as the part of the design that was already right.
 //
-// One row per parameter, carrying its range and an accessor pair. Register, apply and capture are
-// each one loop over these, so a parameter that exists works in all three directions or in none --
-// which is the failure `effect_params.cpp`'s three parallel lists can have and this cannot.
-//
-// The soft range is what the UI offers; the hard range is what a modulation route is clamped to. The
-// two differ wherever an authored value may legitimately go past what a slider should reach for --
-// every HDR radiance here has a hard ceiling well above its soft one, because a route driving a
-// comet's core on a drop is exactly the thing this system is for.
-
-struct FloatField {
-    const char* leaf;
-    float lo, hi, slo, shi;
-    float (*get)(const Effect&);
-    void (*set)(Effect&, float);
-};
-
-struct ColorField {
-    const char* leaf;
-    glm::vec3 (*get)(const Effect&);
-    void (*set)(Effect&, glm::vec3);
-};
-
-struct BoolField {
-    const char* leaf;
-    bool (*get)(const Effect&);
-    void (*set)(Effect&, bool);
-};
-
-#define F_GET(expr) +[](const Effect& e) { return (expr); }
-#define F_SET(lhs) +[](Effect& e, float v) { (lhs) = v; }
-#define C_SET(lhs) +[](Effect& e, glm::vec3 v) { (lhs) = v; }
-#define B_SET(lhs) +[](Effect& e, bool v) { (lhs) = v; }
-
-// Lifecycle and ground illumination: the same questions whatever the effect is, so the same rows.
-constexpr FloatField kSharedFloats[] = {
-    {"groundIntensity", 0.0f, 12.0f, 0.0f, 3.0f, F_GET(e.ground.intensity), F_SET(e.ground.intensity)},
-    {"groundRadius", 1.0f, 4000.0f, 20.0f, 800.0f, F_GET(e.ground.radius), F_SET(e.ground.radius)},
-    {"groundFalloff", 0.05f, 8.0f, 0.5f, 4.0f, F_GET(e.ground.falloff), F_SET(e.ground.falloff)},
-    // Timing is float here and double on the effect: ADR-011 says a parameter is float components.
-    {"delay", 0.0f, 300.0f, 0.0f, 20.0f, F_GET(static_cast<float>(e.timing.delay)),
-     +[](Effect& e, float v) { e.timing.delay = v; }},
-    {"lifetime", 0.0f, 900.0f, 0.0f, 60.0f, F_GET(static_cast<float>(e.timing.lifetime)),
-     +[](Effect& e, float v) { e.timing.lifetime = v; }},
-    {"fadeIn", 0.0f, 60.0f, 0.0f, 8.0f, F_GET(static_cast<float>(e.timing.fadeIn)),
-     +[](Effect& e, float v) { e.timing.fadeIn = v; }},
-    {"fadeOut", 0.0f, 60.0f, 0.0f, 8.0f, F_GET(static_cast<float>(e.timing.fadeOut)),
-     +[](Effect& e, float v) { e.timing.fadeOut = v; }},
-    {"windowStart", 0.0f, 3600.0f, 0.0f, 240.0f, F_GET(static_cast<float>(e.timing.windowStart)),
-     +[](Effect& e, float v) { e.timing.windowStart = v; }},
-    {"windowSeconds", 0.0f, 3600.0f, 0.0f, 120.0f, F_GET(static_cast<float>(e.timing.windowSeconds)),
-     +[](Effect& e, float v) { e.timing.windowSeconds = v; }},
-    {"repeat", 0.0f, 600.0f, 0.0f, 30.0f, F_GET(static_cast<float>(e.timing.repeatSeconds)),
-     +[](Effect& e, float v) { e.timing.repeatSeconds = v; }},
-    // §68. How much of the subscribed field's motion this effect takes. Shared rather than per-kind
-    // on purpose, and that is the point ADR-387 was making: ONE row here gives all three kinds a
-    // registered parameter, a modulation target, a timeline key, a preset member, a save entry, and
-    // apply and capture in both directions -- and a fourth kind gets it on the day it is added,
-    // without anybody remembering to.
-    //
-    // 0 is off and is the default, which is what makes every existing scene render unchanged. The
-    // soft ceiling is 2 because 1 is "the field moves this as much as it moves a leaf" and an
-    // artist wants to be able to overdo it; the hard ceiling is 8 because a route driving this from
-    // a drop is entitled to overshoot the slider (ADR-388's rule for `scattering`, applied again).
-    {"flowInfluence", 0.0f, 8.0f, 0.0f, 2.0f, F_GET(e.flow.influence), F_SET(e.flow.influence)},
-};
-
-constexpr ColorField kSharedColors[] = {
-    {"groundColor", F_GET(e.ground.color), C_SET(e.ground.color)},
-};
-
-constexpr FloatField kCometFloats[] = {
-    // Appearance. Every radiance's hard ceiling is far above its soft one: a route driving the core
-    // on a drop is the reason this system exists, and a hard clamp at the slider's end would make
-    // the route do nothing at exactly the moment it matters.
-    {"coreIntensity", 0.0f, 200.0f, 0.0f, 40.0f, F_GET(e.comet.appearance.coreIntensity),
-     F_SET(e.comet.appearance.coreIntensity)},
-    {"headSize", 0.5f, 400.0f, 2.0f, 80.0f, F_GET(e.comet.appearance.headSize), F_SET(e.comet.appearance.headSize)},
-    {"haloIntensity", 0.0f, 60.0f, 0.0f, 10.0f, F_GET(e.comet.appearance.haloIntensity),
-     F_SET(e.comet.appearance.haloIntensity)},
-    {"haloSize", 1.0f, 2000.0f, 10.0f, 400.0f, F_GET(e.comet.appearance.haloSize), F_SET(e.comet.appearance.haloSize)},
-    {"tailIntensity", 0.0f, 80.0f, 0.0f, 15.0f, F_GET(e.comet.appearance.tailIntensity),
-     F_SET(e.comet.appearance.tailIntensity)},
-    {"tailLength", 10.0f, 6000.0f, 100.0f, 2000.0f, F_GET(e.comet.appearance.tailLength),
-     F_SET(e.comet.appearance.tailLength)},
-    {"tailWidth", 1.0f, 600.0f, 5.0f, 200.0f, F_GET(e.comet.appearance.tailWidth), F_SET(e.comet.appearance.tailWidth)},
-    {"tailFalloff", 0.05f, 8.0f, 0.5f, 4.0f, F_GET(e.comet.appearance.tailFalloff),
-     F_SET(e.comet.appearance.tailFalloff)},
-    {"wispAmount", 0.0f, 400.0f, 0.0f, 150.0f, F_GET(e.comet.appearance.wispAmount),
-     F_SET(e.comet.appearance.wispAmount)},
-    {"wispScale", 0.0f, 0.05f, 0.0f, 0.01f, F_GET(e.comet.appearance.wispScale), F_SET(e.comet.appearance.wispScale)},
-    {"flowSpeed", -4.0f, 4.0f, -1.0f, 1.0f, F_GET(e.comet.appearance.flowSpeed), F_SET(e.comet.appearance.flowSpeed)},
-    // Sparkle. `density` is fragments per metre of trail, so its numbers are small: a 900 m tail at
-    // 0.016 sheds fourteen.
-    {"sparkleDensity", 0.0f, 0.2f, 0.0f, 0.05f, F_GET(e.comet.sparkle.density), F_SET(e.comet.sparkle.density)},
-    {"sparkleSize", 0.0f, 1.0f, 0.02f, 0.8f, F_GET(e.comet.sparkle.size), F_SET(e.comet.sparkle.size)},
-    {"sparkleIntensity", 0.0f, 80.0f, 0.0f, 20.0f, F_GET(e.comet.sparkle.intensity), F_SET(e.comet.sparkle.intensity)},
-    {"sparkleSpeed", 0.0f, 12.0f, 0.0f, 4.0f, F_GET(e.comet.sparkle.speed), F_SET(e.comet.sparkle.speed)},
-    // Rainbow.
-    {"rainbowSpeed", -4.0f, 4.0f, -1.0f, 1.0f, F_GET(e.comet.rainbow.speed), F_SET(e.comet.rainbow.speed)},
-    {"rainbowScale", 0.0f, 12.0f, 0.0f, 4.0f, F_GET(e.comet.rainbow.scale), F_SET(e.comet.rainbow.scale)},
-    {"rainbowHue", -4.0f, 4.0f, 0.0f, 1.0f, F_GET(e.comet.rainbow.hueOffset), F_SET(e.comet.rainbow.hueOffset)},
-    {"rainbowSaturation", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.comet.rainbow.saturation),
-     F_SET(e.comet.rainbow.saturation)},
-    {"rainbowBrightness", 0.0f, 4.0f, 0.0f, 2.0f, F_GET(e.comet.rainbow.brightness),
-     F_SET(e.comet.rainbow.brightness)},
-    // Motion.
-    {"startAzimuth", -720.0f, 720.0f, -180.0f, 180.0f, F_GET(e.comet.path.startAzimuth),
-     F_SET(e.comet.path.startAzimuth)},
-    {"startElevation", -20.0f, 89.0f, 0.0f, 80.0f, F_GET(e.comet.path.startElevation),
-     F_SET(e.comet.path.startElevation)},
-    {"endAzimuth", -720.0f, 720.0f, -180.0f, 180.0f, F_GET(e.comet.path.endAzimuth), F_SET(e.comet.path.endAzimuth)},
-    {"endElevation", -20.0f, 89.0f, 0.0f, 80.0f, F_GET(e.comet.path.endElevation), F_SET(e.comet.path.endElevation)},
-    {"distance", 50.0f, 40000.0f, 400.0f, 8000.0f, F_GET(e.comet.path.distance), F_SET(e.comet.path.distance)},
-    {"travelSeconds", 0.05f, 600.0f, 1.0f, 30.0f, F_GET(e.comet.path.travelSeconds),
-     F_SET(e.comet.path.travelSeconds)},
-    {"speed", 0.01f, 20.0f, 0.1f, 4.0f, F_GET(e.comet.path.speedScale), F_SET(e.comet.path.speedScale)},
-    // Floored just above -0.5, where the reparameterisation stops being monotone; the hard range is
-    // what a route is clamped to, so this is the clamp that stops a modulated comet reversing.
-    {"acceleration", -0.45f, 8.0f, -0.4f, 3.0f, F_GET(e.comet.path.acceleration), F_SET(e.comet.path.acceleration)},
-    {"curvature", -4000.0f, 4000.0f, -800.0f, 800.0f, F_GET(e.comet.path.curvature), F_SET(e.comet.path.curvature)},
-    {"arcLift", -4000.0f, 4000.0f, -600.0f, 600.0f, F_GET(e.comet.path.arcLift), F_SET(e.comet.path.arcLift)},
-};
-
-constexpr ColorField kCometColors[] = {
-    {"coreColor", F_GET(e.comet.appearance.coreColor), C_SET(e.comet.appearance.coreColor)},
-    {"haloColor", F_GET(e.comet.appearance.haloColor), C_SET(e.comet.appearance.haloColor)},
-    {"tailColor", F_GET(e.comet.appearance.tailColor), C_SET(e.comet.appearance.tailColor)},
-};
-
-constexpr BoolField kCometBools[] = {
-    {"sparkle", F_GET(e.comet.sparkle.enabled), B_SET(e.comet.sparkle.enabled)},
-    {"rainbow", F_GET(e.comet.rainbow.enabled), B_SET(e.comet.rainbow.enabled)},
-};
-
-constexpr FloatField kAuroraFloats[] = {
-    // Appearance.
-    {"intensity", 0.0f, 60.0f, 0.0f, 8.0f, F_GET(e.aurora.appearance.intensity), F_SET(e.aurora.appearance.intensity)},
-    {"emission", 0.0f, 2.0f, 0.0f, 1.0f, F_GET(e.aurora.appearance.emission), F_SET(e.aurora.appearance.emission)},
-    {"opacity", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.aurora.appearance.opacity), F_SET(e.aurora.appearance.opacity)},
-    {"edgeBrightness", 0.0f, 30.0f, 0.0f, 6.0f, F_GET(e.aurora.appearance.edgeBrightness),
-     F_SET(e.aurora.appearance.edgeBrightness)},
-    {"filaments", 0.0f, 10.0f, 0.0f, 3.0f, F_GET(e.aurora.appearance.filaments), F_SET(e.aurora.appearance.filaments)},
-    {"sparkle", 0.0f, 10.0f, 0.0f, 3.0f, F_GET(e.aurora.appearance.sparkle), F_SET(e.aurora.appearance.sparkle)},
-    {"horizonGlow", 0.0f, 6.0f, 0.0f, 2.0f, F_GET(e.aurora.appearance.horizonGlow),
-     F_SET(e.aurora.appearance.horizonGlow)},
-    // Shape. `curtains` is hard-clamped to the shader's loop bound, because a route that pushed it
-    // to seven would silently do nothing past five and that is a control that lies.
-    {"curtains", 1.0f, 5.0f, 1.0f, 5.0f, F_GET(e.aurora.shape.curtainCount), F_SET(e.aurora.shape.curtainCount)},
-    {"radius", 200.0f, 40000.0f, 1000.0f, 12000.0f, F_GET(e.aurora.shape.radius), F_SET(e.aurora.shape.radius)},
-    {"layerSpacing", 0.0f, 3.0f, 0.0f, 1.0f, F_GET(e.aurora.shape.layerSpacing), F_SET(e.aurora.shape.layerSpacing)},
-    {"baseHeight", -4000.0f, 4000.0f, -400.0f, 400.0f, F_GET(e.aurora.shape.baseHeight),
-     F_SET(e.aurora.shape.baseHeight)},
-    {"curtainHeight", 50.0f, 30000.0f, 400.0f, 8000.0f, F_GET(e.aurora.shape.curtainHeight),
-     F_SET(e.aurora.shape.curtainHeight)},
-    {"waveAmplitude", 0.0f, 3.0f, 0.0f, 1.0f, F_GET(e.aurora.shape.waveAmplitude),
-     F_SET(e.aurora.shape.waveAmplitude)},
-    {"waveScale", 0.0f, 30.0f, 0.2f, 8.0f, F_GET(e.aurora.shape.waveScale), F_SET(e.aurora.shape.waveScale)},
-    {"turbulence", 0.0f, 3.0f, 0.0f, 1.5f, F_GET(e.aurora.shape.turbulence), F_SET(e.aurora.shape.turbulence)},
-    {"complexity", 0.0f, 160.0f, 4.0f, 60.0f, F_GET(e.aurora.shape.complexity), F_SET(e.aurora.shape.complexity)},
-    {"flowSpeed", -2.0f, 2.0f, -0.4f, 0.4f, F_GET(e.aurora.shape.flowSpeed), F_SET(e.aurora.shape.flowSpeed)},
-    {"driftSpeed", -4.0f, 4.0f, -1.0f, 1.0f, F_GET(e.aurora.shape.driftSpeed), F_SET(e.aurora.shape.driftSpeed)},
-    {"verticalSpeed", -4.0f, 4.0f, -1.0f, 1.0f, F_GET(e.aurora.shape.verticalSpeed),
-     F_SET(e.aurora.shape.verticalSpeed)},
-    // Audio response. These are depths on signals that already exist, not an analyzer.
-    {"audioBass", 0.0f, 6.0f, 0.0f, 2.0f, F_GET(e.aurora.audio.bass), F_SET(e.aurora.audio.bass)},
-    {"audioLowMid", 0.0f, 6.0f, 0.0f, 2.0f, F_GET(e.aurora.audio.lowMid), F_SET(e.aurora.audio.lowMid)},
-    {"audioMid", 0.0f, 6.0f, 0.0f, 2.0f, F_GET(e.aurora.audio.mid), F_SET(e.aurora.audio.mid)},
-    {"audioHigh", 0.0f, 6.0f, 0.0f, 2.0f, F_GET(e.aurora.audio.high), F_SET(e.aurora.audio.high)},
-    {"audioBeat", 0.0f, 6.0f, 0.0f, 2.0f, F_GET(e.aurora.audio.beat), F_SET(e.aurora.audio.beat)},
-    {"audioSensitivity", 0.0f, 6.0f, 0.0f, 3.0f, F_GET(e.aurora.audio.sensitivity),
-     F_SET(e.aurora.audio.sensitivity)},
-    {"spectrumShape", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.aurora.audio.spectrumShape),
-     F_SET(e.aurora.audio.spectrumShape)},
-    // Rainbow.
-    {"rainbowSpeed", -4.0f, 4.0f, -0.5f, 0.5f, F_GET(e.aurora.rainbow.speed), F_SET(e.aurora.rainbow.speed)},
-    {"rainbowScale", 0.0f, 12.0f, 0.0f, 3.0f, F_GET(e.aurora.rainbow.scale), F_SET(e.aurora.rainbow.scale)},
-    {"rainbowHue", -4.0f, 4.0f, 0.0f, 1.0f, F_GET(e.aurora.rainbow.hueOffset), F_SET(e.aurora.rainbow.hueOffset)},
-    {"rainbowSaturation", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.aurora.rainbow.saturation),
-     F_SET(e.aurora.rainbow.saturation)},
-    {"rainbowBrightness", 0.0f, 4.0f, 0.0f, 2.0f, F_GET(e.aurora.rainbow.brightness),
-     F_SET(e.aurora.rainbow.brightness)},
-};
-
-constexpr ColorField kAuroraColors[] = {
-    {"lowColor", F_GET(e.aurora.appearance.lowColor), C_SET(e.aurora.appearance.lowColor)},
-    {"midColor", F_GET(e.aurora.appearance.midColor), C_SET(e.aurora.appearance.midColor)},
-    {"topColor", F_GET(e.aurora.appearance.topColor), C_SET(e.aurora.appearance.topColor)},
-};
-
-constexpr BoolField kAuroraBools[] = {
-    {"rainbow", F_GET(e.aurora.rainbow.enabled), B_SET(e.aurora.rainbow.enabled)},
-};
-
-// ADR-387: the vortex's parameters, table-driven like the other two kinds so it gains
-// registration, apply, capture and default routes without a line of bespoke code.
-constexpr FloatField kVortexFloats[] = {
-    {"radius", 0.0f, 20000.0f, 0.0f, 1500.0f, F_GET(e.vortex.radius), F_SET(e.vortex.radius)},
-    {"thickness", 0.1f, 5000.0f, 5.0f, 600.0f, F_GET(e.vortex.thickness), F_SET(e.vortex.thickness)},
-    {"funnelDepth", 0.0f, 20000.0f, 0.0f, 3000.0f, F_GET(e.vortex.funnelDepth), F_SET(e.vortex.funnelDepth)},
-    {"throat", 0.02f, 1.0f, 0.05f, 1.0f, F_GET(e.vortex.throat), F_SET(e.vortex.throat)},
-    {"throatDensity", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.vortex.throatDensity), F_SET(e.vortex.throatDensity)},
-    {"swirl", -32.0f, 32.0f, -8.0f, 8.0f, F_GET(e.vortex.swirl), F_SET(e.vortex.swirl)},
-    {"rotationSpeed", -4.0f, 4.0f, -0.4f, 0.4f, F_GET(e.vortex.rotationSpeed), F_SET(e.vortex.rotationSpeed)},
-    {"turbulence", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.vortex.turbulence), F_SET(e.vortex.turbulence)},
-    {"turbulenceScale", 0.001f, 40.0f, 0.1f, 8.0f, F_GET(e.vortex.turbulenceScale), F_SET(e.vortex.turbulenceScale)},
-    {"density", 0.0f, 8.0f, 0.0f, 0.01f, F_GET(e.vortex.density), F_SET(e.vortex.density)},
-    {"emission", 0.0f, 20.0f, 0.0f, 0.2f, F_GET(e.vortex.emission), F_SET(e.vortex.emission)},
-    {"contrast", 0.05f, 12.0f, 0.5f, 5.0f, F_GET(e.vortex.contrast), F_SET(e.vortex.contrast)},
-    {"innerVoid", 0.0f, 0.95f, 0.0f, 0.6f, F_GET(e.vortex.innerVoid), F_SET(e.vortex.innerVoid)},
-    {"filaments", 0.0f, 4.0f, 0.0f, 2.0f, F_GET(e.vortex.filaments), F_SET(e.vortex.filaments)},
-    {"breathAmount", 0.0f, 1.0f, 0.0f, 0.3f, F_GET(e.vortex.breathAmount), F_SET(e.vortex.breathAmount)},
-    {"breathSpeed", 0.0f, 4.0f, 0.0f, 1.0f, F_GET(e.vortex.breathSpeed), F_SET(e.vortex.breathSpeed)},
-    // ADR-389, the smoke controls. Soft ranges are the whole of the useful span in each case, for
-    // the reason the scattering row gives: a modulation route clamps to the HARD range, and a
-    // slider whose interesting region is in its first hair is the `scene/windSpeed` defect.
-    //
-    // `smokeWarp` is the one that does the work -- it advects the finer octaves through a coarse
-    // flow, which is the difference between detail sitting ON the spiral and detail carried BY it.
-    {"smokeWarp", 0.0f, 8.0f, 0.0f, 2.0f, F_GET(e.vortex.smokeWarp), F_SET(e.vortex.smokeWarp)},
-    {"smokeBillow", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.vortex.smokeBillow), F_SET(e.vortex.smokeBillow)},
-    {"detail", 0.0f, 2.0f, 0.0f, 1.0f, F_GET(e.vortex.detail), F_SET(e.vortex.detail)},
-    {"spill", 0.0f, 20.0f, 0.0f, 6.0f, F_GET(e.vortex.spill), F_SET(e.vortex.spill)},
-    // ADR-388, and the range is a measurement rather than a guess. Laddered on the shipped Tree of
-    // Life at t=6, mean frame luminance of 255:
-    //
-    //     0.00  65.5      0.10  67.2      0.50  73.4
-    //     0.02  65.9      0.20  68.9      1.00  80.3
-    //     0.05  66.4
-    //
-    // Nearly linear, and usable across the whole of 0..1 -- so 0..1 IS the soft range, and putting
-    // it at 0..0.2 "to be safe" would have been the mis-scaled-knob defect this branch already
-    // fixed once on `scene/windSpeed`, arrived at from the cautious direction.
-    //
-    // Worth saying plainly, because the first version of this comment got it wrong: ADR-371's
-    // catastrophic 131-of-255 was measured on the PRE-FUNNEL slab, before ADR-374 gave the vortex a
-    // throat, a void and a rim. Against today's shape, full scattering costs +15 luminance levels,
-    // not a wash. The refusal ADR-371 records is still right as a default; the number it records is
-    // no longer what this setting does, and quoting it as though it were would be exactly ADR-385's
-    // stated reason that is not evidence.
-    //
-    // The hard maximum is 4 rather than 1 because that is what a modulation route clamps to, and
-    // somebody driving this from a drop is entitled to overshoot on purpose.
-    {"scattering", 0.0f, 4.0f, 0.0f, 1.0f, F_GET(e.vortex.scattering), F_SET(e.vortex.scattering)},
-    {"cometResponse", 0.0f, 8.0f, 0.0f, 2.0f, F_GET(e.vortex.cometResponse), F_SET(e.vortex.cometResponse)},
-    {"cometReach", 1.0f, 40.0f, 1.0f, 12.0f, F_GET(e.vortex.cometReach), F_SET(e.vortex.cometReach)},
-    {"centerX", -1e5f, 1e5f, -500.0f, 500.0f, F_GET(e.vortex.center.x), F_SET(e.vortex.center.x)},
-    {"centerY", -1e5f, 1e5f, -2000.0f, 500.0f, F_GET(e.vortex.center.y), F_SET(e.vortex.center.y)},
-    {"centerZ", -1e5f, 1e5f, -500.0f, 500.0f, F_GET(e.vortex.center.z), F_SET(e.vortex.center.z)},
-};
-constexpr ColorField kVortexColors[] = {
-    {"colorDeep", F_GET(e.vortex.colorDeep), C_SET(e.vortex.colorDeep)},
-    {"colorMid", F_GET(e.vortex.colorMid), C_SET(e.vortex.colorMid)},
-    {"colorAccent", F_GET(e.vortex.colorAccent), C_SET(e.vortex.colorAccent)},
-};
-
-#undef F_GET
-#undef F_SET
-#undef C_SET
-#undef B_SET
-
-std::span<const FloatField> floatFields(AtmosphereKind kind) {
-    switch (kind) {
-    case AtmosphereKind::Comet: return std::span<const FloatField>(kCometFloats);
-    case AtmosphereKind::Vortex: return std::span<const FloatField>(kVortexFloats);
-    case AtmosphereKind::Aurora: break;
-    }
-    return std::span<const FloatField>(kAuroraFloats);
-}
-std::span<const ColorField> colorFields(AtmosphereKind kind) {
-    switch (kind) {
-    case AtmosphereKind::Comet: return std::span<const ColorField>(kCometColors);
-    case AtmosphereKind::Vortex: return std::span<const ColorField>(kVortexColors);
-    case AtmosphereKind::Aurora: break;
-    }
-    return std::span<const ColorField>(kAuroraColors);
-}
-std::span<const BoolField> boolFields(AtmosphereKind kind) {
-    switch (kind) {
-    case AtmosphereKind::Comet: return std::span<const BoolField>(kCometBools);
-    // A vortex has no booleans of its own: `enabled` is the effect's, and `radius` 0 is the gate.
-    case AtmosphereKind::Vortex: return {};
-    case AtmosphereKind::Aurora: break;
-    }
-    return std::span<const BoolField>(kAuroraBools);
-}
+// `copyParameters` still serves apply and capture from one walk, so the two cannot drift. That was
+// the load-bearing property before and it is unchanged.
 
 // Desc builders, the same shape `effect_params.cpp` uses.
 params::ParamDesc<float> f(std::string path, float def, float lo, float hi, float slo, float shi) {
@@ -332,30 +52,6 @@ params::ParamDesc<glm::vec3> col(std::string path, glm::vec3 def) {
     return d;
 }
 
-// Belt and braces before the values reach the resolver: a route can drive a final anywhere inside
-// the *hard* range, and a few of these are divisors. The hard ranges above already exclude zero
-// where it matters, so this is the second line rather than the first.
-void sanitise(Effect& e) {
-    e.comet.path.travelSeconds = std::max(e.comet.path.travelSeconds, 0.05f);
-    e.comet.path.speedScale = std::max(e.comet.path.speedScale, 0.01f);
-    e.comet.path.distance = std::max(e.comet.path.distance, 1.0f);
-    e.comet.appearance.tailLength = std::max(e.comet.appearance.tailLength, 1.0f);
-    e.comet.appearance.headSize = std::max(e.comet.appearance.headSize, 0.1f);
-    e.comet.appearance.haloSize = std::max(e.comet.appearance.haloSize, 1.0f);
-    e.comet.appearance.tailWidth = std::max(e.comet.appearance.tailWidth, 0.5f);
-    e.comet.appearance.tailFalloff = std::max(e.comet.appearance.tailFalloff, 0.05f);
-    e.aurora.shape.curtainCount = std::clamp(e.aurora.shape.curtainCount, 1.0f, 5.0f);
-    e.aurora.shape.radius = std::max(e.aurora.shape.radius, 1.0f);
-    e.aurora.shape.curtainHeight = std::max(e.aurora.shape.curtainHeight, 1.0f);
-    e.ground.radius = std::max(e.ground.radius, 1.0f);
-    e.ground.falloff = std::max(e.ground.falloff, 0.05f);
-    // §68. Not a divisor, so this is a floor rather than a guard against division: a negative
-    // influence would invert the field -- a comet's tail leaning INTO a gust -- which is a thing
-    // nobody wants and which reads as a bug rather than as a setting. The hard range already
-    // starts at 0; this is the second line, as the comment above says.
-    e.flow.influence = std::max(e.flow.influence, 0.0f);
-}
-
 } // namespace
 
 std::string atmosphericParameterPrefix(std::string_view effectName) {
@@ -379,6 +75,13 @@ AtmosphericParameters registerAtmosphericParameters(params::ParameterSet& params
     AtmosphericParameters out;
     out.effects.reserve(effects.size());
     for (const AtmosphericEffect& e : effects) {
+        const EffectSchema* schema = effectSchema(e.kind);
+        if (schema == nullptr) {
+            // A kind with no schema. It registers nothing, so nothing about it is automatable --
+            // and `checkRegistry` has already named it in the CPU suite, which is where the news
+            // belongs rather than in a frame nobody is watching.
+            continue;
+        }
         const std::string base = atmosphericParameterPrefix(e.name);
         const auto path = [&](const char* leaf) {
             std::string full = base + leaf;
@@ -391,30 +94,31 @@ AtmosphericParameters registerAtmosphericParameters(params::ParameterSet& params
         p.kind = e.kind;
         p.enabled = &params.add(b(path("enabled"), e.enabled));
 
-        // Only the rows for the kind this effect actually is. An effect keeps the settings of the
-        // kind it is not -- that is why both payloads exist -- but registering both would put ninety
-        // parameters in the table for every one an artist can reach, and half of them would do
-        // nothing, which is worse than their being absent.
-        const auto floats = floatFields(e.kind);
-        p.floats.reserve(floats.size() + std::size(kSharedFloats));
-        for (const FloatField& field : floats) {
-            p.floats.push_back(&params.add(f(path(field.leaf), field.get(e), field.lo, field.hi, field.slo, field.shi)));
+        // Only the rows for the kind this effect actually is, then the shared ones. An effect keeps
+        // the settings of the kind it is not -- that is why every payload exists -- but registering
+        // them all would put ninety parameters in the table for every one an artist can reach, and
+        // most of them would do nothing, which is worse than their being absent.
+        p.values.reserve(schema->fields.size() + sharedEffectFields().size());
+        const auto addRow = [&](const EffectField& field) {
+            switch (field.type) {
+            case FieldType::Float:
+                p.values.push_back(&params.add(f(path(field.leaf), fieldFloat(field, *schema, e),
+                                                 field.hardMin, field.hardMax, field.softMin,
+                                                 field.softMax)));
+                break;
+            case FieldType::Color:
+                p.values.push_back(&params.add(col(path(field.leaf), fieldColor(field, *schema, e))));
+                break;
+            case FieldType::Bool:
+                p.values.push_back(&params.add(b(path(field.leaf), fieldBool(field, *schema, e))));
+                break;
+            }
+        };
+        for (const EffectField& field : schema->fields) {
+            addRow(field);
         }
-        for (const FloatField& field : kSharedFloats) {
-            p.floats.push_back(&params.add(f(path(field.leaf), field.get(e), field.lo, field.hi, field.slo, field.shi)));
-        }
-        const auto colors = colorFields(e.kind);
-        p.colors.reserve(colors.size() + std::size(kSharedColors));
-        for (const ColorField& field : colors) {
-            p.colors.push_back(&params.add(col(path(field.leaf), field.get(e))));
-        }
-        for (const ColorField& field : kSharedColors) {
-            p.colors.push_back(&params.add(col(path(field.leaf), field.get(e))));
-        }
-        const auto bools = boolFields(e.kind);
-        p.flags.reserve(bools.size());
-        for (const BoolField& field : bools) {
-            p.flags.push_back(&params.add(b(path(field.leaf), field.get(e))));
+        for (const EffectField& field : sharedEffectFields()) {
+            addRow(field);
         }
         out.effects.push_back(std::move(p));
     }
@@ -446,49 +150,41 @@ void copyParameters(const AtmosphericParameters& registered, std::vector<Atmosph
         if (p == nullptr || p->kind != e.kind) {
             continue;
         }
+        const EffectSchema* schema = effectSchema(e.kind);
+        if (schema == nullptr) {
+            continue;
+        }
         if (p->enabled != nullptr) {
             e.enabled = value(p->enabled, 0) >= 0.5f;
         }
-        const auto floats = floatFields(e.kind);
         std::size_t i = 0;
-        for (const FloatField& field : floats) {
-            if (i < p->floats.size() && p->floats[i] != nullptr) {
-                field.set(e, value(p->floats[i], 0));
+        const auto copyRow = [&](const EffectField& field) {
+            if (i >= p->values.size() || p->values[i] == nullptr) {
+                ++i;
+                return;
+            }
+            const params::IParameter* q = p->values[i];
+            switch (field.type) {
+            case FieldType::Float: setFieldFloat(field, *schema, e, value(q, 0)); break;
+            case FieldType::Color:
+                setFieldColor(field, *schema, e, glm::vec3(value(q, 0), value(q, 1), value(q, 2)));
+                break;
+            case FieldType::Bool: setFieldBool(field, *schema, e, value(q, 0) >= 0.5f); break;
             }
             ++i;
+        };
+        for (const EffectField& field : schema->fields) {
+            copyRow(field);
         }
-        for (const FloatField& field : kSharedFloats) {
-            if (i < p->floats.size() && p->floats[i] != nullptr) {
-                field.set(e, value(p->floats[i], 0));
-            }
-            ++i;
-        }
-        const auto colors = colorFields(e.kind);
-        std::size_t c = 0;
-        for (const ColorField& field : colors) {
-            if (c < p->colors.size() && p->colors[c] != nullptr) {
-                const params::IParameter* q = p->colors[c];
-                field.set(e, glm::vec3(value(q, 0), value(q, 1), value(q, 2)));
-            }
-            ++c;
-        }
-        for (const ColorField& field : kSharedColors) {
-            if (c < p->colors.size() && p->colors[c] != nullptr) {
-                const params::IParameter* q = p->colors[c];
-                field.set(e, glm::vec3(value(q, 0), value(q, 1), value(q, 2)));
-            }
-            ++c;
-        }
-        const auto bools = boolFields(e.kind);
-        std::size_t k = 0;
-        for (const BoolField& field : bools) {
-            if (k < p->flags.size() && p->flags[k] != nullptr) {
-                field.set(e, value(p->flags[k], 0) >= 0.5f);
-            }
-            ++k;
+        for (const EffectField& field : sharedEffectFields()) {
+            copyRow(field);
         }
         if (!fromBase) {
-            sanitise(e);
+            // Belt and braces before the values reach the resolver: a route can drive a final
+            // anywhere inside the *hard* range, and a few of these are divisors. The hard ranges
+            // already exclude zero where it matters, so this is the second line rather than the
+            // first -- and it is now each row's own floor rather than a list beside them.
+            sanitiseEffect(e);
         }
     }
 }
@@ -505,68 +201,34 @@ void captureAtmosphericParameters(const AtmosphericParameters& registered,
 }
 
 std::vector<params::ModRoute> defaultAtmosphericRoutes(std::string_view effectName, AtmosphereKind kind) {
-    const std::string base = atmosphericParameterPrefix(effectName);
+    // ADR-392's defect was that this function was `if aurora else comet`, so a vortex fell into the
+    // comet arm and was handed three routes aimed at paths it does not register. Nothing failed: a
+    // route naming an unregistered path binds to nothing, warns once at load, and is thereafter
+    // indistinguishable from an effect nobody automated.
+    //
+    // ADR-500 removes the shape rather than fixing the arms. The routes are declared as leaves
+    // beside the rows they aim at, in the kind's own file, so a target outside the effect's own
+    // prefix is now unspellable -- the leaf is appended to the prefix here and nowhere else -- and
+    // a target the kind does not declare is named by `checkRegistry` in the CPU suite.
     std::vector<params::ModRoute> routes;
-    const auto add = [&](const char* source, const char* leaf, float amount, float attackMs, float decayMs) {
-        params::ModRoute r;
-        r.source = source;
-        r.target = base + leaf;
-        r.amount = amount;
+    const EffectSchema* schema = effectSchema(kind);
+    if (schema == nullptr) {
+        return routes;
+    }
+    const std::string base = atmosphericParameterPrefix(effectName);
+    routes.reserve(schema->routes.size());
+    for (const EffectRoute& r : schema->routes) {
+        params::ModRoute route;
+        route.source = r.source;
+        route.target = base + r.leaf;
+        route.amount = r.amount;
         // `Add` so silence leaves the authored pose exactly as it was written. A `Multiply` route
         // would make an unplayed project look wrong, which is the discipline scene/tree_audio.hpp
-        // states and the reason every depth here is small next to the value it moves.
-        r.op = params::ModOp::Add;
-        r.chain.attackMs = attackMs;
-        r.chain.decayMs = decayMs;
-        routes.push_back(std::move(r));
-    };
-    // A switch with no `default`, not an if/else chain. This function is where the chain cost
-    // something: a vortex fell into the comet's `else` and was handed three routes aimed at
-    // `coreIntensity`, `tailIntensity` and `sparkleIntensity`, none of which a vortex registers.
-    // Nothing failed -- a route that names an unregistered path binds to nothing, warns once at
-    // load and is thereafter indistinguishable from an effect nobody automated. The arms below are
-    // exhaustive so the next kind is at least a diagnostic, and
-    // `tests/unit/test_effect_conformance.cpp` fails by name whatever the warning level.
-    switch (kind) {
-    case AtmosphereKind::Aurora:
-        // §4.2's proposed mapping, as the default rather than as the only answer. The depths are
-        // fractions of each parameter's soft range, and the smoothing is what stops the curtain
-        // jittering: a 40 ms attack and a ~400 ms release is a curtain that answers the music
-        // rather than one that strobes with it.
-        add("audio.bass", "curtainHeight", 900.0f, 60.0f, 420.0f);
-        add("audio.rms", "intensity", 0.8f, 80.0f, 500.0f);
-        add("audio.lowMid", "waveAmplitude", 0.12f, 50.0f, 380.0f);
-        add("audio.mid", "turbulence", 0.20f, 40.0f, 320.0f);
-        add("audio.treble", "filaments", 0.55f, 25.0f, 240.0f);
-        add("beat.pulse", "edgeBrightness", 1.1f, 10.0f, 260.0f);
-        break;
-    case AtmosphereKind::Vortex:
-        // ADR-387 records the five routes the shipped Tree of Life project authors on its funnel --
-        // bass to density and breath, mid to turbulence, treble to filaments -- and those are the
-        // mapping here, because a default taken from the one scene that has tuned a vortex is
-        // evidence and a default invented for this function is not.
-        //
-        // The one departure: the shipped project drives emission from `time.progress`, which ramps
-        // the funnel's brightness across the song. That is a composition decision rather than a
-        // property of vortices, so the brightness route here is `beat.pulse` -- the same leaf
-        // `ui::atmosphericBeatTarget` picks for this kind, so the Beat response slider finds the
-        // route this function wrote instead of writing a second one beside it.
-        //
-        // Every depth is a fraction of the leaf's soft range: density's soft range ends at 0.01 /m
-        // and emission's at 0.2, which is why these numbers look small next to an aurora's.
-        add("audio.bass", "density", 0.0020f, 70.0f, 450.0f);
-        add("audio.bass", "breathAmount", 0.080f, 90.0f, 520.0f);
-        add("audio.mid", "turbulence", 0.150f, 45.0f, 340.0f);
-        add("audio.treble", "filaments", 0.400f, 25.0f, 240.0f);
-        add("beat.pulse", "emission", 0.030f, 10.0f, 260.0f);
-        break;
-    case AtmosphereKind::Comet:
-        // A comet is an event, and most of its shape is authored rather than played. What answers
-        // the music is its brightness and its sparkle -- the two that read at a glance.
-        add("audio.rms", "coreIntensity", 6.0f, 60.0f, 400.0f);
-        add("beat.pulse", "tailIntensity", 1.4f, 10.0f, 280.0f);
-        add("audio.treble", "sparkleIntensity", 4.0f, 20.0f, 220.0f);
-        break;
+        // states and the reason every depth is small next to the value it moves.
+        route.op = params::ModOp::Add;
+        route.chain.attackMs = r.attackMs;
+        route.chain.decayMs = r.decayMs;
+        routes.push_back(std::move(route));
     }
     return routes;
 }

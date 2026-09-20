@@ -51,7 +51,8 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "shadowRange", "volumeSteps", "volumeDensityField", "volumeColorField", "sky",
+    "shadowCascades", "shadowRange", "volumeSteps", "volumeJitter", "volumeDensityField",
+    "volumeColorField", "sky",
     "vortex"};
 constexpr std::string_view kSkyKeys[] = {
     "enabled", "background", "useKeyLight", "zenithColor", "horizonColor", "groundColor",
@@ -235,6 +236,21 @@ void forEachParticleParam(ParticleParameters& p, F&& f) {
     f(p.twoSided);
     f(p.stretch);
     f(p.trailWidth);
+    // ADR-520, in declaration order. See the paragraph above: an omission here is silent.
+    f(p.collisionHeight);
+    f(p.splashSize);
+    f(p.sizeVariance);
+    f(p.sizeSkew);
+    f(p.dragSizeBias);
+    f(p.pulseRate);
+    f(p.pulseDepth);
+    f(p.pulseSync);
+    f(p.pulseSharpness);
+    f(p.clusterRadius);
+    f(p.pauseRate);
+    f(p.pauseFraction);
+    f(p.scatterStrength);
+    f(p.scatterAnisotropy);
     f(p.enabled);
 }
 
@@ -476,6 +492,55 @@ json particlesToJson(const ParticleSystem& s) {
         j["trailFade"] = s.trailFade;
         j["trailTint"] = vecToJson(s.trailTint);
     }
+    // ---- ADR-520 ----
+    // Written only when they do something, for the reason ADR-367 gives above: a default nobody
+    // chose, written unconditionally, becomes a value baked into every file the editor ever saves.
+    if (s.volumeFollow != glm::vec3(0.0f)) {
+        j["volumeFollow"] = vecToJson(s.volumeFollow);
+    }
+    if (s.volumeWrap) {
+        j["volumeWrap"] = true;
+    }
+    if (s.collision != CollisionResponse::None) {
+        j["collision"] = collisionResponseName(s.collision);
+        j["collisionHeight"] = s.collisionHeight;
+        j["collisionRestitution"] = s.collisionRestitution;
+        if (s.collision == CollisionResponse::Splash) {
+            j["splashLifetime"] = s.splashLifetime;
+            j["splashSize"] = s.splashSize;
+            j["ringThickness"] = s.ringThickness;
+        }
+    }
+    if (s.sizeVariance != 0.3f) {
+        j["sizeVariance"] = s.sizeVariance;
+    }
+    if (s.sizeSkew != 1.0f) {
+        j["sizeSkew"] = s.sizeSkew;
+    }
+    if (s.dragSizeBias != 0.0f) {
+        j["dragSizeBias"] = s.dragSizeBias;
+    }
+    if (s.pulseRate != 0.0f) {
+        j["pulseRate"] = s.pulseRate;
+        j["pulseDepth"] = s.pulseDepth;
+        j["pulseSync"] = s.pulseSync;
+        j["pulseSharpness"] = s.pulseSharpness;
+    }
+    if (s.clusterCount != 0u) {
+        j["clusterCount"] = s.clusterCount;
+        j["clusterRadius"] = s.clusterRadius;
+    }
+    if (s.pauseRate != 0.0f) {
+        j["pauseRate"] = s.pauseRate;
+        j["pauseFraction"] = s.pauseFraction;
+    }
+    if (s.scatterStrength != 0.0f) {
+        j["scatterStrength"] = s.scatterStrength;
+        j["scatterAnisotropy"] = s.scatterAnisotropy;
+    }
+    if (!s.emitMaskField.empty()) {
+        j["emitMaskField"] = s.emitMaskField;
+    }
     if (s.fogCoupling != 1.0f) {
         j["fogCoupling"] = s.fogCoupling;
     }
@@ -623,7 +688,45 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
     AVGEN_READ(trailTint, readVec<3>);
     AVGEN_READ(fogCoupling, readFloat);
     AVGEN_READ(volumeGlow, readFloat);
+    // ---- ADR-520 ----
+    AVGEN_READ(volumeFollow, readVec<3>);
+    AVGEN_READ(volumeWrap, readBool);
+    AVGEN_READ(collisionHeight, readFloat);
+    AVGEN_READ(collisionRestitution, readFloat);
+    AVGEN_READ(splashLifetime, readFloat);
+    AVGEN_READ(splashSize, readFloat);
+    AVGEN_READ(ringThickness, readFloat);
+    AVGEN_READ(sizeVariance, readFloat);
+    AVGEN_READ(sizeSkew, readFloat);
+    AVGEN_READ(dragSizeBias, readFloat);
+    AVGEN_READ(pulseRate, readFloat);
+    AVGEN_READ(pulseDepth, readFloat);
+    AVGEN_READ(pulseSync, readFloat);
+    AVGEN_READ(pulseSharpness, readFloat);
+    AVGEN_READ(clusterRadius, readFloat);
+    AVGEN_READ(pauseRate, readFloat);
+    AVGEN_READ(pauseFraction, readFloat);
+    AVGEN_READ(scatterStrength, readFloat);
+    AVGEN_READ(scatterAnisotropy, readFloat);
+    AVGEN_READ(emitMaskField, readString);
 #undef AVGEN_READ
+    if (j.contains("collision")) {
+        auto name = readString(j, "collision", "");
+        if (!name) {
+            return std::unexpected(name.error());
+        }
+        auto mode = collisionResponseFromName(*name);
+        if (!mode) {
+            return fail("unknown collision response '{}' (expected none, kill, bounce or splash)", *name);
+        }
+        s.collision = *mode;
+    }
+    if (j.contains("clusterCount")) {
+        if (!j.at("clusterCount").is_number_unsigned()) {
+            return fail("'clusterCount' must be a positive integer");
+        }
+        s.clusterCount = j.at("clusterCount").get<std::uint32_t>();
+    }
     for (const auto& [key, target] : {std::pair<const char*, std::uint32_t*>{"trailLength", &s.trailLength},
                                       std::pair<const char*, std::uint32_t*>{"trailStride", &s.trailStride}}) {
         if (j.contains(key)) {
@@ -3618,6 +3721,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                                                       .softMin = 8,
                                                       .softMax = 96,
                                                       .label = "scene/volumeSteps"});
+    // ADR-461. The soft range is the whole of 0..1 because the whole of it is usable and the
+    // interesting end is the low one -- a slider whose useful region is in its first hair is the
+    // `scene/windSpeed` defect this project has already fixed once.
+    volumeJitter_ = &params.add(
+        floatDesc(prefix_ + "scene/volumeJitter", volumeSetting_.volumeJitter, 0.0f, 1.0f, 0.0f, 1.0f));
     {
         auto fogDesc = vec3Desc(prefix_ + "scene/fogColor", fogColorSet_ ? fogColorSetting_ : scene_.environment.backgroundColor,
                                 0.0f, 1.0f, 0.0f, 1.0f);
@@ -4531,6 +4639,7 @@ void Composition::detach() {
     volumeNoiseSpeed_ = nullptr;
     volumeEmission_ = nullptr;
     volumeSteps_ = nullptr;
+    volumeJitter_ = nullptr;
     keyLight_ = nullptr;
     gridIntensity_ = nullptr;
     rootScale_ = nullptr;
@@ -7120,6 +7229,7 @@ void Composition::applyParameters() {
         env.volumeNoiseSpeed = pick(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
         env.volumeEmission = pick(volumeEmission_, volumeSetting_.volumeEmission);
         env.volumeSteps = volumeSteps_ != nullptr ? volumeSteps_->value() : volumeSetting_.volumeSteps;
+        env.volumeJitter = pick(volumeJitter_, volumeSetting_.volumeJitter);
         env.shadowCascades = volumeSetting_.shadowCascades;
         env.shadowRange = pick(shadowRange_, volumeSetting_.shadowRange);
         env.volumeMaxDistance = volumeSetting_.volumeMaxDistance;
@@ -8127,6 +8237,7 @@ nlohmann::json Composition::toJson() const {
             environment["volumeNoiseSpeed"] = base(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
             environment["volumeEmission"] = base(volumeEmission_, volumeSetting_.volumeEmission);
             environment["volumeSteps"] = volumeSteps_ != nullptr ? volumeSteps_->base() : volumeSetting_.volumeSteps;
+            environment["volumeJitter"] = base(volumeJitter_, volumeSetting_.volumeJitter);
             environment["shadowCascades"] = volumeSetting_.shadowCascades;
             environment["volumeMaxDistance"] = volumeSetting_.volumeMaxDistance;
             if (!volumeDensityFieldSetting_.empty()) {
@@ -9124,6 +9235,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return fail("'volumeSteps' must be an integer");
                 }
                 v.volumeSteps = std::clamp(e["volumeSteps"].get<int>(), 4, 256);
+            }
+            if (e.contains("volumeJitter")) {
+                if (!e["volumeJitter"].is_number()) {
+                    return fail("'volumeJitter' must be a number");
+                }
+                v.volumeJitter = std::clamp(e["volumeJitter"].get<float>(), 0.0f, 1.0f);
             }
             auto densityField = readString(e, "volumeDensityField", comp->volumeDensityFieldSetting_);
             if (!densityField) {

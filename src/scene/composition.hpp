@@ -1459,6 +1459,7 @@ private:
     params::Parameter<glm::vec3>* styledSkyAmbient_ = nullptr;
     params::Parameter<glm::vec3>* styledGroundAmbient_ = nullptr;
     params::Parameter<int>* volumeSteps_ = nullptr;
+    params::Parameter<float>* volumeJitter_ = nullptr; // ADR-461
     // How far the directional shadow cascades reach; 0 = ADR-112's automatic range. See
     // `Environment::shadowRange` for why a scene is allowed an opinion about this one.
     params::Parameter<float>* shadowRange_ = nullptr;

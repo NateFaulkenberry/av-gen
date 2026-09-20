@@ -64,6 +64,7 @@
 
 #include <cstdint>
 #include <span>
+#include <utility>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -96,7 +97,17 @@ enum class AtmosphereKind : std::uint8_t {
     // `atmosphere_fx.wgsl` is a rendering detail -- this family is about authoring, not about which
     // pass rasterises the result.
     Vortex,
+    // ADR-500. The two effects added to prove the registry: one file each, and the two lines this
+    // enumerator and `builtinSchemas()` are. Both reach the picture through an integrator the
+    // engine already has -- a shower is N records in the comet bucket, a fog bank is a placed
+    // volumetric medium with no swirl -- which is deliberately the easy half. A kind that needs a
+    // NEW integrator needs shader work, and that is the one part of an effect the registry does not
+    // and cannot move into a single C++ file.
+    MeteorShower,
+    VolumetricFog,
 };
+// ADR-500: derived from the registry's schemas rather than written out here, so a kind whose name
+// does not round-trip is a named failure of `checkRegistry` instead of an if-chain that fell behind.
 [[nodiscard]] const char* atmosphereKindName(AtmosphereKind k);
 [[nodiscard]] std::optional<AtmosphereKind> atmosphereKindFromName(std::string_view name);
 
@@ -316,6 +327,20 @@ struct Vortex {
     float smokeWarp = 0.0f;   // domain-warp amount; the one that does the work
     float smokeBillow = 0.0f; // 0 wispy fBM, 1 rounded billowing masses
     float detail = 0.2f;      // the fine octave's weight; was a hardcoded 0.2
+    // The macro structure (Vortex 2.0 §7-§11). The full account of why these exist is in
+    // `core/vortex.hpp` beside the maths; the short version is that before them this field's
+    // envelope was uniform in angle and monotone in radius, so every feature in the picture came
+    // out of the fBM stack above -- which is precisely the "procedural noise / stippled particles"
+    // the brief opens by rejecting. All default to off, so ADR-389's funnel is unchanged.
+    // §8/§9: the eye is `innerVoid` given a wall, not a second radius. `eyeWallWidth` replaces a
+    // hardcoded 0.22 and defaults to it, so nothing moves until somebody asks.
+    float eyeWallWidth = 0.22f;     // §9, fraction of the mouth radius the wall rises over
+    float eyeWallGain = 0.0f;       // §9, how much denser the wall's crest is than the body
+    float bandArms = 0.0f;          // §10, primary spiral arm count; 0 is off
+    float bandPitchDegrees = 18.0f; // §10, the spiral's pitch angle; rainbands run 10-25
+    float bandDepth = 0.0f;         // §10, band contrast
+    float bandHarmonic = 0.0f;      // §11, weight of the two finer nested scales
+    float cloudNoise = 1.0f;        // §53, weight of the whole fBM stack; 0 is the macro field
     float emission = 1.0f;        // emissive density PER METRE (ADR-374)
     float filaments = 0.9f;
     float spill = 2.5f;           // surface irradiance on what floats above it (ADR-379)
@@ -339,6 +364,33 @@ struct Vortex {
     glm::vec3 colorAccent{0.090f, 0.320f, 0.420f};
     [[nodiscard]] bool active() const { return radius > 0.0f; }
     [[nodiscard]] Result<void> validate() const;
+};
+
+// ---- values a kind declared in its own file keeps (ADR-500) ---------------------------------------
+
+// ADR-500. The three kinds that predate the registry keep their typed structs above -- `Comet`,
+// `Aurora`, `Vortex` -- because a member access is what makes the port to the registry provably
+// behaviour-neutral. A kind declared after it has nowhere to put a typed struct here, and adding
+// one would be exactly the shared-header edit the registry exists to remove, so its numbers live in
+// this store instead.
+//
+// Keyed by `<kind key>/<leaf>`, which is what gives it the same property the three structs have and
+// the reason `AtmosphericEffect` is not a variant: an effect that changes kind keeps the settings of
+// the kind it left, so switching to a preset and back does not throw work away.
+//
+// Vectors rather than a map because they are short -- a kind declares tens of rows, not thousands --
+// and because a sorted vector serialises in a stable order, which a save that must not churn needs.
+struct EffectValueStore {
+    std::vector<std::pair<std::string, float>> floats;
+    std::vector<std::pair<std::string, glm::vec3>> colors;
+    std::vector<std::pair<std::string, std::uint8_t>> flags;
+
+    [[nodiscard]] float getFloat(std::string_view key, float fallback) const;
+    void setFloat(std::string_view key, float value);
+    [[nodiscard]] glm::vec3 getColor(std::string_view key, glm::vec3 fallback) const;
+    void setColor(std::string_view key, glm::vec3 value);
+    [[nodiscard]] bool getBool(std::string_view key, bool fallback) const;
+    void setBool(std::string_view key, bool value);
 };
 
 struct AtmosphericEffect {
@@ -366,6 +418,11 @@ struct AtmosphericEffect {
     // replaces. What each kind DOES with the answer is per-kind and lives in the resolver.
     fields::Subscription flow;
 
+    // ADR-500. Where a kind declared in its own file keeps its numbers. Empty for the three kinds
+    // that predate the registry, so every scene written before it serialises byte for byte as it
+    // did -- the block is omitted entirely when there is nothing in it.
+    EffectValueStore values;
+
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] nlohmann::json toJson() const;
     [[nodiscard]] static Result<AtmosphericEffect> fromJson(const nlohmann::json& j);
@@ -380,6 +437,16 @@ struct AtmosphericEffect {
 // A style configures the underlying parameters and then gets out of the way; nothing reads `style`
 // at runtime. Separate lists per kind because "Rainbow Cosmic" is a comet and "Glowmere
 // Bioluminescence" is an aurora, and one list would offer each to the other.
+
+// ADR-500, and these three are the generic form the three per-kind accessors below now adapt:
+// every kind's presets and every kind's "Add" button come from its schema, so a new kind gets both
+// without a line being written in this file.
+[[nodiscard]] std::span<const std::string_view> effectStyleNames(AtmosphereKind kind);
+// False when the name is not a style of that kind -- which is what the UI relies on to leave the
+// preset combo where it was rather than silently doing nothing to the effect.
+bool applyEffectStyle(AtmosphericEffect& effect, AtmosphereKind kind, std::string_view style);
+// The ready-made effect the "Add" button makes and the conformance probe uses, for any kind.
+[[nodiscard]] AtmosphericEffect makeAtmosphericEffect(AtmosphereKind kind, std::string name);
 
 [[nodiscard]] std::span<const std::string_view> cometStyleNames();
 [[nodiscard]] std::span<const std::string_view> auroraStyleNames();
@@ -419,6 +486,28 @@ struct AtmosphericContext {
     // ownership, exactly as `shots` and `spectrum` are.
     const fields::FieldBus* fieldBus = nullptr;
 };
+
+// ---- the geometry every sky kind shares ----------------------------------------------------------
+//
+// ADR-500. Exported rather than copied into each effect's file. A kind declares its own rows, its
+// own presets and its own resolve -- but a second transliteration of the arc is exactly the defect
+// ADR-388 records between the CPU and GPU halves of the vortex, and two copies inside one language
+// would be that with none of the excuse. The comet and the meteor shower call this function; they
+// do not each have one.
+
+// Azimuth is degrees clockwise from +Z, elevation degrees above the horizon. Chosen over "degrees
+// from +X counter-clockwise" because a scene's camera is usually written looking down -Z and an
+// artist typing 0 should get "straight ahead", not "off to the right".
+[[nodiscard]] glm::vec3 directionFromSky(float azimuthDegrees, float elevationDegrees);
+
+// Progress through a crossing, with the acceleration reparameterisation. Monotone for
+// `acceleration > -0.5`, which `CometPath::validate` enforces, and fixed at both ends so changing
+// the acceleration does not move where the comet starts or finishes.
+[[nodiscard]] float reparameterise(float progress, float acceleration);
+
+// A world anchor is a fixed point; a camera anchor is the eye, so the effect keeps its bearing
+// however far the camera travels.
+[[nodiscard]] glm::vec3 anchorOf(SkyAnchor anchor, const glm::vec3& authored, const glm::vec3& camera);
 
 // The intermediate an effect resolves to, before packing. Exposed because every interesting
 // question -- did it activate, where is the head, how far has it flown -- is answerable here with

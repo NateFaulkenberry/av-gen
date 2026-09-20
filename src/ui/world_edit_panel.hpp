@@ -13,6 +13,7 @@
 
 #include "app/engine.hpp"
 #include "assets/asset_library.hpp"
+#include "ui/particle_weather_rows.hpp"
 #include "ui/world_editor.hpp"
 
 #include <optional>

@@ -68,6 +68,9 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/ui/world_editor.cpp"
     # The Lights panel's decisions, which are ImGui-free precisely so they can be linked here.
     "${CMAKE_SOURCE_DIR}/src/ui/lights_panel_logic.cpp"
+    # ADR-520: the particle section's weather rows. Same reason, one panel over -- the table names
+    # thirteen parameter paths by string and a wrong one draws an empty box instead of failing.
+    "${CMAKE_SOURCE_DIR}/src/ui/particle_weather_rows.cpp"
     # The camera director's join: heroes to a brief, a sequence onto the timeline (ADR-075).
     "${CMAKE_SOURCE_DIR}/src/app/camera_director.cpp"
     # Musical events published as signals (ADR-073). engine.cpp holds a MusicRuntime, so this has to

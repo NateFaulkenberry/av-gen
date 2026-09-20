@@ -1,0 +1,48 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Weather front"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "weather-front.scene.json"
+  }
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "tracks": [],
+  "cues": []
+ },
+ "parameters": {
+  "camera/lens/focalLength": 32.0,
+  "camera/lens/aperture": 2.8,
+  "camera/lens/focusDistance": 9.0,
+  "camera/lens/shutterAngle": 172.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.1,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.22,
+  "post/bloom/threshold": 1.4,
+  "post/bloom/radius": 1.1,
+  "post/dof/enabled": true,
+  "post/dof/physical": true,
+  "post/grade/contrast": 1.2,
+  "post/grade/saturation": 0.82,
+  "post/grade/temperature": -0.06,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.035
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 60,
+  "output": "sequence",
+  "path": "renders/weather-front"
+ }
+}

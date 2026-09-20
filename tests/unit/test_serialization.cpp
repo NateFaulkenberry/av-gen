@@ -709,3 +709,75 @@ TEST_CASE("loadProject migrates a copy and leaves the caller's document unchange
     REQUIRE_FALSE(rejected.has_value());
     CHECK_THAT(rejected.error().message, ContainsSubstring("version 5"));
 }
+
+TEST_CASE("loadProject keeps the routes a subsystem installed and drops the rest", "[serialization][macro]") {
+    // ADR-522. `loadProject` replaces the AUTHORED routes and keeps the ones a subsystem owns,
+    // because the owner puts them back and a saved copy would duplicate on every save. Two owners
+    // were flagged -- a procedural graph (ADR-028) and an entity's reactions (ADR-088) -- and the
+    // third, a world macro, was not: its routes were installed by `Engine::applyWorldMacros`,
+    // bound, counted, and then erased sixty lines later by the second parameter pass.
+    //
+    // examples/machine/machine.json loaded with exactly its twelve authored LFO and audio routes
+    // and none of its three macros' eight. The knobs existed, appeared in the panel and took part
+    // in cue presets, and moved nothing at all.
+    Fixture f;
+    const json doc = saveProject(f.params, f.modulator); // no routes of its own
+
+    Fixture g;
+    ModRoute authored;
+    authored.source = "audio.bass";
+    authored.target = "orb/scale";
+    ModRoute graph = authored;
+    graph.fromGraph = true;
+    ModRoute entity = authored;
+    entity.fromEntity = true;
+    ModRoute macro = authored;
+    macro.source = "macro.season";
+    macro.fromMacro = true;
+    macro.chain.remapEnabled = true;
+    g.modulator.addRoute(authored);
+    g.modulator.addRoute(graph);
+    g.modulator.addRoute(entity);
+    g.modulator.addRoute(macro);
+    // The premise: all four are there before the load, so "three survived" is a survival and not
+    // an initial condition (ADR-182).
+    REQUIRE(g.modulator.routes().size() == 4);
+
+    REQUIRE(loadProject(doc, g.params, g.modulator).has_value());
+
+    std::size_t graphs = 0;
+    std::size_t entities = 0;
+    std::size_t macros = 0;
+    std::size_t authoredLeft = 0;
+    for (const ModRoute& r : g.modulator.routes()) {
+        graphs += r.fromGraph ? 1 : 0;
+        entities += r.fromEntity ? 1 : 0;
+        macros += r.fromMacro ? 1 : 0;
+        authoredLeft += (!r.fromGraph && !r.fromEntity && !r.fromMacro) ? 1 : 0;
+    }
+    CHECK(graphs == 1);
+    CHECK(entities == 1);
+    CHECK(macros == 1);   // the one this ADR is about
+    CHECK(authoredLeft == 0); // and the authored one really was replaced
+}
+
+TEST_CASE("saveProject does not write the routes a subsystem owns", "[serialization][macro]") {
+    // The other half: an owner rebuilds its routes on every load, so writing them would give a
+    // project a duplicate of each one every time it was saved -- and a route the author cannot
+    // delete, because the owner puts it straight back.
+    Fixture f;
+    ModRoute authored;
+    authored.source = "audio.bass";
+    authored.target = "orb/scale";
+    ModRoute macro = authored;
+    macro.source = "macro.season";
+    macro.fromMacro = true;
+    f.modulator.addRoute(authored);
+    f.modulator.addRoute(macro);
+    REQUIRE(f.modulator.routes().size() == 2);
+
+    const json doc = saveProject(f.params, f.modulator);
+    REQUIRE(doc["routes"].is_array());
+    CHECK(doc["routes"].size() == 1);
+    CHECK(doc["routes"][0]["source"] == "audio.bass");
+}

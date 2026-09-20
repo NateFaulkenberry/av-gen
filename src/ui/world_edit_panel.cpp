@@ -952,6 +952,23 @@ void WorldEditPanel::drawParticleSettings(app::Engine& engine, WorldEditor& edit
             ui::setBaseComponents(engine, base + "size", {*edited});
         }
     }
+    // ADR-520: the weather controls, from the shared table. Collapsed by default because most
+    // particle systems are not weather and a section that is always open pushes the four controls
+    // above it off the top of a short panel -- but present for every system, not only for the ones
+    // currently using them, because a control that appears only once the effect is already working
+    // cannot be how the effect is turned on.
+    if (ImGui::TreeNodeEx("weather & life", ImGuiTreeNodeFlags_SpanAvailWidth)) {
+        for (const ParticleWeatherRow& row : particleWeatherRows()) {
+            params::IParameter* p = engine.params().find(base + row.leaf);
+            if (p == nullptr) {
+                continue;
+            }
+            if (const auto edited = drag(row.leaf, row.label, p->finalComponent(0), row.lo, row.hi, row.fmt, row.tip)) {
+                ui::setBaseComponents(engine, base + row.leaf, {*edited});
+            }
+        }
+        ImGui::TreePop();
+    }
     ImGui::Separator();
 }
 
