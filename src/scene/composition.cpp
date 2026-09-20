@@ -240,6 +240,7 @@ void forEachParticleParam(ParticleParameters& p, F&& f) {
     f(p.splashSize);
     f(p.sizeVariance);
     f(p.sizeSkew);
+    f(p.dragSizeBias);
     f(p.pulseRate);
     f(p.pulseDepth);
     f(p.pulseSync);
@@ -515,6 +516,9 @@ json particlesToJson(const ParticleSystem& s) {
     if (s.sizeSkew != 1.0f) {
         j["sizeSkew"] = s.sizeSkew;
     }
+    if (s.dragSizeBias != 0.0f) {
+        j["dragSizeBias"] = s.dragSizeBias;
+    }
     if (s.pulseRate != 0.0f) {
         j["pulseRate"] = s.pulseRate;
         j["pulseDepth"] = s.pulseDepth;
@@ -693,6 +697,7 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
     AVGEN_READ(ringThickness, readFloat);
     AVGEN_READ(sizeVariance, readFloat);
     AVGEN_READ(sizeSkew, readFloat);
+    AVGEN_READ(dragSizeBias, readFloat);
     AVGEN_READ(pulseRate, readFloat);
     AVGEN_READ(pulseDepth, readFloat);
     AVGEN_READ(pulseSync, readFloat);

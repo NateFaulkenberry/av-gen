@@ -188,6 +188,17 @@ struct ParticleSystem {
     // expression, so nothing that does not ask changes.
     float sizeVariance = 0.3f;
     float sizeSkew = 1.0f;
+    // ...and scale, in a falling population, means SPEED. A raindrop's terminal velocity goes with
+    // the square root of its radius; a big flake flutters down slower than a small dense one. With
+    // one `drag` for the whole system every particle reaches the same terminal velocity and falls
+    // in lockstep, which is the "identical particle motion" the quality bar names -- and no amount
+    // of turbulence hides it, because turbulence perturbs a speed it does not vary.
+    //
+    // `dragSizeBias` blends the system's drag towards `drag / size`, so a particle drawn large by
+    // `sizeVariance` is also drawn fast, and the two variations are correlated the way they are in
+    // the world rather than independent the way two random numbers are. 0 is off and is exactly
+    // what every existing system does.
+    float dragSizeBias = 0.0f;
 
     // ---- ADR-520: the flash -------------------------------------------------------------------
     // A per-particle brightness oscillation. `pulseSync` is the whole reason this is one feature
@@ -314,6 +325,7 @@ struct ParticleParameters {
     params::Parameter<float>* splashSize = nullptr;
     params::Parameter<float>* sizeVariance = nullptr;
     params::Parameter<float>* sizeSkew = nullptr;
+    params::Parameter<float>* dragSizeBias = nullptr;
     params::Parameter<float>* pulseRate = nullptr;
     params::Parameter<float>* pulseDepth = nullptr;
     params::Parameter<float>* pulseSync = nullptr;

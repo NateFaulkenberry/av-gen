@@ -868,6 +868,10 @@ std::span<const ParticleWeatherRow> particleWeatherRows() {
         {"sizeSkew", "size skew", 0.2f, 6.0f, "%.2f",
          "Above 1: many small particles and a few large ones, which is what real drops, flakes, "
          "motes and embers look like. 1 is an even spread."},
+        {"dragSizeBias", "size drives speed", 0.0f, 1.0f, "%.2f",
+         "How much a particle's size decides how fast it falls. At 0 every particle falls at the "
+         "same speed, which reads as a machine. Turn it up and the big ones fall faster, the way "
+         "big drops and dense flakes do."},
         {"pulseRate", "blink rate", 0.0f, 8.0f, "%.2f Hz",
          "How often each particle brightens and dims. 0 is a steady glow."},
         {"pulseDepth", "blink depth", 0.0f, 1.0f, "%.2f", "How far down the blink takes the brightness."},

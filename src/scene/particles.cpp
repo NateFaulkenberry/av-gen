@@ -273,6 +273,7 @@ ParticleParameters registerParticleParameters(params::ParameterSet& params, cons
     p.splashSize = &params.add(f(base, "splashSize", s.splashSize, 0.0f, 200.0f, 0.0f, 30.0f));
     p.sizeVariance = &params.add(f(base, "sizeVariance", s.sizeVariance, 0.0f, 1.0f, 0.0f, 1.0f));
     p.sizeSkew = &params.add(f(base, "sizeSkew", s.sizeSkew, 0.05f, 16.0f, 0.2f, 6.0f));
+    p.dragSizeBias = &params.add(f(base, "dragSizeBias", s.dragSizeBias, 0.0f, 1.0f, 0.0f, 1.0f));
     p.pulseRate = &params.add(f(base, "pulseRate", s.pulseRate, 0.0f, 60.0f, 0.0f, 8.0f));
     p.pulseDepth = &params.add(f(base, "pulseDepth", s.pulseDepth, 0.0f, 1.0f, 0.0f, 1.0f));
     p.pulseSync = &params.add(f(base, "pulseSync", s.pulseSync, 0.0f, 1.0f, 0.0f, 1.0f));
@@ -340,6 +341,7 @@ void applyParticleParameters(const ParticleParameters& p, const ParticleSystem& 
     if (p.splashSize != nullptr) { s.splashSize = p.splashSize->value(); }
     if (p.sizeVariance != nullptr) { s.sizeVariance = p.sizeVariance->value(); }
     if (p.sizeSkew != nullptr) { s.sizeSkew = p.sizeSkew->value(); }
+    if (p.dragSizeBias != nullptr) { s.dragSizeBias = p.dragSizeBias->value(); }
     if (p.pulseRate != nullptr) { s.pulseRate = p.pulseRate->value(); }
     if (p.pulseDepth != nullptr) { s.pulseDepth = p.pulseDepth->value(); }
     if (p.pulseSync != nullptr) { s.pulseSync = p.pulseSync->value(); }

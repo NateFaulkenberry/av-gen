@@ -652,7 +652,7 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         u.collide = glm::vec4(static_cast<float>(sys.collision), sys.collisionHeight,
                               std::clamp(sys.collisionRestitution, 0.0f, 1.0f), std::max(0.0f, sys.splashSize));
         u.collide2 = glm::vec4(std::max(1e-3f, sys.splashLifetime), std::clamp(sys.ringThickness, 0.01f, 1.0f),
-                               0.0f, 0.0f);
+                               std::clamp(sys.dragSizeBias, 0.0f, 1.0f), 0.0f);
         u.pulse = glm::vec4(std::max(0.0f, sys.pulseRate), std::clamp(sys.pulseDepth, 0.0f, 1.0f),
                             std::clamp(sys.pulseSync, 0.0f, 1.0f), std::max(0.05f, sys.pulseSharpness));
         u.cluster = glm::vec4(static_cast<float>(sys.clusterCount), std::max(0.0f, sys.clusterRadius),

@@ -66,7 +66,7 @@ struct ParticleUniforms {
     // ---- ADR-520 ----
     glm::vec4 volume;   // volumeFollow.xyz (per-axis 0..1), w = 1 when the box wraps
     glm::vec4 collide;  // response (0 none, 1 kill, 2 bounce, 3 splash), height, restitution, splashSize
-    glm::vec4 collide2; // splashLifetime, ringThickness, 0, 0
+    glm::vec4 collide2; // splashLifetime, ringThickness, dragSizeBias, 0
     glm::vec4 pulse;    // rate (Hz, 0 = off), depth, sync, sharpness
     glm::vec4 cluster;  // clusterCount (0 = off), clusterRadius, pauseRate, pauseFraction
     glm::vec4 scatter;  // scatterStrength, HG anisotropy, sizeVariance, sizeSkew

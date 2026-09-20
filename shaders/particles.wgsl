@@ -122,7 +122,7 @@ struct Params {
     // ---- ADR-520 ----
     volume: vec4<f32>,   // volumeFollow.xyz (per-axis 0..1), w = 1 when the box wraps
     collide: vec4<f32>,  // response (0 none, 1 kill, 2 bounce, 3 splash), height, restitution, splashSize
-    collide2: vec4<f32>, // splashLifetime, ringThickness, 0, 0
+    collide2: vec4<f32>, // splashLifetime, ringThickness, dragSizeBias, 0
     pulse: vec4<f32>,    // rate (Hz, 0 = off), depth, sync, sharpness
     cluster: vec4<f32>,  // cluster count (0 = off), cluster radius, pause rate, pause fraction
     scatter: vec4<f32>,  // scatter strength, HG anisotropy, size variance, size skew
@@ -458,7 +458,11 @@ fn cs_simulate(@builtin(global_invocation_id) gid: vec3<u32>) {
             p.velocity += fv * (a.z * dt);
         }
     }
-    p.velocity *= max(0.0, 1.0 - params.direction.w * dt);
+    // ADR-520: drag that knows how big the particle is. bias 0 -- the default -- is exactly
+    // `params.direction.w`, so this multiply changes nothing for a system that has not asked.
+    let dragBias = clamp(params.collide2.z, 0.0, 1.0);
+    let effectiveDrag = params.direction.w * mix(1.0, 1.0 / max(p.size, 0.05), dragBias);
+    p.velocity *= max(0.0, 1.0 - effectiveDrag * dt);
     // ADR-520: dart and hover. Real flying insects do not cruise; they move, stop, hang, and move
     // again, and a field of particles all moving at once is the "identical particle motion" the
     // quality bar names. The phase is per particle, so at any instant some of the swarm is still
