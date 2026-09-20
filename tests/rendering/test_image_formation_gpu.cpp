@@ -11,6 +11,7 @@
 #include "scene/camera.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
+#include "scene/tonemap.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -45,87 +46,26 @@ gpu::ShaderLibrary makeShaders(gpu::Context& ctx) {
     return gpu::ShaderLibrary(ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
 }
 
-// ---- CPU mirrors of shaders/tonemap.wgsl, so the operators can be checked against numbers ------
+// ---- the CPU output transform, used as the GPU's independent check (ADR-383) -------------------
+//
+// These used to be a private copy of shaders/tonemap.wgsl living in this file. It is now
+// `src/scene/tonemap.cpp`, because the path tracer needs it to turn a frame into video without a
+// GPU -- and keeping it here as well would be the second copy that ADR-372's defect lived in.
+//
+// Note what this comparison is and is not. C++ and WGSL are genuinely separate source texts, so
+// this catches transcription drift between them. It CANNOT catch both being wrong in the same way,
+// which is exactly what happened with AgX's inverse. The arm for that is `tests/unit/test_tonemap.cpp`,
+// which anchors the C++ against byte values measured off this pipeline and written down in
+// docs/, and carries the historical wrong inverse as a control.
 
 glm::vec3 clamp01(glm::vec3 c) { return glm::clamp(c, glm::vec3(0.0f), glm::vec3(1.0f)); }
 
-glm::vec3 acesFitted(glm::vec3 x) {
-    const float a = 2.51f, b = 0.03f, c = 2.43f, d = 0.59f, e = 0.14f;
-    return clamp01((x * (a * x + b)) / (x * (c * x + d) + e));
-}
-
-glm::vec3 agxContrast(glm::vec3 x) {
-    const glm::vec3 x2 = x * x;
-    const glm::vec3 x4 = x2 * x2;
-    return 15.5f * x4 * x2 - 40.14f * x4 * x + 31.96f * x4 - 6.868f * x2 * x + 0.4298f * x2 + 0.1191f * x -
-           0.00232f;
-}
-
-glm::vec3 agx(glm::vec3 val) {
-    // The WGSL mat3x3 constructor takes columns, and glm::mat3 does too.
-    const glm::mat3 inset(glm::vec3(0.842479062253094f, 0.0423282422610123f, 0.0423756549057051f),
-                          glm::vec3(0.0784335999999992f, 0.878468636469772f, 0.0784336f),
-                          glm::vec3(0.0792237451477643f, 0.0791661274605434f, 0.879142973793104f));
-    const glm::mat3 outset(glm::vec3(1.19687900512017f, -0.0528968517574562f, -0.0529716355144438f),
-                           glm::vec3(-0.0980208811401368f, 1.15190312990417f, -0.0980434501171241f),
-                           glm::vec3(-0.0990297440797205f, -0.0989611768448433f, 1.15107367264116f));
-    const float minEv = -12.47393f;
-    const float maxEv = 4.026069f;
-    glm::vec3 v = inset * val;
-    v = glm::clamp(glm::log2(glm::max(v, glm::vec3(1e-10f))), glm::vec3(minEv), glm::vec3(maxEv));
-    v = (v - minEv) / (maxEv - minEv);
-    v = agxContrast(v);
-    v = outset * v;
-    // The exact inverse of the sRGB OETF `srgbByte` applies, mirroring shaders/tonemap.wgsl's
-    // `srgbToLinear`. This was `glm::pow(clamp01(v), 2.2f)` on both sides -- the same wrong
-    // inverse in the shader and in its mirror, so the mirror confirmed the shader was consistent
-    // with itself and never that it was right (ADR-372).
-    const glm::vec3 c = clamp01(v);
-    const glm::vec3 lo = c / 12.92f;
-    const glm::vec3 hi = glm::pow((c + 0.055f) / 1.055f, glm::vec3(2.4f));
-    return glm::vec3(c.x <= 0.04045f ? lo.x : hi.x, c.y <= 0.04045f ? lo.y : hi.y,
-                     c.z <= 0.04045f ? lo.z : hi.z);
-}
-
-glm::vec3 reinhardExtended(glm::vec3 c) {
-    const float white = 4.0f;
-    const float l = glm::dot(c, glm::vec3(0.2126f, 0.7152f, 0.0722f));
-    const float lm = l * (1.0f + l / (white * white)) / (1.0f + l);
-    return clamp01(c * (lm / std::max(l, 1e-5f)));
-}
-
-glm::vec3 pbrNeutral(glm::vec3 color) {
-    const float startCompression = 0.8f - 0.04f;
-    const float desaturation = 0.15f;
-    const float x = std::min(color.r, std::min(color.g, color.b));
-    const float offset = x < 0.08f ? x - 6.25f * x * x : 0.04f;
-    color -= glm::vec3(offset);
-    const float peak = std::max(color.r, std::max(color.g, color.b));
-    if (peak < startCompression) {
-        return clamp01(color);
-    }
-    const float d = 1.0f - startCompression;
-    const float newPeak = 1.0f - d * d / (peak + d - startCompression);
-    color *= newPeak / peak;
-    const float g = 1.0f - 1.0f / (desaturation * (peak - newPeak) + 1.0f);
-    return clamp01(glm::mix(color, glm::vec3(newPeak), g));
-}
-
 glm::vec3 tonemapReference(scene::TonemapOperator op, glm::vec3 hdr) {
-    switch (op) {
-    case scene::TonemapOperator::AgX: return agx(hdr);
-    case scene::TonemapOperator::Reinhard: return reinhardExtended(hdr);
-    case scene::TonemapOperator::PbrNeutral: return pbrNeutral(hdr);
-    case scene::TonemapOperator::Clamp: return clamp01(hdr);
-    case scene::TonemapOperator::AcesFitted: break;
-    }
-    return acesFitted(hdr);
+    return scene::tonemapOperator(op, hdr);
 }
 
-int srgbByte(float linear) {
-    const float encoded = linear <= 0.0031308f ? linear * 12.92f : 1.055f * std::pow(linear, 1.0f / 2.4f) - 0.055f;
-    return static_cast<int>(std::lround(std::clamp(encoded, 0.0f, 1.0f) * 255.0f));
-}
+int srgbByte(float linear) { return static_cast<int>(scene::srgbByte(linear)); }
+
 
 // A scene whose whole frame is one known scene-linear colour, with every post stage neutral.
 scene::Scene flatScene(glm::vec3 colour) {

@@ -1145,4 +1145,41 @@ inline constexpr float kMinItemWidth = 60.0f;
     return buffer;
 }
 
+// ---- which codecs this machine can actually produce (ADR-383, audit G4) -------------------------
+//
+// The Render panel's codec list was a hardcoded array of eight, four of them ffmpeg-only, offered
+// whether or not this build has a native encoder and whether or not an ffmpeg exists anywhere on
+// the machine. The brief's own rule is "do not expose unavailable backends", and the shipping UI
+// broke it one layer below where the brief was looking: choosing `libx265` with no ffmpeg installed
+// is a render that fails at the moment the output is opened, after the project has been saved.
+//
+// A pure function of three facts so a test can ask it every combination without an encoder.
+// `backend` is the panel's own setting -- "auto", "native" or "ffmpeg" -- because asking for
+// `native` narrows the list further than `auto` does.
+[[nodiscard]] inline std::vector<std::string> availableCodecs(std::span<const std::string> native,
+                                                              bool haveFfmpeg,
+                                                              std::string_view backend) {
+    // Everything the ffmpeg path understands beyond the four the native backend shares with it.
+    static const char* kFfmpegOnly[] = {"libx264", "libx265", "prores_ks", "libvpx-vp9"};
+    std::vector<std::string> out;
+    const bool wantNative = backend != "ffmpeg";
+    const bool wantFfmpeg = backend != "native";
+    if (wantNative) {
+        out.assign(native.begin(), native.end());
+    }
+    if (wantFfmpeg && haveFfmpeg) {
+        // The native four are already spelled the same way for ffmpeg (`planFfmpegCodec` maps
+        // them), so under "ffmpeg" they stay offered rather than disappearing.
+        if (!wantNative) {
+            for (const char* n : {"prores4444", "prores422", "h264", "hevc"}) {
+                out.emplace_back(n);
+            }
+        }
+        for (const char* n : kFfmpegOnly) {
+            out.emplace_back(n);
+        }
+    }
+    return out;
+}
+
 } // namespace avgen::ui

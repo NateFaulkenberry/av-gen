@@ -4,6 +4,7 @@
 
 #include <cstring>
 
+#include "app/frame_range.hpp"
 #include "app/transport.hpp"
 
 #include "ui/editor_shell.hpp"
@@ -2811,7 +2812,13 @@ void ControlPanel::drawPathTrace() {
 
     const pathtrace::TraceProgress p =
         pathTraceProgress ? pathTraceProgress() : pathtrace::TraceProgress{};
-    const bool running = !p.finished() && p.state != pathtrace::TraceJobState::Queued;
+    // ADR-383: a sequence reports frames AND samples-within-the-frame, because a path-traced frame
+    // takes long enough that a frame counter on its own reads as a hang.
+    const std::optional<app::SequenceProgress> seq =
+        pathTraceSequenceProgress ? pathTraceSequenceProgress() : std::nullopt;
+    const bool seqRunning = seq.has_value() && !seq->finished;
+    const bool running =
+        seqRunning || (!p.finished() && p.state != pathtrace::TraceJobState::Queued);
 
     ImGui::BeginDisabled(running);
 
@@ -2830,8 +2837,47 @@ void ControlPanel::drawPathTrace() {
             t.seconds = std::max(0.0, static_cast<double>(seconds));
         }
         if (ImGui::IsItemHovered()) {
-            tooltip("The timeline second to trace. One frame, not a sequence -- a path-traced\n"
-                    "sequence is a queue of these and is not built yet.");
+            tooltip("The timeline second to trace, or the first second of a range.");
+        }
+
+        // ADR-383. A path-traced SEQUENCE. The tooltip above used to end "one frame, not a
+        // sequence -- a path-traced sequence is a queue of these and is not built yet", and this
+        // is the thing that makes that sentence false.
+        bool sequence = t.isSequence();
+        if (ImGui::Checkbox("range", &sequence)) {
+            // Turning it on proposes a second of footage rather than an empty range, so the
+            // control does something the moment it is ticked; turning it off returns to the one
+            // frame every existing project describes.
+            t.endSeconds = sequence ? t.seconds + 1.0 : -1.0;
+        }
+        if (ImGui::IsItemHovered()) {
+            tooltip("Trace a range of frames instead of one. The end is exclusive, exactly as a\n"
+                    "realtime render's is, so 12.0 to 13.0 at 24 fps is twenty-four frames\n"
+                    "starting at 12.0 and the last one is at 12.958.");
+        }
+        if (sequence) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(90.0f);
+            auto end = static_cast<float>(t.endSeconds);
+            if (ImGui::InputFloat("to", &end, 0.1f, 1.0f, "%.3f")) {
+                t.endSeconds = static_cast<double>(end);
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(70.0f);
+            auto fps = static_cast<float>(t.fps);
+            if (ImGui::InputFloat("fps", &fps, 1.0f, 10.0f, "%.3g")) {
+                t.fps = std::max(0.001, static_cast<double>(fps));
+            }
+            const app::FrameRange range = t.frameRange();
+            const std::uint64_t frames = range.frameCount(range.resolvedEnd(0.0, 0.0));
+            ImGui::TextDisabled("%llu frame(s); a movie if the output ends .mov or .mp4",
+                                static_cast<unsigned long long>(frames));
+            if (ImGui::IsItemHovered()) {
+                tooltip("A path-traced movie is tone mapped on the CPU, so it needs no GPU at all\n"
+                        "-- which is the whole reason to use this renderer while the device is\n"
+                        "busy. Anything else writes one scene-linear EXR per frame into a folder\n"
+                        "of that name.");
+            }
         }
     }
 
@@ -2910,7 +2956,36 @@ void ControlPanel::drawPathTrace() {
     }
     ImGui::Separator();
 
-    if (running) {
+    if (seqRunning) {
+        const auto samples = pathTraceSequenceSamples ? pathTraceSequenceSamples()
+                                                      : std::pair<std::uint32_t, std::uint32_t>{0, 0};
+        const std::string overlay = fmt::format("frame {} / {}", seq->framesSubmitted, seq->framesTotal);
+        ImGui::ProgressBar(static_cast<float>(std::clamp(seq->fraction(), 0.0, 1.0)), ImVec2(-1, 0),
+                           overlay.c_str());
+        if (samples.second > 0) {
+            ImGui::Text("%u / %u samples on this frame -- %s elapsed", samples.first, samples.second,
+                        elapsedClock(seq->elapsedSeconds).c_str());
+        } else {
+            ImGui::Text("%s elapsed", elapsedClock(seq->elapsedSeconds).c_str());
+        }
+        if (seq->estimatedRemainingSeconds >= 0.0) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("(about %s left)",
+                                elapsedClock(seq->estimatedRemainingSeconds).c_str());
+        } else if (ImGui::IsItemHovered()) {
+            tooltip("No estimate yet. Eight frames is the least this will guess from -- a rate\n"
+                    "taken over the first frame is not a rate, and a confident wrong number at\n"
+                    "the only moment somebody looks at it teaches them to ignore the number.");
+        }
+        drawViewportSuspension();
+        if (ImGui::Button("Cancel") && onCancelPathTrace) {
+            onCancelPathTrace();
+        }
+        if (ImGui::IsItemHovered()) {
+            tooltip("Stops after the frame being traced. Every frame already written is kept --\n"
+                    "a cancelled sequence is a short sequence, not a deleted one.");
+        }
+    } else if (running) {
         // PROGRESS HONESTY (spec section 36). A bar is drawn only for a stage that can actually
         // measure itself. Rendering counts finished samples, so it gets one. Scene build, BVH,
         // denoise and write emit no intermediate signal, so they get the STAGE NAME instead -- a
@@ -2943,7 +3018,20 @@ void ControlPanel::drawPathTrace() {
         }
         ImGui::SameLine();
         ImGui::TextDisabled("writes one EXR");
-        if (p.state == pathtrace::TraceJobState::Complete) {
+        if (seq.has_value() && seq->finished) {
+            if (!seq->error.empty()) {
+                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "failed: %s", seq->error.c_str());
+            } else if (seq->cancelled) {
+                ImGui::TextColored(ImVec4(0.9f, 0.8f, 0.4f, 1.0f), "cancelled -- %llu frame(s) kept",
+                                   static_cast<unsigned long long>(seq->framesWritten));
+            } else {
+                ImGui::TextColored(ImVec4(0.55f, 0.85f, 0.55f, 1.0f),
+                                   "done: %llu frame(s) in %s, hash %016llx",
+                                   static_cast<unsigned long long>(seq->framesWritten),
+                                   elapsedClock(seq->elapsedSeconds).c_str(),
+                                   static_cast<unsigned long long>(seq->sequenceHash));
+            }
+        } else if (p.state == pathtrace::TraceJobState::Complete) {
             ImGui::TextColored(ImVec4(0.55f, 0.85f, 0.55f, 1.0f), "done in %s",
                                elapsedClock(p.elapsedSeconds).c_str());
         } else if (p.state == pathtrace::TraceJobState::Cancelled) {
@@ -3128,16 +3216,42 @@ void ControlPanel::drawRender(app::Engine& engine) {
         onChooseRenderOutput();
     }
     if (s.output == app::RenderOutput::Video) {
-        static const char* codecs[] = {"prores4444", "prores422", "h264", "hevc", "libx264", "libx265", "prores_ks", "libvpx-vp9"};
-        int codec = 0;
-        for (int i = 0; i < 8; ++i) {
-            if (s.codec == codecs[i]) {
-                codec = i;
+        // ADR-383 / audit G4: only what this machine can actually produce. This was a hardcoded
+        // array of eight, four of them ffmpeg-only, offered whether or not an ffmpeg exists
+        // anywhere -- so picking one was a render that failed when the output was opened, after
+        // the project had been saved. The decision is `ui::availableCodecs`, which a test can ask
+        // every combination of without an encoder.
+        const std::vector<std::string> codecs =
+            ui::availableCodecs(assets::nativeCodecs(), !assets::findFfmpeg().empty(), s.backend);
+        if (codecs.empty()) {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f),
+                               "no video encoder: this build has no native backend and no ffmpeg "
+                               "was found");
+        } else {
+            std::vector<const char*> items;
+            items.reserve(codecs.size());
+            int codec = 0;
+            for (std::size_t i = 0; i < codecs.size(); ++i) {
+                items.push_back(codecs[i].c_str());
+                if (s.codec == codecs[i]) {
+                    codec = static_cast<int>(i);
+                }
             }
-        }
-        ImGui::SetNextItemWidth(140);
-        if (ImGui::Combo("codec", &codec, codecs, 8)) {
-            s.codec = codecs[codec];
+            // A setting that names a codec this machine cannot produce is shown as selected anyway
+            // -- it came from the project and quietly rewriting somebody's authored choice because
+            // their laptop lacks an encoder is worse than saying so.
+            const bool unavailable =
+                std::find(codecs.begin(), codecs.end(), s.codec) == codecs.end();
+            ImGui::SetNextItemWidth(140);
+            if (ImGui::Combo("codec", &codec, items.data(), static_cast<int>(items.size()))) {
+                s.codec = codecs[static_cast<std::size_t>(codec)];
+            }
+            if (unavailable) {
+                ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.35f, 1.0f),
+                                   "'%s' is not available here; the render will fail unless you "
+                                   "change it or install ffmpeg",
+                                   s.codec.c_str());
+            }
         }
         ImGui::SameLine();
         static const char* backends[] = {"auto", "native", "ffmpeg"};
@@ -3152,6 +3266,18 @@ void ControlPanel::drawRender(app::Engine& engine) {
                               "above, which is how much work the renderer does per frame.");
         }
         ImGui::Checkbox("mux audio", &s.muxAudio);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(90.0f);
+        // ADR-383 / audit G3. `encoderThreads` round-tripped through the project and had no widget
+        // anywhere: CLI only, on a setting whose whole purpose is "this machine is busy, spend
+        // fewer cores on the encoder".
+        ImGui::InputInt("encoders", &s.encoderThreads, 1, 2);
+        s.encoderThreads = std::clamp(s.encoderThreads, 0, 16);
+        if (ImGui::IsItemHovered()) {
+            tooltip("Threads compressing frames. 0 lets the job choose -- one per core less one,\n"
+                    "capped at sixteen, and always 1 for a video because the muxer is sequential.\n"
+                    "Lower it when you want the machine back while a render goes.");
+        }
         if (!videoBackends.empty()) {
             ImGui::TextWrapped("%s", videoBackends.c_str());
         }
@@ -3161,6 +3287,64 @@ void ControlPanel::drawRender(app::Engine& engine) {
         ImGui::SetNextItemWidth(200);
         if (ImGui::InputText("pattern", pat, sizeof(pat))) {
             s.pattern = pat;
+        }
+    }
+
+    // ---- properties of the deliverable that were CLI-only (audit G3, ADR-383) --------------------
+    {
+        ImGui::SetNextItemWidth(120.0f);
+        float supersample = s.supersample;
+        if (ImGui::SliderFloat("supersample", &supersample, 1.0f, 2.0f, "%.2fx")) {
+            s.supersample = supersample;
+        }
+        if (ImGui::IsItemHovered()) {
+            tooltip("Render at this multiple of the output size and resolve back down (ADR-212).\n"
+                    "It is the documented answer to foliage shimmer: neighbour-to-neighbour chroma\n"
+                    "noise measures 2.80% at 1280x720 against 1.86% at 2560x1440, and a 720p\n"
+                    "deliverable had no other way to buy its way out of it.\n\n"
+                    "1.00x is off. Costs the square of what it says.");
+        }
+
+        // The AOV set, as checkboxes over `RenderSettings::aovNames()` rather than a text field, so
+        // a typo cannot silently export nothing -- which is the failure `aovList()` exists to
+        // refuse and which a free-text box would keep re-creating.
+        if (ImGui::TreeNode("auxiliary passes (AOVs)")) {
+            // Read through `aovList()`, which parses the comma list properly, rather than by
+            // substring: `s.aovs.find("id")` is true for a list containing nothing but a name that
+            // happens to contain those two letters, and a checkbox that lies about its own state is
+            // worse than no checkbox.
+            const auto parsed = s.aovList();
+            const std::vector<std::string> selected = parsed ? *parsed : std::vector<std::string>{};
+            const auto isOn = [&selected](const std::string& n) {
+                return std::find(selected.begin(), selected.end(), n) != selected.end();
+            };
+            for (const std::string_view name : app::RenderSettings::aovNames()) {
+                const std::string n(name);
+                bool on = isOn(n);
+                if (ImGui::Checkbox(n.c_str(), &on)) {
+                    // Rebuilt from the boxes in `aovNames()`'s order, so the list is canonical and
+                    // two identical selections cannot produce two different strings.
+                    std::string next;
+                    for (const std::string_view other : app::RenderSettings::aovNames()) {
+                        const std::string o(other);
+                        const bool keep = o == n ? on : isOn(o);
+                        if (keep) {
+                            if (!next.empty()) next += ',';
+                            next += o;
+                        }
+                    }
+                    s.aovs = next;
+                }
+                if (ImGui::IsItemHovered()) {
+                    tooltip("Written as its own scene-linear EXR sequence beside the beauty pass\n"
+                            "(ADR-242). The renderer already draws these every frame; this is the\n"
+                            "consumer.");
+                }
+            }
+            if (!s.aovs.empty()) {
+                ImGui::TextDisabled("%s", s.aovs.c_str());
+            }
+            ImGui::TreePop();
         }
     }
     if (auto v = s.validate(); !v) {
