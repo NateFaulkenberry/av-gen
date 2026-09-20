@@ -89,8 +89,15 @@ private:
 // makes the whole sky flash rather than making its curtain edges answer the beat.
 [[nodiscard]] inline std::string atmosphericBeatTarget(const std::string& effectName,
                                                        world::AtmosphereKind kind) {
-    return world::atmosphericParameterPrefix(effectName) +
-           (kind == world::AtmosphereKind::Comet ? "coreIntensity" : "edgeBrightness");
+    // ADR-383: a vortex's brightness is its emissive density. Not `density`, which is extinction --
+    // pulsing that makes the funnel thicker rather than brighter, which reads as the fog breathing.
+    const char* leaf = "edgeBrightness";
+    switch (kind) {
+    case world::AtmosphereKind::Comet: leaf = "coreIntensity"; break;
+    case world::AtmosphereKind::Aurora: leaf = "edgeBrightness"; break;
+    case world::AtmosphereKind::Vortex: leaf = "emission"; break;
+    }
+    return world::atmosphericParameterPrefix(effectName) + leaf;
 }
 
 } // namespace avgen::ui

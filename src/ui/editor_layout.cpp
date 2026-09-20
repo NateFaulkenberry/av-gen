@@ -18,7 +18,7 @@ constexpr int kFormatVersion = 1;
 // The panels, grouped the way the View menu reads them: what you build with on the left, what you
 // inspect and tune on the right, what runs underneath along the bottom. Nothing is assigned to the
 // centre -- see DockRegion.
-constexpr std::array<EditorPanel, 22> kPanels{{
+constexpr std::array<EditorPanel, 21> kPanels{{
     {"World Builder", "World Builder", DockRegion::Left, true,
      "recipe, Generate World and the job monitor"},
     // ADR-092. One panel, not two: the brush and the selection are the same job seen from two
@@ -48,10 +48,14 @@ constexpr std::array<EditorPanel, 22> kPanels{{
     // ADR-375. Beside World Effects, because the question "why does the sky look like that" is
     // asked in the same breath as "why is the beam not firing", and both were answered until now by
     // scrolling the flat Parameters list.
+    //
+    // ADR-383 removed the "Tree" panel that used to sit on the next line. It was a scene-specific
+    // wrapper: five sections that found their subjects by sniffing parameter names for "leaf",
+    // "mote" and "/wind/strength", and a second global wind beside the authoritative one. A saved
+    // layout that still names it is harmless -- `EditorLayout::slot` returns null for an id the
+    // registry does not have, and the restore skips it.
     {"Environment", "Environment", DockRegion::Right, false,
-     "the sky and what is under the island: cosmic atmosphere and the vortex"},
-    {"Tree", "Tree", DockRegion::Right, false,
-     "what the tree does: wind, the bodies that bend in it, and the leaves it sheds"},
+     "the sky, the fog and the wind field over this world"},
     // The scene's authored local lights. Beside Cameras, because "what is looking at this" and
     // "what is lighting it" are the same kind of question about the same scene. Sky, fog and
     // environment intensity are deliberately NOT here; they are the Environment panel's, which is

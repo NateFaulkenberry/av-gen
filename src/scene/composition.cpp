@@ -3443,32 +3443,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // on shipped. Both halves are parameters now. Speed 0 is still a genuine no-op, and so is
     // enabled false, which is the default for every scene that does not say otherwise, so
     // registering these moves no existing picture.
-    // ADR-371: the cosmic vortex. Registered always, so a scene that has not switched one on can
-    // still be given one from the UI -- the reachability lesson of ADR-360, applied the first time
-    // instead of the second. Radius 0 is off and is the default.
-    {
-        const scene::Environment::Vortex& vx = volumeSetting_.vortex;
-        const std::string b = prefix_ + "scene/vortex/";
-        vortexRadius_ = &params.add(floatDesc(b + "radius", vx.radius, 0.0f, 20000.0f, 0.0f, 1500.0f));
-        vortexDensity_ = &params.add(floatDesc(b + "density", vx.density, 0.0f, 8.0f, 0.0f, 2.0f));
-        vortexEmission_ = &params.add(floatDesc(b + "emission", vx.emission, 0.0f, 20.0f, 0.0f, 4.0f));
-        vortexSwirl_ = &params.add(floatDesc(b + "swirl", vx.swirl, -32.0f, 32.0f, -8.0f, 8.0f));
-        vortexRotation_ = &params.add(floatDesc(b + "rotationSpeed", vx.rotationSpeed, -4.0f, 4.0f, -0.4f, 0.4f));
-        vortexTurbulence_ = &params.add(floatDesc(b + "turbulence", vx.turbulence, 0.0f, 1.0f, 0.0f, 1.0f));
-        vortexInnerVoid_ = &params.add(floatDesc(b + "innerVoid", vx.innerVoid, 0.0f, 0.95f, 0.0f, 0.6f));
-        vortexContrast_ = &params.add(floatDesc(b + "contrast", vx.contrast, 0.05f, 12.0f, 0.5f, 5.0f));
-        vortexBreath_ = &params.add(floatDesc(b + "breathAmount", vx.breathAmount, 0.0f, 1.0f, 0.0f, 0.3f));
-        vortexThickness_ = &params.add(floatDesc(b + "thickness", vx.thickness, 0.1f, 5000.0f, 5.0f, 600.0f));
-        vortexFilaments_ = &params.add(floatDesc(b + "filaments", vx.filaments, 0.0f, 4.0f, 0.0f, 2.0f));
-        vortexSpill_ = &params.add(floatDesc(b + "spill", vx.spill, 0.0f, 20.0f, 0.0f, 6.0f));
-        vortexCometResponse_ = &params.add(floatDesc(b + "cometResponse", vx.cometResponse, 0.0f, 8.0f, 0.0f, 2.0f));
-        vortexFunnelDepth_ = &params.add(floatDesc(b + "funnelDepth", vx.funnelDepth, 0.0f, 20000.0f, 0.0f, 3000.0f));
-        vortexThroat_ = &params.add(floatDesc(b + "throat", vx.throat, 0.02f, 1.0f, 0.05f, 1.0f));
-        vortexThroatDensity_ = &params.add(floatDesc(b + "throatDensity", vx.throatDensity, 0.0f, 1.0f, 0.0f, 1.0f));
-        vortexColorDeep_ = &params.add(vec3Desc(b + "colorDeep", vx.colorDeep, 0.0f, 4.0f, 0.0f, 1.0f));
-        vortexColorMid_ = &params.add(vec3Desc(b + "colorMid", vx.colorMid, 0.0f, 4.0f, 0.0f, 1.0f));
-        vortexColorAccent_ = &params.add(vec3Desc(b + "colorAccent", vx.colorAccent, 0.0f, 8.0f, 0.0f, 2.0f));
-    }
+    // ADR-383: the vortex's parameters are gone from here. They were `scene/vortex/*` on the
+    // environment -- a singleton, registered whether or not a scene had one, and reachable only
+    // through the Tree panel. They are now `atmos/<name>/*` on an authored effect instance, which
+    // is where the aurora and the comet already live, and they arrive with instances, an enable,
+    // serialisation, the World Effects panel and modulation that this block had to hand-build.
     windEnabled_ = &params.add(boolDesc(prefix_ + "scene/wind/enabled", windSetting_.enabled));
     // ADR-377: the hard maximum is 1.6 and not 4.0, and that is a measurement rather than a
     // preference. The mesh deformation's usable range on a 138 m tree is bounded by LEAF SIZE: the
@@ -3784,10 +3763,20 @@ void Composition::applyCanopyEmitters() {
         if (node.kind != NodeKind::Particles || !node.vortexAttractor) {
             continue;
         }
-        const Environment::Vortex& vx = volumeSetting_.vortex;
-        if (!vx.active()) {
+        // ADR-383: the vortex is an authored effect now, so this looks for the first live one
+        // rather than reading a field off the environment. Still no scene knowledge: it binds to
+        // whatever vortex the scene contains, and to nothing if it contains none.
+        const world::Vortex* found = nullptr;
+        for (const world::AtmosphericEffect& e : atmosphericEffects_) {
+            if (e.kind == world::AtmosphereKind::Vortex && e.enabled && e.vortex.active()) {
+                found = &e.vortex;
+                break;
+            }
+        }
+        if (found == nullptr) {
             continue;
         }
+        const world::Vortex& vx = *found;
         const std::string full = sanitise(prefix_) + node.name;
         for (ParticleSystem& ps : scene_.particles) {
             if (ps.name != full && ps.name != node.name) {
@@ -4375,14 +4364,6 @@ void Composition::detach() {
     volumeDensity_ = nullptr;
     fogHeight_ = nullptr;
     fogHeightFalloff_ = nullptr;
-    vortexRadius_ = nullptr; vortexDensity_ = nullptr; vortexEmission_ = nullptr;
-    vortexSwirl_ = nullptr; vortexRotation_ = nullptr; vortexTurbulence_ = nullptr;
-    vortexInnerVoid_ = nullptr; vortexContrast_ = nullptr; vortexBreath_ = nullptr;
-    vortexThickness_ = nullptr; vortexFilaments_ = nullptr;
-    vortexSpill_ = nullptr;
-    vortexCometResponse_ = nullptr;
-    vortexFunnelDepth_ = nullptr; vortexThroat_ = nullptr; vortexThroatDensity_ = nullptr;
-    vortexColorDeep_ = nullptr; vortexColorMid_ = nullptr; vortexColorAccent_ = nullptr;
     windEnabled_ = nullptr;
     windSpeed_ = nullptr;
     windDirection_ = nullptr;
@@ -6958,28 +6939,6 @@ void Composition::applyParameters() {
         // ADR-360: every field of the wind is a live parameter now, not just two, so the whole
         // field can be turned up, down, off, gustier or calmer from the UI, keyed on the timeline
         // and driven by audio (`music.build -> scene/windSpeed` is the intended idiom).
-        // ADR-371: the vortex travels with the rest of the atmosphere. Copied rather than picked
-        // for now: the parameters below are the live half.
-        env.vortex = volumeSetting_.vortex;
-        env.vortex.radius = pick(vortexRadius_, volumeSetting_.vortex.radius);
-        env.vortex.density = pick(vortexDensity_, volumeSetting_.vortex.density);
-        env.vortex.emission = pick(vortexEmission_, volumeSetting_.vortex.emission);
-        env.vortex.swirl = pick(vortexSwirl_, volumeSetting_.vortex.swirl);
-        env.vortex.rotationSpeed = pick(vortexRotation_, volumeSetting_.vortex.rotationSpeed);
-        env.vortex.turbulence = pick(vortexTurbulence_, volumeSetting_.vortex.turbulence);
-        env.vortex.innerVoid = pick(vortexInnerVoid_, volumeSetting_.vortex.innerVoid);
-        env.vortex.contrast = pick(vortexContrast_, volumeSetting_.vortex.contrast);
-        env.vortex.breathAmount = pick(vortexBreath_, volumeSetting_.vortex.breathAmount);
-        env.vortex.thickness = pick(vortexThickness_, volumeSetting_.vortex.thickness);
-        env.vortex.filaments = pick(vortexFilaments_, volumeSetting_.vortex.filaments);
-        env.vortex.spill = pick(vortexSpill_, volumeSetting_.vortex.spill);
-        env.vortex.cometResponse = pick(vortexCometResponse_, volumeSetting_.vortex.cometResponse);
-        env.vortex.funnelDepth = pick(vortexFunnelDepth_, volumeSetting_.vortex.funnelDepth);
-        env.vortex.throat = pick(vortexThroat_, volumeSetting_.vortex.throat);
-        env.vortex.throatDensity = pick(vortexThroatDensity_, volumeSetting_.vortex.throatDensity);
-        if (vortexColorDeep_ != nullptr) { env.vortex.colorDeep = vortexColorDeep_->value(); }
-        if (vortexColorMid_ != nullptr) { env.vortex.colorMid = vortexColorMid_->value(); }
-        if (vortexColorAccent_ != nullptr) { env.vortex.colorAccent = vortexColorAccent_->value(); }
         env.wind = windSetting_;
         env.wind.enabled = windEnabled_ != nullptr ? windEnabled_->value() : windSetting_.enabled;
         env.wind.speed = pick(windSpeed_, windSetting_.speed);
@@ -8550,6 +8509,10 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
     if (j.contains("post")) {
         comp->postJson_ = j.at("post");
     }
+    // ADR-383 §19: a scene saved before the vortex became an authored effect carries it under
+    // `environment.vortex`. It is read into this and converted into an effect instance after the
+    // `atmosphericEffects` array is read, because the conversion has to know what names are taken.
+    std::optional<world::Vortex> legacyVortex;
     if (j.contains("environment")) {
         const json& e = j.at("environment");
         if (!e.is_object()) {
@@ -8793,11 +8756,14 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 }
                 *fk.target = *value;
             }
-            // ADR-371: the cosmic vortex. Absent is off, which is every scene but the one this
-            // was written for.
+            // ADR-383, consolidation §19: the legacy `environment.vortex` block. It was ADR-371's
+            // singleton; the vortex is an authored atmospheric effect now. Reading it here and
+            // converting it below preserves every value of every scene saved in the old form
+            // rather than silently discarding the configuration -- the file keeps loading, and the
+            // next save writes it in the new place.
             if (e.contains("vortex") && e.at("vortex").is_object()) {
                 const nlohmann::json& vj = e.at("vortex");
-                scene::Environment::Vortex& vx = v.vortex;
+                world::Vortex& vx = legacyVortex.emplace();
                 auto f = [&vj](const char* key, float& out) {
                     if (vj.contains(key) && vj.at(key).is_number()) {
                         out = vj.at(key).get<float>();
@@ -8987,6 +8953,37 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         }
         if (auto ok = comp->setAtmosphericEffects(std::move(atmospherics)); !ok) {
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
+        }
+    }
+    // ADR-383 §19: the migration. Only a vortex that was actually on is carried over -- a zero
+    // radius was ADR-371's "off", and turning it into a disabled effect instance would put a row
+    // in the World Effects panel for something the scene never had. Values are copied, not
+    // re-defaulted: §10 asks that the Tree of Life look identical, and the only way to be sure of
+    // that is for the numbers to be the same numbers.
+    if (legacyVortex && legacyVortex->active()) {
+        std::vector<world::AtmosphericEffect> effects = comp->atmosphericEffects_;
+        const bool alreadyAuthored =
+            std::any_of(effects.begin(), effects.end(), [](const world::AtmosphericEffect& e) {
+                return e.kind == world::AtmosphereKind::Vortex;
+            });
+        if (!alreadyAuthored) {
+            std::string name = "vortex";
+            int suffix = 2;
+            while (std::any_of(effects.begin(), effects.end(),
+                               [&name](const world::AtmosphericEffect& e) { return e.name == name; })) {
+                name = std::format("vortex{}", suffix++);
+            }
+            world::AtmosphericEffect e;
+            e.name = std::move(name);
+            e.kind = world::AtmosphereKind::Vortex;
+            e.enabled = true;
+            e.activation = world::Activation::Always;
+            e.vortex = *legacyVortex;
+            effects.push_back(std::move(e));
+            if (auto ok = comp->setAtmosphericEffects(std::move(effects)); !ok) {
+                return fail("scene file '{}': migrating 'environment.vortex': {}", scenePath.string(),
+                            ok.error().message);
+            }
         }
     }
     // ADR-097: the profile library the scene names, read once before the entities that reference

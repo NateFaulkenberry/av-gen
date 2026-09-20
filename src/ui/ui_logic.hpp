@@ -1145,4 +1145,63 @@ inline constexpr float kMinItemWidth = 60.0f;
     return buffer;
 }
 
+// ---- the vortex's rows in the World Effects panel (ADR-383) -------------------------------------
+//
+// Declared here, as data, for the reason ADR-382's Tree-panel defect gives: that panel computed a
+// parameter path by string arithmetic, got it five characters wrong, drew nothing, and said
+// nothing about it -- and no test could catch it because the arithmetic lived inside an ImGui
+// function nothing could call. A row list that is plain data can be walked by the panel and by a
+// test, and the test's question is the panel's question: does every leaf this asks for exist on a
+// vortex?
+//
+// Only the vortex's rows are here. The comet's and the aurora's predate this and are still written
+// out inline; moving them is a mechanical change with no decision in it, and doing it in the same
+// commit as the vortex would bury what this is for.
+struct EffectRow {
+    std::string_view section; // non-empty starts a new SeparatorText before this row
+    std::string_view leaf;    // appended to `atmos/<name>/`
+    std::string_view label;
+    std::string_view format;    // empty = the panel's default
+    bool logarithmic = false;
+    bool color = false;
+};
+
+// What somebody reaches for first: what colour, how bright, how big, how fast.
+[[nodiscard]] inline std::span<const EffectRow> vortexRows() {
+    static constexpr EffectRow kRows[] = {
+        {"", "colorDeep", "Deep colour", "", false, true},
+        {"", "colorMid", "Mid colour", "", false, true},
+        {"", "colorAccent", "Accent colour", "", false, true},
+        {"", "emission", "Brightness", "%.3f /m"},
+        {"", "density", "Thickness", "%.4f /m"},
+        {"", "radius", "Mouth radius", "%.0f m", true},
+        {"", "funnelDepth", "Funnel depth", "%.0f m", true},
+        {"", "rotationSpeed", "Rotation", "%.3f rad/s"},
+        {"", "swirl", "Swirl", ""},
+        {"", "filaments", "Filaments", ""},
+        {"", "spill", "Light spill", ""},
+    };
+    return kRows;
+}
+
+[[nodiscard]] inline std::span<const EffectRow> vortexAdvancedRows() {
+    static constexpr EffectRow kRows[] = {
+        {"Placement", "centerX", "Centre X", "%.1f m"},
+        {"", "centerY", "Centre Y", "%.1f m"},
+        {"", "centerZ", "Centre Z", "%.1f m"},
+        {"Shape", "thickness", "Wall thickness", "%.0f m", true},
+        {"", "throat", "Throat", "%.2f of mouth"},
+        {"", "throatDensity", "Throat thickness", ""},
+        {"", "innerVoid", "Inner void", ""},
+        {"", "contrast", "Contrast", ""},
+        {"Motion", "turbulence", "Turbulence", ""},
+        {"", "turbulenceScale", "Turbulence scale", ""},
+        {"", "breathAmount", "Breath amount", ""},
+        {"", "breathSpeed", "Breath speed", ""},
+        {"Comet response", "cometResponse", "Comet light", ""},
+        {"", "cometReach", "Comet reach", "%.1f x"},
+    };
+    return kRows;
+}
+
 } // namespace avgen::ui
