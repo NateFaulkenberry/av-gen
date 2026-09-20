@@ -3162,6 +3162,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // the branch it fell from are reading one description of the air.
         particleFrame.wind = wind::packWind(scene.environment.wind);
         particleFrame.spawnScale = std::max(qualitySettings_.particleSpawnScale, 0.0f); // ADR-382
+        particleFrame.warmUpFrames = particleWarmUpFrames_; // ADR-360, 0 unless asked
         particleFrame.shutterSeconds = static_cast<float>(std::clamp(time.deltaTime, 0.0, 0.1)) *
                                        std::clamp(scene.camera.lens.shutterAngle, 0.0f, 360.0f) / 360.0f;
         // ADR-387: `enabled(scene)`, not `enabled(environment)`. The vortex used to live on the

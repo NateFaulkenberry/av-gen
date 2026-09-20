@@ -32,6 +32,7 @@
 #include "gpu/shader_library.hpp"
 #include "platform/window.hpp"
 #include "rendering/environment.hpp"
+#include "rendering/particle_renderer.hpp" // ADR-360: kMaxWarmUpFrames, the --particle-warmup cap
 #include "rendering/scene_renderer.hpp"
 #include "rendering/debug_visualizer.hpp"
 #include "app/world_builder.hpp"
@@ -211,6 +212,11 @@ std::string usageText() {
            "                      so each fix has a before arm in the same process\n"
            "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
            "  --supersample <f>   offline render only: render the scene at this multiple of the output\n"
+           "  --particle-warmup <n>  step the particle pools n frames before the first frame of a\n"
+           "                      render range or after a seek, so the range does not open on an\n"
+           "                      empty field (ADR-360). 0 (the default) is the bloom-in. Use at\n"
+           "                      least the scene's longest particle lifetime, in frames; capped\n"
+           "                      at 240\n"
            "  --viewport-matches-render   lift the distance detail limits in the viewport too, so\n"
            "                      live playback shows what a render will (costs frame time)\n"
            "  --preview-mode <m>  open the canvas in workspace | outputFrame | outputPreview. The\n"
@@ -649,6 +655,16 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             else if (arg == "--ui-ab-blocks") options.uiAbBlocks = std::max(1, n);
             else options.uiAbSettle = n;
             ++i;
+        } else if (arg == "--particle-warmup") {
+            auto v = need(i, "--particle-warmup");
+            if (!v) return std::unexpected(v.error());
+            const long n = std::strtol(v->c_str(), nullptr, 10);
+            if (n < 0 || n > static_cast<long>(rendering::ParticleRenderer::kMaxWarmUpFrames)) {
+                return fail("--particle-warmup must be 0 to {}, got '{}'",
+                            rendering::ParticleRenderer::kMaxWarmUpFrames, *v);
+            }
+            options.particleWarmUpFrames = static_cast<std::uint32_t>(n);
+            ++i;
         } else if (arg == "--supersample") {
             auto v = need(i, "--supersample");
             if (!v) return std::unexpected(v.error());
@@ -1073,6 +1089,11 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     if (auto r = renderer_->init(); !r) {
         return std::unexpected(r.error());
     }
+    // ADR-360: off unless asked for, and asked for exactly once, here. A seek in the editor keeps
+    // the hard pool reset it has always had -- EntityWorld::seek already re-simulates up to 90 s
+    // per scrub click and is the measured cause of the app's scrub lag, and this would be a second
+    // re-simulation stacked on it.
+    renderer_->setParticleWarmUpFrames(options_.particleWarmUpFrames);
     // The 2D composition (ADR-083): installed as the renderer's overlay, so it draws over the
     // tone-mapped frame in every path the renderer already has -- window, offline render,
     // screenshot, projection output -- rather than in one of them.

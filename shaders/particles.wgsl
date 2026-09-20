@@ -18,7 +18,8 @@
 //                       alive slot its rank r; aliveList[r] = slot, and every dead slot its rank
 //                       slot - r; deadList[slot - r] = slot. Both lists are therefore in slot order.
 //   Render: vs_particle reads aliveList[instance_index], so instances are drawn in slot order.
-// Randomness is a hash of (slot, frameIndex, seed, salt) - deterministic for a frame sequence.
+// Randomness is a hash of (slot, frameNonce, seed, salt): keyed to the timeline second (ADR-360),
+// not to the frame index, so the same second seeds the same spawns wherever the render began.
 //
 // Field forces (ADR-025): params.fieldForces holds up to 4 (mode, slot, strength, mix) + (axis, 0)
 // pairs sampled from the FieldBlock (binding 8, fields.wgsl) at the particle position after the
@@ -84,6 +85,12 @@ struct Params {
     colorStart: vec4<f32>,
     colorEnd: vec4<f32>,
     sim: vec4<f32>,         // dt, time, frameIndex, seed
+    // ADR-360: the spawn key. x = FrameTime::frameNonce(), which is derived from the position on
+    // the TIMELINE (round(renderTime * 240), wrapped at 2^24) and not from how many frames have
+    // been drawn since this render started. `sim.z` is still the frame index and is still what the
+    // trail stride counts, because "every Nth frame" is a rate and not a seed; nothing else in this
+    // shader may key randomness to it. yzw = 0.
+    nonce: vec4<u32>,
     stretch: vec4<f32>,     // velocityStretch, stretchMax, stretchMin, 0
     trail: vec4<f32>,       // history points (0 = trails off), stride, width, taper
     trail2: vec4<f32>,      // tail alpha fraction, tail tint rgb
@@ -247,7 +254,12 @@ fn cs_emit(@builtin(global_invocation_id) gid: vec3<u32>) {
     // Spawn i takes the i-th free slot (lowest slot first). Clamped to last frame's dead count.
     if (i >= params.counts.x || i >= counters.deadCount) { return; }
     let slot = deadList[i];
-    let frame = u32(params.sim.z);
+    // ADR-360. This used to be `u32(params.sim.z)` -- the frame index -- so the same second of the
+    // same scene seeded different spawns in a full render, in a re-render of a section, and in the
+    // live application, whose RealtimeClock never resets the counter at all. Measured before this
+    // changed: two fresh renderers handed the same renderTime and frame indices 0 and 97 differed
+    // over 7656 of 147456 bytes, max delta 235.
+    let frame = params.nonce.x;
     let r1 = rand3(slot, frame, 1u);
     let r2 = rand3(slot, frame, 2u);
     let r3 = rand3(slot, frame, 3u);
