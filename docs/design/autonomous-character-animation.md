@@ -1896,6 +1896,28 @@ and arrives with the body 0.0902 lower with it on.
 | §12.2 | the fix is "one lambda" plus relaxing two checks | also the unconditional tip write, which nothing in the Phase 0 reading surfaced because it is invisible on a nested rig |
 | §12.2 | the alien "needs a hand-authored map per rig pair" was the worst case | still open — the retarget work has not started — but the chain half of it is now data, not code |
 
+### Steps 4 and 5 — contacts and phase · **DONE** (ADR-546, Accepted)
+
+`src/scene/motion_analysis.{hpp,cpp}`: `detectContacts`, `extractPhase`, `analyseClip`. Offline
+only. The textbook detector was measured wrong on this content and the finding is ADR-546's whole
+context: **an in-place clip has no ground frame**, so "planted means stationary" finds the swing.
+
+### Phase A task log
+
+| task | state | note |
+|---|---|---|
+| STEP 1 arbitrary IK chains | **done** | ADR-543 Accepted; farm rigs unchanged, alien's detached chain solves |
+| STEP 2 body compensation | **done** | ADR-544 Accepted; 0.0902 hip drop on the real rig |
+| STEP 3 velocity vector | **done** | ADR-545 Accepted; measured once, not authored at 20+ sites |
+| STEP 4 contact extraction | **done** | ADR-546 Accepted; the in-place finding |
+| STEP 5 phase extraction | **done** | ADR-546; every clip in the pack yields a phase |
+| STEP 6 phase-aware transitions | next | |
+| STEP 7 inertialization | next | |
+| STEP 8-9 decoupling, retarget profile | pending | the largest unit (§12.1) |
+| STEP 10 100STYLE subset | pending | gated on 9 |
+| STEP 11-13 MotionPack, offline tool, benchmark | pending | |
+| STEP 15 visual validation | pending | the first non-numeric result |
+
 ### Still to come in Phase A
 
 Steps 3-18 of the phase brief: velocity vector, contact extraction, phase extraction, phase-aware

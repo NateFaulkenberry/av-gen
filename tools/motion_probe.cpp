@@ -34,7 +34,9 @@
 //     skeleton is a failure that an end-effector error alone would score as a success.
 
 #include "assets/gltf_loader.hpp"
+#include "scene/animation.hpp"
 #include "scene/ik.hpp"
+#include "scene/motion_analysis.hpp"
 #include "scene/scene.hpp"
 #include "scene/skeleton.hpp"
 
@@ -467,6 +469,63 @@ int main(int argc, char** argv) {
         fmt::print("PROBE BROKEN: the ancestor rule was supposed to be wrong on this rig and was not. "
                    "The premise of this probe is unproven.\n");
         ++failures;
+    }
+
+    // ---- 6b. the two locomotion clips in detail --------------------------------------------------
+    fmt::print("\nCONTACT DETAIL -- the clips locomotion actually uses\n");
+    {
+        const std::array<scene::ContactJoint, 2> feetD{{{"foot.l", scene::ContactKind::Foot},
+                                                        {"foot.r", scene::ContactKind::Foot}}};
+        for (const char* want : {"Walking", "Running", "Idle"}) {
+            const int ci = rig.findClip(want);
+            if (ci < 0) {
+                continue;
+            }
+            const scene::AnimationClip& clip = rig.clips[static_cast<std::size_t>(ci)];
+            const scene::ClipAnalysis a = scene::analyseClip(skeleton, clip, feetD, 0, {});
+            fmt::print("  {} (len {:.3f}, rootTravel {:.4f}, groundSpeed {:.4f})\n", want, a.length,
+                       glm::length(glm::vec3(a.rootTravel.x, 0.0f, a.rootTravel.z)), a.groundSpeed);
+            for (const scene::ContactTrack& t : a.contacts) {
+                fmt::print("    {:<8} lowest={:+.4f} duty={:.2f}  spans:", t.joint, t.lowest, t.dutyCycle);
+                for (const scene::ContactSpan& sp : t.spans) {
+                    fmt::print(" [{:.3f}..{:.3f}]", sp.start, sp.end);
+                }
+                fmt::print("\n");
+            }
+            // The foot height trace, so a human can see where the thresholds are landing.
+            scene::Pose pose;
+            std::vector<glm::mat4> mm;
+            const int lf = skeleton.find("foot.l");
+            fmt::print("    foot.l height: ");
+            for (int s = 0; s <= static_cast<int>(a.length * 30.0f); ++s) {
+                const float t = clip.start + static_cast<float>(s) / 30.0f;
+                scene::setRestPose(skeleton, pose);
+                scene::sampleClip(clip, std::min(t, clip.duration), pose);
+                scene::poseToModel(skeleton, pose, mm);
+                fmt::print("{:.3f} ", mm[static_cast<std::size_t>(lf)][3].y);
+            }
+            fmt::print("\n");
+        }
+    }
+
+    // ---- 6. contacts and phase, over every clip in the pack (Phase A steps 4 and 5) --------------
+    fmt::print("\nCONTACTS AND PHASE -- all {} clips, 30 Hz, ground frame\n", rig.clips.size());
+    const std::array<scene::ContactJoint, 2> feet{{{"foot.l", scene::ContactKind::Foot},
+                                                   {"foot.r", scene::ContactKind::Foot}}};
+    scene::ContactSettings settings;
+    fmt::print("  {:<22} {:>6} {:>5} {:>5} {:>6} {:>6} {:>8} {:>7} {:>9}\n", "clip", "len", "L", "R",
+               "dutyL", "dutyR", "cyclic", "cycle", "variance");
+    for (const scene::AnimationClip& clip : rig.clips) {
+        const scene::ClipAnalysis a = scene::analyseClip(skeleton, clip, feet, 0, settings);
+        const auto spans = [&](std::size_t i) {
+            return i < a.contacts.size() ? a.contacts[i].spans.size() : 0;
+        };
+        const auto duty = [&](std::size_t i) {
+            return i < a.contacts.size() ? a.contacts[i].dutyCycle : 0.0f;
+        };
+        fmt::print("  {:<22} {:6.3f} {:5d} {:5d} {:6.2f} {:6.2f} {:>8} {:7.3f} {:9.3f}\n", clip.name,
+                   a.length, static_cast<int>(spans(0)), static_cast<int>(spans(1)), duty(0), duty(1),
+                   a.phase.cyclic ? "yes" : "no", a.phase.cycleSeconds, a.phase.cycleVariance);
     }
 
     fmt::print("\n{}\n", failures == 0 ? "ARBITRARY-CHAIN SOLVE: every arm passed."
