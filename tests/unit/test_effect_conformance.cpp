@@ -198,59 +198,72 @@ TEST_CASE("the beat-response target is a parameter of the kind it is chosen for"
     }
 }
 
-TEST_CASE("every row the World Effects panel draws for a vortex is a parameter a vortex has",
+TEST_CASE("every row the World Effects panel draws is a parameter that kind has",
           "[world][atmospherics][conformance][ui]") {
-    // ADR-387 put the vortex's rows in `ui_logic.hpp` as data so this question could be asked.
-    // Asking it through `checkLeavesExist` rather than through a bespoke loop is what makes the
-    // same question available to the comet's and the aurora's rows the day they become data too.
-    std::vector<std::string_view> leaves;
-    for (const ui::EffectRow& r : ui::vortexRows()) {
-        leaves.push_back(r.leaf);
+    // ADR-387 put the vortex's rows in `ui_logic.hpp` as data so this question could be asked;
+    // ADR-392 put the comet's and the aurora's there for the same reason, which is what turns this
+    // from a test of one kind into a test of the family. A leaf five characters wrong in any of
+    // them draws an empty box and says nothing (ADR-382), and now fails here with the path printed.
+    const auto collect = [](std::span<const ui::EffectRow> a, std::span<const ui::EffectRow> b) {
+        std::vector<std::string_view> leaves;
+        for (const ui::EffectRow& r : a) {
+            leaves.push_back(r.leaf);
+        }
+        for (const ui::EffectRow& r : b) {
+            leaves.push_back(r.leaf);
+        }
+        return leaves;
+    };
+
+    SECTION("vortex") {
+        const std::vector<std::string_view> leaves = collect(ui::vortexRows(), ui::vortexAdvancedRows());
+        REQUIRE(leaves.size() > 10);
+        const conf::Report r =
+            conf::checkLeavesExist(world::AtmosphereKind::Vortex, leaves, "panel-rows");
+        INFO(r.summary());
+        CHECK(r.clean());
     }
-    for (const ui::EffectRow& r : ui::vortexAdvancedRows()) {
-        leaves.push_back(r.leaf);
+
+    SECTION("comet") {
+        const std::vector<std::string_view> leaves = collect(ui::cometRows(), ui::cometAdvancedRows());
+        REQUIRE(leaves.size() > 10);
+        const conf::Report r =
+            conf::checkLeavesExist(world::AtmosphereKind::Comet, leaves, "panel-rows");
+        INFO(r.summary());
+        CHECK(r.clean());
     }
-    REQUIRE(leaves.size() > 10);
 
-    const conf::Report r = conf::checkLeavesExist(world::AtmosphereKind::Vortex, leaves, "panel-rows");
-    INFO(r.summary());
-    CHECK(r.clean());
-}
-
-TEST_CASE("the three kinds resolve as three different things",
-          "[world][atmospherics][conformance]") {
-    // The control for `resolve-dispatch`. `resolveAtmosphericEffects` dispatches with
-    // `if comet / else if aurora / else`, so a kind that is forgotten there does not resolve as
-    // nothing -- it resolves as a VORTEX, and is then dropped past the first one. That is a worse
-    // failure than a no-op and a quieter one.
-    //
-    // Per-kind the check asserts "this kind resolved as itself", which passes trivially if every
-    // kind resolved as the same thing. Here the three signatures are required to be pairwise
-    // distinct, which is the assertion that would have caught a fourth kind falling through.
-    std::set<std::string> signatures;
-    for (const world::AtmosphereKind kind : conf::kAtmosphereKinds) {
-        world::AtmosphericEffect live = conf::probeEffect(kind, "conformance probe");
-        live.enabled = true;
-        live.activation = world::Activation::Always;
-        live.timing = world::Timing{};
-        live.timing.fadeIn = 0.0;
-        live.timing.fadeOut = 0.0;
-
-        world::AtmosphericContext ctx;
-        ctx.seconds = 0.5;
-        std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
-        std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
-        const world::AtmosphericCounts counts =
-            world::resolveAtmosphericEffects(std::span(&live, 1), ctx, comets, auroras);
-
-        const std::string signature = std::to_string(counts.comets) + "/" +
-                                      std::to_string(counts.auroras) + "/" +
-                                      std::to_string(counts.vortices);
-        INFO("kind: " << world::atmosphereKindName(kind) << " resolved as " << signature);
-        CHECK(counts.dropped == 0);
-        signatures.insert(signature);
+    SECTION("aurora") {
+        const std::vector<std::string_view> leaves = collect(ui::auroraRows(), ui::auroraAdvancedRows());
+        REQUIRE(leaves.size() > 10);
+        const conf::Report r =
+            conf::checkLeavesExist(world::AtmosphereKind::Aurora, leaves, "panel-rows");
+        INFO(r.summary());
+        CHECK(r.clean());
     }
-    CHECK(signatures.size() == conf::kAtmosphereKinds.size());
+
+    SECTION("the rainbow and ground rows belong to both sky kinds and to neither vortex") {
+        const std::vector<std::string_view> shared =
+            collect(ui::skyRainbowRows(), ui::skyGroundRows());
+        for (const world::AtmosphereKind kind :
+             {world::AtmosphereKind::Comet, world::AtmosphereKind::Aurora}) {
+            const conf::Report r = conf::checkLeavesExist(kind, shared, "panel-rows");
+            INFO("kind: " << world::atmosphereKindName(kind));
+            INFO(r.summary());
+            CHECK(r.clean());
+        }
+        // The other half of the same claim, and the reason the panel returns before drawing these
+        // for a vortex: a vortex registers no rainbow at all, so these rows would find nothing.
+        // ADR-375's lesson the other way round -- a control that draws and does nothing.
+        std::vector<std::string_view> rainbow;
+        for (const ui::EffectRow& r : ui::skyRainbowRows()) {
+            rainbow.push_back(r.leaf);
+        }
+        const conf::Report vortex =
+            conf::checkLeavesExist(world::AtmosphereKind::Vortex, rainbow, "panel-rows");
+        CHECK_FALSE(vortex.clean());
+        CHECK(vortex.findings.size() == rainbow.size());
+    }
 }
 
 TEST_CASE("registered paths are read back from the registrar, not from the tables",
