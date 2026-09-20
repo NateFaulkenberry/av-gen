@@ -361,7 +361,10 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
                        static_cast<float>(time.frameNonce() % 4096u));
     u.sizes = glm::vec4(static_cast<float>(im.half.width()), static_cast<float>(im.half.height()),
                         static_cast<float>(width), static_cast<float>(height));
-    u.depthParams = glm::vec4(scene.camera.nearPlane, scene.camera.farPlane, 0.0f, 0.0f);
+    // ADR-461: `.z` is the march's start jitter, 0..1. Carried in a slot that was already
+    // there and zero rather than growing `VolumeUniforms`, which has a `sizeof` assertion on it.
+    u.depthParams = glm::vec4(scene.camera.nearPlane, scene.camera.farPlane,
+                              std::clamp(scene.environment.volumeJitter, 0.0f, 1.0f), 0.0f);
     u.fogColor = glm::vec4(env.fogColor, 0.0f);
     // ADR-040: the march reads this many entries from the particle glow table.
     const std::uint32_t glowSystems = std::min(particleGlowSystems, kMaxParticleGlowSystems);

@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "tree-of-life-floating-island.scene.json",
-        "sha256": "5811388518cf170a79bbf0a806212636796f5f2a751f10416daa18e449550765",
-        "size": 12307
+        "sha256": "e70df5ed0b1d8f4ad54c448e3580a2481ddad36d9860f60acca85f468e3b055e",
+        "size": 11865
       }
     }
   },
@@ -1490,6 +1490,7 @@
     "scene/volumeNoiseScale": 0.10000000149011612,
     "scene/volumeNoiseSpeed": 0.10000000149011612,
     "scene/volumeScattering": 1.0,
+    "scene/volumeJitter": 0.0,
     "scene/volumeSteps": 32,
     "scene/windDirection": 0.0,
     "scene/windSpeed": 1.319000005722046,
@@ -1972,36 +1973,6 @@
       "target": "atmos/Cosmic Vortex/breathAmount"
     },
     {
-      "amount": 1.1,
-      "chain": {
-        "attackMs": 30.0,
-        "clampEnabled": false,
-        "clampMax": 1.0,
-        "clampMin": 0.0,
-        "curve": "linear",
-        "curveAmount": 1.0,
-        "decayMs": 380.0,
-        "envelope": "none",
-        "envelopeFallPerSecond": 4.0,
-        "envelopeHoldMs": 0.0,
-        "gain": 1.0,
-        "offset": 0.0,
-        "remapEnabled": false,
-        "remapInMax": 1.0,
-        "remapInMin": 0.0,
-        "remapOutMax": 1.0,
-        "remapOutMin": 0.0,
-        "threshold": "none",
-        "thresholdLevel": 0.5
-      },
-      "component": -1,
-      "enabled": true,
-      "op": "add",
-      "polarity": "unipolar",
-      "source": "audio.bass",
-      "target": "nodes/tree-of-life/energy/intensity"
-    },
-    {
       "amount": 0.0009,
       "chain": {
         "attackMs": 40.0,
@@ -2060,36 +2031,6 @@
       "polarity": "unipolar",
       "source": "audio.mid",
       "target": "atmos/Cosmic Vortex/turbulence"
-    },
-    {
-      "amount": 0.3,
-      "chain": {
-        "attackMs": 25.0,
-        "clampEnabled": false,
-        "clampMax": 1.0,
-        "clampMin": 0.0,
-        "curve": "linear",
-        "curveAmount": 1.0,
-        "decayMs": 300.0,
-        "envelope": "none",
-        "envelopeFallPerSecond": 4.0,
-        "envelopeHoldMs": 0.0,
-        "gain": 1.0,
-        "offset": 0.0,
-        "remapEnabled": false,
-        "remapInMax": 1.0,
-        "remapInMin": 0.0,
-        "remapOutMax": 1.0,
-        "remapOutMin": 0.0,
-        "threshold": "none",
-        "thresholdLevel": 0.5
-      },
-      "component": -1,
-      "enabled": true,
-      "op": "add",
-      "polarity": "unipolar",
-      "source": "audio.mid",
-      "target": "nodes/tree-of-life/energy/shimmer"
     },
     {
       "amount": 45.0,
@@ -2180,36 +2121,6 @@
       "polarity": "unipolar",
       "source": "audio.treble",
       "target": "particles/tree-motes/emissive"
-    },
-    {
-      "amount": 0.5,
-      "chain": {
-        "attackMs": 8.0,
-        "clampEnabled": false,
-        "clampMax": 1.0,
-        "clampMin": 0.0,
-        "curve": "linear",
-        "curveAmount": 1.0,
-        "decayMs": 240.0,
-        "envelope": "none",
-        "envelopeFallPerSecond": 4.0,
-        "envelopeHoldMs": 0.0,
-        "gain": 1.0,
-        "offset": 0.0,
-        "remapEnabled": false,
-        "remapInMax": 1.0,
-        "remapInMin": 0.0,
-        "remapOutMax": 1.0,
-        "remapOutMin": 0.0,
-        "threshold": "none",
-        "thresholdLevel": 0.5
-      },
-      "component": -1,
-      "enabled": true,
-      "op": "add",
-      "polarity": "unipolar",
-      "source": "beat.pulse",
-      "target": "nodes/tree-of-life/energy/intensity"
     },
     {
       "amount": 0.035,

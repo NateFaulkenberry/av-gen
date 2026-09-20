@@ -115,6 +115,31 @@ def set_parameter(text: str, key: str, value) -> str:
     return out
 
 
+def set_centre(text: str, centre) -> str:
+    """Move the vortex's own `center`. Anchored inside the `vortex` object, which is what keeps it
+    off the comet's anchor position and the three light positions in the same file."""
+    x, y, z = centre
+    # `[^{}]*?` between the brace and the key, not `\s*`: `set_vortex` inserts new keys directly
+    # after `"vortex": {`, so by the time this runs `center` is no longer the first member. An
+    # anchored-on-the-brace pattern matched the deliverable and nothing derived from it.
+    pattern = (r'("vortex":\s*\{[^{}]*?"center":\s*\[)'
+               r'\s*-?[0-9.eE+]+,\s*-?[0-9.eE+]+,\s*-?[0-9.eE+]+\s*(\])')
+    out, n = re.subn(pattern, lambda m: f"{m.group(1)}{x}, {y}, {z}{m.group(2)}", text,
+                     count=1, flags=re.S)
+    if n != 1:
+        raise SystemExit(f"{PROJECT}: expected one vortex centre to move, found {n}")
+    return out
+
+
+def add_parameter(text: str, key: str, value: float) -> str:
+    """Add a `parameters` entry that the deliverable does not have, beside one that it does."""
+    anchor = '"scene/volumeSteps":'
+    i = text.index(anchor)
+    line_start = text.rindex("\n", 0, i) + 1
+    indent = text[line_start:i]
+    return text[:line_start] + f'{indent}"{key}": {value},\n' + text[line_start:]
+
+
 def no_bloom(text: str) -> str:
     out, n = re.subn(r'("post/bloom/enabled":\s*)true', r'\1false', text, count=1)
     if n != 1:
@@ -127,6 +152,13 @@ def main() -> int:
     if '"post/bloom/enabled": true' not in src:
         raise SystemExit(f"{PROJECT}: bloom is not on, so the arms would not be isolating it")
 
+    # ADR-461: the march's start jitter off, on every arm. At the shipped 4000 m over 32 steps a
+    # step is 125 metres and the funnel changes completely across one, so a full-step offset between
+    # neighbouring pixels is 125 metres of uncorrelated displacement. Measured on this exact frame:
+    # grain 1.457 at the default 1.0, 1.066 at 0.25, **0.436 at 0**. The default stays at 1.0 engine
+    # wide so no other scene moves; it is authored here because here is where it was measured.
+    src = add_parameter(src, "scene/volumeJitter", 0.0)
+
     before = no_bloom(src)
     (EX / "_vx2-before.json").write_text(before)
 
@@ -138,6 +170,36 @@ def main() -> int:
     (EX / "_vx2-macro.json").write_text(macro)
     (EX / "_vx2-macro-noise.json").write_text(set_vortex(noisy, "cloudNoise", 1.0))
 
+    # The placement arms. The coordinator's decision is "move the vortex, not the camera": put it
+    # beyond the tree along the camera's own view direction and lower, so the tree is SILHOUETTED
+    # against the cyclone instead of floating above an invisible one, radius unchanged.
+    #
+    # Corrected for ADR-264 before being used. The coordinator worked the placement from the SCENE
+    # file's camera at (158, 6, 152) -- but the project overrides the camera to (197.7, 45.3, 83.5)
+    # looking at (-16.9, 9.4, -6.0), and a project's parameters are applied over its scene. Against
+    # the camera that actually renders, `(-380, -150, -365)` is **15.2 degrees off the view axis**,
+    # and the mouth is only +/-15.3 wide in a +/-30 frame, so it would have sat jammed against one
+    # edge. The same placement worked from the real camera is `(-491, -111, -204)`.
+    #
+    # And the distance is corrected too, from a measurement rather than a preference: the island and
+    # tree occupy **+/-15.0 degrees** of this frame, measured off the shipped render, and the
+    # coordinator's 746 m puts the mouth at 30.0 degrees -- exactly the island's own width, so the
+    # island would cover the eye again, which is the whole thing the move was for. Nearer is what
+    # makes the cyclone a backdrop rather than a disc behind a rock.
+    #
+    #   D      centre                 subtend   mouth against the frame's -18..+18
+    #   746    (-491, -111, -204)      30.0     -12.0 .. +18.0   the island's own width
+    #   600    (-356, -104, -147)      36.9     -13.2 .. +23.6
+    #   500    (-264,  -98, -109)      43.6     -14.6 .. +29.0
+    for name, centre in (("far", (-491.0, -111.0, -204.0)),
+                         ("mid", (-356.0, -104.0, -147.0)),
+                         ("near", (-264.0, -98.0, -109.0))):
+        # `cloudNoise` written explicitly rather than left to its 1.0 default: these arms are
+        # about the placement, and a reader must not have to know a default to know that the
+        # noise is on in them.
+        (EX / f"_vx2-place-{name}.json").write_text(
+            set_centre(set_vortex(noisy, "cloudNoise", 1.0), centre))
+
     above = macro
     for key, value in ABOVE_CAMERA.items():
         above = set_parameter(above, key, value)
@@ -145,7 +207,8 @@ def main() -> int:
 
     # ADR-182: the arms have to be shown to differ from the thing they are derived from, or a
     # regex that matched nothing produces three identical files and a checkpoint that passes.
-    for name in ("_vx2-before", "_vx2-macro", "_vx2-macro-noise", "_vx2-above"):
+    for name in ("_vx2-before", "_vx2-macro", "_vx2-macro-noise", "_vx2-above",
+                 "_vx2-place-far", "_vx2-place-mid", "_vx2-place-near"):
         text = (EX / f"{name}.json").read_text()
         if text == src:
             raise SystemExit(f"{name}.json is identical to the deliverable: nothing was changed")

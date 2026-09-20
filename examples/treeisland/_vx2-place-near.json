@@ -187,11 +187,7 @@
 "bandArms": 3.0,
 "eyeWallGain": 2.0,
 "eyeWallWidth": 0.1,
-"center": [
-          0.0,
-          -70.0,
-          0.0
-        ],
+"center": [-264.0, -98.0, -109.0],
         "radius": 200.0,
         "funnelDepth": 1500.0,
         "throat": 0.1,

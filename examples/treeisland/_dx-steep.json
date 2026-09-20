@@ -187,11 +187,7 @@
 "bandArms": 3.0,
 "eyeWallGain": 2.0,
 "eyeWallWidth": 0.1,
-"center": [
-          0.0,
-          -70.0,
-          0.0
-        ],
+"center": [-375, -231, -155],
         "radius": 200.0,
         "funnelDepth": 1500.0,
         "throat": 0.1,
@@ -1498,8 +1494,7 @@
     "scene/volumeNoiseScale": 0.10000000149011612,
     "scene/volumeNoiseSpeed": 0.10000000149011612,
     "scene/volumeScattering": 1.0,
-    "scene/volumeJitter": 0.0,
-    "scene/volumeSteps": 32,
+    "scene/volumeSteps": 256,
     "scene/windDirection": 0.0,
     "scene/windSpeed": 1.319000005722046,
     "shader/glowmere-cosmos/baseLevel": 0.16200000047683716,

@@ -357,7 +357,7 @@
       0.0
     ],
     "camera/focus/speed": 0.0,
-    "camera/fov": 36.0,
+    "camera/fov": 45.0,
     "camera/height": 880.753173828125,
     "camera/lens/aperture": 5.599999904632568,
     "camera/lens/focalLength": 35.0,
@@ -369,11 +369,7 @@
     "camera/lookAhead": 2.0,
     "camera/mode": 1,
     "camera/orbitSpeed": 0.0,
-    "camera/position": [
-      197.67652893066406,
-      45.33953094482422,
-      83.45803833007812
-    ],
+    "camera/position": [0.0, 700.0, 800.0],
     "camera/shake/amplitude": 0.0,
     "camera/shake/decay": 0.0,
     "camera/shake/frequency": 9.0,
@@ -385,11 +381,7 @@
       0.0
     ],
     "camera/splineT": 0.0,
-    "camera/target": [
-      -16.906749725341797,
-      9.354751586914062,
-      -5.985854148864746
-    ],
+    "camera/target": [0.0, -300.0, 0.0],
     "env/dayNight/cycleSeconds": 240.0,
     "env/dayNight/dayPhase": 0.0,
     "env/dayNight/enabled": false,
@@ -1498,7 +1490,6 @@
     "scene/volumeNoiseScale": 0.10000000149011612,
     "scene/volumeNoiseSpeed": 0.10000000149011612,
     "scene/volumeScattering": 1.0,
-    "scene/volumeJitter": 0.0,
     "scene/volumeSteps": 32,
     "scene/windDirection": 0.0,
     "scene/windSpeed": 1.319000005722046,

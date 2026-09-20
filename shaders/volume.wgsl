@@ -102,9 +102,29 @@ fn linearDepth(z: f32) -> f32 {
 }
 
 // Deterministic jitter in [0, 1) from the pixel and the frame index (no wall clock).
+//
+// ADR-461: scaled by `Environment::volumeJitter` (depthParams.z), and centred on the middle of the
+// step so that lowering it converges on the step's midpoint rather than on its start -- the mean
+// sample position must not move, or the medium's integrated density moves with it and every
+// per-metre coefficient calibrated against it is wrong (ADR-374/379/381/389's family).
+//
+// Why it is a control at all: jitter turns banding into noise, which is a good trade when the
+// medium varies LITTLE across one step. The cosmic vortex is the opposite -- at 4000 m over 32
+// steps a step is 125 metres and the funnel changes completely across one, so a full-step offset
+// between neighbouring pixels is 125 metres of uncorrelated displacement and it reads as
+// salt-and-pepper. ADR-460 measured that on a field with the noise switched off entirely and the
+// grain still fell 61% when the steps went up eight times; this is the same artifact from the
+// other side, for nothing.
+//
+// An ORDERED offset was tried first and is not the answer: interleaved gradient noise at the same
+// amplitude moved the grain by -11% where the field is smooth and **+8% on the shipped frame**,
+// where the field is aliased noise and a structured sample pattern exposes error that an
+// independent one averages away. That is ADR-389's weight-based band-limit finding again, in a
+// different mechanism. The amount is the lever; the arrangement is not.
 fn stepJitter(px: vec2<i32>, frameIndex: u32) -> f32 {
     let h = pcg3d(vec3<u32>(bitcast<u32>(px.x), bitcast<u32>(px.y), frameIndex));
-    return f32(h.x) * (1.0 / 4294967296.0);
+    let u = f32(h.x) * (1.0 / 4294967296.0);
+    return 0.5 + clamp(vol.depthParams.z, 0.0, 1.0) * (u - 0.5);
 }
 
 // ADR-371: the cosmic vortex, as a world-space density field inside the volumetric march.
