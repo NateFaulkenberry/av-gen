@@ -207,3 +207,27 @@ Like `MotionMemory`, `MotionState` is a plain value the entity owns, so a seek r
 `MotionSolution` reports `accelerationLimited` and `turnLimited` rather than clamping silently —
 B.A found exactly that failure in `Gait::playbackRate`, where the shipping cast has been sitting on
 the clamp floor with nothing saying so.
+
+---
+
+## Known limitation, stated before it sets: B.C and B.D are not yet reachable
+
+`MotionContext` **is** wired: `driveLayers` builds it every frame, and the integration test reads
+it out of a real scene through `Composition::motionContext`.
+
+`MotionChain`, `ClipMotionProvider` and `stepMotion` **are not**. They are tested thoroughly and
+called by nothing in the product. That is precisely the failure mode this repository has recorded
+before — four subsystems shipped unreachable in one session, and *tests share the product's blind
+spot*, because a test constructs the thing directly and therefore cannot notice that nothing else
+does.
+
+It is written down here rather than left to be discovered because the gap is easiest to close now
+and hardest to close after two more layers are built on top of it.
+
+**What closing it looks like:** an opt-in per entity — default off, so no shipping scene changes
+behaviour — that routes a character's pose through the chain instead of through `AnimationPlayer`,
+with the alien foot lab as the first consumer. Until that exists, the correct description of B.C
+and B.D is *designed, tested, and not yet load-bearing*.
+
+Scheduled before B.G, because B.G's foot placement is the first thing a person can look at, and a
+visual milestone that bypasses the seam it is supposed to validate would prove the wrong thing.
