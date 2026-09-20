@@ -11,12 +11,18 @@
 //    failure family this codebase keeps finding one instance at a time.
 
 #include "ui/cosmic_ocean_rows.hpp"
+#include "world/atmospherics.hpp"
 #include "world/cosmic_ocean.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
+#include <limits>
+#include <cstdlib>
+#include <fstream>
 #include <cstring>
 #include <set>
 #include <string>
@@ -284,9 +290,28 @@ TEST_CASE("Validation refuses what would draw nothing or draw forever", "[cosmic
         CHECK_FALSE(o.validate());
     }
     {
+        // ...and the one that is deliberately NOT refused, which is the other half of the contract.
+        //
+        // An inverted mask used to fail `validate()`. `effect_conformance`'s round trip found what
+        // that meant: the two angles are independent registered parameters with their own 0..180
+        // hard ranges, and `validate` runs inside `fromJson`, so any route, key or slider that
+        // inverted them produced a project the engine would refuse to load again -- the failure
+        // landing on the next person to open it rather than on whoever moved the slider.
+        //
+        // A soft constraint between two knobs is resolved where the value is used. So an inverted
+        // pair loads, `sanitiseCosmicOcean` orders it, and `packCosmicOcean` clamps both angles
+        // before the cosines reach the shader: a degenerate mask, not an unloadable file.
         world::CosmicOcean o = world::defaultCosmicOcean();
         o.mask.outerAngle = o.mask.innerAngle - 1.0f;
-        CHECK_FALSE(o.validate());
+        CHECK(o.validate());
+        world::sanitiseCosmicOcean(o);
+        CHECK(o.mask.outerAngle > o.mask.innerAngle);
+
+        // The probe can fail: a NaN in the same field is still refused, so this case is not merely
+        // asserting that `validate` stopped looking at the mask (ADR-182).
+        world::CosmicOcean bad = world::defaultCosmicOcean();
+        bad.mask.outerAngle = std::numeric_limits<float>::quiet_NaN();
+        CHECK_FALSE(bad.validate());
     }
 }
 
@@ -357,4 +382,15 @@ TEST_CASE("Every panel row names a field the tables carry", "[cosmic][ocean][ui]
     // Effects panel -- the Parameters panel is the exhaustive surface -- so this is a floor rather
     // than an equality, set high enough that forgetting a whole section fails it.
     CHECK(shown.size() * 10 >= known.size() * 9);
+}
+
+// A scaffold, hidden from the default run (the leading `.` in the tag), that writes the factory's
+// Cosmic Ocean as the JSON an `atmosphericEffects` entry carries. Authoring that block by hand is
+// a hundred and thirteen chances to typo a key; asking the factory is none.
+TEST_CASE("dump the factory's cosmic ocean as JSON", "[.dump-cosmic]") {
+    const char* out = std::getenv("AVGEN_COSMIC_DUMP");
+    REQUIRE(out != nullptr);
+    std::ofstream f(out);
+    REQUIRE(f.good());
+    f << avgen::world::cosmicOceanEffect("Cosmic Ocean").toJson().dump(2);
 }

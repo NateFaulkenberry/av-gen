@@ -468,7 +468,23 @@ fn coStars(co: CosmicOceanBlock, ro: vec3<f32>, rd: vec3<f32>, lane: vec4<f32>, 
     // The profile: a core that is one pixel at most, and a small halo that is what actually makes a
     // star look like a light source rather than a dot.
     let core = 1.0 - smoothstep(radius * 0.4, radius, d);
-    let halo = exp(-d / max(radius * (1.0 + co.atmos1.z * 2.0), 1.0e-6)) * 0.35;
+    // The halo has to reach zero BEFORE the cell boundary, or the cell becomes the halo.
+    //
+    // This was `exp(-d / (radius * (1 + glow * 2)))`, which never reaches zero. A star is evaluated
+    // only inside its own cell -- that is the whole point of the one-cell scheme above -- so
+    // whatever the exponential still had left at the cell edge was cut off there, by a straight
+    // line, in the two axis-aligned directions the cube face's grid runs. The result is a soft
+    // SQUARE around every star, four of them meeting at each cell corner. The first render of the
+    // Tree of Life with this effect on was a sky of boxes, and it is visible at a glance rather than
+    // subtly: see `examples/treeisland/renders/`.
+    //
+    // A compactly supported profile instead. The star is inset to 0.25..0.75 of its cell, so 0.24
+    // of a cell is the largest reach that cannot cross a boundary; the halo is capped there and
+    // falls to exactly zero at its own edge, so there is nothing left for the boundary to cut.
+    // Capped rather than scaled, so a coarse stratum does not get halos the size of its cells.
+    let haloReach = min(radius * (1.0 + co.atmos1.z * 2.0) * 4.0, cell.scale * 0.24);
+    let haloT = clamp(1.0 - d / max(haloReach, 1.0e-6), 0.0, 1.0);
+    let halo = haloT * haloT * haloT * 0.35;
     let fade = coPointFade(radius, pixelAngle);
 
     // Colour variation about the star tint: blue-white one way, amber the other, which is the range
@@ -603,7 +619,14 @@ fn coPlanets(co: CosmicOceanBlock, ro: vec3<f32>, rd: vec3<f32>, sunDir: vec3<f3
     } else {
         // ---- the atmospheric halo, just outside the limb ----
         let d = sqrt(r2);
-        let glow = exp(-(d - 1.0) * 6.0) * co.planet2.x * 0.5;
+        // The same cut the star halo had, and it showed as a square around every planet in the
+        // same render. `exp(-(d - 1) * 6)` is still finite at the cell edge, and this branch runs
+        // over the whole of the cell outside the disc, so the edge is where it stopped. Tapered to
+        // zero inside the cell: the planet's centre is inset to 0.3..0.7, so 0.28 of a cell is the
+        // reach that cannot cross a boundary, expressed here in planet radii.
+        let glowLimit = max(cell.scale * 0.28 / radius, 1.05);
+        let glowWindow = clamp(1.0 - (d - 1.0) / max(glowLimit - 1.0, 1.0e-3), 0.0, 1.0);
+        let glow = exp(-(d - 1.0) * 6.0) * co.planet2.x * 0.5 * glowWindow * glowWindow;
         // Brightest when the planet is between the camera and the light: that is forward
         // scattering through its atmosphere, and it is what gives a back-lit world a bright thin
         // rim instead of a uniform ring. `scattering` chooses how directional it is.
@@ -639,6 +662,10 @@ fn coGalaxies(co: CosmicOceanBlock, ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f3
 
     let r = length(p);
     if (r > 1.6) { return vec3<f32>(0.0); }
+    // ...and taper into that cut rather than stepping off it. Same family as the two above: the
+    // profile is still ~0.004 of its peak at r = 1.6, which is a visible edge once the master
+    // brightness and the bloom have had it.
+    let rim = smoothstep(1.6, 1.15, r);
 
     // A logarithmic spiral in the disc: the arm term is a function of angle minus log-radius, which
     // is what makes arms wind rather than radiate.
@@ -652,7 +679,7 @@ fn coGalaxies(co: CosmicOceanBlock, ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f3
 
     let tint = mix(co.nebulaTint.rgb, vec3<f32>(1.0, 0.94, 0.82), 0.45);
     let aa = coPointFade(co.galaxy1.x * 0.02, pixelAngle);
-    return tint * (disc * dust + core) * lane.w * aa * 0.25;
+    return tint * (disc * dust + core) * lane.w * aa * rim * 0.25;
 }
 
 // ---- cosmic dust (§9) ------------------------------------------------------------------------------

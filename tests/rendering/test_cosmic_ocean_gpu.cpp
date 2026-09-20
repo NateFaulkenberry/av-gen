@@ -315,3 +315,114 @@ TEST_CASE("parallax separates the strata rather than sliding the sky", "[gpu][co
     // and the "depth system" is a name rather than a mechanism.
     CHECK(nearMoved > farMoved * 3);
 }
+
+TEST_CASE("a star field is sparse, and its cells do not show", "[gpu][cosmic]") {
+    // The regression for ADR-393 §4, and the reason it is phrased as sparsity rather than as
+    // "no square edges".
+    //
+    // `coCell` puts at most one body in a cell, inset from the edges, so that no body crosses a
+    // boundary and no neighbour search is needed -- four hashes a star instead of thirty-six. That
+    // holds only for a profile with compact support, and the star's halo was `exp(-d / ...)`, which
+    // never reaches zero. Whatever it still had at the cell edge was cut off there, by a straight
+    // line, in the two directions the cube face's grid runs: a soft axis-aligned SQUARE around every
+    // star, four meeting at each corner. The first render of the Tree of Life with this effect on
+    // was a sky of boxes.
+    //
+    // The property that was violated is that a *sparse* field covers a small part of the sky. When
+    // each occupied cell is filled to its edges, occupancy stops being sparsity, and the lit
+    // fraction jumps to roughly the density -- which is what this measures. It is a claim about the
+    // picture rather than a hash, and it is the claim the defect broke.
+    //
+    // `glow` is at its ceiling on purpose: it was the multiplier on the halo's scale length, so it
+    // is the arm on which the old code was worst and the new code must be unmoved.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    scene::Scene scene = oceanScene();
+    const FrameTime time{.renderTime = 3.0, .deltaTime = 1.0 / 60.0, .frameIndex = 1};
+
+    auto starsOnly = [](float density) {
+        world::CosmicOcean o = world::defaultCosmicOcean();
+        o.brightness = 6.0f;
+        o.nebulaFar.stratum.density = 0.0f;
+        o.nebulaMid.stratum.density = 0.0f;
+        o.galaxies.stratum.density = 0.0f;
+        o.planets.stratum.density = 0.0f;
+        o.dust.stratum.density = 0.0f;
+        // The FINEST stratum, and that is the whole point of the fixture rather than a detail.
+        //
+        // `cosmicOceanAt` gives the four strata 190, 120, 64 and 34 cells a cube face, so a cell of
+        // the ultra-distant layer spans about 0.0083 rad and a cell of the near one about 0.046.
+        // The defect was a halo whose scale length was not bounded by the cell: at the default star
+        // size and `glow` at its ceiling that length is ~0.005 rad, which is comfortably inside a
+        // near cell and WIDER THAN AN ULTRA CELL. So the near stratum never showed the squares and
+        // the ultra one was nothing but squares.
+        //
+        // The first version of this probe used the near stratum and passed against the defect --
+        // a probe that cannot fail (ADR-182), caught by reverting the shader and running it, which
+        // is the only way that gets caught.
+        o.starsUltra.stratum.density = density;
+        o.starsFar.stratum.density = 0.0f;
+        o.starsMid.stratum.density = 0.0f;
+        o.starsNear.stratum.density = 0.0f;
+        // `starShape` and `starTwinkle` are packed from `starsNear` for every stratum, so these
+        // are the shared controls and not the near layer's own.
+        o.starsNear.twinkle = 0.0f;
+        o.starsNear.glint = 0.0f;
+        o.atmosphere.haze = 0.0f;
+        o.atmosphere.glow = 1.0f; // the halo's scale multiplier, at its ceiling
+        o.events.shootingStars = 0.0f;
+        o.events.flares = 0.0f;
+        return o;
+    };
+    auto renderWith = [&](const world::CosmicOcean& o) {
+        scene.atmospherics.hasCosmicOcean = true;
+        scene.atmospherics.cosmicOcean = o;
+        scene.atmospherics.cosmicOceanEnvelope = 1.0f;
+        auto image = renderer.renderToImage(scene, time, kWidth, kHeight);
+        REQUIRE(image.has_value());
+        return std::move(*image);
+    };
+
+    // The reference is the SAME ocean with the star stratum empty, not a frame with no ocean at
+    // all. Deep space, the palette and the atmospheric term light every sky pixel by design, so a
+    // bare-sky reference would report 100% lit for any density whatever and could not tell a star
+    // field from a star field's cells -- which is exactly what it did on the first attempt.
+    const gpu::Image8 noStars = renderWith(starsOnly(0.0f));
+    const gpu::Image8* bare = &noStars;
+
+    // Sky only: the ridge occupies the bottom of the frame and moves for its own reasons.
+    auto litFraction = [&](const gpu::Image8& image) {
+        std::size_t lit = 0;
+        std::size_t n = 0;
+        for (std::size_t y = 0; y < kHeight / 2; ++y) {
+            for (std::size_t x = 0; x < kWidth; ++x) {
+                const std::size_t i = (y * kWidth + x) * 4;
+                const int d = std::abs(static_cast<int>(image.rgba[i]) - static_cast<int>(bare->rgba[i])) +
+                              std::abs(static_cast<int>(image.rgba[i + 1]) - static_cast<int>(bare->rgba[i + 1])) +
+                              std::abs(static_cast<int>(image.rgba[i + 2]) - static_cast<int>(bare->rgba[i + 2]));
+                if (d > 9) { // three levels a channel: above readback quantisation, well below a star
+                    ++lit;
+                }
+                ++n;
+            }
+        }
+        return static_cast<double>(lit) / static_cast<double>(n);
+    };
+
+    const double sparse = litFraction(renderWith(starsOnly(0.12f)));
+    INFO("a 12%-occupancy stratum lit " << sparse * 100.0 << "% of the sky");
+    // It has to light *something*, or the arm is measuring an effect that is switched off.
+    CHECK(sparse > 0.002);
+    // ...and it must not light most of it. When every occupied cell was filled to its boundary this
+    // was of the order of the occupancy itself.
+    CHECK(sparse < 0.10);
+
+    // The probe can detect what it is looking for (ADR-182): more stars light more sky, so a pass
+    // above is a statement about this field rather than about the threshold.
+    const double dense = litFraction(renderWith(starsOnly(0.85f)));
+    INFO("an 85%-occupancy stratum lit " << dense * 100.0 << "% of the sky");
+    CHECK(dense > sparse * 2.0);
+}
