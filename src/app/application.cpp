@@ -1374,6 +1374,20 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // -- one is discoverable and one is fast -- and the button is where a person looking at a
         // timeline goes to put a song on it. All three are this callback.
         panel_->onFreeCamera = [this]() { ensureFreeCamera(/*deliberate=*/true); };
+        // ADR-391. Choosing what the canvas shows is the host's state, because the host is what
+        // knows the two things that overrule the choice (see `effectiveViewportView`).
+        panel_->onViewportView = [this](scene::ViewportView view) {
+            viewportView_ = view;
+            applyViewportView();
+        };
+        // Navigation's one seam, handed to the panel so "go to camera" cannot become a second way
+        // to write the film's camera.
+        panel_->onMoveViewport = [this](glm::vec3 eye, glm::vec3 target) {
+            CameraPose pose;
+            pose.eye = eye;
+            pose.target = target;
+            setViewportPose(pose);
+        };
         panel_->cameraLocked = &cameraLocked_;
         panel_->onOpenAudio = dialog(platform::Window::DialogKind::Audio);
         panel_->sequence.onOpenAudio = panel_->onOpenAudio;
@@ -2282,9 +2296,81 @@ std::string describeWrites(const UiScript& script) {
 
 // ---- viewport interaction (ADR-068) -------------------------------------------------------------
 
+// ---- what the viewport is looking through (ADR-391) ---------------------------------------------
+//
+// The user's choice, narrowed by what the canvas is currently being used for. Two things overrule
+// it, and both are cases where the person is looking at the deliverable rather than at the world:
+//
+//   * **A preview mode that shows the output frame.** Workspace is the flexible canvas -- the
+//     editor's window on the world -- and Output Frame and Preview are the picture that renders.
+//     An editor viewpoint inside them would be a lie about what the render contains, which is the
+//     one thing those modes exist to tell the truth about. So: Workspace navigates, Output Frame
+//     composes, and a drag in Output Frame still moves the film's camera exactly as it used to.
+//   * **An open output or share.** `presentAll` and `TextureShare::publish` are handed
+//     `finalTexture_` -- the live viewport's own render target -- so whatever the canvas is showing
+//     is on the projector or in the Syphon feed. While anything is watching, the canvas shows the
+//     film. Flying the editor viewpoint without disturbing a live output needs a second render of
+//     the film per frame, which is real GPU cost and a separate piece of work; what must not happen
+//     is that it *looks* like it works and quietly re-frames somebody's show.
+//
+// A scene with no composition has no editor viewpoint to offer (the override lives on
+// `Composition`), and answers Film -- which is what those scenes have always done.
+scene::ViewportView Application::effectiveViewportView() const {
+    if (engine_ == nullptr || engine_->composition() == nullptr) {
+        return {};
+    }
+    if (ui::viewportShowsFilm(viewportView_.showsFilm(),
+                              panel_ != nullptr && ui::modeShowsOutputFrame(panel_->preview.mode),
+                              outputs_.openCount() > 0 || share_.isOpen(),
+                              /*hasComposition=*/true)) {
+        return {};
+    }
+    return viewportView_;
+}
+
+void Application::applyViewportView() {
+    if (engine_ == nullptr) {
+        return;
+    }
+    if (scene::Composition* comp = engine_->composition()) {
+        comp->setViewportView(effectiveViewportView());
+    }
+}
+
+// ---- the viewport's pose, wherever it lives -----------------------------------------------------
+//
+// One seam, two destinations. Which one is chosen is `effectiveViewportView`'s answer and not the
+// caller's business: a drag, the wheel and frame-selected all say "here is where the view should
+// be now" and none of them should have to know whether that is an edit to the film.
+namespace {
+// The editor's own viewpoint, when there is one to move. Null in Film mode, over a scene with no
+// composition, or while an output is watching -- in which case the pose lives in `camera/*`.
+[[nodiscard]] scene::Composition* editorViewpointOwner(Engine* engine, const scene::ViewportView& view) {
+    if (engine == nullptr || view.showsFilm()) {
+        return nullptr;
+    }
+    return engine->composition();
+}
+} // namespace
+
 CameraPose Application::viewportPose() const {
     CameraPose pose;
     if (engine_ == nullptr) {
+        return pose;
+    }
+    const scene::ViewportView view = effectiveViewportView();
+    if (const scene::Composition* comp = engine_->composition(); comp != nullptr && !view.showsFilm()) {
+        // The editor's pose, or -- if it has not been seeded yet, or the viewport is pinned to an
+        // authored rig -- the frame that is actually on screen. Reading the live frame rather than
+        // a default is what makes the first drag after a mode change continue from what you were
+        // looking at instead of jumping to wherever the unseeded pose happened to be.
+        if (view.mode == scene::ViewportCamera::Editor && comp->editorCameraSeeded()) {
+            pose.eye = comp->editorCamera().position;
+            pose.target = comp->editorCamera().target;
+        } else {
+            pose.eye = engine_->scene().camera.position;
+            pose.target = engine_->scene().camera.target;
+        }
         return pose;
     }
     pose.eye = engine_->scene().camera.position;
@@ -2306,6 +2392,31 @@ void Application::setViewportPose(const CameraPose& pose) {
     if (engine_ == nullptr) {
         return;
     }
+    const scene::ViewportView view = effectiveViewportView();
+    if (scene::Composition* comp = editorViewpointOwner(engine_.get(), view)) {
+        // **Not `camera/*`.** This is the whole of ADR-391 in three lines: a navigation gesture
+        // writes a pose the film does not own, so there is nothing for it to destroy and nothing
+        // for a save to photograph. Moving the view while pinned to a rig takes the viewport off
+        // that rig and onto its own viewpoint, starting from the rig's frame -- a person who drags
+        // has stopped looking *through* something and started looking *around*.
+        scene::CameraPose next = comp->editorCamera();
+        next.position = pose.eye;
+        next.target = pose.target;
+        if (view.mode == scene::ViewportCamera::Through) {
+            next.fovDegrees = glm::degrees(engine_->scene().camera.fovYRadians);
+            next.focalLength = 0.0f;
+            viewportView_.mode = scene::ViewportCamera::Editor;
+            viewportView_.camera = scene::kNoCamera;
+            if (panel_ != nullptr) {
+                panel_->setStatus("the editor viewpoint took over from the camera you were looking "
+                                  "through -- the film is unchanged");
+            }
+        } else if (!comp->editorCameraSeeded()) {
+            next.fovDegrees = glm::degrees(engine_->scene().camera.fovYRadians);
+        }
+        comp->setEditorCamera(next);
+        return;
+    }
     if (auto* p = engine_->params().find("camera/position")) {
         if (auto* v = dynamic_cast<params::Parameter<glm::vec3>*>(p)) {
             v->setBase(pose.eye);
@@ -2322,25 +2433,42 @@ void Application::ensureFreeCamera(bool deliberate) {
     if (engine_ == nullptr) {
         return;
     }
+    // **ADR-391: off the path of an ordinary drag.**
+    //
+    // Everything below this guard is about taking the film's camera away from whoever is driving
+    // it, and that is only what a gesture means when the frame on screen *is* the film's. When the
+    // viewport is showing its own viewpoint, a drag moves a pose the film does not own: there is no
+    // director to stand down, no track to remove, nothing to lose and so nothing to defend. The
+    // lock ADR-386 added is still here and still correct -- it just is not in the way of navigating
+    // any more, which was its entire cost.
+    if (!effectiveViewportView().showsFilm()) {
+        return;
+    }
     // The lock, and it is FIRST, before anything below mutates.
     //
     // It sat after the free-roam block to begin with, which was a half-applied state: a locked drag
-    // still set `viewportFreeRoam` and copied the live pose onto `camera/position`'s base, then
+    // still copied the live pose onto `camera/position`'s base, then
     // refused to stand the director down and told the user nothing had happened. A refusal that
     // changes the project anyway is worse than no refusal, because now the message is wrong too.
     //
     // So a locked, incidental gesture is a complete no-op plus a sentence saying how to ask
-    // properly. The cost is real and is the brief's §7 bargain: while the cut is locked, the
-    // viewport cannot move the camera at all. There is no separate editor camera in this engine --
-    // the viewport IS `camera/*` -- so "navigate without modifying" is not something this
-    // architecture can offer yet, and pretending otherwise would be the harder lie to unpick.
-    // The lock asks what would actually be lost rather than assuming there is something.
+    // properly. What the brief's §7 called the bargain -- "while the cut is locked, the viewport
+    // cannot move the camera at all" -- is no longer the price of it, because there IS a separate
+    // editor camera now (ADR-391) and the guard above sends every ordinary gesture to it. All this
+    // refuses is the narrower thing it always meant to: moving the *film's* camera by hand, on a
+    // project whose cut is baked, without saying so.
+    //
+    // And it still asks what would actually be lost rather than assuming there is something. The two
+    // halves are independent: ADR-391 narrowed WHICH gestures reach this refusal, and the bake count
+    // decides whether the refusal is worth making at all. On the Tree of Life -- 0 camera tracks, 0
+    // aim-follow entries, 0 shot spans -- there is nothing to defend and the answer is yes either way.
     if (cameraDirection_.directed &&
         !ui::viewportMayReleaseDirector(true, cameraLocked_, deliberate,
                                         directedCameraBakeSize(*engine_) > 0)) {
         if (panel_ != nullptr) {
-            panel_->setStatus("camera is locked: this project's cut is baked. Unlock in the Cameras "
-                              "panel to edit it (that discards the director's cut).");
+            panel_->setStatus("this frame is the film's and its cut is baked. Switch the canvas to "
+                              "the editor viewpoint to fly without touching it, or unlock in the "
+                              "Cameras panel to edit the cut (that discards it).");
         }
         if (!cameraLockAnnounced_) {
             cameraLockAnnounced_ = true;
@@ -2362,28 +2490,30 @@ void Application::ensureFreeCamera(bool deliberate) {
     // navigate the world", which is exactly right.
     //
     // Reaching for the camera is asking for it back, and now that means both halves.
+    //
+    // The free-roam flag that used to be set here is gone (ADR-391): it pinned the frame to the
+    // MAIN camera, and the main camera *is* `camera/*`, so it never stopped a gesture writing the
+    // film -- it only chose which of the film's cameras was written. What it did that is still
+    // worth doing is the pose copy: the main camera picks up where the shot left off, so handing
+    // the camera back does not teleport the frame. `releaseDirectedCamera` below removes the
+    // director's shots, so the film resolves to the main camera on the next frame by itself.
     if (scene::Composition* comp = engine_->composition();
-        comp != nullptr && !comp->viewportFreeRoam()) {
-        // Where the frame is *now* becomes where free-roam starts, so taking the camera back does
-        // not teleport: you carry on from the shot you were looking at.
-        if (comp->activeCamera().camera != scene::kMainCamera) {
-            const scene::Camera& live = engine_->scene().camera;
-            if (auto* p = engine_->params().find("camera/position")) {
-                for (std::size_t c = 0; c < 3; ++c) {
-                    p->setBaseComponent(c, live.position[c]);
-                }
-            }
-            if (auto* t = engine_->params().find("camera/target")) {
-                for (std::size_t c = 0; c < 3; ++c) {
-                    t->setBaseComponent(c, live.target[c]);
-                }
-            }
-            log::info("viewport: free roam, taking over from '{}'", comp->activeCamera().name);
-            if (panel_ != nullptr) {
-                panel_->setStatus("viewport is free-roaming -- the director still owns the film");
+        comp != nullptr && comp->activeCamera().camera != scene::kMainCamera) {
+        const scene::Camera& live = engine_->scene().camera;
+        if (auto* p = engine_->params().find("camera/position")) {
+            for (std::size_t c = 0; c < 3; ++c) {
+                p->setBaseComponent(c, live.position[c]);
             }
         }
-        comp->setViewportFreeRoam(true);
+        if (auto* t = engine_->params().find("camera/target")) {
+            for (std::size_t c = 0; c < 3; ++c) {
+                t->setBaseComponent(c, live.target[c]);
+            }
+        }
+        log::info("viewport: taking the film's camera over from '{}'", comp->activeCamera().name);
+        if (panel_ != nullptr) {
+            panel_->setStatus("the film's camera is yours -- the director's cut has been discarded");
+        }
     }
     // The viewport is about to move the camera by hand, so whoever else was driving it stops now.
     //
@@ -3812,6 +3942,40 @@ int Application::runLive() {
             if (active.blending()) {
                 panel_->previewCameraLabel += fmt::format("  ({:.0f}%)", active.blend * 100.0f);
             }
+            // ADR-391: the label above says what the *film* is on, which is the truth and is what
+            // the Cameras panel needs. It is not necessarily what this frame was rendered through,
+            // and the indicator's job is the second question. Said as a prefix rather than by
+            // replacing the film's answer, because "you are flying, and the film is on UFO Watch"
+            // is one fact with two halves and dropping either one is how somebody concludes the
+            // director has stopped working.
+            const scene::ViewportView shown = effectiveViewportView();
+            if (!shown.showsFilm()) {
+                if (shown.mode == scene::ViewportCamera::Editor) {
+                    panel_->previewCameraLabel = "editor view  (film: " + panel_->previewCameraLabel + ")";
+                } else {
+                    const scene::CameraRig* rig = engine_->composition() != nullptr
+                                                      ? engine_->composition()->cameraDirection().find(shown.camera)
+                                                      : nullptr;
+                    panel_->previewCameraLabel = fmt::format("through {}  (film: {})",
+                                                             rig != nullptr ? rig->name : std::string("?"),
+                                                             panel_->previewCameraLabel);
+                }
+            }
+            // What the toolbar draws, and why it is not always what was asked for.
+            panel_->viewportView = viewportView_;
+            panel_->viewportViewForced = !viewportView_.showsFilm() && shown.showsFilm();
+            panel_->viewportViewNote.clear();
+            if (panel_->viewportViewForced) {
+                if (ui::modeShowsOutputFrame(panel_->preview.mode)) {
+                    panel_->viewportViewNote = "the canvas is in " +
+                                               std::string(ui::previewViewModeLabel(panel_->preview.mode)) +
+                                               " mode, which shows what renders";
+                } else if (engine_->composition() == nullptr) {
+                    panel_->viewportViewNote = "this scene has one fixed camera";
+                } else {
+                    panel_->viewportViewNote = "an output or share is presenting this frame";
+                }
+            }
         }
         prof.add(kPhResize, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
                                                                       resizeStart).count());
@@ -3922,6 +4086,10 @@ int Application::runLive() {
             lastTransportDiscontinuity_ = discontinuity;
         }
         engine_->setViewport(renderWidth_, renderHeight_);
+        // ADR-391, and *before* the update: the composition decides the frame's camera inside
+        // `update`, so a mode pushed after it would be one frame late -- which is exactly long
+        // enough for a click to be picked against the previous frame's camera.
+        applyViewportView();
         {
             const std::uint64_t allocsBefore = core::allocCounters().allocations;
             const auto updateStart = std::chrono::steady_clock::now();

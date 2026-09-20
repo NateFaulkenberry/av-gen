@@ -64,6 +64,15 @@ const char* activeCameraReasonName(ActiveCameraReason reason) {
     return "default";
 }
 
+const char* viewportCameraName(ViewportCamera mode) {
+    switch (mode) {
+    case ViewportCamera::Editor: return "editor";
+    case ViewportCamera::Through: return "through";
+    case ViewportCamera::Film: break;
+    }
+    return "film";
+}
+
 std::string cameraSlug(std::string_view name) {
     std::string out;
     out.reserve(name.size());

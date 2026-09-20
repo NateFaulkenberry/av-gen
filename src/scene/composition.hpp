@@ -263,6 +263,17 @@ struct CompositionNode {
     bool locked = false;
     float emissiveBoost = 1.0f;
     float roughnessScale = 1.0f;
+    // ADR-385. A whole-node opacity multiplier, for the same reason `emissiveBoost` and
+    // `roughnessScale` are here: an effect wants to drive one object's material without the scene
+    // restating the asset's own numbers. 1 is a genuine no-op and is the default, so a node nobody
+    // fades is byte-identical to one built before this existed.
+    //
+    // It also does the thing neither of its neighbours has to. `pbr_shade.wgsl` reads
+    // `let alpha = select(1.0, baseColor.a, alphaMode > 1.5)`: an OPAQUE material's alpha is
+    // discarded outright, and every farm GLB in the repository is authored OPAQUE. So an opacity
+    // under 1 also *promotes* the entity's `alphaMode` to `Blend` for the frames it is under 1, and
+    // puts it back when it is not. Driving the number alone rendered a perfectly solid cow.
+    float opacityScale = 1.0f;
     // ADR-360: the wind body this node's meshes belong to, when it is a Group that declares one.
     // `windAuthored` distinguishes "the author wrote nothing" from "the author wrote the defaults",
     // which is what keeps a scene written before this key existed byte-identical on a re-save.
@@ -352,6 +363,7 @@ struct CompositionNode {
     params::Parameter<bool>* visibleParam = nullptr;
     params::Parameter<float>* emissiveParam = nullptr;
     params::Parameter<float>* roughnessParam = nullptr;
+    params::Parameter<float>* opacityParam = nullptr;
     // Scale and tint for the lights this node's asset contributed. Registered for every node and
     // inert on one that brought none, exactly as `emissiveBoost` is on a node with no emission.
     params::Parameter<float>* lightIntensityParam = nullptr;
@@ -925,21 +937,51 @@ public:
     // the engine decides this, and a consumer that wants the pose reads `Scene::camera` as it
     // always has. Updated once per frame inside `applyParameters`.
     [[nodiscard]] const ActiveCameraState& activeCamera() const { return activeCamera_; }
-    // ---- who owns the viewport (the canvas-camera separation) ----------------------------------
+    // ---- what the viewport is looking through (ADR-391) -----------------------------------------
     //
-    // The editor viewport and the director's active camera are two concepts, and conflating them is
-    // what made an artist unable to fly around their own world: the director switching cameras took
-    // the viewport with it, and there was no way back because the gesture that takes the camera
-    // back (`Application::ensureFreeCamera`) only ever released the *main* camera's tracks -- which
-    // does nothing when the thing on screen is an authored rig.
+    // **Navigating the view is no longer the same act as modifying the film's camera.**
     //
-    // Free-roam pins the frame to the main camera, which is the camera the viewport has always
-    // flown. It changes nothing the director decided: `activeCamera()` still answers with the shot
-    // that owns the film, and an offline render -- which never turns this on -- renders it.
+    // The viewport used to *be* `camera/*`: a drag wrote `camera/position` and `camera/target`, so
+    // flying around to look at something was an edit to the deliverable. On a directed project that
+    // meant a drag could only be honoured by discarding the director's bake (ADR-386's lock), and
+    // "look through that camera" could not be built at all, because there was no pose in this
+    // engine that the film did not own.
     //
-    // Off by default, so nothing that does not ask is affected, including every render.
-    void setViewportFreeRoam(bool on) { viewportFreeRoam_ = on; }
-    [[nodiscard]] bool viewportFreeRoam() const { return viewportFreeRoam_; }
+    // There is one now. The viewport has a mode, and the mode says where the frame comes from:
+    //
+    //   Film    -- the director's answer, `camera/*`, the active rig. Exactly as before, and **the
+    //              only value any render path ever sees**: this is default-constructed state that
+    //              nothing but the editor writes, and it is not serialised, so an offline render,
+    //              a RenderJob and a sequence render cannot inherit an editor's navigation.
+    //   Editor  -- a pose the editor owns (`editorCamera()`), which drags, the wheel, frame-selected
+    //              and "go to camera" write. Never reaches `camera/*` and never reaches a file.
+    //   Through -- pinned to one authored rig whatever the director is doing.
+    //
+    // **Applied to the frame, never inside the resolver.** This is the same rule free-roam obeyed
+    // and the reason it is stated twice: `resolveActiveCamera` stays a pure function of (cameras,
+    // shots, events, time), `activeCamera()` keeps answering with the camera that owns the *film*,
+    // and all that changes is the pose written into `scene_.camera` for display. What free-roam got
+    // wrong was only its destination -- it redirected to the MAIN camera, and the main camera *is*
+    // `camera/*`, so navigating still wrote the film. It is superseded by `Editor` rather than kept
+    // beside it: two overlapping concepts for "the viewport is not showing the film" is how the next
+    // person gets this wrong.
+    //
+    // One consequence worth naming: because the editor pose is not `camera/*`, it does not care
+    // about `camera/mode`. A drag in orbit mode used to write parameters the main camera does not
+    // read and look exactly like a dead input; the editor viewpoint moves.
+    void setViewportView(ViewportView view);
+    [[nodiscard]] const ViewportView& viewportView() const { return viewportView_; }
+    // Where the editor's own viewpoint is. Read by the editor to move it, and by nothing else.
+    //
+    // Seeded from the film the first frame `Editor` is in effect and never before, so switching to
+    // the editor viewpoint puts you exactly where you were looking rather than teleporting you --
+    // and so a composition that has never had an editor viewpoint has no pose to disagree about.
+    [[nodiscard]] const CameraPose& editorCamera() const { return editorCamera_; }
+    [[nodiscard]] bool editorCameraSeeded() const { return editorCameraSeeded_; }
+    void setEditorCamera(const CameraPose& pose) {
+        editorCamera_ = pose;
+        editorCameraSeeded_ = true;
+    }
     // Whether the timeline drives any of a camera's own channels -- which is the whole of the
     // difference between a "static" camera and an "animated" one. There is no mode for it because
     // there is no state for it: a camera is animated exactly when somebody keyed it.
@@ -1428,7 +1470,10 @@ private:
     };
     std::vector<CameraChannels> cameraChannels_;
     ActiveCameraState activeCamera_;
-    bool viewportFreeRoam_ = false;
+    // ADR-391. Editor state, deliberately not serialised: see `setViewportView`.
+    ViewportView viewportView_;
+    CameraPose editorCamera_;
+    bool editorCameraSeeded_ = false;
     // What the director has seen happen, as spans. A scenario's run is live state (ADR-210: it is
     // started by `autoStart` or by a signal edge, not by a second on the timeline), so the only
     // honest span for one is "it began when this composition first saw it begin". An entry whose
@@ -1444,6 +1489,9 @@ private:
     // Evaluates the main camera exactly as this file always has: orbit, free or spline, from the
     // `camera/*` parameters. Extracted from `applyParameters` without a change of behaviour.
     [[nodiscard]] CameraPose evaluateMainCamera() const;
+    // ADR-391: the frame the *viewport* is showing, applied over the film's camera once the film's
+    // camera is final. A no-op in `Film` mode, which is every render.
+    void applyViewportView(float mainFovDegrees);
     // Folds this frame's staging state into `cameraEvents_`. Called from `updateBehaviour`, after
     // the staging tick, so a scenario that began this frame is visible to this frame's cut.
     void observeCameraEvents(double seconds);
@@ -1648,6 +1696,13 @@ private:
         std::vector<Transform> restTransforms;       // entity transforms inside the asset
         std::vector<float> restEmissive;
         std::vector<float> restRoughness;
+        // The opacity the asset was built with, captured the first time a node's `opacity`
+        // parameter is read rather than pushed alongside `restRoughness` at every one of the six
+        // sites that build a range. Lazy because a vector that is silently shorter than
+        // `entityCount` is an out-of-bounds write, and six push_backs that must stay in step with
+        // each other is the shape of defect this file has the most of.
+        std::vector<float> restOpacity;
+        std::vector<std::uint8_t> restAlphaMode;
         int particleIndex = -1;                      // index into scene_.particles (Particles kind)
         int proceduralIndex = -1;                    // index into scene_.procedurals (Procedural kind)
         std::size_t proceduralSubCount = 0;          // the asset's other materials, immediately after it
