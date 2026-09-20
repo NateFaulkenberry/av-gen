@@ -133,11 +133,42 @@ public:
     // complete session. Paths are written relative to the project file. ----
     static constexpr const char* kAppVersion = "0.1.0";
     [[nodiscard]] Result<void> saveProject(const std::filesystem::path& path);
+    // The document `saveProject` would write for `path`, without writing it. Split out so the
+    // unsaved-changes comparison below is the *same function* the save is -- a second serialiser
+    // written "to match" is the shape of defect this codebase keeps finding (ADR-440).
+    [[nodiscard]] nlohmann::json projectDocument(const std::filesystem::path& path);
     // Restores the assets first (a missing one is a warning, see projectWarnings()), then the
     // rest. Fails only when the document itself is invalid.
     [[nodiscard]] Result<void> loadProject(const std::filesystem::path& path);
     [[nodiscard]] const std::filesystem::path& projectPath() const { return projectPath_; }
     [[nodiscard]] const std::vector<std::string>& projectWarnings() const { return projectWarnings_; }
+
+    // ---- unsaved changes (ADR-440) --------------------------------------------------------------
+    //
+    // "Is there work in this session that closing it would lose?" -- computed by serialising the
+    // project and comparing it against the serialisation taken when it was last opened or saved,
+    // never by a flag that every mutation site has to remember to set. The long comment above
+    // `Engine::sampleProjectDirty` carries the measurement that rules out the two obvious
+    // alternatives (comparing against the file; a hand-maintained list of noisy keys).
+    //
+    // `touchedSinceLastSample` is the host's answer to "did anything happen to this application
+    // since you last asked me" -- a pointer, a key, a menu, a drop. It is not a dirty flag: it is
+    // never consulted to decide that something *did* change, only to decide whether a change that
+    // has already been measured could possibly be the user's. On a sample where nothing touched the
+    // application, every difference is the engine writing its own state (entity positions, a world
+    // effect's parameter writeback) and the baseline moves to absorb it.
+    //
+    // Costs a full project serialisation: 31 ms on `glowmere-valley-2-multicam.json` (675 KB, 5,502
+    // parameters), under a millisecond on everything small. Call it when closing something, and
+    // otherwise only on idle frames -- `Application` throttles it against its own measured cost.
+    void sampleProjectDirty(bool touchedSinceLastSample);
+    // Samples and answers. Monotone: once dirty, dirty until a save or a load.
+    [[nodiscard]] bool projectDirty(bool touchedSinceLastSample = true);
+    // The last answer, with no serialisation. For a per-frame reader such as the window title.
+    [[nodiscard]] bool projectDirtyCached() const { return projectDirty_; }
+    // "What is in memory is what is stored." Called by `saveProject` and at the end of a load; also
+    // the hook for anything else that makes the two agree.
+    void markProjectSaved();
 
     // ---- what a load is doing while it does it (the brief's section 5) -------------------------
     //
@@ -822,6 +853,12 @@ private:
     std::filesystem::path environmentPath_;
     std::filesystem::path compositionPath_;
     std::filesystem::path projectPath_;
+    // ADR-440. `projectBaseline_` is the document a save would have written at the moment this
+    // project last agreed with the disk; `projectBaselineValid_` is false only before the first
+    // load or save, when there is nothing to compare against and nothing to lose.
+    nlohmann::json projectBaseline_;
+    bool projectBaselineValid_ = false;
+    bool projectDirty_ = false;
     // Appends to projectWarnings_ if it is not already there. Unresolved bindings are re-reported
     // on every rebind, and a warning list that grew a duplicate per scene swap would stop being
     // read.

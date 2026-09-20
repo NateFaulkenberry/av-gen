@@ -42,6 +42,7 @@
 #include <imgui_internal.h>
 #include "ui/imgui_layer.hpp"
 #include "ui/ui_logic.hpp"
+#include "ui/unsaved_changes.hpp"
 
 #include <SDL3/SDL.h>
 #include <glm/gtx/quaternion.hpp>
@@ -1456,16 +1457,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
         panel_->onAddGltfNode = addAssetNode(scene::NodeKind::Gltf, platform::Window::DialogKind::Scene);
         panel_->onAddSceneNode = addAssetNode(scene::NodeKind::Scene, platform::Window::DialogKind::Any);
-        auto saveTo = [this](const std::filesystem::path& path) {
-            storeOutputsToProject();
-            if (auto r = engine_->saveProject(path); !r) {
-                log::error("save project: {}", r.error().message);
-                panel_->setStatus(r.error().message);
-            } else {
-                panel_->setStatus("saved " + path.filename().string());
-                rememberProject(path);
-            }
-        };
+        auto saveTo = [this](const std::filesystem::path& path) { saveProjectTo(path); };
         panel_->onSaveProject = [this, saveTo] {
             window_->saveFileDialog(platform::Window::SaveKind::Project, [saveTo](std::string path) {
                 if (!path.empty()) {
@@ -1479,8 +1471,19 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             }
         };
         panel_->onNewProject = [this] {
-            engine_->newProject();
-            panel_->setStatus("new project");
+            // ADR-440: File > New discards the open project as completely as File > Open does.
+            requestClose(ui::CloseIntent::NewProject, [this] {
+                engine_->newProject();
+                edits_.clearHistory();
+                if (panel_ != nullptr) {
+                    // The history describes a document that is gone (ADR-092). `openAny` does this
+                    // for every other close; File > New is the one path that never did, so undo
+                    // after a New would have edited the new project with the old one's commands.
+                    panel_->editor.reset();
+                    panel_->setStatus("new project");
+                }
+                refreshWindowTitle();
+            });
         };
         panel_->onOpenRecent = [this](const std::filesystem::path& path) { loadAny(path); };
         panel_->onExportBundle = [this] {
@@ -1514,10 +1517,20 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // The second half is the whole difference from File > Examples, and it is why this is not
         // just another index entry.
         panel_->onOpenLab = [this](const labs::LabDescriptor& lab) {
-            loadAny(labs::repositoryRoot() / std::string(lab.fixture));
-            panel_->world.debug = labs::overlaysFor(lab.id);
-            panel_->world.showDebugOptions = true;
-            panel_->setStatus(fmt::format("{}: {}", lab.title, lab.question));
+            // The overlay selection is part of opening the lab, so it moves inside the gated
+            // action (ADR-440). Left outside, cancelling the prompt would still have switched the
+            // overlays and the status line -- a Cancel that changed something is not a Cancel.
+            const std::filesystem::path fixture = labs::repositoryRoot() / std::string(lab.fixture);
+            const auto overlays = labs::overlaysFor(lab.id);
+            const std::string note = fmt::format("{}: {}", lab.title, lab.question);
+            requestClose(ui::CloseIntent::OpenProject,
+                         [this, fixture, overlays, note] {
+                             beginOpen(fixture);
+                             panel_->world.debug = overlays;
+                             panel_->world.showDebugOptions = true;
+                             panel_->setStatus(note);
+                         },
+                         fixture);
         };
         // The loader names the stage it is entering. Only the live editor installs this: offline
         // has no window to tell and `runHeadless` must not acquire a dependency on one.
@@ -1950,10 +1963,193 @@ void Application::loadAny(const std::filesystem::path& path) {
         performOpen(path);
         return;
     }
+    // ADR-440. A project replaces the one that is open, so it is offered the prompt first; audio,
+    // an environment map, a scene and a shader are *added to* the open project and are not a close.
+    // The check is on what the open would do, not on which menu asked for it, so Open Recent, the
+    // examples list, the labs and a dropped file are all covered by this one line.
+    if (opensADifferentProject(path)) {
+        const std::filesystem::path copy = path;
+        requestClose(ui::CloseIntent::OpenProject, [this, copy] { beginOpen(copy); }, path);
+        return;
+    }
+    beginOpen(path);
+}
+
+void Application::beginOpen(const std::filesystem::path& path) {
     pendingOpen_ = path;
     panel_->loading = ui::ControlPanel::Loading{
         .active = true, .what = path.filename().string(), .stage = {}, .index = 0, .count = 1};
     panel_->setStatus(fmt::format("Opening {}...", path.filename().string()));
+}
+
+// ---- what counts as closing the project (ADR-440) --------------------------------------------
+//
+// Mirrors `Engine::loadFile`'s routing rather than restating it as a list of extensions to keep in
+// step: anything that is not a .json is audio, a scene, an environment or a shader, and every one
+// of those modifies the open project instead of replacing it. A .json is a project unless it
+// announces itself as a scene document, and a recipe builds a whole new world, which discards
+// everything live just as surely as a project does.
+bool Application::opensADifferentProject(const std::filesystem::path& path) {
+    if (world::isRecipeFile(path)) {
+        return true;
+    }
+    std::string ext = path.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (ext != ".json") {
+        return false;
+    }
+    std::ifstream in(path);
+    const nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
+    if (!doc.is_object()) {
+        return false;
+    }
+    return doc.value("format", std::string()) != scene::Composition::kFormatName;
+}
+
+bool Application::requestClose(ui::CloseIntent intent, std::function<void()> action,
+                               const std::filesystem::path& path) {
+    if (closeGate_.busy()) {
+        // A modal is already up, or a save is in flight. Dropping the second request is what keeps
+        // three taps on Cmd-Q from stacking three pending quits behind one dialog.
+        return false;
+    }
+    // Measured here and nowhere else: this is the one moment the answer is needed, and it costs a
+    // full serialisation (31 ms on the heaviest project in the repository), which is invisible
+    // beside the two-second load it is about to gate.
+    //
+    // `edits_.dirty()` is asked first because it is free and it can only say yes: a world edit that
+    // has not been saved is unsaved work whatever the documents say. It is not trusted to say *no*
+    // -- it knows about the world editor's commands and nothing about a slider, a light or a
+    // timeline -- so a clean history falls through to the comparison rather than short-circuiting
+    // it. (It also gives `EditSystem::dirty()` its first production reader; before ADR-440 it had
+    // neither a reader nor a writer.)
+    const bool dirty = edits_.dirty() || engine_->projectDirty(touchedSinceDirtySample_);
+    touchedSinceDirtySample_ = false;
+    lastDirtySample_ = std::chrono::steady_clock::now();
+    if (closeGate_.requestClose(intent, dirty, path)) {
+        action();
+        return true;
+    }
+    pendingClose_ = std::move(action);
+    return false;
+}
+
+void Application::serviceCloseGate() {
+    bool answered = false;
+    const std::string name = engine_->projectPath().empty()
+                                 ? std::string()
+                                 : engine_->projectPath().filename().string();
+    const ui::UnsavedAnswer answer = ui::drawUnsavedChangesModal(closeGate_, name, &answered);
+    if (answered) {
+        closeGate_.answer(answer);
+        if (closeGate_.state() == ui::UnsavedChangesGate::State::AwaitingSave) {
+            if (engine_->projectPath().empty()) {
+                // Yes on a project with no path is Save As -- and Cancel in *that* dialog cancels
+                // the whole close rather than falling through to discarding, which is the half of
+                // this that is easy to get wrong.
+                saveProjectAsForGate();
+            } else {
+                saveProjectTo(engine_->projectPath());
+                closeGate_.saveFinished(!engine_->projectDirtyCached());
+            }
+        }
+        if (!closeGate_.busy() && closeGate_.state() == ui::UnsavedChangesGate::State::Idle) {
+            // Cancel, here or in the Save As dialog. The pending action is dropped without being
+            // performed and the application is exactly where it was.
+            pendingClose_ = nullptr;
+            if (panel_ != nullptr) {
+                panel_->setStatus({});
+            }
+        }
+    }
+    if (closeGate_.takeReady()) {
+        std::function<void()> action = std::move(pendingClose_);
+        pendingClose_ = nullptr;
+        if (action) {
+            action();
+        }
+    }
+}
+
+void Application::saveProjectAsForGate() {
+    window_->saveFileDialog(platform::Window::SaveKind::Project, [this](std::string chosen) {
+        if (chosen.empty()) {
+            closeGate_.saveFinished(false);
+            return;
+        }
+        saveProjectTo(std::filesystem::path(chosen));
+        closeGate_.saveFinished(!engine_->projectDirtyCached());
+    });
+}
+
+// ---- the window title (ADR-440) ---------------------------------------------------------------
+//
+// A prompt is the last line of defence, not the only signal: an artist should be able to see that
+// there is something to lose without being asked. The marker is a bullet rather than an asterisk
+// because macOS uses a dot in the close button for the same fact.
+void Application::refreshWindowTitle() {
+    if (window_ == nullptr) {
+        return;
+    }
+    std::string title = "avgen " + std::string(app::Engine::kAppVersion) + " - ";
+    title += engine_->projectPath().empty() ? std::string("Untitled")
+                                            : engine_->projectPath().filename().string();
+    if (engine_->projectDirtyCached()) {
+        title += " \u2022";
+    }
+    window_->setTitle(title);
+}
+
+// ---- what counts as touching the application (ADR-440) ----------------------------------------
+//
+// **Not "an input event arrived".** The drift the absorption exists to swallow -- hero positions,
+// a world effect's parameter writeback -- happens while *time advances*, which is exactly when a
+// film is playing. If moving the pointer across the window counted as a touch, then watching a
+// project play with a hand on the mouse would attribute twenty paths of simulation to the user and
+// the prompt would fire on a project nobody had edited. That is the failure the brief calls worse
+// than having no prompt.
+//
+// So the signal is `ImGui::IsAnyItemActive()` -- a slider being dragged, a field being typed in, a
+// menu item under the pointer -- plus the edit history, which is what a gizmo drag in the canvas
+// produces. Pointer motion over the viewport is neither, and is not a change to the project.
+//
+// Read before `panel_->draw`, so it reports the state the *previous* frame's widgets left behind,
+// which is the window this sample is asking about.
+//
+// Sampled no more often than ten times the cost of the last sample -- so the 675 KB project is
+// checked about every 310 ms and a small one four times a second -- and never while a widget is
+// active, so a 31 ms serialisation cannot land in the middle of a drag.
+void Application::sampleProjectDirtyIfIdle() {
+    const bool widgetActive = ImGui::IsAnyItemActive();
+    if (widgetActive || edits_.dirty()) {
+        touchedSinceDirtySample_ = true;
+    }
+    if (widgetActive) {
+        return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    const double waited = std::chrono::duration<double, std::milli>(now - lastDirtySample_).count();
+    if (waited < std::max(250.0, lastDirtySampleMs_ * 10.0)) {
+        return;
+    }
+    const bool wasDirty = engine_->projectDirtyCached();
+    const auto started = std::chrono::steady_clock::now();
+    if (std::getenv("AVGEN_DIRTY_TRACE") != nullptr) {
+        log::info("DIRTYTRACE sample touched={} dirty={}", touchedSinceDirtySample_, wasDirty);
+    }
+    engine_->sampleProjectDirty(touchedSinceDirtySample_);
+    lastDirtySampleMs_ =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+    touchedSinceDirtySample_ = false;
+    lastDirtySample_ = now;
+    if (engine_->projectDirtyCached() != wasDirty) {
+        refreshWindowTitle();
+        // Said once per transition, because "the title grew a dot" is the kind of claim that is
+        // true of the code and false of the running application (ADR-387), and this is the only
+        // place the answer changes on its own.
+        log::info("project has unsaved changes (sampled in {:.1f} ms)", lastDirtySampleMs_);
+    }
 }
 
 void Application::servicePendingOpen() {
@@ -1973,6 +2169,10 @@ void Application::servicePendingOpen() {
 
 void Application::performOpen(const std::filesystem::path& path) {
     auto r = openAny(path);
+    // Whatever happens below, the attribution window starts again here: a load resets the engine's
+    // baseline, and the click that asked for the load is not an edit to what just arrived.
+    touchedSinceDirtySample_ = false;
+    lastDirtySample_ = std::chrono::steady_clock::now();
     if (!r) {
         log::error("open '{}': {}", path.string(), r.error().message);
         if (panel_) {
@@ -1985,8 +2185,11 @@ void Application::performOpen(const std::filesystem::path& path) {
     }
     if (!engine_->projectPath().empty() && std::filesystem::absolute(engine_->projectPath()) == std::filesystem::absolute(path)) {
         rememberProject(path);
-    } else if (window_) {
-        window_->setTitle("avgen " + std::string(app::Engine::kAppVersion) + " - " + path.filename().string());
+    } else {
+        // Something added to the open project rather than replacing it -- audio, a scene, an
+        // environment. It changed the project, so the next idle sample will find it and the title
+        // will grow its marker; the title is refreshed here so the *name* is right immediately.
+        refreshWindowTitle();
     }
 }
 
@@ -2201,6 +2404,34 @@ void Application::startRenderFromUi() {
     panel_->setStatus("rendering...");
 }
 
+// The one way a project reaches the disk from the editor. Cmd-S, Save As and the unsaved-changes
+// modal's Yes all come through here, so "what counts as a successful save" cannot have two answers
+// (ADR-440) -- and `Engine::saveProject` is what clears the dirty state, so the gate reading
+// `projectDirtyCached()` afterwards is reading the save's own verdict rather than a second one.
+void Application::saveProjectTo(const std::filesystem::path& path) {
+    storeOutputsToProject();
+    if (auto r = engine_->saveProject(path); !r) {
+        log::error("save project: {}", r.error().message);
+        if (panel_ != nullptr) {
+            panel_->setStatus(r.error().message);
+        }
+        return;
+    }
+    if (panel_ != nullptr) {
+        panel_->setStatus("saved " + path.filename().string());
+    }
+    // The edit history now describes the document on disk. Until this line `EditSystem::markSaved`
+    // had no production caller at all -- a writer with no writer, the shape ADR-225 is about. It is
+    // not what the prompt reads (the document comparison is), but leaving it permanently unset
+    // would make `EditSystem::dirty()` answer a question it has the data for and get it wrong.
+    edits_.markSaved();
+    rememberProject(path);
+    // The baseline has just moved, so the window this attributes over starts here. Without this,
+    // the click that asked for the save would be attributed to whatever the engine wrote next.
+    touchedSinceDirtySample_ = false;
+    lastDirtySample_ = std::chrono::steady_clock::now();
+}
+
 void Application::rememberProject(const std::filesystem::path& path) {
     // The Render panel edits `uiRender_`, and `uiRender_` was copied from the engine exactly once,
     // in `init()` -- which runs *before* a `--project` on the command line is even loaded. So the
@@ -2230,9 +2461,7 @@ void Application::rememberProject(const std::filesystem::path& path) {
                               engine_->projectWarnings().front());
         }
     }
-    if (window_) {
-        window_->setTitle("avgen " + std::string(app::Engine::kAppVersion) + " - " + path.filename().string());
-    }
+    refreshWindowTitle();
 }
 
 namespace {
@@ -3798,7 +4027,14 @@ int Application::runLive() {
         auto events = window_->pollEvents([this](const SDL_Event& e) { handleInputEvent(e); });
         prof.add(kPhEvents, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
                                                                         eventsStart).count());
+        // ADR-440: quit is a close like any other. The `break` is deferred until the modal has
+        // been answered, which needs frames to draw -- so the event raises the prompt and
+        // `quitting_` carries the answer back here. A project with nothing to lose still leaves on
+        // this line, because `requestClose` runs the action immediately when it is not dirty.
         if (events.quit) {
+            requestClose(ui::CloseIntent::Quit, [this] { quitting_ = true; });
+        }
+        if (quitting_) {
             break;
         }
         for (const auto& dropped : events.droppedFiles) {
@@ -3820,6 +4056,10 @@ int Application::runLive() {
             for (int i = 0; i < 3; ++i) {
                 stressStep(*engine_, stressRng, static_cast<std::uint64_t>(framesRendered));
             }
+            // The stress driver stands in for a user and reaches the engine directly, so it has to
+            // say so: without this its edits are indistinguishable from the engine's own writeback
+            // and are absorbed. Found by running it and watching nothing happen (ADR-387).
+            touchedSinceDirtySample_ = true;
         }
         if (!engineShaderWatcher_.poll().empty()) {
             if (auto r = renderer_->reloadEngineShaders(); !r) {
@@ -4061,6 +4301,9 @@ int Application::runLive() {
             prof.add(kPhEvents,
                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - lateStart).count());
             if (events.quit) {
+                requestClose(ui::CloseIntent::Quit, [this] { quitting_ = true; });
+            }
+            if (quitting_) {
                 break;
             }
         }
@@ -4156,6 +4399,11 @@ int Application::runLive() {
         if (ai_) {
             core::PhaseProfiler::Scope scope(prof, kPhAi);
             ai_->pump();
+            // No touch is recorded here, and that is checked rather than assumed: ADR-101 routes
+            // every assistant edit through `EditHistoryTransactionSink` into `edits_`, so the
+            // `edits_.dirty()` arm of the sampler already sees them. An assistant edit that did not
+            // reach the undo history would also not be undoable, which is a louder failure than
+            // this one.
         }
 
         // ADR-186's limits in the viewport. Set every frame rather than on the checkbox's edge:
@@ -4250,7 +4498,15 @@ int Application::runLive() {
             // be enabled or stood down while the panel is open, and a lock offered for a cut that
             // no longer exists is a control that guards nothing.
             panel_->cameraDirected = cameraDirection_.directed;
+            // ADR-440. Before the panels rather than after, so the title and the menus agree with
+            // the modal about whether there is anything to lose, and so the widget-activity signal
+            // it reads is the previous frame's -- the window it is asking about.
+            sampleProjectDirtyIfIdle();
             panel_->draw(*engine_, stats);
+            // After the panels, so the modal is submitted last and is on top of everything it is
+            // blocking (ADR-440). Inside the ImGui frame, because that is the only place a popup
+            // exists.
+            serviceCloseGate();
             // Raised *after* the panels are submitted, because ImGui cannot focus a window it has
             // not seen this frame. The focus lands on the next frame, which is why the capture frame
             // defaults to well after the layout settles.
@@ -4790,6 +5046,10 @@ Result<void> Application::openAny(const std::filesystem::path& path) {
     if (panel_ != nullptr) {
         panel_->editor.reset();
     }
+    // The commands go with the document they describe, and the new project is clean because it is
+    // exactly as it was stored (ADR-092, ADR-440). Without this a project opened after an edited
+    // one would report itself dirty the moment it appeared.
+    edits_.clearHistory();
     if (world::isRecipeFile(path)) {
         return generateWorldFromRecipe(path);
     }
