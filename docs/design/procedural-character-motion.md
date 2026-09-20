@@ -5,6 +5,31 @@
 
 ---
 
+## Phase B task log
+
+| stage (§61) | state | note |
+|---|---|---|
+| A. Phase A audit | **done** | the implementation map below; found the stride problem is 97% one-sided |
+| B. MotionContext | **done** | ADR-561; found three seam publication defects on the way (ADR-560) |
+| C. MotionController — provider seam | **done** | ADR-541 built as written; chain + clip provider held to parity |
+| D. acceleration / deceleration | **done** | the vector layer `Gait::approach` does not have |
+| E. locomotion adaptation | next | **stride warping first, not rate blending** — see B.A |
+| F. turn / directional movement | pending | |
+| G. foot placement | pending | the first visually checkable milestone |
+| H. terrain adaptation | pending | |
+| I. body compensation / balance | pending | validated at unit level, never seen to engage in a scene |
+| J-L. look-at, reach, secondary motion | pending | |
+| M. offline procedural augmentation | pending | |
+| N-O. validation metrics, profiling | pending | |
+| P. Glowmere vertical slice | pending | |
+| Q. documentation / ADRs | continuous | this file |
+
+**Blocked, and recorded so the dependency is visible:** ADR-553 (positional retargeting) gates
+**Phase C**, not Phase B. Phase B runs on the alien's own 57 seconds of authored clips, whose legs
+articulate (reach 0.69–0.96) where the retargeted corpus does not (0.970 flat).
+
+---
+
 ## B.A — Audit of Phase A
 
 §2 asks for an implementation map before any code: existing primitive → what Phase B reuses → what
