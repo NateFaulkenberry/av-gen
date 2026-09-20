@@ -267,6 +267,32 @@ enum class ViewportIntent : std::uint8_t {
     return deliberate || !locked;
 }
 
+// ---- what the canvas is for, this frame (ADR-391) ----------------------------------------------
+//
+// The editor viewpoint is the user's choice, and two things overrule it. Both are cases where
+// somebody other than the person driving is looking at this frame, and in both of them the canvas
+// has to be the film:
+//
+//   * `previewShowsOutputFrame` -- Output Frame and Preview render at the output's aspect ratio and
+//     exist to show what the deliverable contains. An editor viewpoint inside them would be a lie
+//     about the one thing those modes are for. Workspace navigates; Output Frame composes, and a
+//     drag there moves the film's camera exactly as it always has.
+//   * `outputWatching` -- an open output window or a Syphon/NDI share. Both are handed the live
+//     viewport's own render target (`presentAll`, `TextureShare::publish`), so whatever the canvas
+//     shows is on the projector. Flying without disturbing a live output would take a second render
+//     of the film every frame; what must not happen is that it silently re-frames somebody's show.
+//
+// `hasComposition` is false for the scenes that have one fixed camera and no composition to hold an
+// editor pose (the orb, a bare glTF). Those have always been the film and still are.
+//
+// A predicate rather than a branch inside `Application`, because it is the rule that decides
+// whether a mouse drag edits the deliverable, and a rule like that should be readable and reachable
+// by a test without a window, a device or a project.
+[[nodiscard]] inline bool viewportShowsFilm(bool userWantsFilm, bool previewShowsOutputFrame,
+                                            bool outputWatching, bool hasComposition) {
+    return userWantsFilm || previewShowsOutputFrame || outputWatching || !hasComposition;
+}
+
 // Labels for a list of file paths: the file name where that is enough to tell them apart, and as
 // much of the trailing path as it takes where it is not.
 //

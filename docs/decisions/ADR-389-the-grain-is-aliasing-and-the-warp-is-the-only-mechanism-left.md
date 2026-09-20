@@ -106,6 +106,27 @@ aliasing and leaves the rest of the problem visible where it belongs, in the ste
 compromise and it should be legible as one: the strict answer is written beside it, in the shader,
 so nobody later mistakes the floor for the maths.
 
+### Changing the transfer function moved the mean, and the per-metre coefficients were calibrated against it
+
+The contrast curve is replaced: `pow(n, contrast)` becomes a smoothstep whose width narrows as
+contrast rises, so the same parameter in the same range still means "more contrast" but keeps the
+midtones that make a volume read as thick instead of crushing them and leaving sparks.
+
+The first attempt shipped the curve without compensating for what it does to the **mean**, and the
+render came back a blown-out cyan glow filling the lower frame.
+
+`pow(n, c)` over a roughly uniform `n` has mean `1/(c+1)` — 0.22 at the shipped contrast of 3.6.
+A smoothstep centred on 0.5 has mean 0.5 whatever its width. Swapping one for the other multiplies
+the medium's mean density by about **six**, and `density` and `emission` are **per-metre
+coefficients calibrated against the old mean**. So the factor `2/(contrast + 1)` is applied, and the
+authored values keep meaning what they meant.
+
+This is the fourth member of a family this codebase keeps rediscovering — ADR-374's density,
+ADR-379's spill, ADR-381's comet-on-fog — and the first that is not literally about metres. The
+general form is worth stating, because the next one will not be about metres either: **a coefficient
+tuned against a quantity is invalidated by any change to that quantity's distribution, not only by a
+change to its units.** The comment naming the first three now names this one too.
+
 ### When samples are unaffordable, warping is the only mechanism left
 
 This is the design rule that outlives the effect.

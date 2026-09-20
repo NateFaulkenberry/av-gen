@@ -447,6 +447,13 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
                 let d = length(p.xz - frame.skyGroundPoint.xz) /
                         max(frame.skyGroundPoint.w * max(vol.vortex5.y, 1.0), 1.0);
                 let fall = pow(clamp(1.0 - d, 0.0, 1.0), max(lit.w, 0.5));
+                // ADR-389 is the fourth member of this family and the first that is not about
+                // metres: replacing the vortex's contrast curve changed the MEAN of its shape by
+                // six times, and `density` and `emission` were calibrated against the old one. The
+                // general form, for whoever meets the fifth: a coefficient tuned against a quantity
+                // is invalidated by any change to that quantity's DISTRIBUTION, not only by a
+                // change to its units.
+                //
                 // The 0.005 is the per-metre conversion, and it is the THIRD time in this branch
                 // that adding a radiance to a march without it has produced a number two orders of
                 // magnitude wrong (ADR-374's density, ADR-379's spill). `lit.rgb` is a surface
