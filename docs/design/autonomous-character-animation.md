@@ -1924,7 +1924,8 @@ context: **an in-place clip has no ground frame**, so "planted means stationary"
 | STEP 8-9 decoupling, retarget profile | **done** | ADR-548; real alien onto itself at 0.0396 deg worst |
 | STEP 10a BVH reader + travelling-path validation | **done** | ADR-549; split out of STEP 10 |
 | STEP 10b 100STYLE subset experiment | **blocked** | the corpus is not in this repository; the reader and every code path it exercises are built and tested |
-| STEP 11-13 MotionPack, offline tool, benchmark | pending | |
+| STEP 11 MotionPack | **done** | ADR-550; licence is a refusal, REQUIRES_REVIEW is the default |
+| STEP 12-13 offline tool, M2 Max benchmark | pending | |
 | STEP 15 visual validation | pending | the first non-numeric result |
 
 ### A pattern, not an incident: ADR-204 and the 1/30 s start
