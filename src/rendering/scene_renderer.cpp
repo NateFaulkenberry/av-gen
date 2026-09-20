@@ -3164,7 +3164,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         particleFrame.spawnScale = std::max(qualitySettings_.particleSpawnScale, 0.0f); // ADR-382
         particleFrame.shutterSeconds = static_cast<float>(std::clamp(time.deltaTime, 0.0, 0.1)) *
                                        std::clamp(scene.camera.lens.shutterAngle, 0.0f, 360.0f) / 360.0f;
-        if (VolumeRenderer::enabled(scene.environment)) {
+        // ADR-386: `enabled(scene)`, not `enabled(environment)`. The vortex used to live on the
+        // environment and could therefore switch this march on by itself; moving it to the
+        // atmospherics put it out of that overload's sight, and this call silently stopped filling
+        // the particle fog coupling in the one scene whose `volumeDensity` is zero and whose
+        // volume pass exists only because of the vortex. Worth 95% of the frame's pixels -- small
+        // per-pixel deltas over every mote and leaf, which is what an unfilled coupling looks like.
+        if (VolumeRenderer::enabled(scene)) {
             particleFrame.fogDensity = scene.environment.volumeDensity;
             particleFrame.fogHeight = scene.environment.fogHeight;
             particleFrame.fogHeightFalloff = scene.environment.fogHeightFalloff;
