@@ -51,7 +51,8 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "shadowRange", "volumeSteps", "volumeDensityField", "volumeColorField", "sky",
+    "shadowCascades", "shadowRange", "volumeSteps", "volumeJitter", "volumeDensityField",
+    "volumeColorField", "sky",
     "vortex"};
 constexpr std::string_view kSkyKeys[] = {
     "enabled", "background", "useKeyLight", "zenithColor", "horizonColor", "groundColor",
@@ -3538,6 +3539,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                                                       .softMin = 8,
                                                       .softMax = 96,
                                                       .label = "scene/volumeSteps"});
+    // ADR-461. The soft range is the whole of 0..1 because the whole of it is usable and the
+    // interesting end is the low one -- a slider whose useful region is in its first hair is the
+    // `scene/windSpeed` defect this project has already fixed once.
+    volumeJitter_ = &params.add(
+        floatDesc(prefix_ + "scene/volumeJitter", volumeSetting_.volumeJitter, 0.0f, 1.0f, 0.0f, 1.0f));
     {
         auto fogDesc = vec3Desc(prefix_ + "scene/fogColor", fogColorSet_ ? fogColorSetting_ : scene_.environment.backgroundColor,
                                 0.0f, 1.0f, 0.0f, 1.0f);
@@ -4451,6 +4457,7 @@ void Composition::detach() {
     volumeNoiseSpeed_ = nullptr;
     volumeEmission_ = nullptr;
     volumeSteps_ = nullptr;
+    volumeJitter_ = nullptr;
     keyLight_ = nullptr;
     gridIntensity_ = nullptr;
     rootScale_ = nullptr;
@@ -7008,6 +7015,7 @@ void Composition::applyParameters() {
         env.volumeNoiseSpeed = pick(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
         env.volumeEmission = pick(volumeEmission_, volumeSetting_.volumeEmission);
         env.volumeSteps = volumeSteps_ != nullptr ? volumeSteps_->value() : volumeSetting_.volumeSteps;
+        env.volumeJitter = pick(volumeJitter_, volumeSetting_.volumeJitter);
         env.shadowCascades = volumeSetting_.shadowCascades;
         env.shadowRange = pick(shadowRange_, volumeSetting_.shadowRange);
         env.volumeMaxDistance = volumeSetting_.volumeMaxDistance;
@@ -8015,6 +8023,7 @@ nlohmann::json Composition::toJson() const {
             environment["volumeNoiseSpeed"] = base(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
             environment["volumeEmission"] = base(volumeEmission_, volumeSetting_.volumeEmission);
             environment["volumeSteps"] = volumeSteps_ != nullptr ? volumeSteps_->base() : volumeSetting_.volumeSteps;
+            environment["volumeJitter"] = base(volumeJitter_, volumeSetting_.volumeJitter);
             environment["shadowCascades"] = volumeSetting_.shadowCascades;
             environment["volumeMaxDistance"] = volumeSetting_.volumeMaxDistance;
             if (!volumeDensityFieldSetting_.empty()) {
@@ -8978,6 +8987,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return fail("'volumeSteps' must be an integer");
                 }
                 v.volumeSteps = std::clamp(e["volumeSteps"].get<int>(), 4, 256);
+            }
+            if (e.contains("volumeJitter")) {
+                if (!e["volumeJitter"].is_number()) {
+                    return fail("'volumeJitter' must be a number");
+                }
+                v.volumeJitter = std::clamp(e["volumeJitter"].get<float>(), 0.0f, 1.0f);
             }
             auto densityField = readString(e, "volumeDensityField", comp->volumeDensityFieldSetting_);
             if (!densityField) {

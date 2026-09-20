@@ -316,6 +316,20 @@ struct Vortex {
     float smokeWarp = 0.0f;   // domain-warp amount; the one that does the work
     float smokeBillow = 0.0f; // 0 wispy fBM, 1 rounded billowing masses
     float detail = 0.2f;      // the fine octave's weight; was a hardcoded 0.2
+    // The macro structure (Vortex 2.0 §7-§11). The full account of why these exist is in
+    // `core/vortex.hpp` beside the maths; the short version is that before them this field's
+    // envelope was uniform in angle and monotone in radius, so every feature in the picture came
+    // out of the fBM stack above -- which is precisely the "procedural noise / stippled particles"
+    // the brief opens by rejecting. All default to off, so ADR-389's funnel is unchanged.
+    // §8/§9: the eye is `innerVoid` given a wall, not a second radius. `eyeWallWidth` replaces a
+    // hardcoded 0.22 and defaults to it, so nothing moves until somebody asks.
+    float eyeWallWidth = 0.22f;     // §9, fraction of the mouth radius the wall rises over
+    float eyeWallGain = 0.0f;       // §9, how much denser the wall's crest is than the body
+    float bandArms = 0.0f;          // §10, primary spiral arm count; 0 is off
+    float bandPitchDegrees = 18.0f; // §10, the spiral's pitch angle; rainbands run 10-25
+    float bandDepth = 0.0f;         // §10, band contrast
+    float bandHarmonic = 0.0f;      // §11, weight of the two finer nested scales
+    float cloudNoise = 1.0f;        // §53, weight of the whole fBM stack; 0 is the macro field
     float emission = 1.0f;        // emissive density PER METRE (ADR-374)
     float filaments = 0.9f;
     float spill = 2.5f;           // surface irradiance on what floats above it (ADR-379)

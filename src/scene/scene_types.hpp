@@ -589,6 +589,30 @@ struct Environment {
     float volumeNoiseSpeed = 0.1f;
     float volumeEmission = 0.0f;
     int volumeSteps = 32;                  // raymarch samples per pixel
+    // ADR-461: how much of a step each pixel's march start is randomised by, 0..1. 1 is a full
+    // uniform step and is what the pass has always done; 0 starts every pixel at the middle of its
+    // first step.
+    //
+    // It belongs HERE, beside the step count and not in `QualitySettings`, and the reason is
+    // ADR-035's rule: a tier may scale "sample counts, resolutions and history lengths" and this is
+    // none of those. It is a property of the medium the scene authors -- specifically of how much
+    // that medium varies across one step -- so the scene that chose the step count is the thing
+    // that knows the answer.
+    //
+    // Jitter exists to turn banding into noise, and it is worth it when the medium varies LITTLE
+    // over a step. The cosmic vortex is the opposite case: at 4000 m over 32 steps a step is 125
+    // metres and the funnel changes completely across one, so a full-step offset between
+    // neighbouring pixels is 125 metres of uncorrelated displacement and it reads as
+    // salt-and-pepper. Measured on the shipped hero frame, ADR-389's grain metric: **1.457 at 1.0,
+    // 1.357 at 0.5, 1.066 at 0.25, 0.436 at 0** -- monotone, and a 70% fall for nothing.
+    //
+    // The default stays at 1.0 so that no existing frame moves (ADR-371's lesson: do not ship a
+    // change the owner can see and did not ask for). Two controls say lowering it is safe where it
+    // helps: the Volumetric Lab's transmittance ladders -- flat slabs at right angles to the view,
+    // which is the case banding is worst in -- pass unchanged at 0, and Glowmere Valley 2's real
+    // fog at only 12 steps moves by a mean of **0.024 luminance levels** with 44 of 921600 pixels
+    // past two levels and no change in its row structure.
+    float volumeJitter = 1.0f;
     float volumeMaxDistance = 200.0f;
     // ADR-387: the cosmic vortex used to live here, as a singleton on the environment. It is an
     // authored `world::AtmosphericEffect` of kind `Vortex` now, for the reason the consolidation

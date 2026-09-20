@@ -37,7 +37,11 @@ constexpr std::string_view kProbeName = "conformance probe";
 // is why the `sizeof` assertion below is here: it does not name the new member, but it does stop
 // the frame growing silently past what this function reads.
 [[nodiscard]] bool frameDiffers(const AtmosphericFrame& a, const AtmosphericFrame& b) {
-    static_assert(sizeof(AtmosphericFrame) == 1612,
+    // 1612 -> 1640 when Vortex 2.0 added seven floats to `Vortex` (§7-§11's macro structure).
+    // Checked, which is what this assertion is for: the `memcmp` at the bottom covers the WHOLE of
+    // `Vortex`, so the new members are read with no edit here -- the assertion fired, the question
+    // was asked, and the answer was yes.
+    static_assert(sizeof(AtmosphericFrame) == 1640,
                   "AtmosphericFrame changed size: check that frameDiffers still reads all of it");
     if (a.cometCount != b.cometCount || a.auroraCount != b.auroraCount || a.hasVortex != b.hasVortex ||
         a.cometSteps != b.cometSteps) {

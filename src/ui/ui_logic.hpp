@@ -1315,17 +1315,39 @@ struct EffectRow {
         {"", "rotationSpeed", "Rotation", "%.3f rad/s"},
         {"", "swirl", "Swirl", ""},
         {"", "filaments", "Filaments", ""},
-        {"", "smokeWarp", "Smoke", "", false, false,
-         "Drags the fine detail into the big swirl instead of letting it sit on top as speckle.\n"
-         "The single control that decides whether this reads as smoke or as noise -- raise it\n"
-         "first, before reaching for anything else here."},
-        {"", "smokeBillow", "Billow", "", false, false,
-         "0 is wispy and filamentary; 1 is rounded, puffy masses with creases between them.\n"
-         "The difference between a nebula and a smoke column."},
-        {"", "detail", "Fine detail", "", false, false,
-         "Weight of the finest noise octave. Detail below what the volume march can sample is\n"
-         "faded out automatically, so raising this past the point where it stops changing the\n"
-         "picture means the march is the limit, not this."},
+        // Vortex 2.0 §7-§11, and its own section because it is a different KIND of control from
+        // the ones above: these shape the storm, the ones below texture it. The owner's rule is
+        // that if it is visible in the picture an artist must be able to find it, and `findable`
+        // is not `reachable in principle` -- so the eye and the bands get named rows in the order
+        // somebody would reach for them, not a row called "macro".
+        {"Cyclone structure", "innerVoid", "Eye radius", "", false, false,
+         "The clear centre of the storm, as a fraction of the mouth radius. This is the same\n"
+         "number the Advanced section used to call Inner void; it is here because with a wall\n"
+         "around it it is no longer a detail, it is the shape of the thing."},
+        {"", "eyeWallWidth", "Eye wall width", "", false, false,
+         "How far, as a fraction of the mouth radius, the density takes to climb out of the eye.\n"
+         "Narrow reads as a violent storm; wide reads as a slow one."},
+        {"", "eyeWallGain", "Eye wall", "", false, false,
+         "How much denser the ring around the eye is than the body of the storm. This is the\n"
+         "control that makes the silhouette read as a cyclone rather than as a hole in a cloud.\n"
+         "It raises the overall thickness of the medium as well, so check Thickness after it."},
+        {"", "bandArms", "Spiral arms", "%.0f", false, false,
+         "How many spiral bands wind out of the eye. 0 switches the bands off and leaves the\n"
+         "envelope smooth, which is what it was before. Two or three reads as a hurricane; more\n"
+         "reads as a galaxy."},
+        {"", "bandPitchDegrees", "Arm pitch", "%.0f deg", false, false,
+         "How tightly the arms wind: the angle an arm makes with the circle it crosses. Real\n"
+         "rainbands run 10 to 25 degrees. Small is tightly coiled, large is nearly radial."},
+        {"", "bandDepth", "Arm contrast", "", false, false,
+         "How much denser a band is than the gap beside it. The bands cost nothing to sample and\n"
+         "cannot alias, so this is the control to reach for before Filaments or Fine detail."},
+        {"", "bandHarmonic", "Arm detail", "", false, false,
+         "Adds two finer sets of arms inside the main ones, at a third and a ninth of the\n"
+         "contrast. Structure rather than noise: it survives freezing time and going monochrome."},
+        {"", "cloudNoise", "Cloud noise", "", false, false,
+         "The weight of the whole noise stack against a smooth medium. At 0 you see the cyclone's\n"
+         "structure alone -- eye, wall, arms, funnel -- with no detail on it at all. That render\n"
+         "is the test: if it is not already impressive at 0, no amount of detail will save it."},
         {"", "spill", "Light spill", "", false, false,
          "How much of the funnel's own light lands on the surfaces above it. Separate from\n"
          "Brightness so it can be tuned against the island without changing the funnel."},
@@ -1348,7 +1370,6 @@ struct EffectRow {
         {"Shape", "thickness", "Wall thickness", "%.0f m", true},
         {"", "throat", "Throat", "%.2f of mouth"},
         {"", "throatDensity", "Throat thickness", ""},
-        {"", "innerVoid", "Inner void", ""},
         {"", "contrast", "Contrast", ""},
         {"Motion", "turbulence", "Turbulence", ""},
         {"", "turbulenceScale", "Turbulence scale", ""},

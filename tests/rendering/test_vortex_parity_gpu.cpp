@@ -337,6 +337,24 @@ vortex::VortexField smoky() {
     return f;
 }
 
+// Vortex 2.0 §7-§11: the smoky funnel with the macro structure switched on -- an eye, a wall and
+// three nested sets of spiral arms. For the same reason `smoky()` exists one function up, and it is
+// the same reason ADR-401 was written: a parity test that only covers the configuration that ships
+// goes red the first time somebody turns a new thing on, and a per-field reachability probe cannot
+// see a field whose effect is gated behind another field that is off. `bandPitchDegrees`,
+// `bandDepth` and `bandHarmonic` all move nothing at `bandArms` 0.
+vortex::VortexField cyclonic() {
+    vortex::VortexField f = smoky();
+    f.eyeWallWidth = 0.14f;
+    f.eyeWallGain = 1.6f;
+    f.bandArms = 3.0f;
+    f.bandPitchDegrees = 16.0f;
+    f.bandDepth = 0.6f;
+    f.bandHarmonic = 0.5f;
+    f.cloudNoise = 0.8f;
+    return f;
+}
+
 // A spread that lands INSIDE the wall, densely, which `positions()` deliberately does not: that one
 // covers every branch including the four early-outs, so most of it sits where the answer is zero.
 // Zero agrees with zero for reasons that have nothing to do with the noise or the curve, so a probe
@@ -421,7 +439,10 @@ TEST_CASE("every number the vortex uniform carries reaches the shader", "[gpu][v
     const std::vector<glm::vec3> pts = wallPositions();
     constexpr float kT = 6.0f;
 
-    const vortex::VortexField base = smoky();
+    // The macro structure on, or three of the twenty-two knobs below would be gated off and the
+    // loop would pass while proving nothing about them -- which is ADR-401's defect in its other
+    // form: not a field that fails to reach the shader, but a probe that cannot see whether it did.
+    const vortex::VortexField base = cyclonic();
     const std::vector<Gpu> reference = harness.run(vortex::packVortex(base), kT, pts);
 
     struct Knob {
@@ -448,6 +469,15 @@ TEST_CASE("every number the vortex uniform carries reaches the shader", "[gpu][v
         {"smokeWarp", &vortex::VortexField::smokeWarp, 0.9f},
         {"smokeBillow", &vortex::VortexField::smokeBillow, 0.15f},
         {"detail", &vortex::VortexField::detail, 0.05f},
+        // Vortex 2.0 §7-§11, carried in `v7` and `v8`. These are here on the day they are added and
+        // not on the day something breaks, which is the whole of ADR-401's recommendation.
+        {"eyeWallWidth", &vortex::VortexField::eyeWallWidth, 0.05f},
+        {"eyeWallGain", &vortex::VortexField::eyeWallGain, 3.4f},
+        {"bandArms", &vortex::VortexField::bandArms, 6.0f},
+        {"bandPitchDegrees", &vortex::VortexField::bandPitchDegrees, 45.0f},
+        {"bandDepth", &vortex::VortexField::bandDepth, 0.15f},
+        {"bandHarmonic", &vortex::VortexField::bandHarmonic, 0.05f},
+        {"cloudNoise", &vortex::VortexField::cloudNoise, 0.2f},
     };
 
     for (const Knob& k : knobs) {

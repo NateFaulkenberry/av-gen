@@ -28,6 +28,8 @@
 //   v2  x = innerVoid, y = contrast, z = turbulence, w = turbulenceScale
 //   v3  x = breathAmount, y = breathSpeed, z/w = appearance, unused here
 //   v4  x = funnelDepth, y = throat, z = throatDensity, w = 0
+//   v7  x = eyeWallWidth, y = eyeWallGain, z = cloudNoise, w = 0          (§9/§53)
+//   v8  x = bandArms, y = cot(bandPitch), z = bandDepth, w = bandHarmonic  (§10/§11)
 
 struct VortexUniformsWgsl {
     v0: vec4<f32>,
@@ -36,6 +38,8 @@ struct VortexUniformsWgsl {
     v3: vec4<f32>,
     v4: vec4<f32>,
     v6: vec4<f32>, // ADR-389: smokeWarp, smokeBillow, detail, 0
+    v7: vec4<f32>, // §9/§53: eyeWallWidth, eyeWallGain, cloudNoise, 0
+    v8: vec4<f32>, // §10/§11: bandArms, band cotangent, bandDepth, bandHarmonic
 };
 
 // ADR-389. An octave whose world period falls below twice the distance between march samples
@@ -56,6 +60,80 @@ fn vortexOctaveWeight(periodMetres: f32, filterWidth: f32) -> f32 {
         return 1.0;
     }
     return smoothstep(0.0, 1.0, periodMetres / (2.0 * filterWidth));
+}
+
+// ---- the macro structure (Vortex 2.0 §7-§11) ------------------------------------------------
+//
+// The transliteration of `radialProfile` and `spiralBands` in core/vortex.cpp, in the same order
+// and the same expressions, for the same reason every other function in this file is.
+//
+// Why it exists at all, because it is the finding the whole rebuild turns on: BEFORE this, the
+// envelope was `voidMask * rim * vert` -- monotone in radius, completely UNIFORM IN ANGLE, smooth
+// in height. It had no structure in it. Everything anybody has ever seen in this effect came out
+// of the three fBMs below, which is why the owner reads it as noise: structurally, it is noise on
+// a smooth cone. That is also why ADR-389's strict Nyquist clamp came back a flat teal wash --
+// there was nothing underneath the noise for the clamp to leave behind.
+//
+// Everything here is analytic. No noise, a handful of ALU, band-limited by construction, so it
+// survives the march's 125-metre sample spacing intact and it does not move the cost.
+
+// §8/§9. The radial profile: a clear eye, a wall standing around it, the body falling to the rim.
+fn vortexRadialProfile(v: VortexUniformsWgsl, rr: f32) -> f32 {
+    let rim = 1.0 - smoothstep(0.72, 1.3, rr);
+    // The eye. `innerVoid` IS its radius -- a second radius control would have left whichever of
+    // the two was not in charge as a slider that silently does nothing, which the parity test's
+    // per-field reachability probe caught on the first attempt. `eyeWallWidth` is the 0.22
+    // ADR-374 hardcoded, now authored, and at 0.22 with gain 0 this is ADR-374's profile exactly.
+    let eyeR = clamp(v.v2.x, 0.0, 0.95);
+    let wallW = max(v.v7.x, 1e-3);
+    // A hole, so its boundary is a RISE and not a fade. Smoothstep, not a step: ADR-369's rule is
+    // that there must be no edge anywhere for a hard line to live on.
+    let eye = smoothstep(eyeR, eyeR + wallW, rr);
+    // §9: the wall -- a ring of extra density whose crest sits just outside the eye. This is what
+    // makes the silhouette read as a hurricane rather than as a hole in a cloud.
+    let crest = eyeR + wallW;
+    let d = (rr - crest) / max(wallW * 1.5, 1e-3);
+    let ring = exp(-d * d);
+    return eye * rim * (1.0 + max(v.v7.y, 0.0) * ring);
+}
+
+// §10/§11. Logarithmic spiral bands at three nested scales.
+//
+// r = a e^{b theta}, so `theta - ln(r) / b` is constant along an arm: that expression IS the band
+// coordinate and the rest is shaping. `b` arrives as the cotangent of the pitch angle, packed on
+// the CPU so no trigonometry is needed to recover it.
+//
+// Returns a MULTIPLIER whose mean over angle is exactly 1 at any depth. ADR-389's family rule:
+// `density` and `emission` are per-metre coefficients calibrated against this field's mean, and a
+// band term with mean 0.5 would silently halve the medium under them.
+fn vortexSpiralBands(v: VortexUniformsWgsl, rr: f32, angle: f32, t: f32) -> f32 {
+    let arms = v.v8.x;
+    if (arms < 0.5) {
+        return 1.0;
+    }
+    let depth = clamp(v.v8.z, 0.0, 1.0);
+    let harmonic = clamp(v.v8.w, 0.0, 1.0);
+    // Clamped away from the axis: ln(rr) diverges there and the eye has removed that region from
+    // the picture anyway. Without it the bands wind infinitely fast at the centre and alias
+    // however many steps the march takes -- ADR-389's own mistake, repeated in a new place.
+    let rClamped = max(rr, 0.06);
+    let arm = angle - log(rClamped) * v.v8.y;
+    // The arms turn with the structure, on the same `rotationSpeed` the noise uses, so the bands
+    // and the filaments cannot drift apart into two storms.
+    let spin = t * v.v1.z;
+    var band = cos(arms * (arm - spin));
+    // §11's nested scales: 3x and 7x the arm count at a third and a ninth of the depth. A
+    // structural hierarchy, not an octave sum -- summing equal-weight sinusoids is how noise is
+    // built, and noise is the thing §0 forbids.
+    if (harmonic > 0.0) {
+        band = band + harmonic * (cos(arms * 3.0 * (arm - spin * 1.3)) / 3.0 +
+                                  cos(arms * 7.0 * (arm - spin * 1.7)) / 9.0);
+    }
+    // Bands wash out at the eye wall, where the flow is a solid ring, and at the outer edge where
+    // the storm frays. Applied to the DEPTH rather than to the density, so the mean stays 1.
+    let reach = smoothstep(0.0, 0.22, rr - clamp(v.v2.x, 0.0, 0.95)) *
+                (1.0 - smoothstep(0.85, 1.25, rr));
+    return 1.0 + depth * reach * band;
 }
 
 // The shape and the intermediates a velocity needs, in one evaluation so the two entry points
@@ -119,15 +197,18 @@ fn vortexEvaluate(v: VortexUniformsWgsl, p: vec3<f32>, t: f32, filterWidth: f32)
     // the places where the answer is already zero, and they were paying full price for it.
     // Every factor here is smooth, so the early-out fires only where the result was already
     // negligible and introduces no edge (ADR-369).
-    let voidMask = smoothstep(v.v2.x, v.v2.x + 0.22, rr);
-    let rim = 1.0 - smoothstep(0.72, 1.3, rr);
-    let envelope = voidMask * rim * vert;
+    //
+    // §7-§11: the macro structure lives HERE, in the envelope, above the early-out and below any
+    // noise. That ordering is the brief's hierarchy written as control flow -- macro cyclone
+    // structure, then density, then detail -- and it is what makes §52-§56's failure tests
+    // passable: turn every noise term off and the eye, the wall, the bands and the funnel remain.
+    let angle = atan2(s.rel.z, s.rel.x);
+    let envelope = vortexRadialProfile(v, rr) * vortexSpiralBands(v, rr, angle, t) * vert;
     if (envelope < 1.0e-6) {
         return s;
     }
     s.envelope = envelope;
     s.inside = true;
-    let angle = atan2(s.rel.z, s.rel.x);
     // The shear. Angle advanced by radius makes a spiral; advanced by time makes it turn.
     let warped = angle + rr * v.v1.y + t * v.v1.z;
     // Back to a cartesian sample point, so the noise is sampled in a frame that winds with the
@@ -215,7 +296,14 @@ fn vortexEvaluate(v: VortexUniformsWgsl, p: vec3<f32>, t: f32, filterWidth: f32)
     let half = 0.5 / contrast;
     let curve = smoothstep(0.5 - half, 0.5 + half, clamp(n, 0.0, 1.0));
     let shaped = curve * (2.0 / (contrast + 1.0));
-    s.density = shaped * envelope;
+    // §53, and §5's diagnostic: `cloudNoise` is the weight of the whole fBM stack against a FLAT
+    // field of the same mean. At 0 the density is the macro envelope alone, which is the render
+    // the owner asks to be shown before any detail is added; at 1 it is ADR-389's field exactly.
+    // Blended toward the noise's own mean rather than toward 1, so turning the detail down does
+    // not brighten the medium -- the ADR-389 family again, and why this is a mix and not a scale.
+    let flatLevel = 0.5 * (2.0 / (contrast + 1.0));
+    let cloudNoise = clamp(v.v7.z, 0.0, 1.0);
+    s.density = mix(flatLevel, shaped, cloudNoise) * envelope;
     return s;
 }
 
