@@ -3,6 +3,7 @@
 #include "gpu/context.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <vector>
@@ -11,10 +12,42 @@ namespace avgen::gpu {
 
 namespace {
 
-float srgbToLinear(std::uint8_t v) {
+float srgbToLinearExact(std::uint8_t v) {
     const float c = static_cast<float>(v) / 255.0f;
     return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
 }
+
+// ---- the mip chain's `std::pow` bill (the interactive-performance pass, §4/§29) ------------------
+//
+// Opening `examples/world/glowmere-valley-2-multicam.json` spends **2.1 seconds uploading 58
+// textures** -- 37 ms each -- out of a 3.2 second project load. That is the single largest
+// component of the load waterfall and it is not the GPU: `uploadTexture` builds the whole mip
+// chain on the CPU, one level at a time, and a box filter over an sRGB image decodes every source
+// texel and re-encodes every destination texel. On a 512x512 image that is about 1.3 million
+// `std::pow` calls per texture.
+//
+// The decode side of that is free, and exactly free. Its input is a `std::uint8_t`, so there are
+// **256 possible answers**, and a table of them is not an approximation of `srgbToLinearExact` --
+// it is its complete output. Three quarters of the calls disappear and not one bit of any mip
+// level changes. `tests/rendering/test_texture_upload.cpp` asserts the equality for all 256 inputs, which is the
+// only thing that could go wrong here and is checkable exhaustively.
+//
+// The encode side keeps its `std::pow`. Its input is a float with no small domain to tabulate, and
+// an interpolated table there *would* be an approximation -- a different mip chain for a saving a
+// quarter the size. §50: an optimisation that changes the image has to be argued for, and this one
+// does not need to be.
+const std::array<float, 256>& srgbToLinearTable() {
+    static const std::array<float, 256> table = [] {
+        std::array<float, 256> t{};
+        for (std::size_t i = 0; i < t.size(); ++i) {
+            t[i] = srgbToLinearExact(static_cast<std::uint8_t>(i));
+        }
+        return t;
+    }();
+    return table;
+}
+
+inline float srgbToLinear(std::uint8_t v) { return srgbToLinearTable()[v]; }
 
 std::uint8_t linearToSrgb(float c) {
     c = std::clamp(c, 0.0f, 1.0f);
@@ -93,6 +126,8 @@ void writeLevel(Context& context, const wgpu::Texture& texture, std::uint32_t le
 }
 
 } // namespace
+
+float srgbToLinear8(std::uint8_t value) { return srgbToLinear(value); }
 
 std::uint32_t mipLevelCount(std::uint32_t width, std::uint32_t height) {
     std::uint32_t levels = 1;

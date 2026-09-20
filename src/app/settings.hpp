@@ -51,6 +51,23 @@ struct AppSettings {
     // (ADR-084). It lives here because it is a property of this machine and this display, not of
     // the project: the same project on a laptop and on a workstation wants different answers.
     float canvasRenderScale = 1.0f;
+    // §15-§17. Whether the editor is allowed to lower the *scene's* resolution on its own when the
+    // GPU cannot hold the budget, filtering the result back up into the canvas the person asked
+    // for (`app::InteractiveResolution`). On by default, which needs the justification it gets in
+    // that header: at rung 0 it changes nothing at all, and it only leaves rung 0 on a frame that
+    // would otherwise be missing the budget by a factor of two or more. It lives here rather than
+    // in the project for `canvasRenderScale`'s reason -- it is a property of this machine and this
+    // display, and opening somebody else's project must not change how you are watching yours.
+    //
+    // The two are separate levers on purpose. `canvasRenderScale` is a manual reduction of the
+    // *canvas target*, which the person chooses and the application never overrides; this one moves
+    // `QualitySettings::renderScale`, the renderer's own scene-below-output scale, and the two
+    // compose rather than fight.
+    bool adaptiveCanvasScale = true;
+    // The GPU frame time the controller aims at, in milliseconds. One frame at 60 Hz (§3's
+    // playhead budget). Nothing below about 8 ms is reachable on the content this was measured on,
+    // because the frame has a ~4.6 ms floor that no resolution can touch.
+    double adaptiveCanvasBudgetMs = 16.67;
     AppearanceTheme appearance = AppearanceTheme::System;
     // ADR-320/ADR-225: the Render panel shows the frames a render is writing. Off by default --
     // it is an instrument, and an instrument is never the reason a deliverable costs more -- but a
