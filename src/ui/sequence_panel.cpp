@@ -3960,6 +3960,36 @@ void SequencePanel::drawAudioClips(app::Engine& engine) {
         ImGui::TextDisabled("mixed to %.1f s at %u Hz in %.0f ms", mix.durationSeconds, mix.sampleRate,
                             mix.millis);
     }
+
+    // Embedded Tempo diagnostics (ADR-394). The transport bar shows the tempo and a one-word
+    // origin; the format and field belong here, with the rest of what the imported audio turned
+    // out to be, rather than on a bar an artist reads at a glance.
+    if (const audio::AudioTempo& embedded = engine.embeddedTempo(); embedded.available) {
+        ImGui::TextDisabled("BPM %.2f / Source: %s / Format: %s / Field: %s", embedded.bpm,
+                            std::string(audio::tempoProvenanceName(embedded.source)).c_str(),
+                            embedded.metadataFormat.c_str(), embedded.metadataKey.c_str());
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "Read from the file's own metadata at import -- not estimated from the audio,\n"
+                "and never guessed from the filename.\n\n"
+                "It gives seconds per beat (%.4f s). It does not give beat phase, the downbeat,\n"
+                "bars, a time signature, swing or any tempo change: those come from analysis.\n\n"
+                "%s",
+                embedded.secondsPerBeat(),
+                embedded.integerSemantics
+                    ? "This format stores BPM as an integer; a fractional value written into it is kept as written."
+                    : "This format stores BPM as free text, so a fractional value is native to it.");
+        }
+    } else if (!engine.audioClips().empty()) {
+        // Said, rather than left blank: "no tempo in the file" and "we did not look" are different
+        // facts, and only one of them is true.
+        ImGui::TextDisabled("No embedded tempo in the imported audio.");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("The container carries no BPM field. WAV, AIFF, FLAC and MP3 are read\n"
+                              "for one; MP4/M4A and Ogg/Opus are not, because this build cannot\n"
+                              "decode them either (ADR-394).");
+        }
+    }
     ImGui::Separator();
 
     ImGui::SetNextItemWidth(-90.0f);
