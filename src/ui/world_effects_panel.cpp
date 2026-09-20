@@ -491,6 +491,61 @@ const char* const kGroundGlowNames[] = {"off", "subtle", "strong"};
 // ADR-387: walks a declared row list. The panel and `tests/unit/test_world_effects_panel.cpp` ask
 // the same question of the same data, which is the thing ADR-382's defect was missing -- there, the
 // path arithmetic lived inside the draw call and no test could reach it.
+// ADR-500. The atmospheric family's rows are its schema's. This draws one page of them.
+//
+// The row table and the registration are now the SAME list, which is what closes ADR-392's
+// headline defect: a panel row naming a parameter nobody registered drew an empty box,
+// indistinguishable from "this scene has no such effect", and the owner reported that class of
+// defect twice. There is no longer a second list to be five characters wrong in.
+void drawSchemaRows(app::Engine& engine, const std::string& prefix, const world::EffectSchema& schema,
+                    world::FieldPage page) {
+    for (const world::EffectField& field : schema.fields) {
+        if (field.page != page) {
+            continue;
+        }
+        if (field.section[0] != '\0') {
+            ImGui::SeparatorText(field.section);
+        }
+        switch (field.type) {
+        case world::FieldType::Color:
+            paramColor(engine, prefix, field.leaf, field.label);
+            break;
+        case world::FieldType::Bool:
+            paramCheckbox(engine, prefix, field.leaf, field.label);
+            break;
+        case world::FieldType::Float:
+            paramSlider(engine, prefix, field.leaf, field.label,
+                        field.format[0] != '\0' ? field.format : "%.2f", field.logarithmic);
+            break;
+        }
+        if (field.tip[0] != '\0' && ImGui::IsItemHovered()) {
+            tooltipUnformatted(field.tip);
+        }
+    }
+}
+
+// The shared rows -- ground illumination and the field subscription -- drawn by leaf name from
+// `sharedEffectFields()` so that the panel and the registrar name them once between them.
+void drawSharedRow(app::Engine& engine, const std::string& prefix, const char* leaf) {
+    for (const world::EffectField& field : world::sharedEffectFields()) {
+        if (std::string_view(field.leaf) != leaf) {
+            continue;
+        }
+        switch (field.type) {
+        case world::FieldType::Color: paramColor(engine, prefix, field.leaf, field.label); break;
+        case world::FieldType::Bool: paramCheckbox(engine, prefix, field.leaf, field.label); break;
+        case world::FieldType::Float:
+            paramSlider(engine, prefix, field.leaf, field.label,
+                        field.format[0] != '\0' ? field.format : "%.2f", field.logarithmic);
+            break;
+        }
+        if (field.tip[0] != '\0' && ImGui::IsItemHovered()) {
+            tooltipUnformatted(field.tip);
+        }
+        return;
+    }
+}
+
 void drawEffectRows(app::Engine& engine, const std::string& prefix, std::span<const EffectRow> rows) {
     for (const EffectRow& r : rows) {
         if (!r.section.empty()) {
@@ -608,30 +663,26 @@ void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
         engine.addDefaultAtmosphericRoutes(name);
     };
 
-    if (ImGui::Button("Add comet")) {
-        append(world::bioluminescentComet(unique("Bioluminescent Comet")));
-    }
-    if (ImGui::IsItemHovered()) {
-        tooltip("A celestial object on a great-circle arc across the sky.\n"
-                          "It arrives as an event with an authored window, so it launches once;\n"
-                          "give it a repeat interval to make it a shower.");
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Add aurora")) {
-        append(world::glowmereAurora(unique("Aurora")));
-    }
-    if (ImGui::IsItemHovered()) {
-        tooltip("Curtains rising from the horizon, shaped by the audio spectrum.\n"
-                          "Always on and fading up: an aurora is scenery that breathes.");
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Add vortex")) {
-        append(world::cosmicVortex(unique("Cosmic Vortex")));
-    }
-    if (ImGui::IsItemHovered()) {
-        tooltip("A turning funnel of luminous medium, drawn inside the volumetric march.\n"
-                          "It is placed in the world rather than on the sky dome, and it is the\n"
-                          "only atmospheric that a particle system can name as its attractor.");
+    // ADR-500: one button per declared kind, from the registry. Adding a kind used to mean adding
+    // a button, a tooltip and a factory call here; it now means nothing here at all, which is the
+    // difference between "seventy effects" being a list of edits and being a list of files.
+    {
+        bool first = true;
+        for (const world::EffectSchema* schema : world::effectSchemas()) {
+            if (schema->factory == nullptr) {
+                continue;
+            }
+            if (!first) {
+                ImGui::SameLine();
+            }
+            first = false;
+            if (ImGui::Button(schema->addLabel)) {
+                append(world::makeAtmosphericEffect(schema->kind, unique(schema->displayName)));
+            }
+            if (schema->addTip[0] != '\0' && ImGui::IsItemHovered()) {
+                tooltipUnformatted(schema->addTip);
+            }
+        }
     }
 
     if (authored.empty()) {
@@ -659,8 +710,7 @@ void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
 void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::AtmosphericEffect& authored,
                                         std::size_t index) {
     const std::string prefix = world::atmosphericParameterPrefix(authored.name);
-    const bool isComet = authored.kind == world::AtmosphereKind::Comet;
-    const bool isVortex = authored.kind == world::AtmosphereKind::Vortex;
+    const world::EffectSchema* schema = world::effectSchema(authored.kind);
     const bool open = ImGui::CollapsingHeader(authored.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen |
                                                                         ImGuiTreeNodeFlags_AllowOverlap);
     ImGui::SameLine(ImGui::GetContentRegionAvail().x - 74.0f);
@@ -674,10 +724,18 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
     }
     ImGui::Indent();
 
+    // A kind the registry does not declare. Said out loud, in the place an artist is looking, rather
+    // than drawn as an empty section -- ADR-392's defect was precisely a section that looked like an
+    // effect with nothing in it. `checkRegistry` has already named it in the suite.
+    if (schema == nullptr) {
+        ImGui::TextColored(kWarning, "This effect's kind is not registered, so nothing can be "
+                                     "changed here and nothing renders it.");
+        ImGui::Unindent();
+        return;
+    }
+
     // ---- preset ----
-    const auto styles = isComet    ? world::cometStyleNames()
-                        : isVortex ? world::vortexStyleNames()
-                                   : world::auroraStyleNames();
+    const std::span<const std::string_view> styles = world::effectStyleNames(authored.kind);
     std::vector<const char*> styleNames;
     int current = -1;
     for (std::size_t s = 0; s < styles.size(); ++s) {
@@ -686,55 +744,35 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
             current = static_cast<int>(s);
         }
     }
-    rowLabel("Preset");
-    if (ImGui::Combo("##preset", &current, styleNames.data(), static_cast<int>(styleNames.size())) &&
-        current >= 0) {
-        // A preset is a shortcut through the same parameters, never a second way to control the
-        // effect: it rewrites the authored values and the parameters take their defaults from those.
-        const std::string_view style = styles[static_cast<std::size_t>(current)];
-        commitAtmospheric(engine, index, [isComet, isVortex, style](world::AtmosphericEffect& e) {
-            if (isComet) {
-                world::applyCometStyle(e, style);
-            } else if (isVortex) {
-                world::applyVortexStyle(e, style);
-            } else {
-                world::applyAuroraStyle(e, style);
-            }
-        });
-        ImGui::Unindent();
-        return; // the parameters below have just been re-registered; draw them next frame
+    if (!styleNames.empty()) {
+        rowLabel("Preset");
+        if (ImGui::Combo("##preset", &current, styleNames.data(), static_cast<int>(styleNames.size())) &&
+            current >= 0) {
+            // A preset is a shortcut through the same parameters, never a second way to control the
+            // effect: it rewrites the authored values and the parameters take their defaults from
+            // those.
+            const std::string_view style = styles[static_cast<std::size_t>(current)];
+            const world::AtmosphereKind kind = authored.kind;
+            commitAtmospheric(engine, index, [kind, style](world::AtmosphericEffect& e) {
+                world::applyEffectStyle(e, kind, style);
+            });
+            ImGui::Unindent();
+            return; // the parameters below have just been re-registered; draw them next frame
+        }
     }
 
-    if (isVortex) {
-        // ADR-387. `density` is extinction and `emission` is light -- ADR-374 is the whole reason
-        // they are two knobs, so they are labelled as two different things rather than as
-        // "opacity" and "glow", which is how they got confused in the first place. The rows are
-        // `ui::vortexRows()` rather than a page of calls, so that a test can ask the same question
-        // this code asks: does every leaf named here exist?
-        // Each row carries its own tooltip (ADR-388); the panel used to attach one to whatever it
-        // had drawn last, which meant appending a row moved somebody else's explanation.
-        drawEffectRows(engine, prefix, vortexRows());
-    } else if (isComet) {
-        // ADR-392: rows rather than a page of calls, for the reason the vortex's are --
-        // `conformance::checkLeavesExist` can walk a table and cannot walk an ImGui call. The two
-        // checkboxes stay here: they are `enabled`-shaped bools rather than value rows.
-        drawEffectRows(engine, prefix, cometRows());
-        paramCheckbox(engine, prefix, "sparkle", "Sparkling fragments");
-        paramCheckbox(engine, prefix, "rainbow", "Rainbow");
-    } else {
-        drawEffectRows(engine, prefix, auroraRows());
-        paramCheckbox(engine, prefix, "rainbow", "Colour cycle");
-    }
+    drawSchemaRows(engine, prefix, *schema, world::FieldPage::Main);
 
     // ---- ground illumination (section 6) ----
     // The mode is a structural choice rather than a parameter: automating "should this light the
     // valley" is not a thing anybody wants, while automating *how much* is -- so the three words are
     // a combo and the intensity below is an ordinary modulatable parameter.
-    // ADR-387: not offered for a vortex. The ground glow is a pool on terrain, and the vortex is
-    // under the island with no terrain beneath it; its light on the world is `spill`, above. A combo
-    // that changed nothing would be worse than no combo.
+    //
+    // Offered only by the kinds that declare one. ADR-387: a vortex does not, because the glow is a
+    // pool on terrain and the funnel is under the island with no terrain beneath it; its light on
+    // the world is `spill`. A combo that changed nothing would be worse than no combo.
     int ground = static_cast<int>(authored.ground.mode);
-    if (!isVortex) {
+    if (schema->groundGlow) {
         rowLabel("Ground glow");
         if (ImGui::Combo("##ground", &ground, kGroundGlowNames, 3)) {
             commitAtmospheric(engine, index, [ground](world::AtmosphericEffect& e) {
@@ -743,21 +781,18 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
             ImGui::Unindent();
             return;
         }
-    }
-    if (!isVortex && authored.ground.mode != world::GroundGlow::Off) {
-        paramColor(engine, prefix, "groundColor", "Glow colour");
-        paramSlider(engine, prefix, "groundIntensity", "Glow amount");
+        if (authored.ground.mode != world::GroundGlow::Off) {
+            drawSharedRow(engine, prefix, "groundColor");
+            drawSharedRow(engine, prefix, "groundIntensity");
+        }
     }
 
     // ---- beat response ----
     // The same construction the propagation section uses, and for the same reason: this writes an
     // ordinary modulation route, visible and editable in the Modulation panel, rather than a hidden
     // audio hook inside the effect.
-    {
-        const char* leaf = isComet    ? "coreIntensity"
-                           : isVortex ? "emission"
-                                      : "edgeBrightness";
-        params::IParameter* target = find(engine, prefix, leaf);
+    if (schema->beatLeaf[0] != '\0') {
+        params::IParameter* target = find(engine, prefix, schema->beatLeaf);
         const std::string path = atmosphericBeatTarget(authored.name, authored.kind);
         params::Modulator& modulator = engine.modulator();
         params::ModRoute* route = findRoute(modulator, beatResponseSource(), path);
@@ -799,8 +834,10 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
                                                 const world::AtmosphericEffect& authored,
                                                 std::size_t index) {
     const std::string prefix = world::atmosphericParameterPrefix(authored.name);
-    const bool isComet = authored.kind == world::AtmosphereKind::Comet;
-    const bool isVortex = authored.kind == world::AtmosphereKind::Vortex;
+    const world::EffectSchema* schema = world::effectSchema(authored.kind);
+    if (schema == nullptr) {
+        return;
+    }
 
     // ---- §68: which field this effect follows ----
     //
@@ -809,8 +846,8 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
     // could only be typed into a scene file would be exactly the sixteen-parameter travelling band
     // of light ADR-375 was written about. So: a combo of the names this scene actually publishes --
     // never a text box, because a typo in a text box and a field nobody has made yet look the same
-    // -- and the one slider, from the row table above so that a test computes its path the way this
-    // does (ADR-382).
+    // -- and the one slider, from the shared rows so that the panel and the registrar name it once
+    // between them (ADR-382).
     {
         ImGui::SeparatorText("Field");
         const world::fields::FieldBus& bus = engine.fieldBus();
@@ -864,7 +901,7 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
             ImGui::TextColored(kMuted, "'%s' is not published by this scene -- nothing follows it.",
                                authored.flow.field.c_str());
         }
-        drawEffectRows(engine, prefix, atmosphericFlowRows());
+        drawSharedRow(engine, prefix, "flowInfluence");
     }
 
     ImGui::SeparatorText("Lifetime");
@@ -877,58 +914,42 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
         return;
     }
     if (authored.activation == world::Activation::Window) {
-        paramSlider(engine, prefix, "windowStart", "Window start", "%.2f s");
-        paramSlider(engine, prefix, "windowSeconds", "Window length", "%.2f s");
+        drawSharedRow(engine, prefix, "windowStart");
+        drawSharedRow(engine, prefix, "windowSeconds");
     }
-    paramSlider(engine, prefix, "delay", "Delay", "%.2f s");
-    paramSlider(engine, prefix, "fadeIn", "Fade in", "%.2f s");
-    paramSlider(engine, prefix, "fadeOut", "Fade out", "%.2f s");
-    paramSlider(engine, prefix, "lifetime", "Lifetime", "%.2f s");
-    paramSlider(engine, prefix, "repeat", "Repeat every", "%.2f s");
+    drawSharedRow(engine, prefix, "delay");
+    drawSharedRow(engine, prefix, "fadeIn");
+    drawSharedRow(engine, prefix, "fadeOut");
+    drawSharedRow(engine, prefix, "lifetime");
+    drawSharedRow(engine, prefix, "repeat");
 
-    if (isVortex) {
-        drawEffectRows(engine, prefix, vortexAdvancedRows());
-    } else if (isComet) {
-        ImGui::SeparatorText("Trajectory");
-        int anchor = static_cast<int>(authored.comet.path.anchor);
+    // The anchor combo, for the kinds that have one. It stays inline rather than being a row
+    // because it writes a `SkyAnchor` enum on the effect rather than a parameter -- putting it in
+    // the row table would put a leaf there that registration does not produce, which is the
+    // opposite of the point (ADR-392).
+    if (schema->anchorSection != nullptr && schema->getAnchor != nullptr) {
+        ImGui::SeparatorText(schema->anchorSection);
+        int anchor = static_cast<int>(schema->getAnchor(authored));
         rowLabel("Anchored to");
         if (ImGui::Combo("##anchor", &anchor, kSkyAnchorNames, 2)) {
-            commitAtmospheric(engine, index, [anchor](world::AtmosphericEffect& e) {
-                e.comet.path.anchor = static_cast<world::SkyAnchor>(std::clamp(anchor, 0, 1));
+            const world::EffectSchema* captured = schema;
+            commitAtmospheric(engine, index, [anchor, captured](world::AtmosphericEffect& e) {
+                captured->setAnchor(e, static_cast<world::SkyAnchor>(std::clamp(anchor, 0, 1)));
             });
             return;
         }
         if (ImGui::IsItemHovered()) {
-            tooltip("A world anchor gives the comet real parallax: it slides against the\n"
-                              "stars as the camera travels, and it can leave frame. A camera anchor\n"
-                              "keeps its bearing however far the camera goes.");
+            tooltip("A world anchor gives real parallax: the effect slides against the stars\n"
+                    "as the camera travels, and it can leave frame. A camera anchor keeps its\n"
+                    "bearing however far the camera goes.");
         }
-        drawEffectRows(engine, prefix, cometAdvancedRows());
-    } else {
-        ImGui::SeparatorText("Shape");
-        int anchor = static_cast<int>(authored.aurora.shape.anchor);
-        rowLabel("Anchored to");
-        if (ImGui::Combo("##anchor", &anchor, kSkyAnchorNames, 2)) {
-            commitAtmospheric(engine, index, [anchor](world::AtmosphericEffect& e) {
-                e.aurora.shape.anchor = static_cast<world::SkyAnchor>(std::clamp(anchor, 0, 1));
-            });
-            return;
-        }
-        drawEffectRows(engine, prefix, auroraAdvancedRows());
     }
 
-    // The rainbow and the ground pool belong to the two sky kinds; a vortex registers neither, and
-    // the rows would silently draw nothing (ADR-375's lesson, the other way round).
-    if (isVortex) {
-        ImGui::TextColored(kMuted, "Every control here is the parameter atmos/%s/...",
-                           authored.name.c_str());
-        return;
-    }
+    drawSchemaRows(engine, prefix, *schema, world::FieldPage::Advanced);
 
-    drawEffectRows(engine, prefix, skyRainbowRows());
-
-    if (authored.ground.mode != world::GroundGlow::Off) {
-        drawEffectRows(engine, prefix, skyGroundRows());
+    if (schema->groundGlow && authored.ground.mode != world::GroundGlow::Off) {
+        drawSharedRow(engine, prefix, "groundRadius");
+        drawSharedRow(engine, prefix, "groundFalloff");
     }
 
     ImGui::TextColored(kMuted, "Every control here is the parameter atmos/%s/...", authored.name.c_str());

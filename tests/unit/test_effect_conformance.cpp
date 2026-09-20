@@ -11,10 +11,10 @@
 // capable of failing (ADR-182).
 
 #include "labs/case.hpp"
-#include "ui/ui_logic.hpp"
 #include "ui/world_effects_panel.hpp"
 #include "world/atmospheric_params.hpp"
 #include "world/world_effects/effect_conformance.hpp"
+#include "world/world_effects/effect_registry.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -104,39 +104,66 @@ std::vector<std::string> declaredKindNames() {
 
 } // namespace
 
-TEST_CASE("the conformance table covers every kind the enum declares",
-          "[world][atmospherics][conformance]") {
+TEST_CASE("the registry covers every kind the enum declares", "[world][atmospherics][conformance]") {
     const std::vector<std::string> declared = declaredKindNames();
     REQUIRE_FALSE(declared.empty());
 
-    std::set<std::string> fromHeader;
-    for (const std::string& n : declared) {
-        fromHeader.insert(lower(n));
-    }
-    std::set<std::string> covered;
-    for (const world::AtmosphereKind k : conf::kAtmosphereKinds) {
-        covered.insert(lower(world::atmosphereKindName(k)));
+    // ADR-500 changed how the two sides are matched, and the change was bought by a failure.
+    //
+    // ADR-392 lowercased the enumerator and compared it with `atmosphereKindName`. That worked for
+    // three kinds because "Comet" lowercases to "comet" **by coincidence**: an enumerator's
+    // spelling and a kind's file format are two different decisions, and the first kind for which
+    // they differed -- `MeteorShower`, which serialises as "meteors" -- failed this test while
+    // being entirely correct. A guard that fires on working code is not a guard.
+    //
+    // So the mapping is declared: `EffectSchema::enumName` says which enumerator a schema claims,
+    // and the two sets are compared by that. The property that matters is unchanged and is in fact
+    // stronger -- an enumerator with no schema and a schema claiming an enumerator that no longer
+    // exists are now both named -- and `checkRegistry` catches an empty or duplicate `enumName`.
+    std::set<std::string> fromHeader(declared.begin(), declared.end());
+    std::set<std::string> claimed;
+    for (const world::EffectSchema* schema : world::effectSchemas()) {
+        claimed.insert(schema->enumName);
     }
 
     // Printed rather than counted, because the point of this failing is that it names the kind
     // somebody added and did not finish wiring.
     for (const std::string& n : fromHeader) {
-        INFO("AtmosphereKind::" << n << " is declared in atmospherics.hpp");
-        CHECK(covered.count(n) == 1);
+        INFO("AtmosphereKind::" << n << " is declared in atmospherics.hpp but no schema claims it -- "
+             "add a line to builtinSchemas() in effect_registry.cpp");
+        CHECK(claimed.count(n) == 1);
     }
-    for (const std::string& n : covered) {
-        INFO(n << " is in conformance::kAtmosphereKinds");
+    for (const std::string& n : claimed) {
+        INFO("a schema claims AtmosphereKind::" << n << ", which atmospherics.hpp does not declare");
         CHECK(fromHeader.count(n) == 1);
     }
+    // ...and the array the exhaustive switches are indexed by, which is the third place a kind has
+    // to appear and the one a `-Wswitch` warning nobody reads would otherwise be the only guard for.
+    INFO("kAtmosphereKinds has " << conf::kAtmosphereKinds.size() << " entries for "
+         << declared.size() << " enumerators");
+    CHECK(conf::kAtmosphereKinds.size() == declared.size());
 
     SECTION("the reader can fail") {
         // The control ADR-182 asks for: the parser is shown finding what is there, so an empty
         // result above would be a broken parser rather than an empty enum.
-        CHECK(fromHeader.count("comet") == 1);
-        CHECK(fromHeader.count("aurora") == 1);
-        CHECK(fromHeader.count("vortex") == 1);
-        CHECK(fromHeader.count("nosuchkind") == 0);
+        CHECK(fromHeader.count("Comet") == 1);
+        CHECK(fromHeader.count("Aurora") == 1);
+        CHECK(fromHeader.count("Vortex") == 1);
+        CHECK(fromHeader.count("NoSuchKind") == 0);
     }
+}
+
+TEST_CASE("the registry's own contract holds for every declared kind",
+          "[world][atmospherics][conformance][registry]") {
+    // ADR-500's replacement for "a forgotten piece is silent". Every finding names the kind and the
+    // row, so a half-declared effect fails here rather than drawing an empty box.
+    const std::vector<world::RegistryFinding> findings = world::checkRegistry();
+    std::string summary;
+    for (const world::RegistryFinding& f : findings) {
+        summary += f.subject + " [" + f.rule + "] " + f.detail + "\n";
+    }
+    INFO(summary);
+    CHECK(findings.empty());
 }
 
 TEST_CASE("every atmospheric kind conforms to the family's contract",
@@ -198,71 +225,77 @@ TEST_CASE("the beat-response target is a parameter of the kind it is chosen for"
     }
 }
 
-TEST_CASE("every row the World Effects panel draws is a parameter that kind has",
+TEST_CASE("every parameter a kind registers is a row the panel can draw",
           "[world][atmospherics][conformance][ui]") {
-    // ADR-387 put the vortex's rows in `ui_logic.hpp` as data so this question could be asked;
-    // ADR-392 put the comet's and the aurora's there for the same reason, which is what turns this
-    // from a test of one kind into a test of the family. A leaf five characters wrong in any of
-    // them draws an empty box and says nothing (ADR-382), and now fails here with the path printed.
-    const auto collect = [](std::span<const ui::EffectRow> a, std::span<const ui::EffectRow> b) {
-        std::vector<std::string_view> leaves;
-        for (const ui::EffectRow& r : a) {
-            leaves.push_back(r.leaf);
+    // ADR-500 turned this question round, and the reason is ADR-182.
+    //
+    // ADR-392's version asked "is every row the panel draws a parameter that kind has". That was
+    // the right question while the rows were a SECOND list in `ui_logic.hpp` that a five-character
+    // typo could break silently. The panel now walks `EffectSchema::fields` directly, so the row
+    // and the registration are the same declaration and the old question cannot fail -- which
+    // makes it a probe that proves nothing.
+    //
+    // The question that can still fail is the inverse, and it is also the owner's standing rule:
+    // if it is in the picture an artist must be able to find it and change it. Every path the
+    // REGISTRAR writes must correspond to a row the panel will draw. A row marked `Hidden`, a row
+    // with no label, or a shared row the panel forgets fails here, by path.
+    for (const world::AtmosphereKind kind : conf::kAtmosphereKinds) {
+        const world::EffectSchema* schema = world::effectSchema(kind);
+        REQUIRE(schema != nullptr);
+        const world::AtmosphericEffect probe = conf::probeEffect(kind, "conformance probe");
+        const std::vector<std::string> leaves = conf::registeredLeaves(probe);
+        REQUIRE(leaves.size() > 10);
+
+        for (const std::string& leaf : leaves) {
+            if (leaf == "enabled") {
+                continue; // the header's own checkbox, drawn beside the effect's name
+            }
+            const world::EffectField* row = nullptr;
+            for (const world::EffectField& f : schema->fields) {
+                if (leaf == f.leaf) { row = &f; }
+            }
+            for (const world::EffectField& f : world::sharedEffectFields()) {
+                if (leaf == f.leaf) { row = &f; }
+            }
+            INFO("kind: " << world::atmosphereKindName(kind) << ", leaf: " << leaf);
+            REQUIRE(row != nullptr);
+            // A registered parameter with no label is one an artist cannot identify, and one on
+            // the Hidden page is one they cannot reach. Both are ADR-375's defect.
+            CHECK(row->label[0] != '\0');
+            CHECK(row->page != world::FieldPage::Hidden);
         }
-        for (const ui::EffectRow& r : b) {
-            leaves.push_back(r.leaf);
+    }
+
+    SECTION("the check can fail") {
+        // ADR-182. A leaf no kind declares is reported by the same machinery the panel's rows go
+        // through, which is what shows the comparison above is not vacuous.
+        const std::array<std::string_view, 2> bogus{"noSuchLeaf", "coreIntensity"};
+        const conf::Report r =
+            conf::checkLeavesExist(world::AtmosphereKind::Comet, bogus, "panel-rows");
+        CHECK_FALSE(r.clean());
+        CHECK(r.findings.size() == 1); // the second one is real
+    }
+
+    SECTION("a kind that declares no hue cycle registers none of its leaves") {
+        // The other half of the same claim, and the reason the panel does not draw a rainbow for a
+        // vortex: a vortex declares no rainbow rows at all, so these leaves find nothing. ADR-375's
+        // lesson the other way round -- a control that draws and does nothing.
+        const std::array<std::string_view, 5> rainbow{"rainbowSpeed", "rainbowScale", "rainbowHue",
+                                                      "rainbowSaturation", "rainbowBrightness"};
+        for (const world::AtmosphereKind kind :
+             {world::AtmosphereKind::Vortex, world::AtmosphereKind::VolumetricFog}) {
+            const conf::Report r = conf::checkLeavesExist(kind, rainbow, "panel-rows");
+            INFO("kind: " << world::atmosphereKindName(kind));
+            CHECK_FALSE(r.clean());
+            CHECK(r.findings.size() == rainbow.size());
         }
-        return leaves;
-    };
-
-    SECTION("vortex") {
-        const std::vector<std::string_view> leaves = collect(ui::vortexRows(), ui::vortexAdvancedRows());
-        REQUIRE(leaves.size() > 10);
-        const conf::Report r =
-            conf::checkLeavesExist(world::AtmosphereKind::Vortex, leaves, "panel-rows");
-        INFO(r.summary());
-        CHECK(r.clean());
-    }
-
-    SECTION("comet") {
-        const std::vector<std::string_view> leaves = collect(ui::cometRows(), ui::cometAdvancedRows());
-        REQUIRE(leaves.size() > 10);
-        const conf::Report r =
-            conf::checkLeavesExist(world::AtmosphereKind::Comet, leaves, "panel-rows");
-        INFO(r.summary());
-        CHECK(r.clean());
-    }
-
-    SECTION("aurora") {
-        const std::vector<std::string_view> leaves = collect(ui::auroraRows(), ui::auroraAdvancedRows());
-        REQUIRE(leaves.size() > 10);
-        const conf::Report r =
-            conf::checkLeavesExist(world::AtmosphereKind::Aurora, leaves, "panel-rows");
-        INFO(r.summary());
-        CHECK(r.clean());
-    }
-
-    SECTION("the rainbow and ground rows belong to both sky kinds and to neither vortex") {
-        const std::vector<std::string_view> shared =
-            collect(ui::skyRainbowRows(), ui::skyGroundRows());
+        // ...and the two sky kinds that DO declare it register all five.
         for (const world::AtmosphereKind kind :
              {world::AtmosphereKind::Comet, world::AtmosphereKind::Aurora}) {
-            const conf::Report r = conf::checkLeavesExist(kind, shared, "panel-rows");
-            INFO("kind: " << world::atmosphereKindName(kind));
-            INFO(r.summary());
+            const conf::Report r = conf::checkLeavesExist(kind, rainbow, "panel-rows");
+            INFO("kind: " << world::atmosphereKindName(kind) << "\n" << r.summary());
             CHECK(r.clean());
         }
-        // The other half of the same claim, and the reason the panel returns before drawing these
-        // for a vortex: a vortex registers no rainbow at all, so these rows would find nothing.
-        // ADR-375's lesson the other way round -- a control that draws and does nothing.
-        std::vector<std::string_view> rainbow;
-        for (const ui::EffectRow& r : ui::skyRainbowRows()) {
-            rainbow.push_back(r.leaf);
-        }
-        const conf::Report vortex =
-            conf::checkLeavesExist(world::AtmosphereKind::Vortex, rainbow, "panel-rows");
-        CHECK_FALSE(vortex.clean());
-        CHECK(vortex.findings.size() == rainbow.size());
     }
 }
 

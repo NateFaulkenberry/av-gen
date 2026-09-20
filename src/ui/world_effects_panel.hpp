@@ -23,6 +23,7 @@
 // Modulation panel like any other, rather than a hidden audio hook inside the effect.
 
 #include "world/atmospheric_params.hpp"
+#include "world/world_effects/effect_registry.hpp"
 #include "world/effect_params.hpp"
 
 #include <algorithm>
@@ -95,16 +96,16 @@ private:
 // brightness for its kind -- a comet's core and an aurora's edge -- rather than on one name that
 // happens to exist on both, because "intensity" on an aurora is its overall level and pulsing that
 // makes the whole sky flash rather than making its curtain edges answer the beat.
+//
+// ADR-500: the leaf comes from the kind's own declaration (`EffectSchema::beatLeaf`), which is
+// where the person adding a kind is already writing. That closes the last of ADR-392's two bare
+// string literals: the other was the panel's rows, and they are rows now too. `checkRegistry`
+// fails by name when a kind's `beatLeaf` is not a leaf it declares, which is the thing a five-
+// character typo here used to do silently -- a slider that moved and a route that bound to nothing.
 [[nodiscard]] inline std::string atmosphericBeatTarget(const std::string& effectName,
                                                        world::AtmosphereKind kind) {
-    // ADR-387: a vortex's brightness is its emissive density. Not `density`, which is extinction --
-    // pulsing that makes the funnel thicker rather than brighter, which reads as the fog breathing.
-    const char* leaf = "edgeBrightness";
-    switch (kind) {
-    case world::AtmosphereKind::Comet: leaf = "coreIntensity"; break;
-    case world::AtmosphereKind::Aurora: leaf = "edgeBrightness"; break;
-    case world::AtmosphereKind::Vortex: leaf = "emission"; break;
-    }
+    const world::EffectSchema* schema = world::effectSchema(kind);
+    const char* leaf = schema != nullptr ? schema->beatLeaf : "";
     return world::atmosphericParameterPrefix(effectName) + leaf;
 }
 
