@@ -521,6 +521,59 @@ void drawViewportOverlay(const WorldEditor& editor, const scene::Camera& camera,
         painter.label(light.position, light.name.c_str(), light.selected ? kSelection : colour);
     }
 
+    // ---- the authored cameras, as objects in the world ------------------------------------------
+    //
+    // A frustum built from the camera's OWN fov and aspect, so the drawing is the camera's
+    // properties rather than a decoration that happens to agree with them -- change the lens and
+    // the cone opens. Short, because a frustum drawn to the far plane is a pair of lines across the
+    // whole world and tells you nothing about where the camera is looking from.
+    //
+    // The live camera is drawn brighter and with a filled near plane rather than only in a
+    // different colour: §3 asks for the active camera to be identifiable in the existing visual
+    // language, and colour alone fails the moment two cameras overlap on screen.
+    for (const EditorVisuals::CameraMarker& cam : visuals.cameraMarkers) {
+        ImVec2 body;
+        if (!painter.point(cam.position, body)) {
+            continue;
+        }
+        const ImU32 colour = cam.selected ? kSelection
+                             : cam.active ? IM_COL32(255, 236, 170, 235)
+                                          : IM_COL32(150, 170, 200, 170);
+
+        glm::vec3 forward = cam.target - cam.position;
+        const float length = glm::length(forward);
+        forward = length > 1e-5f ? forward / length : glm::vec3(0.0f, 0.0f, -1.0f);
+        glm::vec3 up = std::abs(forward.y) > 0.95f ? glm::vec3(0.0f, 0.0f, 1.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
+        const glm::vec3 right = glm::normalize(glm::cross(forward, up));
+        up = glm::normalize(glm::cross(right, forward));
+
+        // A fixed, readable depth rather than the real far plane.
+        const float depth = cam.selected ? 6.0f : 3.0f;
+        const float half = depth * std::tan(glm::radians(std::max(cam.fovDegrees, 1.0f)) * 0.5f);
+        const glm::vec3 centre = cam.position + forward * depth;
+        const glm::vec3 hx = right * (half * cam.aspect);
+        const glm::vec3 hy = up * half;
+        const std::array<glm::vec3, 4> corner{centre - hx - hy, centre + hx - hy, centre + hx + hy,
+                                              centre - hx + hy};
+        for (std::size_t i = 0; i < corner.size(); ++i) {
+            painter.line(corner[i], corner[(i + 1) % corner.size()], colour, cam.active ? 1.6f : 1.2f);
+            painter.line(cam.position, corner[i], colour, cam.active ? 1.5f : 1.1f);
+        }
+        // Which way is up, so a rolled camera reads as rolled rather than as a square.
+        painter.line(corner[3], corner[3] + up * (half * 0.35f), colour, 1.2f);
+        painter.line(corner[2], corner[3] + up * (half * 0.35f), colour, 1.2f);
+
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        const float boxSize = cam.selected ? 6.0f : 4.0f;
+        draw->AddRectFilled(ImVec2(body.x - boxSize, body.y - boxSize),
+                            ImVec2(body.x + boxSize, body.y + boxSize), colour, 2.0f);
+        if (cam.selected) {
+            draw->AddCircle(body, boxSize + 5.0f, kSelection, 0, 1.6f);
+        }
+        painter.label(cam.position, cam.active ? (cam.name + "  [LIVE]").c_str() : cam.name.c_str(),
+                      colour);
+    }
+
     // ---- the gizmo ----
     if (visuals.showGizmo) {
         const GizmoFrame& frame = visuals.gizmo;

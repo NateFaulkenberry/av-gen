@@ -117,6 +117,28 @@ struct EditorVisuals {
     };
     std::vector<LightMarker> lightMarkers;
 
+    // ---- authored cameras, as objects in the world ----------------------------------------------
+    //
+    // §28's three-way distinction, drawn rather than described. These are the **authored scene
+    // cameras** -- `scene::CameraRig`s in the composition's `CameraDirection`. They are not the
+    // editor navigation camera, which is the viewport's own `camera/*` parameters and is where you
+    // are looking from rather than a thing to look at; and `active` marks the one the director has
+    // put on screen right now, which is a property of the clock and not of the camera.
+    //
+    // `seq::Shot` is not `scene::CameraShot` and neither of them is here: a shot is a span of time
+    // that names a camera, and what this draws is the camera.
+    struct CameraMarker {
+        std::string name;
+        std::uint32_t id = 0;
+        glm::vec3 position{0.0f};
+        glm::vec3 target{0.0f, 0.0f, -1.0f};
+        float fovDegrees = 50.0f;
+        float aspect = 16.0f / 9.0f;
+        bool active = false;   // the director has this one on screen now
+        bool selected = false;
+    };
+    std::vector<CameraMarker> cameraMarkers;
+
     // The heroes this scene declares (ADR-104), drawn whether or not anything is selected.
     //
     // Designation has no other appearance -- a hero looks exactly like the object it was made from
@@ -374,6 +396,17 @@ private:
         bool aimed = false;               // directional or spot: has azimuth/elevation parameters
     };
     std::vector<StartLight> startLights_;
+
+    // A selected camera's state at the press. A camera is neither a node nor a light: it has no
+    // parent frame and no scale, and its orientation is a *target point* rather than angles -- so
+    // rotating one moves where it looks, not a quaternion it stores.
+    struct StartCamera {
+        std::string prefix;   // `cameras/<slug>/`, frozen at creation so a rename cannot orphan it
+        glm::vec3 position{0.0f};
+        glm::vec3 target{0.0f};
+    };
+    std::vector<StartCamera> startCameras_;
+    void collectSelectedCameras(app::Engine& engine, std::vector<StartCamera>& out) const;
     // The selected lights' positions and ids, rebuilt each frame for the gizmo and the drag.
     void collectSelectedLights(app::Engine& engine, std::vector<StartLight>& out) const;
 

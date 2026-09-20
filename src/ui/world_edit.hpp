@@ -100,9 +100,9 @@ public:
     // True when this changed anything, so a caller can avoid recording a selection edit that did
     // nothing.
     //
-    // Nodes are checked against the composition, lights against its authored list. A camera ref is
-    // kept whatever happens: a camera's identity is a `CameraId` that the name only labels, so
-    // dropping one on a name miss would deselect the camera every time somebody renamed it.
+    // Nodes are checked against the composition, lights against its authored list, cameras against
+    // its camera direction. All three drop on a name miss, so a selection cannot outlive the thing
+    // it points at -- which for a camera is reachable from the Cameras panel's Delete button.
     bool retainOnly(const scene::Composition& composition); // drops entries that no longer exist
 
 private:

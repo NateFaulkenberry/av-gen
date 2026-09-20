@@ -120,10 +120,6 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
-        # ADR-383 split the range out of RenderSettings; the unit-test list gained it and this one
-        # did not, so `avgen_render_tests` stopped linking. Not caught by a build of the default
-        # target, which is why it is worth a line: this executable is only built on request.
-        "${CMAKE_SOURCE_DIR}/src/app/frame_range.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/render_job.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/scene_states.cpp"

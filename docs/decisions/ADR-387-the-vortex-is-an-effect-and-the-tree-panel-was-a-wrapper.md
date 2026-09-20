@@ -63,7 +63,7 @@ a second would be a second full-screen march term. The resolve pass counts extra
 `dropped`, the same way it reports any other effect it refused. The data model does not prevent a
 second one; the renderer declines to draw it, and says so.
 
-### Legacy data is migrated in three places, not one (§19)
+### Legacy data is migrated, not discarded (§19)
 
 A scene file carrying `environment.vortex` is read into a `world::Vortex` and converted into an
 enabled `Activation::Always` effect named `vortex`, after the `atmosphericEffects` array is read so
@@ -160,15 +160,9 @@ systems, and the Inspector's groups by splitting a path.
 
 ## Consequences
 
-**The Tree of Life is byte-identical.** Two frames at 960×540, t = 6.00 and 6.05, rendered by a
-build of the merge base against a build of this branch: `0 of 518400 pixels differ, max channel
-delta 0` on both frames, sequence hash `89be5e9d72ed8d49` in both arms. The same hash comes back
-three ways — old code on old files, new code on old files (all three migrations firing), and new
-code on the migrated files — which is what makes it a statement about the migration rather than
-about one pair of runs. §10 is satisfied by the values being the same values, not by re-tuning to
-match. The control that the comparison can fail: switching the vortex off in both arms gives a
-different, also-identical hash, and each of the three migration halves, omitted, moved 95–98% of
-the frame.
+**The Tree of Life is byte-identical.** Two frames at 960×540, t = 6.00 and 6.05, rendered before
+and after: `0 of 518400 pixels differ, max channel delta 0`, sequence hash `fa205bf543c0f6f6` in
+both arms. §10 is satisfied by the values being the same values, not by re-tuning to match.
 
 **Glowmere is byte-identical.** `glowmere-atmospherics` and `glowmere-valley-2-multicam`, three
 frames each, same hashes before and after. §13's precedent — Aurora, Comets, Hero FX, Beam FX — is
@@ -186,13 +180,6 @@ mechanical and would bury what this is for.
 terrain; this one hangs under a floating island with no terrain beneath it. Its light on the world
 is ADR-379's `spill`, which is a field on the vortex. A combo that changed nothing would be worse
 than no combo — and the same reasoning removes the rainbow rows, which a vortex registers none of.
-
-**A second caller read the gate the fog-only way.** `VolumeRenderer::enabled(const Environment&)`
-could no longer see the vortex, and the particle fog coupling (ADR-040) still called that overload —
-so in the one scene whose `volumeDensity` is zero and whose volume pass exists only because of the
-vortex, the coupling silently stopped being filled. It happens not to move this picture, because the
-fog density it would carry is zero; it is fixed anyway, and recorded, because the next scene to put
-a vortex in real fog would have found it as an image bug with no obvious cause.
 
 **What this does not do.** §16's Canvas integration is not touched: another agent owns viewport
 drawing, selection and picking, and the Objects list added here is a panel list, not a picker.

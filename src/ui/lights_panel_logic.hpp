@@ -22,6 +22,18 @@
 
 namespace avgen::ui {
 
+// The parameter path prefix the panel asks under, ending in '/'.
+//
+// **This exists so the panel and its test can do the same arithmetic.** A hand-written panel asks
+// for a parameter by string, so a prefix computed one way here and asserted another way in a test
+// proves only that the parameters exist -- it says nothing about whether the UI can reach them, and
+// both would keep passing while every row silently failed to draw. That is exactly the defect the
+// owner found in the Tree panel, where a wrongly computed prefix made two whole sections render
+// as an empty box indistinguishable from a scene without the feature.
+//
+// So there is one function, the panel calls it, and the test calls it.
+[[nodiscard]] std::string lightParameterBase(const scene::Composition::AuthoredLight& light);
+
 // Every parameter leaf a light of `type` registers, in the order the panel shows them. Mirrors
 // `Composition::registerAuthoredLightParameters`: a directional light has no `range`, only a spot
 // has cone angles, only an area kind has an extent.
