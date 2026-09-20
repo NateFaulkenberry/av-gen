@@ -1,4 +1,4 @@
-// Temporal media: the ring's capture pass and the effects that read it (ADR-394, brief §8-§17).
+// Temporal media: the ring's capture pass and the effects that read it (ADR-400, brief §8-§17).
 //
 // Two things happen in this file and they must not be confused:
 //
@@ -12,7 +12,7 @@
 // one decision. Feeding an effect's output back into its own history is an IIR filter: frame N
 // depends on every frame before it, K is infinite, and no warm-up can rebuild it. Capturing the
 // clean frame makes every effect an FIR filter over the last K frames, which a warm-up CAN rebuild
-// by re-rendering K frames. ADR-394 calls this "a cache of a pure function"; this is where it is
+// by re-rendering K frames. ADR-400 calls this "a cache of a pure function"; this is where it is
 // actually true or false.
 
 struct TemporalUniforms {

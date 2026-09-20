@@ -1,8 +1,8 @@
 #pragma once
 
-// Conformance for the temporal effect family (ADR-394, and ADR-392's mechanism).
+// Conformance for the temporal effect family (ADR-400, and ADR-392's mechanism).
 //
-// **What this is for.** ADR-394's whole argument rests on one promise: no temporal effect is an
+// **What this is for.** ADR-400's whole argument rests on one promise: no temporal effect is an
 // accumulator, because each declares a bounded history depth. That promise is a *convention*. A
 // kind that forgets to declare a bound, or declares one it does not honour, does not fail to
 // compile, does not throw and does not log -- it just quietly reads more history than the ring was
@@ -14,7 +14,7 @@
 //
 //   1. **bounded-k** -- every enabled kind declares a depth in 1..kMaxTemporalFrames. Zero while
 //      enabled means "I did not declare"; over the ceiling means "I declared more than the ring
-//      can hold". Both are the accumulator ADR-394 forbids, arriving by different routes.
+//      can hold". Both are the accumulator ADR-400 forbids, arriving by different routes.
 //   2. **paths** -- every parameter a kind's panel row asks for is a path that kind registers,
 //      obtained by registering into a scratch `ParameterSet` rather than by reading a table. A
 //      conformance layer that read the tables would agree with the tables and learn nothing.

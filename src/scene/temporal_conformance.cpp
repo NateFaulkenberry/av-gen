@@ -78,7 +78,7 @@ Report checkBounds(std::span<const DeclaredBound> bounds) {
         if (b.frames == 0) {
             report(r, b.subject, "bounded-k",
                    "enabled but declares no history bound -- an effect that cannot state a bound is "
-                   "the accumulator ADR-394 forbids");
+                   "the accumulator ADR-400 forbids");
             continue;
         }
         if (b.frames > static_cast<std::uint32_t>(kMaxTemporalFrames)) {

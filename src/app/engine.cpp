@@ -75,6 +75,7 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     stateIndexSignal_ = bus_.declare("state.index", 0.0f, 64.0f);
     sources_.attach(bus_, params_);
     postParams_ = scene::registerPostParameters(params_, post_);
+    temporalParams_ = scene::registerTemporalParameters(params_, temporal_);
     cameraParams_ = scene::registerCameraParameters(params_, lens_, exposure_, focus_);
     installController(std::make_unique<scene::OrbScene>(params_, modulator_));
     if (mode_ == EngineMode::Live) {
@@ -186,6 +187,10 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
     if (params_.find("post/bloom/intensity") == nullptr) {
         scene::PostSettings keep = post_;
         postParams_ = scene::registerPostParameters(params_, keep);
+    }
+    if (params_.find("temporal/echo/enabled") == nullptr) {
+        const scene::TemporalSettings keep = temporal_;
+        temporalParams_ = scene::registerTemporalParameters(params_, keep);
     }
     if (params_.find("camera/lens/focalLength") == nullptr) {
         const scene::LensSettings keepLens = lens_;
@@ -3772,6 +3777,7 @@ void Engine::update(const FrameTime& time) {
     probeStage(probe2::frame().updControllerMs); // TEMPORARY: phase 2
     stats_.allocsController = allocsNow() - allocMark;
     scene::applyPostParameters(postParams_, post_);
+    scene::applyTemporalParameters(temporalParams_, temporal_);
     // ---- physical camera (ADR-037) ---------------------------------------------------------
     // After controller_->update() has placed the camera: the lens, the focus tracker's new
     // distance and the exposure block go onto the camera and into the post chain, which applies
@@ -3815,6 +3821,10 @@ void Engine::update(const FrameTime& time) {
         // post/motionBlur/amount stays exactly as authored.
     }
     controller_->scene().post = post_;
+    // Without this line every temporal parameter resolves, round-trips and reaches nothing --
+    // ADR-039's selective bloom and ADR-035's identifier mask were both shipped missing exactly
+    // this assignment, and both were invisible because the feature simply never ran.
+    controller_->scene().temporal = temporal_;
     updateWorldEffects();
     updateAtmosphericEffects();
     {

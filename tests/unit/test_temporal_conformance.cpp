@@ -1,6 +1,6 @@
-// Conformance for the temporal effect family (ADR-394).
+// Conformance for the temporal effect family (ADR-400).
 //
-// The check this file exists for is **bounded-k**: ADR-394's entire argument is that no temporal
+// The check this file exists for is **bounded-k**: ADR-400's entire argument is that no temporal
 // effect is an accumulator, and that promise is a convention a kind can forget silently. So the
 // first thing proved here is that the check CAN FAIL -- ADR-182, a probe that cannot fail proves
 // nothing. Only then does a pass over the real family mean anything.
@@ -8,6 +8,7 @@
 #include "params/parameter_set.hpp"
 #include "scene/temporal_conformance.hpp"
 #include "scene/temporal_settings.hpp"
+#include "ui/ui_logic.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
@@ -39,7 +40,7 @@ TEST_CASE("the bounded-k check fails for an effect that cannot state a bound", "
     // The control that makes every other assertion in this file mean something. A checker that
     // computed the bounds itself could never be made to report, and its green would say only that
     // it ran.
-    SECTION("enabled with no declared depth is the accumulator ADR-394 forbids") {
+    SECTION("enabled with no declared depth is the accumulator ADR-400 forbids") {
         const std::vector<conf::DeclaredBound> bounds{
             {"echo", true, 6},
             {"unbounded", true, 0}, // the kind that forgot
@@ -219,4 +220,18 @@ TEST_CASE("a modulated frame count rounds rather than truncates", "[temporal][pa
     params.resetFinals();
     applyTemporalParameters(p, s);
     CHECK(s.echo.frames == 5);
+}
+
+TEST_CASE("temporal parameters are findable on the layer the editor opens on", "[temporal][ui]") {
+    // Reachable is not findable (ADR-375). A path the Parameters panel filters out on the default
+    // authoring layer is a control nobody will ever see, and the failure looks exactly like the
+    // feature not existing.
+    const std::string path = temporalParameterPrefix(TemporalEffectKind::FrameEcho) + "strength";
+    CHECK(ui::layerShowsPath(ui::AuthoringLayer::Beginner, path));
+    CHECK(ui::layerShowsPath(ui::AuthoringLayer::Intermediate, path));
+    CHECK(ui::layerShowsPath(ui::AuthoringLayer::Advanced, path));
+
+    // The control: a group that is on no list must NOT show on Beginner, or this test passes
+    // against a `layerShowsPath` that says yes to everything.
+    CHECK_FALSE(ui::layerShowsPath(ui::AuthoringLayer::Beginner, std::string("nosuchgroup/thing")));
 }

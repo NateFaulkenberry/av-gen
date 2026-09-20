@@ -1,12 +1,12 @@
 #pragma once
 
-// Authored settings for the temporal effect family (ADR-394, brief §9-§17).
+// Authored settings for the temporal effect family (ADR-400, brief §9-§17).
 //
 // **The load-bearing thing in this file is `historyFrames()`.** Every temporal effect must state,
 // as a function of its own settings, how many frames of history it reads. That number is what
 // makes the family scrub-safe: it sizes the ring, it sizes the seek warm-up, and it is what the
 // artist is told is still settling. An effect that cannot state a bound is an accumulator, which
-// ADR-394 forbids outright -- and because "I forgot to declare a bound" does not fail to compile,
+// ADR-400 forbids outright -- and because "I forgot to declare a bound" does not fail to compile,
 // does not throw and does not log, `temporal_conformance.hpp` asks every kind for its bound and
 // fails by name for the one that cannot give it.
 //

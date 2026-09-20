@@ -1,6 +1,6 @@
 #pragma once
 
-// The temporal effect passes (ADR-394, brief §9-§17) over the ring in `temporal_history.hpp`.
+// The temporal effect passes (ADR-400, brief §9-§17) over the ring in `temporal_history.hpp`.
 //
 // Runs between the scene pass and the post chain: it captures the clean scene radiance into the
 // ring and then returns an image for post to grade. Capturing *before* post and *before* its own

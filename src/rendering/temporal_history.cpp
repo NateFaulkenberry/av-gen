@@ -21,6 +21,7 @@ namespace {
     switch (format) {
     case wgpu::TextureFormat::RG11B10Ufloat: return 4;
     case wgpu::TextureFormat::RG16Float: return 4;
+    case wgpu::TextureFormat::RGBA16Float: return 8; // the fallback when RG11B10 is not renderable
     default: return 0;
     }
 }
@@ -60,6 +61,12 @@ struct TemporalHistory::Impl {
     gpu::FrameTimeline* timeline = nullptr;
 
     bool initialised = false;
+    // Resolved once at init from the adapter's capabilities, then used everywhere a format is
+    // needed, so the ring, the placeholder and the capture pipeline cannot disagree about it.
+    bool rg11b10Renderable = false;
+    [[nodiscard]] wgpu::TextureFormat formatOf(TemporalChannel c) const {
+        return temporalChannelFormat(c, rg11b10Renderable);
+    }
     std::array<Ring, kTemporalChannelCount> rings{};
     std::array<wgpu::TextureView, kTemporalChannelCount> placeholders{};
     std::array<wgpu::Texture, kTemporalChannelCount> placeholderTextures{};
@@ -76,7 +83,7 @@ struct TemporalHistory::Impl {
     wgpu::PipelineLayout pipelineLayout;
     wgpu::RenderPipeline captureColour;
 
-    // ---- the determinism state machine (ADR-394) ----
+    // ---- the determinism state machine (ADR-400) ----
     //
     // Copied deliberately from `AoRenderer::update`, which solved this once. Two cases that look
     // alike and need opposite treatment -- treating them the same is the bug this repo calls
@@ -113,7 +120,7 @@ Result<void> TemporalHistory::Impl::createPlaceholders() {
         desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::RenderAttachment;
         desc.dimension = wgpu::TextureDimension::e2D;
         desc.size = {1, 1, 1};
-        desc.format = temporalChannelFormat(channel);
+        desc.format = formatOf(channel);
         wgpu::Texture texture = device.CreateTexture(&desc);
         if (texture == nullptr) {
             return fail("temporal placeholder '{}'", temporalChannelName(channel));
@@ -144,7 +151,7 @@ Result<void> TemporalHistory::Impl::ensureRing(Ring& ring, TemporalChannel chann
                  wgpu::TextureUsage::CopySrc;
     desc.dimension = wgpu::TextureDimension::e2D;
     desc.size = {w, h, frames};
-    desc.format = temporalChannelFormat(channel);
+    desc.format = formatOf(channel);
 
     device.PushErrorScope(wgpu::ErrorFilter::Validation);
     wgpu::Texture texture = device.CreateTexture(&desc);
@@ -190,6 +197,7 @@ TemporalHistory::~TemporalHistory() = default;
 Result<void> TemporalHistory::init() {
     Impl& im = *impl_;
     const auto& device = im.context.device();
+    im.rg11b10Renderable = im.context.capabilities().rg11b10Renderable;
     {
         wgpu::BufferDescriptor desc{};
         desc.label = "temporal-uniforms";
@@ -251,7 +259,7 @@ Result<void> TemporalHistory::reload() {
     if (!module) return std::unexpected(module.error());
 
     wgpu::ColorTargetState target{};
-    target.format = temporalChannelFormat(TemporalChannel::Colour);
+    target.format = im.formatOf(TemporalChannel::Colour);
 
     wgpu::FragmentState fragment{};
     fragment.module = *module;
@@ -361,7 +369,7 @@ void TemporalHistory::beginFrame(std::uint64_t frameIndex) {
     state_.framesValid = std::min(im.framesValid, capacity);
     state_.framesNeeded = im.framesNeeded;
     // Stalled, not settling: the ring is smaller than what the live effects ask for, so no amount
-    // of waiting fills it. The two need different words in the UI (ADR-394).
+    // of waiting fills it. The two need different words in the UI (ADR-400).
     state_.stalled = im.framesNeeded > capacity;
 }
 
@@ -396,7 +404,12 @@ void TemporalHistory::encodeCapture(wgpu::CommandEncoder& encoder, const wgpu::T
     entries[2].binding = 2;
     entries[2].textureView = sceneHdr;
     entries[3].binding = 3;
-    entries[3].textureView = ring.arrayView;
+    // The PLACEHOLDER, not the ring -- a pass cannot read what it writes, and this pass is drawing
+    // into one of the ring's own layers. Binding the array here is a validation error even though
+    // the shader never samples it, because the whole texture is in the render pass's
+    // synchronisation scope. `AoRenderer` says the same thing about its frame bind group, for the
+    // same reason. The layout requires a binding, so it gets a 1x1x1 one.
+    entries[3].textureView = im.placeholders[static_cast<std::uint32_t>(TemporalChannel::Colour)];
     wgpu::BindGroupDescriptor groupDesc{};
     groupDesc.label = "temporal-capture-group";
     groupDesc.layout = im.layout;
@@ -481,7 +494,7 @@ std::uint64_t TemporalHistory::bytes() const {
         const auto& ring = im.rings[i];
         if (!ring.valid()) continue;
         total += static_cast<std::uint64_t>(im.width) * im.height * ring.frames *
-                 bytesPerTexel(temporalChannelFormat(static_cast<TemporalChannel>(i)));
+                 bytesPerTexel(im.formatOf(static_cast<TemporalChannel>(i)));
     }
     return total;
 }
