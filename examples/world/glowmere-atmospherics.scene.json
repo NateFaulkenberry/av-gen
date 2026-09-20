@@ -8866,7 +8866,7 @@
           },
           {
             "name": "beamFadeSeconds",
-            "value": 0.9,
+            "value": 0.15,
             "min": 0.0,
             "max": 10.0
           },
@@ -8935,6 +8935,12 @@
             "value": 1.55,
             "min": 0.0,
             "max": 10.0
+          },
+          {
+            "name": "beamSize",
+            "value": 1.0,
+            "min": 0.0,
+            "max": 4.0
           },
           {
             "name": "beamRestRate",
@@ -9106,6 +9112,23 @@
                     "duration": 0.2
                   }
                 ]
+              },
+              {
+                "role": "actor.beam",
+                "steps": [
+                  {
+                    "kind": "set",
+                    "name": "beamWidth",
+                    "target": "size",
+                    "from": 0.0,
+                    "to": {
+                      "param": "beamSize"
+                    },
+                    "duration": {
+                      "param": "beamSeconds"
+                    }
+                  }
+                ]
               }
             ],
             "then": "abduct"
@@ -9214,6 +9237,13 @@
                     "to": {
                       "param": "beamRestRate"
                     },
+                    "duration": 0.0
+                  },
+                  {
+                    "kind": "set",
+                    "name": "beamCut",
+                    "target": "size",
+                    "to": 0.0,
                     "duration": {
                       "param": "beamFadeSeconds"
                     }

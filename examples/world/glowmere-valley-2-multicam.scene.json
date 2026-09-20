@@ -7202,6 +7202,36 @@
         "state": "Walk",
         "updateHz": 30
       },
+      "asset": "../../assets/farm/bull.glb",
+      "kind": "gltf",
+      "name": "bull-18",
+      "position": [
+        32.0,
+        9.539999961853027,
+        -30.0
+      ],
+      "rotation": [
+        0.0,
+        -67.9,
+        0.0
+      ],
+      "scale": [
+        1.94,
+        1.94,
+        1.94
+      ],
+      "visible": true
+    },
+    {
+      "animation": {
+        "blend": 0.3,
+        "cullDistance": 280.0,
+        "farHz": 15.0,
+        "nearDistance": 20.0,
+        "speed": 1.0,
+        "state": "Walk",
+        "updateHz": 30
+      },
       "asset": "../../assets/farm/horse.glb",
       "kind": "gltf",
       "name": "horse-2",
@@ -7213,6 +7243,36 @@
       "rotation": [
         0.0,
         -111.98999786376953,
+        0.0
+      ],
+      "scale": [
+        1.94,
+        1.94,
+        1.94
+      ],
+      "visible": true
+    },
+    {
+      "animation": {
+        "blend": 0.3,
+        "cullDistance": 280.0,
+        "farHz": 15.0,
+        "nearDistance": 20.0,
+        "speed": 1.0,
+        "state": "Walk",
+        "updateHz": 30
+      },
+      "asset": "../../assets/farm/horse.glb",
+      "kind": "gltf",
+      "name": "horse-20",
+      "position": [
+        -106.0,
+        15.699999809265137,
+        -132.0
+      ],
+      "rotation": [
+        0.0,
+        38.1,
         0.0
       ],
       "scale": [
@@ -7262,137 +7322,17 @@
         "state": "Walk",
         "updateHz": 30
       },
-      "asset": "../../assets/farm/sheep.glb",
+      "asset": "../../assets/farm/cow.glb",
       "kind": "gltf",
-      "name": "sheep-4",
+      "name": "cow-19",
       "position": [
-        -111.11000061035156,
-        23.5,
-        -97.55000305175781
+        -70.0,
+        5.53000020980835,
+        66.0
       ],
       "rotation": [
         0.0,
-        97.98999786376953,
-        0.0
-      ],
-      "scale": [
-        1.94,
-        1.94,
-        1.94
-      ],
-      "visible": true
-    },
-    {
-      "animation": {
-        "blend": 0.3,
-        "cullDistance": 280.0,
-        "farHz": 15.0,
-        "nearDistance": 20.0,
-        "speed": 1.0,
-        "state": "Walk",
-        "updateHz": 30
-      },
-      "asset": "../../assets/farm/goat.glb",
-      "kind": "gltf",
-      "name": "goat-5",
-      "position": [
-        19.09000015258789,
-        6.809999942779541,
-        -23.170000076293945
-      ],
-      "rotation": [
-        0.0,
-        -15.020000457763672,
-        0.0
-      ],
-      "scale": [
-        1.94,
-        1.94,
-        1.94
-      ],
-      "visible": true
-    },
-    {
-      "animation": {
-        "blend": 0.3,
-        "cullDistance": 280.0,
-        "farHz": 15.0,
-        "nearDistance": 20.0,
-        "speed": 1.0,
-        "state": "Walk",
-        "updateHz": 30
-      },
-      "asset": "../../assets/farm/pig.glb",
-      "kind": "gltf",
-      "name": "pig-6",
-      "position": [
-        -222.9600067138672,
-        51.83000183105469,
-        -135.02000427246094
-      ],
-      "rotation": [
-        0.0,
-        -103.69000244140625,
-        0.0
-      ],
-      "scale": [
-        1.94,
-        1.94,
-        1.94
-      ],
-      "visible": true
-    },
-    {
-      "animation": {
-        "blend": 0.3,
-        "cullDistance": 280.0,
-        "farHz": 15.0,
-        "nearDistance": 20.0,
-        "speed": 1.0,
-        "state": "Walk",
-        "updateHz": 30
-      },
-      "asset": "../../assets/farm/rooster.glb",
-      "kind": "gltf",
-      "name": "rooster-7",
-      "position": [
-        -251.75,
-        58.310001373291016,
-        140.0399932861328
-      ],
-      "rotation": [
-        0.0,
-        64.05999755859375,
-        0.0
-      ],
-      "scale": [
-        1.94,
-        1.94,
-        1.94
-      ],
-      "visible": true
-    },
-    {
-      "animation": {
-        "blend": 0.3,
-        "cullDistance": 280.0,
-        "farHz": 15.0,
-        "nearDistance": 20.0,
-        "speed": 1.0,
-        "state": "Walk",
-        "updateHz": 30
-      },
-      "asset": "../../assets/farm/chicken.glb",
-      "kind": "gltf",
-      "name": "chicken-8",
-      "position": [
-        149.25999450683594,
-        11.8100004196167,
-        -69.61000061035156
-      ],
-      "rotation": [
-        0.0,
-        -104.23999786376953,
+        163.7,
         0.0
       ],
       "scale": [
@@ -7416,13 +7356,13 @@
       "kind": "gltf",
       "name": "bull-10",
       "position": [
-        26.760000228881836,
-        17.489999771118164,
-        -238.16000366210938
+        -82.0,
+        17.450000762939453,
+        -270.0
       ],
       "rotation": [
         0.0,
-        -80.13999938964844,
+        118.4,
         0.0
       ],
       "scale": [
@@ -7446,13 +7386,13 @@
       "kind": "gltf",
       "name": "horse-11",
       "position": [
-        98.58000183105469,
-        8.59000015258789,
-        9.760000228881836
+        -4.0,
+        5.420000076293945,
+        66.0
       ],
       "rotation": [
         0.0,
-        128.4199981689453,
+        -142.6,
         0.0
       ],
       "scale": [
@@ -7476,163 +7416,13 @@
       "kind": "gltf",
       "name": "cow-12",
       "position": [
-        -246.7100067138672,
-        56.88999938964844,
-        -119.18000030517578
+        -154.0,
+        40.06999969482422,
+        -84.0
       ],
       "rotation": [
         0.0,
-        37.91999816894531,
-        0.0
-      ],
-      "scale": [
-        1.94,
-        1.94,
-        1.94
-      ],
-      "visible": true
-    },
-    {
-      "animation": {
-        "blend": 0.3,
-        "cullDistance": 280.0,
-        "farHz": 15.0,
-        "nearDistance": 20.0,
-        "speed": 1.0,
-        "state": "Walk",
-        "updateHz": 30
-      },
-      "asset": "../../assets/farm/sheep.glb",
-      "kind": "gltf",
-      "name": "sheep-13",
-      "position": [
-        -73.26000213623047,
-        6.739999771118164,
-        28.479999542236328
-      ],
-      "rotation": [
-        0.0,
-        -37.38999938964844,
-        0.0
-      ],
-      "scale": [
-        1.94,
-        1.94,
-        1.94
-      ],
-      "visible": true
-    },
-    {
-      "animation": {
-        "blend": 0.3,
-        "cullDistance": 280.0,
-        "farHz": 15.0,
-        "nearDistance": 20.0,
-        "speed": 1.0,
-        "state": "Walk",
-        "updateHz": 30
-      },
-      "asset": "../../assets/farm/goat.glb",
-      "kind": "gltf",
-      "name": "goat-14",
-      "position": [
-        1.8799999952316284,
-        -1.190000057220459,
-        241.1999969482422
-      ],
-      "rotation": [
-        0.0,
-        42.470001220703125,
-        0.0
-      ],
-      "scale": [
-        1.94,
-        1.94,
-        1.94
-      ],
-      "visible": true
-    },
-    {
-      "animation": {
-        "blend": 0.3,
-        "cullDistance": 280.0,
-        "farHz": 15.0,
-        "nearDistance": 20.0,
-        "speed": 1.0,
-        "state": "Walk",
-        "updateHz": 30
-      },
-      "asset": "../../assets/farm/pig.glb",
-      "kind": "gltf",
-      "name": "pig-15",
-      "position": [
-        -42.97999954223633,
-        6.28000020980835,
-        -0.6399999856948853
-      ],
-      "rotation": [
-        0.0,
-        -126.4800033569336,
-        0.0
-      ],
-      "scale": [
-        1.94,
-        1.94,
-        1.94
-      ],
-      "visible": true
-    },
-    {
-      "animation": {
-        "blend": 0.3,
-        "cullDistance": 280.0,
-        "farHz": 15.0,
-        "nearDistance": 20.0,
-        "speed": 1.0,
-        "state": "Walk",
-        "updateHz": 30
-      },
-      "asset": "../../assets/farm/rooster.glb",
-      "kind": "gltf",
-      "name": "rooster-16",
-      "position": [
-        -87.87999725341797,
-        17.940000534057617,
-        -284.6099853515625
-      ],
-      "rotation": [
-        0.0,
-        -59.58000183105469,
-        0.0
-      ],
-      "scale": [
-        1.94,
-        1.94,
-        1.94
-      ],
-      "visible": true
-    },
-    {
-      "animation": {
-        "blend": 0.3,
-        "cullDistance": 280.0,
-        "farHz": 15.0,
-        "nearDistance": 20.0,
-        "speed": 1.0,
-        "state": "Walk",
-        "updateHz": 30
-      },
-      "asset": "../../assets/farm/chicken.glb",
-      "kind": "gltf",
-      "name": "chicken-17",
-      "position": [
-        9.680000305175781,
-        7.840000152587891,
-        23.68000030517578
-      ],
-      "rotation": [
-        0.0,
-        140.97000122070312,
+        -96.3,
         0.0
       ],
       "scale": [
@@ -8497,6 +8287,67 @@
     {
       "behaviors": [
         {
+          "bounce": 0.026,
+          "bounceRate": 0.84,
+          "kind": "liveliness",
+          "nod": 1.15,
+          "sway": 2.08,
+          "swayRate": 0.218
+        },
+        {
+          "arrive": 0.88,
+          "homeRadius": 18.24,
+          "kind": "wander",
+          "maxRange": 14.31,
+          "minRange": 1.8,
+          "pauseMax": 5.34,
+          "pauseMin": 1.08,
+          "runSpeed": 3.0911,
+          "speed": 1.9319,
+          "turnRate": 76.3
+        },
+        {
+          "bodyRadius": 1.46,
+          "footprint": 2.65,
+          "kind": "ground",
+          "slopeAlign": 0.55
+        }
+      ],
+      "clips": {
+        "idle": "Walk",
+        "run": "Walk",
+        "turn": "Walk",
+        "walk": "Walk"
+      },
+      "coarseInterval": 0.1,
+      "cullDistance": 260.0,
+      "fullDetailDistance": 90.0,
+      "gait": {
+        "accel": 3.0932,
+        "decel": 4.2518,
+        "idleRate": 0.0,
+        "matchRate": true,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
+        "rateMax": 1.0,
+        "rateMin": 0.005,
+        "runEnter": 3.0911,
+        "runExit": 2.2218,
+        "runSpeed": 3.2375,
+        "walkSpeed": 3.2375
+      },
+      "name": "bull-18",
+      "node": "bull-18",
+      "seed": 20281854,
+      "tags": [
+        "animal",
+        "farm",
+        "bull"
+      ]
+    },
+    {
+      "behaviors": [
+        {
           "kind": "liveliness",
           "bounce": 0.057,
           "bounceRate": 1.04,
@@ -8549,6 +8400,67 @@
       "name": "horse-2",
       "node": "horse-2",
       "seed": 20268847,
+      "tags": [
+        "animal",
+        "farm",
+        "horse"
+      ]
+    },
+    {
+      "behaviors": [
+        {
+          "bounce": 0.057,
+          "bounceRate": 1.04,
+          "kind": "liveliness",
+          "nod": 1.39,
+          "sway": 2.8,
+          "swayRate": 0.102
+        },
+        {
+          "arrive": 0.79,
+          "homeRadius": 19.54,
+          "kind": "wander",
+          "maxRange": 10.66,
+          "minRange": 2.78,
+          "pauseMax": 5.03,
+          "pauseMin": 1.03,
+          "runSpeed": 2.2202,
+          "speed": 1.3876,
+          "turnRate": 94.4
+        },
+        {
+          "bodyRadius": 1.26,
+          "footprint": 2.29,
+          "kind": "ground",
+          "slopeAlign": 0.55
+        }
+      ],
+      "clips": {
+        "idle": "Walk",
+        "run": "Walk",
+        "turn": "Walk",
+        "walk": "Walk"
+      },
+      "coarseInterval": 0.1,
+      "cullDistance": 260.0,
+      "fullDetailDistance": 90.0,
+      "gait": {
+        "accel": 2.2202,
+        "decel": 3.0555,
+        "idleRate": 0.0,
+        "matchRate": true,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
+        "rateMax": 1.0,
+        "rateMin": 0.0051,
+        "runEnter": 2.2202,
+        "runExit": 1.5956,
+        "runSpeed": 3.1577,
+        "walkSpeed": 3.1577
+      },
+      "name": "horse-20",
+      "node": "horse-20",
+      "seed": 20294107,
       "tags": [
         "animal",
         "farm",
@@ -8619,30 +8531,30 @@
     {
       "behaviors": [
         {
+          "bounce": 0.024,
+          "bounceRate": 0.86,
           "kind": "liveliness",
-          "bounce": 0.03,
-          "bounceRate": 1.01,
-          "sway": 2.37,
-          "swayRate": 0.111,
-          "nod": 2.19
+          "nod": 2.19,
+          "sway": 2.5,
+          "swayRate": 0.098
         },
         {
-          "arrive": 0.53,
-          "homeRadius": 16.36,
+          "arrive": 0.57,
+          "homeRadius": 15.5,
           "kind": "wander",
-          "maxRange": 12.96,
-          "minRange": 2.14,
-          "pauseMax": 5.68,
-          "pauseMin": 1.16,
-          "runSpeed": 0.8865,
-          "speed": 0.554,
-          "turnRate": 93.8
+          "maxRange": 13.02,
+          "minRange": 2.48,
+          "pauseMax": 3.45,
+          "pauseMin": 1.13,
+          "runSpeed": 2.5554,
+          "speed": 1.5973,
+          "turnRate": 110.0
         },
         {
+          "bodyRadius": 1.21,
+          "footprint": 2.2,
           "kind": "ground",
-          "slopeAlign": 0.55,
-          "footprint": 1.27,
-          "bodyRadius": 0.7
+          "slopeAlign": 0.55
         }
       ],
       "clips": {
@@ -8655,270 +8567,26 @@
       "cullDistance": 260.0,
       "fullDetailDistance": 90.0,
       "gait": {
-        "accel": 0.8838,
-        "decel": 1.2179,
+        "accel": 2.5543,
+        "decel": 3.5136,
         "idleRate": 0.0,
         "matchRate": true,
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
         "rateMax": 1.0,
-        "rateMin": 0.0121,
-        "runEnter": 0.8865,
-        "runExit": 0.637,
-        "runSpeed": 1.3374,
-        "walkSpeed": 1.3374
+        "rateMin": 0.0054,
+        "runEnter": 2.5554,
+        "runExit": 1.8371,
+        "runSpeed": 3.0122,
+        "walkSpeed": 3.0122
       },
-      "name": "sheep-4",
-      "node": "sheep-4",
-      "seed": 20284685,
+      "name": "cow-19",
+      "node": "cow-19",
+      "seed": 20289331,
       "tags": [
         "animal",
         "farm",
-        "sheep"
-      ]
-    },
-    {
-      "behaviors": [
-        {
-          "kind": "liveliness",
-          "bounce": 0.06,
-          "bounceRate": 0.81,
-          "sway": 3.05,
-          "swayRate": 0.154,
-          "nod": 2.42
-        },
-        {
-          "arrive": 0.77,
-          "homeRadius": 15.23,
-          "kind": "wander",
-          "maxRange": 10.18,
-          "minRange": 2.24,
-          "pauseMax": 4.62,
-          "pauseMin": 1.11,
-          "runSpeed": 0.9382,
-          "speed": 0.5863,
-          "turnRate": 85.6
-        },
-        {
-          "kind": "ground",
-          "slopeAlign": 0.55,
-          "footprint": 0.95,
-          "bodyRadius": 0.52
-        }
-      ],
-      "clips": {
-        "idle": "Walk",
-        "run": "Walk",
-        "turn": "Walk",
-        "walk": "Walk"
-      },
-      "coarseInterval": 0.1,
-      "cullDistance": 260.0,
-      "fullDetailDistance": 90.0,
-      "gait": {
-        "accel": 0.9377,
-        "decel": 1.2879,
-        "idleRate": 0.0,
-        "matchRate": true,
-        "moveEnter": 0.0323,
-        "moveExit": 0.0162,
-        "rateMax": 1.0,
-        "rateMin": 0.0143,
-        "runEnter": 0.9382,
-        "runExit": 0.6741,
-        "runSpeed": 1.1312,
-        "walkSpeed": 1.1312
-      },
-      "name": "goat-5",
-      "node": "goat-5",
-      "seed": 20292604,
-      "tags": [
-        "animal",
-        "farm",
-        "goat"
-      ]
-    },
-    {
-      "behaviors": [
-        {
-          "kind": "liveliness",
-          "bounce": 0.058,
-          "bounceRate": 0.75,
-          "sway": 1.51,
-          "swayRate": 0.14,
-          "nod": 1.73
-        },
-        {
-          "arrive": 0.74,
-          "homeRadius": 21.09,
-          "kind": "wander",
-          "maxRange": 11.52,
-          "minRange": 2.93,
-          "pauseMax": 5.19,
-          "pauseMin": 1.06,
-          "runSpeed": 1.5563,
-          "speed": 0.9727,
-          "turnRate": 101.7
-        },
-        {
-          "kind": "ground",
-          "slopeAlign": 0.55,
-          "footprint": 1.29,
-          "bodyRadius": 0.71
-        }
-      ],
-      "clips": {
-        "idle": "Walk",
-        "run": "Walk",
-        "turn": "Walk",
-        "walk": "Walk"
-      },
-      "coarseInterval": 0.1,
-      "cullDistance": 260.0,
-      "fullDetailDistance": 90.0,
-      "gait": {
-        "accel": 1.5574,
-        "decel": 2.1394,
-        "idleRate": 0.0,
-        "matchRate": true,
-        "moveEnter": 0.0323,
-        "moveExit": 0.0162,
-        "rateMax": 1.0,
-        "rateMin": 0.0105,
-        "runEnter": 1.5563,
-        "runExit": 1.1187,
-        "runSpeed": 1.5332,
-        "walkSpeed": 1.5332
-      },
-      "name": "pig-6",
-      "node": "pig-6",
-      "seed": 20300523,
-      "tags": [
-        "animal",
-        "farm",
-        "pig"
-      ]
-    },
-    {
-      "behaviors": [
-        {
-          "kind": "liveliness",
-          "bounce": 0.022,
-          "bounceRate": 0.94,
-          "sway": 3.08,
-          "swayRate": 0.215,
-          "nod": 1.16
-        },
-        {
-          "arrive": 0.66,
-          "homeRadius": 16.56,
-          "kind": "wander",
-          "maxRange": 10.74,
-          "minRange": 2.32,
-          "pauseMax": 3.06,
-          "pauseMin": 1.3,
-          "runSpeed": 0.9183,
-          "speed": 0.5739,
-          "turnRate": 99.6
-        },
-        {
-          "kind": "ground",
-          "slopeAlign": 0.55,
-          "footprint": 0.38,
-          "bodyRadius": 0.21
-        }
-      ],
-      "clips": {
-        "idle": "Walk",
-        "run": "Walk",
-        "turn": "Walk",
-        "walk": "Walk"
-      },
-      "coarseInterval": 0.1,
-      "cullDistance": 260.0,
-      "fullDetailDistance": 90.0,
-      "gait": {
-        "accel": 0.9161,
-        "decel": 1.261,
-        "idleRate": 0.0,
-        "matchRate": true,
-        "moveEnter": 0.0323,
-        "moveExit": 0.0162,
-        "rateMax": 1.0,
-        "rateMin": 0.0168,
-        "runEnter": 0.9183,
-        "runExit": 0.6601,
-        "runSpeed": 0.9646,
-        "walkSpeed": 0.9646
-      },
-      "name": "rooster-7",
-      "node": "rooster-7",
-      "seed": 20308442,
-      "tags": [
-        "animal",
-        "farm",
-        "rooster"
-      ]
-    },
-    {
-      "behaviors": [
-        {
-          "kind": "liveliness",
-          "bounce": 0.054,
-          "bounceRate": 0.79,
-          "sway": 1.56,
-          "swayRate": 0.143,
-          "nod": 1.8
-        },
-        {
-          "arrive": 0.58,
-          "homeRadius": 15.31,
-          "kind": "wander",
-          "maxRange": 9.57,
-          "minRange": 2.53,
-          "pauseMax": 3.82,
-          "pauseMin": 1.65,
-          "runSpeed": 0.8105,
-          "speed": 0.5066,
-          "turnRate": 106.4
-        },
-        {
-          "kind": "ground",
-          "slopeAlign": 0.55,
-          "footprint": 0.33,
-          "bodyRadius": 0.18
-        }
-      ],
-      "clips": {
-        "idle": "Walk",
-        "run": "Walk",
-        "turn": "Walk",
-        "walk": "Walk"
-      },
-      "coarseInterval": 0.1,
-      "cullDistance": 260.0,
-      "fullDetailDistance": 90.0,
-      "gait": {
-        "accel": 0.8083,
-        "decel": 1.1155,
-        "idleRate": 0.0,
-        "matchRate": true,
-        "moveEnter": 0.0323,
-        "moveExit": 0.0162,
-        "rateMax": 1.0,
-        "rateMin": 0.0147,
-        "runEnter": 0.8105,
-        "runExit": 0.5825,
-        "runSpeed": 1.0965,
-        "walkSpeed": 1.0965
-      },
-      "name": "chicken-8",
-      "node": "chicken-8",
-      "seed": 20316361,
-      "tags": [
-        "animal",
-        "farm",
-        "chicken"
+        "cow"
       ]
     },
     {
@@ -9103,311 +8771,6 @@
         "farm",
         "cow"
       ]
-    },
-    {
-      "behaviors": [
-        {
-          "kind": "liveliness",
-          "bounce": 0.059,
-          "bounceRate": 0.88,
-          "sway": 2.24,
-          "swayRate": 0.209,
-          "nod": 2.26
-        },
-        {
-          "arrive": 0.88,
-          "homeRadius": 16.93,
-          "kind": "wander",
-          "maxRange": 11.88,
-          "minRange": 2.89,
-          "pauseMax": 3.54,
-          "pauseMin": 1.43,
-          "runSpeed": 1.0357,
-          "speed": 0.6472,
-          "turnRate": 88.8
-        },
-        {
-          "kind": "ground",
-          "slopeAlign": 0.55,
-          "footprint": 1.26,
-          "bodyRadius": 0.69
-        }
-      ],
-      "clips": {
-        "idle": "Walk",
-        "run": "Walk",
-        "turn": "Walk",
-        "walk": "Walk"
-      },
-      "coarseInterval": 0.1,
-      "cullDistance": 260.0,
-      "fullDetailDistance": 90.0,
-      "gait": {
-        "accel": 1.0347,
-        "decel": 1.4227,
-        "idleRate": 0.0,
-        "matchRate": true,
-        "moveEnter": 0.0323,
-        "moveExit": 0.0162,
-        "rateMax": 1.0,
-        "rateMin": 0.0121,
-        "runEnter": 1.0357,
-        "runExit": 0.7442,
-        "runSpeed": 1.3374,
-        "walkSpeed": 1.3374
-      },
-      "name": "sheep-13",
-      "node": "sheep-13",
-      "seed": 20355956,
-      "tags": [
-        "animal",
-        "farm",
-        "sheep"
-      ]
-    },
-    {
-      "behaviors": [
-        {
-          "kind": "liveliness",
-          "bounce": 0.05,
-          "bounceRate": 0.77,
-          "sway": 1.73,
-          "swayRate": 0.1,
-          "nod": 1.28
-        },
-        {
-          "arrive": 0.87,
-          "homeRadius": 21.34,
-          "kind": "wander",
-          "maxRange": 12.76,
-          "minRange": 2.13,
-          "pauseMax": 4.29,
-          "pauseMin": 0.84,
-          "runSpeed": 0.9991,
-          "speed": 0.6246,
-          "turnRate": 107.1
-        },
-        {
-          "kind": "ground",
-          "slopeAlign": 0.55,
-          "footprint": 0.84,
-          "bodyRadius": 0.46
-        }
-      ],
-      "clips": {
-        "idle": "Walk",
-        "run": "Walk",
-        "turn": "Walk",
-        "walk": "Walk"
-      },
-      "coarseInterval": 0.1,
-      "cullDistance": 260.0,
-      "fullDetailDistance": 90.0,
-      "gait": {
-        "accel": 0.9969,
-        "decel": 1.3742,
-        "idleRate": 0.0,
-        "matchRate": true,
-        "moveEnter": 0.0323,
-        "moveExit": 0.0162,
-        "rateMax": 1.0,
-        "rateMin": 0.0143,
-        "runEnter": 0.9991,
-        "runExit": 0.7183,
-        "runSpeed": 1.1312,
-        "walkSpeed": 1.1312
-      },
-      "name": "goat-14",
-      "node": "goat-14",
-      "seed": 20363875,
-      "tags": [
-        "animal",
-        "farm",
-        "goat"
-      ]
-    },
-    {
-      "behaviors": [
-        {
-          "kind": "liveliness",
-          "bounce": 0.021,
-          "bounceRate": 0.9,
-          "sway": 2.64,
-          "swayRate": 0.137,
-          "nod": 1.39
-        },
-        {
-          "arrive": 0.69,
-          "homeRadius": 15.97,
-          "kind": "wander",
-          "maxRange": 9.94,
-          "minRange": 2.61,
-          "pauseMax": 3.35,
-          "pauseMin": 1.28,
-          "runSpeed": 0.9916,
-          "speed": 0.6197,
-          "turnRate": 106.7
-        },
-        {
-          "kind": "ground",
-          "slopeAlign": 0.55,
-          "footprint": 1.23,
-          "bodyRadius": 0.68
-        }
-      ],
-      "clips": {
-        "idle": "Walk",
-        "run": "Walk",
-        "turn": "Walk",
-        "walk": "Walk"
-      },
-      "coarseInterval": 0.1,
-      "cullDistance": 260.0,
-      "fullDetailDistance": 90.0,
-      "gait": {
-        "accel": 0.9916,
-        "decel": 1.3634,
-        "idleRate": 0.0,
-        "matchRate": true,
-        "moveEnter": 0.0323,
-        "moveExit": 0.0162,
-        "rateMax": 1.0,
-        "rateMin": 0.0105,
-        "runEnter": 0.9916,
-        "runExit": 0.7124,
-        "runSpeed": 1.5332,
-        "walkSpeed": 1.5332
-      },
-      "name": "pig-15",
-      "node": "pig-15",
-      "seed": 20371794,
-      "tags": [
-        "animal",
-        "farm",
-        "pig"
-      ]
-    },
-    {
-      "behaviors": [
-        {
-          "kind": "liveliness",
-          "bounce": 0.056,
-          "bounceRate": 0.72,
-          "sway": 1.51,
-          "swayRate": 0.115,
-          "nod": 2.47
-        },
-        {
-          "arrive": 0.74,
-          "homeRadius": 20.26,
-          "kind": "wander",
-          "maxRange": 9.11,
-          "minRange": 2.98,
-          "pauseMax": 3.28,
-          "pauseMin": 1.35,
-          "runSpeed": 0.7426,
-          "speed": 0.464,
-          "turnRate": 110.8
-        },
-        {
-          "kind": "ground",
-          "slopeAlign": 0.55,
-          "footprint": 0.38,
-          "bodyRadius": 0.21
-        }
-      ],
-      "clips": {
-        "idle": "Walk",
-        "run": "Walk",
-        "turn": "Walk",
-        "walk": "Walk"
-      },
-      "coarseInterval": 0.1,
-      "cullDistance": 260.0,
-      "fullDetailDistance": 90.0,
-      "gait": {
-        "accel": 0.7437,
-        "decel": 1.0185,
-        "idleRate": 0.0,
-        "matchRate": true,
-        "moveEnter": 0.0323,
-        "moveExit": 0.0162,
-        "rateMax": 1.0,
-        "rateMin": 0.0168,
-        "runEnter": 0.7426,
-        "runExit": 0.5335,
-        "runSpeed": 0.9646,
-        "walkSpeed": 0.9646
-      },
-      "name": "rooster-16",
-      "node": "rooster-16",
-      "seed": 20379713,
-      "tags": [
-        "animal",
-        "farm",
-        "rooster"
-      ]
-    },
-    {
-      "behaviors": [
-        {
-          "kind": "liveliness",
-          "bounce": 0.028,
-          "bounceRate": 1.04,
-          "sway": 1.48,
-          "swayRate": 0.215,
-          "nod": 2.19
-        },
-        {
-          "arrive": 0.5,
-          "homeRadius": 19.6,
-          "kind": "wander",
-          "maxRange": 13.29,
-          "minRange": 2.1,
-          "pauseMax": 4.72,
-          "pauseMin": 1.65,
-          "runSpeed": 1.0794,
-          "speed": 0.6747,
-          "turnRate": 78.4
-        },
-        {
-          "kind": "ground",
-          "slopeAlign": 0.55,
-          "footprint": 0.33,
-          "bodyRadius": 0.18
-        }
-      ],
-      "clips": {
-        "idle": "Walk",
-        "run": "Walk",
-        "turn": "Walk",
-        "walk": "Walk"
-      },
-      "coarseInterval": 0.1,
-      "cullDistance": 260.0,
-      "fullDetailDistance": 90.0,
-      "gait": {
-        "accel": 1.0778,
-        "decel": 1.4819,
-        "idleRate": 0.0,
-        "matchRate": true,
-        "moveEnter": 0.0323,
-        "moveExit": 0.0162,
-        "rateMax": 1.0,
-        "rateMin": 0.0147,
-        "runEnter": 1.0794,
-        "runExit": 0.776,
-        "runSpeed": 1.0965,
-        "walkSpeed": 1.0965
-      },
-      "name": "chicken-17",
-      "node": "chicken-17",
-      "seed": 20387632,
-      "tags": [
-        "animal",
-        "farm",
-        "chicken"
-      ]
     }
   ],
   "navWadeDepth": 0.8536,
@@ -9496,7 +8859,7 @@
           },
           {
             "name": "beamFadeSeconds",
-            "value": 0.9,
+            "value": 0.15,
             "min": 0.0,
             "max": 10.0
           },
@@ -9567,6 +8930,12 @@
             "max": 10.0
           },
           {
+            "name": "beamSize",
+            "value": 1.0,
+            "min": 0.0,
+            "max": 4.0
+          },
+          {
             "name": "beamRestRate",
             "value": 0.0,
             "min": 0.0,
@@ -9597,14 +8966,26 @@
             "max": 10.0
           },
           {
+            "name": "glowHoldSeconds",
+            "value": 2.0,
+            "min": 0.0,
+            "max": 30.0
+          },
+          {
+            "name": "fadeDelaySeconds",
+            "value": 3.4,
+            "min": 0.0,
+            "max": 30.0
+          },
+          {
             "name": "fadeSeconds",
-            "value": 1.4,
+            "value": 1.2,
             "min": 0.1,
             "max": 10.0
           },
           {
             "name": "glowFadeSeconds",
-            "value": 1.9,
+            "value": 1.2,
             "min": 0.0,
             "max": 10.0
           }
@@ -9633,7 +9014,7 @@
             ],
             "cues": [],
             "then": "approach",
-            "otherwise": ""
+            "otherwise": "acquire"
           },
           {
             "name": "approach",
@@ -9756,6 +9137,23 @@
                     "duration": 0.2
                   }
                 ]
+              },
+              {
+                "role": "actor.beam",
+                "steps": [
+                  {
+                    "kind": "set",
+                    "name": "beamWidth",
+                    "target": "size",
+                    "from": 0.0,
+                    "to": {
+                      "param": "beamSize"
+                    },
+                    "duration": {
+                      "param": "beamSeconds"
+                    }
+                  }
+                ]
               }
             ],
             "then": "abduct"
@@ -9829,15 +9227,11 @@
                     }
                   },
                   {
-                    "kind": "set",
-                    "name": "fade",
-                    "target": "opacity",
-                    "from": 1.0,
-                    "to": 0.0,
+                    "kind": "wait",
+                    "name": "glow-hold",
                     "duration": {
-                      "param": "fadeSeconds"
-                    },
-                    "ease": true
+                      "param": "glowHoldSeconds"
+                    }
                   },
                   {
                     "kind": "set",
@@ -9847,6 +9241,29 @@
                     "duration": {
                       "param": "glowFadeSeconds"
                     }
+                  }
+                ]
+              },
+              {
+                "role": "target",
+                "steps": [
+                  {
+                    "kind": "wait",
+                    "name": "rise",
+                    "duration": {
+                      "param": "fadeDelaySeconds"
+                    }
+                  },
+                  {
+                    "kind": "set",
+                    "name": "fade",
+                    "target": "opacity",
+                    "from": 1.0,
+                    "to": 0.0,
+                    "duration": {
+                      "param": "fadeSeconds"
+                    },
+                    "ease": true
                   },
                   {
                     "kind": "retire",
@@ -9871,6 +9288,13 @@
                     "to": {
                       "param": "beamRestRate"
                     },
+                    "duration": 0.0
+                  },
+                  {
+                    "kind": "set",
+                    "name": "beamCut",
+                    "target": "size",
+                    "to": 0.0,
                     "duration": {
                       "param": "beamFadeSeconds"
                     }
