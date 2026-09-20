@@ -396,6 +396,17 @@ private:
         bool aimed = false;               // directional or spot: has azimuth/elevation parameters
     };
     std::vector<StartLight> startLights_;
+
+    // A selected camera's state at the press. A camera is neither a node nor a light: it has no
+    // parent frame and no scale, and its orientation is a *target point* rather than angles -- so
+    // rotating one moves where it looks, not a quaternion it stores.
+    struct StartCamera {
+        std::string prefix;   // `cameras/<slug>/`, frozen at creation so a rename cannot orphan it
+        glm::vec3 position{0.0f};
+        glm::vec3 target{0.0f};
+    };
+    std::vector<StartCamera> startCameras_;
+    void collectSelectedCameras(app::Engine& engine, std::vector<StartCamera>& out) const;
     // The selected lights' positions and ids, rebuilt each frame for the gizmo and the drag.
     void collectSelectedLights(app::Engine& engine, std::vector<StartLight>& out) const;
 

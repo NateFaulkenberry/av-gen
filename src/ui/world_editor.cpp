@@ -658,6 +658,41 @@ void WorldEditor::collectSelectedLights(app::Engine& engine, std::vector<StartLi
     }
 }
 
+void WorldEditor::collectSelectedCameras(app::Engine& engine, std::vector<StartCamera>& out) const {
+    out.clear();
+    const scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        return;
+    }
+    for (const SelectionRef& ref : selection.refs()) {
+        if (ref.kind != SelectionRef::Kind::Camera) {
+            continue;
+        }
+        for (const scene::CameraRig& rig : composition->cameraDirection().cameras) {
+            if (rig.name != ref.name) {
+                continue;
+            }
+            StartCamera start;
+            start.prefix = rig.channelPrefix();
+            // From the parameter rather than the rig, because the parameter is what a drag writes
+            // and what the panel's own "Place here" writes; reading the rig would start the drag
+            // from a value a previous drag had not yet been folded back into.
+            if (const auto* p = engine.params().find(start.prefix + "position")) {
+                start.position = glm::vec3(p->baseComponent(0), p->baseComponent(1), p->baseComponent(2));
+            } else {
+                start.position = rig.position;
+            }
+            if (const auto* t = engine.params().find(start.prefix + "target")) {
+                start.target = glm::vec3(t->baseComponent(0), t->baseComponent(1), t->baseComponent(2));
+            } else {
+                start.target = rig.target;
+            }
+            out.push_back(std::move(start));
+            break;
+        }
+    }
+}
+
 bool WorldEditor::buildGizmoFrame(app::Engine& engine, const scene::Camera& camera) {
     scene::Composition* composition = engine.composition();
     if (composition == nullptr || selection.empty()) {
@@ -673,6 +708,11 @@ bool WorldEditor::buildGizmoFrame(app::Engine& engine, const scene::Camera& came
     collectSelectedLights(engine, lights);
     for (const StartLight& light : lights) {
         bounds.include(light.position);
+    }
+    std::vector<StartCamera> cameras;
+    collectSelectedCameras(engine, cameras);
+    for (const StartCamera& cam : cameras) {
+        bounds.include(cam.position);
     }
 
     if (!bounds.valid) {
@@ -701,6 +741,7 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
             drag_ = GizmoDrag{};
             startTransforms_.clear();
             startLights_.clear();
+            startCameras_.clear();
         }
         return;
     }
@@ -761,6 +802,62 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
                     // and a cone angle on a spot, and silently reinterpreting a scale drag as one of
                     // those would be a gesture whose meaning depends on the type -- so the scale
                     // tool leaves lights alone and the panel owns those numbers.
+                    break;
+                }
+            }
+
+            // The selected cameras.
+            //
+            // A camera is moved by writing `cameras/<slug>/position` and `target` -- its OWN
+            // parameters -- which is why dragging one is safe where dragging the viewport is not.
+            // The viewport camera is `camera/*` and standing the director down to move it discards
+            // the bake (ADR-386's lock); an authored rig has no such entanglement. That is §28's
+            // three-way distinction doing real work rather than being a note.
+            for (const StartCamera& start : startCameras_) {
+                auto* position = engine.params().find(start.prefix + "position");
+                auto* target = engine.params().find(start.prefix + "target");
+                if (position == nullptr) {
+                    continue;
+                }
+                switch (drag_.mode) {
+                case GizmoMode::Move: {
+                    // Position and target move together, or a dolly becomes a pan: the camera would
+                    // slide sideways while still staring at the point it started from.
+                    const glm::vec3 moved = start.position + delta.translation;
+                    for (std::size_t c = 0; c < 3; ++c) {
+                        position->setBaseComponent(c, moved[c]);
+                    }
+                    if (target != nullptr) {
+                        const glm::vec3 movedTarget = start.target + delta.translation;
+                        for (std::size_t c = 0; c < 3; ++c) {
+                            target->setBaseComponent(c, movedTarget[c]);
+                        }
+                    }
+                    break;
+                }
+                case GizmoMode::Rotate: {
+                    // Turning a camera turns where it LOOKS. A rig stores a target point rather
+                    // than an orientation, so the rotation is applied to the offset from the body
+                    // to the target -- and the body itself swings about the shared pivot like
+                    // everything else in the selection.
+                    const glm::vec3 moved = pivot + delta.rotation * (start.position - pivot);
+                    for (std::size_t c = 0; c < 3; ++c) {
+                        position->setBaseComponent(c, moved[c]);
+                    }
+                    if (target != nullptr) {
+                        const glm::vec3 look = delta.rotation * (start.target - start.position);
+                        const glm::vec3 movedTarget = moved + look;
+                        for (std::size_t c = 0; c < 3; ++c) {
+                            target->setBaseComponent(c, movedTarget[c]);
+                        }
+                    }
+                    break;
+                }
+                case GizmoMode::Scale:
+                    // A camera has no scale. Its "size" is its lens, which is `focalLength` and
+                    // `fovDegrees` on the rig and belongs to the Cameras panel -- reinterpreting a
+                    // scale drag as a zoom would be a gesture whose meaning depends on what is
+                    // selected. The viewport brief says scale should be disabled for cameras.
                     break;
                 }
             }
@@ -841,6 +938,7 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
             drag_ = GizmoDrag{};
             startTransforms_.clear();
             startLights_.clear();
+            startCameras_.clear();
         }
         return;
     }
@@ -876,6 +974,7 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
             // list -- a path the drag does not name is a change the single undo step does not
             // carry, so the light would move and stay moved through an undo.
             collectSelectedLights(engine, startLights_);
+            collectSelectedCameras(engine, startCameras_);
             std::vector<std::string> dragPaths = transformParamPaths(topmostOf(*composition, selection.nodes()));
             for (const StartLight& light : startLights_) {
                 dragPaths.push_back("lights/" + light.id + "/position");
@@ -883,6 +982,10 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
                     dragPaths.push_back("lights/" + light.id + "/azimuth");
                     dragPaths.push_back("lights/" + light.id + "/elevation");
                 }
+            }
+            for (const StartCamera& cam : startCameras_) {
+                dragPaths.push_back(cam.prefix + "position");
+                dragPaths.push_back(cam.prefix + "target");
             }
             const std::string what =
                 selection.size() == 1

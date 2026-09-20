@@ -1555,3 +1555,85 @@ TEST_CASE("a locked camera keeps its bake through a drag and a save", "[camera][
     CHECK(engine.shotSpans().empty());
 #endif
 }
+
+TEST_CASE("dragging an authored camera does not disturb the director's cut",
+          "[camera][director][lock]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    // The claim this checks is plausible and therefore worth checking: moving a camera in the
+    // Canvas writes that rig's OWN parameters (`cameras/<slug>/position` and `target`), where
+    // moving the *viewport* writes `camera/*` and stands the director down. §28's three-way
+    // distinction is the reason those are different operations, and if they were not, making
+    // cameras draggable would have handed everyone the data-loss defect the lock exists to stop.
+    const std::filesystem::path wav =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "audio" / "glowmere-valley.wav";
+    if (!std::filesystem::exists(wav)) {
+        SKIP("glowmere-valley.wav is generated, not committed: run tools/make_glowmere_score.py");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    REQUIRE(engine.loadAudio(wav).has_value());
+    REQUIRE(engine.composition()->setHeroes(threeHeroes()).has_value());
+
+    // An authored camera to drag.
+    scene::CameraDirection direction = engine.composition()->cameraDirection();
+    scene::CameraRig rig;
+    rig.name = "Hero Closeup";
+    rig.position = glm::vec3(3.0f, 2.0f, 8.0f);
+    rig.target = glm::vec3(0.0f, 1.0f, 0.0f);
+    const scene::CameraId added = direction.addCamera(rig);
+    REQUIRE(engine.setCameraDirection(std::move(direction)).has_value());
+
+    app::DirectorState state;
+    REQUIRE(app::directEngine(engine, engine.composition()->heroes(), {}).has_value());
+    app::noteDirected(engine, state);
+
+    const std::size_t aimFollowBefore = engine.composition()->aimFollow().size();
+    const std::size_t spansBefore = engine.shotSpans().size();
+    REQUIRE(spansBefore + aimFollowBefore > 0); // the premise; see the case above
+
+    // The drag, exactly as `WorldEditor::updateGizmo` performs it: write the rig's own parameters.
+    const scene::CameraRig* live = nullptr;
+    for (const scene::CameraRig& r : engine.composition()->cameraDirection().cameras) {
+        if (r.id == added) {
+            live = &r;
+        }
+    }
+    REQUIRE(live != nullptr);
+    const std::string prefix = live->channelPrefix();
+    auto* position = engine.params().find(prefix + "position");
+    REQUIRE(position != nullptr);
+    position->setBaseComponent(0, 11.0f);
+    position->setBaseComponent(1, 6.0f);
+    position->setBaseComponent(2, 2.0f);
+
+    // Nothing the director baked has moved.
+    CHECK(engine.timeline().isAutomated("camera/position"));
+    CHECK(engine.composition()->aimFollow().size() == aimFollowBefore);
+    CHECK(engine.shotSpans().size() == spansBefore);
+    CHECK(state.directed);
+
+    // And the save an offline render reloads still carries both tables, plus the drag.
+    const std::filesystem::path dir = std::filesystem::temp_directory_path() / "avgen-camera-drag";
+    std::filesystem::create_directories(dir);
+    const std::filesystem::path project = dir / "dragged.json";
+    REQUIRE(engine.saveProject(project).has_value());
+    std::ifstream in(project);
+    const nlohmann::json doc = nlohmann::json::parse(in);
+    if (aimFollowBefore > 0) {
+        REQUIRE(doc.contains("cameraAimFollow"));
+        CHECK(doc["cameraAimFollow"].size() == aimFollowBefore);
+    }
+    if (spansBefore > 0) {
+        REQUIRE(doc.contains("cameraShotSpans"));
+        CHECK(doc["cameraShotSpans"].size() == spansBefore);
+    }
+    // THE CONTROL that the drag happened at all: a test asserting only that tables survived would
+    // pass just as well against a drag that silently did nothing.
+    REQUIRE(doc.contains("parameters"));
+    REQUIRE(doc["parameters"].contains(prefix + "position"));
+    CHECK_THAT(doc["parameters"][prefix + "position"][0].get<float>(),
+               Catch::Matchers::WithinAbs(11.0, 1e-4));
+#endif
+}
