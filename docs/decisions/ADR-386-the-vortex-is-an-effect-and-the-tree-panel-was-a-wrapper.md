@@ -1,4 +1,4 @@
-# ADR-383: The vortex is an effect, and the Tree panel was a wrapper around one scene
+# ADR-386: The vortex is an effect, and the Tree panel was a wrapper around one scene
 
 - Status: Accepted (2026-09-19)
 - Supersedes the Tree panel half of ADR-375. Extends ADR-230 (atmospheric effects), ADR-207 (world

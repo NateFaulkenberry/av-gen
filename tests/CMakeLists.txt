@@ -15,6 +15,14 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
+    # The frame-range driver (ADR-383): the range arithmetic, the frame loop, the hash chain and
+    # the bounded writer pool, with no GPU and no renderer in any of it. On this list for the
+    # reason `output_preview.cpp` is -- a sequence that is a frame short, or hashes out of order,
+    # is the kind of wrong that a device is not needed to find and a device makes harder to find.
+    "${CMAKE_SOURCE_DIR}/src/app/frame_range.cpp"
+    # A path-traced sequence (ADR-383). It needs no GPU -- which is the whole point of it -- so it
+    # belongs in the CPU suite where it can actually be run.
+    "${CMAKE_SOURCE_DIR}/src/app/trace_sequence.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/scene_states.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/profile_capture.cpp"

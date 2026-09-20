@@ -193,7 +193,7 @@ constexpr BoolField kAuroraBools[] = {
     {"rainbow", F_GET(e.aurora.rainbow.enabled), B_SET(e.aurora.rainbow.enabled)},
 };
 
-// ADR-383: the vortex's parameters, table-driven like the other two kinds so it gains
+// ADR-386: the vortex's parameters, table-driven like the other two kinds so it gains
 // registration, apply, capture and default routes without a line of bespoke code.
 constexpr FloatField kVortexFloats[] = {
     {"radius", 0.0f, 20000.0f, 0.0f, 1500.0f, F_GET(e.vortex.radius), F_SET(e.vortex.radius)},

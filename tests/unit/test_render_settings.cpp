@@ -1,6 +1,7 @@
 // Milestone 1.0: render settings (ADR-020) — ranges, frame counts, patterns, JSON.
 
 #include "app/render_settings.hpp"
+#include "app/frame_range.hpp"
 #include "app/render_state.hpp"
 
 #include "pathtrace/path_tracer.hpp"
@@ -414,6 +415,8 @@ TEST_CASE("--aov shadow refuses the configurations where it would be a constant"
 TEST_CASE("Every path-trace setting survives a JSON round trip, twice", "[render][pathtrace][settings]") {
     PathTraceSettings authored;
     authored.seconds = 12.75;
+    authored.endSeconds = 20.5;     // ADR-383: the range is part of the authored set
+    authored.fps = 30.0;
     authored.samplesPerPixel = 512;
     authored.maxDepth = 9;
     authored.seed = 0xfeedfacecafebeefULL;
@@ -427,6 +430,8 @@ TEST_CASE("Every path-trace setting survives a JSON round trip, twice", "[render
     // emits nothing at all passes a test whose input is the defaults.
     const PathTraceSettings defaults;
     REQUIRE(authored.seconds != defaults.seconds);
+    REQUIRE(authored.endSeconds != defaults.endSeconds);
+    REQUIRE(authored.fps != defaults.fps);
     REQUIRE(authored.samplesPerPixel != defaults.samplesPerPixel);
     REQUIRE(authored.maxDepth != defaults.maxDepth);
     REQUIRE(authored.seed != defaults.seed);
@@ -442,6 +447,8 @@ TEST_CASE("Every path-trace setting survives a JSON round trip, twice", "[render
     REQUIRE(second.has_value());
 
     CHECK(second->seconds == authored.seconds);
+    CHECK(second->endSeconds == authored.endSeconds);
+    CHECK(second->fps == authored.fps);
     CHECK(second->samplesPerPixel == authored.samplesPerPixel);
     CHECK(second->maxDepth == authored.maxDepth);
     // The seed goes through the integer path deliberately: 0x853c49e6748fea9b does not survive a
@@ -465,6 +472,32 @@ TEST_CASE("A project with no pathtrace block reads the defaults, not the last on
     CHECK_FALSE(PathTraceSettings::fromJson(nlohmann::json(42)).has_value());
     CHECK_FALSE(PathTraceSettings::fromJson(nlohmann::json{{"samples", "lots"}}).has_value());
     CHECK_FALSE(PathTraceSettings::fromJson(nlohmann::json{{"denoise", 1}}).has_value());
+}
+
+TEST_CASE("A project with no range traces one frame, and saying so is not a range",
+          "[render][pathtrace][settings]") {
+    // ADR-383. Every project written before the range existed says nothing about it, and every one
+    // of them must still mean "one frame at `seconds`". The default is what carries that, so it is
+    // asserted rather than assumed.
+    const PathTraceSettings defaults;
+    CHECK_FALSE(defaults.isSequence());
+    CHECK(defaults.frameRange().frameCount(defaults.frameRange().resolvedEnd(0.0, 0.0)) == 1);
+
+    PathTraceSettings ranged = defaults;
+    ranged.seconds = 2.0;
+    ranged.endSeconds = 3.0;
+    ranged.fps = 24.0;
+    CHECK(ranged.isSequence());
+    CHECK(ranged.frameRange().frameCount(3.0) == 24);
+
+    // The edge that decides which side of the branch a person lands on: an end EQUAL to the start
+    // is a sequence of one frame, not "not a sequence". It has to be one or the other and silence
+    // about it is how a UI checkbox and a job disagree.
+    PathTraceSettings degenerate = defaults;
+    degenerate.seconds = 5.0;
+    degenerate.endSeconds = 5.0;
+    CHECK(degenerate.isSequence());
+    CHECK(degenerate.frameRange().frameCount(5.0) == 1);
 }
 
 TEST_CASE("Path-trace settings refuse what cannot be a render", "[render][pathtrace][settings]") {

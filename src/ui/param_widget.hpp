@@ -1,6 +1,6 @@
 #pragma once
 
-// ADR-383: one widget for "edit this parameter", shared by every panel that offers one.
+// ADR-386: one widget for "edit this parameter", shared by every panel that offers one.
 //
 // The Parameters panel had the only implementation -- the kind switch, the component fan-out, the
 // base-not-final write-back and the "= 0.312" annotation when a route is moving it. Every other

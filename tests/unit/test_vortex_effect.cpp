@@ -1,4 +1,4 @@
-// ADR-383: the vortex as an authored World Effect rather than a field on the environment, and the
+// ADR-386: the vortex as an authored World Effect rather than a field on the environment, and the
 // removal of the Tree panel that wrapped it.
 //
 // Four questions, and each has a control that could fail the other way:

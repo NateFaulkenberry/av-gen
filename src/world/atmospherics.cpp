@@ -228,7 +228,7 @@ Result<void> Aurora::validate() const {
     return {};
 }
 
-// ADR-383. The gate is `radius`: every shader function returns before doing any work at zero, so a
+// ADR-386. The gate is `radius`: every shader function returns before doing any work at zero, so a
 // zero radius must stay legal (it is the default, and it is what every scene but one has).
 Result<void> Vortex::validate() const {
     if (!finite(center.x) || !finite(center.y) || !finite(center.z)) {
@@ -422,7 +422,7 @@ json AtmosphericEffect::toJson() const {
                        {"spectrumShape", a.audio.spectrumShape}}},
         {"rainbow", rainbowToJson(a.rainbow)}};
 
-    // ADR-383: flat, because every one of these is a single authored number with no sub-structure
+    // ADR-386: flat, because every one of these is a single authored number with no sub-structure
     // and the names are the ones the legacy `environment.vortex` block used -- a scene migrated
     // from that form reads back identically field for field.
     const Vortex& vx = vortex;
@@ -623,7 +623,7 @@ namespace {
 constexpr std::array<std::string_view, 5> kCometStyles{"Bioluminescent Cyan", "Rainbow Cosmic",
                                                        "Emerald Teal", "Magenta Blue",
                                                        "Subtle Shooting Star"};
-// ADR-383. "Cosmic Funnel" is the Tree of Life's shipped funnel, value for value, for the reason
+// ADR-386. "Cosmic Funnel" is the Tree of Life's shipped funnel, value for value, for the reason
 // the factory comment above gives: a preset that only approximates the scene it was taken from is a
 // preset that drifts from it. The other two are the two directions that turned out to read -- a
 // shallow disc seen from above, and a deeper, denser throat.
@@ -1116,7 +1116,7 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
             r.anchor = anchorOf(s.anchor, s.anchorPosition, ctx.cameraPosition);
             auroras[counts.auroras++] = r;
         } else {
-            // ADR-383: a vortex has no per-frame trajectory to resolve -- it is a static field the
+            // ADR-386: a vortex has no per-frame trajectory to resolve -- it is a static field the
             // volume march samples -- so resolution is "is it live", and the payload travels
             // unchanged. Counted as dropped past the first, so the second one in a scene is a
             // reported limit rather than a silent no-op.
@@ -1213,7 +1213,7 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
 
     out.cometCount = static_cast<std::uint32_t>(counts.comets);
     out.auroraCount = static_cast<std::uint32_t>(counts.auroras);
-    // ADR-383: the first live vortex, copied through. Its `enabled`, activation and lifetime
+    // ADR-386: the first live vortex, copied through. Its `enabled`, activation and lifetime
     // envelope were already applied by the resolve above, so a vortex inside a closed window
     // arrives here switched off exactly as a comet does.
     out.hasVortex = false;

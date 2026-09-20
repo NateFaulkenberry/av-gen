@@ -77,3 +77,45 @@ target_link_libraries(avgen_charai_probe PRIVATE avgen_core)
 # TEMPORARY (ADR-273). Delete with the phase it priced.
 add_executable(avgen_seek_probe seek_probe.cpp)
 target_link_libraries(avgen_seek_probe PRIVATE avgen_core)
+
+# TEMPORARY (ADR-383, the audit's W6). The Metal ray-tracing DECISION, not a backend: does Metal
+# beat Embree on an M2, where there is no hardware RT unit? Delete it with the decision it informs.
+if(APPLE)
+    # The same app/ sources `avgen_overlay_shot` lists, and for the same reason: `Engine` lives in
+    # the executable's glob rather than in `avgen_core`, so anything outside the app that wants to
+    # load a project has to name them.
+    add_executable(avgen_metal_rt_probe metal_rt_probe.mm
+        "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/frame_range.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/scene_states.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/world_director.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/music_runtime.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/placement.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/edit_system.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/camera_director.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/asset_browser.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/profile_capture.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/job_system.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/world_builder.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/ai_edit_sink.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/examples.cpp"
+        # `edit_system.cpp` and `ai_edit_sink.cpp` reach into the editor's undo stack, which lives
+        # in `src/ui/`. Three files rather than linking `avgen_platform`, because that would drag
+        # Dear ImGui and a window into a probe that wants neither.
+        "${CMAKE_SOURCE_DIR}/src/ui/edit_history.cpp"
+        "${CMAKE_SOURCE_DIR}/src/ui/world_edit.cpp"
+        "${CMAKE_SOURCE_DIR}/src/ui/world_editor.cpp"
+        "${CMAKE_SOURCE_DIR}/src/ui/world_probe.cpp"
+        "${CMAKE_SOURCE_DIR}/src/ui/brush.cpp"
+        "${CMAKE_SOURCE_DIR}/src/ui/gizmo.cpp"
+        "${CMAKE_SOURCE_DIR}/src/ui/output_preview.cpp")
+    set_source_files_properties(metal_rt_probe.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    target_link_libraries(avgen_metal_rt_probe PRIVATE avgen_core
+        "-framework Metal" "-framework Foundation")
+endif()

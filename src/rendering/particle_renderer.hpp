@@ -73,6 +73,10 @@ static_assert(sizeof(ParticleUniforms) == 128 + 16 * 28 + 32 * scene::kMaxFieldF
 struct ParticleFrameContext {
     // ADR-370: the frame's wind, packed by wind::packWind, exactly as FrameUniforms carries it.
     wind::WindUniforms wind{};
+    // ADR-382: the quality tier's multiplier on every system's spawn rate. Capacity is deliberately
+    // not scaled -- changing it destroys and recreates the pool (ADR-015), so a tier change would
+    // empty every system mid-shot.
+    float spawnScale = 1.0f;
     glm::mat4 prevViewProj{1.0f};   // ADR-035, for the velocity target
     glm::vec3 cameraPosition{0.0f}; // ribbons face it; the fog coupling marches from it
     float shutterSeconds = 0.0f;    // shutterAngle / 360 * frame duration (ADR-037)

@@ -1,4 +1,4 @@
-// ADR-375, revised by ADR-383. See environment_panel.hpp for why this exists when every control
+// ADR-375, revised by ADR-386. See environment_panel.hpp for why this exists when every control
 // in it was already reachable from the Parameters panel, and for where the Tree panel's sections
 // went.
 
@@ -92,7 +92,7 @@ void drawEnvironmentPanel(app::Engine& engine) {
         ImGui::PopID();
     }
 
-    // ADR-055's field, and ADR-383's §18: ONE authoritative global wind. `scene/windSpeed` and
+    // ADR-055's field, and ADR-386's §18: ONE authoritative global wind. `scene/windSpeed` and
     // `scene/windDirection` are it. What a given tree does with that air is a response multiplier
     // on the tree, not a second global, and it is edited where the tree is -- see the note at the
     // bottom of this section.

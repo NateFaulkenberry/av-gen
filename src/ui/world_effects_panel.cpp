@@ -486,7 +486,7 @@ namespace {
 
 const char* const kGroundGlowNames[] = {"off", "subtle", "strong"};
 
-// ADR-383: walks a declared row list. The panel and `tests/unit/test_world_effects_panel.cpp` ask
+// ADR-386: walks a declared row list. The panel and `tests/unit/test_world_effects_panel.cpp` ask
 // the same question of the same data, which is the thing ADR-382's defect was missing -- there, the
 // path arithmetic lived inside the draw call and no test could reach it.
 void drawEffectRows(app::Engine& engine, const std::string& prefix, std::span<const EffectRow> rows) {
@@ -658,7 +658,7 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
     }
 
     if (isVortex) {
-        // ADR-383. `density` is extinction and `emission` is light -- ADR-374 is the whole reason
+        // ADR-386. `density` is extinction and `emission` is light -- ADR-374 is the whole reason
         // they are two knobs, so they are labelled as two different things rather than as
         // "opacity" and "glow", which is how they got confused in the first place. The rows are
         // `ui::vortexRows()` rather than a page of calls, so that a test can ask the same question
@@ -696,7 +696,7 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
     // The mode is a structural choice rather than a parameter: automating "should this light the
     // valley" is not a thing anybody wants, while automating *how much* is -- so the three words are
     // a combo and the intensity below is an ordinary modulatable parameter.
-    // ADR-383: not offered for a vortex. The ground glow is a pool on terrain, and the vortex is
+    // ADR-386: not offered for a vortex. The ground glow is a pool on terrain, and the vortex is
     // under the island with no terrain beneath it; its light on the world is `spill`, above. A combo
     // that changed nothing would be worse than no combo.
     int ground = static_cast<int>(authored.ground.mode);
