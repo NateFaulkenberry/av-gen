@@ -1461,6 +1461,10 @@ void ControlPanel::drawWorldWindow(app::Engine& engine) {
             world.drawDirector(engine);
             ImGui::EndTabItem();
         }
+        if (ImGui::BeginTabItem("Scenarios")) {
+            world.drawScenarios(engine);
+            ImGui::EndTabItem();
+        }
         if (ImGui::BeginTabItem("Macros")) {
             world.drawMacros(engine);
             ImGui::EndTabItem();

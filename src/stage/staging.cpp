@@ -1100,6 +1100,7 @@ void Staging::writeParameter(const Run& run, std::string_view role, const std::s
         // have exactly the same lifetime -- `reset` clears both.
         w.scenario = desc_.scenarios[run.scenario].name;
         w.role = std::string(role);
+        w.entity = resolveName(run, role);
         written_.push_back(std::move(w));
     }
     p->setBaseComponent(0, v);
@@ -1213,6 +1214,7 @@ void Staging::enterBeat(Run& run, const StageContext& ctx) {
     run.beatStart = ctx.time;
     run.gateOpen = false;
     run.gated = false;
+    run.said = false;
     run.cues.assign(beat.cues.size(), CueRun{});
     for (CueRun& cue : run.cues) {
         cue.startedAt = ctx.time;
@@ -1603,7 +1605,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             }
         }
         const auto u = static_cast<float>(std::clamp(elapsed / duration, 0.0, 1.0));
-        writeParameter(run, role, path, glm::mix(cue.span, to, u), ctx);
+        writeParameter(run, role, path, glm::mix(cue.span, to, step.ease ? smoothstep(u) : u), ctx);
         return u >= 1.0f ? StepStatus::Done : StepStatus::Running;
     }
 
@@ -1674,7 +1676,37 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             // holding a director motion that will never be updated again.
             self->clearDirectorMotion();
             self->actions().cancel(entity::Authority::Director, ctx.time);
-            writeParameter(run, role, parameterPath(run, role, {}, ctx), 0.0f, ctx);
+            const std::string hidePath = parameterPath(run, role, {}, ctx);
+            // And put back every parameter this scenario drove *through this role*, to the value it
+            // held before the scenario first touched it, before hiding it (ADR-385).
+            //
+            // A retired body is gone for good, so whatever an effect left on it is a photograph of
+            // one run that nothing will ever clear. That was harmless while the only thing a
+            // scenario wrote was `visible`, and stopped being harmless the moment one of them was
+            // `opacity`: the fade ends at 0, the node stays promoted into the blend pipeline for
+            // the rest of the film, and a save taken afterwards ships an animal that is invisible
+            // twice over. Measured: 3,615 frames of 5,400 still carrying a retired body in `Blend`,
+            // which is what the control arm of "the fade reaches the flattened scene and is given
+            // back" was built to catch, and did, on its first run.
+            //
+            // `written_` already holds the base of everything this director wrote and which role
+            // resolved it, so this replays a record that existed rather than adding a second list
+            // of parameter names the director has to know by heart.
+            if (ctx.params != nullptr) {
+                const std::string& holder = desc_.scenarios[run.scenario].name;
+                for (const Written& w : written_) {
+                    // By the BODY, not by the role: `target` binds a different animal every cycle.
+                    if (w.scenario != holder || w.entity != name || w.path == hidePath) {
+                        continue;
+                    }
+                    if (params::IParameter* p = ctx.params->find(w.path); p != nullptr) {
+                        for (std::size_t c = 0; c < w.base.size() && c < p->componentCount(); ++c) {
+                            p->setBaseComponent(c, w.base[c]);
+                        }
+                    }
+                }
+            }
+            writeParameter(run, role, hidePath, 0.0f, ctx);
         }
         claims_.erase(std::remove_if(claims_.begin(), claims_.end(),
                                      [&](const Claim& c) { return c.entity == name; }),
@@ -1739,6 +1771,17 @@ void Staging::update(const StageContext& ctx) {
     events_.clear();
     if (desc_.scenarios.empty() || ctx.world == nullptr) {
         return;
+    }
+    // One published state per scenario, every frame, whether it runs or not -- an overlay that had
+    // to distinguish "not running" from "the director did not get as far as saying" would be an
+    // overlay reading a stale frame and not knowing it.
+    states_.assign(desc_.scenarios.size(), SequenceState{});
+    for (std::size_t i = 0; i < desc_.scenarios.size(); ++i) {
+        states_[i].scenario = desc_.scenarios[i].name;
+        states_[i].time = ctx.time;
+        states_[i].running = runs_[i].running;
+        states_[i].cycle = runs_[i].cycle;
+        states_[i].maxCycles = desc_.scenarios[i].maxCycles;
     }
     lastWorld_ = ctx.world;
     lastParams_ = ctx.params;
@@ -1834,18 +1877,23 @@ void Staging::update(const StageContext& ctx) {
                 }
             }
             if (moving) {
-                rememberPositions(run, ctx); // the `continue` below skips the tail of the loop
+                // Both of the loop's tail calls, because the `continue` below skips it -- and a
+                // gated frame is precisely the frame an overlay most needs published.
+                run.gated = true;
+                publishState(run, ctx);
+                rememberPositions(run, ctx);
                 for (CueRun& cue : run.cues) {
                     cue.startedAt = ctx.time;
                 }
                 ++report_.gated;
-                if (!run.gated) {
-                    run.gated = true;
+                if (!run.said) {
+                    run.said = true;
                     emit(StageEventKind::Waiting, run, ctx, {}, beat.stillRoles.front(), who);
                 }
                 continue;
             }
             run.gated = false;
+            run.said = false;
             run.gateOpen = true;
         }
 
@@ -1904,7 +1952,79 @@ void Staging::update(const StageContext& ctx) {
         // After the decisions, never before them: `measuredSpeed` compares against the *previous*
         // frame, and a record taken first would be comparing a body with itself and calling
         // everything still.
+        // Before the record, because `measuredSpeed` compares against the previous frame and
+        // `rememberPositions` is what makes this frame the previous one. Published after the
+        // decisions and before the bookkeeping is the only window in which both halves are true.
+        publishState(run, ctx);
         rememberPositions(run, ctx);
+    }
+}
+
+// The overlay's reading of the frame (ADR-385). Built after every decision, so what it reports is
+// what the frame actually did rather than what it was about to do. Costs one small vector per
+// scenario per frame and is the only thing in this file that exists for a human rather than for the
+// simulation -- which is why it is a separate pass and not a field somebody has to remember to set.
+void Staging::publishState(const Run& run, const StageContext& ctx) {
+    {
+        const ScenarioDesc& scenario = desc_.scenarios[run.scenario];
+        SequenceState st;
+        st.scenario = scenario.name;
+        st.running = run.running;
+        st.time = ctx.time;
+        st.cycle = run.cycle;
+        st.maxCycles = scenario.maxCycles;
+        st.gated = run.gated;
+        st.beatStart = run.beatStart;
+        // The same answer `Staging::beat()` gives, deliberately: an overlay and a test that
+        // disagreed about which beat is running would be two readings of one fact.
+        if (run.running && run.beat < scenario.beats.size()) {
+            const BeatDesc& beat = scenario.beats[run.beat];
+            st.beat = beat.name;
+            if (run.gated && !beat.stillRoles.empty()) {
+                for (const std::string& role : beat.stillRoles) {
+                    if (const entity::Entity* body = resolve(run, role, ctx); body != nullptr) {
+                        st.gatedOn = fmt::format("{} at {:.3f} m/s", body->name(),
+                                                 measuredSpeed(*body, ctx));
+                        break;
+                    }
+                }
+            }
+            for (std::size_t c = 0; c < beat.cues.size() && c < run.cues.size(); ++c) {
+                const CueDesc& cueDesc = beat.cues[c];
+                const CueRun& cue = run.cues[c];
+                CueState cs;
+                cs.role = cueDesc.role;
+                cs.index = cue.step;
+                cs.steps = cueDesc.steps.size();
+                cs.done = cue.done;
+                cs.elapsed = ctx.time - cue.startedAt;
+                cs.progress = cue.progress;
+                if (cue.step < cueDesc.steps.size()) {
+                    const StepDesc& step = cueDesc.steps[cue.step];
+                    cs.kind = stepKindName(step.kind);
+                    cs.step = step.name.empty() ? cs.kind : step.name;
+                    cs.duration = static_cast<double>(value(run, step.duration));
+                    // A `set` and a `wait` have no tween parameter; their progress is the clock.
+                    if (cs.progress <= 0.0f && cs.duration > 0.0) {
+                        cs.progress = static_cast<float>(
+                            std::clamp(cs.elapsed / cs.duration, 0.0, 1.0));
+                    }
+                }
+                const std::string_view role =
+                    cs.role.empty() ? std::string_view() : std::string_view(cs.role);
+                if (const entity::Entity* body = resolve(run, role, ctx); body != nullptr) {
+                    cs.entity = body->name();
+                    cs.position = body->state().position();
+                    const float measured = measuredSpeed(*body, ctx);
+                    cs.speed = std::isfinite(measured) ? measured : 0.0f;
+                }
+                st.cues.push_back(std::move(cs));
+            }
+        }
+        // One entry per scenario, in scenario order, replacing the previous frame's.
+        if (run.scenario < states_.size()) {
+            states_[run.scenario] = std::move(st);
+        }
     }
 }
 
@@ -1920,6 +2040,7 @@ void Staging::reset(entity::EntityWorld* world, params::ParameterSet* params) {
         run.entered = false;
         run.cycle = 0;
         run.gated = false;
+        run.said = false;
         run.gateOpen = false;
         run.cues.clear();
         run.bindings.clear();

@@ -263,6 +263,17 @@ struct CompositionNode {
     bool locked = false;
     float emissiveBoost = 1.0f;
     float roughnessScale = 1.0f;
+    // ADR-385. A whole-node opacity multiplier, for the same reason `emissiveBoost` and
+    // `roughnessScale` are here: an effect wants to drive one object's material without the scene
+    // restating the asset's own numbers. 1 is a genuine no-op and is the default, so a node nobody
+    // fades is byte-identical to one built before this existed.
+    //
+    // It also does the thing neither of its neighbours has to. `pbr_shade.wgsl` reads
+    // `let alpha = select(1.0, baseColor.a, alphaMode > 1.5)`: an OPAQUE material's alpha is
+    // discarded outright, and every farm GLB in the repository is authored OPAQUE. So an opacity
+    // under 1 also *promotes* the entity's `alphaMode` to `Blend` for the frames it is under 1, and
+    // puts it back when it is not. Driving the number alone rendered a perfectly solid cow.
+    float opacityScale = 1.0f;
     // ADR-360: the wind body this node's meshes belong to, when it is a Group that declares one.
     // `windAuthored` distinguishes "the author wrote nothing" from "the author wrote the defaults",
     // which is what keeps a scene written before this key existed byte-identical on a re-save.
@@ -352,6 +363,7 @@ struct CompositionNode {
     params::Parameter<bool>* visibleParam = nullptr;
     params::Parameter<float>* emissiveParam = nullptr;
     params::Parameter<float>* roughnessParam = nullptr;
+    params::Parameter<float>* opacityParam = nullptr;
     // Scale and tint for the lights this node's asset contributed. Registered for every node and
     // inert on one that brought none, exactly as `emissiveBoost` is on a node with no emission.
     params::Parameter<float>* lightIntensityParam = nullptr;
@@ -1648,6 +1660,13 @@ private:
         std::vector<Transform> restTransforms;       // entity transforms inside the asset
         std::vector<float> restEmissive;
         std::vector<float> restRoughness;
+        // The opacity the asset was built with, captured the first time a node's `opacity`
+        // parameter is read rather than pushed alongside `restRoughness` at every one of the six
+        // sites that build a range. Lazy because a vector that is silently shorter than
+        // `entityCount` is an out-of-bounds write, and six push_backs that must stay in step with
+        // each other is the shape of defect this file has the most of.
+        std::vector<float> restOpacity;
+        std::vector<std::uint8_t> restAlphaMode;
         int particleIndex = -1;                      // index into scene_.particles (Particles kind)
         int proceduralIndex = -1;                    // index into scene_.procedurals (Procedural kind)
         std::size_t proceduralSubCount = 0;          // the asset's other materials, immediately after it
