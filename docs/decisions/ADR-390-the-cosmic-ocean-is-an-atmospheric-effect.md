@@ -1,4 +1,4 @@
-# ADR-388: The Cosmic Ocean is an atmospheric effect, and the sky can afford to be procedural
+# ADR-390: The Cosmic Ocean is an atmospheric effect, and the sky can afford to be procedural
 
 - Status: Accepted (2026-09-19). Design approved; implementation in progress. The four shared
   per-kind switch arms land last, after the vortex branch merges — see "Sequencing".
