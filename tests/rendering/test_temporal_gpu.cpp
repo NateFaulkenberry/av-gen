@@ -18,6 +18,7 @@
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "rendering/temporal_history.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 #include "assets/image.hpp"
@@ -420,4 +421,48 @@ TEST_CASE("capture: the history-state debug view", "[.capture][gpu][temporal]") 
     // Partly filled: the layers beyond framesValid are tinted red, because an empty layer and a
     // black frame are otherwise identical to the eye.
     shootRing(3, 9, "temporal-ring-settling.png");
+}
+
+TEST_CASE("the ring costs what ADR-410 says it costs", "[gpu][temporal][memory]") {
+    // ADR-410 claims about 25 MB at 1080p against a naive 1.86 GB. That is arithmetic until
+    // something measures it, and `bytes()` reports the real allocation rather than recomputing the
+    // estimate -- so this is the renderer reporting back, not the claim restated.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::TemporalHistory history(*ctx, shaders);
+    REQUIRE(history.init().has_value());
+
+    const auto mb = [](std::uint64_t b) { return static_cast<double>(b) / (1024.0 * 1024.0); };
+
+    rendering::TemporalHistoryConfig cfg;
+    cfg.resolutionScale = 0.5f; // the Realtime tier
+    cfg.frames[static_cast<std::uint32_t>(rendering::TemporalChannel::Colour)] = 8;
+    REQUIRE(history.configure(1920, 1080, cfg).has_value());
+    const double eight = mb(history.bytes());
+    INFO("8 frames, half res, 1080p: " << eight << " MB (" << history.width() << "x" << history.height() << ")");
+    CHECK(history.width() == 960);
+    CHECK(history.height() == 540);
+    // RG11B10Ufloat gives 16.6 MB; the RGBA16Float fallback doubles it. Both are the ADR's claim,
+    // which is why the bound is stated as a range rather than a number -- the format is a device
+    // capability, not a choice (see `temporalChannelFormat`).
+    CHECK(eight > 8.0);
+    CHECK(eight < 40.0);
+
+    // The naive reading the ADR argues against: 32 frames at FULL resolution.
+    cfg.resolutionScale = 1.0f;
+    cfg.frames[static_cast<std::uint32_t>(rendering::TemporalChannel::Colour)] = 32;
+    REQUIRE(history.configure(1920, 1080, cfg).has_value());
+    const double naive = mb(history.bytes());
+    INFO("32 frames, full res: " << naive << " MB");
+    // Sixteen times the eight-frame default: four times the frames, four times the texels.
+    CHECK(naive > eight * 15.0);
+    CHECK(naive < eight * 17.0);
+
+    // And zero when nothing asks. This is the line that matters most in §8: a project with no
+    // temporal effect must pay nothing at all, not merely pay a little.
+    cfg.frames = {};
+    REQUIRE(history.configure(1920, 1080, cfg).has_value());
+    CHECK(history.bytes() == 0u);
+    CHECK_FALSE(history.active());
+    CHECK(ctx->errorCount() == 0);
 }
