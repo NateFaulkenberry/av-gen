@@ -4017,6 +4017,40 @@ void Composition::refreshWindBodyAmounts() {
 // about, one step earlier in the workflow. The parameters are structural, so this re-registers
 // them and the caller has to rebind the modulator afterwards (`Engine::rebind`), exactly as the
 // world-effect panel does for its own structural edits.
+Result<void> Composition::setNodeDeformers(const std::string& name, std::vector<Deformer> stack) {
+    const auto it = std::find_if(nodes_.begin(), nodes_.end(),
+                                 [&](const auto& n) { return n->name == name; });
+    if (it == nodes_.end()) {
+        return fail("no node named '{}'", name);
+    }
+    CompositionNode& node = **it;
+    if (node.kind != NodeKind::Procedural) {
+        return fail("node '{}' is a {} and only a procedural object has a deformer stack", name,
+                    nodeKindName(node.kind));
+    }
+    if (stack.size() > static_cast<std::size_t>(kMaxDeformers)) {
+        return fail("procedural '{}': at most {} deformers (got {})", name, kMaxDeformers, stack.size());
+    }
+    // Validated through the object's own `validate()` rather than by re-stating its rules here,
+    // which is the second list that goes stale. A stack the file format would refuse must not be
+    // reachable through a panel either -- ADR-387's parameter path is three things at once, and a
+    // structural edit is the fourth.
+    {
+        ProceduralGeometry probe = node.proceduralRest;
+        probe.deformers = stack;
+        if (auto v = probe.validate(); !v) {
+            return v;
+        }
+    }
+
+    unregisterNodeParameters(node);
+    node.procedural.deformers = stack;
+    node.proceduralRest.deformers = std::move(stack);
+    registerNodeParameters(node);
+    dirty_ = true;
+    return {};
+}
+
 bool Composition::setNodeWindBody(const std::string& name, bool present) {
     const auto it = std::find_if(nodes_.begin(), nodes_.end(),
                                  [&](const auto& n) { return n->name == name; });

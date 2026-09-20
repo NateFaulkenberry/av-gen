@@ -1229,6 +1229,26 @@ private:
     void refreshWindBodyAmounts();
 public:
     bool setNodeWindBody(const std::string& name, bool present);
+
+    // ADR-421: the deformer stack of a procedural node, replaced wholesale.
+    //
+    // The stack's SHAPE -- how many slots, what kind each is, which space it acts in -- is
+    // structural: `registerProceduralParameters` writes one set of `deform/<n>/*` paths per slot and
+    // labels them by kind, and `applyProceduralParameters` takes `kind` and `space` from the rest
+    // copy on every frame. So changing any of those means unregister, mutate, re-register, exactly
+    // as `setNodeWindBody` above does for a wind body, and for the same reason: the parameters ARE
+    // the stack's interface and they have to be rebuilt to describe it.
+    //
+    // It does NOT rebuild geometry, and that is a property worth stating because it is what makes
+    // an editor for this affordable. `ProceduralGeometry::structuralHash` does not include the
+    // deformers -- deliberately, since a deformer is a vertex-stage transform of geometry that has
+    // already been generated -- so adding a Twist to one of Glowmere Valley 2's forty-two
+    // procedurals costs a re-registration and a flatten, not a regeneration.
+    //
+    // Both `procedural` and `proceduralRest` are written: the first is what `toJson` saves, the
+    // second is what registration and the per-frame apply read. Writing one and not the other is
+    // the reader-without-a-writer this repository keeps finding.
+    Result<void> setNodeDeformers(const std::string& name, std::vector<Deformer> stack);
 private:
     void registerNodeParameters(CompositionNode& node);
     void unregisterNodeParameters(CompositionNode& node);
