@@ -556,11 +556,21 @@ void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
         return name;
     };
     const auto append = [&](world::AtmosphericEffect effect) {
+        const std::string name = effect.name;
         std::vector<world::AtmosphericEffect> next = authored;
         next.push_back(std::move(effect));
         if (auto ok = engine.setAtmosphericEffects(std::move(next)); !ok) {
             status_ = ok.error().message;
+            return;
         }
+        // ADR-392. The family's premise is that audio reaches an effect as an ordinary modulation
+        // route rather than as a hook, and `defaultAtmosphericRoutes` is what implements it -- but
+        // until now nothing called it, so "Add aurora" made an aurora that answered nothing and six
+        // routes somebody had to author by hand. The routes are ordinary: they appear in the
+        // Modulation panel, can be re-pointed, curved or deleted there, and are saved in the project
+        // like every other route. Attached after the effect, because registration happens in the
+        // call above and a route bound before its target exists binds to nothing.
+        engine.addDefaultAtmosphericRoutes(name);
     };
 
     if (ImGui::Button("Add comet")) {
