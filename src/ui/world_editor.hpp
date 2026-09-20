@@ -117,6 +117,28 @@ struct EditorVisuals {
     };
     std::vector<LightMarker> lightMarkers;
 
+    // ---- authored cameras, as objects in the world ----------------------------------------------
+    //
+    // §28's three-way distinction, drawn rather than described. These are the **authored scene
+    // cameras** -- `scene::CameraRig`s in the composition's `CameraDirection`. They are not the
+    // editor navigation camera, which is the viewport's own `camera/*` parameters and is where you
+    // are looking from rather than a thing to look at; and `active` marks the one the director has
+    // put on screen right now, which is a property of the clock and not of the camera.
+    //
+    // `seq::Shot` is not `scene::CameraShot` and neither of them is here: a shot is a span of time
+    // that names a camera, and what this draws is the camera.
+    struct CameraMarker {
+        std::string name;
+        std::uint32_t id = 0;
+        glm::vec3 position{0.0f};
+        glm::vec3 target{0.0f, 0.0f, -1.0f};
+        float fovDegrees = 50.0f;
+        float aspect = 16.0f / 9.0f;
+        bool active = false;   // the director has this one on screen now
+        bool selected = false;
+    };
+    std::vector<CameraMarker> cameraMarkers;
+
     // The heroes this scene declares (ADR-104), drawn whether or not anything is selected.
     //
     // Designation has no other appearance -- a hero looks exactly like the object it was made from

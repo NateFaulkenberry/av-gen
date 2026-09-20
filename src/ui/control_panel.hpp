@@ -90,6 +90,11 @@ public:
     // directed *main* camera also carries timeline tracks that would overwrite the next drag, and
     // `Application::ensureFreeCamera` is the one place that knows both halves.
     std::function<void()> onFreeCamera;
+    // The camera lock (viewport brief §7). Read and written by the Cameras panel; owned by the
+    // application, because what it guards is the application's `releaseDirectedCamera`.
+    bool* cameraLocked = nullptr;
+    // Whether this project's camera is baked at all -- there is nothing to lock when it is not.
+    bool cameraDirected = false;
     std::function<void()> onOpenAudio;
     std::function<void()> onOpenScene;
     std::function<void()> onOpenEnvironment;
@@ -406,6 +411,16 @@ private:
     // (`Engine::activeCamera`) and is never decided here: an editor selection and a director's
     // choice are different questions and conflating them is the mistake this whole ADR is about.
     std::uint32_t selectedCamera_ = 0;
+
+public:
+    // Canvas -> panel. Before this, `selectedCamera_` was a private id with **no observer
+    // anywhere**: choosing a camera here changed nothing in the viewport and nothing in the
+    // viewport could choose one. The panel -> Canvas direction is `drawCameras`, which writes the
+    // editor's `Selection` when a row is clicked.
+    void selectCamera(std::uint32_t id) { selectedCamera_ = id; }
+    [[nodiscard]] std::uint32_t selectedCamera() const { return selectedCamera_; }
+
+private:
     std::string cameraProblem_;
     void drawControlTab(app::Engine& engine);
     void drawOutputsTab(app::Engine& engine);

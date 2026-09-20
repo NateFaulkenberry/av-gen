@@ -3696,6 +3696,32 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         ImGui::SameLine();
         ImGui::Text("-- blending %.0f%%", static_cast<double>(active.blend) * 100.0);
     }
+
+    // The lock (viewport brief §7), and it is a guard on data loss rather than a convenience.
+    //
+    // A directed project's cut is **baked**: timeline tracks on six camera targets, an aim-follow
+    // table and a shot-span table. Dragging the viewport used to stand the director down and
+    // discard all of it, and the next Save wrote the loss -- observed for real, recovered from git.
+    // Re-baking does not undo it either, because it re-photographs the hero anchors (ADR-344).
+    //
+    // Shown only when there is something to protect, so an undirected project is not asked to think
+    // about a lock that guards nothing.
+    if (cameraDirected && cameraLocked != nullptr) {
+        ImGui::Separator();
+        bool locked = *cameraLocked;
+        if (ImGui::Checkbox("Lock camera (this project's cut is baked)", &locked)) {
+            *cameraLocked = locked;
+        }
+        if (locked) {
+            ImGui::TextColored(ImVec4(0.62f, 0.66f, 0.72f, 1.0f),
+                               "  Navigating the viewport will not change the authored cut.");
+        } else {
+            ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.4f, 1.0f),
+                               "  Unlocked: moving the viewport camera DISCARDS the director's cut\n"
+                               "  (its tracks, aim-follow table and shot spans). Re-running the\n"
+                               "  director makes a different cut, not the same one back.");
+        }
+    }
     ImGui::Separator();
 
     if (ImGui::Button("+ Camera")) {
@@ -3726,6 +3752,10 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         }
         if (ImGui::Selectable(label.c_str(), selected)) {
             selectedCamera_ = rig.id;
+            // panel -> Canvas: the same `Selection` the viewport and the Lights panel share, so a
+            // camera chosen here highlights in the world (§4's "selection must remain synchronized
+            // in both directions"). Before this, `selectedCamera_` had no observer anywhere.
+            editor.selection.set(SelectionRef{SelectionRef::Kind::Camera, rig.name});
         }
         if (selected) {
             ImGui::Indent();

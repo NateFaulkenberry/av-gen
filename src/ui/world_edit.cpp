@@ -176,10 +176,28 @@ bool Selection::retainOnly(const scene::Composition& composition) {
                                                                return a.light.name == r.name;
                                                            });
                                    }
-                                   case SelectionRef::Kind::Camera:
-                                       // Kept: the name labels a `CameraId`, it does not identify
-                                       // one, so a miss here would deselect on every rename.
-                                       return false;
+                                   case SelectionRef::Kind::Camera: {
+                                       // Dropped when no rig answers to the name, the same as a
+                                       // node or a light.
+                                       //
+                                       // This kept cameras unconditionally to begin with, on the
+                                       // grounds that a name only labels a `CameraId` and a miss
+                                       // would deselect on every rename. That traded a reachable
+                                       // bug for a hypothetical one: nothing in this editor can
+                                       // rename a camera, while the Cameras panel's Delete button
+                                       // is right there -- so the only case the old rule actually
+                                       // met was a selection pointing at a camera that no longer
+                                       // exists, drawing no marker and reporting itself as the
+                                       // active object for ever.
+                                       //
+                                       // If camera rename arrives, the fix is for the ref to carry
+                                       // the `CameraId` rather than for this to stop checking.
+                                       const auto& cameras = composition.cameraDirection().cameras;
+                                       return std::none_of(cameras.begin(), cameras.end(),
+                                                           [&](const scene::CameraRig& rig) {
+                                                               return rig.name == r.name;
+                                                           });
+                                   }
                                    }
                                    return false;
                                }),

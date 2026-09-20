@@ -136,6 +136,24 @@ void WorldEditor::update(app::Engine& engine, const assets::AssetLibrary* librar
         visuals_.lightMarkers.push_back(std::move(marker));
     }
 
+    // The authored cameras. `activeCamera()` is asked once, because "which camera is live" is a
+    // question about the clock and answering it per marker would be answering it several times.
+    {
+        const scene::ActiveCameraState live = composition->activeCamera();
+        for (const scene::CameraRig& rig : composition->cameraDirection().cameras) {
+            EditorVisuals::CameraMarker marker;
+            marker.name = rig.name;
+            marker.id = rig.id;
+            marker.position = rig.position;
+            marker.target = rig.target;
+            marker.fovDegrees = rig.fovDegrees;
+            marker.aspect = aspect;
+            marker.active = rig.id == live.camera;
+            marker.selected = selection.contains(SelectionRef{SelectionRef::Kind::Camera, rig.name});
+            visuals_.cameraMarkers.push_back(std::move(marker));
+        }
+    }
+
     // The heroes that are selected, and only those.
     //
     // A hero is the one piece of authored state with no appearance of its own, so the mark has to
