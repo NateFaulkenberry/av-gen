@@ -212,6 +212,15 @@ constexpr FloatField kVortexFloats[] = {
     {"filaments", 0.0f, 4.0f, 0.0f, 2.0f, F_GET(e.vortex.filaments), F_SET(e.vortex.filaments)},
     {"breathAmount", 0.0f, 1.0f, 0.0f, 0.3f, F_GET(e.vortex.breathAmount), F_SET(e.vortex.breathAmount)},
     {"breathSpeed", 0.0f, 4.0f, 0.0f, 1.0f, F_GET(e.vortex.breathSpeed), F_SET(e.vortex.breathSpeed)},
+    // ADR-389, the smoke controls. Soft ranges are the whole of the useful span in each case, for
+    // the reason the scattering row gives: a modulation route clamps to the HARD range, and a
+    // slider whose interesting region is in its first hair is the `scene/windSpeed` defect.
+    //
+    // `smokeWarp` is the one that does the work -- it advects the finer octaves through a coarse
+    // flow, which is the difference between detail sitting ON the spiral and detail carried BY it.
+    {"smokeWarp", 0.0f, 8.0f, 0.0f, 2.0f, F_GET(e.vortex.smokeWarp), F_SET(e.vortex.smokeWarp)},
+    {"smokeBillow", 0.0f, 1.0f, 0.0f, 1.0f, F_GET(e.vortex.smokeBillow), F_SET(e.vortex.smokeBillow)},
+    {"detail", 0.0f, 2.0f, 0.0f, 1.0f, F_GET(e.vortex.detail), F_SET(e.vortex.detail)},
     {"spill", 0.0f, 20.0f, 0.0f, 6.0f, F_GET(e.vortex.spill), F_SET(e.vortex.spill)},
     // ADR-388, and the range is a measurement rather than a guess. Laddered on the shipped Tree of
     // Life at t=6, mean frame luminance of 255:

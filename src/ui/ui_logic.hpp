@@ -1208,6 +1208,17 @@ struct EffectRow {
         {"", "rotationSpeed", "Rotation", "%.3f rad/s"},
         {"", "swirl", "Swirl", ""},
         {"", "filaments", "Filaments", ""},
+        {"", "smokeWarp", "Smoke", "", false, false,
+         "Drags the fine detail into the big swirl instead of letting it sit on top as speckle.\n"
+         "The single control that decides whether this reads as smoke or as noise -- raise it\n"
+         "first, before reaching for anything else here."},
+        {"", "smokeBillow", "Billow", "", false, false,
+         "0 is wispy and filamentary; 1 is rounded, puffy masses with creases between them.\n"
+         "The difference between a nebula and a smoke column."},
+        {"", "detail", "Fine detail", "", false, false,
+         "Weight of the finest noise octave. Detail below what the volume march can sample is\n"
+         "faded out automatically, so raising this past the point where it stops changing the\n"
+         "picture means the march is the limit, not this."},
         {"", "spill", "Light spill", "", false, false,
          "How much of the funnel's own light lands on the surfaces above it. Separate from\n"
          "Brightness so it can be tuned against the island without changing the funnel."},

@@ -237,7 +237,7 @@ Result<void> Vortex::validate() const {
     for (const float f : {radius, thickness, swirl, rotationSpeed, density, innerVoid, contrast,
                           turbulence, turbulenceScale, breathAmount, breathSpeed, emission,
                           filaments, spill, scattering, cometResponse, cometReach, funnelDepth,
-                          throat, throatDensity}) {
+                          throat, throatDensity, smokeWarp, smokeBillow, detail}) {
         if (!finite(f)) { return fail("a vortex control is not finite"); }
     }
     if (radius < 0.0f) { return fail("the vortex radius may not be negative (0 is off)"); }
@@ -438,6 +438,9 @@ json AtmosphericEffect::toJson() const {
                        {"turbulenceScale", vx.turbulenceScale},
                        {"breathAmount", vx.breathAmount},
                        {"breathSpeed", vx.breathSpeed},
+                       {"smokeWarp", vx.smokeWarp},
+                       {"smokeBillow", vx.smokeBillow},
+                       {"detail", vx.detail},
                        {"emission", vx.emission},
                        {"filaments", vx.filaments},
                        {"spill", vx.spill},
@@ -598,6 +601,9 @@ Result<AtmosphericEffect> AtmosphericEffect::fromJson(const json& j) {
         vx.turbulenceScale = readFloat(vj, "turbulenceScale", vx.turbulenceScale);
         vx.breathAmount = readFloat(vj, "breathAmount", vx.breathAmount);
         vx.breathSpeed = readFloat(vj, "breathSpeed", vx.breathSpeed);
+        vx.smokeWarp = readFloat(vj, "smokeWarp", vx.smokeWarp);
+        vx.smokeBillow = readFloat(vj, "smokeBillow", vx.smokeBillow);
+        vx.detail = readFloat(vj, "detail", vx.detail);
         vx.emission = readFloat(vj, "emission", vx.emission);
         vx.filaments = readFloat(vj, "filaments", vx.filaments);
         vx.spill = readFloat(vj, "spill", vx.spill);

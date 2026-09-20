@@ -52,7 +52,8 @@ struct VolumeUniforms {
     vortexB: vec4<f32>,   // mid colour
     vortexAccent: vec4<f32>, // luminous accent
     vortex4: vec4<f32>,   // ADR-374: funnel depth, throat radius fraction, throat density, 0
-    vortex5: vec4<f32>,   // ADR-381: x = comet response, yzw = 0
+    vortex5: vec4<f32>,   // ADR-381/388: comet response, reach, scene scattering, 0
+    vortex6: vec4<f32>,   // ADR-389: smokeWarp, smokeBillow, detail, 0
 };
 
 @group(1) @binding(1) var<uniform> vol: VolumeUniforms;
@@ -122,9 +123,17 @@ fn stepJitter(px: vec2<i32>, frameIndex: u32) -> f32 {
 // This wrapper exists so the march reads the five uniform slots it already uploads. The numbers
 // and their order are unchanged, which is what makes the Tree of Life byte-identical across this
 // move rather than something to re-tune.
+// ADR-389: the march passes its own step length so the field can drop the octaves this many
+// samples cannot resolve. `info.x` is the step count and `params1.w` the far distance, which is the
+// same pair `fs_march` divides to get `stepLength` -- kept in one expression here so the two cannot
+// disagree about how finely this frame is being sampled.
+fn vortexFilterWidth() -> f32 {
+    return vol.params1.w / max(vol.info.x, 1.0);
+}
+
 fn vortexShape(p: vec3<f32>, t: f32) -> f32 {
     return vortexShapeAt(VortexUniformsWgsl(vol.vortex0, vol.vortex1, vol.vortex2, vol.vortex3,
-                                            vol.vortex4), p, t);
+                                            vol.vortex4, vol.vortex6), p, t, vortexFilterWidth());
 }
 
 // The vortex's own light. It is emissive rather than lit: nothing in this scene could illuminate

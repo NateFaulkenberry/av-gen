@@ -13,6 +13,16 @@ float smoothstepf(float edge0, float edge1, float x) {
     return t * t * (3.0f - 2.0f * t);
 }
 
+// ADR-389: an octave whose world period falls below twice the sample spacing cannot be resolved,
+// and what it contributes is aliasing rather than detail. `filterWidth` 0 means a point sample --
+// nothing is being integrated, so nothing can alias, and every octave is taken.
+float octaveWeight(float periodMetres, float filterWidth) {
+    if (filterWidth <= 0.0f) {
+        return 1.0f;
+    }
+    return smoothstepf(0.0f, 1.0f, periodMetres / (2.0f * filterWidth));
+}
+
 // The shape, and the intermediates a velocity needs, in one place so the two entry points cannot
 // drift. Every expression here is in the same order as `shaders/vortex.wgsl`; the parity test is
 // what keeps that true rather than the comment.
@@ -25,7 +35,7 @@ struct Shape {
     bool inside = false;
 };
 
-Shape evaluate(const VortexUniforms& v, const glm::vec3& p, float t) {
+Shape evaluate(const VortexUniforms& v, const glm::vec3& p, float t, float filterWidth) {
     Shape s;
     const float radius = v.v0.w;
     if (radius <= 0.0f) {
@@ -71,13 +81,43 @@ Shape evaluate(const VortexUniforms& v, const glm::vec3& p, float t) {
     const float warped = angle + rr * v.v1.y + t * v.v1.z;
     const glm::vec3 q(std::cos(warped) * rr, s.rel.y / std::max(v.v1.x, 1e-3f), std::sin(warped) * rr);
     const float scale = std::max(v.v2.w, 1e-3f);
+    // ADR-389, the domain warp: the finer octaves are advected through a low-frequency flow, so
+    // their detail is carried BY the spiral instead of sitting on it. Uncorrelated detail on a
+    // smooth flow is what the eye calls grain; advected detail is what it calls smoke.
+    glm::vec3 q1 = q;
+    glm::vec3 q2 = q;
+    const float warpAmount = std::max(v.v6.x, 0.0f);
+    if (warpAmount > 0.0f) {
+        const glm::vec3 flow =
+            noise::fbm3Vec(q * (scale * 0.7f) + glm::vec3(t * 0.02f, 0.0f, -t * 0.015f), 11u);
+        q1 = q + flow * warpAmount;
+        q2 = q + flow * (warpAmount * 1.6f);
+    }
     // Three octaves at three rates: macro barely moves, fine detail moves fastest. One rate reads
     // instantly as a screensaver (ADR-371).
-    const float n0 = noise::fbm3(q * scale + glm::vec3(t * 0.013f, 0.0f, t * 0.009f), 29u);
-    const float n1 = noise::fbm3(q * (scale * 3.1f) + glm::vec3(0.0f, t * 0.055f, 0.0f), 53u);
-    const float n2 = noise::fbm3(q * (scale * 9.7f) + glm::vec3(t * 0.17f, 0.0f, -t * 0.13f), 97u);
-    float n = n0 + 0.45f * n1 + 0.2f * n2;
-    n = n / 1.65f;
+    const float strictScale = radius / std::max(2.0f * filterWidth * 4.11f, 1e-3f);
+    const float effScale0 =
+        filterWidth > 0.0f ? std::min(scale, std::max(strictScale, scale * 0.45f)) : scale;
+    float n0 = noise::fbm3(q * effScale0 + glm::vec3(t * 0.013f, 0.0f, t * 0.009f), 29u);
+    float n1 = noise::fbm3(q1 * (effScale0 * 3.1f) + glm::vec3(0.0f, t * 0.055f, 0.0f), 53u);
+    float n2 = noise::fbm3(q2 * (effScale0 * 9.7f) + glm::vec3(t * 0.17f, 0.0f, -t * 0.13f), 97u);
+    const float billow = std::clamp(v.v6.y, 0.0f, 1.0f);
+    if (billow > 0.0f) {
+        n0 = std::lerp(n0, std::abs(n0 * 2.0f - 1.0f), billow);
+        n1 = std::lerp(n1, std::abs(n1 * 2.0f - 1.0f), billow);
+        n2 = std::lerp(n2, std::abs(n2 * 2.0f - 1.0f), billow);
+    }
+    // ADR-389: the band-limit, floored. See the long note in `shaders/vortex.wgsl`: the strict
+    // Nyquist scale at the shipped 32 steps erases the funnel, which is the correct answer to
+    // "what can 125-metre samples carry" and the proof that the march is starved. The floor takes
+    // the worst of the aliasing and leaves the rest of the problem where it belongs.
+    const float periodBase = radius / effScale0;
+    const float w0 = octaveWeight(periodBase, filterWidth);
+    const float w1 = octaveWeight(periodBase / 3.1f, filterWidth);
+    const float w2 = octaveWeight(periodBase / 9.7f, filterWidth);
+    const float detail = std::max(v.v6.z, 0.0f);
+    const float wSum = std::max(w0 + 0.45f * w1 + detail * w2, 1e-4f);
+    float n = (n0 * w0 + 0.45f * n1 * w1 + detail * n2 * w2) / wSum;
     n = std::lerp(n, n * (0.55f + 0.9f * n1), std::clamp(v.v2.z, 0.0f, 1.0f));
     const float shaped = std::pow(std::clamp(n, 0.0f, 1.0f), std::max(v.v2.y, 0.05f));
     s.density = shaped * envelope;
@@ -95,15 +135,18 @@ VortexUniforms packVortex(const VortexField& f) {
     v.v3 = glm::vec4(std::max(f.breathAmount, 0.0f), f.breathSpeed, 0.0f, 0.0f);
     v.v4 = glm::vec4(std::max(f.funnelDepth, 0.0f), std::clamp(f.throat, 0.02f, 1.0f),
                      std::clamp(f.throatDensity, 0.0f, 1.0f), 0.0f);
+    v.v6 = glm::vec4(std::max(f.smokeWarp, 0.0f), std::clamp(f.smokeBillow, 0.0f, 1.0f),
+                     std::max(f.detail, 0.0f), 0.0f);
     return v;
 }
 
-float vortexShape(const VortexUniforms& v, const glm::vec3& p, float t) {
-    return evaluate(v, p, t).density;
+float vortexShape(const VortexUniforms& v, const glm::vec3& p, float t, float filterWidth) {
+    return evaluate(v, p, t, filterWidth).density;
 }
 
 VortexSample sampleVortex(const VortexUniforms& v, const glm::vec3& p, float t) {
-    const Shape s = evaluate(v, p, t);
+    // A point sample: nothing is being integrated, so nothing can alias.
+    const Shape s = evaluate(v, p, t, 0.0f);
     VortexSample out;
     out.density = s.density;
     out.envelope = s.envelope;

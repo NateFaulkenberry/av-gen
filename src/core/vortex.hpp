@@ -56,6 +56,13 @@ struct VortexField {
     float turbulenceScale = 2.1f;
     float breathAmount = 0.05f;
     float breathSpeed = 0.18f;
+    // ADR-389: the smoke controls. `smokeWarp` advects the finer octaves through a low-frequency
+    // flow, which is the difference between detail that sits on the spiral and detail carried by
+    // it; `smokeBillow` blends toward rounded masses; `detail` is the fine octave's weight, which
+    // was a hardcoded 0.2.
+    float smokeWarp = 0.0f;
+    float smokeBillow = 0.0f;
+    float detail = 0.2f;
 
     [[nodiscard]] bool active() const { return radius > 0.0f; }
 };
@@ -70,8 +77,9 @@ struct VortexUniforms {
     glm::vec4 v2{0.0f}; // x = innerVoid, y = contrast, z = turbulence, w = turbulenceScale
     glm::vec4 v3{0.0f}; // x = breathAmount, y = breathSpeed, z/w = (appearance, unused here)
     glm::vec4 v4{0.0f}; // x = funnelDepth, y = throat, z = throatDensity, w = 0
+    glm::vec4 v6{0.0f}; // ADR-389: smokeWarp, smokeBillow, detail, 0
 };
-static_assert(sizeof(VortexUniforms) == 80);
+static_assert(sizeof(VortexUniforms) == 96);
 
 [[nodiscard]] VortexUniforms packVortex(const VortexField& field);
 
@@ -107,6 +115,11 @@ struct VortexSample {
 // The shape alone, which is what the volumetric march wants and all it wants. Separate because it
 // skips the velocity trigonometry entirely, and the march evaluates this per step per pixel: the
 // one place in this system where a few multiplies are worth a second entry point.
-[[nodiscard]] float vortexShape(const VortexUniforms& v, const glm::vec3& p, float t);
+// `filterWidth` is the world-space distance between the caller's samples, and 0 means "a point
+// sample, not an integral". ADR-389: an octave whose period falls below twice that spacing cannot
+// be resolved and contributes aliasing rather than detail, so it is faded out. Not a knob -- the
+// right answer changes with `volumeSteps` and `volumeMaxDistance`, which change between tiers.
+[[nodiscard]] float vortexShape(const VortexUniforms& v, const glm::vec3& p, float t,
+                                float filterWidth = 0.0f);
 
 } // namespace avgen::vortex

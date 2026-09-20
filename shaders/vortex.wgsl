@@ -35,7 +35,28 @@ struct VortexUniformsWgsl {
     v2: vec4<f32>,
     v3: vec4<f32>,
     v4: vec4<f32>,
+    v6: vec4<f32>, // ADR-389: smokeWarp, smokeBillow, detail, 0
 };
+
+// ADR-389. An octave whose world period falls below twice the distance between march samples
+// cannot be resolved, and what it contributes is not detail: it is aliasing, which in a volumetric
+// is salt-and-pepper grain that crawls when the camera moves. This fades such an octave out
+// smoothly instead.
+//
+// It is correctness rather than taste, and it is deliberately NOT a knob. Nobody should have to
+// find a slider called "stop aliasing", and the right answer changes whenever `volumeSteps` or
+// `volumeMaxDistance` do -- which they do between Preview and Cinematic, and which the shipped
+// scene already disagrees with itself about (the scene file says 48 steps, the project overrides
+// it to 32, and 32 over 4 km is a sample every 125 metres).
+//
+// `filterWidth` of 0 means "point sample, not an integral" -- a particle asking where the medium is
+// going is not integrating along a ray and has nothing to alias, so it takes every octave.
+fn vortexOctaveWeight(periodMetres: f32, filterWidth: f32) -> f32 {
+    if (filterWidth <= 0.0) {
+        return 1.0;
+    }
+    return smoothstep(0.0, 1.0, periodMetres / (2.0 * filterWidth));
+}
 
 // The shape and the intermediates a velocity needs, in one evaluation so the two entry points
 // cannot drift apart.
@@ -48,7 +69,7 @@ struct VortexShapeResult {
     inside: bool,
 };
 
-fn vortexEvaluate(v: VortexUniformsWgsl, p: vec3<f32>, t: f32) -> VortexShapeResult {
+fn vortexEvaluate(v: VortexUniformsWgsl, p: vec3<f32>, t: f32, filterWidth: f32) -> VortexShapeResult {
     var s: VortexShapeResult;
     s.density = 0.0;
     s.envelope = 0.0;
@@ -113,12 +134,66 @@ fn vortexEvaluate(v: VortexUniformsWgsl, p: vec3<f32>, t: f32) -> VortexShapeRes
     // structure rather than across it.
     let q = vec3<f32>(cos(warped) * rr, s.rel.y / max(v.v1.x, 1e-3), sin(warped) * rr);
     let scale = max(v.v2.w, 1e-3);
+    // ADR-389, the domain warp: the thing that makes this read as smoke rather than as noise.
+    // Three independent fBMs summed at fixed rates give detail that sits ON the spiral instead of
+    // being carried BY it, and uncorrelated detail on a smooth flow is what the eye calls grain.
+    // Advecting the finer octaves through a low-frequency vector field drags them into the sheets
+    // and curls of the big structure, which is what billowing gas actually is.
+    var q1 = q;
+    var q2 = q;
+    let warpAmount = max(v.v6.x, 0.0);
+    if (warpAmount > 0.0) {
+        let flow = fbm3Vec(q * (min(scale, 1e9) * 0.7) + vec3<f32>(t * 0.02, 0.0, -t * 0.015), 11u);
+        q1 = q + flow * warpAmount;
+        q2 = q + flow * (warpAmount * 1.6);
+    }
     // Three octaves at three rates: macro barely moves, fine detail moves fastest.
-    let n0 = fbm3(q * scale + vec3<f32>(t * 0.013, 0.0, t * 0.009), 29u);
-    let n1 = fbm3(q * (scale * 3.1) + vec3<f32>(0.0, t * 0.055, 0.0), 53u);
-    let n2 = fbm3(q * (scale * 9.7) + vec3<f32>(t * 0.17, 0.0, -t * 0.13), 97u);
-    var n = n0 + 0.45 * n1 + 0.2 * n2;
-    n = n / 1.65;
+    // How fine this march can carry. `fbm3` is itself three octaves at 1, 2.03 and 4.11, so a call
+    // at scale S has its finest content at period `radius / (S * 4.11)`, and Nyquist wants two
+    // samples across that.
+    //
+    // The clamp is deliberately NOT applied at full strength, and the reason is a measurement. At
+    // the shipped 32 steps over 4 km -- a sample every 125 metres -- the strict Nyquist scale is
+    // 0.19 against an authored 2.4, and clamping to it erases the funnel: no filaments, no swirl,
+    // a flat teal wash. That is the correct answer to "what can 32 samples carry", and it is the
+    // proof that this march is starved rather than this noise being mis-designed. Watering the
+    // signal processing down would hide that; refusing to clamp at all leaves the grain. So the
+    // clamp is applied with a floor, which bites hard enough to take the worst of the aliasing and
+    // leaves the rest of the problem visible where it belongs -- in the step count.
+    let strict = radius / max(2.0 * filterWidth * 4.11, 1e-3);
+    let resolvableScale = max(strict, scale * 0.45);
+    var effScale0 = scale;
+    if (filterWidth > 0.0) {
+        effScale0 = min(scale, resolvableScale);
+    }
+    var n0 = fbm3(q * effScale0 + vec3<f32>(t * 0.013, 0.0, t * 0.009), 29u);
+    var n1 = fbm3(q1 * (effScale0 * 3.1) + vec3<f32>(0.0, t * 0.055, 0.0), 53u);
+    var n2 = fbm3(q2 * (effScale0 * 9.7) + vec3<f32>(t * 0.17, 0.0, -t * 0.13), 97u);
+    // Billow: |2n-1| turns a wispy field into rounded masses with creases between them, which is
+    // the difference between a nebula and a smoke column. Blended rather than switched, because the
+    // vortex wants to be able to be both.
+    let billow = clamp(v.v6.y, 0.0, 1.0);
+    if (billow > 0.0) {
+        n0 = mix(n0, abs(n0 * 2.0 - 1.0), billow);
+        n1 = mix(n1, abs(n1 * 2.0 - 1.0), billow);
+        n2 = mix(n2, abs(n2 * 2.0 - 1.0), billow);
+    }
+    // The band-limit, and the first version of it was wrong in a way worth recording: attenuating
+    // the finer octaves and renormalising made the grain WORSE (|hf| 1.139 -> 1.307), because at
+    // this march's 125-metre spacing even the COARSEST octave is undersampled -- its period is 83
+    // metres and Nyquist wants 250. Averaging several aliased octaves cancels some of the error;
+    // isolating one does not. So the fix cannot be a weight. It has to be a FREQUENCY: the base
+    // scale is clamped to the finest this many samples can actually carry, and the octaves above it
+    // fade out because they remain beyond it whatever the base does.
+    let periodBase = radius / effScale0;
+    let w0 = vortexOctaveWeight(periodBase, filterWidth);
+    let w1 = vortexOctaveWeight(periodBase / 3.1, filterWidth);
+    let w2 = vortexOctaveWeight(periodBase / 9.7, filterWidth);
+    let detail = max(v.v6.z, 0.0);
+    // Normalised by the weights actually used, so fading an octave out smooths the result instead
+    // of darkening it -- the mean must not move when the step length changes.
+    let wSum = max(w0 + 0.45 * w1 + detail * w2, 1e-4);
+    var n = (n0 * w0 + 0.45 * n1 * w1 + detail * n2 * w2) / wSum;
     // Turbulence breaks the spiral's symmetry, because a real nebula is not a mathematical spiral
     // and the brief says so.
     n = mix(n, n * (0.55 + 0.9 * n1), clamp(v.v2.z, 0.0, 1.0));
@@ -132,8 +207,8 @@ fn vortexEvaluate(v: VortexUniformsWgsl, p: vec3<f32>, t: f32) -> VortexShapeRes
 // The shape alone: what the volumetric march wants and all it wants, without the velocity
 // trigonometry. The march evaluates this per step per pixel, which is the one place in this system
 // where a few multiplies are worth a second entry point.
-fn vortexShapeAt(v: VortexUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
-    return vortexEvaluate(v, p, t).density;
+fn vortexShapeAt(v: VortexUniformsWgsl, p: vec3<f32>, t: f32, filterWidth: f32) -> f32 {
+    return vortexEvaluate(v, p, t, filterWidth).density;
 }
 
 struct VortexSampleWgsl {
@@ -147,7 +222,8 @@ struct VortexSampleWgsl {
 // Everything a consumer has asked for so far, in one evaluation. Splitting it would mean sampling
 // the noise twice for a particle that wants both where it is and which way to go.
 fn sampleVortex(v: VortexUniformsWgsl, p: vec3<f32>, t: f32) -> VortexSampleWgsl {
-    let s = vortexEvaluate(v, p, t);
+    // A point sample: nothing is being integrated, so nothing can alias.
+    let s = vortexEvaluate(v, p, t, 0.0);
     var out: VortexSampleWgsl;
     out.density = s.density;
     out.envelope = s.envelope;
