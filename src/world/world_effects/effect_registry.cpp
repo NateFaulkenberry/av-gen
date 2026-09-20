@@ -1,7 +1,5 @@
 #include "world/world_effects/effect_registry.hpp"
 
-#include "world/world_effects/builtin_effects.hpp"
-
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -17,14 +15,30 @@ using json = nlohmann::json;
 
 // ---- the list ------------------------------------------------------------------------------------
 //
-// ADR-500. **This is the one line outside its own file that a new effect costs**, and it is not a
-// line anybody can forget quietly: `checkRegistry` requires a schema for every enumerator declared
-// in `atmospherics.hpp` and names the enumerator that has none.
+// ADR-500. **These are the two lines outside its own file that a new effect costs in this file**,
+// and neither is a line anybody can forget quietly: `checkRegistry` requires a schema for every
+// enumerator in `kAtmosphereKinds`, and `tests/unit/test_effect_conformance.cpp` requires that
+// array to cover exactly the enumerators declared in `atmospherics.hpp` -- by name, in both
+// directions.
 //
 // An explicit list rather than static self-registration through a global constructor, deliberately.
 // These files compile into a static library; a translation unit nothing references is dropped by
 // the linker, and a registry that is correct in a debug build and empty in a release one is the
-// worst failure this repository knows how to have. A line here is a reference.
+// worst failure this repository knows how to have. A declaration here IS a reference.
+//
+// Declared here rather than in a header of their own, because a header of their own was a third
+// file to edit and bought nothing: nothing outside this function calls them.
+
+} // namespace
+
+const EffectSchema& cometSchema();
+const EffectSchema& auroraSchema();
+const EffectSchema& vortexSchema();
+const EffectSchema& meteorShowerSchema();
+const EffectSchema& volumetricFogSchema();
+
+namespace {
+
 const std::vector<const EffectSchema*>& builtinSchemas() {
     static const std::vector<const EffectSchema*> kSchemas = {
         &cometSchema(),        //

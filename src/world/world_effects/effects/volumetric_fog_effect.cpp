@@ -32,7 +32,7 @@
 // JSON path). The nine controls a bank has no use for are simply not declared here -- which means
 // the panel does not draw them, registration does not produce them, and a route cannot aim at them.
 
-#include "world/world_effects/builtin_effects.hpp"
+#include "world/world_effects/effect_registry.hpp"
 
 #include <array>
 #include <string>
@@ -284,7 +284,7 @@ EffectSchema buildSchema() {
     s.kind = AtmosphereKind::VolumetricFog;
     s.key = "fog";
     s.enumName = "VolumetricFog";
-    s.displayName = "Volumetric fog";
+    s.displayName = "Volumetric Fog";
     s.addLabel = "Add fog bank";
     s.addTip = "A placed bank of medium with a soft rim and a billowing interior: mist in a\n"
                "valley, or a glowing haze around an island. It is drawn by the volumetric\n"

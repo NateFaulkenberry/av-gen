@@ -9,7 +9,7 @@
 // spectrum. §4.2's per-band depths below are **depths on a signal that already exists**, not a
 // second analyzer -- each scales how much a band already in the frame block moves its feature.
 
-#include "world/world_effects/builtin_effects.hpp"
+#include "world/world_effects/effect_registry.hpp"
 
 #include <array>
 #include <string>

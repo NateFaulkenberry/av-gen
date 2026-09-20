@@ -3,11 +3,11 @@
 // **Read this file as the answer to "what does adding an effect cost now".** Everything below --
 // the rows with their ranges and artist labels, which of them the panel shows above the fold, the
 // saved file's shape, the clamps, the presets, the default audio routes, and how one authored
-// shower becomes six streaks in the sky each frame -- is here. Outside it, this effect cost three
-// lines: the `AtmosphereKind::MeteorShower` enumerator, its entry in `kAtmosphereKinds`, and a
-// reference in `builtinSchemas()`. Before ADR-500 the same effect would have been about twenty
-// edits across six files that every other agent also had open, which is the reason seventy effects
-// was unreachable.
+// shower becomes six streaks in the sky each frame -- is here. Outside it, this effect cost four
+// lines in two files: the `AtmosphereKind::MeteorShower` enumerator, its entry in
+// `kAtmosphereKinds`, and a declaration plus a reference in `builtinSchemas()`. Before ADR-500 the
+// same effect would have been about twenty edits across six files that every other agent also had
+// open, which is the reason seventy effects was unreachable.
 //
 // **How it reaches the GPU without a line of new shader.** A meteor is a comet: a bright head on a
 // great-circle arc with a trail integrated along the view ray, which is exactly what
@@ -26,7 +26,7 @@
 // edit ADR-500 exists to remove, so they live in `AtmosphericEffect::values` under `meteors/`. Both
 // kinds of row are declared the same way here and nothing downstream knows which it got.
 
-#include "world/world_effects/builtin_effects.hpp"
+#include "world/world_effects/effect_registry.hpp"
 
 #include <algorithm>
 #include <array>
@@ -461,7 +461,7 @@ EffectSchema buildSchema() {
     s.kind = AtmosphereKind::MeteorShower;
     s.key = "meteors";
     s.enumName = "MeteorShower";
-    s.displayName = "Meteor shower";
+    s.displayName = "Meteor Shower";
     s.addLabel = "Add meteor shower";
     s.addTip = "A handful of streaks thrown from one point in the sky, staggered so they\n"
                "arrive as a shower rather than together. Each one is a comet's trail, so\n"

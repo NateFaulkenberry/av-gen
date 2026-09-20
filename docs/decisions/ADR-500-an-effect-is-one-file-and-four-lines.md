@@ -1,4 +1,4 @@
-# ADR-500: An effect is one file and three lines
+# ADR-500: An effect is one file and four lines
 
 - Status: Accepted (2026-09-20)
 - Supersedes the mechanism of ADR-387 (the two `constexpr` field tables) and implements the survey
@@ -61,17 +61,26 @@ slider and the JSON key. The nine sites ADR-392 counted are one line.
 `AtmosphereKind::` in `src/` is now **49 references for 5 kinds**, and 25 of them are inside an
 effect's own file or in the one list the registry keeps.
 
-### The remaining cost, counted honestly: three lines in two files
+### The remaining cost, counted honestly: four lines in two files
 
 1. an enumerator in `AtmosphereKind` (`world/atmospherics.hpp`);
-2. an entry in `kAtmosphereKinds` and its arm in `atmosphereKindIndex` (`effect_registry.hpp`);
-3. a line in `builtinSchemas()` (`effect_registry.cpp`).
+2. an entry in `kAtmosphereKinds` (`effect_registry.hpp`);
+3. a declaration of the schema accessor in `effect_registry.cpp`, and
+4. the reference to it in `builtinSchemas()` on the next line.
 
-**Two of those could have been collapsed and deliberately were not.** If the list of enumerators
-were derived from the schemas, then "every enumerator has a schema" would be a check asking the
-schemas about the schemas -- the self-agreeing shape ADR-392 spent its length warning about.
-`kAtmosphereKinds` is a second, independent list, and the test holds it against the enum read out of
-the header. One extra line per effect buys a guard that can fail.
+It was six, in four files, when this ADR was first written -- and the count was wrong in the draft,
+which is worth recording because the draft said three. Measuring it turned up two lines that were
+buying nothing: a `builtin_effects.hpp` that existed only to declare five functions nothing outside
+`builtinSchemas()` calls, and an exhaustive `switch` in `atmosphereKindIndex` sitting directly below
+the array it indexes. The switch was the weaker of ADR-392's two guards -- a `-Wswitch` diagnostic,
+which ADR-392 itself says is not a guard while `-Werror` is off -- so it became a search over the
+array, and the guard that actually fires is unchanged.
+
+**The list in (2) could be derived from the schemas, collapsing two more, and deliberately is not.**
+If the enumerators came from the schemas, then "every enumerator has a schema" would be a check
+asking the schemas about the schemas -- the self-agreeing shape ADR-392 spent its length warning
+about. `kAtmosphereKinds` is a second, independent list, and the test holds it against the enum read
+out of the header. One line per effect buys a guard that can fail.
 
 `builtinSchemas()` is an explicit list rather than static self-registration through a global
 constructor, and that is not style. These compile into a static library; a translation unit nothing

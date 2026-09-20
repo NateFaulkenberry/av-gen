@@ -20,7 +20,7 @@
 // the trajectory is a great-circle arc and not a chord, and `shaders/atmosphere_fx.wgsl` for the
 // integrator this resolves into.
 
-#include "world/world_effects/builtin_effects.hpp"
+#include "world/world_effects/effect_registry.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -400,7 +400,7 @@ EffectSchema buildSchema() {
     
     s.key = "comet";
     s.enumName = "Comet";
-    s.displayName = "Comet";
+    s.displayName = "Bioluminescent Comet";
     s.addLabel = "Add comet";
     s.addTip = "A celestial object on a great-circle arc across the sky.\n"
                "It arrives as an event with an authored window, so it launches once;\n"

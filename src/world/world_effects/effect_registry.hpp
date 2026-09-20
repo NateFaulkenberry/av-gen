@@ -15,14 +15,15 @@
 // its validation clamps, its default audio routes, its style presets, and how it resolves per
 // frame. Every shared file iterates this registry instead of switching on an enumerator.
 //
-// **What a new effect still costs outside its own file, counted honestly.** Three lines, in two
+// **What a new effect still costs outside its own file, counted honestly.** Four lines, in two
 // files, and every one of them is forced by the compiler or named by a failing test:
 //
 //   1. an enumerator in `AtmosphereKind` (`world/atmospherics.hpp`);
-//   2. an entry in `kAtmosphereKinds` and its arm in `atmosphereKindIndex` (below);
-//   3. a line in `builtinSchemas()` (`effect_registry.cpp`).
+//   2. an entry in `kAtmosphereKinds` (below);
+//   3. a declaration in `effect_registry.cpp`, and
+//   4. the reference to it in `builtinSchemas()` beside it.
 //
-// Two of those could be collapsed by deriving the kind list from the registry, and that is
+// The list in (2) could be derived from the schemas, collapsing two of these, and that is
 // deliberately NOT done. If the list of enumerators came from the schemas, then "every enumerator
 // has a schema" would be a check asking the schemas about the schemas -- the self-agreeing shape
 // ADR-392 spent its length warning about. `kAtmosphereKinds` is a second, independent list, and
@@ -358,16 +359,24 @@ inline constexpr std::array<AtmosphereKind, 5> kAtmosphereKinds{
     AtmosphereKind::VolumetricFog, //
 };
 
-// The kind's position in `kAtmosphereKinds`. Exhaustive, no `default`: the compile-time half.
+// The kind's position in `kAtmosphereKinds`, or `size()` for an enumerator that is not in it --
+// which is the loud case and which `checkRegistry` and the header-reading test both name.
+//
+// A search rather than an exhaustive `switch`, and that is a deliberate downgrade of the weaker of
+// ADR-392's two guards. The switch made a new enumerator a `-Wswitch` diagnostic, but
+// `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`) and ADR-392 says plainly that a warning
+// in a five-thousand-line log is not a guard. What it cost was a second line per effect in a shared
+// file, on top of the array entry directly above -- and the guard that actually fires, the test
+// that reads the enum out of the header and names the kind, does not need it. The exhaustive
+// switch that DOES still matter is over `EffectBucket` in `resolveAtmosphericEffects`, where the
+// arms are per GPU payload and adding one is a real decision.
 [[nodiscard]] constexpr std::size_t atmosphereKindIndex(AtmosphereKind k) {
-    switch (k) {
-    case AtmosphereKind::Comet: return 0;
-    case AtmosphereKind::Aurora: return 1;
-    case AtmosphereKind::Vortex: return 2;
-    case AtmosphereKind::MeteorShower: return 3;
-    case AtmosphereKind::VolumetricFog: return 4;
+    for (std::size_t i = 0; i < kAtmosphereKinds.size(); ++i) {
+        if (kAtmosphereKinds[i] == k) {
+            return i;
+        }
     }
-    return kAtmosphereKinds.size(); // unreachable for a declared enumerator
+    return kAtmosphereKinds.size();
 }
 
 static_assert(atmosphereKindIndex(AtmosphereKind::Comet) == 0);

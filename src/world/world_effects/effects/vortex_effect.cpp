@@ -9,7 +9,7 @@
 // and `emission` is emissive density PER METRE. They are two knobs because they are two physical
 // quantities, and labelling them "opacity" and "glow" is how they got confused in the first place.
 
-#include "world/world_effects/builtin_effects.hpp"
+#include "world/world_effects/effect_registry.hpp"
 
 #include <array>
 #include <string>
@@ -286,7 +286,7 @@ EffectSchema buildSchema() {
     
     s.key = "vortex";
     s.enumName = "Vortex";
-    s.displayName = "Cosmic vortex";
+    s.displayName = "Cosmic Vortex";
     s.addLabel = "Add vortex";
     s.addTip = "A turning funnel of luminous medium, drawn inside the volumetric march.\n"
                "It is placed in the world rather than on the sky dome, and it is the\n"
