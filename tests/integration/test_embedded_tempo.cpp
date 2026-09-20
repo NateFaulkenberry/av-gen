@@ -325,6 +325,39 @@ TEST_CASE("a tempo override and its provenance survive save, load and save again
     REQUIRE(second["transport"]["tempo"]["source"].get<std::string>() == "user");
 }
 
+TEST_CASE("a saved override still wins when the project's audio has its own BPM",
+          "[tempo][engine]") {
+    // The ordering risk the simpler round-trip cannot catch: loadProject installs the audio
+    // BEFORE it reads the transport block, so the embedded tempo is in place by the time the
+    // override arrives. If the two were applied in the wrong order -- or if refreshTransport ran
+    // only between them -- the file's BPM would win on load and the artist's number would come
+    // back from disk and then be discarded.
+    Fixture fx("embedded-tempo-load-order");
+    const auto tagged = writeClickWav(fx.dir / "tagged.wav", 128.0, 6.0, "128");
+    const auto project = fx.dir / "p.avgen";
+
+    {
+        auto engine = makeEngine();
+        REQUIRE(engine.loadAudio(tagged).has_value());
+        engine.setTempoOverride(96.0);
+        REQUIRE(engine.saveProject(project).has_value());
+    }
+
+    auto engine = makeEngine();
+    REQUIRE(engine.loadProject(project).has_value());
+    // Both facts survive, and the right one is in force.
+    REQUIRE(engine.embeddedTempo().available);
+    REQUIRE(engine.embeddedTempo().bpm == Approx(128.0));
+    REQUIRE(engine.tempo().source == TempoProvenance::UserOverride);
+    REQUIRE(engine.tempo().bpm == Approx(96.0));
+    REQUIRE(engine.transport().tempoBpm() == Approx(96.0));
+
+    // And clearing it on the loaded project falls back to the file, not to nothing.
+    engine.clearTempoOverride();
+    REQUIRE(engine.tempo().source == TempoProvenance::EmbeddedMetadata);
+    REQUIRE(engine.transport().tempoBpm() == Approx(128.0));
+}
+
 TEST_CASE("a project with no override writes no tempo, and loading one clears it",
           "[tempo][engine]") {
     Fixture fx("embedded-tempo-default");
