@@ -17,6 +17,7 @@
 //   window  The same seek at a range of window lengths. Cost must be linear in the window and the
 //           control is that it is: a window arm whose cost does not move with the window is
 //           measuring something other than the re-simulation.
+//   g       What the navigation grid would be worth, and what it would cost the frame.
 //   hist    Does the answer at `target` depend on how far back the replay started? Per kind, the
 //           shortest replay that lands on the same state as the full one. A kind that reports
 //           "1 step" and a kind that reports "the whole window" are the two halves of the
@@ -365,6 +366,70 @@ void authoredScene(scene::Composition& comp, params::ParameterSet& params, doubl
                 "not biting)\n");
 }
 
+// ---- what the navigation grid would be worth, and what it would cost the frame (ADR-295) --------
+//
+// `pathClear` is the per-step cost: the profile of one `explore` body-step is
+// `Explore::update -> Navigator::steer -> pathClear -> Navigator::sample -> TerrainQuery::at ->
+// WorldMap::sample -> WorldMap::height`, and two thirds of that last one is `closestOnPath`
+// walking a river polyline. ADR-295 built the answer -- let the baked grid settle the terrain half
+// where it can prove it -- and on Glowmere the grid's build-time self-check **refuses**:
+//
+//     nav grid: the grid will NOT answer for this world's terrain -- it disagreed with
+//     the world after 261 sampled walk(s); every walkability query stays analytic
+//
+// The refusal is correct, and `tools/charai_probe`'s agree arm says raising the margin does not
+// cure it: 17 unsafe segments at trust 2 and 17 at trust 3, most of them the step test. So the
+// question this arm exists to answer is the one that decides whether the soundness work is worth
+// doing at all: **if the grid did answer, how much faster is the replay, and how far away does it
+// leave the cast?** A speedup that moves a walker is not a speedup (ADR-182), and a soundness
+// project worth weeks needs its prize measured first.
+//
+// Run it as `AVGEN_NAV_FORCE_TRUST=1 avgen_seek_probe <scene> 25 2 g`. Without the variable the
+// grid does not vouch and both arms are analytic, which is this arm's own control: the two times
+// then agree and the movement is zero, and an arm that reports a prize in that configuration is
+// measuring something other than the grid.
+void gridPrize(scene::Composition& comp, params::ParameterSet& params, double target, int repeats) {
+    std::printf("\n== what the nav grid would be worth on this world, seeked to t = %.0f s ==\n",
+                target);
+    entity::EntityWorld& world = comp.entityWorld();
+    entity::Navigator nav = world.navigator();
+    const entity::NavSettings shipped = nav.settings();
+    const auto run = [&](float trustMetres) {
+        entity::NavSettings s = shipped;
+        s.gridTrustMetres = trustMetres; // 0 restores the analytic path exactly (navigation.hpp)
+        nav.setSettings(s);
+        world.setNavigator(nav);
+        double best = std::numeric_limits<double>::max();
+        for (int r = 0; r < repeats; ++r) {
+            const auto start = Clock::now();
+            world.seek(target, &params, nullptr, 1.0 / 60.0, entity::SeekBudget{.maxSeconds = 90.0});
+            best = std::min(best, msSince(start));
+        }
+        std::vector<glm::vec3> pose;
+        for (const auto& e : world.entities()) {
+            pose.push_back(e->visualPosition());
+        }
+        return std::pair{best, pose};
+    };
+    const bool vouches = nav.grid() != nullptr && nav.grid()->valid() && nav.grid()->vouches();
+    std::printf("  the grid %s answer for this world%s\n",
+                vouches ? "WILL" : "will NOT",
+                entity::NavGrid::trustForcedForDiagnostics() ? " (AVGEN_NAV_FORCE_TRUST is set)" : "");
+    const auto [analyticMs, analyticPose] = run(0.0f);
+    const auto [gridMs, gridPose] = run(shipped.gridTrustMetres);
+    double moved = 0.0;
+    for (std::size_t i = 0; i < gridPose.size() && i < analyticPose.size(); ++i) {
+        moved = std::max(moved, static_cast<double>(glm::length(gridPose[i] - analyticPose[i])));
+    }
+    std::printf("  %-26s %10s %14s\n", "arm", "seek ms", "worst body vs analytic");
+    std::printf("  %-26s %10.1f %14s\n", "analytic (gridTrust 0)", analyticMs, "0.000 m (reference)");
+    std::printf("  %-26s %10.1f %11.3f m\n",
+                vouches ? "grid answers the terrain" : "grid present but refusing", gridMs, moved);
+    std::printf("  (without AVGEN_NAV_FORCE_TRUST the two arms are the same code and the control is\n"
+                "   that they agree: equal times and 0.000 m)\n");
+    world.setNavigator([&] { entity::Navigator back = nav; back.setSettings(shipped); return back; }());
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -396,5 +461,6 @@ int main(int argc, char** argv) {
     if (want('w')) { windowScaling(nav, n, "explore", repeats); }
     if (want('h')) { historyDepth(nav, 30.0); }
     if (want('a')) { authoredScene(comp, params, 90.0, repeats); }
+    if (want('g')) { gridPrize(comp, params, 90.0, repeats); }
     return 0;
 }

@@ -3,6 +3,7 @@
 #include "core/log.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <chrono>
 #include <cmath>
 #include <limits>
@@ -821,6 +822,25 @@ void NavGrid::checkTrust(const Navigator& nav) {
     // agreement (ADR-182).
     constexpr std::size_t kMinimumEvidence = 16;
     stats_.trusted = stats_.trustChecks >= kMinimumEvidence;
+}
+
+// TEMPORARY DIAGNOSTIC. `AVGEN_NAV_FORCE_TRUST=1` makes the grid answer for a world it has just
+// caught itself getting wrong. It exists to price the optimisation on a world where the self-check
+// refuses -- Glowmere is one, and the refusal is correct -- so that "how much would this be worth
+// if it were sound" can be a measurement rather than an argument. See `tools/seek_probe.cpp`'s
+// `g` arm, which runs the analytic and the forced-grid replay and reports how far the cast ends up
+// apart.
+//
+// **It must never be set for anything anybody keeps.** A forced grid answers walkability at four
+// metres where the world answers it at a quarter, and a walker routed by one takes a different
+// line past a trunk: the frame it produces is a different frame, which is what `vouches()` exists
+// to prevent. Same shape as AVGEN_LEGACY_PROCGEN -- an arm, not a setting.
+bool NavGrid::trustForcedForDiagnostics() {
+    static const bool forced = [] {
+        const char* v = std::getenv("AVGEN_NAV_FORCE_TRUST");
+        return v != nullptr && v[0] != '\0' && v[0] != '0';
+    }();
+    return forced;
 }
 
 std::uint8_t NavGrid::terrainRoom(glm::ivec2 c) const {

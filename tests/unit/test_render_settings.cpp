@@ -338,7 +338,14 @@ TEST_CASE("supersample round-trips through a project", "[render][settings]") {
 
 // ---- the shadow AOV's preconditions (ADR-255, ADR-182) ------------------------------------------
 
-TEST_CASE("--aov shadow refuses the configurations where it would be a constant",
+// The name does not begin with `--`, and that is not a style choice. `catch_discover_tests`
+// registers each case with CTest by passing its name as an ARGUMENT to the test binary, and Catch2
+// parses a leading `--` as a flag: this case failed on every `ctest --preset release` run with
+// `Unrecognised token: --aov`, while passing by wildcard with 10 assertions and exit 0. One red
+// line is enough to stop the suite exiting 0, so anyone reading that exit code on main drew the
+// wrong conclusion from it -- the tenth entry in docs/testing.md's list, and the only one whose
+// cause is the name of the test rather than anything it does.
+TEST_CASE("the shadow AOV refuses the configurations where it would be a constant (--aov shadow)",
           "[render][settings][aov][adr255]") {
     // ADR-255 asked for one clause; running the arm produced a second. Both are here because a
     // refusal nobody can exercise is a refusal nobody knows still works -- and because the shape

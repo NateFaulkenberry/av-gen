@@ -260,7 +260,11 @@ public:
     // wrong 18 times in 20,000, and that is enough to put four of twenty-four bodies somewhere else
     // within one second. Two worlds, one rule, opposite answers -- which is why the grid decides per
     // world instead of the engine deciding once.
-    [[nodiscard]] bool vouches() const { return stats_.trusted; }
+    // Whether the grid is allowed to answer for this world's terrain: it tests itself against the
+    // world at build and refuses for a world it got wrong (ADR-295). `trustForcedForDiagnostics`
+    // is a TEMPORARY arm and never a setting -- see its definition.
+    [[nodiscard]] bool vouches() const { return stats_.trusted || trustForcedForDiagnostics(); }
+    [[nodiscard]] static bool trustForcedForDiagnostics();
 
     // Re-sample the cells inside an XZ rectangle, then relabel the whole graph (ADR-297).
     //
