@@ -87,8 +87,8 @@ std::vector<std::string> ClipSources::sync(std::span<const AudioClip> clips) {
     std::vector<std::string> failures;
     // Drop what is no longer named. Done first so a project swap releases the old piece's memory
     // before the new one's is decoded rather than after.
-    std::erase_if(files_, [&](const auto& entry) {
-        return std::ranges::none_of(clips, [&](const AudioClip& c) { return c.file == entry.first; });
+    std::erase_if(files_, [&](const Source& entry) {
+        return std::ranges::none_of(clips, [&](const AudioClip& c) { return c.file == entry.path; });
     });
     for (const AudioClip& clip : clips) {
         if (clip.file.empty() || find(clip.file) != nullptr) {
@@ -100,15 +100,57 @@ std::vector<std::string> ClipSources::sync(std::span<const AudioClip> clips) {
                                            loaded.error().message));
             continue;
         }
-        files_.emplace_back(clip.file, std::make_shared<const AudioFile>(std::move(*loaded)));
+        // Embedded Tempo, read once, here (ADR-394). Reading the container's metadata cannot fail
+        // the import: a file with no BPM is the ordinary case, and a file whose head we cannot
+        // read has already decoded fine, so the tempo is simply unknown.
+        AudioTempo tempo;
+        if (auto read = readEmbeddedTempo(clip.file)) {
+            tempo = std::move(*read);
+        }
+        files_.push_back(Source{.path = clip.file,
+                                .file = std::make_shared<const AudioFile>(std::move(*loaded)),
+                                .tempo = std::move(tempo)});
     }
     return failures;
 }
 
 std::shared_ptr<const AudioFile> ClipSources::find(const std::filesystem::path& path) const {
-    const auto it = std::ranges::find(files_, path, &std::pair<std::filesystem::path,
-                                                               std::shared_ptr<const AudioFile>>::first);
-    return it == files_.end() ? nullptr : it->second;
+    const auto it = std::ranges::find(files_, path, &Source::path);
+    return it == files_.end() ? nullptr : it->file;
+}
+
+AudioTempo ClipSources::embeddedTempo(const std::filesystem::path& path) const {
+    const auto it = std::ranges::find(files_, path, &Source::path);
+    return it == files_.end() ? AudioTempo{} : it->tempo;
+}
+
+AudioTempo arrangementEmbeddedTempo(std::span<const AudioClip> clips, const ClipSources& sources) {
+    const AudioClip* winner = nullptr;
+    AudioTempo tempo;
+    int disagreements = 0;
+    for (const AudioClip& clip : clips) {
+        if (!clip.enabled || clip.file.empty()) {
+            continue;
+        }
+        const AudioTempo candidate = sources.embeddedTempo(clip.file);
+        if (!candidate.available) {
+            continue;
+        }
+        if (winner == nullptr || clip.startSeconds < winner->startSeconds) {
+            if (winner != nullptr && candidate.bpm != tempo.bpm) {
+                ++disagreements;
+            }
+            winner = &clip;
+            tempo = candidate;
+        } else if (candidate.bpm != tempo.bpm) {
+            ++disagreements;
+        }
+    }
+    if (disagreements > 0 && winner != nullptr) {
+        log::info("embedded tempo: {} clip(s) disagree; using {:g} from '{}' (the earliest)",
+                  disagreements + 1, tempo.bpm, winner->file.filename().string());
+    }
+    return tempo;
 }
 
 // ---- the mix -------------------------------------------------------------------------------------

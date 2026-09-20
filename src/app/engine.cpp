@@ -1309,6 +1309,15 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
                               {"start", loop.startSeconds},
                               {"end", loop.endSeconds}}}};
     }
+    // The artist's tempo, and only the artist's (ADR-394). A detected tempo is not written --
+    // re-analysing produces it again, and persisting it would make a measurement look like a
+    // decision. An embedded tempo is not written either: it lives in the audio file, and writing a
+    // stale copy here would outlive the file being replaced. What must survive a save is the one
+    // thing nothing can recompute: that a person chose this number.
+    if (tempoOverride_.available) {
+        doc["transport"]["tempo"] = {{"bpm", tempoOverride_.bpm},
+                                     {"source", audio::tempoProvenanceToken(tempoOverride_.source)}};
+    }
     doc["control"] = controlHub_.map().toJson();
     if (outputs_.is_array() && !outputs_.empty()) {
         doc["outputs"] = outputs_;
@@ -2070,6 +2079,10 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     // than inheriting the one from whatever was open before: loading a project must not leave a
     // range from another piece quietly governing this one.
     transport_.clearLoop();
+    // Same rule as the loop: a project with no tempo block gets none, rather than inheriting the
+    // override from whatever was open before. A tempo from another piece quietly governing this
+    // one is exactly the defect the reset exists to prevent.
+    tempoOverride_ = {};
     if (doc.contains("transport") && doc["transport"].is_object()) {
         const auto& block = doc["transport"];
         if (block.contains("loop") && block["loop"].is_object()) {
@@ -2079,6 +2092,23 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             parsed.startSeconds = loop.value("start", 0.0);
             parsed.endSeconds = loop.value("end", 0.0);
             transport_.setLoop(parsed);
+        }
+        if (block.contains("tempo") && block["tempo"].is_object()) {
+            const auto& tempo = block["tempo"];
+            const double bpm = tempo.value("bpm", 0.0);
+            // Provenance round-trips with the value. A file that somehow records a non-user
+            // provenance here is not honoured: only a decision is persisted, so anything else
+            // would be a measurement masquerading as one.
+            const auto source = audio::tempoProvenanceFromToken(tempo.value("source", "user"));
+            if (source == audio::TempoProvenance::UserOverride && bpm >= audio::kMinPlausibleBpm &&
+                bpm <= audio::kMaxPlausibleBpm) {
+                tempoOverride_ = audio::AudioTempo{.available = true,
+                                                   .bpm = bpm,
+                                                   .source = audio::TempoProvenance::UserOverride,
+                                                   .confidence = 1.0};
+            } else if (bpm != 0.0) {
+                log::warn("project tempo {:g} ({}) ignored", bpm, tempo.value("source", "user"));
+            }
         }
     }
     // Parameter values for sources and shader inputs arrive in the same document; apply them
@@ -2645,6 +2675,11 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
         track_.reset();
         audioFile_.reset();
         audioPath_.clear();
+        // The tempo the audio brought with it goes when the audio does. Left standing it would be a
+        // tempo attributed to a file that is no longer loaded -- and, worse, one that would keep
+        // outranking the analyzer for whatever was loaded next. The override is NOT cleared here:
+        // that belongs to the project, not to the audio.
+        embeddedTempo_ = {};
         offlineFrameCursor_ = 0;
         hasFrame_ = false;
         ++audioRevision_;
@@ -2674,8 +2709,27 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
     // It costs one pass over the file at load -- about 130 ms for ninety seconds -- and both of the
     // places that read `track_` are already behind a mode or player check, so this is inert for
     // live rendering.
+    // The beat grid, seeded but not skipped (ADR-394).
+    //
+    // An embedded BPM is a number, not a grid: it has no beat phase, no downbeat and no bar line
+    // in it. Skipping this pass because a tag supplied a number would leave the BeatTracker, the
+    // Auto-director, the sequencer and every beat-driven route with nothing to consume -- and no
+    // test in the feature would notice. So the pass always runs.
+    //
+    // What the tag buys is not time -- the cost here is the onset/STFT pass, which every other
+    // audio-reactive signal needs anyway and which no tag can replace. It buys *accuracy*: the
+    // tempogram's log-Gaussian prior is centred on the known BPM and narrowed, which removes the
+    // half/double-tempo octave error the default prior at 120 exists to mitigate and cannot always
+    // resolve. The search still runs; it is simply told where to look.
+    analysis::BeatTrackerConfig beatConfig;
+    if (embeddedTempo_.available) {
+        beatConfig.preferredBpm = static_cast<float>(embeddedTempo_.bpm);
+        beatConfig.priorWidthOctaves = audio::kSeededPriorWidthOctaves;
+        log::info("beat tracking seeded from embedded tempo: {:g} bpm (prior width {:g} octaves)",
+                  embeddedTempo_.bpm, audio::kSeededPriorWidthOctaves);
+    }
     track_ = std::make_shared<analysis::AnalysisTrack>(
-        analysis::AnalysisTrack::analyze(*file, analyzerConfig_));
+        analysis::AnalysisTrack::analyze(*file, analyzerConfig_, beatConfig));
     offlineFrameCursor_ = 0;
     log::info("analyzed {:.2f} s of audio: {} frames", file->durationSeconds(), track_->frames().size());
     audioFile_ = std::move(file);
@@ -2735,6 +2789,16 @@ Result<void> Engine::rebuildAudio() {
         log::info("audio: {} clip(s) mixed to {:.2f} s at {} Hz, {} ch in {:.1f} ms",
                   audioMix_.clipsMixed, audioMix_.durationSeconds, audioMix_.sampleRate,
                   audioMix_.channels, audioMix_.millis);
+    }
+    // Embedded Tempo of the arrangement, captured before the mix is installed -- the mixdown has
+    // no container to read, so this is the last point it exists (ADR-394). Set before
+    // `installAudio` because the whole-track analysis it runs is seeded from it.
+    embeddedTempo_ = audio::arrangementEmbeddedTempo(audioClips_, clipSources_);
+    if (embeddedTempo_.available && tempoOverride_.available) {
+        // Precedence, stated where it would otherwise be violated: importing a file with a BPM in
+        // it must not silently replace a tempo the artist typed.
+        log::info("embedded tempo {:g} noted; tempo override {:g} kept", embeddedTempo_.bpm,
+                  tempoOverride_.bpm);
     }
     auto shared = std::make_shared<const audio::AudioFile>(std::move(*mixed));
     if (auto r = installAudio(shared); !r) {
@@ -2941,6 +3005,75 @@ double Engine::audioDurationSeconds() const { return audioFile_ ? audioFile_->du
 
 double Engine::durationSeconds() const { return transport_.durationSeconds(); }
 
+std::pair<audio::TempoProvenance, double> Engine::resolvedTempo() const {
+    // The precedence chain, and the only copy of it. Highest first; each arm returns immediately,
+    // so a lower source can never overwrite a higher one. That is the whole point -- an import
+    // must not silently replace a tempo the artist typed, and making it structural beats making it
+    // a rule somebody has to remember.
+    if (tempoOverride_.available) {
+        return {audio::TempoProvenance::UserOverride, tempoOverride_.bpm};
+    }
+    if (midiClockActive_) {
+        if (const double bpm = controlHub_.midiClock().bpm(); bpm > 0.0) {
+            return {audio::TempoProvenance::ExternalClock, bpm};
+        }
+    }
+    if (embeddedTempo_.available) {
+        return {audio::TempoProvenance::EmbeddedMetadata, embeddedTempo_.bpm};
+    }
+    if (hasFrame_ && latest_.tempoBpm > 0.0f) {
+        return {audio::TempoProvenance::Detected, static_cast<double>(latest_.tempoBpm)};
+    }
+    return {audio::TempoProvenance::None, 0.0};
+}
+
+audio::AudioTempo Engine::tempo() const {
+    // `resolvedTempo()` decides; this only dresses the answer with the diagnostics belonging to
+    // whichever source won. Not a second precedence chain -- there is exactly one.
+    const auto [source, bpm] = resolvedTempo();
+    switch (source) {
+    case audio::TempoProvenance::UserOverride:
+        return tempoOverride_;
+    case audio::TempoProvenance::EmbeddedMetadata:
+        return embeddedTempo_;
+    case audio::TempoProvenance::ExternalClock:
+        return audio::AudioTempo{
+            .available = true, .bpm = bpm, .source = source, .confidence = 1.0};
+    case audio::TempoProvenance::Detected:
+        return audio::AudioTempo{.available = true,
+                                 .bpm = bpm,
+                                 .source = source,
+                                 .confidence = static_cast<double>(latest_.tempoConfidence)};
+    case audio::TempoProvenance::None:
+        break;
+    }
+    return {};
+}
+
+void Engine::setTempoOverride(double bpm) {
+    if (!(bpm >= audio::kMinPlausibleBpm && bpm <= audio::kMaxPlausibleBpm)) {
+        log::warn("tempo override {:g} ignored: outside {:g}..{:g} bpm", bpm, audio::kMinPlausibleBpm,
+                  audio::kMaxPlausibleBpm);
+        return;
+    }
+    tempoOverride_ = audio::AudioTempo{.available = true,
+                                       .bpm = bpm,
+                                       .source = audio::TempoProvenance::UserOverride,
+                                       .confidence = 1.0};
+    log::info("tempo override set to {:g} bpm", bpm);
+    refreshTransport();
+}
+
+void Engine::clearTempoOverride() {
+    if (!tempoOverride_.available) {
+        return;
+    }
+    tempoOverride_ = {};
+    log::info("tempo override cleared; tempo returns to {}",
+              audio::tempoProvenanceName(tempo().source));
+    refreshTransport();
+}
+
 void Engine::refreshTransport() {
     // The project's length is the longest thing in it. A sequence that runs past its audio is a
     // sequence that should play to its end, and a project with no audio at all still has a length.
@@ -2951,9 +3084,7 @@ void Engine::refreshTransport() {
     // The tempo is for the bars/beats readout and for beat stepping with no analyzed grid. It comes
     // from wherever the beat clock came from this frame, so the display cannot disagree with the
     // signals.
-    const double bpm = midiClockActive_ ? controlHub_.midiClock().bpm()
-                                        : (hasFrame_ ? static_cast<double>(latest_.tempoBpm) : 0.0);
-    transport_.setTempo(bpm, 4);
+    transport_.setTempo(resolvedTempo().second, 4);
     // The project's frame rate *is* the render settings' frame rate. Not a second one: the frames a
     // person steps through have to be the frames the project exports, and two numbers that are
     // nearly always equal are two numbers that will one day not be.
@@ -3194,7 +3325,10 @@ void Engine::publishFrame(const analysis::AnalysisFrame& frame) {
 void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
     const auto& midiClock = controlHub_.midiClock();
     midiClockActive_ = tempoSource_ == TempoSource::MidiClock && midiClock.running() && midiClock.hasTempo();
-    double bpm = hasFrame_ ? static_cast<double>(latest_.tempoBpm) : 0.0;
+    // The same resolution the transport readout uses, so the picture and the display cannot be
+    // driven by different numbers (ADR-394). The *phase* below still comes from the analyzer even
+    // when the bpm came from a tag, because a BPM tag has no phase in it.
+    double bpm = resolvedTempo().second;
     bool pulse = false;
     if (midiClockActive_) {
         // The MIDI clock owns the beat clock: phase and count come straight from the tracker

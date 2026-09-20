@@ -37,6 +37,8 @@ private:
     void drawTransportButtons(app::Engine& engine, const app::TransportSnapshot& snapshot);
     void drawTimeDisplay(app::Engine& engine, const app::TransportSnapshot& snapshot);
     void drawLoopControls(app::Engine& engine, const app::TransportSnapshot& snapshot);
+    // Tempo, its provenance, and the override (ADR-394).
+    void drawTempo(app::Engine& engine, const app::TransportSnapshot& snapshot);
 
     TimeFormat format_ = TimeFormat::Clock;
 };

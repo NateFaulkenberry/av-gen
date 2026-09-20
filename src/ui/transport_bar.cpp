@@ -6,6 +6,8 @@
 #include "app/transport.hpp"
 #include "core/log.hpp"
 
+#include <fmt/format.h>
+
 #include <imgui.h>
 
 #include <algorithm>
@@ -285,14 +287,91 @@ void TransportBar::draw(app::Engine& engine, bool compact) {
         tooltip("The project's frame rate: what a frame step moves by and what timecode "
                           "counts in.\nSet it in Render.");
     }
-    if (snapshot.tempoBpm > 0.0) {
-        ImGui::SameLine(0.0f, 10.0f);
-        ImGui::TextDisabled("%.1f bpm", snapshot.tempoBpm);
-    }
+    drawTempo(engine, snapshot);
     if (snapshot.rate != 1.0 && engine.hasAudio()) {
         ImGui::SameLine(0.0f, 10.0f);
         ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.45f, 1.0f), "audio silent at %s", kRateNames[rate]);
     }
+}
+
+// Tempo, where it came from, and the way to change it (ADR-394).
+//
+// It lives here, where the tempo readout already was, rather than in a panel of its own: a tempo is
+// not a reusable engine concept needing first-class UI, and a "Tempo" panel would be the kind of
+// feature-specific surface this project has deleted before.
+//
+// The source is shown next to the number because a tempo an artist cannot account for is one they
+// cannot trust -- 128 from the file's TBPM and 128 from the analyzer are not the same claim. The
+// field and format that supplied it are one hover away rather than on the bar, because they are
+// diagnostics; the Sequencer's audio-clip view carries the same detail in full.
+void TransportBar::drawTempo(app::Engine& engine, const app::TransportSnapshot& snapshot) {
+    const audio::AudioTempo tempo = engine.tempo();
+    if (!tempo.available && !engine.embeddedTempo().available) {
+        return;
+    }
+    ImGui::SameLine(0.0f, 10.0f);
+
+    // Editable in place. An artist who can see a tempo must be able to change it; a number they can
+    // only read is the defect, not the feature.
+    auto bpm = static_cast<float>(tempo.bpm);
+    ImGui::SetNextItemWidth(78.0f);
+    const bool overridden = tempo.source == audio::TempoProvenance::UserOverride;
+    if (!overridden) {
+        ImGui::PushStyleColor(ImGuiCol_Text, palette().textMuted);
+    }
+    const bool changed = ImGui::DragFloat("##tempo", &bpm, 0.1f, static_cast<float>(audio::kMinPlausibleBpm),
+                                          static_cast<float>(audio::kMaxPlausibleBpm), "%.2f bpm");
+    if (!overridden) {
+        ImGui::PopStyleColor();
+    }
+    if (changed) {
+        engine.setTempoOverride(static_cast<double>(bpm));
+    }
+
+    std::string detail = fmt::format("Tempo: {:.2f} bpm\nSource: {}", tempo.bpm,
+                                     audio::tempoProvenanceName(tempo.source));
+    if (tempo.source == audio::TempoProvenance::EmbeddedMetadata) {
+        detail += fmt::format("\nFormat: {}\nField: {}", tempo.metadataFormat, tempo.metadataKey);
+    }
+    if (overridden && engine.embeddedTempo().available) {
+        // The file's claim is not thrown away when the artist overrides it, and saying so is what
+        // stops the override looking like the file was misread.
+        detail += fmt::format("\n\nThe file says {:.2f} bpm ({} {}).", engine.embeddedTempo().bpm,
+                              engine.embeddedTempo().metadataFormat, engine.embeddedTempo().metadataKey);
+    }
+    detail += "\n\nDrag to set the project tempo.";
+    if (overridden) {
+        detail += "\nRight-click to clear it and return to the file or the analyzer.";
+    }
+    // What a BPM does not give you, said where somebody might assume otherwise.
+    detail += "\n\nA tempo gives seconds per beat. The beat grid -- phase, downbeat, bars --\n"
+              "comes from analysis, not from the number.";
+    if (ImGui::IsItemHovered()) {
+        tooltip(detail.c_str());
+    }
+    if (overridden && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+        engine.clearTempoOverride();
+    }
+
+    // A one-word origin beside the number, so the provenance is readable without a hover.
+    ImGui::SameLine(0.0f, 4.0f);
+    switch (tempo.source) {
+    case audio::TempoProvenance::UserOverride:
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette().accent), "set");
+        break;
+    case audio::TempoProvenance::EmbeddedMetadata:
+        ImGui::TextDisabled("file");
+        break;
+    case audio::TempoProvenance::ExternalClock:
+        ImGui::TextDisabled("midi");
+        break;
+    case audio::TempoProvenance::Detected:
+        ImGui::TextDisabled("analysis");
+        break;
+    case audio::TempoProvenance::None:
+        break;
+    }
+    static_cast<void>(snapshot);
 }
 
 } // namespace avgen::ui

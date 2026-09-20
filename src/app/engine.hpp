@@ -20,6 +20,7 @@
 #include "audio/audio_file.hpp"
 #include "audio/arrangement.hpp"
 #include "audio/audio_player.hpp"
+#include "audio/tempo_metadata.hpp"
 #include "comp/layer_stack.hpp"
 #include "core/error.hpp"
 #include "core/time.hpp"
@@ -359,6 +360,34 @@ public:
     [[nodiscard]] TempoSource tempoSource() const { return tempoSource_; }
     // True when this frame's beat clock came from the MIDI clock (source selected and running).
     [[nodiscard]] bool midiClockActive() const { return midiClockActive_; }
+
+    // ---- tempo and where it came from (ADR-394) ----
+    //
+    // One resolution, used by the transport readout AND by the beat clock, so the number an artist
+    // reads can never disagree with the number driving the picture. Precedence, highest first:
+    //
+    //   UserOverride     the artist typed it -- never silently replaced by anything below
+    //   ExternalClock    a running MIDI clock, because selecting it is itself a user act
+    //   EmbeddedMetadata the BPM written into the imported file
+    //   Detected         the analyzer's estimate
+    //   None             nothing knows
+    //
+    // Note what this does NOT do: an embedded BPM outranks the analyzer for the tempo *number*
+    // only. Beat phase, the beat count and the whole beat grid still come from analysis, because a
+    // BPM tag does not contain them. Metadata supplies the scalar; analysis supplies the grid.
+    [[nodiscard]] audio::AudioTempo tempo() const;
+    // The resolved tempo's bpm and provenance without the diagnostic strings. Identical precedence
+    // -- it IS the precedence, which `tempo()` then decorates -- and it allocates nothing, which
+    // matters because the beat clock asks every frame and a metadata format string is past SSO.
+    [[nodiscard]] std::pair<audio::TempoProvenance, double> resolvedTempo() const;
+    // The tempo embedded in the loaded arrangement's audio, whether or not it is the one in force.
+    // Kept separately so the UI can say "the file says 128, you have set 130".
+    [[nodiscard]] const audio::AudioTempo& embeddedTempo() const { return embeddedTempo_; }
+    // The artist's number. Setting it makes it win over everything below; clearing returns the
+    // project to whatever the file and the analyzer say.
+    void setTempoOverride(double bpm);
+    void clearTempoOverride();
+    [[nodiscard]] const audio::AudioTempo& tempoOverride() const { return tempoOverride_; }
 
     // ---- outputs (milestone 1.2): the application owns the windows; the engine only carries the
     // project's "outputs" block so it saves and loads with everything else ----
@@ -791,6 +820,12 @@ private:
     std::uint64_t audioRevision_ = 1;
     audio::ClipSources clipSources_;
     audio::MixReport audioMix_;
+    // Embedded Tempo, captured when the arrangement's sources were loaded. Not derived from
+    // `audioFile_`: that is a mixdown with no container to read (ADR-394).
+    audio::AudioTempo embeddedTempo_;
+    // The artist's tempo. Persisted; `available` false means "not overridden", which is not the
+    // same as 0 bpm.
+    audio::AudioTempo tempoOverride_;
     Transport transport_;
     // The interactive seek's outstanding request. See `requestSeek`.
     double seekRequestSeconds_ = 0.0;
