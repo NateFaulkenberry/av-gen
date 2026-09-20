@@ -269,7 +269,7 @@ void WorldPanel::drawOverview(app::Engine& engine) {
         }
         ImGui::PopID();
     };
-    // ADR-386: the composition's own nodes -- the things somebody placed and named. This list was
+    // ADR-387: the composition's own nodes -- the things somebody placed and named. This list was
     // missing, and its absence is half of why the Tree panel was written: every other kind of
     // object in the scene could be selected here and inspected, and the authored nodes could only
     // be reached by clicking them in the viewport, which does not work for a group whose children
@@ -384,7 +384,7 @@ void WorldPanel::drawInspector(app::Engine& engine) {
             break;
         }
     }
-    // ADR-386: the selected object's own controls, editable, grouped by the sub-prefix the
+    // ADR-387: the selected object's own controls, editable, grouped by the sub-prefix the
     // registration already gives them -- `nodes/<n>/wind/strength` sits under "wind", and every
     // node that declares a wind body gets that group for free. Nothing here knows the name of any
     // scene, any node or any effect: the grouping is read off the paths, which is what makes this

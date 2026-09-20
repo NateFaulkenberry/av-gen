@@ -1705,7 +1705,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             effects.push_back(std::move(*one));
         }
         if (readable) {
-            // ADR-386 §19, the second half of the migration. A project's `atmosphericEffects` block
+            // ADR-387 §19, the second half of the migration. A project's `atmosphericEffects` block
             // is a COPY of the scene's list and REPLACES it (ADR-264), so a project saved before the
             // vortex was an effect carries a list that cannot contain one -- and the vortex the
             // scene's own migration just produced would be thrown away by a project that is exactly
@@ -1732,7 +1732,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             }
         }
     }
-    // ADR-386 §19, the third and last half of the migration: the PATHS. Moving the vortex from
+    // ADR-387 §19, the third and last half of the migration: the PATHS. Moving the vortex from
     // `scene/vortex/*` to `atmos/<name>/*` orphans every route, key, preset member and macro that
     // named the old one -- silently, because a route whose target does not resolve is dropped with
     // a warning nobody reads and the picture simply stops answering the music.
@@ -1788,7 +1788,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             };
             rewrite(rewrite, doc);
             if (moved > 0) {
-                log::info("project: migrated {} reference(s) from 'scene/vortex/' to '{}' (ADR-386)",
+                log::info("project: migrated {} reference(s) from 'scene/vortex/' to '{}' (ADR-387)",
                           moved, to);
             }
         }

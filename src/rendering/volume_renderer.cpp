@@ -73,7 +73,7 @@ VolumeRenderer::VolumeRenderer(gpu::Context& context, gpu::ShaderLibrary& shader
 VolumeRenderer::~VolumeRenderer() = default;
 
 bool VolumeRenderer::enabled(const scene::Environment& environment) {
-    // ADR-386: the vortex moved out of `Environment` and into the atmospheric effects, so this
+    // ADR-387: the vortex moved out of `Environment` and into the atmospheric effects, so this
     // overload can no longer see it. Kept for the fog-only callers; `enabled(scene)` below is the
     // one that knows about both.
     return environment.volumeDensity > 0.0f;

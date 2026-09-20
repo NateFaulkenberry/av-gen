@@ -3443,7 +3443,7 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // on shipped. Both halves are parameters now. Speed 0 is still a genuine no-op, and so is
     // enabled false, which is the default for every scene that does not say otherwise, so
     // registering these moves no existing picture.
-    // ADR-386: the vortex's parameters are gone from here. They were `scene/vortex/*` on the
+    // ADR-387: the vortex's parameters are gone from here. They were `scene/vortex/*` on the
     // environment -- a singleton, registered whether or not a scene had one, and reachable only
     // through the Tree panel. They are now `atmos/<name>/*` on an authored effect instance, which
     // is where the aurora and the comet already live, and they arrive with instances, an enable,
@@ -3763,7 +3763,7 @@ void Composition::applyCanopyEmitters() {
         if (node.kind != NodeKind::Particles || !node.vortexAttractor) {
             continue;
         }
-        // ADR-386: the vortex is an authored effect now, so this looks for the first live one
+        // ADR-387: the vortex is an authored effect now, so this looks for the first live one
         // rather than reading a field off the environment. Still no scene knowledge: it binds to
         // whatever vortex the scene contains, and to nothing if it contains none.
         const world::Vortex* found = nullptr;
@@ -8509,7 +8509,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
     if (j.contains("post")) {
         comp->postJson_ = j.at("post");
     }
-    // ADR-386 §19: a scene saved before the vortex became an authored effect carries it under
+    // ADR-387 §19: a scene saved before the vortex became an authored effect carries it under
     // `environment.vortex`. It is read into this and converted into an effect instance after the
     // `atmosphericEffects` array is read, because the conversion has to know what names are taken.
     std::optional<world::Vortex> legacyVortex;
@@ -8756,7 +8756,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 }
                 *fk.target = *value;
             }
-            // ADR-386, consolidation §19: the legacy `environment.vortex` block. It was ADR-371's
+            // ADR-387, consolidation §19: the legacy `environment.vortex` block. It was ADR-371's
             // singleton; the vortex is an authored atmospheric effect now. Reading it here and
             // converting it below preserves every value of every scene saved in the old form
             // rather than silently discarding the configuration -- the file keeps loading, and the
@@ -8955,7 +8955,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
     }
-    // ADR-386 §19: the migration. Only a vortex that was actually on is carried over -- a zero
+    // ADR-387 §19: the migration. Only a vortex that was actually on is carried over -- a zero
     // radius was ADR-371's "off", and turning it into a disabled effect instance would put a row
     // in the World Effects panel for something the scene never had. Values are copied, not
     // re-defaulted: §10 asks that the Tree of Life look identical, and the only way to be sure of

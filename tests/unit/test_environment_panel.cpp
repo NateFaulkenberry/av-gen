@@ -1,4 +1,4 @@
-// ADR-375, revised by ADR-386: the Environment panel, and the two ways a bespoke panel lies.
+// ADR-375, revised by ADR-387: the Environment panel, and the two ways a bespoke panel lies.
 //
 // A hand-written panel asks for parameters by string. If a path is wrong -- a typo, or a rename
 // somewhere else -- the row simply does not draw, and the section degrades to an empty box that
@@ -9,7 +9,7 @@
 // file's job, and it is the findability half of ADR-350 -- which only ever asserted that a
 // parameter was *registered*, never that anything pointed at it.
 //
-// ADR-386 removed the Tree panel and cut the Environment panel back to what is generic, so the
+// ADR-387 removed the Tree panel and cut the Environment panel back to what is generic, so the
 // sections this file used to cover moved:
 //
 //   * the vortex's rows  -> tests/unit/test_vortex_effect.cpp, against the World Effects panel
@@ -56,7 +56,7 @@ TEST_CASE("Every path the Environment panel asks for exists", "[ui][panels][para
     }
     // THE CONTROL. Without it the loop above passes against a set that answers yes to anything.
     CHECK_FALSE(registered(params, "scene/nonesuch"));
-    // ADR-386: and the vortex is no longer a field on the environment, so nothing registers these.
+    // ADR-387: and the vortex is no longer a field on the environment, so nothing registers these.
     // A scene that still carries them in its file is migrated on load -- see test_vortex_effect.cpp.
     CHECK_FALSE(registered(params, "scene/vortex/radius"));
     CHECK_FALSE(registered(params, "scene/vortex/emission"));
@@ -80,7 +80,7 @@ TEST_CASE("Every path the Environment panel's wind section asks for exists",
         CHECK(registered(params, path));
     }
 
-    // ADR-386 §18: exactly one global wind. A second one registered anywhere -- on a node, on an
+    // ADR-387 §18: exactly one global wind. A second one registered anywhere -- on a node, on an
     // effect -- would make "how windy is it" have two answers, which is the thing the consolidation
     // is against. Anything ending in `windSpeed` other than the one is a failure.
     int globals = 0;
@@ -98,7 +98,7 @@ TEST_CASE("Every path the Environment panel's wind section asks for exists",
 
 TEST_CASE("A node's wind response is reachable through the Inspector's own arithmetic",
           "[ui][panels][parameters][wind][inspector]") {
-    // ADR-386. The per-body half of the wind moved out of a bespoke panel and into the World
+    // ADR-387. The per-body half of the wind moved out of a bespoke panel and into the World
     // panel's Inspector, which groups an object's parameters by the first path segment after its
     // prefix. That is string arithmetic of exactly the kind ADR-382 records getting wrong, so it is
     // done here the way the Inspector does it and checked against what registration produces.
@@ -157,7 +157,7 @@ TEST_CASE("A particle system's controls are reachable under its own prefix",
     leaves.particles.shape2d = scene::ParticleShape::Leaf;
     REQUIRE(comp.addNode(std::move(leaves)).has_value());
 
-    // ADR-386: found by selecting it -- `WorldSelection::Kind::Particles` is `particles/<name>/`
+    // ADR-387: found by selecting it -- `WorldSelection::Kind::Particles` is `particles/<name>/`
     // -- rather than by sniffing paths for the substring "leaf", which is what the Tree panel did
     // and which made the control's existence depend on what somebody named their node.
     const std::string base = "particles/falling-leaves/";
@@ -227,7 +227,7 @@ TEST_CASE("A wind body can be created and removed from the application", "[ui][p
 // The panel did not use those; it computed its own from a prefix, and the arithmetic in between was
 // never exercised.
 //
-// ADR-386 deleted that panel, and the energy controls moved to the World panel's Inspector, which
+// ADR-387 deleted that panel, and the energy controls moved to the World panel's Inspector, which
 // derives its groups from the paths rather than from a wind prefix -- so the off-by-five cannot be
 // written again in that shape. The case is kept and pointed at the new arithmetic, because the
 // *blind spot* is what it guards and the blind spot survives a rewrite: a panel asks for parameters

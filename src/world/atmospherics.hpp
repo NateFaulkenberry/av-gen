@@ -88,7 +88,7 @@ inline constexpr std::size_t kAuroraBands = 16;
 enum class AtmosphereKind : std::uint8_t {
     Comet,  // a bright head on a world-space curve, with a trail integrated along the view ray
     Aurora, // curtains on vertical shells, rising from a world height, shaped by the spectrum
-    // ADR-386. A cosmic vortex is a sky phenomenon a scene AUTHORS, so it belongs in this family
+    // ADR-387. A cosmic vortex is a sky phenomenon a scene AUTHORS, so it belongs in this family
     // for the same reasons the other two do: instances with names, an enable, a table of parameters
     // under `atmos/<name>/`, serialisation in `atmosphericEffects`, a row in the World Effects
     // panel, and modulation, all for free. That it is drawn by the volumetric pass rather than by
@@ -292,7 +292,7 @@ struct Aurora {
 // One struct with both payloads rather than a variant: an effect changes kind when somebody picks a
 // different preset, and a variant would throw away the settings of the kind they left. Both are
 // small, both round-trip, and only the one `kind` names is ever read.
-// ADR-386: the cosmic vortex as an authored instance rather than a singleton on `Environment`.
+// ADR-387: the cosmic vortex as an authored instance rather than a singleton on `Environment`.
 // Every field here was `Environment::Vortex` and means exactly what it did, which is what keeps
 // §10's "the Tree of Life must look the same" true by construction rather than by re-tuning.
 struct Vortex {
@@ -359,7 +359,7 @@ struct AtmosphericEffect {
 // alone. False when the name is not a style of that kind.
 bool applyCometStyle(AtmosphericEffect& effect, std::string_view style);
 bool applyAuroraStyle(AtmosphericEffect& effect, std::string_view style);
-// ADR-386. A vortex style leaves `center` alone: where the funnel is in the world is a placement
+// ADR-387. A vortex style leaves `center` alone: where the funnel is in the world is a placement
 // decision the scene made, and a preset that moved it would silently unanchor it from the island.
 bool applyVortexStyle(AtmosphericEffect& effect, std::string_view style);
 
@@ -464,7 +464,7 @@ static_assert(sizeof(SkyGroundGpu) == 48);
 struct AtmosphericFrame {
     std::uint32_t cometCount = 0;
     std::uint32_t auroraCount = 0;
-    // ADR-386: the live vortex, if a scene authored one. ONE, not an array: the volumetric march
+    // ADR-387: the live vortex, if a scene authored one. ONE, not an array: the volumetric march
     // evaluates three fBMs per sample inside it, and ADR-374 measured the single vortex at +5.5 ms
     // of a 13.5 ms frame -- the most expensive term in the scene. A second is a deliberate future
     // decision rather than an oversight, and the resolve counts what it dropped so the UI can say
@@ -490,7 +490,7 @@ struct AtmosphericFrame {
 struct AtmosphericCounts {
     std::size_t comets = 0;
     std::size_t auroras = 0;
-    std::size_t vortices = 0; // ADR-386; at most one is used, the rest count as dropped
+    std::size_t vortices = 0; // ADR-387; at most one is used, the rest count as dropped
     std::size_t dropped = 0;
 };
 AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> effects,

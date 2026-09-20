@@ -3164,7 +3164,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         particleFrame.spawnScale = std::max(qualitySettings_.particleSpawnScale, 0.0f); // ADR-382
         particleFrame.shutterSeconds = static_cast<float>(std::clamp(time.deltaTime, 0.0, 0.1)) *
                                        std::clamp(scene.camera.lens.shutterAngle, 0.0f, 360.0f) / 360.0f;
-        // ADR-386: `enabled(scene)`, not `enabled(environment)`. The vortex used to live on the
+        // ADR-387: `enabled(scene)`, not `enabled(environment)`. The vortex used to live on the
         // environment and could therefore switch this march on by itself; moving it to the
         // atmospherics put it out of that overload's sight, and this call silently stopped filling
         // the particle fog coupling in the one scene whose `volumeDensity` is zero and whose

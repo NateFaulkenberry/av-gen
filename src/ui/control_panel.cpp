@@ -1906,7 +1906,7 @@ void ControlPanel::drawParameters(app::Engine& engine) {
       for (IParameter* param : grouped[group]) {
         ImGui::PushID(param->path().c_str());
         const std::size_t n = param->componentCount();
-        // ADR-386: the one implementation, shared with the World panel's Inspector.
+        // ADR-387: the one implementation, shared with the World panel's Inspector.
         drawParameterValue(*param);
         // Show the modulated (final) value next to the slider when it differs.
         if (n == 1 && std::abs(param->finalComponent(0) - param->baseComponent(0)) > 1e-5f) {

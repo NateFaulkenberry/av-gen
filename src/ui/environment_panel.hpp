@@ -1,6 +1,6 @@
 #pragma once
 
-// ADR-375, revised by ADR-386: the Environment panel.
+// ADR-375, revised by ADR-387: the Environment panel.
 //
 // Everything it shows was already reachable: registering a parameter puts it in the Parameters
 // panel, makes it a modulation target, a timeline key and a save entry (ADR-011), which is what
@@ -8,7 +8,7 @@
 // grouped by path prefix, so "how windy is it" is a scroll through `scene/` between `stylized` and
 // `volumeAbsorption`.
 //
-// ADR-386 removed the Tree panel that shipped beside this one and cut this panel back to what is
+// ADR-387 removed the Tree panel that shipped beside this one and cut this panel back to what is
 // generic. The rule the owner set is that AV Gen's first-class UI represents reusable engine
 // concepts, and that a scene's artistic composition is data inside those systems rather than a new
 // panel. What is left here is world state that every scene has -- the sky, the fog, and what the

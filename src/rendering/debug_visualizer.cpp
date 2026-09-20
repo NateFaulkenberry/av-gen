@@ -341,7 +341,7 @@ void buildWindDebug(DebugDraw& draw, const scene::Scene& scene, double time) {
 // have shown the funnel extending upward as a cylinder, and the camera being inside the mouth,
 // without a single render of the beauty pass.
 void buildVortexDebug(DebugDraw& draw, const scene::Scene& scene, double time) {
-    // ADR-386: the vortex is an authored atmospheric effect now, so this reads the resolved frame
+    // ADR-387: the vortex is an authored atmospheric effect now, so this reads the resolved frame
     // rather than a field on the environment. `hasVortex` is false in every scene that authors
     // none, which is the same gate `active()` was.
     if (!scene.atmospherics.hasVortex) {

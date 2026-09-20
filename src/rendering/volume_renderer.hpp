@@ -102,7 +102,7 @@ public:
 
     // True when this scene wants volumetrics at all (volumeDensity > 0).
     [[nodiscard]] static bool enabled(const scene::Environment& environment);
-    // ADR-386: the vortex lives in the atmospheric effects now, so the whole-scene overload is
+    // ADR-387: the vortex lives in the atmospheric effects now, so the whole-scene overload is
     // the one that answers correctly for a scene with a vortex and no fog.
     [[nodiscard]] static bool enabled(const scene::Scene& scene);
 

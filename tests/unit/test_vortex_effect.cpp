@@ -1,4 +1,4 @@
-// ADR-386: the vortex as an authored World Effect rather than a field on the environment, and the
+// ADR-387: the vortex as an authored World Effect rather than a field on the environment, and the
 // removal of the Tree panel that wrapped it.
 //
 // Four questions, and each has a control that could fail the other way:
@@ -266,7 +266,7 @@ TEST_CASE("the Tree panel is gone and the Environment panel is generic", "[ui][p
     CHECK(blurb.find("vortex") == std::string::npos);
 }
 
-// ADR-386 §19, the half that nearly shipped broken: the PATHS.
+// ADR-387 §19, the half that nearly shipped broken: the PATHS.
 //
 // Moving the vortex from `scene/vortex/*` to `atmos/<name>/*` orphans every route, key, preset
 // member and macro that named the old one. The shipped Tree of Life project has five such routes,

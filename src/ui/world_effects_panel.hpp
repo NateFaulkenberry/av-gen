@@ -89,7 +89,7 @@ private:
 // makes the whole sky flash rather than making its curtain edges answer the beat.
 [[nodiscard]] inline std::string atmosphericBeatTarget(const std::string& effectName,
                                                        world::AtmosphereKind kind) {
-    // ADR-386: a vortex's brightness is its emissive density. Not `density`, which is extinction --
+    // ADR-387: a vortex's brightness is its emissive density. Not `density`, which is extinction --
     // pulsing that makes the funnel thicker rather than brighter, which reads as the fog breathing.
     const char* leaf = "edgeBrightness";
     switch (kind) {

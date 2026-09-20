@@ -1,4 +1,4 @@
-# ADR-386: The vortex is an effect, and the Tree panel was a wrapper around one scene
+# ADR-387: The vortex is an effect, and the Tree panel was a wrapper around one scene
 
 - Status: Accepted (2026-09-19)
 - Supersedes the Tree panel half of ADR-375. Extends ADR-230 (atmospheric effects), ADR-207 (world
@@ -87,6 +87,23 @@ treble → filaments, progress → emission — and losing them does not fail, d
 only in a line nobody reads. The document is rewritten over its **whole tree**, string values and
 object keys alike, because a parameter path appears in six places and a migration that knows about
 one of them fails quietly in the other five.
+
+#### A parameter path is three things at once, and a correct value is not a reached value
+
+This is the general fact, and it is worth stating on its own because the next instance of it will
+not look like a vortex. **A parameter path is three things at once: where a value is stored, what a
+project's `parameters` block names, and what a modulation route targets.** Renaming one moves the
+first. Nothing in the build, the loader or the renderer notices that the other two were left behind.
+
+It was proved here the expensive way. A one-shot probe on the uniform upload reported every field
+of the vortex arriving at the GPU correct to the last decimal — radius 200, density 0.0013, emission
+0.04, every colour — while 95.35% of the frame's pixels were wrong. **A correct value is not a
+reached value.** What had been renamed was not the number but the *permission to change it*.
+
+The same family as ADR-385's stated reason that was not evidence, and as the reader with no writer:
+a thing that is present, correct, and reaching nothing. What makes this one worth its own paragraph
+is the shape of the alibi — the measurement that says "the value is right" is exactly the
+measurement that cannot see the failure, and it is the first one anybody reaches for.
 
 Two measurements are worth keeping, because they are what each half cost:
 

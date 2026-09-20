@@ -45,7 +45,7 @@ scene::Scene voidWorld(bool vortexOn, float fogDensity, glm::vec3 eye) {
     s.camera.position = eye;
     s.camera.target = {0.0f, -200.0f, 0.0f};
     if (vortexOn) {
-        // ADR-386: the vortex is an authored atmospheric effect, and what the renderer reads is the
+        // ADR-387: the vortex is an authored atmospheric effect, and what the renderer reads is the
         // resolved frame. Built here directly rather than through `resolveAtmospherics`, so this
         // test still states the vortex it is rendering rather than an effect list and a second.
         s.atmospherics.hasVortex = true;

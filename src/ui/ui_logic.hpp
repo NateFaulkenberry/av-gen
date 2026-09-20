@@ -1145,7 +1145,7 @@ inline constexpr float kMinItemWidth = 60.0f;
     return buffer;
 }
 
-// ---- the vortex's rows in the World Effects panel (ADR-386) -------------------------------------
+// ---- the vortex's rows in the World Effects panel (ADR-387) -------------------------------------
 //
 // Declared here, as data, for the reason ADR-382's Tree-panel defect gives: that panel computed a
 // parameter path by string arithmetic, got it five characters wrong, drew nothing, and said

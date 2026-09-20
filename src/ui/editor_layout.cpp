@@ -49,7 +49,7 @@ constexpr std::array<EditorPanel, 21> kPanels{{
     // asked in the same breath as "why is the beam not firing", and both were answered until now by
     // scrolling the flat Parameters list.
     //
-    // ADR-386 removed the "Tree" panel that used to sit on the next line. It was a scene-specific
+    // ADR-387 removed the "Tree" panel that used to sit on the next line. It was a scene-specific
     // wrapper: five sections that found their subjects by sniffing parameter names for "leaf",
     // "mote" and "/wind/strength", and a second global wind beside the authoritative one. A saved
     // layout that still names it is harmless -- `EditorLayout::slot` returns null for an id the
