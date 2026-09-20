@@ -1926,6 +1926,21 @@ context: **an in-place clip has no ground frame**, so "planted means stationary"
 | STEP 11-13 MotionPack, offline tool, benchmark | pending | |
 | STEP 15 visual validation | pending | the first non-numeric result |
 
+### A pattern, not an incident: ADR-204 and the 1/30 s start
+
+Three separate units in Phase A were wrong by exactly one frame before being corrected, all for the
+same reason: **a clip in this repository does not start at zero.** Blender's exporter writes the
+frame range it was given, and this pack was authored on frames 1..32, so `clip.start` is 1/30 s.
+
+| where | how it showed up |
+|---|---|
+| contact detection | a float `floor(length * rate)` dropped the final key, which on a looping clip is the sample that closes the wrap |
+| phase grid | same arithmetic, same fix |
+| retargeting | a retargeted clip is normalised to zero, so comparing the same `t` on both sides is off by a frame — 0.08 model units at the feet, small enough to be mistaken for solver error |
+
+ADR-204 recorded this once. It is now a property of the content rather than a bug that was fixed:
+anything that samples, resamples or compares clips must take `clip.start` from the clip.
+
 ### A forward constraint from Phase F, recorded now because it bears on existing behaviour
 
 Phase F §54 requires that **characters simulate independently of the active camera** — one

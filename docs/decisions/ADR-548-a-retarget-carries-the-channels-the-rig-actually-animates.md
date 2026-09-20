@@ -52,16 +52,37 @@ values never leave their first is dropped.
 
 `rootTranslationOnly` restores the textbook behaviour for a rig that wants it.
 
-**2. It is not scale.** The obvious next suspect, once translation was carried and 0.08 remained,
-was the `*_stretch` bones — Auto-Rig Pro's stretch joints are scale-driven and the names say so.
-Measured directly out of the GLB: **`Walking` has 89 scale channels and 0 of them vary.** The
-suspicion was wrong and the measurement cost two minutes; assuming it would have cost a wrong
-implementation.
+**2. It is not scale — and the next person will reach for scale too, so read this before you do.**
+
+Once translation was carried and 0.08 model units remained, the obvious suspect was the
+`*_stretch` bones. The rig has `thigh_stretch.l` and `leg_stretch.l`; Auto-Rig Pro's stretch joints
+are scale-driven; the names say so outright. Every step of that reasoning is sound and the
+conclusion is **wrong**.
+
+Measured directly out of the GLB rather than implemented against:
+
+```
+Walking: 89 scale channels, 0 of them vary   (max deviation from the first key < 1e-4 on all 89)
+```
+
+Two minutes with a Python script against the binary. Implementing scale carry-over instead would
+have produced a change that appeared to work — the error would have moved, because touching scale
+moves every child — and would have had to be unpicked once the real cause turned up. The habit
+this records is the one worth keeping: **when a name suggests a mechanism, measure the mechanism
+before building on it.** It is the same lesson ADR-540 records about a synthetic fixture, arriving
+from the other direction.
 
 **3. It was the time base.** The remaining 0.08 was one frame of walk. A retargeted clip is
 normalised to start at zero; this pack's clips start at **1/30 s**, because Blender's exporter
 writes the frame range it was given (ADR-204). Source second `clip.start + t` is output second `t`.
 The test was comparing instants one frame apart.
+
+**ADR-204 has now surfaced three times in one phase** — in contact detection's sample count, in the
+phase track's grid, and here. It has stopped being an incident and become a property of this
+content: *a clip in this repository does not start at zero, and any code that assumes it does will
+be wrong by exactly one frame.* One frame of walk is 0.08 model units at the feet, which is small
+enough to be mistaken for solver error and large enough to matter. Anything that samples, resamples
+or compares clips should take `clip.start` from the clip.
 
 ## Evidence
 
