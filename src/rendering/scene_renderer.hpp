@@ -212,6 +212,14 @@ enum class AuxDebugView : std::uint8_t {
     ObjectDepth,
     Overdraw,
     FragmentDensity,
+    // ADR-410. APPENDED, not inserted: `shaders/aux_debug.wgsl` dispatches on the raw enum
+    // ordinal, so putting a new view anywhere but the end silently renumbers every mode after it.
+    //
+    // Unlike its neighbours this one is not an ADR-035 target -- it is a picture of the temporal
+    // ring itself, drawn by `TemporalEffects::encodeDebugView` from a texture array the aux debug
+    // bind group does not carry. It is in this enum anyway because this enum is how a debug view
+    // is *named*, and a view with no name is reachable only by editing code.
+    TemporalHistory,
 };
 [[nodiscard]] const char* auxDebugViewName(AuxDebugView view);
 

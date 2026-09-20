@@ -258,7 +258,7 @@ std::string usageText() {
            "                      Works in --render, where there is no panel to switch them on\n"
            "  --debug-target <t>  display an auxiliary render target: normal|roughness|velocity|\n"
            "                      emission|ids|occlusion|depth|linear depth|depth edges|\n"
-           "                      object depth|overdraw|fragment density\n"
+           "                      object depth|overdraw|fragment density|temporal history\n"
            "  --tier <t>          quality tier: preview|realtime|high|offline\n"
            "  --render-limits <m> distance detail in a render: tier|live|unlimited\n"
            "  --disable <list>    switch phases off for cost attribution, or subsystems off for\n"
@@ -1142,7 +1142,8 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             rendering::AuxDebugView::Occlusion, rendering::AuxDebugView::Depth,
             rendering::AuxDebugView::LinearDepth, rendering::AuxDebugView::DepthEdges,
             rendering::AuxDebugView::ObjectDepth, rendering::AuxDebugView::Overdraw,
-            rendering::AuxDebugView::FragmentDensity};
+            rendering::AuxDebugView::FragmentDensity,
+            rendering::AuxDebugView::TemporalHistory};
         bool found = false;
         for (const auto view : kViews) {
             if (options_.debugTarget == rendering::auxDebugViewName(view)) {
