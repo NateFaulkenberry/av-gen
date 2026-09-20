@@ -106,6 +106,44 @@ struct Source {
     std::string format;
 };
 
+// **The two unit conversions on this path, in the one place that knows about both.**
+//
+// A motion corpus arrives in centimetres at 60 Hz; AV Gen is metres and the pack is 30 Hz. Each
+// conversion is individually obvious and each has a silent failure mode: the wrong scale lands a
+// 170-unit human in a world where the alien is 1.66, and the wrong rate has already produced a
+// one-frame time-base disagreement three times this session (ADR-204). They are applied here, and
+// checked here, rather than at each of the seven call sites that needs one.
+struct SourceUnits {
+    float scale = 1.0f;     // source length units to metres
+    float sampleRate = 30.0f; // the pack's rate, whatever the source was captured at
+};
+
+// A character is between a cat and an elephant. This is not a style check -- it is the assertion
+// that catches a forgotten `--scale 0.01`, which otherwise produces a skeleton that retargets,
+// packs and validates cleanly and is a hundred times too big.
+constexpr float kMinCharacterHeight = 0.2f;
+constexpr float kMaxCharacterHeight = 5.0f;
+
+float restHeight(const scene::Skeleton& skeleton) {
+    scene::Pose pose;
+    std::vector<glm::mat4> model;
+    scene::setRestPose(skeleton, pose);
+    scene::poseToModel(skeleton, pose, model);
+    float lo = 0.0f;
+    float hi = 0.0f;
+    bool first = true;
+    for (const glm::mat4& m : model) {
+        if (first) {
+            lo = m[3].y;
+            hi = m[3].y;
+            first = false;
+        }
+        lo = std::min(lo, m[3].y);
+        hi = std::max(hi, m[3].y);
+    }
+    return hi - lo;
+}
+
 Result<Source> loadSource(const fs::path& path, float bvhScale) {
     Source source;
     source.label = path.filename().string();
@@ -121,6 +159,13 @@ Result<Source> loadSource(const fs::path& path, float bvhScale) {
         source.skeleton = std::move(bvh->skeleton);
         source.clips.push_back(std::move(bvh->clip));
         source.format = "bvh";
+        const float height = restHeight(source.skeleton);
+        if (height < kMinCharacterHeight || height > kMaxCharacterHeight) {
+            return fail(
+                "'{}' is {:.2f} units tall at scale {}, which is not a character. 100STYLE, CMU and "
+                "ACCAD are in centimetres: pass --scale 0.01.",
+                path.filename().string(), height, bvhScale);
+        }
         return source;
     }
     scene::Scene scene;
@@ -147,12 +192,14 @@ int usage() {
                "  retarget  <src> <dst> --map s:t,s:t     move motion between skeletons\n"
                "  pack      <file...> --out <dir>         build a MotionPack\n"
                "  validate  <pack>                        the report; exit 2 on FAIL\n"
+               "  reach     <pack> [--chain h:k:a,...]    how close each pose is to a straight leg\n"
                "  benchmark <file> [--repeat n]           what each stage costs here\n"
                "  survey    <dir>                         per-FILE rotation orders, up axis,\n"
                "                                          skeleton consistency across a corpus\n\n"
                "  --scale <f>       BVH units to metres (0.01 for centimetres)\n"
                "  --contacts a,b    joints to analyse; the first is the phase reference\n"
                "  --license <id>    SPDX identifier, REQUIRED by `pack`\n"
+               "  --retarget-to <f> --map s:t,...   pack onto ANOTHER skeleton\n"
                "  --source <name>   the corpus this came from, REQUIRED by `pack`\n");
     return 1;
 }
@@ -206,17 +253,28 @@ int cmdAnalyse(const Args& args) {
         fmt::print(stderr, "analyse needs --contacts (the first joint is the phase reference)\n");
         return 1;
     }
-    fmt::print("{:<28} {:>7} {:>8} {:>8} {:>7} {:>8}  contacts\n", "clip", "len", "travel", "speed",
-               "cyclic", "cycle");
+    // `net` is where the root ended up and `path` is how far it actually went. They are printed
+    // side by side because on real mocap they disagree by two orders of magnitude, and only `path`
+    // answers "does this clip travel".
+    // `net` is where it ended up, `path` is how far it went, `ext` is how far apart the two most
+    // distant places it stood are as a multiple of its own height -- and only `ext` decides
+    // `travels`. See `measureRoot` for why the other two both give the wrong answer.
+    fmt::print("{:<28} {:>7} {:>8} {:>9} {:>8} {:>7} {:>6} {:>7} {:>8}  contacts\n", "clip", "len",
+               "net", "path", "speed", "ext/h", "trav", "cyclic", "cycle");
     for (const scene::AnimationClip& clip : source->clips) {
         const scene::ClipAnalysis a = scene::analyseClip(source->skeleton, clip, joints, 0, {});
         std::string spans;
         for (const scene::ContactTrack& track : a.contacts) {
-            spans += fmt::format(" {}:{}", track.joint, track.spans.size());
+            spans += fmt::format(" {}:{} slide{:.3f}", track.joint, track.spans.size(),
+                                 track.worstSlide);
         }
-        fmt::print("{:<28} {:7.3f} {:8.3f} {:8.3f} {:>7} {:8.3f} {}\n", clip.name, a.length,
-                   glm::length(glm::vec3(a.rootTravel.x, 0.0f, a.rootTravel.z)), a.groundSpeed,
-                   a.phase.cyclic ? "yes" : "no", a.phase.cycleSeconds, spans);
+        fmt::print("{:<28} {:7.3f} {:8.3f} {:9.3f} {:8.3f} {:7.2f} {:>6} {:>7} {:8.3f} {}\n",
+                   clip.name, a.length,
+                   glm::length(glm::vec3(a.rootTravel.x, 0.0f, a.rootTravel.z)), a.rootPathLength,
+                   a.groundSpeed, a.restHeight > 0.0f ? a.rootExtent / a.restHeight : 0.0f,
+                   a.travels ? (a.travelAmbiguous ? "yes?" : "yes")
+                             : (a.travelAmbiguous ? "no?" : "no"), a.phase.cyclic ? "yes" : "no", a.phase.cycleSeconds,
+                   spans);
     }
     return 0;
 }
@@ -323,6 +381,73 @@ int cmdPack(const Args& args) {
         fmt::print(stderr, "{}\n", first.error().message);
         return 1;
     }
+
+    // ---- optional retarget, so a corpus can be imported and packed in one pass ------------------
+    //
+    // `--retarget-to <rig> --map s:t,...` makes the pack belong to the TARGET skeleton. Without it
+    // a pack of 100STYLE would be a pack of a skeleton no AV Gen character has.
+    scene::Skeleton packSkeleton = first->skeleton;
+    scene::RetargetBinding binding;
+    bool retargeting = false;
+    if (args.has("retarget-to")) {
+        auto target = loadSource(args.option("retarget-to"), 1.0f);
+        if (!target) {
+            fmt::print(stderr, "{}\n", target.error().message);
+            return 1;
+        }
+        scene::RetargetProfile profile;
+        profile.name = args.option("profile", "cli");
+        profile.rootJoint = args.option("root");
+        for (const std::string& pair : splitCommas(args.option("map"))) {
+            const std::size_t colon = pair.find(':');
+            if (colon == std::string::npos) {
+                fmt::print(stderr, "--map entries are source:target, got '{}'\n", pair);
+                return 1;
+            }
+            profile.joints.push_back(scene::JointMapping{
+                pair.substr(0, colon), pair.substr(colon + 1),
+                scene::roleForJointName(pair.substr(colon + 1))});
+        }
+        if (profile.joints.empty()) {
+            fmt::print(stderr, "--retarget-to needs --map\n");
+            return 1;
+        }
+        binding = scene::bindRetarget(first->skeleton, target->skeleton, profile);
+        for (const std::string& problem : binding.problems) {
+            fmt::print(stderr, "  {}\n", problem);
+        }
+        if (!binding.usable()) {
+            fmt::print(stderr, "the retarget profile resolved to nothing\n");
+            return 1;
+        }
+        packSkeleton = target->skeleton;
+        retargeting = true;
+        provenance.processing.push_back(
+            fmt::format("retarget profile={} joints={} rootScale={:.4f}", profile.name,
+                        binding.links.size(), binding.rootScale));
+        fmt::print("retargeting through {} joint(s), rootScale {:.4f}\n", binding.links.size(),
+                   binding.rootScale);
+    }
+
+    const auto convert = [&](std::vector<scene::AnimationClip>& source) {
+        if (!retargeting) {
+            return;
+        }
+        for (scene::AnimationClip& clip : source) {
+            scene::RetargetStats stats;
+            scene::AnimationClip out =
+                scene::retargetClip(clip, first->skeleton, packSkeleton, binding, &stats);
+            // The retarget's own error, per clip, into the provenance. A pack that cannot say how
+            // accurately its motion was transferred is a pack nobody can judge.
+            provenance.processing.push_back(fmt::format(
+                "retarget '{}': {} frames, orientation worst {:.4f} deg mean {:.5f}, bone worst {:.6f}",
+                clip.name, stats.frames, stats.worstOrientationError, stats.meanOrientationError,
+                stats.worstBoneLengthError));
+            clip = std::move(out);
+        }
+    };
+
+    convert(first->clips);
     std::vector<scene::AnimationClip> clips = first->clips;
     for (std::size_t i = 1; i < args.positional.size(); ++i) {
         auto more = loadSource(args.positional[i], scale);
@@ -337,6 +462,7 @@ int cmdPack(const Args& args) {
                        args.positional[i], args.positional.front());
             return 1;
         }
+        convert(more->clips);
         for (scene::AnimationClip& clip : more->clips) {
             clips.push_back(std::move(clip));
         }
@@ -349,7 +475,7 @@ int cmdPack(const Args& args) {
         options.contactJoints.push_back(scene::ContactJoint{name, scene::ContactKind::Foot});
     }
 
-    const auto built = scene::buildMotionPack(args.option("name", first->label), first->skeleton, clips,
+    const auto built = scene::buildMotionPack(args.option("name", first->label), packSkeleton, clips,
                                               provenance, options);
     if (!built) {
         fmt::print(stderr, "{}\n", built.error().message);
@@ -384,6 +510,203 @@ int cmdValidate(const Args& args) {
 // file. Reports the two facts that would silently corrupt every downstream number -- the rotation
 // orders declared, and which axis the skeleton actually stands up in -- plus the skeleton's shape,
 // so that "one retarget profile covers all of this" can be checked rather than assumed.
+// Reach: how close a retargeted pose comes to straightening the target's leg.
+//
+// **The prediction this measures.** Phase 0 noted that a 1.79 m human's locomotion on a 1.66 m
+// alien whose rest leg has 0.0098 m of slack will clamp constantly unless stride and hip height
+// scale to the target's actual reach. The retarget scales root translation, and whether that is
+// enough is a measurement, not an argument. For every frame of every clip this reports the hip-to-
+// ankle distance as a fraction of the leg's own length: 1.0 is a straight leg, and anything at or
+// above it is a pose foot IK could not have produced and a pose foot IK cannot correct from.
+int cmdReach(const Args& args) {
+    if (args.positional.empty()) {
+        return usage();
+    }
+    // A pack, or any file `loadSource` reads -- because the whole point of this measurement is to
+    // compare retargeted motion against the character's own, and those live in different formats.
+    scene::Skeleton skeleton;
+    std::vector<scene::AnimationClip> animation;
+    std::vector<std::string> clipNames;
+    std::vector<float> clipRates;
+    const fs::path input = args.positional.front();
+    if (fs::is_directory(input)) {
+        const auto pack = scene::readMotionPack(input);
+        if (!pack) {
+            fmt::print(stderr, "{}\n", pack.error().message);
+            return 1;
+        }
+        skeleton = pack->skeleton;
+        animation = pack->animation;
+        for (const scene::PackClip& pc : pack->clips) {
+            clipNames.push_back(pc.name);
+            clipRates.push_back(pc.sampleRate > 0.0f ? pc.sampleRate : 30.0f);
+        }
+    } else {
+        auto source = loadSource(input, std::stof(args.option("scale", "1.0")));
+        if (!source) {
+            fmt::print(stderr, "{}\n", source.error().message);
+            return 1;
+        }
+        skeleton = std::move(source->skeleton);
+        animation = std::move(source->clips);
+        for (const scene::AnimationClip& clip : animation) {
+            clipNames.push_back(clip.name);
+            clipRates.push_back(30.0f);
+        }
+    }
+    if (skeleton.joints.empty() || animation.empty()) {
+        fmt::print(stderr, "'{}' gave {} joint(s) and {} clip(s); nothing to measure\n",
+                   input.string(), skeleton.joints.size(), animation.size());
+        return 1;
+    }
+    const std::vector<std::string> chains = splitCommas(args.option("chain", "thigh_twist.l:leg_stretch.l:foot.l,thigh_twist.r:leg_stretch.r:foot.r"));
+    struct Leg {
+        std::string name;
+        int hip = -1;
+        int knee = -1;
+        int ankle = -1;
+        float length = 0.0f;
+    };
+    std::vector<Leg> legs;
+    scene::Pose rest;
+    std::vector<glm::mat4> restModel;
+    scene::setRestPose(skeleton, rest);
+    scene::poseToModel(skeleton, rest, restModel);
+    for (const std::string& spec : chains) {
+        std::vector<std::string> parts;
+        std::string current;
+        for (const char c : spec) {
+            if (c == ':') {
+                parts.push_back(current);
+                current.clear();
+            } else {
+                current.push_back(c);
+            }
+        }
+        parts.push_back(current);
+        if (parts.size() != 3) {
+            fmt::print(stderr, "chain '{}' is not hip:knee:ankle\n", spec);
+            return 1;
+        }
+        Leg leg;
+        leg.name = parts[2];
+        leg.hip = skeleton.find(parts[0]);
+        leg.knee = skeleton.find(parts[1]);
+        leg.ankle = skeleton.find(parts[2]);
+        if (leg.hip < 0 || leg.knee < 0 || leg.ankle < 0) {
+            fmt::print(stderr, "chain '{}' does not resolve. This skeleton has:\n", spec);
+            for (std::size_t i = 0; i < skeleton.joints.size(); ++i) {
+                fmt::print(stderr, "  {:>3} {}\n", i, skeleton.joints[i].name);
+            }
+            return 1;
+        }
+        const glm::vec3 h(restModel[static_cast<std::size_t>(leg.hip)][3]);
+        const glm::vec3 k(restModel[static_cast<std::size_t>(leg.knee)][3]);
+        const glm::vec3 a(restModel[static_cast<std::size_t>(leg.ankle)][3]);
+        leg.length = glm::length(k - h) + glm::length(a - k);
+        // **The assertion that the two chains are not the same chain.** A pair computed by one loop
+        // is where an off-by-one hides: earlier this session `chains()[layerIndex]` after a
+        // post-increment gave the left foot the right foot's data and read one past the end, and it
+        // looked entirely plausible. Two legs must resolve to different joints.
+        for (const Leg& other : legs) {
+            // The ankle, not the hip: two legs legitimately share a pelvis, and on this rig they
+            // do. It is the end of the chain that must differ.
+            if (other.ankle == leg.ankle) {
+                fmt::print(stderr, "chains '{}' and '{}' resolve to the same joints\n", other.name,
+                           leg.name);
+                return 1;
+            }
+        }
+        fmt::print("{:<18} hip {:>3} knee {:>3} ankle {:>3}  leg {:.4f} m  rest reach {:.4f} m ({:.1f}%)\n",
+                   leg.name, leg.hip, leg.knee, leg.ankle, leg.length,
+                   glm::length(a - h), 100.0f * glm::length(a - h) / leg.length);
+        legs.push_back(leg);
+    }
+
+    // **`excursion` is the column that matters on a rig like this one.** How far the ankle moves
+    // relative to the body over the clip. A walking character's ankle swings a stride; an ankle
+    // that does not move relative to the pelvis is not walking, whatever its legs are doing. It is
+    // reported beside reach because a constant reach ratio has two causes -- a leg held at a fixed
+    // bend, and a leg the animation never reaches -- and this tells them apart.
+    fmt::print("\n{:<24} {:>8} {:>8} {:>9} {:>9} {:>9} {:>10}\n", "clip/leg", "frames", "mean",
+               "p99", "worst", ">=99.5%", "excursion");
+    std::size_t totalFrames = 0;
+    std::size_t totalOver = 0;
+    float globalWorst = 0.0f;
+    for (std::size_t c = 0; c < animation.size(); ++c) {
+        const scene::AnimationClip& clip = animation[c];
+        const float rate = clipRates[c];
+        const auto frames =
+            static_cast<std::size_t>(std::max(2.0f, std::floor(clip.length() * rate + 0.5f) + 1.0f));
+        // The datum for "relative to the body" is the joint that carries travel -- ADR-337's rule,
+        // the lowest-indexed joint this clip translates. Using joint 0 gives `rig`, an armature
+        // wrapper no clip animates, and the subtraction is then a no-op that credits the feet with
+        // the whole body's travel: measured, 4.74 m of "excursion" on a clip whose feet never move.
+        int datum = 0;
+        for (const scene::AnimationChannel& ch : clip.channels) {
+            if (ch.path == scene::AnimationPath::Translation &&
+                (datum == 0 || static_cast<int>(ch.joint) < datum)) {
+                datum = static_cast<int>(ch.joint);
+            }
+        }
+        scene::Pose pose;
+        std::vector<glm::mat4> model;
+        std::vector<std::vector<float>> ratios(legs.size());
+        std::vector<glm::vec3> ankleLo(legs.size());
+        std::vector<glm::vec3> ankleHi(legs.size());
+        bool firstFrame = true;
+        for (std::size_t f = 0; f < frames; ++f) {
+            const float t = std::min(clip.start + (static_cast<float>(f) / rate), clip.duration);
+            scene::setRestPose(skeleton, pose);
+            scene::sampleClip(clip, t, pose);
+            scene::poseToModel(skeleton, pose, model);
+            for (std::size_t l = 0; l < legs.size(); ++l) {
+                const glm::vec3 h(model[static_cast<std::size_t>(legs[l].hip)][3]);
+                const glm::vec3 a(model[static_cast<std::size_t>(legs[l].ankle)][3]);
+                ratios[l].push_back(glm::length(a - h) / legs[l].length);
+                // Relative to the body, so a travelling clip is not credited with foot motion that
+                // is really the root going past.
+                const glm::vec3 rel = a - glm::vec3(model[static_cast<std::size_t>(datum)][3]);
+                if (firstFrame) {
+                    ankleLo[l] = rel;
+                    ankleHi[l] = rel;
+                }
+                ankleLo[l] = glm::min(ankleLo[l], rel);
+                ankleHi[l] = glm::max(ankleHi[l], rel);
+            }
+            firstFrame = false;
+        }
+        for (std::size_t l = 0; l < legs.size(); ++l) {
+            std::vector<float>& r = ratios[l];
+            if (r.empty()) {
+                continue;
+            }
+            std::sort(r.begin(), r.end());
+            double sum = 0.0;
+            std::size_t over = 0;
+            for (const float v : r) {
+                sum += v;
+                if (v >= 0.995f) {
+                    ++over;
+                }
+            }
+            const float worst = r.back();
+            globalWorst = std::max(globalWorst, worst);
+            totalFrames += r.size();
+            totalOver += over;
+            fmt::print("{:<24} {:>8} {:>8.3f} {:>9.3f} {:>9.3f} {:>8.2f}% {:>10.4f}\n",
+                       fmt::format("{}/{}", clipNames[c], legs[l].name), r.size(),
+                       sum / static_cast<double>(r.size()), r[(r.size() * 99) / 100], worst,
+                       100.0 * static_cast<double>(over) / static_cast<double>(r.size()),
+                       glm::length(ankleHi[l] - ankleLo[l]));
+        }
+    }
+    fmt::print("\n{} leg-frames, worst reach {:.3f}, {:.3f}% at or past a straight leg\n",
+               totalFrames, globalWorst,
+               totalFrames > 0 ? 100.0 * static_cast<double>(totalOver) / static_cast<double>(totalFrames) : 0.0);
+    return 0;
+}
+
 int cmdSurvey(const Args& args) {
     if (args.positional.empty()) {
         return usage();
@@ -623,6 +946,9 @@ int main(int argc, char** argv) {
     }
     if (args.command == "validate") {
         return cmdValidate(args);
+    }
+    if (args.command == "reach") {
+        return cmdReach(args);
     }
     if (args.command == "survey") {
         return cmdSurvey(args);

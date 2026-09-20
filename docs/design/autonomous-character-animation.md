@@ -1923,11 +1923,128 @@ context: **an in-place clip has no ground frame**, so "planted means stationary"
 | STEP 7 inertialization | **done** | ADR-547; one clip evaluated, offset recomputed not stored |
 | STEP 8-9 decoupling, retarget profile | **done** | ADR-548; real alien onto itself at 0.0396 deg worst |
 | STEP 10a BVH reader + travelling-path validation | **done** | ADR-549; split out of STEP 10 |
-| STEP 10b 100STYLE subset experiment | **blocked** | the corpus is not in this repository; the reader and every code path it exercises are built and tested |
+| STEP 10b 100STYLE subset experiment | **done, and the answer is no** | 810 files surveyed, 24 retargeted and packed. ADR-553: the retarget is numerically excellent and the character cannot walk. Two switch bugs found and fixed on the way (ADR-552) |
 | STEP 11 MotionPack | **done** | ADR-550; licence is a refusal, REQUIRES_REVIEW is the default |
-| STEP 12-13 offline tool, M2 Max benchmark | pending | |
+| STEP 12-13 offline tool, M2 Max benchmark | **done** | `avgen-motion` has 8 verbs; measured on real corpus data at four scales, linear above ~50k frames |
 | STEP 14 per-foot ground planes | **done** | ADR-551; built as Phase B §17's `IGroundQuery`, not as a widened seam. Found two shipping bugs on the way |
 | STEP 15 visual validation | **partly done** | `alien-foot-lab.scene.json`: the alien's detached chains bind and both feet apply on real terrain, which was impossible before ADR-543 |
+
+### A.10b: what the corpus did to the code that was written before it arrived
+
+Three measurements, in the order they happened. The first two are the same shape: **a switch whose
+two arms had never both run, because the only content available could not make them.**
+
+#### 1. A 131-second forward walk that reported as standing still
+
+ADR-546 makes the foot-contact test conditional on whether a clip travels. The test for "does this
+clip travel" was net root displacement over duration, threshold 0.05 m/s. On 100STYLE's
+`Neutral_FW` — 131 seconds of continuous forward walking — that reads **0.004 m/s**, because a
+mocap subject turns round and comes back and the take nets **0.508 m** out of **93.030 m** covered.
+Every travelling file in the corpus took the in-place branch.
+
+Path length is the obvious repair and breaks the other half: an in-place cycle's root sways, sway
+has a length, and this repository's own `Running` then reads 0.330 m/s and `Fight_leg_kick_1`
+0.535 m/s — both travelling, both wrong, and the in-place arm is the one ADR-540's content needs.
+
+The answer is **extent against the body's own rest height**: an in-place root is bounded however
+long it sways. ADR-552 has the full table. Measured cost of the original rule, worst foot slide
+within a contact span, same slide definition on both sides:
+
+| clip | net-displacement rule | extent rule |
+|---|---|---|
+| `Neutral_FR` | 0.662 m | **0.052 m** |
+| `Neutral_FW` | 0.370 m | **0.062 m** |
+| `Neutral_TR1` | 0.232 m | **0.059 m** |
+
+Nothing in this repository could have caught it. ADR-540 established every clip here is authored in
+place, so displacement and path length were both ~0 and the two readings agreed on all existing
+content. **It took the corpus**, and the delta only exists once.
+
+Following the same rule as the up-axis survey, the classifier now reports `travelAmbiguous` when it
+lands in the empty band between the two populations (0.568 at the top of this repository's clips,
+1.80 at the bottom of 100STYLE's) rather than presenting a guess as a reading.
+
+#### 2. The retarget is numerically excellent and the character cannot walk
+
+24 clips retargeted onto the alien: orientation error **worst 0.056°**, bone-length error **worst
+0.000000**, pack validation **PASS**, 85,610 frames, 13.3 s to build.
+
+Pelvis-to-ankle distance on the retargeted clips is **0.970 on every frame of every clip, on both
+legs** — which is its rest value. The foot is welded to the pelvis. The alien's own `Walking`
+varies 0.69–0.96, because a leg is supposed to flex.
+
+| source | clip | reach mean | reach worst | ankle excursion |
+|---|---|---|---|---|
+| alien, authored | `Walking` (left) | 0.879 | 0.956 | 0.746 m |
+| alien, authored | `Running` (left) | 0.687 | 0.927 | 0.873 m |
+| retargeted | `Neutral_FW` (left) | **0.970** | **0.970** | 0.587 m |
+| retargeted | `Neutral_FR` (left) | **0.970** | **0.970** | 0.908 m |
+
+The cause is ADR-543's rig, seen from the other side. `foot.l` is a **sibling** of `thigh_twist.l`
+under `root.x`, and `leg_stretch.l` — where a retarget maps the knee — hangs off `rig` entirely. A
+rotation retarget moves a joint by rotating its ancestors; the foot's only animated ancestor is
+`root.x`. The alien's own clips move the foot by **translation**, and ADR-548 carries translation
+only where the source has it — BVH translates `Hips` alone.
+
+**Every quality gate passed**, because each of them asks whether the numbers written were the
+numbers meant, and none asks whether the joint moved. ADR-553 records the result and declines to
+repair it inside the rotation retarget: the repair is positional retargeting through IK, which is a
+different mechanism and is Phase B/C work.
+
+Note also what this does to Phase 0's prediction that a 1.79 m human's stride on a 1.66 m alien
+leg with 0.0098 m of rest slack would **clamp constantly**. Measured: **0.00% of leg-frames at or
+past a straight leg.** That is not a refutation — the leg never leaves rest extension, so nothing
+*could* clamp. The prediction is untested and becomes testable once the feet move.
+
+#### 3. Two conversions and a guard that fires
+
+Centimetres against metres and 60 Hz against the pack's 30 are two silent failures on one path.
+`loadSource` now applies and checks both in one place: a BVH whose rest height is outside
+0.2–5.0 m is refused, with the fix in the message.
+
+```
+$ avgen-motion analyse Neutral_ID.bvh --contacts LeftAnkle
+'Neutral_ID.bvh' is 179.00 units tall at scale 1, which is not a character.
+100STYLE, CMU and ACCAD are in centimetres: pass --scale 0.01.
+```
+
+#### A.13: the M2 Max benchmark, on the corpus rather than on an extrapolation
+
+End-to-end `pack` — BVH text parse, contact and phase extraction, resample, write — over the first
+N files of 100STYLE, wall clock, everything included:
+
+| files | frames | seconds | frames/s | on disk |
+|---|---|---|---|---|
+| 2 | 7,940 | 0.27 | 29,400 | 7.3 MB |
+| 17 | 46,071 | 0.96 | 48,000 | 42.6 MB |
+| 170 | 478,541 | 9.48 | 50,500 | 442 MB |
+| **350** | **1,023,711** | **20.38** | **50,200** | **949 MB**, validation **PASS** |
+
+Throughput is flat from about 50,000 frames upward, so the cost is linear in frames and the small
+case is paying fixed overhead rather than the large case paying a penalty. Extrapolating the whole
+corpus from the *measured* slope rather than from the small case: **4.78 M frames in roughly 95 s
+and about 4.5 GB**. Storage is **0.95 KB per frame** at 30 Hz on a 28-joint skeleton.
+
+Per-stage, minimum of 5 runs (ADR-170), on a single 4,323-frame file:
+
+| stage | ms | frames/s |
+|---|---|---|
+| import (BVH text) | 45.3 | 95,500 |
+| analyse (contacts + phase) | 32.2 | 134,100 |
+| pack build | 32.2 | 134,100 |
+| pack write | 7.6 | — |
+| pack read | 16.0 | 270,500 |
+
+**Import dominates**, and it is text parsing. Nothing here is on a frame path: a million frames
+build in 20 seconds offline and read back at 270,000 frames/s.
+
+#### The probe shape, stated once
+
+All three findings have the same form, and so did the `chains()[layerIndex]` off-by-one and the
+`TerrainReject` conflation before them: **a value that was computed correctly and measured the
+wrong thing.** The probe that catches it is not "is the output right" but *did the thing I was
+trying to move actually move* — zero variance in a number that must vary is the tell, and it is
+cheaper to assert than to notice.
 
 ### Why the alien lab does not exercise body compensation, and what that says
 

@@ -113,6 +113,19 @@ struct ContactTrack {
     // and it is reported rather than left for a human to notice.
     float dutyCycle = 0.0f;
     float lowest = 0.0f;         // the lowest this joint got, model units -- the height datum used
+    // ---- foot sliding -------------------------------------------------------------------------
+    // How far this joint travels horizontally WHILE IT IS IN CONTACT, which is the single most
+    // useful quality number about a piece of locomotion: a planted foot that moves is the artifact
+    // every viewer notices and no still frame shows. Measured per contact span and reported as the
+    // worst span and the mean over spans, in model units.
+    //
+    // **It is not an error in an in-place clip and it is an error in a travelling one.** An
+    // in-place cycle's stance foot sweeps backwards under the hips by design (ADR-546), so its
+    // slide is the stride length; a travelling clip's planted foot should not move at all. The
+    // caller knows which kind it has -- `ClipAnalysis::groundSpeed` says -- and this reports the
+    // number either way rather than deciding for it.
+    float worstSlide = 0.0f;
+    float meanSlide = 0.0f;
 };
 
 // Detect contacts for `joints` over `clip`.
@@ -189,10 +202,37 @@ struct ClipAnalysis {
     float length = 0.0f;
     std::vector<ContactTrack> contacts;
     PhaseTrack phase;
-    // Ground-frame displacement of the root over the clip, and the straight-line speed it implies.
-    // This is the number ADR-540 measured as ~0 for every locomotion clip in this repository, and
-    // it is recorded per clip so that a motion pack can say which of its clips actually travel.
+    // Net displacement of the root over the clip: where it ended, minus where it began.
     glm::vec3 rootTravel{0.0f};
+    // The root's PATH LENGTH -- the distance it actually covered, summed step by step.
+    //
+    // **These two are not the same thing and the difference is not academic.** A mocap subject
+    // walking in a capture volume turns round and comes back, so 131 seconds of forward walking in
+    // 100STYLE nets **0.508 m** of displacement while covering **far more** ground. Net
+    // displacement over duration therefore reports a travelling clip as an in-place one, which is
+    // exactly the wrong answer for the switch below.
+    float rootPathLength = 0.0f;
+    // The diagonal of the root's horizontal bounding box: how far apart the two most distant places
+    // the body stood are. This is the number that separates the two kinds of clip -- see
+    // `travels` -- because it is bounded by the body's own size in an in-place cycle and by the
+    // capture volume in a travelling one.
+    float rootExtent = 0.0f;
+    // Rest height of the skeleton: the tallest joint in the rest pose. Carried so that `rootExtent`
+    // can be read against the body it belongs to rather than against a number in metres.
+    float restHeight = 0.0f;
+    // Did this body actually go anywhere? See `detectContacts` for why neither the net displacement
+    // nor the path length answers this on its own.
+    bool travels = false;
+    // **The switch above had to pick a side, and this says when it had no business being sure.**
+    // True when `rootExtent / restHeight` lands in the empty band between the two populations --
+    // measured, this repository's in-place clips top out at 0.57 and 100STYLE's least mobile file,
+    // a 35-second idle, comes in at 1.80, so a clip between 0.7 and 1.4 resembles neither. The
+    // classification is still made, because a contact detector cannot abstain; this is how a survey
+    // or a pack build says the answer is a guess rather than presenting it as a reading.
+    bool travelAmbiguous = false;
+    // Path length over duration: how fast the body was actually moving. This is what decides
+    // whether a clip travels (ADR-546's horizontal contact arm) and it is the path length rather
+    // than the displacement for the reason above.
     float groundSpeed = 0.0f;
 };
 
