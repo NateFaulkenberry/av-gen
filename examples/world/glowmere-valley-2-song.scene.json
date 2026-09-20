@@ -20860,7 +20860,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/bull.glb",
+      "asset": "../../assets/farm/bull.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "bull-1",
@@ -20892,7 +20892,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/horse.glb",
+      "asset": "../../assets/farm/horse.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "horse-2",
@@ -20924,7 +20924,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/cow.glb",
+      "asset": "../../assets/farm/cow.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "cow-3",
@@ -20956,7 +20956,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/sheep.glb",
+      "asset": "../../assets/farm/sheep.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "sheep-4",
@@ -20988,7 +20988,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/goat.glb",
+      "asset": "../../assets/farm/goat.glb",
       "emissiveBoost": 0.0,
       "kind": "gltf",
       "name": "goat-5",
@@ -21020,7 +21020,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/pig.glb",
+      "asset": "../../assets/farm/pig.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "pig-6",
@@ -21052,7 +21052,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/rooster.glb",
+      "asset": "../../assets/farm/rooster.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "rooster-7",
@@ -21084,7 +21084,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/chicken.glb",
+      "asset": "../../assets/farm/chicken.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "chicken-8",
@@ -21116,7 +21116,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/bull.glb",
+      "asset": "../../assets/farm/bull.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "bull-10",
@@ -21148,7 +21148,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/horse.glb",
+      "asset": "../../assets/farm/horse.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "horse-11",
@@ -21180,7 +21180,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/cow.glb",
+      "asset": "../../assets/farm/cow.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "cow-12",
@@ -21212,7 +21212,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/sheep.glb",
+      "asset": "../../assets/farm/sheep.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "sheep-13",
@@ -21244,7 +21244,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/goat.glb",
+      "asset": "../../assets/farm/goat.glb",
       "emissiveBoost": 0.0,
       "kind": "gltf",
       "name": "goat-14",
@@ -21276,7 +21276,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/pig.glb",
+      "asset": "../../assets/farm/pig.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "pig-15",
@@ -21308,7 +21308,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/rooster.glb",
+      "asset": "../../assets/farm/rooster.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "rooster-16",
@@ -21340,7 +21340,7 @@
         "state": "Walk",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen-wt-songdirector/assets/farm/chicken.glb",
+      "asset": "../../assets/farm/chicken.glb",
       "emissiveBoost": 0.0,
       "kind": "gltf",
       "name": "chicken-17",
