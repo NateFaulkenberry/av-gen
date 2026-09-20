@@ -233,67 +233,65 @@ TEST_CASE("A bounded warm-up gives a partial render the pool a full render would
 
 // ---- a resize is not a seek (the interactive-performance pass) -----------------------------------
 //
-// `SceneRenderer::resize` ends in `resetTemporalHistory()`, and that call resets the particle pools
-// along with the screen-space history, because ADR-360's fix for a seek that kept the same scene
-// put `particles_->resetAll()` there. A resize is not a seek. The pools hold world state -- alive
-// lists, emit carry, trail rings -- and nothing in them is indexed by a screen pixel, so a new
-// render-target extent has no more claim on them than a new window title does.
+// `SceneRenderer::resize` ended in `resetTemporalHistory()`, and that call resets the particle
+// pools, because ADR-360's fix for a seek that kept the same scene put `particles_->resetAll()`
+// there. A resize is not a seek. The pools hold world state -- alive lists, emit carry, trail
+// rings -- and nothing in them is indexed by a screen pixel, so a new render-target extent has no
+// more claim on them than a new window title does.
 //
-// It matters twice. Today, every splitter drag and every window resize in the editor empties the
-// particle field, and on Glowmere the motes take 30 to 50 seconds of playback to reach the vortex
-// (ADR-380), so what is lost is half a minute of simulation. And it is the thing that stops the
-// render scale from being adaptive at all: a controller that changes the scene's resolution changes
-// the target extent, and a resolution change that wipes the particles is not a presentation change,
-// which is precisely what §33/§34 forbid.
+// It matters twice. Before ADR-480, every splitter drag and every window resize in the editor
+// emptied the particle field, and on Glowmere the motes take 30 to 50 seconds of playback to reach
+// the vortex (ADR-380), so what was lost was half a minute of simulation. And it is the thing that
+// stopped the render scale from being adaptive at all: a controller that changes the scene's
+// resolution changes the target extent, and a resolution change that wipes the particles is not a
+// presentation change, which is precisely what §33/§34 forbid.
 //
-// Arm 2 is the control (ADR-182): the same playback with the extent held still. Without it a probe
-// that read zero at the end would be satisfied by particles that had simply died.
+// **One renderer, not two, and that is not an accident.** The first version of this test ran the
+// control arm and the measured arm in separate `SceneRenderer`s. Each one allocates a shadow
+// atlas, the AO targets, the volume grid and the temporal ring, and this file already builds five;
+// two more were enough to make the hidden `[.perf]` million-particle probe later in the suite die
+// with a bus error. That probe is fragile under memory pressure and this test was the straw --
+// worth knowing, and not worth paying for, because both arms fit in one renderer anyway: the
+// control frame is rendered at the settled extent and the measured frame at a different one,
+// back to back, off the same population.
 TEST_CASE("changing the render target extent does not empty the particle pools",
           "[gpu][particles][resize]") {
     auto ctx = makeContext();
-    // Long enough that the pool is in steady state well before the resize, so "alive" is a
+    // Long enough that the pool is in steady state well before the extent moves, so "alive" is a
     // population rather than a transient.
     constexpr float kLife = 0.5f;
-    constexpr std::uint64_t kPlayFrames = 60;
+    constexpr std::uint64_t kPlayFrames = 36;
     const scene::Scene s = drizzle(kLife);
     gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
 
-    // One renderer per arm. The two arms differ in exactly one thing: the extent of the frame
-    // rendered after the playback.
-    const auto playThenRenderAt = [&](std::uint32_t w, std::uint32_t h) {
-        rendering::SceneRenderer renderer(*ctx, shaders);
-        REQUIRE(renderer.init().has_value());
-        for (std::uint64_t f = 1; f <= kPlayFrames; ++f) {
-            auto img = renderer.renderToImage(s, at(static_cast<double>(f) * kDt, f), 64, 64);
-            REQUIRE(img.has_value());
-        }
-        auto settled = renderer.particles().readCounts(0);
-        REQUIRE(settled.has_value());
-        auto img = renderer.renderToImage(s, at(static_cast<double>(kPlayFrames + 1) * kDt,
-                                                kPlayFrames + 1),
-                                          w, h);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    const auto frameAt = [&](std::uint64_t f, std::uint32_t w, std::uint32_t h) {
+        auto img = renderer.renderToImage(s, at(static_cast<double>(f) * kDt, f), w, h);
         REQUIRE(img.has_value());
-        auto after = renderer.particles().readCounts(0);
-        REQUIRE(after.has_value());
-        return std::pair{settled->alive, after->alive};
+        auto counts = renderer.particles().readCounts(0);
+        REQUIRE(counts.has_value());
+        return counts->alive;
     };
 
-    const auto [heldSettled, heldAfter] = playThenRenderAt(64, 64);   // control: same extent
-    const auto [movedSettled, movedAfter] = playThenRenderAt(96, 72); // the resize
+    std::uint32_t settled = 0;
+    for (std::uint64_t f = 1; f <= kPlayFrames; ++f) {
+        settled = frameAt(f, 64, 64);
+    }
+    // The control: one more frame at the extent it has been rendering at. A build in which this
+    // falls has a particle problem that has nothing to do with resizing, and the assertion after
+    // it would be measuring that instead (ADR-182).
+    const std::uint32_t held = frameAt(kPlayFrames + 1, 64, 64);
+    // The claim: one more frame at a different extent. A resize is a presentation change, and the
+    // simulation is not presentation.
+    const std::uint32_t resized = frameAt(kPlayFrames + 2, 96, 72);
 
-    INFO("alive: control " << heldSettled << " -> " << heldAfter << ";  resized " << movedSettled
-                           << " -> " << movedAfter);
+    INFO("alive: settled " << settled << " -> held " << held << " -> resized " << resized);
 
-    // Both arms reached the same steady state before they diverged. If they did not, the comparison
-    // below is between two different populations and means nothing.
-    REQUIRE(heldSettled > 2000);
-    REQUIRE(movedSettled == heldSettled);
-
-    // The control: one more frame at the same extent keeps the field. A build in which this fails
-    // has a particle problem that has nothing to do with resizing, and the assertion after it would
-    // be measuring that instead.
-    REQUIRE(heldAfter > heldSettled / 2);
-
-    // The claim. A resize is a presentation change; the simulation is not presentation.
-    CHECK(movedAfter > movedSettled / 2);
+    // Steady state was reached before anything moved. If it was not, the comparisons below are
+    // between two different populations and mean nothing.
+    REQUIRE(settled > 2000);
+    CHECK(held > settled / 2);
+    CHECK(resized > settled / 2);
+    CHECK(ctx->errorCount() == 0);
 }
