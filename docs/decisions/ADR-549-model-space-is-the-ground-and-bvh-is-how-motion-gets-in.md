@@ -98,6 +98,30 @@ corpus will take, so that when it arrives a failure looks like a bug rather than
 problem. The subset experiment's measurements — retarget quality, foot sliding, contact
 preservation, processing time, output size — remain to be taken.
 
+## The corpus, and one thing deliberately not fetched
+
+**100STYLE, Zenodo record 8127870.** Licence verified at the authoritative source rather than from
+a summary: the record's API returns `"license": {"id": "cc-by-4.0"}`. Creators Mason, Starke and
+Komura; DOI 10.1145/3522618. Retrieved 2026-09-20.
+
+Two files are offered:
+
+| file | size | what it is | taken |
+|---|---:|---|---|
+| `100STYLE.zip` | 1,468,515,354 B | the original BVH capture — all four million frames | **yes** |
+| `100Style-Labelled-Data.zip` | 14,751,560,934 B | Mason et al.'s own preprocessed features and local-phase labels | no |
+
+The BVH half is the corpus in source form. The labelled half is a derived artifact of a pipeline
+AV Gen is not using: this engine has its own contact detection, phase extraction and feature
+pipeline (ADR-546), and ADR-542 makes the MotionPack the format — ingesting someone else's feature
+layout would mean adopting their conventions or converting them, with the source data in hand to
+derive our own. Extracting it would also have put the pair past half the machine's free space.
+
+**One use for it remains on the list.** Their local-phase labels are a published reference against
+which to *compare* what this engine's phase extractor produces from the same frames. That is a real
+validation of a thing built from scratch, and it belongs with Phase C's phase-aware matching rather
+than here. Recorded so it is not lost.
+
 ## Revisit triggers
 
 * The real corpus arrives: re-run every measurement here. A hand-built fixture proves the branch
