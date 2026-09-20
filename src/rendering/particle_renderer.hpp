@@ -63,6 +63,15 @@ struct ParticleUniforms {
     glm::vec4 windGust;
     glm::vec4 windTurb;
     glm::vec4 windMix;    // x = windInfluence, yzw unused
+    // ---- ADR-520 ----
+    glm::vec4 volume;   // volumeFollow.xyz (per-axis 0..1), w = 1 when the box wraps
+    glm::vec4 collide;  // response (0 none, 1 kill, 2 bounce, 3 splash), height, restitution, splashSize
+    glm::vec4 collide2; // splashLifetime, ringThickness, 0, 0
+    glm::vec4 pulse;    // rate (Hz, 0 = off), depth, sync, sharpness
+    glm::vec4 cluster;  // clusterCount (0 = off), clusterRadius, pauseRate, pauseFraction
+    glm::vec4 scatter;  // scatterStrength, HG anisotropy, sizeVariance, sizeSkew
+    glm::vec4 sun;      // xyz = unit direction *towards* the key light, w = 1 when it is usable
+    glm::vec4 sunColor; // rgb = the key light's colour times its intensity, w = 0
     glm::uvec4 curves;    // size / colour / opacity key counts, glow slot
     glm::uvec4 counts; // emitCount, capacity, blend, scan blocks
     glm::uvec4 fieldInfo; // x = field force count (ADR-025), y = spline emitter slot + 1 (0 = none, ADR-026)
@@ -71,7 +80,7 @@ struct ParticleUniforms {
     glm::vec4 opacityKeys[scene::kMaxCurveKeys]; // (t, value, 0, 0)
     glm::vec4 colorKeys[scene::kMaxCurveKeys];   // (t, r, g, b)
 };
-static_assert(sizeof(ParticleUniforms) == 128 + 16 * 29 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys);
+static_assert(sizeof(ParticleUniforms) == 128 + 16 * 37 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys);
 
 // Everything the draw needs that is not a per-system parameter (ADR-040). Set once per frame.
 struct ParticleFrameContext {
@@ -103,6 +112,13 @@ struct ParticleFrameContext {
     // coupling for the frame (there is nothing to say what depth the volume composite marched to),
     // and a 1x1 placeholder is bound so the bind group stays valid.
     wgpu::TextureView linearDepth;
+    // ADR-520: the key light, for the scattering phase function. A unit vector pointing *towards*
+    // it, in the sky's own convention (scene::Environment::sunDirection). All-zero switches the
+    // phase term off rather than dividing by a zero-length vector, which is why `scatterStrength`
+    // alone is not enough to enable it: a scene with no key light has no forward direction to
+    // scatter along, and inventing one would make dust that blazes at a light that is not there.
+    glm::vec3 sunDirection{0.0f};
+    glm::vec3 sunColor{0.0f}; // already multiplied by intensity
 };
 
 struct ParticleStats {

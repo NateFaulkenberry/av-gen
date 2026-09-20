@@ -29,6 +29,30 @@ std::optional<FieldForceMode> fieldForceModeFromName(std::string_view name) {
     return std::nullopt;
 }
 
+const char* collisionResponseName(CollisionResponse mode) {
+    switch (mode) {
+    case CollisionResponse::None:
+        return "none";
+    case CollisionResponse::Kill:
+        return "kill";
+    case CollisionResponse::Bounce:
+        return "bounce";
+    case CollisionResponse::Splash:
+        return "splash";
+    }
+    return "none";
+}
+
+std::optional<CollisionResponse> collisionResponseFromName(std::string_view name) {
+    for (const auto mode : {CollisionResponse::None, CollisionResponse::Kill, CollisionResponse::Bounce,
+                            CollisionResponse::Splash}) {
+        if (name == collisionResponseName(mode)) {
+            return mode;
+        }
+    }
+    return std::nullopt;
+}
+
 namespace {
 // The exact rule shaders/particles.wgsl `curveAt` implements: clamp below the first key, clamp
 // above the last, linear between the bracketing pair. Keys are assumed ascending in t.
@@ -123,6 +147,25 @@ Result<void> validateParticleSystem(const ParticleSystem& s) {
                         "{} MiB budget; lower the capacity or the trail length, or use velocityStretch instead",
                         s.name, s.trailLength, s.capacity, bytes >> 20, kMaxTrailBytes >> 20);
         }
+    }
+    // ---- ADR-520 ----
+    // The two that are not merely ugly when wrong but *silently empty the system*, which is the
+    // failure mode this repository keeps paying for: a system that renders nothing and reports
+    // nothing. A wrapping volume with a zero half-extent has no interior to wrap into, and a
+    // splash with a zero lifetime is a ring that is born dead.
+    if (s.volumeWrap && (s.extent.x <= 0.0f || s.extent.y <= 0.0f || s.extent.z <= 0.0f)) {
+        return fail("particle system '{}': volumeWrap needs a box with a positive half-extent on every axis, "
+                    "got ({}, {}, {}) -- wrapping into a zero-thickness slab teleports every particle onto one "
+                    "plane and the system renders as a line",
+                    s.name, s.extent.x, s.extent.y, s.extent.z);
+    }
+    if (s.collision == CollisionResponse::Splash && s.splashLifetime <= 0.0f) {
+        return fail("particle system '{}': splashLifetime must be positive, got {} -- a ring with no life is born "
+                    "dead and the collision response is then indistinguishable from 'kill'",
+                    s.name, s.splashLifetime);
+    }
+    if (s.sizeSkew <= 0.0f) {
+        return fail("particle system '{}': sizeSkew must be positive, got {}", s.name, s.sizeSkew);
     }
     return Result<void>{};
 }
@@ -222,6 +265,23 @@ ParticleParameters registerParticleParameters(params::ParameterSet& params, cons
     p.twoSided = &params.add(f(base, "twoSided", s.twoSided, 0.0f, 1.0f, 0.0f, 1.0f));
     p.stretch = &params.add(f(base, "stretch", s.velocityStretch, 0.0f, 20.0f, 0.0f, 4.0f));
     p.trailWidth = &params.add(f(base, "trailWidth", s.trailWidth, 0.0f, 20.0f, 0.0f, 4.0f));
+    // ADR-520. Registered for every system for ADR-370's reason: a control that appears and
+    // disappears with another control is harder to find than one that is always there, and §77
+    // asks for findable, not present-under-conditions. Every one of these is seeded from the
+    // scene, because a default that ignores the authored value deletes it on the first apply.
+    p.collisionHeight = &params.add(f(base, "collisionHeight", s.collisionHeight, -1000.0f, 1000.0f, -20.0f, 20.0f));
+    p.splashSize = &params.add(f(base, "splashSize", s.splashSize, 0.0f, 200.0f, 0.0f, 30.0f));
+    p.sizeVariance = &params.add(f(base, "sizeVariance", s.sizeVariance, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.sizeSkew = &params.add(f(base, "sizeSkew", s.sizeSkew, 0.05f, 16.0f, 0.2f, 6.0f));
+    p.pulseRate = &params.add(f(base, "pulseRate", s.pulseRate, 0.0f, 60.0f, 0.0f, 8.0f));
+    p.pulseDepth = &params.add(f(base, "pulseDepth", s.pulseDepth, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.pulseSync = &params.add(f(base, "pulseSync", s.pulseSync, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.pulseSharpness = &params.add(f(base, "pulseSharpness", s.pulseSharpness, 0.1f, 64.0f, 0.5f, 16.0f));
+    p.clusterRadius = &params.add(f(base, "clusterRadius", s.clusterRadius, 0.0f, 1000.0f, 0.0f, 20.0f));
+    p.pauseRate = &params.add(f(base, "pauseRate", s.pauseRate, 0.0f, 20.0f, 0.0f, 4.0f));
+    p.pauseFraction = &params.add(f(base, "pauseFraction", s.pauseFraction, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.scatterStrength = &params.add(f(base, "scatterStrength", s.scatterStrength, 0.0f, 20.0f, 0.0f, 6.0f));
+    p.scatterAnisotropy = &params.add(f(base, "scatterAnisotropy", s.scatterAnisotropy, -0.95f, 0.95f, -0.9f, 0.9f));
     {
         params::ParamDesc<bool> d;
         d.path = base + "enabled";
@@ -274,6 +334,21 @@ void applyParticleParameters(const ParticleParameters& p, const ParticleSystem& 
     if (p.twoSided != nullptr) { s.twoSided = p.twoSided->value(); }
     s.velocityStretch = p.stretch->value();
     s.trailWidth = p.trailWidth->value();
+    // ADR-520. Null-checked like ADR-370's above, so a ParticleParameters built by an older caller
+    // (or zero-initialised in a test) leaves the authored value alone instead of writing a 0 over it.
+    if (p.collisionHeight != nullptr) { s.collisionHeight = p.collisionHeight->value(); }
+    if (p.splashSize != nullptr) { s.splashSize = p.splashSize->value(); }
+    if (p.sizeVariance != nullptr) { s.sizeVariance = p.sizeVariance->value(); }
+    if (p.sizeSkew != nullptr) { s.sizeSkew = p.sizeSkew->value(); }
+    if (p.pulseRate != nullptr) { s.pulseRate = p.pulseRate->value(); }
+    if (p.pulseDepth != nullptr) { s.pulseDepth = p.pulseDepth->value(); }
+    if (p.pulseSync != nullptr) { s.pulseSync = p.pulseSync->value(); }
+    if (p.pulseSharpness != nullptr) { s.pulseSharpness = p.pulseSharpness->value(); }
+    if (p.clusterRadius != nullptr) { s.clusterRadius = p.clusterRadius->value(); }
+    if (p.pauseRate != nullptr) { s.pauseRate = p.pauseRate->value(); }
+    if (p.pauseFraction != nullptr) { s.pauseFraction = p.pauseFraction->value(); }
+    if (p.scatterStrength != nullptr) { s.scatterStrength = p.scatterStrength->value(); }
+    if (p.scatterAnisotropy != nullptr) { s.scatterAnisotropy = p.scatterAnisotropy->value(); }
     s.enabled = p.enabled->value();
 }
 

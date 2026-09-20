@@ -63,6 +63,21 @@ enum class EmitterShape : std::uint8_t { Point, Sphere, Disc, Box, Spline };
 enum class ParticleShape : std::uint8_t { Round, Leaf };
 enum class ParticleBlend : std::uint8_t { Additive, Alpha };
 
+// ADR-520: what a particle does when it reaches the collision height.
+//
+// `None` is the default and is what every particle in the repository did before this existed:
+// nothing, it falls through the ground and lives out its lifetime underneath it.
+enum class CollisionResponse : std::uint8_t {
+    None,   // fall through (the old behaviour)
+    Kill,   // die on contact
+    Bounce, // reflect, keeping `collisionRestitution` of the normal speed -- spray, hail, grit
+    Splash, // a SECOND LIFE: the particle is reborn at the impact point as a ground-aligned
+            // expanding ring, which is what a drop landing actually leaves behind. See the note
+            // on `splashSize` for why this is one particle and not a burst of them.
+};
+[[nodiscard]] const char* collisionResponseName(CollisionResponse mode);
+[[nodiscard]] std::optional<CollisionResponse> collisionResponseFromName(std::string_view name);
+
 enum class FieldForceMode : std::uint8_t { Force, Velocity, Turbulence, Kill };
 [[nodiscard]] const char* fieldForceModeName(FieldForceMode mode);
 [[nodiscard]] std::optional<FieldForceMode> fieldForceModeFromName(std::string_view name);
@@ -138,6 +153,79 @@ struct ParticleSystem {
     // 0, so 0 is the only value that reproduces what those scenes already look like. The old 0.2
     // default was never a behaviour, it was a number the writer baked into every scene it saved.
     float softness = 0.0f;
+
+    // ---- ADR-520: the air the camera carries ------------------------------------------------
+    // Weather is not a box of particles somewhere in the world; it is everywhere, and what the
+    // camera can see of it is a small moving slice. `volumeFollow` moves the emitter (and the wrap
+    // bounds below) with the camera, per axis, 0..1 -- so rain authored as a 60 m box follows the
+    // shot instead of being left behind by it, and a 40 k pool spends all of itself on what is
+    // actually in frame. All zero is off and is what every existing system does.
+    glm::vec3 volumeFollow{0.0f};
+    // A particle that leaves the box (half extents `extent`, centred on the emitter) re-enters on
+    // the opposite face instead of travelling on. This is what makes a *steady* fall possible: with
+    // wrapping, lifetime stops being the thing that recycles a particle, so rain does not have to
+    // fade in and out at the top and bottom of its life to hide the respawn. Pure function of
+    // position, so it costs determinism nothing.
+    bool volumeWrap = false;
+
+    // ---- ADR-520: the ground ------------------------------------------------------------------
+    CollisionResponse collision = CollisionResponse::None;
+    float collisionHeight = 0.0f;     // world Y of the plane a particle collides with
+    float collisionRestitution = 0.3f; // Bounce: the share of the normal speed kept
+    // Splash: the reborn ring. One particle, not a burst, because the pool is fixed (ADR-015) and
+    // spending eight slots on every impact would mean a downpour with an eighth of the drops. An
+    // expanding ground ring is also what the eye actually reads as "something landed there" --
+    // three additive dots flying up is not.
+    float splashLifetime = 0.45f;   // seconds the ring lives
+    float splashSize = 6.0f;        // the ring's final radius as a multiple of the drop's size
+    float ringThickness = 0.22f;    // ring wall as a fraction of its radius; 1 = a filled disc
+
+    // ---- ADR-520: layered scale ---------------------------------------------------------------
+    // The per-particle size multiplier used to be a hard-coded mix(0.7, 1.3, r): uniform, and
+    // uniform randomness is the brief's §82 failure by name. `sizeSkew` is the exponent on the
+    // uniform sample, so > 1 gives many small and few large -- which is what a real population of
+    // drops, flakes, motes and embers looks like. variance 0.3 / skew 1 is exactly the old
+    // expression, so nothing that does not ask changes.
+    float sizeVariance = 0.3f;
+    float sizeSkew = 1.0f;
+
+    // ---- ADR-520: the flash -------------------------------------------------------------------
+    // A per-particle brightness oscillation. `pulseSync` is the whole reason this is one feature
+    // and not two: at 0 every particle blinks on its own phase, which is an ember bed; at 1 they
+    // all blink together, which is a firefly chorus. `pulseSharpness` is the exponent that turns
+    // the sine into a brief flash. Rate 0 is off.
+    float pulseRate = 0.0f;
+    float pulseDepth = 0.8f;
+    float pulseSync = 0.0f;
+    float pulseSharpness = 1.0f;
+
+    // ---- ADR-520: clustering and hovering -----------------------------------------------------
+    // Spawn positions drawn from `clusterCount` centres rather than uniformly over the emitter.
+    // A cluster centre is a pure function of its index, so it is the same place every frame and
+    // the clustering persists instead of dissolving into the uniform field it was drawn from.
+    // 0 = off (uniform), which is what every existing system does.
+    std::uint32_t clusterCount = 0;
+    float clusterRadius = 1.0f;
+    // The dart-and-hover cycle. While paused a particle is heavily damped, so it drifts almost
+    // still; between pauses it moves at whatever the forces give it. Rate 0 is off.
+    float pauseRate = 0.0f;
+    float pauseFraction = 0.5f;
+
+    // ---- ADR-520: catching the light ----------------------------------------------------------
+    // Dust is not visible because it is bright; it is visible because it is BETWEEN you and a
+    // light. `scatterStrength` multiplies the particle by a Henyey-Greenstein phase function of
+    // the angle between the view ray and the key light, so the same motes are nearly invisible
+    // across the light and blaze when you look into it. 0 is off.
+    float scatterStrength = 0.0f;
+    float scatterAnisotropy = 0.72f; // HG g; 0 isotropic, -> 1 sharply forward
+
+    // ---- ADR-520: where it is allowed to exist ------------------------------------------------
+    // A scalar FieldSpec sampled at the spawn position: the spawn survives with probability equal
+    // to the sample. Soft-edged by construction, which is what a weather front needs -- a Kill
+    // force gives a hard wall of rain with nothing in front of it, and a front arrives gradually.
+    // Empty = no mask. A name the scene does not define is reported by validateParticleSystem's
+    // caller, never silently ignored.
+    std::string emitMaskField;
 
     // Lifetime curves (ADR-040). Empty (fewer than two keys) = the linear ramp above.
     ParticleCurve sizeCurve;         // world units; replaces mix(sizeStart, sizeEnd)
@@ -219,6 +307,22 @@ struct ParticleParameters {
     params::Parameter<float>* twoSided = nullptr;
     params::Parameter<float>* stretch = nullptr;    // scales velocityStretch (ADR-040)
     params::Parameter<float>* trailWidth = nullptr; // scales trailWidth (ADR-040)
+    // ADR-520. All absolute, not multipliers: each of these is a thing an artist points at in the
+    // picture ("make them blink faster", "make the motes catch more light"), and a multiplier over
+    // a rest value is not what that request means.
+    params::Parameter<float>* collisionHeight = nullptr;
+    params::Parameter<float>* splashSize = nullptr;
+    params::Parameter<float>* sizeVariance = nullptr;
+    params::Parameter<float>* sizeSkew = nullptr;
+    params::Parameter<float>* pulseRate = nullptr;
+    params::Parameter<float>* pulseDepth = nullptr;
+    params::Parameter<float>* pulseSync = nullptr;
+    params::Parameter<float>* pulseSharpness = nullptr;
+    params::Parameter<float>* clusterRadius = nullptr;
+    params::Parameter<float>* pauseRate = nullptr;
+    params::Parameter<float>* pauseFraction = nullptr;
+    params::Parameter<float>* scatterStrength = nullptr;
+    params::Parameter<float>* scatterAnisotropy = nullptr;
     params::Parameter<bool>* enabled = nullptr;
 };
 
