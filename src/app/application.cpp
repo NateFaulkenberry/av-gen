@@ -2915,6 +2915,25 @@ void Application::handleViewportEvent(const SDL_Event& event) {
         const glm::vec2 delta = now - viewportLastMouse_;
         viewportLastMouse_ = now;
         viewportDragTotal_ += glm::abs(delta);
+        // §22 / ADR-182. `Interaction::CameraOrbit` was declared, named and never begun, so flying
+        // the camera in the canvas -- the interaction a person spends most of their time in, and
+        // the one §22 asks to be profiled separately from the panels -- was invisible to the
+        // latency log. Opened per motion event rather than per gesture: the camera is re-derived
+        // and the world re-rendered on each one, so a record per gesture would report the length
+        // of the drag rather than what answering it costs. Pan, look and orbit share the kind --
+        // they differ in the arithmetic of `applyDrag` and in nothing the frame downstream can
+        // tell apart, and three kinds that cost the same thing are three thinner samples.
+        // Coalesced the way `TimelineDrag` is: several motion events can land in one frame, and a
+        // fresh `begin` while one is open *discards* the older record rather than completing it --
+        // measured, when this was a bare begin: 142 begun, 3 completed, **139 abandoned**. Folding
+        // into the open record keeps T0 at the batch's oldest input, which is the pessimistic end
+        // and the one a latency figure has to be quoted from.
+        if (core::interactions().openKind() == core::Interaction::CameraOrbit) {
+            core::interactions().noteSuperseded();
+        } else {
+            core::interactions().beginFromInput(core::Interaction::CameraOrbit);
+            core::interactions().markCommand();
+        }
         ensureFreeCamera();
         setViewportPose(applyDrag(viewportPose(), viewportGesture_, delta, ViewportControlSettings{},
                                   engine_->scene().camera.up));

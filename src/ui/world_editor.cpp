@@ -1,6 +1,7 @@
 #include "ui/world_editor.hpp"
 
 #include "app/engine.hpp"
+#include "core/interaction_latency.hpp"
 #include "core/log.hpp"
 #include "entity/entity.hpp"
 #include "entity/nav_grid.hpp"
@@ -750,6 +751,25 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
     if (drag_.active) {
         wantsMouse_ = true;
         visuals_.dragging = drag_.handle;
+        // §22 / ADR-182. `Interaction::GizmoDrag` has been declared and named since the latency log
+        // was written and had **no `begin*` call site anywhere**, so a transform drag in the canvas
+        // -- the editor's most common direct manipulation -- was the one interaction the instrument
+        // could not see. One record per frame of the drag, which is the same shape `property-drag`
+        // uses and is the right one: a held drag re-derives the whole selection from the press
+        // every frame, so the question is what one frame of it costs, not what the gesture costs
+        // end to end. No coalescing, for the same reason -- nothing here is deferred, so there is
+        // no outstanding batch for a later frame to be folded into.
+        // Coalesced the way `TimelineDrag` is: several motion events can land in one frame, and a
+        // fresh `begin` while one is open *discards* the older record rather than completing it --
+        // measured, when this was a bare begin: 142 begun, 3 completed, **139 abandoned**. Folding
+        // into the open record keeps T0 at the batch's oldest input, which is the pessimistic end
+        // and the one a latency figure has to be quoted from.
+        if (core::interactions().openKind() == core::Interaction::GizmoDrag) {
+            core::interactions().noteSuperseded();
+        } else {
+            core::interactions().beginFromInput(core::Interaction::GizmoDrag);
+            core::interactions().markCommand();
+        }
         const GizmoDelta delta = updateGizmoDrag(drag_, camera, aspect, input.ndc, snap);
         if (delta.valid) {
             visuals_.dragReadout = delta.readout;

@@ -53,6 +53,14 @@ struct Sample {
     float ground = 0.0f;
     float beamVisible = 0.0f;
     float beamRate = 0.0f;
+    // Not the same question as the rate. The rate is the tap; this is every particle already in
+    // the air, and it is the one the column's visible life is measured on.
+    float beamSize = 1.0f;
+    // And the same number where it lands: `sizeStart` of the FLATTENED system, which is the
+    // parameter's final multiplied through -- audio modulation and all -- rather than the base
+    // the director wrote. `enabled` there has the node's `visible` already folded into it.
+    float beamDrawnSize = -1.0f;
+    bool beamDrawnOn = false;
     float step = 0.0f;   // |pos - previous pos|
     float stepY = 0.0f;
     int camera = 0;      // the camera holding the frame, for the cut test
@@ -87,8 +95,10 @@ std::vector<Sample> playFilm(double seconds, double hz,
     }
     const params::IParameter* beamVisible = engine.params().find("nodes/visitor-beam/visible");
     const params::IParameter* beamRate = engine.params().find("particles/visitor-beam/spawnRate");
+    const params::IParameter* beamSize = engine.params().find("particles/visitor-beam/size");
     REQUIRE(beamVisible != nullptr);
     REQUIRE(beamRate != nullptr);
+    REQUIRE(beamSize != nullptr);
 
     std::vector<Sample> out;
     const double step = 1.0 / hz;
@@ -116,6 +126,13 @@ std::vector<Sample> playFilm(double seconds, double hz,
         s.ground = nav.valid() ? nav.groundHeight(glm::vec2(s.pos.x, s.pos.z)) : 0.0f;
         s.beamVisible = beamVisible->baseComponent(0);
         s.beamRate = beamRate->baseComponent(0);
+        s.beamSize = beamSize->baseComponent(0);
+        for (const scene::ParticleSystem& ps : comp->scene().particles) {
+            if (ps.name.find("visitor-beam") != std::string::npos) {
+                s.beamDrawnSize = ps.sizeStart;
+                s.beamDrawnOn = ps.enabled;
+            }
+        }
         s.camera = static_cast<int>(comp->activeCamera().camera);
         if (!s.target.empty()) {
             if (const params::IParameter* o =
@@ -679,12 +696,12 @@ TEST_CASE("the abducted animal fades out before it is hidden", "[stage][abductio
             hiddenAt[s.target] = s.t;
         }
     }
-    // Three, not five. Two of the film's abduction targets -- `rooster-16` and `chicken-17` --
-    // are entities the scene has no node for, which the loader says out loud at every load
-    // ("entity 'rooster-16' drives node 'rooster-16', which this scene has no node for"). They
-    // have no transform parameters, no opacity and nothing drawn: the director walks them around
-    // and abducts them invisibly. That is a production-data gap and not this work's to close, but
-    // it is why this number is three.
+    // Every animal in the film now has a node, so `nodeless` should come back empty -- and it is
+    // still counted rather than assumed. It used to hold `rooster-16` and `chicken-17`, entities
+    // the scene had no node for, which the loader said out loud at every load ("entity
+    // 'rooster-16' drives node 'rooster-16', which this scene has no node for"): no transform
+    // parameters, no opacity and nothing drawn, so the director walked them around and abducted
+    // them invisibly. The cast is nine four-legged animals now and the gap closed with them.
     std::set<std::string> nodeless;
     for (const Sample& s : run) {
         if (!s.target.empty() && s.targetOpacity < 0.0f) {
@@ -693,6 +710,7 @@ TEST_CASE("the abducted animal fades out before it is hidden", "[stage][abductio
     }
     INFO(fmt::format("targets with no node and therefore nothing to fade: {}",
                      fmt::join(nodeless, ", ")));
+    CHECK(nodeless.empty());
     REQUIRE(trace.size() >= 3);
 
     std::size_t faded = 0;
@@ -730,7 +748,7 @@ TEST_CASE("the abducted animal fades out before it is hidden", "[stage][abductio
         // It got all the way out.
         CHECK(lowest <= 0.01f);
         // And it got there gradually. A hard toggle is a single-frame change of 1.0; the authored
-        // `fadeSeconds` is 1.4 s, so a 60 Hz frame moves about 0.012 even at the eased curve's
+        // `fadeSeconds` is 1.2 s, so a 60 Hz frame moves about 0.015 even at the eased curve's
         // steepest. 0.1 is an order of magnitude above that and an order of magnitude below a pop.
         CHECK(worstStep <= 0.1f);
         // The fade took real time rather than being a ramp with one frame in it.
@@ -744,6 +762,150 @@ TEST_CASE("the abducted animal fades out before it is hidden", "[stage][abductio
     }
     INFO(fmt::format("{} of {} bound targets with a node faded", faded, trace.size()));
     CHECK(faded >= 3);
+}
+
+// Test 5c -- the dissolve belongs at the top of the lift, and it was happening at the bottom.
+//
+// The report was "they're fading out too early", and the arithmetic behind it is not the
+// arithmetic it looks like. The lift is `mix(from, goal, smoothstep(t / abductSeconds))`, so the
+// fraction of the CLIMB covered is not the fraction of the beat elapsed. The old cue ran the
+// animal's steps in one sequence -- glow-rise 1.3 s, then fade 1.4 s, then glow-fade 1.9 s -- so
+// the fade occupied 1.3 s to 2.7 s of a 4.6 s lift, and `smoothstep(1.3/4.6)` is 0.19. The animal
+// began dissolving a fifth of the way up and was invisible at 0.63, leaving the beam to finish
+// the journey carrying nothing.
+//
+// The fade now waits `fadeDelaySeconds` in its own cue, parallel to the glow: 3.4 s of 4.6, which
+// is `smoothstep(0.739)` = 0.83 of the climb, and it ends as the lift does.
+//
+// Measured against the climb and not against the clock, which is the whole point -- the bound
+// keeps meaning what it says if anybody retimes the beat, and it is the conversion between the
+// two that the defect lived in.
+TEST_CASE("the abducted animal is most of the way up before it starts to dissolve",
+          "[stage][abduction][sequence]") {
+    const std::vector<Sample>& run = film();
+    struct Climb {
+        double startT = 0.0;
+        float startY = 0.0f;
+        float topY = -1e9f;
+        float fadeY = 0.0f;
+        double fadeT = -1.0;
+        float lowest = 1.0f;
+        bool started = false;
+    };
+    std::map<std::string, Climb> climbs;
+    for (const Sample& s : run) {
+        if (s.beat != "abduct" || s.target.empty() || s.targetOpacity < 0.0f) {
+            continue;
+        }
+        Climb& c = climbs[s.target];
+        if (!c.started) {
+            c.started = true;
+            c.startT = s.t;
+            c.startY = s.targetY;
+        }
+        c.topY = std::max(c.topY, s.targetY);
+        c.lowest = std::min(c.lowest, s.targetOpacity);
+        if (c.fadeT < 0.0 && s.targetOpacity < 0.999f) {
+            c.fadeT = s.t;
+            c.fadeY = s.targetY;
+        }
+    }
+    std::size_t judged = 0;
+    for (const auto& [animal, c] : climbs) {
+        // A lift the run ended in the middle of is not evidence either way: its `topY` is wherever
+        // the film stopped, so the fraction would be measured against a climb that never finished.
+        // Completeness is the filter, not a wider bound -- widening it would accept the defect.
+        if (c.lowest > 0.01f || c.fadeT < 0.0 || c.topY - c.startY < 5.0f) {
+            continue;
+        }
+        const float climbed = (c.fadeY - c.startY) / (c.topY - c.startY);
+        ++judged;
+        INFO(fmt::format("{}: lift {:.2f} m -> {:.2f} m from t={:.3f}; the fade starts at "
+                         "{:.2f} m, t={:.3f} -- {:.1f}% of the climb, {:.3f} s in",
+                         animal, c.startY, c.topY, c.startT, c.fadeY, c.fadeT,
+                         100.0f * climbed, c.fadeT - c.startT));
+        // The owner asked for 80-90% of the way up. Both ends are asserted: a fade that waited
+        // until the animal was already inside the craft would be as wrong as one that started on
+        // the ground, and a one-sided bound would call it a pass.
+        CHECK(climbed >= 0.78f);
+        CHECK(climbed <= 0.97f);
+    }
+    INFO(fmt::format("{} complete lift(s) of {} judged", judged, climbs.size()));
+    CHECK(judged >= 3);
+}
+
+// Test 5d -- the beam goes out, instead of draining like a tap somebody half closed.
+//
+// "The particle beam turns off like water in a slow faucet." It did, and ramping `spawnRate` down
+// was why: that closes the tap, and says nothing at all about the six thousand particles already
+// falling. They keep going, for `lifetimeMax` = 5 s, thinning from the top -- which is exactly
+// what a closing faucet looks like.
+//
+// So `depart` now stops the spawn dead and crushes `size`, which every particle in flight reads
+// from the uniform block on the frame it is drawn. The column goes out in `beamFadeSeconds`.
+//
+// The drain and the hide are deliberately NOT moved forward with it: a disabled pool is frozen
+// rather than aged (`ParticleRenderer::update` skips a system that is not enabled), so hiding the
+// beam while it still holds particles means the next cycle resumes them, unaged, under a craft
+// that has flown somewhere else. `beamDrainSeconds` still covers a whole particle lifetime. What
+// changed is that nothing is visible during it.
+//
+// Asserted on the flattened system's `sizeStart` rather than on the parameter, because the
+// parameter is the instruction and this is the thing the renderer is handed.
+TEST_CASE("the beam is out within a moment of the abduction ending", "[stage][abduction][sequence]") {
+    const std::vector<Sample>& run = film();
+    REQUIRE(!run.empty());
+    // The control arm, and it is the half that makes the other one mean something: the beam has to
+    // have been at full size while it was firing. A system whose `sizeStart` is always zero would
+    // pass "it is out quickly" on every frame of the film (ADR-182).
+    float firing = 0.0f;
+    for (const Sample& s : run) {
+        if (s.beat == "abduct" && s.beamDrawnOn) {
+            firing = std::max(firing, s.beamDrawnSize);
+        }
+    }
+    INFO(fmt::format("widest the beam got while lifting: {:.4f}", firing));
+    REQUIRE(firing > 0.3f);
+
+    std::size_t measured = 0;
+    for (std::size_t i = 1; i < run.size(); ++i) {
+        if (run[i].beat != "depart" || run[i - 1].beat == "depart") {
+            continue;
+        }
+        const auto fellTo = [&](float fraction) {
+            for (std::size_t j = i; j < run.size() && run[j].beat == "depart"; ++j) {
+                if (!run[j].beamDrawnOn || run[j].beamDrawnSize <= firing * fraction) {
+                    return run[j].t - run[i].t;
+                }
+            }
+            return -1.0;
+        };
+        const double quarter = fellTo(0.25f);
+        if (quarter < 0.0) {
+            continue; // the film ended inside this depart; a truncated decay measures nothing
+        }
+        ++measured;
+        double base = -1.0;
+        for (std::size_t j = i; j < run.size() && run[j].beat == "depart"; ++j) {
+            if (run[j].beamSize <= 1e-4f) {
+                base = run[j].t - run[i].t;
+                break;
+            }
+        }
+        INFO(fmt::format("depart at t={:.3f}: the director's size reached 0 after {:.3f} s; the "
+                         "drawn column fell to half at {:.3f} s, a quarter at {:.3f} s, a "
+                         "twentieth at {:.3f} s",
+                         run[i].t, base, fellTo(0.5f), quarter, fellTo(0.05f)));
+        // The instruction: `beamFadeSeconds` is 0.15 s, and a frame of slack either side.
+        CHECK(base >= 0.0);
+        CHECK(base <= 0.2);
+        // And the column the renderer draws, which is the half that matters. Before this change it
+        // was still at full width here and took the better part of five seconds to drain, so there
+        // is no risk of this bound being generous.
+        CHECK(quarter <= 0.35);
+    }
+    INFO(fmt::format("{} depart(s) measured", measured));
+    CHECK(measured >= 3);
 }
 
 // Test 5b -- the fade reaches the renderer, and lets go of it again.
@@ -869,4 +1031,162 @@ TEST_CASE("the director publishes the state an overlay needs", "[stage][abductio
     CHECK(framesGated > 0);
     CHECK(sawCraftPosition);
     CHECK(sawNonZeroSpeed);
+}
+
+// ---- why did the search stop? ----------------------------------------------------------------
+//
+// `acquire` has `"otherwise": ""`, so ONE failed search ends the scenario for the rest of the
+// film -- there is no retry. With a smaller cast that is a real cliff, and "nothing passed the
+// filter" has six possible causes. This prints all six for every animal, per search, so the
+// answer is read rather than guessed (ADR-385).
+TEST_CASE("what the abduction search sees, animal by animal", "[.abduction-instrument]") {
+    app::Engine engine(app::EngineMode::Offline);
+    auto loaded = engine.loadProject(filmProject());
+    REQUIRE(loaded.has_value());
+    scene::Composition* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+    comp->setViewport(1600, 900);
+    comp->scene().detailLimits.entityDistanceCull = false;
+
+    FrameTime time;
+    const double step = 1.0 / 60.0;
+    std::string was;
+    for (int i = 0; i < 60 * 90; ++i) {
+        time.renderTime = static_cast<double>(i) * step;
+        time.deltaTime = i == 0 ? 0.0 : step;
+        time.frameIndex = static_cast<std::uint64_t>(i);
+        engine.update(time);
+        const std::string beat(comp->director().beat("abduction"));
+        if (beat == was) {
+            continue;
+        }
+        was = beat;
+        if (beat != "acquire") {
+            continue;
+        }
+        const entity::Entity* craft = comp->entityWorld().find("visitor");
+        REQUIRE(craft != nullptr);
+        const glm::vec3 c = craft->state().position();
+        const entity::Navigator& nav = comp->entityWorld().navigator();
+        fmt::print("\n---- acquire at t={:.3f}, craft ({:.1f}, {:.1f}, {:.1f}) ----\n", time.renderTime,
+                   c.x, c.y, c.z);
+        for (const auto& e : comp->entityWorld().entities()) {
+            const auto& tags = e->desc().tags;
+            if (std::find(tags.begin(), tags.end(), "animal") == tags.end()) {
+                continue;
+            }
+            const glm::vec3 p = e->state().position();
+            const float d = glm::length(p - c);
+            const glm::vec2 xz(p.x, p.z);
+            fmt::print("  {:<10} d={:7.1f}  canopy={:6.2f} (>6.5 rejects)  navigable={}  "
+                       "pos ({:.1f}, {:.1f}, {:.1f})\n",
+                       e->name(), d, nav.valid() ? nav.canopyHeight(xz) : -1.0f,
+                       nav.valid() ? (nav.navigable(xz) ? "yes" : "NO ") : "?",
+                       p.x, p.y, p.z);
+        }
+    }
+}
+
+// ---- where can an animal actually be abducted from? -------------------------------------------
+//
+// `acquire` rejects any animal whose canopy is higher than `targetClearance` (6.5 m): under a tree
+// the beam does not reach and the shot does not read. Most of this valley is under 7.1-8.0 m of
+// canopy, so "open ground" is a much smaller set than the map suggests -- and an animal that
+// wanders under a tree stops being abductable without moving far.
+//
+// This scans the valley for spots that are navigable, open over the whole 20 m the wander
+// behaviours use, and far enough apart to read as scattered. It prints them as scene positions.
+TEST_CASE("open ground an abduction beam can reach", "[.abduction-instrument]") {
+    app::Engine engine(app::EngineMode::Offline);
+    auto loaded = engine.loadProject(filmProject());
+    REQUIRE(loaded.has_value());
+    scene::Composition* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+    comp->setViewport(1600, 900);
+    FrameTime time;
+    engine.update(time);
+
+    const entity::Navigator& nav = comp->entityWorld().navigator();
+    REQUIRE(nav.valid());
+    constexpr float kClearance = 6.5f;
+    constexpr float kMargin = 4.5f;   // the bar a home must clear, with room under the 6.5
+    constexpr float kWander = 10.0f;  // and clear over the radius the wander behaviours use
+    constexpr float kApart = 40.0f;   // far enough apart that the cast reads as scattered
+
+    {
+        std::map<int, int> hist;
+        int walk = 0;
+        for (float x = -280.0f; x <= 180.0f; x += 6.0f) {
+            for (float z = -270.0f; z <= 70.0f; z += 6.0f) {
+                const glm::vec2 xz(x, z);
+                if (!nav.navigable(xz)) continue;
+                ++walk;
+                ++hist[static_cast<int>(nav.canopyHeight(xz) * 10.0f + 0.5f)];
+            }
+        }
+        fmt::print("\ncanopy over {} navigable cells:\n", walk);
+        for (const auto& [k, n] : hist) {
+            fmt::print("   {:5.2f} m : {:5d} ({:4.1f}%)\n", k / 10.0f, n, 100.0 * n / walk);
+        }
+    }
+    struct Spot { glm::vec2 xz; float ground; float worstCanopy; };
+    std::vector<Spot> open;
+    for (float x = -280.0f; x <= 180.0f; x += 6.0f) {
+        for (float z = -270.0f; z <= 70.0f; z += 6.0f) {
+            const glm::vec2 xz(x, z);
+            if (!nav.navigable(xz)) {
+                continue;
+            }
+            float worst = nav.canopyHeight(xz);
+            for (int k = 0; k < 8 && worst <= kMargin; ++k) {
+                const float a = static_cast<float>(k) * 0.785398f;
+                const glm::vec2 r = xz + kWander * glm::vec2(std::cos(a), std::sin(a));
+                if (!nav.navigable(r)) {
+                    worst = 1e9f; // it could wander somewhere it cannot stand
+                    break;
+                }
+                worst = std::max(worst, nav.canopyHeight(r));
+            }
+            if (worst > kMargin) {
+                continue;
+            }
+            open.push_back({xz, nav.groundHeight(xz), worst});
+        }
+    }
+    fmt::print("\n{} open cell(s) of the scan, clearance bar {:.1f} m (the find rejects over {:.1f})\n",
+               open.size(), kMargin, kClearance);
+    // Greedy, farthest-first, so the chosen set spreads instead of clumping in one clearing.
+    // Seeded with the three animals that already stand in open ground, so the answer is "six more
+    // places, as far from those and from each other as this valley allows".
+    std::vector<Spot> picked;
+    for (const char* who : {"bull-1", "horse-2", "cow-3"}) {
+        const entity::Entity* e = comp->entityWorld().find(who);
+        if (e == nullptr) continue;
+        const glm::vec3 p = e->state().position();
+        picked.push_back({glm::vec2(p.x, p.z), p.y, nav.canopyHeight(glm::vec2(p.x, p.z))});
+        fmt::print("  seed {:<9} [{:.2f}, {:.2f}, {:.2f}]\n", who, p.x, p.y, p.z);
+    }
+    while (picked.size() < 9 && !open.empty()) {
+        std::size_t best = 0;
+        float bestD = -1.0f;
+        for (std::size_t i = 0; i < open.size(); ++i) {
+            float nearest = 1e9f;
+            for (const Spot& p : picked) {
+                nearest = std::min(nearest, glm::length(open[i].xz - p.xz));
+            }
+            if (nearest > bestD) {
+                bestD = nearest;
+                best = i;
+            }
+        }
+        if (!picked.empty() && bestD < kApart) {
+            break;
+        }
+        picked.push_back(open[best]);
+        open.erase(open.begin() + static_cast<long>(best));
+    }
+    for (const Spot& p : picked) {
+        fmt::print("  [{:.2f}, {:.2f}, {:.2f}]   canopy over {:.0f} m: {:.2f}\n", p.xz.x, p.ground,
+                   p.xz.y, kWander, p.worstCanopy);
+    }
 }

@@ -2098,7 +2098,7 @@
      },
      {
       "name": "beamFadeSeconds",
-      "value": 0.5,
+      "value": 0.15,
       "min": 0.0,
       "max": 10.0
      },
@@ -2169,6 +2169,12 @@
       "max": 10.0
      },
      {
+      "name": "beamSize",
+      "value": 1.0,
+      "min": 0.0,
+      "max": 4.0
+     },
+     {
       "name": "beamRestRate",
       "value": 0.0,
       "min": 0.0,
@@ -2199,14 +2205,26 @@
       "max": 10.0
      },
      {
+      "name": "glowHoldSeconds",
+      "value": 0.82,
+      "min": 0.0,
+      "max": 30.0
+     },
+     {
+      "name": "fadeDelaySeconds",
+      "value": 2.22,
+      "min": 0.0,
+      "max": 30.0
+     },
+     {
       "name": "fadeSeconds",
-      "value": 0.6,
+      "value": 0.78,
       "min": 0.1,
       "max": 10.0
      },
      {
       "name": "glowFadeSeconds",
-      "value": 1.9,
+      "value": 0.78,
       "min": 0.0,
       "max": 10.0
      }
@@ -2356,6 +2374,23 @@
           "duration": 0.2
          }
         ]
+       },
+       {
+        "role": "actor.beam",
+        "steps": [
+         {
+          "kind": "set",
+          "name": "beamWidth",
+          "target": "size",
+          "from": 0.0,
+          "to": {
+           "param": "beamSize"
+          },
+          "duration": {
+           "param": "beamSeconds"
+          }
+         }
+        ]
        }
       ],
       "then": "abduct"
@@ -2429,15 +2464,11 @@
           }
          },
          {
-          "kind": "set",
-          "name": "fade",
-          "target": "opacity",
-          "from": 1.0,
-          "to": 0.0,
+          "kind": "wait",
+          "name": "glow-hold",
           "duration": {
-           "param": "fadeSeconds"
-          },
-          "ease": true
+           "param": "glowHoldSeconds"
+          }
          },
          {
           "kind": "set",
@@ -2447,6 +2478,29 @@
           "duration": {
            "param": "glowFadeSeconds"
           }
+         }
+        ]
+       },
+       {
+        "role": "target",
+        "steps": [
+         {
+          "kind": "wait",
+          "name": "rise",
+          "duration": {
+           "param": "fadeDelaySeconds"
+          }
+         },
+         {
+          "kind": "set",
+          "name": "fade",
+          "target": "opacity",
+          "from": 1.0,
+          "to": 0.0,
+          "duration": {
+           "param": "fadeSeconds"
+          },
+          "ease": true
          },
          {
           "kind": "retire",
@@ -2471,6 +2525,13 @@
           "to": {
            "param": "beamRestRate"
           },
+          "duration": 0.0
+         },
+         {
+          "kind": "set",
+          "name": "beamCut",
+          "target": "size",
+          "to": 0.0,
           "duration": {
            "param": "beamFadeSeconds"
           }

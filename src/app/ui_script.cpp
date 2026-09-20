@@ -182,10 +182,26 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
         const float x = w * (0.5f + 0.12f * std::sin(phase_ * 0.7f));
         const float y = h * (0.42f + 0.08f * std::cos(phase_ * 0.7f));
         const std::uint64_t inCycle = frame % 120;
+        // **Option is held for the whole gesture, and without it this arm was never the camera.**
+        // `ui::viewportIntent` maps a plain left drag to `EditorPointer`; only `left && alt`
+        // reaches `CameraOrbit`. So for as long as this arm has existed it pushed a left drag over
+        // the canvas, drove the editor's selection and gizmo path, and was called `camera` -- which
+        // is also why `Interaction::CameraOrbit` could sit in the latency log with no call site and
+        // no one notice that nothing was exercising it. Measured: with the modifier, the arm
+        // produces camera-orbit records; without it, none at all.
+        //
+        // `SDL_SetModState` rather than a synthetic key event, because the handler asks
+        // `SDL_GetModState()` at the moment it classifies the press -- a key event pushed onto the
+        // queue is read later and would arrive after the decision it is supposed to inform.
         if (inCycle == 0) {
+            SDL_SetModState(SDL_KMOD_LALT);
             pushButton(window, x, y, true);
         } else if (inCycle == 110) {
             pushButton(window, x, y, false);
+            // Cleared on release and not merely at the end of the run: an arm that leaves a
+            // modifier latched changes what every arm after it means, and `--ui-ab` interleaves
+            // them inside one process.
+            SDL_SetModState(SDL_KMOD_NONE);
         } else if (inCycle < 110) {
             pushMotion(window, x, y);
         }

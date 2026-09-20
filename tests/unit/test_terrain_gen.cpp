@@ -369,3 +369,90 @@ TEST_CASE("the feature path accelerator changes no height", "[terrain][gen][dete
         }
     }
 }
+
+// ---- the block accelerator is an accelerator, and this is what says so (ADR-482) ----------------
+//
+// `closestOnPath` is **62% of an entire timeline scrub** on Glowmere: `Navigator::pathClear` asks
+// `WorldMap::sample` per walker per step of a 5,400-step replay, and that reaches this function
+// once per terrain feature. The interactive-performance pass made the per-block skip bite from the
+// first block instead of only after `best` had shrunk, which is a change to how many segments are
+// visited and must be no change at all to the answer.
+//
+// `Feature::blocks` is documented as "purely an accelerator... passing an empty span walks every
+// segment and gives the identical result". That is the contract, and until now nothing checked it
+// -- the determinism captures would have caught a *drift* between two runs of the same build, and
+// this is the other thing: a difference between the accelerated and the unaccelerated answer, in
+// one build, which no comparison of two identical runs can see.
+//
+// Bit for bit over 4,225 heights per style, because the tolerance for this is zero. A height that
+// differs in the last mantissa bit moves a walker by a hair, and a walker that is a hair away takes
+// a different line past a trunk one second later -- the same argument ADR-295 makes about the
+// navigation grid, and the reason that grid is allowed to refuse.
+TEST_CASE("the path block accelerator returns the identical height, not merely a close one",
+          "[terrain][gen][accel]") {
+    for (const world::TerrainStyle style : world::terrainStyles()) {
+        world::WorldMap accelerated = world::generateTerrain(paramsFor(style));
+        std::size_t featuresWithBlocks = 0;
+        for (const world::Feature& f : accelerated.features) {
+            featuresWithBlocks += f.blocks.empty() ? 0u : 1u;
+        }
+
+        // The unaccelerated reference: the same prepared world with the block boxes thrown away,
+        // so every segment of every feature is walked.
+        world::WorldMap reference = accelerated;
+        for (world::Feature& f : reference.features) {
+            f.blocks.clear();
+        }
+
+        INFO("style " << world::terrainStyleName(style) << ", " << featuresWithBlocks
+                      << " feature(s) carrying block boxes");
+        const std::vector<float> fast = lattice(accelerated);
+        const std::vector<float> slow = lattice(reference);
+        REQUIRE(fast.size() == slow.size());
+        std::size_t differing = 0;
+        double worst = 0.0;
+        std::size_t firstAt = 0;
+        for (std::size_t i = 0; i < fast.size(); ++i) {
+            if (fast[i] != slow[i]) {
+                if (differing == 0) { firstAt = i; }
+                ++differing;
+                worst = std::max(worst, std::fabs(static_cast<double>(fast[i]) - slow[i]));
+            }
+        }
+        INFO("differing " << differing << " of " << fast.size() << ", worst " << worst
+                          << " m, first at " << firstAt << " (fast " << fast[firstAt] << " slow "
+                          << slow[firstAt] << ")");
+        CHECK(differing == 0);
+    }
+}
+
+// The control (ADR-182). The test above compares two things that are supposed to agree, and a
+// comparison of two things that agree proves nothing unless something could have made them
+// disagree. A block box that is too small is exactly the defect the accelerator can have -- it
+// rejects a block that did hold the nearest segment -- and it must be caught.
+TEST_CASE("a block box that lies is caught by the same comparison", "[terrain][gen][accel]") {
+    world::WorldMap sabotaged = world::generateTerrain(paramsFor(world::TerrainStyle::Valley));
+    world::WorldMap reference = sabotaged;
+    for (world::Feature& f : reference.features) {
+        f.blocks.clear();
+    }
+    // Collapse every box to a point far outside the world. Every block is then "further away" than
+    // anything real, so the skip fires on all of them and the answer comes from whatever survives.
+    std::size_t boxes = 0;
+    for (world::Feature& f : sabotaged.features) {
+        for (glm::vec4& box : f.blocks) {
+            box = glm::vec4(1.0e6f, 1.0e6f, 1.0e6f, 1.0e6f);
+            ++boxes;
+        }
+    }
+    REQUIRE(boxes > 0); // a world with no blocks would make this test vacuous
+
+    const std::vector<float> lying = lattice(sabotaged);
+    const std::vector<float> honest = lattice(reference);
+    std::size_t differing = 0;
+    for (std::size_t i = 0; i < lying.size() && i < honest.size(); ++i) {
+        differing += lying[i] == honest[i] ? 0u : 1u;
+    }
+    INFO(boxes << " box(es) collapsed; " << differing << " of " << honest.size() << " heights moved");
+    CHECK(differing > 0);
+}

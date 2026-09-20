@@ -6,8 +6,8 @@
   "assets": {
     "audio": {
       "path": "../../../../../Desktop/MP3/bass.mp3",
-      "sha256": "1ef91ba42f63c7fb7c46cede268d81614c3c8d8f132b051a52201e8b78f938ca",
-      "size": 7341376
+      "sha256": "ffe225be72b5546b03ec73a24f159476e2315384ed0a896a2d461ca568f07ed8",
+      "size": 235327
     },
     "scene": {
       "kind": "composition",

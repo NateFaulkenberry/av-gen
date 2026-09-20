@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Eight ways a green suite has lied
+## Ten ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into two families: **the run did not happen as you think**,
@@ -116,6 +116,36 @@ and **the run happened and you read it wrong.**
    file says so — and is tagged so Catch2 expects it. In isolation it reports `1 failed as expected`
    and **exits 0**. This is the "1 failed as expected" in every summary here, and it looks exactly
    like a real failure if you are reading `FAILED:` blocks rather than the summary and exit code.
+
+### The run never started, because of what the test is called
+
+9. **A test whose NAME begins with `--` fails on every `ctest` run and passes by every other
+   route.** `catch_discover_tests` registers each case with CTest by passing its name as an
+   *argument* to the test binary, and Catch2 parses a leading `--` as a flag. `TEST_CASE("--aov
+   shadow refuses ...")` therefore produced, on every single `ctest --preset release`:
+
+   ```
+   1/3028 Test #1: unit.--aov shadow refuses the configurations where it would be a constant ***Failed
+   Error(s) in input:
+     Unrecognised token: --aov
+   ```
+
+   while `avgen_tests "*aov shadow refuses*"` passed it with 10 assertions and **exit 0**. One red
+   line is enough to stop the whole suite exiting 0, so for as long as it was there, *nobody could
+   read `ctest`'s exit code on main and learn anything*. It cost one agent a bisect to establish
+   that two unrelated failures beside it were pre-existing, because the exit code could not
+   distinguish. Fixed by renaming the case; the flag it is about now sits in parentheses at the
+   end. **Do not start a `TEST_CASE` name with a dash.**
+
+10. **A test that crashes a LATER test, and is named as the later one.** The suite reported a bus
+   error in `gpu.an area light with no authored range reaches as far as one that has it`. Nothing
+   was wrong with that test: the crash was in the hidden `[.perf]` million-particle probe several
+   cases earlier, and its cause was a *third* test that built two `SceneRenderer`s where one would
+   do — each allocates a shadow atlas, AO targets, a volume grid and a temporal ring, and the file
+   already built five. The million-particle pool then had nowhere to go. The tell is that the named
+   test passes alone, passes with the suspect beside it, and only dies in the full set; the method
+   is to bisect the *filter*, not to read the named test. Cumulative GPU memory makes the victim and
+   the culprit different tests, and ctest names the victim.
 
 **So `grep -c FAILED` is not a failure count.** Two of the eight cases above put a well-formed
 `FAILED:` block into a perfectly healthy log. Read the **exit code first, the summary second, and
