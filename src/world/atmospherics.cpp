@@ -76,6 +76,7 @@ const char* atmosphereKindName(AtmosphereKind k) {
     case AtmosphereKind::Comet: return "comet";
     case AtmosphereKind::Aurora: return "aurora";
     case AtmosphereKind::Vortex: return "vortex";
+    case AtmosphereKind::CosmicOcean: return "cosmicOcean";
     }
     return "comet";
 }
@@ -83,6 +84,7 @@ std::optional<AtmosphereKind> atmosphereKindFromName(std::string_view name) {
     if (name == "comet") { return AtmosphereKind::Comet; }
     if (name == "aurora") { return AtmosphereKind::Aurora; }
     if (name == "vortex") { return AtmosphereKind::Vortex; }
+    if (name == "cosmicOcean") { return AtmosphereKind::CosmicOcean; }
     return std::nullopt;
 }
 
@@ -262,6 +264,7 @@ Result<void> AtmosphericEffect::validate() const {
     if (auto ok = comet.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     if (auto ok = aurora.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     if (auto ok = vortex.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
+    if (auto ok = cosmicOcean.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     if (auto ok = ground.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     if (auto ok = timing.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     return {};
@@ -453,6 +456,29 @@ json AtmosphericEffect::toJson() const {
                        {"colorDeep", vec3ToJson(vx.colorDeep)},
                        {"colorMid", vec3ToJson(vx.colorMid)},
                        {"colorAccent", vec3ToJson(vx.colorAccent)}};
+
+    // ADR-390's Cosmic Ocean, written THROUGH ITS FIELD TABLES rather than key by key.
+    //
+    // ADR-390 §2.1 names the family's real hazard: `toJson`/`fromJson` are hand-written per kind,
+    // so the JSON key set is a second list maintained by hand beside the field-table leaves, and a
+    // field added to one can be forgotten by the other. The comet and the aurora carry that risk
+    // because their file format predates their tables and their keys deliberately differ from their
+    // leaves (`speedScale` against `speed`) -- two namespaces, not two spellings, and not a defect.
+    //
+    // A new kind has no such history, so it does not have to inherit the hazard. Choosing
+    // `key == leaf` for the ocean makes the two lists ONE list: a field the table does not have
+    // cannot be written, and a field it has cannot be forgotten. The round-trip check in
+    // `effect_conformance` then reads back through re-registration and can only pass for real.
+    // ~113 hand-written key lines are also ~113 chances to typo one.
+    {
+        json co;
+        // `enabled` is not written here: it is `oceanEnabled` in `cosmicBoolFields()` below, and
+        // writing it twice under two names is how the two lists start drifting again.
+        for (const CosmicFloatField& f : cosmicFloatFields()) { co[f.leaf] = f.get(cosmicOcean); }
+        for (const CosmicColorField& f : cosmicColorFields()) { co[f.leaf] = vec3ToJson(f.get(cosmicOcean)); }
+        for (const CosmicBoolField& f : cosmicBoolFields()) { co[f.leaf] = f.get(cosmicOcean); }
+        j["cosmicOcean"] = std::move(co);
+    }
     return j;
 }
 
@@ -616,6 +642,23 @@ Result<AtmosphericEffect> AtmosphericEffect::fromJson(const json& j) {
         vx.colorDeep = readVec3(vj, "colorDeep", vx.colorDeep);
         vx.colorMid = readVec3(vj, "colorMid", vx.colorMid);
         vx.colorAccent = readVec3(vj, "colorAccent", vx.colorAccent);
+    }
+
+    // ADR-390, read back through the same tables that wrote it -- see the note in `toJson`. Every
+    // leaf falls back to the value already in `e.cosmicOcean`, which is the struct's own default, so
+    // an older file missing a key loads with that default rather than with a zero.
+    if (j.contains("cosmicOcean") && j.at("cosmicOcean").is_object()) {
+        const json& cj = j.at("cosmicOcean");
+        CosmicOcean& co = e.cosmicOcean;
+        for (const CosmicFloatField& f : cosmicFloatFields()) {
+            f.set(co, readFloat(cj, f.leaf, f.get(co)));
+        }
+        for (const CosmicColorField& f : cosmicColorFields()) {
+            f.set(co, readVec3(cj, f.leaf, f.get(co)));
+        }
+        for (const CosmicBoolField& f : cosmicBoolFields()) {
+            f.set(co, readBool(cj, f.leaf, f.get(co)));
+        }
     }
 
     if (auto ok = e.validate(); !ok) {
@@ -1004,6 +1047,37 @@ AtmosphericEffect cosmicVortex(std::string name) {
     return e;
 }
 
+// ADR-390. The styles themselves live in `cosmic_ocean.cpp` over `CosmicOcean`, because that is
+// where the struct is; this is the one-line bridge the family's `applyXStyle(AtmosphericEffect&)`
+// shape needs, and nothing else.
+bool applyCosmicOceanStyle(AtmosphericEffect& effect, std::string_view style) {
+    return applyCosmicOceanStyle(effect.cosmicOcean, style);
+}
+
+AtmosphericEffect cosmicOceanEffect(std::string name) {
+    AtmosphericEffect e;
+    e.name = std::move(name);
+    e.kind = AtmosphereKind::CosmicOcean;
+    // `defaultCosmicOcean()` and not the struct's member defaults: the members have to be *neutral*
+    // so a field round-trips to itself, and the default *look* has to be worth rendering, and those
+    // are not the same numbers. `cosmic_ocean.hpp` says the same thing at the declaration.
+    e.cosmicOcean = defaultCosmicOcean();
+    const auto styles = cosmicOceanStyleNames();
+    if (!styles.empty()) {
+        e.style = std::string(styles[0]);
+        applyCosmicOceanStyle(e.cosmicOcean, styles[0]);
+    }
+    // Scenery, not an event, and exactly for the vortex's reasons: it is the background, it is
+    // there for the whole shot, and a fade on it is a fade on the sky.
+    e.activation = Activation::Always;
+    e.timing.fadeIn = 0.0;
+    e.timing.fadeOut = 0.0;
+    // No ground glow. A cosmic background does not light the island -- ADR-390 §10 -- and a
+    // `GroundIllumination` that did nothing would be a control that lies.
+    e.ground.mode = GroundGlow::Off;
+    return e;
+}
+
 // ---- resolution --------------------------------------------------------------------------------
 
 namespace {
@@ -1154,6 +1228,24 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
                 continue;
             }
             ++counts.vortices;
+            counts.vortex = r;
+            claimed = true;
+            break;
+        }
+        case AtmosphereKind::CosmicOcean: {
+            // ADR-390: like the vortex, nothing per-frame to resolve -- every celestial body in it
+            // is a hash the fragment shader evaluates, so there is no trajectory on the CPU. What
+            // resolution decides is "is it live, and how far through its fade", and that is the
+            // envelope already computed above.
+            //
+            // One, not an array. A second cosmos is not a composition; the extras are counted so
+            // the UI can say so rather than silently doing nothing with them.
+            if (counts.cosmicOceans >= 1) {
+                ++counts.dropped;
+                continue;
+            }
+            ++counts.cosmicOceans;
+            counts.cosmicOcean = r;
             claimed = true;
             break;
         }
@@ -1250,18 +1342,29 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
 
     out.cometCount = static_cast<std::uint32_t>(counts.comets);
     out.auroraCount = static_cast<std::uint32_t>(counts.auroras);
-    // ADR-387: the first live vortex, copied through. Its `enabled`, activation and lifetime
-    // envelope were already applied by the resolve above, so a vortex inside a closed window
-    // arrives here switched off exactly as a comet does.
-    out.hasVortex = false;
-    out.vortex = Vortex{};
-    for (const AtmosphericEffect& e : effects) {
-        if (e.kind != AtmosphereKind::Vortex || !e.enabled || !e.vortex.active()) {
-            continue;
-        }
-        out.hasVortex = true;
-        out.vortex = e.vortex;
-        break;
+    // ADR-387: the first live vortex, copied through, and ADR-390's Cosmic Ocean beside it. Both
+    // come from the resolve rather than from a second search over `effects`.
+    //
+    // That second search is what used to be here, and it is worth naming because the comment above
+    // it claimed the opposite: it tested `e.enabled && e.vortex.active()` and nothing else, so a
+    // vortex whose activation window was shut, or whose fade had not started, rendered anyway --
+    // while the line above it said "its enabled, activation and lifetime envelope were already
+    // applied by the resolve above". They were applied, to a `counts.vortices` nobody read. ADR-385
+    // exactly: a stated reason that stopped anyone checking. One resolve, one answer.
+    out.hasVortex = counts.vortex.effect != nullptr;
+    out.vortex = out.hasVortex ? counts.vortex.effect->vortex : Vortex{};
+    // `vortex.active()` stays as a second gate: a vortex of radius zero is authored off, which is
+    // the scene's way of saying so and is not a lifecycle question.
+    if (out.hasVortex && !out.vortex.active()) {
+        out.hasVortex = false;
+        out.vortex = Vortex{};
+    }
+
+    out.hasCosmicOcean = counts.cosmicOcean.effect != nullptr;
+    out.cosmicOcean = out.hasCosmicOcean ? counts.cosmicOcean.effect->cosmicOcean : CosmicOcean{};
+    out.cosmicOceanEnvelope = out.hasCosmicOcean ? counts.cosmicOcean.envelope : 0.0f;
+    if (out.hasCosmicOcean && !out.cosmicOcean.active()) {
+        out.hasCosmicOcean = false;
     }
     for (std::size_t i = 0; i < counts.comets; ++i) {
         out.comets[i] = packComet(comets[i]);

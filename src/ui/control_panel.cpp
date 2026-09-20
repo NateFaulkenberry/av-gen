@@ -3348,11 +3348,16 @@ void ControlPanel::drawRender(app::Engine& engine) {
             s.supersample = supersample;
         }
         if (ImGui::IsItemHovered()) {
-            tooltip("Render at this multiple of the output size and resolve back down (ADR-212).\n"
-                    "It is the documented answer to foliage shimmer: neighbour-to-neighbour chroma\n"
-                    "noise measures 2.80% at 1280x720 against 1.86% at 2560x1440, and a 720p\n"
-                    "deliverable had no other way to buy its way out of it.\n\n"
-                    "1.00x is off. Costs the square of what it says.");
+            // `tooltip` is printf-style (IM_FMTARGS(1)) and this text contains two literal per-cent
+            // signs, so "2.80% at" was being read as a `% a` conversion against an empty varargs
+            // list: undefined behaviour, and a tooltip that printed a garbage hex float instead of
+            // the measurement. Found by -Wformat-insufficient-args, which this build does not
+            // treat as an error; it is the one warning in the census that was already a live bug.
+            tooltipUnformatted("Render at this multiple of the output size and resolve back down (ADR-212).\n"
+                               "It is the documented answer to foliage shimmer: neighbour-to-neighbour chroma\n"
+                               "noise measures 2.80% at 1280x720 against 1.86% at 2560x1440, and a 720p\n"
+                               "deliverable had no other way to buy its way out of it.\n\n"
+                               "1.00x is off. Costs the square of what it says.");
         }
 
         // The AOV set, as checkboxes over `RenderSettings::aovNames()` rather than a text field, so

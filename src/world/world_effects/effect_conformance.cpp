@@ -72,6 +72,7 @@ AtmosphericEffect probeEffect(AtmosphereKind kind, std::string name) {
     case AtmosphereKind::Comet: return bioluminescentComet(std::move(name));
     case AtmosphereKind::Aurora: return glowmereAurora(std::move(name));
     case AtmosphereKind::Vortex: return cosmicVortex(std::move(name));
+    case AtmosphereKind::CosmicOcean: return cosmicOceanEffect(std::move(name));
     }
     return bioluminescentComet(std::move(name));
 }
@@ -305,13 +306,15 @@ Report checkAtmospheric(AtmosphereKind kind) {
         case AtmosphereKind::Comet: mine = counts.comets; break;
         case AtmosphereKind::Aurora: mine = counts.auroras; break;
         case AtmosphereKind::Vortex: mine = counts.vortices; break;
+        case AtmosphereKind::CosmicOcean: mine = counts.cosmicOceans; break;
         }
-        const std::size_t total = counts.comets + counts.auroras + counts.vortices;
+        const std::size_t total = counts.comets + counts.auroras + counts.vortices + counts.cosmicOceans;
         if (mine != 1) {
             report(out, kind, "resolve-dispatch",
                    "one live effect of this kind resolved as " + std::to_string(counts.comets) +
                        " comet(s), " + std::to_string(counts.auroras) + " aurora(s), " +
                        std::to_string(counts.vortices) + " vortex/vortices, " +
+                       std::to_string(counts.cosmicOceans) + " cosmic ocean(s), " +
                        std::to_string(counts.dropped) + " dropped -- it is not claimed by its own "
                        "arm of the switch in resolveAtmosphericEffects");
         } else if (total != 1) {

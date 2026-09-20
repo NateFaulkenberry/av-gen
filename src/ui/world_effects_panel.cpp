@@ -6,6 +6,7 @@
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
 #include "ui/help_panel.hpp"
+#include "ui/cosmic_ocean_rows.hpp"
 #include "ui/ui_logic.hpp"
 #include "world/atmospheric_params.hpp"
 #include "world/atmospherics.hpp"
@@ -598,6 +599,15 @@ void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
                           "It is placed in the world rather than on the sky dome, and it is the\n"
                           "only atmospheric that a particle system can name as its attractor.");
     }
+    ImGui::SameLine();
+    if (ImGui::Button("Add cosmic ocean")) {
+        append(world::cosmicOceanEffect(unique("Cosmic Ocean")));
+    }
+    if (ImGui::IsItemHovered()) {
+        tooltip("A procedural deep-space background: nebulae, star strata, planets, dust\n"
+                          "and galaxies, each on its own shell with its own parallax, so the sky\n"
+                          "separates by depth as the camera travels. One per scene.");
+    }
 
     if (authored.empty()) {
         ImGui::TextDisabled("No atmospheric effects in this scene.");
@@ -626,6 +636,7 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
     const std::string prefix = world::atmosphericParameterPrefix(authored.name);
     const bool isComet = authored.kind == world::AtmosphereKind::Comet;
     const bool isVortex = authored.kind == world::AtmosphereKind::Vortex;
+    const bool isOcean = authored.kind == world::AtmosphereKind::CosmicOcean;
     const bool open = ImGui::CollapsingHeader(authored.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen |
                                                                         ImGuiTreeNodeFlags_AllowOverlap);
     ImGui::SameLine(ImGui::GetContentRegionAvail().x - 74.0f);
@@ -642,6 +653,7 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
     // ---- preset ----
     const auto styles = isComet    ? world::cometStyleNames()
                         : isVortex ? world::vortexStyleNames()
+                        : isOcean  ? world::cosmicOceanStyleNames()
                                    : world::auroraStyleNames();
     std::vector<const char*> styleNames;
     int current = -1;
@@ -657,11 +669,13 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
         // A preset is a shortcut through the same parameters, never a second way to control the
         // effect: it rewrites the authored values and the parameters take their defaults from those.
         const std::string_view style = styles[static_cast<std::size_t>(current)];
-        commitAtmospheric(engine, index, [isComet, isVortex, style](world::AtmosphericEffect& e) {
+        commitAtmospheric(engine, index, [isComet, isVortex, isOcean, style](world::AtmosphericEffect& e) {
             if (isComet) {
                 world::applyCometStyle(e, style);
             } else if (isVortex) {
                 world::applyVortexStyle(e, style);
+            } else if (isOcean) {
+                world::applyCosmicOceanStyle(e, style);
             } else {
                 world::applyAuroraStyle(e, style);
             }
@@ -679,6 +693,13 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
         // Each row carries its own tooltip (ADR-388); the panel used to attach one to whatever it
         // had drawn last, which meant appending a row moved somebody else's explanation.
         drawEffectRows(engine, prefix, vortexRows());
+    } else if (isOcean) {
+        // ADR-390 §10: no new panel. The ~35 rows anybody reaches for first -- Master, Colour,
+        // Nebula, Stars, Planets -- with the other eight sections behind "Advanced". The rows are a
+        // table for the reason the vortex's are: `conformance::checkLeavesExist` can walk a table
+        // and cannot walk an ImGui call, and a leaf five characters wrong draws an empty box and
+        // says nothing (ADR-382).
+        drawEffectRows(engine, prefix, cosmicOceanRows());
     } else if (isComet) {
         // ADR-392: rows rather than a page of calls, for the reason the vortex's are --
         // `conformance::checkLeavesExist` can walk a table and cannot walk an ImGui call. The two
@@ -698,8 +719,11 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
     // ADR-387: not offered for a vortex. The ground glow is a pool on terrain, and the vortex is
     // under the island with no terrain beneath it; its light on the world is `spill`, above. A combo
     // that changed nothing would be worse than no combo.
+    // ADR-390: not offered for a Cosmic Ocean either, and for the same reason -- a cosmic
+    // background does not light the island, and a combo that changed nothing would be worse than no
+    // combo. `cosmicOceanEffect()` sets the mode to Off and nothing here can move it.
     int ground = static_cast<int>(authored.ground.mode);
-    if (!isVortex) {
+    if (!isVortex && !isOcean) {
         rowLabel("Ground glow");
         if (ImGui::Combo("##ground", &ground, kGroundGlowNames, 3)) {
             commitAtmospheric(engine, index, [ground](world::AtmosphericEffect& e) {
@@ -709,7 +733,7 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
             return;
         }
     }
-    if (!isVortex && authored.ground.mode != world::GroundGlow::Off) {
+    if (!isVortex && !isOcean && authored.ground.mode != world::GroundGlow::Off) {
         paramColor(engine, prefix, "groundColor", "Glow colour");
         paramSlider(engine, prefix, "groundIntensity", "Glow amount");
     }
@@ -719,8 +743,12 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
     // ordinary modulation route, visible and editable in the Modulation panel, rather than a hidden
     // audio hook inside the effect.
     {
+        // The leaf and `atmosphericBeatTarget` below must agree: the slider looks the route up by
+        // the path the helper builds and reads its range from the parameter this leaf names, so two
+        // spellings would show a route the slider could never find (ADR-387).
         const char* leaf = isComet    ? "coreIntensity"
                            : isVortex ? "emission"
+                           : isOcean  ? "intensity"
                                       : "edgeBrightness";
         params::IParameter* target = find(engine, prefix, leaf);
         const std::string path = atmosphericBeatTarget(authored.name, authored.kind);
@@ -766,6 +794,7 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
     const std::string prefix = world::atmosphericParameterPrefix(authored.name);
     const bool isComet = authored.kind == world::AtmosphereKind::Comet;
     const bool isVortex = authored.kind == world::AtmosphereKind::Vortex;
+    const bool isOcean = authored.kind == world::AtmosphereKind::CosmicOcean;
 
     ImGui::SeparatorText("Lifetime");
     int activation = static_cast<int>(authored.activation);
@@ -788,6 +817,8 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
 
     if (isVortex) {
         drawEffectRows(engine, prefix, vortexAdvancedRows());
+    } else if (isOcean) {
+        drawEffectRows(engine, prefix, cosmicOceanAdvancedRows());
     } else if (isComet) {
         ImGui::SeparatorText("Trajectory");
         int anchor = static_cast<int>(authored.comet.path.anchor);
@@ -819,7 +850,7 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
 
     // The rainbow and the ground pool belong to the two sky kinds; a vortex registers neither, and
     // the rows would silently draw nothing (ADR-375's lesson, the other way round).
-    if (isVortex) {
+    if (isVortex || isOcean) {
         ImGui::TextColored(kMuted, "Every control here is the parameter atmos/%s/...",
                            authored.name.c_str());
         return;

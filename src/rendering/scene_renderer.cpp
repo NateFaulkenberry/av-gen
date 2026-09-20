@@ -2651,6 +2651,30 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         stats_.comets = 0;
         stats_.auroras = 0;
     }
+    // ADR-390: the Cosmic Ocean, gated on its OWN predicate and not on `any()`.
+    //
+    // This line is what makes the effect reachable at all, and it is the one to check if the sky
+    // comes up empty -- `CosmicOceanRenderer::update` had exactly one caller before it, a GPU test,
+    // which is what "built, tested and unreachable" looks like from the inside. It is deliberately
+    // not folded into the `any()` branch above: `any()` gates the fullscreen *atmosphere* draw, and
+    // the ocean is a separate pipeline with a separate `Draw(3)`, so an ocean-only scene must not
+    // switch the atmosphere draw on and an atmosphere-only scene must not upload an ocean block.
+    // `AtmosphericFrame::any()` carries the same note at its declaration.
+    //
+    // Packing happens here rather than in `buildAtmosphericFrame` because the quality tier is the
+    // renderer's to know: `cosmicOctaveScale` and `cosmicSampleScale` are a rendering decision and
+    // the world has no business carrying them.
+    {
+        const auto& atmos = scene.atmospherics;
+        const bool live = toggles_.cosmicOcean && atmos.anyCosmicOcean();
+        const world::CosmicQualityScale quality{qualitySettings_.cosmicOctaveScale,
+                                                qualitySettings_.cosmicSampleScale};
+        const world::CosmicOceanGpu block =
+            live ? world::packCosmicOcean(atmos.cosmicOcean, atmos.cosmicOceanEnvelope,
+                                          time.renderTime, quality)
+                 : world::CosmicOceanGpu{};
+        cosmicOcean_->update(block, live, 0);
+    }
     queue.WriteBuffer(frameUniforms_, 0, &frame, sizeof(frame));
     // Each shadow view is the same block with its own light-space matrix, so the depth-only passes
     // reuse the ordinary vertex shaders (ADR-034).

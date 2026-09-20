@@ -73,10 +73,11 @@ struct Report {
 // so a new enumerator is at minimum a `-Wswitch` diagnostic here -- and `test_effect_conformance`
 // reads the enum out of the header and fails by name if this array has fallen behind it, because
 // `-Werror` is off by default in this build and a warning nobody reads is not a guard.
-inline constexpr std::array<AtmosphereKind, 3> kAtmosphereKinds{
+inline constexpr std::array<AtmosphereKind, 4> kAtmosphereKinds{
     AtmosphereKind::Comet,
     AtmosphereKind::Aurora,
     AtmosphereKind::Vortex,
+    AtmosphereKind::CosmicOcean,
 };
 
 // The kind's position in `kAtmosphereKinds`. The switch is exhaustive and has no `default` on
@@ -86,6 +87,7 @@ inline constexpr std::array<AtmosphereKind, 3> kAtmosphereKinds{
     case AtmosphereKind::Comet: return 0;
     case AtmosphereKind::Aurora: return 1;
     case AtmosphereKind::Vortex: return 2;
+    case AtmosphereKind::CosmicOcean: return 3;
     }
     return kAtmosphereKinds.size(); // unreachable for a declared enumerator
 }
@@ -93,6 +95,7 @@ inline constexpr std::array<AtmosphereKind, 3> kAtmosphereKinds{
 static_assert(atmosphereKindIndex(AtmosphereKind::Comet) == 0);
 static_assert(atmosphereKindIndex(AtmosphereKind::Aurora) == 1);
 static_assert(atmosphereKindIndex(AtmosphereKind::Vortex) == 2);
+static_assert(atmosphereKindIndex(AtmosphereKind::CosmicOcean) == 3);
 
 // The canonical authored effect of a kind -- the same factory the "Add ..." button calls, so a
 // probe is a thing an artist can actually make rather than a default-constructed struct no scene

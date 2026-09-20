@@ -96,6 +96,11 @@ private:
     case world::AtmosphereKind::Comet: leaf = "coreIntensity"; break;
     case world::AtmosphereKind::Aurora: leaf = "edgeBrightness"; break;
     case world::AtmosphereKind::Vortex: leaf = "emission"; break;
+    // ADR-390 §11 names `intensity` for the ocean, and for this kind that IS the right leaf rather
+    // than an exception to the rule above: an aurora's `intensity` pulses the whole sky because the
+    // aurora is a shape in it, whereas the Cosmic Ocean *is* the sky, and its brightest per-layer
+    // knobs (a star stratum, a nebula) each move only their own stratum.
+    case world::AtmosphereKind::CosmicOcean: leaf = "intensity"; break;
     }
     return world::atmosphericParameterPrefix(effectName) + leaf;
 }
