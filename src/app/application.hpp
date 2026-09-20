@@ -8,6 +8,7 @@
 #include "app/camera_director.hpp"
 #include "app/engine.hpp"
 #include "app/viewport_camera.hpp"
+#include "scene/camera_rig.hpp"
 #include "app/placement.hpp"
 #include "app/viewport_pick.hpp"
 #include "app/job_system.hpp"
@@ -489,15 +490,32 @@ private:
     // next unit up with Shift (ADR-357). `direction` is -1 or +1.
     void nudgePlayhead(int direction, bool coarse);
 
-    // Reads `camera/position` and `camera/target`. Returns the scene camera's own pose when the
-    // parameters are missing, so a gesture over a scene without them still does something sensible.
+    // Where the viewport is looking, and how a gesture moves it.
+    //
+    // **Both are mode-aware, and they are the only seam that needs to be** (ADR-391): every
+    // navigation gesture in this editor -- a drag, the wheel, frame-selected, "go to camera" --
+    // goes through this pair, so pointing them at the editor's own pose points all of them at it
+    // at once. Under `ViewportCamera::Editor` they read and write `Composition::editorCamera`, and
+    // `camera/*` is not touched at all; under `Film` they read and write `camera/position` and
+    // `camera/target` exactly as they always have.
     [[nodiscard]] CameraPose viewportPose() const;
     void setViewportPose(const CameraPose& pose);
+    // What the viewport is looking through *right now*, which is the user's choice narrowed by what
+    // the canvas is currently for. Pushed onto the composition once per frame, before the update
+    // that places the camera; see the definition for the two things that overrule the choice.
+    [[nodiscard]] scene::ViewportView effectiveViewportView() const;
+    void applyViewportView();
+    // The user's choice. Editor by default -- navigating the view is not an edit to the film -- and
+    // session state: it is never written to a project, which is what makes a render immune to it.
+    scene::ViewportView viewportView_{scene::ViewportCamera::Editor, scene::kNoCamera};
     // Puts the camera in free mode, because position and target are ignored in orbit mode and a
     // gesture that silently moves nothing is indistinguishable from a dead input.
     // `deliberate` is whether the user asked for the camera in words rather than by moving the
     // mouse. Only a deliberate gesture may stand the director down while the camera is locked; see
     // `ui::viewportMayReleaseDirector` for what that protects and why it is not a preference.
+    //
+    // ADR-391: **no longer on the path of an ordinary drag.** It returns at once unless the frame
+    // on screen is the film's, which is the only case where moving the view is an edit to it.
     void ensureFreeCamera(bool deliberate = false);
     // Locked by default, because the destructive direction is the one worth defending. Nothing
     // reads this but `ensureFreeCamera`; the Camera panel toggles it.

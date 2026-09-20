@@ -192,6 +192,18 @@ bool hasRouteTo(const params::Modulator& modulator, std::string_view target) {
                        [&](const params::ModRoute& r) { return r.target == target; });
 }
 
+// Every pointer in `ParticleParameters`, in declaration order.
+//
+// Its only caller unregisters, removing each parameter by its own `path()`, so this is correct by
+// construction PROVIDED it visits everything -- and an omission is silent: the parameter simply
+// outlives the node it belonged to. Seven did. `softness` (ADR-367) and `windInfluence`,
+// `tumbleRate`, `leafAspect`, `twoSided`, `stretch`, `trailWidth` (ADR-370, ADR-040) were declared
+// between `emissive` and `enabled`, and this walked from one straight to the other, so deleting a
+// particle node left seven `particles/<name>/...` parameters registered against a node that no
+// longer existed. Found by an invariant in `test_composition.cpp`, which had asserted a hard-coded
+// count of 26 and so could only ever report the wrong total, never which ones.
+//
+// **Keep this in declaration order and add to it when the struct grows.**
 template <typename F>
 void forEachParticleParam(ParticleParameters& p, F&& f) {
     f(p.spawnRate);
@@ -216,6 +228,13 @@ void forEachParticleParam(ParticleParameters& p, F&& f) {
     f(p.colorStart);
     f(p.colorEnd);
     f(p.emissive);
+    f(p.softness);
+    f(p.windInfluence);
+    f(p.tumbleRate);
+    f(p.leafAspect);
+    f(p.twoSided);
+    f(p.stretch);
+    f(p.trailWidth);
     f(p.enabled);
 }
 
@@ -4175,7 +4194,12 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
         const std::string base = prefix_ + "nodes/" + node.name + "/";
         for (const char* suffix :
              {"position", "rotation", "scale", "visible", "emissiveBoost", "roughnessScale",
-              "opacity"}) {
+              "opacity",
+              // Registered by `registerNodeParameters` for every node and absent here, so a node
+              // carrying a light left these two behind when it was deleted. Same failure as the
+              // particle visitor above: an exact list (ADR-207 is right that it must be exact) that
+              // nothing keeps in step with the registrar.
+              "lightIntensity", "lightColor"}) {
             params_->remove(base + suffix);
         }
         // ADR-375: the wind body's leaves, by their exact paths. A suffix table and never a prefix
@@ -6790,31 +6814,14 @@ void Composition::applyParameters() {
     // parameters and nothing else -- no spline sample, no arithmetic, no draw.
     const CameraId cameraWas = activeCamera_.camera;
     activeCamera_ = resolveActiveCamera(cameraDirection_, cameraEvents_, currentTime_);
-    // ---- the viewport may stand the director down ------------------------------------------------
-    //
-    // **Applied to the resolver's answer, never inside it.** `resolveActiveCamera` is a pure
-    // function of (cameras, shots, events, time) and ADR-091 rests on that: it is what makes a cut
-    // scrubbable and an offline render identical to the live one. Feeding an editor's navigation
-    // state into it would make the film depend on where somebody had flown the viewport, which is
-    // the opposite of the property it exists to have.
-    //
-    // So free-roam is expressed as an override *on the result*: the director still decides what the
-    // film does, `activeCamera_` still reports it truthfully -- the Cameras panel keeps saying which
-    // camera is live and why -- and only the pose written into `scene_.camera` is taken from the
-    // main camera instead. An offline render never sets this, so the deliverable is unchanged.
-    //
-    // Why the *main* camera rather than a fourth kind of pose: it already is the free-roam camera.
-    // Before ADR-245 there was one camera and flying the viewport moved it; `camera/position` is
-    // still what `W`/`A`/`S`/`D` and every viewport drag write. Pointing free-roam back at it gets
-    // the old behaviour exactly rather than a reimplementation of it.
-    if (viewportFreeRoam_ && activeCamera_.camera != kMainCamera) {
-        activeCamera_.camera = kMainCamera;
-        activeCamera_.previous = kNoCamera;   // a blend from a camera the viewport is not showing
-        activeCamera_.blend = 0.0f;           // would slide the free-roam view across the screen
-        activeCamera_.reason = ActiveCameraReason::Default;
-        activeCamera_.name = "Viewport";
-        activeCamera_.eventName.clear();
-    }
+    // ADR-391. The viewport's own viewpoint used to be expressed here, as a redirection of the
+    // resolver's *answer* to the main camera ("free roam"). It is not expressed here any more, and
+    // the reason is worth keeping: redirecting the answer made `activeCamera_` stop reporting the
+    // film -- it said "Viewport", so the Cameras panel could no longer tell you which camera owned
+    // the cut while you were flying -- and pointing it at the main camera meant navigating still
+    // wrote `camera/*`, which is the whole defect. The frame the viewport shows is now decided
+    // *after* the film's camera is final, in `applyViewportView`, and `activeCamera_` is left
+    // telling the truth about the film in every mode.
     // What the director just did and why, once per change (multicam-demo section 21). Cheap enough
     // to leave on: a camera that changes sixty times a second is a bug worth hearing about.
     if (activeCamera_.camera != cameraWas && cameraDirection_.directing()) {
@@ -6882,6 +6889,17 @@ void Composition::applyParameters() {
     scene_.camera.nearPlane = std::clamp(radius_ * 0.005f, 0.01f, 0.5f);
     scene_.camera.farPlane = std::max(radius_ * 50.0f, 2000.0f); // free cameras look across whole worlds
     applyFraming();
+    // ADR-391, and the position in this function is the whole of its correctness. The film's camera
+    // is now final -- resolved, evaluated, shaken, framed -- and `activeCamera_` has published what
+    // owns it. Only now may the viewport put a different frame on screen, and everything below this
+    // line follows the frame that is actually being looked at: the terrain's LOD, the water, the
+    // rig lights that stand relative to the view, the renderer's culling, and (through
+    // `Scene::camera`) every ray the editor casts to pick, drag a gizmo or box-select. That is not
+    // a nicety -- a picker that rays from a camera nobody is looking through selects whatever is
+    // under a point in a frame that is not on screen, and it looks right until you click something.
+    //
+    // In `Film` mode this is a branch and a return, so every render is byte-for-byte what it was.
+    applyViewportView(fov0);
     updateTerrainLod();
     updateWaterSurfaces();
     // Last frame's ecology lights come off before the rig block, which removes its own lights by
@@ -7525,6 +7543,84 @@ void Composition::updateTerrainLod() {
             }
         }
     }
+}
+
+// ---- what the viewport is looking through (ADR-391) --------------------------------------------
+
+void Composition::setViewportView(ViewportView view) {
+    // A `Through` that names nothing is a `Film`, normalised here rather than at every reader. The
+    // id is checked at use, not here: a caller may legitimately set the mode before the camera it
+    // names exists (a project load re-creates the rigs), and refusing it here would turn a reorder
+    // into a silent mode change.
+    if (view.mode == ViewportCamera::Through && view.camera == kNoCamera) {
+        view.mode = ViewportCamera::Film;
+    }
+    viewportView_ = view;
+}
+
+void Composition::applyViewportView(float mainFovDegrees) {
+    if (viewportView_.showsFilm()) {
+        return; // every render, and every frame of every project that has not asked for anything
+    }
+    if (viewportView_.mode == ViewportCamera::Editor) {
+        if (!editorCameraSeeded_) {
+            // **Seeded from the film, once.** Switching to the editor viewpoint must not teleport
+            // you: the first frame under it is the frame you were already looking at, and only then
+            // does it become yours. Without this, taking the viewport off a shot threw you to
+            // wherever a default pose happened to be -- which is the "there is no reliable way to
+            // leave the director camera" report in a different costume.
+            editorCamera_.position = scene_.camera.position;
+            editorCamera_.target = scene_.camera.target;
+            editorCamera_.fovDegrees = glm::degrees(scene_.camera.fovYRadians);
+            editorCamera_.focalLength = 0.0f;
+            editorCameraSeeded_ = true;
+        }
+        CameraPose pose = editorCamera_;
+        ensureDistinctAim(pose);
+        scene_.camera.position = pose.position;
+        scene_.camera.target = pose.target;
+        scene_.camera.fovYRadians =
+            glm::radians(pose.fovDegrees > 0.0f ? pose.fovDegrees : mainFovDegrees);
+        // The editor's viewpoint has no opinion about the lens, which is what stops an authored
+        // 24 mm rig holding the film from re-imposing its focal length on a frame it is not in
+        // (`Engine::update` reads these two and pushes them onto the physical lens). Focus, on the
+        // other hand, is what the *viewport* is aimed at -- a frame focused on a subject somewhere
+        // off screen is the same defect as a picker that rays from the wrong camera.
+        activeCamera_.focalLength = 0.0f;
+        activeCamera_.focusDistance = glm::length(pose.target - pose.position);
+        return;
+    }
+    // Through a camera: the rig's own pose, its own lens, whatever the director is doing.
+    const CameraRig* rig = cameraDirection_.find(viewportView_.camera);
+    if (rig == nullptr) {
+        return; // a camera that is gone cannot be looked through; the film keeps the frame
+    }
+    if (rig->id == kMainCamera) {
+        // The main camera *is* `camera/*`, so "through the main camera" is the film's own answer
+        // whenever the film is on it -- and when it is not, it is the pose the main camera would
+        // have. Evaluated rather than taken from `scene_.camera`, which may hold an authored rig.
+        const CameraPose pose = evaluateMainCamera();
+        scene_.camera.position = pose.position;
+        scene_.camera.target = pose.target;
+        scene_.camera.fovYRadians = glm::radians(mainFovDegrees);
+        activeCamera_.focalLength = 0.0f;
+        activeCamera_.focusDistance = glm::length(pose.target - pose.position);
+        return;
+    }
+    const CameraChannels* channels = nullptr;
+    for (const CameraChannels& c : cameraChannels_) {
+        if (c.id == rig->id) {
+            channels = &c;
+            break;
+        }
+    }
+    CameraPose pose = evaluateAuthoredCamera(*rig, channels);
+    ensureDistinctAim(pose);
+    scene_.camera.position = pose.position;
+    scene_.camera.target = pose.target;
+    scene_.camera.fovYRadians = glm::radians(pose.fovDegrees);
+    activeCamera_.focalLength = pose.focalLength;
+    activeCamera_.focusDistance = glm::length(pose.target - pose.position);
 }
 
 void Composition::applyFraming() {

@@ -1,6 +1,6 @@
 // §16's interaction matrix, as tests that run every time.
 //
-// The report behind `setViewportFreeRoam` was fixed and has two tests
+// The report behind the viewport/camera separation was fixed and has tests
 // (`tests/unit/test_viewport_camera.cpp`): a cut moves a following viewport more than 50 m and a
 // free-roaming one less than 0.5 m. Those are the right two assertions about the *one* thing that
 // broke. What the specification asks for is broader and is what this file is:
@@ -91,18 +91,15 @@ struct Rig {
     // `Parameter<int>` the generic component setter does not reach, and orbit mode ignores position
     // and target entirely -- so without this every "free-roam" arm measures an orbit around an empty
     // world instead of the pose it thought it set.
+    // ADR-391: where the *editor's* viewpoint is, which is what a drag moves now. It used to be
+    // `camera/position` in free mode -- the film's own camera -- and that coupling is what every
+    // arm below was really measuring: a viewport that could only stay still by holding the film's
+    // camera still.
     void placeViewport(const glm::vec3& eye, const glm::vec3& look) {
-        auto* mode = dynamic_cast<params::Parameter<int>*>(params.find("camera/mode"));
-        REQUIRE(mode != nullptr);
-        mode->setBase(1);
-        auto* pos = params.find("camera/position");
-        auto* tgt = params.find("camera/target");
-        REQUIRE(pos != nullptr);
-        REQUIRE(tgt != nullptr);
-        for (std::size_t c = 0; c < 3; ++c) {
-            pos->setBaseComponent(c, eye[static_cast<int>(c)]);
-            tgt->setBaseComponent(c, look[static_cast<int>(c)]);
-        }
+        scene::CameraPose pose;
+        pose.position = eye;
+        pose.target = look;
+        comp.setEditorCamera(pose);
     }
 
     glm::vec3 eyeAt(double seconds) {
@@ -256,13 +253,19 @@ TEST_CASE("A free-roaming viewport survives every kind of camera change", "[came
     SECTION("a cut between two authored cameras") {
         Rig fx;
         fx.eyeAt(1.0);
-        fx.comp.setViewportFreeRoam(true);
+        fx.comp.setViewportView({scene::ViewportCamera::Editor, scene::kNoCamera});
         fx.placeViewport(mine, glm::vec3(0.0f));
         const glm::vec3 before = fx.eyeAt(1.0);
         const glm::vec3 after = fx.eyeAt(7.0);
         INFO("moved " << glm::length(after - before) << " m across the cut");
-        CHECK(glm::length(after - before) < 0.5f);
-        CHECK(fx.comp.activeCamera().camera == scene::kMainCamera);
+        // Exact, not approximate. The editor's viewpoint is a pose, not an integrator: the
+        // half-metre tolerance this used to need was the main camera's own orbit angle advancing
+        // under a viewport that was standing on it.
+        CHECK(glm::length(after - before) < 1e-4f);
+        // And the director still did its job -- which the old assertion here could not say,
+        // because free-roam overwrote `activeCamera` with "Viewport", so the Cameras panel lost
+        // track of the film for as long as anybody was flying.
+        CHECK(fx.comp.activeCamera().camera == 3);
     }
 
     SECTION("the whole camera direction being replaced") {
@@ -270,20 +273,20 @@ TEST_CASE("A free-roaming viewport survives every kind of camera change", "[came
         // editor that re-installs the direction on every edit -- adding a shot, renaming a camera,
         // dragging a shot's edge -- must not thereby take the canvas back.
         Rig fx;
-        fx.comp.setViewportFreeRoam(true);
+        fx.comp.setViewportView({scene::ViewportCamera::Editor, scene::kNoCamera});
         fx.placeViewport(mine, glm::vec3(0.0f));
         const glm::vec3 before = fx.eyeAt(7.0);
         fx.install(3.0);   // the same two cameras, the cut moved
-        CHECK(fx.comp.viewportFreeRoam());
+        CHECK(fx.comp.viewportView().mode == scene::ViewportCamera::Editor);
         const glm::vec3 after = fx.eyeAt(7.0);
         INFO("moved " << glm::length(after - before) << " m across a re-install");
-        CHECK(glm::length(after - before) < 0.5f);
-        CHECK(fx.comp.activeCamera().camera == scene::kMainCamera);
+        CHECK(glm::length(after - before) < 1e-4f);
+        CHECK(fx.comp.activeCamera().camera == 3);
     }
 
     SECTION("a camera being added to the collection") {
         Rig fx;
-        fx.comp.setViewportFreeRoam(true);
+        fx.comp.setViewportView({scene::ViewportCamera::Editor, scene::kNoCamera});
         fx.placeViewport(mine, glm::vec3(0.0f));
         const glm::vec3 before = fx.eyeAt(7.0);
         scene::CameraDirection dir = fx.comp.cameraDirection();
@@ -296,10 +299,10 @@ TEST_CASE("A free-roaming viewport survives every kind of camera change", "[came
         dir.cameras.push_back(extra);
         dir.nextId = 5;
         REQUIRE(fx.comp.setCameraDirection(std::move(dir)).has_value());
-        CHECK(fx.comp.viewportFreeRoam());
+        CHECK(fx.comp.viewportView().mode == scene::ViewportCamera::Editor);
         const glm::vec3 after = fx.eyeAt(7.0);
         INFO("moved " << glm::length(after - before) << " m across an added camera");
-        CHECK(glm::length(after - before) < 0.5f);
+        CHECK(glm::length(after - before) < 1e-4f);
     }
 
     SECTION("the viewport being resized, in every canvas mode") {
@@ -308,7 +311,7 @@ TEST_CASE("A free-roaming viewport survives every kind of camera change", "[came
         // touching a camera at all, and it must move nothing.
         for (const auto mode : kModes) {
             Rig fx;
-            fx.comp.setViewportFreeRoam(true);
+            fx.comp.setViewportView({scene::ViewportCamera::Editor, scene::kNoCamera});
             fx.placeViewport(mine, glm::vec3(0.0f));
             const ui::PreviewRender a = extentFor(mode, canvas(980.0f, 690.0f), 1920, 1080);
             fx.comp.setViewport(a.width, a.height);
@@ -321,9 +324,9 @@ TEST_CASE("A free-roaming viewport survives every kind of camera change", "[came
             // The control first: the two extents really are different shapes, so a resize that
             // changed nothing is not what made this pass.
             CHECK((a.width != b.width || a.height != b.height));
-            CHECK(fx.comp.viewportFreeRoam());
-            CHECK(glm::length(after - before) < 0.5f);
-            CHECK(fx.comp.activeCamera().camera == scene::kMainCamera);
+            CHECK(fx.comp.viewportView().mode == scene::ViewportCamera::Editor);
+            CHECK(glm::length(after - before) < 1e-4f);
+            CHECK(fx.comp.activeCamera().camera == 3);
         }
     }
 }
@@ -333,7 +336,7 @@ TEST_CASE("A following viewport still follows every kind of camera change", "[ca
     // moves would satisfy all of them. Directing must still direct.
     SECTION("the cut moves it") {
         Rig fx;
-        REQUIRE_FALSE(fx.comp.viewportFreeRoam());
+        REQUIRE(fx.comp.viewportView().showsFilm());
         const glm::vec3 wide = fx.eyeAt(1.0);
         CHECK(fx.comp.activeCamera().camera == 2);
         const glm::vec3 hero = fx.eyeAt(7.0);
@@ -382,13 +385,14 @@ TEST_CASE("Lock and unlock are reversible from every canvas mode", "[camera][lab
         const glm::vec3 directed = fx.eyeAt(7.0);
         REQUIRE(fx.comp.activeCamera().camera == 3);
 
-        fx.comp.setViewportFreeRoam(true);
+        fx.comp.setViewportView({scene::ViewportCamera::Editor, scene::kNoCamera});
         fx.placeViewport(glm::vec3(4.0f, 9.0f, -13.0f), glm::vec3(0.0f));
         const glm::vec3 roamed = fx.eyeAt(7.0);
-        CHECK(fx.comp.activeCamera().camera == scene::kMainCamera);
+        // The film never left camera 3 -- flying the editor's viewpoint is not a change of shot.
+        CHECK(fx.comp.activeCamera().camera == 3);
         CHECK(glm::length(roamed - directed) > 50.0f);
 
-        fx.comp.setViewportFreeRoam(false);
+        fx.comp.setViewportView({});
         const glm::vec3 back = fx.eyeAt(7.0);
         INFO(ui::previewViewModeName(mode) << " at " << extent.width << "x" << extent.height
              << ": directed " << directed.x << ", roamed " << roamed.x << ", back " << back.x);
@@ -399,7 +403,7 @@ TEST_CASE("Lock and unlock are reversible from every canvas mode", "[camera][lab
 
 TEST_CASE("Flying the viewport never edits anybody's camera", "[camera][lab][viewport]") {
     Rig fx;
-    fx.comp.setViewportFreeRoam(true);
+    fx.comp.setViewportView({scene::ViewportCamera::Editor, scene::kNoCamera});
     fx.placeViewport(glm::vec3(42.0f, 17.0f, -31.0f), glm::vec3(3.0f, 1.0f, 2.0f));
     fx.eyeAt(7.0);
     // Checked on the rigs rather than on what is drawn: "the picture did not change" would also be
@@ -418,17 +422,21 @@ TEST_CASE("Flying the viewport never edits anybody's camera", "[camera][lab][vie
 // §16 lists "shot camera" and "camera presets" beside the director camera and free roam, and they
 // reach the viewport by a **different route**, which is the finding this section exists to record.
 //
-// `setViewportFreeRoam` redirects `activeCamera_` away from an authored `scene::CameraRig` and back
-// to `kMainCamera`. A `seq::Shot`'s camera is not a rig: `Sequence::bake` emits ordinary
-// `camera/position` and `camera/target` keys onto the timeline, and the main camera is what those
-// keys drive -- so it is exactly the camera free-roam hands the viewport back to. Free-roam is
-// therefore free of *rigs* and not free of *tracks*, and nothing in the flag's name says so.
+// The finding this section recorded, and what ADR-391 did to it. The old free-roam flag redirected
+// `activeCamera_` away from an authored `scene::CameraRig` and back to `kMainCamera`. A `seq::Shot`'s
+// camera is **not a rig**: `Sequence::bake` emits ordinary `camera/position` and `camera/target`
+// keys onto the timeline, and the main camera is what those keys drive -- so it was exactly the
+// camera free-roam handed the viewport back to. Free-roam was free of *rigs* and not free of
+// *tracks*, and nothing in the flag's name said so: a baked sequence dragged the "free" viewport
+// around by the face.
 //
-// That is not an oversight and it is deliberate on the timeline's side: `Application` announces it
-// ("the timeline is driving the camera -- Camera > Hand Camera Back to the Viewport") rather than
-// deleting keys it does not own, and `releaseDirectedCamera` is the gesture that does own them. The
-// tests below establish which of the two it is by measurement rather than by reading the code,
-// because reading the code is how the original report got argued about for a week.
+// (Two things called "shot", and this is where they meet: `seq::Shot` is a sequence's shot and bakes
+// to tracks; `scene::CameraShot` is the camera director's and names a rig. Confusing them is the
+// standing trap in this area.)
+//
+// The editor's viewpoint is neither a rig nor a track, so it is free of both, and the assertion
+// below changed direction when it landed. It is still measured rather than read, because reading
+// the code is how the original report got argued about for a week.
 
 #include "app/cinematic.hpp"
 #include "app/engine.hpp"
@@ -448,7 +456,7 @@ struct PresetRun {
     scene::CameraId active = scene::kMainCamera;
 };
 
-PresetRun runPreset(seq::CameraPreset preset, bool freeRoam) {
+PresetRun runPreset(seq::CameraPreset preset, bool editorView) {
     PresetRun out;
     app::Engine engine(app::EngineMode::Offline);
     auto loaded = engine.loadProject(presetProject());
@@ -491,8 +499,8 @@ PresetRun runPreset(seq::CameraPreset preset, bool freeRoam) {
         WARN("setSequence: " << seq.error().message);
         return out;
     }
-    if (freeRoam) {
-        comp->setViewportFreeRoam(true);
+    if (editorView) {
+        comp->setViewportView({scene::ViewportCamera::Editor, scene::kNoCamera});
     }
     // **Played, not seeked** (ADR-091). `seekSeconds` moves the clock; `Engine::update` re-derives
     // the scene. A test that seeks and reads measures the frame it was already on, which has
@@ -513,8 +521,8 @@ PresetRun runPreset(seq::CameraPreset preset, bool freeRoam) {
 
 } // namespace
 
-TEST_CASE("Every camera preset installs as timeline keys, and free-roam does not shield the viewport"
-          " from them", "[camera][lab][preset][viewport]") {
+TEST_CASE("Every camera preset installs as timeline keys, and the editor's viewpoint is immune to"
+          " them", "[camera][lab][preset][viewport]") {
     if (!std::filesystem::exists(presetProject())) {
         SKIP("night-shift is not present");
     }
@@ -529,21 +537,24 @@ TEST_CASE("Every camera preset installs as timeline keys, and free-roam does not
         // silently not covering, and the loop would carry on to the next one.
         REQUIRE(following.ran);
         REQUIRE(roaming.ran);
-        INFO(seq::cameraPresetName(preset) << ": following travelled " << following.travelled
-             << " m, free-roaming travelled " << roaming.travelled << " m, active camera "
+        INFO(seq::cameraPresetName(preset) << ": the film travelled " << following.travelled
+             << " m, the editor's viewpoint travelled " << roaming.travelled << " m, active camera "
              << roaming.active);
-        // A shot camera is a *track*, not a rig, so `activeCamera` is the main camera either way --
-        // and that is precisely why free-roam cannot shield the viewport from it: the camera it
-        // hands the viewport back to is the camera the keys are driving.
+        // A shot camera is a *track*, not a rig, so `activeCamera` is the main camera either way.
+        // That is still true and still worth saying: it is why free-roam could not shield the
+        // viewport from a baked sequence, and why the fix had to be a pose the film does not own
+        // rather than a redirection to one of the film's own cameras.
         CHECK(following.active == scene::kMainCamera);
         CHECK(roaming.active == scene::kMainCamera);
-        // Whatever the preset does to the viewport, it does the same with free-roam on. Stated as
-        // an equality rather than as "both are zero" because seven of the ten presets are moves and
-        // three of them are behaviours, and two are composed to hold still.
-        CHECK_THAT(roaming.travelled, Catch::Matchers::WithinAbs(following.travelled, 1e-3));
+        // **The assertion that changed direction.** Whatever the preset does to the film's camera,
+        // it does nothing at all to the editor's viewpoint -- which is what "navigating is not the
+        // same act as modifying the film's camera" means when the film is the one moving.
+        CHECK_THAT(roaming.travelled, Catch::Matchers::WithinAbs(0.0, 1e-4));
         (following.travelled > 0.01f ? moved : still)++;
     }
-    // The control that stops the equality above being satisfied by ten presets that all do nothing.
-    INFO(moved << " preset(s) move the viewport, " << still << " hold it still");
+    // The control, and it is load-bearing here: "the editor's viewpoint did not move" is satisfied
+    // by ten presets that move nothing at all. At least one preset must actually drive the film's
+    // camera for the comparison to have had something to be immune to.
+    INFO(moved << " preset(s) move the film's camera, " << still << " hold it still");
     CHECK(moved > 0);
 }
