@@ -120,6 +120,13 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
+        # ADR-383's frame-range driver. `render_settings.cpp` calls FrameRange::frameCount,
+        # ::resolvedEnd and ::validate, so it has to be on BOTH lists -- it was added to the unit
+        # list alone (61c8117a, 2026-09-19) and from that commit until this one `avgen_render_tests`
+        # did not link at all: three undefined symbols at the last step of a 100% build. Nothing in
+        # the day's work said so, because the binary already on disk kept running and a build
+        # wrapper reports the shell line's status rather than the compiler's.
+        "${CMAKE_SOURCE_DIR}/src/app/frame_range.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/render_job.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/scene_states.cpp"
