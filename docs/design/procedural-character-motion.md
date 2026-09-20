@@ -83,3 +83,67 @@ scheduled accordingly.
 (Rate matching is *off* for 94 of the 100 warnings, so most of the cast is not even using the one
 tool that exists. That is a content question as much as an engine one, and it is noted rather than
 fixed here.)
+
+---
+
+## B.B — MotionContext
+
+`src/scene/motion_context.hpp`. ADR-561 records why it is scene-tier and entity-free, and why
+`LocomotionMode` is a five-value projection of the nine-value `entity::Activity` rather than that
+enum. Built once per frame at `Composition::AnimationSink::driveLayers`, the one function that
+already depends on both tiers; readable through `Composition::motionContext(node)` for §50's debug
+view and for tests.
+
+**What it carries that nothing carried before:** `dt`; the body's own `restHeight`, so a layer's
+thresholds are ratios rather than metres (ADR-552's rule, on this side of the pipeline); and
+`strideRatio` from `Gait::footSlip`, which is the number Phase B exists to drive to 1.
+
+### The three seam defects it found
+
+Needing to read `LocomotionState` meant asking, for each field, *which of the two publish paths
+writes it*. Two of three answers were wrong (ADR-560):
+
+| field | `update` | `seek` | symptom |
+|---|---|---|---|
+| `velocity`, `facing` | **no** | yes | measured **2.12, 2.12**; seam carried **0, 0** for all of live play |
+| `action` | yes | **no** | play published `"Sit"`, scrub published `""` — a sitting body stood up and walked when scrubbed to |
+| `grounded` | **no** | **no** | dead |
+
+All three survived because every test asserted on `Entity::state()`, which *computes* the value,
+and none on `Entity::locomotion()`, which *carries* it. That is the zero-variance probe rule stated
+in the Phase A report, and this is the first thing it caught in Phase B.
+
+---
+
+## B.C — the provider seam
+
+`entity/motion_provider.hpp`, `entity/motion_chain.hpp`, `entity/clip_motion_provider.{hpp,cpp}`.
+ADR-541's design, implemented as written: **a provider is a pure function whose memory is owned by
+the entity and handed to it.**
+
+* `MotionRequest` is **locomotion intent only**. Look and reach targets are pose concerns that
+  already cross the seam as `LocomotionState::lookTarget`; a look does not change which clip plays,
+  and duplicating them here would be two answers to one question.
+* `MotionMemory` is a plain value with no containers. `EntityWorld::seek` rebuilds it by replay,
+  which is why no provider may own it.
+* `MotionChain` is **Neural → Motion Matching → Procedural/Clip**, first to produce a pose wins.
+  It reports `provider`, `fellThrough` and `firstDeclined` — a chain that silently fell back would
+  hide a broken preferred provider behind a working fallback forever.
+* `ClipMotionProvider` is a *second, smaller* implementation of clip playback rather than a wrapper
+  around `AnimationPlayer`, because the player keeps its state inside itself and ADR-541's whole
+  point is that a provider keeps none.
+
+**The obligation, measured.** ADR-541 corollary 1 requires the clip provider to agree with
+`AnimationPlayer` for the case they both cover. Asserted joint by joint over 90 frames of a looping
+clip at a steady rate, tolerance 1e-4.
+
+### Two findings from the tests
+
+* **The provider dropped the first frame's `dt`** — off by exactly one frame for all ninety
+  comparisons. The fixture was the thing at fault: it started the player at t=0 and first asked the
+  provider at t=1/60, so the provider selected its clip on that call and sat at local 0 while the
+  player was at 1/60. The engine calls every frame including the first, so priming is what actually
+  happens. ADR-204's one-frame family, fourth occurrence this session.
+* **An empty entry style was a wildcard**, so a request for a style nothing carries resolved
+  silently to the default walk. A style typo, or a pack that shipped without its styled clips,
+  would have been invisible. Now matched exactly; a catch-all is authored explicitly (§64).
