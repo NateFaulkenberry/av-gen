@@ -239,6 +239,38 @@ Result<void> Aurora::validate() const {
     return {};
 }
 
+// ADR-561. Moved here from `rendering/volume_renderer.cpp`, where it was the one step of the
+// vortex pipeline that had no second caller and therefore no test -- see the note beside the
+// declaration in the header.
+vortex::VortexField vortexFieldOf(const Vortex& v) {
+    return vortex::VortexField{
+        .center = v.center,
+        .radius = v.radius,
+        .thickness = v.thickness,
+        .funnelDepth = v.funnelDepth,
+        .throat = v.throat,
+        .throatDensity = v.throatDensity,
+        .swirl = v.swirl,
+        .rotationSpeed = v.rotationSpeed,
+        .innerVoid = v.innerVoid,
+        .contrast = v.contrast,
+        .turbulence = v.turbulence,
+        .turbulenceScale = v.turbulenceScale,
+        .breathAmount = v.breathAmount,
+        .breathSpeed = v.breathSpeed,
+        .smokeWarp = v.smokeWarp,
+        .smokeBillow = v.smokeBillow,
+        .detail = v.detail,
+        .eyeWallWidth = v.eyeWallWidth,
+        .eyeWallGain = v.eyeWallGain,
+        .bandArms = v.bandArms,
+        .bandPitchDegrees = v.bandPitchDegrees,
+        .bandDepth = v.bandDepth,
+        .bandHarmonic = v.bandHarmonic,
+        .cloudNoise = v.cloudNoise,
+    };
+}
+
 // ADR-387. The gate is `radius`: every shader function returns before doing any work at zero, so a
 // zero radius must stay legal (it is the default, and it is what every scene but one has).
 Result<void> Vortex::validate() const {

@@ -9,6 +9,17 @@
   ADR-500 (an effect is one file and four lines).
 - **Corrects two statements this repository currently makes about itself in its own comments.**
 
+> **The brief's §44 bar 1 -- "noise disabled -> still looks like fog" -- is currently unreachable by
+> construction, not by tuning.** With the detail off, a fog bank's density field is monotone in
+> radius, uniform in angle and smooth in height: no eye, no wall, no bands, and no rows for any of
+> them. There is nothing underneath the noise for a clamp, a step count or a parameter to leave
+> behind. That is the whole finding, and every phase after this one follows from it.
+
+Worth stating because it arrived twice: `agent/tornado` reached the same conclusion about the vortex
+half of this family from different evidence and on its own -- that the shipped effect **computes the
+wrong thing** rather than computing the right thing badly. Two independent routes to one diagnosis
+is a stronger result than either, and it is why the rebuild is a rebuild.
+
 ## 1. The owner's bug: the second placed medium is not reduced, it is absent
 
 The report is "if I turn on fog I can't see the vortex". Measured, with a fog bank and the shipped
@@ -218,11 +229,24 @@ slabs at 4, 12, 24, 40 and 60 m in a known volume and nothing else -- is, and it
   until the slot limit is lifted that is the whole fix for the owner's report.
 - **Do not buy steps.** ADR-461 demoted per-tier `volumeStepScale`; this demotes the step count for
   fog as well, from the other side -- more steps admit more aliased content here.
-- **`tools/grain.py` and the exposure rule.** Two arms whose mean luminance differs by more than a
-  luminance level are not comparable by this number. Three of the four figures in the first version
-  of §2's table were wrong for this reason and the ADR would have shipped them.
+- **The exposure rule, which ADR-389's family did not have and is where the next agent will look.**
+  *The grain metric is only valid between arms at the same exposure.* A density ladder that adds
+  nothing but density moves it 15%; normalising by the local mean does not fix it, because the tone
+  curve compresses faster than 1/mean as it approaches white. Two arms whose lower-frame mean
+  luminance differs by more than about a luminance level are **not comparable by this number**, and
+  an arm that changes the medium's brightness must be re-shot at matched exposure before its grain
+  is quoted. Three of the four figures in the first version of §2's table were wrong for this reason
+  and this ADR would have shipped them. `tools/grain.py` prints both figures and carries the rule.
 - **The fixture moves to the Volumetric Lab** for the density work, and comes back to Tree of Life
-  and Glowmere for §40 and §41.
+  and Glowmere for §40 and §41 -- those are acceptance, not development.
+- **The brief's §46 ordering is inverted by one step, deliberately.** §46 runs A diagnose, B clean
+  analytical volume, C local banks; the next thing built is the medium-slot array and the per-slot
+  ray interval instead. That is not drift. §46's ordering assumes the foundation exists, and it does
+  not: one live owner-facing bug and a second agent's whole effect are both blocked on a literal `1`
+  in `atmospherics.cpp`, and the ray interval is simultaneously §31's adaptive sampling, §32's
+  empty-space optimisation and what makes §20's self-shadowing affordable. **Building the thing
+  everything else stands on, first, is the ordering §46 would have had if it had known the slot
+  limit was real.** §46 B resumes immediately after, on the Volumetric Lab fixture.
 
 ## Revisit when
 

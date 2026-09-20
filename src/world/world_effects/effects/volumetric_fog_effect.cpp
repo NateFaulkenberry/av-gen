@@ -20,12 +20,18 @@
 // A control that does nothing teaches an artist that the system is broken (ADR-421), and nine of a
 // vortex's controls do nothing to a fog bank.
 //
-// **The limit, stated rather than discovered.** The volumetric march has ONE medium slot
-// (`AtmosphericFrame::hasVortex`), for the reason ADR-374 measured: the single vortex costs +5.5 ms
-// of a 13.5 ms frame, and it is the most expensive term in the scene. So a fog bank and a cosmic
-// vortex compete for that slot, and the second one in a scene is counted in `AtmosphericCounts::
-// dropped` and reported -- a stated limit, not a silent no-op. A second slot is a deliberate future
-// decision with a measurement attached, not an oversight.
+// **The limit, and the sentence that used to be here was false.** The volumetric march has ONE
+// medium slot (`AtmosphericFrame::hasVortex`), for the reason ADR-374 measured: the single vortex
+// costs +5.5 ms of a 13.5 ms frame. This comment used to say the second medium in a scene "is
+// counted in `AtmosphericCounts::dropped` and reported -- a stated limit, not a silent no-op."
+//
+// ADR-560 measured it. A fog bank and the Cosmic Vortex authored together render **byte-identical**
+// to whichever of the two appears FIRST in the array; the other contributes not one pixel, and
+// which one survives is the order of a list in a project file. `dropped` has exactly one reader in
+// the tree and it is a CPU conformance finding, not a panel and not a log, so nothing reports
+// anything. It was a silent no-op, and the stated reason is what stopped anyone checking (ADR-385).
+//
+// The slot count is being lifted rather than documented; until it is, this is the owner's live bug.
 //
 // **Where its numbers live.** `e.vortex`, aliased on purpose: it is the same medium, so it is the
 // same struct and the same block in the saved file (the rows say so with an absolute `/vortex/...`
@@ -79,6 +85,25 @@ constexpr EffectField kFields[] = {
                SETF(e.vortex.smokeBillow)).json("/vortex/smokeBillow").main()
         .tooltip("0 is a thin wispy haze; 1 is rounded masses with creases between them.\n"
                  "The difference between a mist and a bank of cloud."),
+    // ADR-561. §53's control, and the reason it is a MAIN row on a fog bank rather than an advanced
+    // one: the brief's §4 D, its §44 bar 1 and its Definition of Done are all this parameter. "With
+    // all noise and detail at zero the system must still produce clean, coherent fog" is a claim an
+    // artist has to be able to CHECK, and until this row existed they could not -- the vortex
+    // declared `cloudNoise` and the fog bank did not, so every diagnostic arm in ADR-560 had to be
+    // hand-authored into JSON, where it round-trips only because `AtmosphericEffect::toJson` walks
+    // every registered kind's rows and not just this one's.
+    //
+    // The JSON path is the vortex's own, so the two rows write one key and cannot disagree -- the
+    // same aliasing every other row in this file uses, and the reason they are declared absolute.
+    //
+    // Named for what it does to the picture rather than for the fBM it weights: ADR-560 measured
+    // that at 0 this bank is a grey card, which is a defect in the FIELD and not in this control.
+    // Turning it down is how an artist sees that, which is what a diagnostic is for.
+    floatField("detailAmount", "Detail amount", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.cloudNoise),
+               SETF(e.vortex.cloudNoise)).json("/vortex/cloudNoise").main()
+        .tooltip("How much of the bank's density comes from procedural detail rather than from\n"
+                 "its shape. At 0 the bank is its analytic volume alone -- which is the check\n"
+                 "that the fog is fog and not a noise field: it should still read as fog."),
     floatField("drift", "Drift", -4.0f, 4.0f, -0.2f, 0.2f, GET(e.vortex.rotationSpeed),
                SETF(e.vortex.rotationSpeed)).json("/vortex/rotationSpeed").main()
         .tooltip("How fast the whole bank turns over. Slow: fog that moves quickly reads as\n"
@@ -157,6 +182,20 @@ void applyStyle(AtmosphericEffect& e, std::string_view style) {
     v.throat = 1.0f;       // ...and the mouth does not narrow
     v.throatDensity = 0.0f;
     v.innerVoid = 0.0f;    // filled, not a ring
+    // ADR-561, and `innerVoid = 0` alone did NOT achieve it. The envelope's eye term is
+    // `smoothstep(innerVoid, innerVoid + eyeWallWidth, rr)`, and `eyeWallWidth` defaults to the
+    // 0.22 ADR-374 hardcoded for the vortex -- so with the void at zero the density still climbed
+    // from EXACTLY ZERO on the axis to full at 22% of the radius. Every fog bank in the product had
+    // a soft hole in the middle of it: 200 metres of clear air inside a 900 metre bank, inherited
+    // from a cyclone's eye by an effect that has no use for an eye, with no row on the panel to
+    // close it. Measured before this line: envelope 0.0000 at rr = 0, 0.4320 at rr = 0.10, 1.0000
+    // at rr = 0.25.
+    //
+    // Zero rather than a small number: `vortexRadialProfile` clamps it to 1e-3, so the rise happens
+    // over a thousandth of the radius and the bank is filled to its axis with no edge introduced
+    // (ADR-369's rule still holds -- the term is still a smoothstep, it is just no longer wide).
+    v.eyeWallWidth = 0.0f;
+    v.eyeWallGain = 0.0f;  // and no ring of extra density around a hole that is no longer there
     v.cometResponse = 0.0f;
 
     if (style == kStyleNames[0]) { // Valley Mist -- thin, wide, low, barely lit

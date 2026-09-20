@@ -52,7 +52,22 @@ float radialProfile(const VortexUniforms& v, float rr) {
     // 0.22 and a gain of 0 this is `smoothstep(innerVoid, innerVoid + 0.22, rr) * rim`, which is
     // ADR-374's profile to the bit.
     const float eyeR = std::clamp(v.v2.x, 0.0f, 0.95f);
-    const float wallW = std::max(v.v7.x, 1e-3f);
+    // ADR-561: a width of ZERO means NO EYE, not an infinitely sharp one.
+    //
+    // This used to be `max(v.v7.x, 1e-3)`, so 0 meant "the narrowest eye expressible". The
+    // difference is invisible everywhere except on the axis -- and on the axis it is total, because
+    // `smoothstep(eyeR, eyeR + w, eyeR)` is EXACTLY 0 for every positive w however small. A fog
+    // bank asks for no eye and got a pinhole with the density falling to nothing inside it: a hard
+    // line, for exactly the reason ADR-369 says not to leave one anywhere.
+    //
+    // `eyeWallGain` goes with it, deliberately. The gain is the WALL's, and a structure with no eye
+    // has no wall for a ring of extra density to stand on; a crest of zero width is degenerate
+    // arithmetic rather than a picture. Nothing in the tree authors a zero width today (the shipped
+    // vortex leaves the 0.22 default; only the `_vx2-` arms set it, to 0.1), so this is additive.
+    if (v.v7.x <= 0.0f) {
+        return rim;
+    }
+    const float wallW = v.v7.x;
     // A HOLE, so its boundary is a rise and not a fade: density is ~0 inside `eyeR` and reaches
     // the body of the storm over `wallW`. Smoothstep and not a step, because ADR-369's rule is
     // that there must be no edge anywhere for a hard line to live on.
@@ -233,7 +248,12 @@ VortexUniforms packVortex(const VortexField& f) {
                      std::clamp(f.throatDensity, 0.0f, 1.0f), 0.0f);
     v.v6 = glm::vec4(std::max(f.smokeWarp, 0.0f), std::clamp(f.smokeBillow, 0.0f, 1.0f),
                      std::max(f.detail, 0.0f), 0.0f);
-    v.v7 = glm::vec4(std::max(f.eyeWallWidth, 1e-3f), std::max(f.eyeWallGain, 0.0f),
+    // ADR-561: `eyeWallWidth` is NOT floored here any more. It used to be `max(w, 1e-3)`, which
+    // meant a zero could never reach `radialProfile` and "no eye" was unexpressible -- the floor
+    // was the third and last place the pinhole survived, after the profile's own `max` and the
+    // preset that never reset the default. Clamped at zero from below only, because a negative
+    // width is not a shape.
+    v.v7 = glm::vec4(std::max(f.eyeWallWidth, 0.0f), std::max(f.eyeWallGain, 0.0f),
                      std::clamp(f.cloudNoise, 0.0f, 1.0f), 0.0f);
     // The pitch angle is packed as its COTANGENT, which is the `b` of r = a e^{b theta}: the
     // shader then needs no trigonometry to recover the spiral, and the artist still types an angle.

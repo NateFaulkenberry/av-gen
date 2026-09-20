@@ -56,6 +56,7 @@
 // than smuggled in as a second analyzer.
 
 #include "core/error.hpp"
+#include "core/vortex.hpp"
 #include "world/effects.hpp"
 #include "world/world_effects/field_bus.hpp"
 
@@ -365,6 +366,19 @@ struct Vortex {
     [[nodiscard]] bool active() const { return radius > 0.0f; }
     [[nodiscard]] Result<void> validate() const;
 };
+
+// The geometry-and-motion half of an authored medium, as `core/vortex.cpp` and `shaders/vortex.wgsl`
+// both want it (ADR-388's split: colour, emission and filament contrast stay on `Vortex`, because a
+// particle asking which way the medium is moving must not have to carry a colour ramp to find out).
+//
+// ADR-561, and it is ADR-401's lesson one call site over. `packVortex` exists so that one
+// description of the field reaches everything that samples it -- and this CONVERSION, the step
+// before it, was written out by hand inside `rendering/volume_renderer.cpp` and existed nowhere
+// else. So the bytes the shipped frame marched were produced by a function no test could call, and
+// a test that wanted to ask "what is this authored fog bank's density at its own centre" had to
+// write the conversion out a second time and would then have been testing its own copy. One
+// conversion, in the library, reachable from the CPU suite.
+[[nodiscard]] vortex::VortexField vortexFieldOf(const Vortex& v);
 
 // ---- values a kind declared in its own file keeps (ADR-500) ---------------------------------------
 

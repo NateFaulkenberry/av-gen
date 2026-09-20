@@ -387,32 +387,11 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
             // packing. The appearance slots stay here, where they belong -- `vortex1.w`,
             // `vortex3.zw`, the three colours and `vortex5` are what the picture does with the
             // field and are deliberately not part of it (see core/vortex.hpp's opening note).
-            const vortex::VortexUniforms f = vortex::packVortex(vortex::VortexField{
-                .center = v.center,
-                .radius = v.radius,
-                .thickness = v.thickness,
-                .funnelDepth = v.funnelDepth,
-                .throat = v.throat,
-                .throatDensity = v.throatDensity,
-                .swirl = v.swirl,
-                .rotationSpeed = v.rotationSpeed,
-                .innerVoid = v.innerVoid,
-                .contrast = v.contrast,
-                .turbulence = v.turbulence,
-                .turbulenceScale = v.turbulenceScale,
-                .breathAmount = v.breathAmount,
-                .breathSpeed = v.breathSpeed,
-                .smokeWarp = v.smokeWarp,
-                .smokeBillow = v.smokeBillow,
-                .detail = v.detail,
-                .eyeWallWidth = v.eyeWallWidth,
-                .eyeWallGain = v.eyeWallGain,
-                .bandArms = v.bandArms,
-                .bandPitchDegrees = v.bandPitchDegrees,
-                .bandDepth = v.bandDepth,
-                .bandHarmonic = v.bandHarmonic,
-                .cloudNoise = v.cloudNoise,
-            });
+            // ADR-561: the conversion is `world::vortexFieldOf` now, in the library beside
+            // the struct. It used to be written out here and nowhere else, which made it
+            // the one step of this pipeline the CPU suite could not call -- ADR-401's
+            // finding about `packVortex` itself, one call site earlier.
+            const vortex::VortexUniforms f = vortex::packVortex(world::vortexFieldOf(v));
             u.vortex0 = f.v0;
             // `.w` is the per-metre extinction -- appearance, so it is added here rather than
             // being carried through the field (ADR-374: every quantity entering a march is per
