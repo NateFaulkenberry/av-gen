@@ -6,6 +6,7 @@
 #include "rendering/spline_buffers.hpp"
 
 #include "core/log.hpp"
+#include "core/pre_roll.hpp" // ADR-397: the bounded pre-roll this warm-up is one consumer of
 #include "gpu/context.hpp"
 #include "gpu/frame_timeline.hpp"
 #include "gpu/readback.hpp"
@@ -440,23 +441,24 @@ void ParticleRenderer::resetAll() {
 void ParticleRenderer::runWarmUp(const scene::Scene& scene, const FrameTime& time, const glm::mat4& view,
                                  const glm::mat4& proj, const FieldUniforms* fields,
                                  const SplineBuffers* splines) {
-    const std::uint32_t frames = std::min(frame_.warmUpFrames, kMaxWarmUpFrames);
-    if (frames == 0) {
+    // ADR-397: the schedule is shared, the work is not. `planPreRoll` decides which timeline
+    // seconds this roll consists of and what frame indices they carry; re-running the emit and
+    // simulate passes over them is this renderer's own business. The temporal-media history
+    // buffers take the same plan and re-run theirs.
+    PreRoll roll;
+    roll.frames = frame_.warmUpFrames;
+    roll.cap = kMaxWarmUpFrames;
+    const PreRollPlan plan = planPreRoll(roll, time);
+    if (plan.frames.empty()) {
         return;
     }
-    // The step. The frame's own delta when it has one -- an offline render's frames are 1/fps apart
-    // and the warm-up has to land on the same seconds the full render did, or the nonce it seeds
-    // each step with is not the nonce that second had. A first frame with no delta yet falls back
-    // to 60 fps, which is what every clock in this engine defaults to.
-    const double step = time.deltaTime > 0.0 && time.deltaTime <= 0.1 ? time.deltaTime : 1.0 / 60.0;
+    // `plan.arrivalFrameIndex` is deliberately ignored: nothing in the particle path keys history
+    // continuity to the frame index (the compaction carries the pools across frames by itself), so
+    // rewriting the arriving frame's index would change the trail stride's phase for no gain.
     const ParticleStats savedStats = stats_;
     const bool savedPass = passThisFrame_;
     warming_ = true;
-    for (std::uint32_t k = frames; k >= 1; --k) {
-        FrameTime warm{};
-        warm.renderTime = time.renderTime - static_cast<double>(k) * step;
-        warm.deltaTime = step;
-        warm.frameIndex = 0; // deliberately: nothing downstream of here may read it (ADR-360)
+    for (const FrameTime& warm : plan.frames) {
         wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();
         update(encoder, scene, warm, view, proj, fields, splines);
         wgpu::CommandBuffer commands = encoder.Finish();

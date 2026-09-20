@@ -2816,6 +2816,19 @@ void Engine::seekSeconds(double seconds) {
     lastAnalysisBeatCount_ = 0;
     cueState_ = {};   // cues re-sync from the new position on the next frame
     cueApplied_ = false;
+    // ADR-398. `PostSettings::exposureReset` has documented itself as "(scene change, timeline
+    // seek)" since it was written, and until this line only the scene change ever set it:
+    // `resetCameraState` had exactly one caller, the composition install. So a scrub reset the
+    // renderer's temporal history and left the METER on its pre-seek reading, and the first frames
+    // after a jump from a night interior to a noon exterior were exposed for the interior and
+    // walked out of it over the meter's adaptation time. The focus tracker behind the same call is
+    // the same story one lens along.
+    //
+    // A seek is `TimelineStep::Jump` (core/pre_roll.hpp) and this is what a jump costs: the state
+    // that was a function of the frames you came from is not a function of the frame you arrived
+    // at. Re-rendering the same frame is NOT this case and must not take it -- a repeat has to
+    // reproduce, which is why this sits in `seekSeconds` and not in the per-frame update.
+    resetCameraState();
     // Entities, too (ADR-093). Until this existed a seek left every character exactly where the
     // playhead had walked it to, so scrubbing back to the same second twice gave two different
     // frames -- `EntityWorld::reset` was written for this and nothing ever called it. `seek` is
