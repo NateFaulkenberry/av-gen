@@ -600,6 +600,49 @@ TEST_CASE("the craft never teleports", "[stage][abduction][sequence]") {
     CHECK(jumps == 0);
 }
 
+// Test 4b -- the control for the rate limit the case above bought.
+//
+// `MoveTo`'s clearance floor is rate-limited now, because `groundHeight` has a seam in it and the
+// floor was transmitting it: 1.206 m of craft in one frame on a 0.165 m step, which Test 4 caught.
+// A limit that is too tight stops being a limit and starts being a cap -- the floor would lag the
+// ground for the whole flight and the craft would fly *into* the hills it is supposed to clear,
+// and Test 4 would go green on a worse defect than the one it found.
+//
+// So: the floor still has to do its job. The craft crosses this valley with `cruiseClearance` 34
+// against `hoverHeight` 23, and what the arc buys is altitude in the MIDDLE of a move that neither
+// end asks for. Both halves are asserted -- it never drops below the hover height the shot asks
+// for, and it still climbs well past it -- because only the pair can tell a working floor from a
+// frozen one.
+TEST_CASE("the rate-limited clearance floor still clears the ground", "[stage][abduction][sequence]") {
+    const std::vector<Sample>& run = film();
+    REQUIRE(run.size() > 1000);
+    float lowest = 1e9f;
+    float highest = -1e9f;
+    double lowestAt = 0.0;
+    for (const Sample& s : run) {
+        if (s.beat != "approach") {
+            continue; // the only beat that moves the craft far enough for the arc to matter
+        }
+        const float agl = s.pos.y - s.ground;
+        if (agl < lowest) {
+            lowest = agl;
+            lowestAt = s.t;
+        }
+        highest = std::max(highest, agl);
+    }
+    INFO(fmt::format("over every approach: the craft got as low as {:.2f} m above ground (t={:.3f}) "
+                     "and as high as {:.2f} m; the shot asks for a hover of 23 m and a cruise "
+                     "clearance of 34 m", lowest, lowestAt, highest));
+    // It never gives up the hover height the approach is aiming at -- 23.00 m, which is
+    // `hoverHeight` exactly, because the arc only ever adds. Verified sensitive rather than
+    // assumed: with the limit forced to zero, so the floor freezes at the value it was sampled
+    // with on the move's first frame, this reads 20.46 m and the bound catches it (ADR-182).
+    CHECK(lowest > 22.5f);
+    // ...and the arc still lifts it well above that toward the cruise clearance of 34 m, which a
+    // floor pinned too low could not do.
+    CHECK(highest > 30.0f);
+}
+
 // Test 6 -- a camera cut never moves a world object.
 //
 // `UFO Watch` is `followNode: visitor` with `eventBlend: 0.0`, so it is a hard cut to a camera
@@ -1096,6 +1139,40 @@ TEST_CASE("what the abduction search sees, animal by animal", "[.abduction-instr
 //
 // This scans the valley for spots that are navigable, open over the whole 20 m the wander
 // behaviours use, and far enough apart to read as scattered. It prints them as scene positions.
+TEST_CASE("the height seam under the craft path", "[.abduction-instrument]") {
+    app::Engine engine(app::EngineMode::Offline);
+    auto loaded = engine.loadProject(filmProject());
+    REQUIRE(loaded.has_value());
+    scene::Composition* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+    comp->setViewport(1600, 900);
+    FrameTime time;
+    engine.update(time);
+    for (const auto& node : comp->nodes()) {
+        if (node == nullptr || node->kind != scene::NodeKind::Terrain) {
+            continue;
+        }
+        const scene::CompositionNode* n = node.get();
+        const world::WorldMap& fast = n->worldMap;
+        world::WorldMap slow = fast;
+        std::size_t withBlocks = 0;
+        for (world::Feature& f : slow.features) {
+            withBlocks += f.blocks.empty() ? 0u : 1u;
+            f.blocks.clear();
+        }
+        fmt::print("terrain '{}': {} feature(s), {} carrying block boxes\n", n->name,
+                   fast.features.size(), withBlocks);
+        for (int i = 0; i <= 20; ++i) {
+            const float t = static_cast<float>(i) / 20.0f;
+            const float x = -105.7502f + t * (-105.7485f + 105.7502f);
+            const float z = -94.7246f + t * (-94.7410f + 94.7246f);
+            fmt::print("  ({:9.4f},{:9.4f})  accel={:9.4f}  plain={:9.4f}  delta={:+.4f}\n", x, z,
+                       fast.height(glm::vec2(x, z)), slow.height(glm::vec2(x, z)),
+                       fast.height(glm::vec2(x, z)) - slow.height(glm::vec2(x, z)));
+        }
+    }
+}
+
 TEST_CASE("open ground an abduction beam can reach", "[.abduction-instrument]") {
     app::Engine engine(app::EngineMode::Offline);
     auto loaded = engine.loadProject(filmProject());
