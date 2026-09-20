@@ -22,6 +22,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 410-419 | `agent/temporal` |
 | 420-439 | `agent/wfx2` -- World Effects phases and the deformation half |
 | 440+ | unassigned; ask before taking |
+| 540-559 | `agent/anim-research` -- autonomous character animation / motion synthesis research |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
 cheap failure: this index already skips 301-309, 311-319 and 321-329, and a non-contiguous index
