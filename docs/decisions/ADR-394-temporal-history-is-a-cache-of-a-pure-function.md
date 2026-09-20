@@ -7,36 +7,58 @@
 **Builds on:** ADR-035 (the five scene targets), ADR-034 (the AO temporal pass),
 ADR-387/ADR-392 (the world-effect family's conformance)
 
+## The short version
+
+Datamosh gets a declared I-frame cadence anchored to `audio.beatCount` through an ordinary
+`ModRoute`. **The thing that makes it land on the music is the same thing that makes it
+scrubbable** — the constraint improves the effect instead of taxing it. The rest of this document
+is the generalisation of that one observation: an effect that declares *when its history starts*
+as a function of time is a cache, not an accumulator, and a cache can always be rebuilt.
+
+The second result is that **time rift, time freeze and temporal rewind need no history at all**.
+They are `render(t + offset)`, `render(T_freeze)` and `render(w(t))` — re-evaluations of a
+renderer that is already re-entrant on time. The naive reading of the spec would have built a
+32-frame ring in order to freeze a picture.
+
+## A correction, because the misquote did real work
+
+This ADR was briefed against the rule "**ADR-091: scrub must equal play**". That sentence does not
+appear in ADR-091, and the rule it states is stricter than the one this project actually holds.
+
+ADR-091 is titled **Two-tier simulation authority**, and it documents an entire tier of entities
+as "stateful, reset on seek, and **explicitly not frame-accurate under scrub**". The contract that
+really governs is ADR-360's:
+
+> **A render must still be reproducible.** Scrub may differ from play; two renders of the same
+> range may not differ from each other.
+
+The compression is an easy one to make, and it had been repeated to several agents, which is why
+it is corrected here in the open rather than quietly worked around. A design built against "scrub
+must equal play" fails in one of two directions: it refuses a feature the project permits, or it
+smuggles in an accumulator to get around a rule that was never there. **A rule everyone
+half-remembers wrongly is worse than one nobody remembers**, because it never gets looked up.
+
+What ADR-091 does supply — and what this ADR leans on entirely — is the *method* rather than the
+prohibition. When a tier cannot give a guarantee, declare it: "a guarantee that is not visible is
+a guarantee nobody can rely on."
+
 ## The problem the brief does not name
 
 The brief asks for a reusable temporal media system: a history of previous colour, depth, motion,
 object id and normal, 1–32 frames deep, feeding frame echo, temporal smear, datamosh, temporal
 displacement, time rift, time freeze, rewind and an afterimage field.
 
-Every one of those makes frame *N* depend on frames *N−1 … N−K*.
+Every one of those makes frame *N* depend on frames *N−1 … N−K*, and §47 asks for offline
+determinism on top. A K-frame history and a reproducible render cannot both hold if history is an
+accumulator.
 
-ADR-091 makes the opposite promise. The sequencer is pure: a frame is `Track::evaluate(t)` and
-nothing else, so a scrub is a seek and an offline render is identical to the live one *by
-construction, because there is no accumulated state to be wrong about*. ADR-091 relaxed that for
-the live entity tier only, and it relaxed it by **declaring** the relaxation, not by hiding it:
-"a guarantee that is not visible is a guarantee nobody can rely on."
-
-§47 then asks for offline determinism. Scrub-equals-play, a K-frame history, and a deterministic
-render cannot all hold if history is an accumulator.
-
-**The governing rule already exists and it is not mine.** ADR-360, relaxing ADR-091 for particles
-at the owner's request, drew the line in one sentence:
-
-> **A render must still be reproducible.** Scrub may differ from play; two renders of the same
-> range may not differ from each other.
-
-That relaxation is "particles only" by its own words, so it does not extend to this half. But its
-*shape* is the right shape, and the mechanism it promised — "a bounded, opt-in **warm-up** (a
+ADR-360's relaxation is "particles only" by its own words, so it does not extend to this half. But
+its *shape* is the right shape, and the mechanism it promised — "a bounded, opt-in **warm-up** (a
 parameter, in frames, capped) [that] fills the pools from the seeded state on seek and at the head
 of a render range" — is the same mechanism temporal history needs. That warm-up was never built;
 it is being built now for particles. **This ADR does not invent a second one.** It states the
-contract both must satisfy, and holds itself to a stronger version of it than ADR-360 required:
-here the warm-up is not optional, and the scrub divergence *converges* rather than persisting.
+contract both must satisfy, and holds itself to a stronger version than ADR-360 required: here the
+warm-up is not optional, and the scrub divergence *converges* rather than persisting.
 
 The naive failure is the one this project keeps paying for: scrub to frame N cold, get a different
 picture than playing into N, and see no sign that anything is different. A black frame and a
@@ -128,8 +150,15 @@ would have given it.
   picture the render will produce.
 - *Throughout*, `TemporalHistoryState{ framesValid, framesNeeded }` is surfaced in four places: a
   viewport badge, the World Effects panel row for each temporal effect, a debug view, and
-  `RenderStats`. **When `framesValid < framesNeeded`, what is on screen is not what will be
-  rendered, and the UI says so in those words.**
+  `RenderStats`.
+
+**The badge says what to do, not only what is wrong.** "Not what will be rendered" is accurate and
+leaves the artist stuck; **"Temporal: settling — 3 of 8 frames"** tells them the picture is on its
+way and roughly how far. A disclosure that does not imply an action is a disclosure people learn
+to ignore, and an ignored badge is the silent failure this section exists to prevent. The
+stuck-state wording is reserved for the case that *is* stuck: a history that cannot fill (no
+warm-up budget, or an effect whose K exceeds the cap) reads **"Temporal: cold — this is not the
+rendered picture"**, which is the one time the artist genuinely must act.
 
 This is ADR-091's two-tier move applied to frames instead of entities: the divergence is bounded,
 it is temporary, and it is *declared*. The difference is that ADR-091's live tier never converges
@@ -227,10 +256,16 @@ stated where an author chooses the effect, not found in a render.
   hand-written sections today (`src/ui/world_effects_panel.cpp:146`, `:537`); this is a third,
   added the way the second was — one `drawTemporalSection(engine)` call — with its rows as
   `constexpr EffectRow` tables in `src/ui/ui_logic.hpp` so a test can walk them.
-- **A new path prefix is invisible until it is named.** `ui_logic.hpp:43-47`'s
-  `kBeginnerPrefixes` / `kIntermediatePrefixes` gate which groups appear below the Advanced
-  authoring layer. A `temporal/` group absent from those lists is reachable-in-principle and
-  findable by nobody — ADR-375's exact defect, and the reason it is written down here.
+- **`temporal/` goes in `kBeginnerPrefixes`, not merely `kIntermediatePrefixes`**
+  (`ui_logic.hpp:43-47`). Those lists gate which groups appear below the Advanced authoring layer,
+  so a prefix absent from them is reachable-in-principle and findable by nobody — ADR-375's exact
+  defect, reported twice. The authoring layer does not get to decide whether a flagship effect
+  exists.
+- **The opaque-only velocity limitation is stated in the effect's tooltip, not only here.** A mosh
+  or displacement over fog, aurora or the vortex advects with whatever opaque surface is behind it
+  (see §45 below). That is a surprising result that looks exactly like a bug, so it is one
+  sentence on the row where an author turns the effect on. An ADR nobody reads at the moment of
+  choosing is not a disclosure.
 - **Audio reactivity is a `ModRoute`, not a mechanism** (§39). The datamosh anchor is a route from
   `audio.beatCount`; nothing new is built.
 - **§53's debug views need a surface, because the existing family has none.** `AuxDebugView` is
