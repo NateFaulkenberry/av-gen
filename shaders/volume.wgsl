@@ -28,6 +28,9 @@
 // point below reads it. Mirrors rendering/volume_renderer.hpp.
 #include "common.wgsl"
 #include "fields.wgsl"
+// ADR-388. After fields.wgsl, which is what brings in noise.wgsl's fbm3; the include directive
+// does not de-duplicate, so this file must not include noise.wgsl itself.
+#include "vortex.wgsl"
 
 struct VolumeUniforms {
     params0: vec4<f32>,   // density, fogHeight, fogHeightFalloff, scattering
@@ -111,80 +114,17 @@ fn stepJitter(px: vec2<i32>, frameIndex: u32) -> f32 {
 // angle sheared by radius so the structure winds, then domain-warped noise at three spatial and
 // three TEMPORAL rates. The last part is what stops it reading as a screensaver -- a single rate
 // makes everything move together, which the eye reads instantly as procedural.
+// ADR-388: the funnel's shape comes from `shaders/vortex.wgsl` now, which is the transliteration
+// of `core/vortex.cpp`. It used to live here, in this file, which meant the volumetric march was
+// the only thing in the engine that could ask where the vortex was -- particles approximated it
+// with an attractor and an orbit force (ADR-380), and anything else had to guess again.
+//
+// This wrapper exists so the march reads the five uniform slots it already uploads. The numbers
+// and their order are unchanged, which is what makes the Tree of Life byte-identical across this
+// move rather than something to re-tune.
 fn vortexShape(p: vec3<f32>, t: f32) -> f32 {
-    let radius = vol.vortex0.w;
-    if (radius <= 0.0) {
-        return 0.0;
-    }
-    let rel = p - vol.vortex0.xyz;
-    // Breathing: the whole structure widens and narrows slowly. Applied to the radius rather than
-    // to the density so the silhouette moves, which is what reads as breathing; scaling density
-    // alone just pulses the brightness.
-    let breath = 1.0 + vol.vortex3.x * sin(t * vol.vortex3.y);
-    // ADR-374: a FUNNEL, not a flat disc. The first version was a slab, and from the hero camera --
-    // which looks very nearly level -- a slab 700 m below is seen edge-on and reads as a band of
-    // haze, not as a vortex. The brief's own diagram is a funnel narrowing into a dark void, and a
-    // funnel has an inner wall that a level camera can see down into. That is the whole difference
-    // between "there is something below" and "the island is hanging over a hole".
-    //
-    // `depth` is how far down the throat goes and `throat` is the radius it narrows to, as a
-    // fraction of the mouth. Depth 0 keeps the old slab, so the shape is a superset.
-    let depth = max(vol.vortex4.x, 1e-3);
-    let yn = clamp(-rel.y / depth, 0.0, 1.0); // 0 at the mouth, 1 at the throat
-    let mouth = mix(1.0, clamp(vol.vortex4.y, 0.02, 1.0), yn * yn);
-    let rr = length(rel.xz) / max(radius * breath * mouth, 1e-3);
-    if (rr > 1.35) {
-        return 0.0; // outside the funnel entirely, and compactly so -- ADR-369's lesson
-    }
-    // The wall's thickness across the funnel surface, and its fade down the throat. Gaussian, so
-    // there is no edge anywhere for a hard line to live on (ADR-369 again).
-    let wall = exp(-(rel.y * rel.y) / max(vol.vortex1.x * vol.vortex1.x, 1e-3));
-    // Below the mouth the funnel keeps going instead of stopping at the slab's edge; the taper is
-    // what makes it read as depth rather than as a second disc.
-    //
-    // `below` is not decoration. `yn` clamps to 0 for anything ABOVE the mouth, so without it the
-    // throat term evaluated to its full value up there and the funnel extended *upward* as a
-    // full-radius cylinder at `throatDensity` -- which is why every wide variant washed the top of
-    // the frame as badly as the bottom. The measurement that found it was the contribution split by
-    // band: a funnel that only descends cannot add +12 luminance to the sky above the island.
-    let below = smoothstep(0.0, -vol.vortex1.x, rel.y);
-    let throatFade = 1.0 - smoothstep(0.55, 1.0, yn);
-    let vert = max(wall, throatFade * vol.vortex4.z * below);
-    if (vert < 1e-4) {
-        return 0.0;
-    }
-    // ADR-374: the cheap masks BEFORE the noise. Measured, the vortex's cost is not the march
-    // length and is barely the step count -- it is how many pixels have non-zero density and
-    // therefore evaluate three fBMs. The void at the centre and everything past the rim are exactly
-    // the places where the answer is already zero, and they were paying full price for it.
-    // Every factor here is smooth, so the early-out fires only where the result was already
-    // negligible and introduces no edge (ADR-369).
-    let voidMask = smoothstep(vol.vortex2.x, vol.vortex2.x + 0.22, rr);
-    let rim = 1.0 - smoothstep(0.72, 1.3, rr);
-    let envelope = voidMask * rim * vert;
-    if (envelope < 1.0e-6) {
-        return 0.0;
-    }
-    let angle = atan2(rel.z, rel.x);
-    // The shear. Angle advanced by radius makes a spiral; advanced by time makes it turn.
-    let warped = angle + rr * vol.vortex1.y + t * vol.vortex1.z;
-    // Back to a cartesian sample point, so the noise is sampled in a frame that winds with the
-    // structure rather than across it.
-    let q = vec3<f32>(cos(warped) * rr, rel.y / max(vol.vortex1.x, 1e-3), sin(warped) * rr);
-    let scale = max(vol.vortex2.w, 1e-3);
-    // Three octaves at three rates: macro barely moves, fine detail moves fastest.
-    let n0 = fbm3(q * scale + vec3<f32>(t * 0.013, 0.0, t * 0.009), 29u);
-    let n1 = fbm3(q * (scale * 3.1) + vec3<f32>(0.0, t * 0.055, 0.0), 53u);
-    let n2 = fbm3(q * (scale * 9.7) + vec3<f32>(t * 0.17, 0.0, -t * 0.13), 97u);
-    var n = n0 + 0.45 * n1 + 0.2 * n2;
-    n = n / 1.65;
-    // Turbulence breaks the spiral's symmetry, because a real nebula is not a mathematical spiral
-    // and the brief says so.
-    n = mix(n, n * (0.55 + 0.9 * n1), clamp(vol.vortex2.z, 0.0, 1.0));
-    // Contrast pushes the midtones apart so the structure reads as filaments in a void rather than
-    // as an even wash. The dark centre and the rim are already folded into `envelope` above.
-    let shaped = pow(clamp(n, 0.0, 1.0), max(vol.vortex2.y, 0.05));
-    return shaped * envelope;
+    return vortexShapeAt(VortexUniformsWgsl(vol.vortex0, vol.vortex1, vol.vortex2, vol.vortex3,
+                                            vol.vortex4), p, t);
 }
 
 // The vortex's own light. It is emissive rather than lit: nothing in this scene could illuminate
@@ -446,7 +386,19 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
         //
         // So the vortex contributes extinction and emission and nothing else. It is self-luminous,
         // which is both what a nebula is and what keeps it out of the scene's lighting entirely.
-        let scattering = fogDensity * vol.params0.w;
+        //
+        // ADR-388 adds the controlled way back in, and leaves the refusal above standing because it
+        // is still the right default. `vortex5.z` is 0 unless a scene asks otherwise, so every
+        // frame rendered before this line changed renders identically after it. What it is FOR is
+        // one thing: an upward spotlight aimed through the funnel lights the surfaces it reaches
+        // and the ordinary fog, and its beam stops dead at the funnel's edge, because the medium
+        // the beam is supposed to be visible in does not scatter. Above 0 it does.
+        //
+        // The 131-of-255 above was measured on the PRE-FUNNEL slab; against the shape ADR-374 left
+        // -- a throat, a void and a rim -- full scattering is worth +15 luminance levels on the
+        // shipped frame, not a wash. The refusal is still the right default. The number is no
+        // longer what this knob does, and it is left above because it is why the knob starts at 0.
+        let scattering = (fogDensity + vortexDensity * vol.vortex5.z) * vol.params0.w;
         var emission = vec3<f32>(0.0);
         if (vol.params1.z > 0.0) {
             var emissionColor = vol.fogColor.rgb;

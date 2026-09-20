@@ -236,8 +236,8 @@ Result<void> Vortex::validate() const {
     }
     for (const float f : {radius, thickness, swirl, rotationSpeed, density, innerVoid, contrast,
                           turbulence, turbulenceScale, breathAmount, breathSpeed, emission,
-                          filaments, spill, cometResponse, cometReach, funnelDepth, throat,
-                          throatDensity}) {
+                          filaments, spill, scattering, cometResponse, cometReach, funnelDepth,
+                          throat, throatDensity}) {
         if (!finite(f)) { return fail("a vortex control is not finite"); }
     }
     if (radius < 0.0f) { return fail("the vortex radius may not be negative (0 is off)"); }
@@ -441,6 +441,7 @@ json AtmosphericEffect::toJson() const {
                        {"emission", vx.emission},
                        {"filaments", vx.filaments},
                        {"spill", vx.spill},
+                       {"scattering", vx.scattering},
                        {"cometResponse", vx.cometResponse},
                        {"cometReach", vx.cometReach},
                        {"funnelDepth", vx.funnelDepth},
@@ -600,6 +601,7 @@ Result<AtmosphericEffect> AtmosphericEffect::fromJson(const json& j) {
         vx.emission = readFloat(vj, "emission", vx.emission);
         vx.filaments = readFloat(vj, "filaments", vx.filaments);
         vx.spill = readFloat(vj, "spill", vx.spill);
+        vx.scattering = readFloat(vj, "scattering", vx.scattering);
         vx.cometResponse = readFloat(vj, "cometResponse", vx.cometResponse);
         vx.cometReach = readFloat(vj, "cometReach", vx.cometReach);
         vx.funnelDepth = readFloat(vj, "funnelDepth", vx.funnelDepth);

@@ -1164,6 +1164,10 @@ struct EffectRow {
     std::string_view format;    // empty = the panel's default
     bool logarithmic = false;
     bool color = false;
+    // ADR-388: the row's own tooltip, empty for none. Per row rather than "whatever the panel last
+    // drew", which is how it worked for one release and which meant adding a row at the end of a
+    // list silently stole the tooltip off the row above it.
+    std::string_view tip;
 };
 
 // What somebody reaches for first: what colour, how bright, how big, how fast.
@@ -1179,7 +1183,13 @@ struct EffectRow {
         {"", "rotationSpeed", "Rotation", "%.3f rad/s"},
         {"", "swirl", "Swirl", ""},
         {"", "filaments", "Filaments", ""},
-        {"", "spill", "Light spill", ""},
+        {"", "spill", "Light spill", "", false, false,
+         "How much of the funnel's own light lands on the surfaces above it. Separate from\n"
+         "Brightness so it can be tuned against the island without changing the funnel."},
+        {"", "scattering", "Scene light inside", "", false, false,
+         "At 0 the funnel makes its own light and the scene's lights do not appear inside it --\n"
+         "a spotlight aimed up through it stops at its edge. Above 0 they do; watch the tree's\n"
+         "key light, which is bright enough to flatten the whole funnel if this goes far."},
     };
     return kRows;
 }
@@ -1188,7 +1198,10 @@ struct EffectRow {
     static constexpr EffectRow kRows[] = {
         {"Placement", "centerX", "Centre X", "%.1f m"},
         {"", "centerY", "Centre Y", "%.1f m"},
-        {"", "centerZ", "Centre Z", "%.1f m"},
+        {"", "centerZ", "Centre Z", "%.1f m", false, false,
+         "Where the mouth of the funnel sits in the world. A particle system that names this\n"
+         "vortex as its attractor follows it here, so the island and the funnel stay related\n"
+         "when either of them moves."},
         {"Shape", "thickness", "Wall thickness", "%.0f m", true},
         {"", "throat", "Throat", "%.2f of mouth"},
         {"", "throatDensity", "Throat thickness", ""},
@@ -1199,7 +1212,10 @@ struct EffectRow {
         {"", "breathAmount", "Breath amount", ""},
         {"", "breathSpeed", "Breath speed", ""},
         {"Comet response", "cometResponse", "Comet light", ""},
-        {"", "cometReach", "Comet reach", "%.1f x"},
+        {"", "cometReach", "Comet reach", "%.1f x", false, false,
+         "How much of a comet's light this medium takes, and how far past the comet's ground\n"
+         "pool it reaches. Off by default: the funnel must not scatter the scene's ordinary\n"
+         "lights, which is what the control above is for."},
     };
     return kRows;
 }
