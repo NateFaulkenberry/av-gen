@@ -6,6 +6,7 @@
 #include "core/log.hpp"
 #include "assets/asset_library.hpp"
 #include "assets/mesh_lod.hpp"
+#include "entity/gait.hpp"
 #include "entity/obstacles.hpp"
 #include "scene/camera.hpp"
 #include "scene/mesh_generators.hpp"
@@ -2563,6 +2564,15 @@ void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& st
 // **Which position (ADR-260).** It reads the *drawn* transform: the node parameters' finals, which
 // `applyOffsets` wrote earlier in this same `EntityWorld::update` -- so there is no frame of lag
 // here, unlike attachments. It writes `SkinnedRig::layers`, which is pose intent and nothing else.
+const MotionContext* Composition::motionContext(std::string_view node) const {
+    for (const auto& sink : animationSinks_) {
+        if (sink->nodeName() == node) {
+            return &sink->motion();
+        }
+    }
+    return nullptr;
+}
+
 void Composition::AnimationSink::driveLayers(const entity::LocomotionState& state) {
     CompositionNode* node = owner_.findNode(node_);
     if (node == nullptr || node->rigs.empty()) {
@@ -2610,6 +2620,74 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
         }
     }
     const float reaction = std::clamp(state.reaction, 0.0f, 1.0f);
+
+    // Phase B §4. Built here because this is the one function that already depends on both tiers,
+    // and built ONCE per frame rather than per layer: the inverse above is a matrix inverse and the
+    // conversions below are the same two lines every layer would otherwise repeat.
+    //
+    // Everything spatial goes to the entity's own frame, for the reason ADR-274 gives -- a posed
+    // rig has no world position -- and the normal goes through the transpose rather than the
+    // inverse, for the reason ADR-359 gives.
+    motion_ = MotionContext{};
+    motion_.dt = state.dt;
+    motion_.time = state.time;
+    motion_.velocity = glm::mat3(inverse) * state.velocity;
+    motion_.facing = glm::normalize(glm::mat3(inverse) * state.facing);
+    motion_.groundSpeed =
+        std::sqrt((state.velocity.x * state.velocity.x) + (state.velocity.z * state.velocity.z));
+    motion_.turnRate = state.turnRate;
+    // The intent, as the polar pair the mover authored it in: a scalar along a heading. Converted
+    // to a vector here so a layer never has to know which of the two forms the seam used.
+    motion_.desiredFacing =
+        glm::normalize(glm::mat3(inverse) * glm::vec3(std::sin(state.yaw), 0.0f, std::cos(state.yaw)));
+    motion_.desiredVelocity = motion_.desiredFacing * state.speed;
+    switch (state.activity) {
+    case entity::Activity::Idle: motion_.mode = LocomotionMode::Idle; break;
+    case entity::Activity::Walk: motion_.mode = LocomotionMode::Walk; break;
+    case entity::Activity::Run: motion_.mode = LocomotionMode::Run; break;
+    case entity::Activity::Turn: motion_.mode = LocomotionMode::Turn; break;
+    default: motion_.mode = LocomotionMode::Other; break;
+    }
+    motion_.playbackRate = state.playbackRate;
+    // What the playing clip was authored for, and how badly the body disagrees with it. Measured
+    // across the shipping Glowmere scene, 97 of 100 mismatches are the stride out-running the body
+    // and the median is 0.250 -- so this is the number a stride warper exists to drive to 1.
+    motion_.authoredSpeed = state.activity == entity::Activity::Run ? entity_.desc().gait.runSpeed
+                            : state.activity == entity::Activity::Walk
+                                ? entity_.desc().gait.walkSpeed
+                                : 0.0f;
+    motion_.strideRatio =
+        entity::Gait::footSlip(entity_.desc().gait, state.activity, state.speed);
+    motion_.ground = &ground;
+    motion_.worldFromLocal = world;
+    motion_.localFromWorld = inverse;
+    motion_.groundPoint = localGround;
+    motion_.groundNormal = localNormal;
+    motion_.hasGroundPlane = haveGround;
+    motion_.lookTarget = localTarget;
+    motion_.hasLookTarget = haveTarget;
+    motion_.reaction = reaction;
+    for (const RigId id : node->rigs) {
+        if (id < owner_.scene_.rigs.size()) {
+            // The body's own scale, so a layer's thresholds can be ratios (ADR-552).
+            const Skeleton& sk = owner_.scene_.rigs[id].skeleton;
+            if (!sk.joints.empty()) {
+                Pose rest;
+                std::vector<glm::mat4> restModel;
+                setRestPose(sk, rest);
+                poseToModel(sk, rest, restModel);
+                float lo = restModel.front()[3].y;
+                float hi = lo;
+                for (const glm::mat4& m : restModel) {
+                    lo = std::min(lo, m[3].y);
+                    hi = std::max(hi, m[3].y);
+                }
+                motion_.restHeight = std::max(hi - lo, 1e-4f);
+            }
+            break;
+        }
+    }
+
     for (const RigId id : node->rigs) {
         if (id >= owner_.scene_.rigs.size()) {
             continue;

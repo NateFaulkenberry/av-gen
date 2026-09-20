@@ -295,3 +295,78 @@ TEST_CASE("body compensation is what puts the alien's feet on the ground", "[ali
     }
 #endif
 }
+
+TEST_CASE("the motion context reaches the alien, in the alien's own space",
+          "[aliens][layers][lab][motion][context]") {
+    // **Phase B §4's integration half.** `test_motion_context.cpp` checks the conversions; this
+    // checks that the seam *arrives*, which is the half that ADR-553 and the `LocomotionState`
+    // publication gaps were both about -- a value computed correctly and delivered nowhere.
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    if (!fs::exists(labScene())) {
+        SKIP("the alien foot lab scene is not present");
+    }
+    assets::AssetRegistry registry(labScene().parent_path());
+    auto loaded = scene::Composition::loadFile(labScene(), registry);
+    INFO((loaded.has_value() ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+    scene::Composition& comp = **loaded;
+
+    params::ParameterSet params;
+    params::Modulator modulator;
+    signals::SignalBus bus;
+    comp.attach(params, modulator);
+    comp.setViewport(1920, 1080);
+    comp.scene().detailLimits.entityDistanceCull = false;
+    for (int frame = 0; frame <= 60; ++frame) {
+        FrameTime time;
+        time.renderTime = static_cast<double>(frame) / 60.0;
+        time.deltaTime = frame == 0 ? 0.0 : 1.0 / 60.0;
+        time.frameIndex = static_cast<std::uint64_t>(frame);
+        params.resetFinals();
+        comp.updateFields(time, bus, modulator);
+        modulator.applyRoutes(bus, params, time.deltaTime);
+        comp.updateBehaviour(time, bus);
+        comp.update(time);
+    }
+
+    const scene::MotionContext* ctx = comp.motionContext("alien-walk");
+    REQUIRE(ctx != nullptr);
+
+    // The frame's own dt, carried across the seam because only the entity tier knows it.
+    CHECK(ctx->dt == Approx(1.0f / 60.0f).margin(1e-5));
+    CHECK(ctx->time == Approx(1.0).margin(1e-6));
+
+    // The body's own scale, which is what lets a layer state a threshold as a ratio (ADR-552). The
+    // alien is 1.662 m at rest; the assertion is loose because the *number* is the asset's business
+    // and the point is that it is a body height and not a default 1.0 nobody filled in.
+    INFO("rest height " << ctx->restHeight);
+    CHECK(ctx->restHeight > 1.0f);
+    CHECK(ctx->restHeight < 3.0f);
+
+    // A ground query is installed and answers under the alien. Null here would mean a layer
+    // silently fell back to the body plane, which is ADR-551's whole subject.
+    REQUIRE(ctx->ground != nullptr);
+    const glm::vec3 underfoot = ctx->toWorld(glm::vec3(0.0f, 0.0f, 0.0f));
+    const scene::GroundSample sample = ctx->ground->sampleAt(underfoot);
+    INFO("sampled at " << underfoot.x << "," << underfoot.y << "," << underfoot.z);
+    CHECK(sample.valid);
+
+    // **The space assertion, which is the one that can fail.** The alien stands at roughly
+    // (-185, 40, -163) in the world and at the origin of its own rig. A context that had forgotten
+    // to convert would carry world-sized numbers here.
+    CHECK(glm::length(underfoot) > 100.0f);              // the world position really is far away
+    CHECK(std::abs(ctx->groundPoint.x) < 10.0f);         // and the local one really is not
+    CHECK(std::abs(ctx->groundPoint.z) < 10.0f);
+    CHECK(ctx->hasGroundPlane);
+
+    // The local ground normal is a unit vector pointing broadly up in the rig's own frame.
+    CHECK(glm::length(ctx->groundNormal) == Approx(1.0f).margin(1e-3));
+    CHECK(ctx->groundNormal.y > 0.5f);
+
+    // The stride quality number Phase B exists to drive to 1, present and finite whatever it says.
+    CHECK(std::isfinite(ctx->strideRatio));
+    CHECK(ctx->strideRatio > 0.0f);
+#endif
+}

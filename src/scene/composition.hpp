@@ -22,6 +22,7 @@
 #include "scene/day_night.hpp"
 #include "scene/field_params.hpp"
 #include "scene/ground_query.hpp"
+#include "scene/motion_context.hpp"
 #include "scene/camera_rig.hpp"
 #include "scene/light_rig.hpp"
 #include "scene/material_params.hpp"
@@ -1590,6 +1591,11 @@ private:
         // Separate because it does a different thing -- it does not push an animation *state*, it
         // writes this frame's intent onto the node's layer stack, in the entity's own frame.
         void driveLayers(const entity::LocomotionState& state);
+        // Phase B §4. The context the procedural layers read, rebuilt from the seam each frame and
+        // kept so a layer, a test or a debug view can ask for it without re-deriving the node's
+        // world transform. Valid only after `driveLayers` has run for this frame.
+        [[nodiscard]] const MotionContext& motion() const { return motion_; }
+        [[nodiscard]] const std::string& nodeName() const { return node_; }
         // The joint's transform in the entity's own frame -- the rig's model space. False when
         // this node carries no rig, no rig of its carries the joint, or the rig has not been posed.
         [[nodiscard]] bool jointTransform(std::string_view joint, scene::Transform& out) const override;
@@ -1611,8 +1617,18 @@ private:
         mutable RigId modelRig_ = kInvalidRig;
         mutable std::uint64_t modelVersion_ = 0;
         mutable bool modelValid_ = false;
+        MotionContext motion_;
     };
     std::vector<std::unique_ptr<AnimationSink>> animationSinks_;
+
+public:
+    // The motion context most recently built for `node`, or null when that node drives no entity
+    // or has not been updated yet. Phase B §50 wants this for a debug view; a test wants it to
+    // check that the seam arrived, which is the only way to catch a field published into a
+    // context nobody reads.
+    [[nodiscard]] const MotionContext* motionContext(std::string_view node) const;
+
+private:
 
     std::vector<world::WorldEffect> worldEffects_; // ADR-207: authored, round-tripped as "worldEffects"
     // ADR-230: authored, round-tripped as "atmosphericEffects"
