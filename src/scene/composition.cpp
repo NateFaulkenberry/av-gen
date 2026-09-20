@@ -3134,6 +3134,7 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
     node.visibleParam = nullptr;
     node.emissiveParam = nullptr;
     node.roughnessParam = nullptr;
+    node.opacityParam = nullptr;
     node.particleParams = {};
 
     switch (node.kind) {
@@ -4032,6 +4033,9 @@ void Composition::registerNodeParameters(CompositionNode& node) {
         &params_->add(floatDesc(base + "emissiveBoost", node.emissiveBoost, 0.0f, 50.0f, 0.0f, 8.0f));
     node.roughnessParam =
         &params_->add(floatDesc(base + "roughnessScale", node.roughnessScale, 0.0f, 2.0f, 0.0f, 2.0f));
+    // ADR-385: the whole-node fade. Hard range [0,1] so nothing can ramp it past opaque.
+    node.opacityParam =
+        &params_->add(floatDesc(base + "opacity", node.opacityScale, 0.0f, 1.0f, 0.0f, 1.0f));
     // The lights the node's asset brought with it. A scale and a tint rather than absolute values,
     // because the asset's own numbers are the authored starting point and a scene should not have to
     // restate them to dim one lamp.
@@ -4170,7 +4174,8 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
     if (params_ != nullptr) {
         const std::string base = prefix_ + "nodes/" + node.name + "/";
         for (const char* suffix :
-             {"position", "rotation", "scale", "visible", "emissiveBoost", "roughnessScale"}) {
+             {"position", "rotation", "scale", "visible", "emissiveBoost", "roughnessScale",
+              "opacity"}) {
             params_->remove(base + suffix);
         }
         // ADR-375: the wind body's leaves, by their exact paths. A suffix table and never a prefix
@@ -4258,6 +4263,7 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
     node.visibleParam = nullptr;
     node.emissiveParam = nullptr;
     node.roughnessParam = nullptr;
+    node.opacityParam = nullptr;
     node.particleParams = {};
 }
 
@@ -4301,6 +4307,7 @@ void Composition::detach() {
         node->visibleParam = nullptr;
         node->emissiveParam = nullptr;
         node->roughnessParam = nullptr;
+        node->opacityParam = nullptr;
         node->lightIntensityParam = nullptr;
         node->lightColorParam = nullptr;
         node->windStrengthParam = nullptr;
@@ -6337,6 +6344,9 @@ void Composition::applyParameters() {
         if (node.roughnessParam != nullptr) {
             node.roughnessScale = node.roughnessParam->base();
         }
+        if (node.opacityParam != nullptr) {
+            node.opacityScale = node.opacityParam->base();
+        }
 
         const Transform nodeT = nodeWorldTransform(node);
         bool visible = nodeVisible(node);
@@ -6366,6 +6376,12 @@ void Composition::applyParameters() {
         }
         const float roughnessScale =
             node.roughnessParam != nullptr ? node.roughnessParam->value() : node.roughnessScale;
+        const float opacityScale =
+            node.opacityParam != nullptr ? node.opacityParam->value() : node.opacityScale;
+        // Only touch a material's opacity on a node that has been faded at all, ever. Writing
+        // `rest * 1.0` every frame for every node would be correct and would also mean every node
+        // in the scene had its alpha mode reassigned sixty times a second for nothing.
+        const bool fading = opacityScale < 1.0f || !range.restOpacity.empty();
         const Transform full = compose(root, nodeT);
         range.world = full;
         range.worldValid = true;
@@ -6410,6 +6426,28 @@ void Composition::applyParameters() {
             if (e.style == MeshStyle::Lit) {
                 e.material.emissiveIntensity = range.restEmissive[k] * emissiveBoost;
                 e.material.roughness = std::clamp(range.restRoughness[k] * roughnessScale, 0.0f, 1.0f);
+            }
+            if (fading) {
+                // Capture before the first write, once. `restOpacity` is empty on a freshly built
+                // range, which is exactly when the asset's own numbers are still in place.
+                if (range.restOpacity.size() != range.entityCount) {
+                    range.restOpacity.assign(range.entityCount, 1.0f);
+                    range.restAlphaMode.assign(range.entityCount, 0u);
+                    for (std::size_t q = 0;
+                         q < range.entityCount && range.firstEntity + q < scene_.entities.size();
+                         ++q) {
+                        const Entity& src = scene_.entities[range.firstEntity + q];
+                        range.restOpacity[q] = src.material.opacity;
+                        range.restAlphaMode[q] = static_cast<std::uint8_t>(src.material.alphaMode);
+                    }
+                }
+                e.material.opacity = std::clamp(range.restOpacity[k] * opacityScale, 0.0f, 1.0f);
+                // The half without which the number does nothing: `pbr_shade.wgsl` throws an
+                // OPAQUE material's alpha away. Restored to the asset's own mode the moment the
+                // fade is over, so a node is never left in a blend pipeline it did not ask for.
+                e.material.alphaMode = opacityScale < 1.0f
+                                           ? AlphaMode::Blend
+                                           : static_cast<AlphaMode>(range.restAlphaMode[k]);
             }
         }
 

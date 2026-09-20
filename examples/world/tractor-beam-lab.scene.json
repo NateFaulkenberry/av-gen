@@ -2199,6 +2199,12 @@
       "max": 10.0
      },
      {
+      "name": "fadeSeconds",
+      "value": 0.6,
+      "min": 0.1,
+      "max": 10.0
+     },
+     {
       "name": "glowFadeSeconds",
       "value": 1.9,
       "min": 0.0,
@@ -2404,10 +2410,6 @@
           "rate": {
            "param": "animalGait"
           }
-         },
-         {
-          "kind": "retire",
-          "name": "vanish"
          }
         ]
        },
@@ -2428,12 +2430,27 @@
          },
          {
           "kind": "set",
+          "name": "fade",
+          "target": "opacity",
+          "from": 1.0,
+          "to": 0.0,
+          "duration": {
+           "param": "fadeSeconds"
+          },
+          "ease": true
+         },
+         {
+          "kind": "set",
           "name": "glow-fade",
           "target": "emissiveBoost",
           "to": 0.0,
           "duration": {
            "param": "glowFadeSeconds"
           }
+         },
+         {
+          "kind": "retire",
+          "name": "vanish"
          }
         ]
        }
