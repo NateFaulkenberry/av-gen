@@ -1373,7 +1373,8 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // Import Audio... button. The menu item and the shortcut are *not* duplicates of each other
         // -- one is discoverable and one is fast -- and the button is where a person looking at a
         // timeline goes to put a song on it. All three are this callback.
-        panel_->onFreeCamera = [this]() { ensureFreeCamera(); };
+        panel_->onFreeCamera = [this]() { ensureFreeCamera(/*deliberate=*/true); };
+        panel_->cameraLocked = &cameraLocked_;
         panel_->onOpenAudio = dialog(platform::Window::DialogKind::Audio);
         panel_->sequence.onOpenAudio = panel_->onOpenAudio;
         panel_->onOpenScene = dialog(platform::Window::DialogKind::Scene);
@@ -2317,8 +2318,37 @@ void Application::setViewportPose(const CameraPose& pose) {
     }
 }
 
-void Application::ensureFreeCamera() {
+void Application::ensureFreeCamera(bool deliberate) {
     if (engine_ == nullptr) {
+        return;
+    }
+    // The lock, and it is FIRST, before anything below mutates.
+    //
+    // It sat after the free-roam block to begin with, which was a half-applied state: a locked drag
+    // still set `viewportFreeRoam` and copied the live pose onto `camera/position`'s base, then
+    // refused to stand the director down and told the user nothing had happened. A refusal that
+    // changes the project anyway is worse than no refusal, because now the message is wrong too.
+    //
+    // So a locked, incidental gesture is a complete no-op plus a sentence saying how to ask
+    // properly. The cost is real and is the brief's §7 bargain: while the cut is locked, the
+    // viewport cannot move the camera at all. There is no separate editor camera in this engine --
+    // the viewport IS `camera/*` -- so "navigate without modifying" is not something this
+    // architecture can offer yet, and pretending otherwise would be the harder lie to unpick.
+    // The lock asks what would actually be lost rather than assuming there is something.
+    if (cameraDirection_.directed &&
+        !ui::viewportMayReleaseDirector(true, cameraLocked_, deliberate,
+                                        directedCameraBakeSize(*engine_) > 0)) {
+        if (panel_ != nullptr) {
+            panel_->setStatus("camera is locked: this project's cut is baked. Unlock in the Cameras "
+                              "panel to edit it (that discards the director's cut).");
+        }
+        if (!cameraLockAnnounced_) {
+            cameraLockAnnounced_ = true;
+            log::info("viewport: camera locked; a drag will not stand the director down "
+                      "({} aim-follow, {} shot span(s) protected)",
+                      engine_->composition() != nullptr ? engine_->composition()->aimFollow().size() : 0,
+                      engine_->shotSpans().size());
+        }
         return;
     }
     // **Stand the director's camera down, if one of its rigs has the frame.**
@@ -3144,6 +3174,32 @@ void Application::serviceViewportPick() {
                 panel_->editor.selection.set(ref);
             }
             return; // the light took the click
+        }
+
+        // Cameras, the same way and after the lights: where a camera body and a light marker
+        // overlap the light wins, because a light is the thing a person is usually reaching for
+        // while composing and a camera can also be chosen from its own panel.
+        std::vector<glm::vec3> cameraPositions;
+        std::vector<const scene::CameraRig*> rigs;
+        for (const scene::CameraRig& rig : comp.cameraDirection().cameras) {
+            cameraPositions.push_back(rig.position);
+            rigs.push_back(&rig);
+        }
+        const int cameraHit =
+            ui::pickProjectedPoint(cameraPositions, camera, aspect, ndc, ui::kHelperPickRadius);
+        if (cameraHit >= 0) {
+            const scene::CameraRig& rig = *rigs[static_cast<std::size_t>(cameraHit)];
+            const ui::SelectionRef ref{ui::SelectionRef::Kind::Camera, rig.name};
+            if (viewportPickAdditive_) {
+                panel_->editor.selection.toggle(ref);
+            } else {
+                panel_->editor.selection.set(ref);
+            }
+            // Canvas -> panel, the other half of §4's "selection must remain synchronized in both
+            // directions". The panel's own selection was a private id with no observer, which is
+            // the same shape as the sequencer's selection having no reader anywhere in the tree.
+            panel_->selectCamera(rig.id);
+            return; // the camera took the click
         }
     }
 
@@ -3990,6 +4046,10 @@ int Application::runLive() {
                     }
                 }
             }
+            // Whether there is a baked cut to protect, refreshed each frame: the Auto-director can
+            // be enabled or stood down while the panel is open, and a lock offered for a cut that
+            // no longer exists is a control that guards nothing.
+            panel_->cameraDirected = cameraDirection_.directed;
             panel_->draw(*engine_, stats);
             // Raised *after* the panels are submitted, because ImGui cannot focus a window it has
             // not seen this frame. The focus lands on the next frame, which is why the capture frame

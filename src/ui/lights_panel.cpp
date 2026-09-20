@@ -281,7 +281,7 @@ void drawLightsPanel(app::Engine& engine, Selection& selection, EditHistory& his
             // id is what is guaranteed unique.
             ImGui::PushID(id.c_str());
 
-            const std::string enabledPath = "lights/" + id + "/enabled";
+            const std::string enabledPath = lightParameterBase(a) + "enabled";
             checkbox(engine, enabledPath, "##en");
             ImGui::SameLine();
 
@@ -321,7 +321,7 @@ void drawLightsPanel(app::Engine& engine, Selection& selection, EditHistory& his
     }
     const scene::Composition::AuthoredLight& light = *it;
     const std::string id = scene::Composition::authoredLightId(light);
-    const std::string base = "lights/" + id + "/";
+    const std::string base = lightParameterBase(light);
     const scene::PunctualLight::Type type = light.light.type;
 
     ImGui::Spacing();

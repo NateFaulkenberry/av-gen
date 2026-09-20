@@ -1,5 +1,7 @@
 #include "ui/control_panel.hpp"
-#include "ui/cosmic_panel.hpp"
+
+#include "ui/param_widget.hpp"
+#include "ui/environment_panel.hpp"
 #include "ui/lights_panel.hpp"
 
 #include <cstring>
@@ -28,6 +30,7 @@
 #include <implot.h>
 
 #include <algorithm>
+#include <string_view>
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -641,7 +644,6 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     panel("Cameras", ImVec2(420, 560), [&] { drawCameras(engine); });
     panel("World Effects", ImVec2(460, 620), [&] { worldEffects.draw(engine); });
     panel("Environment", ImVec2(460, 620), [&] { ui::drawEnvironmentPanel(engine); });
-    panel("Tree", ImVec2(460, 680), [&] { ui::drawTreePanel(engine); });
     panel("Lights", ImVec2(460, 700),
           [&] { ui::drawLightsPanel(engine, editor.selection, editor.history()); });
     panel("Sequence", ImVec2(900, 420), [&] {
@@ -1535,6 +1537,17 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             targetNames.push_back(p->path().c_str());
         }
     }
+    // Alphabetical, not registration order. This list is every modulatable parameter in the project
+    // -- over three thousand on Glowmere Valley 2 -- and registration order is an implementation
+    // detail of who called `add` first, so a person hunting for `atmos/Cosmic Vortex/density` had no
+    // way to predict where it sat. Sorted, the prefix groups everything that belongs together and
+    // the combo's own type-ahead starts working, because ImGui matches against consecutive entries.
+    //
+    // `newRouteTarget_` is an index into this vector, so the ordering has to be the same every
+    // frame or the selection would drift under the cursor. Sorting by the path is deterministic and
+    // the paths are unique (a `ParameterSet` is keyed by them), so there are no ties to break.
+    std::sort(targetNames.begin(), targetNames.end(),
+              [](const char* a, const char* b) { return std::string_view(a) < std::string_view(b); });
     newRouteSource_ = std::clamp(newRouteSource_, 0, std::max(0, static_cast<int>(signalNames.size()) - 1));
     newRouteTarget_ = std::clamp(newRouteTarget_, 0, std::max(0, static_cast<int>(targetNames.size()) - 1));
     ImGui::SetNextItemWidth(200);
@@ -1906,49 +1919,13 @@ void ControlPanel::drawParameters(app::Engine& engine) {
       if (!groupOpen) {
           continue;
       }
-      for (IParameter* param : grouped[group]) {
+      // One row. Extracted so the sub-group pass below can draw rows in two places -- the group's
+      // own direct members and each sub-group's -- without a second copy of the annotations.
+      const auto drawRow = [&](IParameter* param) {
         ImGui::PushID(param->path().c_str());
         const std::size_t n = param->componentCount();
-        float values[4] = {};
-        for (std::size_t i = 0; i < n && i < 4; ++i) {
-            values[i] = param->baseComponent(i);
-        }
-        bool changed = false;
-        switch (param->kind()) {
-        case ParamKind::Bool: {
-            bool b = values[0] >= 0.5f;
-            changed = ImGui::Checkbox(param->label().c_str(), &b);
-            values[0] = b ? 1.0f : 0.0f;
-            break;
-        }
-        case ParamKind::Int: {
-            int v = static_cast<int>(std::lround(values[0]));
-            changed = ImGui::SliderInt(param->label().c_str(), &v, static_cast<int>(param->softMin(0)),
-                                       static_cast<int>(param->softMax(0)));
-            values[0] = static_cast<float>(v);
-            break;
-        }
-        case ParamKind::Color:
-            changed = n == 4 ? ImGui::ColorEdit4(param->label().c_str(), values, ImGuiColorEditFlags_Float)
-                             : ImGui::ColorEdit3(param->label().c_str(), values, ImGuiColorEditFlags_Float);
-            break;
-        case ParamKind::Float:
-            changed = ImGui::SliderFloat(param->label().c_str(), values, param->softMin(0), param->softMax(0));
-            break;
-        default: {
-            // ImGui dereferences the range pointers; use the component-0 soft range for all lanes.
-            const float lo = param->softMin(0);
-            const float hi = param->softMax(0);
-            changed = ImGui::SliderScalarN(param->label().c_str(), ImGuiDataType_Float, values, static_cast<int>(n),
-                                           &lo, &hi);
-            break;
-        }
-        }
-        if (changed) {
-            for (std::size_t i = 0; i < n && i < 4; ++i) {
-                param->setBaseComponent(i, values[i]);
-            }
-        }
+        // ADR-387: the one implementation, shared with the World panel's Inspector.
+        drawParameterValue(*param);
         // Show the modulated (final) value next to the slider when it differs.
         if (n == 1 && std::abs(param->finalComponent(0) - param->baseComponent(0)) > 1e-5f) {
             ImGui::SameLine();
@@ -1996,6 +1973,79 @@ void ControlPanel::drawParameters(app::Engine& engine) {
             ImGui::EndPopup();
         }
         ImGui::PopID();
+      };
+
+      // ---- sub-groups, because "enabled" is not the name of anything ----------------------------
+      //
+      // `group()` is the FIRST path segment and `label()` is the LAST, so everything between them
+      // was being thrown away. Under `post` that put `post/bloom/enabled`, `post/halation/enabled`
+      // and `post/anamorphic/enabled` in one flat list as three checkboxes all labelled "enabled",
+      // above three sliders all labelled "intensity". The owner reported it exactly: "I have no
+      // idea what I'm enabling when I click a checkbox."
+      //
+      // So the middle of the path becomes a heading. Nothing here knows the name of any subsystem
+      // -- the structure is read off the paths, the same way the World panel's Inspector groups a
+      // node's properties (ADR-387), which is what keeps this from becoming a table of special
+      // cases that goes stale the moment somebody registers a new effect.
+      std::vector<IParameter*> direct;
+      std::vector<std::string> subOrder;
+      std::unordered_map<std::string, std::vector<IParameter*>> subs;
+      for (IParameter* param : grouped[group]) {
+          const std::string sub = ui::parameterSubGroup(param->path(), group);
+          if (sub.empty()) {
+              direct.push_back(param);
+              continue;
+          }
+          auto [it, inserted] = subs.try_emplace(sub);
+          if (inserted) {
+              subOrder.push_back(sub);
+          }
+          it->second.push_back(param);
+      }
+      for (IParameter* param : direct) {
+          drawRow(param);
+      }
+      // Open by default only where that is not itself a wall. `post` has a handful of sub-groups and
+      // wants them all visible; `nodes` has one per node -- eighty on Glowmere Valley 2 -- and
+      // opening those would undo the reason the outer groups are closed in the first place.
+      const bool subsOpenByDefault = subOrder.size() <= 8;
+      for (const std::string& sub : subOrder) {
+          std::vector<IParameter*>& members = subs[sub];
+          // The section's own switch, found by its leaf rather than by a list of known names.
+          IParameter* gate = nullptr;
+          for (IParameter* param : members) {
+              if (ui::parameterLeaf(param->path()) == "enabled") {
+                  gate = param;
+              }
+          }
+          const bool on = gate == nullptr || gate->baseComponent(0) >= 0.5f;
+          ImGui::PushID(sub.c_str());
+          const bool subOpen = ImGui::TreeNodeEx(
+              sub.c_str(), subsOpenByDefault ? ImGuiTreeNodeFlags_DefaultOpen : 0);
+          if (gate != nullptr && !on) {
+              // Said on the header, so a collapsed section still tells the truth about itself.
+              ImGui::SameLine();
+              ImGui::TextDisabled("(off)");
+          }
+          if (subOpen) {
+              // The switch first and always live, then everything it gates. Greying the rest is the
+              // owner's second request and it is also an answer to a real ambiguity: a slider that
+              // reads 0.5 in a section that is off looks exactly like a slider that is doing
+              // something. The values are kept and saved either way -- this changes what the panel
+              // says, not what the project holds.
+              if (gate != nullptr) {
+                  drawRow(gate);
+              }
+              ImGui::BeginDisabled(!on);
+              for (IParameter* param : members) {
+                  if (param != gate) {
+                      drawRow(param);
+                  }
+              }
+              ImGui::EndDisabled();
+              ImGui::TreePop();
+          }
+          ImGui::PopID();
       }
       ImGui::TreePop();
     }
@@ -3884,6 +3934,32 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         ImGui::SameLine();
         ImGui::Text("-- blending %.0f%%", static_cast<double>(active.blend) * 100.0);
     }
+
+    // The lock (viewport brief §7), and it is a guard on data loss rather than a convenience.
+    //
+    // A directed project's cut is **baked**: timeline tracks on six camera targets, an aim-follow
+    // table and a shot-span table. Dragging the viewport used to stand the director down and
+    // discard all of it, and the next Save wrote the loss -- observed for real, recovered from git.
+    // Re-baking does not undo it either, because it re-photographs the hero anchors (ADR-344).
+    //
+    // Shown only when there is something to protect, so an undirected project is not asked to think
+    // about a lock that guards nothing.
+    if (cameraDirected && cameraLocked != nullptr) {
+        ImGui::Separator();
+        bool locked = *cameraLocked;
+        if (ImGui::Checkbox("Lock camera (this project's cut is baked)", &locked)) {
+            *cameraLocked = locked;
+        }
+        if (locked) {
+            ImGui::TextColored(ImVec4(0.62f, 0.66f, 0.72f, 1.0f),
+                               "  Navigating the viewport will not change the authored cut.");
+        } else {
+            ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.4f, 1.0f),
+                               "  Unlocked: moving the viewport camera DISCARDS the director's cut\n"
+                               "  (its tracks, aim-follow table and shot spans). Re-running the\n"
+                               "  director makes a different cut, not the same one back.");
+        }
+    }
     ImGui::Separator();
 
     if (ImGui::Button("+ Camera")) {
@@ -3914,10 +3990,52 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         }
         if (ImGui::Selectable(label.c_str(), selected)) {
             selectedCamera_ = rig.id;
+            // panel -> Canvas: the same `Selection` the viewport and the Lights panel share, so a
+            // camera chosen here highlights in the world (§4's "selection must remain synchronized
+            // in both directions"). Before this, `selectedCamera_` had no observer anywhere.
+            editor.selection.set(SelectionRef{SelectionRef::Kind::Camera, rig.name});
         }
         if (selected) {
             ImGui::Indent();
             if (rig.id != scene::kMainCamera) {
+                // "Go to camera": the editor viewpoint moves to match this camera. It is NOT
+                // the brief's §6 "look through camera" and is deliberately not labelled as one.
+                //
+                // Looking *through* a camera would mean pinning the viewport to this rig, and
+                // there is no such concept: `viewportFreeRoam` pins the frame to the MAIN camera
+                // and nothing pins it to an authored one. Worse, under a directed project the
+                // timeline drives `camera/*` every frame, so a pose written here is replaced
+                // before it is seen unless the director is stood down -- which is exactly the
+                // destruction the lock exists to prevent.
+                //
+                // So the button does the honest, useful subset and says so. Disabled while the cut
+                // is locked, because there it would visibly do nothing, and a control that appears
+                // to work and does not is the defect this branch has spent its time removing.
+                const bool goToBlocked = cameraDirected && cameraLocked != nullptr && *cameraLocked;
+                ImGui::BeginDisabled(goToBlocked);
+                if (ImGui::Button("Go to camera")) {
+                    const std::string prefix = rig.channelPrefix();
+                    const auto* pos = engine.params().find(prefix + "position");
+                    const auto* tgt = engine.params().find(prefix + "target");
+                    if (auto* vp = engine.params().find("camera/position"); vp != nullptr && pos != nullptr) {
+                        for (std::size_t c = 0; c < 3; ++c) {
+                            vp->setBaseComponent(c, pos->baseComponent(c));
+                        }
+                    }
+                    if (auto* vt = engine.params().find("camera/target"); vt != nullptr && tgt != nullptr) {
+                        for (std::size_t c = 0; c < 3; ++c) {
+                            vt->setBaseComponent(c, tgt->baseComponent(c));
+                        }
+                    }
+                    setStatus("viewport moved to '" + rig.name + "' -- this is the editor camera, "
+                              "not a binding to that one");
+                }
+                ImGui::EndDisabled();
+                if (goToBlocked && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    ImGui::SetTooltip("The director drives the viewport camera every frame while "
+                                      "the cut is locked, so this would not stick.");
+                }
+                ImGui::SameLine();
                 if (ImGui::Button("Place here")) {
                     // The viewport's pose onto this camera's *base* values. A parameter, never the
                     // derived scene camera: ADR-218's rule, and the reason this does not evaporate

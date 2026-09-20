@@ -73,10 +73,14 @@ VolumeRenderer::VolumeRenderer(gpu::Context& context, gpu::ShaderLibrary& shader
 VolumeRenderer::~VolumeRenderer() = default;
 
 bool VolumeRenderer::enabled(const scene::Environment& environment) {
-    // ADR-371: the vortex lives in this march, so it has to be able to switch the march on. The
-    // Tree of Life scene runs with volumeDensity 0 -- it wants no fog at all -- and gating the
-    // vortex behind the fog's density would have made it unreachable in the one scene it is for.
-    return environment.volumeDensity > 0.0f || environment.vortex.active();
+    // ADR-387: the vortex moved out of `Environment` and into the atmospheric effects, so this
+    // overload can no longer see it. Kept for the fog-only callers; `enabled(scene)` below is the
+    // one that knows about both.
+    return environment.volumeDensity > 0.0f;
+}
+
+bool VolumeRenderer::enabled(const scene::Scene& scene) {
+    return scene.environment.volumeDensity > 0.0f || scene.atmospherics.hasVortex;
 }
 
 const gpu::RenderTarget& VolumeRenderer::target() const {
@@ -324,7 +328,7 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     im.passThisFrame = false;
     stats_ = VolumeStats{};
     const scene::Environment& env = scene.environment;
-    if (!im.initialised || !enabled(env) || width == 0 || height == 0) {
+    if (!im.initialised || !enabled(scene) || width == 0 || height == 0) {
         return;
     }
     // ADR-139: the tier decides how finely the volume is sampled; the scene decides what the
@@ -364,8 +368,8 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     // ADR-371: the vortex. Written as all-zero when the radius is zero, which is the state of
     // every scene that has not asked for one, so the march's added branch is never taken.
     {
-        const scene::Environment::Vortex& v = scene.environment.vortex;
-        if (v.active()) {
+        const world::Vortex& v = scene.atmospherics.vortex;
+        if (scene.atmospherics.hasVortex && v.active()) {
             u.vortex0 = glm::vec4(v.center, v.radius);
             u.vortex1 = glm::vec4(std::max(v.thickness, 0.01f), v.swirl, v.rotationSpeed,
                                   std::max(v.density, 0.0f));
@@ -378,7 +382,12 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
             u.vortexAccent = glm::vec4(v.colorAccent, 0.0f);
             u.vortex4 = glm::vec4(std::max(v.funnelDepth, 0.0f), std::clamp(v.throat, 0.02f, 1.0f),
                                   std::clamp(v.throatDensity, 0.0f, 1.0f), 0.0f);
-            u.vortex5 = glm::vec4(std::max(v.cometResponse, 0.0f), std::max(v.cometReach, 1.0f), 0.0f, 0.0f);
+            // ADR-388: `.z` is the scene-light scattering coefficient, 0 by default. See the
+            // march's comment at `let scattering = ...` for what 1.0 was measured to do.
+            u.vortex5 = glm::vec4(std::max(v.cometResponse, 0.0f), std::max(v.cometReach, 1.0f),
+                                  std::max(v.scattering, 0.0f), 0.0f);
+            u.vortex6 = glm::vec4(std::max(v.smokeWarp, 0.0f), std::clamp(v.smokeBillow, 0.0f, 1.0f),
+                                  std::max(v.detail, 0.0f), 0.0f);
         } else {
             u.vortex0 = glm::vec4(0.0f);
             u.vortex1 = glm::vec4(0.0f);
@@ -389,6 +398,7 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
             u.vortexAccent = glm::vec4(0.0f);
             u.vortex4 = glm::vec4(0.0f);
             u.vortex5 = glm::vec4(0.0f);
+            u.vortex6 = glm::vec4(0.0f);
         }
     }
     im.context.queue().WriteBuffer(im.uniforms, 0, &u, sizeof(u));

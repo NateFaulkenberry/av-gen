@@ -14,8 +14,20 @@
 // plane (depth of field, ADR-037) or by distance from a band across the frame (the tilt-shift,
 // ADR-079), or by both at once, whichever circle is larger.
 //
-// Passes run only when their settings are active; with everything off and a unit exposure the
-// input is returned unchanged. Selective post (bloom weighted by emission, sharpening masked by
+// Passes run only when their settings are active. With everything off and a unit exposure the
+// chain is a SINGLE COMPOSITE PASS carrying the grade -- not a pass-through: `run()` always encodes
+// the composite and always returns a pool texture, never `in.sceneHdr`, and at default grade
+// settings `fs_composite` is the identity only to within a float ulp (`pow(x, 1.0)` lowers to
+// `exp2(log2(x))` and runs twice, `max(colour, 1e-5)` lifts true black, and the 0.18 divide and
+// multiply do not cancel in binary floating point).
+//
+// This sentence used to say "the input is returned unchanged", and docs/image-look-spec.md quoted
+// it as proof that the spec's own no-change guarantee already existed. It did not. A feature that
+// must not change the image therefore proves it DIFFERENTIALLY -- against the same build without
+// the feature -- rather than against the scene HDR, which is a comparison that could never pass
+// (ADR-368, ADR-182). docs/image-formation.md has the long version.
+//
+// Selective post (bloom weighted by emission, sharpening masked by
 // object identifier) uses the ADR-035 auxiliary targets when the caller supplies them in
 // PostFrameInputs, and silently falls back to the luminance-only behaviour when it does not.
 
@@ -28,6 +40,7 @@
 #include <glm/glm.hpp>
 #include <webgpu/webgpu_cpp.h>
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -232,8 +245,17 @@ private:
     wgpu::TextureView depthPlaceholderView_;
     wgpu::Texture idPlaceholder_;
     wgpu::TextureView idPlaceholderView_;
-    wgpu::Buffer meterReadback_;
-    bool meterPending_ = false;   // a copy into meterReadback_ is in flight
+    // ADR-385: a RING, not one buffer. With a single buffer `takeMeasurement` mapped the copy
+    // issued by the PREVIOUS frame, which on a pipelined renderer has often not executed yet, so
+    // the blocking map drained the pipeline -- measured at +1.577 ms of CPU per frame. Reading the
+    // slot written two frames ago instead means the copy has long landed and the map returns
+    // without a stall. Two slots is exactly enough: `takeMeasurement` reads the slot
+    // `encodeMetering` is about to overwrite, which with two slots is the one written two frames
+    // back.
+    static constexpr std::uint32_t kMeterSlots = 2;
+    std::array<wgpu::Buffer, kMeterSlots> meterReadback_;
+    std::array<bool, kMeterSlots> meterPending_{}; // a copy into that slot is in flight
+    std::uint32_t meterSlot_ = 0;                  // the slot to read now and write next
     bool haveMeasurement_ = false;
     float measuredLuminance_ = 0.0f;
     scene::ExposureState exposureState_;

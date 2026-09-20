@@ -6,6 +6,7 @@
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
 #include "ui/help_panel.hpp"
+#include "ui/ui_logic.hpp"
 #include "world/atmospheric_params.hpp"
 #include "world/atmospherics.hpp"
 #include "world/effect_params.hpp"
@@ -16,6 +17,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -482,6 +485,30 @@ void WorldEffectsPanel::drawAdvanced(app::Engine& engine, const world::WorldEffe
 namespace {
 
 const char* const kGroundGlowNames[] = {"off", "subtle", "strong"};
+
+// ADR-387: walks a declared row list. The panel and `tests/unit/test_world_effects_panel.cpp` ask
+// the same question of the same data, which is the thing ADR-382's defect was missing -- there, the
+// path arithmetic lived inside the draw call and no test could reach it.
+void drawEffectRows(app::Engine& engine, const std::string& prefix, std::span<const EffectRow> rows) {
+    for (const EffectRow& r : rows) {
+        if (!r.section.empty()) {
+            const std::string section(r.section);
+            ImGui::SeparatorText(section.c_str());
+        }
+        const std::string leaf(r.leaf);
+        const std::string label(r.label);
+        if (r.color) {
+            paramColor(engine, prefix, leaf.c_str(), label.c_str());
+            continue;
+        }
+        const std::string format(r.format);
+        paramSlider(engine, prefix, leaf.c_str(), label.c_str(),
+                    format.empty() ? "%.2f" : format.c_str(), r.logarithmic);
+        if (!r.tip.empty() && ImGui::IsItemHovered()) {
+            tooltipUnformatted(std::string(r.tip).c_str());
+        }
+    }
+}
 const char* const kSkyAnchorNames[] = {"a fixed world point", "the camera"};
 
 } // namespace
@@ -529,11 +556,21 @@ void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
         return name;
     };
     const auto append = [&](world::AtmosphericEffect effect) {
+        const std::string name = effect.name;
         std::vector<world::AtmosphericEffect> next = authored;
         next.push_back(std::move(effect));
         if (auto ok = engine.setAtmosphericEffects(std::move(next)); !ok) {
             status_ = ok.error().message;
+            return;
         }
+        // ADR-392. The family's premise is that audio reaches an effect as an ordinary modulation
+        // route rather than as a hook, and `defaultAtmosphericRoutes` is what implements it -- but
+        // until now nothing called it, so "Add aurora" made an aurora that answered nothing and six
+        // routes somebody had to author by hand. The routes are ordinary: they appear in the
+        // Modulation panel, can be re-pointed, curved or deleted there, and are saved in the project
+        // like every other route. Attached after the effect, because registration happens in the
+        // call above and a route bound before its target exists binds to nothing.
+        engine.addDefaultAtmosphericRoutes(name);
     };
 
     if (ImGui::Button("Add comet")) {
@@ -551,6 +588,15 @@ void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
     if (ImGui::IsItemHovered()) {
         tooltip("Curtains rising from the horizon, shaped by the audio spectrum.\n"
                           "Always on and fading up: an aurora is scenery that breathes.");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Add vortex")) {
+        append(world::cosmicVortex(unique("Cosmic Vortex")));
+    }
+    if (ImGui::IsItemHovered()) {
+        tooltip("A turning funnel of luminous medium, drawn inside the volumetric march.\n"
+                          "It is placed in the world rather than on the sky dome, and it is the\n"
+                          "only atmospheric that a particle system can name as its attractor.");
     }
 
     if (authored.empty()) {
@@ -579,6 +625,7 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
                                         std::size_t index) {
     const std::string prefix = world::atmosphericParameterPrefix(authored.name);
     const bool isComet = authored.kind == world::AtmosphereKind::Comet;
+    const bool isVortex = authored.kind == world::AtmosphereKind::Vortex;
     const bool open = ImGui::CollapsingHeader(authored.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen |
                                                                         ImGuiTreeNodeFlags_AllowOverlap);
     ImGui::SameLine(ImGui::GetContentRegionAvail().x - 74.0f);
@@ -593,7 +640,9 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
     ImGui::Indent();
 
     // ---- preset ----
-    const auto styles = isComet ? world::cometStyleNames() : world::auroraStyleNames();
+    const auto styles = isComet    ? world::cometStyleNames()
+                        : isVortex ? world::vortexStyleNames()
+                                   : world::auroraStyleNames();
     std::vector<const char*> styleNames;
     int current = -1;
     for (std::size_t s = 0; s < styles.size(); ++s) {
@@ -608,9 +657,11 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
         // A preset is a shortcut through the same parameters, never a second way to control the
         // effect: it rewrites the authored values and the parameters take their defaults from those.
         const std::string_view style = styles[static_cast<std::size_t>(current)];
-        commitAtmospheric(engine, index, [isComet, style](world::AtmosphericEffect& e) {
+        commitAtmospheric(engine, index, [isComet, isVortex, style](world::AtmosphericEffect& e) {
             if (isComet) {
                 world::applyCometStyle(e, style);
+            } else if (isVortex) {
+                world::applyVortexStyle(e, style);
             } else {
                 world::applyAuroraStyle(e, style);
             }
@@ -619,26 +670,24 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
         return; // the parameters below have just been re-registered; draw them next frame
     }
 
-    if (isComet) {
-        paramColor(engine, prefix, "coreColor", "Core colour");
-        paramColor(engine, prefix, "tailColor", "Tail colour");
-        paramSlider(engine, prefix, "coreIntensity", "Core brightness");
-        paramSlider(engine, prefix, "headSize", "Head size", "%.0f m");
-        paramSlider(engine, prefix, "tailLength", "Tail length", "%.0f m");
-        paramSlider(engine, prefix, "tailWidth", "Tail width", "%.0f m");
+    if (isVortex) {
+        // ADR-387. `density` is extinction and `emission` is light -- ADR-374 is the whole reason
+        // they are two knobs, so they are labelled as two different things rather than as
+        // "opacity" and "glow", which is how they got confused in the first place. The rows are
+        // `ui::vortexRows()` rather than a page of calls, so that a test can ask the same question
+        // this code asks: does every leaf named here exist?
+        // Each row carries its own tooltip (ADR-388); the panel used to attach one to whatever it
+        // had drawn last, which meant appending a row moved somebody else's explanation.
+        drawEffectRows(engine, prefix, vortexRows());
+    } else if (isComet) {
+        // ADR-392: rows rather than a page of calls, for the reason the vortex's are --
+        // `conformance::checkLeavesExist` can walk a table and cannot walk an ImGui call. The two
+        // checkboxes stay here: they are `enabled`-shaped bools rather than value rows.
+        drawEffectRows(engine, prefix, cometRows());
         paramCheckbox(engine, prefix, "sparkle", "Sparkling fragments");
         paramCheckbox(engine, prefix, "rainbow", "Rainbow");
-        paramSlider(engine, prefix, "travelSeconds", "Crossing", "%.1f s");
     } else {
-        paramColor(engine, prefix, "lowColor", "Base colour");
-        paramColor(engine, prefix, "midColor", "Middle colour");
-        paramColor(engine, prefix, "topColor", "Top colour");
-        paramSlider(engine, prefix, "intensity", "Brightness");
-        paramSlider(engine, prefix, "curtainHeight", "Height", "%.0f m");
-        paramSlider(engine, prefix, "curtains", "Curtains", "%.0f");
-        paramSlider(engine, prefix, "flowSpeed", "Flow");
-        paramSlider(engine, prefix, "audioSensitivity", "Audio response");
-        paramSlider(engine, prefix, "spectrumShape", "Spectrum shape");
+        drawEffectRows(engine, prefix, auroraRows());
         paramCheckbox(engine, prefix, "rainbow", "Colour cycle");
     }
 
@@ -646,16 +695,21 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
     // The mode is a structural choice rather than a parameter: automating "should this light the
     // valley" is not a thing anybody wants, while automating *how much* is -- so the three words are
     // a combo and the intensity below is an ordinary modulatable parameter.
+    // ADR-387: not offered for a vortex. The ground glow is a pool on terrain, and the vortex is
+    // under the island with no terrain beneath it; its light on the world is `spill`, above. A combo
+    // that changed nothing would be worse than no combo.
     int ground = static_cast<int>(authored.ground.mode);
-    rowLabel("Ground glow");
-    if (ImGui::Combo("##ground", &ground, kGroundGlowNames, 3)) {
-        commitAtmospheric(engine, index, [ground](world::AtmosphericEffect& e) {
-            e.ground.mode = static_cast<world::GroundGlow>(std::clamp(ground, 0, 2));
-        });
-        ImGui::Unindent();
-        return;
+    if (!isVortex) {
+        rowLabel("Ground glow");
+        if (ImGui::Combo("##ground", &ground, kGroundGlowNames, 3)) {
+            commitAtmospheric(engine, index, [ground](world::AtmosphericEffect& e) {
+                e.ground.mode = static_cast<world::GroundGlow>(std::clamp(ground, 0, 2));
+            });
+            ImGui::Unindent();
+            return;
+        }
     }
-    if (authored.ground.mode != world::GroundGlow::Off) {
+    if (!isVortex && authored.ground.mode != world::GroundGlow::Off) {
         paramColor(engine, prefix, "groundColor", "Glow colour");
         paramSlider(engine, prefix, "groundIntensity", "Glow amount");
     }
@@ -665,7 +719,9 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
     // ordinary modulation route, visible and editable in the Modulation panel, rather than a hidden
     // audio hook inside the effect.
     {
-        const char* leaf = isComet ? "coreIntensity" : "edgeBrightness";
+        const char* leaf = isComet    ? "coreIntensity"
+                           : isVortex ? "emission"
+                                      : "edgeBrightness";
         params::IParameter* target = find(engine, prefix, leaf);
         const std::string path = atmosphericBeatTarget(authored.name, authored.kind);
         params::Modulator& modulator = engine.modulator();
@@ -709,6 +765,7 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
                                                 std::size_t index) {
     const std::string prefix = world::atmosphericParameterPrefix(authored.name);
     const bool isComet = authored.kind == world::AtmosphereKind::Comet;
+    const bool isVortex = authored.kind == world::AtmosphereKind::Vortex;
 
     ImGui::SeparatorText("Lifetime");
     int activation = static_cast<int>(authored.activation);
@@ -729,7 +786,9 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
     paramSlider(engine, prefix, "lifetime", "Lifetime", "%.2f s");
     paramSlider(engine, prefix, "repeat", "Repeat every", "%.2f s");
 
-    if (isComet) {
+    if (isVortex) {
+        drawEffectRows(engine, prefix, vortexAdvancedRows());
+    } else if (isComet) {
         ImGui::SeparatorText("Trajectory");
         int anchor = static_cast<int>(authored.comet.path.anchor);
         rowLabel("Anchored to");
@@ -744,31 +803,7 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
                               "stars as the camera travels, and it can leave frame. A camera anchor\n"
                               "keeps its bearing however far the camera goes.");
         }
-        paramSlider(engine, prefix, "startAzimuth", "Start bearing", "%.0f deg");
-        paramSlider(engine, prefix, "startElevation", "Start height", "%.0f deg");
-        paramSlider(engine, prefix, "endAzimuth", "End bearing", "%.0f deg");
-        paramSlider(engine, prefix, "endElevation", "End height", "%.0f deg");
-        paramSlider(engine, prefix, "distance", "Distance", "%.0f m", true);
-        paramSlider(engine, prefix, "speed", "Speed");
-        paramSlider(engine, prefix, "acceleration", "Acceleration");
-        paramSlider(engine, prefix, "arcLift", "Arc lift", "%.0f m");
-        paramSlider(engine, prefix, "curvature", "Curvature", "%.0f m");
-
-        ImGui::SeparatorText("Appearance");
-        paramColor(engine, prefix, "haloColor", "Halo colour");
-        paramSlider(engine, prefix, "haloIntensity", "Halo brightness");
-        paramSlider(engine, prefix, "haloSize", "Halo size", "%.0f m");
-        paramSlider(engine, prefix, "tailIntensity", "Tail brightness");
-        paramSlider(engine, prefix, "tailFalloff", "Tail falloff");
-        paramSlider(engine, prefix, "wispAmount", "Wisp amount", "%.0f m");
-        paramSlider(engine, prefix, "wispScale", "Wisp scale", "%.4f");
-        paramSlider(engine, prefix, "flowSpeed", "Wisp flow");
-
-        ImGui::SeparatorText("Fragments");
-        paramSlider(engine, prefix, "sparkleDensity", "Density", "%.3f /m");
-        paramSlider(engine, prefix, "sparkleSize", "Size");
-        paramSlider(engine, prefix, "sparkleIntensity", "Brightness");
-        paramSlider(engine, prefix, "sparkleSpeed", "Twinkle");
+        drawEffectRows(engine, prefix, cometAdvancedRows());
     } else {
         ImGui::SeparatorText("Shape");
         int anchor = static_cast<int>(authored.aurora.shape.anchor);
@@ -779,46 +814,21 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
             });
             return;
         }
-        paramSlider(engine, prefix, "radius", "Distance", "%.0f m", true);
-        paramSlider(engine, prefix, "layerSpacing", "Layer spacing");
-        paramSlider(engine, prefix, "baseHeight", "Base height", "%.0f m");
-        paramSlider(engine, prefix, "waveAmplitude", "Wave amount");
-        paramSlider(engine, prefix, "waveScale", "Wave scale");
-        paramSlider(engine, prefix, "turbulence", "Turbulence");
-        paramSlider(engine, prefix, "complexity", "Ray structure", "%.0f");
-        paramSlider(engine, prefix, "driftSpeed", "Fold drift");
-        paramSlider(engine, prefix, "verticalSpeed", "Vertical drift");
-
-        ImGui::SeparatorText("Appearance");
-        paramSlider(engine, prefix, "emission", "Bloom weight");
-        paramSlider(engine, prefix, "opacity", "Curtain opacity");
-        paramSlider(engine, prefix, "edgeBrightness", "Edge brightness");
-        paramSlider(engine, prefix, "filaments", "Filaments");
-        paramSlider(engine, prefix, "sparkle", "Sparkle");
-        paramSlider(engine, prefix, "horizonGlow", "Horizon glow");
-
-        // Section 4.2's per-band depths. These scale the bands already in the frame block; they are
-        // not a second analyzer, and every one of them is itself an ordinary parameter a route can
-        // drive.
-        ImGui::SeparatorText("Audio response");
-        paramSlider(engine, prefix, "audioBass", "Bass -> height");
-        paramSlider(engine, prefix, "audioLowMid", "Low-mid -> waves");
-        paramSlider(engine, prefix, "audioMid", "Mid -> folds");
-        paramSlider(engine, prefix, "audioHigh", "High -> filaments");
-        paramSlider(engine, prefix, "audioBeat", "Beat -> pulse");
+        drawEffectRows(engine, prefix, auroraAdvancedRows());
     }
 
-    ImGui::SeparatorText("Rainbow");
-    paramSlider(engine, prefix, "rainbowSpeed", "Speed");
-    paramSlider(engine, prefix, "rainbowScale", "Scale");
-    paramSlider(engine, prefix, "rainbowHue", "Hue offset");
-    paramSlider(engine, prefix, "rainbowSaturation", "Saturation");
-    paramSlider(engine, prefix, "rainbowBrightness", "Brightness");
+    // The rainbow and the ground pool belong to the two sky kinds; a vortex registers neither, and
+    // the rows would silently draw nothing (ADR-375's lesson, the other way round).
+    if (isVortex) {
+        ImGui::TextColored(kMuted, "Every control here is the parameter atmos/%s/...",
+                           authored.name.c_str());
+        return;
+    }
+
+    drawEffectRows(engine, prefix, skyRainbowRows());
 
     if (authored.ground.mode != world::GroundGlow::Off) {
-        ImGui::SeparatorText("Ground illumination");
-        paramSlider(engine, prefix, "groundRadius", "Radius", "%.0f m", true);
-        paramSlider(engine, prefix, "groundFalloff", "Falloff");
+        drawEffectRows(engine, prefix, skyGroundRows());
     }
 
     ImGui::TextColored(kMuted, "Every control here is the parameter atmos/%s/...", authored.name.c_str());

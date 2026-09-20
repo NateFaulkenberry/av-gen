@@ -75,12 +75,14 @@ const char* atmosphereKindName(AtmosphereKind k) {
     switch (k) {
     case AtmosphereKind::Comet: return "comet";
     case AtmosphereKind::Aurora: return "aurora";
+    case AtmosphereKind::Vortex: return "vortex";
     }
     return "comet";
 }
 std::optional<AtmosphereKind> atmosphereKindFromName(std::string_view name) {
     if (name == "comet") { return AtmosphereKind::Comet; }
     if (name == "aurora") { return AtmosphereKind::Aurora; }
+    if (name == "vortex") { return AtmosphereKind::Vortex; }
     return std::nullopt;
 }
 
@@ -226,6 +228,26 @@ Result<void> Aurora::validate() const {
     return {};
 }
 
+// ADR-387. The gate is `radius`: every shader function returns before doing any work at zero, so a
+// zero radius must stay legal (it is the default, and it is what every scene but one has).
+Result<void> Vortex::validate() const {
+    if (!finite(center.x) || !finite(center.y) || !finite(center.z)) {
+        return fail("the vortex centre is not finite");
+    }
+    for (const float f : {radius, thickness, swirl, rotationSpeed, density, innerVoid, contrast,
+                          turbulence, turbulenceScale, breathAmount, breathSpeed, emission,
+                          filaments, spill, scattering, cometResponse, cometReach, funnelDepth,
+                          throat, throatDensity, smokeWarp, smokeBillow, detail}) {
+        if (!finite(f)) { return fail("a vortex control is not finite"); }
+    }
+    if (radius < 0.0f) { return fail("the vortex radius may not be negative (0 is off)"); }
+    if (thickness < 0.0f) { return fail("the vortex thickness may not be negative"); }
+    if (funnelDepth < 0.0f) { return fail("the vortex funnel depth may not be negative"); }
+    if (innerVoid < 0.0f || innerVoid > 1.0f) { return fail("the vortex inner void is 0..1"); }
+    if (throat < 0.0f || throat > 1.0f) { return fail("the vortex throat is 0..1 of the mouth"); }
+    return {};
+}
+
 Result<void> AtmosphericEffect::validate() const {
     if (name.empty()) { return fail("an atmospheric effect needs a name"); }
     if (name.find('/') != std::string::npos) {
@@ -239,6 +261,7 @@ Result<void> AtmosphericEffect::validate() const {
     // one that complains now.
     if (auto ok = comet.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     if (auto ok = aurora.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
+    if (auto ok = vortex.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     if (auto ok = ground.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     if (auto ok = timing.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     return {};
@@ -398,6 +421,38 @@ json AtmosphericEffect::toJson() const {
                        {"sensitivity", a.audio.sensitivity},
                        {"spectrumShape", a.audio.spectrumShape}}},
         {"rainbow", rainbowToJson(a.rainbow)}};
+
+    // ADR-387: flat, because every one of these is a single authored number with no sub-structure
+    // and the names are the ones the legacy `environment.vortex` block used -- a scene migrated
+    // from that form reads back identically field for field.
+    const Vortex& vx = vortex;
+    j["vortex"] = json{{"center", vec3ToJson(vx.center)},
+                       {"radius", vx.radius},
+                       {"thickness", vx.thickness},
+                       {"swirl", vx.swirl},
+                       {"rotationSpeed", vx.rotationSpeed},
+                       {"density", vx.density},
+                       {"innerVoid", vx.innerVoid},
+                       {"contrast", vx.contrast},
+                       {"turbulence", vx.turbulence},
+                       {"turbulenceScale", vx.turbulenceScale},
+                       {"breathAmount", vx.breathAmount},
+                       {"breathSpeed", vx.breathSpeed},
+                       {"smokeWarp", vx.smokeWarp},
+                       {"smokeBillow", vx.smokeBillow},
+                       {"detail", vx.detail},
+                       {"emission", vx.emission},
+                       {"filaments", vx.filaments},
+                       {"spill", vx.spill},
+                       {"scattering", vx.scattering},
+                       {"cometResponse", vx.cometResponse},
+                       {"cometReach", vx.cometReach},
+                       {"funnelDepth", vx.funnelDepth},
+                       {"throat", vx.throat},
+                       {"throatDensity", vx.throatDensity},
+                       {"colorDeep", vec3ToJson(vx.colorDeep)},
+                       {"colorMid", vec3ToJson(vx.colorMid)},
+                       {"colorAccent", vec3ToJson(vx.colorAccent)}};
     return j;
 }
 
@@ -531,6 +586,38 @@ Result<AtmosphericEffect> AtmosphericEffect::fromJson(const json& j) {
         if (au.contains("rainbow")) { e.aurora.rainbow = rainbowFromJson(au.at("rainbow")); }
     }
 
+    if (j.contains("vortex") && j.at("vortex").is_object()) {
+        const json& vj = j.at("vortex");
+        Vortex& vx = e.vortex;
+        vx.center = readVec3(vj, "center", vx.center);
+        vx.radius = readFloat(vj, "radius", vx.radius);
+        vx.thickness = readFloat(vj, "thickness", vx.thickness);
+        vx.swirl = readFloat(vj, "swirl", vx.swirl);
+        vx.rotationSpeed = readFloat(vj, "rotationSpeed", vx.rotationSpeed);
+        vx.density = readFloat(vj, "density", vx.density);
+        vx.innerVoid = readFloat(vj, "innerVoid", vx.innerVoid);
+        vx.contrast = readFloat(vj, "contrast", vx.contrast);
+        vx.turbulence = readFloat(vj, "turbulence", vx.turbulence);
+        vx.turbulenceScale = readFloat(vj, "turbulenceScale", vx.turbulenceScale);
+        vx.breathAmount = readFloat(vj, "breathAmount", vx.breathAmount);
+        vx.breathSpeed = readFloat(vj, "breathSpeed", vx.breathSpeed);
+        vx.smokeWarp = readFloat(vj, "smokeWarp", vx.smokeWarp);
+        vx.smokeBillow = readFloat(vj, "smokeBillow", vx.smokeBillow);
+        vx.detail = readFloat(vj, "detail", vx.detail);
+        vx.emission = readFloat(vj, "emission", vx.emission);
+        vx.filaments = readFloat(vj, "filaments", vx.filaments);
+        vx.spill = readFloat(vj, "spill", vx.spill);
+        vx.scattering = readFloat(vj, "scattering", vx.scattering);
+        vx.cometResponse = readFloat(vj, "cometResponse", vx.cometResponse);
+        vx.cometReach = readFloat(vj, "cometReach", vx.cometReach);
+        vx.funnelDepth = readFloat(vj, "funnelDepth", vx.funnelDepth);
+        vx.throat = readFloat(vj, "throat", vx.throat);
+        vx.throatDensity = readFloat(vj, "throatDensity", vx.throatDensity);
+        vx.colorDeep = readVec3(vj, "colorDeep", vx.colorDeep);
+        vx.colorMid = readVec3(vj, "colorMid", vx.colorMid);
+        vx.colorAccent = readVec3(vj, "colorAccent", vx.colorAccent);
+    }
+
     if (auto ok = e.validate(); !ok) {
         return std::unexpected(ok.error());
     }
@@ -544,6 +631,12 @@ namespace {
 constexpr std::array<std::string_view, 5> kCometStyles{"Bioluminescent Cyan", "Rainbow Cosmic",
                                                        "Emerald Teal", "Magenta Blue",
                                                        "Subtle Shooting Star"};
+// ADR-387. "Cosmic Funnel" is the Tree of Life's shipped funnel, value for value, for the reason
+// the factory comment above gives: a preset that only approximates the scene it was taken from is a
+// preset that drifts from it. The other two are the two directions that turned out to read -- a
+// shallow disc seen from above, and a deeper, denser throat.
+constexpr std::array<std::string_view, 3> kVortexStyles{"Cosmic Funnel", "Shallow Disc",
+                                                        "Deep Maelstrom"};
 constexpr std::array<std::string_view, 5> kAuroraStyles{"Glowmere Bioluminescence", "Vibrant Emerald",
                                                         "Violet Cosmic", "Rainbow Aurora",
                                                         "Subtle Night"};
@@ -552,6 +645,7 @@ constexpr std::array<std::string_view, 5> kAuroraStyles{"Glowmere Bioluminescenc
 
 std::span<const std::string_view> cometStyleNames() { return kCometStyles; }
 std::span<const std::string_view> auroraStyleNames() { return kAuroraStyles; }
+std::span<const std::string_view> vortexStyleNames() { return kVortexStyles; }
 
 bool applyCometStyle(AtmosphericEffect& e, std::string_view style) {
     CometAppearance& a = e.comet.appearance;
@@ -808,6 +902,108 @@ AtmosphericEffect glowmereAurora(std::string name) {
     return e;
 }
 
+bool applyVortexStyle(AtmosphericEffect& e, std::string_view style) {
+    Vortex& v = e.vortex;
+    // Every style writes every field it touches, for the reason the comet's does: a style that
+    // leaves the previous one's throat behind reads as the preset being broken.
+    // `center` is deliberately not written -- see the header.
+    const glm::vec3 keep = v.center;
+    v = Vortex{};
+    v.center = keep;
+    if (style == kVortexStyles[0]) { // Cosmic Funnel -- the Tree of Life's
+        v.radius = 200.0f;
+        v.thickness = 70.0f;
+        v.funnelDepth = 1500.0f;
+        v.throat = 0.1f;
+        v.throatDensity = 0.55f;
+        v.swirl = 6.5f;
+        v.rotationSpeed = 0.028f;
+        v.density = 0.0013f;
+        v.innerVoid = 0.24f;
+        v.contrast = 3.6f;
+        v.turbulence = 0.65f;
+        v.turbulenceScale = 2.4f;
+        v.breathAmount = 0.05f;
+        v.breathSpeed = 0.18f;
+        v.emission = 0.04f;
+        v.filaments = 2.2f;
+        v.spill = 2.5f;
+        v.cometResponse = 0.6f;
+        v.cometReach = 6.0f;
+        v.colorDeep = {0.016f, 0.012f, 0.062f};
+        v.colorMid = {0.050f, 0.085f, 0.240f};
+        v.colorAccent = {0.100f, 0.340f, 0.460f};
+        return true;
+    }
+    if (style == kVortexStyles[1]) { // Shallow Disc
+        v.radius = 260.0f;
+        v.thickness = 45.0f;
+        v.funnelDepth = 0.0f;
+        v.throat = 0.25f;
+        v.throatDensity = 0.6f;
+        v.swirl = 4.2f;
+        v.rotationSpeed = 0.045f;
+        v.density = 0.0016f;
+        v.innerVoid = 0.30f;
+        v.contrast = 2.6f;
+        v.turbulence = 0.45f;
+        v.turbulenceScale = 2.0f;
+        v.breathAmount = 0.06f;
+        v.breathSpeed = 0.22f;
+        v.emission = 0.05f;
+        v.filaments = 1.6f;
+        v.spill = 2.0f;
+        v.cometResponse = 0.4f;
+        v.cometReach = 6.0f;
+        v.colorDeep = {0.014f, 0.018f, 0.055f};
+        v.colorMid = {0.045f, 0.100f, 0.210f};
+        v.colorAccent = {0.120f, 0.380f, 0.420f};
+        return true;
+    }
+    if (style == kVortexStyles[2]) { // Deep Maelstrom
+        v.radius = 170.0f;
+        v.thickness = 95.0f;
+        v.funnelDepth = 2600.0f;
+        v.throat = 0.06f;
+        v.throatDensity = 0.75f;
+        v.swirl = 9.0f;
+        v.rotationSpeed = 0.020f;
+        v.density = 0.0018f;
+        v.innerVoid = 0.18f;
+        v.contrast = 4.4f;
+        v.turbulence = 0.80f;
+        v.turbulenceScale = 3.0f;
+        v.breathAmount = 0.04f;
+        v.breathSpeed = 0.14f;
+        v.emission = 0.055f;
+        v.filaments = 2.8f;
+        v.spill = 3.2f;
+        v.cometResponse = 0.8f;
+        v.cometReach = 7.0f;
+        v.colorDeep = {0.022f, 0.010f, 0.070f};
+        v.colorMid = {0.060f, 0.070f, 0.260f};
+        v.colorAccent = {0.140f, 0.300f, 0.520f};
+        return true;
+    }
+    return false;
+}
+
+AtmosphericEffect cosmicVortex(std::string name) {
+    AtmosphericEffect e;
+    e.name = std::move(name);
+    e.kind = AtmosphereKind::Vortex;
+    e.style = std::string(kVortexStyles[0]);
+    applyVortexStyle(e, kVortexStyles[0]);
+    // A vortex is scenery, not an event, and it has no ground pool of its own: ADR-379's spill is
+    // how it lights what floats over it, and that is a field on the vortex rather than ADR-230's
+    // ground glow, because the glow lands on terrain and there is no terrain under this one.
+    e.activation = Activation::Always;
+    e.timing.fadeIn = 0.0;
+    e.timing.fadeOut = 0.0;
+    e.ground.mode = GroundGlow::Off;
+    return e;
+}
+
 // ---- resolution --------------------------------------------------------------------------------
 
 namespace {
@@ -891,7 +1087,22 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
         r.envelope = envelope;
         r.elapsed = pass;
 
-        if (e.kind == AtmosphereKind::Comet) {
+        // The dispatch is a `switch` with no `default` on purpose, and every arm sets `claimed`.
+        //
+        // It used to be `if comet / else if aurora / else vortex`. The vortex was therefore not a
+        // *test* but the fall-through, which meant a kind no arm named did not resolve as nothing --
+        // it resolved as a vortex, and was then dropped as "the second vortex in the scene". That is
+        // a silent no-op wearing a limit's clothes, and it is the exact failure ADR-385 describes
+        // from the other direction: a reading that stops anyone checking.
+        //
+        // Two guards, because neither alone holds. The missing `default` makes a new enumerator a
+        // `-Wswitch` diagnostic -- but `AVGEN_WARNINGS_AS_ERRORS` is OFF by default
+        // (`CMakeLists.txt`), so that is a line in a build log and not a guard. `claimed` is the
+        // half that holds at runtime: an unclaimed kind is counted in `dropped` and drawn by
+        // nobody, so it is reportable rather than silently attributed to a neighbour.
+        bool claimed = false;
+        switch (e.kind) {
+        case AtmosphereKind::Comet: {
             if (counts.comets >= comets.size()) {
                 ++counts.dropped;
                 continue;
@@ -919,7 +1130,10 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
             r.launch = r.anchor + r.dir0 * r.distance;
             r.destination = r.anchor + r.dir1 * r.distance;
             comets[counts.comets++] = r;
-        } else {
+            claimed = true;
+            break;
+        }
+        case AtmosphereKind::Aurora: {
             if (counts.auroras >= auroras.size()) {
                 ++counts.dropped;
                 continue;
@@ -927,6 +1141,27 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
             const AuroraShape& s = e.aurora.shape;
             r.anchor = anchorOf(s.anchor, s.anchorPosition, ctx.cameraPosition);
             auroras[counts.auroras++] = r;
+            claimed = true;
+            break;
+        }
+        case AtmosphereKind::Vortex: {
+            // ADR-387: a vortex has no per-frame trajectory to resolve -- it is a static field the
+            // volume march samples -- so resolution is "is it live", and the payload travels
+            // unchanged. Counted as dropped past the first, so the second one in a scene is a
+            // reported limit rather than a silent no-op.
+            if (counts.vortices >= 1) {
+                ++counts.dropped;
+                continue;
+            }
+            ++counts.vortices;
+            claimed = true;
+            break;
+        }
+        }
+        if (!claimed) {
+            // A kind no arm above claims. It is reported rather than drawn as something else; see
+            // the note at the top of the switch.
+            ++counts.dropped;
         }
     }
     return counts;
@@ -1015,6 +1250,19 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
 
     out.cometCount = static_cast<std::uint32_t>(counts.comets);
     out.auroraCount = static_cast<std::uint32_t>(counts.auroras);
+    // ADR-387: the first live vortex, copied through. Its `enabled`, activation and lifetime
+    // envelope were already applied by the resolve above, so a vortex inside a closed window
+    // arrives here switched off exactly as a comet does.
+    out.hasVortex = false;
+    out.vortex = Vortex{};
+    for (const AtmosphericEffect& e : effects) {
+        if (e.kind != AtmosphereKind::Vortex || !e.enabled || !e.vortex.active()) {
+            continue;
+        }
+        out.hasVortex = true;
+        out.vortex = e.vortex;
+        break;
+    }
     for (std::size_t i = 0; i < counts.comets; ++i) {
         out.comets[i] = packComet(comets[i]);
     }

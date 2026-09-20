@@ -67,6 +67,30 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     p.bloomThreshold = &params.add(f("post/bloom/threshold", s.bloomThreshold, 0.0f, 20.0f, 0.0f, 4.0f));
     p.bloomKnee = &params.add(f("post/bloom/knee", s.bloomKnee, 0.0f, 1.0f, 0.0f, 1.0f));
     p.bloomRadius = &params.add(f("post/bloom/radius", s.bloomRadius, 0.25f, 3.0f, 0.5f, 2.0f));
+    {
+        // ADR-385. `applyPostJson` used to accept this key and drop it, on the stated grounds that
+        // the pyramid is "fixed when the bloom pyramid is created, so there is no parameter to
+        // move". That was false: `PostProcessor::run` clamps and reads `bloomLevels` on every
+        // frame, for both the bloom and the halation pyramids, and
+        // test_image_formation_gpu.cpp has asserted since ADR-039 that dropping it from 6 to 3
+        // leaves the energy unchanged -- a test that only means anything if the setting is live.
+        // So it was a working control that no scene and no project could reach.
+        //
+        // The range is the clamp `run()` already applies, so the slider cannot express a value the
+        // chain would silently alter.
+        params::ParamDesc<int> d;
+        d.path = "post/bloom/levels";
+        d.defaultValue = static_cast<int>(s.bloomLevels);
+        d.hardMin = 1;
+        d.hardMax = 8;
+        d.softMin = 3;
+        d.softMax = 8;
+        // The leaf, like every other row. Spelling the whole path here made this the one slider in
+        // the panel that shouted its own address -- and now that the section is headed "bloom", the
+        // prefix was saying a third time what the group and the heading already say.
+        d.label = "levels (pyramid depth; fewer is a tighter, harder glow)";
+        p.bloomLevels = &params.add(std::move(d));
+    }
     p.bloomEmissionWeight =
         &params.add(f("post/bloom/emissionWeight", s.bloomEmissionWeight, 0.0f, 1.0f, 0.0f, 1.0f));
     p.halationEnabled = &params.add(b("post/halation/enabled", s.halationEnabled));
@@ -123,7 +147,7 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
         d.hardMax = 32;
         d.softMin = 4;
         d.softMax = 32;
-        d.label = "post/motionBlur/samples (taps along the smear; fewer bands a long streak)";
+        d.label = "samples (taps along the smear; fewer bands a long streak)";
         p.motionBlurSamples = &params.add(std::move(d));
     }
     p.motionBlurMaxRadius =
@@ -136,7 +160,7 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
         d.hardMax = 40;
         d.softMin = 8;
         d.softMax = 40;
-        d.label = "post/motionBlur/tileSize (velocity tile edge in pixels; also the reach in tiles)";
+        d.label = "tileSize (velocity tile edge in pixels; also the reach in tiles)";
         p.motionBlurTileSize = &params.add(std::move(d));
     }
     p.antialias = &params.add(f("post/output/antialias", s.antialias, 0.0f, 1.0f, 0.0f, 1.0f));
@@ -149,7 +173,7 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
         d.hardMax = 65535;
         d.softMin = 0;
         d.softMax = 64;
-        d.label = "post/output/sharpenId (0 = the whole image)";
+        d.label = "sharpenId (0 = the whole image)";
         p.sharpenId = &params.add(std::move(d));
     }
     {
@@ -158,7 +182,7 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
         d.defaultValue = static_cast<int>(s.tonemap);
         d.hardMin = 0;
         d.hardMax = 4;
-        d.label = "post/tonemap/operator (0 aces, 1 agx, 2 reinhard, 3 pbr-neutral, 4 clamp)";
+        d.label = "operator (0 aces, 1 agx, 2 reinhard, 3 pbr-neutral, 4 clamp)";
         p.tonemap = &params.add(std::move(d));
     }
     p.vignette = &params.add(f("post/output/vignette", s.vignette, 0.0f, 1.0f, 0.0f, 1.0f));
@@ -310,9 +334,13 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
             p.tonemap->setBase(static_cast<int>(std::min(value.get<std::uint32_t>(), 4u)));
             continue;
         }
-        if (key == "bloomLevels") {
-            // Fixed when the bloom pyramid is created, so there is no parameter to move. Accepted
-            // and ignored rather than warned about: the scenes that name it are not wrong to.
+        if (key == "bloomLevels" && p.bloomLevels != nullptr) {
+            // ADR-385: this used to be accepted and dropped. It is a live per-frame control and it
+            // now does what the scenes naming it always meant.
+            if (!value.is_number_unsigned()) {
+                return fail("post.bloomLevels must be an unsigned integer (1..8)");
+            }
+            p.bloomLevels->setBase(static_cast<int>(std::clamp(value.get<std::uint32_t>(), 1u, 8u)));
             continue;
         }
         log::warn("post.{}: unknown key, ignored", key);
@@ -329,6 +357,9 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
     s.bloomThreshold = p.bloomThreshold->value();
     s.bloomKnee = p.bloomKnee->value();
     s.bloomRadius = p.bloomRadius->value();
+    if (p.bloomLevels != nullptr) {
+        s.bloomLevels = static_cast<std::uint32_t>(std::clamp(p.bloomLevels->value(), 1, 8));
+    }
     s.bloomEmissionWeight = p.bloomEmissionWeight->value();
     s.halationEnabled = p.halationEnabled->value();
     s.halationIntensity = p.halationIntensity->value();

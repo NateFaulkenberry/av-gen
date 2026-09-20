@@ -77,9 +77,10 @@ struct VolumeUniforms {
     glm::vec4 vortexB;
     glm::vec4 vortexAccent;
     glm::vec4 vortex4;     // ADR-374: funnel depth, throat fraction, throat density, 0
-    glm::vec4 vortex5;     // ADR-381: x = comet response, yzw = 0
+    glm::vec4 vortex5;     // ADR-381: x = comet response, y = reach, z = scene scattering (388), w = 0
+    glm::vec4 vortex6;     // ADR-389: smokeWarp, smokeBillow, detail, 0
 };
-static_assert(sizeof(VolumeUniforms) == 272);
+static_assert(sizeof(VolumeUniforms) == 288);
 
 class VolumeRenderer {
 public:
@@ -102,6 +103,9 @@ public:
 
     // True when this scene wants volumetrics at all (volumeDensity > 0).
     [[nodiscard]] static bool enabled(const scene::Environment& environment);
+    // ADR-387: the vortex lives in the atmospheric effects now, so the whole-scene overload is
+    // the one that answers correctly for a scene with a vortex and no fog.
+    [[nodiscard]] static bool enabled(const scene::Scene& scene);
 
     // Per frame, before encode(): sizes the half-res target, resolves the density/colour field
     // names to slots and writes the uniforms. Does nothing (and clears the stats) when off.
