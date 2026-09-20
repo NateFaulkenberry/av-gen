@@ -536,7 +536,10 @@ AudioTempo readEmbeddedTempo(Bytes bytes, std::string_view name) {
         // as native as an integer.
         return accept(hit->value, std::move(hit->key), "Vorbis comment (FLAC)", false);
     }
-    log::debug("embedded tempo: none found in '{}'", name);
+    // Logged at the same level as the "detected" line above, and as one line per imported file.
+    // "The file carries no tempo" is a fact worth having in the log next to the ones that do --
+    // it is the difference between a tempo that was not there and a reader that did not run.
+    log::info("embedded tempo: none found in '{}'", name);
     return {};
 }
 

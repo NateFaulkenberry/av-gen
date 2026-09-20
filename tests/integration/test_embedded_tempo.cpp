@@ -393,6 +393,20 @@ TEST_CASE("the beat grid still exists when the tempo came from a tag", "[tempo][
     // A grid, not just a number: several beats, at times a BPM alone could not have supplied.
     REQUIRE(track->beats().beatTimes.size() > 4);
     REQUIRE(track->beats().tempoBpm > 0.0f);
+    // And the seeded prior reached the analysis rather than only being computed: the offline
+    // estimate agrees with the tag. A seed that was built and never passed would leave this to
+    // the default prior centred on 120.
+    REQUIRE(track->beats().tempoBpm == Approx(128.0).margin(6.0));
+
+    // The beats are a grid, not a repetition of the number: consecutive intervals near the tag's
+    // seconds-per-beat, which is the thing a BPM alone could not have produced.
+    const auto& beats = track->beats().beatTimes;
+    double sum = 0.0;
+    for (std::size_t i = 1; i < beats.size(); ++i) {
+        sum += beats[i] - beats[i - 1];
+    }
+    const double meanInterval = sum / static_cast<double>(beats.size() - 1);
+    REQUIRE(meanInterval == Approx(60.0 / 128.0).margin(0.05));
 }
 
 TEST_CASE("seeding the tempogram with a known BPM removes the octave error", "[tempo][engine]") {
