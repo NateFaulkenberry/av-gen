@@ -42,7 +42,7 @@
 // environmental simulation layer and ADR-230's family already is one; what it lacked was a
 // statement of its own contract that a machine could check. That is what this is.
 
-#include "world/atmospherics.hpp"
+#include "world/world_effects/effect_registry.hpp"
 
 #include <array>
 #include <cstddef>
@@ -73,34 +73,19 @@ struct Report {
     [[nodiscard]] std::string summary() const;
 };
 
-// Every kind of the family. Kept beside `atmosphereKindIndex` below, whose switch has no `default`,
-// so a new enumerator is at minimum a `-Wswitch` diagnostic here -- and `test_effect_conformance`
-// reads the enum out of the header and fails by name if this array has fallen behind it, because
-// `-Werror` is off by default in this build and a warning nobody reads is not a guard.
-inline constexpr std::array<AtmosphereKind, 3> kAtmosphereKinds{
-    AtmosphereKind::Comet,
-    AtmosphereKind::Aurora,
-    AtmosphereKind::Vortex,
-};
-
-// The kind's position in `kAtmosphereKinds`. The switch is exhaustive and has no `default` on
-// purpose: that is the compile-time half of the guard above.
-[[nodiscard]] constexpr std::size_t atmosphereKindIndex(AtmosphereKind k) {
-    switch (k) {
-    case AtmosphereKind::Comet: return 0;
-    case AtmosphereKind::Aurora: return 1;
-    case AtmosphereKind::Vortex: return 2;
-    }
-    return kAtmosphereKinds.size(); // unreachable for a declared enumerator
-}
-
-static_assert(atmosphereKindIndex(AtmosphereKind::Comet) == 0);
-static_assert(atmosphereKindIndex(AtmosphereKind::Aurora) == 1);
-static_assert(atmosphereKindIndex(AtmosphereKind::Vortex) == 2);
+// ADR-500. The list of kinds and the index into it moved to `world_effects/effect_registry.hpp`,
+// so there is one such list rather than two that could disagree. They are re-exported here because
+// this file's callers name them, and because the property ADR-392 bought is unchanged: the switch
+// behind `atmosphereKindIndex` has no `default`, and `tests/unit/test_effect_registry.cpp` reads
+// `enum class AtmosphereKind` out of `atmospherics.hpp` and fails **by the name of the enumerator**
+// when the array has fallen behind it -- which is what matters, because `-Werror` is off here and a
+// warning nobody reads is not a guard.
+using world::atmosphereKindIndex;
+using world::kAtmosphereKinds;
 
 // The canonical authored effect of a kind -- the same factory the "Add ..." button calls, so a
 // probe is a thing an artist can actually make rather than a default-constructed struct no scene
-// contains. Exhaustive switch, no `default`.
+// contains. ADR-500: the registry's, so a kind added tomorrow has a probe today.
 [[nodiscard]] AtmosphericEffect probeEffect(AtmosphereKind kind, std::string name);
 
 // Every parameter path registering `effect` produces, in registration order. Obtained by

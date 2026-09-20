@@ -1302,88 +1302,6 @@ struct EffectRow {
     return kRows;
 }
 
-// What somebody reaches for first: what colour, how bright, how big, how fast.
-[[nodiscard]] inline std::span<const EffectRow> vortexRows() {
-    static constexpr EffectRow kRows[] = {
-        {"", "colorDeep", "Deep colour", "", false, true},
-        {"", "colorMid", "Mid colour", "", false, true},
-        {"", "colorAccent", "Accent colour", "", false, true},
-        {"", "emission", "Brightness", "%.3f /m"},
-        {"", "density", "Thickness", "%.4f /m"},
-        {"", "radius", "Mouth radius", "%.0f m", true},
-        {"", "funnelDepth", "Funnel depth", "%.0f m", true},
-        {"", "rotationSpeed", "Rotation", "%.3f rad/s"},
-        {"", "swirl", "Swirl", ""},
-        {"", "filaments", "Filaments", ""},
-        // Vortex 2.0 §7-§11, and its own section because it is a different KIND of control from
-        // the ones above: these shape the storm, the ones below texture it. The owner's rule is
-        // that if it is visible in the picture an artist must be able to find it, and `findable`
-        // is not `reachable in principle` -- so the eye and the bands get named rows in the order
-        // somebody would reach for them, not a row called "macro".
-        {"Cyclone structure", "innerVoid", "Eye radius", "", false, false,
-         "The clear centre of the storm, as a fraction of the mouth radius. This is the same\n"
-         "number the Advanced section used to call Inner void; it is here because with a wall\n"
-         "around it it is no longer a detail, it is the shape of the thing."},
-        {"", "eyeWallWidth", "Eye wall width", "", false, false,
-         "How far, as a fraction of the mouth radius, the density takes to climb out of the eye.\n"
-         "Narrow reads as a violent storm; wide reads as a slow one."},
-        {"", "eyeWallGain", "Eye wall", "", false, false,
-         "How much denser the ring around the eye is than the body of the storm. This is the\n"
-         "control that makes the silhouette read as a cyclone rather than as a hole in a cloud.\n"
-         "It raises the overall thickness of the medium as well, so check Thickness after it."},
-        {"", "bandArms", "Spiral arms", "%.0f", false, false,
-         "How many spiral bands wind out of the eye. 0 switches the bands off and leaves the\n"
-         "envelope smooth, which is what it was before. Two or three reads as a hurricane; more\n"
-         "reads as a galaxy."},
-        {"", "bandPitchDegrees", "Arm pitch", "%.0f deg", false, false,
-         "How tightly the arms wind: the angle an arm makes with the circle it crosses. Real\n"
-         "rainbands run 10 to 25 degrees. Small is tightly coiled, large is nearly radial."},
-        {"", "bandDepth", "Arm contrast", "", false, false,
-         "How much denser a band is than the gap beside it. The bands cost nothing to sample and\n"
-         "cannot alias, so this is the control to reach for before Filaments or Fine detail."},
-        {"", "bandHarmonic", "Arm detail", "", false, false,
-         "Adds two finer sets of arms inside the main ones, at a third and a ninth of the\n"
-         "contrast. Structure rather than noise: it survives freezing time and going monochrome."},
-        {"", "cloudNoise", "Cloud noise", "", false, false,
-         "The weight of the whole noise stack against a smooth medium. At 0 you see the cyclone's\n"
-         "structure alone -- eye, wall, arms, funnel -- with no detail on it at all. That render\n"
-         "is the test: if it is not already impressive at 0, no amount of detail will save it."},
-        {"", "spill", "Light spill", "", false, false,
-         "How much of the funnel's own light lands on the surfaces above it. Separate from\n"
-         "Brightness so it can be tuned against the island without changing the funnel."},
-        {"", "scattering", "Scene light inside", "", false, false,
-         "At 0 the funnel makes its own light and the scene's lights do not appear inside it --\n"
-         "a spotlight aimed up through it stops at its edge. Above 0 they do; watch the tree's\n"
-         "key light, which is bright enough to flatten the whole funnel if this goes far."},
-    };
-    return kRows;
-}
-
-[[nodiscard]] inline std::span<const EffectRow> vortexAdvancedRows() {
-    static constexpr EffectRow kRows[] = {
-        {"Placement", "centerX", "Centre X", "%.1f m"},
-        {"", "centerY", "Centre Y", "%.1f m"},
-        {"", "centerZ", "Centre Z", "%.1f m", false, false,
-         "Where the mouth of the funnel sits in the world. A particle system that names this\n"
-         "vortex as its attractor follows it here, so the island and the funnel stay related\n"
-         "when either of them moves."},
-        {"Shape", "thickness", "Wall thickness", "%.0f m", true},
-        {"", "throat", "Throat", "%.2f of mouth"},
-        {"", "throatDensity", "Throat thickness", ""},
-        {"", "contrast", "Contrast", ""},
-        {"Motion", "turbulence", "Turbulence", ""},
-        {"", "turbulenceScale", "Turbulence scale", ""},
-        {"", "breathAmount", "Breath amount", ""},
-        {"", "breathSpeed", "Breath speed", ""},
-        {"Comet response", "cometResponse", "Comet light", ""},
-        {"", "cometReach", "Comet reach", "%.1f x", false, false,
-         "How much of a comet's light this medium takes, and how far past the comet's ground\n"
-         "pool it reaches. Off by default: the funnel must not scatter the scene's ordinary\n"
-         "lights, which is what the control above is for."},
-    };
-    return kRows;
-}
-
 // ---- which codecs this machine can actually produce (ADR-383, audit G4) -------------------------
 //
 // The Render panel's codec list was a hardcoded array of eight, four of them ffmpeg-only, offered
@@ -1422,120 +1340,7 @@ struct EffectRow {
 }
 
 
-// ---- comet ---------------------------------------------------------------------------------------
-//
-// Above the fold: what somebody reaches for first. Every leaf here is checked against what a comet
-// actually registers by `tests/unit/test_effect_conformance.cpp`.
-[[nodiscard]] inline std::span<const EffectRow> cometRows() {
-    static constexpr EffectRow kRows[] = {
-        {"", "coreColor", "Core colour", "", false, true},
-        {"", "tailColor", "Tail colour", "", false, true},
-        {"", "coreIntensity", "Core brightness"},
-        {"", "headSize", "Head size", "%.0f m"},
-        {"", "tailLength", "Tail length", "%.0f m"},
-        {"", "tailWidth", "Tail width", "%.0f m"},
-        {"", "travelSeconds", "Crossing", "%.1f s"},
-    };
-    return kRows;
-}
-
-// The advanced rows, minus the two checkboxes and the anchor combo, which are not parameters of
-// this shape. The first row carries no section because the panel has already drawn "Trajectory"
-// above the anchor combo.
-[[nodiscard]] inline std::span<const EffectRow> cometAdvancedRows() {
-    static constexpr EffectRow kRows[] = {
-        {"", "startAzimuth", "Start bearing", "%.0f deg"},
-        {"", "startElevation", "Start height", "%.0f deg"},
-        {"", "endAzimuth", "End bearing", "%.0f deg"},
-        {"", "endElevation", "End height", "%.0f deg"},
-        {"", "distance", "Distance", "%.0f m", true},
-        {"", "speed", "Speed"},
-        {"", "acceleration", "Acceleration"},
-        {"", "arcLift", "Arc lift", "%.0f m"},
-        {"", "curvature", "Curvature", "%.0f m"},
-        {"Appearance", "haloColor", "Halo colour", "", false, true},
-        {"", "haloIntensity", "Halo brightness"},
-        {"", "haloSize", "Halo size", "%.0f m"},
-        {"", "tailIntensity", "Tail brightness"},
-        {"", "tailFalloff", "Tail falloff"},
-        {"", "wispAmount", "Wisp amount", "%.0f m"},
-        {"", "wispScale", "Wisp scale", "%.4f"},
-        {"", "flowSpeed", "Wisp flow"},
-        {"Fragments", "sparkleDensity", "Density", "%.3f /m"},
-        {"", "sparkleSize", "Size"},
-        {"", "sparkleIntensity", "Brightness"},
-        {"", "sparkleSpeed", "Twinkle"},
-    };
-    return kRows;
-}
-
 // ---- aurora --------------------------------------------------------------------------------------
-
-[[nodiscard]] inline std::span<const EffectRow> auroraRows() {
-    static constexpr EffectRow kRows[] = {
-        {"", "lowColor", "Base colour", "", false, true},
-        {"", "midColor", "Middle colour", "", false, true},
-        {"", "topColor", "Top colour", "", false, true},
-        {"", "intensity", "Brightness"},
-        {"", "curtainHeight", "Height", "%.0f m"},
-        {"", "curtains", "Curtains", "%.0f"},
-        {"", "flowSpeed", "Flow"},
-        {"", "audioSensitivity", "Audio response"},
-        {"", "spectrumShape", "Spectrum shape"},
-    };
-    return kRows;
-}
-
-[[nodiscard]] inline std::span<const EffectRow> auroraAdvancedRows() {
-    static constexpr EffectRow kRows[] = {
-        {"", "radius", "Distance", "%.0f m", true},
-        {"", "layerSpacing", "Layer spacing"},
-        {"", "baseHeight", "Base height", "%.0f m"},
-        {"", "waveAmplitude", "Wave amount"},
-        {"", "waveScale", "Wave scale"},
-        {"", "turbulence", "Turbulence"},
-        {"", "complexity", "Ray structure", "%.0f"},
-        {"", "driftSpeed", "Fold drift"},
-        {"", "verticalSpeed", "Vertical drift"},
-        {"Appearance", "emission", "Bloom weight"},
-        {"", "opacity", "Curtain opacity"},
-        {"", "edgeBrightness", "Edge brightness"},
-        {"", "filaments", "Filaments"},
-        {"", "sparkle", "Sparkle"},
-        {"", "horizonGlow", "Horizon glow"},
-        // Â§4.2's per-band depths. These scale the bands already in the frame block; they are not a
-        // second analyzer, and every one of them is itself an ordinary parameter a route can drive.
-        {"Audio response", "audioBass", "Bass -> height"},
-        {"", "audioLowMid", "Low-mid -> waves"},
-        {"", "audioMid", "Mid -> folds"},
-        {"", "audioHigh", "High -> filaments"},
-        {"", "audioBeat", "Beat -> pulse"},
-    };
-    return kRows;
-}
-
-// The hue-cycle rows, shared by the comet and the aurora. A vortex registers none of them, which is
-// why the panel returns before this rather than drawing five rows that would find nothing.
-[[nodiscard]] inline std::span<const EffectRow> skyRainbowRows() {
-    static constexpr EffectRow kRows[] = {
-        {"Rainbow", "rainbowSpeed", "Speed"},
-        {"", "rainbowScale", "Scale"},
-        {"", "rainbowHue", "Hue offset"},
-        {"", "rainbowSaturation", "Saturation"},
-        {"", "rainbowBrightness", "Brightness"},
-    };
-    return kRows;
-}
-
-// Offered only when the ground glow is not Off, so it is a separate table rather than a tail of the
-// rainbow's.
-[[nodiscard]] inline std::span<const EffectRow> skyGroundRows() {
-    static constexpr EffectRow kRows[] = {
-        {"Ground illumination", "groundRadius", "Radius", "%.0f m", true},
-        {"", "groundFalloff", "Falloff"},
-    };
-    return kRows;
-}
 
 // ---- ADR-421: the deformer stack's rows -------------------------------------------------------
 //
@@ -1638,25 +1443,21 @@ inline constexpr scene::DeformerKind kDeformerKinds[] = {
     return prefix + "deform/" + std::to_string(slot + 1) + "/" + std::string(leaf);
 }
 
-// ADR-420, §68. The field subscription, shared by every kind rather than belonging to one -- the
-// subscription is a member of `AtmosphericEffect`, not of any kind's payload, so every kind draws
-// this and a fourth kind draws it without anybody adding a line. One row, and the reason it is a
-// row at all is ADR-392's: a leaf five characters wrong draws an empty box and says nothing, so the
-// panel and `conformance::checkLeavesExist` have to read one table.
+// ---- ADR-500: the atmospheric family's rows moved ---------------------------------------------
 //
-// The combo that chooses WHICH field is not here, and deliberately. It writes a `std::string` on
-// the effect rather than a parameter, so it is structural in exactly the way the two anchor combos
-// are -- and putting it in a row table would put a leaf here that registration does not produce.
-[[nodiscard]] inline std::span<const EffectRow> atmosphericFlowRows() {
-    static constexpr EffectRow kRows[] = {
-        {"", "flowInfluence", "Follows the field", "%.2f", false, false,
-         "How much of the subscribed field's motion this effect takes. 0 is off: the\n"
-         "effect moves at its own authored speed and does not know the field exists.\n"
-         "At 1 a gust front crossing the valley reaches this effect when it reaches\n"
-         "that place, and two effects subscribed to one field agree without anybody\n"
-         "typing the same number into both."},
-    };
-    return kRows;
-}
+// `cometRows`, `cometAdvancedRows`, `auroraRows`, `auroraAdvancedRows`, `vortexRows`,
+// `vortexAdvancedRows`, `skyRainbowRows`, `skyGroundRows` and `atmosphericFlowRows` were here.
+// They are now `EffectSchema::fields` and `world::sharedEffectFields()`, declared beside the
+// parameter each row registers, in `src/world/world_effects/effects/<kind>_effect.cpp`.
+//
+// That is the point of ADR-500 rather than a tidy-up. ADR-392 made these tables data so that a
+// test could walk them, which is what caught a leaf five characters wrong -- but it left the row
+// and the registration as two lists that had to agree by hand. They are ONE list now, so they
+// cannot disagree, and the question a test can still usefully ask is the inverse: is every
+// REGISTERED parameter a row somebody can reach? `tests/unit/test_effect_conformance.cpp` asks
+// exactly that, and it can fail.
+//
+// `EffectRow` itself stays. The temporal family (ADR-410) and the propagation family still use it,
+// and `effect_params.cpp`'s three parallel lists are the next thing shaped to take this treatment.
 
 } // namespace avgen::ui

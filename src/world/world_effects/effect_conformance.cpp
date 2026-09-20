@@ -5,6 +5,7 @@
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 #include "world/atmospheric_params.hpp"
+#include "world/world_effects/effect_registry.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -109,12 +110,10 @@ std::string Report::summary() const {
 }
 
 AtmosphericEffect probeEffect(AtmosphereKind kind, std::string name) {
-    switch (kind) {
-    case AtmosphereKind::Comet: return bioluminescentComet(std::move(name));
-    case AtmosphereKind::Aurora: return glowmereAurora(std::move(name));
-    case AtmosphereKind::Vortex: return cosmicVortex(std::move(name));
-    }
-    return bioluminescentComet(std::move(name));
+    // ADR-500: the registry's factory, which is the same one the "Add" button calls. A switch here
+    // would be one more per-kind list that a new kind has to be remembered into -- and this file's
+    // whole job is to make forgetting loud, not to have something to forget.
+    return makeAtmosphericEffect(kind, std::move(name));
 }
 
 std::vector<std::string> registeredPaths(const AtmosphericEffect& effect) {
@@ -340,24 +339,46 @@ Report checkAtmospheric(AtmosphereKind kind) {
         const AtmosphericCounts counts =
             resolveAtmosphericEffects(std::span(&live, 1), ctx, comets, auroras);
 
-        // Exhaustive, no `default` -- see the note above.
+        // ADR-500: the counter this kind's records land in comes from its own declaration, and
+        // the switch is over `EffectBucket` -- exhaustive, no `default`, one arm per GPU payload
+        // the engine has. That is what keeps this check able to fail for a kind that does not
+        // exist yet: it asks the schema where this kind SAYS it goes and then checks that it went
+        // there, rather than picking a counter with a chain whose own `else` agrees with whatever
+        // `resolveAtmosphericEffects` did.
+        const EffectSchema* schema = effectSchema(kind);
         std::size_t mine = 0;
-        switch (kind) {
-        case AtmosphereKind::Comet: mine = counts.comets; break;
-        case AtmosphereKind::Aurora: mine = counts.auroras; break;
-        case AtmosphereKind::Vortex: mine = counts.vortices; break;
+        if (schema == nullptr) {
+            report(out, kind, "resolve-dispatch", "this kind has no schema, so nothing resolves it");
+        } else {
+            switch (schema->resolve.bucket) {
+            case EffectBucket::Comet: mine = counts.comets; break;
+            case EffectBucket::Aurora: mine = counts.auroras; break;
+            case EffectBucket::Vortex: mine = counts.vortices; break;
+            }
         }
         const std::size_t total = counts.comets + counts.auroras + counts.vortices;
-        if (mine != 1) {
+        // How many records one live effect of this kind is entitled to. One for everything ADR-230
+        // shipped; a meteor shower declares more, and asserting "exactly one" would have made this
+        // check fail on correct code -- which is the failure ADR-182 is about from the other side.
+        const std::size_t expected =
+            (schema != nullptr && schema->resolve.count != nullptr)
+                ? std::min<std::size_t>(schema->resolve.count(live), kMaxGpuComets)
+                : 1;
+        if (mine == 0) {
             report(out, kind, "resolve-dispatch",
                    "one live effect of this kind resolved as " + std::to_string(counts.comets) +
                        " comet(s), " + std::to_string(counts.auroras) + " aurora(s), " +
                        std::to_string(counts.vortices) + " vortex/vortices, " +
-                       std::to_string(counts.dropped) + " dropped -- it is not claimed by its own "
-                       "arm of the switch in resolveAtmosphericEffects");
-        } else if (total != 1) {
+                       std::to_string(counts.dropped) + " dropped -- nothing put a record in the "
+                       "bucket its own schema names");
+        } else if (total != mine) {
             report(out, kind, "resolve-dispatch",
-                   "one live effect resolved as " + std::to_string(total) + " effects");
+                   "one live effect of this kind put records in more than one bucket: " +
+                       std::to_string(mine) + " in its own and " + std::to_string(total) + " in all");
+        } else if (mine > expected) {
+            report(out, kind, "resolve-dispatch",
+                   "one live effect resolved as " + std::to_string(mine) + " records, more than the " +
+                       std::to_string(expected) + " its own schema declares");
         }
     }
 
