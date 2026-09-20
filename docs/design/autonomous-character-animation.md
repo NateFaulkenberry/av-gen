@@ -1913,10 +1913,20 @@ context: **an in-place clip has no ground frame**, so "planted means stationary"
 | STEP 5 phase extraction | **done** | ADR-546; every clip in the pack yields a phase |
 | STEP 6 phase-aware transitions | **done** | ADR-547; ramp fixture measures 100.0 -> 106.0 |
 | STEP 7 inertialization | **done** | ADR-547; one clip evaluated, offset recomputed not stored |
-| STEP 8-9 decoupling, retarget profile | pending | the largest unit (§12.1) |
+| STEP 8-9 decoupling, retarget profile | **done** | ADR-548; real alien onto itself at 0.0396 deg worst |
 | STEP 10 100STYLE subset | pending | gated on 9 |
 | STEP 11-13 MotionPack, offline tool, benchmark | pending | |
 | STEP 15 visual validation | pending | the first non-numeric result |
+
+### A forward constraint from Phase F, recorded now because it bears on existing behaviour
+
+Phase F §54 requires that **characters simulate independently of the active camera** — one
+simulation driving cameras A, B and C. AV Gen's entity LOD is camera-driven today: `cullDistance`
+and `fullDetailDistance` are measured from the view position, and ADR-267 measured
+**50.263 m** of positional divergence between a simulation run with the camera at the origin and
+the same one with it at 200 m. That is a pre-existing conflict, not one this work introduces, and
+it is the same defect ADR-267 fix #2 names ("LOD selects which stages run, never the integration
+step"). Anything Phase D adds to the character update must not deepen it.
 
 ### Still to come in Phase A
 
