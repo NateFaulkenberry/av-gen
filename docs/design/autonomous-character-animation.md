@@ -1922,7 +1922,8 @@ context: **an in-place clip has no ground frame**, so "planted means stationary"
 | STEP 6 phase-aware transitions | **done** | ADR-547; ramp fixture measures 100.0 -> 106.0 |
 | STEP 7 inertialization | **done** | ADR-547; one clip evaluated, offset recomputed not stored |
 | STEP 8-9 decoupling, retarget profile | **done** | ADR-548; real alien onto itself at 0.0396 deg worst |
-| STEP 10 100STYLE subset | pending | gated on 9 |
+| STEP 10a BVH reader + travelling-path validation | **done** | ADR-549; split out of STEP 10 |
+| STEP 10b 100STYLE subset experiment | **blocked** | the corpus is not in this repository; the reader and every code path it exercises are built and tested |
 | STEP 11-13 MotionPack, offline tool, benchmark | pending | |
 | STEP 15 visual validation | pending | the first non-numeric result |
 

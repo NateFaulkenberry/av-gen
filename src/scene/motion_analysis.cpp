@@ -133,15 +133,29 @@ std::vector<ContactTrack> detectContacts(const Skeleton& skeleton, const Animati
         if (s == 0) {
             rootFirst = rootNow;
         }
-        // The ground frame removes the root's HORIZONTAL travel only. Vertical root motion is the
-        // body bobbing or landing, and a foot that stays put while the hips drop is still planted.
-        const glm::vec3 shift(rootNow.x - rootFirst.x, 0.0f, rootNow.z - rootFirst.z);
+        // **No root subtraction. Model space IS the ground, in both kinds of clip.**
+        //
+        // The first version of this removed the root's horizontal travel, on the reasoning that a
+        // "ground frame" is what a planted foot is stationary in. That reasoning is wrong twice
+        // over, and it took the first travelling content in this repository to show it:
+        //
+        //   * in a TRAVELLING clip a planted foot is stationary in the world, so subtracting the
+        //     root's advance makes it move backwards at the travel speed -- and the horizontal
+        //     contact test then rejects every genuine plant. Measured on a hand-built walk: 0 spans
+        //     found where there are 3;
+        //   * in an IN-PLACE clip there is no root travel to subtract, so the subtraction was a
+        //     no-op and the code path had never actually run.
+        //
+        // So it was harmless on all existing content and wrong on all future content, which is the
+        // worst combination: a branch that cannot be caught until the data arrives. Model space is
+        // the right frame for both -- a travelling clip's world is the ground, and an in-place
+        // clip's planted foot moves backwards in it either way, which is why ADR-546's vertical
+        // test exists.
         for (std::size_t k = 0; k < tracks.size(); ++k) {
             if (tracks[k].jointIndex < 0) {
                 continue;
             }
-            const glm::vec3 p(model[static_cast<std::size_t>(tracks[k].jointIndex)][3]);
-            positions[k][s] = p - shift;
+            positions[k][s] = glm::vec3(model[static_cast<std::size_t>(tracks[k].jointIndex)][3]);
         }
     }
 
@@ -458,7 +472,25 @@ ClipAnalysis analyseClip(const Skeleton& skeleton, const AnimationClip& clip,
     out.contacts = detectContacts(skeleton, clip, joints, settings);
     out.phase = extractPhase(out.contacts, referenceJoint, out.length, settings);
 
-    const int root = rootJoint(skeleton);
+    // Which joint carries travel is not "the skeleton root". ADR-337 established and paid for the
+    // rule: **the lowest-indexed joint this clip gives a translation channel to**. On the alien,
+    // `rig` is an armature wrapper no clip animates and `root.x` is what moves; measuring the
+    // wrapper reports a stationary body for a clip that crosses the room. The same rule is reused
+    // here rather than re-derived, because two answers to "where did the body go" is how ADR-260
+    // started.
+    int root = -1;
+    for (const AnimationChannel& channel : clip.channels) {
+        if (channel.path != AnimationPath::Translation) {
+            continue;
+        }
+        const int j = static_cast<int>(channel.joint);
+        if (root < 0 || j < root) {
+            root = j;
+        }
+    }
+    if (root < 0) {
+        root = rootJoint(skeleton);
+    }
     if (root >= 0 && out.length > 0.0f) {
         Pose pose;
         std::vector<glm::mat4> model;
