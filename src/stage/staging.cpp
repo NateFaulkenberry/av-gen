@@ -19,6 +19,11 @@ constexpr float kDegrees = 180.0f / kPi;
 // cells and small enough that a cell is not the whole meadow; the grid costs one pass to build and
 // the number is not load-bearing beyond that.
 constexpr float kCellSize = 24.0f;
+// How far a finished `MoveTo` may be from the point it resolved before it is a failure rather than
+// an arrival (ADR-385). A centimetre: the tween's last frame lands on the goal exactly, so anything
+// this check ever sees is a constraint silently overruling the author, which is the defect it
+// exists to make loud. It is not a tolerance anybody should tune to make a shot pass.
+constexpr float kArrivalTolerance = 0.01f;
 
 [[nodiscard]] float smoothstep(float u) {
     const float t = std::clamp(u, 0.0f, 1.0f);
@@ -164,6 +169,7 @@ const char* stageEventKindName(StageEventKind kind) {
     case StageEventKind::Bound: return "bound";
     case StageEventKind::Unbound: return "unbound";
     case StageEventKind::Beat: return "beat";
+    case StageEventKind::Waiting: return "waiting";
     case StageEventKind::StepDone: return "stepDone";
     case StageEventKind::StepFailed: return "stepFailed";
     case StageEventKind::Retired: return "retired";
@@ -346,6 +352,9 @@ Result<void> Staging::setDesc(StagingDesc desc) {
             if (!hasBeat(scenario, beat.otherwise)) {
                 return fail("scenario '{}', beat '{}': `otherwise` names '{}', which is not a beat",
                             scenario.name, beat.name, beat.otherwise);
+            }
+            if (auto r = resolveValue(beat.stillSpeed, scenario, "a beat's stillSpeed"); !r) {
+                return r;
             }
             for (QueryDesc& q : beat.find) {
                 if (!q.valid()) {
@@ -1003,8 +1012,8 @@ glm::vec3 Staging::placementOffset(const entity::Entity& e, Anchor place,
     return vp.offset();
 }
 
-bool Staging::resolvePoint(const Run& run, const StepDesc& step, const StageContext& ctx,
-                           glm::vec3& out) const {
+bool Staging::resolvePoint(const Run& run, std::string_view role, const StepDesc& step,
+                           const StageContext& ctx, glm::vec3& out) const {
     const auto placeOf = [&](const entity::Entity& e) {
         return pointOn(e, step.anchor, ctx);
     };
@@ -1016,7 +1025,7 @@ bool Staging::resolvePoint(const Run& run, const StepDesc& step, const StageCont
         }
         base = placeOf(*target);
     } else if (step.relative) {
-        const entity::Entity* self = resolve(run, step.role, ctx);
+        const entity::Entity* self = resolve(run, role, ctx);
         if (self == nullptr) {
             return false;
         }
@@ -1202,6 +1211,8 @@ void Staging::enterBeat(Run& run, const StageContext& ctx) {
     const ScenarioDesc& scenario = desc_.scenarios[run.scenario];
     const BeatDesc& beat = scenario.beats[run.beat];
     run.beatStart = ctx.time;
+    run.gateOpen = false;
+    run.gated = false;
     run.cues.assign(beat.cues.size(), CueRun{});
     for (CueRun& cue : run.cues) {
         cue.startedAt = ctx.time;
@@ -1282,7 +1293,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             return StepStatus::Failed;
         }
         glm::vec3 goal(0.0f);
-        if (!resolvePoint(run, step, ctx, goal)) {
+        if (!resolvePoint(run, role, step, ctx, goal)) {
             return StepStatus::Failed; // the target went away mid-approach
         }
         // Horizontally only, and that is a decision rather than an oversight. The invariant a lift
@@ -1349,19 +1360,70 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         const float eased = smoothstep(cue.progress);
         glm::vec3 p = glm::mix(cue.from, goal, eased);
 
+        // Never closer to the ground than the shot said. The brief's "avoid terrain collisions",
+        // asked of the navigation layer's own height query rather than hoped for.
+        //
+        // ## Why this is weighted, and what it cost to find out (ADR-385)
+        //
+        // This clamp used to be `p.y = max(p.y, ground + clearance)`, applied to the position
+        // written on **every** frame including the last -- while the step's completion test is
+        // `cue.progress >= 1.0`, which is the *tween parameter* and not arrival. So a `MoveTo`
+        // whose destination sits below the floor reported `Done` with the body parked
+        // `clearance - height` metres above where the step resolved, and nothing anywhere noticed.
+        // Glowmere authors `cruiseClearance` 34 against `hoverHeight` 23, so the craft finished
+        // every approach 11.000 m too high, and the `Follow` in the next beat -- same destination,
+        // no clearance, written straight into `DirectorMotion::position` with no easing and no
+        // blend -- put it where it should already have been, in one frame. Measured: ten 11.004 m
+        // teleports in 90 s of the film, two per cycle, one down as the beam lit and an equal one
+        // up as the floor re-engaged on the next approach.
+        //
+        // The floor is therefore a constraint on the **path** and not on its ends. `4e(1-e)` is the
+        // unique quadratic that is zero at both ends and one at the midpoint: nothing is tuned and
+        // there is no split point to argue about. At `eased == 0` the body is left exactly where it
+        // was, so a move never starts with a jump; at `eased == 1` it is left exactly on the
+        // destination the step resolved, so `Done` is the truth and whatever runs next finds the
+        // body already there. In between the craft arcs up to the clearance and back down, which is
+        // a better flight path than a step function and never exceeds it.
+        //
+        // The guarantee this weakens is real and is stated rather than hidden: a move no longer
+        // keeps `clearance` metres of air near its own two ends. At the start that is the altitude
+        // the body already held; at the end it is the destination the shot asked for, which is the
+        // one place a clearance floor has no business overruling the author.
+        const float clearance = value(run, step.clearance);
+        if (clearance > 0.0f && ctx.world->navigator().valid()) {
+            const float floorY = ctx.world->navigator().groundHeight(flat(p)) + clearance;
+            const float w = 4.0f * eased * (1.0f - eased);
+            p.y += w * std::max(0.0f, floorY - p.y);
+        }
+
+        // The arrival contract, as an assertion rather than as a comment. A `MoveTo` that reports
+        // `Done` is at the point it resolved; if it is not, the step fails loudly with the distance
+        // in the reason, because the silent version of exactly this is the defect above. Checked
+        // before the wobble, which is an authored displacement and not a failure to arrive.
+        if (cue.progress >= 1.0f) {
+            const float miss = glm::length(p - goal);
+            if (miss > kArrivalTolerance) {
+                cue.reason =
+                    fmt::format("moveTo finished {:.3f} m from the point it resolved", miss);
+                return StepStatus::Failed;
+            }
+        }
+
         cue.phase += ctx.dt;
         const float wobble = value(run, step.wobble);
         if (wobble > 0.0f) {
             const float rate = value(run, step.wobbleRate);
             const auto t = static_cast<float>(cue.phase) * rate * 2.0f * kPi;
-            p.x += std::sin(t) * wobble;
-            p.z += std::cos(t * 0.73f) * wobble;
-        }
-        // Never closer to the ground than the shot said. The brief's "avoid terrain collisions",
-        // asked of the navigation layer's own height query rather than hoped for.
-        const float clearance = value(run, step.clearance);
-        if (clearance > 0.0f && ctx.world->navigator().valid()) {
-            p.y = std::max(p.y, ctx.world->navigator().groundHeight(flat(p)) + clearance);
+            // Zero displacement at both ends of the step, by the same `4e(1-e)` envelope the
+            // clearance floor uses and for the same reason. Two separate defects lived here:
+            // `cos` is 1 at t = 0, so the second axis threw the body a whole `wobble` sideways on
+            // the first frame; and a sway that is merely periodic is at an arbitrary phase when
+            // the step *ends*, so it hands the next step a body up to `wobble` off the point both
+            // of them resolved. Measured in Glowmere at 0.3 m and 0.33 m respectively. A sway that
+            // starts and finishes at zero cannot do either.
+            const float env = 4.0f * eased * (1.0f - eased);
+            p.x += std::sin(t) * wobble * env;
+            p.z += std::sin(t * 0.73f) * wobble * env;
         }
 
         entity::DirectorMotion motion;
@@ -1402,7 +1464,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         if (step.hold && cue.started) {
             goal = cue.from;
         } else {
-            if (!resolvePoint(run, step, ctx, goal)) {
+            if (!resolvePoint(run, role, step, ctx, goal)) {
                 return StepStatus::Failed;
             }
             if (step.hold) {
@@ -1419,8 +1481,20 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         if (wobble > 0.0f) {
             const float wrate = value(run, step.wobbleRate);
             const auto t = static_cast<float>(cue.phase) * wrate * 2.0f * kPi;
-            p.x += std::sin(t) * wobble;
-            p.z += std::cos(t * 0.73f) * wobble;
+            // `sin` on both axes and the same `4e(1-e)` envelope `MoveTo` uses, for the same two
+            // reasons: `cos` is 1 at t = 0, so a `follow` with any wobble displaced the body a
+            // whole `wobble` sideways on its very first frame; and a sway that is merely periodic
+            // leaves the body at an arbitrary phase when the step ends. In Glowmere both fired
+            // twice a cycle -- at the start of `beam`, and again at the start of `abduct`, whose
+            // fresh `CueRun` resets the phase to zero under a body the previous step had left
+            // 0.33 m out. A `follow` with no duration has no envelope to be on and keeps the plain
+            // sway, which is what "hold this station indefinitely" should do.
+            const float env = duration > 0.0
+                                  ? 4.0f * static_cast<float>(elapsed / duration)
+                                        * (1.0f - static_cast<float>(elapsed / duration))
+                                  : 1.0f;
+            p.x += std::sin(t) * wobble * std::clamp(env, 0.0f, 1.0f);
+            p.z += std::sin(t * 0.73f) * wobble * std::clamp(env, 0.0f, 1.0f);
         }
         const float clearance = value(run, step.clearance);
         if (clearance > 0.0f && ctx.world->navigator().valid()) {
@@ -1447,7 +1521,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             return StepStatus::Failed;
         }
         glm::vec3 goal(0.0f);
-        if (!resolvePoint(run, step, ctx, goal)) {
+        if (!resolvePoint(run, role, step, ctx, goal)) {
             return StepStatus::Failed;
         }
         const glm::vec3 d = goal - self->state().position();
@@ -1617,6 +1691,50 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
     return StepStatus::Done;
 }
 
+// ---- "has it actually stopped?" ------------------------------------------------------------------
+//
+// The frame-to-frame distance the body covered, over the frame's own dt. Two deliberate answers at
+// the edges, and both of them are "not still":
+//
+//  * a body nothing has seen before has no previous frame, so it returns `infinity`. A gate that
+//    opened on the first frame of a beat -- before anything had moved at all -- would be a gate
+//    that always opened, which is a probe that cannot fail (ADR-182).
+//  * a frame with `dt == 0` (the first frame of a run, and every frame of a paused editor) also
+//    returns `infinity`, because a distance divided by no time is not a speed and guessing zero
+//    would let a paused playhead satisfy an invariant about motion.
+float Staging::measuredSpeed(const entity::Entity& e, const StageContext& ctx) const {
+    if (ctx.dt <= 0.0) {
+        return std::numeric_limits<float>::infinity();
+    }
+    for (const Seen& s : seen_) {
+        if (s.entity == e.name()) {
+            return glm::length(e.state().position() - s.position) / static_cast<float>(ctx.dt);
+        }
+    }
+    return std::numeric_limits<float>::infinity();
+}
+
+void Staging::rememberPositions(const Run& run, const StageContext& ctx) {
+    for (const Binding& b : run.bindings) {
+        const entity::Entity* e = ctx.world->find(b.entity);
+        if (e == nullptr) {
+            continue;
+        }
+        bool found = false;
+        for (Seen& s : seen_) {
+            if (s.entity == b.entity) {
+                s.position = e->state().position();
+                s.time = ctx.time;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            seen_.push_back(Seen{b.entity, e->state().position(), ctx.time});
+        }
+    }
+}
+
 void Staging::update(const StageContext& ctx) {
     events_.clear();
     if (desc_.scenarios.empty() || ctx.world == nullptr) {
@@ -1690,6 +1808,47 @@ void Staging::update(const StageContext& ctx) {
         }
 
         const BeatDesc& beat = scenario.beats[run.beat];
+
+        // ---- the gate (ADR-385) -------------------------------------------------------------
+        //
+        // While a role this beat declared has not actually stopped, nothing in the beat runs and
+        // nothing in it ages: every cue's `startedAt` moves with the clock, so a beat held for two
+        // seconds still gets its full authored durations afterwards rather than losing them to the
+        // wait. Held before the cues rather than inside them because it is a property of the
+        // *state transition* and not of any one step -- the whole beat is the thing that has not
+        // started.
+        if (!beat.stillRoles.empty() && !run.gateOpen) {
+            const float limit = value(run, beat.stillSpeed);
+            bool moving = false;
+            std::string who;
+            for (const std::string& role : beat.stillRoles) {
+                const entity::Entity* body = resolve(run, role, ctx);
+                if (body == nullptr) {
+                    continue; // a role that is not bound cannot be moving; the cues will say so
+                }
+                const float speed = measuredSpeed(*body, ctx);
+                if (speed > limit) {
+                    moving = true;
+                    who = fmt::format("{} at {:.3f} m/s", body->name(), speed);
+                    break;
+                }
+            }
+            if (moving) {
+                rememberPositions(run, ctx); // the `continue` below skips the tail of the loop
+                for (CueRun& cue : run.cues) {
+                    cue.startedAt = ctx.time;
+                }
+                ++report_.gated;
+                if (!run.gated) {
+                    run.gated = true;
+                    emit(StageEventKind::Waiting, run, ctx, {}, beat.stillRoles.front(), who);
+                }
+                continue;
+            }
+            run.gated = false;
+            run.gateOpen = true;
+        }
+
         bool allDone = true;
         for (std::size_t c = 0; c < beat.cues.size() && c < run.cues.size(); ++c) {
             CueRun& cue = run.cues[c];
@@ -1742,6 +1901,10 @@ void Staging::update(const StageContext& ctx) {
         if (allDone) {
             leaveBeat(run, ctx);
         }
+        // After the decisions, never before them: `measuredSpeed` compares against the *previous*
+        // frame, and a record taken first would be comparing a body with itself and calling
+        // everything still.
+        rememberPositions(run, ctx);
     }
 }
 
@@ -1756,6 +1919,8 @@ void Staging::reset(entity::EntityWorld* world, params::ParameterSet* params) {
         run.beat = 0;
         run.entered = false;
         run.cycle = 0;
+        run.gated = false;
+        run.gateOpen = false;
         run.cues.clear();
         run.bindings.clear();
         const ScenarioDesc& s = desc_.scenarios[run.scenario];
@@ -1763,6 +1928,11 @@ void Staging::reset(entity::EntityWorld* world, params::ParameterSet* params) {
             s.seed != 0 ? s.seed : nameSeed(s.name);
         run.rng = Rng(seed);
     }
+    // The previous frame every `stillRoles` gate is measured against. A seek that kept it would
+    // measure a body's speed between two frames the playhead never played consecutively, and the
+    // gate would open or hold on an arithmetic accident (ADR-091: a scrubbed frame must not depend
+    // on how the playhead got there).
+    seen_.clear();
     // Put every parameter this director wrote back to the value the scene authored. Without this a
     // seek would leave the beam lit and the cow invisible, and the frame would depend on how the
     // playhead got there -- the defect ADR-093 exists to record.

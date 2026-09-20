@@ -30,6 +30,7 @@
 #include <implot.h>
 
 #include <algorithm>
+#include <string_view>
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -1566,6 +1567,17 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             targetNames.push_back(p->path().c_str());
         }
     }
+    // Alphabetical, not registration order. This list is every modulatable parameter in the project
+    // -- over three thousand on Glowmere Valley 2 -- and registration order is an implementation
+    // detail of who called `add` first, so a person hunting for `atmos/Cosmic Vortex/density` had no
+    // way to predict where it sat. Sorted, the prefix groups everything that belongs together and
+    // the combo's own type-ahead starts working, because ImGui matches against consecutive entries.
+    //
+    // `newRouteTarget_` is an index into this vector, so the ordering has to be the same every
+    // frame or the selection would drift under the cursor. Sorting by the path is deterministic and
+    // the paths are unique (a `ParameterSet` is keyed by them), so there are no ties to break.
+    std::sort(targetNames.begin(), targetNames.end(),
+              [](const char* a, const char* b) { return std::string_view(a) < std::string_view(b); });
     newRouteSource_ = std::clamp(newRouteSource_, 0, std::max(0, static_cast<int>(signalNames.size()) - 1));
     newRouteTarget_ = std::clamp(newRouteTarget_, 0, std::max(0, static_cast<int>(targetNames.size()) - 1));
     ImGui::SetNextItemWidth(200);
@@ -1937,7 +1949,9 @@ void ControlPanel::drawParameters(app::Engine& engine) {
       if (!groupOpen) {
           continue;
       }
-      for (IParameter* param : grouped[group]) {
+      // One row. Extracted so the sub-group pass below can draw rows in two places -- the group's
+      // own direct members and each sub-group's -- without a second copy of the annotations.
+      const auto drawRow = [&](IParameter* param) {
         ImGui::PushID(param->path().c_str());
         const std::size_t n = param->componentCount();
         // ADR-387: the one implementation, shared with the World panel's Inspector.
@@ -1989,6 +2003,79 @@ void ControlPanel::drawParameters(app::Engine& engine) {
             ImGui::EndPopup();
         }
         ImGui::PopID();
+      };
+
+      // ---- sub-groups, because "enabled" is not the name of anything ----------------------------
+      //
+      // `group()` is the FIRST path segment and `label()` is the LAST, so everything between them
+      // was being thrown away. Under `post` that put `post/bloom/enabled`, `post/halation/enabled`
+      // and `post/anamorphic/enabled` in one flat list as three checkboxes all labelled "enabled",
+      // above three sliders all labelled "intensity". The owner reported it exactly: "I have no
+      // idea what I'm enabling when I click a checkbox."
+      //
+      // So the middle of the path becomes a heading. Nothing here knows the name of any subsystem
+      // -- the structure is read off the paths, the same way the World panel's Inspector groups a
+      // node's properties (ADR-387), which is what keeps this from becoming a table of special
+      // cases that goes stale the moment somebody registers a new effect.
+      std::vector<IParameter*> direct;
+      std::vector<std::string> subOrder;
+      std::unordered_map<std::string, std::vector<IParameter*>> subs;
+      for (IParameter* param : grouped[group]) {
+          const std::string sub = ui::parameterSubGroup(param->path(), group);
+          if (sub.empty()) {
+              direct.push_back(param);
+              continue;
+          }
+          auto [it, inserted] = subs.try_emplace(sub);
+          if (inserted) {
+              subOrder.push_back(sub);
+          }
+          it->second.push_back(param);
+      }
+      for (IParameter* param : direct) {
+          drawRow(param);
+      }
+      // Open by default only where that is not itself a wall. `post` has a handful of sub-groups and
+      // wants them all visible; `nodes` has one per node -- eighty on Glowmere Valley 2 -- and
+      // opening those would undo the reason the outer groups are closed in the first place.
+      const bool subsOpenByDefault = subOrder.size() <= 8;
+      for (const std::string& sub : subOrder) {
+          std::vector<IParameter*>& members = subs[sub];
+          // The section's own switch, found by its leaf rather than by a list of known names.
+          IParameter* gate = nullptr;
+          for (IParameter* param : members) {
+              if (ui::parameterLeaf(param->path()) == "enabled") {
+                  gate = param;
+              }
+          }
+          const bool on = gate == nullptr || gate->baseComponent(0) >= 0.5f;
+          ImGui::PushID(sub.c_str());
+          const bool subOpen = ImGui::TreeNodeEx(
+              sub.c_str(), subsOpenByDefault ? ImGuiTreeNodeFlags_DefaultOpen : 0);
+          if (gate != nullptr && !on) {
+              // Said on the header, so a collapsed section still tells the truth about itself.
+              ImGui::SameLine();
+              ImGui::TextDisabled("(off)");
+          }
+          if (subOpen) {
+              // The switch first and always live, then everything it gates. Greying the rest is the
+              // owner's second request and it is also an answer to a real ambiguity: a slider that
+              // reads 0.5 in a section that is off looks exactly like a slider that is doing
+              // something. The values are kept and saved either way -- this changes what the panel
+              // says, not what the project holds.
+              if (gate != nullptr) {
+                  drawRow(gate);
+              }
+              ImGui::BeginDisabled(!on);
+              for (IParameter* param : members) {
+                  if (param != gate) {
+                      drawRow(param);
+                  }
+              }
+              ImGui::EndDisabled();
+              ImGui::TreePop();
+          }
+          ImGui::PopID();
       }
       ImGui::TreePop();
     }

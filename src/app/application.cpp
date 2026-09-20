@@ -2457,7 +2457,14 @@ void Application::ensureFreeCamera(bool deliberate) {
     // editor camera now (ADR-391) and the guard above sends every ordinary gesture to it. All this
     // refuses is the narrower thing it always meant to: moving the *film's* camera by hand, on a
     // project whose cut is baked, without saying so.
-    if (cameraDirection_.directed && !ui::viewportMayReleaseDirector(true, cameraLocked_, deliberate)) {
+    //
+    // And it still asks what would actually be lost rather than assuming there is something. The two
+    // halves are independent: ADR-391 narrowed WHICH gestures reach this refusal, and the bake count
+    // decides whether the refusal is worth making at all. On the Tree of Life -- 0 camera tracks, 0
+    // aim-follow entries, 0 shot spans -- there is nothing to defend and the answer is yes either way.
+    if (cameraDirection_.directed &&
+        !ui::viewportMayReleaseDirector(true, cameraLocked_, deliberate,
+                                        directedCameraBakeSize(*engine_) > 0)) {
         if (panel_ != nullptr) {
             panel_->setStatus("this frame is the film's and its cut is baked. Switch the canvas to "
                               "the editor viewpoint to fly without touching it, or unlock in the "

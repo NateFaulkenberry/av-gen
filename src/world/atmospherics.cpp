@@ -236,8 +236,8 @@ Result<void> Vortex::validate() const {
     }
     for (const float f : {radius, thickness, swirl, rotationSpeed, density, innerVoid, contrast,
                           turbulence, turbulenceScale, breathAmount, breathSpeed, emission,
-                          filaments, spill, cometResponse, cometReach, funnelDepth, throat,
-                          throatDensity}) {
+                          filaments, spill, scattering, cometResponse, cometReach, funnelDepth,
+                          throat, throatDensity, smokeWarp, smokeBillow, detail}) {
         if (!finite(f)) { return fail("a vortex control is not finite"); }
     }
     if (radius < 0.0f) { return fail("the vortex radius may not be negative (0 is off)"); }
@@ -438,9 +438,13 @@ json AtmosphericEffect::toJson() const {
                        {"turbulenceScale", vx.turbulenceScale},
                        {"breathAmount", vx.breathAmount},
                        {"breathSpeed", vx.breathSpeed},
+                       {"smokeWarp", vx.smokeWarp},
+                       {"smokeBillow", vx.smokeBillow},
+                       {"detail", vx.detail},
                        {"emission", vx.emission},
                        {"filaments", vx.filaments},
                        {"spill", vx.spill},
+                       {"scattering", vx.scattering},
                        {"cometResponse", vx.cometResponse},
                        {"cometReach", vx.cometReach},
                        {"funnelDepth", vx.funnelDepth},
@@ -597,9 +601,13 @@ Result<AtmosphericEffect> AtmosphericEffect::fromJson(const json& j) {
         vx.turbulenceScale = readFloat(vj, "turbulenceScale", vx.turbulenceScale);
         vx.breathAmount = readFloat(vj, "breathAmount", vx.breathAmount);
         vx.breathSpeed = readFloat(vj, "breathSpeed", vx.breathSpeed);
+        vx.smokeWarp = readFloat(vj, "smokeWarp", vx.smokeWarp);
+        vx.smokeBillow = readFloat(vj, "smokeBillow", vx.smokeBillow);
+        vx.detail = readFloat(vj, "detail", vx.detail);
         vx.emission = readFloat(vj, "emission", vx.emission);
         vx.filaments = readFloat(vj, "filaments", vx.filaments);
         vx.spill = readFloat(vj, "spill", vx.spill);
+        vx.scattering = readFloat(vj, "scattering", vx.scattering);
         vx.cometResponse = readFloat(vj, "cometResponse", vx.cometResponse);
         vx.cometReach = readFloat(vj, "cometReach", vx.cometReach);
         vx.funnelDepth = readFloat(vj, "funnelDepth", vx.funnelDepth);
@@ -1079,7 +1087,22 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
         r.envelope = envelope;
         r.elapsed = pass;
 
-        if (e.kind == AtmosphereKind::Comet) {
+        // The dispatch is a `switch` with no `default` on purpose, and every arm sets `claimed`.
+        //
+        // It used to be `if comet / else if aurora / else vortex`. The vortex was therefore not a
+        // *test* but the fall-through, which meant a kind no arm named did not resolve as nothing --
+        // it resolved as a vortex, and was then dropped as "the second vortex in the scene". That is
+        // a silent no-op wearing a limit's clothes, and it is the exact failure ADR-385 describes
+        // from the other direction: a reading that stops anyone checking.
+        //
+        // Two guards, because neither alone holds. The missing `default` makes a new enumerator a
+        // `-Wswitch` diagnostic -- but `AVGEN_WARNINGS_AS_ERRORS` is OFF by default
+        // (`CMakeLists.txt`), so that is a line in a build log and not a guard. `claimed` is the
+        // half that holds at runtime: an unclaimed kind is counted in `dropped` and drawn by
+        // nobody, so it is reportable rather than silently attributed to a neighbour.
+        bool claimed = false;
+        switch (e.kind) {
+        case AtmosphereKind::Comet: {
             if (counts.comets >= comets.size()) {
                 ++counts.dropped;
                 continue;
@@ -1107,7 +1130,10 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
             r.launch = r.anchor + r.dir0 * r.distance;
             r.destination = r.anchor + r.dir1 * r.distance;
             comets[counts.comets++] = r;
-        } else if (e.kind == AtmosphereKind::Aurora) {
+            claimed = true;
+            break;
+        }
+        case AtmosphereKind::Aurora: {
             if (counts.auroras >= auroras.size()) {
                 ++counts.dropped;
                 continue;
@@ -1115,7 +1141,10 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
             const AuroraShape& s = e.aurora.shape;
             r.anchor = anchorOf(s.anchor, s.anchorPosition, ctx.cameraPosition);
             auroras[counts.auroras++] = r;
-        } else {
+            claimed = true;
+            break;
+        }
+        case AtmosphereKind::Vortex: {
             // ADR-387: a vortex has no per-frame trajectory to resolve -- it is a static field the
             // volume march samples -- so resolution is "is it live", and the payload travels
             // unchanged. Counted as dropped past the first, so the second one in a scene is a
@@ -1125,6 +1154,14 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
                 continue;
             }
             ++counts.vortices;
+            claimed = true;
+            break;
+        }
+        }
+        if (!claimed) {
+            // A kind no arm above claims. It is reported rather than drawn as something else; see
+            // the note at the top of the switch.
+            ++counts.dropped;
         }
     }
     return counts;

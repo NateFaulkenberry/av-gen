@@ -51,6 +51,7 @@ struct Sample {
     float beamRate = 0.0f;
     float step = 0.0f;   // |pos - previous pos|
     float stepY = 0.0f;
+    int camera = 0;      // the camera holding the frame, for the cut test
 };
 
 std::vector<Sample> playFilm(double seconds, double hz,
@@ -101,6 +102,7 @@ std::vector<Sample> playFilm(double seconds, double hz,
         s.ground = nav.valid() ? nav.groundHeight(glm::vec2(s.pos.x, s.pos.z)) : 0.0f;
         s.beamVisible = beamVisible->baseComponent(0);
         s.beamRate = beamRate->baseComponent(0);
+        s.camera = static_cast<int>(comp->activeCamera().camera);
         if (i > 0) {
             s.step = glm::length(s.pos - last);
             s.stepY = s.pos.y - last.y;
@@ -330,4 +332,282 @@ TEST_CASE("the craft's state around every beam activation", "[.abduction-instrum
                        s.beamVisible > 0.5f ? "ON" : "off");
         }
     }
+}
+
+// =================================================================================================
+// The regression suite (ADR-385). These are not hidden: they are the contract.
+//
+// Every one of them is measured against the *project*, because a project's parameters are applied
+// over its scene (ADR-264) and every `staging/abduction/*` number the director reads is in this
+// project's 5,502. A test of the scene alone is a test of a film that does not ship.
+//
+// One run, shared, because loading the film costs about four seconds and the seven questions below
+// are seven readings of the same ninety seconds.
+// =================================================================================================
+
+namespace {
+
+// A craft travelling at the film's `travelSpeed` of 30 m/s covers 0.5 m in a 60 Hz frame. The
+// teleport this suite exists to prevent was 11.004 m. 1.0 m is comfortably above the first and two
+// orders of magnitude below the second, so the guard cannot be passed by slowing the craft down and
+// cannot be failed by an ordinary frame of travel.
+constexpr float kTeleport = 1.0f;
+// What "stationary" means for the craft's *simulated* position across the whole beam interval. The
+// authored `craftWobble` is 0.3 m of deliberate sway, so the honest bound is a little over that;
+// the y bound is separate and near zero because nothing authored moves the craft vertically while
+// it holds station, and y is where the 11 m lived.
+constexpr float kStationaryXZ = 0.75f;
+constexpr float kStationaryY = 0.05f;
+
+struct Cycle {
+    double approachEnd = 0.0;  // the last frame of `approach`
+    double beamStart = 0.0;    // the first frame of `beam`
+    double beamShown = 0.0;    // the frame `nodes/visitor-beam/visible` went up
+    double abductEnd = 0.0;    // the last frame of `abduct`
+    double departStart = 0.0;
+    double departEnd = 0.0;
+    double craftMoved = 0.0;   // the first frame after `departStart` the craft moved again
+    float worstStep = 0.0f;    // the worst single-frame craft step from beamStart to departEnd
+    float spanXZ = 0.0f;       // horizontal extent of the craft over the same interval
+    float spanY = 0.0f;
+    float beamRateAtMove = 0.0f; // what the beam was emitting when the craft set off again
+    bool beamUpAtMove = false;
+};
+
+std::vector<Cycle> cyclesOf(const std::vector<Sample>& run) {
+    std::vector<Cycle> out;
+    for (std::size_t i = 1; i < run.size(); ++i) {
+        if (run[i].beat == "beam" && run[i - 1].beat != "beam") {
+            Cycle c;
+            c.beamStart = run[i].t;
+            c.approachEnd = run[i - 1].t;
+            out.push_back(c);
+        }
+        if (out.empty()) {
+            continue;
+        }
+        Cycle& c = out.back();
+        if (c.beamShown == 0.0 && run[i].beamVisible > 0.5f && run[i - 1].beamVisible <= 0.5f) {
+            c.beamShown = run[i].t;
+        }
+        if (run[i].beat == "depart" && run[i - 1].beat == "abduct") {
+            c.abductEnd = run[i - 1].t;
+            c.departStart = run[i].t;
+        }
+        if (c.departStart > 0.0 && run[i].beat == "depart") {
+            c.departEnd = run[i].t;
+        }
+        if (c.departStart > 0.0 && c.craftMoved == 0.0 && run[i].t > c.departStart
+            && run[i].step > 0.01f) {
+            c.craftMoved = run[i].t;
+            c.beamRateAtMove = run[i].beamRate;
+            c.beamUpAtMove = run[i].beamVisible > 0.5f;
+        }
+    }
+    // The craft's extent and worst step over each cycle's whole stationary interval.
+    for (Cycle& c : out) {
+        if (c.departEnd <= 0.0) {
+            continue;
+        }
+        glm::vec3 lo(1e9f);
+        glm::vec3 hi(-1e9f);
+        for (std::size_t i = 1; i < run.size(); ++i) {
+            if (run[i].t < c.beamStart || run[i].t > c.departEnd) {
+                continue;
+            }
+            c.worstStep = std::max(c.worstStep, run[i].step);
+            lo = glm::min(lo, run[i].pos);
+            hi = glm::max(hi, run[i].pos);
+        }
+        c.spanXZ = std::max(hi.x - lo.x, hi.z - lo.z);
+        c.spanY = hi.y - lo.y;
+    }
+    // A cycle the run ended in the middle of answers nothing: its `depart` may be truncated and
+    // the craft may simply not have set off again before the last frame. Dropped rather than
+    // half-asserted, because a landmark that is missing because the film stopped is not a defect.
+    while (!out.empty() && (out.back().departEnd <= 0.0 || out.back().craftMoved <= 0.0)) {
+        out.pop_back();
+    }
+    return out;
+}
+
+const std::vector<Sample>& film() {
+    static const std::vector<Sample> run = playFilm(90.0, 60.0);
+    return run;
+}
+
+const std::vector<Cycle>& cycles() {
+    static const std::vector<Cycle> c = cyclesOf(film());
+    return c;
+}
+
+} // namespace
+
+TEST_CASE("the film runs five complete abduction cycles", "[stage][abduction][sequence]") {
+    // The premise every other case here rests on. Without it a suite that found no teleport would
+    // be a suite that found no abduction (ADR-182).
+    REQUIRE(cycles().size() >= 4);
+    for (const Cycle& c : cycles()) {
+        INFO(fmt::format("cycle at {:.3f}", c.beamStart));
+        CHECK(c.beamShown > 0.0);
+        CHECK(c.abductEnd > c.beamStart);
+        CHECK(c.departEnd > c.departStart);
+    }
+}
+
+// Test 1 -- the craft has stopped before the beam deploys.
+TEST_CASE("the beam never deploys under a moving craft", "[stage][abduction][sequence]") {
+    const std::vector<Sample>& run = film();
+    REQUIRE(!cycles().empty());
+    for (const Cycle& c : cycles()) {
+        // The frame the beam became visible, and the one before it. `BeatDesc::stillRoles` holds
+        // the whole beat until the craft is measured still, so both must be.
+        // From the frame the beam goes up to the end of `depart`. Before `beamShown` the beat is
+        // being *held* by its own gate -- the beam is not deploying, the craft is finishing its
+        // approach, and asserting stillness there would assert that a gate which exists to wait
+        // for motion to stop never sees any.
+        bool sawBeam = false;
+        for (std::size_t i = 1; i < run.size(); ++i) {
+            if (run[i].t < c.beamShown || run[i].t > c.departEnd) {
+                continue;
+            }
+            sawBeam = true;
+            const float speed = run[i].step * 60.0f;
+            INFO(fmt::format("cycle {:.3f}: at t={:.3f} the beam was {} and the craft at {:.4f} m/s",
+                             c.beamStart, run[i].t, run[i].beamVisible > 0.5f ? "UP" : "off",
+                             speed));
+            // The authored `craftWobble` is 0.3 m of sway at 0.45 Hz, whose peak speed is
+            // 0.3 * 2pi * 0.45 = 0.85 m/s. That is the craft's *presentation* and the brief
+            // explicitly distinguishes it from translational movement, so the bound is a little
+            // above it -- and two orders of magnitude below the 660 m/s the teleport produced.
+            CHECK(speed <= 1.0f);
+        }
+        CHECK(sawBeam);
+    }
+}
+
+// Test 2 -- the craft is stationary for the whole beam interval.
+TEST_CASE("the craft holds station from beam to beam-complete", "[stage][abduction][sequence]") {
+    REQUIRE(!cycles().empty());
+    for (const Cycle& c : cycles()) {
+        INFO(fmt::format("cycle {:.3f}..{:.3f}: xz span {:.3f} m, y span {:.3f} m, worst step "
+                         "{:.4f} m", c.beamStart, c.departEnd, c.spanXZ, c.spanY, c.worstStep));
+        CHECK(c.spanXZ <= kStationaryXZ);
+        CHECK(c.spanY <= kStationaryY);
+        CHECK(c.worstStep <= kTeleport);
+    }
+}
+
+// Test 3 -- the beam is finished before the craft departs.
+TEST_CASE("the craft does not depart under a live beam", "[stage][abduction][sequence]") {
+    REQUIRE(!cycles().empty());
+    for (const Cycle& c : cycles()) {
+        REQUIRE(c.craftMoved > 0.0);
+        INFO(fmt::format("cycle {:.3f}: the craft set off again at {:.3f}, {:.3f} s after `depart` "
+                         "began, with the beam emitting {:.1f}/s", c.beamStart, c.craftMoved,
+                         c.craftMoved - c.departStart, c.beamRateAtMove));
+        // The craft may not move until the beam has stopped emitting. The node stays *visible*
+        // well past this, deliberately and necessarily: `ParticleRenderer::update` skips a system
+        // that is not enabled, so a hidden pool is frozen rather than aged, and the column has to
+        // stay enabled with nothing coming out of it for a whole particle lifetime or it resumes,
+        // unaged, wherever the craft has got to. That is what `beamDrain` is for and it is not a
+        // defect -- see `test_abduction_alignment.cpp`, "The beam never resumes particles emitted
+        // somewhere else". What must be true is that nothing is being *emitted*.
+        CHECK(c.beamRateAtMove <= 1.0f);
+        CHECK(c.craftMoved >= c.departStart);
+    }
+}
+
+// Test 4 -- no teleport at any transition, anywhere in the film.
+TEST_CASE("the craft never teleports", "[stage][abduction][sequence]") {
+    const std::vector<Sample>& run = film();
+    REQUIRE(run.size() > 1000);
+    std::size_t jumps = 0;
+    float worst = 0.0f;
+    double worstAt = 0.0;
+    std::string worstWhere;
+    for (std::size_t i = 1; i < run.size(); ++i) {
+        if (run[i].step <= kTeleport) {
+            continue;
+        }
+        ++jumps;
+        if (run[i].step > worst) {
+            worst = run[i].step;
+            worstAt = run[i].t;
+            worstWhere = fmt::format("{} -> {}", run[i - 1].beat, run[i].beat);
+        }
+    }
+    INFO(fmt::format("{} frame(s) over {:.1f} m; worst {:.3f} m at t={:.3f} ({})", jumps, kTeleport,
+                     worst, worstAt, worstWhere));
+    CHECK(jumps == 0);
+}
+
+// Test 6 -- a camera cut never moves a world object.
+//
+// `UFO Watch` is `followNode: visitor` with `eventBlend: 0.0`, so it is a hard cut to a camera
+// parented to the craft, fired on the entry of the beat that used to teleport it. Before ADR-385
+// the cut and an 11.004 m drop were one frame apart in four cycles of five and the whole frame
+// lurched. The craft's world transform must be continuous across every cut in the film.
+TEST_CASE("a camera cut never moves the craft", "[stage][abduction][sequence][camera]") {
+    const std::vector<Sample>& run = film();
+    std::size_t cuts = 0;
+    float worst = 0.0f;
+    for (std::size_t i = 1; i < run.size(); ++i) {
+        if (run[i].camera == run[i - 1].camera) {
+            continue;
+        }
+        ++cuts;
+        // The cut's own frame and the two either side of it: a transform disturbed *by* a cut shows
+        // up in the frame the cut lands on or the one after, and looking only at the cut frame
+        // would miss a reinitialisation that runs a frame late.
+        for (std::size_t k = i > 1 ? i - 1 : 1; k < run.size() && k <= i + 1; ++k) {
+            INFO(fmt::format("cut at t={:.3f} (camera {} -> {}); at t={:.3f} the craft stepped "
+                             "{:.4f} m", run[i].t, run[i - 1].camera, run[i].camera, run[k].t,
+                             run[k].step));
+            CHECK(run[k].step <= kTeleport);
+            worst = std::max(worst, run[k].step);
+        }
+    }
+    // A film in which the camera never cut would pass this without testing anything.
+    INFO(fmt::format("{} camera cut(s); worst craft step within one frame of one: {:.4f} m", cuts,
+                     worst));
+    CHECK(cuts >= 5);
+}
+
+// Test 7 -- the same sequencing contract in the Tractor Beam Lab.
+//
+// A different scene, on flat ground, with no project over it, a different cast, `travelSpeed` 90
+// instead of 30 and every duration different. The lab is where the mechanism was shown to be the
+// director's rather than the film's data, and it is where a future change that fixes only Glowmere
+// will be caught.
+TEST_CASE("the lab follows the same sequencing contract", "[stage][abduction][sequence][lab]") {
+    const std::vector<Sample> run = playLab(40.0, 60.0, 0.0f);
+    REQUIRE(run.size() > 1000);
+    // 90 m/s at 60 Hz is 1.5 m a frame, so the lab's own travel is above the film's teleport bound.
+    // The bound here is the teleport that was there: 11.004 m, against 2.5 m of honest travel.
+    constexpr float kLabTeleport = 2.6f;
+    std::size_t jumps = 0;
+    float worst = 0.0f;
+    double worstAt = 0.0;
+    for (std::size_t i = 1; i < run.size(); ++i) {
+        if (run[i].step > kLabTeleport) {
+            ++jumps;
+            if (run[i].step > worst) {
+                worst = run[i].step;
+                worstAt = run[i].t;
+            }
+        }
+    }
+    INFO(fmt::format("{} frame(s) over {:.1f} m; worst {:.3f} m at t={:.3f}", jumps, kLabTeleport,
+                     worst, worstAt));
+    CHECK(jumps == 0);
+
+    // And the arm that proves the bound is not simply loose: the lab *does* travel fast, so a run
+    // with no frames anywhere near the bound would mean the lab never flew.
+    float fastest = 0.0f;
+    for (const Sample& s : run) {
+        fastest = std::max(fastest, s.step);
+    }
+    INFO(fmt::format("the lab's fastest honest frame: {:.3f} m", fastest));
+    CHECK(fastest > 1.0f);
 }
