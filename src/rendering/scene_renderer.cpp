@@ -41,6 +41,7 @@ const char* auxDebugViewName(AuxDebugView view) {
     case AuxDebugView::ObjectDepth: return "object depth";
     case AuxDebugView::Overdraw: return "overdraw";
     case AuxDebugView::FragmentDensity: return "fragment density";
+    case AuxDebugView::TemporalHistory: return "temporal history";
     }
     return "none";
 }
@@ -3929,7 +3930,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // the screen as 202. A diagnostic whose values are a function of the picture it is diagnosing is
     // the kind of instrument this investigation exists to remove. Here the byte on the screen is the
     // value the shader wrote, up to the hardware's own encode on an sRGB target.
-    if (auxDebugView_ != AuxDebugView::None) {
+    // ADR-410: the ring is a texture ARRAY that the aux debug bind group does not carry, and
+    // extending that group for one view would make every other view pay for a binding it never
+    // samples. So this view is drawn by its own pass and returns before the aux chain, which is
+    // also why the enum comment warns that this one is not an ADR-035 target.
+    if (auxDebugView_ == AuxDebugView::TemporalHistory) {
+        temporal_->encodeDebugView(encoder, target.view, target.width, target.height, target.format);
+    } else if (auxDebugView_ != AuxDebugView::None) {
         auto auxPipeline = auxDebugPipelineFor(target.format);
         if (!auxPipeline) {
             return std::unexpected(auxPipeline.error());

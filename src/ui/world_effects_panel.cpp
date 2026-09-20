@@ -5,6 +5,7 @@
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
+#include "scene/temporal_settings.hpp"
 #include "ui/help_panel.hpp"
 #include "ui/ui_logic.hpp"
 #include "world/atmospheric_params.hpp"
@@ -228,6 +229,7 @@ void WorldEffectsPanel::draw(app::Engine& engine) {
         pendingRemove_ = -1;
     }
     drawAtmosphericSection(engine);
+    drawTemporalSection(engine);
 }
 
 void WorldEffectsPanel::drawEffect(app::Engine& engine, const world::WorldEffect& authored, std::size_t index) {
@@ -832,6 +834,46 @@ void WorldEffectsPanel::drawAtmosphericAdvanced(app::Engine& engine,
     }
 
     ImGui::TextColored(kMuted, "Every control here is the parameter atmos/%s/...", authored.name.c_str());
+}
+
+
+// ---- ADR-410: temporal media -------------------------------------------------------------------
+void WorldEffectsPanel::drawTemporalSection(app::Engine& engine) {
+    ImGui::SeparatorText("Reality / Temporal / Digital");
+
+    const std::string prefix = scene::temporalParameterPrefix(scene::TemporalEffectKind::FrameEcho);
+    const bool open = ImGui::CollapsingHeader("Frame echo", ImGuiTreeNodeFlags_DefaultOpen);
+    if (ImGui::IsItemHovered()) {
+        // The limitation an author needs at the moment of choosing, not in an ADR they will never
+        // open (ADR-410). A mosh or an echo over fog advecting with the surface behind it looks
+        // exactly like a bug, and finding out afterwards costs an afternoon.
+        tooltipUnformatted(
+            "Reaches back over previous frames, so a moving object leaves a trail of where it was.\n\n"
+            "Describes OPAQUE surfaces only. Fog, aurora and the vortex are composited after the\n"
+            "scene pass and carry no motion of their own, so an echo over them follows whatever\n"
+            "solid surface is behind them rather than the effect itself.");
+    }
+    if (!open) {
+        return;
+    }
+
+    paramCheckbox(engine, prefix, "enabled", "Enabled");
+
+    // The disclosure ADR-410 turns on. Phrased as what to DO -- "settling, 3 of 8" tells somebody
+    // the picture is on its way; "not what will be rendered" tells them only that they are stuck.
+    // The stuck wording is kept for the case that genuinely is stuck.
+    const scene::TemporalHistoryReport& report = engine.temporalHistoryReport();
+    if (report.stalled) {
+        ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), "Temporal: cold - this is not the rendered picture");
+    } else if (report.settling()) {
+        ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.35f, 1.0f), "Temporal: settling - %u of %u frames",
+                           report.framesValid, report.framesNeeded);
+    } else if (report.framesNeeded > 0) {
+        ImGui::TextDisabled("Temporal: %u frames, %.1f MB at %ux%u", report.framesValid,
+                            static_cast<double>(report.bytes) / (1024.0 * 1024.0), report.width, report.height);
+    }
+
+    drawEffectRows(engine, prefix, temporalEchoRows());
 }
 
 } // namespace avgen::ui

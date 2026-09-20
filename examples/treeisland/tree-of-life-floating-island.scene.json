@@ -141,12 +141,7 @@
       "position": [2.0, 3.0, 1.0],
       "rotation": [0.0, 0.0, 0.0],
       "scale": [1.0, 1.0, 1.0],
-      "wind": {"strength": 1.0, "trunk": 0.3, "branch": 1.2, "foliage": 1.5, "flutter": 1.2, "lag": 0.3},
-      "energy": {"intensity": 1.2, "pulseSpeed": 0.16, "pulseWidth": 0.30, "propagation": 0.14,
-                 "root": 1.0, "trunk": 1.0, "branch": 0.85, "canopy": 0.6,
-                 "noise": 0.35, "noiseScale": 0.08, "noiseSpeed": 2.0, "bloom": 1.0,
-                 "shimmer": 0.35, "shimmerSpeed": 0.05, "shimmerScale": 0.035, "shimmerVariation": 0.5,
-                 "colorNear": [0.20, 0.85, 0.55], "colorFar": [0.35, 0.75, 1.0]}
+      "wind": {"strength": 1.0, "trunk": 0.3, "branch": 1.2, "foliage": 1.5, "flutter": 1.2, "lag": 0.3}
     },
     {
       "name": "tree-wood",

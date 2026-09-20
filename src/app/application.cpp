@@ -269,7 +269,7 @@ std::string usageText() {
            "                      Works in --render, where there is no panel to switch them on\n"
            "  --debug-target <t>  display an auxiliary render target: normal|roughness|velocity|\n"
            "                      emission|ids|occlusion|depth|linear depth|depth edges|\n"
-           "                      object depth|overdraw|fragment density\n"
+           "                      object depth|overdraw|fragment density|temporal history\n"
            "  --tier <t>          quality tier: preview|realtime|high|offline\n"
            "  --render-limits <m> distance detail in a render: tier|live|unlimited\n"
            "  --disable <list>    switch phases off for cost attribution, or subsystems off for\n"
@@ -1187,7 +1187,8 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             rendering::AuxDebugView::Occlusion, rendering::AuxDebugView::Depth,
             rendering::AuxDebugView::LinearDepth, rendering::AuxDebugView::DepthEdges,
             rendering::AuxDebugView::ObjectDepth, rendering::AuxDebugView::Overdraw,
-            rendering::AuxDebugView::FragmentDensity};
+            rendering::AuxDebugView::FragmentDensity,
+            rendering::AuxDebugView::TemporalHistory};
         bool found = false;
         for (const auto view : kViews) {
             if (options_.debugTarget == rendering::auxDebugViewName(view)) {
@@ -4186,6 +4187,15 @@ int Application::runLive() {
         if (discontinuity != lastTransportDiscontinuity_) {
             renderer_->resetTemporalHistory();
             lastTransportDiscontinuity_ = discontinuity;
+        }
+        // ADR-410: publish what the ring holds, so the panel's settling badge is the renderer
+        // reporting rather than the UI guessing. Pushed every frame because the whole point is
+        // that it changes as the history refills after a seek.
+        {
+            const auto& t = renderer_->stats().temporal;
+            engine_->setTemporalHistoryReport(scene::TemporalHistoryReport{
+                .framesValid = t.framesValid, .framesNeeded = t.framesNeeded, .stalled = t.stalled,
+                .bytes = t.historyBytes, .width = t.historyWidth, .height = t.historyHeight});
         }
         engine_->setViewport(renderWidth_, renderHeight_);
         // ADR-391, and *before* the update: the composition decides the frame's camera inside
