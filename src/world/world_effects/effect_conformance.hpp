@@ -25,7 +25,11 @@
 //      inside its hard range;
 //   4. an effect of this kind resolves as *its own kind*, which is what catches a new kind falling
 //      through `resolveAtmosphericEffects`'s `if comet / else if aurora / else` into the vortex arm;
-//   5. the kind's name survives `atmosphereKindName` -> `atmosphereKindFromName`.
+//   5. the kind's name survives `atmosphereKindName` -> `atmosphereKindFromName`;
+//   6. §68's subscription reaches this kind's picture -- subscribing it to a field that is blowing
+//      changes the frame it builds, and an influence of 0 leaves the frame exactly as it was. The
+//      first half is "a correct value is not a reached value" (ADR-387) asked of a shared table
+//      row; the second is the load-bearing default, checked rather than asserted.
 //
 // **How the path set is obtained, and why it matters.** `registeredPaths` does not read the field
 // tables. It registers a probe effect into a scratch `ParameterSet` -- the same call `Engine` makes

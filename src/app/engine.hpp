@@ -739,6 +739,14 @@ private:
     // reads. `kAuroraBands` entries; see `world/atmospherics.hpp` for why this one vector is not a
     // modulation route.
     std::array<float, world::kAuroraBands> auroraSpectrum_{};
+    // §68. The scene's published spatial fields, rebuilt from scratch each frame by
+    // `publishFields()` immediately before the atmospheric resolve reads it. A member rather than a
+    // local so its storage is reused, and cleared-then-filled rather than updated in place so that
+    // a field whose publisher went away this frame cannot linger as a name that still resolves.
+    world::fields::FieldBus fieldBus_;
+    // Names already reported as naming a field nobody publishes, so the log says it once per name
+    // instead of sixty times a second. Cleared whenever the effect list changes.
+    std::vector<std::string> reportedDeadFields_;
     std::vector<world::ShotSpan> shotSpans_;
     AutoDirectorSettings autoDirector_; // ADR-225: saved with the project, read by the host
     SongPlan songPlan_;                 // ADR-249: the same, for Song Mode's authored intents
@@ -746,6 +754,9 @@ private:
     std::uint32_t lastAtmosphericCount_ = 0;
     void updateWorldEffects();
     void updateAtmosphericEffects();
+    // §68. Fills `fieldBus_` with everything this scene publishes: the world's wind, and one field
+    // per live vortex effect. Called from `updateAtmosphericEffects` before the resolve.
+    void publishFields();
     void updateAuroraSpectrum();
     [[nodiscard]] glm::vec3 cameraVelocityOnTimeline() const;
     scene::PostParameters postParams_;

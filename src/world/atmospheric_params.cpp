@@ -64,6 +64,17 @@ constexpr FloatField kSharedFloats[] = {
      +[](Effect& e, float v) { e.timing.windowSeconds = v; }},
     {"repeat", 0.0f, 600.0f, 0.0f, 30.0f, F_GET(static_cast<float>(e.timing.repeatSeconds)),
      +[](Effect& e, float v) { e.timing.repeatSeconds = v; }},
+    // §68. How much of the subscribed field's motion this effect takes. Shared rather than per-kind
+    // on purpose, and that is the point ADR-387 was making: ONE row here gives all three kinds a
+    // registered parameter, a modulation target, a timeline key, a preset member, a save entry, and
+    // apply and capture in both directions -- and a fourth kind gets it on the day it is added,
+    // without anybody remembering to.
+    //
+    // 0 is off and is the default, which is what makes every existing scene render unchanged. The
+    // soft ceiling is 2 because 1 is "the field moves this as much as it moves a leaf" and an
+    // artist wants to be able to overdo it; the hard ceiling is 8 because a route driving this from
+    // a drop is entitled to overshoot the slider (ADR-388's rule for `scattering`, applied again).
+    {"flowInfluence", 0.0f, 8.0f, 0.0f, 2.0f, F_GET(e.flow.influence), F_SET(e.flow.influence)},
 };
 
 constexpr ColorField kSharedColors[] = {
@@ -338,6 +349,11 @@ void sanitise(Effect& e) {
     e.aurora.shape.curtainHeight = std::max(e.aurora.shape.curtainHeight, 1.0f);
     e.ground.radius = std::max(e.ground.radius, 1.0f);
     e.ground.falloff = std::max(e.ground.falloff, 0.05f);
+    // §68. Not a divisor, so this is a floor rather than a guard against division: a negative
+    // influence would invert the field -- a comet's tail leaning INTO a gust -- which is a thing
+    // nobody wants and which reads as a bug rather than as a setting. The hard range already
+    // starts at 0; this is the second line, as the comment above says.
+    e.flow.influence = std::max(e.flow.influence, 0.0f);
 }
 
 } // namespace

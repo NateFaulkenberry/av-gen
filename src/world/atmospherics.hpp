@@ -57,6 +57,7 @@
 
 #include "core/error.hpp"
 #include "world/effects.hpp"
+#include "world/world_effects/field_bus.hpp"
 
 #include <glm/glm.hpp>
 #include <nlohmann/json_fwd.hpp>
@@ -354,6 +355,17 @@ struct AtmosphericEffect {
     Activation activation = Activation::Always; // ADR-207's, unchanged
     Timing timing;                              // ADR-207's, unchanged
 
+    // §68, one field many subscribers. Which spatial field this effect's motion answers to, and how
+    // much. Empty and 0 by default, so every scene written before this existed renders the frame it
+    // rendered before -- and `fields::FieldBus::unresolved` makes a name that resolves to nothing a
+    // reported problem rather than a still picture.
+    //
+    // The reason this is one member on the shared struct rather than three per-kind ones is the
+    // whole of ADR-387's argument: the question "what is the air doing where this effect is" has
+    // one answer, and a comet, an aurora and a funnel that each asked it privately are what this
+    // replaces. What each kind DOES with the answer is per-kind and lives in the resolver.
+    fields::Subscription flow;
+
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] nlohmann::json toJson() const;
     [[nodiscard]] static Result<AtmosphericEffect> fromJson(const nlohmann::json& j);
@@ -398,6 +410,14 @@ struct AtmosphericContext {
     // low to high. Empty is legal and means "no music" -- the curtain falls back to its flat base
     // height, which is what an aurora should look like in silence.
     std::span<const float> spectrum;
+    // §68. The scene's published fields. Null is legal and means "no field layer this frame": every
+    // subscription then resolves to nothing, which is the same picture as no subscription and is
+    // what every call site written before the bus existed gets.
+    //
+    // A raw pointer rather than a reference because the bus is rebuilt each frame by the engine and
+    // a context is a value that tests construct without one; a `span`-shaped borrow with no
+    // ownership, exactly as `shots` and `spectrum` are.
+    const fields::FieldBus* fieldBus = nullptr;
 };
 
 // The intermediate an effect resolves to, before packing. Exposed because every interesting
@@ -421,7 +441,52 @@ struct ResolvedAtmospheric {
     glm::vec3 destination{0.0f};
     float pathLength = 0.0f;          // metres of arc
     float travelled = 0.0f;           // metres flown so far, after the acceleration reparameterisation
+
+    // §68: what the subscribed field was doing at this effect's anchor, this frame, and how much of
+    // it the effect asked for. Resolved on the CPU once per effect per frame and folded into the
+    // numbers the GPU structs already carry -- ADR-055's rule that a transfer function is evaluated
+    // once per draw rather than once per fragment, applied to a field instead of to a plant.
+    //
+    // It is sampled at the ANCHOR rather than at the head, and that is a decision rather than a
+    // convenience: the anchor is a pure function of (activation, camera), so the sample is a pure
+    // function of time. Sampling at the head would make the comet's own motion an input to the
+    // field that drives it, which is a feedback loop an integrator would have to close -- and
+    // ADR-091's two-tier determinism has no integrators in it.
+    fields::FlowSample flow;
+    float flowInfluence = 0.0f; // 0 when unsubscribed, when the name is dead, or when set to 0
 };
+
+// §68. What one effect's subscription answers at `anchor` this frame, and how much of it the effect
+// asked for. Free functions rather than members because the vortex has no `ResolvedAtmospheric` to
+// hang them on -- it is a static field the march samples, not a trajectory -- and because a thing
+// that is a pure function of its arguments is a thing a test can ask a question of without building
+// a frame.
+struct EffectFlow {
+    fields::FlowSample sample;
+    // 0 when the effect is unsubscribed, when it named a field the bus does not publish, or when
+    // the artist set the influence to 0. Those three are deliberately one number downstream: a
+    // subscriber's behaviour must not depend on WHY there is no field, only on there being none.
+    // Which of the three it was is a question for the report, not for the picture.
+    float influence = 0.0f;
+    [[nodiscard]] bool active() const { return influence != 0.0f; }
+};
+[[nodiscard]] EffectFlow resolveEffectFlow(const AtmosphericEffect& effect, const glm::vec3& anchor,
+                                           const AtmosphericContext& ctx);
+
+// The two numbers every kind derives from a flow. They are here, shared, rather than open-coded in
+// three packers, because "each effect has its own isolated wind handling" is the thing §68 is
+// against and three private derivations of one field would be that again one layer down.
+//
+// `flowAmplitude` is a multiplier on whatever lateral motion the kind already has: 1 in still air,
+// more in wind and more again inside a gust front. Unitless, and therefore valid for either
+// `FlowUnits` -- which is why the atmospheric family reads `strength` and `gust` rather than `flow`,
+// and can subscribe to a wind or a vortex without knowing which it got.
+[[nodiscard]] float flowAmplitude(const fields::FlowSample& sample, float influence);
+// `flowOffset` is a SPATIAL phase offset in radians, wrapped to [0, tau). Two effects in different
+// parts of the sky subscribed to one field get different offsets, which is the property that makes
+// this a field rather than a shared clock -- a shared clock would move them in lockstep, and moving
+// in lockstep is the tell ADR-055 was written to remove from the meadow.
+[[nodiscard]] float flowOffset(const fields::FlowSample& sample, float influence);
 
 // Mirrors `Comet` in shaders/atmosphere_fx.wgsl. 144 bytes, the same size ADR-207 chose, for the
 // same reason: it is what nine vec4s cost and nine is what the lanes need.
@@ -510,10 +575,20 @@ struct AtmosphericCounts {
     std::size_t vortices = 0; // ADR-387; at most one is used, the rest count as dropped
     std::size_t dropped = 0;
 };
+// §68 added `vortices`. A vortex has no trajectory, so before this it resolved into a count and
+// nothing else, and `buildAtmosphericFrame` found its payload by walking `effects` a second time.
+// That was fine while the payload was the authored struct copied through, and stopped being fine
+// the moment the resolve had something to SAY about a vortex -- what the field it subscribes to is
+// doing where it stands. Writing it into a record the caller already holds is how the other two
+// kinds work, and a second walk that re-derives what the first walk knew is how the two drift.
+//
+// Defaulted, so every caller written before this compiles and behaves exactly as it did: an empty
+// span means the vortex is counted and not recorded, which is what used to happen.
 AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> effects,
                                             const AtmosphericContext& context,
                                             std::span<ResolvedAtmospheric> comets,
-                                            std::span<ResolvedAtmospheric> auroras);
+                                            std::span<ResolvedAtmospheric> auroras,
+                                            std::span<ResolvedAtmospheric> vortices = {});
 
 // Packing, pure so a test can read every lane.
 [[nodiscard]] CometGpu packComet(const ResolvedAtmospheric& resolved);
