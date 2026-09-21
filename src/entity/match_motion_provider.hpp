@@ -24,6 +24,8 @@
 #include "entity/motion_provider.hpp"
 #include "scene/motion_database.hpp"
 
+#include <atomic>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -127,6 +129,13 @@ public:
     [[nodiscard]] MotionResult pose(const MotionMemory& memory, const scene::Skeleton& skeleton,
                                     scene::Pose& out) const override;
 
+    // Phase C §68/§69: **the query `advance` would search with**, for `request` from `in`, so a
+    // diagnostic explains the decision the provider actually makes rather than one built beside it.
+    // The same code path as `advance` (`fillQuery`), not a copy of it. Empty when there is no
+    // database. Allocates -- it is for tools and debugging, not the matching loop.
+    [[nodiscard]] std::optional<scene::MotionQuery> queryFor(const MotionRequest& request,
+                                                             const MotionMemory& in) const;
+
     // How many searches this provider has run, and how many samples it scored. **Counted by the
     // provider rather than inferred**, because "is the matcher actually searching, or has it been
     // following `sampleNext` since frame one" is the question a matcher that quietly stopped
@@ -138,17 +147,48 @@ public:
         std::uint64_t switches = 0;    // searches that actually changed the motion
         std::uint64_t heldByMargin = 0; // searches whose winner did not beat the margin
     };
-    [[nodiscard]] const Counters& counters() const { return counters_; }
-    void resetCounters() { counters_ = Counters{}; }
+    // A snapshot, by value: the live counters are atomic (below).
+    [[nodiscard]] Counters counters() const {
+        return Counters{counters_.searches.load(std::memory_order_relaxed),
+                        counters_.scored.load(std::memory_order_relaxed),
+                        counters_.continued.load(std::memory_order_relaxed),
+                        counters_.switches.load(std::memory_order_relaxed),
+                        counters_.heldByMargin.load(std::memory_order_relaxed)};
+    }
+    void resetCounters() { counters_.reset(); }
 
 private:
+    void fillQuery(const MotionRequest& request, std::uint32_t current, scene::MotionQuery& query,
+                   std::vector<float>& raw) const;
+
     const scene::MotionDatabase* db_ = nullptr;
     const std::vector<scene::AnimationClip>* clips_ = nullptr;
     MatchSettings settings_;
     std::string name_ = "match";
     // Mutable because `IMotionProvider` is const by contract -- a provider holds no per-character
     // state, and these are diagnostics about the provider rather than about any one character.
-    mutable Counters counters_;
+    //
+    // **Atomic, because one provider serves every character** (§74). These were plain integers
+    // incremented from `advance`, which is a data race the moment two characters are advanced on
+    // two threads -- the only mutable state in an otherwise shareable object. Relaxed: they are
+    // counts, nothing is ordered by them, and a relaxed increment is one uncontended instruction.
+    struct RelaxedCount {
+        std::atomic<std::uint64_t> value{0};
+        RelaxedCount() = default;
+        RelaxedCount(const RelaxedCount& other) : value(other.value.load(std::memory_order_relaxed)) {}
+        RelaxedCount& operator=(const RelaxedCount& other) {
+            value.store(other.value.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            return *this;
+        }
+        void operator++() { value.fetch_add(1, std::memory_order_relaxed); }
+        void operator+=(std::uint64_t n) { value.fetch_add(n, std::memory_order_relaxed); }
+        [[nodiscard]] std::uint64_t load(std::memory_order order) const { return value.load(order); }
+    };
+    struct LiveCounters {
+        RelaxedCount searches, scored, continued, switches, heldByMargin;
+        void reset() { *this = LiveCounters{}; }
+    };
+    mutable LiveCounters counters_;
 };
 
 } // namespace avgen::entity

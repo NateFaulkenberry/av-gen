@@ -536,6 +536,9 @@ TEST_CASE("§32: what the blend costs the presentation half", "[loop][phaseC][al
         entity::MotionMemory memory;
         memory.selection = 0;
         memory.generation = 1;
+        // Hand-built, so it states which database it indexes, as `advance` would (§40). Without it
+        // every arm here times the refusal path, and `three >= none` compares two no-ops.
+        memory.database = fixture.db.identity;
         for (std::size_t i = 0; i < entity::MotionMemory::kBlendSlots; ++i) {
             memory.pushBlend(static_cast<std::uint32_t>(10u + i),
                              fixture.db.sampleTime[10u + i], static_cast<std::uint32_t>(40u + i),

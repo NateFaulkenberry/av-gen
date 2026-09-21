@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace avgen::entity {
 namespace {
@@ -31,6 +32,67 @@ FeatureLayout layoutOf(const scene::MotionFeatureConfig& config) {
 
 } // namespace
 
+void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t current,
+                                    scene::MotionQuery& query, std::vector<float>& raw) const {
+    const FeatureLayout layout = layoutOf(db_->config);
+    const bool haveCurrent = current < db_->sampleCount();
+    // **The pose half is a lookup.** The character is playing a database sample, so what it looks
+    // like right now is that sample's own feature vector -- already extracted and already
+    // standardised. Only the intent half is computed, and it is computed from the request.
+    std::vector<float>& features = query.features;
+    features.assign(db_->dimension, 0.0f);
+    if (haveCurrent) {
+        const float* sample = db_->featuresFor(current);
+        std::copy(sample, sample + db_->dimension, features.begin());
+    }
+
+    // The intent half, in raw units, standardised the same way the database was. Root velocity is
+    // what the body wants to be doing; the trajectory block is where it wants to be at each
+    // horizon, which for a constant desired velocity is that velocity times the horizon.
+    raw.assign(db_->dimension, 0.0f);
+    const glm::vec3 want = request.desiredVelocity + request.steering;
+    for (std::size_t t = 0; t < db_->config.trajectoryTimes.size(); ++t) {
+        const float ahead = db_->config.trajectoryTimes[t];
+        const std::size_t base = layout.trajectory + (t * 4u);
+        raw[base + 0] = want.x * ahead;
+        raw[base + 1] = want.z * ahead;
+        const float len = std::sqrt((want.x * want.x) + (want.z * want.z));
+        raw[base + 2] = len > 1e-5f ? want.x / len : 0.0f;
+        raw[base + 3] = len > 1e-5f ? want.z / len : 0.0f;
+    }
+    raw[layout.rootVelocity + 0] = want.x;
+    raw[layout.rootVelocity + 1] = want.y;
+    raw[layout.rootVelocity + 2] = want.z;
+    scene::normaliseQuery(*db_, raw);
+
+    // Overwrite the intent dimensions of the pose-derived query with what the character wants.
+    // Blended by `intentWeight` against what it is already doing, so a body already moving the
+    // right way is not yanked toward an idealised trajectory it is fractionally off.
+    const float w = std::clamp(settings_.intentWeight, 0.0f, 1.0f);
+    for (std::size_t d = layout.trajectory; d < layout.total && d < layout.rootVelocity + 3; ++d) {
+        features[d] = (features[d] * (1.0f - w)) + (raw[d] * w);
+    }
+
+    query.requireTags = 0;
+    query.current = haveCurrent ? current : scene::MotionDatabase::kInvalid;
+    // §14: a body on the ground never wants an airborne sample. One AND per sample, and it removes
+    // whole clips before anything is scored.
+    query.rejectTags = static_cast<std::uint32_t>(scene::MotionTag::Airborne);
+}
+
+std::optional<scene::MotionQuery> MatchMotionProvider::queryFor(const MotionRequest& request,
+                                                                const MotionMemory& in) const {
+    if (db_ == nullptr || db_->sampleCount() == 0) {
+        return std::nullopt;
+    }
+    const bool haveCurrent =
+        in.generation > 0 && in.database == db_->identity && in.selection < db_->sampleCount();
+    scene::MotionQuery query;
+    std::vector<float> raw;
+    fillQuery(request, haveCurrent ? in.selection : scene::MotionDatabase::kInvalid, query, raw);
+    return query;
+}
+
 MotionResult MatchMotionProvider::advance(const MotionRequest& request, const MotionMemory& in,
                                           double time, float dt, MotionMemory& next) const {
     MotionResult result;
@@ -46,8 +108,16 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
         return result;
     }
 
-    const FeatureLayout layout = layoutOf(db_->config);
-    const bool haveCurrent = in.generation > 0 && in.selection < db_->sampleCount();
+    // §40/§76: a memory settled against another database -- the one this provider held before a
+    // hot swap -- is not a current sample here, however in-range its index is. It is migrated the
+    // only safe way: as a first selection, with no blend from a frame that no longer exists.
+    const bool sameDatabase = in.database == db_->identity;
+    const bool haveCurrent =
+        in.generation > 0 && sameDatabase && in.selection < db_->sampleCount();
+    if (!sameDatabase) {
+        next.clearBlends();
+    }
+    next.database = db_->identity;
 
     // ---- continue, if it is not time to search (§27/§29) --------------------------------------
     //
@@ -77,48 +147,15 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
 
     // ---- build the query -----------------------------------------------------------------------
     //
-    // **The pose half is a lookup.** The character is playing a database sample, so what it looks
-    // like right now is that sample's own feature vector -- already extracted and already
-    // standardised. Only the intent half is computed, and it is computed from the request.
-    std::vector<float> features(db_->dimension, 0.0f);
-    if (haveCurrent) {
-        const float* current = db_->featuresFor(in.selection);
-        std::copy(current, current + db_->dimension, features.begin());
-    }
-
-    // The intent half, in raw units, standardised the same way the database was. Root velocity is
-    // what the body wants to be doing; the trajectory block is where it wants to be at each
-    // horizon, which for a constant desired velocity is that velocity times the horizon.
-    std::vector<float> raw(db_->dimension, 0.0f);
-    const glm::vec3 want = request.desiredVelocity + request.steering;
-    for (std::size_t t = 0; t < db_->config.trajectoryTimes.size(); ++t) {
-        const float ahead = db_->config.trajectoryTimes[t];
-        const std::size_t base = layout.trajectory + (t * 4u);
-        raw[base + 0] = want.x * ahead;
-        raw[base + 1] = want.z * ahead;
-        const float len = std::sqrt((want.x * want.x) + (want.z * want.z));
-        raw[base + 2] = len > 1e-5f ? want.x / len : 0.0f;
-        raw[base + 3] = len > 1e-5f ? want.z / len : 0.0f;
-    }
-    raw[layout.rootVelocity + 0] = want.x;
-    raw[layout.rootVelocity + 1] = want.y;
-    raw[layout.rootVelocity + 2] = want.z;
-    scene::normaliseQuery(*db_, raw);
-
-    // Overwrite the intent dimensions of the pose-derived query with what the character wants.
-    // Blended by `intentWeight` against what it is already doing, so a body already moving the
-    // right way is not yanked toward an idealised trajectory it is fractionally off.
-    const float w = std::clamp(settings_.intentWeight, 0.0f, 1.0f);
-    for (std::size_t d = layout.trajectory; d < layout.total && d < layout.rootVelocity + 3; ++d) {
-        features[d] = (features[d] * (1.0f - w)) + (raw[d] * w);
-    }
-
-    scene::MotionQuery query;
-    query.features = std::move(features);
-    query.current = haveCurrent ? in.selection : scene::MotionDatabase::kInvalid;
-    // §14: a body on the ground never wants an airborne sample. One AND per sample, and it removes
-    // whole clips before anything is scored.
-    query.rejectTags = static_cast<std::uint32_t>(scene::MotionTag::Airborne);
+    // §75: every vector on this path is per-thread scratch, reused. A search allocated three
+    // vectors per call before -- the query, the intent block and the margin's weights -- and at ten
+    // searches a second per character that is thousands of allocations a second on a path that
+    // needs none. `thread_local` rather than members for the reason `pose` gives below: one
+    // provider serves every character, possibly from several threads (§74).
+    thread_local scene::MotionQuery query;
+    thread_local std::vector<float> raw;
+    thread_local std::vector<float> dimWeight;
+    fillQuery(request, haveCurrent ? in.selection : scene::MotionDatabase::kInvalid, query, raw);
 
     const scene::MotionMatch match = scene::searchMotion(*db_, query, settings_.weights);
     ++counters_.searches;
@@ -145,7 +182,7 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
             //
             // A comparison between two costs computed by different formulas is worse than no
             // comparison: it has a defensible-looking number on both sides.
-            const std::vector<float> dimWeight = scene::motionFeatureWeights(db_->config);
+            scene::motionFeatureWeightsInto(db_->config, dimWeight);
             const bool weighted = dimWeight.size() == db_->dimension;
             float continueCost = 0.0f;
             for (std::size_t d = 0; d < db_->dimension; ++d) {
@@ -215,7 +252,11 @@ MotionResult MatchMotionProvider::pose(const MotionMemory& memory, const scene::
     // `selection` is a SAMPLE index in this provider's space. Validated rather than trusted: the
     // clip provider reads the same field as a clip index, and ADR-556's `MotionMemory::provider`
     // is what stops them being confused -- this is the second lock on that door.
-    if (memory.selection >= db_->sampleCount()) {
+    //
+    // §40/§76: and it must be a sample of THIS database. After a hot swap an old index is usually
+    // still in range and names an unrelated frame; declining is what lets the chain fall through
+    // for the one frame until `advance` has migrated the memory.
+    if (memory.database != db_->identity || memory.selection >= db_->sampleCount()) {
         result.status = MotionStatus::NoContent;
         return result;
     }

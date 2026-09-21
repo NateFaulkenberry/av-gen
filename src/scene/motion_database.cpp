@@ -1,4 +1,5 @@
 #include "scene/motion_database.hpp"
+#include "scene/motion_database_io.hpp"
 
 #include "scene/animation.hpp"
 
@@ -124,8 +125,8 @@ const char* motionFeatureGroupName(MotionFeatureGroup group) {
 
 // The layout `buildMotionDatabase` writes, stated once so the weights and the breakdown cannot
 // drift from it. `dimension()` above computes the same total; this says what each slot *is*.
-std::vector<MotionFeatureGroup> motionFeatureLayout(const MotionFeatureConfig& config) {
-    std::vector<MotionFeatureGroup> out;
+void motionFeatureLayoutInto(const MotionFeatureConfig& config, std::vector<MotionFeatureGroup>& out) {
+    out.clear();
     out.reserve(config.dimension());
     for (std::size_t j = 0; j < config.joints.size(); ++j) {
         out.insert(out.end(), 3u, MotionFeatureGroup::JointPosition);
@@ -142,12 +143,19 @@ std::vector<MotionFeatureGroup> motionFeatureLayout(const MotionFeatureConfig& c
     if (config.contactWeight > 0.0f) {
         out.insert(out.end(), config.contactJointNames().size(), MotionFeatureGroup::Contact);
     }
+}
+
+std::vector<MotionFeatureGroup> motionFeatureLayout(const MotionFeatureConfig& config) {
+    std::vector<MotionFeatureGroup> out;
+    motionFeatureLayoutInto(config, out);
     return out;
 }
 
-std::vector<float> motionFeatureWeights(const MotionFeatureConfig& config) {
-    const std::vector<MotionFeatureGroup> layout = motionFeatureLayout(config);
-    std::vector<float> out;
+void motionFeatureWeightsInto(const MotionFeatureConfig& config, std::vector<float>& out) {
+    // Its own scratch, so a caller may pass the layout it also wants without the two aliasing.
+    thread_local std::vector<MotionFeatureGroup> layout;
+    motionFeatureLayoutInto(config, layout);
+    out.clear();
     out.reserve(layout.size());
     for (const MotionFeatureGroup group : layout) {
         switch (group) {
@@ -165,6 +173,11 @@ std::vector<float> motionFeatureWeights(const MotionFeatureConfig& config) {
         case MotionFeatureGroup::Count: out.push_back(1.0f); break;
         }
     }
+}
+
+std::vector<float> motionFeatureWeights(const MotionFeatureConfig& config) {
+    std::vector<float> out;
+    motionFeatureWeightsInto(config, out);
     return out;
 }
 
@@ -526,6 +539,8 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
         (db.sampleClip.size() * sizeof(std::uint32_t)) + (db.sampleTime.size() * sizeof(float)) +
         (db.samplePhase.size() * sizeof(float)) + (db.sampleTags.size() * sizeof(std::uint32_t)) +
         (db.sampleNext.size() * sizeof(std::uint32_t));
+    // §38/§82: record what this was built from, and the identity a hot swap is checked against.
+    stampMotionDatabase(db, pack, options);
     return db;
 }
 
@@ -548,8 +563,14 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
     // §10. Per-dimension weights, derived from the config rather than baked into the features, so
     // a weight is tunable **without rebuilding the database**. Recomputed per search rather than
     // cached: it is a few dozen floats against a scan of up to a million samples.
-    const std::vector<MotionFeatureGroup> layout = motionFeatureLayout(db.config);
-    const std::vector<float> dimWeight = motionFeatureWeights(db.config);
+    //
+    // §75: into per-thread scratch rather than fresh vectors, so a search allocates nothing once a
+    // thread has searched once. Recomputed every time, still -- the weights stay tunable without a
+    // rebuild, and a cache keyed on the config would be one more thing to invalidate.
+    thread_local std::vector<MotionFeatureGroup> layout;
+    thread_local std::vector<float> dimWeight;
+    motionFeatureLayoutInto(db.config, layout);
+    motionFeatureWeightsInto(db.config, dimWeight);
     const bool weighted = dimWeight.size() == dim && layout.size() == dim;
 
     // The family of whatever is playing, for the transition cost (§12). Read from tags and never
