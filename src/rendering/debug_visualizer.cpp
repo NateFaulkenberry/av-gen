@@ -761,9 +761,11 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
                 // **On the content that exists, this is not a conditional failure -- it is total.**
                 // A corpus census of every scene in `examples/` found **zero `lean` layers**, so
                 // `bodyAcceleration` is never written by anything; and `bodyVelocity` is written
-                // only under `footLock > 0`, which **no scene can set** because it has no parser
-                // (see `PoseLayer::footLock`). So the acceleration arrow and the velocity arrow
-                // **never draw, in any scene in this repository.**
+                // only under `footLock > 0`, which no scene sets -- it had no parser at all until
+                // ADR-615, and having one now changes nothing until an author uses it. So the
+                // acceleration arrow and the velocity arrow **never draw, in any scene in this
+                // repository**, and fixing `footLock`'s parser did not fix this: the overlay reads
+                // the wrong layer, which is a separate defect.
                 //
                 // **The failure reads as data rather than as a bug**: the facing arrow below is
                 // computed from the entity transform and always draws, so a viewer ticks "Motion

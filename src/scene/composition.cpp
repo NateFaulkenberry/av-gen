@@ -8838,6 +8838,9 @@ nlohmann::json Composition::toJson() const {
                         if (layer.extension != 1.0f) {
                             l["extension"] = layer.extension;
                         }
+                        if (layer.footLock != 0.0f) {
+                            l["footLock"] = layer.footLock;
+                        }
                         if (glm::dot(layer.soleUp, layer.soleUp) > 0.0f) {
                             l["soleUp"] = vecToJson(layer.soleUp);
                         }
@@ -10406,12 +10409,22 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                             auto align = readFloat(entry, "footAlign", 1.0f);
                             auto offset = readFloat(entry, "groundOffset", 0.0f);
                             auto reach = readFloat(entry, "extension", 1.0f);
+                            // ADR-615: `footLock` is parsed here because its four neighbours above
+                            // always were and it never was -- an omission, not a decision. Until
+                            // this line existed a scene that authored the key was told it "is not
+                            // one this build reads and was ignored", which was true and made the
+                            // whole foot-lock subsystem (ADR-557's derived anchor, `inContact`,
+                            // `contactElapsed`, `bodyVelocity`) unreachable from any scene. The
+                            // default stays 0 -- off -- so nothing changes until an author asks.
+                            auto lock = readFloat(entry, "footLock", 0.0f);
                             if (!align) return std::unexpected(align.error());
                             if (!offset) return std::unexpected(offset.error());
                             if (!reach) return std::unexpected(reach.error());
+                            if (!lock) return std::unexpected(lock.error());
                             layer.footAlign = *align;
                             layer.groundOffset = *offset;
                             layer.extension = *reach;
+                            layer.footLock = *lock;
                             if (entry.contains("poleDirection")) {
                                 auto pole = readVec<3>(entry, "poleDirection", layer.poleDirection);
                                 if (!pole) return std::unexpected(pole.error());
@@ -10449,7 +10462,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                 std::string_view{"weight"},    std::string_view{"chain"},
                                 std::string_view{"poleDirection"}, std::string_view{"footAlign"},
                                 std::string_view{"groundOffset"},  std::string_view{"extension"},
-                                std::string_view{"soleUp"},
+                                std::string_view{"soleUp"},        std::string_view{"footLock"},
                                 // Stride (Phase B §7)
                                 std::string_view{"joint"},     std::string_view{"origin"},
                                 std::string_view{"strideMin"}, std::string_view{"strideMax"},

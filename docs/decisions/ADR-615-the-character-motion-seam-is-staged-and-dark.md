@@ -121,7 +121,7 @@ a documentation problem, and only the corpus can say which those are.
 
 | finding | corpus verdict |
 |---|---|
-| foot-lock contact spans read from the clip player's state on frames it did not run | **latent** — the whole block is gated on `footLock > 0`, which no scene can set |
+| foot-lock contact spans read from the clip player's state on frames it did not run | **latent** — gated on `footLock > 0`, which no scene sets |
 | `bodyAcceleration` divided by node scale while its gain is authored in world m/s² | **latent** — `bodyAcceleration` is written only onto `Lean` layers and **no scene authors one** |
 | the Motion-vectors overlay reading body state off `layers.front()` | **strengthened to unconditional** — neither arrow can ever draw |
 
@@ -138,6 +138,23 @@ Three corpus claims settled, two of them TRUE and correctly stated:
   from landmarks plus ecology scatter plus nav-grid shore and vista points, so it is not statically
   countable. Structurally consistent with how the list is assembled, which is worth saying: that
   file's failure mode was structural claims rotting, not figures being invented.
+
+### `footLock` was the one gap ruled *closed* rather than documented
+
+Every other item here is unreachable **by design pending a product decision**, and wiring it would
+be scope nobody asked for. `footLock` was different and got the opposite ruling: a **parse gap in a
+shipped, tested, ADR-backed subsystem whose four neighbours in the same struct were all parsed and
+all serialised**. That asymmetry is an omission, not a decision — and it had a live trap in it,
+because a scene authoring the key was told *"key is not one this build reads and was ignored"*.
+
+It is parsed and serialised now, and **enabled nowhere**: the default stays 0. The change is
+behaviour-neutral by construction and stops the system lying to the next author. ADR-557 deriving
+an anchor for a feature no scene could switch on was the symptom of the gap, not a reason to keep
+it.
+
+**Note what it did not fix.** The Motion-vectors overlay still cannot draw its velocity arrow,
+because that defect is the overlay reading the wrong layer — a separate fault that a parser cannot
+reach.
 
 ## Consequences
 
