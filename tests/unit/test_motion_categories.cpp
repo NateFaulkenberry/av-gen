@@ -55,8 +55,8 @@ scene::AnimationClip straight(std::string name, float seconds, float speed) {
     return pathClip(std::move(name), seconds, [speed](float t) { return glm::vec3(0.0f, 0.0f, speed * t); });
 }
 
-scene::MotionCategoryReport measure(std::vector<scene::AnimationClip> clips) {
-    const scene::MotionPack pack = testsupport::probePack(std::move(clips));
+scene::MotionCategoryReport measure(std::vector<scene::AnimationClip> clips, bool loop = true) {
+    const scene::MotionPack pack = testsupport::probePack(std::move(clips), loop);
     auto db = scene::buildMotionDatabase(pack, testsupport::probeOptions());
     REQUIRE(db.has_value());
     REQUIRE(db->sampleCount() > 0);
@@ -88,10 +88,10 @@ TEST_CASE("§58: each category is graded from what the body does, against printe
     CHECK(r.at(MotionCategory::Reverse).grade == CoverageGrade::Poor);
     CHECK(r.at(MotionCategory::Strafe).grade == CoverageGrade::Poor);
     CHECK(r.at(MotionCategory::Start).grade == CoverageGrade::Poor);
-    // **The clip-final artefact would otherwise read as three stops**: the builder's velocity is a
-    // forward difference clamped to the clip end, so every clip's last sample reads zero.
+    // **Three steady clips contain no stop.** Before feature extraction version 2, every clip's
+    // last sample read zero velocity, and this report had to exclude those samples or count three
+    // fictitious stops. They are counted now, so this holds only because the features are right.
     CHECK(r.at(MotionCategory::Stop).windows == 0);
-    CHECK(r.excludedClipFinal == 3);
 
     // The thresholds are in the report, not only in the code.
     const std::string text = r.report();
@@ -106,9 +106,9 @@ TEST_CASE("§58: reverse, starts and stops are found where they are and nowhere 
         straight("backup", 3.0f, -1.0f),
         pathClip("setoff", 2.0f, [](float t) { return glm::vec3(0.0f, 0.0f, t < 1.0f ? 0.0f : 1.2f * (t - 1.0f)); }),
         pathClip("halt", 2.0f, [](float t) { return glm::vec3(0.0f, 0.0f, 1.2f * std::min(t, 1.0f)); }),
-    });
+    }, /*loop=*/false); // one set-off and one stop, not cycles: looped, each would contain the other
     INFO(r.report());
-    CHECK(r.at(MotionCategory::Reverse).windows == 15); // 91 samples less the clip end = 3.0 s
+    CHECK(r.at(MotionCategory::Reverse).windows == 15); // 91 samples = 3.03 s
     CHECK(r.at(MotionCategory::Reverse).grade == CoverageGrade::Moderate);
     CHECK(r.at(MotionCategory::Start).windows == 1);
     CHECK(r.at(MotionCategory::Start).grade == CoverageGrade::Limited);
@@ -124,13 +124,13 @@ TEST_CASE("§58: turns are signed, and a fast turn is its own category", "[motio
             return glm::vec3(radius * (1.0f - std::cos(omega * t)), 0.0f, radius * std::sin(omega * t));
         };
     };
-    const scene::MotionCategoryReport left = measure({pathClip("curve", 2.0f, circle(1.0f, 1.5f))});
+    const scene::MotionCategoryReport left = measure({pathClip("curve", 2.0f, circle(1.0f, 1.5f))}, /*loop=*/false);
     INFO(left.report());
     CHECK(left.at(MotionCategory::LeftTurn).samples > 50);
     CHECK(left.at(MotionCategory::RightTurn).samples == 0);
     CHECK(left.at(MotionCategory::FastLeftTurn).samples == 0); // 1.5 m/s is a walk
 
-    const scene::MotionCategoryReport right = measure({pathClip("curve", 2.0f, circle(1.0f, -1.5f))});
+    const scene::MotionCategoryReport right = measure({pathClip("curve", 2.0f, circle(1.0f, -1.5f))}, /*loop=*/false);
     CHECK(right.at(MotionCategory::RightTurn).samples > 50);
     CHECK(right.at(MotionCategory::LeftTurn).samples == 0);
 
@@ -149,12 +149,11 @@ TEST_CASE("§58: the report on the real Glowmere database", "[motioncoverage][ph
     WARN(r.report());
     REQUIRE(r.samples == glowmere->db.sampleCount());
     REQUIRE(r.samples > 1000);
-    // Every non-final sample lands in exactly one of the speed/direction categories.
+    // Every sample lands in exactly one of the speed/direction categories.
     const std::uint32_t classified = r.at(MotionCategory::Idle).samples + r.at(MotionCategory::Walk).samples +
                                      r.at(MotionCategory::Run).samples + r.at(MotionCategory::Strafe).samples +
                                      r.at(MotionCategory::Reverse).samples;
-    CHECK(classified + r.excludedClipFinal == r.samples);
-    CHECK(r.excludedClipFinal == glowmere->db.clipNames.size());
+    CHECK(classified == r.samples);
 }
 
 TEST_CASE("§58: a tag the body does not bear out is flagged, sample by sample",

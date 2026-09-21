@@ -291,9 +291,6 @@ std::string MotionCategoryReport::report() const {
         "{}+ windows ({}+ events) from {}+ clips\n",
         options.moderateWindows, options.moderateEvents, options.goodWindows, options.goodEvents,
         options.goodClips);
-    out += fmt::format("  {} clip-final samples excluded: the builder's forward difference reads zero "
-                       "velocity at every clip's last frame\n",
-                       excludedClipFinal);
     for (const MotionCategoryCoverage& c : categories) {
         if (c.event) {
             out += fmt::format("  {:<22} {:<8} {:>4} events from {} clip(s)", motionCategoryName(c.category),
@@ -384,22 +381,14 @@ MotionCategoryReport measureMotionCategories(const MotionDatabase& db,
         clipsIn[static_cast<std::size_t>(c)][clip] = true;
     };
 
-    // **A clip's last sample is excluded, because its velocity is an artefact.** The builder takes
-    // a forward difference clamped to the clip's end, so the final sample of every clip -- looping
-    // walks included -- reads a root velocity of exactly zero. Counted, it would put one idle
-    // sample and one fictitious STOP at the end of every moving clip in the corpus.
-    const auto clipFinal = [&](std::uint32_t s) {
-        const std::uint32_t next = db.sampleNext[s];
-        return next == MotionDatabase::kInvalid || next <= s || db.sampleClip[next] != db.sampleClip[s];
-    };
+    // Every sample is counted, the last of each clip included. This report used to exclude clip-final
+    // samples because the builder clamped its look ahead at the clip's end and they all read zero
+    // velocity. Feature extraction version 2 fixed that at the source, and an exclusion kept after
+    // the fix would drop real motion.
     constexpr float kQuarter = 0.785398163f;
     // Each sample's speed-and-direction category, for the per-sample tag agreement below.
     std::vector<MotionCategory> primary(db.sampleCount(), MotionCategory::Count);
     for (std::uint32_t s = 0; s < db.sampleCount(); ++s) {
-        if (clipFinal(s)) {
-            ++out.excludedClipFinal;
-            continue;
-        }
         const bool sameClip = s > 0 && db.sampleClip[s] == db.sampleClip[s - 1u];
         if (speed[s] < options.idleSpeed) {
             primary[s] = MotionCategory::Idle;

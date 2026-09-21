@@ -185,8 +185,6 @@ struct MotionCategoryReport {
     MotionCategoryOptions options;
     float sampleRate = 0.0f;
     std::uint32_t samples = 0;
-    // Samples left out because their root velocity is a build artefact (see the .cpp).
-    std::uint32_t excludedClipFinal = 0;
     [[nodiscard]] const MotionCategoryCoverage& at(MotionCategory c) const {
         return categories[static_cast<std::size_t>(c)];
     }

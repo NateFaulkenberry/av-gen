@@ -59,7 +59,10 @@ inline scene::AnimationClip probeGait(std::string name, float amplitude, float t
     return clip;
 }
 
-inline scene::MotionPack probePack(std::vector<scene::AnimationClip> clips = {}) {
+// `loop` marks every clip as a cycle. A clip that sets off, stops or rounds part of a curve is not
+// one: looped, it continues into its own start, and that continuation is a stop, a start or a
+// reversed turn that the clip does not contain.
+inline scene::MotionPack probePack(std::vector<scene::AnimationClip> clips = {}, bool loop = true) {
     if (clips.empty()) {
         clips = {probeGait("Walking", 0.30f, 1.2f), probeGait("Running", 0.75f, 3.0f)};
     }
@@ -77,7 +80,7 @@ inline scene::MotionPack probePack(std::vector<scene::AnimationClip> clips = {})
     for (const scene::AnimationClip& clip : pack.animation) {
         scene::PackClip meta;
         meta.name = clip.name;
-        meta.loop = true;
+        meta.loop = loop;
         meta.sampleRate = 30.0f;
         meta.length = clip.length();
         meta.frames = static_cast<std::uint32_t>(std::lround(clip.length() * 30.0f)) + 1u;

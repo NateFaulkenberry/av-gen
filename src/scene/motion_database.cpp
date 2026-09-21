@@ -87,6 +87,78 @@ std::vector<glm::vec3> clipFacing(const Skeleton& skeleton, const AnimationClip&
     return out;
 }
 
+glm::vec3 impliedTravel(const Skeleton& skeleton, const AnimationClip& clip, int root,
+                        const std::vector<ContactTrack>& contacts,
+                        const std::vector<glm::vec3>& facing, std::uint32_t frames, float dt) {
+    const auto planted = [](const ContactTrack& track, float local) {
+        for (const ContactSpan& span : track.spans) {
+            if (span.wraps() ? (local >= span.start || local <= span.end)
+                             : (local >= span.start && local <= span.end)) {
+                return true;
+            }
+        }
+        return false;
+    };
+    Pose pose;
+    Pose poseAhead;
+    std::vector<glm::mat4> model;
+    std::vector<glm::mat4> modelAhead;
+    (void)root;
+    glm::vec3 sum(0.0f);
+    std::uint32_t count = 0;
+    std::vector<std::uint32_t> perTrack(contacts.size(), 0u);
+    for (std::uint32_t f = 0; f + 1 < frames && f < facing.size(); ++f) {
+        const float t = std::min(clip.start + (static_cast<float>(f) * dt), clip.duration);
+        const float t2 = std::min(t + dt, clip.duration);
+        if (t2 <= t) {
+            continue;
+        }
+        bool posed = false;
+        for (std::size_t k = 0; k < contacts.size(); ++k) {
+            const ContactTrack& track = contacts[k];
+            // By name, not `jointIndex`: a pack read from disk carries the name and leaves the index
+            // unresolved (-1), which silently made every track here count for nothing.
+            const int joint = skeleton.find(track.joint);
+            if (track.kind != ContactKind::Foot || joint < 0 ||
+                !planted(track, t - clip.start) || !planted(track, t2 - clip.start)) {
+                continue;
+            }
+            if (!posed) {
+                setRestPose(skeleton, pose);
+                sampleClip(clip, t, pose);
+                poseToModel(skeleton, pose, model);
+                setRestPose(skeleton, poseAhead);
+                sampleClip(clip, t2, poseAhead);
+                poseToModel(skeleton, poseAhead, modelAhead);
+                posed = true;
+            }
+            // In model space, not relative to the root. A planted foot that moves in the clip's own
+            // space is the ground moving under it, whatever the root is doing. A root that sways
+            // with the foot carried along (the scout's kicks) therefore implies no travel, and root
+            // motion that is already there is not counted twice.
+            const auto j = static_cast<std::size_t>(joint);
+            const glm::vec3 v =
+                toFacingFrame((glm::vec3(modelAhead[j][3]) - glm::vec3(model[j][3])) / (t2 - t), facing[f]);
+            sum += glm::vec3(v.x, 0.0f, v.z);
+            ++count;
+            ++perTrack[k];
+        }
+    }
+    // **A gait plants more than one foot.** A single planted foot is a pivot or a scuff: a kick
+    // stands on one leg. So at least two feet must each contribute two planted steps. The count is
+    // not a fraction of the clip, because contact detection on in-place content finds short
+    // stances. The scout's `Running` has 3 planted frames per foot in 22, and a quarter-of-the-clip
+    // rule returned zero for the one run in the pack.
+    std::uint32_t feet = 0;
+    for (const std::uint32_t n : perTrack) {
+        feet += n >= 2u ? 1u : 0u;
+    }
+    if (feet < 2u || count == 0u) {
+        return glm::vec3(0.0f);
+    }
+    return -sum / static_cast<float>(count);
+}
+
 
 std::uint32_t motionTagsFor(const PackClip& clip, const ClipAnalysis& analysis) {
     std::uint32_t tags = 0;
@@ -454,8 +526,39 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
         // position and never its heading, so a walk facing east and the same walk facing north
         // were different motions to the search. Every Glowmere clip is authored facing +Z, which
         // is why nothing noticed. 100STYLE turns, and so does any character in a scene.
+        //
+        // **Only for a clip whose root travels.** A clip authored in place (ADR-540) is authored
+        // facing +Z by construction, and its pelvis yaw is posture, not heading. Measured on the
+        // scout: `Idle` and `Walking_crouch` hold the pelvis at -43 degrees for the whole clip, and
+        // reading that as heading turned a straight crouch walk into a 47-degree diagonal.
         const std::vector<glm::vec3> facing =
-            clipFacing(pack.skeleton, clip, root, frames, dt, meta.loop, options.config.facingWindow);
+            analysis.travels ? clipFacing(pack.skeleton, clip, root, frames, dt, meta.loop,
+                                          options.config.facingWindow)
+                             : std::vector<glm::vec3>(frames, glm::vec3(0.0f, 0.0f, 1.0f));
+
+        // ---- implied travel, for a cycle authored in place (ADR-540) ------------------------------
+        //
+        // Every Glowmere locomotion cycle is authored in place. Its root does not move, and the
+        // planted foot slides backward at the speed the body would be walking. Read literally,
+        // then, **a walk and an idle have the same root velocity (zero)**, and a request to walk
+        // at 1.6 m/s is closer to a fight clip whose root sways 0.36 m than to any walk.
+        // `agent/anim-cinfra`'s explainer showed exactly that on the scout: asked to walk, it
+        // chose `Fight_leg_kick_1`.
+        //
+        // The travel is in the clip, only in the feet rather than the root. So for a clip whose
+        // root does not travel (ADR-552's box), the opposite of its planted feet's mean velocity is
+        // added to the root's. That is the velocity at which the ground would have to move under
+        // the body for the feet to stay put, and it is what the body's velocity will be when the
+        // clip plays in a scene. A kick or a fall whose feet stay where they are implies nothing.
+        // A clip whose root does travel keeps its root's own answer untouched.
+        //
+        // Not gated on `loop`: a pack built by `avgen-motion pack` marks every clip looping, deaths
+        // included, so the flag says nothing here. The quarter-of-the-clip threshold in
+        // `impliedTravel` is what separates a gait from a scuff.
+        const glm::vec3 implied = !analysis.travels
+                                      ? impliedTravel(pack.skeleton, clip, root, meta.contacts,
+                                                      facing, frames, dt)
+                                      : glm::vec3(0.0f);
 
         for (std::uint32_t f = 0; f < frames; ++f) {
             const float t = std::min(clip.start + (static_cast<float>(f) * dt), clip.duration);
@@ -504,7 +607,7 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
                 const glm::vec3 offset = sampleAhead(t + ahead);
                 const glm::vec3 future =
                     glm::vec3(modelAhead[static_cast<std::size_t>(root)][3]) + offset;
-                const glm::vec3 delta = toFacingFrame(future - body, heading);
+                const glm::vec3 delta = toFacingFrame(future - body, heading) + (implied * ahead);
                 out[k++] = delta.x;
                 out[k++] = delta.z;
                 // Facing: the direction it is heading at that moment, or zero when it is not
@@ -514,7 +617,7 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
                 out[k++] = len > 1e-5f ? delta.z / len : 0.0f;
             }
 
-            const glm::vec3 bodyVelocity = toFacingFrame(rootVelocity, heading);
+            const glm::vec3 bodyVelocity = toFacingFrame(rootVelocity, heading) + implied;
             out[k++] = bodyVelocity.x;
             out[k++] = bodyVelocity.y;
             out[k++] = bodyVelocity.z;

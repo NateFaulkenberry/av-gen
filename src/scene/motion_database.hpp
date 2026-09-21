@@ -72,7 +72,10 @@ enum class MotionTag : std::uint32_t {
 //      every clip read zero root velocity.
 //   3  every feature is expressed in the body's own facing frame (§7), not only relative to its
 //      position.
-inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 3;
+//   4  a clip whose root does not travel carries the travel its planted feet imply, in its root
+//      velocity and its trajectory, and its heading is its authoring frame rather than its
+//      pelvis. Before this, every in-place walk read as standing still.
+inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 4;
 
 // A world-space vector expressed in the frame of a body facing `facing` (world space, planar; +Z is
 // forward, +X is the body's left-to-right axis exactly as it is in an unrotated clip). The one
@@ -91,6 +94,16 @@ inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 3;
 [[nodiscard]] std::vector<glm::vec3> clipFacing(const Skeleton& skeleton, const AnimationClip& clip,
                                                 int root, std::uint32_t frames, float dt, bool loop,
                                                 float window);
+
+// The body velocity implied by a clip authored in place (ADR-540), in the body's facing frame: the
+// opposite of the mean model-space velocity of its planted feet (tracks resolved by joint name), over
+// `frames` samples at `dt` whose facing is `facing` (from `clipFacing`). This is the speed the
+// ground would have to move for the planted feet to stay put. It is zero unless at least two feet
+// each contribute two planted steps: one foot is a pivot or a scuff, not a gait.
+[[nodiscard]] glm::vec3 impliedTravel(const Skeleton& skeleton, const AnimationClip& clip, int root,
+                                      const std::vector<ContactTrack>& contacts,
+                                      const std::vector<glm::vec3>& facing, std::uint32_t frames,
+                                      float dt);
 
 [[nodiscard]] inline glm::vec3 toFacingFrame(const glm::vec3& world, const glm::vec3& facing) {
     const float len = std::sqrt((facing.x * facing.x) + (facing.z * facing.z));
@@ -145,6 +158,8 @@ struct MotionFeatureConfig {
     // and 9.87° at the worst peak. A 0.25 s window leaves 1.98° RMS, 0.5 s leaves 1.39°, and 1 s
     // leaves 0.31° (worst peak 2.04°). One second is about one gait cycle, which is the sway's
     // period, and that is why it cancels. The cost is lag on a real turn, about half the window.
+    // It applies to clips whose root travels. An in-place clip's heading is its authoring frame
+    // (+Z), because its pelvis yaw is posture (see `buildMotionDatabase`).
     // (test_motion_facing.cpp, "how much a Glowmere pelvis sways".)
     float facingWindow = 1.0f;
 
