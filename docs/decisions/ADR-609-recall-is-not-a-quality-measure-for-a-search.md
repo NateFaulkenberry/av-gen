@@ -76,6 +76,21 @@ match and a typical one; in §41's foot slide it was the character's rest height
 deviation it was the rest bone length. **Pick the scale before taking the measurement**, because
 once a number exists there is a strong pull to divide it by whatever is nearest to hand.
 
+### The same discipline at the other end of a measurement
+
+The rule above is about the scale you **divide by**. Its twin is about the cut-off you **compare
+against**, and it cost three numbers in this phase before it was stated:
+
+> **A threshold I chose is a result about me.**
+
+§22's coverage gaps (8 bins), the §21/§22 "convergence" (26 empty cells at those bins), and §23's
+duplicate rate (7.42% at a radius of 0.05) were each overturned by deriving the constant instead of
+picking it. The derived versions: bin width from the speed change the matcher can act on; duplicate
+radius from the feature distance at which the search returns a different sample. Both carry ADR-389's
+property — they move when the weights move — and both changed the conclusion, not just the digits.
+The 0.05 became **1.3945** and 7.42% became **57.02%**, which turned a deletion argument into its
+opposite.
+
 ### And the cheap prefix did not work
 
 The textbook two-stage design ranks coarsely on a cheap prefix of the feature vector. Here the

@@ -1482,3 +1482,91 @@ the analyzer cannot disagree about one corpus — §13's lesson applied one sect
 asserted. Both human-readable and machine-readable output exist, as §23 asks, and the JSON is
 checked for being parseable rather than merely present (including that it contains no `nan`, which
 is not JSON).
+
+
+## One fact, two instruments — and what it predicts
+
+§16's stride-4 plan scores **84 samples of 1,738 at 99.6% recall with a 3.1% worst case**, and I
+wrote that up as "the entire win is the stride". §23's derived radius says **57% of samples are
+interchangeable to the search**, and its radius of 1.3945 sits *below* the corpus's own mean
+nearest-neighbour distance of 1.8493 — so the distance at which this matcher stops telling two
+samples apart is on the same order as the typical spacing between neighbours. The corpus sits at or
+below the matcher's resolution limit nearly everywhere.
+
+**These are not two results agreeing. They are one property measured twice.** If most samples have a
+near-equivalent, subsampling by four cannot lose much, because three of every four skipped have a
+stand-in among those kept. Presenting them as corroboration would repeat the §21/§22 mistake exactly
+— the retraction there was for treating two views of one arbitrary resolution as independent
+evidence, and this would be treating two views of one real property the same way.
+
+Stated correctly it is an **explanation** rather than a confirmation, which is worth more: §16's
+headline stops being an empirical curiosity and acquires a mechanism — *the two-stage search works
+this well here because the database is oversampled relative to what the matcher can resolve.*
+
+**And a mechanism predicts.** Either a corpus the matcher can actually resolve (§20) or a weight
+vector that stops root velocity being 3 of 33 swamped dimensions (§22's finding) should **degrade
+the stride-4 plan**. That is falsifiable, it is the first prediction this phase has made about
+content it does not have, and it is a better reason to want §20 than any of the six results already
+queued behind it.
+
+## A category, not a list of gaps
+
+Three sections of Phase C have now had the same shape, and it is worth naming because it is the form
+this codebase's gaps actually take:
+
+| section | mechanism | measurement |
+|---|---|---|
+| §14 candidate filtering | tag filter, working | "measure how much it helps" — never done |
+| §24 trajectory horizons | `trajectoryTimes`, working | "experimentally validated" — a literature citation instead |
+| §27 search frequency | `searchInterval`, working | "do not assume every-frame search is necessary. Benchmark." — never done |
+
+**Not absent features. Features shipped without the measurement that would say whether their
+defaults are right.** ADR-608's dead weights are the extreme case — mechanism absent *and*
+measurement absent, with a declaration that made both look present — but the ordinary case is this
+one, and it is invisible to any review that checks whether a thing exists.
+
+## §26–§29 — the loop benchmarked, and a dial that another dial shadows
+
+The mechanisms all existed; the measurement did not. Running the loop as a whole — 600 frames of a
+request that changes its mind, driven through `advance` as the product drives it:
+
+| `searchInterval` | searches | switches | held | µs/frame |
+|---|---|---|---|---|
+| 0.000 s | 150 | 150 | 0 | 2.47 |
+| 0.033 s | 150 | 150 | 0 | 2.46 |
+| **0.100 s** (shipping) | **150** | **150** | 0 | **2.46** |
+| 0.250 s | 120 | 120 | 0 | 1.99 |
+
+**`searchInterval` does nothing at its shipping default.** Identical search counts and within 1% the
+same time from 0 to 0.1 s. A search needs `due && !locked`, where `due` is
+`sinceSearch >= searchInterval` (0.1 s) and `locked` is `sinceSearch < minimumContinuation`
+(**0.2 s**) — the lock is always the later of the two, so it decides every time and the interval
+cannot affect anything below it. Only at 0.25 s, above the lock, does it take over.
+
+That is **ADR-608's family with a twist: not a dial nobody reads, but a dial that is read and then
+shadowed by another one.** Setting it produces no change, so a person tuning search frequency
+concludes it does not matter — the same misdiagnosis cost as the dead weights, from a different
+mechanism. It also means **§27's question is unanswerable as the code stands**: the benchmark C asks
+for cannot distinguish "every-frame search is unnecessary" from "the interval is not in control".
+
+| `switchMargin` | searches | switches | heldByMargin |
+|---|---|---|---|
+| 0.00 | 150 | 150 | 0 |
+| **0.05** (shipping) | 150 | **150** | **0** |
+| 0.50 | 150 | 150 | 0 |
+| 100.00 | 150 | 135 | 15 |
+
+**The hysteresis holds nothing at its shipping value, and every search changes the motion** — which
+is exactly the thrashing §28 exists to prevent, happening at the defaults. Two readings are possible
+and this benchmark cannot separate them: the margin is far too small for this cost scale, or a
+changing request genuinely warrants a change every time. §23's measured cost spread makes the first
+far more likely — **a margin of 0.05 against a spread of 69.72 is four parts in ten thousand**.
+Recorded rather than retuned, because tuning needs a motion-quality metric this phase does not have
+and §22 says this corpus cannot supply.
+
+§29 is the one dial in control: minimum continuation 0 s gives 300 searches, 5 s gives 6. Asserted
+with its companion — the unlocked loop actually moved — so a frozen loop cannot pass by reporting no
+switches (ADR-611).
+
+**All three findings are the same category**: mechanisms shipped without the measurement that would
+say whether their defaults are right. Two of the three defaults turn out to be inert.
