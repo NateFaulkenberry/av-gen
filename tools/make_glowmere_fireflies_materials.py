@@ -21,10 +21,9 @@ camera; every other tree, and every fragment outside the band, takes the program
 -- the same pixels as before this existed, at the same cost bar four derivatives the draw takes
 anyway. On the trees it runs on it leaves the base emission alone (output -1), so the tree's own
 glow is kept, and adds one layer: drifting voronoi points in the foliage band, faded in past the
-particle swarms' reach (30-50 m) and out before a point is under a pixel (180-340 m), flashing on
-fly-chorus's oscillator (1.6 Hz, sharpness 9, depth 0.94, a per-tree phase spread of 0.12 of a
-period for pulseSync 0.88) in fly-chorus's two colours. The per-tree phase and colour read
-instanceRandom.x, which wind also reads (flutter phase); the gate reads .w, which nothing else
+particle swarms' reach (30-50 m) and out before a point is under a pixel (180-340 m), glowing
+steadily -- no flash, by the owner's choice (21 Sep) -- in fly-chorus's two colours. The per-tree
+colour reads instanceRandom.x, which wind also reads (flutter phase); the gate reads .w, which nothing else
 does, so whether a tree carries fireflies is independent of how it moves.
 """
 import json
@@ -67,17 +66,9 @@ def ops(freq, lo, hi, s):
     op("smoothstep", 5, srcA=5, constant=[340.0, 180.0, 0.0, 0.0])
     op("multiply", 5, srcA=5, srcB=6)
     op("multiply", 3, srcA=3, srcB=5)
-    # the flash: fly-chorus's oscillator. palette(t) = 0.5 + 0.5 cos(2 pi (1.6 t - 0.25))
-    # = 0.5 + 0.5 sin(2 pi 1.6 t), the particles' own phase; each tree is 0.12 of a period off it
-    # at most (pulseSync 0.88), then sharpness 9 and depth 0.94 as pulseGain has them.
-    op("constant", 6, constant=[0.075, 0.075, 0.075, 0.075])
-    op("multiply", 5, srcA=1, srcB=6)
-    op("add", 5, srcA=2, srcB=5)
-    op("palette", 5, srcA=5, value=0.0, constant=[0.5, 0.5, 0.5, 0.0], constant2=[0.5, 0.5, 0.5, 0.0],
-       constant3=[1.6, 1.6, 1.6, 0.0], constant4=[-0.25, -0.25, -0.25, 0.0])
-    op("power", 5, srcA=5, value=9.0)
-    op("remap", 5, srcA=5, constant=[0.0, 1.0, 0.06, 1.0], value=1.0)
-    op("multiply", 3, srcA=3, srcB=5)
+    # No flash. The owner asked for a steady glow rather than the fly-chorus blink (21 Sep): the
+    # points hold the flash's PEAK brightness, so they read as bright as the old flashes did at
+    # their brightest. emissionIntensity below is the dial if that is too much.
     # colour: fly-chorus's two ends, picked per tree
     op("constant", 6, constant=[1.0, 0.92, 0.42, 1.0])
     op("constant", 7, constant=[0.75, 1.0, 0.35, 1.0])
@@ -94,7 +85,7 @@ for fam, (name, freq, lo, hi, s) in FAM.items():
                 "the same test that picks the trees the 'tree-fireflies' swarms orbit -- and every "
                 "other tree, and every fragment nearer than 30 m or past 340 m, takes the program-less "
                 "path exactly. On the trees it runs on it leaves the "
-                "base emission alone (register -1) and adds one layer of drifting, flashing points in "
+                "base emission alone (register -1) and adds one layer of drifting, steadily glowing points in "
                 "the foliage band. Positions, frequency and the band are in the asset's own units."),
       # the band matches the program's own fades (in 30-50 m, out 180-340 m), so crossing an edge
       # of it changes nothing on screen -- it only stops paying for a program that draws nothing

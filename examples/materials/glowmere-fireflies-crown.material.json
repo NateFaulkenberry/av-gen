@@ -1,6 +1,6 @@
 {
  "name": "glowmereFirefliesCrown",
- "_note": "Glowmere fireflies, crown family, written by tools/make_glowmere_fireflies_materials.py -- edit that, not this. gate: the program runs only on trees whose instanceRandom.w < 0.3876 -- (1/3) / (1 - emissiveSparsity 0.14), so the lit trees it lands on are one in three of all trees, the same test that picks the trees the 'tree-fireflies' swarms orbit -- and every other tree, and every fragment nearer than 30 m or past 340 m, takes the program-less path exactly. On the trees it runs on it leaves the base emission alone (register -1) and adds one layer of drifting, flashing points in the foliage band. Positions, frequency and the band are in the asset's own units.",
+ "_note": "Glowmere fireflies, crown family, written by tools/make_glowmere_fireflies_materials.py -- edit that, not this. gate: the program runs only on trees whose instanceRandom.w < 0.3876 -- (1/3) / (1 - emissiveSparsity 0.14), so the lit trees it lands on are one in three of all trees, the same test that picks the trees the 'tree-fireflies' swarms orbit -- and every other tree, and every fragment nearer than 30 m or past 340 m, takes the program-less path exactly. On the trees it runs on it leaves the base emission alone (register -1) and adds one layer of drifting, steadily glowing points in the foliage band. Positions, frequency and the band are in the asset's own units.",
  "gate": {
   "lane": 3,
   "below": 0.3876,
@@ -129,82 +129,6 @@
    "dst": 5,
    "srcA": 5,
    "srcB": 6
-  },
-  {
-   "kind": "multiply",
-   "dst": 3,
-   "srcA": 3,
-   "srcB": 5
-  },
-  {
-   "kind": "constant",
-   "dst": 6,
-   "constant": [
-    0.075,
-    0.075,
-    0.075,
-    0.075
-   ]
-  },
-  {
-   "kind": "multiply",
-   "dst": 5,
-   "srcA": 1,
-   "srcB": 6
-  },
-  {
-   "kind": "add",
-   "dst": 5,
-   "srcA": 2,
-   "srcB": 5
-  },
-  {
-   "kind": "palette",
-   "dst": 5,
-   "srcA": 5,
-   "value": 0.0,
-   "constant": [
-    0.5,
-    0.5,
-    0.5,
-    0.0
-   ],
-   "constant2": [
-    0.5,
-    0.5,
-    0.5,
-    0.0
-   ],
-   "constant3": [
-    1.6,
-    1.6,
-    1.6,
-    0.0
-   ],
-   "constant4": [
-    -0.25,
-    -0.25,
-    -0.25,
-    0.0
-   ]
-  },
-  {
-   "kind": "power",
-   "dst": 5,
-   "srcA": 5,
-   "value": 9.0
-  },
-  {
-   "kind": "remap",
-   "dst": 5,
-   "srcA": 5,
-   "constant": [
-    0.0,
-    1.0,
-    0.06,
-    1.0
-   ],
-   "value": 1.0
   },
   {
    "kind": "multiply",

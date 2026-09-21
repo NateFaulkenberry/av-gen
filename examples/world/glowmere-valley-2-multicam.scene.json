@@ -7977,8 +7977,8 @@
         "windInfluence": 0.25,
         "pauseRate": 0.9,
         "pauseFraction": 0.62,
-        "pulseRate": 1.6,
-        "pulseDepth": 0.94,
+        "pulseRate": 0.0,
+        "pulseDepth": 0.0,
         "pulseSync": 0.88,
         "pulseSharpness": 9.0,
         "attractorPosition": [
