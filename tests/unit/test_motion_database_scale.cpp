@@ -206,3 +206,189 @@ TEST_CASE("a hundred characters share one database rather than carrying one each
         CHECK(c.database()->features.data() == db.features.data());
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// §15, §17 and §19 -- and a correction to the two cases above.
+//
+// Re-reading §15 and §17 after writing them caught my own fresh work, which is ADR-606's rule
+// applied to something an hour old rather than to something inherited:
+//
+//   §15: "The earlier research already demonstrated that **synthetic benchmark results can
+//         mislead**. Therefore: use real AV Gen motion distributions as the primary benchmark."
+//   §17: "Benchmark **1,700** / 10,000 / 100,000 / 1,000,000 frames. For each: query latency,
+//         **average** latency, **worst-case** latency, candidate count, memory, **database load
+//         time**, **build time**."
+//
+// The cases above are synthetic, start at 10,000, and report only a minimum. Three misses.
+//
+// **What survives the correction, and why, is the interesting part.** A linear scan touches every
+// sample whatever the values are, so its cost is distribution-independent and the synthetic
+// timing above is a valid measurement *of a linear scan*. What is NOT distribution-independent is
+// everything §14 and §16 are about: how much candidate filtering removes, and whether a cheap
+// first stage keeps the sample the full cost would have chosen. Those depend entirely on how the
+// real motion clusters, and a synthetic database with a hash pattern for features would give an
+// answer that means nothing. So the rule for the rest of Phase C is narrow and firm:
+//
+//   **synthetic data may time the scan; only real data may judge a filter or a first stage.**
+//
+// On the minimum-versus-average question: this repository's standing rule is minima over repeats,
+// never means, and §17 asks for average and worst-case. That is not a contradiction, it is two
+// questions. A minimum answers "how fast can this code go", which is a property of the code. A
+// worst case answers "will this drop a frame", which is the only one a 60 Hz budget cares about,
+// because a 36 ms spike drops a frame however good the average was. Both are reported below.
+
+#include "assets/gltf_loader.hpp"
+#include "scene/motion_pack.hpp"
+#include "scene/scene.hpp"
+
+#include <filesystem>
+#include <numeric>
+
+namespace {
+namespace fs = std::filesystem;
+
+fs::path alienGlb() {
+    return fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens" / "alien-scout.glb";
+}
+
+struct Latency {
+    double best = 0.0;
+    double average = 0.0;
+    double worst = 0.0;
+};
+
+Latency timeQueries(const scene::MotionDatabase& db, const scene::MotionQuery& base,
+                    const scene::MotionCostWeights& weights, int queries) {
+    std::vector<double> samples;
+    samples.reserve(static_cast<std::size_t>(queries));
+    scene::MotionQuery query = base;
+    for (int i = 0; i < queries; ++i) {
+        // A different current sample each time, so continuity and transition terms are exercised
+        // across the database rather than at one point in it.
+        query.current = db.sampleCount() > 0
+                            ? static_cast<std::uint32_t>(i) % db.sampleCount()
+                            : scene::MotionDatabase::kInvalid;
+        const auto t0 = std::chrono::steady_clock::now();
+        const scene::MotionMatch match = scene::searchMotion(db, query, weights);
+        const auto t1 = std::chrono::steady_clock::now();
+        (void)match;
+        samples.push_back(
+            std::chrono::duration_cast<std::chrono::duration<double, std::micro>>(t1 - t0).count());
+    }
+    Latency out;
+    out.best = *std::min_element(samples.begin(), samples.end());
+    out.worst = *std::max_element(samples.begin(), samples.end());
+    out.average = std::accumulate(samples.begin(), samples.end(), 0.0) /
+                  static_cast<double>(samples.size());
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("the real Glowmere database, built and benchmarked", "[motionscale][phaseC][aliens]") {
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    REQUIRE_FALSE(sc.rigs.empty());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.attributionRequired = false;
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §19"};
+    provenance.toolVersion = "avgen-phase-c";
+
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+
+    // §17 wants build time, so it is measured rather than mentioned.
+    const auto buildStart = std::chrono::steady_clock::now();
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    const auto buildMid = std::chrono::steady_clock::now();
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+
+    scene::MotionDatabaseOptions dbOptions;
+    dbOptions.sampleRate = 30.0f;
+    dbOptions.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+    auto db = scene::buildMotionDatabase(*pack, dbOptions);
+    const auto buildEnd = std::chrono::steady_clock::now();
+    if (!db.has_value()) {
+        FAIL("motion database build failed: " << db.error().message);
+    }
+
+    const double packMs =
+        std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(buildMid - buildStart)
+            .count();
+    const double dbMs =
+        std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(buildEnd - buildMid)
+            .count();
+
+    WARN(fmt::format("REAL Glowmere database: {} clips, {} samples, dimension {}",
+                     db->clipNames.size(), db->sampleCount(), db->dimension));
+    WARN(fmt::format("  build: pack {:.1f} ms, database {:.1f} ms, total {:.1f} ms", packMs, dbMs,
+                     packMs + dbMs));
+    WARN(fmt::format("  memory: {:.3f} MB ({:.1f} bytes/sample)",
+                     static_cast<double>(featureBytes(*db) + metadataBytes(*db)) / (1024.0 * 1024.0),
+                     static_cast<double>(featureBytes(*db) + metadataBytes(*db)) /
+                         std::max(db->sampleCount(), 1u)));
+
+    // This is the scale §17 names first and the one the synthetic table above skipped: the real
+    // pack, not a round number.
+    CHECK(db->sampleCount() > 100u);
+    CHECK(db->dimension == dbOptions.config.dimension());
+
+    scene::MotionQuery query;
+    query.features.assign(db->dimension, 0.0f);
+    // A query drawn FROM the database, so it sits inside the real distribution rather than at a
+    // point no motion occupies -- which is the whole content of §15's warning.
+    const std::uint32_t seedSample = db->sampleCount() / 3u;
+    const float* seedFeatures = db->featuresFor(seedSample);
+    std::copy(seedFeatures, seedFeatures + db->dimension, query.features.begin());
+
+    scene::MotionCostWeights weights;
+    const Latency latency = timeQueries(*db, query, weights, 500);
+    WARN(fmt::format("  query latency over 500 queries: best {:.2f} us, average {:.2f} us, "
+                     "worst {:.2f} us",
+                     latency.best, latency.average, latency.worst));
+    WARN(fmt::format("  at 60 Hz that is {:.0f} characters per frame on the average and {:.0f} on "
+                     "the worst case",
+                     16666.0 / std::max(latency.average, 1e-6), 16666.0 / std::max(latency.worst, 1e-6)));
+
+    CHECK(latency.best > 0.0);
+    CHECK(latency.average >= latency.best);
+    CHECK(latency.worst >= latency.average);
+    // **The real database is small enough that a linear scan is fine, and that is the finding.**
+    // §16's two-stage search is justified by the million-sample case, not by this one, and saying
+    // so is what stops it being built for the wrong reason. A budget of a third of a frame for a
+    // hundred characters is generous and this is far inside it.
+    CHECK(latency.average < 100.0);
+
+    // The query found something from inside its own distribution: a search seeded with a real
+    // sample must match that sample or one very near it, and a search that returned nothing would
+    // have made every latency number above a measurement of a fast refusal.
+    scene::MotionQuery exact = query;
+    exact.current = scene::MotionDatabase::kInvalid;
+    const scene::MotionMatch match = scene::searchMotion(*db, exact, weights);
+    REQUIRE(match.found());
+    CHECK(match.considered > 0u);
+    WARN(fmt::format("  a query seeded with sample {} matched sample {} at cost {:.6f}", seedSample,
+                     match.sample, match.cost));
+    CHECK(match.sample == seedSample); // it is its own nearest neighbour
+}

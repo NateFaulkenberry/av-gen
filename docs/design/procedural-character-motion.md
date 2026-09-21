@@ -995,3 +995,35 @@ scene's rig memory is a byte-identical second copy (ADR-604) — and it would be
 timing here for the same reason it was there. `MatchMotionProvider` holds a `const MotionDatabase*`,
 so it is correct today; a hundred providers are now asserted to point at the same `features.data()`,
 because *"it is a pointer today" is not a property anything checks.*
+
+## §15, §17 and §19 — the correction, and what survives it
+
+Re-reading §15 and §17 after writing the §6 benchmark caught that benchmark, an hour old, by the
+author who had just written ADR-606 about exactly this. §15 demands **real** motion distributions as
+the primary benchmark and mine was synthetic; §17 names **1,700 frames**, **average** and
+**worst-case** latency and **build time**, and mine started at 10,000 and reported only a minimum.
+
+What survives is the useful part: a linear scan touches every sample whatever the values are, so
+its cost is distribution-independent and the synthetic timing is valid *as a measurement of a
+linear scan*. Filtering effectiveness and first-stage recall are not distribution-independent at
+all. **Synthetic data may time the scan; only real data may judge a filter or a first stage.**
+
+The real Glowmere database, built from `alien-scout.glb` through `buildMotionPack` and
+`buildMotionDatabase`:
+
+- **26 clips, 1,738 samples, dimension 33** — §17's "1,700 frames" is the actual content, not a
+  round number, which says real-data-first is the intended reading rather than a caution.
+- **0.252 MB at 152.0 bytes/sample**, the same per-sample arithmetic as the synthetic table, which
+  cross-checks both.
+- Build: **32.7 ms** for the pack, **77.2 ms** for the database.
+- Query latency over 500 queries seeded from inside the real distribution: **best 8.88 µs, average
+  9.25 µs, worst 17.46 µs** — worst about twice average, and **955 characters per frame at 60 Hz on
+  the worst case**.
+
+**So §16's two-stage search is justified by the million-sample case and by nothing in this
+repository today.** At present content the linear scan is comfortably correct. Saying so is what
+stops the two-stage search being built for the wrong reason and then defended with a benchmark that
+never needed it.
+
+The benchmark's control: a query seeded with sample 579 returns sample 579 at cost 0.000000.
+Without it every latency number could have been the cost of a fast refusal.
