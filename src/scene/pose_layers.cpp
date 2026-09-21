@@ -55,6 +55,7 @@ const char* poseLayerKindName(PoseLayerKind kind) {
     case PoseLayerKind::Additive: return "additive";
     case PoseLayerKind::Foot: return "foot";
     case PoseLayerKind::Stride: return "stride";
+    case PoseLayerKind::Secondary: return "secondary";
     }
     return "aim";
 }
@@ -74,6 +75,10 @@ bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out) {
     }
     if (name == "stride") {
         out = PoseLayerKind::Stride;
+        return true;
+    }
+    if (name == "secondary") {
+        out = PoseLayerKind::Secondary;
         return true;
     }
     return false;
@@ -387,7 +392,12 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
                     }
                 }
             }
-        } else {
+        } else if (layer.kind == PoseLayerKind::Additive) {
+            // **Named explicitly, and it used to be a bare `else`.** That was correct while the
+            // only remaining kind was `Additive`; the moment a kind arrived that plays no clip, a
+            // catch-all branch demanded one and refused the layer with "this rig has no clip ''".
+            // A fall-through `else` over an enum is a statement about every value that will ever
+            // be added to it.
             for (std::size_t c = 0; c < clips.size(); ++c) {
                 const std::string& full = clips[c].name;
                 const std::size_t bar = full.find_last_of('|');
@@ -514,6 +524,51 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             // limb this rig does not have.
             result = layer.kind == PoseLayerKind::Foot ? LayerResolution::NoChain
                                                        : LayerResolution::NoJoints;
+            continue;
+        }
+        if (layer.kind == PoseLayerKind::Secondary) {
+            // **Deterministic by construction.** Everything below is a function of `now`, the
+            // layer's own constants and the joint's index. No accumulator, no RNG, nothing carried
+            // between frames -- so a scrubbed frame and a played one give the same pose, which is
+            // ADR-360 and is the whole reason this is a sine and not a noise field.
+            const float period = std::max(layer.secondaryPeriod, 1e-3f);
+            // Fade with travel: idle life is what a standing body does.
+            float fade = 1.0f;
+            if (layer.secondaryStillness > 1e-4f) {
+                fade = 1.0f - std::clamp(layer.bodySpeed / layer.secondaryStillness, 0.0f, 1.0f);
+            }
+            const float amplitude = glm::radians(layer.secondaryDegrees) * fade *
+                                    std::clamp(layer.weight, 0.0f, 1.0f);
+            if (amplitude <= 1e-6f) {
+                // Faded out rather than switched off: the layer is doing what it was asked to.
+                result = LayerResolution::Applied;
+                stats.applied += 1u;
+                continue;
+            }
+            const glm::vec3 axis = glm::length(layer.secondaryAxis) > 1e-6f
+                                       ? glm::normalize(layer.secondaryAxis)
+                                       : glm::vec3(1.0f, 0.0f, 0.0f);
+            std::uint32_t moved = 0;
+            std::uint32_t ordinal = 0;
+            for (std::size_t j = 0; j < mask.weight.size(); ++j) {
+                const float w = mask.weight[j];
+                if (w <= 0.0f) {
+                    continue;
+                }
+                // Each successive masked joint lags the one before, so the motion travels up the
+                // body instead of moving it as one rigid block.
+                const float phase = layer.secondaryPhase +
+                                    (static_cast<float>(ordinal) * layer.secondarySpread);
+                ++ordinal;
+                const auto cycles = static_cast<float>(now / static_cast<double>(period));
+                const float angle =
+                    amplitude * w * std::sin(6.283185307179586f * (cycles + phase));
+                pose.local[j].rotation =
+                    glm::normalize(pose.local[j].rotation * glm::angleAxis(angle, axis));
+                ++moved;
+            }
+            result = moved > 0 ? LayerResolution::Applied : LayerResolution::NoJoints;
+            stats.applied += moved > 0 ? 1u : 0u;
             continue;
         }
         if (layer.kind == PoseLayerKind::Stride) {

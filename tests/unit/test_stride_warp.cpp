@@ -191,3 +191,103 @@ TEST_CASE("a stride layer that names a joint this rig lacks says so", "[stride][
     scene::PoseLayerStack stack2;
     CHECK_FALSE(stack2.bind({same}, sk, clips).empty());
 }
+
+// ---- Secondary motion (Phase B §26-§28) -------------------------------------------------------
+
+namespace {
+
+scene::PoseLayer secondaryLayer() {
+    scene::PoseLayer layer;
+    layer.name = "breath";
+    layer.kind = scene::PoseLayerKind::Secondary;
+    layer.drive = scene::PoseLayerDrive::Manual;
+    layer.mask.joints = {"body", "foot.l"};
+    layer.secondaryDegrees = 6.0f;
+    layer.secondaryPeriod = 4.0f;
+    layer.secondarySpread = 0.25f;
+    layer.secondaryStillness = 0.6f;
+    layer.weight = 1.0f;
+    return layer;
+}
+
+scene::Pose secondaryAt(double now, float speed) {
+    const scene::Skeleton sk = walkerRig();
+    const std::vector<scene::AnimationClip> clips = travellingClip();
+    scene::PoseLayer layer = secondaryLayer();
+    layer.bodySpeed = speed;
+    scene::PoseLayerStack stack;
+    const std::vector<std::string> problems = stack.bind({layer}, sk, clips);
+    INFO((problems.empty() ? std::string("none") : problems.front()));
+    REQUIRE(problems.empty());
+    scene::Pose pose;
+    scene::setRestPose(sk, pose);
+    stack.apply(sk, clips, now, pose);
+    return pose;
+}
+
+float angleOf(const glm::quat& q) { return 2.0f * std::acos(std::clamp(std::abs(q.w), 0.0f, 1.0f)); }
+
+} // namespace
+
+TEST_CASE("secondary motion is a pure function of the timeline second", "[secondary][layers][determinism]") {
+    // **ADR-360, and the reason this is a sine rather than a noise field.** Anything that
+    // accumulated per frame would make a scrubbed frame differ from a played one. Asked for the
+    // same second twice, out of order, with other work in between.
+    const scene::Pose a = secondaryAt(7.25, 0.0f);
+    (void)secondaryAt(99.0, 0.4f);
+    const scene::Pose b = secondaryAt(7.25, 0.0f);
+    REQUIRE(a.size() == b.size());
+    for (std::size_t j = 0; j < a.size(); ++j) {
+        INFO("joint " << j);
+        CHECK(a.local[j].rotation.w == Approx(b.local[j].rotation.w).margin(1e-7));
+        CHECK(a.local[j].rotation.x == Approx(b.local[j].rotation.x).margin(1e-7));
+    }
+}
+
+TEST_CASE("a standing body breathes and a walking one does not", "[secondary][layers]") {
+    // The fade is what stops idle life fighting a gait. Sampled at a quarter period, which is the
+    // peak of the sine, so "it moved" is answerable.
+    const scene::Pose still = secondaryAt(1.0, 0.0f);      // period 4, so t=1 is the peak
+    const scene::Pose walking = secondaryAt(1.0, 5.0f);    // well past `stillness`
+
+    const float stillAngle = angleOf(still.local[1].rotation);
+    const float walkAngle = angleOf(walking.local[1].rotation);
+    INFO("standing " << glm::degrees(stillAngle) << " deg, walking " << glm::degrees(walkAngle) << " deg");
+    CHECK(stillAngle > glm::radians(3.0f));   // it really is moving
+    CHECK(walkAngle < glm::radians(0.01f));   // and really is not, once travelling
+}
+
+TEST_CASE("the motion travels up the body instead of moving it rigidly", "[secondary][layers]") {
+    // `spread` is what makes a chest and a head different phases of one breath. With it at zero
+    // they are identical, which reads as a mechanism; the pair is the assertion.
+    const scene::Pose spread = secondaryAt(0.6, 0.0f);
+    const float a = angleOf(spread.local[1].rotation);
+    const float b = angleOf(spread.local[2].rotation);
+    INFO("joint 1 " << glm::degrees(a) << " deg, joint 2 " << glm::degrees(b) << " deg");
+    CHECK(std::abs(a - b) > glm::radians(0.2f));
+
+    // The control: no spread, and the two joints agree.
+    const scene::Skeleton sk = walkerRig();
+    const std::vector<scene::AnimationClip> clips = travellingClip();
+    scene::PoseLayer layer = secondaryLayer();
+    layer.secondarySpread = 0.0f;
+    scene::PoseLayerStack stack;
+    REQUIRE(stack.bind({layer}, sk, clips).empty());
+    scene::Pose pose;
+    scene::setRestPose(sk, pose);
+    stack.apply(sk, clips, 0.6, pose);
+    CHECK(angleOf(pose.local[1].rotation) == Approx(angleOf(pose.local[2].rotation)).margin(1e-5));
+}
+
+TEST_CASE("secondary motion oscillates rather than drifting", "[secondary][layers]") {
+    // A layer that accumulated would wind the body up over a minute. Sampled a whole number of
+    // periods apart, the pose must be the same -- which an accumulator could not manage.
+    const scene::Pose t0 = secondaryAt(0.0, 0.0f);
+    const scene::Pose t40 = secondaryAt(40.0, 0.0f); // ten full periods
+    CHECK(angleOf(t0.local[1].rotation) == Approx(angleOf(t40.local[1].rotation)).margin(1e-5));
+    // And half a period away it is on the other side of zero, so this is not a constant.
+    const scene::Pose t2 = secondaryAt(2.0, 0.0f);
+    CHECK(angleOf(t2.local[1].rotation) == Approx(angleOf(t0.local[1].rotation)).margin(1e-5));
+    const scene::Pose t1 = secondaryAt(1.0, 0.0f);
+    CHECK(angleOf(t1.local[1].rotation) > glm::radians(3.0f));
+}

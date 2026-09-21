@@ -13,12 +13,14 @@
 | B. MotionContext | **done** | ADR-561; found three seam publication defects on the way (ADR-560) |
 | C. MotionController — provider seam | **done** | ADR-541 built as written; chain + clip provider held to parity |
 | D. acceleration / deceleration | **done** | the vector layer `Gait::approach` does not have |
-| E. locomotion adaptation | next | **stride warping first, not rate blending** — accepted reordering, see below |
-| F. turn / directional movement | pending | |
-| G. foot placement | pending | the first visually checkable milestone |
-| H. terrain adaptation | pending | |
-| I. body compensation / balance | pending | validated at unit level, never seen to engage in a scene |
-| J-L. look-at, reach, secondary motion | pending | |
+| E. locomotion adaptation | **done** | `PoseLayerKind::Stride`; accepted reordering, see below |
+| F. turn / directional movement | **partly done** | `stepMotion` has the rate limits (B.D); the pose half is lean, below |
+| G. foot placement | **already existed** | `PoseLayerKind::Foot`, ADR-359/543 — Phase A built it |
+| H. terrain adaptation | **already existed** | `IGroundQuery` per foot, ADR-551 — Phase A built it |
+| I. body compensation / balance | **already existed** | `solveBodyCompensation`, ADR-544 — Phase A built it |
+| J. look-at | **already existed** | `PoseLayerKind::Aim` + `PoseLayerDrive::Look`, ADR-300 |
+| K. reach | **cut, named** | nothing in Glowmere reaches for anything; the machinery it needs (`solveTwoBone`, a chain, a target) is the foot layer's, so it is a small addition when a scenario wants it |
+| L. secondary motion | **done** | `PoseLayerKind::Secondary`; a sine of the timeline second, not a noise field |
 | M. offline procedural augmentation | pending | |
 | N-O. validation metrics, profiling | pending | |
 | P. Glowmere vertical slice | pending | |

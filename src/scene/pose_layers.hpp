@@ -73,6 +73,19 @@ enum class PoseLayerKind : std::uint8_t {
     // which runs after it -- put the foot back on the ground. Stride is how far the step reaches;
     // ground contact is where it lands, and they are different questions.
     Stride,
+    // **Secondary motion (Phase B §26-§28).** A small, continuous oscillation added on top of
+    // whatever is already posed: breathing, weight shifts, the micro-motion that separates a
+    // character from a statue.
+    //
+    // **A pure function of the timeline second**, with no state and no random number generator.
+    // That is not a simplification, it is the requirement: ADR-360 says a render must reproduce,
+    // and anything that accumulated per frame would differ between a scrub and a play. A per-layer
+    // `secondaryPhase` and a per-joint spread are what stop every joint moving in lockstep, which
+    // is what noise would otherwise have been for.
+    //
+    // Fades out as the body travels (`secondaryStillness`), because idle life is what a standing
+    // body does and a walking one has a gait instead.
+    Secondary,
 };
 [[nodiscard]] const char* poseLayerKindName(PoseLayerKind kind);
 [[nodiscard]] bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out);
@@ -219,12 +232,30 @@ struct PoseLayer {
     // a march. 0 keeps the authored height; 1 scales it with the stride.
     float strideLift = 0.7f;
 
+    // ---- Secondary (Phase B §26-§28) ------------------------------------------------------------
+    // The axis the oscillation turns about, in each masked joint's own local frame. Defaults to
+    // the rig's forward roll, which is what a breath looks like on a chest.
+    glm::vec3 secondaryAxis{1.0f, 0.0f, 0.0f};
+    float secondaryDegrees = 1.2f;   // peak amplitude; a breath is small and a shiver is not
+    float secondaryPeriod = 4.0f;    // seconds for one full cycle
+    float secondaryPhase = 0.0f;     // 0..1, so two layers on one body are not in lockstep
+    // How much each successive masked joint lags the one before, in cycles. Zero makes a chest and
+    // a head move as one rigid block, which reads as a mechanism rather than a body; a small
+    // value is what makes the motion travel up the spine.
+    float secondarySpread = 0.08f;
+    // Above this ground speed the layer has faded out entirely, in metres per second. Idle life is
+    // what a standing body does; a walking one has a gait. Zero disables the fade.
+    float secondaryStillness = 0.6f;
+
     // ---- intent, written per frame by whatever drives the layer --------------------------------
     float weight = 0.0f;         // 0 = this layer does nothing at all this frame
     // Stride: how far the body travels against the stride its clip was authored for. 1 means they
     // agree and this layer is a no-op. Written per frame from `MotionContext::strideRatio`, which
     // is `Gait::footSlip` -- one answer to that question rather than a second (ADR-260).
     float strideRatio = 1.0f;
+    // Secondary: the body's horizontal speed, so the oscillation can fade as it walks. Written per
+    // frame from `MotionContext::groundSpeed` -- the measurement (ADR-545), not the intent.
+    float bodySpeed = 0.0f;
     glm::vec3 target{0.0f};      // ENTITY-LOCAL (the rig's model space), never world
     bool hasTarget = false;
 };

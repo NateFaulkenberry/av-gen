@@ -2822,6 +2822,9 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
             if (layer.kind == PoseLayerKind::Stride) {
                 layer.strideRatio = motion_.strideRatio;
             }
+            if (layer.kind == PoseLayerKind::Secondary) {
+                layer.bodySpeed = motion_.groundSpeed;
+            }
             switch (layer.drive) {
             case PoseLayerDrive::Manual:
                 break;
@@ -8648,6 +8651,15 @@ nlohmann::json Composition::toJson() const {
                     // of them empty. Written through the shared path it came out with `"joints":
                     // []` and `"clip": ""`, and the file it produced would not load -- a save that
                     // breaks the scene it saved is worse than one that refuses.
+                    if (layer.kind == PoseLayerKind::Secondary) {
+                        l["degrees"] = layer.secondaryDegrees;
+                        l["period"] = layer.secondaryPeriod;
+                        l["phase"] = layer.secondaryPhase;
+                        l["spread"] = layer.secondarySpread;
+                        l["stillness"] = layer.secondaryStillness;
+                        l["axis"] = json::array({layer.secondaryAxis.x, layer.secondaryAxis.y,
+                                                 layer.secondaryAxis.z});
+                    }
                     if (layer.kind == PoseLayerKind::Stride) {
                         l["joint"] = layer.strideJoint;
                         if (!layer.strideOrigin.empty()) {
@@ -10124,6 +10136,36 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         // ADR-359: a foot layer is addressed by a chain and never by a mask, so it
                         // reads a different set of keys and refuses a mask outright here rather
                         // than letting `bind` report a no-op after the scene has loaded.
+                        if (layer.kind == PoseLayerKind::Secondary) {
+                            // Phase B §26-§28. Masked like an aim layer, because the oscillation
+                            // is applied per joint and a chest and a head are different amounts of
+                            // it -- the opposite of a foot layer, where half a knee is meaningless.
+                            auto degrees = readFloat(entry, "degrees", layer.secondaryDegrees);
+                            auto period = readFloat(entry, "period", layer.secondaryPeriod);
+                            auto phase = readFloat(entry, "phase", layer.secondaryPhase);
+                            auto spread = readFloat(entry, "spread", layer.secondarySpread);
+                            auto still = readFloat(entry, "stillness", layer.secondaryStillness);
+                            if (!degrees) return std::unexpected(degrees.error());
+                            if (!period) return std::unexpected(period.error());
+                            if (!phase) return std::unexpected(phase.error());
+                            if (!spread) return std::unexpected(spread.error());
+                            if (!still) return std::unexpected(still.error());
+                            layer.secondaryDegrees = *degrees;
+                            layer.secondaryPeriod = *period;
+                            layer.secondaryPhase = *phase;
+                            layer.secondarySpread = *spread;
+                            layer.secondaryStillness = *still;
+                            if (layer.secondaryPeriod <= 0.0f) {
+                                return fail("node '{}': animation layer '{}': 'period' must be above "
+                                            "zero seconds",
+                                            node.name, layer.name);
+                            }
+                            if (entry.contains("axis")) {
+                                auto axis = readVec<3>(entry, "axis", layer.secondaryAxis);
+                                if (!axis) return std::unexpected(axis.error());
+                                layer.secondaryAxis = *axis;
+                            }
+                        }
                         if (layer.kind == PoseLayerKind::Stride) {
                             // Phase B §7. Addressed by one joint and a body to measure it from,
                             // not by a mask: what it scales is an excursion, which needs two ends.
