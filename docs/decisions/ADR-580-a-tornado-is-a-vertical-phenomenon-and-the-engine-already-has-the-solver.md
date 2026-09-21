@@ -394,6 +394,256 @@ its own density function. It needs a slot, its own uniform bytes, and a call.
 10. **Publish the WGSL include order.** `shaders/vortex.wgsl` records that the include directive
     does not de-duplicate and that ADR-360 learned it the expensive way.
 
+## 8. What was built, and which of §5's predictions survived
+
+Phases 2 to 6. §5 above is the architecture as proposed; this is the architecture as measured, and
+the two differ in places that are recorded rather than quietly reconciled.
+
+### 8.1 The silhouette, and the two things the renders decided that reasoning had not
+
+`core/tornado.{hpp,cpp}` and `shaders/tornado.wgsl` on the `core/wind` / `core/vortex` pattern:
+a pure function of (packed uniforms, world position, time), thirteen `vec4`s, CPU beside WGSL.
+`world::Tornado` holds `tornado::TornadoField` **by value** rather than restating its members --
+the one deliberate departure from `world::Vortex`, because ADR-388 records what the restated
+version cost (`packVortex` with one caller, and the bytes the shipped frame marched assembled
+somewhere else entirely).
+
+Two corrections came from looking at a render, not from thinking about one:
+
+**The first silhouette was a champagne flute.** Making the wall cloud the funnel's own top radius
+flares the column continuously from about a third of its height, and a continuous flare is the one
+thing that cannot read as a tornado -- it rendered as a smooth trumpet, unmistakably a vortex of
+some kind and just as unmistakably not a tornado. The references say why: a classic funnel is
+narrow for most of its height and the wall cloud is a distinct mass three to ten times wider that
+it descends from. **The proportion that says "tornado" and nothing else says is a thin column
+under a broad cloud with a SHOULDER between them.** The cloud is its own term now.
+
+**A smoothly ramped cloud renders as a flying saucer.** Density easing from the cloud's underside
+to its top is an ellipsoid whose only edge is the silhouette of an ellipsoid. It rises to full
+within the lower third of the cloud band and holds, so the base is flat and heavy.
+
+Neither was predictable from §5 and both were obvious in one frame.
+
+### 8.2 The cost prediction was right, and it is not yet the measurement that matters
+
+§5 predicted 1.5 to 3 ms against ADR-460's 8.13 for the vortex at 32 steps, on the argument that
+ADR-374's cost model is coverage of non-zero density rather than march length.
+
+`tools/gpu-lock.sh`, 1920x1080, half-res volume target, **minima over five to seven interleaved
+repeats** (ADR-170):
+
+| arm | `volume.march` |
+|---|---|
+| tornado, 32 steps | **1.25 ms** |
+| tornado, 64 steps | **2.49 ms** |
+| tornado off (the gate) | no `volume.march` pass at all; frame 1.05 ms |
+| *ADR-460's vortex, 32 steps, half res* | *8.13 ms* |
+
+**This is consistent with the coverage model and it is NOT a like-for-like comparison.** The lab
+scene's column covers perhaps 15% of the frame against a funnel filling the lower two thirds. The
+like-for-like test is the hero shot and belongs to Phase 7. Quoting 6.5x from this table would be
+the ADR-389 family's mistake in a new place -- a ratio between two quantities measured under
+different distributions.
+
+Two of the early repeats attributed the entire march to `shadowmask` -- 2.69 ms with
+`volume.march=0.00`, in a scene with one light and no geometry. A mean over those runs would have
+been a number. ADR-170's "minima, never means" earned its keep on its first use here.
+
+### 8.3 A thin medium at a global step count is WRONG, not slow
+
+The Rope preset rendered as three disconnected ellipsoids. The obvious reading is a shape bug. It
+is not:
+
+| arm | result |
+|---|---|
+| rope, 64 steps | three disconnected ellipsoids |
+| rope, 64 steps, **striations off** | three disconnected ellipsoids -- identical failure |
+| rope, **256 steps** | a continuous twisted rope |
+| rope, 1024 steps | indistinguishable from 256 |
+
+A 24 m column sampled every 62.5 m is stepped straight past. **This is the strongest argument in
+this record for the per-slot ray interval** (§7 item 4), and it is stronger than the cost argument
+both agents started from: a medium narrower than the step spacing is not rendered coarsely, it is
+rendered *wrong*, and no amount of patience fixes it because the samples are not there.
+
+It recurred in §47's showcase at a fixed 128 steps, which is how it came to be a *rule* rather than
+a number: each arm now derives a step of about a third of its own narrowest feature -- rope 462,
+wedge 96. Expensive where it must be and cheap where it need not be, which is the correct
+relationship and the opposite of a constant.
+
+### 8.4 ADR-461's jitter finding replicates on a second, independent medium
+
+The first render at 64 steps was salt-and-pepper throughout; `volumeJitter 0` removed all of it and
+revealed helical striations that had been there the whole time. This is the high-optical-depth-
+per-step case ADR-461 said it could not construct. **The default is not proposed for change here**
+-- two media finding jitter unprofitable is a pattern, not yet a measurement of the control -- and
+the lab scene authors 0 explicitly rather than inheriting it quietly.
+
+### 8.5 Parity, and the probe that found a hole in itself
+
+`tests/rendering/test_tornado_parity_gpu.cpp`: a compute harness comparing density, envelope,
+radialT, heightT and all three velocity components against the CPU at t = 0, 6 and 41.7, through
+the packed form. **All tests passed (2870 assertions in 5 test cases)**, exit 0 off the binary,
+under the lock.
+
+The margin is **1e-4 on the envelope** -- tighter than the vortex's 1e-3, and that is a property of
+the architecture rather than of the test: the envelope is trigonometry, smoothsteps and one
+exponential with no fBM in it. Only the density relaxed to 1e-3 when Phase 4 put three octaves of
+value noise on top. Holding the envelope to the tighter bound is deliberate: it is where a drift in
+the structure underneath the noise would show.
+
+ADR-182 in both directions: a 2% shell-width perturbation is rejected at the same margin, and a
+one-character break (`exp(-d*d)` to `exp(-d*d*1.03)`) produces **68 failed assertions** with real
+`with expansion` blocks.
+
+**The per-field reachability probe reported `cloudWidth moved 0 of 80 GPU samples` on its first
+run, and it was not a dead control.** The cloud's interior is a plateau -- `1 - smoothstep(0.55,
+1.0, dist/cr)` is exactly 1 inside 55% of the cloud radius -- and the sample spread was built from
+the FUNNEL's radius while the cloud is four times wider, so every sample sat on the plateau.
+Widening a plateau moves no point already on it. The general form, which is the part worth keeping:
+
+> **A reachability probe built from one feature's extent is blind to every feature that is larger,
+> and it reports that blindness as a dead control.**
+
+Fixed by covering the feature, not by relaxing the check. The probe also compares **velocity**, not
+only density: seven of the thirty-nine knobs move the velocity alone, and a probe watching the
+output it expected to move would have called all seven unreachable and been wrong about every one.
+
+### 8.6 Suction vortices are correct, cheap, and weaker than intended -- for a geometric reason
+
+§27's secondary vortices as a cosine windowed at the radius of maximum wind, not a loop over N
+orbiting Gaussians. A cosine's mean over angle is exactly zero, so the term's mean is exactly 1 at
+every radius and height whatever the count -- and `density` is a per-metre coefficient calibrated
+against this field's mean (the ADR-389 family). The loop would also have cost a loop.
+
+Rendered, they are real and subtle: visible vertical flutes on the column, a scalloped rim on the
+wedge. The reason is geometry and not tuning, and it is this record's own argument turned around:
+
+> This is an **angular** modulation. From a side view the ray integrates through the near wall and
+> the far wall, where the lobes are half a period apart and partially cancel. An angular feature is
+> far more visible from above than from the side.
+
+That is §2's trigonometry -- which argued *for* a tornado over a cyclone -- working against a
+horizontal feature on a vertical phenomenon. They are kept: correct, cheap, mean-exactly-1 and
+reachable. They are not the dramatic feature §20 might be read as promising, and no amount of
+tuning from a ground camera will make them one.
+
+### 8.7 Detail is one multiply whose mean is exactly 1, and §39 passes
+
+Three scales at fixed 3.1x and 9.7x octave ratios -- **one scale control, not three**, because
+three independent sliders get set to the same number and give one octave at triple amplitude, which
+is the failure §21 exists to prevent. Sampled in the column's **co-moving frame**: the angle
+advanced by `rotationAt(h) * t` and the height dropped by `climbRate * t`, so a feature sits still
+in a frame that is itself rising and turning. §29's temporal coherence is a **change of coordinates,
+not an advection** -- no texture, no history, no state, evaluated rather than integrated, and
+therefore reproducible (ADR-360). That is the payoff for having made the flow analytic in §5.
+
+`cloudAmount` at 0 returns **exactly 1.0 from an early-out**, so §38's Mode 1 is byte-identical to
+the analytic field. **Noise is provably never load-bearing rather than intended not to be**, which
+is the difference between a claim and a property.
+
+§39's four panels, read in order: **A** a thin column with clear helical striations under a smooth
+broad cloud, unmistakably a tornado and completely smooth; **B** the cloud breaks into lumpy masses
+and the column gains broad variation; **C** finer granular mottling; **D** finest breakup and wispy
+edges. **A already reads and D is a refinement of it.** The brief's failure condition -- A/B/C a
+meaningless blob and D a tornado -- is not what this does.
+
+**And the first reading of that panel was a fact about the instrument.** Rendered at 640x360 the
+conclusion recorded was that B to D are subtle. `QualitySettings::volumeResolutionScale` is 0.5, so
+the march runs at **320x180 for a 640x360 output against 960x540 for 1920x1080 -- nine times the
+samples**. The detail was generated identically at both sizes and sampled nine times more coarsely
+at the small one; at full resolution the progression is clear at every step. It is specifically
+**not** the band limit, which is the plausible wrong answer: `filterWidth` is
+`volumeMaxDistance / volumeSteps` and is resolution-independent, so the fine octaves fade by exactly
+the same amount either way. **The lever is render resolution, not step count**, and the four panels
+ship as lab scenes with that written in each file's own description so a reader who renders small
+finds it before retuning anything.
+
+### 8.8 §47: seven storms from one field, and a showcase that cannot be rendered
+
+`examples/labs/tornado-showcase.scene.json` authors all seven variants the brief names, differing
+only in the values of the same field. There is no per-variant code anywhere, which is the claim §47
+is a test of. **Six of the seven read as distinct, recognisable storms.** The wedge is still the
+weakest, and the diagnosis from §8.6's phase holds and looks intrinsic: its funnel is as wide as its
+cloud, so the shoulder §8.1 identified as the thing that sells the other six is gone by definition.
+It ships weak and stays in.
+
+**The camera rule was biased and the bias looked like the effect's fault.** Framing on HEIGHT alone
+-- from §2's own measurement -- made the wedge subtend **71.7 degrees of horizontal arc in a 40
+degree frame** and the thick cloud 50, so both rendered as a featureless grey wall. Read off the
+contact sheet that is two variants failing; read off the geometry it is one rule failing on anything
+wider than it is tall, which the WMO's definition makes the *defining* property of a wedge. Framing
+on `max(height, width)` is the removal of a bias, not special treatment, and the wedge is still
+weakest after it.
+
+**And the combined shot came back COMPLETELY EMPTY -- not one of seven, nothing at all.** With one
+medium slot the survivor is whichever tornado comes first in the array; that was the 70 m dust
+devil, which is sub-pixel at group distance; and there was no warning anywhere, because
+`AtmosphericCounts::dropped` reaches no user interface. **A silent drop chosen by array order
+producing a blank deliverable is the owner's "if I turn on fog I can't see the vortex" at its worst
+expression**, and that file now reproduces it on demand. It is deliberately not worked around: its
+own note says do not judge the system by rendering it today, and names both limits (the slot cap,
+and an 8.2 km framing whose ~58 m sample spacing steps past an 80 m funnel).
+
+### 8.9 The panel, and a guard that fired on shipped code
+
+The controls existed; whether an artist could find them was a different question. Sections renamed
+to §33's vocabulary -- Shape / Cloud / Ground / Flow / Turbulence / Appearance / Motion -- because
+they had been named after this struct's field order. Nine rows had no tooltip; all 57 carry one now.
+
+Two of §33's sections are **deliberately absent** and the file header says so. **Particles**: not
+implemented, and a "Particle Density" control against nothing is ADR-421's defect exactly.
+**Performance**: ray steps and volume resolution belong to the shared march, and a per-effect copy
+would be a second opinion about a number the scene owns -- which is not hypothetical, it is the
+divergent hand-written copy the fog agent deleted from `engine.cpp` one layer up.
+
+`drawSchemaRows` emits a section header only on the row that declares one, **after** filtering by
+page. So a section declared on one page whose later rows sit on the other leaves those rows under a
+different section's header. Found by the guard on its first correct run:
+
+> **The shipped Vortex draws Contrast under "Shape".** `contrast` inherits "Cyclone structure" from
+> `innerVoid` in list order; `innerVoid` is `.main()` and `contrast` is Advanced; so no "Cyclone
+> structure" separator is ever emitted on that page and a noise transfer-function exponent lands
+> three rows under Wall thickness, filed as geometry.
+
+Invisible in the source, where the rows read as one tidy list. Invisible in a screenshot unless you
+already know where a row belongs. One `.sec()` fixes it.
+
+**The first version of that guard was wrong and that is the more useful half.** It asserted that the
+first row on each page declares a section, and went red on **five of six shipped kinds**. That is
+not five defects; it is the family's deliberate convention of a few ungrouped rows before the named
+sections. **A guard that fires on working code is not a guard** -- which is the lesson the kind-name
+check twenty lines above it in the same file was bought with, and it was reproduced anyway. The
+property that is both true and load-bearing is narrower: *a row may have no section, but it may not
+have one the panel did not draw.*
+
+Behaviour-neutral, checked rather than asserted: `_tc-2-classic-cone` rendered with the panel
+changes stashed and unstashed gives sequence hash `4a4df759403590bb` both times. The first attempt
+compared against a stale hash, saw a difference, and it was an unrelated relayout -- which is the
+same habit as the light-key check where the hash *not* moving was the proof, used in the other
+direction.
+
+## 9. A pattern, named once rather than found six times
+
+Six instances in one night, across four agents, all the same shape:
+
+| # | the scan | what it reported |
+|---|---|---|
+| 1 | `git grep "kind": "vortex"` for a removal census | eight files authoring a Vortex; six held a `spatial::FieldKind::Vortex` driving particles. Would have deleted particle motion from six scenes. |
+| 2 | the enum parser in `test_effect_conformance.cpp` | "a schema claims `Tornado`, which atmospherics.hpp does not declare" -- stopped by a `}` inside a comment naming `core/tornado.{hpp,cpp}` |
+| 3 | the parity test's reachability probe | `cloudWidth moved 0 of 80 samples` -- blind to any feature wider than the one it was sized from |
+| 4 | a rebase conflict resolver | swallowed `hasTornado`, `Tornado tornado{}` and both counters, because a comment block ran into the next one with no terminator where a line-oriented filter expected one |
+| 5 | `"kind": "grid"` as a census of the ADR-032 solver's users | 183 hits, **zero** of them a simulated grid; all procedural point distributions (ADR-581) |
+| 6 | `"fields"` in a scene file | `entity::FieldDesc` and `spatial::FieldSpec` share the word. A scene parsed, loaded, logged three fields by name, rendered, and simulated **nothing** |
+
+**A scan that does not understand its own input reports its own blindness as a result.**
+
+The split is the useful part. **Four of the six were caught only because something downstream
+disagreed** -- a compiler, a probe's own control, a blown-out render -- and the disagreement
+happening to be loud was luck. **Two were caught by a person parsing instead of matching.** Number
+6 is the worst of them and is not a scan failure at all but a *schema* one: two subsystems sharing
+an English word in the same file, where the symptom was a flat wash that reads as a tuning problem.
+
 ## Do NOT "fix" this later
 
 **Vorticity confinement is absent from the analytic tier on purpose, and the missing slider is not
@@ -412,15 +662,31 @@ the word is missing from a shader.**
 
 ## Revisit when
 
-- §38 Mode 1 is rendered. If the analytic structure alone does not read as a crude but unmistakable
-  tornado, §5's density model is wrong and no later phase can repair it.
-- **Mode 1 must pass a value-separation test, not only a silhouette test.** The shipped backdrop is
-  a flat teal-to-green wash filling the lower two thirds of frame (§1). A dark smoke column against
-  a dark wash has no silhouette however tall it is, and no amount of vertical extent repairs it.
-  So Mode 1's pass condition is two-part: the shape reads as a tornado, **and** it separates in
-  value from the backdrop behind it. This is a Phase 2 gate, deliberately not a Phase 5 lighting
-  discovery.
-- The coverage cost prediction in §5 is measured. If a tornado is not cheaper than the funnel, the
-  ADR-374 coverage model needs re-deriving, not the tornado.
-- The grid tier is attempted. If `kCatchUpSteps` makes a still frame unreproducible in practice as
-  well as in principle, the grid is Cinematic-only or it is nothing.
+- ~~§38 Mode 1 is rendered.~~ **Done (§8.7): it reads, and `cloudAmount` 0 is byte-identical to the
+  analytic field, so noise is provably not load-bearing.**
+- ~~The coverage cost prediction is measured.~~ **Done (§8.2) in the lab and NOT like for like. The
+  hero-shot measurement is Phase 7 and is the one that settles it.**
+- ~~Mode 1 must pass a value-separation test, not only a silhouette test.~~ **Done, in both
+  directions**: dark by extinction against a bright sky, and bright by emission against a dark one.
+  Two coefficients, two directions, and it was made a Phase 2 gate rather than left to be
+  discovered in Phase 5 lighting. The reasoning stands for anyone re-tuning: a dark smoke column
+  against a dark wash has no silhouette however tall it is.
+- The grid tier is attempted. **ADR-581 measured what §4 read off the code**: at `kCatchUpSteps =
+  240`, `--range 6:6` and `--range 30:30` render byte-identically because both skip to a state that
+  was never simulated. It does not violate ADR-360 and it does break `--range t:t`. If the tier is
+  built, one of ADR-581 §4's four options has to be chosen first.
+
+### What is still open at the end of Phase 6
+
+- **Phase 5, cinematic rendering.** Blocked on the shared volumetric foundation's light march
+  (§7 item 7), which the fog agent took. Nothing is budgeted for self-shadowing inside this slot.
+- **Phase 7, Tree of Life integration and the Vortex removal.** Two files, both halves of
+  `tree-of-life-floating-island`, censused by **parsing and not grepping** (§9 row 1 is what that
+  costs). They land together with the Tornado in the hero shot so the shot has no gap. ADR-441
+  waives the compatibility alias.
+- **Phase 8, performance.** The like-for-like cost measurement in the hero shot, which is the one
+  §8.2 explicitly does not claim.
+- **The wedge** is the weakest of the seven and the diagnosis looks intrinsic. Recorded rather than
+  dropped from the showcase, and not to be rescued by a camera chosen for it.
+- **`AtmosphericCounts::dropped` still reaches no user interface**, which §8.8 turned from a code
+  census into a blank deliverable.
