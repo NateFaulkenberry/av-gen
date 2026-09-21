@@ -106,6 +106,85 @@ std::uint32_t MotionFeatureConfig::dimension() const {
     return d;
 }
 
+const char* motionFeatureGroupName(MotionFeatureGroup group) {
+    switch (group) {
+    case MotionFeatureGroup::JointPosition: return "jointPosition";
+    case MotionFeatureGroup::JointVelocity: return "jointVelocity";
+    case MotionFeatureGroup::TrajectoryPosition: return "trajectoryPosition";
+    case MotionFeatureGroup::TrajectoryFacing: return "trajectoryFacing";
+    case MotionFeatureGroup::RootVelocity: return "rootVelocity";
+    case MotionFeatureGroup::Phase: return "phase";
+    case MotionFeatureGroup::Contact: return "contact";
+    case MotionFeatureGroup::Count: break;
+    }
+    return "?";
+}
+
+// The layout `buildMotionDatabase` writes, stated once so the weights and the breakdown cannot
+// drift from it. `dimension()` above computes the same total; this says what each slot *is*.
+std::vector<MotionFeatureGroup> motionFeatureLayout(const MotionFeatureConfig& config) {
+    std::vector<MotionFeatureGroup> out;
+    out.reserve(config.dimension());
+    for (std::size_t j = 0; j < config.joints.size(); ++j) {
+        out.insert(out.end(), 3u, MotionFeatureGroup::JointPosition);
+        out.insert(out.end(), 3u, MotionFeatureGroup::JointVelocity);
+    }
+    for (std::size_t t = 0; t < config.trajectoryTimes.size(); ++t) {
+        out.insert(out.end(), 2u, MotionFeatureGroup::TrajectoryPosition);
+        out.insert(out.end(), 2u, MotionFeatureGroup::TrajectoryFacing);
+    }
+    out.insert(out.end(), 3u, MotionFeatureGroup::RootVelocity);
+    if (config.phaseWeight > 0.0f) {
+        out.insert(out.end(), 2u, MotionFeatureGroup::Phase);
+    }
+    if (config.contactWeight > 0.0f) {
+        out.insert(out.end(), config.joints.size(), MotionFeatureGroup::Contact);
+    }
+    return out;
+}
+
+std::vector<float> motionFeatureWeights(const MotionFeatureConfig& config) {
+    const std::vector<MotionFeatureGroup> layout = motionFeatureLayout(config);
+    std::vector<float> out;
+    out.reserve(layout.size());
+    for (const MotionFeatureGroup group : layout) {
+        switch (group) {
+        case MotionFeatureGroup::JointPosition: out.push_back(config.jointPositionWeight); break;
+        case MotionFeatureGroup::JointVelocity: out.push_back(config.jointVelocityWeight); break;
+        case MotionFeatureGroup::TrajectoryPosition:
+            out.push_back(config.trajectoryPositionWeight);
+            break;
+        case MotionFeatureGroup::TrajectoryFacing:
+            out.push_back(config.trajectoryFacingWeight);
+            break;
+        case MotionFeatureGroup::RootVelocity: out.push_back(config.rootVelocityWeight); break;
+        case MotionFeatureGroup::Phase: out.push_back(config.phaseWeight); break;
+        case MotionFeatureGroup::Contact: out.push_back(config.contactWeight); break;
+        case MotionFeatureGroup::Count: out.push_back(1.0f); break;
+        }
+    }
+    return out;
+}
+
+std::string MotionCostBreakdown::report() const {
+    std::string out;
+    for (std::size_t g = 0; g < static_cast<std::size_t>(MotionFeatureGroup::Count); ++g) {
+        if (terms[g] == 0.0f) {
+            continue;
+        }
+        out += fmt::format("{}={:.4f} ", motionFeatureGroupName(static_cast<MotionFeatureGroup>(g)),
+                           terms[g]);
+    }
+    if (continuity != 0.0f) {
+        out += fmt::format("continuity={:.4f} ", continuity);
+    }
+    if (transition != 0.0f) {
+        out += fmt::format("transition={:.4f} ", transition);
+    }
+    out += fmt::format("| total={:.4f}", total());
+    return out;
+}
+
 MotionFeatureConfig defaultBipedConfig(std::string leftFoot, std::string rightFoot, std::string head) {
     MotionFeatureConfig config;
     config.joints = {std::move(leftFoot), std::move(rightFoot), std::move(head)};
@@ -396,6 +475,12 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
         return best;
     }
     const float* q = query.features.data();
+    // §10. Per-dimension weights, derived from the config rather than baked into the features, so
+    // a weight is tunable **without rebuilding the database**. Recomputed per search rather than
+    // cached: it is a few dozen floats against a scan of up to a million samples.
+    const std::vector<MotionFeatureGroup> layout = motionFeatureLayout(db.config);
+    const std::vector<float> dimWeight = motionFeatureWeights(db.config);
+    const bool weighted = dimWeight.size() == dim && layout.size() == dim;
 
     // The family of whatever is playing, for the transition cost (§12). Read from tags and never
     // from a clip name, which §12 is explicit about.
@@ -425,7 +510,7 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
         float cost = 0.0f;
         for (std::size_t d = 0; d < dim; ++d) {
             const float delta = q[d] - f[d];
-            cost += delta * delta;
+            cost += delta * delta * (weighted ? dimWeight[d] : 1.0f);
             if (best.found() && cost >= bestCost) {
                 break;
             }
@@ -462,6 +547,33 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
         }
     }
     best.cost = bestCost;
+
+    // §10's breakdown, computed **once for the winner** rather than accumulated per candidate. Per
+    // candidate it would cost seven accumulators on every one of a million samples to produce a
+    // number thrown away for all but one of them -- and the early out means a losing candidate's
+    // partial sums would be wrong anyway. Recomputing the winner in full is one extra pass over
+    // `dim` floats, and it is the only one anything reads.
+    if (best.found() && weighted) {
+        const float* f = db.featuresFor(best.sample);
+        for (std::size_t d = 0; d < dim; ++d) {
+            const float delta = q[d] - f[d];
+            best.breakdown.terms[static_cast<std::size_t>(layout[d])] +=
+                delta * delta * dimWeight[d];
+        }
+        if (query.current != MotionDatabase::kInvalid) {
+            const bool continues = query.current < db.sampleNext.size() &&
+                                   db.sampleNext[query.current] == best.sample;
+            if (!continues) {
+                best.breakdown.continuity = weights.continuity;
+                if (db.sampleClip[best.sample] != currentClip) {
+                    const std::uint32_t shared = db.sampleTags[best.sample] & currentTags;
+                    if (currentTags != 0 && shared != currentTags) {
+                        best.breakdown.transition = weights.transition;
+                    }
+                }
+            }
+        }
+    }
     return best;
 }
 

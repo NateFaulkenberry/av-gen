@@ -1027,3 +1027,48 @@ never needed it.
 
 The benchmark's control: a query seeded with sample 579 returns sample 579 at cost 0.000000.
 Without it every latency number could have been the cost of a fast refusal.
+
+## §10 — the cost function, and seven weights that weighted nothing
+
+§10 was among the sixteen sections Phase C inherited as done, and `MotionFeatureConfig` carries
+exactly the seven weights §10 asks for — which is what made it look met.
+
+**Five of the seven were read by nothing at all.** `jointPositionWeight`, `jointVelocityWeight`,
+`trajectoryPositionWeight`, `trajectoryFacingWeight` and `rootVelocityWeight` appeared in no
+translation unit outside their own declaration. The two that *were* read, `phaseWeight` and
+`contactWeight`, were used only as `> 0` presence tests deciding whether to include a dimension:
+setting one to 2.0 rather than 0.5 changed nothing at all. The search summed every dimension with
+weight 1, so the cost was a single undifferentiated squared distance — **precisely the opaque
+scoring function §10 names, with a tuning surface bolted to the outside of it that did nothing.**
+
+That is ADR-558's family, a control that does nothing, and it is worse than an absent control
+because an absent one is obviously absent.
+
+Fixed by deriving a per-dimension weight vector from the config and applying it in the scan.
+Deriving rather than baking is the load-bearing choice: **a weight is now tunable without
+rebuilding the database**, because the features are unchanged and only what they are multiplied by
+differs. `motionFeatureLayout` states the dimension layout once, so the weights and the breakdown
+cannot drift from what `buildMotionDatabase` writes.
+
+§10's other half — "avoid an opaque scoring function" — is `MotionCostBreakdown`, computed **once
+for the winner** rather than accumulated per candidate: per candidate it would cost seven
+accumulators on every one of a million samples to produce a number thrown away for all but one, and
+the early-out means a losing candidate's partial sums would be wrong anyway.
+
+The probe is built so it fails if the weights ever go inert again: two candidates are made wrong in
+*different groups* by the same amount, so they tie at equal weights, and raising one group's weight
+must flip the answer — impossible unless the weight is read. Both directions are asserted, so it is
+a test of the weights rather than of a tie-break, and nothing touches `db.features` between the
+three searches, which is what demonstrates the tunable-without-rebuild property. Shown failing by
+forcing the weights off: four assertions fail, which is the state the code was actually in.
+
+The breakdown asserts `total() == cost`, so it cannot become a decorative second opinion that
+drifts from the number actually used to choose.
+
+**§11 and §12, audited and recorded rather than changed yet.** Continuity is binary: a candidate
+that is literally `sampleNext[current]` pays nothing and *everything else* pays the full penalty —
+so the sample two frames later in the same clip is penalised exactly as hard as a sample from an
+unrelated clip. §11 lists "current sample, previous sample, source clip, phase, root velocity,
+transition distance" as inputs, and a next-or-not flag is the crudest possible reading of that.
+§12 is met in the respect it cares about — it uses tag metadata, never clip names, which is its one
+explicit prohibition — but is likewise binary. Both are next.

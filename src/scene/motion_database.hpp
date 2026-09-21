@@ -83,6 +83,53 @@ struct MotionFeatureConfig {
     friend bool operator==(const MotionFeatureConfig&, const MotionFeatureConfig&) = default;
 };
 
+// Phase C §10: which term of the cost each feature dimension belongs to.
+//
+// §10 requires the cost be `poseCost + trajectoryCost + velocityCost + facingCost + phaseCost +
+// contactCost + transitionCost`, that **every term have a configurable weight**, and that the
+// scoring function not be opaque. Before this existed, none of that was true: five of the seven
+// weights in `MotionFeatureConfig` were read by nothing at all, and the two that were read
+// (`phaseWeight`, `contactWeight`) were used only as `> 0` presence tests deciding whether to
+// *include* the dimension. Setting one to 2.0 rather than 0.5 changed nothing. They were controls
+// that did nothing (ADR-558) wearing the costume of a tuning surface.
+enum class MotionFeatureGroup : std::uint8_t {
+    JointPosition,
+    JointVelocity,
+    TrajectoryPosition,
+    TrajectoryFacing,
+    RootVelocity,
+    Phase,
+    Contact,
+    Count,
+};
+[[nodiscard]] const char* motionFeatureGroupName(MotionFeatureGroup group);
+
+// The group of every dimension, in the order `buildMotionDatabase` writes them. Derived from the
+// config rather than stored per sample: it is a fact about the layout, the same for all million
+// samples, and storing it per sample would be 1 MB of the same byte repeated.
+[[nodiscard]] std::vector<MotionFeatureGroup> motionFeatureLayout(const MotionFeatureConfig& config);
+
+// The weight of each dimension, so a search multiplies rather than consults. Recomputed from the
+// config, which is what makes a weight **tunable without rebuilding the database**: the features
+// are unchanged, only what they are multiplied by.
+[[nodiscard]] std::vector<float> motionFeatureWeights(const MotionFeatureConfig& config);
+
+// §10's explicit breakdown, for the sample a search chose. This is the half that makes the scoring
+// function not opaque: "why that sample" has an answer with numbers in it.
+struct MotionCostBreakdown {
+    float terms[static_cast<std::size_t>(MotionFeatureGroup::Count)] = {};
+    float continuity = 0.0f;
+    float transition = 0.0f;
+    [[nodiscard]] float total() const {
+        float sum = continuity + transition;
+        for (const float t : terms) {
+            sum += t;
+        }
+        return sum;
+    }
+    [[nodiscard]] std::string report() const;
+};
+
 // The default for a biped: the two feet and the head, which is what the literature converges on
 // and what this rig can actually supply.
 [[nodiscard]] MotionFeatureConfig defaultBipedConfig(std::string leftFoot, std::string rightFoot,
@@ -196,6 +243,7 @@ struct MotionCostWeights {
 struct MotionMatch {
     std::uint32_t sample = MotionDatabase::kInvalid;
     float cost = 0.0f;
+    MotionCostBreakdown breakdown; // §10: what the cost was made of, for the winner
     std::uint32_t considered = 0; // how many survived filtering and were scored
     std::uint32_t rejected = 0;   // how many the tag filter removed before scoring
     [[nodiscard]] bool found() const { return sample != MotionDatabase::kInvalid; }

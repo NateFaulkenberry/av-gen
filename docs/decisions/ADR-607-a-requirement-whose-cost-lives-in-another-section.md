@@ -58,7 +58,11 @@ Re-reading §15 and §17 after writing the §6 benchmark caught that benchmark:
   latency, **worst-case** latency, candidate count, memory, database load time, **build time**."
   Mine started at 10,000 and reported only a minimum.
 
-Three misses, in work an hour old, by the author who had just written ADR-606 about exactly this.
+**Three misses, in work one hour old, by the author who had just written ADR-606 about exactly this
+failure.** That sentence is in the record deliberately, because the alternative reading — that the
+first author was careless — is available to every future reader and is wrong. The benchmark was
+written carefully. Awareness of a failure mode decays inside the hour, and the only thing that
+survives the decay is a re-read of the text or a test that fails.
 
 **What survives the correction is the useful part.** A linear scan touches every sample whatever the
 values are, so its cost is distribution-independent and the synthetic timing is a valid measurement
@@ -76,9 +80,17 @@ however good the average was.
 
 ## Consequences
 
-- **The real Glowmere database is 1,738 samples**, which is §17's "1,700 frames" almost exactly —
-  the specification's first scale is the actual content, which is further evidence that §15's "real
-  data first" is the intended reading rather than a caution.
+- **The real Glowmere database is 1,738 samples**, which is §17's "1,700 frames" almost exactly.
+  That is a *second kind of textual evidence*, distinct from the clause-pricing above: a
+  specification quoting a number that turns out to be your own corpus is evidence about **intent**.
+  Real-data-first was the reading and the synthetic ladder of round numbers was the paraphrase. When
+  a spec's example matches the repository's actual content, the example is not an example.
+- **Minima and worst cases are not in conflict, and this is the line that says so.** The standing
+  rule — minima over repeats, never means — was always about *comparing arms on a contended
+  machine*, where a mean measures whatever else the machine was doing. It was never an argument
+  that a worst case is uninteresting. A minimum answers *how fast can this code go*; a worst case
+  answers *will this drop a frame*, and a 36 ms spike drops a frame however good the average was.
+  Report both; use the minimum to compare and the worst case to budget.
 - Measured on it: 26 clips, dimension 33, **0.252 MB at 152.0 bytes/sample** — the same per-sample
   arithmetic as the synthetic table, which cross-checks both. Build is 32.7 ms for the pack plus
   77.2 ms for the database. Query latency over 500 queries seeded from inside the real distribution:
