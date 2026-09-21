@@ -85,7 +85,13 @@ fn vortexRadialProfile(v: VortexUniformsWgsl, rr: f32) -> f32 {
     // per-field reachability probe caught on the first attempt. `eyeWallWidth` is the 0.22
     // ADR-374 hardcoded, now authored, and at 0.22 with gain 0 this is ADR-374's profile exactly.
     let eyeR = clamp(v.v2.x, 0.0, 0.95);
-    let wallW = max(v.v7.x, 1e-3);
+    // ADR-561: a width of ZERO means NO EYE, not an infinitely sharp one. The transliteration of
+    // `core/vortex.cpp`'s branch, in the same place and the same order -- see the note there for
+    // why, and `test_vortex_parity_gpu.cpp` for what holds the two together.
+    if (v.v7.x <= 0.0) {
+        return rim;
+    }
+    let wallW = v.v7.x;
     // A hole, so its boundary is a RISE and not a fade. Smoothstep, not a step: ADR-369's rule is
     // that there must be no edge anywhere for a hard line to live on.
     let eye = smoothstep(eyeR, eyeR + wallW, rr);

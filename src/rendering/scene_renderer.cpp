@@ -2587,19 +2587,45 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         frame.skySunRadiance = glm::vec4(resolved.sunColor, analyticBackground ? 1.0f : 0.0f);
     // ADR-379: the vortex's own light on what floats above it. Zero intensity when there is no
     // vortex, which is the gate the surface shader tests.
-    if (scene.atmospherics.hasVortex && scene.atmospherics.vortex.active()) {
-        const world::Vortex& vx = scene.atmospherics.vortex;
-        frame.vortexGlow = glm::vec4(vx.center, std::max(vx.radius, 1.0f));
-        // The colour the eye reads out of the funnel is the mid tone lifted toward the accent.
-        //
-        // The strength is `spill` ALONE and is deliberately not derived from `emission`. My first
-        // version multiplied the two, and that is a units error: `emission` is an emissive density
-        // PER METRE integrated along a march, while this is a surface irradiance. Scaling one by
-        // the other gave 0.24 where about 2.5 was wanted, and the island brightened by 0.09 of 255
-        // -- invisible, and it took an A/B with the vortex on in both arms to see that, because
-        // switching the vortex off to get a baseline moves the whole background and swamps it.
-        const glm::vec3 tint = glm::mix(vx.colorMid, vx.colorAccent, 0.45f);
-        frame.vortexGlowColor = glm::vec4(tint, std::max(vx.spill, 0.0f));
+    // ADR-562: read out of the medium's packed lanes. The lane map is declared beside each kind's
+    // `packMedium`; the five this needs are named here rather than indexed inline, because
+    // `slot.lane[12].x` is not a thing anybody should have to decode at a call site.
+    //
+    // `spill` is why lane 12 exists. It is a SURFACE irradiance consumed by the lit pass, not a
+    // per-metre coefficient the march integrates, so it appears in none of the twelve lanes the
+    // march needs -- and packing the medium without it would have silently broken this glow. It was
+    // the one reader of the authored struct that genuinely needed something the march does not.
+    //
+    // FIRST medium only, which is a real limit and not an oversight: `frame.vortexGlow` is one
+    // sphere and one colour in the surface shader, so N media would need N of them or a sum, and
+    // summing irradiances from media at different distances is wrong in a way that is worth an
+    // measurement rather than a guess. The march draws all of them; only the glow on what floats
+    // above is limited. Recorded so the next person finds a stated limit rather than a surprise --
+    // which is the whole lesson of ADR-560.
+    if (scene.atmospherics.mediumCount > 0) {
+        const world::MediumSlot& m = scene.atmospherics.media[0];
+        const glm::vec3 centre(m.lane[0]);
+        const float radius = m.lane[0].w;
+        const glm::vec3 colorMid(m.lane[10]);
+        const glm::vec3 colorAccent(m.lane[11]);
+        const float spill = m.lane[12].x;
+        if (radius > 0.0f) {
+            frame.vortexGlow = glm::vec4(centre, std::max(radius, 1.0f));
+            // The colour the eye reads out of the funnel is the mid tone lifted toward the accent.
+            //
+            // The strength is `spill` ALONE and is deliberately not derived from `emission`. My
+            // first version multiplied the two, and that is a units error: `emission` is an
+            // emissive density PER METRE integrated along a march, while this is a surface
+            // irradiance. Scaling one by the other gave 0.24 where about 2.5 was wanted, and the
+            // island brightened by 0.09 of 255 -- invisible, and it took an A/B with the vortex on
+            // in both arms to see that, because switching it off to get a baseline moves the whole
+            // background and swamps it.
+            frame.vortexGlowColor = glm::vec4(glm::mix(colorMid, colorAccent, 0.45f),
+                                              std::max(spill, 0.0f));
+        } else {
+            frame.vortexGlow = glm::vec4(0.0f);
+            frame.vortexGlowColor = glm::vec4(0.0f);
+        }
     } else {
         frame.vortexGlow = glm::vec4(0.0f);
         frame.vortexGlowColor = glm::vec4(0.0f);

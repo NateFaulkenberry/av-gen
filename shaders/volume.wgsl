@@ -41,25 +41,32 @@ struct VolumeUniforms {
     depthParams: vec4<f32>, // camera near, camera far, 0, 0
     fogColor: vec4<f32>,  // rgb = emission tint when no colour field is named
     glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), yzw = 0
-    // ADR-371: the cosmic vortex. All zero -- specifically vortex0.w (the radius) at zero -- means
-    // every function below returns before it does any work, so a scene that does not ask for one
-    // marches exactly what it always marched.
-    vortex0: vec4<f32>,   // centre xyz, radius (0 = no vortex)
-    vortex1: vec4<f32>,   // thickness, swirl, rotationSpeed, density
-    vortex2: vec4<f32>,   // innerVoid, contrast, turbulence, turbulenceScale
-    vortex3: vec4<f32>,   // breathAmount, breathSpeed, emission, filaments
-    vortexA: vec4<f32>,   // deep colour
-    vortexB: vec4<f32>,   // mid colour
-    vortexAccent: vec4<f32>, // luminous accent
-    vortex4: vec4<f32>,   // ADR-374: funnel depth, throat radius fraction, throat density, 0
-    vortex5: vec4<f32>,   // ADR-381/388: comet response, reach, scene scattering, 0
-    vortex6: vec4<f32>,   // ADR-389: smokeWarp, smokeBillow, detail, 0
-    // Vortex 2.0 §7-§11, the macro structure -- eye, eye wall and spiral bands. All zero means
-    // the field evaluates ADR-389's envelope exactly, so this is additive in the same sense
-    // `vortex0.w == 0` is: a scene that asks for nothing gets the frame it got before.
-    vortex7: vec4<f32>,   // eyeWallWidth, eyeWallGain, cloudNoise, 0
-    vortex8: vec4<f32>,   // bandArms, cot(bandPitch), bandDepth, bandHarmonic
+    // ADR-562: the placed media, as lanes. `mediaInfo.x` is how many are live.
+    //
+    // Was twelve named `vortexN` members carrying exactly ONE medium, so the second placed medium
+    // in a scene rendered as nothing and nothing said so (ADR-560). A slot is 16 `vec4`; slot `s`
+    // occupies `media[s * 16 .. s * 16 + 15]`, and the lane map is declared beside each kind's
+    // `packMedium` on the CPU. Lane 0's `.w` is the radius and is the per-slot gate, so an unused
+    // slot costs one comparison.
+    //
+    // Flattened rather than `array<array<vec4<f32>, 16>, N>` because a uniform array of arrays has
+    // a stride the WGSL/Metal layout rules make easy to get subtly wrong, and a flat array with an
+    // index helper cannot be.
+    mediaInfo: vec4<f32>,
+    media: array<vec4<f32>, 64>,   // kMaxMedia (4) * kMediumLanes (16)
 };
+
+// Slot `s`'s lane `l`. The one place the flattening is expressed.
+fn mediaLane(s: u32, l: u32) -> vec4<f32> {
+    return vol.media[s * 16u + l];
+}
+
+// The packed vortex uniforms for slot `s`, in the order `shaders/vortex.wgsl` names them.
+fn mediumVortexUniforms(s: u32) -> VortexUniformsWgsl {
+    return VortexUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 1u), mediaLane(s, 2u),
+                              mediaLane(s, 3u), mediaLane(s, 4u), mediaLane(s, 6u),
+                              mediaLane(s, 7u), mediaLane(s, 8u));
+}
 
 @group(1) @binding(1) var<uniform> vol: VolumeUniforms;
 @group(1) @binding(2) var<uniform> fieldBlock: FieldBlock;
@@ -156,25 +163,94 @@ fn vortexFilterWidth() -> f32 {
     return vol.params1.w / max(vol.info.x, 1.0);
 }
 
-fn vortexShape(p: vec3<f32>, t: f32) -> f32 {
-    return vortexShapeAt(VortexUniformsWgsl(vol.vortex0, vol.vortex1, vol.vortex2, vol.vortex3,
-                                            vol.vortex4, vol.vortex6, vol.vortex7, vol.vortex8),
-                         p, t, vortexFilterWidth());
+fn mediumShape(s: u32, p: vec3<f32>, t: f32) -> f32 {
+    return vortexShapeAt(mediumVortexUniforms(s), p, t, vortexFilterWidth());
 }
 
-// The vortex's own light. It is emissive rather than lit: nothing in this scene could illuminate
+// The medium's own light. Emissive rather than lit: nothing in this scene could illuminate
 // something that size, and the brief's reference is a nebula, which glows.
-fn vortexEmissionAt(p: vec3<f32>, shape: f32, t: f32) -> vec3<f32> {
-    if (shape <= 0.0 || vol.vortex3.z <= 0.0) {
+fn mediumEmissionAt(s: u32, p: vec3<f32>, shape: f32, t: f32) -> vec3<f32> {
+    let l3 = mediaLane(s, 3u);
+    if (shape <= 0.0 || l3.z <= 0.0) {
         return vec3<f32>(0.0);
     }
-    // Colour hierarchy, which is the brief's section on this almost verbatim: DARK -> MID ->
-    // LUMINOUS ACCENT, keyed on density, so the bright colour appears only in the dense filaments
-    // and the bulk of the cloud stays deep. Saturating everything is the failure mode named.
-    var c = mix(vol.vortexA.rgb, vol.vortexB.rgb, smoothstep(0.0, 0.45, shape));
-    let filament = smoothstep(0.62, 0.95, shape) * clamp(vol.vortex3.w, 0.0, 4.0);
-    c = c + vol.vortexAccent.rgb * filament;
-    return c * (shape * vol.vortex3.z);
+    // Colour hierarchy: DARK -> MID -> LUMINOUS ACCENT, keyed on density, so the bright colour
+    // appears only in the dense filaments and the bulk of the cloud stays deep. Saturating
+    // everything is the failure mode the brief names.
+    var c = mix(mediaLane(s, 9u).rgb, mediaLane(s, 10u).rgb, smoothstep(0.0, 0.45, shape));
+    let filament = smoothstep(0.62, 0.95, shape) * clamp(l3.w, 0.0, 4.0);
+    c = c + mediaLane(s, 11u).rgb * filament;
+    return c * (shape * l3.z);
+}
+
+// ADR-562 §4: the per-slot ray interval, as a VERTICAL CYLINDER.
+//
+// This is the highest-value affordance in the foundation and it is why the slot array had to come
+// before the fog authoring work. ADR-560 measured that shrinking a medium's screen footprint moved
+// `volume.march` only 7.14 -> 6.62 ms, because every pixel still marched all 32 steps across the
+// full 4 km and the only saving was the per-sample early-out inside the field. Smaller on screen
+// did not mean fewer steps. `agent/tornado` measured the same thing from the other side: a fixed
+// 128-step march put 31 m between samples and broke a 24 m column into disconnected pieces.
+//
+// A CYLINDER rather than a sphere because every term in this family's field is a function of
+// `length(rel.xz)` and `rel.y` alone -- so a cylinder is the field's own shape, and for the two
+// cases that matter it is dramatically tighter: a wide flat fog bank and a tall thin tornado are
+// both mostly empty inside their bounding spheres.
+//
+// Returns (tEnter, tExit); tExit <= tEnter means the ray misses this medium entirely.
+fn mediumInterval(s: u32, origin: vec3<f32>, dir: vec3<f32>, maxDistance: f32) -> vec2<f32> {
+    let l0 = mediaLane(s, 0u);
+    let radius = l0.w;
+    if (radius <= 0.0) {
+        return vec2<f32>(1.0, -1.0);
+    }
+    // The field is zero past `rr > 1.35` (vortex.wgsl's compact early-out), and `breathAmount`
+    // widens the radius by at most its own amount, so this is the smallest bound that provably
+    // contains every non-zero sample.
+    let breath = 1.0 + max(mediaLane(s, 3u).x, 0.0);
+    let rr = radius * breath * 1.35;
+    // Vertically: the Gaussian wall falls to ~1e-6 by three thicknesses, and the throat descends
+    // `funnelDepth` below the mouth.
+    let thickness = max(mediaLane(s, 1u).x, 1e-3);
+    let depth = max(mediaLane(s, 4u).x, 0.0);
+    let centre = l0.xyz;
+    let yTop = centre.y + thickness * 3.0;
+    let yBot = centre.y - depth - thickness * 3.0;
+
+    // Infinite cylinder about +Y, then clipped by the two caps.
+    let d = vec2<f32>(dir.x, dir.z);
+    let o = vec2<f32>(origin.x - centre.x, origin.z - centre.z);
+    let a = dot(d, d);
+    var t0 = 0.0;
+    var t1 = maxDistance;
+    if (a < 1e-12) {
+        // Ray is vertical: inside the cylinder for its whole length, or never.
+        if (dot(o, o) > rr * rr) {
+            return vec2<f32>(1.0, -1.0);
+        }
+    } else {
+        let b = dot(o, d);
+        let c = dot(o, o) - rr * rr;
+        let disc = b * b - a * c;
+        if (disc < 0.0) {
+            return vec2<f32>(1.0, -1.0);
+        }
+        let sq = sqrt(disc);
+        t0 = max(t0, (-b - sq) / a);
+        t1 = min(t1, (-b + sq) / a);
+    }
+    // The caps.
+    if (abs(dir.y) < 1e-9) {
+        if (origin.y < yBot || origin.y > yTop) {
+            return vec2<f32>(1.0, -1.0);
+        }
+    } else {
+        let ta = (yBot - origin.y) / dir.y;
+        let tb = (yTop - origin.y) / dir.y;
+        t0 = max(t0, min(ta, tb));
+        t1 = min(t1, max(ta, tb));
+    }
+    return vec2<f32>(max(t0, 0.0), min(t1, maxDistance));
 }
 
 fn volumeDensityAt(p: vec3<f32>) -> f32 {
@@ -197,7 +273,12 @@ fn volumeDensityAt(p: vec3<f32>) -> f32 {
 // transmittance. Keeping them separate would mean two marches or a composite, and a composite of
 // two participating media is wrong wherever they overlap.
 fn volumeTotalDensityAt(p: vec3<f32>, t: f32) -> f32 {
-    return volumeDensityAt(p) + vortexShape(p, t) * vol.vortex1.w;
+    var total = volumeDensityAt(p);
+    let count = u32(vol.mediaInfo.x);
+    for (var s = 0u; s < count; s = s + 1u) {
+        total = total + mediumShape(s, p, t) * mediaLane(s, 1u).w;
+    }
+    return total;
 }
 
 // Henyey-Greenstein phase function; g = 0 is isotropic.
@@ -394,18 +475,70 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
     let anisotropy = clamp(vol.params1.y, -0.95, 0.95);
     let colorSlot = i32(vol.info.z);
 
+    // ADR-562 §4: each slot's ray interval, computed ONCE per pixel rather than per step.
+    //
+    // The march's step positions are deliberately unchanged -- the same `steps` over the same
+    // `maxDistance`, so the Environment fog integrates exactly as it did and no existing frame
+    // moves. What the intervals buy is that a step outside a medium's cylinder costs a comparison
+    // instead of a field evaluation, and ADR-374 measured that the cost IS how many samples have
+    // non-zero density.
+    //
+    // Redistributing the steps into the union of the intervals is the bigger win and is NOT done
+    // here: it would change the fog's own integration and every existing frame with it, so it is a
+    // separate measurement with its own arm. `agent/tornado`'s per-medium step derivation (rope 462
+    // steps, wedge 96, against a fixed 128 that broke a 24 m column into pieces) is the evidence
+    // that it is worth doing next.
+    let mediumCount = u32(vol.mediaInfo.x);
+    var slotMin: array<f32, 4>;
+    var slotMax: array<f32, 4>;
+    for (var s = 0u; s < 4u; s = s + 1u) {
+        if (s < mediumCount) {
+            let iv = mediumInterval(s, origin, direction, maxDistance);
+            slotMin[s] = iv.x;
+            slotMax[s] = iv.y;
+        } else {
+            slotMin[s] = 1.0;
+            slotMax[s] = -1.0;
+        }
+    }
+
     var transmittance = 1.0;
     var scattered = vec3<f32>(0.0);
     for (var i = 0; i < steps; i = i + 1) {
         let t = (f32(i) + jitter) * stepLength;
         let p = origin + direction * t;
-        // ADR-371: the vortex is part of the same medium, so it shares one density and one
-        // transmittance with the fog. `vortexShape` returns before doing any work when no vortex is
-        // authored, which is what keeps this loop the cost it was.
-        let vortex = vortexShape(p, vol.noiseParams.w);
+        // ADR-371/562: every placed medium is part of ONE medium as far as the march is
+        // concerned -- one density, one transmittance, one early-out. Keeping them separate would
+        // mean N marches or a composite, and a composite of two participating media is wrong
+        // wherever they overlap.
+        //
+        // ADR-562 §4: a slot whose interval this step is outside costs one comparison instead of a
+        // field evaluation. That is the difference between ADR-560's measured 7% saving from a
+        // smaller medium and a proportional one.
         let fogDensity = volumeDensityAt(p);
-        let vortexDensity = vortex * vol.vortex1.w;
-        let density = fogDensity + vortexDensity;
+        var mediumDensity = 0.0;
+        var mediumScatter = 0.0;
+        var mediumEmission = vec3<f32>(0.0);
+        var cometLit = 0.0;
+        for (var s = 0u; s < mediumCount; s = s + 1u) {
+            if (t < slotMin[s] || t > slotMax[s]) {
+                continue;
+            }
+            let shape = mediumShape(s, p, vol.noiseParams.w);
+            if (shape <= 0.0) {
+                continue;
+            }
+            let l1 = mediaLane(s, 1u);
+            let l5 = mediaLane(s, 5u);
+            let d = shape * l1.w;
+            mediumDensity = mediumDensity + d;
+            // Per-slot scene-light scattering weight (ADR-388), so a dark forward-scattering
+            // tornado and a self-luminous nebula can stand in one frame without sharing a knob.
+            mediumScatter = mediumScatter + d * l5.z;
+            mediumEmission = mediumEmission + mediumEmissionAt(s, p, shape, vol.noiseParams.w);
+            cometLit = cometLit + shape * l5.x;
+        }
+        let density = fogDensity + mediumDensity;
         if (density <= 0.0) {
             continue;
         }
@@ -433,7 +566,7 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
         // -- a throat, a void and a rim -- full scattering is worth +15 luminance levels on the
         // shipped frame, not a wash. The refusal is still the right default. The number is no
         // longer what this knob does, and it is left above because it is why the knob starts at 0.
-        let scattering = (fogDensity + vortexDensity * vol.vortex5.z) * vol.params0.w;
+        let scattering = (fogDensity + mediumScatter) * vol.params0.w;
         var emission = vec3<f32>(0.0);
         if (vol.params1.z > 0.0) {
             var emissionColor = vol.fogColor.rgb;
@@ -445,7 +578,7 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
         }
         // ...and the vortex brings its own light. Emissive rather than lit, because nothing in this
         // scene could illuminate something that size and because the reference is a nebula.
-        emission = emission + vortexEmissionAt(p, vortex, vol.noiseParams.w);
+        emission = emission + mediumEmission;
         // ADR-381, phase 13: the COMET, and only the comet, is allowed to light the vortex.
         //
         // ADR-374 established that letting the scene's lights scatter in this medium turns the
@@ -457,7 +590,7 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
         //
         // Weighted by the vortex's own density, so it reads as the comet finding the cloud rather
         // than as a light in empty space, and gated by a parameter that is zero by default.
-        if (vol.vortex5.x > 0.0 && vortex > 0.0) {
+        if (cometLit > 0.0) {
             let lit = frame.skyGroundPointColor;
             if (lit.r + lit.g + lit.b > 0.0) {
                 // XZ ONLY, and a wider reach than the surfaces get. `atmosphere_ground.wgsl` says
@@ -471,7 +604,7 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
                 // radius is scaled by `vortex5.y`. A light that reaches the rock and stops dead at
                 // the cloud beside it is the discontinuity ADR-369 was about, one object along.
                 let d = length(p.xz - frame.skyGroundPoint.xz) /
-                        max(frame.skyGroundPoint.w * max(vol.vortex5.y, 1.0), 1.0);
+                        max(frame.skyGroundPoint.w * max(mediaLane(0u, 5u).y, 1.0), 1.0);
                 let fall = pow(clamp(1.0 - d, 0.0, 1.0), max(lit.w, 0.5));
                 // ADR-389 is the fourth member of this family and the first that is not about
                 // metres: replacing the vortex's contrast curve changed the MEAN of its shape by
@@ -485,7 +618,7 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
                 // magnitude wrong (ADR-374's density, ADR-379's spill). `lit.rgb` is a surface
                 // radiance; this loop integrates over metres. Without it, cometResponse 0.6 lifted
                 // the whole frame by 125 luminance levels.
-                emission = emission + lit.rgb * (fall * vortex * vol.vortex5.x * 0.005);
+                emission = emission + lit.rgb * (fall * cometLit * 0.005);
             }
         }
         // The particle glow arrives as light to scatter, not as fog emission, so denser dust

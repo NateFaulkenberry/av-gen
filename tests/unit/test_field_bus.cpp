@@ -404,12 +404,16 @@ TEST_CASE("a subscribed frame is a pure function of the transport second",
         REQUIRE(it != ascending.end());
         const std::size_t i = static_cast<std::size_t>(it - ascending.begin());
         const world::AtmosphericFrame scrubbed = frameAt(t);
-        // Per block, not over the struct: `AtmosphericFrame` has padding between `hasVortex` and
-        // `vortex` that member-wise assignment leaves indeterminate, and comparing it reports
-        // differences that are not differences. That cost an hour; see `frameDiffers`.
+        // Per block, not over the struct. `AtmosphericFrame` USED to have padding between
+        // `hasVortex` and `vortex` that member-wise assignment left indeterminate, and comparing it
+        // reported differences that were not differences -- that cost an hour; see `frameDiffers`.
+        // ADR-562 removed the cause (a slot is `vec4` lanes with its padding declared), so the
+        // media block is now safe to compare whole. The per-block habit is kept because the OTHER
+        // blocks have not changed and the reason still applies to them.
         CHECK(std::memcmp(&play[i].comets, &scrubbed.comets, sizeof(play[i].comets)) == 0);
         CHECK(std::memcmp(&play[i].auroras, &scrubbed.auroras, sizeof(play[i].auroras)) == 0);
-        CHECK(std::memcmp(&play[i].vortex, &scrubbed.vortex, sizeof(play[i].vortex)) == 0);
+        CHECK(std::memcmp(&play[i].media, &scrubbed.media, sizeof(play[i].media)) == 0);
+        CHECK(play[i].mediumCount == scrubbed.mediumCount);
     }
 
     // The control: the frames are not all the same frame, or the loop above proves nothing.
@@ -424,27 +428,28 @@ TEST_CASE("the funnel leans downwind, by a bounded amount, and only when asked",
     ctx.fieldBus = &bus;
 
     world::AtmosphericEffect e = world::cosmicVortex("Cosmic Vortex");
-    e.vortex.radius = 400.0f;
-    e.vortex.center = glm::vec3(0.0f, 60.0f, 0.0f);
+    e.vortex.field.radius = 400.0f;
+    e.vortex.field.center = glm::vec3(0.0f, 60.0f, 0.0f);
 
     world::AtmosphericFrame upright{};
     world::buildAtmosphericFrame(std::span(&e, 1), ctx, upright);
-    REQUIRE(upright.hasVortex);
-    CHECK(upright.vortex.center == e.vortex.center);
+    REQUIRE(upright.mediumCount == 1);
+    // Lane 0 is centre.xyz + radius (the map is beside each kind's `packMedium`).
+    CHECK(glm::vec3(upright.media[0].lane[0]) == e.vortex.field.center);
 
     e.flow.field = std::string(fx::kWindField);
     e.flow.influence = 2.0f; // the soft maximum
     world::AtmosphericFrame leaning{};
     world::buildAtmosphericFrame(std::span(&e, 1), ctx, leaning);
-    REQUIRE(leaning.hasVortex);
+    REQUIRE(leaning.mediumCount == 1);
 
-    const glm::vec3 offset = leaning.vortex.center - e.vortex.center;
+    const glm::vec3 offset = glm::vec3(leaning.media[0].lane[0]) - e.vortex.field.center;
     CHECK(glm::length(offset) > 1.0f);
     // A translation in the plane: the funnel drifts, it does not rise or sink.
     CHECK(offset.y == 0.0f);
     // Bounded at a fifth of the radius at the soft maximum, so a subscribed funnel cannot wander
     // off the island it was placed on (ADR-387).
-    CHECK(glm::length(offset) <= 0.2f * e.vortex.radius + 1e-3f);
+    CHECK(glm::length(offset) <= 0.2f * e.vortex.field.radius + 1e-3f);
 }
 
 TEST_CASE("a vortex inside a closed activation window does not reach the march",
@@ -456,22 +461,22 @@ TEST_CASE("a vortex inside a closed activation window does not reach the march",
     ctx.seconds = 0.0;
 
     world::AtmosphericEffect e = world::cosmicVortex("Cosmic Vortex");
-    e.vortex.radius = 400.0f;
+    e.vortex.field.radius = 400.0f;
     e.activation = world::Activation::Window;
     e.timing.windowStart = 100.0;
     e.timing.windowSeconds = 10.0;
 
     world::AtmosphericFrame closed{};
     world::buildAtmosphericFrame(std::span(&e, 1), ctx, closed);
-    CHECK_FALSE(closed.hasVortex);
+    CHECK_FALSE((closed.mediumCount > 0));
 
     // ...and the control: inside its window it does march, so the check above is about the window
     // and not about the vortex being broken.
     ctx.seconds = 103.0;
     world::AtmosphericFrame open{};
     world::buildAtmosphericFrame(std::span(&e, 1), ctx, open);
-    CHECK(open.hasVortex);
-    CHECK(open.vortex.radius == 400.0f);
+    CHECK((open.mediumCount > 0));
+    CHECK(open.media[0].lane[0].w == 400.0f);
 }
 
 TEST_CASE("a vortex fades with its lifetime envelope instead of switching off",
@@ -480,7 +485,7 @@ TEST_CASE("a vortex fades with its lifetime envelope instead of switching off",
     // scale, and nothing else does -- fading the colours would leave a full-strength grey funnel and
     // fading the radius would shrink it rather than dim it.
     world::AtmosphericEffect e = world::cosmicVortex("Cosmic Vortex");
-    e.vortex.radius = 400.0f;
+    e.vortex.field.radius = 400.0f;
     e.activation = world::Activation::Window;
     e.timing.windowStart = 0.0;
     e.timing.windowSeconds = 10.0;
@@ -496,16 +501,16 @@ TEST_CASE("a vortex fades with its lifetime envelope instead of switching off",
 
     const world::AtmosphericFrame early = vortexAt(1.0);
     const world::AtmosphericFrame full = vortexAt(6.0);
-    REQUIRE(early.hasVortex);
-    REQUIRE(full.hasVortex);
+    REQUIRE((early.mediumCount > 0));
+    REQUIRE((full.mediumCount > 0));
 
-    CHECK(early.vortex.density < full.vortex.density);
-    CHECK(early.vortex.emission < full.vortex.emission);
+    CHECK(early.media[0].lane[1].w < full.media[0].lane[1].w);
+    CHECK(early.media[0].lane[3].z < full.media[0].lane[3].z);
     // Everything else is untouched, including the geometry: a fading funnel is the same funnel.
-    CHECK(early.vortex.radius == full.vortex.radius);
-    CHECK(early.vortex.colorAccent == full.vortex.colorAccent);
+    CHECK(early.media[0].lane[0].w == full.media[0].lane[0].w);
+    CHECK(early.media[0].lane[11] == full.media[0].lane[11]); // accent colour
     // Past the fade the coefficients are the authored ones exactly, so a scene with no fade -- which
     // is every scene in the repository -- is arithmetically untouched by this.
-    CHECK(full.vortex.density == e.vortex.density);
-    CHECK(full.vortex.emission == e.vortex.emission);
+    CHECK(full.media[0].lane[1].w == e.vortex.density);
+    CHECK(full.media[0].lane[3].z == e.vortex.emission);
 }

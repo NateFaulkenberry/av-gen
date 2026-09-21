@@ -24,6 +24,7 @@
 #include "gpu/render_target.hpp"
 #include "rendering/render_quality.hpp"
 #include "scene/scene.hpp"
+#include "world/atmospherics.hpp"
 
 #include <glm/glm.hpp>
 #include <webgpu/webgpu_cpp.h>
@@ -68,23 +69,15 @@ struct VolumeUniforms {
     glm::vec4 depthParams; // camera near, camera far, 0, 0
     glm::vec4 fogColor;    // rgb, w = 0
     glm::vec4 glow;        // x = particle glow systems (ADR-040), yzw = 0
-    // ADR-371: the cosmic vortex. vortex0.w (the radius) at 0 is the gate.
-    glm::vec4 vortex0;     // centre xyz, radius
-    glm::vec4 vortex1;     // thickness, swirl, rotationSpeed, density
-    glm::vec4 vortex2;     // innerVoid, contrast, turbulence, turbulenceScale
-    glm::vec4 vortex3;     // breathAmount, breathSpeed, emission, filaments
-    glm::vec4 vortexA;
-    glm::vec4 vortexB;
-    glm::vec4 vortexAccent;
-    glm::vec4 vortex4;     // ADR-374: funnel depth, throat fraction, throat density, 0
-    glm::vec4 vortex5;     // ADR-381: x = comet response, y = reach, z = scene scattering (388), w = 0
-    glm::vec4 vortex6;     // ADR-389: smokeWarp, smokeBillow, detail, 0
-    // Vortex 2.0 §7-§11, the macro structure. Written from `vortex::packVortex`, which is now the
-    // ONE place `world::Vortex` becomes the field's bytes -- see the note at the packing site.
-    glm::vec4 vortex7;     // eyeWallWidth, eyeWallGain, cloudNoise, 0
-    glm::vec4 vortex8;     // bandArms, cot(bandPitch), bandDepth, bandHarmonic
+    // ADR-562: the placed media, as lanes. Was twelve named `vortexN` members carrying exactly one
+    // medium; a slot is `world::kMediumLanes` `vec4` and there are `world::kMaxMedia` of them, so a
+    // second medium is a slot rather than a rewrite. `mediaInfo.x` is how many are live and the
+    // gate; `.y` is each slot's kind tag packed as a float, unused by the march today and read when
+    // a kind needs a different density function.
+    glm::vec4 mediaInfo;
+    glm::vec4 media[world::kMaxMedia * world::kMediumLanes];
 };
-static_assert(sizeof(VolumeUniforms) == 320);
+static_assert(sizeof(VolumeUniforms) == 16 * (8 + 1 + world::kMaxMedia * world::kMediumLanes));
 
 class VolumeRenderer {
 public:

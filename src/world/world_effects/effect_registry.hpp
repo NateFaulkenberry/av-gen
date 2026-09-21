@@ -303,7 +303,10 @@ struct EffectRoute {
 enum class EffectBucket : std::uint8_t {
     Comet,  // the view-ray trail integrator in shaders/atmosphere_fx.wgsl
     Aurora, // the vertical-shell curtains in the same shader
-    Vortex, // the placed volumetric medium in shaders/volume.wgsl
+    // ADR-562: a PLACED VOLUMETRIC MEDIUM in shaders/volume.wgsl -- a cosmic vortex, a fog bank, a
+    // tornado. Named `Vortex` until the bucket held more than one kind, which made the name a lie
+    // about what it carried: a fog bank has never been a vortex, it shared the funnel's field.
+    Medium,
 };
 
 // How one authored effect becomes records in that bucket.
@@ -318,6 +321,17 @@ struct EffectResolve {
     std::size_t (*count)(const AtmosphericEffect&) = nullptr; // null means exactly one
     bool (*fill)(const AtmosphericEffect&, std::size_t index, const AtmosphericContext&,
                  const ResolvedAtmospheric& base, ResolvedAtmospheric& out) = nullptr;
+    // ADR-562, `EffectBucket::Medium` only: how this kind's authored numbers become the 16 packed
+    // lanes the march reads. Declared here so a new medium kind is still one file and four lines --
+    // the alternative was a `switch` over kinds inside `buildAtmosphericFrame`, which is exactly the
+    // shared-header edit the registry exists to remove.
+    //
+    // `envelope` is the lifecycle fade, already resolved. It is passed rather than pre-multiplied
+    // because only the per-metre coefficients should scale with it: fading a medium means less of it
+    // in the air, which is what scaling an extinction and an emissive density does, while fading its
+    // COLOURS would leave a full-strength grey ghost and fading its RADIUS would shrink it rather
+    // than dim it (ADR-387).
+    void (*pack)(const AtmosphericEffect&, float envelope, MediumSlot& out) = nullptr;
 };
 
 // The declaration. One of these per kind, in that kind's own file.

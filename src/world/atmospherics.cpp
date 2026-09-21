@@ -242,24 +242,35 @@ Result<void> Aurora::validate() const {
 // ADR-387. The gate is `radius`: every shader function returns before doing any work at zero, so a
 // zero radius must stay legal (it is the default, and it is what every scene but one has).
 Result<void> Vortex::validate() const {
-    if (!finite(center.x) || !finite(center.y) || !finite(center.z)) {
+    // ADR-562: the geometry half is validated through `field`, which is the same twenty-four
+    // members it always was -- the struct composes `vortex::VortexField` rather than copying it,
+    // so this list no longer has to be kept in step with a second one.
+    if (!finite(field.center.x) || !finite(field.center.y) || !finite(field.center.z)) {
         return fail("the vortex centre is not finite");
     }
-    for (const float f : {radius, thickness, swirl, rotationSpeed, density, innerVoid, contrast,
-                          turbulence, turbulenceScale, breathAmount, breathSpeed, emission,
-                          filaments, spill, scattering, cometResponse, cometReach, funnelDepth,
-                          throat, throatDensity, smokeWarp, smokeBillow, detail,
-                          eyeWallWidth, eyeWallGain, bandArms, bandPitchDegrees,
-                          bandDepth, bandHarmonic, cloudNoise}) {
+    for (const float f : {field.radius, field.thickness, field.swirl, field.rotationSpeed,
+                          field.innerVoid, field.contrast, field.turbulence, field.turbulenceScale,
+                          field.breathAmount, field.breathSpeed, field.funnelDepth, field.throat,
+                          field.throatDensity, field.smokeWarp, field.smokeBillow, field.detail,
+                          field.eyeWallWidth, field.eyeWallGain, field.bandArms,
+                          field.bandPitchDegrees, field.bandDepth, field.bandHarmonic,
+                          field.cloudNoise,
+                          density, emission, filaments, spill, scattering, cometResponse,
+                          cometReach}) {
         if (!finite(f)) { return fail("a vortex control is not finite"); }
     }
-    if (radius < 0.0f) { return fail("the vortex radius may not be negative (0 is off)"); }
-    if (thickness < 0.0f) { return fail("the vortex thickness may not be negative"); }
-    if (funnelDepth < 0.0f) { return fail("the vortex funnel depth may not be negative"); }
-    if (innerVoid < 0.0f || innerVoid > 1.0f) { return fail("the vortex inner void is 0..1"); }
-    if (throat < 0.0f || throat > 1.0f) { return fail("the vortex throat is 0..1 of the mouth"); }
+    if (field.radius < 0.0f) { return fail("the vortex radius may not be negative (0 is off)"); }
+    if (field.thickness < 0.0f) { return fail("the vortex thickness may not be negative"); }
+    if (field.funnelDepth < 0.0f) { return fail("the vortex funnel depth may not be negative"); }
+    if (field.innerVoid < 0.0f || field.innerVoid > 1.0f) {
+        return fail("the vortex inner void is 0..1");
+    }
+    if (field.throat < 0.0f || field.throat > 1.0f) {
+        return fail("the vortex throat is 0..1 of the mouth");
+    }
     return {};
 }
+
 
 Result<void> AtmosphericEffect::validate() const {
     if (name.empty()) { return fail("an atmospheric effect needs a name"); }
@@ -768,12 +779,23 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
                 auroras[counts.auroras++] = r;
                 break;
             }
-            case EffectBucket::Vortex: {
-                // ADR-374 measured the single vortex at +5.5 ms of a 13.5 ms frame -- the most
-                // expensive term in the scene -- so the volumetric march has ONE medium slot. A
-                // second placed medium, whether it is another funnel or a fog bank, is counted as
-                // dropped so the UI can say so instead of silently ignoring it.
-                if (counts.vortices >= 1) {
+            case EffectBucket::Medium: {
+                // ADR-562: `kMaxMedia` slots, not one. The literal `1` that used to be here is the
+                // whole of ADR-560's headline defect -- a fog bank and a cosmic vortex authored
+                // together rendered byte-identical to whichever came FIRST in the array, with the
+                // loser contributing not one pixel and nothing saying so. `agent/tornado`'s
+                // seven-variant showcase rendered a flat grey frame for the same reason.
+                //
+                // The number is still a budget and dropping still happens past it -- ADR-374's
+                // +5.5 ms is real and the per-slot ray interval is what pays for more. What changed
+                // is that the budget is four rather than one, and that going over it is now SAID
+                // (`mediaDropped` on the frame) rather than counted into a field nobody read.
+                // The cap is `kMaxMedia`, NOT `vortices.size()`, and the distinction is a defect
+                // the suite caught: `vortices` is a defaulted `{}` for callers that want the counts
+                // and not the records, so testing the SPAN made an empty span mean "no slots" and
+                // dropped every medium in the scene. Counting and storing are independent here and
+                // always were -- the original guarded the store separately for the same reason.
+                if (counts.vortices >= kMaxMedia) {
                     ++counts.dropped;
                     continue;
                 }
@@ -892,53 +914,46 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
                            AtmosphericFrame& out) {
     std::array<ResolvedAtmospheric, kMaxGpuComets> comets{};
     std::array<ResolvedAtmospheric, kMaxGpuAuroras> auroras{};
-    std::array<ResolvedAtmospheric, 1> vortices{};
+    std::array<ResolvedAtmospheric, kMaxMedia> vortices{};
     const AtmosphericCounts counts = resolveAtmosphericEffects(effects, ctx, comets, auroras, vortices);
 
     out.cometCount = static_cast<std::uint32_t>(counts.comets);
     out.auroraCount = static_cast<std::uint32_t>(counts.auroras);
 
-    // ADR-387: the first live vortex. It is taken from the RESOLVE now, and that is a fix rather
-    // than a tidy-up.
+    // ADR-562: every live placed medium, packed into lanes. It is taken from the RESOLVE, and that
+    // was a fix rather than a tidy-up when ADR-387 made it so: this used to walk `effects` a second
+    // time testing `e.enabled && e.vortex.active()`, under a comment claiming the activation window
+    // and lifetime envelope "were already applied by the resolve above". They were not --
+    // `resolveAtmosphericEffects` takes a `span<const>` and cannot write back, and the second walk
+    // consulted `counts` not at all, so a medium with `activation: window` ignored its window.
+    // ADR-385's stated reason that stopped anyone checking.
     //
-    // This loop used to walk `effects` a second time and test `e.enabled && e.vortex.active()`,
-    // under a comment stating that "its `enabled`, activation and lifetime envelope were already
-    // applied by the resolve above, so a vortex inside a closed window arrives here switched off
-    // exactly as a comet does." It did not. `resolveAtmosphericEffects` takes its effects by
-    // `span<const>` and cannot write anything back; the second walk consulted `counts` not at all.
-    // A vortex with `activation: window` therefore ignored its window, one with a `fadeIn` did not
-    // fade in, and one whose lifetime had expired kept marching -- while the comment said the
-    // opposite, which is ADR-385's stated reason that is not evidence, in the same family that ADR
-    // was written about. No shipped scene exhibits it: the one authored vortex in the repository
-    // (`examples/treeisland/tree-of-life-floating-island.scene.json`, "Cosmic Vortex") is
-    // `activation: always` with no `timing` block, so its envelope is exactly 1 and this change
-    // leaves its frame untouched. That is why it survived: the feature nobody used was the only
-    // one that was broken.
-    out.hasVortex = false;
-    out.vortex = Vortex{};
-    if (counts.vortices > 0 && vortices[0].effect != nullptr && vortices[0].effect->vortex.active()) {
-        const ResolvedAtmospheric& rv = vortices[0];
-        out.hasVortex = true;
-        out.vortex = rv.effect->vortex;
+    // What ADR-562 changes is the count: up to `kMaxMedia`, each through its own kind's `pack`.
+    out.mediumCount = 0;
+    for (auto& slot : out.media) {
+        slot = MediumSlot{};
+    }
+    for (std::size_t i = 0; i < counts.vortices && out.mediumCount < kMaxMedia; ++i) {
+        const ResolvedAtmospheric& rv = vortices[i];
+        if (rv.effect == nullptr) {
+            continue;
+        }
+        const EffectSchema* schema = effectSchema(rv.effect->kind);
+        if (schema == nullptr || schema->resolve.pack == nullptr) {
+            // A medium kind with no packer reaches the march as nothing, so it is counted rather
+            // than attributed to a neighbour -- the runtime half of ADR-500's guard, in the one
+            // place a missing declaration would otherwise be invisible.
+            ++out.mediaDropped;
+            continue;
+        }
+        AtmosphericEffect leaned = *rv.effect;
 
-        // The lifetime envelope, applied to the two per-metre coefficients (ADR-374) and to
-        // nothing else. Fading a funnel means less of it in the air, which is what scaling an
-        // extinction and an emissive density does; fading its COLOURS would leave a full-strength
-        // grey funnel behind, and fading its radius would shrink it rather than dim it.
+        // §68. A placed medium leans downwind. A translation, deliberately, rather than a change to
+        // the turbulence or the breath: those two are inputs to the filament noise whose
+        // distribution ADR-389 measured the march's cost against, and moving where a shape is costs
+        // the march nothing while changing what it is costs it everything.
         //
-        // ADR-389 is the reason this is worth a sentence: scaling density scales the distribution
-        // the march's coefficients were tuned against. It does so uniformly and only when an author
-        // asked for a fade, and at the envelope of 1 that every existing vortex has, both
-        // multiplications are exact identities.
-        out.vortex.density *= rv.envelope;
-        out.vortex.emission *= rv.envelope;
-
-        // §68. The funnel leans downwind. A translation, deliberately, rather than a change to the
-        // turbulence or the breath: those two are inputs to the filament noise whose distribution
-        // ADR-389 measured the march's cost against, and moving where a shape is costs the march
-        // nothing while changing what it is costs it everything.
-        //
-        // Scaled by the funnel's own radius so the lean means the same thing for a 200 m funnel and
+        // Scaled by the medium's own radius so the lean means the same thing for a 200 m funnel and
         // a 2 km one, and capped at a tenth of the radius per unit of influence so that an effect
         // subscribed at the soft maximum leans by a fifth of its width rather than wandering off
         // the island it was placed on (ADR-387's warning about a preset that moves a `center`).
@@ -948,11 +963,19 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
             if (len > 1e-6f) {
                 constexpr float kLeanFraction = 0.10f; // of the radius, per unit influence
                 const float metres = std::min(len, 1.0f) * rv.flowInfluence * kLeanFraction *
-                                     std::max(out.vortex.radius, 0.0f);
-                out.vortex.center += (lean / len) * metres;
+                                     std::max(leaned.vortex.field.radius, 0.0f);
+                leaned.vortex.field.center += (lean / len) * metres;
             }
         }
+        MediumSlot& slot = out.media[out.mediumCount];
+        schema->resolve.pack(leaned, rv.envelope, slot);
+        slot.kind = static_cast<std::uint32_t>(rv.effect->kind);
+        ++out.mediumCount;
     }
+    // Everything the resolve could not seat. ADR-560: this number had one reader in the whole tree
+    // and it was a CPU conformance finding, so in a running editor it did not exist.
+    out.mediaDropped += static_cast<std::uint32_t>(counts.dropped);
+
     for (std::size_t i = 0; i < counts.comets; ++i) {
         out.comets[i] = packComet(comets[i]);
     }

@@ -341,48 +341,62 @@ void buildWindDebug(DebugDraw& draw, const scene::Scene& scene, double time) {
 // have shown the funnel extending upward as a cylinder, and the camera being inside the mouth,
 // without a single render of the beauty pass.
 void buildVortexDebug(DebugDraw& draw, const scene::Scene& scene, double time) {
-    // ADR-387: the vortex is an authored atmospheric effect now, so this reads the resolved frame
-    // rather than a field on the environment. `hasVortex` is false in every scene that authors
-    // none, which is the same gate `active()` was.
-    if (!scene.atmospherics.hasVortex) {
-        return;
-    }
-    const world::Vortex& v = scene.atmospherics.vortex;
-    if (!v.active()) {
-        return;
-    }
-    const glm::vec4 mouthColour(0.35f, 0.85f, 1.0f, 0.95f);
-    const glm::vec4 throatColour(0.9f, 0.4f, 1.0f, 0.85f);
-    auto ring = [&](float y, float radius, const glm::vec4& c) {
-        const int n = 64;
-        for (int i = 0; i < n; ++i) {
-            const float a0 = 6.2831853f * static_cast<float>(i) / n;
-            const float a1 = 6.2831853f * static_cast<float>(i + 1) / n;
-            draw.line(v.center + glm::vec3(std::cos(a0) * radius, y, std::sin(a0) * radius),
-                      v.center + glm::vec3(std::cos(a1) * radius, y, std::sin(a1) * radius), c);
+    // ADR-562: EVERY placed medium, not the first. This view exists to show what the march is
+    // actually drawing, and while the march carried one medium "the vortex" and "what is drawn"
+    // were the same thing. They are not any more -- which is precisely the defect ADR-560 measured
+    // and this view could have shown, had it existed in a world with more than one slot.
+    //
+    // Read out of the packed lanes, and that makes this view MORE correct rather than less:
+    // `packVortex` applies the clamps, so what is drawn here is what the shader marches rather than
+    // what was authored. This file's own comment below asks for exactly that agreement -- "so this
+    // view and the shader cannot disagree about the shape" -- and before the lanes it could not
+    // have it, because an authored value outside a clamp would draw one shape and march another.
+    //
+    // Lane map beside each kind's `packMedium`; named here rather than indexed inline.
+    for (std::uint32_t slot = 0; slot < scene.atmospherics.mediumCount; ++slot) {
+        const world::MediumSlot& m = scene.atmospherics.media[slot];
+        const glm::vec3 centre(m.lane[0]);
+        const float radius = m.lane[0].w;
+        if (radius <= 0.0f) {
+            continue;
         }
-    };
-    ring(0.0f, v.radius, mouthColour);
-    // The funnel's wall, sampled down the throat exactly as `vortexShape` narrows it, so this view
-    // and the shader cannot disagree about the shape.
-    const float depth = std::max(v.funnelDepth, 0.0f);
-    if (depth > 0.0f) {
-        const int rungs = 6;
-        for (int i = 1; i <= rungs; ++i) {
-            const float yn = static_cast<float>(i) / rungs;
-            const float mouth = glm::mix(1.0f, std::clamp(v.throat, 0.02f, 1.0f), yn * yn);
-            ring(-depth * yn, v.radius * mouth, glm::mix(mouthColour, throatColour, yn));
+        const float rotationSpeed = m.lane[1].z;
+        const float funnelDepth = m.lane[4].x;
+        const float throatFraction = m.lane[4].y;
+
+        const glm::vec4 mouthColour(0.35f, 0.85f, 1.0f, 0.95f);
+        const glm::vec4 throatColour(0.9f, 0.4f, 1.0f, 0.85f);
+        auto ring = [&](float y, float r, const glm::vec4& c) {
+            const int n = 64;
+            for (int i = 0; i < n; ++i) {
+                const float a0 = 6.2831853f * static_cast<float>(i) / n;
+                const float a1 = 6.2831853f * static_cast<float>(i + 1) / n;
+                draw.line(centre + glm::vec3(std::cos(a0) * r, y, std::sin(a0) * r),
+                          centre + glm::vec3(std::cos(a1) * r, y, std::sin(a1) * r), c);
+            }
+        };
+        ring(0.0f, radius, mouthColour);
+        // The wall, sampled down the throat exactly as the shader narrows it, so this view and the
+        // march cannot disagree about the shape.
+        const float depth = std::max(funnelDepth, 0.0f);
+        if (depth > 0.0f) {
+            const int rungs = 6;
+            for (int i = 1; i <= rungs; ++i) {
+                const float yn = static_cast<float>(i) / rungs;
+                const float mouth = glm::mix(1.0f, std::clamp(throatFraction, 0.02f, 1.0f), yn * yn);
+                ring(-depth * yn, radius * mouth, glm::mix(mouthColour, throatColour, yn));
+            }
+            draw.line(centre, centre - glm::vec3(0.0f, depth, 0.0f), throatColour);
         }
-        draw.line(v.center, v.center - glm::vec3(0.0f, depth, 0.0f), throatColour);
-    }
-    // Which way it turns, and how hard: tangents on the mouth ring, length by rotation speed.
-    const int arrows = 12;
-    for (int i = 0; i < arrows; ++i) {
-        const float a = 6.2831853f * static_cast<float>(i) / arrows;
-        const glm::vec3 p = v.center + glm::vec3(std::cos(a), 0.0f, std::sin(a)) * v.radius;
-        const glm::vec3 tangent(-std::sin(a), 0.0f, std::cos(a));
-        const float turn = v.rotationSpeed * 400.0f;
-        draw.line(p, p + tangent * turn, glm::vec4(1.0f, 0.9f, 0.4f, 0.9f));
+        // Which way it turns, and how hard: tangents on the mouth ring, length by rotation speed.
+        const int arrows = 12;
+        for (int i = 0; i < arrows; ++i) {
+            const float a = 6.2831853f * static_cast<float>(i) / arrows;
+            const glm::vec3 p = centre + glm::vec3(std::cos(a), 0.0f, std::sin(a)) * radius;
+            const glm::vec3 tangent(-std::sin(a), 0.0f, std::cos(a));
+            draw.line(p, p + tangent * (rotationSpeed * 400.0f),
+                      glm::vec4(1.0f, 0.9f, 0.4f, 0.9f));
+        }
     }
     (void)time;
 }

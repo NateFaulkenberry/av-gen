@@ -1,0 +1,226 @@
+# ADR-562: The march carries media, not a vortex
+
+- Status: Accepted (2026-09-20)
+- Implements the fix for ADR-560's headline defect and builds the shared volumetric foundation the
+  Fog Bank rebuild and `agent/tornado` both stand on. Extends ADR-561 (the conversion extracted),
+  ADR-388 (one field everything can ask), ADR-500 (an effect is one file and four lines).
+  Corrects ADR-390's reason for refusing to pack in the world, by checking whether it still applies.
+  Related: ADR-374 (one medium costs +5.5 ms), ADR-401 (a test can be green about a path nobody
+  renders), ADR-182 (a probe that cannot fail proves nothing).
+- **Inverts one step of the brief's §46 ordering, deliberately.** §46 runs A diagnose, B clean
+  analytical volume, C local banks. This is built before B. §46's ordering assumes the foundation
+  exists and it did not: one live owner-facing bug and a second agent's entire effect were both
+  blocked on a literal `1` in `atmospherics.cpp`, and the per-slot ray interval is simultaneously
+  §31's adaptive sampling, §32's empty-space optimisation and what makes §20's self-shadowing
+  affordable. Building the thing everything else stands on, first, is the ordering §46 would have
+  had if it had known the slot limit was real.
+
+## 1. What was wrong
+
+The volumetric march had **one** medium slot. A fog bank and a cosmic vortex authored in one
+project rendered **byte-identical to whichever appeared first in the array** — both ways round,
+measured in ADR-560 — with the loser contributing not one pixel. `agent/tornado` hit the same
+defect harder: a seven-variant showcase that renders a **flat grey frame**, because the survivor was
+a 70 m dust devil sub-pixel at group distance.
+
+Nothing said so. `AtmosphericCounts::dropped` had exactly one reader in the whole tree and it was a
+CPU conformance finding, so in a running editor the number did not exist — against two comments
+claiming the limit was "reported … not a silent no-op".
+
+## 2. The slot is packed lanes, not an authored struct
+
+`AtmosphericFrame` carries `MediumSlot media[kMaxMedia]` — 16 `vec4` and a kind tag — in place of
+`bool hasVortex; Vortex vortex;`.
+
+The alternative on the table was `{ kind; Vortex; Tornado; }`, a struct per kind. It is affordable
+(~368 bytes a slot) and it was rejected for three reasons, in ascending order of importance:
+
+1. **It grows a shared header by a member per medium kind**, which is the edit ADR-500 exists to
+   delete, and §35 names four more media (smoke, clouds, dust, steam) that would each pay it.
+2. **The frame already carries packed GPU structs** — `CometGpu comets[]`, `AuroraGpu auroras[]`.
+   The vortex holding an authored struct was the exception, not the pattern, and the proposal was to
+   generalise the exception.
+3. **It deletes a bug class this exact function has already had.** `frameDiffers`'s first version
+   compared the **padding between `hasVortex` and `vortex`** and reported a difference that was not
+   one. A slot is `vec4` lanes with its padding declared, so a whole-struct `memcmp` is total and
+   correct by construction rather than by care.
+
+### ADR-390's objection was checked rather than inherited
+
+ADR-390 refused to pack in the world because `packCosmicOcean` takes a `CosmicQualityScale` and the
+quality tier is the renderer's to know, not the world's. Checked: **neither `packVortex` nor
+`packTornado` takes a tier.** Both take only the field. The stated reason is simply absent for these
+two kinds, so it does not carry.
+
+**The reason an ADR gave is not the same as that reason still being true**, and the difference is
+one grep. A medium that needs a tier at pack time is this decision's revisit trigger.
+
+### Per-kind packing is on the schema
+
+`EffectResolve::pack` sits beside `resolve.fill`, so a new medium kind is still one file and four
+lines. The alternative was a `switch` over kinds inside `buildAtmosphericFrame` — the shared-header
+edit again, one layer down.
+
+## 3. The per-slot ray interval is a cylinder, and it is why this came first
+
+Each slot gets a `[tEnter, tExit]` computed **once per pixel** from a bounding **vertical cylinder**;
+a step outside a medium's interval costs one comparison instead of a field evaluation.
+
+A cylinder rather than a sphere because every term in this family's field is a function of
+`length(rel.xz)` and `rel.y` alone — so a cylinder is the field's own shape, and for the two cases
+that matter it is dramatically tighter: a wide flat fog bank and a tall thin tornado are both mostly
+empty inside their bounding spheres.
+
+**Two independent measurements say a global step count is wrong rather than merely slow:**
+
+- ADR-560: shrinking a medium's screen footprint moved `volume.march` only **7.14 → 6.62 ms**, 7%,
+  because every pixel still marched all 32 steps across the full 4 km. Smaller on screen did not
+  mean fewer steps.
+- `agent/tornado`: a fixed 128-step march put **31 m between samples and broke a 24 m column into
+  three disconnected blobs**; deriving the step from each medium's own narrowest feature fixed it
+  (rope 462 steps, wedge 96).
+
+**What is deliberately NOT done here:** redistributing the march's steps into the union of the
+intervals. That is the larger win and it changes the fog's own integration and every existing frame
+with it, so it is a separate change with its own arm and its own measurement. The step positions are
+untouched; only the work at each step is skipped.
+
+## 4. `mediaDropped` reaches a human
+
+The frame carries `mediaDropped`. The budget is still a budget — ADR-374's +5.5 ms is real and four
+slots is a march-cost decision, not a capacity one (a slot is 272 bytes; eight would be 2 KB against
+a 64 KB uniform limit) — but **going over it is now said rather than counted into a field nobody
+read.** That is the difference between `agent/tornado`'s empty render being explicable and being a
+mystery.
+
+## 5. A third copy of one conversion, and why it had fallen behind
+
+Landed in the same branch and recorded here because it is the same lesson: `src/app/engine.cpp`'s
+field-bus publisher held a **third** hand-written `world::Vortex` → `vortex::VortexField` copy, and
+it assigned **17 of the 24 members** — omitting `eyeWallWidth`, `eyeWallGain`, `bandArms`,
+`bandPitchDegrees`, `bandDepth`, `bandHarmonic` and `cloudNoise`, every one of Vortex 2.0's
+macro-structure controls. The field the bus *published* had no eye wall and no spiral bands while
+the march *drew* them.
+
+Three independent copies of one conversion (ADR-401's clamps, ADR-561's conversion, this), and the
+third had silently diverged. **A struct that must be copied to be used will be copied, and the
+copies will diverge.** `world::Vortex` composes `vortex::VortexField` now and all three are deleted.
+
+**Why nobody could see it**, measured: there are **zero flow subscriptions of any kind** in authored
+content — every non-arm `.json` under `examples/`, every dict walked. The publisher has no
+subscribers, so nothing downstream was positioned to disagree with it. ADR-420's dead-subscription
+warning has no subscriptions to check.
+
+That is the same condition `agent/tornado` found the ADR-032 grid solver in: complete, tested,
+CPU-referenced, zero users, latent defect, green forever. **Tests share the product's blind spot,
+because they are written against the same reachable surface the product exposes.** It is the
+degenerate case of the failure family `docs/testing.md` now calls C — not a control aimed at the
+wrong place, but no control at all.
+
+## The probe, and the failure that earns it (ADR-182)
+
+`avgen_render_tests "[media]"` — two media in one scene must produce a frame that differs from
+either alone, **in both orders**. An assertion that the frame merely has two slots would pass on a
+march that still drew one.
+
+Broken deliberately by restoring the one-slot limit in the march (`min(mediumCount, 1u)`):
+
+```
+both vs first alone:  identical (36864 bytes)
+both vs second alone: 26075 of 36864 bytes differ
+```
+
+**`identical (36864 bytes)`** is ADR-560's measurement reproduced exactly — the second medium
+contributing not one pixel — and in the reversed order the other arm is the identical one. 1 case,
+0 passed, 1 failed, exit 42. Restored: 26 assertions, exit 0.
+
+The case also carries its own control: the two single-medium arms must differ from *each other*, or
+"both differs from each" would be satisfied by a renderer drawing nothing at all.
+
+## 6. Which check is load-bearing is not the same for every change
+
+Two edits in this branch, verified two different ways, and the pairing is the point.
+
+**The rename (ADR-562 part one) was ~220 regex substitutions across 12 files, and the compiler was
+the witness.** Every missed site was a compile error, so "it builds" genuinely was evidence. That is
+a property of *that* change — a member moving behind a `.field.` — and not of regex substitution.
+Through a template, a macro, or a name that also exists on another type, a miss would have compiled
+and the same method would have proved nothing.
+
+**The WGSL uniform change is the opposite: the compiler is not a witness at all.** Replacing twelve
+named `vortexN` members with `media: array<vec4<f32>, 64>` fails at **pipeline creation**, not at
+compile time — a `minBindingSize` mismatch between the C++ struct and the shader's block is a
+runtime error inside Dawn. The C++ builds, the shader parses, and every check short of running it on
+a device passes. Only the GPU suite established that the two agree about the layout.
+
+So: **know which check is actually load-bearing for the kind of change you are making, because it is
+not always the same one.** "It compiles" ranges from conclusive to worthless depending on the edit,
+and the difference is not visible in the diff.
+
+(There is a third case in this branch: `engine.cpp`'s seven-member divergence compiled, ran, and was
+wrong for two ADRs, because nothing downstream consumed it. See §5 — when there is no consumer, no
+check is load-bearing, which is the degenerate case.)
+
+## 7. The defect this branch nearly shipped, which is the one it exists to fix
+
+Recorded because it is not carelessness and the mechanism generalises.
+
+`resolveAtmosphericEffects` takes `std::span<ResolvedAtmospheric> vortices = {}` — **defaulted**, for
+callers that want the counts and not the records. The slot cap was written as:
+
+```cpp
+if (counts.vortices >= vortices.size()) { ++counts.dropped; continue; }
+```
+
+For a counts-only caller that is `0 >= 0`: **every medium in the scene dropped, silently**, in the
+subsystem whose entire purpose is that no medium is dropped silently. ADR-560's defect was one
+medium lost; this was all of them.
+
+**Why it looked like simplification.** The old code tested `counts.vortices >= 1` and guarded the
+*store* separately, so counting and storing were independent by construction. Collapsing them into
+one bound reads as tidying and is actually a **coupling**: the span's size is a fact about the
+*caller's buffer*, not about the engine's capacity, and using it as the cap makes an empty buffer
+mean "no capacity exists". The general form: **a bound derived from a caller-supplied container is
+not a statement about the system's limits, and substituting one for the other is invisible until a
+caller passes an empty one.**
+
+**It was caught by a control**, and that is the part worth keeping. `test_atmospherics.cpp`'s
+section is called *"the control: a real vortex still resolves as one vortex"* — it exists to make an
+*adjacent* assertion meaningful, and it caught a defect the adjacent assertion was not looking for.
+
+That is the exact inverse of the family `docs/testing.md` calls C. The controls that failed tonight
+failed because they were derived from the belief under test — a probe sampling where the author
+assumed the knob acted, a teeth-check defeating the mechanism the author assumed carried the safety.
+This one worked because it was **not** derived from anything under test: it asserts something
+boringly true that the feature's author had no reason to special-case, which is precisely why it was
+still pointing somewhere useful when the author was wrong.
+
+## Consequences
+
+- **`EffectBucket::Vortex` is `EffectBucket::Medium`.** The name was a lie about what the bucket
+  carried the moment a fog bank went in it.
+- **The `static_assert` on `sizeof(AtmosphericFrame)` no longer guards a hand-maintained list.** It
+  still pins the size, because a member added outside the slots is still worth being asked about;
+  but `frameDiffers` compares an array with no interior padding, so the question it used to ask —
+  *did you remember to add your member here* — cannot arise.
+- **The debug view draws every medium**, and reading the packed lanes makes it *more* correct than
+  before: `packVortex` applies the clamps, so it now draws what the shader marches rather than what
+  was authored. Its own comment asked for that agreement and could not have it.
+- **`spill` is lane 12.** It is a surface irradiance consumed by the lit pass, not a per-metre
+  coefficient, so it appears in none of the twelve lanes the march needs — and packing without it
+  would have silently broken ADR-379's glow. Found by auditing the readers before the change, which
+  is the only reason it is not a regression.
+- **The surface glow is still first-medium-only**, stated as a limit rather than discovered as one:
+  `frame.vortexGlow` is one sphere and one colour, and summing irradiances from media at different
+  distances is wrong in a way that wants a measurement.
+
+## Revisit when
+
+- **A medium needs a quality tier at pack time.** That is ADR-390's objection becoming true, and it
+  is the one thing that would move packing back to the renderer.
+- **Four slots is not enough.** It is a march-cost number and the ray interval is what pays for
+  more; `agent/tornado`'s §47 showcase wants seven. Raising it is a constant and a measurement, not
+  a redesign.
+- **The step redistribution lands.** The intervals exist; using them to place samples rather than
+  only to skip them is the next measurement, and the two independent step-count findings above are
+  the case for it.

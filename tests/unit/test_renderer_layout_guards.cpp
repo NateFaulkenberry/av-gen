@@ -779,8 +779,13 @@ const std::vector<Pairing>& pairings() {
         {"ShadowViewGpu", {"shadows.wgsl"}, "ShadowViewGpu", {"rendering/shadow_math.hpp"}, "ShadowViewGpu", {}},
         {"ShadowUniforms", {"shadows.wgsl"}, "ShadowUniforms", {"rendering/shadow_math.hpp"}, "ShadowUniforms", {}},
         {"GpuLight", {"shadows.wgsl"}, "GpuLight", {"rendering/light_data.hpp"}, "GpuLight", {}},
-        {"VolumeUniforms", {"volume.wgsl"}, "VolumeUniforms", {"rendering/volume_renderer.hpp"},
-         "VolumeUniforms", {}},
+        // ADR-562: `world/atmospherics.hpp` is in the bundle for `kMaxMedia` and `kMediumLanes`.
+        // The media array's extent is written as a product of them, and this guard REFUSES to
+        // evaluate an extent it cannot resolve -- "an unresolved extent would give a plausible
+        // wrong answer" -- so a constant it has not been shown is a hard failure rather than a
+        // guess. That is the guard working: it caught this the first time the array landed.
+        {"VolumeUniforms", {"volume.wgsl"}, "VolumeUniforms",
+         {"rendering/volume_renderer.hpp", "world/atmospherics.hpp"}, "VolumeUniforms", {}},
         {"AoUniforms", {"gtao.wgsl"}, "AoUniforms", {"rendering/ao_renderer.hpp"}, "AoUniforms", {}},
         {"ShadowMaskUniforms", {"shadow_mask.wgsl"}, "ShadowMaskUniforms",
          {"rendering/shadow_mask_renderer.hpp"}, "ShadowMaskUniforms", {}},

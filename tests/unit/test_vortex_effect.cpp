@@ -72,19 +72,19 @@ json shippedVortex() {
 }
 
 void checkShippedValues(const world::Vortex& v) {
-    CHECK(v.center.y == Approx(-70.0f));
-    CHECK(v.radius == Approx(200.0f));
-    CHECK(v.funnelDepth == Approx(1500.0f));
-    CHECK(v.throat == Approx(0.1f));
-    CHECK(v.throatDensity == Approx(0.55f));
-    CHECK(v.thickness == Approx(70.0f));
-    CHECK(v.swirl == Approx(6.5f));
-    CHECK(v.rotationSpeed == Approx(0.028f));
+    CHECK(v.field.center.y == Approx(-70.0f));
+    CHECK(v.field.radius == Approx(200.0f));
+    CHECK(v.field.funnelDepth == Approx(1500.0f));
+    CHECK(v.field.throat == Approx(0.1f));
+    CHECK(v.field.throatDensity == Approx(0.55f));
+    CHECK(v.field.thickness == Approx(70.0f));
+    CHECK(v.field.swirl == Approx(6.5f));
+    CHECK(v.field.rotationSpeed == Approx(0.028f));
     CHECK(v.density == Approx(0.0013f));
-    CHECK(v.innerVoid == Approx(0.24f));
-    CHECK(v.contrast == Approx(3.6f));
-    CHECK(v.turbulence == Approx(0.65f));
-    CHECK(v.turbulenceScale == Approx(2.4f));
+    CHECK(v.field.innerVoid == Approx(0.24f));
+    CHECK(v.field.contrast == Approx(3.6f));
+    CHECK(v.field.turbulence == Approx(0.65f));
+    CHECK(v.field.turbulenceScale == Approx(2.4f));
     CHECK(v.emission == Approx(0.04f));
     CHECK(v.filaments == Approx(2.2f));
     CHECK(v.cometResponse == Approx(0.6f));
@@ -126,16 +126,16 @@ const world::AtmosphericEffect* firstVortex(const std::vector<world::Atmospheric
 
 TEST_CASE("a vortex round-trips through JSON as an atmospheric effect", "[vortex][atmospherics]") {
     world::AtmosphericEffect e = world::cosmicVortex("Funnel");
-    e.vortex.center = {3.0f, -70.0f, -8.0f};
+    e.vortex.field.center = {3.0f, -70.0f, -8.0f};
     e.vortex.spill = 4.25f;
 
     const auto back = world::AtmosphericEffect::fromJson(e.toJson());
     REQUIRE(back.has_value());
     CHECK(back->kind == world::AtmosphereKind::Vortex);
     CHECK(back->name == "Funnel");
-    CHECK(back->vortex.center.z == Approx(-8.0f));
+    CHECK(back->vortex.field.center.z == Approx(-8.0f));
     CHECK(back->vortex.spill == Approx(4.25f));
-    CHECK(back->vortex.radius == Approx(e.vortex.radius));
+    CHECK(back->vortex.field.radius == Approx(e.vortex.field.radius));
     CHECK(back->vortex.colorAccent.g == Approx(e.vortex.colorAccent.g));
 
     // THE CONTROL: an effect of another kind does not come back as a vortex, and a comet's payload

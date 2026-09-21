@@ -78,17 +78,34 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Ten ways a green suite has lied
+## Eighteen ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
-were building concurrently. They divide into two families: **the run did not happen as you think**,
-and **the run happened and you read it wrong.**
+were building concurrently. They divide into **three** families, and the third is the one to read if
+you are short of time, because it is the only one the exit code cannot save you from.
+
+- **Family A — the run did not happen as you think** (entries 1-3, 12, 18).
+- **Family B — the run happened and you read it wrong** (entries 4-8, 11).
+- **Family C — the scan, the filter or the control was looking where the effect could not reach**
+  (entries 13-17; 9 and 10 are its older members, from before it had a name).
+
+Families A and B are failures of *reporting*: the run lies about itself, and **the binary's exit
+code catches every one of them.** Family C is a failure of *aim*: the run is honest, the exit code
+is 0 and correct, and the thing you measured is not the thing you meant. **No exit code catches
+those.** They pass every check you would think to run, which is why two of them arrived on the same
+night from two agents who never spoke to each other.
 
 ### The run did not happen as you think
 
 1. **Stale binary.** The test glob is *configure-time*, so an incremental build after a merge
    silently omits test files the merge added and the suite passes without ever compiling them.
    Always `cmake -S . -B build/release` after a merge.
+
+   **The same thing happens without a merge, on a timescale of minutes.** A suite started before
+   your last edit is not a suite of your last edit: the process has the old binary mapped and goes
+   on running it however many times you rebuild underneath it. Reporting that run's exit code as a
+   guard for the code you are about to commit is this entry with extra steps. If you edit while a
+   suite is running, the run is spent — restart it.
 2. **Stale object.** Worse, and the binary-level guard misses it. A merge wrote a source in the same
    second the compiler read it, the timestamp comparison tied, and one `.o` was never rebuilt — so
    the binary was *newer than every source* and still contained an old compiled test. It ran against
@@ -147,9 +164,189 @@ and **the run happened and you read it wrong.**
    is to bisect the *filter*, not to read the named test. Cumulative GPU memory makes the victim and
    the culprit different tests, and ctest names the victim.
 
-**So `grep -c FAILED` is not a failure count.** Two of the eight cases above put a well-formed
-`FAILED:` block into a perfectly healthy log. Read the **exit code first, the summary second, and
-`FAILED:` blocks only as a pointer to what to go and look at** — not the other way round.
+11. **A crash prints NO verdict line at all, so a failure grep reports success.** Distinct from 5,
+   and the distinction is the whole point: there the summary printed and was honest. Here the
+   process dies before Catch2 writes anything, so the log contains **no `test cases:` line, no
+   `All tests passed`, and no `FAILED:`** — only `tools/gpu-lock.sh: line 39: 88724 Bus error: 10`
+   from the shell. A guard script that counts `FAILED:` blocks and reads the summary therefore
+   reports a clean run twice over: both counters are legitimately zero *because nothing ran to
+   completion*. That is what happened on 2026-09-20 to the full `avgen_render_tests` run — an
+   `=== FAILED ===` section that printed nothing, two zeroed counters, and **exit 138**, with the
+   exit code the only dissenting signal. Absence of a verdict is not a pass. If neither
+   `test cases:` nor `All tests passed` appears, the run did not finish, whatever else the log says.
+
+12. **A task reported dead whose process is still alive, still holding the GPU lock.** This one
+   belongs to the first family — *the run did not happen as you think* — and it is the nastiest
+   here because **it is invisible from both ends at once**. A task harness killed the wrapper it
+   had launched; `tools/gpu-lock.sh` and the test binary underneath it survived the signal and
+   kept running for about five minutes. To the agent that killed it, the task had finished and
+   failed, exit 144. To the agent waiting on the lock, the holder was active and healthy:
+   `kill -0` succeeded, so the stale-lock reclaim in `gpu-lock.sh` **correctly declined to steal
+   it**. Both agents were right about everything they could see, and the GPU sat idle inside a
+   held lock.
+
+   The trap is that `trap ... EXIT INT TERM` only fires for the process that installed it, so
+   signalling the wrapper does not clean up the child. **The tell is a task reported dead whose
+   PID still answers `ps`.** After any killed or failed GPU task, before assuming you released
+   anything: `pgrep -fl avgen_render_tests` and read the lock's own `pid` file.
+
+   **And when you go to kill it, do not use a pattern.** Two traps compound here.
+
+   The binary's own command line is **relative** — `./build/release/tests/avgen_tests` — while the
+   wrapper's contains the absolute worktree path. So a pattern specific enough to identify *your*
+   worktree matches the wrapper and **can never match the child**: parent dead, child running,
+   which is this entry arriving in the file that documents this entry. It happened that way on
+   2026-09-20.
+
+   Loosen the pattern and it stops identifying an owner at all. On a machine with four agents in
+   four worktrees, `ps -Ao pid,comm` prints the **identical string** for every one of them, because
+   they are the same binary built from the same relative path. One such sweep had five candidates
+   and **three belonged to other agents**, including a suite three minutes into a verification run.
+
+   **The working directory is the only thing that distinguishes them.** Resolve it per candidate
+   and kill by PID:
+
+   ```sh
+   for pid in $(pgrep -f tests/avgen_tests); do
+     cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | grep ^n | head -1)
+     case "$cwd" in *my-worktree*) kill -TERM "$pid";; esac
+   done
+   ```
+
+   `pkill -f` is not a targeting mechanism on a shared machine. It is a coin toss weighted by who
+   happens to be running.
+
+18. **The exit code you read was the tooling's opinion, not the binary's.**
+
+   Twice in one session a harness running a test binary reported an exit code that disagreed with
+   what the binary did. Once it reported **failure (144)** for a run whose process was still alive
+   and still holding the GPU lock — the wrapper had been killed and the child kept going (entry 12
+   is that incident from the lock's side). Once it reported **success (0)** for a run whose own
+   summary said `1 failed`.
+
+   Both directions are dangerous and **the second is worse, because it is the one that gets a defect
+   committed.**
+
+   So the guard is narrower than "read the exit code":
+
+   > **Read the exit code the binary itself returned, not the one the tooling reports about the
+   > binary.**
+
+   In practice: capture `$?` immediately after the binary, in the same shell, and write it somewhere
+   you will read — `./build/release/tests/avgen_tests …; echo "EXIT=$?" >> log`. A wrapper's status,
+   a task runner's summary and a CI widget are all reports *about* the run and can each be wrong
+   about it. And because a crashed Catch2 run prints **no verdict line at all** (11), `EXIT=` and the
+   presence of a summary have to be read **together**: an exit code with no summary is a crash, and
+   a summary with a disagreeing exit code is a tooling fault — **neither is a pass.**
+
+   This is not about any one harness; it is structural to anything that wraps a process.
+
+   **And capturing `$?` straight from the binary is load-bearing wherever it already happens.** It
+   is usually not written down as a requirement, so a later cleanup that wraps an invocation "for
+   consistency" silently removes the only reason the result can be trusted, and nothing announces
+   it. Same shape as three divergent copies of one conversion: a property everything depends on,
+   recorded nowhere, preserved by luck.
+
+### The scan, the filter or the control was looking where the effect could not reach
+
+13. **Command-line matching counts the watchers as workers.** `pgrep -f "avgen_render_tests"`
+   returned **8 matches, every one of them `/bin/zsh`** — shells whose command lines merely quoted
+   the binary's name, including the pollers that were checking whether the machine was busy. The
+   machine was idle. `pgrep -f` matches the whole command line, so any script that *mentions* a
+   binary counts as running it, and a loop that checks for contention is itself the thing it finds.
+   **`ps -Ao pid,comm` shows the actual executable** and is the only honest check. This was nearly
+   reported as GPU contention, and separately caused one agent to misread its own output.
+
+14. **A Catch2 spec containing a comma silently excludes nothing, and says nothing.** Excluding a
+   case by name:
+
+   ```
+   '~a star field is sparse, and its cells do not show'   ->  394 matching test cases
+   ```
+
+   — the full suite, no exclusion, no error. **The comma is a spec separator**, so that parses as
+   `~a star field is sparse` *plus* ` and its cells do not show`, and the tail is an **inclusion**
+   pattern that matches everything else. An attempt to exclude three cases returned 392 where 391
+   was wanted: two names took, the comma'd one nullified itself, and the count was quietly wrong in
+   the direction that still looks controlled. **Prefer tags to names** (`~[cosmic]` gave exactly
+   391) and **verify with `--list-tests` before spending GPU time on a filtered run.**
+
+15. **A `git grep` census that does not understand its own input.** A word-level scan for `"vortex"`
+   returned **eight files**; the answer was **two**. Six of them carry `spatial::FieldKind::Vortex`,
+   a vector field that drives particles, which shares an English word with the atmospheric effect
+   and nothing else. Acting on the eight — "strip the vortex block from these files" — would have
+   deleted motion fields from six scenes **and looked like a clean edit.** Parse the structure, do
+   not grep the noun; the fix was twenty lines of `json.load` walking `atmosphericEffects`.
+
+16. **A teeth-check that passes because a *second* mechanism masked the fault.**
+
+   `AVGEN_HEIGHT_CENSUS`/ADR-483. A cache entry was guarded against a rebuilt map by two independent
+   mechanisms: the map's identity was in the entry's **tag**, and it was also folded into the
+   **hash index**. The stale-map test was checked for teeth by removing the identity from the tag —
+   and the test **passed**, and was one sentence from being reported as verified. It passed because
+   the index still sent a rebuilt map's coordinate to a different slot, so the stale entry was never
+   consulted. Only removing the identity from the index *as well* produced the failure: 174 stale
+   heights of 4,225, exit 42.
+
+   This is worse than "a probe that cannot fail proves nothing" (ADR-182), and less obvious: **the
+   probe can fail, and does fail, but not for the reason you are testing.** It certifies a mechanism
+   that is not the one carrying the safety. A later reader who removes the index hashing as a
+   simplification, trusting the tag, gets a green suite and a cache that returns confidently wrong
+   values.
+
+   **Defeat every mechanism that could mask the fault, together, not one at a time. If you cannot
+   name all of them, you do not yet know which one your test is checking.**
+
+17. **A reachability control that reports a dead knob, because it sampled where the knob does
+   nothing.** A per-field probe reported `cloudWidth` "moved 0 of 80 samples" and looked exactly
+   like the silently-dead control ADR-460's parity work exists to catch. The knob was live. The
+   cloud's interior is a **plateau**, and the sample spread had been built from the *funnel's*
+   radius while the cloud is four times wider — so every sample sat inside the plateau, and
+   **widening a plateau moves no point already on it.**
+
+   The general form, and it is the same defect as 16 from the other side: a control that cannot move
+   at all is caught by ADR-182, but **a control that moves, fails on demand, and is nonetheless
+   aimed at the wrong region or the wrong mechanism passes every check you would think to run.**
+   When a reachability probe reports zero, suspect the sample domain before the knob.
+
+**So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
+put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
+log of a process that died. Read the **exit code first, the summary second, and `FAILED:` blocks
+only as a pointer to what to go and look at** — not the other way round.
+
+**The exit code is the only check that catches every entry in families A and B** — but it has to be
+**the binary's own**, not a wrapper's report of it (18). Every other signal there — the summary, the
+`FAILED:` blocks, the assertion counts — is a convenience that some entry above defeats. Capture
+`$?` immediately after the binary, in the same shell: a pipeline's exit code is the last command's,
+which is usually `grep`, and `grep` is delighted to find nothing. Then read it **with** the summary,
+because an exit code and no summary is a crash and a summary disagreeing with an exit code is a
+tooling fault, and neither is a pass.
+
+**And it catches nothing in family C, which is why that family is the dangerous one.** 13 through 17
+all exit 0, print a truthful summary, and report a number that is not about what you think it is
+about. There is no signal to read, because the run was honest; the aim was wrong. The only defences
+are structural, and they are cheap:
+
+**One defence in this tree already works, and it is worth copying.** `test_renderer_layout_guards.cpp`
+resolves a struct's array extents against constants scraped from named headers, and when it meets a
+symbolic name it has not been shown it **fails hard rather than guessing** — its own comment says
+why: *"an unresolved extent would give a plausible wrong answer."* On 2026-09-20 that refusal paid
+out on a change made long after it was written: a new `media[kMaxMedia * kMediumLanes]` array named
+two constants the guard did not have, and it stopped. Writing a literal `64` in the test instead
+would have passed every check while the C++ and the WGSL drifted apart the next time a lane was
+added. **A check that refuses to proceed on an input it cannot resolve is worth more than one that
+resolves it optimistically**, and it is the only entry in this family that is a defence rather than
+a wound.
+
+- **When a filter, census or probe returns the number you expected, that is when to check it. A
+  surprising number gets checked for free.** That is the whole family in one sentence, and it would
+  have caught all three of the scans below.
+- **Check what your scan matched, not just how many.** 13, 14 and 15 were each caught by looking at
+  the matched items — eight files that were the wrong eight, 392 cases where 391 was wanted, eight
+  `pgrep` hits that were all shells. Every one announced itself in output somebody nearly skipped.
+- **Name every mechanism that could mask the fault before you trust a teeth-check** (16), and
+  **suspect the sample domain before the knob when a reachability probe reports zero** (17).
+
 
 ## The scratchpad is shared by every agent in a session
 

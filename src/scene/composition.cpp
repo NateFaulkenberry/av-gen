@@ -3912,8 +3912,8 @@ void Composition::applyCanopyEmitters() {
             }
             // The mouth, and a reach that covers it. The particles have to feel the pull well
             // before they arrive or they fall past it rather than spiralling in.
-            ps.attractorPosition = vx.center;
-            ps.attractorRadius = std::max(vx.radius * node.vortexReach, 1.0f);
+            ps.attractorPosition = vx.field.center;
+            ps.attractorRadius = std::max(vx.field.radius * node.vortexReach, 1.0f);
             node.particleRest.attractorPosition = ps.attractorPosition;
             node.particleRest.attractorRadius = ps.attractorRadius;
         }
@@ -9054,26 +9054,26 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                         vj.at(key)[2].get<float>());
                     }
                 };
-                c3("center", vx.center);
-                f("radius", vx.radius);
-                f("thickness", vx.thickness);
-                f("swirl", vx.swirl);
-                f("rotationSpeed", vx.rotationSpeed);
+                c3("center", vx.field.center);
+                f("radius", vx.field.radius);
+                f("thickness", vx.field.thickness);
+                f("swirl", vx.field.swirl);
+                f("rotationSpeed", vx.field.rotationSpeed);
                 f("density", vx.density);
-                f("innerVoid", vx.innerVoid);
-                f("contrast", vx.contrast);
-                f("turbulence", vx.turbulence);
-                f("turbulenceScale", vx.turbulenceScale);
-                f("breathAmount", vx.breathAmount);
-                f("breathSpeed", vx.breathSpeed);
+                f("innerVoid", vx.field.innerVoid);
+                f("contrast", vx.field.contrast);
+                f("turbulence", vx.field.turbulence);
+                f("turbulenceScale", vx.field.turbulenceScale);
+                f("breathAmount", vx.field.breathAmount);
+                f("breathSpeed", vx.field.breathSpeed);
                 f("emission", vx.emission);
                 f("filaments", vx.filaments);
                 f("spill", vx.spill);
                 f("cometResponse", vx.cometResponse);
                 f("cometReach", vx.cometReach);
-                f("funnelDepth", vx.funnelDepth);
-                f("throat", vx.throat);
-                f("throatDensity", vx.throatDensity);
+                f("funnelDepth", vx.field.funnelDepth);
+                f("throat", vx.field.throat);
+                f("throatDensity", vx.field.throatDensity);
                 c3("colorDeep", vx.colorDeep);
                 c3("colorMid", vx.colorMid);
                 c3("colorAccent", vx.colorAccent);

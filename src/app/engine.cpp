@@ -3804,25 +3804,22 @@ void Engine::publishFields() {
         if (e.kind != world::AtmosphereKind::Vortex || !e.enabled || !e.vortex.active()) {
             continue;
         }
-        vortex::VortexField f;
-        f.center = e.vortex.center;
-        f.radius = e.vortex.radius;
-        f.thickness = e.vortex.thickness;
-        f.funnelDepth = e.vortex.funnelDepth;
-        f.throat = e.vortex.throat;
-        f.throatDensity = e.vortex.throatDensity;
-        f.swirl = e.vortex.swirl;
-        f.rotationSpeed = e.vortex.rotationSpeed;
-        f.innerVoid = e.vortex.innerVoid;
-        f.contrast = e.vortex.contrast;
-        f.turbulence = e.vortex.turbulence;
-        f.turbulenceScale = e.vortex.turbulenceScale;
-        f.breathAmount = e.vortex.breathAmount;
-        f.breathSpeed = e.vortex.breathSpeed;
-        f.smokeWarp = e.vortex.smokeWarp;
-        f.smokeBillow = e.vortex.smokeBillow;
-        f.detail = e.vortex.detail;
-        fieldBus_.publishVortex(world::fields::vortexFieldName(e.name), vortex::packVortex(f));
+        // ADR-562, and this site was BROKEN before it. It hand-copied `world::Vortex` into a
+        // `vortex::VortexField` member by member -- and copied **17 of the 24**, omitting
+        // `eyeWallWidth`, `eyeWallGain`, `bandArms`, `bandPitchDegrees`, `bandDepth`,
+        // `bandHarmonic` and `cloudNoise`: every one of Vortex 2.0's macro-structure controls.
+        //
+        // So the field this bus PUBLISHED was a different shape from the one the march drew -- no
+        // eye wall, no spiral bands, the fBM stack at full weight -- and anything subscribing to a
+        // vortex through `fieldBus_` has been following a funnel that does not exist on screen.
+        // ADR-388's whole premise is one description of the medium that everything can ask; a
+        // second hand-written copy of it is how that premise quietly stops being true, which is
+        // ADR-401's finding for the third time in this family (the renderer's clamps, then the
+        // renderer's conversion, now this).
+        //
+        // Composing the field removes the copy rather than correcting it. There is nothing left
+        // here to fall behind.
+        fieldBus_.publishVortex(world::fields::vortexFieldName(e.name), vortex::packVortex(e.vortex.field));
     }
 
     // The loud half. A subscription naming a field nobody publishes is this repository's signature
@@ -3871,6 +3868,28 @@ void Engine::updateAtmosphericEffects() {
     ctx.spectrum = auroraSpectrum_;
     ctx.fieldBus = &fieldBus_;
     world::buildAtmosphericFrame(atmosphericEffects_, ctx, live.atmospherics);
+    // ADR-562: say it out loud. `AtmosphericCounts::dropped` existed for two ADRs and had exactly
+    // ONE reader in the whole tree -- a CPU conformance finding -- so in a running editor or a
+    // headless render the number did not exist, while two comments claimed the limit was "reported,
+    // not a silent no-op". It was not reported. ADR-560 measured what that cost: a fog bank and a
+    // vortex authored together rendered byte-identical to whichever came first, with the loser
+    // contributing not one pixel.
+    //
+    // `agent/tornado` produced the worst case -- a seven-variant showcase that renders a FLAT GREY
+    // FRAME, because the one surviving medium was a 70 m dust devil sub-pixel at group distance.
+    // This line is the difference between that being a mystery and being a sentence.
+    //
+    // Once per changed count rather than per frame: a message repeated at frame rate is a message
+    // nobody reads, which is the same failure from the other end (the §68 dead-subscription
+    // warning next to this one says so too).
+    if (live.atmospherics.mediaDropped != lastMediaDropped_) {
+        lastMediaDropped_ = live.atmospherics.mediaDropped;
+        if (live.atmospherics.mediaDropped > 0) {
+            log::warn("{} placed medium/media were not drawn: the volumetric march carries {} and "
+                      "the scene enables more. The first ones in the effect list win.",
+                      live.atmospherics.mediaDropped, world::kMaxMedia);
+        }
+    }
     // The §12 quality control. Offline renders get the full march; live playback takes two thirds of
     // it, which is a difference nobody sees on a moving comet and a third of the tail's cost.
     live.atmospherics.cometSteps = mode_ == EngineMode::Offline ? 28u : 18u;
