@@ -1127,7 +1127,20 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             entity.motion_ = MotionOffset{};
             entity.state_.hasLookTarget = false;
             entity.state_.reaction = 0.0f;
+            // **`turnRate` is a RATE, so it is cleared with `activity` and for the same reason**
+            // (ADR-619). Every turner writes it while it turns and none wrote zero when it
+            // stopped, and `EntityState` persists -- so the last rate a body turned at survived
+            // until something happened to write another. `Gait::select` reads it as this frame's
+            // rate, which is the only reading under which its `turnEnter` band means anything, and
+            // a standing body therefore kept classifying as `Activity::Turn`: measured at 509 of
+            // 600 stationary frames, at a stale 2.094 rad/s against a 0.35 threshold.
+            //
+            // Clearing it here makes the contract the same one `activity` already has -- a
+            // behaviour publishes what is true this frame, and silence means nothing is happening.
+            // Every existing writer already computes an instantaneous `turned / dt`, so none of
+            // them relied on the latch.
             entity.state_.activity = Activity::Idle;
+            entity.state_.turnRate = 0.0f;
             entity.state_.detail = 1.0f;
             entity.state_.driven = false;
             entity.state_.airborne = false;
@@ -1511,7 +1524,11 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         entity.motion_ = MotionOffset{};
         entity.state_.hasLookTarget = false;
         entity.state_.reaction = 0.0f;
+        // Cleared on BOTH paths, deliberately: `seek` and `update` reset the per-frame state
+        // separately, so a field cleared in one and not the other is cleared for a played frame
+        // and latched for a scrubbed one (ADR-619, testing.md #31).
         entity.state_.activity = Activity::Idle;
+        entity.state_.turnRate = 0.0f;
         entity.state_.driven = false;
         entity.state_.airborne = false;
 

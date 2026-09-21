@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Thirty-one ways a green suite has lied
+## Thirty-two ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -793,6 +793,38 @@ a wound.
    each is a place where a fact was copied and can rot independently. Entry 22's dispatch and
    entry 23's two kinds are the same family seen from the code side; this is the same family seen
    from the *fix* side, and it is the one that bites after you think you are done.
+
+32. **Two locally correct decisions can compose into data loss, and no test of either one can see
+   it.**
+
+   `PoseLayer::weight` was parsed and never serialised. Read each half on its own and both are
+   right, with reasons:
+
+   - the **parser** keeps an authored weight only for `Manual` layers, *because a driven layer's
+     weight is written every frame from the seam and an authored one would be overwritten before
+     it was read*;
+   - the **writer** treats weight as per-frame state and does not save it, which is correct for
+     every drive **except** the one case the parser singles out.
+
+   Neither is a mistake. The defect lives in the space between them, and it is not visible from
+   either side: a parser test passes, a writer test passes, and loading and saving the shipping
+   scene turns fifteen layers off on five characters — **the file still loads cleanly**, and the
+   layers report `LayerResolution::Inactive`, which nothing distinguishes from any other reason a
+   layer did nothing. A defect hiding behind a second defect.
+
+   **The general form: a round trip is a contract between two functions, and neither function owns
+   it.** Every asymmetric pair is a candidate — parser and writer, `seek` and `update`, encode and
+   decode, `toJson` and `fromJson`, push and pop. Unit-testing each half is exactly the test that
+   cannot find this.
+
+   The cheap check is to **enumerate the keys one side knows and diff them against the other**, not
+   to reason about either: here, everything in the `kLayerKeys` whitelist should appear in the
+   writer, and `weight` did not. **A key on a read-whitelist is a promise the writer has to keep**,
+   because the whitelist exists to warn an author about ignored keys — and a key the writer drops
+   is ignored silently, on the way out, where no warning fires.
+
+   Distinct from 22 and 23, which are about two code paths that *do* the same thing diverging.
+   This is about two paths that do *opposite* things failing to be inverses.
 
 ## The scratchpad is shared by every agent in a session
 

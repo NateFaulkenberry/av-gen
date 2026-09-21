@@ -876,9 +876,32 @@ public:
         const float turnRate = (turn_ != nullptr ? turn_->value() : turnDefault_) / kDegrees;
         const float step = turnRate * weight * static_cast<float>(ctx.dt);
         const float d = angleDelta(state.yaw, wanted);
-        state.yaw += std::clamp(d, -step, step);
-        if (std::abs(d) > 0.05f && state.activity == Activity::Idle) {
-            state.activity = Activity::Turn;
+        const float applied = std::clamp(d, -step, step);
+        state.yaw += applied;
+        // **Publish the rate as well as the activity, because the consumer reads the rate.**
+        //
+        // `Gait::select` does not trust a locomotor proposal -- `Activity::Turn` is one, so it is
+        // discarded and re-derived from `speed` and `turnRate`. This was the only turner in the
+        // engine that wrote the activity and not the field, so a standing body rotating at
+        // 120 deg/s came out `Idle` on 599 of 600 frames (ADR-619). **Writing the activity alone
+        // is not publishing a turn.**
+        //
+        // Both writes are guarded on nothing else driving the body -- `LookAt` defers, and a
+        // character that is walking already has a turn rate from the behaviour walking it -- but
+        // **on different quantities, and that distinction is the whole of the fix.** The activity
+        // is claimed when there is a meaningful angle still to cover (`d`, the remaining error).
+        // The rate reports what the body **actually did** (`applied`), which is not the same
+        // thing: a character tracking a moving target holds a small error while turning steadily,
+        // so a rate guarded on the error goes unpublished on exactly the frames it is turning
+        // hardest. The first version of this fix made that mistake and read as correct only
+        // because `turnRate` was still latching a stale value from an earlier frame.
+        if (state.activity == Activity::Idle) {
+            if (std::abs(applied) > 1e-6f) {
+                state.turnRate = applied / std::max(static_cast<float>(ctx.dt), 1e-4f);
+            }
+            if (std::abs(d) > 0.05f) {
+                state.activity = Activity::Turn;
+            }
         }
     }
 
