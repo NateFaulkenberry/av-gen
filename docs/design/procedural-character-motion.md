@@ -594,3 +594,48 @@ expected shape — `Dying_forward`, `Crazy` and the rest of the non-locomotion h
 gate's foot-slide and contact-height limits were written for — but it means **the §44 limits are a
 locomotion gate, not a clip gate**, and a generator that feeds it non-locomotion source will reject
 everything it is given. Noted for §46's slice, which is where a generator first has a source.
+
+## §46 — the first true vertical slice
+
+One continuous 14.5-second run, 870 frames, driven by scripted `MotionRequest`s as §55-57 permits:
+idle → accelerate → walk → turn → curve → slope → look → slow → stop → reach → return. Top speed
+1.41 m/s, facing swept 270°, ground moved 0.00 → 0.35 m, the look layer resolved on 344 frames and
+the reach on 176.
+
+The word doing the work in "should look like a continuous character motion system, not a collection
+of disconnected demos" is *continuous*, and it is measurable: no joint may move further in one frame
+than a body at this speed accounts for. Three arms, because "nothing jumped" is satisfied by a stack
+that does nothing — continuity, then seven separate checks that the run actually happened, then a
+control arm that runs the identical script with the motion controller bypassed and must breach the
+bound.
+
+**The first run breached it by an order of magnitude, and nobody had authored any of it.** The
+causes, each measured after the previous fix: 0.803 m (the reach layer switching on at full weight
+in one frame), 0.301 m (`strideRatio` stepping 0.3 → 1.0 at a threshold), 0.231 m (the script's own
+terrain teleporting between beats), 0.150 m (the stride weight finishing its sweep in four frames),
+0.098 m (a 0.8 m reach blended over 0.25 s — a hand at 3.2 m/s), and then 0.072 m, which is the walk
+clip's own loop seam and the floor.
+
+The first was identical with the controller bypassed, which is how it was clear the controller was
+not at fault — the same shape as §5's control refuting my diagnosis of the clamping foot, and the
+second time in this phase that the arm built to check something else was the arm that found the
+answer.
+
+Recorded as ADR-602, whose two rules are:
+
+1. **A layer arrives over a stated duration**, derived from an elapsed time rather than accumulated
+   (ADR-557: the pose tier poses once on a scrub) and expressed in *elapsed seconds* rather than an
+   absolute one (ADR-086: the stack runs on the rig's clock, the driver knows the entity's — the
+   first implementation mixed them and nothing failed, because nothing rate-limits a rig with a look
+   layer yet). `blendSeconds = 0` is the old behaviour to the bit, and because a default nobody sets
+   is ADR-600, `driveLayers` sets it on the shipping `Look` drive and `LocomotionState` carries the
+   schedule, published by one helper that both `update` and `seek` call (ADR-554).
+2. **A parameter that snaps at a threshold should have been a weight.** `Gait::footSlip` returns
+   1.0 the moment activity leaves Walk — correct about the meaning, wrong about the transition,
+   because a neutral value is not neutral when the thing reading it scales by it. The ratio now runs
+   continuously to zero and the weight falls off instead; and the weight *is* the clamped ratio,
+   one coefficient rather than two.
+
+Three of the six causes were in the driver rather than the stack, and one was in the test's own
+script. That last distinction is kept rather than smoothed over: a continuity bound is only
+meaningful over inputs a world could actually present, so the fix was the script, not the bound.

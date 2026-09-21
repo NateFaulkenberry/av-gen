@@ -349,6 +349,47 @@ struct PoseLayer {
 
     // ---- intent, written per frame by whatever drives the layer --------------------------------
     float weight = 0.0f;         // 0 = this layer does nothing at all this frame
+
+    // Phase B §46. A layer that switches on at full weight in one frame teleports whatever it
+    // drives. The slice found it at exactly one place -- the reach layer coming on moved the hand
+    // 0.803 m between two frames, thirty-five times the distance the body covers in that frame --
+    // and it was identical with the motion controller bypassed, which is how it was clear the
+    // controller was not the thing at fault.
+    //
+    // The blend is **derived from a time, never accumulated**, for ADR-557's reason: a scrub poses
+    // the rig once, at frame N, with no frame N-1 to have ramped from. So the driver states the
+    // schedule -- what the weight was, what it is now, and when it changed -- and the realized
+    // weight is a pure function of `now`. Seek to the middle of a blend and you get the middle of
+    // the blend, not the end of it.
+    //
+    // `blendSeconds` at 0 means instant, which is what every caller that has not been taught about
+    // this gets. That is deliberate rather than an oversight to be fixed later: the blend changes
+    // what a layer does, and a default that silently softened every existing layer would rewrite
+    // the farm pack's contacts and this repository's layer tests at the same time.
+    // `blendElapsed` is **seconds since the target changed, not an absolute time**, and that is
+    // not a convenience. The layer stack is applied on the rig's sample clock (ADR-086's fixed
+    // grid), while a driver knows about the entity's; handing this struct an absolute second from
+    // one clock to be compared against `now` from the other is a bug that would only show on a
+    // rate-limited rig. An elapsed duration is computed where both of its terms live, so there is
+    // no clock to get wrong.
+    float blendSeconds = 0.0f;
+    float weightBefore = 0.0f;   // the target weight this layer is blending *from*
+    float blendElapsed = 0.0f;   // seconds since `weight` became the target
+    // The realized weight: `weightBefore` -> `weight` over `blendSeconds`, smoothstepped.
+    [[nodiscard]] float effectiveWeight() const {
+        if (blendSeconds <= 0.0f) {
+            return weight;
+        }
+        const float t = blendElapsed / blendSeconds;
+        if (t <= 0.0f) {
+            return weightBefore;
+        }
+        if (t >= 1.0f) {
+            return weight;
+        }
+        const float s = t * t * (3.0f - 2.0f * t);
+        return weightBefore + (weight - weightBefore) * s;
+    }
     // Stride: how far the body travels against the stride its clip was authored for. 1 means they
     // agree and this layer is a no-op. Written per frame from `MotionContext::strideRatio`, which
     // is `Gait::footSlip` -- one answer to that question rather than a second (ADR-260).

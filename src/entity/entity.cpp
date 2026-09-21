@@ -845,6 +845,14 @@ void EntityWorld::bind(params::ParameterSet& params, const std::string& prefix) 
 // body is doing and wants, and both halves already live on the entity (ADR-545); building it from
 // parameters would give a caller a way to advance the memory with something other than the truth,
 // and a seek would then replay a different request from the one a play used.
+void Entity::publishLookSchedule() {
+    if (state_.hasLookTarget != locomotion_.hasLookTarget) {
+        locomotion_.lookTargetBefore = locomotion_.hasLookTarget;
+        locomotion_.lookTargetSince = locomotion_.time;
+    }
+    locomotion_.hasLookTarget = state_.hasLookTarget;
+}
+
 void Entity::advanceMotion(double time, float dt) {
     if (motionChain_ == nullptr || !desc_.proceduralMotion) {
         return;
@@ -1246,7 +1254,7 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         entity.advanceMotion(entity.locomotion_.time, static_cast<float>(dt));
         entity.locomotion_.reaction = entity.state_.reaction;
         entity.locomotion_.lookTarget = entity.state_.lookTarget;
-        entity.locomotion_.hasLookTarget = entity.state_.hasLookTarget;
+        entity.publishLookSchedule();
         // ADR-359: the ground under this body, for a foot IK layer. Published here beside the look
         // target, and by the same rule -- the entity owns the smoothing, the layer owns the solve.
         entity.locomotion_.groundPoint = entity.state_.groundPoint;
@@ -1798,7 +1806,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         entity.advanceMotion(entity.locomotion_.time, static_cast<float>(ctx.dt));
         entity.locomotion_.reaction = entity.state_.reaction;
         entity.locomotion_.lookTarget = entity.state_.lookTarget;
-        entity.locomotion_.hasLookTarget = entity.state_.hasLookTarget;
+        entity.publishLookSchedule();
         // ADR-359: the ground under this body, for a foot IK layer. Published here beside the look
         // target, and by the same rule -- the entity owns the smoothing, the layer owns the solve.
         entity.locomotion_.groundPoint = entity.state_.groundPoint;

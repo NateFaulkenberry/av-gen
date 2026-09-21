@@ -2654,6 +2654,11 @@ const MotionContext* Composition::motionContext(std::string_view node) const {
     return nullptr;
 }
 
+// Phase B §46: how long a look layer takes to arrive. A head turn, not a reach -- 0.25s is a
+// glance; the slice sets its reach layer to 0.45s because the hand has 0.8m to travel and 0.25s
+// would put it at 3.2 m/s.
+namespace { constexpr float kLookBlendSeconds = 0.25f; }
+
 void Composition::AnimationSink::driveLayers(const entity::LocomotionState& state) {
     CompositionNode* node = owner_.findNode(node_);
     if (node == nullptr || node->rigs.empty()) {
@@ -2864,9 +2869,28 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
             case PoseLayerDrive::Manual:
                 break;
             case PoseLayerDrive::Look:
+                // Phase B §46. Not `haveTarget ? 1 : 0` any more. The vertical slice measured what
+                // that costs: a layer arriving at full weight in one frame moved what it drives
+                // 0.803 m between two frames, thirty-five times the distance the body covered in
+                // the same frame, and it did so identically with the motion controller bypassed --
+                // which is how it was clear the controller was not the thing at fault.
+                //
+                // The schedule comes off the seam rather than being accumulated here, because a
+                // scrub poses the rig once at frame N with no frame N-1 to have ramped from
+                // (ADR-557). `lookTargetSince` is a time; the realized weight is a pure function
+                // of it and `now`, so seeking into the middle of a blend gives the middle of the
+                // blend. `EntityWorld` may remember -- it re-simulates on a seek -- and this tier
+                // may not.
                 layer.weight = haveTarget ? 1.0f : 0.0f;
+                layer.weightBefore = state.lookTargetBefore ? 1.0f : 0.0f;
+                layer.blendElapsed =
+                    static_cast<float>(std::max(state.time - state.lookTargetSince, 0.0));
+                layer.blendSeconds = kLookBlendSeconds;
                 layer.target = localTarget;
-                layer.hasTarget = haveTarget;
+                // The target stays live while the weight fades *out*, or the layer reaches weight
+                // 0.4 with nothing to aim at and resolves `NoTarget`, which is a snap wearing the
+                // costume of a blend.
+                layer.hasTarget = haveTarget || layer.effectiveWeight() > 0.0f;
                 break;
             case PoseLayerDrive::Reaction:
                 layer.weight = reaction;

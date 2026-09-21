@@ -526,7 +526,10 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
         poseToModel(skeleton, pose, model_);
         for (std::size_t i = 0; i < layers_.size(); ++i) {
             const PoseLayer& layer = layers_[i];
-            if (layer.kind != PoseLayerKind::Foot || layer.weight <= 0.0f) {
+            // The same realized weight the apply loop will use. Reading `layer.weight` here
+            // instead would let the body compensation see a foot the solve is still blending in,
+            // which is one pipeline stage disagreeing with the next about whether a layer is on.
+            if (layer.kind != PoseLayerKind::Foot || layer.effectiveWeight() <= 0.0f) {
                 continue;
             }
             const glm::ivec3 ids = chain_[i];
@@ -576,7 +579,11 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
         PoseLayer& layer = layers_[i];
         const JointMask& mask = masks_[i];
         LayerResolution& result = results_[i];
-        if (layer.weight <= 0.0f) {
+        // §46: one read of the realized weight per layer per frame, derived from `now`. Every use
+        // below is of this, not of `layerWeight`, so a blend cannot apply to some of a layer's
+        // effects and not others -- which is the shape of `docs/testing.md` #25.
+        const float layerWeight = layer.effectiveWeight();
+        if (layerWeight <= 0.0f) {
             result = LayerResolution::Inactive;
             continue;
         }
@@ -645,7 +652,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             // Scaled as a pair rather than clamped per axis, so a body accelerating diagonally
             // leans diagonally instead of squaring off against the limit.
             const float scale = clamped && magnitude > 1e-6f ? limit / magnitude : 1.0f;
-            const float w = std::clamp(layer.weight, 0.0f, 1.0f);
+            const float w = std::clamp(layerWeight, 0.0f, 1.0f);
             const float pitch = glm::radians(pitchDegrees * scale) * w;
             const float roll = glm::radians(rollDegrees * scale) * w;
             if (std::abs(pitch) < 1e-6f && std::abs(roll) < 1e-6f) {
@@ -687,7 +694,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 fade = 1.0f - std::clamp(layer.bodySpeed / layer.secondaryStillness, 0.0f, 1.0f);
             }
             const float amplitude = glm::radians(layer.secondaryDegrees) * fade *
-                                    std::clamp(layer.weight, 0.0f, 1.0f);
+                                    std::clamp(layerWeight, 0.0f, 1.0f);
             if (amplitude <= 1e-6f) {
                 // Faded out rather than switched off: the layer is doing what it was asked to.
                 result = LayerResolution::Applied;
@@ -768,7 +775,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 originModel + glm::vec3(excursion.x * scale, excursion.y * lift, excursion.z * scale);
             // Blended by the layer's weight, like every other correction here, so a scene can fade
             // it in rather than snap it (§63).
-            const glm::vec3 finalModel = glm::mix(jointModel, wantedModel, std::clamp(layer.weight, 0.0f, 1.0f));
+            const glm::vec3 finalModel = glm::mix(jointModel, wantedModel, std::clamp(layerWeight, 0.0f, 1.0f));
 
             // Back to the joint's own parent frame. A model position is in the rig's space and a
             // local translation is in the parent's, so the parent's model transform has to come
@@ -818,7 +825,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                                                   ? updated_[static_cast<std::size_t>(parent)]
                                                   : glm::mat4(1.0f);
                 glm::mat4 world = parentModel * pose.local[j].matrix();
-                const float w = std::min(mask.weight[j] * layer.weight, 1.0f);
+                const float w = std::min(mask.weight[j] * layerWeight, 1.0f);
                 if (w > 0.0f) {
                     const glm::quat turn = w >= 1.0f ? full : glm::slerp(kIdentity, full, w);
                     world = toPivot * glm::mat4_cast(turn) * fromPivot * world;
@@ -921,7 +928,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 result = LayerResolution::Degenerate;
                 continue;
             }
-            const float w = std::min(layer.weight, 1.0f);
+            const float w = std::min(layerWeight, 1.0f);
             // The two increments are blended separately, not the composed pair. ADR-359: slerping
             // the mid's *total* rotation makes the knee's share of a half-weight solve depend on
             // the hip's, and it reads as the knee lagging the leg.
@@ -1036,7 +1043,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
         sampleClip(clip, additivePhase(clip, now, layer.clipRate), sampled_);
         std::uint32_t wrote = 0;
         for (std::size_t j = 0; j < count; ++j) {
-            const float w = std::min(mask.weight[j] * layer.weight, 1.0f);
+            const float w = std::min(mask.weight[j] * layerWeight, 1.0f);
             if (w <= 0.0f) {
                 continue;
             }

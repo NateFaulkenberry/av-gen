@@ -126,6 +126,16 @@ struct LocomotionState {
     // sentence was true about the intent and false about the engine until there was a layer.
     glm::vec3 lookTarget{0.0f};
     bool hasLookTarget = false;
+    // Phase B §46: the sample second at which `hasLookTarget` last changed, and what it was before.
+    // A look layer that switches on at full weight snaps the head, and the blend that stops it has
+    // to be **derived** rather than accumulated, because the pose tier poses once on a scrub and
+    // has no previous frame to have ramped from (ADR-557).
+    //
+    // The division of labour is the point. This tier may remember -- `EntityWorld::seek` replays
+    // every step, so anything accumulated here is reconstructable at frame N by construction. The
+    // pose tier may not, and so it is handed a *time* instead of a ramp.
+    double lookTargetSince = 0.0;
+    bool lookTargetBefore = false;
 
     // The ground under this body, in WORLD space, and entity-local by the time it reaches a layer
     // -- `Composition::AnimationSink::driveLayers` does the conversion, the same one and for the

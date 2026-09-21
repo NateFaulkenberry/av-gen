@@ -311,6 +311,12 @@ public:
     // Advance the provider memory one step. Called from BOTH publish paths -- ADR-554's rule,
     // applied to the very thing that rule was discovered by.
     void advanceMotion(double time, float dt);
+    // Phase B §46. Publishes `hasLookTarget` **and the schedule the pose tier blends against**, in
+    // one place called by both `EntityWorld::update` and `EntityWorld::seek`. One function rather
+    // than two copies of three lines for ADR-554's reason: this struct is the one that rule was
+    // discovered on, and a schedule written by only one of its two publishers is the same defect
+    // with a longer name.
+    void publishLookSchedule();
     // Where the body is **drawn**, as distinct from where the simulation says it is.
     //
     // `state().position()` is the anchor plus `travel` -- what navigation and a director wrote. The
