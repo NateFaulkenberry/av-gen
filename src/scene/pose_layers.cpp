@@ -261,6 +261,27 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
         // authored. ADR-359: a two-bone solve is not maskable per joint -- half a knee does not
         // reach half a target -- so an authored mask on one could only be a silent no-op, which is
         // the failure this whole unit exists to stop repeating. It is reported instead.
+        // ---- the tripwire -------------------------------------------------------------------
+        //
+        // **Four times in this programme a branch saying "anything that is not X" has silently
+        // swallowed a new `PoseLayerKind`:** `rebind`'s additive clip lookup, the parser's
+        // hand-written kind list, the scene validator's mask check, and `apply`'s own `kind == Foot`.
+        //
+        // A catch-all is a claim about every value that will ever be added to the enum, and the
+        // author of the next value pays. This switch exists only so the compiler makes them pay
+        // at build time instead: `-Wall` implies `-Wswitch`, so adding a kind without visiting
+        // this function is a build error rather than a silent no-op.
+        switch (layer.kind) {
+        case PoseLayerKind::Aim:
+        case PoseLayerKind::Additive:
+        case PoseLayerKind::Foot:
+        case PoseLayerKind::Stride:
+        case PoseLayerKind::Secondary:
+        case PoseLayerKind::Lean:
+        case PoseLayerKind::Reach:
+            break;
+        }
+
         JointMaskSpec spec = layer.mask;
         if (layer.kind == PoseLayerKind::Stride && spec.joints.empty() && !layer.strideJoint.empty()) {
             // A stride layer's joint set IS its named joint, the same way a foot layer's is its
@@ -536,6 +557,29 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                                                        : LayerResolution::NoJoints;
             continue;
         }
+        // ---- the tripwire -------------------------------------------------------------------
+        //
+        // **Four times in this programme a branch saying "anything that is not X" has silently
+        // swallowed a new `PoseLayerKind`:** `rebind`'s additive clip lookup, the parser's
+        // hand-written kind list, the scene validator's mask check, and this function's own
+        // `kind == Foot` -- the last of which made every `Reach` layer report Solved having done
+        // nothing, with an unreachable target coming back successful and the hand at rest.
+        //
+        // A catch-all is a claim about every value that will ever be added to the enum, and the
+        // author of the next value pays. This switch exists only so the compiler makes them pay
+        // at build time instead: `-Wall` implies `-Wswitch`, so adding a kind without visiting
+        // this function is a build error rather than a silent no-op.
+        switch (layer.kind) {
+        case PoseLayerKind::Aim:
+        case PoseLayerKind::Additive:
+        case PoseLayerKind::Foot:
+        case PoseLayerKind::Stride:
+        case PoseLayerKind::Secondary:
+        case PoseLayerKind::Lean:
+        case PoseLayerKind::Reach:
+            break;
+        }
+
         if (layer.kind == PoseLayerKind::Lean) {
             // **Into the force, in the body's own frame.**
             //

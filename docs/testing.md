@@ -78,13 +78,13 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-four ways a green suite has lied
+## Twenty-five ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
 you are short of time, because it is the only one the exit code cannot save you from.
 
-- **Family A — the run did not happen as you think** (entries 1-3, 12, 18).
+- **Family A — the run did not happen as you think** (entries 1-3, 12, 18, 25).
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
   (entries 13-17, 19, 24; 9 and 10 are its older members, from before it had a name).
@@ -117,6 +117,24 @@ night from two agents who never spoke to each other.
    The tell is that the failure text does not match source you can read. `git clean` the test object
    directory after a merge is cheaper than the check.
 3. **A log written by somebody else's process.** See the next section; this is the severe one.
+25. **An edit script that asserts and writes at the end leaves a partial change that looks
+   complete.** The shape is: make N replacements in memory, assert each match count so a silent
+   wrong edit is impossible, write the file once at the end. When the *fourth* assertion fires,
+   the first three are discarded with it — and the file on disk is neither the before nor the
+   after, because some earlier script in the same session did write.
+
+   **The discipline that prevents silent wrong edits is exactly what creates silent partial ones.**
+   Three agents hit this on 2026-09-21, twice within an hour by one of them. One instance left a
+   `PoseLayerKind` dispatch reading `kind == Foot` while two related edits landed, so every `Reach`
+   layer fell through to the additive path and reported **`Solved` with the hand at rest** — an
+   unreachable IK target coming back successful.
+
+   The tell is that a change you believe you made is absent while its siblings are present. **The
+   fix is structural, not careful: write after every successful replacement, or build the entire
+   new content and write once with no assertions between.** Asserting match counts is still right;
+   it is the interleaving of assertions and a single deferred write that is wrong.
+
+   Related but distinct from 1 and 2: those are a stale *binary*, this is a stale *source*.
 
 ### The run happened and you read it wrong
 
