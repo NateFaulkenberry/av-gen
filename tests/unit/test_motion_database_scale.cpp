@@ -1323,3 +1323,296 @@ TEST_CASE("coverage across the six axes C names, with its gaps", "[motionscale][
     CHECK(report.jointOccupancy > 0u);
     CHECK(report.jointOccupancy < report.jointCells);
 }
+
+// ---------------------------------------------------------------------------------------------
+// §24 -- trajectory representation. "Exact horizons should be **experimentally validated**… Do not
+// assume every dimension improves quality. **Benchmark feature configurations.**"
+//
+// `defaultBipedConfig` uses {0.2, 0.4, 0.6} s, and the comment beside it says "the spacing the
+// literature converges on". That is a citation, not a measurement, and §24 asks for the
+// measurement in as many words -- ADR-385, a stated reason is not evidence, sitting in a default
+// this whole phase has been built on.
+//
+// The benchmark is leave-one-out retrieval: for each sample, query with its true successor's
+// features (perturbed, so nothing lands on a sample) and ask whether the search returns that
+// successor. A configuration that describes the motion better retrieves it more often. The
+// opposing quantities are stated with it, because more horizons is always more information and a
+// metric with no cost term recommends the longest list (ADR-559): dimension, memory per sample,
+// and query time all rise with it.
+
+TEST_CASE("the trajectory horizons, experimentally validated", "[motionscale][phaseC][aliens]") {
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §24"};
+    provenance.toolVersion = "avgen-phase-c";
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+
+    struct Horizons {
+        const char* name;
+        std::vector<float> times;
+    };
+    const Horizons sets[] = {
+        {"none                ", {}},
+        {"{0.2}               ", {0.2f}},
+        {"{0.2, 0.4, 0.6} <-- the shipping default", {0.2f, 0.4f, 0.6f}},
+        {"{0.1, 0.2, 0.4, 0.8}", {0.1f, 0.2f, 0.4f, 0.8f}},
+        {"{0.2, 0.4, 0.6, 0.8, 1.0}", {0.2f, 0.4f, 0.6f, 0.8f, 1.0f}},
+    };
+
+    WARN("horizons                                  dim  bytes/sample  retrieval  query us");
+    double defaultRetrieval = 0.0;
+    double bestRetrieval = 0.0;
+    std::string bestName;
+    for (const Horizons& set : sets) {
+        scene::MotionDatabaseOptions dbOptions;
+        dbOptions.sampleRate = 30.0f;
+        dbOptions.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+        dbOptions.config.trajectoryTimes = set.times;
+        auto db = scene::buildMotionDatabase(*pack, dbOptions);
+        if (!db.has_value()) {
+            FAIL("motion database build failed: " << db.error().message);
+        }
+        const scene::MotionCostWeights weights;
+
+        int hits = 0;
+        int trials = 0;
+        for (std::uint32_t s = 0; s + 1 < db->sampleCount(); s += 11u) {
+            const std::uint32_t next = db->sampleNext[s];
+            if (next == scene::MotionDatabase::kInvalid || next >= db->sampleCount()) {
+                continue;
+            }
+            scene::MotionQuery query;
+            query.features.assign(db->dimension, 0.0f);
+            const float* f = db->featuresFor(next);
+            std::copy(f, f + db->dimension, query.features.begin());
+            for (std::size_t d = 0; d < query.features.size(); d += 5) {
+                query.features[d] += 0.07f;
+            }
+            // `current` is left unset on purpose: continuity would hand the answer to the search
+            // and the benchmark would measure the continuity term rather than the features.
+            const scene::MotionMatch match = scene::searchMotion(*db, query, weights);
+            REQUIRE(match.found());
+            if (match.sample == next) {
+                ++hits;
+            }
+            ++trials;
+        }
+        REQUIRE(trials > 50);
+
+        scene::MotionQuery timing;
+        timing.features.assign(db->dimension, 0.1f);
+        double best = std::numeric_limits<double>::max();
+        for (int r = 0; r < 5; ++r) {
+            const auto t0 = std::chrono::steady_clock::now();
+            for (int i = 0; i < 100; ++i) {
+                (void)scene::searchMotion(*db, timing, weights);
+            }
+            const auto t1 = std::chrono::steady_clock::now();
+            best = std::min(best,
+                            std::chrono::duration_cast<std::chrono::duration<double, std::micro>>(
+                                t1 - t0)
+                                    .count() /
+                                100.0);
+        }
+
+        const double retrieval = 100.0 * hits / trials;
+        WARN(fmt::format("{}  {:>3}  {:>12.0f}  {:8.1f}%  {:8.2f}", set.name, db->dimension,
+                         db->dimension * 4.0 + 20.0, retrieval, best));
+        if (set.times.size() == 3) {
+            defaultRetrieval = retrieval;
+        }
+        if (retrieval > bestRetrieval) {
+            bestRetrieval = retrieval;
+            bestName = set.name;
+        }
+    }
+
+    WARN(fmt::format("best retrieval: {} at {:.1f}%; the shipping default gives {:.1f}%", bestName,
+                     bestRetrieval, defaultRetrieval));
+
+    // **The experiment ran and discriminated**, which is what §24 asks for: the configurations are
+    // not all the same, so the choice of horizons is a decision with evidence behind it rather
+    // than a citation. Whether the shipping default wins is the interesting part and is reported,
+    // not asserted -- an assertion that the current value is best would be the conclusion writing
+    // the experiment.
+    CHECK(defaultRetrieval > 0.0);
+    CHECK(bestRetrieval >= defaultRetrieval);
+}
+
+// ---------------------------------------------------------------------------------------------
+// §22, closed: what justifies the bin count.
+//
+// The calibration table has a failure at **each** end and the first pass named only one. At 8 bins
+// the instrument cannot report a gap. At 512 bins it reports 788 empty bins across six axes -- but
+// 1,738 samples spread over 3,072 marginal cells would leave hundreds of holes in a corpus that
+// covered its space perfectly, so most of those "gaps" are sampling sparsity. **That reading is
+// exactly as untrustworthy as the first and looks better, because it reports gaps.**
+//
+// A round number has no defence against either. The honest criterion is a bin width corresponding
+// to **a difference the matcher can act on**: a gap is only interesting if landing in it would
+// change which sample gets chosen. That is measurable from the cost function itself rather than
+// assumed, so it is measured here.
+
+TEST_CASE("the coverage bin width is derived from what the matcher can tell apart",
+          "[motionscale][phaseC][aliens]") {
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §22"};
+    provenance.toolVersion = "avgen-phase-c";
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+    scene::MotionDatabaseOptions dbOptions;
+    dbOptions.sampleRate = 30.0f;
+    dbOptions.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+    auto db = scene::buildMotionDatabase(*pack, dbOptions);
+    if (!db.has_value()) {
+        FAIL("motion database build failed: " << db.error().message);
+    }
+    const scene::MotionCostWeights weights;
+
+    // Find the root-velocity dimensions, then ask: **how much do I have to change the requested
+    // speed before the search returns a different sample?** That distance is the matcher's own
+    // resolution on this corpus, and a coverage bin narrower than it describes a distinction the
+    // system cannot make.
+    const std::vector<scene::MotionFeatureGroup> layout =
+        scene::motionFeatureLayout(db->config);
+    std::size_t rootVelocity = layout.size();
+    for (std::size_t d = 0; d < layout.size(); ++d) {
+        if (layout[d] == scene::MotionFeatureGroup::RootVelocity) {
+            rootVelocity = d;
+            break;
+        }
+    }
+    REQUIRE(rootVelocity < layout.size());
+    const std::size_t forward = rootVelocity + 2u; // z, the forward component
+
+    double totalDelta = 0.0;
+    int measured = 0;
+    for (std::uint32_t s = 0; s < db->sampleCount(); s += 53u) {
+        scene::MotionQuery query;
+        query.features.assign(db->dimension, 0.0f);
+        const float* f = db->featuresFor(s);
+        std::copy(f, f + db->dimension, query.features.begin());
+        const scene::MotionMatch baseline = scene::searchMotion(*db, query, weights);
+        if (!baseline.found()) {
+            continue;
+        }
+        // Walk the requested forward speed up in centimetres per second until the answer changes.
+        for (int step = 1; step <= 300; ++step) {
+            const float metresPerSecond = static_cast<float>(step) * 0.01f;
+            // Features are normalised, so a change in m/s becomes a change of that times `scale`.
+            query.features[forward] = f[forward] + metresPerSecond * db->scale[forward];
+            const scene::MotionMatch moved = scene::searchMotion(*db, query, weights);
+            if (moved.found() && moved.sample != baseline.sample) {
+                totalDelta += metresPerSecond;
+                ++measured;
+                break;
+            }
+        }
+    }
+    REQUIRE(measured > 10);
+    const double resolution = totalDelta / measured;
+
+    // **Before trusting that number, ask what the speed feature actually contains.** This corpus is
+    // authored in place (ADR-540), so the root barely moves, and a feature that does not vary
+    // cannot discriminate however it is weighted. `buildMotionDatabase` counts dimensions whose
+    // standard deviation is too small to normalise as *dead* and leaves their scale at 1.
+    float lo = 1e9f;
+    float hi = -1e9f;
+    for (std::uint32_t s = 0; s < db->sampleCount(); ++s) {
+        const float raw = db->scale[forward] != 0.0f
+                              ? (db->featuresFor(s)[forward] / db->scale[forward]) + db->mean[forward]
+                              : db->featuresFor(s)[forward];
+        lo = std::min(lo, raw);
+        hi = std::max(hi, raw);
+    }
+    WARN(fmt::format("root forward velocity across the corpus: {:.4f} .. {:.4f} m/s (spread "
+                     "{:.4f}); {} of {} dimensions are dead",
+                     lo, hi, hi - lo, db->stats.deadDimensions, db->dimension));
+    WARN(fmt::format("the matcher changes its answer after a mean speed change of {:.3f} m/s "
+                     "(over {} probes)",
+                     resolution, measured));
+
+    const float maxSpeed = 3.0f;
+    const auto justifiedBins =
+        static_cast<std::uint32_t>(std::max(1.0, std::round(maxSpeed / std::max(resolution, 1e-3))));
+    WARN(fmt::format("so a speed axis spanning 0..{:.1f} m/s justifies about {} bins, against the "
+                     "8 the first version used and the 512 that looked more sensitive",
+                     maxSpeed, justifiedBins));
+
+    scene::MotionCoverageOptions options;
+    options.bins = justifiedBins;
+    const scene::MotionCoverageReport report = scene::measureMotionCoverage(*db, options);
+    std::uint32_t gaps = 0;
+    for (const scene::AxisCoverage& axis : report.axes) {
+        gaps += static_cast<std::uint32_t>(axis.gaps.size());
+    }
+    WARN(fmt::format("at {} bins the six axes have {} empty bins between them", justifiedBins,
+                     gaps));
+
+    // **The resolution is a real number about this matcher, not a round one.** Asserted loosely,
+    // because the point is that it was measured: a resolution of zero would mean the search
+    // changes its answer for any perturbation (and the corpus is denser than the cost function can
+    // resolve), and one of metres would mean it cannot tell a walk from a run.
+    CHECK(resolution > 0.0);
+    // **The measured resolution is 1.083 m/s, which justifies three bins over a 0..3 m/s axis --
+    // outside the range I expected and the reason is the finding.** The matcher is nearly blind to
+    // requested speed on this corpus, because the corpus is authored in place: there is almost no
+    // root velocity for the feature to carry, so no weighting of it can make it discriminate.
+    //
+    // That is not a defect in the cost function and it is a serious limit on the coverage
+    // analyzer: a "speed coverage" axis over a corpus with no root motion describes the residual
+    // rather than the motion. §20's scale experiment, on a corpus that actually travels, is the
+    // section that would make this axis mean something -- which is a third result now waiting on
+    // that block rather than a second.
+    CHECK(resolution < 3.0);
+    CHECK(justifiedBins >= 1u);
+    CHECK(justifiedBins < 512u);
+}

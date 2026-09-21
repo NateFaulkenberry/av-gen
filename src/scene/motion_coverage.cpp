@@ -54,10 +54,14 @@ AxisCoverage binAxis(CoverageAxis axis, const std::vector<float>& values, std::u
 } // namespace
 
 std::string MotionCoverageReport::report() const {
-    std::string out = fmt::format("coverage over {} samples\n", samples);
+    std::string out = fmt::format(
+        "coverage over {} samples (per-axis figures are a POPULATED-NESS check, not coverage: the "
+        "matcher's own resolution is ~1.08 m/s of speed, so a fine-binned marginal reports "
+        "sampling sparsity and a coarse one cannot report a gap at all)\n",
+        samples);
     for (const AxisCoverage& axis : axes) {
-        out += fmt::format("  {:<15} {:>3}/{:<3} bins ({:5.1f}%)", coverageAxisName(axis.axis),
-                           axis.occupied, axis.bins, 100.0f * axis.fraction());
+        out += fmt::format("  {:<15} {:>3}/{:<3} bins populated", coverageAxisName(axis.axis),
+                           axis.occupied, axis.bins);
         if (axis.gaps.empty()) {
             out += "  no gaps\n";
         } else {
@@ -71,7 +75,8 @@ std::string MotionCoverageReport::report() const {
             out += "\n";
         }
     }
-    out += fmt::format("  (speed x turn): {} of {} cells occupied\n", jointOccupancy, jointCells);
+    out += fmt::format("  (speed x turn): {} of {} cells occupied  <-- the informative measure\n",
+                       jointOccupancy, jointCells);
     return out;
 }
 

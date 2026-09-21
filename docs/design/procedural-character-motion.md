@@ -1303,3 +1303,56 @@ a 26-cell gap that the marginal report called 100% covered.** That inverts the f
 was written with. The *pairing* is the informative measure; the marginals are the near-vacuous one,
 useful only as a check that every axis is populated at all. The pairing is reported as a **count**
 rather than as a sixth percentage, so it cannot be averaged into the others and lost.
+
+### §22 closed: what justifies the bin count
+
+The calibration table has a failure at **each** end and the first pass named only one. At 8 bins the
+instrument cannot report a gap. At 512 bins it reports 788 empty bins — but 1,738 samples over 3,072
+marginal cells would leave hundreds of holes in a corpus that covered its space perfectly, so most
+of those are **sampling sparsity**. That reading is exactly as untrustworthy as the first and looks
+better, because it reports gaps.
+
+A round number defends against neither. So the width is derived from **a difference the matcher can
+act on**, measured rather than assumed: *how much must the requested speed change before the search
+returns a different sample?* Answer, over 33 probes on the real corpus: **1.083 m/s**, which
+justifies about **three** bins over a 0–3 m/s axis.
+
+Checked before trusting it — the root forward velocity spans **−2.68 to 1.72 m/s**, a 4.4 m/s
+spread, so the feature is live and the coarseness is not a dead dimension. It is **weighting**: root
+velocity is 3 of 33 dimensions and the pose terms swamp it. Now that §10 has made the weights
+actually do something, that is a tunable with evidence behind it rather than a guess — but tuning it
+needs a quality metric, so it is recorded rather than changed.
+
+**Conclusion: the marginal report is demoted to what it is.** Not coverage — a populated-ness check
+that every axis has motion somewhere along it. `report()` now says "populated" rather than printing
+a percentage that reads like coverage, and carries the reason inline. **`jointOccupancy` is the
+informative measure**, and it is a count.
+
+### §21 and §22 agree from opposite directions
+
+The 26 empty (speed × turn) cells are largely **turn** coverage — and turn variation is one of the
+three augmentation kinds §21's audit found missing from `VariantKind`. **The coverage analyzer has
+independently identified the gap the augmentation audit says the tools cannot currently fill.** Two
+sections arriving at the same hole from opposite directions is stronger than either alone, and it
+turns "turn variation is on the inventory list" into "turn variation is the next thing to build".
+
+## §24 — the horizons, experimentally validated
+
+`defaultBipedConfig` uses {0.2, 0.4, 0.6} s with a comment citing "the spacing the literature
+converges on". §24 asks for the measurement in as many words, so that comment was ADR-385 sitting in
+a default this whole phase is built on. Leave-one-out retrieval on the real corpus — query with a
+sample's true successor's features, perturbed, `current` deliberately unset so continuity cannot
+hand over the answer:
+
+| horizons | dim | bytes/sample | retrieval | query µs |
+|---|---|---|---|---|
+| none | 21 | 104 | 83.5% | 9.82 |
+| {0.2} | 25 | 120 | 88.0% | 10.33 |
+| **{0.2, 0.4, 0.6}** — shipping default | 33 | 152 | **93.0%** | ~10.9 |
+| {0.1, 0.2, 0.4, 0.8} | 37 | 168 | 92.4% | 11.34 |
+| {0.2, 0.4, 0.6, 0.8, 1.0} | 41 | 184 | 91.1% | 11.84 |
+
+**The shipping default wins, and more horizons make it worse while costing more** — 92.4% and 91.1%
+for 37 and 41 dimensions. That is §24's own warning ("do not assume every dimension improves
+quality") demonstrated rather than quoted. The result is *reported* and only weakly asserted:
+asserting that the current value is best would be the conclusion writing the experiment.

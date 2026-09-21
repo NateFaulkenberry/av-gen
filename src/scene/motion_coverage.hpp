@@ -56,6 +56,16 @@ struct AxisCoverage {
     }
 };
 
+// **What the marginal report is, after calibration.** Measured on the real corpus: at 8 bins every
+// axis reads 100% with no gaps, at 512 bins the six axes show 788 empty bins that are mostly
+// sampling sparsity rather than absent motion, and the bin width the *matcher* can actually act on
+// -- the speed change needed before the search returns a different sample -- is **1.083 m/s**,
+// which justifies about three bins over a 0..3 m/s axis.
+//
+// So a marginal percentage here is not a coverage measure and must not be read as one. It is a
+// **populated-ness check**: every axis has motion somewhere along it. `AxisCoverage::fraction` is
+// kept because the gap list needs the bins, and `report()` labels it accordingly rather than
+// printing a number that reads like coverage. The informative measure is `jointOccupancy`.
 struct MotionCoverageReport {
     std::vector<AxisCoverage> axes;
     std::uint32_t samples = 0;
