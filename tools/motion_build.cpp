@@ -200,7 +200,8 @@ int usage() {
                "  reach     <pack> [--chain h:k:a,...]    how close each pose is to a straight leg\n"
                "  database  <pack> --joints a,b,c [--bench]  build a motion database and search it\n"
                "  benchmark <file> [--repeat n]           what each stage costs here\n"
-               "  quality   <pack> --joints a,b,c         Phase C 20: density, duplicates, search\n"
+               "  quality   <pack> --joints a,b,c [--trajectory 0.2,0.4,0.6]\n"
+               "                                          Phase C 20: density, duplicates, search\n"
                "                                          plan recall, cross-clip coverage bound\n"
                "  survey    <dir>                         per-FILE rotation orders, up axis,\n"
                "                                          skeleton consistency across a corpus\n\n"
@@ -750,6 +751,15 @@ int cmdQuality(const Args& args) {
         return 1;
     }
     options.config.joints = joints;
+    // **The trajectory block is what makes this commensurable with the earlier numbers.** Phase C's
+    // published density figures were taken on a 33-dimension database -- 3 joints x 6, plus 3 root
+    // velocity, plus 3 horizons x 4 -- and a 21-dimension run of the same corpus is a different
+    // number system, not a correction to that one. `--trajectory 0.2,0.4,0.6` reproduces it.
+    if (args.has("trajectory")) {
+        for (const std::string& t : splitCommas(args.option("trajectory"))) {
+            options.config.trajectoryTimes.push_back(std::stof(t));
+        }
+    }
     const auto db = scene::buildMotionDatabase(*pack, options);
     if (!db) {
         fmt::print(stderr, "{}\n", db.error().message);

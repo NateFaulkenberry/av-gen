@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-eight ways a green suite has lied
+## Twenty-nine ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -87,7 +87,7 @@ you are short of time, because it is the only one the exit code cannot save you 
 - **Family A — the run did not happen as you think** (entries 1-3, 12, 18, 27).
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
-  (entries 13-17, 19, 26; 9 and 10 are its older members, from before it had a name).
+  (entries 13-17, 19, 26, 29; 9 and 10 are its older members, from before it had a name).
 - **Family D — the ask was malformed** (entries 20-21). Neither a bad measurement nor a bad reading:
   the instrument worked, the probe looked in the right place, and the answer was spoiled by the
   *form of the question* (20) or by the *size of the window* (21).
@@ -717,6 +717,25 @@ a wound.
 - **Name every mechanism that could mask the fault before you trust a teeth-check** (16), and
   **suspect the sample domain before the knob when a reachability probe reports zero** (17).
 
+
+29. **A search truncated by `head` is a search you have not done, and its silence is indistinguishable
+   from an answer.**
+
+   Before writing a BVH importer for §20 I checked whether one existed:
+   `grep -rli "bvh" src/ tools/ ... | head`. Ten lines came back, every one of them a *bounding
+   volume hierarchy* in the path tracer, and I concluded there was no Biovision reader.
+   `src/assets/bvh_loader.{hpp,cpp}` — written for 100STYLE specifically, with the scale option and
+   the rotation-order survey already in it — sat below the cut.
+
+   **The pipe reported success and the truncation left no trace in the output.** A `grep` that finds
+   nothing prints nothing; a `grep` piped into `head` that finds sixty things also prints ten, and
+   the two look identical if you only read what came back. The habit that catches it is the one
+   entries 13, 14 and 15 converge on: **read what the scan matched, not just how many lines
+   arrived** — and count the matches separately (`grep -c`) before capping the display.
+
+   The general form: **a filter you added for readability is still a filter.** `head`, `-m`, a
+   `LIMIT`, a default page size and a truncated log all silently narrow a result set, and none of
+   them marks the output as partial.
 
 ## The scratchpad is shared by every agent in a session
 

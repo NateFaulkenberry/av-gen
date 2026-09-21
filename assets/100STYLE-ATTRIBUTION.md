@@ -55,6 +55,11 @@ forward walk. Manifest digest `7f2e0d2707aa5611`.
 The digests are `sha256` over each subset's sorted `name:size` list, truncated to 16 hex
 characters — enough to catch a different subset, not a content hash of 1 GB of ASCII.
 
+**`assets/100style-tr/` — the transition axis.** `*_TR1.bvh` for all 100 styles: 100 files,
+593.8 MB, 420,432 pack frames. **This is the content §30 was written for** — starts, stops and
+directional changes — and the first the contact verdict has been tested against. Packed to
+`assets/100style-tr-pack/` (also gitignored), which is what the §30 test reads.
+
 ## How to rebuild the measurement
 
 ```
@@ -63,7 +68,13 @@ avgen_motion pack    assets/100style/*.bvh --out <dir> --scale 0.01 \
                      --license CC-BY-4.0 --source 100STYLE \
                      --contacts LeftAnkle,RightAnkle \
                      --redistribution allowed --derivedDataAllowed true
-avgen_motion quality <dir> --joints LeftAnkle,RightAnkle,Head --seeds 250
+avgen_motion quality <dir> --joints LeftAnkle,RightAnkle,Head --seeds 250 \
+                     --trajectory 0.2,0.4,0.6
 ```
+
+**The trajectory block is not optional for comparability.** Phase C's earlier density figures were
+taken on a 33-dimension database; without `--trajectory 0.2,0.4,0.6` this runs 21 and the numbers
+are a different system. The §30 transition test reads `assets/100style-tr-pack/`, built by the same
+`pack` command over `assets/100style-tr/*.bvh`.
 
 ADR-614 has the numbers and the control the same commands produce on the Glowmere corpus.

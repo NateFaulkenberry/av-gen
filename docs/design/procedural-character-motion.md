@@ -1279,17 +1279,29 @@ digests and the commands. Two subsets, 434,478 and 279,735 database samples, aga
 
 Against the four local results this section listed as needing §20:
 
-- the **stride-4, full-prefix** plan: **survives**, but the finding that *the cheap prefix bought
-  nothing* does **not** — it is free on Glowmere and costs 16.7 recall points at scale;
+- the **stride-4, full-prefix** plan: **survives outright** — 98.3% → 98.4% recall at 33
+  dimensions, with the cost of a miss falling from 0.38× to 0.02× of the typical gap. The finding
+  that *the cheap prefix bought nothing* does **not** survive: free on Glowmere, where it beat
+  full-prefix 94.8% to 94.5%, and **−23.1 recall points** at scale;
 - the **69.72 cost spread**: the spread is the one figure that transferred, moving only 32.76 →
   31.82 across a 250× corpus under this instrument, so severity numbers expressed against it carry
   better than expected;
 - the **82% rejection rate** and the **95% `Cyclic` share**: not re-measured — both are properties
   of the tag distribution, and the 100STYLE pack tags every clip alike.
 
+**And §30's contact verdict, which has carried "on this corpus" since it was taken, has now met the
+content it was written for.** On 100STYLE's `TR1` transition files contacts are **not inert**: they
+change the matcher's behaviour substantially where on Glowmere they did nothing but cost. Whether
+they *help* is unresolved — −16.2% per transition against +7.5% over the run, because they switch
+28% more often. ADR-614 §4, including the degenerate first run and how it was caught.
+
 And the prediction that motivated the section — that a corpus the matcher can resolve would break
-the stride plan — is **refuted**: 100STYLE is further under the matcher's resolution limit than
-Glowmere is, not less. ADR-614 has the tables.
+the stride plan — is **untested, not refuted**. 100STYLE is *further* under the matcher's
+resolution limit than Glowmere is (radius ÷ mean nearest neighbour 0.95 → 1.71, duplicates 61.68%
+→ 91.66%), so it is not the corpus the prediction was about. **Testing it needs a different
+weighting, not more data.** ADR-614 has the tables, and the retraction: an earlier version of that
+ADR reported the mechanism as refuted, on a 21-dimension run that the rest of the phase's numbers
+are not measured in.
 
 ## §20 — the original entry: blocked, and what that blocks knowing
 

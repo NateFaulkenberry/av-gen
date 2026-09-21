@@ -122,3 +122,5 @@ __pycache__/
 # measurement. docs/dependencies.md and CREDITS.md carry the obligation.
 /assets/100style/
 /assets/100style-mixed/
+/assets/100style-tr/
+/assets/100style-tr-pack/

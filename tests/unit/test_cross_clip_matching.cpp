@@ -34,6 +34,7 @@
 #include "scene/animation.hpp"
 #include "scene/motion_database.hpp"
 #include "scene/motion_pack.hpp"
+#include "scene/motion_quality_report.hpp"
 #include "scene/scene.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -1218,4 +1219,227 @@ TEST_CASE("§32 against ADR-612's own population: the forced cross-clip transiti
     CHECK(afterMean <= 0.0510);
     // The companion, in the direction that would catch a blend which only moved the defect.
     CHECK(afterWorstFrame < beforeWorstFrame);
+}
+
+// **Hidden by default (`[.scale]`), for three reasons that are about this test and not about the
+// crash below.** It reads a 389 MB pack built from a gitignored 594 MB corpus that exists on one
+// machine, so it skips everywhere else; it takes **131 seconds**; and it peaks at **1.7 GB**, which
+// is a third of the whole suite's footprint for one case. The repository already keeps `[.perf]`
+// probes out of the default run for less.
+//
+// **It also SIGSEGV'd once inside the full suite and did not reproduce.** One run crashed here at
+// case 661 of 2955; an identical re-run of the same binary completed clean at 4.88 GB peak, and the
+// test passes alone and with its whole `[crossclip]` family. **That is recorded rather than
+// explained** -- hiding it is not a diagnosis, and if it recurs the note is here. Other agents were
+// building concurrently on the same machine, which makes allocation failure the first suspect and
+// not a conclusion.
+TEST_CASE("§30 against the content it was written for: transitions in 100STYLE",
+          "[.scale][crossclip][phaseC]") {
+    // **§30's verdict has been scoped to "this corpus" since it was taken, and this is the first
+    // content it was actually written for.**
+    //
+    // §30 exists for *starts, stops and directional changes*. Every Glowmere clip is a steady-state
+    // cycle authored in place (ADR-540), so the finding that contact features are inert there was
+    // recorded as a property of that corpus rather than of the feature. 100STYLE's `TR1` files are
+    // transitions: 100 styles of a body changing what it is doing, with real root motion.
+    //
+    // **The instrument is §30's own** -- the forced cross-clip transition loop from "§30 measured
+    // against its own purpose", which is the measurement §30's stated purpose asks for: how far a
+    // foot jumps when the matcher switches motion, with contacts off and on. The same loop, the
+    // same switch definition, the same two arms; only the corpus differs.
+    //
+    // The pack is built by the command in `assets/100STYLE-ATTRIBUTION.md` and is gitignored, so
+    // this skips wherever the corpus is absent -- which is everywhere but the machine that fetched
+    // it. That is stated rather than hidden: it is a research measurement over a corpus that
+    // cannot be redistributed, not a regression test.
+    const fs::path packDir = fs::path(AVGEN_SOURCE_DIR) / "assets" / "100style-tr-pack";
+    if (!fs::exists(packDir)) {
+        SKIP("the 100STYLE TR pack is not present (see assets/100STYLE-ATTRIBUTION.md)");
+    }
+    const auto pack = scene::readMotionPack(packDir);
+    if (!pack.has_value()) {
+        FAIL("motion pack read failed: " << pack.error().message);
+    }
+    const int footL = pack->skeleton.find("LeftAnkle");
+    const int footR = pack->skeleton.find("RightAnkle");
+    REQUIRE(footL >= 0);
+    REQUIRE(footR >= 0);
+
+    const auto feetAt = [&](const scene::MotionDatabase& db, std::uint32_t s) {
+        const scene::AnimationClip& clip = pack->animation[db.sampleClip[s]];
+        scene::Pose pose;
+        std::vector<glm::mat4> model;
+        scene::setRestPose(pack->skeleton, pose);
+        // `sampleTime` is already absolute (it is `clip.start + f*dt`), which is the convention
+        // `MatchMotionProvider::pose` reads it under.
+        scene::sampleClip(clip, db.sampleTime[s], pose);
+        scene::poseToModel(pack->skeleton, pose, model);
+        return std::pair<glm::vec3, glm::vec3>{
+            glm::vec3(model[static_cast<std::size_t>(footL)][3]),
+            glm::vec3(model[static_cast<std::size_t>(footR)][3])};
+    };
+
+    const auto measureTransitions = [&](float contactWeight, float perturbation,
+                                        const char* label) {
+        scene::MotionDatabaseOptions options;
+        options.sampleRate = 30.0f;
+        options.config = scene::defaultBipedConfig("LeftAnkle", "RightAnkle", "Head");
+        options.config.trajectoryTimes = {0.2f, 0.4f, 0.6f};
+        options.config.contactWeight = contactWeight;
+        auto db = scene::buildMotionDatabase(*pack, options);
+        if (!db.has_value()) {
+            FAIL("motion database build failed: " << db.error().message);
+        }
+        const scene::MotionCostWeights weights;
+        std::vector<std::uint32_t> clipStarts;
+        for (std::uint32_t s = 1; s < db->sampleCount(); ++s) {
+            if (db->sampleClip[s] != db->sampleClip[s - 1u]) {
+                clipStarts.push_back(s);
+            }
+        }
+        REQUIRE(clipStarts.size() > 5u);
+
+        std::uint32_t current = 0;
+        double totalJump = 0.0;
+        double worstJump = 0.0;
+        int switches = 0;
+        // **What the metric can see, counted before anything is concluded from it.** If the search
+        // returns the sample the query was built from on every step, the two arms cannot differ
+        // whatever the contact feature carries -- the query identifies its own source and the
+        // experiment has no discriminating power. A fact about the instrument at this corpus size,
+        // measured rather than assumed either way.
+        int returnedTheSeed = 0;
+        for (int i = 0; i < 600; ++i) {
+            const std::uint32_t leg = static_cast<std::uint32_t>(i / 20) % clipStarts.size();
+            const std::uint32_t base = clipStarts[leg];
+            const std::uint32_t want =
+                base + static_cast<std::uint32_t>(i % 20) < db->sampleCount()
+                    ? base + static_cast<std::uint32_t>(i % 20)
+                    : base;
+            scene::MotionQuery query;
+            query.features.assign(db->dimension, 0.0f);
+            const float* f = db->featuresFor(want);
+            std::copy(f, f + db->dimension, query.features.begin());
+            for (std::size_t d = 0; d < query.features.size(); ++d) {
+                query.features[d] += perturbation;
+            }
+            query.current = current;
+            const scene::MotionMatch match = scene::searchMotion(*db, query, weights);
+            REQUIRE(match.found());
+            if (match.sample == want) {
+                ++returnedTheSeed;
+            }
+            const bool continues = db->sampleNext[current] == match.sample;
+            if (!continues) {
+                const auto [beforeL, beforeR] = feetAt(*db, current);
+                const auto [afterL, afterR] = feetAt(*db, match.sample);
+                totalJump += std::max(glm::length(afterL - beforeL), glm::length(afterR - beforeR));
+                worstJump = std::max(worstJump, static_cast<double>(std::max(
+                                                    glm::length(afterL - beforeL),
+                                                    glm::length(afterR - beforeR))));
+                ++switches;
+            }
+            current = match.sample;
+        }
+        const double mean = switches > 0 ? totalJump / switches : 0.0;
+        // The distribution before the ratio (§14), and the liveness check §30 requires: a contact
+        // feature that never varies is a dead dimension wearing a name.
+        const std::vector<scene::MotionFeatureGroup> layout =
+            scene::motionFeatureLayout(db->config);
+        float lo = 1e9f;
+        float hi = -1e9f;
+        std::size_t contactDims = 0;
+        for (std::size_t d = 0; d < layout.size(); ++d) {
+            if (layout[d] != scene::MotionFeatureGroup::Contact) {
+                continue;
+            }
+            ++contactDims;
+            for (std::uint32_t s = 0; s < db->sampleCount(); ++s) {
+                lo = std::min(lo, db->featuresFor(s)[d]);
+                hi = std::max(hi, db->featuresFor(s)[d]);
+            }
+        }
+        WARN(fmt::format("{:<22} {} samples, {} switches, mean foot jump {:.4f} m, worst {:.4f} m; "
+                         "{} contact dim(s) spanning {:.3f}..{:.3f}; returned the SEED sample on "
+                         "{}/600 steps; TOTAL jump over the run {:.1f} m",
+                         label, db->sampleCount(), switches, mean, worstJump, contactDims,
+                         contactDims > 0 ? lo : 0.0f, contactDims > 0 ? hi : 0.0f,
+                         returnedTheSeed, totalJump));
+        (void)perturbation;
+        return std::tuple<double, int, double>{mean, switches, totalJump};
+    };
+
+    // ---- the perturbation, derived from the matcher rather than kept at 0.05 -----------------
+    //
+    // **The first run of this was degenerate and the tell was in the table.** At +0.05 on every
+    // dimension the two arms agreed to four decimals -- mean, worst AND switch count -- and the
+    // reason is that the search returned **600 of 600** seed samples: a query built from a sample's
+    // own features, nudged by a fixed 0.05, identifies its source uniquely among 420,432 samples,
+    // so no feature can change the answer and the number measured is the corpus's clip layout
+    // rather than the matcher's choices. On 1,738 Glowmere samples the same nudge left the choice
+    // genuinely open, which is why the instrument worked there and not here.
+    //
+    // **Ask what the metric can see before asking what the feature carries**, and the fix is a
+    // perturbation expressed in the matcher's own units instead of raw ones: the derived duplicate
+    // radius is the distance at which this matcher stops being able to tell two samples apart, so
+    // a query moved by exactly that much is ambiguous *by construction* at any corpus size. Spread
+    // over the vector so the L2 displacement is the radius.
+    scene::MotionDatabaseOptions probeOptions;
+    probeOptions.sampleRate = 30.0f;
+    probeOptions.config = scene::defaultBipedConfig("LeftAnkle", "RightAnkle", "Head");
+    probeOptions.config.trajectoryTimes = {0.2f, 0.4f, 0.6f};
+    const auto probeDb = scene::buildMotionDatabase(*pack, probeOptions);
+    REQUIRE(probeDb.has_value());
+    const scene::MotionQualitySummary probeQuality = scene::analyseMotionQuality(*probeDb);
+    const float derived =
+        probeQuality.duplicateRadius / std::sqrt(static_cast<float>(probeDb->dimension));
+    WARN(fmt::format("§30 perturbation, derived: duplicate radius {:.4f} over {} dimensions = "
+                     "{:.4f} per dimension (the fixed 0.05 was {:.1f}x smaller)",
+                     probeQuality.duplicateRadius, probeDb->dimension, derived, derived / 0.05f));
+
+    const auto [flatOff, flatSwitchesOff, flatWorstOff] =
+        measureTransitions(0.0f, 0.05f, "0.05  contacts OFF");
+    const auto [flatOn, flatSwitchesOn, flatWorstOn] =
+        measureTransitions(1.0f, 0.05f, "0.05  contacts ON");
+    const auto [withoutContacts, switchesOff, totalOff] =
+        measureTransitions(0.0f, derived, "derived contacts OFF");
+    const auto [withContacts, switchesOn, totalOn] =
+        measureTransitions(1.0f, derived, "derived contacts ON");
+
+    // **The two measures disagree, and both are printed because picking one would be a choice
+    // about the answer.** Contacts change how OFTEN the matcher switches as well as how far each
+    // switch moves a foot, so a mean per transition and a total over the run are not the same
+    // comparison: the arms do not share a denominator.
+    WARN(fmt::format("§30 ON ITS OWN CONTENT, at the derived perturbation:"));
+    WARN(fmt::format("  per transition: {:.4f} m -> {:.4f} m ({:+.1f}%)  [{} vs {} switches]",
+                     withoutContacts, withContacts,
+                     100.0 * (withContacts - withoutContacts) / std::max(withoutContacts, 1e-9),
+                     switchesOff, switchesOn));
+    WARN(fmt::format("  over the run:   {:.1f} m -> {:.1f} m ({:+.1f}%)  -- contacts switch "
+                     "{:+.0f}% more often, so a lower mean per transition can still be more "
+                     "total discontinuity",
+                     totalOff, totalOn,
+                     100.0 * (totalOn - totalOff) / std::max(totalOff, 1e-9),
+                     100.0 * (switchesOn - switchesOff) / std::max(switchesOff, 1)));
+    WARN(fmt::format("§30 at the FIXED 0.05, for contrast: {:.4f} m vs {:.4f} m -- identical, and "
+                     "the seed-return count above says why",
+                     flatOff, flatOn));
+    WARN("§30 on Glowmere, as recorded: 0.3566 m -> 0.3792 m (+6.3%), worst 1.6437 m in both arms. "
+         "**That was taken at the fixed 0.05 on 1,738 samples**, so it is not directly comparable "
+         "with the derived row above -- what is comparable is the sign and the size of the gap "
+         "between arms.");
+
+    CHECK(switchesOff > 20);
+    CHECK(switchesOn > 20);
+    CHECK(withoutContacts > 0.0);
+    // The instrument has to be able to disagree with itself before a null means anything.
+    CHECK(flatOff == Approx(flatOn));  // the degenerate arm, asserted so its failure is visible
+    // Contacts are NOT inert on this content -- the arms disagree, which is the thing Glowmere
+    // could not show. Asserted in that direction only; which way the disagreement goes is what
+    // the two rows above are for.
+    CHECK(withContacts != Approx(withoutContacts));
+    (void)flatSwitchesOff;
+    (void)flatSwitchesOn;
+    (void)flatWorstOff;
+    (void)flatWorstOn;
 }

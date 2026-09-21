@@ -82,6 +82,26 @@ has to be measured against the database's own cost spread.
 > **A ratio whose denominator can approach zero measures the denominator.** An error metric needs a
 > scale that is a property of the data, not of how close this particular query happened to land.
 
+#### And the tell, so the rule is something you can check rather than something you must remember
+
+The rule above tells you what to avoid; it does not tell you when you have already done it. This
+does:
+
+> **Three orders of magnitude between a mean and a median means the denominator approaches zero
+> somewhere in the set.**
+
+Print both. A ratio whose denominator is safely bounded has a mean and a median within a small
+factor of each other; one that is not has a mean that is a description of its single smallest
+denominator. §20's cross-clip coverage bound reads **2142.95× as a mean of per-seed ratios and
+3.53× as a median** on the same 276 seeds — the mean is one near-static frame, whose next frame is
+nearly identical, dividing into everything. The median and the ratio of means agreed with each
+other and with the figure already on the record.
+
+**Three ratios in Phase C have now failed this way**: the 2957× staged-against-full cost above, the
+cost spread computed unweighted under a weighted numerator, and this one. The first two were caught
+by reasoning about the formula; this one was caught by the tell, which is cheaper and works when
+the formula looks fine.
+
 Every quantity of the form "how much worse is A than B" needs an explicit answer to *worse relative
 to what*, and the answer is almost never B itself. Here the scale is the measured gap between a good
 match and a typical one; in §41's foot slide it was the character's rest height; in §45's limb
