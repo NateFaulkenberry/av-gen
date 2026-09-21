@@ -28,6 +28,25 @@
 // had one caller, the parity test, and the bytes the shipped frame marched were assembled somewhere
 // else entirely. One list cannot disagree with itself, so the rows below reach through `field`.
 
+// **The panel, in the brief's §33 vocabulary.** The sections are the artist's words and the order
+// is the order somebody reaches for them, not this struct's field order: Shape, Cloud, Ground,
+// Flow, Turbulence, Appearance, Motion on the main page; Placement, Asymmetry and Flow (advanced)
+// behind the disclosure. Every one of the 57 rows carries a tooltip, because a row an artist cannot
+// interpret is a row they will not touch.
+//
+// **Two of §33's sections are deliberately absent, and saying so is the point.**
+//
+//   * **Particles.** §25 wants dust, debris and wisps as a secondary layer. None is implemented, so
+//     there are no rows for it. Adding "Particle Density" and "Particle Size" against nothing would
+//     be ADR-421's defect exactly -- a control that does nothing teaches an artist the system is
+//     broken, which is worse than one that is absent.
+//   * **Performance.** §35 wants ray steps, volume resolution and simulation bounds. Those are
+//     properties of the SHARED volumetric march (`Environment::volumeSteps`,
+//     `QualitySettings::volumeResolutionScale`), not of one medium in it. A per-effect "Ray Steps"
+//     would be a second opinion about a number the scene already owns, and the two would disagree
+//     the first time anybody changed either. `Detail` and the three octave weights are the per-
+//     effect half of the same idea and they are on the panel.
+
 #include "world/world_effects/effect_registry.hpp"
 
 #include <array>
@@ -150,7 +169,7 @@ constexpr EffectField kFields[] = {
     // ---- Rotation. §21's striations, which are what make a STILL frame read as turning.
     floatField("stripeCount", "Striations", 0.0f, 32.0f, 0.0f, 12.0f,
                GET(e.tornado.field.stripeCount), SETF(e.tornado.field.stripeCount))
-        .fmt("%.0f").main().sec("Rotation")
+        .fmt("%.0f").main().sec("Flow")
         .tooltip("How many condensation bands wind up the funnel. 0 switches them off and leaves\n"
                  "the column smooth, which is the diagnostic: a smooth funnel is ambiguous about\n"
                  "whether it is spinning at all, and no amount of motion in playback fixes a\n"
@@ -187,7 +206,9 @@ constexpr EffectField kFields[] = {
         .tooltip("Where they ride, as a fraction of the funnel radius. 1.0 is the wall, where the\n"
                  "shear is and where they actually are."),
     floatField("suctionWidth", "Vortex spread", 0.01f, 2.0f, 0.1f, 1.0f,
-               GET(e.tornado.field.suctionWidth), SETF(e.tornado.field.suctionWidth)).main(),
+               GET(e.tornado.field.suctionWidth), SETF(e.tornado.field.suctionWidth)).main()
+        .tooltip("How far up and down the wall the secondary vortices reach. Narrow keeps them as\n"
+                 "distinct scallops on the funnel; wide smears them into a general waviness."),
     floatField("suctionSpeed", "Vortex speed", -8.0f, 8.0f, 0.0f, 4.0f,
                GET(e.tornado.field.suctionSpeed), SETF(e.tornado.field.suctionSpeed)).main()
         .tooltip("Their own turn rate, ON TOP of the parent's. If this is 0 they are locked to the\n"
@@ -204,7 +225,7 @@ constexpr EffectField kFields[] = {
 
     // ---- Detail (§21). Everything above is the tornado; this is what makes it look natural.
     floatField("cloudAmount", "Detail", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.tornado.field.cloudAmount),
-               SETF(e.tornado.field.cloudAmount)).main().sec("Detail")
+               SETF(e.tornado.field.cloudAmount)).main().sec("Turbulence")
         .tooltip("The weight of the whole noise stack against the smooth analytic storm. At 0 you\n"
                  "see the tornado's STRUCTURE alone -- funnel, shell, skirt, wall cloud,\n"
                  "striations -- with no noise on it anywhere. That render is the test: if it is\n"
@@ -226,7 +247,11 @@ constexpr EffectField kFields[] = {
                  "sit at fixed ratios above it, because three independent scale sliders get set to\n"
                  "the same number and give one octave at triple amplitude."),
     floatField("detailContrast", "Detail contrast", 0.05f, 12.0f, 0.5f, 5.0f,
-               GET(e.tornado.field.detailContrast), SETF(e.tornado.field.detailContrast)).main(),
+               GET(e.tornado.field.detailContrast), SETF(e.tornado.field.detailContrast)).main()
+        .tooltip("How hard the difference is between a dense wisp and the gap beside it. Low is a\n"
+                 "soft even haze; high is separated clumps with clear air between them. It does NOT\n"
+                 "change how much medium there is -- the average is held constant -- so this moves\n"
+                 "the look of the smoke without needing Thickness re-tuned after it."),
     floatField("climbRate", "Detail climb", -4.0f, 4.0f, 0.0f, 0.6f, GET(e.tornado.field.climbRate),
                SETF(e.tornado.field.climbRate)).main()
         .tooltip("How fast detail is carried UP the column. This is what reads as material being\n"
@@ -238,7 +263,9 @@ constexpr EffectField kFields[] = {
         .tooltip("How much harder the detail bites where the storm is already thin. This is what\n"
                  "makes wisps break AWAY from the column instead of the whole thing fading evenly."),
     floatField("edgeWidth", "Edge width", 0.01f, 4.0f, 0.05f, 2.0f, GET(e.tornado.field.edgeWidth),
-               SETF(e.tornado.field.edgeWidth)).main(),
+               SETF(e.tornado.field.edgeWidth)).main()
+        .tooltip("How much of the storm counts as 'the edge' for Edge breakup above. Small erodes\n"
+                 "only the outermost skin; large lets the breakup eat into the body."),
 
     // ---- Appearance.
     colorField("colorThin", "Thin colour", GET(e.tornado.colorThin), SETC(e.tornado.colorThin))
@@ -270,13 +297,19 @@ constexpr EffectField kFields[] = {
                  "Scaled toward zero at the ground: a tornado is pinned at the surface, and a\n"
                  "base that wanders is a base that leaves the frame while the shot is held."),
     floatField("wobbleSpeed", "Wobble speed", 0.0f, 4.0f, 0.0f, 0.8f,
-               GET(e.tornado.field.wobbleSpeed), SETF(e.tornado.field.wobbleSpeed)).main(),
+               GET(e.tornado.field.wobbleSpeed), SETF(e.tornado.field.wobbleSpeed)).main()
+        .tooltip("How fast the column snakes. Slow reads as a heavy storm leaning in the wind; fast\n"
+                 "reads as a small nervous one. A dust devil wants this high."),
 
     // ---- Advanced: placement and the flow field itself.
     floatField("baseX", "Base X", -1e5f, 1e5f, -2000.0f, 2000.0f, GET(e.tornado.field.base.x),
-               SETF(e.tornado.field.base.x)).json("base/0").fmt("%.1f m").sec("Placement"),
+               SETF(e.tornado.field.base.x)).json("base/0").fmt("%.1f m").sec("Placement")
+        .tooltip("Where the column meets the ground, east-west. See Base Z for why this is a\n"
+                 "contact point rather than a centre."),
     floatField("baseY", "Base Y", -1e5f, 1e5f, -500.0f, 500.0f, GET(e.tornado.field.base.y),
-               SETF(e.tornado.field.base.y)).json("base/1").fmt("%.1f m"),
+               SETF(e.tornado.field.base.y)).json("base/1").fmt("%.1f m")
+        .tooltip("The ground height the column stands on. Raising it lifts the whole storm and its\n"
+                 "skirt together -- it does NOT make the funnel hang, which is Touchdown."),
     floatField("baseZ", "Base Z", -1e5f, 1e5f, -2000.0f, 2000.0f, GET(e.tornado.field.base.z),
                SETF(e.tornado.field.base.z)).json("base/2").fmt("%.1f m")
         .tooltip("Where the column MEETS THE GROUND -- not its centre. A tornado is defined by its\n"
@@ -284,17 +317,20 @@ constexpr EffectField kFields[] = {
                  "cosmic vortex's centre is the mouth of a funnel that descends, which is the\n"
                  "opposite convention, and confusing the two puts the column underground."),
     floatField("leanX", "Lean X", -1e4f, 1e4f, -500.0f, 500.0f, GET(e.tornado.field.lean.x),
-               SETF(e.tornado.field.lean.x)).json("lean/0").fmt("%.1f m").sec("Asymmetry"),
+               SETF(e.tornado.field.lean.x)).json("lean/0").fmt("%.1f m").sec("Asymmetry")
+        .tooltip("How far the top of the column leans east-west. See Lean Z."),
     floatField("leanZ", "Lean Z", -1e4f, 1e4f, -500.0f, 500.0f, GET(e.tornado.field.lean.y),
                SETF(e.tornado.field.lean.y)).json("lean/1").fmt("%.1f m")
         .tooltip("Metres of lateral offset at the TOP, quadratic in height, so the column stands\n"
                  "vertical where it meets the ground and tilts aloft. This is also what a wind\n"
                  "subscription drives: a storm column answers weather by bending, not by sliding."),
     floatField("footSoft", "Foot softness", 0.001f, 0.5f, 0.005f, 0.2f,
-               GET(e.tornado.field.footSoft), SETF(e.tornado.field.footSoft)).sec("Shape"),
+               GET(e.tornado.field.footSoft), SETF(e.tornado.field.footSoft)).sec("Shape")
+        .tooltip("How abruptly the funnel ends where Touchdown cuts it. Small gives a cleanly\n"
+                 "severed tip; large fades the funnel out over a stretch of its height."),
     floatField("circulation", "Circulation", 0.0f, 100000.0f, 0.0f, 5000.0f,
                GET(e.tornado.field.circulation), SETF(e.tornado.field.circulation))
-        .fmt("%.0f m2/s").log().sec("Flow field")
+        .fmt("%.0f m2/s").log().sec("Flow (advanced)")
         .tooltip("Gamma over two pi: the strength of the swirl in the Burgers-Rott velocity field.\n"
                  "Nothing in the picture reads this yet -- it is what particles, the grid solver\n"
                  "and a debug overlay sample, and what the striations turn at."),
@@ -316,7 +352,9 @@ constexpr EffectField kFields[] = {
                  "brief asks for the control, but it is stated here rather than discovered."),
     floatField("rotationCurve", "Spin curve", 0.05f, 6.0f, 0.2f, 3.0f,
                GET(e.tornado.field.rotationCurve), SETF(e.tornado.field.rotationCurve))
-        .sec("Rotation"),
+        .tooltip("How the spin blends from the low value to the high one over the height. 1 is a\n"
+                 "straight ramp; below 1 the storm reaches its top speed low down; above 1 it stays\n"
+                 "slow until near the cloud."),
 };
 
 #undef GET
