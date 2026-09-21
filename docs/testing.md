@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-nine ways a green suite has lied
+## Thirty ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -788,6 +788,44 @@ night from two agents who never spoke to each other.
    - **`^test cases:` is not printed when everything passes.** Catch2 prints `All tests passed
      (N assertions in M test cases)` instead, so a guard that greps only for `^test cases:` reads
      0 verdict lines on a perfect run. Grep for both.
+
+30. **A tolerance is a proxy for a property. When a feature lands that the proxy forbids, the
+   feature working looks exactly like the defect.**
+
+   A case called *"a fog bank is filled to its own axis"* guarded a real defect -- a 200 m hole in
+   the middle of a 900 m bank, inherited from a cyclone's eye. It guarded it by sampling outward
+   from the centre and requiring every sample **within 2% of the axis value**, which was a fair
+   proxy while the field was `rim * profile`.
+
+   Then a density response curve landed, and a bank *should* fall away faster than 2% by half a
+   radius. **The new feature working was indistinguishable from the old defect returning**, and the
+   case failed against correct code.
+
+   The repair is not a wider tolerance. **A hole means the centre reads LOWER than a point further
+   out**, so the case asserts that -- the axis is the maximum -- plus a control that the bank is
+   not simply empty. That form cannot be broken by any legitimate change to how fast the density
+   falls, because it is the property rather than a symptom of it.
+
+   The same case was wrong two more ways for the same underlying reason, and both are worth
+   recognising:
+
+   - **it sampled where the thing was not.** The probe ran at `y = 0`, and a control that slides
+     the densest layer between a bank's floor and its top put that layer a thickness *below* the
+     centre for three of ten presets. It computes the layer from the control now;
+   - **it measured along an axis whose length a preset owns.** Two neighbouring assertions sampled
+     a fixed multiple of the radius along the *long* axis to prove the field ended -- which stops
+     being outside the shape the moment somebody tunes the length. They use the short axis, whose
+     extent no control moves.
+
+   The generalisation, which is the whole of this document in one line: **a test encodes a claim,
+   and a proxy encodes a claim about a claim.** When the thing under test grows a feature, the
+   proxy is the part that silently stops meaning what it meant -- and it fails *loudly against
+   working code*, which is the good case. The bad case is the same drift in a proxy that stays
+   green (entries 22, 28): the harness that quietly narrowed, and the parity test that stopped
+   covering a term.
+
+   **Ask of every tolerance: what property is this standing in for, and can I assert that instead?**
+   Usually you can, and it is usually shorter.
 
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
