@@ -1328,13 +1328,37 @@ that every axis has motion somewhere along it. `report()` now says "populated" r
 a percentage that reads like coverage, and carries the reason inline. **`jointOccupancy` is the
 informative measure**, and it is a count.
 
-### §21 and §22 agree from opposite directions
+### §21 and §22 do **not** agree, and the correction is the result
 
-The 26 empty (speed × turn) cells are largely **turn** coverage — and turn variation is one of the
-three augmentation kinds §21's audit found missing from `VariantKind`. **The coverage analyzer has
-independently identified the gap the augmentation audit says the tools cannot currently fill.** Two
-sections arriving at the same hole from opposite directions is stronger than either alone, and it
-turns "turn variation is on the inventory list" into "turn variation is the next thing to build".
+I wrote here that the 26 empty (speed × turn) cells were largely *turn* coverage, and that the
+coverage analyzer had independently confirmed §21's missing turn-variation augmentation — two
+sections arriving at the same hole from opposite directions.
+
+**That was measured at eight bins, a number nothing justified.** Once the width is derived from what
+the matcher can distinguish, the grid is 3×3 and **9 of 9 cells are occupied**. The 26-cell gap was
+an artefact of the bin count. The agreement was between an audit and a measurement taken at an
+arbitrary resolution, which is not agreement.
+
+**The honest result is different and more useful: coverage analysis cannot motivate augmentation on
+this corpus**, because every distinction the matcher can make is already populated. The case for
+building turn variation now rests on §21's audit against C's text — which still stands — or on a
+corpus large enough to have gaps at this resolution, which is §20.
+
+The instrument can still see absence when there is absence: pinned to 128 bins it reports gaps. That
+is what distinguishes "no gaps at this resolution" from "cannot report a gap", and it is asserted,
+because without it the result above is indistinguishable from a broken analyzer.
+
+### The resolution is derived per run, not stored
+
+The width is calibrated against the **weight vector**, and §10 made those weights mutable for the
+first time — before that they were read by nothing. A stored resolution would be invalidated by the
+first person to tune them, silently. That is ADR-389: a coefficient tuned against a quantity is
+invalidated by a change to that quantity's distribution.
+
+So `MotionCoverageOptions::bins` defaults to **0, meaning "derive it from the matcher in hand"**. It
+costs a few dozen probe searches per analysis, and it makes the resolution a *reported property of
+the run* — `bin width derived from THIS matcher: 0.876 m/s` — which tells the reader how finely this
+matcher can be interrogated today rather than how finely one could be at some point in the past.
 
 ## §24 — the horizons, experimentally validated
 
@@ -1352,7 +1376,15 @@ hand over the answer:
 | {0.1, 0.2, 0.4, 0.8} | 37 | 168 | 92.4% | 11.34 |
 | {0.2, 0.4, 0.6, 0.8, 1.0} | 41 | 184 | 91.1% | 11.84 |
 
-**The shipping default wins, and more horizons make it worse while costing more** — 92.4% and 91.1%
-for 37 and 41 dimensions. That is §24's own warning ("do not assume every dimension improves
-quality") demonstrated rather than quoted. The result is *reported* and only weakly asserted:
-asserting that the current value is best would be the conclusion writing the experiment.
+**The shipping default wins, and the claim I can support is the weaker one.** Retrieval is computed
+over ~158 probes, so the standard error on a 93% rate is about 2 points — which means the 93.0 /
+92.4 / 91.1 decline across 33, 37 and 41 dimensions is *suggestive and not significant*, and "more
+horizons make it worse" is more than the data carries.
+
+**What the data does carry is decisive on its own: more horizons buy no measurable gain and cost
+more.** The cost side is exact rather than sampled — 37 and 41 dimensions against 33, 168 and 184
+bytes per sample against 152, 11.34 and 11.84 µs against ~10.9. That is §24's own warning ("do not
+assume every dimension improves quality") demonstrated without needing a noise analysis.
+
+The result is *reported* and only weakly asserted: asserting that the current value is best would be
+the conclusion writing the experiment, and the same scepticism has to apply to the decline.

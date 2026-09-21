@@ -73,11 +73,28 @@ struct MotionCoverageReport {
     // because a joint-occupancy *percentage* is the trap this header exists to avoid.
     std::uint32_t jointOccupancy = 0;
     std::uint32_t jointCells = 0;
+    // The speed change needed before the search returns a different sample, measured on this
+    // database with its current weights. The bin count is derived from it when `bins` is 0.
+    float speedResolution = 0.0f;
+    bool resolutionDerived = false;
     [[nodiscard]] std::string report() const;
 };
 
 struct MotionCoverageOptions {
-    std::uint32_t bins = 8;
+    // **0 means "derive it from the matcher in hand", and that is the default for a reason.**
+    //
+    // The bin width that makes a gap meaningful is the difference the matcher can act on, and that
+    // is a property of the **weight vector**, not a constant. Phase C §10 made those weights
+    // actually do something for the first time -- before that they were read by nothing -- so the
+    // first person to tune them would silently invalidate any stored resolution. That is ADR-389:
+    // a coefficient tuned against a quantity is invalidated by a change to that quantity's
+    // distribution, and a stored constant with no check is the thing that goes stale.
+    //
+    // Deriving it per run costs a few dozen probe searches, which is nothing beside building the
+    // database, and it makes the resolution a **reported property of this run** rather than a fixed
+    // number -- which is more honest anyway: it tells the reader how finely this matcher can be
+    // interrogated today.
+    std::uint32_t bins = 0;
     float maxSpeed = 3.0f;       // m/s; the top of the speed axis
     float maxAcceleration = 6.0f;// m/s^2
     float maxTurnRate = 3.0f;    // rad/s

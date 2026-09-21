@@ -55,10 +55,15 @@ AxisCoverage binAxis(CoverageAxis axis, const std::vector<float>& values, std::u
 
 std::string MotionCoverageReport::report() const {
     std::string out = fmt::format(
-        "coverage over {} samples (per-axis figures are a POPULATED-NESS check, not coverage: the "
-        "matcher's own resolution is ~1.08 m/s of speed, so a fine-binned marginal reports "
-        "sampling sparsity and a coarse one cannot report a gap at all)\n",
+        "coverage over {} samples (per-axis figures are a POPULATED-NESS check, not coverage: a "
+        "fine-binned marginal reports sampling sparsity and a coarse one cannot report a gap at "
+        "all)\n",
         samples);
+    if (resolutionDerived) {
+        out += fmt::format("  bin width derived from THIS matcher: {:.3f} m/s of speed changes its "
+                           "answer, with the weights this database carries\n",
+                           speedResolution);
+    }
     for (const AxisCoverage& axis : axes) {
         out += fmt::format("  {:<15} {:>3}/{:<3} bins populated", coverageAxisName(axis.axis),
                            axis.occupied, axis.bins);
@@ -79,6 +84,44 @@ std::string MotionCoverageReport::report() const {
                        jointOccupancy, jointCells);
     return out;
 }
+
+namespace {
+
+// How much the requested forward speed must change before the search returns a different sample,
+// with the weights this database currently carries. Probed rather than assumed, and probed sparsely
+// -- a few dozen samples is enough for a width, and this runs on every analysis.
+float deriveSpeedResolution(const MotionDatabase& db, std::size_t forward) {
+    if (forward >= db.dimension || db.sampleCount() == 0) {
+        return 0.0f;
+    }
+    const MotionCostWeights weights;
+    double total = 0.0;
+    int measured = 0;
+    const std::uint32_t stride = std::max(db.sampleCount() / 32u, 1u);
+    for (std::uint32_t s = 0; s < db.sampleCount(); s += stride) {
+        MotionQuery query;
+        query.features.assign(db.dimension, 0.0f);
+        const float* f = db.featuresFor(s);
+        std::copy(f, f + db.dimension, query.features.begin());
+        const MotionMatch baseline = searchMotion(db, query, weights);
+        if (!baseline.found()) {
+            continue;
+        }
+        for (int step = 1; step <= 300; ++step) {
+            const float metres = static_cast<float>(step) * 0.01f;
+            query.features[forward] = f[forward] + metres * db.scale[forward];
+            const MotionMatch moved = searchMotion(db, query, weights);
+            if (moved.found() && moved.sample != baseline.sample) {
+                total += metres;
+                ++measured;
+                break;
+            }
+        }
+    }
+    return measured > 0 ? static_cast<float>(total / measured) : 0.0f;
+}
+
+} // namespace
 
 MotionCoverageReport measureMotionCoverage(const MotionDatabase& db,
                                            const MotionCoverageOptions& options) {
@@ -143,19 +186,30 @@ MotionCoverageReport measureMotionCoverage(const MotionDatabase& db,
         }
     }
 
-    out.axes.push_back(binAxis(CoverageAxis::Speed, speed, options.bins, 0.0f, options.maxSpeed));
+    // Derive the bin count from the matcher's own resolution unless the caller pinned one.
+    std::uint32_t bins = options.bins;
+    if (bins == 0u) {
+        out.speedResolution = deriveSpeedResolution(db, rootVelocity + 2u);
+        out.resolutionDerived = out.speedResolution > 0.0f;
+        bins = out.resolutionDerived
+                   ? static_cast<std::uint32_t>(std::max(
+                         1.0f, std::round(options.maxSpeed / out.speedResolution)))
+                   : 8u;
+    }
+
+    out.axes.push_back(binAxis(CoverageAxis::Speed, speed, bins, 0.0f, options.maxSpeed));
     out.axes.push_back(
-        binAxis(CoverageAxis::Direction, direction, options.bins, -3.14159265f, 3.14159265f));
-    out.axes.push_back(binAxis(CoverageAxis::Acceleration, acceleration, options.bins,
+        binAxis(CoverageAxis::Direction, direction, bins, -3.14159265f, 3.14159265f));
+    out.axes.push_back(binAxis(CoverageAxis::Acceleration, acceleration, bins,
                                -options.maxAcceleration, options.maxAcceleration));
     out.axes.push_back(
-        binAxis(CoverageAxis::TurnRate, turn, options.bins, -options.maxTurnRate, options.maxTurnRate));
-    out.axes.push_back(binAxis(CoverageAxis::Phase, phase, options.bins, 0.0f, 1.0f));
+        binAxis(CoverageAxis::TurnRate, turn, bins, -options.maxTurnRate, options.maxTurnRate));
+    out.axes.push_back(binAxis(CoverageAxis::Phase, phase, bins, 0.0f, 1.0f));
     out.axes.push_back(binAxis(CoverageAxis::LocomotionMode, mode, 4u, 0.0f, 4.0f));
 
     // The one pairing where a gap means something concrete -- a fast turn -- reported as a count,
     // because a joint-occupancy percentage over six axes is the trap this analyzer exists to avoid.
-    const std::uint32_t grid = std::max(options.bins, 1u);
+    const std::uint32_t grid = std::max(bins, 1u);
     out.jointCells = grid * grid;
     std::vector<bool> cells(out.jointCells, false);
     for (std::size_t i = 0; i < turn.size() && i + 1 < speed.size(); ++i) {

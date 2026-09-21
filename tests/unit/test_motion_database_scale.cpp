@@ -1300,10 +1300,27 @@ TEST_CASE("coverage across the six axes C names, with its gaps", "[motionscale][
         CHECK(axis.occupied <= axis.bins);
     }
 
-    // **At 8 bins every axis is 100% covered with no gaps, and that is a fact about the bin count
-    // rather than about the corpus.** So the coarse marginal report is kept for what it is -- a
-    // sanity check that every axis is populated at all -- and the assertion that the analyzer can
-    // see absence is made where absence is actually visible.
+    // **At the resolution this matcher can actually distinguish, the corpus has no gaps at all --
+    // and that invalidated a conclusion I had already drawn.**
+    //
+    // With an arbitrary 8 bins the (speed x turn) grid read 38 of 64 cells, and I wrote that up as
+    // the coverage analyzer independently confirming §21's missing *turn variation* augmentation.
+    // At the derived resolution the grid is 3x3 and **9 of 9 cells are occupied**. The 26-cell
+    // "gap" was an artefact of the bin count, not a fact about the corpus, and the agreement
+    // between §21 and §22 was an agreement between an audit and a measurement taken at a
+    // resolution nobody had justified.
+    //
+    // So the honest result is different and more useful: **coverage analysis cannot motivate
+    // augmentation on this corpus.** Every distinction the matcher can make is already populated.
+    // The case for building turn variation has to rest on §21's audit against C's text, or on a
+    // corpus large enough to have gaps at this resolution -- which is §20, blocked.
+    CHECK(report.resolutionDerived);
+    CHECK(report.speedResolution > 0.0f);
+    CHECK(report.jointOccupancy == report.jointCells);
+
+    // The instrument can still see absence when there is absence to see: pinning a fine bin count
+    // produces gaps, which is what distinguishes "no gaps at this resolution" from "cannot report
+    // a gap". Without this the result above would be indistinguishable from a broken analyzer.
     scene::MotionCoverageOptions fine;
     fine.bins = 128u;
     const scene::MotionCoverageReport detailed = scene::measureMotionCoverage(*db, fine);
@@ -1311,17 +1328,10 @@ TEST_CASE("coverage across the six axes C names, with its gaps", "[motionscale][
     for (const scene::AxisCoverage& axis : detailed.axes) {
         fineGaps += static_cast<std::uint32_t>(axis.gaps.size());
     }
-    WARN(fmt::format("at 128 bins the six axes have {} empty bins between them", fineGaps));
+    WARN(fmt::format("pinned to 128 bins the six axes have {} empty bins -- mostly sampling "
+                     "sparsity at that width, which is why 128 is not the default",
+                     fineGaps));
     CHECK(fineGaps > 0u);
-
-    // **And the joint occupancy is the number that carried information all along**: 38 of 64
-    // (speed x turn) cells, which is a gap of 26 cells that a marginal report called 100% covered.
-    // That inverts the framing this analyzer was written with -- the pairing is the informative
-    // measure and the marginals are the near-vacuous one -- and it is why the pairing is reported
-    // as a count rather than as a percentage buried among five other percentages.
-    CHECK(report.jointCells == 64u);
-    CHECK(report.jointOccupancy > 0u);
-    CHECK(report.jointOccupancy < report.jointCells);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1439,9 +1449,16 @@ TEST_CASE("the trajectory horizons, experimentally validated", "[motionscale][ph
                                 100.0);
         }
 
+        // §24's numbers are a *rate over samples*, so they carry sampling error and the write-up
+        // has to respect it: at ~158 probes the standard error on a 93% rate is about 2 points, so
+        // a 0.6-point difference between configurations is not a difference. Reported with the n
+        // and the interval so nobody reads the decline as significant.
         const double retrieval = 100.0 * hits / trials;
-        WARN(fmt::format("{}  {:>3}  {:>12.0f}  {:8.1f}%  {:8.2f}", set.name, db->dimension,
-                         db->dimension * 4.0 + 20.0, retrieval, best));
+        const double stderrPoints =
+            100.0 * std::sqrt((retrieval / 100.0) * (1.0 - retrieval / 100.0) / trials);
+        WARN(fmt::format("{}  {:>3}  {:>12.0f}  {:6.1f}% +-{:.1f} (n={})  {:8.2f}", set.name,
+                         db->dimension, db->dimension * 4.0 + 20.0, retrieval, stderrPoints,
+                         trials, best));
         if (set.times.size() == 3) {
             defaultRetrieval = retrieval;
         }
@@ -1461,6 +1478,11 @@ TEST_CASE("the trajectory horizons, experimentally validated", "[motionscale][ph
     // the experiment.
     CHECK(defaultRetrieval > 0.0);
     CHECK(bestRetrieval >= defaultRetrieval);
+    // **The claim that is actually supported**, and it needs no noise analysis because the cost
+    // side is exact rather than sampled: adding horizons beyond the default costs dimensions,
+    // bytes and microseconds, and buys nothing measurable. Whether it makes retrieval *worse* is
+    // suggestive at this sample size and is deliberately not asserted.
+    CHECK(defaultRetrieval + 3.0 > bestRetrieval);
 }
 
 // ---------------------------------------------------------------------------------------------
