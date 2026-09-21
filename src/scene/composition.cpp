@@ -11,6 +11,7 @@
 #include "scene/camera.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/mesh_metrics.hpp"
+#include "scene/scatter_anchors.hpp"
 #include "scene/sky.hpp"
 
 #include <glm/gtc/quaternion.hpp>
@@ -533,6 +534,15 @@ json particlesToJson(const ParticleSystem& s) {
         j["clusterCount"] = s.clusterCount;
         j["clusterRadius"] = s.clusterRadius;
     }
+    if (s.scatterAnchor.active()) {
+        json a = json::object();
+        a["terrain"] = s.scatterAnchor.terrain;
+        a["layers"] = s.scatterAnchor.layers;
+        a["randomBelow"] = s.scatterAnchor.randomBelow;
+        a["litOnly"] = s.scatterAnchor.litOnly;
+        a["viewDistance"] = s.scatterAnchor.viewDistance;
+        j["scatterAnchor"] = std::move(a);
+    }
     if (s.pauseRate != 0.0f) {
         j["pauseRate"] = s.pauseRate;
         j["pauseFraction"] = s.pauseFraction;
@@ -729,6 +739,36 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
             return fail("'clusterCount' must be a positive integer");
         }
         s.clusterCount = j.at("clusterCount").get<std::uint32_t>();
+    }
+    if (j.contains("scatterAnchor")) {
+        const json& a = j.at("scatterAnchor");
+        if (!a.is_object()) {
+            return fail("'scatterAnchor' must be an object");
+        }
+        auto terrain = readString(a, "terrain", "");
+        auto randomBelow = readFloat(a, "randomBelow", s.scatterAnchor.randomBelow);
+        auto litOnly = readBool(a, "litOnly", s.scatterAnchor.litOnly);
+        auto viewDistance = readFloat(a, "viewDistance", s.scatterAnchor.viewDistance);
+        if (!terrain || !randomBelow || !litOnly || !viewDistance) {
+            return fail("'scatterAnchor' needs a string 'terrain', numeric 'randomBelow' and 'viewDistance' and a "
+                        "boolean 'litOnly'");
+        }
+        if (!a.contains("layers") || !a.at("layers").is_array() || a.at("layers").empty()) {
+            return fail("'scatterAnchor' needs a non-empty 'layers' array of scatter layer names");
+        }
+        for (const json& layer : a.at("layers")) {
+            if (!layer.is_string()) {
+                return fail("'scatterAnchor.layers' entries must be strings");
+            }
+            s.scatterAnchor.layers.push_back(layer.get<std::string>());
+        }
+        if (terrain->empty()) {
+            return fail("'scatterAnchor' needs the name of the terrain node whose layers it reads");
+        }
+        s.scatterAnchor.terrain = *terrain;
+        s.scatterAnchor.randomBelow = *randomBelow;
+        s.scatterAnchor.litOnly = *litOnly;
+        s.scatterAnchor.viewDistance = *viewDistance;
     }
     for (const auto& [key, target] : {std::pair<const char*, std::uint32_t*>{"trailLength", &s.trailLength},
                                       std::pair<const char*, std::uint32_t*>{"trailStride", &s.trailStride}}) {
@@ -1310,6 +1350,8 @@ void prefixFieldReferences(ParticleSystem& ps, const std::string& prefix) {
         f.field = prefixed(prefix, f.field);
     }
     ps.spline = prefixed(prefix, ps.spline);
+    // The terrain's scatter objects are named with the same prefix (scatterObjectName below).
+    ps.scatterAnchor.terrain = prefixed(prefix, ps.scatterAnchor.terrain);
 }
 void prefixSdfReferences(spatial::SdfNode& node, const std::string& prefix) {
     node.reference = prefixed(prefix, node.reference);
@@ -5681,7 +5723,7 @@ void Composition::rebuild() {
                     }
                 }
                 ProceduralGeometry pg;
-                pg.name = sanitise(prefix_) + node.name + "_" + layer.name;
+                pg.name = scatterObjectName(sanitise(prefix_) + node.name, layer.name);
                 pg.source.kind = PrimitiveKind::Mesh;
                 pg.source.asset = layer.asset;
                 pg.source.meshBudget = layer.meshBudget;

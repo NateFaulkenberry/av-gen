@@ -91,6 +91,35 @@ struct FieldForce {
 };
 constexpr int kMaxFieldForces = 4;
 
+// Cluster centres that are real scatter instances rather than `clusterRand` points.
+//
+// A terrain's trees are not nodes: they are scatter layers, tens of thousands of placements that
+// `world::scatter` produces and the procedural objects upload as instance records. Those records
+// are on the CPU as well as the GPU -- `ProceduralGeometry::instances` is exactly what is uploaded
+// -- so a swarm can be centred on an actual tree without anything re-deriving where the trees are.
+//
+// Each frame the CPU takes every instance of the named layers that passes the gate, keeps the ones
+// within `viewDistance` of the camera, nearest first, at most `clusterCount` of them, and uploads
+// the centre of each one's crown (scene/scatter_anchors.hpp). The table is a pure function of the
+// scene and the camera, never of frame history, so a scrub lands on the same swarms (ADR-360).
+// Each particle keeps the anchor it was born at, and the system's attractor -- strength, radius
+// and orbit, as authored -- pulls it round that anchor rather than round `attractorPosition`.
+//
+// The gate is the one a material program can read: `instanceRandom.w < randomBelow`, and with
+// `litOnly` the specimen must also be one `emissiveSparsity` left lit (a non-zero
+// `instanceEmissive`). A program that tests the same `instanceRandom.w` therefore lights exactly
+// the trees the swarms circle, which is what lets the two read as one effect.
+struct ScatterAnchor {
+    std::string terrain;             // the terrain node whose scatter layers are read
+    std::vector<std::string> layers; // scatter layer names on it
+    float randomBelow = 1.0f;        // instanceRandom.w < this; 1 takes every instance
+    bool litOnly = false;            // and only specimens with a non-zero instance emissive
+    float viewDistance = 50.0f;      // metres from the camera to the crown centre
+    [[nodiscard]] bool active() const { return !terrain.empty() && !layers.empty(); }
+};
+// The most anchors one system can use at once: the size of the table in the particle uniforms.
+constexpr std::uint32_t kMaxScatterAnchors = 64;
+
 struct ParticleSystem {
     std::string name = "particles";
     bool enabled = true;
@@ -221,6 +250,14 @@ struct ParticleSystem {
     // still; between pauses it moves at whatever the forces give it. Rate 0 is off.
     float pauseRate = 0.0f;
     float pauseFraction = 0.5f;
+
+    // ---- Scatter-anchored clusters -----------------------------------------------------------
+    // The clusters above with their centres taken from real scatter instances instead of from
+    // `clusterRand` (see ScatterAnchor). `clusterCount` is then the most anchors used at once
+    // (at most kMaxScatterAnchors) and `clusterRadius` the spawn jitter round each one, and
+    // `spawnRate` is the rate with the table full: it scales with the anchors actually in range,
+    // so a tree's swarm is as dense with three trees nearby as with sixty.
+    ScatterAnchor scatterAnchor;
 
     // ---- ADR-520: catching the light ----------------------------------------------------------
     // Dust is not visible because it is bright; it is visible because it is BETWEEN you and a
