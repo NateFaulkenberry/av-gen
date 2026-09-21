@@ -1332,9 +1332,22 @@ TEST_CASE("coverage across the six axes C names, with its gaps", "[motionscale][
     // augmentation on this corpus.** Every distinction the matcher can make is already populated.
     // The case for building turn variation has to rest on §21's audit against C's text, or on a
     // corpus large enough to have gaps at this resolution -- which is §20, blocked.
+    //
+    // **Retracted in part, 2026-09-21.** "Every distinction is populated" was measured on features
+    // in which the last sample of every clip read a root velocity of zero, a fictitious stop per
+    // clip (found by `agent/anim-cinfra`, fixed in feature extraction version 2). Those samples
+    // were not motion, and they were occupying cells. With them corrected, the derived resolution
+    // moves from 1.083 to 0.789 m/s, the grid becomes 4x4, and **13 of 16 cells are occupied**:
+    // there are gaps at the matcher's own resolution after all. So coverage analysis *can* motivate
+    // augmentation on this corpus, and the equality this test used to assert is no longer true.
+    // The occupancy is reported, not pinned. It depends on every feature definition upstream, and
+    // two more corrections (the facing frame and implied travel) are about to move it again.
     CHECK(report.resolutionDerived);
     CHECK(report.speedResolution > 0.0f);
-    CHECK(report.jointOccupancy == report.jointCells);
+    CHECK(report.jointOccupancy > 0u);
+    CHECK(report.jointOccupancy <= report.jointCells);
+    WARN(fmt::format("(speed x turn) at the derived resolution: {} of {} cells occupied",
+                     report.jointOccupancy, report.jointCells));
 
     // The instrument can still see absence when there is absence to see: pinning a fine bin count
     // produces gaps, which is what distinguishes "no gaps at this resolution" from "cannot report

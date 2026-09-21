@@ -61,6 +61,8 @@ private:
 };
 
 void digestSchema(Digest& d, const MotionFeatureConfig& config) {
+    // How each dimension is computed, not only which exist (§36).
+    d.value(kMotionFeatureExtractionVersion);
     d.value(static_cast<std::uint32_t>(config.joints.size()));
     for (const std::string& j : config.joints) {
         d.text(j);

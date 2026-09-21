@@ -343,6 +343,59 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
             static_cast<std::uint32_t>(std::max(2.0f, std::floor(length * rate + 0.5f) + 1.0f));
         const std::uint32_t firstSample = db.sampleCount();
 
+        // ---- what lies past the clip's last key ------------------------------------------------
+        //
+        // **Every look ahead used to be clamped at the clip's end**, so the last sample of every
+        // clip read a root velocity of zero and its trajectory shrank to nothing over the final
+        // horizon. That included looping walks. Each moving clip therefore ended in a fictitious
+        // stop, and a query landing on a clip's last frame saw a body at rest. `agent/anim-cinfra`
+        // found it while building §58's category report.
+        //
+        // The honest continuation depends on what the clip is:
+        //   * a **looping** clip continues into its own start, one cycle's travel further on.
+        //     Anything else would contradict `sampleNext`, which already says so;
+        //   * a **non-looping** clip continues at the velocity it ended with. That is the least
+        //     assumption, and a clip that ends at rest (every death here) extrapolates to rest,
+        //     so it is unchanged.
+        const auto rootAt = [&](float time) {
+            setRestPose(pack.skeleton, poseAhead);
+            sampleClip(clip, time, poseAhead);
+            poseToModel(pack.skeleton, poseAhead, modelAhead);
+            return glm::vec3(modelAhead[static_cast<std::size_t>(root)][3]);
+        };
+        const glm::vec3 rootFirst = rootAt(clip.start);
+        const glm::vec3 rootLast = rootAt(clip.duration);
+        const glm::vec3 rootBeforeLast = rootAt(std::max(clip.start, clip.duration - dt));
+        const glm::vec3 cycleTravel =
+            meta.loop ? glm::vec3(rootLast.x - rootFirst.x, 0.0f, rootLast.z - rootFirst.z)
+                      : glm::vec3(0.0f);
+        const glm::vec3 endVelocity =
+            meta.loop ? glm::vec3(0.0f)
+                      : glm::vec3(rootLast.x - rootBeforeLast.x, 0.0f,
+                                  rootLast.z - rootBeforeLast.z) / dt;
+        // Pose `modelAhead` at `time`, which may lie past the end, and return the planar offset
+        // the continuation adds to everything in it. The offset moves the whole body, so it
+        // cancels in body-relative quantities and appears only in the root's own travel.
+        const auto sampleAhead = [&](float time) {
+            float local = time;
+            glm::vec3 offset(0.0f);
+            if (time > clip.duration) {
+                if (meta.loop && length > 0.0f) {
+                    const float over = time - clip.start;
+                    const float cycles = std::floor(over / length);
+                    local = clip.start + (over - (cycles * length));
+                    offset = cycleTravel * cycles;
+                } else {
+                    local = clip.duration;
+                    offset = endVelocity * (time - clip.duration);
+                }
+            }
+            setRestPose(pack.skeleton, poseAhead);
+            sampleClip(clip, local, poseAhead);
+            poseToModel(pack.skeleton, poseAhead, modelAhead);
+            return offset;
+        };
+
         for (std::uint32_t f = 0; f < frames; ++f) {
             const float t = std::min(clip.start + (static_cast<float>(f) * dt), clip.duration);
             setRestPose(pack.skeleton, pose);
@@ -351,14 +404,13 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
             // One step ahead, for velocities. A forward difference rather than a central one so
             // that the first sample of a clip is not a special case; the error is one frame of
             // acceleration, which is below the noise in the source.
-            const float tAhead = std::min(t + dt, clip.duration);
-            setRestPose(pack.skeleton, poseAhead);
-            sampleClip(clip, tAhead, poseAhead);
-            poseToModel(pack.skeleton, poseAhead, modelAhead);
+            const glm::vec3 aheadOffset = sampleAhead(t + dt);
 
             const glm::vec3 body(model[static_cast<std::size_t>(root)][3]);
+            // Body-relative quantities use the pose as sampled; the continuation's offset moves
+            // the whole body and would cancel anyway.
             const glm::vec3 bodyAhead(modelAhead[static_cast<std::size_t>(root)][3]);
-            const glm::vec3 rootVelocity = (bodyAhead - body) / dt;
+            const glm::vec3 rootVelocity = ((bodyAhead + aheadOffset) - body) / dt;
 
             const std::size_t base = db.features.size();
             db.features.resize(base + dim);
@@ -385,11 +437,9 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
             // repository. Built anyway because it is correct and because 100STYLE exercises it;
             // `deadDimensions` below reports when it contributed nothing.
             for (const float ahead : options.config.trajectoryTimes) {
-                const float ft = std::min(t + ahead, clip.duration);
-                setRestPose(pack.skeleton, poseAhead);
-                sampleClip(clip, ft, poseAhead);
-                poseToModel(pack.skeleton, poseAhead, modelAhead);
-                const glm::vec3 future(modelAhead[static_cast<std::size_t>(root)][3]);
+                const glm::vec3 offset = sampleAhead(t + ahead);
+                const glm::vec3 future =
+                    glm::vec3(modelAhead[static_cast<std::size_t>(root)][3]) + offset;
                 const glm::vec3 delta = future - body;
                 out[k++] = delta.x;
                 out[k++] = delta.z;
@@ -601,7 +651,7 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
         float cost = 0.0f;
         for (std::size_t d = 0; d < dim; ++d) {
             const float delta = q[d] - f[d];
-            cost += delta * delta * (weighted ? dimWeight[d] : 1.0f);
+            cost += motionFeatureTerm(delta, weighted ? dimWeight[d] : 1.0f);
             if (best.found() && cost >= bestCost) {
                 break;
             }
@@ -730,7 +780,7 @@ MotionMatch searchMotionStaged(const MotionDatabase& db, const MotionQuery& quer
         float cost = 0.0f;
         for (std::size_t d = 0; d < prefix; ++d) {
             const float delta = q[d] - f[d];
-            cost += delta * delta * (weighted ? dimWeight[d] : 1.0f);
+            cost += motionFeatureTerm(delta, weighted ? dimWeight[d] : 1.0f);
         }
         if (shortlist.size() < plan.shortlist) {
             shortlist.emplace_back(cost, s);
@@ -770,7 +820,7 @@ MotionMatch searchMotionStaged(const MotionDatabase& db, const MotionQuery& quer
         float cost = 0.0f;
         for (std::size_t d = 0; d < dim; ++d) {
             const float delta = q[d] - f[d];
-            cost += delta * delta * (weighted ? dimWeight[d] : 1.0f);
+            cost += motionFeatureTerm(delta, weighted ? dimWeight[d] : 1.0f);
         }
         if (query.current != MotionDatabase::kInvalid) {
             const bool continues =

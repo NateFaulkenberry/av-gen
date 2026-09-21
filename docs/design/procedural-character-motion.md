@@ -2353,7 +2353,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 18 | Real data first | done | `369b7027` |
 | 19 | First database from Glowmere | done | `369b7027`. Re-checked in `3b66b565` |
 | 20 | 100STYLE scale experiment | done | `d67fc36a` (ADR-612 amended; the licence is CC BY 4.0, `bc56f7f1`) |
-| 21 | Motion augmentation | **partial** | `03659866` audit: 4 of the 7 kinds exist. **Missing: directional warping, turn variation and start/stop variants.** `motion_variants` has no product consumer |
+| 21 | Motion augmentation | **partial** | **Corrected after reading the generator, not the enum.** `03659866` counted 4 of 7 kinds from `VariantKind`. Only **speed** is actually generated. `strideWarp` is a function nothing calls, `Mirror` is an enum value with no implementation, and `VariantOptions::mirror` is a dead knob. Root-motion adaptation exists separately (`adaptRootMotion`). **Missing: mirroring, stride, directional warping, turn variation and start/stop variants.** `generateVariants` has no caller outside its test |
 | 22 | Coverage analysis | done | `03659866`, `8a90148a`, `38017f94` |
 | 23 | Database quality analyzer | done | `8c9165fa`, `4fdde514` |
 | 24 | Trajectory representation | done | `8a90148a`, re-taken in `3b66b565`. `49aeb2ea` voids only its §20 queue item |
@@ -2368,7 +2368,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 33 | Integrate with Phase B layers | done | `528e5dec`, the audit. One latent defect is recorded there |
 | 34 | Matching does not own behaviour | done | `528e5dec`, the audit |
 | 35 | Fallback system | **partial** (owner) | The mechanism is typed and tested but unreachable, because the chain has one entry (ADR-615, staged and dark). This is the owner's decision |
-| 36 | Database versioning | **partial** | Packs carry a version, a skeleton digest and a tool version, and a wrong one is refused (`test_motion_pack.cpp`). **Missing: a feature-schema version and a retarget-profile version.** The database is built in memory and never persisted, so it has no version of its own |
+| 36 | Database versioning | done (via merge) | `9ebbb173` (`agent/anim-cinfra`, merged in `54f30cc3`): the database is a file with a format version, a feature schema digest, the skeleton digest, a pack content digest that includes the provenance chain (where the retarget profile is recorded), and a tool version. Incompatible files are refused on load. **Added here:** `kMotionFeatureExtractionVersion`, folded into the schema digest, so a change in how a feature is *computed*, not only which features exist, also invalidates stored data |
 | 44 | Motion style | **partial** | Style travels in the request and the clip provider reads it. **The matcher ignores style**: there is no style tag or cost term |
 | 45 | Search weights | **partial** | All 8 weights are configurable and live (ADR-608; `test_motion_cost.cpp:56`). **Missing: a versioned configuration** |
 | 46 | Automated search evaluation | **partial** | The pieces exist: pose-space retrieval (`test_cross_clip_matching.cpp`), jump rate (`test_motion_database_scale.cpp:658`), plant discontinuity. **Missing: one ground-truth harness that reports all seven measures** |

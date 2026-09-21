@@ -45,8 +45,13 @@ MotionCandidateCost motionCandidateCost(const MotionDatabase& db, const MotionQu
         !((query.requireTags != 0 && (tags & query.requireTags) != query.requireTags) ||
           (query.rejectTags != 0 && (tags & query.rejectTags) != 0));
 
-    // **The same arithmetic as `searchMotion`, in the same order**, so `total` for the search's
-    // winner equals `MotionMatch::cost` to the bit. A test holds the two together.
+    // **The same arithmetic as `searchMotion`, in the same order and in the same expression
+    // shape**, so `total` for the search's winner equals `MotionMatch::cost` to the bit. A test
+    // holds the two together.
+    //
+    // The per-dimension term comes from `motionFeatureTerm`, the one both sides call. Written out
+    // as an expression here, it rounded differently from the search's, and the two disagreed by
+    // one ULP once the feature values changed.
     const std::vector<MotionFeatureGroup> layout = motionFeatureLayout(db.config);
     const std::vector<float> dimWeight = motionFeatureWeights(db.config);
     const bool weighted = dimWeight.size() == dim && layout.size() == dim;
@@ -55,7 +60,7 @@ MotionCandidateCost motionCandidateCost(const MotionDatabase& db, const MotionQu
     float cost = 0.0f;
     for (std::size_t d = 0; d < dim; ++d) {
         const float delta = q[d] - f[d];
-        const float term = delta * delta * (weighted ? dimWeight[d] : 1.0f);
+        const float term = motionFeatureTerm(delta, weighted ? dimWeight[d] : 1.0f);
         cost += term;
         if (weighted) {
             out.breakdown.terms[static_cast<std::size_t>(layout[d])] += term;

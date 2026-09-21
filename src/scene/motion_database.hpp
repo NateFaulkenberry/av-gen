@@ -56,6 +56,31 @@ enum class MotionTag : std::uint32_t {
 [[nodiscard]] std::uint32_t motionTagsFor(const PackClip& clip, const ClipAnalysis& analysis);
 [[nodiscard]] std::string motionTagNames(std::uint32_t tags);
 
+// **What the feature values mean, as opposed to which dimensions exist.** `MotionFeatureConfig`
+// says which dimensions a vector has. This constant covers how each dimension is computed. It is
+// folded into the feature schema digest (`motionFeatureSchemaDigest`), so a stored database
+// extracted under an older definition is refused on load instead of being searched against
+// queries built under the new one. §36: "changing feature definitions should invalidate
+// incompatible search data."
+//
+//   1  the first definition.
+//   2  looks past a clip's end continue it instead of clamping: a looping clip wraps into its own
+//      start, and anything else extrapolates at its final velocity. Before this, the last sample of
+//      every clip read zero root velocity.
+inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 2;
+
+// One feature dimension's contribution to a cost: the squared difference, weighted. **A function
+// rather than an expression written out at each site** so that every place a cost is summed
+// (search, staged search, the spread statistic and the explainer) rounds the same way. Written
+// inline as `cost += delta * delta * w`, the compiler may fuse the add into a multiply-add at one
+// site and not at another, and the explainer's "to the bit" agreement with the search then holds
+// only on the data it happened to be checked on. Kept out of the summing expression, the
+// product is rounded once, the same way, everywhere.
+[[nodiscard]] inline float motionFeatureTerm(float delta, float weight) {
+    const float squared = delta * delta;
+    return squared * weight;
+}
+
 // Which features to extract and how much each matters (§8). **Data-driven on purpose**: §8 forbids
 // hardcoding `leftFoot`/`rightFoot`/`pelvis` into the search, because which joints carry a
 // character's identity is a property of the character. The alien's feet are `foot.l`/`foot.r`; a

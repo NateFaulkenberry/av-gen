@@ -228,7 +228,11 @@ TEST_CASE("§72: a baked session replays the session's poses, and bakes identica
     float worst = 0.0f;
     for (std::uint32_t i = 0; i < baked->steps; ++i) {
         scene::setRestPose(pack.skeleton, fromBake);
-        scene::sampleClip(baked->clip, static_cast<float>(i) / options.sampleRate, fromBake);
+        // At the key's own time. `static_cast<float>(i) / rate` is not that time: the bake keys
+        // `float(i * double(dt))`, which at i = 90 is 3.00000016 against 3.0. The difference put the
+        // sample a hair into the next segment, and across a clip wrap, where the root jumps a
+        // cycle's travel between keys, that hair read as 2e-5 m of disagreement.
+        scene::sampleClip(baked->clip, baked->clip.channels[0].times[i], fromBake);
         REQUIRE(provider.pose(baked->memories[i], pack.skeleton, fromProvider).ok());
         for (std::size_t j = 0; j < fromBake.local.size(); ++j) {
             worst = std::max(worst, glm::length(fromBake.local[j].position - fromProvider.local[j].position));
