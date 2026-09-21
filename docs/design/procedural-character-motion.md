@@ -2230,6 +2230,31 @@ file rather than deleted silently: it measured 0.0 points, **that null was under
 dose-response reversed it.**
 
 
+## §32–§35 — the provider seam, audited and made to blend
+
+**Recorded here as sections; the evidence lives in ADRs 612–620.**
+
+- **§32 — root-motion continuity.** The acceptance bar (ADR-612's 0.0510 m, set before any fix
+  existed) is met. Both motion providers now inertialize at the seam: matcher 0.0892 → 0.0205 m,
+  clip provider 0.4484 → 0.0029 m (ADR-613). **The provider the product actually installs is the
+  clip provider, not the matcher**, so ADR-612's named beneficiary was only reachable through the
+  clip provider, and that defect was the larger one. On a *forced* cross-clip transition the worst
+  frame is still 8.06× the bar, and that residual is accepted: a blend turns a teleport into a fast
+  slide, and only better selection can do more.
+- **§33 — integrate with Phase B's procedural layers.** Satisfied. The external pose replaces the
+  clip player's, root motion runs next, then the layers. One **latent** defect: root motion is
+  looked up through the clip player's state even on frames where a provider supplied the pose. No
+  scene reaches it.
+- **§34 — matching must not own behaviour.** Satisfied, by design: `MotionRequest` carries intent
+  only, and nothing in `src/` reads provider output except diagnostics. One dead output was found:
+  `MotionResult::playbackRate` is written and never read.
+- **§35 — fallback system.** The mechanism is present and typed. **It is unreachable from the
+  product**, because the chain has one entry, and it is recorded as staged and dark (ADR-615)
+  rather than wired.
+
+The provider work also turned up the character-motion defects fixed in ADRs 618–620: layer weights
+lost on save, the two `turnRate` defects, and acceleration that nothing read.
+
 ## §30 measured against its own purpose — the third candidate also fails
 
 Pose proximity asks what the body *looks like* at one instant. A contact flag describes **where in
