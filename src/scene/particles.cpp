@@ -167,6 +167,24 @@ Result<void> validateParticleSystem(const ParticleSystem& s) {
     if (s.sizeSkew <= 0.0f) {
         return fail("particle system '{}': sizeSkew must be positive, got {}", s.name, s.sizeSkew);
     }
+    // Scatter anchors: the same "silently empty" family. No clusters means no table to spawn from,
+    // a gate of 0 admits no tree, and a view distance of 0 reaches none; each would be a system that
+    // loads, draws nothing and says nothing.
+    if (s.scatterAnchor.active()) {
+        if (s.clusterCount == 0 || s.clusterCount > kMaxScatterAnchors) {
+            return fail("particle system '{}': scatterAnchor needs clusterCount in 1..{} (the most trees that "
+                        "carry a swarm at once), got {}",
+                        s.name, kMaxScatterAnchors, s.clusterCount);
+        }
+        if (!(s.scatterAnchor.randomBelow > 0.0f && s.scatterAnchor.randomBelow <= 1.0f)) {
+            return fail("particle system '{}': scatterAnchor.randomBelow must be in (0, 1], got {}", s.name,
+                        s.scatterAnchor.randomBelow);
+        }
+        if (!(s.scatterAnchor.viewDistance > 0.0f)) {
+            return fail("particle system '{}': scatterAnchor.viewDistance must be positive, got {}", s.name,
+                        s.scatterAnchor.viewDistance);
+        }
+    }
     return Result<void>{};
 }
 

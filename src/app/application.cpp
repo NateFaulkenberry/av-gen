@@ -160,7 +160,8 @@ std::string usageText() {
            "                      (.mov/.mp4/...); size/fps/range/codec from the project's render settings\n"
            "  --format <kind>     render output kind: png (default for a directory), exr (scene-linear half\n"
            "                      EXR sequence, before tone mapping), or video\n"
-           "  --range <a>:<b>     render time range in seconds (either side may be empty)\n"
+           "  --range <a>:<b>     render time range in seconds (either side may be empty); with\n"
+           "                      --headless and no --render, every benchmark block starts at <a>\n"
            "  --codec <id>        video codec: prores4444, prores422, h264, hevc, or an ffmpeg encoder name\n"
            "  --quality <0-100>   video quality\n"
            "  --queue <file>      run a render queue (JSON list of projects and render settings), headless\n"
@@ -5703,7 +5704,10 @@ int Application::runHeadless() {
         // Every block renders the same frame range from the same start, or the arms are not being
         // compared on the same work: a scene whose second 2 differs from its second 0 would put
         // the difference between two blocks into the difference between two arms.
-        clock.restartAt(0.0);
+        // `--range a:` moves that start off zero, so a benchmark can measure the shot the change is
+        // about rather than whatever the timeline opens on -- the multicam opens fifty metres up,
+        // where nothing near the ground is in reach. Still one start for every block.
+        clock.restartAt(options_.rangeStart.value_or(0.0));
         renderer_->resetTemporalHistory();
         if (schedule.size() > 1) {
             log::info("--- block {}/{}: arm '{}' ---", blockIndex + 1, schedule.size(), block.arm);
@@ -6075,6 +6079,7 @@ int Application::runHeadless() {
             record.counters.particleCapacity = medianOfStat([](const RS& s) { return s.particles.capacity; });
             record.counters.particlesEmitted =
                 medianOfStat([](const RS& s) { return s.particles.emittedThisFrame; });
+            record.counters.particleAnchors = medianOfStat([](const RS& s) { return s.particles.anchors; });
             record.counters.transientTextures = medianOfStat([](const RS& s) { return s.transientTextures; });
             record.counters.entities = medianOfStat([](const RS& s) { return s.entities; });
             record.counters.computeDispatches = medianOfStat([](const RS& s) { return s.computeDispatches; });

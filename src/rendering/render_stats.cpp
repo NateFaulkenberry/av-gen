@@ -435,6 +435,7 @@ nlohmann::ordered_json countersJson(const BenchmarkCounters& c) {
         {"particleSystems", c.particleSystems},
         {"particleCapacity", c.particleCapacity},
         {"particlesEmittedPerFrame", c.particlesEmitted},
+        {"particleAnchors", c.particleAnchors},
         {"transientTextures", c.transientTextures},
         {"entities", c.entities},
         {"computeDispatches", c.computeDispatches},

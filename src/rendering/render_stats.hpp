@@ -433,6 +433,7 @@ struct BenchmarkCounters {
     double particleSystems = 0.0;
     double particleCapacity = 0.0;   // sum of the pools; not how many are alive
     double particlesEmitted = 0.0;   // spawns requested this frame (the GPU clamps to free slots)
+    double particleAnchors = 0.0;    // scatter anchors in use (scene::ScatterAnchor), all systems
     double transientTextures = 0.0;
     double entities = 0.0;
     double computeDispatches = 0.0;

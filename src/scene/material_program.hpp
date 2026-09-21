@@ -134,6 +134,32 @@ struct MaterialLayer {
     int occlusionRegister = -1;
 };
 
+// Where a program runs at all. A gated program runs only on instances whose `instanceRandom[lane]`
+// is below `below`, and only on fragments between `near` and `far` metres from the camera; on every
+// other fragment the surface is the material with NO program -- not a program that happens to
+// write nothing, but the program-less path, bit for bit, and at its cost. That difference is why
+// this exists rather than a `threshold` op or a `cameraDistance` fade inside the program: a program
+// that masks itself to zero still pays for every op and still takes the program path's
+// ambient-occlusion read on every fragment it covers, which on Glowmere's forest was a third more
+// scene-pass time spent on trees and distances where the program drew nothing.
+//
+// A program should fade its own effect to nothing at the band's edges, so that crossing one is
+// invisible; the gate is where it stops paying, not where the effect stops.
+// lane -1 = no instance test; near 0 = no near edge; far 0 = no far edge.
+struct MaterialGate {
+    int lane = -1;       // 0..3: which instanceRandom component is tested
+    float below = 1.0f;  // the program runs where instanceRandom[lane] < below
+    float near = 0.0f;   // ...and at least this far from the camera (metres)
+    float far = 0.0f;    // ...and nearer than this (0 = no limit)
+    [[nodiscard]] bool active() const { return lane >= 0 || near > 0.0f || far > 0.0f; }
+    [[nodiscard]] bool admits(const glm::vec4& instanceRandom, float cameraDistance) const {
+        if (lane >= 0 && !(instanceRandom[static_cast<glm::length_t>(lane)] < below)) {
+            return false;
+        }
+        return cameraDistance >= near && (far <= 0.0f || cameraDistance < far);
+    }
+};
+
 struct MaterialProgram {
     std::string name = "material";
     std::vector<MaterialOp> ops;
@@ -147,6 +173,7 @@ struct MaterialProgram {
     int normalRegister = -1;    // tangent-space normal perturbation (ADR-036)
     int occlusionRegister = -1; // multiplies the material's occlusion
     int heightRegister = -1;    // the surface height the layers blend against
+    MaterialGate gate;
     [[nodiscard]] int totalOpCount() const; // base + every enabled layer
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const;
