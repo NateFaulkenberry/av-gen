@@ -6,7 +6,7 @@
 //   B  a database per target skeleton, retargeted offline,
 //   C  a hybrid,
 // "measured, not chosen on aesthetics", over memory, load time, runtime CPU, reuse and diversity.
-// This file is the measurement; the decision is recorded in the phase log under §42.
+// This file is the measurement; ADR-650 is the decision.
 //
 // The cast is the realistic case for this repository: the one corpus that animates these rigs is
 // the scout's own (ADR-553: a BVH corpus cannot), and five other aliens want to play it.
@@ -186,7 +186,7 @@ TEST_CASE("§42/§43: source-plus-runtime-retarget against retargeted-per-rig, o
                          characters, rigsNeeded, aCpu, mb(aMem), bCpu, mb(bMem)));
     }
 
-    // What the measurement must show for the §42 decision (phase log) to stand. If a change to
+    // What the measurement must show for ADR-650 to stand. If a change to
     // the retargeter or the sampler moves these, the decision is re-opened by this test failing.
     CHECK(perPoseA > perPoseB * 5.0);
     // A retargeted pack costs the same order of memory as the source's -- B's cost is per RIG.

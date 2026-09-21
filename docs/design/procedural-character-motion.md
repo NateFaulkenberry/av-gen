@@ -2488,7 +2488,7 @@ it was never written to catch.
 - `MotionMemory` is tripwired at ≤128 bytes and trivially copyable. A hundred providers bound from
   one slot share one `features.data()`.
 
-## §42/§43 — the strategy, measured on the cast — DECISION (ADR number requested; see below)
+## §42/§43 — the strategy, measured on the cast — DECISION (ADR-650)
 
 Measured on the six Glowmere aliens (`[motionstrategy]`):
 
@@ -2510,8 +2510,8 @@ characters cost most of a core. Its one advantage, a small memory saving per ext
 many *distinct* skeletons arrives and memory binds before CPU does. The test asserts
 `perPoseA > 5 × perPoseB`, so a faster retargeter re-opens the decision by failing.
 
-This needs an ADR, and the numbering table gives 600–649 to `agent/anim-research` and says 650+
-"ask before taking". **The number is requested from the supervisor rather than taken.**
+Recorded as **ADR-650**. (The numbering table gave 600–649 to `agent/anim-research` and said 650+
+"ask before taking"; the supervisor then assigned 650–669 to this branch.)
 
 ## §57 — the inspector
 
@@ -2589,5 +2589,5 @@ and config changes are listed.
   installs the clip provider and the matcher is dark (ADR-615, §35 is the owner's). The slot, the
   migration and the explainer are ready for the day it is wired. Wiring it changes shipping scene
   behaviour, so it is not done here.
-- **ADR number** for the §42 decision: requested (650+ is "ask before taking").
+- **ADR number** for the §42 decision: ADR-650, from the range the supervisor assigned (650–669).
 - **For the core agent (§65):** the explain output above, and the clip-final zero-velocity artefact.
