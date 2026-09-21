@@ -106,8 +106,10 @@ writes a scene file. `--help` lists every flag.
   [docs/procedural-graph.md](docs/procedural-graph.md),
   [docs/gpu-culling-lod.md](docs/gpu-culling-lod.md),
   [docs/scene-states-and-macros.md](docs/scene-states-and-macros.md)
-- [docs/dependencies.md](docs/dependencies.md): every third-party library and dataset, its licence
-  and reason -- including the credit line that published work must carry
+- [CREDITS.md](CREDITS.md): the credits that published work must carry. Read this before
+  releasing a render, video or still
+- [docs/dependencies.md](docs/dependencies.md): every third-party library and dataset, its licence,
+  version and reason
 - [docs/quality-lab/](docs/quality-lab/): the Render Quality Lab -- objective, repeatable measurement
   of rendered output. [reconnaissance](docs/quality-lab/repository-reconnaissance.md),
   [research](docs/quality-lab/research.md) (what was adopted and what was rejected, with reasons),
