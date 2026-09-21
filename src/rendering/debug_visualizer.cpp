@@ -748,8 +748,23 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
             }
 
             if (options.motionVectors && !layers.empty()) {
-                // Read off any live layer: `driveLayers` writes the same body state onto all of
-                // them, so this is the frame's own numbers rather than a second derivation.
+                // **FALSE, AND IT MAKES THE OVERLAY LIE QUIETLY (ADR-615).** `driveLayers` does
+                // NOT write the same body state onto every layer -- it writes each field onto one
+                // kind only: `bodyAcceleration`/`bodyTurnRate`/`bodyDownhill` onto `Lean`,
+                // `bodySpeed` onto `Secondary`, `strideRatio` onto `Stride`, and `bodyVelocity`
+                // onto a `Foot` layer only when `PoseLayerDrive::Ground` is set AND
+                // `footLock > 0` (which defaults to 0).
+                //
+                // `layers.front()` is the lowest `poseLayerStage`, and the order is Stride 10,
+                // Lean 20, Secondary 30, Aim 40, Additive 50, Foot 60, Reach 70. So the
+                // acceleration arrow appears only on a rig with a Lean layer and no Stride layer,
+                // and the velocity arrow only on a rig whose lowest-stage layer is a foot-locking
+                // Foot layer -- no Stride, Lean, Secondary, Aim or Additive at all.
+                //
+                // **The failure reads as data rather than as a bug**: the facing arrow below is
+                // computed from the entity transform and always draws, so a viewer sees one arrow
+                // and concludes the body has no velocity. Whoever fixes this should read the
+                // fields off the layer that carries each one, by kind.
                 const scene::PoseLayer& any = layers.front();
                 const glm::vec3 origin = glm::vec3(model[3]);
                 const auto dir = [&](const glm::vec3& local) {

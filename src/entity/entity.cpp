@@ -1230,7 +1230,8 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         // Published on BOTH paths, deliberately. The sweep that added these asked, for every
         // field of the seam, which of `seek` and `update` writes it -- and two of the answers
         // were wrong: `velocity`/`facing` were written only by `seek`, and `action` only by
-        // `update`. `grounded` was written by neither and read by nobody.
+        // `update`. `grounded` was written by neither -- it is written by both now, and still
+        // read by nobody, which is the half of the fix that did not happen (ADR-615).
         entity.locomotion_.acceleration = entity.state_.acceleration;
         // Phase B §8-§11, on both paths (ADR-554). The plan reads the gait's answer and adds
         // the transitional phase to it -- a body does not go from standing to walking, it
@@ -1782,7 +1783,8 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // Published on BOTH paths, deliberately. The sweep that added these asked, for every
         // field of the seam, which of `seek` and `update` writes it -- and two of the answers
         // were wrong: `velocity`/`facing` were written only by `seek`, and `action` only by
-        // `update`. `grounded` was written by neither and read by nobody.
+        // `update`. `grounded` was written by neither -- it is written by both now, and still
+        // read by nobody, which is the half of the fix that did not happen (ADR-615).
         entity.locomotion_.acceleration = entity.state_.acceleration;
         // Phase B §8-§11, on both paths (ADR-554). The plan reads the gait's answer and adds
         // the transitional phase to it -- a body does not go from standing to walking, it

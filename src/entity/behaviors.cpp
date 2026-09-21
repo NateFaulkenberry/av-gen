@@ -251,6 +251,13 @@ private:
 //
 // **What it deliberately does not do.** Lean into a turn is `bank`, which already exists and does it
 // properly with a response time. A second knob for the same thing on the same body would fight it.
+// **STALE (ADR-615): the reason below no longer holds, and this comment now argues against
+// building the right thing.** `ISkeletonQuery` IS implemented -- `Composition::AnimationSink` --
+// and a head can be addressed two ways: `PoseLayerKind::Aim` with a pivot, and
+// `PoseLayerDrive::Look`. So a head knob on `Liveliness` is buildable, and the whole-body nod is a
+// choice rather than the only honest option. Someone reading the paragraph below and building a
+// second whole-body approximation would be doing it for a reason that expired.
+//
 // And "head movement" is not here, because nothing can address a head: `ISkeletonQuery` is declared,
 // stored, and never implemented, so every socket resolves against the entity origin. A whole-body
 // nod is what is honestly available, and that is what `nod` is.

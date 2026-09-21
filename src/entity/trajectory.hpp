@@ -3,10 +3,20 @@
 // Curved trajectories (Phase B §38): where the body will want to be heading shortly, so a turn can
 // begin before the corner rather than at it.
 //
-// **The gap this closes is a field with no producer.** `MotionRequest::futureDirection` and
-// `futureSeconds` were added in B.C and written by nobody, read by nothing -- the mirror of the
-// publisher-with-no-subscribers ADR-554 records, and of a tag with no reader. Both ends are closed
-// here: this produces the direction, and `stepMotion` consumes it.
+// **The gap this was written to close is still open, and this module is on the dark side of it**
+// (ADR-615). `MotionRequest::futureDirection` and `futureSeconds` were added in B.C with no
+// producer and no consumer. The sentence that used to stand here said "Both ends are closed here:
+// this produces the direction, and `stepMotion` consumes it." **Neither half is true as built:**
+//
+//   * `sampleTrajectory` has no caller in `src/` or `tools/` -- only tests;
+//   * `stepMotion`, the named consumer, is itself unreachable (`Entity::motionState_` is touched
+//     in exactly one place in the tree, and that place is `.reset()`);
+//   * nothing anywhere assigns `MotionRequest::futureDirection` -- what this file writes is
+//     `TrajectorySample::futureDirection`, a different struct, and nothing copies one to the other;
+//   * `MotionRequest::futureSeconds` has exactly one reference in the tree: its own declaration.
+//
+// The code is correct and tested. It is waiting for a caller, and the ruling is to leave it that
+// way and say so here rather than wire it or delete it.
 //
 // **Deliberately one sample, not a trajectory.** §38 says so outright: Phase C's motion matcher
 // will want a real future trajectory with several horizons, and this is the lightweight stand-in

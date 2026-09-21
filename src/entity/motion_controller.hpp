@@ -1,5 +1,15 @@
 #pragma once
 
+// **Staged and dark (ADR-615).** Nothing in `src/` or `tools/` calls `stepMotion`: its only caller
+// is `predictTrajectory`, which is itself reached only from tests. `Entity` holds a `MotionState`
+// member that is touched in exactly one place in the tree -- `EntityWorld::reset` clearing it --
+// and read by nothing. `Entity::advanceMotion` builds a `MotionRequest` and hands it straight to
+// the provider chain, so this integrator is not on the path any character takes.
+//
+// The code is correct and tested. It is left built, and said to be dark here, rather than wired
+// (a product change with a per-frame cost that no spec section needs) or deleted (it is an
+// unfinished feature, not a cut one, so ADR-441 does not apply).
+
 // The motion controller (Phase B §33-§35): intent in, continuous motion out.
 //
 // **What it is not.** It does not decide goals -- §33 is explicit, and ADR-091's tiers already say

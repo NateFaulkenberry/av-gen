@@ -452,6 +452,13 @@ struct PoseLayer {
 
 // What one layer did this frame, for the same reason `entity::SocketResolution` exists: "it did
 // nothing" has four different causes and three of them are mistakes.
+// **Computed in full, consumed as a boolean (ADR-615).** All nine values are produced inside
+// `pose_layers.cpp`, and outside it the product reads them in exactly two places: the debug
+// visualizer tests `!= Inactive`, and `Composition::MotionDebug` copies them into a struct whose
+// only caller is a test. `layerResolutionName` has no caller in `src/` or `tools/`. So the engine
+// works out which of `NoJoints`, `NoPivot`, `NoSource`, `NoTarget`, `NoChain` or `Degenerate`
+// happened, and then answers "it did nothing" -- which is the question the comment below says it
+// exists to stop being the only answer available.
 enum class LayerResolution : std::uint8_t {
     Inactive, // weight 0: nothing was asked of it
     NoJoints, // its mask named joints and this rig carries none of them

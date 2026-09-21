@@ -301,6 +301,11 @@ public:
     // reconstructs it by replay and a provider that owned it would be the one object in the
     // character pipeline a scrub could not rewind.
     [[nodiscard]] const MotionMemory& motionMemory() const { return motionMemory_; }
+    // **Staged and dark** (ADR-615): `motionState_` is touched in exactly one place in the whole
+    // tree -- `EntityWorld::reset` calls `.reset()` on it -- and this accessor has no callers. The
+    // controller that would fill it, `entity::stepMotion`, is reached only through
+    // `predictTrajectory`, which is itself test-only. `advanceMotion` builds a `MotionRequest` and
+    // hands it straight to the provider chain; the controller is not in the path.
     [[nodiscard]] const MotionState& motionState() const { return motionState_; }
     [[nodiscard]] const MotionChainResult& motionChainResult() const { return motionChainResult_; }
     [[nodiscard]] const LocomotionPlanState& locomotionPlan() const { return locomotionPlan_; }

@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-nine ways a green suite has lied
+## Thirty ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -87,7 +87,7 @@ you are short of time, because it is the only one the exit code cannot save you 
 - **Family A — the run did not happen as you think** (entries 1-3, 12, 18, 27).
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
-  (entries 13-17, 19, 26, 29; 9 and 10 are its older members, from before it had a name).
+  (entries 13-17, 19, 26, 29, 30; 9 and 10 are its older members, from before it had a name).
 - **Family D — the ask was malformed** (entries 20-21). Neither a bad measurement nor a bad reading:
   the instrument worked, the probe looked in the right place, and the answer was spoiled by the
   *form of the question* (20) or by the *size of the window* (21).
@@ -736,6 +736,33 @@ a wound.
    The general form: **a filter you added for readability is still a filter.** `head`, `-m`, a
    `LIMIT`, a default page size and a truncated log all silently narrow a result set, and none of
    them marks the output as partial.
+
+30. **An instrument can become degenerate as the corpus grows, silently, with nobody touching it.**
+
+   §30's contact experiment perturbs a query built from a database sample's own feature vector by a
+   fixed +0.05 per dimension and asks which sample the matcher picks. On 1,738 Glowmere samples that
+   nudge leaves the choice genuinely open and the experiment works. Re-run unchanged on **420,432**
+   samples, the search returned **the seed sample on 600 of 600 steps**: at that density a vector
+   displaced by a fixed small amount still identifies its own source uniquely, so **no feature could
+   have changed the answer** and the number being compared was the corpus's clip layout rather than
+   the matcher's choices.
+
+   **The tell was three identical columns.** Both arms agreed to four decimals on the mean, on the
+   worst case, *and on the switch count*. Two arms agreeing on a mean is a null result; two arms
+   agreeing on an integer count of events is two arms that made identical decisions, which is a
+   statement about the instrument and not about the feature.
+
+   **The fix is not a bigger constant.** A perturbation of 0.5 would work here and fail again at
+   four million samples. What works at any size is a perturbation in **the matcher's own units** --
+   the derived duplicate radius, the distance at which the search stops being able to tell two
+   samples apart -- so the query is ambiguous by construction whatever the density. Here that was
+   5.8x the fixed value, and seed-return fell from 600/600 to 194/600.
+
+   The general form, and it is the uncomfortable one: **an experiment that passed its own controls
+   at one scale can quietly stop measuring anything at another, and nothing fails.** The test still
+   runs, still asserts, still prints a number with four decimals. Ask what the metric can see
+   before asking what the feature carries -- the same instinct as 13, 17 and 26, arriving through
+   the corpus rather than through the fixture.
 
 ## The scratchpad is shared by every agent in a session
 

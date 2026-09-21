@@ -186,6 +186,18 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
     next.localTime = db_->sampleTime[chosen];
     next.phase = db_->samplePhase[chosen];
     next.hasPhase = true;
+    // **This counts SEARCHES, not selection changes, and `MotionMemory::generation` is documented
+    // as the latter** -- "bumped whenever `selection` changes, so a consumer can tell 'still
+    // playing the same thing' from 'playing the same thing again'". `ClipMotionProvider` honours
+    // that; this bumps unconditionally, including on the majority of searches whose winner was the
+    // continuation and which changed nothing.
+    //
+    // **One field, two writers, two meanings** -- the same defect as the field three lines above
+    // it, which was renamed `decisionTime` for exactly this reason. It is harmless only because
+    // every live reader tests `> 0` as a presence check; the first consumer to use it the way the
+    // header describes gets a wrong answer under this provider. Left as-is rather than changed
+    // inside a documentation pass, because `switched` is right there and the fix is a behaviour
+    // change that wants its own before-and-after (ADR-615).
     next.generation = in.generation + 1;
     next.decisionTime = time;
     result.status = MotionStatus::Produced;

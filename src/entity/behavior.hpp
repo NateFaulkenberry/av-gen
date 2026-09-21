@@ -245,6 +245,14 @@ struct ScoredOption {
 };
 
 // What a deciding behaviour is doing, in the terms an overlay draws.
+//
+// **Produced and read by nobody (ADR-615), which is the defect this seam was written to fix.**
+// `Explore` fills it every decision. Its sibling `navDebug` reaches the World editor and is drawn;
+// `decisionDebug` has no call site in `src/` at all. The paragraph above about `NavDebug` being
+// "published and read by nobody for long enough that the data was true and invisible -- which is
+// the same as absent" describes this struct's present state exactly, one layer up, and it was
+// written as the argument for building this. `ScoredOption::chosen` names a diagnosis -- a dwell
+// or a margin refusal overriding the highest score -- that nothing displays.
 struct DecisionDebug {
     std::span<const ScoredOption> options; // every option scored on the last decision tick, in order
     std::string_view chosen;               // the committed option's name; empty when nothing scored

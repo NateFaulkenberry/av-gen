@@ -104,6 +104,10 @@ struct MotionRequest {
     // rather than at it. One sample, not a trajectory: Phase C's motion matcher will want a real
     // future trajectory and this is the lightweight stand-in that does not pretend to be one.
     // Zero length means "no opinion", which is not the same as "straight ahead".
+    // **Both are still written by nobody** -- `futureSeconds` has exactly one reference in the
+    // tree, this line. `entity/trajectory.hpp` was built to produce them and is itself uncalled;
+    // ADR-615 has the list and the ruling. A matcher reading these gets zero, which it correctly
+    // treats as "no opinion".
     glm::vec3 futureDirection{0.0f};
     float futureSeconds = 0.0f;
 
@@ -259,6 +263,13 @@ struct MotionMemory {
 // `LayerResolution`, `IkStatus`, `PathStatus`, `SocketResolution` and `ActionResult` already follow.
 // A silent false is indistinguishable from a provider that is not installed, and the fallback chain
 // below would then hide a broken provider behind a working one forever.
+// **As built, nothing in the product distinguishes these (ADR-615).** The only consumers in
+// `src/` are `MotionResult::ok()` (`== Produced`) and the chain's passthrough, so the six
+// diagnoses collapse to a boolean on every live path; `motionStatusName` has no caller outside
+// tests. And two values are produced by nobody at all: **`SkeletonMismatch`** -- the digest it
+// cites exists on both `MotionPack` and `MotionDatabase`, and no provider compares them -- and
+// **`Failed`**. The rationale above is therefore still an aspiration: a silent false and a typed
+// one are equally invisible until something reads the type.
 enum class MotionStatus : std::uint8_t {
     Produced,        // it posed the skeleton
     NoContent,       // nothing in its pack matches this request

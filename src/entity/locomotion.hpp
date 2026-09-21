@@ -92,12 +92,17 @@ struct LocomotionState {
     LocomotionPhase phase = LocomotionPhase::Idle;
     float phaseStride = 1.0f;
     float strafeAngle = 0.0f;
-    // **Written by nobody and read by nobody** until Phase B looked for the same publication gap
-    // that hid `velocity` and `action`. Its source is `EntityState::airborne`, which the jump/fall
-    // machinery maintains; a foot placement layer must not plant a foot on a body in mid-air, so it
-    // is published now rather than deleted. The sweep that found it is worth more than the field:
-    // *for each seam field, which paths write it* is a question with an answer, and two of the
-    // three answers were wrong.
+    // **Written on both paths and read by nobody.** Its source is `EntityState::airborne`, which
+    // the jump/fall machinery maintains; a foot placement layer must not plant a foot on a body in
+    // mid-air, so it is published rather than deleted. Nothing consumes it yet: `MotionContext`
+    // carries no `grounded`, and `PoseLayerDrive::Ground` uses `hasGroundPlane` instead.
+    //
+    // **The sentence above used to read "written by nobody and read by nobody", and it was left
+    // there after the write half was fixed.** So this comment spent a phase documenting a defect
+    // the code no longer had -- which misleads in the opposite direction from every other
+    // one-ended contract in this codebase, and is invisible to any sweep for dead symbols because
+    // the symbol is alive and written twice a frame. A comment saying a thing is broken is exactly
+    // the comment nobody re-reads after fixing it. ADR-615 records the shape.
     bool grounded = true;
     // Seconds since the previous step. Carried because `MotionContext` needs it and the entity is
     // the only tier that knows it: deriving it downstream by differencing `time` would be memory

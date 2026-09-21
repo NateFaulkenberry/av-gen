@@ -33,6 +33,12 @@ struct AnimationClip;
 
 // ---- contacts ------------------------------------------------------------------------------------
 
+// **Stored, serialised, and never branched on (ADR-615).** Nothing in the engine reads
+// `ContactTrack::kind` or `ContactJoint::kind` to make a decision, so a `Hand` or `Body` track is
+// detected, gated, packed and matched exactly as a `Foot` one is. Every in-engine construction is
+// `Foot`; the others can only arrive from pack JSON, where an unrecognised kind name silently
+// becomes `Foot` rather than being reported -- harmless while nothing branches, and the wrong
+// default the moment something does.
 enum class ContactKind : std::uint8_t { Foot, Hand, Body, Custom };
 [[nodiscard]] const char* contactKindName(ContactKind kind);
 [[nodiscard]] bool contactKindFromName(std::string_view name, ContactKind& out);

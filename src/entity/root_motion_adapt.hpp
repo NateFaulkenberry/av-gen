@@ -1,5 +1,11 @@
 #pragma once
 
+// **Staged and dark (ADR-615).** `adaptRootMotion` has no caller in `src/` or `tools/` -- tests
+// only. So `RootMotionAdaptSettings` is a tuning surface for something that never runs, and
+// `RootMotionAdaptResult::clamped` is a saturation report that nothing reads, including the
+// `clamped` flag that exists precisely so this engine does not repeat the silent-clamp failure
+// B.A found in `Gait::playbackRate`. Left built and documented rather than wired or deleted.
+
 // Procedural root motion (Phase B §37): adapting an authored clip's displacement to the velocity
 // the controller actually wants.
 //

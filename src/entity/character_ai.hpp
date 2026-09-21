@@ -9,9 +9,11 @@
 // what an implementation agent owes it. Two do not exist and are declared here, with contracts and
 // no implementation, so that the agent who writes the first one writes it against this.
 //
-// Nothing in this file compiles into the engine. `src/CMakeLists.txt` globs `entity/*.cpp`; a
-// header nobody includes is inert by construction, which is the point: Phase 0 ships a contract,
-// not a runtime.
+// **STALE AS WRITTEN (ADR-615).** This said "Nothing in this file compiles into the engine… a
+// header nobody includes is inert by construction". It is included by `entity/decision.hpp`,
+// `entity/perception.hpp` and `entity/entity.hpp`, so `Percept`, `PerceptionSettings`, `Option`,
+// `DecisionContext` and `IConsiderer` are compiled runtime types and editing this header is not
+// free. Phase 0 shipped a contract; the contract has since been implemented around it.
 //
 // ------------------------------------------------------------------------------------------------
 // §0. What already exists. Do not build a second one of any of these.
@@ -352,6 +354,36 @@ public:
 // (`scene/composition.cpp:1892-1906` uses only `action`, `activity`, `time`, `blend`,
 // `playbackRate`). The seam is wider than the implementation on the far side of it.
 //
+// ================================================================================================
+// **EVERYTHING IN THE NEXT PARAGRAPH WAS TRUE IN PHASE 0 AND IS FALSE NOW. A1-A4 ARE ALL DONE.**
+//
+// This is the first file anyone reads before working on characters, and it declares itself
+// normative. It spent a phase telling new readers that four shipped subsystems do not exist, which
+// is the opposite failure from every other stale claim in this codebase: those describe code that
+// does less than it promises, and this describes code that does **more**. A grep for a dead symbol
+// cannot find it, because the symbols are alive. ADR-615 records the shape.
+//
+// What is actually there now, each verified:
+//
+//   * **masks and a layer stack**: `JointMaskSpec`/`JointMask`/`resolveJointMask` in
+//     `scene/skeleton.hpp`, `PoseLayerKind::Additive`, and the whole `PoseLayerStack`. The grep the
+//     paragraph below tells you to run now returns hits.
+//   * **IK**: `scene/ik.{hpp,cpp}`, `IkStatus`, `PoseLayerKind::Foot` and `Reach`.
+//   * **root motion**: `scene/root_motion.{hpp,cpp}`, `SkinnedRig::rootMotionAt`, compensation
+//     applied in `SkinnedRig::evaluate`, behind ADR-337's per-clip opt-in. `Landing` is not
+//     discarded.
+//   * **`ISkeletonQuery` is implemented** -- `Composition::AnimationSink`, which says so at its
+//     definition -- and **`Entity::setSkeleton` is called**, from `Composition`.
+//   * **`socketTransform` reports the fallback**: it returns a three-valued `SocketResolution` and
+//     produces `Joint`, so it no longer returns `true` while quietly using the entity frame.
+//
+// Morph targets are still refused at import, which is the one clause that survives.
+//
+// The paragraph is kept rather than rewritten because the four work items below are the record of
+// what Phase 0 saw, and a reader tracing why the engine has a layer stack should find the argument
+// that produced it. **Read it as history. It is not a description of this engine.**
+// ================================================================================================
+//
 // And underneath, the animation layer is smaller than the brief assumes. Verified: one cross-fade
 // between exactly two clip slots (`scene/animation.cpp:346-356`); **no additive, no masks, no layer
 // stack** (grep for `additive`, `jointMask`, `layerWeight` in `src/scene/animation.*` and
@@ -362,7 +394,8 @@ public:
 // `Entity::socketTransform` returns the entity frame for every socket and returns `true` while
 // doing it, which is worse than returning false.
 //
-// So the animation-intent work is not "design an interface". It is:
+// So the animation-intent work is not "design an interface". It is: [ALL FOUR ARE DONE -- see the
+// block above.]
 //
 //   A1. Implement `ISkeletonQuery` over `scene::SkinnedRig` and call `Entity::setSkeleton`. This is
 //       the smallest change with the largest reach: it is the only thing between the engine and

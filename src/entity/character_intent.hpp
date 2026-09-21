@@ -45,6 +45,17 @@ enum class IntentType : std::uint8_t {
 };
 [[nodiscard]] const char* intentTypeName(IntentType type);
 
+// **If you are here because a character ignores the intent you set on it, this is the answer:
+// nothing in `src/` or `tools/` writes any field of this struct** (ADR-615).
+//
+// `Entity::advanceMotion` reads it -- `if (state_.intent.valid)` at `entity.cpp` -- and `valid` is
+// never set true by anything, so that branch is dead and **every character takes the polar
+// `speed`/`yaw` reconstruction underneath it**. The seam is built and correct and has no producer;
+// a behaviour that wants vector intent has to write this itself, and none does.
+//
+// Deliberately kept rather than deleted: the spec asked for it and the spec is still being worked,
+// so this is an unfinished feature and not a cut one. ADR-615 has the ruling and the list of the
+// other five things dark for the same reason.
 struct CharacterIntent {
     IntentType type = IntentType::Idle;
 
