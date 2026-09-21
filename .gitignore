@@ -121,3 +121,4 @@ __pycache__/
 # ADR-570 self-shadow cost arms.
 /examples/treeisland/_fogshadow-*.json
 /examples/treeisland/_fogshadowshot-*.json
+/examples/treeisland/_fogtemporal-*.json
