@@ -9,17 +9,22 @@
 #   tools/gpu-lock.sh ./build/release/tests/avgen_render_tests "[water]"
 #   tools/gpu-lock.sh ./build/release/src/avgen --headless --frames 120 ...
 #
-# BEFORE YOU READ THE RESULT: docs/testing.md, "Twelve ways a green suite has lied".
+# BEFORE YOU READ THE RESULT: docs/testing.md, "Seventeen ways a green suite has lied".
 #
 # It is here because it is not findable from anywhere else. Two agents in one night each
 # walked into a hazard that section already described accurately -- one of them by name,
 # naming the exact test file -- and neither knew the document existed. This is the one file
 # every agent doing GPU work reads the top of, so the pointer lives here.
 #
-# The short version, which the twelve add up to: **read the exit code of the BINARY**. Not
+# The short version: **read the exit code of the BINARY**, for families A and B. Not
 # the summary, not a `grep -c FAILED`, and never a pipeline's `$?` -- that is the last
 # command's, usually `grep`, and grep is delighted to find nothing. A crashed run prints no
 # verdict line at all, so a failure grep reports success on it.
+#
+# Family C the exit code CANNOT catch: the run is honest, exit 0 is correct, and the
+# thing you measured is not the thing you meant -- a filter that excluded nothing, a
+# census that matched the wrong noun, a probe aimed where the knob does nothing. Check
+# what your scan MATCHED, not just how many. An expected number is the one to verify.
 #
 # And if you kill a run: `trap` only fires for the process that installed it. Signalling
 # this wrapper leaves the test binary alive and this lock held, which is invisible from

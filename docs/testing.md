@@ -78,11 +78,22 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twelve ways a green suite has lied
+## Seventeen ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
-were building concurrently. They divide into two families: **the run did not happen as you think**,
-and **the run happened and you read it wrong.**
+were building concurrently. They divide into **three** families, and the third is the one to read if
+you are short of time, because it is the only one the exit code cannot save you from.
+
+- **Family A — the run did not happen as you think** (entries 1-3, 12).
+- **Family B — the run happened and you read it wrong** (entries 4-8, 11).
+- **Family C — the scan, the filter or the control was looking where the effect could not reach**
+  (entries 13-17; 9 and 10 are its older members, from before it had a name).
+
+Families A and B are failures of *reporting*: the run lies about itself, and **the binary's exit
+code catches every one of them.** Family C is a failure of *aim*: the run is honest, the exit code
+is 0 and correct, and the thing you measured is not the thing you meant. **No exit code catches
+those.** They pass every check you would think to run, which is why two of them arrived on the same
+night from two agents who never spoke to each other.
 
 ### The run did not happen as you think
 
@@ -173,15 +184,90 @@ and **the run happened and you read it wrong.**
    PID still answers `ps`.** After any killed or failed GPU task, before assuming you released
    anything: `pgrep -fl avgen_render_tests` and read the lock's own `pid` file.
 
+### The scan, the filter or the control was looking where the effect could not reach
+
+13. **Command-line matching counts the watchers as workers.** `pgrep -f "avgen_render_tests"`
+   returned **8 matches, every one of them `/bin/zsh`** — shells whose command lines merely quoted
+   the binary's name, including the pollers that were checking whether the machine was busy. The
+   machine was idle. `pgrep -f` matches the whole command line, so any script that *mentions* a
+   binary counts as running it, and a loop that checks for contention is itself the thing it finds.
+   **`ps -Ao pid,comm` shows the actual executable** and is the only honest check. This was nearly
+   reported as GPU contention, and separately caused one agent to misread its own output.
+
+14. **A Catch2 spec containing a comma silently excludes nothing, and says nothing.** Excluding a
+   case by name:
+
+   ```
+   '~a star field is sparse, and its cells do not show'   ->  394 matching test cases
+   ```
+
+   — the full suite, no exclusion, no error. **The comma is a spec separator**, so that parses as
+   `~a star field is sparse` *plus* ` and its cells do not show`, and the tail is an **inclusion**
+   pattern that matches everything else. An attempt to exclude three cases returned 392 where 391
+   was wanted: two names took, the comma'd one nullified itself, and the count was quietly wrong in
+   the direction that still looks controlled. **Prefer tags to names** (`~[cosmic]` gave exactly
+   391) and **verify with `--list-tests` before spending GPU time on a filtered run.**
+
+15. **A `git grep` census that does not understand its own input.** A word-level scan for `"vortex"`
+   returned **eight files**; the answer was **two**. Six of them carry `spatial::FieldKind::Vortex`,
+   a vector field that drives particles, which shares an English word with the atmospheric effect
+   and nothing else. Acting on the eight — "strip the vortex block from these files" — would have
+   deleted motion fields from six scenes **and looked like a clean edit.** Parse the structure, do
+   not grep the noun; the fix was twenty lines of `json.load` walking `atmosphericEffects`.
+
+16. **A teeth-check that passes because a *second* mechanism masked the fault.**
+
+   `AVGEN_HEIGHT_CENSUS`/ADR-483. A cache entry was guarded against a rebuilt map by two independent
+   mechanisms: the map's identity was in the entry's **tag**, and it was also folded into the
+   **hash index**. The stale-map test was checked for teeth by removing the identity from the tag —
+   and the test **passed**, and was one sentence from being reported as verified. It passed because
+   the index still sent a rebuilt map's coordinate to a different slot, so the stale entry was never
+   consulted. Only removing the identity from the index *as well* produced the failure: 174 stale
+   heights of 4,225, exit 42.
+
+   This is worse than "a probe that cannot fail proves nothing" (ADR-182), and less obvious: **the
+   probe can fail, and does fail, but not for the reason you are testing.** It certifies a mechanism
+   that is not the one carrying the safety. A later reader who removes the index hashing as a
+   simplification, trusting the tag, gets a green suite and a cache that returns confidently wrong
+   values.
+
+   **Defeat every mechanism that could mask the fault, together, not one at a time. If you cannot
+   name all of them, you do not yet know which one your test is checking.**
+
+17. **A reachability control that reports a dead knob, because it sampled where the knob does
+   nothing.** A per-field probe reported `cloudWidth` "moved 0 of 80 samples" and looked exactly
+   like the silently-dead control ADR-460's parity work exists to catch. The knob was live. The
+   cloud's interior is a **plateau**, and the sample spread had been built from the *funnel's*
+   radius while the cloud is four times wider — so every sample sat inside the plateau, and
+   **widening a plateau moves no point already on it.**
+
+   The general form, and it is the same defect as 16 from the other side: a control that cannot move
+   at all is caught by ADR-182, but **a control that moves, fails on demand, and is nonetheless
+   aimed at the wrong region or the wrong mechanism passes every check you would think to run.**
+   When a reachability probe reports zero, suspect the sample domain before the knob.
+
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
 log of a process that died. Read the **exit code first, the summary second, and `FAILED:` blocks
 only as a pointer to what to go and look at** — not the other way round.
 
-**The exit code is the only check that catches all twelve.** Every other signal here — the summary,
-the `FAILED:` blocks, the assertion counts — is a convenience that some entry above defeats. Capture
-`$?` from the binary itself: a pipeline's exit code is the last command's, which is usually `grep`,
-and `grep` is delighted to find nothing.
+**The exit code is the only check that catches every entry in families A and B.** Every other
+signal there — the summary, the `FAILED:` blocks, the assertion counts — is a convenience that some
+entry above defeats. Capture `$?` from the binary itself: a pipeline's exit code is the last
+command's, which is usually `grep`, and `grep` is delighted to find nothing.
+
+**And it catches nothing in family C, which is why that family is the dangerous one.** 13 through 17
+all exit 0, print a truthful summary, and report a number that is not about what you think it is
+about. There is no signal to read, because the run was honest; the aim was wrong. The only defences
+are structural, and they are cheap:
+
+- **Check what your scan matched, not just how many.** 13, 14 and 15 were each caught by looking at
+  the matched items — eight files that were the wrong eight, 392 cases where 391 was wanted, eight
+  `pgrep` hits that were all shells. Every one announced itself in output somebody nearly skipped.
+- **Name every mechanism that could mask the fault before you trust a teeth-check** (16), and
+  **suspect the sample domain before the knob when a reachability probe reports zero** (17).
+- When a filter, a census or a probe returns a number you expected, that is when to check it. A
+  surprising number gets checked for free.
 
 ## The scratchpad is shared by every agent in a session
 
