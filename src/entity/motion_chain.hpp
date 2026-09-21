@@ -79,6 +79,16 @@ public:
             const MotionResult r = providers_[i]->advance(request, in, time, dt, scratch);
             if (r.ok()) {
                 next = scratch;
+                // **A handover is not a transition, and nobody can blend it.** ADR-613's blend
+                // slots name content in the *settling provider's* own index space, so a memory
+                // that changes hands carries two integers that the new provider would read as its
+                // own -- a matcher's database sample posed as a clip index, which is the exact
+                // confusion `MotionMemory::provider` exists to stop. The slots are cleared on the
+                // frame the answer moves. The body therefore jumps once when a provider takes
+                // over, which is honest: the two providers have no common pose to interpolate in.
+                if (in.provider >= 0 && in.provider != static_cast<int>(i)) {
+                    next.clearBlends();
+                }
                 next.provider = static_cast<int>(i);
                 chain.result = r;
                 chain.provider = static_cast<int>(i);

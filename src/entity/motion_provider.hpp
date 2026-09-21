@@ -24,6 +24,7 @@
 #include "scene/animation.hpp"
 #include "scene/skeleton.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -31,6 +32,43 @@
 #include <glm/glm.hpp>
 
 namespace avgen::entity {
+
+// ---- inertialization at the seam (ADR-613, Phase C §32) ----------------------------------------
+//
+// Shared by every provider rather than owned by one, because it is a property of the seam: a
+// provider swaps what the body is playing, and what it swapped away from has to decay rather than
+// vanish. `MatchMotionProvider` and `ClipMotionProvider` both use these; they must not grow second
+// versions.
+
+// The interval a per-frame distance budget is stated over. **A distance budget carries the frame
+// length it was measured at** -- ADR-612's 0.0510 m is a 1/30 s step -- and pairing it with the
+// product's frame rate instead would halve or double it for free.
+inline constexpr float kBlendBudgetFrameSeconds = 1.0f / 30.0f;
+
+// **The halflife that minimises the worst thing a transition can do to a foot.** Derived, not
+// chosen: see ADR-613 for the two failures it balances and for why the size of the jump cancels
+// out of the answer. `soonestRepeatSeconds` is the shortest interval in which one transition can
+// follow another -- the matcher's continuation lock, the gait tier's minimum dwell.
+[[nodiscard]] float derivedInertializeHalflife(float soonestRepeatSeconds, float frameSeconds);
+
+// A critically damped decay released from rest: exactly 1 at `elapsed` 0 and with zero slope
+// there, so the pose at the transition instant is exactly the outgoing pose and there is no kink.
+[[nodiscard]] float inertializationDecay(float halflife, float elapsed);
+
+// The floor at which a transition is let go. **Not an epsilon**: dropping a slot is itself a
+// discontinuity of `decay` times its offset, so this decides how big that last teleport is. At 1%
+// the worst offset the Glowmere corpus produces (0.81 m) leaves 0.008 m, 16% of ADR-612's bar, and
+// it ends the decay's tail at 0.43 s rather than 0.81 s -- which is what stops every slot being
+// sampled on every frame. See ADR-613's cost table.
+inline constexpr float kInertializationFloor = 0.01f;
+
+// Add `decay` times the pose difference (`was` - `became`) to `out`. The two ends are the outgoing
+// and incoming poses **at the instant of the transition**, sampled by the caller from whatever its
+// content is addressed by; the offset is therefore recomputed every frame rather than remembered,
+// which is what lets a scrub landing mid-transition reconstruct it (ADR-360) and what lets
+// `MotionMemory` hold two integers where an engine would hold a pose.
+void applyInertializedOffset(const scene::Pose& was, const scene::Pose& became, float decay,
+                             scene::Pose& out);
 
 // How the body is getting about. Not a clip name and not a gait: a *mode* the request can ask for,
 // which the provider turns into content through the motion pack.
@@ -96,9 +134,90 @@ struct MotionMemory {
     // 0..1 through the locomotion cycle, when the content has a phase (Phase A's `PhaseTrack`).
     float phase = 0.0f;
     bool hasPhase = false;
-    // The timeline second the current transition began, for inertialization. A *time*, never an
-    // elapsed count, for the reason ADR-086 gives.
+    // The timeline second the provider last made a decision. A *time*, never an elapsed count,
+    // for the reason ADR-086 gives.
+    //
+    // **It is not the instant the current transition began, and an inertializer must not read it
+    // as one** (ADR-613). `ClipMotionProvider` writes it when the clip actually changes;
+    // `MatchMotionProvider` writes it on **every search**, including the searches whose winner was
+    // the continuation and which therefore changed nothing. Under the matcher's convention it is
+    // "when the last search ran", which is what the search interval and the continuation lock read
+    // it for and what they need. One name, two conventions, and the name carries the wrong one --
+    // which is why the blend below has its own clock instead of deriving one from here.
     double transitionStart = 0.0;
+
+    // ---- the inertialized transition (ADR-613, Phase C §32) ------------------------------------
+    //
+    // **Two sample indices and a clock, because the offset itself may not live here.** ADR-547's
+    // inertialization on `AnimationPlayer` decays the pose difference captured at the instant of a
+    // transition, and recomputes that difference every frame rather than storing it, so that a
+    // scrub landing mid-transition reconstructs it instead of inheriting it. The same rule binds
+    // harder at this seam: `MotionMemory` holds no containers (above), and `advance` may not touch
+    // a skeleton (ADR-556), so the difference can be neither stored nor computed on the simulation
+    // half. What *can* be recorded is the pair of samples it is the difference between, which is
+    // two integers, and `pose` -- which already has a skeleton and runs once per drawn frame --
+    // recomputes the rest.
+    //
+    // Both are in the settling provider's own index space, exactly as `selection` is, and mean
+    // nothing to anyone else.
+    static constexpr std::uint32_t kNoBlend = 0xFFFFFFFFu;
+
+    // **More than one, because a transition can interrupt a transition, and dropping the one in
+    // flight is the same teleport in miniature.** Measured: with one slot the shipping loop leaves
+    // 18.8% of the outgoing offset undecayed when the next switch arrives 0.2 s later, and throws
+    // it away in a single frame -- which is most of what the fix has left to give (ADR-613's
+    // table). Slots are the whole cost of not doing that: three `std::uint32_t` and a `float` per
+    // level of nesting, still a plain value, still bounded, still reconstructed by a replay.
+    //
+    // **Three is a measured depth, not a guess** -- see ADR-613 for what each level buys.
+    static constexpr std::size_t kBlendSlots = 3;
+    struct Blend {
+        // What was playing at the instant of the switch.
+        std::uint32_t from = kNoBlend;
+        // What it switched to, at that same instant. Recorded separately from `selection` because
+        // `selection` moves on with the motion and the offset is anchored to where it started.
+        std::uint32_t to = kNoBlend;
+        // Where each end was in **the provider's own time coordinate** at that instant -- a clip
+        // second for the clip player, a database sample's time for the matcher. Recorded because
+        // the two ends are frozen poses and a provider whose content is addressed by an index plus
+        // a time cannot reconstruct them from the index alone.
+        float fromTime = 0.0f;
+        float toTime = 0.0f;
+        // Seconds since that instant. **Its own clock**, for the reason `transitionStart` gives
+        // above.
+        float elapsed = 0.0f;
+        [[nodiscard]] bool live() const { return from != kNoBlend && to != kNoBlend; }
+        friend bool operator==(const Blend&, const Blend&) = default;
+    };
+    // Newest first. A new transition shifts the array down and drops the oldest.
+    Blend blends[kBlendSlots]{};
+
+    [[nodiscard]] bool blending() const { return blends[0].live(); }
+    // Advance every live blend's clock. Called on every step, including the ones that do not
+    // search: `pose` is handed a memory and a skeleton and no clock at all (ADR-556).
+    void tickBlends(float dt) {
+        for (Blend& b : blends) {
+            if (b.live()) {
+                b.elapsed += dt;
+            }
+        }
+    }
+    // Record a transition, keeping the ones still in flight underneath it.
+    void pushBlend(std::uint32_t from, float fromTime, std::uint32_t to, float toTime,
+                   std::size_t slots) {
+        for (std::size_t i = kBlendSlots - 1; i > 0; --i) {
+            blends[i] = blends[i - 1];
+        }
+        blends[0] = Blend{from, to, fromTime, toTime, 0.0f};
+        for (std::size_t i = std::max<std::size_t>(slots, 1); i < kBlendSlots; ++i) {
+            blends[i] = Blend{};
+        }
+    }
+    void clearBlends() {
+        for (Blend& b : blends) {
+            b = Blend{};
+        }
+    }
     // **Which provider settled this memory**, as an index into the chain, or -1 for none. Recorded
     // because `advance` and `pose` are separate calls and the second must go to the provider that
     // won the first: a chain that re-selected at pose time could hand a motion matcher's database

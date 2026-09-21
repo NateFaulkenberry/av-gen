@@ -30,6 +30,9 @@
 namespace avgen::entity {
 
 struct MatchSettings {
+    // The default `minimumContinuation` and the derived halflife below are both stated against
+    // this, so changing one cannot leave the other behind.
+    static constexpr float kDefaultContinuation = 0.2f;
     // §27. How often to search, in seconds. Between searches the motion continues by following
     // `sampleNext`, which is an array read rather than a scan -- so the cost of motion matching is
     // this frequency times the scan, and not the scan every frame.
@@ -41,7 +44,7 @@ struct MatchSettings {
     // §29. The minimum a newly chosen motion plays before another search may replace it. Without
     // it a character on a threshold re-selects every search and never commits to anything, which
     // is the same flicker `GaitSettings::minDwell` exists to stop one tier up.
-    float minimumContinuation = 0.2f;
+    float minimumContinuation = kDefaultContinuation;
     // §28. A new candidate must beat the continuation by this much to be taken. Hysteresis in
     // cost, complementing the hysteresis in time above: they catch different failures, exactly as
     // the speed band and the dwell timer do in `Gait::select`.
@@ -69,6 +72,26 @@ struct MatchSettings {
     // is the one weight that is about intent rather than about the data, which is why it is a
     // setting and not part of `MotionFeatureConfig`.
     float intentWeight = 1.0f;
+
+    // ---- §32: the inertialized transition (ADR-613) -------------------------------------------
+    //
+    // Seconds for the pose offset a switch introduces to halve. **Zero means no blend**, which is
+    // what this provider did for the whole of Phase B and what ADR-612 measured at 0.3566 m of
+    // foot teleport per transition.
+    //
+    // **The default is derived, not chosen**: `derivedInertializeHalflife` balances a decay fast
+    // enough to move the foot against one slow enough to still be running when the next switch
+    // arrives, and the soonest that can happen here is `minimumContinuation`, because the lock
+    // makes searches at least that far apart.
+    float inertializeHalflife =
+        derivedInertializeHalflife(kDefaultContinuation, kBlendBudgetFrameSeconds);
+
+    // How many interrupted transitions are kept decaying underneath the current one. 1 is the
+    // shape `AnimationPlayer` has (ADR-547 keeps one `previous_` state); above 1 is what this seam
+    // can afford that a player holding whole poses cannot, because what is kept here is two
+    // integers, two times and a clock. **Measured**: the second slot halves the mean at a
+    // transition, the third buys 10% more (ADR-613). Clamped to `MotionMemory::kBlendSlots`.
+    std::size_t blendSlots = MotionMemory::kBlendSlots;
 
     // True when `searchInterval` cannot change the behaviour because `minimumContinuation` is the
     // later gate. Not an error -- it is a legitimate configuration -- but it is the difference

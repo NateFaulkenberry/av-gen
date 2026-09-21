@@ -1,6 +1,9 @@
 #include "entity/match_motion_provider.hpp"
 
 #include "scene/animation.hpp"
+#include "scene/skeleton.hpp"
+
+#include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -61,6 +64,9 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
             next.localTime = db_->sampleTime[follow];
             next.phase = db_->samplePhase[follow];
             next.hasPhase = true;
+            // §32: the blends' own clocks run on every step, including the ones that do not
+            // search.
+            next.tickBlends(dt);
             ++counters_.continued;
             result.status = MotionStatus::Produced;
             result.content = db_->clipNames[db_->sampleClip[follow]];
@@ -156,8 +162,25 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
         }
     }
 
-    if (!haveCurrent || chosen != db_->sampleNext[in.selection]) {
+    const bool switched = !haveCurrent || chosen != db_->sampleNext[in.selection];
+    if (switched) {
         ++counters_.switches;
+    }
+    // §32/ADR-613. **A blend begins where the motion jumps, and nowhere else.** A search whose
+    // winner was the continuation changed nothing, so restarting the decay there would throw away
+    // a running blend for a transition that did not happen -- and would do it on the majority of
+    // searches, because most searches continue. This is the same distinction `counters_.switches`
+    // already draws, reused rather than re-derived so the two cannot disagree.
+    if (switched && haveCurrent) {
+        next.tickBlends(dt);
+        next.pushBlend(in.selection, db_->sampleTime[in.selection], chosen,
+                       db_->sampleTime[chosen], settings_.blendSlots);
+    } else if (switched) {
+        // The first selection of a character's life is not a transition: there is nothing to
+        // blend from, and pretending otherwise would decay an offset against a bind pose.
+        next.clearBlends();
+    } else {
+        next.tickBlends(dt);
     }
     next.selection = chosen;
     next.localTime = db_->sampleTime[chosen];
@@ -194,6 +217,57 @@ MotionResult MatchMotionProvider::pose(const MotionMemory& memory, const scene::
     scene::sampleClip(clip, db_->sampleTime[memory.selection], out);
     result.status = MotionStatus::Produced;
     result.content = clip.name;
+
+    // ---- §32: inertialize across the seam (ADR-613) --------------------------------------------
+    //
+    // The pose above is the incoming motion, alone. What is added here is **the difference the
+    // switch introduced**, decaying to nothing -- so at the instant of the switch the output is
+    // exactly the outgoing pose, and from there it converges on the incoming one without ever
+    // teleporting. That is ADR-547's inertialization on `AnimationPlayer`, applied at the provider
+    // seam, and it is deliberately the same arithmetic rather than a second scheme: the bar for
+    // switching `proceduralMotion` on is parity with the player it replaces, and a provider that
+    // blended *differently* would be a change of look as well as of architecture.
+    //
+    // **The offset is recomputed, never remembered.** Both ends are sampled from the two database
+    // frames the memory names, so a scrub that lands mid-transition reconstructs the same offset
+    // instead of inheriting one from wherever the playhead came from -- the property ADR-360
+    // requires and the reason `MotionMemory` can hold two integers where an engine would hold a
+    // pose.
+    if (settings_.inertializeHalflife <= 0.0f || !memory.blending()) {
+        return result;
+    }
+    // Scratch for the two ends of one offset. `thread_local` rather than a member:
+    // `IMotionProvider` is const because one instance serves every character in a scene, so a
+    // mutable member would be shared state between bodies the moment anything poses two of them at
+    // once.
+    thread_local scene::Pose was;
+    thread_local scene::Pose became;
+
+    // **Oldest first.** The offsets were introduced in order, so they are re-applied in order;
+    // translations add either way, and rotations do not, so the order is the one that matches how
+    // the pose was actually built up.
+    const std::size_t slots =
+        std::min(std::max<std::size_t>(settings_.blendSlots, 1), MotionMemory::kBlendSlots);
+    for (std::size_t s = slots; s-- > 0;) {
+        const MotionMemory::Blend& blend = memory.blends[s];
+        if (!blend.live() || blend.from >= db_->sampleCount() || blend.to >= db_->sampleCount()) {
+            continue; // an empty slot, or a memory from another database
+        }
+        const float decay = inertializationDecay(settings_.inertializeHalflife, blend.elapsed);
+        if (decay <= kInertializationFloor) {
+            continue; // what is left of this offset is below the floor
+        }
+        const std::uint32_t fromClip = db_->sampleClip[blend.from];
+        const std::uint32_t toClip = db_->sampleClip[blend.to];
+        if (fromClip >= clips_->size() || toClip >= clips_->size()) {
+            continue;
+        }
+        scene::setRestPose(skeleton, was);
+        scene::sampleClip((*clips_)[fromClip], blend.fromTime, was);
+        scene::setRestPose(skeleton, became);
+        scene::sampleClip((*clips_)[toClip], blend.toTime, became);
+        applyInertializedOffset(was, became, decay, out);
+    }
     return result;
 }
 

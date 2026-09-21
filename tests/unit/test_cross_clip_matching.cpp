@@ -30,6 +30,7 @@
 //      clips without matching anything.
 
 #include "assets/gltf_loader.hpp"
+#include "entity/match_motion_provider.hpp"
 #include "scene/animation.hpp"
 #include "scene/motion_database.hpp"
 #include "scene/motion_pack.hpp"
@@ -1042,4 +1043,179 @@ TEST_CASE("§32's acceptance threshold, derived and fixed BEFORE any fix exists"
     CHECK(typicalStep > 0.0f);
     CHECK(restHeight > 1.0f);
     CHECK(0.3566f > typicalStep); // the defect is real against this threshold, stated before the fix
+}
+
+TEST_CASE("§32 against ADR-612's own population: the forced cross-clip transition",
+          "[crossclip][phaseC][aliens]") {
+    // **This is the after-figure for the 0.3566 m.**
+    //
+    // §32's own measurement in `test_matching_loop.cpp` drives the provider with a request and
+    // lets the shipping loop choose its own transitions. That is the right instrument for "what
+    // does a Glowmere alien do", and it is the **wrong** instrument for "did the number in ADR-612
+    // come down", because it does not measure the same population of switches: ADR-612's mean is
+    // over transitions *forced* to a different clip every 20 steps, and the shipping loop's own
+    // switches are mostly mild re-selections inside one clip. Two honest means over two different
+    // populations are not a before and an after.
+    //
+    // So this reproduces §30's driver exactly -- the same forced cross-clip targets, the same
+    // query, the same search -- and changes only where the pose comes from: `MatchMotionProvider`,
+    // with the memory advanced as the provider advances it, rather than a raw sample lookup. Both
+    // arms run through that same path, so the blend is the only difference between them.
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §32"};
+    provenance.toolVersion = "avgen-phase-c";
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+    scene::MotionDatabaseOptions options;
+    options.sampleRate = 30.0f;
+    options.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+    auto db = scene::buildMotionDatabase(*pack, options);
+    if (!db.has_value()) {
+        FAIL("motion database build failed: " << db.error().message);
+    }
+    const int footL = rig.skeleton.find("foot.l");
+    const int footR = rig.skeleton.find("foot.r");
+    REQUIRE(footL >= 0);
+    REQUIRE(footR >= 0);
+
+    std::vector<std::uint32_t> clipStarts;
+    for (std::uint32_t s = 1; s < db->sampleCount(); ++s) {
+        if (db->sampleClip[s] != db->sampleClip[s - 1u]) {
+            clipStarts.push_back(s);
+        }
+    }
+    REQUIRE(clipStarts.size() > 5u);
+
+    const auto measure = [&](float halflife) {
+        entity::MatchSettings settings;
+        settings.inertializeHalflife = halflife;
+        entity::MatchMotionProvider provider(&*db, &rig.clips, "match");
+        provider.setSettings(settings);
+        entity::MotionMemory memory;
+        memory.selection = 0;
+        memory.generation = 1;
+        const scene::MotionCostWeights weights;
+        scene::Pose out;
+        std::vector<glm::mat4> matrices;
+        glm::vec3 lastL{0.0f};
+        glm::vec3 lastR{0.0f};
+        bool have = false;
+        double total = 0.0;
+        double worst = 0.0;
+        int switches = 0;
+        double worstFrame = 0.0;
+        const float step = entity::kBlendBudgetFrameSeconds;
+        for (int i = 0; i < 600; ++i) {
+            const std::uint32_t leg = static_cast<std::uint32_t>(i / 20) % clipStarts.size();
+            const std::uint32_t base = clipStarts[leg];
+            const std::uint32_t want =
+                base + static_cast<std::uint32_t>(i % 20) < db->sampleCount()
+                    ? base + static_cast<std::uint32_t>(i % 20)
+                    : base;
+            scene::MotionQuery query;
+            query.features.assign(db->dimension, 0.0f);
+            const float* f = db->featuresFor(want);
+            std::copy(f, f + db->dimension, query.features.begin());
+            for (std::size_t d = 0; d < query.features.size(); ++d) {
+                query.features[d] += 0.05f;
+            }
+            query.current = memory.selection;
+            const scene::MotionMatch match = scene::searchMotion(*db, query, weights);
+            REQUIRE(match.found());
+            // Exactly §30's definition of a switch: anything that is not the natural continuation.
+            const bool switched = db->sampleNext[memory.selection] != match.sample;
+            // The memory is advanced the way `MatchMotionProvider::advance` advances it. The
+            // search above stands in for the provider's own, because this driver poses a query the
+            // request cannot express -- that is the whole point of reproducing §30's driver.
+            memory.tickBlends(step);
+            if (switched) {
+                memory.pushBlend(memory.selection, db->sampleTime[memory.selection],
+                                 match.sample, db->sampleTime[match.sample],
+                                 entity::MotionMemory::kBlendSlots);
+            }
+            memory.selection = match.sample;
+            memory.generation += 1;
+            if (!provider.pose(memory, rig.skeleton, out).ok()) {
+                continue;
+            }
+            scene::poseToModel(rig.skeleton, out, matrices);
+            const glm::vec3 l = glm::vec3(matrices[static_cast<std::size_t>(footL)][3]);
+            const glm::vec3 r = glm::vec3(matrices[static_cast<std::size_t>(footR)][3]);
+            if (have) {
+                const double moved = std::max(glm::length(l - lastL), glm::length(r - lastR));
+                worstFrame = std::max(worstFrame, moved);
+                if (switched) {
+                    total += moved;
+                    worst = std::max(worst, moved);
+                    ++switches;
+                }
+            }
+            lastL = l;
+            lastR = r;
+            have = true;
+        }
+        return std::tuple<double, double, int, double>{switches > 0 ? total / switches : 0.0,
+                                                       worst, switches, worstFrame};
+    };
+
+    const auto [beforeMean, beforeWorst, beforeCount, beforeWorstFrame] = measure(0.0f);
+    const auto [afterMean, afterWorst, afterCount, afterWorstFrame] =
+        measure(entity::MatchSettings{}.inertializeHalflife);
+
+    WARN(fmt::format("§32 on ADR-612's population: BEFORE {} switches, mean {:.4f} m, worst "
+                     "{:.4f} m",
+                     beforeCount, beforeMean, beforeWorst));
+    WARN(fmt::format("§32 on ADR-612's population: AFTER  {} switches, mean {:.4f} m, worst "
+                     "{:.4f} m ({:+.1f}% mean, {:+.1f}% worst)",
+                     afterCount, afterMean, afterWorst,
+                     100.0 * (afterMean - beforeMean) / std::max(beforeMean, 1e-9),
+                     100.0 * (afterWorst - beforeWorst) / std::max(beforeWorst, 1e-9)));
+    // **The mean at a switch is not enough here, and the after-figure is the reason.**
+    //
+    // An inertialized pose at the instant of a transition is *exactly* the outgoing pose -- that
+    // is the property that removes the teleport -- and the outgoing pose at that instant is the
+    // same sample the previous frame already showed. So the foot is momentarily held, the
+    // switch-frame metric reads near zero, and it would read near zero for any blend that merely
+    // deferred the displacement to the following frames. **A metric with one obvious answer
+    // rewards producing that answer**, so the worst single frame of the whole run is reported and
+    // asserted beside it: it counts the deferred motion wherever the blend eventually puts it.
+    WARN(fmt::format("§32 worst single frame anywhere in the run: {:.4f} m before, {:.4f} m after "
+                     "({:+.1f}%) -- this is the anti-smear figure, and the mean above is not "
+                     "readable without it",
+                     beforeWorstFrame, afterWorstFrame,
+                     100.0 * (afterWorstFrame - beforeWorstFrame) /
+                         std::max(beforeWorstFrame, 1e-9)));
+    WARN(fmt::format("§32 against the 0.0510 m bar on this population: mean at a switch {:.2f}x, "
+                     "worst frame anywhere {:.2f}x",
+                     afterMean / 0.0510, afterWorstFrame / 0.0510));
+    CHECK(beforeCount > 20);
+    CHECK(beforeCount == afterCount); // the blend is in `pose`; it cannot change what was selected
+    CHECK(afterMean < beforeMean);
+    CHECK(afterMean <= 0.0510);
+    // The companion, in the direction that would catch a blend which only moved the defect.
+    CHECK(afterWorstFrame < beforeWorstFrame);
 }
