@@ -506,6 +506,9 @@ Result<void> writeMotionPack(const MotionPack& pack, const std::filesystem::path
             c["tags"] = clip.tags;
         }
         c["contacts"] = contactsToJson(clip.contacts);
+        if (!clip.heading.empty()) {
+            c["heading"] = clip.heading;
+        }
         clipIndex.push_back(std::move(c));
     }
     doc["clips"] = std::move(clipIndex);
@@ -700,6 +703,9 @@ Result<MotionPack> readMotionPack(const std::filesystem::path& directory) {
                     clip.tags.push_back(tag.get<std::string>());
                 }
             }
+        }
+        if (c.contains("heading") && c.at("heading").is_array()) {
+            clip.heading = c.at("heading").get<std::vector<float>>();
         }
         if (c.contains("contacts")) {
             clip.contacts = contactsFromJson(c.at("contacts"));

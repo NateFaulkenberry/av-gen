@@ -2353,7 +2353,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 18 | Real data first | done | `369b7027` |
 | 19 | First database from Glowmere | done | `369b7027`. Re-checked in `3b66b565` |
 | 20 | 100STYLE scale experiment | done | `d67fc36a` (ADR-612 amended; the licence is CC BY 4.0, `bc56f7f1`) |
-| 21 | Motion augmentation | **partial** | **Corrected after reading the generator, not the enum.** `03659866` counted 4 of 7 kinds from `VariantKind`. Only **speed** is actually generated. `strideWarp` is a function nothing calls, `Mirror` is an enum value with no implementation, and `VariantOptions::mirror` is a dead knob. Root-motion adaptation exists separately (`adaptRootMotion`). **Missing: mirroring, stride, directional warping, turn variation and start/stop variants.** `generateVariants` has no caller outside its test |
+| 21 | Motion augmentation | done | `scene/motion_augment.*` adds stride, direction, turn, start, stop and mirror, all through one foot-target-plus-IK step. Speed and root-motion adaptation came from Phase B. Each variant is gated by its own IK reach and kept only if it improves §58 coverage. On the scout, 4 of 13 planned were kept (the turns); see "§21" below |
 | 22 | Coverage analysis | done | `03659866`, `8a90148a`, `38017f94` |
 | 23 | Database quality analyzer | done | `8c9165fa`, `4fdde514` |
 | 24 | Trajectory representation | done | `8a90148a`, re-taken in `3b66b565`. `49aeb2ea` voids only its §20 queue item |
@@ -2461,6 +2461,40 @@ What this changes in ADR-614:
 
 Not re-taken: MIXED, and §30 on TR (the `[.scale]` test). Both are 100STYLE runs that the facing
 frame will move. They are queued rather than claimed.
+
+## §21 — augmentation, kept only where it adds coverage
+
+`scene/motion_augment.{hpp,cpp}`. **One step for five kinds.** An in-place clip is first planted:
+the treadmill becomes travel, using the velocity its planted feet imply. Then a per-frame map
+moves the body, and each planted foot's target is anchored to the map at the start of its stance
+(a swing foot follows the frame's own map, corrected toward both anchors). Each leg is solved
+with `solveTwoBone`. A planted foot stays planted by construction. A foot the leg cannot reach
+refuses the variant (2% of the leg). Every output carries the heading its generator applied
+(`PackClip::heading`), and the database faces by it (feature extraction v5).
+
+On a rotation-driven synthetic leg, every kind does what it says with planted drift around 0:
+- stride and direction hit their target speed and angle;
+- a turn bends the path by exactly ω·t;
+- start and stop ramp 0.31 → 1.20 and 1.20 → 0.35 m/s, never to a standstill;
+- mirroring twice returns the clip to 4e-7.
+
+**On the scout, gated by §58 coverage** (13 planned, 8 passed their own gate, 4 kept):
+
+| variant | verdict |
+|---|---|
+| Walking turn ±1.4 rad/s | **kept**: left turn moderate 14 → good 19, right turn moderate 7 → 12 |
+| Running turn ±1.4 rad/s | **kept**: run limited 3 → moderate 11, high-speed turns poor → limited |
+| Walking stride 1.3, direction ±0.6 and 2.4 | refused by IK: the scout's leg misses by 2.7–10.9% |
+| Walking stride 0.7, start, stop, mirror | redundant: no category gained |
+
+**Strafe stays limited.** The scout's walk cannot be warped 35° sideways without the foot missing,
+so strafe coverage needs a different source clip, not a bigger warp.
+
+**§58's categories had to change first.** After §7 put features in the body's frame, a root-velocity
+heading difference no longer measured turning (a body turning while it walks keeps its travel ahead
+of it), and pelvis sway was counted as starts and stops. Speed, direction and turn now come from the
+trajectory block: the mean over the furthest horizon, and the path's own curvature. With the old
+reading, a +1.4 rad/s turn variant scored 0 left and 1 right; now it scores 18 left and 0 right.
 
 ### Observed under load, not chased: `test_lighting_perf`
 

@@ -7,6 +7,97 @@
 
 namespace avgen::scene {
 
+namespace {
+
+// How each sample is moving: speed, direction relative to the body's facing, and turn rate.
+//
+// **From the trajectory, not the root velocity, whenever the database has one.** The root velocity
+// is one frame's difference and carries every sway of the pelvis. On the scout that sway alone
+// produced 52 "starts" and 53 "stops" in clips that never start or stop (agent/anim-cinfra's
+// finding, seen again from §21's side). The trajectory block says where the body will be at each
+// horizon, so speed and direction read off the furthest horizon are a mean over it. And with every
+// feature in the body's frame (§7), the turn rate is the path's own curvature: the direction of its
+// last segment against its first, over the time between them. A root-velocity heading difference
+// stopped measuring turning the moment the features began turning with the body.
+struct SampleMotion {
+    std::vector<float> speed;
+    std::vector<float> heading;
+    std::vector<float> turn;        // rad/s, positive left
+    std::vector<bool> turnKnown;
+    bool fromTrajectory = false;
+};
+
+SampleMotion sampleMotion(const MotionDatabase& db) {
+    SampleMotion out;
+    const std::uint32_t n = db.sampleCount();
+    out.speed.assign(n, 0.0f);
+    out.heading.assign(n, 0.0f);
+    out.turn.assign(n, 0.0f);
+    out.turnKnown.assign(n, false);
+    std::vector<MotionFeatureGroup> layout;
+    motionFeatureLayoutInto(db.config, layout);
+    std::size_t tp = layout.size();
+    std::size_t rv = layout.size();
+    for (std::size_t d = 0; d < layout.size(); ++d) {
+        if (tp == layout.size() && layout[d] == MotionFeatureGroup::TrajectoryPosition) {
+            tp = d;
+        }
+        if (rv == layout.size() && layout[d] == MotionFeatureGroup::RootVelocity) {
+            rv = d;
+        }
+    }
+    const auto raw = [&](const float* f, std::size_t d) {
+        return db.scale[d] != 0.0f ? (f[d] / db.scale[d]) + db.mean[d] : f[d];
+    };
+    const auto wrap = [](float a) {
+        while (a > 3.14159265f) { a -= 6.28318531f; }
+        while (a < -3.14159265f) { a += 6.28318531f; }
+        return a;
+    };
+    const std::vector<float>& horizons = db.config.trajectoryTimes;
+    if (tp < layout.size() && !horizons.empty() && horizons.back() > 0.0f) {
+        out.fromTrajectory = true;
+        const std::size_t last = horizons.size() - 1;
+        for (std::uint32_t s = 0; s < n; ++s) {
+            const float* f = db.featuresFor(s);
+            const auto at = [&](std::size_t k) {
+                return glm::vec2(raw(f, tp + (k * 4u)), raw(f, tp + (k * 4u) + 1u));
+            };
+            const glm::vec2 end = at(last);
+            out.speed[s] = glm::length(end) / horizons[last];
+            out.heading[s] = std::atan2(end.x, end.y);
+            if (last >= 1) {
+                const glm::vec2 first = at(0);
+                const glm::vec2 tail = end - at(last - 1);
+                if (glm::length(first) > 1e-4f && glm::length(tail) > 1e-4f) {
+                    const float span = (0.5f * (horizons[last] + horizons[last - 1])) - (0.5f * horizons[0]);
+                    out.turn[s] = wrap(std::atan2(tail.x, tail.y) - std::atan2(first.x, first.y)) / std::max(span, 1e-3f);
+                    out.turnKnown[s] = true;
+                }
+            }
+        }
+        return out;
+    }
+    if (rv + 2u >= db.dimension) {
+        return out;
+    }
+    for (std::uint32_t s = 0; s < n; ++s) {
+        const float* f = db.featuresFor(s);
+        const float x = raw(f, rv);
+        const float z = raw(f, rv + 2u);
+        out.speed[s] = std::sqrt((x * x) + (z * z));
+        out.heading[s] = std::atan2(x, z);
+        if (s > 0 && db.sampleClip[s] == db.sampleClip[s - 1u]) {
+            const float dt = std::max(db.sampleTime[s] - db.sampleTime[s - 1u], 1e-4f);
+            out.turn[s] = wrap(out.heading[s] - out.heading[s - 1u]) / dt;
+            out.turnKnown[s] = true;
+        }
+    }
+    return out;
+}
+
+} // namespace
+
 const char* coverageAxisName(CoverageAxis axis) {
     switch (axis) {
     case CoverageAxis::Speed: return "speed";
@@ -152,20 +243,12 @@ MotionCoverageReport measureMotionCoverage(const MotionDatabase& db,
     speed.reserve(db.sampleCount());
     std::vector<float> previousSpeed;
 
+    // Speed, direction and turn from the trajectory when there is one (see `sampleMotion`).
+    const SampleMotion motion = sampleMotion(db);
     for (std::uint32_t s = 0; s < db.sampleCount(); ++s) {
-        const float* f = db.featuresFor(s);
-        glm::vec3 v{0.0f};
-        if (rootVelocity + 2u < db.dimension) {
-            // Features are normalised; undo it so the axes are in metres per second and a gap can
-            // be reported in units a person can act on.
-            const auto raw = [&](std::size_t d) {
-                return db.scale[d] != 0.0f ? (f[d] / db.scale[d]) + db.mean[d] : f[d];
-            };
-            v = glm::vec3(raw(rootVelocity), raw(rootVelocity + 1u), raw(rootVelocity + 2u));
-        }
-        const float planar = std::sqrt((v.x * v.x) + (v.z * v.z));
+        const float planar = motion.speed[s];
         speed.push_back(planar);
-        direction.push_back(std::atan2(v.x, v.z));
+        direction.push_back(motion.heading[s]);
         phase.push_back(db.samplePhase[s]);
         const std::uint32_t tags = db.sampleTags[s];
         mode.push_back(static_cast<float>(
@@ -173,16 +256,14 @@ MotionCoverageReport measureMotionCoverage(const MotionDatabase& db,
             : (tags & static_cast<std::uint32_t>(MotionTag::Walk)) != 0u   ? 1
             : (tags & static_cast<std::uint32_t>(MotionTag::Turn)) != 0u   ? 3
                                                                            : 0));
-        // Acceleration and turn rate are differences along a clip, so they exist only where the
-        // previous sample is in the same clip -- at a clip boundary there is no previous frame and
-        // inventing one would put a fictitious spike in the corpus's own statistics.
+        // Acceleration is a difference along a clip, so it exists only where the previous sample
+        // is in the same clip. Turn rate comes with the sample when the trajectory gives it.
         if (s > 0 && db.sampleClip[s] == db.sampleClip[s - 1u]) {
             const float dt = std::max(db.sampleTime[s] - db.sampleTime[s - 1u], 1e-4f);
             acceleration.push_back((planar - speed[s - 1u]) / dt);
-            float dTheta = direction[s] - direction[s - 1u];
-            while (dTheta > 3.14159265f) { dTheta -= 6.28318531f; }
-            while (dTheta < -3.14159265f) { dTheta += 6.28318531f; }
-            turn.push_back(dTheta / dt);
+        }
+        if (motion.turnKnown[s]) {
+            turn.push_back(motion.turn[s]);
         }
     }
 
@@ -358,19 +439,10 @@ MotionCategoryReport measureMotionCategories(const MotionDatabase& db,
     if (rv + 2u >= db.dimension) {
         return out;
     }
-    const auto raw = [&](const float* f, std::size_t d) {
-        return db.scale[d] != 0.0f ? (f[d] / db.scale[d]) + db.mean[d] : f[d];
-    };
 
-    std::vector<float> speed(db.sampleCount());
-    std::vector<float> heading(db.sampleCount());
-    for (std::uint32_t s = 0; s < db.sampleCount(); ++s) {
-        const float* f = db.featuresFor(s);
-        const float x = raw(f, rv);
-        const float z = raw(f, rv + 2u);
-        speed[s] = std::sqrt((x * x) + (z * z));
-        heading[s] = std::atan2(x, z);
-    }
+    const SampleMotion motion = sampleMotion(db);
+    const std::vector<float>& speed = motion.speed;
+    const std::vector<float>& heading = motion.heading;
 
     std::vector<std::vector<bool>> clipsIn(count, std::vector<bool>(db.clipNames.size() + 1u, false));
     const auto add = [&](MotionCategory c, std::uint32_t s) {
@@ -403,22 +475,15 @@ MotionCategoryReport measureMotionCategories(const MotionDatabase& db,
             }
         }
         add(primary[s], s);
-        if (speed[s] >= options.idleSpeed) {
-            // A turn needs a direction at both ends, so both samples must be moving.
-            if (sameClip && speed[s - 1u] >= options.idleSpeed) {
-                const float dt = std::max(db.sampleTime[s] - db.sampleTime[s - 1u], 1e-4f);
-                float dTheta = heading[s] - heading[s - 1u];
-                while (dTheta > 3.14159265f) { dTheta -= 6.28318531f; }
-                while (dTheta < -3.14159265f) { dTheta += 6.28318531f; }
-                const float turn = dTheta / dt;
-                const bool fast = speed[s] >= options.runSpeed;
-                if (turn > options.turnRate) {
-                    add(fast ? MotionCategory::FastLeftTurn : MotionCategory::LeftTurn, s);
-                    if (fast) { add(MotionCategory::LeftTurn, s); }
-                } else if (turn < -options.turnRate) {
-                    add(fast ? MotionCategory::FastRightTurn : MotionCategory::RightTurn, s);
-                    if (fast) { add(MotionCategory::RightTurn, s); }
-                }
+        if (speed[s] >= options.idleSpeed && motion.turnKnown[s]) {
+            const float turn = motion.turn[s];
+            const bool fast = speed[s] >= options.runSpeed;
+            if (turn > options.turnRate) {
+                add(fast ? MotionCategory::FastLeftTurn : MotionCategory::LeftTurn, s);
+                if (fast) { add(MotionCategory::LeftTurn, s); }
+            } else if (turn < -options.turnRate) {
+                add(fast ? MotionCategory::FastRightTurn : MotionCategory::RightTurn, s);
+                if (fast) { add(MotionCategory::RightTurn, s); }
             }
         }
         if (sameClip) {

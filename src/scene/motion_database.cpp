@@ -531,10 +531,27 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
         // facing +Z by construction, and its pelvis yaw is posture, not heading. Measured on the
         // scout: `Idle` and `Walking_crouch` hold the pelvis at -43 degrees for the whole clip, and
         // reading that as heading turned a straight crouch walk into a 47-degree diagonal.
-        const std::vector<glm::vec3> facing =
-            analysis.travels ? clipFacing(pack.skeleton, clip, root, frames, dt, meta.loop,
-                                          options.config.facingWindow)
-                             : std::vector<glm::vec3>(frames, glm::vec3(0.0f, 0.0f, 1.0f));
+        //
+        // **First, a heading the clip carries** (§21): an augmented clip knows the heading its
+        // generator gave it, and a pelvis only guesses. Sampled at this build's rate from the
+        // clip's own, and held at its ends.
+        std::vector<glm::vec3> facing;
+        if (!meta.heading.empty()) {
+            facing.resize(frames);
+            const float headingRate = meta.sampleRate > 0.0f ? meta.sampleRate : rate;
+            for (std::uint32_t f = 0; f < frames; ++f) {
+                const float at = static_cast<float>(f) * dt * headingRate;
+                const auto i0 = std::min(static_cast<std::size_t>(at), meta.heading.size() - 1);
+                const std::size_t i1 = std::min(i0 + 1, meta.heading.size() - 1);
+                const float s = std::clamp(at - static_cast<float>(i0), 0.0f, 1.0f);
+                const float yaw = meta.heading[i0] + ((meta.heading[i1] - meta.heading[i0]) * s);
+                facing[f] = glm::vec3(std::sin(yaw), 0.0f, std::cos(yaw));
+            }
+        } else {
+            facing = analysis.travels ? clipFacing(pack.skeleton, clip, root, frames, dt, meta.loop,
+                                                   options.config.facingWindow)
+                                      : std::vector<glm::vec3>(frames, glm::vec3(0.0f, 0.0f, 1.0f));
+        }
 
         // ---- implied travel, for a cycle authored in place (ADR-540) ------------------------------
         //

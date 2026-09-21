@@ -107,6 +107,11 @@ struct PackClip {
     // Index into `MotionPack::provenance`. Per clip, not per pack: a pack may mix a CC0 character's
     // own takes with CC-BY corpus motion, and the answer to "may we ship this" then differs by clip.
     std::uint32_t provenance = 0;
+    // Phase C §21: the body's heading at each frame (yaw about +Y, radians, at `sampleRate`), when
+    // the clip knows it better than its pelvis does. An augmented clip records the heading its
+    // generator applied (a turn variant turns because it was turned). Empty means "derive it",
+    // which is every authored clip. The database reads this before any other source of facing.
+    std::vector<float> heading;
 };
 
 struct MotionPack {

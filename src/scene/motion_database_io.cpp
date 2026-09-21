@@ -282,6 +282,7 @@ std::string motionPackContentDigest(const MotionPack& pack) {
         d.text(meta.name);
         d.value(meta.loop);
         d.value(meta.sampleRate);
+        d.array(meta.heading);
         for (const std::string& tag : meta.tags) {
             d.text(tag);
         }

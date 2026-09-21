@@ -75,7 +75,9 @@ enum class MotionTag : std::uint32_t {
 //   4  a clip whose root does not travel carries the travel its planted feet imply, in its root
 //      velocity and its trajectory, and its heading is its authoring frame rather than its
 //      pelvis. Before this, every in-place walk read as standing still.
-inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 4;
+//   5  a clip that carries a heading (`PackClip::heading`, written by §21's augmentation) is
+//      faced by it rather than by its pelvis.
+inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 5;
 
 // A world-space vector expressed in the frame of a body facing `facing` (world space, planar; +Z is
 // forward, +X is the body's left-to-right axis exactly as it is in an unrotated clip). The one
