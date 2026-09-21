@@ -3948,6 +3948,21 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                                                             .label = "scene/volumeShadowSteps"});
     volumeShadowStrength_ = &params.add(floatDesc(prefix_ + "scene/volumeShadowStrength",
                                                   volumeSetting_.volumeShadowStrength, 0.0f, 8.0f, 0.0f, 2.0f));
+    // ADR-573, the fog brief's §27: "where practical, local lights should interact with the fog ...
+    // this could be a major visual upgrade for Glowmere and Tree of Life." The interaction has
+    // existed since ADR-053 and reaches the shader through `glow.y`. What did not exist was any
+    // way to ask for it: no parameter, so no panel row, no automation, no modulation route. Twelve
+    // shipped scenes set it -- every Glowmere scene among them -- and every one of them had to be
+    // hand-edited to do it.
+    volumeLocalLights_ = &params.add(floatDesc(prefix_ + "scene/volumeLocalLights",
+                                               volumeSetting_.volumeLocalLights, 0.0f, 8.0f, 0.0f, 2.0f));
+    // ADR-573: the same, for how far the march goes. Thirty-two shipped scenes set it and none of
+    // them could have done so from the editor. The hard maximum is generous because a scene whose
+    // subject is kilometres of air legitimately wants one; the soft range is where a frame budget
+    // survives.
+    volumeMaxDistance_ = &params.add(floatDesc(prefix_ + "scene/volumeMaxDistance",
+                                               volumeSetting_.volumeMaxDistance, 0.01f, 20000.0f,
+                                               10.0f, 4000.0f));
     // ADR-461. The soft range is the whole of 0..1 because the whole of it is usable and the
     // interesting end is the low one -- a slider whose useful region is in its first hair is the
     // `scene/windSpeed` defect this project has already fixed once.
@@ -4870,6 +4885,8 @@ void Composition::detach() {
     volumeSteps_ = nullptr;
     volumeShadowSteps_ = nullptr;
     volumeShadowStrength_ = nullptr;
+    volumeLocalLights_ = nullptr;
+    volumeMaxDistance_ = nullptr;
     volumeJitter_ = nullptr;
     keyLight_ = nullptr;
     gridIntensity_ = nullptr;
@@ -7468,7 +7485,9 @@ void Composition::applyParameters() {
         env.volumeJitter = pick(volumeJitter_, volumeSetting_.volumeJitter);
         env.shadowCascades = volumeSetting_.shadowCascades;
         env.shadowRange = pick(shadowRange_, volumeSetting_.shadowRange);
-        env.volumeMaxDistance = volumeSetting_.volumeMaxDistance;
+        env.volumeMaxDistance = pick(volumeMaxDistance_, volumeSetting_.volumeMaxDistance);
+        // ADR-573 (§27): picked, not copied. It used not to be assigned here at all.
+        env.volumeLocalLights = pick(volumeLocalLights_, volumeSetting_.volumeLocalLights);
         // Field names are prefixed like every other reference so a nested scene stays self-contained.
         env.volumeDensityField =
             volumeDensityFieldSetting_.empty() ? std::string() : sanitise(prefix_) + volumeDensityFieldSetting_;
@@ -8469,7 +8488,7 @@ nlohmann::json Composition::toJson() const {
             environment["volumeScattering"] = base(volumeScattering_, volumeSetting_.volumeScattering);
             environment["volumeAbsorption"] = base(volumeAbsorption_, volumeSetting_.volumeAbsorption);
             environment["volumeAnisotropy"] = base(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
-            environment["volumeLocalLights"] = volumeSetting_.volumeLocalLights;
+            environment["volumeLocalLights"] = base(volumeLocalLights_, volumeSetting_.volumeLocalLights);
             environment["volumeNoise"] = base(volumeNoise_, volumeSetting_.volumeNoiseAmount);
             environment["volumeNoiseScale"] = base(volumeNoiseScale_, volumeSetting_.volumeNoiseScale);
             environment["volumeNoiseSpeed"] = base(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
@@ -8481,7 +8500,7 @@ nlohmann::json Composition::toJson() const {
                 base(volumeShadowStrength_, volumeSetting_.volumeShadowStrength);
             environment["volumeJitter"] = base(volumeJitter_, volumeSetting_.volumeJitter);
             environment["shadowCascades"] = volumeSetting_.shadowCascades;
-            environment["volumeMaxDistance"] = volumeSetting_.volumeMaxDistance;
+            environment["volumeMaxDistance"] = base(volumeMaxDistance_, volumeSetting_.volumeMaxDistance);
             if (!volumeDensityFieldSetting_.empty()) {
                 environment["volumeDensityField"] = volumeDensityFieldSetting_;
             }

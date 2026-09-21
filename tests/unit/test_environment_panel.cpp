@@ -54,6 +54,8 @@ TEST_CASE("Every path the Environment panel asks for exists", "[ui][panels][para
                              "scene/fogUpperDensity", "scene/fogHeightCurve",
                              // ADR-570 (§20/§22): the self-shadow march's two controls.
                              "scene/volumeShadowSteps", "scene/volumeShadowStrength",
+                             // ADR-573 (§27): two controls that shipped without a way to reach them.
+                             "scene/volumeLocalLights", "scene/volumeMaxDistance",
                              "env/intensity", "env/sky/intensity"}) {
         INFO(path);
         CHECK(registered(params, path));

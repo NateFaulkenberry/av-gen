@@ -121,6 +121,11 @@ void drawEnvironmentPanel(app::Engine& engine) {
         // is the whole feature's off switch, which an artist should be able to find.
         intSlider(engine, "scene/volumeShadowSteps", "Fog shadow steps");
         slider(engine, "scene/volumeShadowStrength", "Fog shadow strength", "%.2f");
+        // ADR-573 (§27). "Local lights in fog" is the artist's name for it; `volumeLocalLights` is
+        // the engine's. The capability has existed since ADR-053 and twelve shipped scenes use it,
+        // every one of them hand-edited, because until now there was no row to move.
+        slider(engine, "scene/volumeLocalLights", "Local lights in fog", "%.2f");
+        slider(engine, "scene/volumeMaxDistance", "Fog march distance", "%.0f m", true);
         slider(engine, "env/intensity", "Ambient", "%.2f");
         slider(engine, "env/sky/intensity", "Sky intensity", "%.2f");
         ImGui::PopID();

@@ -1468,6 +1468,11 @@ private:
     // ADR-570 (§20/§22): the self-shadow march, beside the march steps it is a march of.
     params::Parameter<int>* volumeShadowSteps_ = nullptr;
     params::Parameter<float>* volumeShadowStrength_ = nullptr;
+    // ADR-573 (§27): two volumetric controls that existed, shipped, and could only be
+    // reached by hand-editing a scene file. Parameters now, so they are drawable,
+    // automatable and modulatable like every other control on this pass.
+    params::Parameter<float>* volumeLocalLights_ = nullptr;
+    params::Parameter<float>* volumeMaxDistance_ = nullptr;
     params::Parameter<float>* volumeJitter_ = nullptr; // ADR-461
     // How far the directional shadow cascades reach; 0 = ADR-112's automatic range. See
     // `Environment::shadowRange` for why a scene is allowed an opinion about this one.
