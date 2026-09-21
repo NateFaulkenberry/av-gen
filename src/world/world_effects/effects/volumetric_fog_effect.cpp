@@ -38,6 +38,7 @@
 // JSON path). The nine controls a bank has no use for are simply not declared here -- which means
 // the panel does not draw them, registration does not produce them, and a route cannot aim at them.
 
+#include "core/vortex.hpp"
 #include "world/world_effects/effect_registry.hpp"
 
 #include <array>
@@ -318,6 +319,66 @@ bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx
 
 Result<void> validate(const AtmosphericEffect& e) { return e.vortex.validate(); }
 
+// ADR-562: the authored numbers as the sixteen lanes the march reads.
+//
+// IDENTICAL to the vortex's packer, deliberately and not by accident: a fog bank IS the
+// placed medium the engine has, authored in fog vocabulary (see this file's opening note).
+// Sharing the lane map is what makes that true rather than merely claimed. If the two ever
+// need to differ, that is the moment the fog bank stops being a different authoring surface
+// onto one primitive and becomes a second primitive, which is a decision with an ADR in it.
+//
+// THE LANE MAP, and it is the contract. `shaders/volume.wgsl` reads these by index and
+// `shaders/vortex.wgsl` names them `v0`..`v8`; the two must agree and this comment is where they
+// are held against each other.
+//
+//   0  centre.xyz, radius (0 is off, and it is the gate)
+//   1  thickness, swirl, rotationSpeed, DENSITY (extinction per metre)
+//   2  innerVoid, contrast, turbulence, turbulenceScale
+//   3  breathAmount, breathSpeed, EMISSION (per metre), filaments
+//   4  funnelDepth, throat, throatDensity, 0
+//   5  cometResponse, cometReach, sceneScattering, 0
+//   6  smokeWarp, smokeBillow, detail, 0
+//   7  eyeWallWidth, eyeWallGain, cloudNoise, 0
+//   8  bandArms, cot(bandPitch), bandDepth, bandHarmonic
+//   9  deep colour
+//  10  mid colour
+//  11  luminous accent
+//  12  SPILL, 0, 0, 0   -- the thirteenth lane, and it is not decoration
+//  13-15 unused (headroom; the tornado fills through 13)
+//
+// Lane 12 exists because `spill` is a SURFACE irradiance consumed by the lit pass (ADR-379), not a
+// per-metre coefficient the march integrates -- so it appears in no lane the march needs, and
+// packing the medium without it would have silently broken the vortex's glow on the island above
+// it. `scene_renderer.cpp` reads it from here now. It was the one reader of the authored struct
+// that the audit found genuinely needed something the twelve march lanes did not carry.
+//
+// The geometry and motion lanes come from `vortex::packVortex`, which is the ONE packing, so the
+// CPU sampler, the shader and this site cannot disagree about the field (ADR-388, and ADR-401 for
+// what happens when they can). The appearance lanes are assembled here because they are what the
+// picture does with the field rather than part of it.
+void packMedium(const E& e, float envelope, MediumSlot& out) {
+    const Vortex& v = e.vortex;
+    const vortex::VortexUniforms f = vortex::packVortex(v.field);
+    out.lane[0] = f.v0;
+    // The envelope scales the two PER-METRE coefficients and nothing else (ADR-387): fading a
+    // medium means less of it in the air. Fading its colours would leave a full-strength grey
+    // ghost; fading its radius would shrink it rather than dim it.
+    out.lane[1] = glm::vec4(glm::vec3(f.v1), std::max(v.density, 0.0f) * envelope);
+    out.lane[2] = f.v2;
+    out.lane[3] = glm::vec4(f.v3.x, f.v3.y, std::max(v.emission, 0.0f) * envelope,
+                            std::max(v.filaments, 0.0f));
+    out.lane[4] = f.v4;
+    out.lane[5] = glm::vec4(std::max(v.cometResponse, 0.0f), std::max(v.cometReach, 1.0f),
+                            std::max(v.scattering, 0.0f), 0.0f);
+    out.lane[6] = f.v6;
+    out.lane[7] = f.v7;
+    out.lane[8] = f.v8;
+    out.lane[9] = glm::vec4(v.colorDeep, 0.0f);
+    out.lane[10] = glm::vec4(v.colorMid, 0.0f);
+    out.lane[11] = glm::vec4(v.colorAccent, 0.0f);
+    out.lane[12] = glm::vec4(std::max(v.spill, 0.0f), 0.0f, 0.0f, 0.0f);
+}
+
 EffectSchema buildSchema() {
     EffectSchema s;
     s.kind = AtmosphereKind::VolumetricFog;
@@ -335,7 +396,8 @@ EffectSchema buildSchema() {
     s.beatLeaf = "selfGlow";
     s.groundGlow = false;
     s.factory = make;
-    s.resolve.bucket = EffectBucket::Vortex;
+    s.resolve.bucket = EffectBucket::Medium;
+    s.resolve.pack = packMedium;
     s.resolve.fill = fill;
     s.validate = validate;
     return s;

@@ -610,18 +610,74 @@ struct SkyGroundGpu {
 };
 static_assert(sizeof(SkyGroundGpu) == 48);
 
+// ---- the placed volumetric media (ADR-562) ------------------------------------------------------
+
+// How many placed media the march carries. Four to start, and the number is a MARCH-COST decision
+// rather than a capacity one: a slot is 272 bytes, so eight would be 2 KB against a 64 KB uniform
+// limit. ADR-374 measured one medium at +5.5 ms of a 13.5 ms frame and ADR-560 measured a fog bank
+// at 7.14 ms of `volume.march`, with the cost tracking how many (pixel, step) samples have non-zero
+// density -- which is what the per-slot ray interval is for, and what has to be measured before
+// this rises.
+inline constexpr std::size_t kMaxMedia = 4;
+
+// 16 `vec4` per medium. The vortex uses 12 (nine field + three colour) plus `spill` in the 13th;
+// the tornado uses 13 and was 14 by the end of its Phase 2. Sized 16 so a medium gaining a term is
+// not a shared-header edit -- the headroom is 64 bytes a slot and it buys the same property the
+// packed form buys, which is that adding a kind changes nothing here.
+inline constexpr std::size_t kMediumLanes = 16;
+
+// One placed medium, as the march will read it.
+//
+// `kind` selects the density function; the lanes are that kind's packed parameters and their
+// meaning is documented beside each kind's `pack`. Padding is EXPLICIT so the struct has none of
+// its own and a whole-struct `memcmp` is total -- see `effect_conformance.cpp`'s preamble for the
+// bug that makes this worth stating.
+struct MediumSlot {
+    glm::vec4 lane[kMediumLanes]{};
+    std::uint32_t kind = 0; // AtmosphereKind, compared as a scalar
+    std::uint32_t pad[3]{};
+};
+
 // What one frame hands the renderer. A plain aggregate so nothing allocates and `scene::Scene` can
 // hold it by value beside `worldEffects`.
 struct AtmosphericFrame {
     std::uint32_t cometCount = 0;
     std::uint32_t auroraCount = 0;
-    // ADR-387: the live vortex, if a scene authored one. ONE, not an array: the volumetric march
-    // evaluates three fBMs per sample inside it, and ADR-374 measured the single vortex at +5.5 ms
-    // of a 13.5 ms frame -- the most expensive term in the scene. A second is a deliberate future
-    // decision rather than an oversight, and the resolve counts what it dropped so the UI can say
-    // so instead of silently ignoring it.
-    bool hasVortex = false;
-    Vortex vortex{};
+    // ADR-562: the placed volumetric media, as PACKED LANES rather than authored structs.
+    //
+    // This was `bool hasVortex; Vortex vortex;` -- one slot, and the second placed medium in a
+    // scene rendered as nothing at all. ADR-560 measured that: a fog bank and a cosmic vortex
+    // authored together produced a frame byte-identical to whichever appeared FIRST in the array,
+    // with the loser contributing not one pixel and nothing anywhere saying so.
+    //
+    // Why lanes and not `{ kind; Vortex; Tornado; }`. The frame already carries `CometGpu` and
+    // `AuroraGpu` -- packed GPU structs -- so a slot holding an authored struct was the exception,
+    // not the pattern, and generalising the exception costs a member in a shared header per medium
+    // kind, which is the edit ADR-500 exists to delete (§35 names smoke, clouds, dust and steam).
+    // Lanes are a fixed 16 `vec4` whatever kinds exist.
+    //
+    // It also removes a class of bug this file has already had: `frameDiffers`'s first version
+    // compared the PADDING between `hasVortex` and `vortex` and reported a difference that was not
+    // one. An array of `vec4` has no interior padding, so the comparison is one `memcmp` that
+    // cannot be wrong.
+    //
+    // ADR-390 refused to pack in the world because `packCosmicOcean` took a `CosmicQualityScale`
+    // and the tier is the renderer's to know. Checked rather than inherited: **neither
+    // `packVortex` nor `packTornado` takes a tier**, so that reason is absent here. A medium that
+    // needs one at pack time is this decision's revisit trigger.
+    std::uint32_t mediumCount = 0;
+    MediumSlot media[kMaxMedia]{};
+    // ADR-560's headline defect, wired to somewhere a person can see it. The resolve has always
+    // counted what it dropped; `AtmosphericCounts::dropped` had exactly one reader in the tree and
+    // it was a CPU conformance finding, so in a running editor the number did not exist. Two
+    // comments claimed the limit was "reported -- a stated limit, not a silent no-op". It was not.
+    //
+    // `agent/tornado` produced the strongest statement of what that costs: a seven-variant showcase
+    // that renders a FLAT GREY FRAME. Seven media authored, one slot, the survivor chosen by array
+    // order, and the winner a 70 m dust devil sub-pixel at group distance -- an entirely blank
+    // deliverable with no warning anywhere in the log. This is the difference between an empty
+    // render being explicable and being a mystery.
+    std::uint32_t mediaDropped = 0;
     // Samples the shader marches down each comet's tail. A quality control (§12): lowering it
     // costs smoothness and not brightness, because the accumulation is normalised by the count and
     // the sample width has a floor of the sample spacing.

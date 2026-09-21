@@ -40,30 +40,49 @@ constexpr std::string_view kProbeName = "conformance probe";
 // the frame growing silently past what this function reads.
 [[nodiscard]] bool frameDiffers(const AtmosphericFrame& a, const AtmosphericFrame& b) {
     // 1612 -> 1640 when Vortex 2.0 added seven floats to `Vortex` (§7-§11's macro structure).
-    // Checked, which is what this assertion is for: the `memcmp` at the bottom covers the WHOLE of
-    // `Vortex`, so the new members are read with no edit here -- the assertion fired, the question
+    // Checked, which is what this assertion is for: the `memcmp` at the bottom covered the WHOLE of
+    // `Vortex`, so the new members were read with no edit here -- the assertion fired, the question
     // was asked, and the answer was yes.
     //
     // 1640 -> 2400 when ADR-390's Cosmic Ocean arrived, and that time the answer was **no**: the
     // frame had gained `hasCosmicOcean`, `cosmicOcean` and `cosmicOceanEnvelope` and this function
     // read none of the three. The assertion earned its keep twice in one day.
     //
-    // 2400 -> 1640 when the Cosmic Ocean was removed (ADR-441), which is the same question asked
-    // in the other direction and is the easy direction: a member this function read is gone, and
-    // what is left is what it read before. A SHRINKING frame is the case an assertion on `sizeof`
-    // catches and a checklist does not.
-    static_assert(sizeof(AtmosphericFrame) == 1640,
+    // 2400 -> 1640 when the Cosmic Ocean was removed (ADR-441), the same question in the other
+    // direction and the easy one: a member this function read is gone and what is left is what it
+    // read before. A SHRINKING frame is the case an assertion on `sizeof` catches and a checklist
+    // does not.
+    //
+    // 1640 -> 2564 for ADR-562's medium slots, and this time the answer changes the FUNCTION rather
+    // than the list. The frame no longer carries an authored `Vortex` behind a `bool`; it carries
+    // `MediumSlot media[kMaxMedia]` plus two counts, and a slot is an array of `vec4` with its
+    // padding declared. So:
+    //
+    //   * there is no member list here to fall behind any more. The old body named `vortex` and
+    //     would have gone on compiling, and silently comparing nothing, if a second medium had been
+    //     added beside it -- which is exactly the shape of the defect ADR-390's arrival produced.
+    //   * the padding question is gone at the source. This function's preamble is about two
+    //     indeterminate bytes between `hasVortex` and `vortex` that a `memcmp` read and reported as
+    //     a difference that was not one. `MediumSlot` has an explicit `pad[3]`, so a whole-struct
+    //     compare is total and correct by construction rather than by care.
+    //
+    // **That is why the tripwire can finally relax.** It still pins the size, because a frame that
+    // grows a member OUTSIDE the slots is still a question worth being asked. It no longer guards a
+    // hand-maintained list, because there is no longer a hand-maintained list to guard.
+    static_assert(sizeof(AtmosphericFrame) == 2564,
                   "AtmosphericFrame changed size: check that frameDiffers still reads all of it");
-    if (a.cometCount != b.cometCount || a.auroraCount != b.auroraCount || a.hasVortex != b.hasVortex ||
-        a.cometSteps != b.cometSteps) {
+    if (a.cometCount != b.cometCount || a.auroraCount != b.auroraCount ||
+        a.cometSteps != b.cometSteps || a.mediumCount != b.mediumCount ||
+        a.mediaDropped != b.mediaDropped) {
         return true;
     }
     if (std::memcmp(&a.comets, &b.comets, sizeof(a.comets)) != 0) { return true; }
     if (std::memcmp(&a.auroras, &b.auroras, sizeof(a.auroras)) != 0) { return true; }
     if (std::memcmp(&a.ground, &b.ground, sizeof(a.ground)) != 0) { return true; }
-    // `Vortex` is floats and `vec3`s, all 4-byte aligned, so it has no interior padding either.
-    static_assert(sizeof(Vortex) % 4 == 0);
-    return std::memcmp(&a.vortex, &b.vortex, sizeof(a.vortex)) != 0;
+    // Lanes are `vec4` and the only sub-word member is padded explicitly, so the whole array
+    // compares with no indeterminate byte in it -- which the preamble above is the story of.
+    static_assert(sizeof(MediumSlot) == sizeof(glm::vec4) * kMediumLanes + 16);
+    return std::memcmp(&a.media, &b.media, sizeof(a.media)) != 0;
 }
 
 
@@ -363,7 +382,7 @@ Report checkAtmospheric(AtmosphereKind kind) {
             switch (schema->resolve.bucket) {
             case EffectBucket::Comet: mine = counts.comets; break;
             case EffectBucket::Aurora: mine = counts.auroras; break;
-            case EffectBucket::Vortex: mine = counts.vortices; break;
+            case EffectBucket::Medium: mine = counts.vortices; break;
             }
         }
         const std::size_t total = counts.comets + counts.auroras + counts.vortices;

@@ -805,6 +805,9 @@ private:
     world::WorldEffectParameters worldEffectParams_;
     // ADR-230, on the same terms: the live set and the `atmos/...` parameters that own it.
     std::vector<world::AtmosphericEffect> atmosphericEffects_;
+    // ADR-562: the last reported dropped-media count, so the warning is once per change rather than
+    // once per frame.
+    std::uint32_t lastMediaDropped_ = 0;
     world::AtmosphericParameters atmosphericParams_;
     // The aurora's spectrum, resolved each frame from the analysis frame every other consumer
     // reads. `kAuroraBands` entries; see `world/atmospherics.hpp` for why this one vector is not a

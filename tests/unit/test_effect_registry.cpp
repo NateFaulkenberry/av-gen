@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <set>
 #include <string>
 #include <string_view>
@@ -338,15 +339,29 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
         ctx.seconds = 1.0;
         world::AtmosphericFrame frame{};
         world::buildAtmosphericFrame(std::span(&fog, 1), ctx, frame);
-        CHECK(frame.hasVortex);
-        CHECK(frame.vortex.field.radius > 0.0f);
+        // ADR-562: lanes, not an authored struct. Lane 0's `.w` is the radius and the gate; the
+        // map is beside each kind's `packMedium`.
+        REQUIRE(frame.mediumCount == 1);
+        CHECK(frame.media[0].lane[0].w > 0.0f);
         // What makes it a bank rather than a funnel, and the reason it is a kind rather than a
         // preset: the panel it draws has no swirl, no throat and no funnel depth on it.
-        CHECK(frame.vortex.field.swirl == 0.0f);
-        CHECK(frame.vortex.field.funnelDepth == 0.0f);
+        CHECK(frame.media[0].lane[1].y == 0.0f); // swirl
+        CHECK(frame.media[0].lane[4].x == 0.0f); // funnelDepth
     }
 
-    SECTION("a bank and a funnel in one scene are a reported limit, not a silent no-op") {
+    SECTION("a bank and a funnel in one scene are BOTH marched") {
+        // ADR-562, and this section used to assert the defect.
+        //
+        // It was called "a reported limit, not a silent no-op" and it checked
+        // `counts.vortices == 1` and `counts.dropped == 1` -- enshrining the drop as correct
+        // behaviour, in a test whose own name claimed the drop was reported. It was not reported:
+        // ADR-560 measured that `dropped` had exactly one reader in the tree and it was a CPU
+        // conformance finding, so a person running the editor saw nothing at all. The test passed
+        // for two ADRs while the owner's bug sat underneath it.
+        //
+        // That is worth more than the assertion it replaces: **a test can hold a defect in place by
+        // asserting it, and the name can describe the behaviour somebody intended rather than the
+        // behaviour that exists.** Read a test's name as a claim to be checked, not as documentation.
         std::array<world::AtmosphericEffect, 2> both{
             world::makeAtmosphericEffect(world::AtmosphereKind::Vortex, "funnel"),
             world::makeAtmosphericEffect(world::AtmosphereKind::VolumetricFog, "bank")};
@@ -358,11 +373,24 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
         ctx.seconds = 1.0;
         std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
         std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
+        std::array<world::ResolvedAtmospheric, world::kMaxMedia> media{};
         const world::AtmosphericCounts counts =
-            world::resolveAtmosphericEffects(both, ctx, comets, auroras);
-        CHECK(counts.vortices == 1);
-        CHECK(counts.dropped == 1);
+            world::resolveAtmosphericEffects(both, ctx, comets, auroras, media);
+        CHECK(counts.vortices == 2);
+        CHECK(counts.dropped == 0);
+
+        // ...and both reach the frame, with distinct radii, so this cannot pass by seating one
+        // medium twice. ADR-560's proof of the defect was that the two arms were byte-identical;
+        // the proof of the fix has to be that they are not.
+        world::AtmosphericFrame frame{};
+        world::buildAtmosphericFrame(both, ctx, frame);
+        REQUIRE(frame.mediumCount == 2);
+        CHECK(frame.media[0].lane[0].w > 0.0f);
+        CHECK(frame.media[1].lane[0].w > 0.0f);
+        CHECK(frame.mediaDropped == 0);
+        CHECK(std::memcmp(&frame.media[0], &frame.media[1], sizeof(frame.media[0])) != 0);
     }
+
 }
 
 TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",

@@ -82,7 +82,7 @@ bool VolumeRenderer::enabled(const scene::Environment& environment) {
 }
 
 bool VolumeRenderer::enabled(const scene::Scene& scene) {
-    return scene.environment.volumeDensity > 0.0f || scene.atmospherics.hasVortex;
+    return scene.environment.volumeDensity > 0.0f || scene.atmospherics.mediumCount > 0;
 }
 
 const gpu::RenderTarget& VolumeRenderer::target() const {
@@ -370,60 +370,23 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     const std::uint32_t glowSystems = std::min(particleGlowSystems, kMaxParticleGlowSystems);
     u.glow = glm::vec4(static_cast<float>(glowSystems),
                        std::max(scene.environment.volumeLocalLights, 0.0f), 0.0f, 0.0f);
-    // ADR-371: the vortex. Written as all-zero when the radius is zero, which is the state of
-    // every scene that has not asked for one, so the march's added branch is never taken.
+    // ADR-562: the media, copied straight in. There is no assembly here any more -- each kind's
+    // `packMedium` produced these lanes in `buildAtmosphericFrame`, so this site cannot disagree
+    // with the field the CPU sampler and the shader share. That was the point: ADR-401 found
+    // `packVortex` with one caller because this file kept its own copy of the clamps, ADR-561 found
+    // the conversion in the same place, and ADR-562 found a third copy in `engine.cpp` that had
+    // fallen seven members behind. Copying opaque lanes is the shape that cannot rot.
+    //
+    // Slots past `mediumCount` stay zero, and lane 0's `.w` (the radius) at zero is the per-slot
+    // gate the march tests, so an unused slot costs one comparison.
     {
-        const world::Vortex& v = scene.atmospherics.vortex;
-        if (scene.atmospherics.hasVortex && v.active()) {
-            // ADR-388 extracted the field so that everything could sample one description of it,
-            // and then this site kept its own hand-written copy of the clamps -- so for two ADRs
-            // `vortex::packVortex` had exactly ONE caller, the parity test, and the bytes the
-            // shipped frame actually marched were produced here and tested by nothing. The parity
-            // test proved core/vortex.cpp and shaders/vortex.wgsl agree; nothing proved that
-            // either of them agreed with what the renderer uploads. ADR-401's lesson one file
-            // over: a test can be green about a path nobody renders.
-            //
-            // So the GEOMETRY AND MOTION slots come from `packVortex` now, and there is one
-            // packing. The appearance slots stay here, where they belong -- `vortex1.w`,
-            // `vortex3.zw`, the three colours and `vortex5` are what the picture does with the
-            // field and are deliberately not part of it (see core/vortex.hpp's opening note).
-            // ADR-562: there is no conversion left to get wrong. `world::Vortex` composes
-            // `vortex::VortexField`, so the field IS the field -- ADR-561 moved the
-            // twenty-four-member copy out of this file so a test could reach it, and this
-            // deletes it instead.
-            const vortex::VortexUniforms f = vortex::packVortex(v.field);
-            u.vortex0 = f.v0;
-            // `.w` is the per-metre extinction -- appearance, so it is added here rather than
-            // being carried through the field (ADR-374: every quantity entering a march is per
-            // metre, and this is the one the field deliberately does not know about).
-            u.vortex1 = glm::vec4(glm::vec3(f.v1), std::max(v.density, 0.0f));
-            u.vortex2 = f.v2;
-            u.vortex3 = glm::vec4(f.v3.x, f.v3.y, std::max(v.emission, 0.0f),
-                                  std::max(v.filaments, 0.0f));
-            u.vortexA = glm::vec4(v.colorDeep, 0.0f);
-            u.vortexB = glm::vec4(v.colorMid, 0.0f);
-            u.vortexAccent = glm::vec4(v.colorAccent, 0.0f);
-            u.vortex4 = f.v4;
-            // ADR-388: `.z` is the scene-light scattering coefficient, 0 by default. See the
-            // march's comment at `let scattering = ...` for what 1.0 was measured to do.
-            u.vortex5 = glm::vec4(std::max(v.cometResponse, 0.0f), std::max(v.cometReach, 1.0f),
-                                  std::max(v.scattering, 0.0f), 0.0f);
-            u.vortex6 = f.v6;
-            u.vortex7 = f.v7;
-            u.vortex8 = f.v8;
-        } else {
-            u.vortex0 = glm::vec4(0.0f);
-            u.vortex1 = glm::vec4(0.0f);
-            u.vortex2 = glm::vec4(0.0f);
-            u.vortex3 = glm::vec4(0.0f);
-            u.vortexA = glm::vec4(0.0f);
-            u.vortexB = glm::vec4(0.0f);
-            u.vortexAccent = glm::vec4(0.0f);
-            u.vortex4 = glm::vec4(0.0f);
-            u.vortex5 = glm::vec4(0.0f);
-            u.vortex6 = glm::vec4(0.0f);
-            u.vortex7 = glm::vec4(0.0f);
-            u.vortex8 = glm::vec4(0.0f);
+        u.mediaInfo = glm::vec4(static_cast<float>(scene.atmospherics.mediumCount), 0.0f, 0.0f, 0.0f);
+        for (std::size_t slot = 0; slot < world::kMaxMedia; ++slot) {
+            const bool live = slot < scene.atmospherics.mediumCount;
+            for (std::size_t lane = 0; lane < world::kMediumLanes; ++lane) {
+                u.media[slot * world::kMediumLanes + lane] =
+                    live ? scene.atmospherics.media[slot].lane[lane] : glm::vec4(0.0f);
+            }
         }
     }
     im.context.queue().WriteBuffer(im.uniforms, 0, &u, sizeof(u));

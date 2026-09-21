@@ -798,30 +798,40 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
     // Computed here from the authored list rather than plumbed from the frame, because the panel
     // already has everything the question needs and `AtmosphericFrame` is memcmp'd against a
     // `static_assert`ed size -- a string on it would be the wrong shape for the wrong reason.
-    if (schema->resolve.bucket == world::EffectBucket::Vortex && authored.enabled) {
+    if (schema->resolve.bucket == world::EffectBucket::Medium && authored.enabled) {
         std::size_t ahead = 0;
         for (const world::AtmosphericEffect& other : engine.atmosphericEffects()) {
             if (&other == &authored) {
                 break;
             }
             const world::EffectSchema* s2 = world::effectSchema(other.kind);
-            if (other.enabled && s2 != nullptr && s2->resolve.bucket == world::EffectBucket::Vortex) {
+            if (other.enabled && s2 != nullptr && s2->resolve.bucket == world::EffectBucket::Medium) {
                 ++ahead;
             }
         }
-        if (ahead > 0) {
-            ImGui::TextColored(kWarning, "Not drawn: the volumetric march has one medium slot and "
-                                         "an effect above this one is using it.");
+        // ADR-562 raised the slot count from one to `kMaxMedia`, and this warning had to move with
+        // it or become a LIE -- it would have told the artist that media two, three and four were
+        // "not drawn" while the march drew all of them. A warning that fires when nothing is wrong
+        // teaches an artist to ignore warnings, which is ADR-421's defect wearing the opposite face
+        // and is how the next real one gets missed.
+        if (ahead >= world::kMaxMedia) {
+            ImGui::TextColored(kWarning,
+                               "Not drawn: the march carries %zu placed media and %zu enabled "
+                               "effects above this one are using them.",
+                               world::kMaxMedia, ahead);
             if (ImGui::IsItemHovered()) {
                 tooltipUnformatted(
-                    "A cosmic vortex and a fog bank are the same placed medium, marched by the\n"
-                    "same pass, and there is room for one of them. The first enabled one in this\n"
-                    "list wins; disable it, or disable this one, to see the other.\n\n"
-                    "The limit is the cost: one medium is +5.5 ms of a 13.5 ms frame (ADR-374),\n"
-                    "which is the most expensive term in the scene.");
+                    "A cosmic vortex, a fog bank and a tornado are all the same placed medium,\n"
+                    "marched by the same pass. The first enabled ones in this list win; disable\n"
+                    "one of them, or disable this one, to see this effect.\n\n"
+                    "The limit is cost, not capacity: one medium is +5.5 ms of a 13.5 ms frame\n"
+                    "(ADR-374), and the per-slot ray interval is what pays for more (ADR-562).\n\n"
+                    "Before ADR-562 this limit was ONE, and the effect that lost was not dimmed\n"
+                    "or blended -- it contributed not one pixel, and nothing anywhere said so.");
             }
         }
     }
+
 
     // ---- preset ----
     const std::span<const std::string_view> styles = world::effectStyleNames(authored.kind);

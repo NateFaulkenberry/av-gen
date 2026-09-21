@@ -3868,6 +3868,28 @@ void Engine::updateAtmosphericEffects() {
     ctx.spectrum = auroraSpectrum_;
     ctx.fieldBus = &fieldBus_;
     world::buildAtmosphericFrame(atmosphericEffects_, ctx, live.atmospherics);
+    // ADR-562: say it out loud. `AtmosphericCounts::dropped` existed for two ADRs and had exactly
+    // ONE reader in the whole tree -- a CPU conformance finding -- so in a running editor or a
+    // headless render the number did not exist, while two comments claimed the limit was "reported,
+    // not a silent no-op". It was not reported. ADR-560 measured what that cost: a fog bank and a
+    // vortex authored together rendered byte-identical to whichever came first, with the loser
+    // contributing not one pixel.
+    //
+    // `agent/tornado` produced the worst case -- a seven-variant showcase that renders a FLAT GREY
+    // FRAME, because the one surviving medium was a 70 m dust devil sub-pixel at group distance.
+    // This line is the difference between that being a mystery and being a sentence.
+    //
+    // Once per changed count rather than per frame: a message repeated at frame rate is a message
+    // nobody reads, which is the same failure from the other end (the §68 dead-subscription
+    // warning next to this one says so too).
+    if (live.atmospherics.mediaDropped != lastMediaDropped_) {
+        lastMediaDropped_ = live.atmospherics.mediaDropped;
+        if (live.atmospherics.mediaDropped > 0) {
+            log::warn("{} placed medium/media were not drawn: the volumetric march carries {} and "
+                      "the scene enables more. The first ones in the effect list win.",
+                      live.atmospherics.mediaDropped, world::kMaxMedia);
+        }
+    }
     // The §12 quality control. Offline renders get the full march; live playback takes two thirds of
     // it, which is a difference nobody sees on a moving comet and a third of the tail's cost.
     live.atmospherics.cometSteps = mode_ == EngineMode::Offline ? 28u : 18u;

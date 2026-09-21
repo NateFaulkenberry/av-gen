@@ -100,6 +100,12 @@ night from two agents who never spoke to each other.
 1. **Stale binary.** The test glob is *configure-time*, so an incremental build after a merge
    silently omits test files the merge added and the suite passes without ever compiling them.
    Always `cmake -S . -B build/release` after a merge.
+
+   **The same thing happens without a merge, on a timescale of minutes.** A suite started before
+   your last edit is not a suite of your last edit: the process has the old binary mapped and goes
+   on running it however many times you rebuild underneath it. Reporting that run's exit code as a
+   guard for the code you are about to commit is this entry with extra steps. If you edit while a
+   suite is running, the run is spent — restart it.
 2. **Stale object.** Worse, and the binary-level guard misses it. A merge wrote a source in the same
    second the compiler read it, the timestamp comparison tied, and one `.o` was never rebuilt — so
    the binary was *newer than every source* and still contained an old compiled test. It ran against
@@ -183,6 +189,32 @@ night from two agents who never spoke to each other.
    signalling the wrapper does not clean up the child. **The tell is a task reported dead whose
    PID still answers `ps`.** After any killed or failed GPU task, before assuming you released
    anything: `pgrep -fl avgen_render_tests` and read the lock's own `pid` file.
+
+   **And when you go to kill it, do not use a pattern.** Two traps compound here.
+
+   The binary's own command line is **relative** — `./build/release/tests/avgen_tests` — while the
+   wrapper's contains the absolute worktree path. So a pattern specific enough to identify *your*
+   worktree matches the wrapper and **can never match the child**: parent dead, child running,
+   which is this entry arriving in the file that documents this entry. It happened that way on
+   2026-09-20.
+
+   Loosen the pattern and it stops identifying an owner at all. On a machine with four agents in
+   four worktrees, `ps -Ao pid,comm` prints the **identical string** for every one of them, because
+   they are the same binary built from the same relative path. One such sweep had five candidates
+   and **three belonged to other agents**, including a suite three minutes into a verification run.
+
+   **The working directory is the only thing that distinguishes them.** Resolve it per candidate
+   and kill by PID:
+
+   ```sh
+   for pid in $(pgrep -f tests/avgen_tests); do
+     cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | grep ^n | head -1)
+     case "$cwd" in *my-worktree*) kill -TERM "$pid";; esac
+   done
+   ```
+
+   `pkill -f` is not a targeting mechanism on a shared machine. It is a coin toss weighted by who
+   happens to be running.
 
 18. **The exit code you read was the tooling's opinion, not the binary's.**
 
@@ -294,6 +326,17 @@ tooling fault, and neither is a pass.
 all exit 0, print a truthful summary, and report a number that is not about what you think it is
 about. There is no signal to read, because the run was honest; the aim was wrong. The only defences
 are structural, and they are cheap:
+
+**One defence in this tree already works, and it is worth copying.** `test_renderer_layout_guards.cpp`
+resolves a struct's array extents against constants scraped from named headers, and when it meets a
+symbolic name it has not been shown it **fails hard rather than guessing** — its own comment says
+why: *"an unresolved extent would give a plausible wrong answer."* On 2026-09-20 that refusal paid
+out on a change made long after it was written: a new `media[kMaxMedia * kMediumLanes]` array named
+two constants the guard did not have, and it stopped. Writing a literal `64` in the test instead
+would have passed every check while the C++ and the WGSL drifted apart the next time a lane was
+added. **A check that refuses to proceed on an input it cannot resolve is worth more than one that
+resolves it optimistically**, and it is the only entry in this family that is a defence rather than
+a wound.
 
 - **When a filter, census or probe returns the number you expected, that is when to check it. A
   surprising number gets checked for free.** That is the whole family in one sentence, and it would
