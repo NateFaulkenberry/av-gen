@@ -1,0 +1,70 @@
+# ADR-612: The provider seam does not blend, which is why `proceduralMotion` is off in Glowmere — and it costs 0.36 m per transition
+
+**Status:** Accepted
+**Date:** 2026-09-21
+**Related:** ADR-556 (a motion provider advances and draws in two calls), ADR-540 (clips are
+authored in place), Phase B's Glowmere integration, Phase C §30 and §32
+**Implemented by:** nothing — this records a measured product defect and its blocked consumer
+**Tests:** `tests/unit/test_cross_clip_matching.cpp` — "§30 measured against its own purpose"
+
+---
+
+## Context
+
+**If you are here because you are asking "why is `proceduralMotion` off on the Glowmere aliens",
+this is the answer.**
+
+The provider seam works. `ClipMotionProvider` and `MatchMotionProvider` both pose the rig, and the
+Glowmere integration was built, rendered and shown to be byte-identical with the feature default-off.
+`proceduralMotion` was nevertheless left **off on all five aliens**, for one stated reason: the
+providers have parity with the shipping `AnimationPlayer` in steady state but **implement no
+transitions and no inertialization**, and Glowmere's aliens change gait constantly. Switching them
+on would have traded a blending player for a non-blending one — an architecture win that reads on
+screen as a regression.
+
+That caveat was recorded without a magnitude. It now has one.
+
+## The measurement, taken by accident
+
+Phase C §30 built a transition loop to test whether contact features reduce foot-plant
+discontinuity. They do not — but **both arms agreed on a number nobody had asked for**:
+
+| | switches | mean foot jump at a transition | worst |
+|---|---|---|---|
+| contacts off | 32 | **0.3566 m** | 1.6437 m |
+| contacts on | 30 | **0.3792 m** | 1.6437 m |
+
+**A foot teleports 36 cm on average when the matcher switches motion**, on a character whose rest
+height is 1.66 m. The worst case is over a metre and a half and is **identical in both arms**, so it
+comes from a specific reproducible pair of clips rather than a distributional tail.
+
+**This is the shipping path, not the harness.** `MatchMotionProvider::advance` records
+`transitionStart`, and it is read *only* for the search interval and the continuation lock. Nothing
+in the provider blends between the outgoing and incoming samples. The test loop jumps because the
+provider jumps.
+
+## Decision
+
+**Record it as a product defect with a named beneficiary, and treat Phase C §32 (root-motion
+continuity) as the fix rather than as a routine section.**
+
+- The defect is findable from the symptom, which is the point of this ADR existing separately from
+  Phase C's design log: someone investigating Glowmere's disabled flag should not have to read a
+  motion-matching phase log to find the cause.
+- **0.3566 m mean / 1.6437 m worst, over ~30 real switches on the real corpus, is the before
+  figure.** It is unusually well-conditioned: it was taken *before anyone intended to fix it*, as a
+  by-product of a different experiment, so nothing was tuned in anticipation of it.
+- The consumer is explicit. Fixing this is what allows `proceduralMotion` to be switched on for the
+  five Glowmere aliens, which is the last item outstanding from the Phase B integration.
+
+## Consequences
+
+- §32 has a defect, a number, a named beneficiary and an honest before/after. That is the
+  best-conditioned measurement available in this programme.
+- The contact experiment that produced it found nothing about contacts and something important
+  about transitions, which is the fourth time in Phase C that **printing the distribution before the
+  ratio** has outperformed the ratio. The general form, and the cheapest of the pre-tests:
+  **when the ratio is null, the shared baseline is where the result is.** A null difference means
+  the arms agree, and agreeing on a bad number is still agreeing.
+- Until it is fixed, any claim that the provider seam is production-ready is true only for steady
+  state, and this ADR is the qualifier.
