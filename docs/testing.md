@@ -414,6 +414,15 @@ probe's own control, a blown-out render, a person parsing instead of matching. *
 prospectively, by distrusting an expected number**, which is the only defence available when nothing
 downstream is positioned to disagree.
 
+**And one positive check is worth naming, because it is the inverse of everything above.** Most of
+these entries are numbers that looked right and were not. The opposite move is to find a number that
+must be **identical** and use identity as the signal: after a change that should have added
+assertions to existing cases rather than adding cases, the suite's case count matching the
+previously verified total *exactly* confirms the change was what its author thought. **A count that
+had moved would have meant something unaccounted for.** Pick a quantity your change must not move,
+and check it did not — it is cheaper than checking the quantities it should move, and it fails
+loudly when your model of your own edit is wrong.
+
 **One defence in this tree already works, and it is worth copying.** `test_renderer_layout_guards.cpp`
 resolves a struct's array extents against constants scraped from named headers, and when it meets a
 symbolic name it has not been shown it **fails hard rather than guessing** — its own comment says

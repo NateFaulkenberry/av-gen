@@ -66,8 +66,19 @@ constexpr EffectField kFields[] = {
     // ADR-374: this is EXTINCTION per metre. It is the quantity the march integrates, and the
     // coefficients the look was tuned against are per metre too -- changing the unit here would
     // invalidate them, which is the general form ADR-379/381/389 keep restating.
-    floatField("fogDensity", "Fog density", 0.0f, 8.0f, 0.0f, 0.01f, GET(e.vortex.density),
-               SETF(e.vortex.density)).json("/vortex/density").fmt("%.4f /m").main()
+    // ADR-564 (§24): this is the optical depth THROUGH THE BANK, not an extinction per metre.
+    //
+    // It used to be per metre, and that made it a control whose meaning depended on the bank's
+    // size: measured, one authored 0.0016 gives an optical depth of 0.45 at a 100 m radius and
+    // 4.03 at 900 m -- invisible to opaque slab, across a range an artist crosses by dragging the
+    // radius slider without touching this one. A preset therefore could not ship a density, because
+    // there is no number that is right at two sizes.
+    //
+    // Normalised by the bank's own long-axis crossing in `packMedium`, so 1.0 means "you can just
+    // see through it" whatever the bank's size. `Environment::volumeAbsorption` still scales it as
+    // a scene-wide multiplier, which is what that control is for.
+    floatField("fogDensity", "Fog density", 0.0f, 8.0f, 0.0f, 4.0f, GET(e.vortex.density),
+               SETF(e.vortex.density)).json("/vortex/density").fmt("%.2f").main()
         .tooltip("How much of what is behind the bank it hides, per metre travelled.\n"
                  "This is thickness, not brightness -- Self glow below is the light."),
     floatField("bankRadius", "Bank radius", 0.0f, 20000.0f, 0.0f, 3000.0f, GET(e.vortex.field.radius),
@@ -220,7 +231,7 @@ void applyStyle(AtmosphericEffect& e, std::string_view style) {
     if (style == kStyleNames[0]) { // Valley Mist -- thin, wide, low, barely lit
         v.field.radius = 1400.0f;
         v.field.thickness = 90.0f;
-        v.density = 0.0016f;
+        v.density = 2.0f;  // optical depth: reads as fog
         v.emission = 0.004f;
         v.field.contrast = 1.5f;
         v.field.turbulence = 0.35f;
@@ -240,7 +251,7 @@ void applyStyle(AtmosphericEffect& e, std::string_view style) {
     } else if (style == kStyleNames[1]) { // Glowmere Haze -- bioluminescent, threaded, self-lit
         v.field.radius = 900.0f;
         v.field.thickness = 160.0f;
-        v.density = 0.0021f;
+        v.density = 2.6f;
         v.emission = 0.030f;
         v.field.contrast = 2.6f;
         v.field.turbulence = 0.55f;
@@ -260,7 +271,7 @@ void applyStyle(AtmosphericEffect& e, std::string_view style) {
     } else { // Dense Bank -- thick, tall, billowing, opaque
         v.field.radius = 650.0f;
         v.field.thickness = 320.0f;
-        v.density = 0.0055f;
+        v.density = 5.0f;  // thick, still not a slab
         v.emission = 0.010f;
         v.field.contrast = 3.4f;
         v.field.turbulence = 0.70f;
@@ -381,7 +392,11 @@ void packMedium(const E& e, float envelope, MediumSlot& out) {
     // The envelope scales the two PER-METRE coefficients and nothing else (ADR-387): fading a
     // medium means less of it in the air. Fading its colours would leave a full-strength grey
     // ghost; fading its radius would shrink it rather than dim it.
-    out.lane[1] = glm::vec4(glm::vec3(f.v1), std::max(v.density, 0.0f) * envelope);
+    // ADR-564: the authored number is an optical depth through the bank; the march wants an
+    // extinction per metre. The crossing path is the ellipse's long axis, which is the direction a
+    // bank is usually looked through, so `density` means the same thing at any size.
+    const float crossing = std::max(2.0f * v.field.radius * std::max(storedOf(e, "bankLength", 1.0f), 0.05f), 1.0f);
+    out.lane[1] = glm::vec4(glm::vec3(f.v1), (std::max(v.density, 0.0f) / crossing) * envelope);
     out.lane[2] = f.v2;
     out.lane[3] = glm::vec4(f.v3.x, f.v3.y, std::max(v.emission, 0.0f) * envelope,
                             std::max(v.filaments, 0.0f));

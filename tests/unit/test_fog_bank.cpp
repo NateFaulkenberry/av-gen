@@ -214,3 +214,51 @@ TEST_CASE("a fog bank with its detail at zero still has a field with shape in it
     INFO("angular spread of a CIRCULAR bank: " << (rhi - rlo));
     CHECK(rhi - rlo == Approx(0.0f).margin(1e-5f));
 }
+
+// ADR-564 (§24): one authored density means the same thing at any bank size.
+//
+// Before this, `density` was an extinction PER METRE, so the optical depth through a bank scaled
+// with the bank: the shipped `Valley Mist` 0.0016 gives 0.45 at a 100 m radius and 4.03 at 900 m --
+// invisible to opaque slab, across a range an artist crosses by dragging the RADIUS slider without
+// touching density at all. A preset could not ship a correct density because no number is right at
+// two sizes.
+//
+// The probe is the optical depth through the bank's long axis, which is the quantity the artist is
+// really setting: `perMetre * crossing`, where `crossing` is what `packMedium` normalised by.
+TEST_CASE("one fog density reads the same at any bank size", "[fog]") {
+    const world::EffectSchema& s = fogSchema();
+    REQUIRE(s.resolve.pack != nullptr);
+
+    const auto opticalDepth = [&](float radius) {
+        world::AtmosphericEffect e = fogBank("Valley Mist");
+        e.vortex.field.radius = radius;
+        e.values.setFloat("fog/bankLength", 2.0f);
+        world::MediumSlot slot{};
+        s.resolve.pack(e, 1.0f, slot);
+        const float perMetre = slot.lane[1].w;
+        const float crossing = 2.0f * radius * 2.0f;
+        return perMetre * crossing;
+    };
+
+    const float small = opticalDepth(100.0f);
+    const float mid = opticalDepth(400.0f);
+    const float large = opticalDepth(900.0f);
+    INFO("optical depth at radius 100 / 400 / 900: " << small << " / " << mid << " / " << large);
+    // Equal to within float rounding, across a NINE-fold change in size.
+    CHECK(mid == Approx(small).epsilon(0.01));
+    CHECK(large == Approx(small).epsilon(0.01));
+    // ...and it is not equal by being zero, which is the way this assertion would pass vacuously.
+    CHECK(small > 0.1f);
+
+    // The control: the authored number still CHANGES the depth, or the test above would pass on a
+    // packer that ignored it entirely (ADR-182, and the shape ADR-460's reachability probe uses).
+    world::AtmosphericEffect a = fogBank("Valley Mist");
+    a.vortex.field.radius = 400.0f;
+    world::MediumSlot lo{};
+    world::MediumSlot hi{};
+    a.vortex.density = 1.0f;
+    s.resolve.pack(a, 1.0f, lo);
+    a.vortex.density = 4.0f;
+    s.resolve.pack(a, 1.0f, hi);
+    CHECK(hi.lane[1].w > lo.lane[1].w * 3.5f);
+}
