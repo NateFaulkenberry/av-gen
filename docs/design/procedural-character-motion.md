@@ -2139,15 +2139,48 @@ That predicts exactly what is observed, including the part that looks paradoxica
 - **Shuffling a redundant feature removes the double-counting** while paying only the noise cost →
   shuffled beats real, which is otherwise hard to explain.
 
-**This is a hypothesis and it is falsifiable now, on the corpus in hand:** measure the correlation
-between the explicit gait dimensions (phase, contact) and the pose dimensions. High correlation
-supports redundancy; low correlation kills it and sends the search elsewhere. That measurement is
-the next thing to do and it does not need §20.
+**FALSIFIED.** The correlation test I proposed would have been the weaker instrument and could have
+returned low even under full redundancy, because "is this foot planted" is a joint, non-linear
+function of several pose and velocity dimensions rather than a linear echo of any one. The
+**ablation** is causal where a correlation is associational, and it settles it:
 
-**What it would mean if it holds:** the feature vector is over-specified for this corpus, and the
-right response is not to tune the weights of the explicit gait features but to **remove them** — the
-opposite of what §30 and §31 were written to add. That would change what the feature vector should
-be rather than what its weights should be, which is why it is recorded above the section level.
+| | contacts vs baseline |
+|---|---|
+| pose velocities **present** | **−1.4** |
+| pose velocities **neutralised** | **−1.4** (33.6% → 32.2%) |
+
+**Removing the implicit copy changes nothing.** Under redundancy, contacts should have become
+positive once the other copy of the signal was gone. They are identically unhelpful. **The
+redundancy hypothesis is dead**, and it was mine.
+
+### What is left, stated narrowly
+
+The rival hypothesis — *the contacts are wrong* — is also weakened, because the detector was checked
+directly and is finding the stance phase: **75% of planted frames are in the lowest height quartile
+against 25% by chance**, with a plausible 0.38 duty cycle. (The velocity tell does not apply here at
+all: ADR-540 says these clips are authored in place, so a planted foot **must** slide backwards at
+gait speed — "a planted foot is not moving" is a tell about root-motion clips and is inverted for
+these.)
+
+So both of the big explanations fail, and the supported claim is narrower and duller than either:
+**a binary per-foot contact flag is not informative for cross-clip pose matching on this corpus.**
+It is not duplicated, it is not detectably wrong, and it is still worth less than the two dimensions
+it costs. Why a correct signal carries no usable information here is open, and the honest state is
+that it is unexplained rather than explained by either candidate.
+
+**The general design rule I was about to write — "an explicit feature that restates implicit
+information double-counts and distorts the distance" — is not supported by this evidence and is
+withdrawn.** It may still be true; nothing here shows it.
+
+**What survives the falsification** is the measurement rather than the explanation: three explicit
+gait features, each measured with its own control, each failing to earn its dimensions. That is
+still a statement about the encoding and still belongs above the section level — but it is now an
+*observation in search of a mechanism* rather than a mechanism with evidence, and it must be written
+as the former.
+
+**And the practical consequence is unchanged by the falsification**: contacts at net −2.0 are not
+worth carrying on this corpus, whatever the reason. What changes is that I cannot say *why*, and so
+cannot predict whether a different corpus or a different encoding would change it.
 
 ## And the flag is fixed
 

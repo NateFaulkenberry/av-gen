@@ -45,6 +45,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <map>
+#include <string>
 #include <random>
 #include <set>
 #include <vector>
@@ -519,6 +520,78 @@ TEST_CASE("cross-clip matching, judged in pose space", "[crossclip][phaseC][alie
         if (shuffledContactsRate > withContactsRate) {
             WARN("*** shuffled contacts BEAT real contacts -- third instance, see the design log");
         }
+    }
+
+    // **THE DECISIVE EXPERIMENT: ablate the implicit signal, then re-measure the explicit one.**
+    //
+    // Redundancy and wrong-data both predict every row observed. They differ in what happens when
+    // the *implicit* copy is removed:
+    //
+    //   redundancy  -> contacts were worthless because the information was already in the pose
+    //                  block; remove the other copy and contacts should become POSITIVE.
+    //   wrong data  -> contacts carry something incorrect; removing the pose signal changes
+    //                  nothing about that, and they stay NEGATIVE.
+    //
+    // Causal where a correlation would be associational -- and a per-dimension linear correlation
+    // could read low even under full redundancy, because "is this foot planted" is a joint,
+    // non-linear function of several pose and velocity dimensions rather than a linear echo of any
+    // one. A low correlation would kill only the *linear* version of the hypothesis.
+    //
+    // Neutralising the foot velocity dimensions isolates the signal from the dimension count, the
+    // property established when that technique was introduced.
+    {
+        scene::MotionDatabaseOptions opts;
+        opts.sampleRate = 30.0f;
+        opts.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+        opts.config.contactWeight = 1.0f;
+        auto full = scene::buildMotionDatabase(*pack, opts);
+        if (!full.has_value()) {
+            FAIL("motion database build failed: " << full.error().message);
+        }
+        const std::vector<scene::MotionFeatureGroup> lay = scene::motionFeatureLayout(full->config);
+
+        // Arm A: pose velocities neutralised, contacts OFF (by neutralising them too).
+        // Arm B: pose velocities neutralised, contacts ON.
+        // The difference is the contact feature's value *with the implicit copy gone*.
+        const auto neutralise = [&](scene::MotionDatabase db,
+                                    std::initializer_list<scene::MotionFeatureGroup> groups) {
+            for (std::size_t d = 0; d < lay.size(); ++d) {
+                bool hit = false;
+                for (const scene::MotionFeatureGroup g : groups) {
+                    if (lay[d] == g) {
+                        hit = true;
+                    }
+                }
+                if (!hit) {
+                    continue;
+                }
+                for (std::uint32_t s = 0; s < db.sampleCount(); ++s) {
+                    db.features[static_cast<std::size_t>(s) * db.dimension + d] = 0.0f;
+                }
+            }
+            return db;
+        };
+
+        const scene::MotionDatabase noVelNoContact =
+            neutralise(*full, {scene::MotionFeatureGroup::JointVelocity,
+                               scene::MotionFeatureGroup::Contact});
+        const scene::MotionDatabase noVelWithContact =
+            neutralise(*full, {scene::MotionFeatureGroup::JointVelocity});
+
+        const auto [ablatedBase, oA] = score(noVelNoContact, "ABLATED: no joint velocity, no contact");
+        const auto [ablatedContact, oB] = score(noVelWithContact, "ABLATED: no joint velocity, CONTACT ON");
+        CHECK(oA == Approx(oB).margin(1e-6f));
+
+        const double withImplicit = -1.4;  // measured above: contacts against baseline, full vector
+        const double withoutImplicit = ablatedContact - ablatedBase;
+        WARN(fmt::format("ABLATION: with the pose velocities present contacts scored {:+.1f}; with "
+                         "them neutralised contacts score {:+.1f} ({:.1f}% -> {:.1f}%)",
+                         withImplicit, withoutImplicit, ablatedBase, ablatedContact));
+        WARN(std::string(withoutImplicit > 0.5
+                             ? "  => REDUNDANCY: the explicit feature gains value once the implicit"
+                               " copy is gone"
+                             : "  => NOT redundancy: contacts stay unhelpful with the implicit"
+                               " signal removed"));
     }
 
     CHECK(withoutPhase > 0.0);
