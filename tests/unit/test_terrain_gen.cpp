@@ -456,3 +456,83 @@ TEST_CASE("a block box that lies is caught by the same comparison", "[terrain][g
     INFO(boxes << " box(es) collapsed; " << differing << " of " << honest.size() << " heights moved");
     CHECK(differing > 0);
 }
+
+// ---- the height cache, and the arm that catches a stale one (ADR-483) ---------------------------
+//
+// `WorldMap::height` is memoised in a small thread_local table. The obvious test -- read every
+// height twice and check the second agrees with the first -- is worthless, because **both reads
+// would come from the same cache**. It would pass against a cache that had been poisoned at fill
+// time and against one answering for a world that no longer exists.
+//
+// So there are two arms and the second is the one that matters.
+namespace {
+std::vector<float> latticeUncached(const world::WorldMap& map, int side = 65) {
+    std::vector<float> out;
+    out.reserve(static_cast<std::size_t>(side) * side);
+    for (int j = 0; j < side; ++j) {
+        for (int i = 0; i < side; ++i) {
+            const glm::vec2 uv((i + 0.5f) / side, (j + 0.5f) / side);
+            out.push_back(map.heightUncached(map.min() + map.size * uv));
+        }
+    }
+    return out;
+}
+} // namespace
+
+TEST_CASE("the height cache answers with the identical float, not a close one",
+          "[terrain][gen][cache]") {
+    for (const world::TerrainStyle style : world::terrainStyles()) {
+        const world::WorldMap map = world::generateTerrain(paramsFor(style));
+        const std::vector<float> cached = lattice(map);
+        const std::vector<float> direct = latticeUncached(map);
+        REQUIRE(cached.size() == direct.size());
+        std::size_t differing = 0;
+        for (std::size_t i = 0; i < cached.size(); ++i) {
+            differing += cached[i] == direct[i] ? 0u : 1u;
+        }
+        INFO("style " << world::terrainStyleName(style) << ": " << differing << " of "
+                      << cached.size() << " heights differ between cached and uncached");
+        CHECK(differing == 0);
+    }
+}
+
+// **The stale arm.** A cache keyed on (x, z) alone is correct for exactly as long as the map is,
+// and `prepare()` rebuilds the features from whatever the caller has edited. This warms the cache,
+// changes the world, rebuilds it, and asks again -- which is the question a two-reads test cannot
+// pose, because a stale cache is perfectly self-consistent.
+//
+// Its own control is the last assertion: the edit has to have moved the heights at all. Without it
+// this would pass just as happily against an edit that did nothing.
+TEST_CASE("a rebuilt map is not answered out of the old map's cache", "[terrain][gen][cache]") {
+    world::WorldMap map = world::generateTerrain(paramsFor(world::TerrainStyle::Valley));
+    REQUIRE_FALSE(map.features.empty());
+
+    // Warm the cache thoroughly: every point the comparison below will ask about.
+    const std::vector<float> before = lattice(map);
+
+    // Change the world by an amount nobody could mistake for noise, and rebuild it.
+    for (world::Feature& f : map.features) {
+        f.amplitude *= 2.0f;
+        f.width *= 1.5f;
+    }
+    map.prepare();
+
+    const std::vector<float> afterCached = lattice(map);
+    const std::vector<float> afterDirect = latticeUncached(map);
+
+    std::size_t stale = 0;
+    for (std::size_t i = 0; i < afterCached.size(); ++i) {
+        stale += afterCached[i] == afterDirect[i] ? 0u : 1u;
+    }
+    std::size_t moved = 0;
+    for (std::size_t i = 0; i < before.size() && i < afterDirect.size(); ++i) {
+        moved += before[i] == afterDirect[i] ? 0u : 1u;
+    }
+    INFO("after rebuild: " << stale << " heights came from the stale cache; the edit moved "
+                           << moved << " of " << before.size());
+
+    // The claim: nothing is answered out of the previous build.
+    CHECK(stale == 0);
+    // The control: the edit actually changed the world, so the claim above is not vacuous.
+    CHECK(moved > 0);
+}

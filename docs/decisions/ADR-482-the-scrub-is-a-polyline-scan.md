@@ -127,6 +127,30 @@ determinism captures cannot: they compare two runs of one build, and both runs u
 accelerated and unaccelerated answers **bit for bit** over 4,225 heights per terrain style, and its
 control collapses every box to a point outside the world and requires the heights to move.
 
+### The rule this is an instance of
+
+> **A documented contract with no test is a claim.**
+
+Not a weaker test, not an untested-but-probably-fine invariant — a *claim*, with the same standing
+as a comment asserting anything else nobody has checked. `Feature::blocks` carried its contract in
+prose from the day it was written. The prose was correct. The first implementation written *against*
+that prose, by someone who had read it and reasoned carefully from it, was wrong by **eight metres**,
+and the only reason anybody knows is that the test went in before the optimisation was trusted
+rather than after it was believed.
+
+The argument that failed is worth stating because it is the kind that usually works: `cutoff` is a
+distance a real segment achieves, so the block holding the true minimum has a box distance below it
+and cannot be skipped. That is sound. What is not sound is the step it hides — that two *differently
+written expressions* for the same mathematical quantity compare as equals in floating point. The
+reasoning was fine and the arithmetic was not, and no amount of further reasoning would have found
+it, because the error lived exactly where the reasoning stopped looking.
+
+This generalises past terrain. The pattern to distrust is a contract whose test would have to
+compare a fast path against a slow path that **no shipping configuration still runs** — the slow
+path stops being exercised, the contract stops being checked, and the comment goes on asserting it.
+`passing an empty span walks every segment` describes a configuration nothing in the engine uses.
+That is precisely when the claim needs a test, and precisely when it is least likely to have one.
+
 ## Decision 3: §6 and §7 are already done, and the number says do not build cancellation
 
 The brief asks for obsolete work and latest-request-wins, and warns that they are hypotheses rather

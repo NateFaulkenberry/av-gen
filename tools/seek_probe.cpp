@@ -31,6 +31,7 @@
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
+#include "world/world_map.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -337,7 +338,9 @@ void authoredScene(scene::Composition& comp, params::ParameterSet& params, doubl
         }
         return std::pair{best, pose};
     };
+    world::WorldMap::heightCensusMark("load: world build, nav bake, scatter");
     const auto [fullMs, fullPose] = run(0);
+    world::WorldMap::heightCensusMark("one uncapped seek to t = 90 s");
     const entity::EntityWorld::SeekWork fullWork = world.lastSeekWork();
     std::printf("  %zu entities; %llu deep, %llu shallow; the uncapped window is %llu steps = "
                 "%llu body-steps\n",
