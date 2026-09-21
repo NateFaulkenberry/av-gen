@@ -212,9 +212,20 @@ matcher's.
   Two providers have no common pose to interpolate in, so the body jumps once when the answer moves
   — for instance when a body leaves the ground and the matcher declines by design. Honest rather
   than hidden, and unmeasured: it needs its own before-figure.
-- **The matcher is still not in the chain.** §32 is met on both providers, but wiring the matcher
-  into `buildChain` is a separate change with its own cost and its own decision, and nothing here
-  made it reachable.
+- **The matcher is still not in the chain, and that is a decision rather than an omission.**
+  Wiring it into `buildChain` carries a per-character-per-frame search cost, and §34 established
+  that the only consumers of provider output in `src/` are diagnostics — so it blocks no spec
+  section now that §32 is done. **Recorded as available and unexercised**: the provider works, has
+  steady-state parity, and now blends; nothing runs it. A future reader finding it unused should
+  read this line rather than conclude it was abandoned or that it does not work.
+- **The residual on a forced cross-clip transition is accepted, and the mechanism is why.**
+  0.4112 m at 8.06x the bar is not a failure of the blend; it is the honest limit of the approach.
+  **The blend converts a teleport into a fast slide, and nothing in a pose-space blend could make a
+  violent cross-clip switch graceful** — the outgoing and incoming poses simply are that far apart,
+  and interpolating between two distant poses more smoothly does not bring them closer. **The fix
+  for it is better selection, not better blending**, which is where §16's severity work already
+  points: a matcher that does not choose a pose 2.8x further away than an adjacent frame does not
+  need a blend to rescue it. Recorded as a residual rather than opened as a section.
 - The default halflife is on. No shipping body is affected, because `proceduralMotion` is off on
   every one of them; the cost above is what it will cost when they are switched on.
 - **`transitionStart` is misnamed for one of its two writers.** Renaming it touches two providers

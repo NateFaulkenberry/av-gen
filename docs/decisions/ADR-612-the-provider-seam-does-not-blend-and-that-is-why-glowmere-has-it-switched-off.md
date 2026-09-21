@@ -1,11 +1,50 @@
 # ADR-612: The provider seam does not blend, which is why `proceduralMotion` is off in Glowmere — and it costs 0.36 m per transition
 
-**Status:** Accepted
+**Status:** Accepted — **amended 2026-09-21, and one of its central claims was false.** See
+"Correction" immediately below before reading anything else here.
 **Date:** 2026-09-21
 **Related:** ADR-556 (a motion provider advances and draws in two calls), ADR-540 (clips are
 authored in place), Phase B's Glowmere integration, Phase C §30 and §32
 **Implemented by:** nothing — this records a measured product defect and its blocked consumer
 **Tests:** `tests/unit/test_cross_clip_matching.cpp` — "§30 measured against its own purpose"
+
+---
+
+## Correction (2026-09-21): the named beneficiary could not have benefited
+
+**This ADR told a reader that fixing `MatchMotionProvider`'s blend would unblock Glowmere. That was
+false when written.**
+
+`MatchMotionProvider` is constructed **nowhere in `src/`**. `Composition::AnimationSink::buildChain`
+adds exactly one provider and it is `ClipMotionProvider`, so a body with `proceduralMotion` on is
+posed by the clip provider and the matcher is unreachable from the application. Everything below
+about the matcher's missing blend is accurate; the inference that repairing it reaches the five
+Glowmere aliens is not.
+
+**And the defect was worse on the provider they would actually run.** Measured on the same
+character against the same bar: the clip provider jumps **0.4484 m at a gait change, 8.8x the
+0.0510 m bar**, against the 0.3566 m recorded below for the matcher. The thing this ADR was written
+to fix was the smaller of the two, and the larger one was the one in the way.
+
+The clip provider's header explained why it did not blend: *"those are the player's job and
+duplicating them here would be a second answer to a question already settled (ADR-547)"*. That was
+**true when written and invalidated by the seam it was written for** — when a provider poses a body,
+`SkinnedRig::evaluate` takes the external pose and `AnimationPlayer::evaluate` is never called, so
+there is no first answer for the provider's to be a second one to. Nothing re-read it.
+
+**This is the fifth instance in this programme of one shape, and the sharpest: the rationale was
+correct, the code was correct, and the world the rationale referred to stopped existing.** A
+reasoned decision does not carry an expiry date, and nothing re-checks the premise of a comment
+when the premise moves. That is the transferable part, and it is worth more than the metres.
+
+Both providers now inertialize — ADR-613 has the before-and-after for each, the derivation of the
+halflife, the residual that remains, and what it costs.
+
+**Two figures below that are still exactly right, and should not be discounted by this
+correction:** the 0.3566 m itself, which was reproduced to within one switch by an independent
+harness a day later, and the 0.0510 m acceptance threshold, which was re-derived from the content
+and came back identical to four decimals. The number was sound; the sentence about who it helped
+was not.
 
 ---
 
@@ -93,6 +132,8 @@ continuity) as the fix rather than as a routine section.**
   by-product of a different experiment, so nothing was tuned in anticipation of it.
 - The consumer is explicit. Fixing this is what allows `proceduralMotion` to be switched on for the
   five Glowmere aliens, which is the last item outstanding from the Phase B integration.
+  **[Amended: false as stated — the aliens are reached through `ClipMotionProvider`, not through
+  this provider. See the correction at the top.]**
 
 ## Consequences
 
