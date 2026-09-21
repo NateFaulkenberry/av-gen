@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-three ways a green suite has lied
+## Twenty-four ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -87,7 +87,7 @@ you are short of time, because it is the only one the exit code cannot save you 
 - **Family A — the run did not happen as you think** (entries 1-3, 12, 18).
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
-  (entries 13-17, 19; 9 and 10 are its older members, from before it had a name).
+  (entries 13-17, 19, 24; 9 and 10 are its older members, from before it had a name).
 - **Family D — the ask was malformed** (entries 20-21). Neither a bad measurement nor a bad reading:
   the instrument worked, the probe looked in the right place, and the answer was spoiled by the
   *form of the question* (20) or by the *size of the window* (21).
@@ -311,6 +311,24 @@ night from two agents who never spoke to each other.
    at all is caught by ADR-182, but **a control that moves, fails on demand, and is nonetheless
    aimed at the wrong region or the wrong mechanism passes every check you would think to run.**
    When a reachability probe reports zero, suspect the sample domain before the knob.
+
+24. **A fixture at a boundary of its own valid range measures the boundary, not the feature.**
+
+   A foot-lock probe reported the lock doing nothing: the held foot and the free foot came out at
+   the same place, on every arm, reproducibly. The lock was correct. The **test rig's leg was
+   straight at rest** — two segments spanning exactly their own combined length — so a leg with
+   zero slack put every horizontal lock offset out of reach, the IK solver clamped, and the probe
+   faithfully measured the clamp.
+
+   Nothing was wrong with the code, the assertion or the sampling. The *fixture* sat on a singular
+   configuration of the thing it was exercising. A straight leg is to an IK solver what a plateau is
+   to a noise field (17) and what a funnel-sized spread is to a cloud four times wider: a place
+   where the mechanism has no authority, so the feature cannot show up however correct it is.
+
+   **The general form: ask what range your fixture's own parameters are valid over, and whether it
+   is sitting at an end of it.** A rig with 0.055 of slack measured the lock immediately. The tell
+   is the same as 13 and 17 — a confident, reproducible zero — and the instinct that catches all
+   three is to suspect the fixture's domain before the feature.
 
 19. **A minimum is robust to contention ARRIVING and defenceless against the machine getting
    quieter.** ADR-170 says "report minima over repeats, never means" and stops, which reads as

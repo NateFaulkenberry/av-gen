@@ -71,6 +71,14 @@ body is about 3.2 m tall and stands ~130 px tall in the `rook` close-up.
 * At the **authored peak** (`rook` has `accel: 4.815`) during a start, it would be ~0.2 m, about
   **9 px**, which is marginally visible.
 
+**And the worst case is where the ease has most authority, which is the argument for a weight
+rather than a switch.** The hardest acceleration happens during a start, and a start is also the
+*shortest* stance — so `elapsedInContact` never reaches the values that make `0.5·a·t²` large, and
+both edge ramps are a larger fraction of the span. The drift is worst exactly where the mechanism
+that suppresses it is strongest. That coincidence is structural rather than lucky, and it is why
+`footLock` is a dial: a scene that finds the bad case can back it off without losing the lock
+everywhere else.
+
 So the honest summary is that a number which sounds large in metres is a pixel or two on this
 content, and only approaches visibility during the hardest possible start — which is also when the
 stance is shortest and the ease is doing most of its work. `footLock` is a weight rather than a
