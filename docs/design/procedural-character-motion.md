@@ -1608,3 +1608,54 @@ small, which is exactly why it survived; fixing it moved the 0.50 row from 3 hel
 a defensible-looking number on both sides.** This is the second defect §10's weighting change
 created downstream — the first being the coverage resolution it made mutable — and both were found
 by measuring something else.
+
+## The feature-distance sweep — enumerated rather than tripped over
+
+Two defects had already been found downstream of §10 making the weights live, **both by measuring
+something else entirely**. Two accidents in a row is not a method, so the remaining sites were
+enumerated: *every place that computes a distance, cost or comparison over a feature vector, and
+whether it applies the weight vector.*
+
+| site | was | now | intended? |
+|---|---|---|---|
+| `searchMotion` feature cost | weighted | weighted | yes — §10 |
+| `MotionCostBreakdown` terms | weighted | weighted | yes — must equal the cost |
+| `searchMotionStaged` coarse pass | weighted | weighted | yes |
+| `searchMotionStaged` full pass | weighted | weighted | yes |
+| `MatchMotionProvider::continueCost` | **unweighted** | weighted | **bug — §28** |
+| `MotionDatabaseStats::costSpread` | **unweighted** | weighted | **bug — found here** |
+| quality report nearest-neighbour | **unweighted** | weighted | **bug — found here** |
+| the §16 test's own spread fixture | **unweighted** | weighted | **bug — found here** |
+
+**Three more, and one was a scale I had introduced an hour earlier.** `costSpread` is the
+denominator for §16's search severity and §28's switch margin, both of which compare *weighted*
+costs — an unweighted denominator under a weighted numerator is the identical asymmetry the
+hysteresis had. The quality report's nearest-neighbour distance is compared against
+`duplicateRadius`, which is derived from the search's own discrimination and is therefore weighted.
+
+**Both published numbers moved**: the cost spread from 69.72 to **52.57**, and the duplicate rate
+from 57.02% to **61.68%**. Every severity figure in §16 was divided by the wrong scale.
+
+Some of these could defensibly have been unweighted — a nearest-neighbour statistic describing the
+corpus is arguably a property of the data. The rule is that **each must be unweighted on purpose and
+say so**, not by having been written before the weights existed. Every one here is now weighted
+because every one is compared against something weighted, and the comments say which.
+
+### The general form
+
+> **Making a dormant parameter live retroactively invalidates every consumer written while it was
+> dormant.**
+
+§10 did not introduce a bug into the hysteresis. It revealed that the hysteresis had been written
+against a world in which weights did not exist — and the same for the spread, the nearest-neighbour
+distance and a test fixture. This is a category the "mechanism present, measurement missing" table
+does not cover, and it **predicts where the remaining instances are**: anything written *before*
+§10 that touches feature-space distance. That is a finite, greppable set, which is why enumerating
+it took minutes and finding the third by accident would have taken another night.
+
+### And a rule the remedies keep converging on
+
+`MotionCostBreakdown::caveat()`, the coverage report's inline reason, and
+`MatchSettings::searchIntervalShadowed()` are the same fix three times:
+
+> **A caveat belongs where the number is read, not where the number is explained.**

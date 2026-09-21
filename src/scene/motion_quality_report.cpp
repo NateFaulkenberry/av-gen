@@ -98,6 +98,14 @@ MotionQualitySummary analyseMotionQuality(const MotionDatabase& db,
         out.radiusDerived = out.duplicateRadius > 0.0f;
     }
 
+    // **Weighted, and that is a decision rather than a default.** A nearest-neighbour statistic
+    // could defensibly describe the corpus in raw feature space -- but this one is compared against
+    // `duplicateRadius`, which is derived from the *search's* discrimination and is therefore
+    // weighted. Two quantities compared to each other must be in one space, whichever space that
+    // is, and the radius has no meaning outside the weighted one.
+    const std::vector<float> dimWeight = motionFeatureWeights(db.config);
+    const bool weighted = dimWeight.size() == db.dimension;
+
     const std::uint32_t stride =
         db.sampleCount() > options.exactBelow ? db.sampleCount() / options.exactBelow : 1u;
     double total = 0.0;
@@ -120,7 +128,7 @@ MotionQualitySummary analyseMotionQuality(const MotionDatabase& db,
             float d = 0.0f;
             for (std::size_t k = 0; k < db.dimension; ++k) {
                 const float delta = fa[k] - fb[k];
-                d += delta * delta;
+                d += delta * delta * (weighted ? dimWeight[k] : 1.0f);
                 if (d >= nearest) {
                     break;
                 }

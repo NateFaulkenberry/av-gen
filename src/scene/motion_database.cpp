@@ -477,6 +477,13 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
     {
         double total = 0.0;
         int counted = 0;
+        // **Weighted, because everything measured against this scale is weighted.** `costSpread`
+        // is the denominator for §16's search severity and for §28's switch margin, both of which
+        // compare *weighted* costs -- computing the scale unweighted would put the numerator and
+        // the denominator in different units, which is the same asymmetry the hysteresis had.
+        // Found by enumerating every feature-distance site rather than by tripping over it.
+        const std::vector<float> spreadWeight = motionFeatureWeights(db.config);
+        const bool spreadWeighted = spreadWeight.size() == dim;
         const std::uint32_t probe = std::max(db.sampleCount() / 32u, 1u);
         for (std::uint32_t s = 0; s < db.sampleCount(); s += probe) {
             const float* a = db.featuresFor(s);
@@ -484,7 +491,7 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
             float typical = 0.0f;
             for (std::size_t d = 0; d < dim; ++d) {
                 const float delta = a[d] - b[d];
-                typical += delta * delta;
+                typical += delta * delta * (spreadWeighted ? spreadWeight[d] : 1.0f);
             }
             total += typical;
             ++counted;

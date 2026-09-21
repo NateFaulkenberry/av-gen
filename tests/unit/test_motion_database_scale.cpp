@@ -488,10 +488,16 @@ TEST_CASE("the two-stage search finds what the linear scan finds, on real motion
             const scene::MotionMatch best = scene::searchMotion(*db, q, weights);
             // A typical candidate: the same query scored against a sample far away in the database.
             const float* other = db->featuresFor((s + db->sampleCount() / 2u) % db->sampleCount());
+            // Weighted, like the costs it is the denominator for. An unweighted scale under a
+            // weighted numerator is the asymmetry the §28 hysteresis had, and a test fixture that
+            // hand-rolls a distance is exactly where it hides -- this one was written before the
+            // weights were live and had to be corrected by the enumeration, not by failing.
+            const std::vector<float> spreadWeight = scene::motionFeatureWeights(db->config);
             float typical = 0.0f;
             for (std::size_t d = 0; d < db->dimension; ++d) {
                 const float delta = q.features[d] - other[d];
-                typical += delta * delta;
+                typical += delta * delta *
+                           (spreadWeight.size() == db->dimension ? spreadWeight[d] : 1.0f);
             }
             spread += static_cast<double>(typical) - static_cast<double>(best.cost);
             ++n;
