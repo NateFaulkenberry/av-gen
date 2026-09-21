@@ -65,6 +65,21 @@ struct VolumeUniforms {
 };
 
 // Slot `s`'s lane `l`. The one place the flattening is expressed.
+//
+// **THE SAME LANE MEANS DIFFERENT THINGS TO DIFFERENT KINDS, AND THAT IS NOT A BUG.** A slot is
+// one kind -- `mediumKind(s)` says which -- and never two at once, so each kind reads the sixteen
+// lanes through its own map:
+//
+//   lanes 0..12   vortex/fog: the shared `VortexField`.     tornado: its own `TornadoField`.
+//   lanes 13..14  fog: its shape controls (ADR-563).        tornado: colour + per-metre coefficient.
+//   lane  15      the KIND TAG, for every kind (ADR-562). No packer may write it; it is set
+//                 centrally in `buildAtmosphericFrame` after each kind's `pack` returns.
+//
+// So a reviewer reading `mediaLane(s, 13u)` in two places and seeing two different meanings is
+// looking at the design rather than at a collision. `agent/tornado`'s packer DID collide with lane
+// 15 once, writing a colour over the tag -- had the tag landed first that would have presented as
+// a tornado intermittently rendering as a comet, which is a long thing to chase. The lane budget
+// for a new kind is 0..14; fifteen is spoken for.
 fn mediaLane(s: u32, l: u32) -> vec4<f32> {
     return vol.media[s * 16u + l];
 }

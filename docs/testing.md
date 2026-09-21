@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty ways a green suite has lied
+## Twenty-two ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -116,7 +116,28 @@ night from two agents who never spoke to each other.
    pointing at a line that is a closing brace, for a test name that no longer exists in the file.
    The tell is that the failure text does not match source you can read. `git clean` the test object
    directory after a merge is cheaper than the check.
-3. **A log written by somebody else's process.** See the next section; this is the severe one.
+3. **A build that compiled nothing you changed, and said exit 0.** `cmake --build && ./tests`
+   chained with `&&` looks safe and is not: if the build fails, the shell short-circuits and you
+   never run the suite — but if you *piped* the build (`cmake --build ... | tail`) the exit code is
+   the pipe's, the build's failure is invisible, and the suite then runs **the previous binary**.
+   `agent/tornado` hit both ends of this in one night: a `| tail` that reported 0 for a failed
+   build, and later a suite that reported a failure in a test file whose five compile errors meant
+   it had never been rebuilt.
+
+   **The tell is a failure whose line number points into code you have just replaced.** If the
+   assertion text does not match what is on that line now, you are reading a report about a binary
+   that no longer corresponds to the tree. Read the build's exit code off the build, separately,
+   before believing anything the suite says.
+4. **The shader compiles at LOAD, so a green build proves nothing about WGSL.** C++ errors stop the
+   build; a duplicate function in a `.wgsl` file does not exist until `ShaderLibrary` concatenates
+   the includes and hands the result to Dawn — at which point the *render* fails with
+   `redeclaration of ...` and the build is still green. Merging two branches that each added a
+   dispatch arm to `shaders/volume.wgsl` produced exactly that, four redeclarations deep, with a
+   clean `cmake --build`.
+
+   So a change to a shader is unverified until something has **rendered a frame** with it. A suite
+   that never loads that shader will not tell you, and neither will the compiler.
+5. **A log written by somebody else's process.** See the next section; this is the severe one.
 
 ### The run happened and you read it wrong
 
