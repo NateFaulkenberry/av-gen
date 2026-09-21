@@ -62,6 +62,22 @@ float stripes(const TornadoUniforms& v, float rr, float h, float angle, float t)
     return 1.0f + depth * smoothstepf(0.30f, 0.85f, rr) * band;
 }
 
+// §27/§20. The transliteration of `tornadoSuction`; see `shaders/tornado.wgsl` for why this is a
+// cosine windowed at the radius of maximum wind rather than a loop over N orbiting Gaussians --
+// the short version is that a cosine's mean over angle is exactly zero, so the term's mean is
+// exactly 1 whatever the count, and `density` is a per-metre coefficient calibrated against this
+// field's mean (ADR-389's family).
+float suction(const TornadoUniforms& v, float rr, float h, float angle, float t) {
+    const float count = v.t9.z;
+    if (count < 0.5f || v.t9.w <= 0.0f) {
+        return 1.0f;
+    }
+    const float d = (rr - std::clamp(v.t10.x, 0.0f, 2.0f)) / std::max(v.t10.y, 1e-3f);
+    const float window = std::exp(-d * d);
+    const float spin = t * (v.t10.z + rotationAt(v, h)) + h * 2.0f;
+    return 1.0f + std::clamp(v.t9.w, 0.0f, 0.9f) * window * std::cos(count * (angle - spin));
+}
+
 Shape evaluate(const TornadoUniforms& v, const glm::vec3& p, float t, float /*filterWidth*/) {
     Shape s;
     const float height = v.t0.w;
@@ -111,6 +127,8 @@ Shape evaluate(const TornadoUniforms& v, const glm::vec3& p, float t, float /*fi
 
     const float angle = std::atan2(planar.y, planar.x);
     funnel = funnel * stripes(v, rr, hc, angle, t);
+    const float suck = suction(v, rr, hc, angle, t);
+    funnel = funnel * suck;
 
     float skirt = 0.0f;
     if (h < skirtHeight && v.t4.z > 0.0f) {
@@ -118,7 +136,7 @@ Shape evaluate(const TornadoUniforms& v, const glm::vec3& p, float t, float /*fi
         const float flare =
             std::max(v.t1.x * std::max(v.t4.x, 1.0f) * (1.0f + std::max(v.t4.w, 0.0f) * sk), 1e-3f);
         skirt = v.t4.z * (1.0f - smoothstepf(0.30f, 1.0f, dist / flare)) * sk * sk;
-        skirt = skirt * smoothstepf(-0.02f, 0.0f, h);
+        skirt = skirt * smoothstepf(-0.02f, 0.0f, h) * suck;
     }
 
     float cloud = 0.0f;
@@ -172,8 +190,10 @@ TornadoUniforms packTornado(const TornadoField& f) {
     v.t7 = glm::vec4(f.lean.x, f.lean.y, std::max(f.wobbleAmount, 0.0f), f.wobbleSpeed);
     v.t8 = glm::vec4(f.rotationBottom, f.rotationTop, std::max(f.rotationCurve, 0.05f),
                      std::max(f.cloudWidth, 1.0f));
-    v.t9 = glm::vec4(std::clamp(f.cloudHeight, 1e-3f, 1.0f), std::max(f.cloudDensity, 0.0f), 0.0f,
-                     0.0f);
+    v.t9 = glm::vec4(std::clamp(f.cloudHeight, 1e-3f, 1.0f), std::max(f.cloudDensity, 0.0f),
+                     std::max(f.suctionCount, 0.0f), std::clamp(f.suctionStrength, 0.0f, 0.9f));
+    v.t10 = glm::vec4(std::clamp(f.suctionRadius, 0.0f, 2.0f), std::max(f.suctionWidth, 1e-3f),
+                      f.suctionSpeed, 0.0f);
     return v;
 }
 

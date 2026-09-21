@@ -170,6 +170,29 @@ constexpr EffectField kFields[] = {
         .tooltip("Adds two finer sets of bands inside the main ones, at a third and a ninth of the\n"
                  "contrast. Structure rather than noise: it survives freezing time and going\n"
                  "monochrome, which is the test."),
+    floatField("suctionCount", "Suction vortices", 0.0f, 12.0f, 0.0f, 6.0f,
+               GET(e.tornado.field.suctionCount), SETF(e.tornado.field.suctionCount))
+        .fmt("%.0f").main()
+        .tooltip("How many secondary vortices ride the funnel wall. Real violent tornadoes are\n"
+                 "multi-vortex: two to six of them orbit the parent axis at the radius of maximum\n"
+                 "wind, turning faster than the parent does. 0 is off and is the default, because\n"
+                 "a single-vortex tornado is the commoner thing."),
+    floatField("suctionStrength", "Vorticity", 0.0f, 0.9f, 0.0f, 0.9f,
+               GET(e.tornado.field.suctionStrength), SETF(e.tornado.field.suctionStrength)).main()
+        .tooltip("How pronounced those vortices are. This is the control the brief calls\n"
+                 "Vorticity, and it drives a STRUCTURE rather than a confinement force -- see the\n"
+                 "note in core/tornado.hpp on why an analytic field has nothing to confine."),
+    floatField("suctionRadius", "Vortex orbit", 0.0f, 2.0f, 0.3f, 1.5f,
+               GET(e.tornado.field.suctionRadius), SETF(e.tornado.field.suctionRadius)).main()
+        .tooltip("Where they ride, as a fraction of the funnel radius. 1.0 is the wall, where the\n"
+                 "shear is and where they actually are."),
+    floatField("suctionWidth", "Vortex spread", 0.01f, 2.0f, 0.1f, 1.0f,
+               GET(e.tornado.field.suctionWidth), SETF(e.tornado.field.suctionWidth)).main(),
+    floatField("suctionSpeed", "Vortex speed", -8.0f, 8.0f, 0.0f, 4.0f,
+               GET(e.tornado.field.suctionSpeed), SETF(e.tornado.field.suctionSpeed)).main()
+        .tooltip("Their own turn rate, ON TOP of the parent's. If this is 0 they are locked to the\n"
+                 "funnel and read as flutes cut into it; above 0 they crawl around it, which is\n"
+                 "the tell that there is more than one vortex."),
     floatField("rotationBottom", "Spin (low)", -8.0f, 8.0f, 0.0f, 3.0f,
                GET(e.tornado.field.rotationBottom), SETF(e.tornado.field.rotationBottom)).main()
         .tooltip("A multiplier on the swirl near the ground. The core spins faster where it is\n"
@@ -308,6 +331,11 @@ bool applyStyle(AtmosphericEffect& e, std::string_view style) {
         tn.field.rotationTop = 0.55f;
         tn.field.wobbleAmount = 18.0f;
         tn.field.wobbleSpeed = 0.15f;
+        // Off on the Classic Cone: a single-vortex tornado is the commoner thing and this preset is
+        // the reference one. The Wedge below turns them on, because a wedge is where multi-vortex
+        // structure actually shows up -- and where this preset most needs the help.
+        tn.field.suctionCount = 0.0f;
+        tn.field.suctionStrength = 0.0f;
         tn.density = 0.06f;
         tn.emission = 0.0f;
         tn.scattering = 1.0f;
@@ -380,6 +408,14 @@ bool applyStyle(AtmosphericEffect& e, std::string_view style) {
         tn.field.inflow = 0.45f;
         tn.field.rotationBottom = 0.85f;
         tn.field.rotationTop = 0.6f;
+        // The wedge is the one preset that was visibly weakest without them: its funnel is as wide
+        // as its cloud, so the shoulder that sells the other four is gone by definition, and what
+        // is left to distinguish it from a spinning drum is exactly this.
+        tn.field.suctionCount = 4.0f;
+        tn.field.suctionStrength = 0.55f;
+        tn.field.suctionRadius = 0.92f;
+        tn.field.suctionWidth = 0.30f;
+        tn.field.suctionSpeed = 0.7f;
         tn.field.wobbleAmount = 30.0f;
         tn.field.wobbleSpeed = 0.1f;
         tn.density = 0.05f;

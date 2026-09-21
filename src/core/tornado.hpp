@@ -127,6 +127,23 @@ struct TornadoField {
     float stripeDepth = 0.35f;
     float stripeHarmonic = 0.4f;
 
+    // ---- secondary vortices (§27) and what §20's vorticity actually drives -------------------
+    //
+    // Real violent tornadoes are multi-vortex: two to six *suction vortices* orbit the parent axis
+    // at roughly the radius of maximum wind, turning faster than the parent, each a scaled copy of
+    // the same circulation. They are structure -- a named physical thing -- rather than detail,
+    // which is why they are here and not in the breakup stage.
+    //
+    // ADR-580 refuses vorticity confinement in the analytic tier, because confinement restores
+    // energy that numerical diffusion removed and an analytic field has none. THIS is what §20's
+    // Vorticity control drives, and the visual consequence §20 asks for is delivered by a structure
+    // that cannot dissipate because it is evaluated rather than integrated.
+    float suctionCount = 0.0f;    // lobes; 0 is off and is the default
+    float suctionStrength = 0.0f;
+    float suctionRadius = 1.0f;   // where they ride, as a fraction of the funnel radius
+    float suctionWidth = 0.35f;   // the radial window's width
+    float suctionSpeed = 0.9f;    // their own turn rate, ON TOP of the parent's
+
     // ---- motion (§13, §17-§19) ---------------------------------------------------------------------
     //
     // A Burgers-Rott vortex: `u_r = -a r / 2`, `u_z = +a z`, `u_theta = (G / 2 pi r)(1 - e^{-r^2/Rc^2})`.
@@ -162,9 +179,10 @@ struct TornadoUniforms {
     glm::vec4 t6{0.0f}; // circulation, coreRadiusMetres, inflow, lift
     glm::vec4 t7{0.0f}; // leanX, leanZ, wobbleAmount, wobbleSpeed
     glm::vec4 t8{0.0f}; // rotationBottom, rotationTop, rotationCurve, cloudWidth
-    glm::vec4 t9{0.0f}; // cloudHeight, cloudDensity, 0, 0
+    glm::vec4 t9{0.0f};  // cloudHeight, cloudDensity, suctionCount, suctionStrength
+    glm::vec4 t10{0.0f}; // suctionRadius, suctionWidth, suctionSpeed, 0
 };
-static_assert(sizeof(TornadoUniforms) == 160);
+static_assert(sizeof(TornadoUniforms) == 176);
 
 [[nodiscard]] TornadoUniforms packTornado(const TornadoField& field);
 

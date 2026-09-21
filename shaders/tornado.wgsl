@@ -34,7 +34,8 @@
 //   t6  circulation, coreRadiusMetres, inflow, lift
 //   t7  leanX, leanZ, wobbleAmount, wobbleSpeed
 //   t8  rotationBottom, rotationTop, rotationCurve, cloudWidth
-//   t9  cloudHeight, cloudDensity, 0, 0
+//   t9  cloudHeight, cloudDensity, suctionCount, suctionStrength
+//   t10 suctionRadius, suctionWidth, suctionSpeed, 0
 
 struct TornadoUniformsWgsl {
     t0: vec4<f32>,
@@ -47,6 +48,7 @@ struct TornadoUniformsWgsl {
     t7: vec4<f32>,
     t8: vec4<f32>,
     t9: vec4<f32>,
+    t10: vec4<f32>,
 };
 
 // ---- shape ------------------------------------------------------------------------------------
@@ -134,6 +136,48 @@ fn tornadoStripes(v: TornadoUniformsWgsl, rr: f32, h: f32, angle: f32, t: f32) -
     // Striations are a property of the condensation SURFACE, so they fade out of the interior --
     // where, physically, there is no surface for them to be on.
     return 1.0 + depth * smoothstep(0.30, 0.85, rr) * band;
+}
+
+// §27's secondary vortices -- and §20's vorticity, answered in the one form that is honest for an
+// analytic field.
+//
+// **What this is.** Real violent tornadoes are multi-vortex: two to six *suction vortices* orbit
+// the parent axis at roughly the radius of maximum wind, turning faster than the parent does, each
+// a scaled copy of the same circulation. They are what makes the base ragged and they are the
+// single most recognisable feature of a strong tornado after the silhouette. They are STRUCTURE --
+// a real, named, physical thing -- not detail noise, which is why they are in this file and in this
+// phase rather than in the breakup stage.
+//
+// **Why it is a cosine and not a loop over N Gaussians.** The obvious implementation sums N bumps
+// orbiting the axis. It costs a loop per sample, and worse, its mean over angle is some number
+// nobody can write down -- and `density` is a per-metre coefficient calibrated against this field's
+// mean (ADR-389's family). A cosine in angle has mean EXACTLY zero, so `1 + strength * window *
+// cos(...)` has mean exactly 1 at every radius and height, whatever the count, strength or speed.
+// Same trick as the striations, same reason, and it is also about six times cheaper.
+//
+// **Why it is windowed at the radius of maximum wind.** Suction vortices do not live at the axis
+// and they do not live out in the inflow; they ride the wall where the shear is. The Gaussian
+// window in `rr` is that, and it is also what stops this from being a second set of striations.
+//
+// **Vorticity, stated where somebody will look for it.** ADR-580 refuses vorticity confinement in
+// the analytic tier, because confinement restores energy that NUMERICAL DIFFUSION removed and an
+// analytic field has none. `suctionStrength` is what §20's Vorticity control actually drives, and
+// the visual consequence §20 asks for -- "preserving and enhancing swirling motion that otherwise
+// dissipates" -- is delivered by a structure that cannot dissipate because it is evaluated rather
+// than integrated.
+fn tornadoSuction(v: TornadoUniformsWgsl, rr: f32, h: f32, angle: f32, t: f32) -> f32 {
+    let count = v.t9.z;
+    if (count < 0.5 || v.t9.w <= 0.0) {
+        return 1.0;
+    }
+    // The window: a Gaussian ring centred on the radius of maximum wind.
+    let d = (rr - clamp(v.t10.x, 0.0, 2.0)) / max(v.t10.y, 1e-3);
+    let window = exp(-d * d);
+    // They turn FASTER than the parent, which is the tell that there is more than one vortex:
+    // their own rate plus the parent's, so they never sit still relative to the funnel.
+    let spin = t * (v.t10.z + tornadoRotationAt(v, h)) + h * 2.0;
+    // Clamped so the density cannot go negative, exactly as the striations are.
+    return 1.0 + clamp(v.t9.w, 0.0, 0.9) * window * cos(count * (angle - spin));
 }
 
 struct TornadoShape {
@@ -228,6 +272,11 @@ fn tornadoEvaluate(v: TornadoUniformsWgsl, p: vec3<f32>, t: f32, filterWidth: f3
 
     let angle = atan2(planar.y, planar.x);
     funnel = funnel * tornadoStripes(v, rr, hc, angle, t);
+    // Applied to the funnel and to the SKIRT below, but not to the cloud: suction vortices are a
+    // feature of the column and of where it meets the ground, and putting lobes on the wall cloud
+    // would read as a fairground ride.
+    let suction = tornadoSuction(v, rr, hc, angle, t);
+    funnel = funnel * suction;
 
     // ---- the debris skirt ----------------------------------------------------------------------
     //
@@ -245,7 +294,7 @@ fn tornadoEvaluate(v: TornadoUniformsWgsl, p: vec3<f32>, t: f32, filterWidth: f3
         let flare = max(v.t1.x * max(v.t4.x, 1.0) * (1.0 + max(v.t4.w, 0.0) * sk), 1e-3);
         skirt = v.t4.z * (1.0 - smoothstep(0.30, 1.0, dist / flare)) * sk * sk;
         // Fade out just below the contact point rather than clipping at it.
-        skirt = skirt * smoothstep(-0.02, 0.0, h);
+        skirt = skirt * smoothstep(-0.02, 0.0, h) * suction;
     }
 
     // ---- the wall cloud ---------------------------------------------------------------------

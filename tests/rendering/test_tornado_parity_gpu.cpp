@@ -240,6 +240,11 @@ tornado::TornadoField cone() {
     f.rotationBottom = 1.0f;
     f.rotationTop = 0.55f;
     f.rotationCurve = 1.0f;
+    f.suctionCount = 4.0f;
+    f.suctionStrength = 0.5f;
+    f.suctionRadius = 0.95f;
+    f.suctionWidth = 0.32f;
+    f.suctionSpeed = 0.8f;
     f.lean = {30.0f, -18.0f};
     f.wobbleAmount = 18.0f;
     f.wobbleSpeed = 0.15f;
@@ -478,6 +483,11 @@ TEST_CASE("every number the tornado uniform carries reaches the shader", "[gpu][
         {"stripePitch", &tornado::TornadoField::stripePitch, 14.0f},
         {"stripeDepth", &tornado::TornadoField::stripeDepth, 0.62f},
         {"stripeHarmonic", &tornado::TornadoField::stripeHarmonic, 0.95f},
+        {"suctionCount", &tornado::TornadoField::suctionCount, 5.0f},
+        {"suctionStrength", &tornado::TornadoField::suctionStrength, 0.7f},
+        {"suctionRadius", &tornado::TornadoField::suctionRadius, 0.4f},
+        {"suctionWidth", &tornado::TornadoField::suctionWidth, 0.9f},
+        {"suctionSpeed", &tornado::TornadoField::suctionSpeed, 3.3f},
         {"wobbleAmount", &tornado::TornadoField::wobbleAmount, 140.0f},
         {"wobbleSpeed", &tornado::TornadoField::wobbleSpeed, 1.4f},
         // The velocity half. These move `sampleTornado`'s velocity and not its density, which is
