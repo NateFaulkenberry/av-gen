@@ -21,11 +21,16 @@
 //   f0  xyz = centre, w = radius (0 is off, and it is the gate)
 //   f1  x = thickness, y = length/width ratio, z = cos(rotation), w = sin(rotation)
 //   f2  x = edgeSoftness, y = heightBias, z = heightFalloff, w = domeShape
+//   f3  = LANE 7, which the vortex packs as (eyeWallWidth, eyeWallGain, cloudNoise, 0) and a fog
+//        bank has no eye to want the first two for. So the fog packer reuses them:
+//        x = detail scale, y = drift speed, z = detail amount (cloudNoise), w = 0.
+//        NOT lane 12 -- that is `spill`, read by the surface glow (ADR-562), and a fog bank uses it.
 
 struct FogUniformsWgsl {
     f0: vec4<f32>,
     f1: vec4<f32>,
     f2: vec4<f32>,
+    f3: vec4<f32>,
 };
 
 // The bank's horizontal footprint: an ELLIPSE, rotated.
@@ -81,6 +86,34 @@ fn fogVerticalProfile(f: FogUniformsWgsl, relY: f32) -> f32 {
     return mix(thin, dome * dome, clamp(f.f2.w, 0.0, 1.0));
 }
 
+// §13/§14: MACRO detail, and the three properties that keep it secondary.
+//
+// 1. **Identity at zero.** `detail` 0 returns exactly 1.0, so the analytic field is untouched and
+//    §44's first bar -- the whole reason this file exists -- stays reachable by construction rather
+//    than by a small number.
+// 2. **Mean-preserving by construction**, which ADR-560 measured the vortex's version is NOT: its
+//    `mix(flatLevel, shaped, cloudNoise)` raised the frame's mean luminance by 20.7 levels when the
+//    detail was turned OFF, because the compensation assumed a mean the billow and turbulence
+//    moved. This is written `1 + amount * (n * 2 - 1)`, whose mean over a zero-centred noise is
+//    exactly 1 whatever the amount -- the same form `vortexSpiralBands` uses and for the same
+//    reason (ADR-389's family rule).
+// 3. **One octave, at a LOW frequency.** The brief's §13: noise distorts large boundaries, it does
+//    not create the density. A period tied to the bank's own radius means it cannot introduce
+//    spatial frequencies the march's sample spacing cannot carry, which is ADR-389's finding and
+//    the reason the vortex needed a band-limit this does not.
+fn fogMacroDetail(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
+    let amount = clamp(f.f3.z, 0.0, 1.0);
+    if (amount <= 0.0) {
+        return 1.0;
+    }
+    // Tied to the bank's radius, so the detail is the same SHAPE at any size -- the size
+    // independence ADR-564 gave the density, applied to the structure.
+    let scale = max(f.f3.x, 0.05) / max(f.f0.w, 1.0);
+    let drift = f.f3.y * t;
+    let n = fbm3(p * scale + vec3<f32>(drift, drift * 0.3, -drift * 0.7), 41u);
+    return 1.0 + amount * (n * 2.0 - 1.0);
+}
+
 // The bank, analytic and complete. Zero outside, and compactly so, which is the property ADR-374
 // measured the march's cost against and ADR-562's ray interval depends on.
 fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
@@ -100,5 +133,5 @@ fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
     if (rim <= 0.0) {
         return 0.0;
     }
-    return rim * fogVerticalProfile(f, rel.y);
+    return max(rim * fogVerticalProfile(f, rel.y) * fogMacroDetail(f, p, t), 0.0);
 }

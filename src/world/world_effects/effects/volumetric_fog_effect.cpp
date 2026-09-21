@@ -129,6 +129,11 @@ constexpr EffectField kFields[] = {
     storedFloat("groundHug", "Ground hug", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f).main(),
     storedFloat("heightFalloff", "Height falloff", 1.4f, 0.05f, 8.0f, 0.3f, 4.0f).sec("Structure"),
     storedFloat("domeShape", "Dome", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f),
+    // ADR-565 (§13/§14): the macro detail's own two controls. Frequency is expressed against the
+    // bank's radius, so the detail is the same SHAPE at any size -- ADR-564's size independence
+    // applied to structure rather than to density.
+    storedFloat("detailScale", "Detail scale", 6.0f, 0.5f, 40.0f, 1.0f, 16.0f).sec("Structure"),
+    storedFloat("detailDrift", "Detail drift", 0.01f, -0.5f, 0.5f, -0.1f, 0.1f),
     floatField("detailAmount", "Detail amount", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.cloudNoise),
                SETF(e.vortex.field.cloudNoise)).json("/vortex/cloudNoise").main()
         .tooltip("How much of the bank's density comes from procedural detail rather than from\n"
@@ -404,7 +409,11 @@ void packMedium(const E& e, float envelope, MediumSlot& out) {
     out.lane[5] = glm::vec4(std::max(v.cometResponse, 0.0f), std::max(v.cometReach, 1.0f),
                             std::max(v.scattering, 0.0f), 0.0f);
     out.lane[6] = f.v6;
-    out.lane[7] = f.v7;
+    // ADR-565: a fog bank has no eye, so lane 7's first two slots carry its macro-detail terms
+    // instead. `.z` stays `cloudNoise` exactly where `packVortex` put it, so the control an artist
+    // moves is the one the field reads.
+    out.lane[7] = glm::vec4(std::max(storedOf(e, "detailScale", 6.0f), 0.05f),
+                            storedOf(e, "detailDrift", 0.01f), f.v7.z, 0.0f);
     out.lane[8] = f.v8;
     out.lane[9] = glm::vec4(v.colorDeep, 0.0f);
     out.lane[10] = glm::vec4(v.colorMid, 0.0f);
