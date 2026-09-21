@@ -1,19 +1,19 @@
 // The fog bank's field, as an artist reaches it (ADR-560, ADR-561).
 //
 // Every question here goes through the SHIPPED path and not through a copy of it: the registry's
-// own factory and styles produce the `AtmosphericEffect`, `world::vortexFieldOf` converts it and
-// `vortex::packVortex` packs it -- which is exactly the sequence `rendering::VolumeRenderer::update`
+// own factory and styles produce the `AtmosphericEffect`, `vortex::packVortex` packs its `field` -- which is exactly the sequence `rendering::VolumeRenderer::update`
 // performs, and since ADR-561 it is literally the same three calls. That matters more here than
 // usual, because ADR-401 recorded the failure mode: a test can be green about a path nobody
 // renders. Before ADR-561 the conversion step existed only inside the renderer, so a test of this
 // shape would have had to write it out a second time and would then have been asserting about its
-// own copy.
+// own copy. ADR-562 deleted the conversion outright: `world::Vortex` composes `vortex::VortexField`,
+// so `e.vortex.field` IS what the renderer packs.
 //
 // What each case is evidence for, and how it fails:
 //
 //   1. A fog bank is filled to its axis. Before ADR-561 the envelope was EXACTLY ZERO on the
 //      centre line -- a 200 m hole inside a 900 m bank -- because `eyeWallWidth` defaults to the
-//      0.22 the vortex's eye wants and `applyStyle` never reset it. Delete `v.eyeWallWidth = 0`
+//      0.22 the vortex's eye wants and `applyStyle` never reset it. Delete `v.field.eyeWallWidth = 0`
 //      from `applyStyle` and case 1 fails at the first assertion.
 //   2. The detail weight is reachable from the fog kind's own rows. Before ADR-561 `cloudNoise` was
 //      declared by the vortex and not by the fog bank, so the one control the brief's §44 bar 1 and
@@ -62,8 +62,8 @@ world::AtmosphericEffect fogBank(std::string_view style) {
 }
 
 vortex::VortexSample sampleAt(const world::AtmosphericEffect& e, glm::vec3 offset, float t = 0.0f) {
-    return vortex::sampleVortex(vortex::packVortex(world::vortexFieldOf(e.vortex)),
-                                e.vortex.center + offset, t);
+    return vortex::sampleVortex(vortex::packVortex(e.vortex.field),
+                                e.vortex.field.center + offset, t);
 }
 
 } // namespace
@@ -72,7 +72,7 @@ TEST_CASE("a fog bank is filled to its own axis", "[fog]") {
     for (const world::EffectStyle& style : fogSchema().styles) {
         INFO("style: " << style.name);
         const world::AtmosphericEffect e = fogBank(style.name);
-        const float radius = e.vortex.radius;
+        const float radius = e.vortex.field.radius;
         REQUIRE(radius > 0.0f);
 
         // The centre line, at the height the bank's Gaussian is centred on. There is nothing here
@@ -111,20 +111,20 @@ TEST_CASE("the fog bank's detail weight is reachable from its own rows", "[fog]"
     // move must reach the packed bytes. This is the probe shape ADR-460's parity work found a live
     // defect with ("changing innerVoid moved 0 of 160 GPU samples").
     world::setFieldFloat(*row, s, e, 0.0f);
-    CHECK(e.vortex.cloudNoise == Approx(0.0f));
-    const vortex::VortexUniforms off = vortex::packVortex(world::vortexFieldOf(e.vortex));
+    CHECK(e.vortex.field.cloudNoise == Approx(0.0f));
+    const vortex::VortexUniforms off = vortex::packVortex(e.vortex.field);
     world::setFieldFloat(*row, s, e, 1.0f);
-    CHECK(e.vortex.cloudNoise == Approx(1.0f));
-    const vortex::VortexUniforms on = vortex::packVortex(world::vortexFieldOf(e.vortex));
+    CHECK(e.vortex.field.cloudNoise == Approx(1.0f));
+    const vortex::VortexUniforms on = vortex::packVortex(e.vortex.field);
     CHECK(off.v7.z != on.v7.z);
 
     // And it must reach the picture: somewhere inside the bank the two must disagree about the
     // density. A packed byte that no sample depends on is the same defect one layer down.
-    const float radius = e.vortex.radius;
+    const float radius = e.vortex.field.radius;
     bool moved = false;
     for (int i = 1; i < 24 && !moved; ++i) {
         const float rr = 0.04f * static_cast<float>(i);
-        const glm::vec3 p = e.vortex.center + glm::vec3(radius * rr, 0.0f, radius * rr * 0.31f);
+        const glm::vec3 p = e.vortex.field.center + glm::vec3(radius * rr, 0.0f, radius * rr * 0.31f);
         moved = vortex::sampleVortex(off, p, 3.0f).density !=
                 vortex::sampleVortex(on, p, 3.0f).density;
     }
@@ -133,10 +133,10 @@ TEST_CASE("the fog bank's detail weight is reachable from its own rows", "[fog]"
 
 TEST_CASE("a fog bank with its detail at zero still has a field with shape in it", "[fog]") {
     world::AtmosphericEffect e = fogBank("Valley Mist");
-    e.vortex.cloudNoise = 0.0f;
-    const vortex::VortexUniforms u = vortex::packVortex(world::vortexFieldOf(e.vortex));
-    const float radius = e.vortex.radius;
-    const float thickness = e.vortex.thickness;
+    e.vortex.field.cloudNoise = 0.0f;
+    const vortex::VortexUniforms u = vortex::packVortex(e.vortex.field);
+    const float radius = e.vortex.field.radius;
+    const float thickness = e.vortex.field.thickness;
 
     // The WEAK form, and it is weak on purpose. ADR-560's finding is that with the detail at zero
     // this field is monotone in radius, uniform in ANGLE and smooth in height -- a grey card rather
@@ -146,14 +146,14 @@ TEST_CASE("a fog bank with its detail at zero still has a field with shape in it
     std::vector<float> radial;
     for (int i = 0; i <= 14; ++i) {
         const float rr = 0.1f * static_cast<float>(i);
-        radial.push_back(vortex::sampleVortex(u, e.vortex.center + glm::vec3(radius * rr, 0.0f, 0.0f),
+        radial.push_back(vortex::sampleVortex(u, e.vortex.field.center + glm::vec3(radius * rr, 0.0f, 0.0f),
                                               0.0f).density);
     }
     CHECK(*std::max_element(radial.begin(), radial.end()) > 0.0f);
     CHECK(*std::min_element(radial.begin(), radial.end()) == Approx(0.0f).margin(1e-6f));
     // Vertical: the Gaussian wall, so a sample two half-heights up is far below the centre's.
-    const float mid = vortex::sampleVortex(u, e.vortex.center, 0.0f).density;
-    const float high = vortex::sampleVortex(u, e.vortex.center + glm::vec3(0.0f, thickness * 2.0f, 0.0f),
+    const float mid = vortex::sampleVortex(u, e.vortex.field.center, 0.0f).density;
+    const float high = vortex::sampleVortex(u, e.vortex.field.center + glm::vec3(0.0f, thickness * 2.0f, 0.0f),
                                             0.0f).density;
     CHECK(high < mid * 0.05f);
 
@@ -167,7 +167,7 @@ TEST_CASE("a fog bank with its detail at zero still has a field with shape in it
     float hi = -1e30f;
     for (int i = 0; i < 16; ++i) {
         const float a = 6.2831853f * static_cast<float>(i) / 16.0f;
-        const glm::vec3 p = e.vortex.center +
+        const glm::vec3 p = e.vortex.field.center +
                             glm::vec3(radius * 0.45f * std::cos(a), 0.0f, radius * 0.45f * std::sin(a));
         const float d = vortex::sampleVortex(u, p, 0.0f).density;
         lo = std::min(lo, d);

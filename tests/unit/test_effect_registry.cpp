@@ -339,11 +339,11 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
         world::AtmosphericFrame frame{};
         world::buildAtmosphericFrame(std::span(&fog, 1), ctx, frame);
         CHECK(frame.hasVortex);
-        CHECK(frame.vortex.radius > 0.0f);
+        CHECK(frame.vortex.field.radius > 0.0f);
         // What makes it a bank rather than a funnel, and the reason it is a kind rather than a
         // preset: the panel it draws has no swirl, no throat and no funnel depth on it.
-        CHECK(frame.vortex.swirl == 0.0f);
-        CHECK(frame.vortex.funnelDepth == 0.0f);
+        CHECK(frame.vortex.field.swirl == 0.0f);
+        CHECK(frame.vortex.field.funnelDepth == 0.0f);
     }
 
     SECTION("a bank and a funnel in one scene are a reported limit, not a silent no-op") {

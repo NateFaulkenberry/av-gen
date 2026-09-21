@@ -2589,7 +2589,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // vortex, which is the gate the surface shader tests.
     if (scene.atmospherics.hasVortex && scene.atmospherics.vortex.active()) {
         const world::Vortex& vx = scene.atmospherics.vortex;
-        frame.vortexGlow = glm::vec4(vx.center, std::max(vx.radius, 1.0f));
+        frame.vortexGlow = glm::vec4(vx.field.center, std::max(vx.field.radius, 1.0f));
         // The colour the eye reads out of the funnel is the mid tone lifted toward the accent.
         //
         // The strength is `spill` ALONE and is deliberately not derived from `emission`. My first

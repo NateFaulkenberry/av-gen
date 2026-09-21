@@ -239,59 +239,38 @@ Result<void> Aurora::validate() const {
     return {};
 }
 
-// ADR-561. Moved here from `rendering/volume_renderer.cpp`, where it was the one step of the
-// vortex pipeline that had no second caller and therefore no test -- see the note beside the
-// declaration in the header.
-vortex::VortexField vortexFieldOf(const Vortex& v) {
-    return vortex::VortexField{
-        .center = v.center,
-        .radius = v.radius,
-        .thickness = v.thickness,
-        .funnelDepth = v.funnelDepth,
-        .throat = v.throat,
-        .throatDensity = v.throatDensity,
-        .swirl = v.swirl,
-        .rotationSpeed = v.rotationSpeed,
-        .innerVoid = v.innerVoid,
-        .contrast = v.contrast,
-        .turbulence = v.turbulence,
-        .turbulenceScale = v.turbulenceScale,
-        .breathAmount = v.breathAmount,
-        .breathSpeed = v.breathSpeed,
-        .smokeWarp = v.smokeWarp,
-        .smokeBillow = v.smokeBillow,
-        .detail = v.detail,
-        .eyeWallWidth = v.eyeWallWidth,
-        .eyeWallGain = v.eyeWallGain,
-        .bandArms = v.bandArms,
-        .bandPitchDegrees = v.bandPitchDegrees,
-        .bandDepth = v.bandDepth,
-        .bandHarmonic = v.bandHarmonic,
-        .cloudNoise = v.cloudNoise,
-    };
-}
-
 // ADR-387. The gate is `radius`: every shader function returns before doing any work at zero, so a
 // zero radius must stay legal (it is the default, and it is what every scene but one has).
 Result<void> Vortex::validate() const {
-    if (!finite(center.x) || !finite(center.y) || !finite(center.z)) {
+    // ADR-562: the geometry half is validated through `field`, which is the same twenty-four
+    // members it always was -- the struct composes `vortex::VortexField` rather than copying it,
+    // so this list no longer has to be kept in step with a second one.
+    if (!finite(field.center.x) || !finite(field.center.y) || !finite(field.center.z)) {
         return fail("the vortex centre is not finite");
     }
-    for (const float f : {radius, thickness, swirl, rotationSpeed, density, innerVoid, contrast,
-                          turbulence, turbulenceScale, breathAmount, breathSpeed, emission,
-                          filaments, spill, scattering, cometResponse, cometReach, funnelDepth,
-                          throat, throatDensity, smokeWarp, smokeBillow, detail,
-                          eyeWallWidth, eyeWallGain, bandArms, bandPitchDegrees,
-                          bandDepth, bandHarmonic, cloudNoise}) {
+    for (const float f : {field.radius, field.thickness, field.swirl, field.rotationSpeed,
+                          field.innerVoid, field.contrast, field.turbulence, field.turbulenceScale,
+                          field.breathAmount, field.breathSpeed, field.funnelDepth, field.throat,
+                          field.throatDensity, field.smokeWarp, field.smokeBillow, field.detail,
+                          field.eyeWallWidth, field.eyeWallGain, field.bandArms,
+                          field.bandPitchDegrees, field.bandDepth, field.bandHarmonic,
+                          field.cloudNoise,
+                          density, emission, filaments, spill, scattering, cometResponse,
+                          cometReach}) {
         if (!finite(f)) { return fail("a vortex control is not finite"); }
     }
-    if (radius < 0.0f) { return fail("the vortex radius may not be negative (0 is off)"); }
-    if (thickness < 0.0f) { return fail("the vortex thickness may not be negative"); }
-    if (funnelDepth < 0.0f) { return fail("the vortex funnel depth may not be negative"); }
-    if (innerVoid < 0.0f || innerVoid > 1.0f) { return fail("the vortex inner void is 0..1"); }
-    if (throat < 0.0f || throat > 1.0f) { return fail("the vortex throat is 0..1 of the mouth"); }
+    if (field.radius < 0.0f) { return fail("the vortex radius may not be negative (0 is off)"); }
+    if (field.thickness < 0.0f) { return fail("the vortex thickness may not be negative"); }
+    if (field.funnelDepth < 0.0f) { return fail("the vortex funnel depth may not be negative"); }
+    if (field.innerVoid < 0.0f || field.innerVoid > 1.0f) {
+        return fail("the vortex inner void is 0..1");
+    }
+    if (field.throat < 0.0f || field.throat > 1.0f) {
+        return fail("the vortex throat is 0..1 of the mouth");
+    }
     return {};
 }
+
 
 Result<void> AtmosphericEffect::validate() const {
     if (name.empty()) { return fail("an atmospheric effect needs a name"); }
@@ -980,8 +959,8 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
             if (len > 1e-6f) {
                 constexpr float kLeanFraction = 0.10f; // of the radius, per unit influence
                 const float metres = std::min(len, 1.0f) * rv.flowInfluence * kLeanFraction *
-                                     std::max(out.vortex.radius, 0.0f);
-                out.vortex.center += (lean / len) * metres;
+                                     std::max(out.vortex.field.radius, 0.0f);
+                out.vortex.field.center += (lean / len) * metres;
             }
         }
     }

@@ -61,12 +61,12 @@ constexpr EffectField kFields[] = {
                SETF(e.vortex.density)).json("/vortex/density").fmt("%.4f /m").main()
         .tooltip("How much of what is behind the bank it hides, per metre travelled.\n"
                  "This is thickness, not brightness -- Self glow below is the light."),
-    floatField("bankRadius", "Bank radius", 0.0f, 20000.0f, 0.0f, 3000.0f, GET(e.vortex.radius),
-               SETF(e.vortex.radius)).json("/vortex/radius").fmt("%.0f m").main()
+    floatField("bankRadius", "Bank radius", 0.0f, 20000.0f, 0.0f, 3000.0f, GET(e.vortex.field.radius),
+               SETF(e.vortex.field.radius)).json("/vortex/radius").fmt("%.0f m").main()
         .tooltip("How far the bank reaches from its centre. 0 switches it off, and that is\n"
                  "the default: a volumetric medium costs the march real time, so it is opt-in."),
-    floatField("bankHeight", "Bank height", 0.1f, 5000.0f, 10.0f, 1200.0f, GET(e.vortex.thickness),
-               SETF(e.vortex.thickness)).json("/vortex/thickness").fmt("%.0f m").main()
+    floatField("bankHeight", "Bank height", 0.1f, 5000.0f, 10.0f, 1200.0f, GET(e.vortex.field.thickness),
+               SETF(e.vortex.field.thickness)).json("/vortex/thickness").fmt("%.0f m").main()
         .tooltip("The vertical half-extent, as a soft Gaussian rather than a slab with a lid --\n"
                  "so there is no edge anywhere for a hard line to live on."),
     colorField("fogColor", "Fog colour", GET(e.vortex.colorMid), SETC(e.vortex.colorMid))
@@ -81,8 +81,8 @@ constexpr EffectField kFields[] = {
                SETF(e.vortex.emission)).json("/vortex/emission").fmt("%.3f /m").main()
         .tooltip("Emissive density per metre: the bank's own light. Bioluminescent mist glows;\n"
                  "ordinary fog does not, so 0 is a real setting here rather than a floor."),
-    floatField("billow", "Billow", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.smokeBillow),
-               SETF(e.vortex.smokeBillow)).json("/vortex/smokeBillow").main()
+    floatField("billow", "Billow", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.smokeBillow),
+               SETF(e.vortex.field.smokeBillow)).json("/vortex/smokeBillow").main()
         .tooltip("0 is a thin wispy haze; 1 is rounded masses with creases between them.\n"
                  "The difference between a mist and a bank of cloud."),
     // ADR-561. §53's control, and the reason it is a MAIN row on a fog bank rather than an advanced
@@ -99,42 +99,42 @@ constexpr EffectField kFields[] = {
     // Named for what it does to the picture rather than for the fBM it weights: ADR-560 measured
     // that at 0 this bank is a grey card, which is a defect in the FIELD and not in this control.
     // Turning it down is how an artist sees that, which is what a diagnostic is for.
-    floatField("detailAmount", "Detail amount", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.cloudNoise),
-               SETF(e.vortex.cloudNoise)).json("/vortex/cloudNoise").main()
+    floatField("detailAmount", "Detail amount", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.cloudNoise),
+               SETF(e.vortex.field.cloudNoise)).json("/vortex/cloudNoise").main()
         .tooltip("How much of the bank's density comes from procedural detail rather than from\n"
                  "its shape. At 0 the bank is its analytic volume alone -- which is the check\n"
                  "that the fog is fog and not a noise field: it should still read as fog."),
-    floatField("drift", "Drift", -4.0f, 4.0f, -0.2f, 0.2f, GET(e.vortex.rotationSpeed),
-               SETF(e.vortex.rotationSpeed)).json("/vortex/rotationSpeed").main()
+    floatField("drift", "Drift", -4.0f, 4.0f, -0.2f, 0.2f, GET(e.vortex.field.rotationSpeed),
+               SETF(e.vortex.field.rotationSpeed)).json("/vortex/rotationSpeed").main()
         .tooltip("How fast the whole bank turns over. Slow: fog that moves quickly reads as\n"
                  "smoke, and the eye notices the motion instead of the place."),
 
     // ---- Advanced
-    floatField("churn", "Churn", 0.0f, 8.0f, 0.0f, 2.0f, GET(e.vortex.smokeWarp),
-               SETF(e.vortex.smokeWarp)).sec("Structure").json("/vortex/smokeWarp")
+    floatField("churn", "Churn", 0.0f, 8.0f, 0.0f, 2.0f, GET(e.vortex.field.smokeWarp),
+               SETF(e.vortex.field.smokeWarp)).sec("Structure").json("/vortex/smokeWarp")
         .tooltip("ADR-389: drags the fine detail through the coarse flow, so the detail is\n"
                  "carried BY the structure rather than sitting ON it. The one control that\n"
                  "turns noise into something that looks like moving air."),
-    floatField("wisps", "Wisps", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.turbulence),
-               SETF(e.vortex.turbulence)).json("/vortex/turbulence"),
-    floatField("wispScale", "Wisp scale", 0.001f, 40.0f, 0.1f, 8.0f, GET(e.vortex.turbulenceScale),
-               SETF(e.vortex.turbulenceScale)).json("/vortex/turbulenceScale"),
-    floatField("fineDetail", "Fine detail", 0.0f, 2.0f, 0.0f, 1.0f, GET(e.vortex.detail),
-               SETF(e.vortex.detail)).json("/vortex/detail"),
+    floatField("wisps", "Wisps", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.turbulence),
+               SETF(e.vortex.field.turbulence)).json("/vortex/turbulence"),
+    floatField("wispScale", "Wisp scale", 0.001f, 40.0f, 0.1f, 8.0f, GET(e.vortex.field.turbulenceScale),
+               SETF(e.vortex.field.turbulenceScale)).json("/vortex/turbulenceScale"),
+    floatField("fineDetail", "Fine detail", 0.0f, 2.0f, 0.0f, 1.0f, GET(e.vortex.field.detail),
+               SETF(e.vortex.field.detail)).json("/vortex/detail"),
     floatField("threads", "Threads", 0.0f, 4.0f, 0.0f, 2.0f, GET(e.vortex.filaments),
                SETF(e.vortex.filaments)).json("/vortex/filaments")
         .tooltip("Bright luminous threads in the densest folds, in Glow colour. 0 for\n"
                  "ordinary fog; this is what makes a bank read as alive."),
-    floatField("contrast", "Contrast", 0.05f, 12.0f, 0.5f, 5.0f, GET(e.vortex.contrast),
-               SETF(e.vortex.contrast)).json("/vortex/contrast")
+    floatField("contrast", "Contrast", 0.05f, 12.0f, 0.5f, 5.0f, GET(e.vortex.field.contrast),
+               SETF(e.vortex.field.contrast)).json("/vortex/contrast")
         .tooltip("Low is an even wash; high separates the bank into distinct masses with\n"
                  "clear air between them."),
-    floatField("swell", "Swell", 0.0f, 1.0f, 0.0f, 0.3f, GET(e.vortex.breathAmount),
-               SETF(e.vortex.breathAmount)).json("/vortex/breathAmount").sec("Breathing")
+    floatField("swell", "Swell", 0.0f, 1.0f, 0.0f, 0.3f, GET(e.vortex.field.breathAmount),
+               SETF(e.vortex.field.breathAmount)).json("/vortex/breathAmount").sec("Breathing")
         .tooltip("The bank widens and narrows slowly. Applied to the RADIUS rather than the\n"
                  "density, so the silhouette moves -- scaling density alone just pulses it."),
-    floatField("swellSpeed", "Swell speed", 0.0f, 4.0f, 0.0f, 1.0f, GET(e.vortex.breathSpeed),
-               SETF(e.vortex.breathSpeed)).json("/vortex/breathSpeed"),
+    floatField("swellSpeed", "Swell speed", 0.0f, 4.0f, 0.0f, 1.0f, GET(e.vortex.field.breathSpeed),
+               SETF(e.vortex.field.breathSpeed)).json("/vortex/breathSpeed"),
 
     // ADR-388's measured range, unchanged from the vortex's: laddered on the shipped Tree of Life,
     // nearly linear and usable across the whole of 0..1, with a hard ceiling of 4 because a route
@@ -148,12 +148,12 @@ constexpr EffectField kFields[] = {
                SETF(e.vortex.spill)).json("/vortex/spill")
         .tooltip("Surface irradiance on what stands in the bank (ADR-379)."),
 
-    floatField("centerX", "Centre X", -1e5f, 1e5f, -2000.0f, 2000.0f, GET(e.vortex.center.x),
-               SETF(e.vortex.center.x)).json("/vortex/center/0").fmt("%.0f m").sec("Placement"),
-    floatField("centerY", "Centre Y", -1e5f, 1e5f, -500.0f, 1000.0f, GET(e.vortex.center.y),
-               SETF(e.vortex.center.y)).json("/vortex/center/1").fmt("%.0f m"),
-    floatField("centerZ", "Centre Z", -1e5f, 1e5f, -2000.0f, 2000.0f, GET(e.vortex.center.z),
-               SETF(e.vortex.center.z)).json("/vortex/center/2").fmt("%.0f m"),
+    floatField("centerX", "Centre X", -1e5f, 1e5f, -2000.0f, 2000.0f, GET(e.vortex.field.center.x),
+               SETF(e.vortex.field.center.x)).json("/vortex/center/0").fmt("%.0f m").sec("Placement"),
+    floatField("centerY", "Centre Y", -1e5f, 1e5f, -500.0f, 1000.0f, GET(e.vortex.field.center.y),
+               SETF(e.vortex.field.center.y)).json("/vortex/center/1").fmt("%.0f m"),
+    floatField("centerZ", "Centre Z", -1e5f, 1e5f, -2000.0f, 2000.0f, GET(e.vortex.field.center.z),
+               SETF(e.vortex.field.center.z)).json("/vortex/center/2").fmt("%.0f m"),
 };
 
 #undef GET
@@ -173,15 +173,15 @@ constexpr std::array<std::string_view, 3> kStyleNames{"Valley Mist", "Glowmere H
 // scene made, and a preset that moved it would silently unanchor it (ADR-387's rule for vortices).
 void applyStyle(AtmosphericEffect& e, std::string_view style) {
     Vortex& v = e.vortex;
-    const glm::vec3 keep = v.center;
+    const glm::vec3 keep = v.field.center;
     v = Vortex{};
-    v.center = keep;
+    v.field.center = keep;
     // What makes it a bank rather than a funnel, in four numbers.
-    v.swirl = 0.0f;        // no spiral
-    v.funnelDepth = 0.0f;  // no throat descending below the mouth
-    v.throat = 1.0f;       // ...and the mouth does not narrow
-    v.throatDensity = 0.0f;
-    v.innerVoid = 0.0f;    // filled, not a ring
+    v.field.swirl = 0.0f;        // no spiral
+    v.field.funnelDepth = 0.0f;  // no throat descending below the mouth
+    v.field.throat = 1.0f;       // ...and the mouth does not narrow
+    v.field.throatDensity = 0.0f;
+    v.field.innerVoid = 0.0f;    // filled, not a ring
     // ADR-561, and `innerVoid = 0` alone did NOT achieve it. The envelope's eye term is
     // `smoothstep(innerVoid, innerVoid + eyeWallWidth, rr)`, and `eyeWallWidth` defaults to the
     // 0.22 ADR-374 hardcoded for the vortex -- so with the void at zero the density still climbed
@@ -194,65 +194,65 @@ void applyStyle(AtmosphericEffect& e, std::string_view style) {
     // Zero rather than a small number: `vortexRadialProfile` clamps it to 1e-3, so the rise happens
     // over a thousandth of the radius and the bank is filled to its axis with no edge introduced
     // (ADR-369's rule still holds -- the term is still a smoothstep, it is just no longer wide).
-    v.eyeWallWidth = 0.0f;
-    v.eyeWallGain = 0.0f;  // and no ring of extra density around a hole that is no longer there
+    v.field.eyeWallWidth = 0.0f;
+    v.field.eyeWallGain = 0.0f;  // and no ring of extra density around a hole that is no longer there
     v.cometResponse = 0.0f;
 
     if (style == kStyleNames[0]) { // Valley Mist -- thin, wide, low, barely lit
-        v.radius = 1400.0f;
-        v.thickness = 90.0f;
+        v.field.radius = 1400.0f;
+        v.field.thickness = 90.0f;
         v.density = 0.0016f;
         v.emission = 0.004f;
-        v.contrast = 1.5f;
-        v.turbulence = 0.35f;
-        v.turbulenceScale = 1.1f;
-        v.smokeWarp = 0.9f;
-        v.smokeBillow = 0.35f;
-        v.detail = 0.25f;
+        v.field.contrast = 1.5f;
+        v.field.turbulence = 0.35f;
+        v.field.turbulenceScale = 1.1f;
+        v.field.smokeWarp = 0.9f;
+        v.field.smokeBillow = 0.35f;
+        v.field.detail = 0.25f;
         v.filaments = 0.0f;
-        v.rotationSpeed = 0.012f;
-        v.breathAmount = 0.06f;
-        v.breathSpeed = 0.09f;
+        v.field.rotationSpeed = 0.012f;
+        v.field.breathAmount = 0.06f;
+        v.field.breathSpeed = 0.09f;
         v.scattering = 0.6f;
         v.spill = 0.8f;
         v.colorDeep = {0.050f, 0.062f, 0.085f};
         v.colorMid = {0.140f, 0.170f, 0.210f};
         v.colorAccent = {0.230f, 0.270f, 0.320f};
     } else if (style == kStyleNames[1]) { // Glowmere Haze -- bioluminescent, threaded, self-lit
-        v.radius = 900.0f;
-        v.thickness = 160.0f;
+        v.field.radius = 900.0f;
+        v.field.thickness = 160.0f;
         v.density = 0.0021f;
         v.emission = 0.030f;
-        v.contrast = 2.6f;
-        v.turbulence = 0.55f;
-        v.turbulenceScale = 1.8f;
-        v.smokeWarp = 1.4f;
-        v.smokeBillow = 0.55f;
-        v.detail = 0.35f;
+        v.field.contrast = 2.6f;
+        v.field.turbulence = 0.55f;
+        v.field.turbulenceScale = 1.8f;
+        v.field.smokeWarp = 1.4f;
+        v.field.smokeBillow = 0.55f;
+        v.field.detail = 0.35f;
         v.filaments = 1.4f;
-        v.rotationSpeed = 0.020f;
-        v.breathAmount = 0.10f;
-        v.breathSpeed = 0.14f;
+        v.field.rotationSpeed = 0.020f;
+        v.field.breathAmount = 0.10f;
+        v.field.breathSpeed = 0.14f;
         v.scattering = 0.35f;
         v.spill = 2.0f;
         v.colorDeep = {0.014f, 0.040f, 0.048f};
         v.colorMid = {0.040f, 0.150f, 0.145f};
         v.colorAccent = {0.110f, 0.360f, 0.300f};
     } else { // Dense Bank -- thick, tall, billowing, opaque
-        v.radius = 650.0f;
-        v.thickness = 320.0f;
+        v.field.radius = 650.0f;
+        v.field.thickness = 320.0f;
         v.density = 0.0055f;
         v.emission = 0.010f;
-        v.contrast = 3.4f;
-        v.turbulence = 0.70f;
-        v.turbulenceScale = 2.6f;
-        v.smokeWarp = 2.0f;
-        v.smokeBillow = 0.90f;
-        v.detail = 0.45f;
+        v.field.contrast = 3.4f;
+        v.field.turbulence = 0.70f;
+        v.field.turbulenceScale = 2.6f;
+        v.field.smokeWarp = 2.0f;
+        v.field.smokeBillow = 0.90f;
+        v.field.detail = 0.45f;
         v.filaments = 0.3f;
-        v.rotationSpeed = 0.030f;
-        v.breathAmount = 0.12f;
-        v.breathSpeed = 0.16f;
+        v.field.rotationSpeed = 0.030f;
+        v.field.breathAmount = 0.12f;
+        v.field.breathSpeed = 0.16f;
         v.scattering = 0.8f;
         v.spill = 1.4f;
         v.colorDeep = {0.060f, 0.058f, 0.070f};
@@ -309,7 +309,7 @@ AtmosphericEffect make(std::string name) {
 bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx,
           const ResolvedAtmospheric& base, ResolvedAtmospheric& r) {
     r = base;
-    r.anchor = e.vortex.center;
+    r.anchor = e.vortex.field.center;
     const EffectFlow flow = resolveEffectFlow(e, r.anchor, ctx);
     r.flow = flow.sample;
     r.flowInfluence = flow.influence;

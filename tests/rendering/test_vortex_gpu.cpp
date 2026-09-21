@@ -50,13 +50,13 @@ scene::Scene voidWorld(bool vortexOn, float fogDensity, glm::vec3 eye) {
         // test still states the vortex it is rendering rather than an effect list and a second.
         s.atmospherics.hasVortex = true;
         world::Vortex& v = s.atmospherics.vortex;
-        v.center = {0.0f, -600.0f, 0.0f};
-        v.radius = 1500.0f;
-        v.thickness = 300.0f;
+        v.field.center = {0.0f, -600.0f, 0.0f};
+        v.field.radius = 1500.0f;
+        v.field.thickness = 300.0f;
         v.density = 0.0012f;
         v.emission = 0.006f;
-        v.contrast = 3.6f;
-        v.innerVoid = 0.30f;
+        v.field.contrast = 3.6f;
+        v.field.innerVoid = 0.30f;
     }
     return s;
 }
@@ -87,7 +87,7 @@ TEST_CASE("A scene without a vortex marches exactly what it always marched", "[g
     const glm::vec3 eye{300.0f, 0.0f, 300.0f};
 
     // Radius 0 is the gate, and it is the default.
-    CHECK(world::Vortex{}.radius == 0.0f);
+    CHECK(world::Vortex{}.field.radius == 0.0f);
     CHECK_FALSE(world::Vortex{}.active());
     // ...and a scene that authors none says so, which is the gate one level above the radius.
     CHECK_FALSE(scene::Scene{}.atmospherics.hasVortex);

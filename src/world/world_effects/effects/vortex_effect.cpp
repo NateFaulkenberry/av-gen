@@ -37,14 +37,14 @@ constexpr EffectField kFields[] = {
                SETF(e.vortex.emission)).fmt("%.3f /m").main(),
     floatField("density", "Thickness", 0.0f, 8.0f, 0.0f, 0.01f, GET(e.vortex.density),
                SETF(e.vortex.density)).fmt("%.4f /m").main(),
-    floatField("radius", "Mouth radius", 0.0f, 20000.0f, 0.0f, 1500.0f, GET(e.vortex.radius),
-               SETF(e.vortex.radius)).fmt("%.0f m").log().main(),
-    floatField("funnelDepth", "Funnel depth", 0.0f, 20000.0f, 0.0f, 3000.0f, GET(e.vortex.funnelDepth),
-               SETF(e.vortex.funnelDepth)).fmt("%.0f m").log().main(),
-    floatField("rotationSpeed", "Rotation", -4.0f, 4.0f, -0.4f, 0.4f, GET(e.vortex.rotationSpeed),
-               SETF(e.vortex.rotationSpeed)).fmt("%.3f rad/s").main(),
-    floatField("swirl", "Swirl", -32.0f, 32.0f, -8.0f, 8.0f, GET(e.vortex.swirl),
-               SETF(e.vortex.swirl)).main(),
+    floatField("radius", "Mouth radius", 0.0f, 20000.0f, 0.0f, 1500.0f, GET(e.vortex.field.radius),
+               SETF(e.vortex.field.radius)).fmt("%.0f m").log().main(),
+    floatField("funnelDepth", "Funnel depth", 0.0f, 20000.0f, 0.0f, 3000.0f, GET(e.vortex.field.funnelDepth),
+               SETF(e.vortex.field.funnelDepth)).fmt("%.0f m").log().main(),
+    floatField("rotationSpeed", "Rotation", -4.0f, 4.0f, -0.4f, 0.4f, GET(e.vortex.field.rotationSpeed),
+               SETF(e.vortex.field.rotationSpeed)).fmt("%.3f rad/s").main(),
+    floatField("swirl", "Swirl", -32.0f, 32.0f, -8.0f, 8.0f, GET(e.vortex.field.swirl),
+               SETF(e.vortex.field.swirl)).main(),
     floatField("filaments", "Filaments", 0.0f, 4.0f, 0.0f, 2.0f, GET(e.vortex.filaments),
                SETF(e.vortex.filaments)).main(),
     // Vortex 2.0 §7-§11 (ADR-461), carried onto the registry unchanged. Its own section because
@@ -60,57 +60,57 @@ constexpr EffectField kFields[] = {
     // of the two doing nothing, which the parity test's reachability probe reported as
     // `changing innerVoid moved 0 of 160 GPU samples` the first time this was written.
     floatField("eyeWallWidth", "Eye wall width", 0.005f, 0.6f, 0.02f, 0.4f,
-               GET(e.vortex.eyeWallWidth), SETF(e.vortex.eyeWallWidth)).main().sec("Cyclone structure")
+               GET(e.vortex.field.eyeWallWidth), SETF(e.vortex.field.eyeWallWidth)).main().sec("Cyclone structure")
         .tooltip("How far, as a fraction of the mouth radius, the density takes to climb out of the eye.\n"
                  "Narrow reads as a violent storm; wide reads as a slow one."),
-    floatField("eyeWallGain", "Eye wall", 0.0f, 8.0f, 0.0f, 3.0f, GET(e.vortex.eyeWallGain),
-               SETF(e.vortex.eyeWallGain)).main()
+    floatField("eyeWallGain", "Eye wall", 0.0f, 8.0f, 0.0f, 3.0f, GET(e.vortex.field.eyeWallGain),
+               SETF(e.vortex.field.eyeWallGain)).main()
         .tooltip("How much denser the ring around the eye is than the body of the storm. This is the\n"
                  "control that makes the silhouette read as a cyclone rather than as a hole in a cloud.\n"
                  "It raises the overall thickness of the medium as well, so check Thickness after it."),
     // Arm count is a float because every field in this table is, and because a route sweeping it
     // continuously is a legitimate thing to want -- the band term is a cosine and does not care
     // whether the count is whole.
-    floatField("bandArms", "Spiral arms", 0.0f, 24.0f, 0.0f, 8.0f, GET(e.vortex.bandArms),
-               SETF(e.vortex.bandArms)).fmt("%.0f").main()
+    floatField("bandArms", "Spiral arms", 0.0f, 24.0f, 0.0f, 8.0f, GET(e.vortex.field.bandArms),
+               SETF(e.vortex.field.bandArms)).fmt("%.0f").main()
         .tooltip("How many spiral bands wind out of the eye. 0 switches the bands off and leaves the\n"
                  "envelope smooth, which is what it was before. Two or three reads as a hurricane; more\n"
                  "reads as a galaxy."),
     // Clamped to 2..80 degrees where it is packed: 0 is a circle and 90 is a radial spoke, and
     // neither of those is a band. The hard range says so rather than letting a route find out.
     floatField("bandPitchDegrees", "Arm pitch", 2.0f, 80.0f, 8.0f, 40.0f,
-               GET(e.vortex.bandPitchDegrees), SETF(e.vortex.bandPitchDegrees)).fmt("%.0f deg").main()
+               GET(e.vortex.field.bandPitchDegrees), SETF(e.vortex.field.bandPitchDegrees)).fmt("%.0f deg").main()
         .tooltip("How tightly the arms wind: the angle an arm makes with the circle it crosses. Real\n"
                  "rainbands run 10 to 25 degrees. Small is tightly coiled, large is nearly radial."),
-    floatField("bandDepth", "Arm contrast", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.bandDepth),
-               SETF(e.vortex.bandDepth)).main()
+    floatField("bandDepth", "Arm contrast", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.bandDepth),
+               SETF(e.vortex.field.bandDepth)).main()
         .tooltip("How much denser a band is than the gap beside it. The bands cost nothing to sample and\n"
                  "cannot alias, so this is the control to reach for before Filaments or Fine detail."),
-    floatField("bandHarmonic", "Arm detail", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.bandHarmonic),
-               SETF(e.vortex.bandHarmonic)).main()
+    floatField("bandHarmonic", "Arm detail", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.bandHarmonic),
+               SETF(e.vortex.field.bandHarmonic)).main()
         .tooltip("Adds two finer sets of arms inside the main ones, at a third and a ninth of the\n"
                  "contrast. Structure rather than noise: it survives freezing time and going monochrome."),
     // §53's failure test as a control. The whole of 0..1 is usable and 0 is the diagnostic §5 asks
     // to be shown, so the soft range is the hard range.
-    floatField("cloudNoise", "Cloud noise", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.cloudNoise),
-               SETF(e.vortex.cloudNoise)).main()
+    floatField("cloudNoise", "Cloud noise", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.cloudNoise),
+               SETF(e.vortex.field.cloudNoise)).main()
         .tooltip("The weight of the whole noise stack against a smooth medium. At 0 you see the cyclone's\n"
                  "structure alone -- eye, wall, arms, funnel -- with no detail on it at all. That render\n"
                  "is the test: if it is not already impressive at 0, no amount of detail will save it."),
     // ADR-389, the smoke controls. Soft ranges are the whole of the useful span in each case,
     // because a modulation route clamps to the HARD range and a slider whose interesting region is
     // in its first hair is the `scene/windSpeed` defect.
-    floatField("smokeWarp", "Smoke", 0.0f, 8.0f, 0.0f, 2.0f, GET(e.vortex.smokeWarp),
-               SETF(e.vortex.smokeWarp)).main()
+    floatField("smokeWarp", "Smoke", 0.0f, 8.0f, 0.0f, 2.0f, GET(e.vortex.field.smokeWarp),
+               SETF(e.vortex.field.smokeWarp)).main()
         .tooltip("Drags the fine detail into the big swirl instead of letting it sit on top as speckle.\n"
                  "The single control that decides whether this reads as smoke or as noise -- raise it\n"
                  "first, before reaching for anything else here."),
-    floatField("smokeBillow", "Billow", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.smokeBillow),
-               SETF(e.vortex.smokeBillow)).main()
+    floatField("smokeBillow", "Billow", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.smokeBillow),
+               SETF(e.vortex.field.smokeBillow)).main()
         .tooltip("0 is wispy and filamentary; 1 is rounded, puffy masses with creases between them.\n"
                  "The difference between a nebula and a smoke column."),
-    floatField("detail", "Fine detail", 0.0f, 2.0f, 0.0f, 1.0f, GET(e.vortex.detail),
-               SETF(e.vortex.detail)).main()
+    floatField("detail", "Fine detail", 0.0f, 2.0f, 0.0f, 1.0f, GET(e.vortex.field.detail),
+               SETF(e.vortex.field.detail)).main()
         .tooltip("Weight of the finest noise octave. Detail below what the volume march can sample is\n"
                  "faded out automatically, so raising this past the point where it stops changing the\n"
                  "picture means the march is the limit, not this."),
@@ -133,38 +133,38 @@ constexpr EffectField kFields[] = {
     // The centre is three parameters and one `"center": [x, y, z]` in the file -- a numeric JSON
     // segment indexes the array, which is how the registry serves a vec3 the file writes as one key
     // and the parameter system must see as three automatable numbers.
-    floatField("centerX", "Centre X", -1e5f, 1e5f, -500.0f, 500.0f, GET(e.vortex.center.x),
-               SETF(e.vortex.center.x)).json("center/0").fmt("%.1f m").sec("Placement"),
-    floatField("centerY", "Centre Y", -1e5f, 1e5f, -2000.0f, 500.0f, GET(e.vortex.center.y),
-               SETF(e.vortex.center.y)).json("center/1").fmt("%.1f m"),
-    floatField("centerZ", "Centre Z", -1e5f, 1e5f, -500.0f, 500.0f, GET(e.vortex.center.z),
-               SETF(e.vortex.center.z)).json("center/2").fmt("%.1f m")
+    floatField("centerX", "Centre X", -1e5f, 1e5f, -500.0f, 500.0f, GET(e.vortex.field.center.x),
+               SETF(e.vortex.field.center.x)).json("center/0").fmt("%.1f m").sec("Placement"),
+    floatField("centerY", "Centre Y", -1e5f, 1e5f, -2000.0f, 500.0f, GET(e.vortex.field.center.y),
+               SETF(e.vortex.field.center.y)).json("center/1").fmt("%.1f m"),
+    floatField("centerZ", "Centre Z", -1e5f, 1e5f, -500.0f, 500.0f, GET(e.vortex.field.center.z),
+               SETF(e.vortex.field.center.z)).json("center/2").fmt("%.1f m")
         .tooltip("Where the mouth of the funnel sits in the world. A particle system that names this\n"
                  "vortex as its attractor follows it here, so the island and the funnel stay related\n"
                  "when either of them moves."),
-    floatField("thickness", "Wall thickness", 0.1f, 5000.0f, 5.0f, 600.0f, GET(e.vortex.thickness),
-               SETF(e.vortex.thickness)).fmt("%.0f m").log().sec("Shape"),
-    floatField("throat", "Throat", 0.02f, 1.0f, 0.05f, 1.0f, GET(e.vortex.throat),
-               SETF(e.vortex.throat)).fmt("%.2f of mouth"),
-    floatField("throatDensity", "Throat thickness", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.throatDensity),
-               SETF(e.vortex.throatDensity)),
-    floatField("innerVoid", "Eye radius", 0.0f, 0.95f, 0.0f, 0.6f, GET(e.vortex.innerVoid),
-               SETF(e.vortex.innerVoid)).main().sec("Cyclone structure")
+    floatField("thickness", "Wall thickness", 0.1f, 5000.0f, 5.0f, 600.0f, GET(e.vortex.field.thickness),
+               SETF(e.vortex.field.thickness)).fmt("%.0f m").log().sec("Shape"),
+    floatField("throat", "Throat", 0.02f, 1.0f, 0.05f, 1.0f, GET(e.vortex.field.throat),
+               SETF(e.vortex.field.throat)).fmt("%.2f of mouth"),
+    floatField("throatDensity", "Throat thickness", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.throatDensity),
+               SETF(e.vortex.field.throatDensity)),
+    floatField("innerVoid", "Eye radius", 0.0f, 0.95f, 0.0f, 0.6f, GET(e.vortex.field.innerVoid),
+               SETF(e.vortex.field.innerVoid)).main().sec("Cyclone structure")
         .tooltip("The clear centre of the storm, as a fraction of the mouth radius. This is the same\n"
                  "number the Advanced section used to call Inner void; it is here because with a wall\n"
                  "around it it is no longer a detail, it is the shape of the thing."),
-    floatField("contrast", "Contrast", 0.05f, 12.0f, 0.5f, 5.0f, GET(e.vortex.contrast),
-               SETF(e.vortex.contrast)),
-    floatField("turbulence", "Turbulence", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.turbulence),
-               SETF(e.vortex.turbulence)).sec("Motion"),
+    floatField("contrast", "Contrast", 0.05f, 12.0f, 0.5f, 5.0f, GET(e.vortex.field.contrast),
+               SETF(e.vortex.field.contrast)),
+    floatField("turbulence", "Turbulence", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.turbulence),
+               SETF(e.vortex.field.turbulence)).sec("Motion"),
     floatField("turbulenceScale", "Turbulence scale", 0.001f, 40.0f, 0.1f, 8.0f,
-               GET(e.vortex.turbulenceScale), SETF(e.vortex.turbulenceScale)),
-    floatField("breathAmount", "Breath amount", 0.0f, 1.0f, 0.0f, 0.3f, GET(e.vortex.breathAmount),
-               SETF(e.vortex.breathAmount))
+               GET(e.vortex.field.turbulenceScale), SETF(e.vortex.field.turbulenceScale)),
+    floatField("breathAmount", "Breath amount", 0.0f, 1.0f, 0.0f, 0.3f, GET(e.vortex.field.breathAmount),
+               SETF(e.vortex.field.breathAmount))
         .tooltip("Applied to the RADIUS rather than to the density, so the silhouette moves.\n"
                  "Scaling density alone just pulses the brightness."),
-    floatField("breathSpeed", "Breath speed", 0.0f, 4.0f, 0.0f, 1.0f, GET(e.vortex.breathSpeed),
-               SETF(e.vortex.breathSpeed)),
+    floatField("breathSpeed", "Breath speed", 0.0f, 4.0f, 0.0f, 1.0f, GET(e.vortex.field.breathSpeed),
+               SETF(e.vortex.field.breathSpeed)),
     floatField("cometResponse", "Comet light", 0.0f, 8.0f, 0.0f, 2.0f, GET(e.vortex.cometResponse),
                SETF(e.vortex.cometResponse)).sec("Comet response"),
     floatField("cometReach", "Comet reach", 1.0f, 40.0f, 1.0f, 12.0f, GET(e.vortex.cometReach),
@@ -190,24 +190,24 @@ bool applyStyle(AtmosphericEffect& e, std::string_view style) {
     // Every style writes every field it touches, for the reason the comet's does: a style that
     // leaves the previous one's throat behind reads as the preset being broken.
     // `center` is deliberately not written -- see the header.
-    const glm::vec3 keep = v.center;
+    const glm::vec3 keep = v.field.center;
     v = Vortex{};
-    v.center = keep;
+    v.field.center = keep;
     if (style == kStyleNames[0]) { // Cosmic Funnel -- the Tree of Life's
-        v.radius = 200.0f;
-        v.thickness = 70.0f;
-        v.funnelDepth = 1500.0f;
-        v.throat = 0.1f;
-        v.throatDensity = 0.55f;
-        v.swirl = 6.5f;
-        v.rotationSpeed = 0.028f;
+        v.field.radius = 200.0f;
+        v.field.thickness = 70.0f;
+        v.field.funnelDepth = 1500.0f;
+        v.field.throat = 0.1f;
+        v.field.throatDensity = 0.55f;
+        v.field.swirl = 6.5f;
+        v.field.rotationSpeed = 0.028f;
         v.density = 0.0013f;
-        v.innerVoid = 0.24f;
-        v.contrast = 3.6f;
-        v.turbulence = 0.65f;
-        v.turbulenceScale = 2.4f;
-        v.breathAmount = 0.05f;
-        v.breathSpeed = 0.18f;
+        v.field.innerVoid = 0.24f;
+        v.field.contrast = 3.6f;
+        v.field.turbulence = 0.65f;
+        v.field.turbulenceScale = 2.4f;
+        v.field.breathAmount = 0.05f;
+        v.field.breathSpeed = 0.18f;
         v.emission = 0.04f;
         v.filaments = 2.2f;
         v.spill = 2.5f;
@@ -219,20 +219,20 @@ bool applyStyle(AtmosphericEffect& e, std::string_view style) {
         return true;
     }
     if (style == kStyleNames[1]) { // Shallow Disc
-        v.radius = 260.0f;
-        v.thickness = 45.0f;
-        v.funnelDepth = 0.0f;
-        v.throat = 0.25f;
-        v.throatDensity = 0.6f;
-        v.swirl = 4.2f;
-        v.rotationSpeed = 0.045f;
+        v.field.radius = 260.0f;
+        v.field.thickness = 45.0f;
+        v.field.funnelDepth = 0.0f;
+        v.field.throat = 0.25f;
+        v.field.throatDensity = 0.6f;
+        v.field.swirl = 4.2f;
+        v.field.rotationSpeed = 0.045f;
         v.density = 0.0016f;
-        v.innerVoid = 0.30f;
-        v.contrast = 2.6f;
-        v.turbulence = 0.45f;
-        v.turbulenceScale = 2.0f;
-        v.breathAmount = 0.06f;
-        v.breathSpeed = 0.22f;
+        v.field.innerVoid = 0.30f;
+        v.field.contrast = 2.6f;
+        v.field.turbulence = 0.45f;
+        v.field.turbulenceScale = 2.0f;
+        v.field.breathAmount = 0.06f;
+        v.field.breathSpeed = 0.22f;
         v.emission = 0.05f;
         v.filaments = 1.6f;
         v.spill = 2.0f;
@@ -244,20 +244,20 @@ bool applyStyle(AtmosphericEffect& e, std::string_view style) {
         return true;
     }
     if (style == kStyleNames[2]) { // Deep Maelstrom
-        v.radius = 170.0f;
-        v.thickness = 95.0f;
-        v.funnelDepth = 2600.0f;
-        v.throat = 0.06f;
-        v.throatDensity = 0.75f;
-        v.swirl = 9.0f;
-        v.rotationSpeed = 0.020f;
+        v.field.radius = 170.0f;
+        v.field.thickness = 95.0f;
+        v.field.funnelDepth = 2600.0f;
+        v.field.throat = 0.06f;
+        v.field.throatDensity = 0.75f;
+        v.field.swirl = 9.0f;
+        v.field.rotationSpeed = 0.020f;
         v.density = 0.0018f;
-        v.innerVoid = 0.18f;
-        v.contrast = 4.4f;
-        v.turbulence = 0.80f;
-        v.turbulenceScale = 3.0f;
-        v.breathAmount = 0.04f;
-        v.breathSpeed = 0.14f;
+        v.field.innerVoid = 0.18f;
+        v.field.contrast = 4.4f;
+        v.field.turbulence = 0.80f;
+        v.field.turbulenceScale = 3.0f;
+        v.field.breathAmount = 0.04f;
+        v.field.breathSpeed = 0.14f;
         v.emission = 0.055f;
         v.filaments = 2.8f;
         v.spill = 3.2f;
@@ -324,7 +324,7 @@ AtmosphericEffect make(std::string name) {
 bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx,
           const ResolvedAtmospheric& base, ResolvedAtmospheric& r) {
     r = base;
-    r.anchor = e.vortex.center;
+    r.anchor = e.vortex.field.center;
     const EffectFlow flow = resolveEffectFlow(e, r.anchor, ctx);
     r.flow = flow.sample;
     r.flowInfluence = flow.influence;

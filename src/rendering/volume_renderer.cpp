@@ -387,11 +387,11 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
             // packing. The appearance slots stay here, where they belong -- `vortex1.w`,
             // `vortex3.zw`, the three colours and `vortex5` are what the picture does with the
             // field and are deliberately not part of it (see core/vortex.hpp's opening note).
-            // ADR-561: the conversion is `world::vortexFieldOf` now, in the library beside
-            // the struct. It used to be written out here and nowhere else, which made it
-            // the one step of this pipeline the CPU suite could not call -- ADR-401's
-            // finding about `packVortex` itself, one call site earlier.
-            const vortex::VortexUniforms f = vortex::packVortex(world::vortexFieldOf(v));
+            // ADR-562: there is no conversion left to get wrong. `world::Vortex` composes
+            // `vortex::VortexField`, so the field IS the field -- ADR-561 moved the
+            // twenty-four-member copy out of this file so a test could reach it, and this
+            // deletes it instead.
+            const vortex::VortexUniforms f = vortex::packVortex(v.field);
             u.vortex0 = f.v0;
             // `.w` is the per-metre extinction -- appearance, so it is added here rather than
             // being carried through the field (ADR-374: every quantity entering a march is per

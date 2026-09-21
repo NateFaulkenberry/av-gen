@@ -3804,25 +3804,22 @@ void Engine::publishFields() {
         if (e.kind != world::AtmosphereKind::Vortex || !e.enabled || !e.vortex.active()) {
             continue;
         }
-        vortex::VortexField f;
-        f.center = e.vortex.center;
-        f.radius = e.vortex.radius;
-        f.thickness = e.vortex.thickness;
-        f.funnelDepth = e.vortex.funnelDepth;
-        f.throat = e.vortex.throat;
-        f.throatDensity = e.vortex.throatDensity;
-        f.swirl = e.vortex.swirl;
-        f.rotationSpeed = e.vortex.rotationSpeed;
-        f.innerVoid = e.vortex.innerVoid;
-        f.contrast = e.vortex.contrast;
-        f.turbulence = e.vortex.turbulence;
-        f.turbulenceScale = e.vortex.turbulenceScale;
-        f.breathAmount = e.vortex.breathAmount;
-        f.breathSpeed = e.vortex.breathSpeed;
-        f.smokeWarp = e.vortex.smokeWarp;
-        f.smokeBillow = e.vortex.smokeBillow;
-        f.detail = e.vortex.detail;
-        fieldBus_.publishVortex(world::fields::vortexFieldName(e.name), vortex::packVortex(f));
+        // ADR-562, and this site was BROKEN before it. It hand-copied `world::Vortex` into a
+        // `vortex::VortexField` member by member -- and copied **17 of the 24**, omitting
+        // `eyeWallWidth`, `eyeWallGain`, `bandArms`, `bandPitchDegrees`, `bandDepth`,
+        // `bandHarmonic` and `cloudNoise`: every one of Vortex 2.0's macro-structure controls.
+        //
+        // So the field this bus PUBLISHED was a different shape from the one the march drew -- no
+        // eye wall, no spiral bands, the fBM stack at full weight -- and anything subscribing to a
+        // vortex through `fieldBus_` has been following a funnel that does not exist on screen.
+        // ADR-388's whole premise is one description of the medium that everything can ask; a
+        // second hand-written copy of it is how that premise quietly stops being true, which is
+        // ADR-401's finding for the third time in this family (the renderer's clamps, then the
+        // renderer's conversion, now this).
+        //
+        // Composing the field removes the copy rather than correcting it. There is nothing left
+        // here to fall behind.
+        fieldBus_.publishVortex(world::fields::vortexFieldName(e.name), vortex::packVortex(e.vortex.field));
     }
 
     // The loud half. A subscription naming a field nobody publishes is this repository's signature

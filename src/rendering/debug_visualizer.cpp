@@ -358,30 +358,30 @@ void buildVortexDebug(DebugDraw& draw, const scene::Scene& scene, double time) {
         for (int i = 0; i < n; ++i) {
             const float a0 = 6.2831853f * static_cast<float>(i) / n;
             const float a1 = 6.2831853f * static_cast<float>(i + 1) / n;
-            draw.line(v.center + glm::vec3(std::cos(a0) * radius, y, std::sin(a0) * radius),
-                      v.center + glm::vec3(std::cos(a1) * radius, y, std::sin(a1) * radius), c);
+            draw.line(v.field.center + glm::vec3(std::cos(a0) * radius, y, std::sin(a0) * radius),
+                      v.field.center + glm::vec3(std::cos(a1) * radius, y, std::sin(a1) * radius), c);
         }
     };
-    ring(0.0f, v.radius, mouthColour);
+    ring(0.0f, v.field.radius, mouthColour);
     // The funnel's wall, sampled down the throat exactly as `vortexShape` narrows it, so this view
     // and the shader cannot disagree about the shape.
-    const float depth = std::max(v.funnelDepth, 0.0f);
+    const float depth = std::max(v.field.funnelDepth, 0.0f);
     if (depth > 0.0f) {
         const int rungs = 6;
         for (int i = 1; i <= rungs; ++i) {
             const float yn = static_cast<float>(i) / rungs;
-            const float mouth = glm::mix(1.0f, std::clamp(v.throat, 0.02f, 1.0f), yn * yn);
-            ring(-depth * yn, v.radius * mouth, glm::mix(mouthColour, throatColour, yn));
+            const float mouth = glm::mix(1.0f, std::clamp(v.field.throat, 0.02f, 1.0f), yn * yn);
+            ring(-depth * yn, v.field.radius * mouth, glm::mix(mouthColour, throatColour, yn));
         }
-        draw.line(v.center, v.center - glm::vec3(0.0f, depth, 0.0f), throatColour);
+        draw.line(v.field.center, v.field.center - glm::vec3(0.0f, depth, 0.0f), throatColour);
     }
     // Which way it turns, and how hard: tangents on the mouth ring, length by rotation speed.
     const int arrows = 12;
     for (int i = 0; i < arrows; ++i) {
         const float a = 6.2831853f * static_cast<float>(i) / arrows;
-        const glm::vec3 p = v.center + glm::vec3(std::cos(a), 0.0f, std::sin(a)) * v.radius;
+        const glm::vec3 p = v.field.center + glm::vec3(std::cos(a), 0.0f, std::sin(a)) * v.field.radius;
         const glm::vec3 tangent(-std::sin(a), 0.0f, std::cos(a));
-        const float turn = v.rotationSpeed * 400.0f;
+        const float turn = v.field.rotationSpeed * 400.0f;
         draw.line(p, p + tangent * turn, glm::vec4(1.0f, 0.9f, 0.4f, 0.9f));
     }
     (void)time;
