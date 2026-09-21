@@ -232,18 +232,19 @@ TEST_CASE("§28: hysteresis stops thrashing without refusing to adapt", "[loop][
         }
     }
 
-    // **The dial does something at 100, and nothing at all at its shipping 0.05.** `heldByMargin`
-    // is 0 for margins 0.00, 0.05 and 0.50, and switches equals searches at every one of them --
-    // so **every search changes the motion**, which is precisely the thrashing §28 exists to
-    // prevent, happening at the defaults. Only at a margin of 100 does anything get held (15 of
-    // 150).
+    // **The margin is now a fraction of the database's measured cost spread, not raw cost units**,
+    // and that change is what made the table readable: 0.50 (half the spread) holds 6 of 150,
+    // 100.00 (a hundred spreads) holds 147. Before the unit change the same dial held nothing until
+    // 100 and then held indiscriminately, because 0.05 against a spread of 69.72 is four parts in
+    // ten thousand -- a units mismatch, the fog bank's per-metre density defect in a new place.
     //
-    // Two readings are possible and the benchmark cannot separate them: either the margin is far
-    // too small for this cost scale, or a changing request genuinely warrants a change every time.
-    // §23's cost spread (a typical candidate is 69.72 worse than the best) makes the first far more
-    // likely -- a margin of 0.05 against a spread of 69.72 is four parts in ten thousand. Recorded
-    // rather than retuned, because tuning it needs a motion-quality metric this phase does not have
-    // and §21's coverage work says the corpus cannot supply.
+    // **Changing the unit makes the default meaningful, not correct.** 0.05 now means "five percent
+    // of the good-to-typical gap", which is a number a person can reason about; whether five
+    // percent is the right amount still needs a motion-quality metric this phase does not have.
+    //
+    // At 0.05 it still holds nothing, and that is now a statement about the loop rather than about
+    // the units: the continuation is essentially never within five percent of the best match on
+    // this corpus.
     CHECK(hugeMarginSwitches < noMarginSwitches);
     // **And it does not refuse to adapt at its shipping value**, which is §28's explicit second
     // warning and the one a single "fewer switches is better" metric would recommend violating

@@ -472,6 +472,26 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
         }
     }
 
+    // §16/§28's scale, measured once here rather than by each consumer. Sparse -- a few dozen
+    // probes is enough for a scale, and this runs on every database build.
+    {
+        double total = 0.0;
+        int counted = 0;
+        const std::uint32_t probe = std::max(db.sampleCount() / 32u, 1u);
+        for (std::uint32_t s = 0; s < db.sampleCount(); s += probe) {
+            const float* a = db.featuresFor(s);
+            const float* b = db.featuresFor((s + db.sampleCount() / 2u) % db.sampleCount());
+            float typical = 0.0f;
+            for (std::size_t d = 0; d < dim; ++d) {
+                const float delta = a[d] - b[d];
+                typical += delta * delta;
+            }
+            total += typical;
+            ++counted;
+        }
+        db.stats.costSpread = counted > 0 ? static_cast<float>(total / counted) : 0.0f;
+    }
+
     // The rotation-invariant statistic: how much each feature joint's DISTANCE from the body
     // moved. Computed from the raw features before they were standardised, which is why it is
     // gathered in the loop above rather than here -- see `radiusSum`.

@@ -131,12 +131,25 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
             // The continuation's own cost, under the same query, so the comparison is like for
             // like rather than the winner against a remembered number.
             const float* f = db_->featuresFor(follow);
+            // **Weighted, because `match.cost` is.** This summed raw squared deltas while the
+            // search it is compared against applies per-dimension weights (§10) -- so the two were
+            // in different scales and the comparison was invalid. §10 made the weights live for
+            // the first time and nothing here was updated to match; at the default weight vector
+            // the discrepancy is small, which is exactly why it survived.
+            //
+            // A comparison between two costs computed by different formulas is worse than no
+            // comparison: it has a defensible-looking number on both sides.
+            const std::vector<float> dimWeight = scene::motionFeatureWeights(db_->config);
+            const bool weighted = dimWeight.size() == db_->dimension;
             float continueCost = 0.0f;
             for (std::size_t d = 0; d < db_->dimension; ++d) {
                 const float delta = query.features[d] - f[d];
-                continueCost += delta * delta;
+                continueCost += delta * delta * (weighted ? dimWeight[d] : 1.0f);
             }
-            if (match.cost > continueCost - settings_.switchMargin) {
+            // §28: the margin is a fraction of the measured spread, so it is in the cost
+            // function's own scale rather than in raw units that mean nothing without it.
+            const float margin = settings_.switchMargin * db_->stats.costSpread;
+            if (match.cost > continueCost - margin) {
                 chosen = follow;
                 ++counters_.heldByMargin;
             }

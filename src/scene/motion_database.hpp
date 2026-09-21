@@ -163,6 +163,12 @@ struct MotionDatabaseStats {
     // that. Reported rather than silently carried, because a zero-variance column is the same
     // shape of defect as everything else this project has been catching.
     std::uint32_t deadDimensions = 0;
+    // The measured gap between a good match and a typical one, in the cost function's own units.
+    // **This is the scale every cost threshold has to be expressed against**, and it is measured
+    // at build time rather than assumed because it is a property of the corpus and the weights
+    // together -- change either and it moves (ADR-389). §16 uses it as the denominator for search
+    // severity; §28's switch margin is a fraction of it.
+    float costSpread = 0.0f;
     // **Per feature joint, the spread of its DISTANCE from the body, in model units.**
     //
     // A dead-dimension count is necessary and not sufficient, and this is the statistic that says

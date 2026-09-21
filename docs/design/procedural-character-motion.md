@@ -1570,3 +1570,41 @@ switches (ADR-611).
 
 **All three findings are the same category**: mechanisms shipped without the measurement that would
 say whether their defaults are right. Two of the three defaults turn out to be inert.
+
+### §27 is not answered, and §28 was in the wrong units
+
+**§27's honest state is *not answered*, not *answered no*.** C asked whether every-frame search is
+necessary; the benchmark cannot distinguish "it is unnecessary" from "the interval is not in
+control", because `searchInterval` is shadowed by `minimumContinuation` at the defaults. That the
+thing a benchmark was meant to measure is not currently measurable is a legitimate result, and here
+it is worth more than a number would have been.
+
+The remedy is to make the relationship legible at the value rather than in a table:
+`MatchSettings::searchIntervalShadowed()` says when `searchInterval < minimumContinuation`, which is
+the same fix as `MotionCostBreakdown::caveat()` and the coverage report's inline reason — **meet the
+reader at the number**.
+
+**§28 was a units problem, not a tuning problem.** `switchMargin` was 0.05 in *raw cost units*
+against a measured spread of 69.72 — four parts in ten thousand, which could never hold anything —
+while the value that did hold (100) exceeds the entire spread and so holds indiscriminately. **No
+default in raw units could have been right, because the sensible range depends on a scale nobody had
+measured.** That is the fog bank's per-metre density defect in a new place.
+
+It is now a **fraction of `MotionDatabaseStats::costSpread`**, measured at build time from the corpus
+and the weights together, so it tracks both (ADR-389). The dial became readable immediately: 0.50
+holds 6 of 150, 100.00 holds 147. **Changing the unit makes the default meaningful, not correct** —
+what five percent *should* be still needs a motion-quality metric this phase does not have, and that
+distinction is the point.
+
+### And a bug the units work uncovered
+
+`continueCost` — the cost of staying on the current motion, which the margin is compared against —
+summed **raw squared deltas**, while `match.cost` applies per-dimension weights. §10 made those
+weights live for the first time and nothing here was updated to match, so **the two sides of the
+comparison were computed by different formulas.** At the default weight vector the discrepancy is
+small, which is exactly why it survived; fixing it moved the 0.50 row from 3 held to 6.
+
+**A comparison between two costs computed by different formulas is worse than no comparison: it has
+a defensible-looking number on both sides.** This is the second defect §10's weighting change
+created downstream — the first being the coverage resolution it made mutable — and both were found
+by measuring something else.

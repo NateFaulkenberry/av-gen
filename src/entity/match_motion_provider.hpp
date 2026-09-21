@@ -33,6 +33,10 @@ struct MatchSettings {
     // §27. How often to search, in seconds. Between searches the motion continues by following
     // `sampleNext`, which is an array read rather than a scan -- so the cost of motion matching is
     // this frequency times the scan, and not the scan every frame.
+    // **Inert whenever it is below `minimumContinuation`**, which at the defaults it is: a search
+    // needs `sinceSearch >= searchInterval` AND `sinceSearch >= minimumContinuation`, so the later
+    // of the two decides and this one cannot affect anything below 0.2 s. `shadowed()` says so, so
+    // the relationship is legible at the value rather than only in a benchmark table.
     float searchInterval = 0.1f;
     // §29. The minimum a newly chosen motion plays before another search may replace it. Without
     // it a character on a threshold re-selects every search and never commits to anything, which
@@ -41,12 +45,38 @@ struct MatchSettings {
     // §28. A new candidate must beat the continuation by this much to be taken. Hysteresis in
     // cost, complementing the hysteresis in time above: they catch different failures, exactly as
     // the speed band and the dwell timer do in `Gait::select`.
+    // **A fraction of the database's measured cost spread, not raw cost units.**
+    //
+    // This was 0.05 in raw units, and the §28 benchmark showed it held *nothing*: `heldByMargin`
+    // was 0 at 0.00, 0.05 and 0.50, and only a margin of 100 held anything. Set beside the measured
+    // spread -- a typical candidate scores **69.72** worse than the best -- that is not a value a
+    // little too low. **It is a units mismatch**: 0.05 against 69.72 is four parts in ten thousand
+    // and was never going to hold, while the value that does hold is larger than the entire spread
+    // and so holds indiscriminately. No default in raw units could have been right, because the
+    // sensible range depends on a scale nobody had measured.
+    //
+    // That is the fog bank's density defect exactly -- a quantity expressed per-metre when its
+    // meaning depends on a size -- and the fix is the one this phase has now derived three times:
+    // express it against a scale that is a property of the data, so it lands in the right range by
+    // construction and tracks the weights instead of going stale (ADR-389).
+    //
+    // **Changing the unit makes the default meaningful, not correct.** What its value *should* be
+    // still needs a motion-quality metric this phase does not have, and 0.05 here now means "five
+    // percent of the good-to-typical gap", which is a number an artist can reason about.
     float switchMargin = 0.05f;
     scene::MotionCostWeights weights;
     // How strongly the request's desired velocity steers the search, against the pose term. This
     // is the one weight that is about intent rather than about the data, which is why it is a
     // setting and not part of `MotionFeatureConfig`.
     float intentWeight = 1.0f;
+
+    // True when `searchInterval` cannot change the behaviour because `minimumContinuation` is the
+    // later gate. Not an error -- it is a legitimate configuration -- but it is the difference
+    // between "search frequency does not matter" and "this dial is not the one in control", and a
+    // person tuning the first will draw the wrong conclusion without being told.
+    [[nodiscard]] bool searchIntervalShadowed() const {
+        return searchInterval < minimumContinuation;
+    }
 };
 
 class MatchMotionProvider final : public IMotionProvider {
