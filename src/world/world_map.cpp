@@ -7,6 +7,12 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <functional>
+#include <thread>
+#include <mutex>
+#include <cstring>
+#include <unordered_map>
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
@@ -275,7 +281,246 @@ float HeightImage::bilinear(glm::vec2 uv) const {
     return glm::mix(glm::mix(a, b, tx), glm::mix(c, d, tx), ty);
 }
 
+// TEMPORARY DIAGNOSTIC (the interactive-performance pass). `AVGEN_HEIGHT_CENSUS=1` counts every
+// call to `WorldMap::height` and how many distinct (x, z) it was asked about, so that "memoise it,
+// it is a pure function" can be a measurement instead of a plausible sentence. A cache's prize is
+// the repeat rate and nothing else: at one repeat per key there is no cache, however pure the
+// function is. Counts only -- no timing -- so a contended machine cannot move the answer (ADR-170).
+namespace {
+struct HeightCensus {
+    // Locked, and the lock is a finding rather than an inconvenience. The first version of this
+    // census was an unsynchronised map and it died with SIGSEGV before printing anything, because
+    // `WorldMap::height` is called from the job workers as well as the main thread. A memoisation
+    // of it therefore is not "cache a pure function" -- it is shared mutable state on a hot path
+    // reached concurrently, which is a different and much larger proposition. Counts only, so the
+    // mutex costs nothing anybody is measuring.
+    // A perfect cache's hit rate is an upper bound nobody can buy: it needs an entry per distinct
+    // point, and one seek asks about two million of them. What a cache would really be is a small
+    // fixed table, so the census simulates three of them -- direct-mapped, the cheapest thing that
+    // could work -- and reports what each would actually have hit. The gap between the perfect
+    // number and these is the whole difference between "62% of calls repeat" and "a cache is worth
+    // building".
+    static constexpr std::size_t kSimSizes[3] = {4096, 65536, 1048576};
+    std::array<std::vector<std::uint64_t>, 3> simTags;
+    std::array<std::uint64_t, 3> simHits{};
+    std::mutex mutex;
+    std::unordered_map<std::uint64_t, std::uint32_t> seen;
+    std::unordered_map<std::uint64_t, std::uint32_t> threads;
+    std::uint64_t calls = 0;
+    bool on = false;
+    HeightCensus() {
+        const char* v = std::getenv("AVGEN_HEIGHT_CENSUS");
+        on = v != nullptr && v[0] != '\0' && v[0] != '0';
+    }
+    ~HeightCensus() {
+        if (!on || calls == 0) {
+            return;
+        }
+        // Reported inline rather than through reportCensus: this runs during static destruction,
+        // when calling back into a namespace-scope function whose own statics may already be gone
+        // is exactly the kind of thing that turns a diagnostic into a crash at exit.
+        std::uint64_t repeats = 0;
+        std::uint32_t worst = 0;
+        for (const auto& [k, n] : seen) {
+            repeats += n > 1 ? n - 1 : 0;
+            worst = std::max(worst, n);
+        }
+        std::fprintf(stderr,
+                     "HEIGHT CENSUS: %llu calls, %zu distinct (x,z), %llu repeats "
+                     "(%.1f%% of calls would hit a perfect cache), busiest key %u times, "
+                     "called from %zu thread(s)\n",
+                     static_cast<unsigned long long>(calls), seen.size(),
+                     static_cast<unsigned long long>(repeats),
+                     100.0 * static_cast<double>(repeats) / static_cast<double>(calls), worst,
+                     threads.size());
+    }
+};
+HeightCensus& census() {
+    static HeightCensus c;
+    return c;
+}
+
+void reportCensus(HeightCensus& c, const char* label) {
+    if (!c.on || c.calls == 0) {
+        return;
+    }
+    std::uint64_t repeats = 0;
+    std::uint32_t worst = 0;
+    for (const auto& [k, n] : c.seen) {
+        repeats += n > 1 ? n - 1 : 0;
+        worst = std::max(worst, n);
+    }
+    std::fprintf(stderr,
+                 "HEIGHT CENSUS [%s]: %llu calls, %zu distinct (x,z), %llu repeats "
+                 "(%.1f%% perfect), direct-mapped 4K/64K/1M would hit %.1f%%/%.1f%%/%.1f%%, "
+                 "busiest key %u, %zu thread(s)\n",
+                 label, static_cast<unsigned long long>(c.calls), c.seen.size(),
+                 static_cast<unsigned long long>(repeats),
+                 100.0 * static_cast<double>(repeats) / static_cast<double>(c.calls),
+                 100.0 * static_cast<double>(c.simHits[0]) / static_cast<double>(c.calls),
+                 100.0 * static_cast<double>(c.simHits[1]) / static_cast<double>(c.calls),
+                 100.0 * static_cast<double>(c.simHits[2]) / static_cast<double>(c.calls), worst,
+                 c.threads.size());
+}
+} // namespace
+
+void WorldMap::heightCensusMark(const char* label) {
+    HeightCensus& c = census();
+    if (!c.on) {
+        return;
+    }
+    const std::lock_guard<std::mutex> lock(c.mutex);
+    reportCensus(c, label);
+    c.seen.clear();
+    c.threads.clear();
+    for (std::size_t i = 0; i < 3; ++i) {
+        c.simTags[i].clear();
+        c.simHits[i] = 0;
+    }
+    c.calls = 0;
+}
+
+// ---- the height cache (the interactive-performance pass) ----------------------------------------
+//
+// Measured before it was built, because "it is a pure function, memoise it" is a claim of the exact
+// kind ADR-482 is about. `AVGEN_HEIGHT_CENSUS=1` on the authored Glowmere seek:
+//
+//   load: world build, nav bake, scatter   1.82M calls,  3.0% perfect,  0.2% at 4K, 12 threads
+//   one uncapped seek to t = 90 s          2.83M calls, 28.7% perfect, 26.5% at 4K,  1 thread
+//
+// Three things decided the design and none of them were guessable. The **seek is single-threaded**,
+// so the table needs no lock on the path that benefits. A **4,096-entry table takes 26.5 of the
+// 28.7 points** a perfect cache would -- 92% of the ceiling from 32 KB -- because a walker
+// re-samples its own neighbourhood, so the repeats are temporally local and a small table holds
+// them. And the **load phase hits 0.2%**, a lattice swept once, so a cache is worth nothing there
+// and must at least be harmless: `thread_local` makes it so, since the twelve job workers get
+// their own tables and never contend.
+//
+// The entry carries the map's identity and build (`cacheId_`, reassigned by every `prepare()`), so
+// a stale map cannot answer for a fresh one. That is the failure a bit-exactness test cannot see on
+// its own -- both arms would share the staleness -- which is why the test mutates the map between
+// samples rather than only comparing two reads of one.
+namespace {
+struct HeightCacheSlot {
+    std::uint64_t tag = 0; // map identity + build
+    std::uint64_t key = 0; // the two coordinates, bit for bit
+    float value = 0.0f;
+    bool filled = false;
+};
+constexpr std::size_t kHeightCacheSlots = 4096;
+
+std::array<HeightCacheSlot, kHeightCacheSlots>& heightCache() {
+    static thread_local std::array<HeightCacheSlot, kHeightCacheSlots> slots{};
+    return slots;
+}
+
+std::atomic<std::uint64_t>& heightCacheIds() {
+    static std::atomic<std::uint64_t> next{1};
+    return next;
+}
+
+// Which map, if any, this thread is currently promising not to edit. A pointer and not a flag,
+// because the promise is about one map: a scope on map A must not license answering for map B out
+// of the same table.
+const WorldMap*& cachedMap() {
+    static thread_local const WorldMap* map = nullptr;
+    return map;
+}
+} // namespace
+
+WorldMap::HeightCacheScope::HeightCacheScope(const WorldMap& map) : previous_(cachedMap()) {
+    cachedMap() = &map;
+    // Cleared on entry rather than trusted to tag matching. Tags are drawn per `prepare()`, and a
+    // *copy* of a prepared map carries its identity -- which is exactly the defect this scope was
+    // added for, so the scope must not depend on the mechanism that failed. 4,096 slots is a 128 KB
+    // clear, once per replay, against the two million height calls it is protecting.
+    for (auto& slot : heightCache()) {
+        slot.filled = false;
+    }
+}
+
+WorldMap::HeightCacheScope::~HeightCacheScope() { cachedMap() = previous_; }
+
+std::uint64_t nextWorldMapCacheId() { return heightCacheIds().fetch_add(1, std::memory_order_relaxed); }
+
 float WorldMap::height(glm::vec2 p) const {
+    // An unprepared map has no identity, so it is never cached: `prepare()` is what assigns one,
+    // and answering from a table for a map whose features have not been built would be answering
+    // for a different world.
+    // `AVGEN_HEIGHT_CACHE=0` takes the cache out without taking the build apart, so the two arms
+    // can be run back to back in one session. A number for one arm taken now and the other taken an
+    // hour ago is not a comparison on a machine four agents share (ADR-170) -- this pass has
+    // already seen a uniform 2x appear across every row of an unrelated table purely from load.
+    static const bool enabled = [] {
+        const char* v = std::getenv("AVGEN_HEIGHT_CACHE");
+        return v == nullptr || (v[0] != '0' || v[1] != '\0');
+    }();
+    // Outside a scope, or inside one opened for a different map, nothing is cached. This is the
+    // precondition made explicit; see `HeightCacheScope`.
+    if (cacheId_ == 0 || !enabled || cachedMap() != this) {
+        return heightUncached(p);
+    }
+    std::uint64_t kx = 0;
+    std::uint64_t kz = 0;
+    std::memcpy(&kx, &p.x, 4);
+    std::memcpy(&kz, &p.y, 4);
+    const std::uint64_t key = (kx << 32) | kz;
+    // Fibonacci hashing over both coordinates, **and over the map's identity**. Indexing on the raw
+    // bits would put every point of a scan line into a handful of slots, because two nearby floats
+    // differ only in their low mantissa bits -- the table would be the right size and almost
+    // entirely unused.
+    //
+    // Folding `cacheId_` into the index as well as into the tag is not redundancy, and the test
+    // proved it the awkward way. With the identity removed from the **tag alone** the stale-map arm
+    // still passed, because a rebuilt map sends the same coordinate to a different slot and the old
+    // entry is simply never looked at; the arm only failed -- 174 stale heights of 4,225 -- once the
+    // identity came out of the **index** too. So the index carries most of the safety and the tag is
+    // what makes it exact, and anyone who removes just one of them will find only one of them
+    // caught. That is also why the first attempt to show the arm had teeth reported that it did not.
+    const std::size_t slot =
+        static_cast<std::size_t>(((key ^ (cacheId_ * 0x9E3779B97F4A7C15ull)) * 0x9E3779B97F4A7C15ull) >> 40) %
+        kHeightCacheSlots;
+    HeightCacheSlot& entry = heightCache()[slot];
+    if (entry.filled && entry.tag == cacheId_ && entry.key == key) {
+        return entry.value;
+    }
+    const float value = heightUncached(p);
+    entry.tag = cacheId_;
+    entry.key = key;
+    entry.value = value;
+    entry.filled = true;
+    return value;
+}
+
+float WorldMap::heightUncached(glm::vec2 p) const {
+    if (census().on) {
+        std::uint64_t kx = 0;
+        std::uint64_t kz = 0;
+        std::memcpy(&kx, &p.x, 4);
+        std::memcpy(&kz, &p.y, 4);
+        HeightCensus& c = census();
+        const std::lock_guard<std::mutex> lock(c.mutex);
+        ++c.calls;
+        const std::uint64_t key = (kx << 32) | kz;
+        ++c.seen[key];
+        for (std::size_t i = 0; i < 3; ++i) {
+            if (c.simTags[i].empty()) {
+                c.simTags[i].assign(HeightCensus::kSimSizes[i], ~0ull);
+            }
+            // Fibonacci hashing, so the low bits of two nearby coordinates do not collide into one
+            // slot -- a direct-mapped table indexed by raw bits would report a hit rate that is an
+            // artefact of the float layout rather than of the access pattern.
+            const std::size_t slot =
+                static_cast<std::size_t>((key * 0x9E3779B97F4A7C15ull) >> 40) %
+                HeightCensus::kSimSizes[i];
+            if (c.simTags[i][slot] == key) {
+                ++c.simHits[i];
+            } else {
+                c.simTags[i][slot] = key;
+            }
+        }
+        ++c.threads[std::hash<std::thread::id>{}(std::this_thread::get_id())];
+    }
     // Pass one: what the features want here. Collected before the noise is evaluated because the
     // smallest `roughness` any of them asks for damps the noise itself -- that is what makes a
     // river bed smooth without carving a smooth shape out of a rough one and leaving a rim.
@@ -418,6 +663,11 @@ Sample WorldMap::sample(glm::vec2 p, float epsilon) const {
 }
 
 void WorldMap::prepare() {
+    // A fresh identity on every build, never reused. Every cached height taken from the previous
+    // build is thereby unreachable rather than merely unlikely to be asked for again -- the entries
+    // are not cleared (they cannot be; they live in other threads) and they do not need to be,
+    // because no tag will ever match them again.
+    cacheId_ = nextWorldMapCacheId();
     for (Feature& f : features) {
         f.curve = f.smoothing > 0 && f.path.size() >= 3 ? chaikin(f.path, f.smoothing) : std::vector<glm::vec3>{};
         glm::vec2 lo(std::numeric_limits<float>::max());

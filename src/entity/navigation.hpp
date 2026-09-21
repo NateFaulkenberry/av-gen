@@ -192,6 +192,10 @@ public:
     void buildGrid(float cellSize = 4.0f);
     void setGrid(std::shared_ptr<const NavGrid> grid) { grid_ = std::move(grid); }
     [[nodiscard]] const NavGrid* grid() const { return grid_.get(); }
+    // The world this navigator answers about, so a caller that knows it is not editing the map for
+    // a while can say so (`world::WorldMap::HeightCacheScope`). Null on a navigator built without
+    // a map, which is what the flat-ground tests use.
+    [[nodiscard]] const world::WorldMap* map() const { return map_; }
 
     // The surface height at p. Zero when there is no map, so a scene with no terrain still runs
     // its entities on the y = 0 plane rather than refusing to run them at all.

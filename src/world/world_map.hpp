@@ -122,6 +122,9 @@ struct Sample {
     float altitude = 0.0f;    // height as 0..1 over the map's measured range
 };
 
+// Hands out never-reused identities for the height cache's tags.
+[[nodiscard]] std::uint64_t nextWorldMapCacheId();
+
 struct WorldMap {
     std::string name = "world";
     std::uint32_t seed = 1;
@@ -150,6 +153,9 @@ struct WorldMap {
     // Runtime, from prepare(): the height range over a coarse sample of the whole map. Terrain uses
     // it to normalise altitude into a 0..1 the material can blend against, which is why it lives
     // here rather than being recomputed per chunk -- every chunk must agree on where "high" is.
+    // Identity and build number for the height cache; set by `prepare()`. Not serialised: they
+    // describe this in-memory copy, not the world.
+    std::uint64_t cacheId_ = 0;
     float sampledMinHeight = 0.0f;
     float sampledMaxHeight = 1.0f;
 
@@ -193,6 +199,61 @@ struct WorldMap {
     // required before sampling: the parsers and defaultWorld() call it, so a map built by hand is
     // the only one that has to.
     void prepare();
+    // ---- the height cache's identity (the interactive-performance pass) -------------------------
+    //
+    // A memoisation of `height` is only sound while the map it answers for is the map it was
+    // filled from, and "the map does not change" is a claim, not a fact: `prepare()` rebuilds the
+    // features and any caller may edit them before calling it. So a cached entry carries **which
+    // map** and **which build of it** it came from, and neither is inferred.
+    //
+    // `cacheId_` is drawn from a global counter and never reused, so a second map -- including one
+    // that happens to be allocated at the address a destroyed one had -- cannot be mistaken for the
+    // first. A pointer alone would make that mistake, rarely and silently, which is the class of
+    // defect this pass has spent the night writing ADRs about.
+    [[nodiscard]] std::uint64_t cacheTag() const { return cacheId_; }
+    // The height without the cache in front of it. Public **so that the slow path is something a
+    // shipping build can still run** -- ADR-482's rule is that a contract whose test has to compare
+    // against a path nothing exercises is the contract that rots, and a private uncached body
+    // reachable only from a friend declaration is that shape exactly. `test_terrain_gen` compares
+    // the two bit for bit, including across a map edit, which is the arm that catches a stale
+    // entry rather than a wrong one.
+    [[nodiscard]] float heightUncached(glm::vec2 p) const;
+
+    // ---- the height cache is opt-in, and this is why (ADR-483) ---------------------------------
+    //
+    // The first version cached whenever the map had been `prepare()`d, on the assumption that every
+    // change to a map goes through `prepare()`. **That assumption is false and the suite said so**:
+    // `WorldMap` is a struct of public fields, so
+    //
+    //     WorldMap eroded = plain;   // a copy -- and it carries the identity with it
+    //     eroded.erosion = 1.0f;     // a height-changing edit, no prepare()
+    //
+    // leaves two maps sharing one identity, and the second is answered out of the first's entries.
+    // `erosion redistributes detail without changing the map's identity` failed with a largest
+    // height difference of **exactly 0**, which is the whole of that defect in one number.
+    //
+    // So the precondition is now stated rather than assumed: a caller opens a scope to promise that
+    // *this* map is not edited for its lifetime, and outside a scope nothing is cached. The replay
+    // in `EntityWorld::seek` is such a caller and is where the measured win is; the world build,
+    // which the census showed gains 0.2%, simply never opts in and keeps its twelve threads out of
+    // the table entirely.
+    class HeightCacheScope {
+    public:
+        explicit HeightCacheScope(const WorldMap& map);
+        ~HeightCacheScope();
+        HeightCacheScope(const HeightCacheScope&) = delete;
+        HeightCacheScope& operator=(const HeightCacheScope&) = delete;
+
+    private:
+        const WorldMap* previous_ = nullptr;
+    };
+    // TEMPORARY DIAGNOSTIC. Prints the height-call census since the last mark and resets it, so a
+    // phase can be told from the run that contains it. Without it the number pools the world build
+    // -- a 97x97 survey, a 154x154 nav grid bake, scatter placement -- with the replay, and those
+    // have opposite access patterns: the build sweeps a lattice once and the replay revisits a
+    // walker's neighbourhood. A cache is being considered for the second and would be sized by the
+    // first. No-op unless AVGEN_HEIGHT_CENSUS is set.
+    static void heightCensusMark(const char* label);
     // Altitude as 0..1 over the measured range, which is what a terrain material blends against.
     [[nodiscard]] float altitude01(float h) const {
         return glm::clamp((h - sampledMinHeight) / std::max(sampledMaxHeight - sampledMinHeight, 1e-3f), 0.0f, 1.0f);

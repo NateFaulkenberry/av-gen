@@ -1,4 +1,5 @@
 #include "entity/entity.hpp"
+#include "world/world_map.hpp"
 #include "core/phase2_probe.hpp" // TEMPORARY: ui-responsiveness phase 2
 
 #include "entity/nav_grid.hpp"
@@ -12,6 +13,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include <algorithm>
+#include <optional>
 #include <cmath>
 #include <fstream>
 #include <span>
@@ -988,6 +990,18 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
     probe2::frame().entitySimSteps += steps;
     probe2::frame().entitySimBodies += seekWork_.bodySteps;
     const probe2::Add probeEntitySeek(probe2::frame().entitySeekMs);
+    // ---- the replay promises not to edit the world (ADR-483) ----------------------------------
+    //
+    // This is the caller the height cache exists for, and the only one in the engine that opts in.
+    // A replay integrates entities against a fixed world -- it reads the terrain and never writes
+    // it -- and the census measured 2.83M height calls at a 26.5% hit rate from a 4,096-entry
+    // table across this one call. Opening the scope here rather than making the cache unconditional
+    // is what keeps the world *build* (0.2% hit, twelve threads) out of the table entirely, and it
+    // is what makes the promise auditable: one scope, one function, and the map named in it.
+    std::optional<world::WorldMap::HeightCacheScope> heightCache;
+    if (nav_.map() != nullptr) {
+        heightCache.emplace(*nav_.map());
+    }
 
     // A fixed step, not the frame's. That is what makes the answer a function of `time` alone: a
     // seek that integrated whatever dt the last frame happened to take would land somewhere that
