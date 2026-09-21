@@ -72,8 +72,9 @@ struct VolumeUniforms {
     // ADR-562: the placed media, as lanes. Was twelve named `vortexN` members carrying exactly one
     // medium; a slot is `world::kMediumLanes` `vec4` and there are `world::kMaxMedia` of them, so a
     // second medium is a slot rather than a rewrite. `mediaInfo.x` is how many are live and the
-    // gate; `.y` is each slot's kind tag packed as a float, unused by the march today and read when
-    // a kind needs a different density function.
+    // gate. Each slot's KIND is in its own last lane (`lane[15].x`), not here -- `mediaInfo` is one
+    // `vec4` for the whole uniform and could only ever have held one kind, which is a thing this
+    // comment used to claim it did.
     glm::vec4 mediaInfo;
     glm::vec4 media[world::kMaxMedia * world::kMediumLanes];
 };

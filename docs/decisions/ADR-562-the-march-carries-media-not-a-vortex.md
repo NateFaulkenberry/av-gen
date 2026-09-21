@@ -195,6 +195,107 @@ This one worked because it was **not** derived from anything under test: it asse
 boringly true that the feature's author had no reason to special-case, which is precisely why it was
 still pointing somewhere useful when the author was wrong.
 
+## 8. A measurement taken at the worst case and applied to the best case is wrong in a DIRECTION
+
+The per-slot cost curve is the number that decides four slots versus eight, and the first attempt at
+it was confounded. It is recorded because the failure is instructive rather than embarrassing.
+
+Four media of 500 m radius placed close together, `volume.march` minima under the lock:
+
+| slots | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|
+| min (ms) | 8.19 | 12.06 | 14.55 | **14.02** |
+
+A fourth slot cheaper than a third is not physical if each slot adds work. The linear fit —
+**"7.21 ms fixed + 2.00 ms per slot, eight slots → 23.2 ms"** — is clean, quotable and
+decision-shaped, and it was one message from being reported.
+
+**The arms were wrong, and rendering them is what said so.** n1 and n4 come back as
+indistinguishable pale washes, mean luma 131.2 against 131.4 with n3 at 138.3 — non-monotonic. Four
+large banks close together merge into one volume, so *"another medium"* and *"another medium in a
+region already being marched"* had become the same arm.
+
+### The direction, which matters more than the noise
+
+Even a clean ladder from those arms would have been the wrong evidence. **Four large overlapping
+media filling the frame is where the ray interval helps LEAST** — every ray hits every cylinder, so
+nothing is skipped. The case the decision is about is `agent/tornado`'s §47: seven **small,
+separated** columns, which is where the interval helps **most**.
+
+So the curve would not have been merely imprecise. **It would have argued against eight slots using
+evidence drawn from the opposite geometry.** A measurement taken at the worst case and applied to
+the best case is wrong in a *direction*, not only in magnitude, and that is a distinct failure from
+a noisy number — a noisy number announces itself, a directional one does not.
+
+The second, independent reason: six samples a rung, with rungs 3 and 4's five-lowest spreads
+(14.55–15.53, 14.02–15.73) almost entirely overlapping. **Fixing the geometry without raising the
+sample count would produce a cleaner-looking ladder that is still not separable.**
+
+### The answer, after three more ladders
+
+The sequential ladder above is not the only thing that was wrong with the first attempt. The arms
+were re-cut small and separated -- the geometry the decision is actually about -- and the anomaly
+reappeared **at the same rung with different geometry and three times the samples**, which is when
+it stopped being an arm problem.
+
+Re-run **interleaved**, paired within each repeat (ADR-460's method, which the first ladder did not
+use), `volume.march` minima:
+
+| | 1 medium | 4 media | delta |
+|---|---|---|---|
+| rep 1 | 5.70 | 4.26 | −1.44 |
+| rep 2 | 6.16 | 4.65 | −1.51 |
+| rep 3 (load ~49) | 5.11 | 4.59 | −0.52 |
+
+**Four media measurably cost LESS than one**, in all three repeats. Note rep 3: half the magnitude
+of the others and the same sign, which is what a paired delta does under load -- noisier, not
+biased. **A paired delta's sign is the robust quantity and its magnitude is not.**
+
+The mechanism is `shaders/volume.wgsl`'s `if (transmittance < 0.002) { break; }`. Four media at
+density 0.010 drop a crossing ray's transmittance roughly four times faster, so the march terminates
+earlier and executes fewer steps. Tested by matching optical depth -- four media at a quarter the
+density -- interleaved against one medium:
+
+| arm | mean delta vs 1 medium |
+|---|---|
+| 4 media, full density | **−1.16 ms** |
+| 4 media, matched depth | **−0.24 ms** |
+
+**Diluting removes 79% of the saving.** The early-out is four fifths of the effect.
+
+**The prediction was stated in advance and was the wrong SHAPE.** It was binary -- *matched depth
+must cost more* -- and the result is quantitative. By the letter it refutes; by the magnitudes it
+strongly confirms. Framing a quantitative effect as a yes/no invites reading a supporting result as
+a refutation, which is what happened for several minutes.
+
+The 21% residual is not resolved, and the arm is biased against it: most rays cross **one** dilute
+medium rather than four, so for those rays the dilute arm has a quarter of the single medium's
+optical depth and should have been *more* expensive. The residual is therefore real and its size is
+meaningless.
+
+### So the answer is a regime, not a number
+
+> **Per-slot cost is not additive, and the sign of the marginal depends on optical depth.** Dense
+> media in one frame subsidise each other through the transmittance early-out, and at four they more
+> than pay for themselves. Thin, separated media do not subsidise each other and approach the
+> additive regime, which is where the measured **+0.5 ms per medium** of rungs two and three lives.
+
+That is a better answer than the curve, because it says *when* each regime applies. `agent/tornado`'s
+§47 -- seven thin separated columns -- is the additive regime, so ~+0.5 ms each is the expectation,
+resting on two measured rungs **plus a mechanism that explains why they should be additive** rather
+than on an extrapolation. It is still not an argument for eight slots; four stands until measured.
+
+### What stands, and what caught it
+
+**A second medium costs +3.87 ms on top of the first's 8.19** — at the worst geometry, both arms
+tight. That is a real upper bound on the marginal cost of slot two, and it is directly the owner's
+case (fog plus one vortex) rather than a hypothetical eight.
+
+The defence that worked is `docs/testing.md`'s family-C headline: *when a filter, census or probe
+returns the number you expected, that is when to check it; a surprising number gets checked for
+free.* The fit looked right, which is the only reason it was checked. And the instrument was the one
+ADR-560 already prescribes — **look at the picture before trusting the statistic derived from it.**
+
 ## Consequences
 
 - **`EffectBucket::Vortex` is `EffectBucket::Medium`.** The name was a lie about what the bucket

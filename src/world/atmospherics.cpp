@@ -970,6 +970,18 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
         MediumSlot& slot = out.media[out.mediumCount];
         schema->resolve.pack(leaned, rv.envelope, slot);
         slot.kind = static_cast<std::uint32_t>(rv.effect->kind);
+        // ADR-562: and the kind reaches the SHADER, in the last lane.
+        //
+        // It did not, for a day. `MediumSlot::kind` was set here, compared by `frameDiffers` and
+        // then dropped on the floor by the renderer, which uploaded only the lanes -- so the march
+        // had no way to tell a fog bank from a tornado and every kind got `vortexShapeAt`. The slot
+        // contract said "kind tag" and the tag was unreachable: this branch's own defect family,
+        // one day old, in the foundation written to fix it.
+        //
+        // Set HERE rather than in each kind's `packMedium`, so a new kind cannot forget to. The
+        // lane is the last one precisely because it is the one no kind's parameters will reach
+        // first -- the vortex fills 0-12 and the tornado 0-13.
+        slot.lane[kMediumLanes - 1].x = static_cast<float>(slot.kind);
         ++out.mediumCount;
     }
     // Everything the resolve could not seat. ADR-560: this number had one reader in the whole tree

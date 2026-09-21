@@ -157,22 +157,60 @@ TEST_CASE("a fog bank with its detail at zero still has a field with shape in it
                                             0.0f).density;
     CHECK(high < mid * 0.05f);
 
-    // The STRONG form, which §46 B has to make pass and which is recorded here rather than in a
-    // document so that it is the thing that goes green: with the detail at zero the field must vary
-    // with ANGLE at a fixed radius and height. Today it cannot -- every term in the envelope is a
-    // function of `length(rel.xz)` and `rel.y` alone, and `bandArms` is 0 for a fog bank -- so this
-    // is deliberately asserted the wrong way round, as the "before" that must break when the shape
-    // arrives. If this case starts failing, §46 B has landed and the CHECK below inverts.
+    // The STRONG form, and **it has flipped**. ADR-560 recorded this assertion inverted -- asserting
+    // that the field is uniform in angle -- as the "before" that §46 B had to break. ADR-563 broke
+    // it: a fog bank's footprint is an ELLIPSE now, evaluated by `shaders/fog.wgsl` rather than by
+    // the vortex's field, so at a fixed radius and height the density varies with angle **with the
+    // detail at zero**. That is §44's first quality bar becoming reachable, which is the whole
+    // point of the phase.
+    //
+    // Measured through the packed lanes and the same `fogShapeAt` the march runs, not a copy.
+    world::AtmosphericEffect shaped = fogBank("Valley Mist");
+    shaped.vortex.field.cloudNoise = 0.0f;
+    shaped.values.setFloat("fog/bankLength", 2.5f); // a bank with a long axis
+    world::MediumSlot slot{};
+    const world::EffectSchema& fs = fogSchema();
+    REQUIRE(fs.resolve.pack != nullptr);
+    fs.resolve.pack(shaped, 1.0f, slot);
+
+    // Sampled at 0.9 of the radius, NOT at 0.45, and the difference is a finding rather than a
+    // fitting of the test to the code: with `edgeSoftness` at its default the bank is a flat
+    // plateau out to about 65% of its radius, so the ellipse is visible in the SILHOUETTE and not
+    // in the interior. An honest probe has to sample where the shape actually varies -- the first
+    // version of this assertion sampled the plateau and read a spread of exactly 0, which looks
+    // identical to the ellipse not working.
+    //
+    // That the interior is still flat is §46 B's stated limit: this phase gives a bank an outline,
+    // and the interior structure is §46 C's local volumes and §46 D's height and distance terms.
+    const float r = shaped.vortex.field.radius * 0.9f;
     float lo = 1e30f;
     float hi = -1e30f;
     for (int i = 0; i < 16; ++i) {
         const float a = 6.2831853f * static_cast<float>(i) / 16.0f;
-        const glm::vec3 p = e.vortex.field.center +
-                            glm::vec3(radius * 0.45f * std::cos(a), 0.0f, radius * 0.45f * std::sin(a));
-        const float d = vortex::sampleVortex(u, p, 0.0f).density;
+        const glm::vec3 p = shaped.vortex.field.center +
+                            glm::vec3(r * std::cos(a), 0.0f, r * std::sin(a));
+        const float d = world::fogShapeAt(slot, p);
         lo = std::min(lo, d);
         hi = std::max(hi, d);
     }
-    INFO("angular spread at rr=0.45, detail 0: " << (hi - lo));
-    CHECK(hi - lo == Approx(0.0f).margin(1e-6f)); // ADR-560 §3: it is uniform in angle. Invert here.
+    INFO("angular spread at rr=0.9, detail 0, bankLength 2.5: " << (hi - lo));
+    CHECK(hi - lo > 0.05f); // ADR-563: it varies with angle. Was asserted == 0 before §46 B.
+
+    // ...and the control, or the assertion above would pass on a field that is simply noisy: a
+    // CIRCULAR bank must still be uniform in angle, because that is the shape it is.
+    shaped.values.setFloat("fog/bankLength", 1.0f);
+    world::MediumSlot round{};
+    fs.resolve.pack(shaped, 1.0f, round);
+    float rlo = 1e30f;
+    float rhi = -1e30f;
+    for (int i = 0; i < 16; ++i) {
+        const float a = 6.2831853f * static_cast<float>(i) / 16.0f;
+        const glm::vec3 p = shaped.vortex.field.center +
+                            glm::vec3(r * std::cos(a), 0.0f, r * std::sin(a));
+        const float d = world::fogShapeAt(round, p);
+        rlo = std::min(rlo, d);
+        rhi = std::max(rhi, d);
+    }
+    INFO("angular spread of a CIRCULAR bank: " << (rhi - rlo));
+    CHECK(rhi - rlo == Approx(0.0f).margin(1e-5f));
 }

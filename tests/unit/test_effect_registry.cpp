@@ -411,9 +411,21 @@ TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
         INFO(doc.dump().substr(0, 400));
         REQUIRE(back.has_value());
         CHECK(back->kind == kind);
-        // The fog block aliases the vortex's struct entirely, so it holds nothing of its own.
+        // ADR-563: the fog block is no longer EMPTY, and this assertion changing is the test
+        // reporting a real consequence of that change rather than breaking.
+        //
+        // It used to alias the vortex's struct entirely -- every row absolute -- so it wrote `{}`.
+        // §46 B gave a fog bank six shape controls of its own (`bankLength`, `bankRotation`,
+        // `edgeSoftness`, `groundHug`, `heightFalloff`, `domeShape`), and they live in
+        // `EffectValueStore` because `world::Vortex` is shared with the tornado. Stored rows
+        // serialise their defaults, exactly as the shower's six do.
+        //
+        // The consequence worth stating: **every effect of every kind now writes six more numbers
+        // in its `fog` block**, because `toJson` writes every kind's block. They are defaults, so
+        // nothing loads differently -- which is the property this case exists to check and still
+        // checks, one line down.
         REQUIRE(doc.contains("fog"));
-        CHECK(doc["fog"].empty());
+        CHECK(doc["fog"].size() == 6);
         // The shower block holds only its six own numbers.
         REQUIRE(doc.contains("meteors"));
         CHECK(doc["meteors"].size() == 6);
