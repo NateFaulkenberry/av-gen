@@ -13,8 +13,8 @@
                "kind": "composition",
                "path": {
                  "path": "glowmere-atmospherics.scene.json",
-                 "sha256": "ffe225be72b5546b03ec73a24f159476e2315384ed0a896a2d461ca568f07ed8",
-                 "size": 235327
+                 "sha256": "f9028f6617a82e748d7d508139f48ce3996490f0e6189757876e55fdbceaf618",
+                 "size": 235297
                }
              }
   },
