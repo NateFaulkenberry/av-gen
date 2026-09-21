@@ -10073,8 +10073,22 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         if (!weight) return std::unexpected(weight.error());
                         layer.name = *lname;
                         if (!poseLayerKindFromName(*kind, layer.kind)) {
-                            return fail("node '{}': animation layer '{}': unknown kind '{}' (aim, additive)",
-                                        node.name, layer.name, *kind);
+                            // The list is generated rather than written out. It said
+                            // "(aim, additive)" while the engine had supported `foot` for a whole
+                            // phase -- a hand-maintained enumeration in an error message is a
+                            // claim about every value that will ever be added, and it was already
+                            // wrong before anyone read it.
+                            std::string known;
+                            for (const PoseLayerKind k :
+                                 {PoseLayerKind::Aim, PoseLayerKind::Additive, PoseLayerKind::Foot,
+                                  PoseLayerKind::Stride, PoseLayerKind::Secondary}) {
+                                if (!known.empty()) {
+                                    known += ", ";
+                                }
+                                known += poseLayerKindName(k);
+                            }
+                            return fail("node '{}': animation layer '{}': unknown kind '{}' ({})",
+                                        node.name, layer.name, *kind, known);
                         }
                         if (!poseLayerDriveFromName(*drive, layer.drive)) {
                             return fail("node '{}': animation layer '{}': unknown drive '{}' (manual, look, "
@@ -10235,18 +10249,42 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                 if (!sole) return std::unexpected(sole.error());
                                 layer.soleUp = *sole;
                             }
-                        } else if (layer.mask.joints.empty()) {
+                        } else if (layer.kind != PoseLayerKind::Stride && layer.mask.joints.empty()) {
+                            // **A stride layer is addressed by `joint`, not by a mask** -- the same
+                            // way a foot layer is addressed by `chain`. Without this exemption the
+                            // check refused every stride layer with "masks no joints", which is the
+                            // third catch-all over this enum to fire tonight: `rebind`'s clip
+                            // lookup, the error message's hand-written kind list, and this.
+                            //
+                            // The pattern is worth naming. A branch that says "anything that is
+                            // not X" is a claim about every value that will ever be added to the
+                            // enum, and it is the author of the *next* value who pays for it.
                             return fail("node '{}': animation layer '{}' masks no joints, so it could only "
                                         "ever do nothing",
                                         node.name, layer.name);
                         }
                         for (const auto& key : entry.items()) {
-                            static constexpr std::array<std::string_view, 19> kLayerKeys{
-                                "name",         "kind",     "drive",         "joints",
-                                "weights",      "descendants", "pivot",      "forward",
-                                "maxYaw",       "maxPitch", "clip",          "clipRate",
-                                "weight",       "chain",    "poleDirection", "footAlign",
-                                "groundOffset", "extension", "soleUp"};
+                            // The size is deduced rather than written, because a hand-kept count
+                            // beside a hand-kept list is two things that can disagree.
+                            static constexpr std::array kLayerKeys{
+                                std::string_view{"name"},      std::string_view{"kind"},
+                                std::string_view{"drive"},     std::string_view{"joints"},
+                                std::string_view{"weights"},   std::string_view{"descendants"},
+                                std::string_view{"pivot"},     std::string_view{"forward"},
+                                std::string_view{"maxYaw"},    std::string_view{"maxPitch"},
+                                std::string_view{"clip"},      std::string_view{"clipRate"},
+                                std::string_view{"weight"},    std::string_view{"chain"},
+                                std::string_view{"poleDirection"}, std::string_view{"footAlign"},
+                                std::string_view{"groundOffset"},  std::string_view{"extension"},
+                                std::string_view{"soleUp"},
+                                // Stride (Phase B §7)
+                                std::string_view{"joint"},     std::string_view{"origin"},
+                                std::string_view{"strideMin"}, std::string_view{"strideMax"},
+                                std::string_view{"strideLift"},
+                                // Secondary motion (Phase B §26-§28)
+                                std::string_view{"degrees"},   std::string_view{"period"},
+                                std::string_view{"phase"},     std::string_view{"spread"},
+                                std::string_view{"stillness"}, std::string_view{"axis"}};
                             if (std::find(kLayerKeys.begin(), kLayerKeys.end(), key.key()) ==
                                 kLayerKeys.end()) {
                                 log::warn("scene file '{}': node '{}': animation layer key '{}' is not one "

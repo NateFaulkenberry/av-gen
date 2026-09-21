@@ -272,17 +272,22 @@ TEST_CASE("probe: what the multicam's pose layers do over ninety seconds",
 }
 
 // ---------------------------------------------------------------------------------------------
-TEST_CASE("The multicam's five aliens carry two pose layers that resolve against their own rigs",
+TEST_CASE("The multicam's five aliens carry a pose stack that resolves against their own rigs",
           "[glowmere][multicam][layers]") {
     // Short: binding happens at load and nothing below depends on the simulation.
     const auto run = playLayers(0.5);
     for (const char* name : kCast) {
         const auto it = run.find(name);
-        INFO(name << ": the film's scene authors two layers on this node");
+        INFO(name << ": the film's scene authors a pose stack on this node");
         REQUIRE(it != run.end());
         const LayerTrack& t = it->second;
         INFO(name << ": stack of " << t.stackSize);
-        CHECK(t.stackSize == 2);
+        // **Seven, since the Phase D2 integration**, and it was two before it: look and startle,
+        // plus two `foot` layers that plant on terrain, two `stride` layers that shorten the step
+        // to match how fast the body is actually travelling, and one `secondary` layer for idle
+        // life. The number is asserted rather than left open because the failure this whole test
+        // exists to catch is a layer that quietly stops being authored.
+        CHECK(t.stackSize == 7);
         // The three ways a layer is silently nothing. `Inactive` and `NoTarget` are legitimate --
         // they mean "nobody asked it to do anything this frame" -- and the guard must not forbid
         // them or it would forbid a character that is not looking at anything.
@@ -324,7 +329,7 @@ TEST_CASE("A joint name this rig does not carry resolves to nothing, and the fil
     const auto run = playLayers(0.5, json{{"nodes", nodes}}, "misspelt");
     const auto rook = run.find("rook");
     REQUIRE(rook != run.end());
-    REQUIRE(rook->second.maskNamedKept.size() == 2);
+    REQUIRE(rook->second.maskNamedKept.size() >= 2); // aim and startle first; the D2 layers follow
     INFO("rook's misspelt aim mask asked for " << rook->second.maskNamedKept[0].first
                                                << " names and kept "
                                                << rook->second.maskNamedKept[0].second);
@@ -335,7 +340,7 @@ TEST_CASE("A joint name this rig does not carry resolves to nothing, and the fil
     for (const char* name : {"tide", "sage", "ember", "vane"}) {
         const auto it = run.find(name);
         REQUIRE(it != run.end());
-        REQUIRE(it->second.maskNamedKept.size() == 2);
+        REQUIRE(it->second.maskNamedKept.size() >= 2);
         INFO(name << ": aim mask kept " << it->second.maskNamedKept[0].second << " of "
                   << it->second.maskNamedKept[0].first << " names, startle kept "
                   << it->second.maskNamedKept[1].second);
@@ -361,9 +366,13 @@ TEST_CASE("Every one of the film's five aliens turns its head, and the attend po
         // mask that missed looks like, and it is the failure this file exists for.
         CHECK(t.framesLookApplied > 0);
         CHECK(t.maxJoints > 0);
-        // The mask is five names on a rig of eighty-nine joints. A layer writing the whole rig
-        // would satisfy "it moved" and would be the other failure ADR-300 names.
-        CHECK(t.maxJoints <= 5);
+        // A rig of eighty-nine joints, and the stack writes eleven of them: the aim's five-name
+        // mask, plus a three-joint chain for each foot since the Phase D2 integration. **The
+        // bound is the point, not the number** -- a layer writing the whole rig would satisfy "it
+        // moved" and would be the other failure ADR-300 names -- so this stays far below 89 and
+        // moves only when the authored stack does.
+        CHECK(t.maxJoints <= 11);
+        CHECK(t.maxJoints < 20);
         turning += t.framesLookApplied > 0 ? 1 : 0;
     }
     INFO(turning << " of the five turned their heads; before the attend pose carried its subject "
