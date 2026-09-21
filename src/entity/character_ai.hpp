@@ -386,6 +386,10 @@ struct Option {
     bool hasTarget = false;
     float urgency = 0.0f;
     float stoppingDistance = 0.0f;
+    // The `InterestKind` of the place this option goes to, when it is a place (255 otherwise). What
+    // lets a decider remember "I have been to three shorelines in a row" (§22's novelty, one level
+    // up from the single place).
+    std::uint8_t kind = 255;
     // The terms the score is the sum or product of, largest first by convention. Fixed storage: an
     // option is copied into the selector's list every tick and must not allocate.
     std::array<ScoreFactor, 6> factors{};

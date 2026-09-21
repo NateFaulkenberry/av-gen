@@ -381,6 +381,8 @@ struct MindView {
     SubjectId committed = kNoSubject;
     // `habituationSeconds` scale from the personality's attention span.
     float spanScale = 1.0f;
+    // The `InterestKind`s of the last few places this body finished an errand at, oldest first.
+    std::span<const std::uint8_t> recentKinds;
 
     [[nodiscard]] float novelty(SubjectId id, double time) const {
         return memory != nullptr ? memory->novelty(id, time, spanScale) : 1.0f;

@@ -2241,7 +2241,12 @@ void Composition::installEntities() {
         // actually points -- which is the same rule `anchor` already follows for position.
         const glm::vec3 forward = placed.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
         binding.facing = std::atan2(forward.x, forward.z);
-        landmarks.emplace_back(node.name, binding.anchor);
+        // Phase D §23: a terrain is the ground itself, not a place on it. Listed as a landmark it
+        // was a wander destination at its own origin -- both aliens of the autonomy demo opened by
+        // walking "to the ground". Filtered by what the node IS (its kind), never by its name.
+        if (node.kind != NodeKind::Terrain) {
+            landmarks.emplace_back(node.name, binding.anchor);
+        }
         bindings.push_back(std::move(binding));
     }
     // Heroes are landmarks too: "look at the elder" is the natural thing for an author to write,

@@ -796,6 +796,7 @@ InterestConsiderer::InterestConsiderer(const nlohmann::json* settings)
     readTaste(settings, taste_);
     source_ = readString(settings, "source", "perceived") == "omniscient" ? Source::Omniscient
                                                                          : Source::Perceived;
+    variety_ = std::clamp(readFloat(settings, "variety", 0.6f), 0.0f, 1.0f);
 }
 
 void InterestConsiderer::registerParameters(params::ParameterSet& params, const std::string& prefix) {
@@ -880,8 +881,26 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
         o.target = scratch_[i].position;
         o.hasTarget = true;
         o.stoppingDistance = approach_;
+        o.kind = static_cast<std::uint8_t>(scratch_[i].kind);
         o.addFactor("goal", scratch_[i].weight);
         o.addFactor("weight", w);
+        // Variety (§23), aware deciders only. Measured on the autonomy demo before this: a
+        // cautious warden walked eleven shore points in a row, 12-16 m apart, for 80 s. Not the
+        // shore creep (every errand completed) but argmax over a dense kind: shore points are the
+        // nearest unvisited candidates wherever the body stands on a bank, so nearness alone keeps
+        // choosing the next one. A body that has just been to the water three times wants
+        // something else.
+        if (ctx.mind != nullptr && variety_ < 1.0f) {
+            int repeats = 0;
+            for (const std::uint8_t k : ctx.mind->recentKinds) {
+                repeats += k == o.kind ? 1 : 0;
+            }
+            if (repeats > 0) {
+                const float v = std::pow(variety_, static_cast<float>(repeats));
+                o.score *= v;
+                o.addFactor("variety", v);
+            }
+        }
     }
 }
 

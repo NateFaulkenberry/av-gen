@@ -2324,6 +2324,7 @@ public:
         factorsText_.clear();
         attentionName_.clear();
         attentionNameFor_ = kNoSubject;
+        recentKinds_.clear();
     }
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
@@ -2374,6 +2375,12 @@ public:
             ctx.actions->drained(Authority::Routine).serial == planSerial_) {
             const ActionQueue::Drained& drained = ctx.actions->drained(Authority::Routine);
             lastOutcome_ = drained.failed ? "failed: " + drained.reason : "completed";
+            if (!drained.failed && committed_.kind != 255) {
+                recentKinds_.push_back(committed_.kind);
+                while (recentKinds_.size() > kRecentKinds) {
+                    recentKinds_.erase(recentKinds_.begin());
+                }
+            }
             if (committed_.subject != kNoSubject) {
                 if (drained.failed) {
                     objects_.failed(committed_.subject, ctx.time);
@@ -2640,6 +2647,7 @@ private:
         view_.tags = &world.semanticTags();
         view_.committed = committed_.subject;
         view_.spanScale = 0.5f + personality_.attentionSpan;
+        view_.recentKinds = recentKinds_;
 
         AttentionModel::Inputs in;
         in.percepts = dctx.percepts;
@@ -2728,6 +2736,7 @@ private:
         committed_.urgency = winner.urgency;
         committed_.stoppingDistance = winner.stoppingDistance;
         committed_.score = winner.score;
+        committed_.kind = winner.kind;
         committed_.subjectName =
             winner.subject != kNoSubject ? describeSubject(*ctx.world, winner.subject) : std::string();
         planSerial_ = winner.actions.empty() ? 0 : ctx.actions->serial(Authority::Routine);
@@ -2848,6 +2857,7 @@ private:
         float urgency = 0.0f;
         float stoppingDistance = 0.0f;
         float score = 0.0f;
+        std::uint8_t kind = 255;
         std::string subjectName;
     };
     Committed committed_{};
@@ -2856,6 +2866,8 @@ private:
     std::string attentionName_;
     SubjectId attentionNameFor_ = kNoSubject;
     static constexpr std::size_t kHistoryCapacity = 256;
+    static constexpr std::size_t kRecentKinds = 4;
+    std::vector<std::uint8_t> recentKinds_;
     std::vector<DecisionTraceEntry> history_;
     std::size_t historyTotal_ = 0;
     PerceptMemory memory_;

@@ -437,6 +437,9 @@ public:
 private:
     GoalTaste taste_{};
     Source source_ = Source::Perceived;
+    // Phase D §22/§23, aware deciders only: each recent errand to the same *kind* of place
+    // multiplies that kind's candidates by this. 1 = no preference for variety.
+    float variety_ = 0.6f;
     std::string activity_;
     float approach_ = 0.0f;
     double dwell_ = 0.0;

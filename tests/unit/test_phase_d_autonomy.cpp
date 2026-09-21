@@ -1247,3 +1247,138 @@ TEST_CASE("an injected goal is taken up when it opens, executed by the character
     REQUIRE(ended > first);
     CHECK_FALSE(again);        // once done, not repeated while the window is still open
 }
+
+// ---- §43 adversarial: an unreachable target does not become an infinite approach ---------------
+
+TEST_CASE("a glowing thing inside a rock is tried, fails, and is left alone rather than retried forever",
+          "[entity][phaseD][adversarial]") {
+    if (!assetsPresent()) {
+        WARN("assets missing; skipping");
+        return;
+    }
+    const auto run = [](float capacity, std::size_t& attempts, std::size_t& decisions) {
+        nlohmann::json doc = demoJson();
+        // A third glowing mushroom, planted in the middle of rock-1: every stand-off point is solid.
+        doc["nodes"].push_back(nlohmann::json{{"name", "mushroom-x"},
+                                              {"kind", "gltf"},
+                                              {"asset", "../../../assets/kenney/mushroom_red.glb"},
+                                              {"position", {-48.0, 0.0, -20.0}},
+                                              {"scale", {1.0, 1.0, 1.0}}});
+        doc["entities"].push_back(nlohmann::json{{"name", "mushroom-x"}, {"node", "mushroom-x"},
+                                                 {"tags", {"mushroom", "glowing"}}});
+        for (auto& e : doc["entities"]) {
+            if (e["name"] == "scout") {
+                for (auto& b : e["behaviors"]) {
+                    if (b["kind"] == "decide") {
+                        b["mind"]["memory"]["capacity"] = capacity;
+                    }
+                }
+            }
+        }
+        World w(doc);
+        REQUIRE(w.world().navigator().obstructed(glm::vec2(-48.0f, -20.0f), 0.0f)); // it is inside
+        attempts = 0;
+        std::size_t seen = 0;
+        w.play(120.0, [&] {
+            const DecisionDebug d = w.decision("scout");
+            for (std::size_t k = seen; k < d.historyTotal; ++k) {
+                const std::size_t back = d.historyTotal - 1 - k;
+                if (back < d.history.size() &&
+                    d.history[d.history.size() - 1 - back].subject == "mushroom-x") {
+                    ++attempts;
+                }
+            }
+            seen = d.historyTotal;
+        });
+        decisions = w.decision("scout").historyTotal;
+    };
+    std::size_t attempts = 0;
+    std::size_t decisions = 0;
+    run(24.0f, attempts, decisions);
+    INFO("attempts " << attempts << " of " << decisions << " decisions");
+    // It may try -- it cannot know the rock is solid until it asks the planner -- but a failed
+    // target is suppressed for `failSeconds`, so in 120 s at most one attempt per 30 s window.
+    CHECK(attempts >= 1);
+    CHECK(attempts <= 5);
+    CHECK(decisions > attempts + 4); // and it was never stuck on it
+
+    // Control: with no object memory (no failure suppression, no habituation) the same scout goes
+    // back to the impossible target again and again -- §59's "unbounded path retries", which is
+    // what the memory is there to stop.
+    std::size_t retries = 0;
+    std::size_t decisions2 = 0;
+    run(0.0f, retries, decisions2);
+    INFO("without memory: " << retries << " attempts");
+    CHECK(retries > attempts * 3);
+}
+
+// ---- §23: the ground is not a destination --------------------------------------------------------
+
+TEST_CASE("a terrain node is not a wander landmark, whatever it is called",
+          "[entity][phaseD][wander]") {
+    if (!assetsPresent()) {
+        WARN("assets missing; skipping");
+        return;
+    }
+    nlohmann::json doc = demoJson();
+    // Renamed, so the filter cannot be keyed on the word "ground".
+    REQUIRE(doc["nodes"][0]["kind"] == "terrain");
+    doc["nodes"][0]["name"] = "meadow";
+    World w(doc);
+    for (const InterestPoint& p : w.world().interestPoints()) {
+        CHECK(p.name != "meadow");
+    }
+    // Subject: other nodes are still landmarks.
+    const auto points = w.world().interestPoints();
+    CHECK(std::any_of(points.begin(), points.end(), [](const InterestPoint& p) { return p.name == "rock-1"; }));
+    bool choseIt = false;
+    w.play(60.0, [&] {
+        choseIt = choseIt || w.decision("scout").chosen == "meadow" || w.decision("warden").chosen == "meadow";
+    });
+    CHECK_FALSE(choseIt);
+}
+
+TEST_CASE("an aware wanderer does not march shore point to shore point",
+          "[entity][phaseD][wander]") {
+    if (!assetsPresent()) {
+        WARN("assets missing; skipping");
+        return;
+    }
+    // The longest run of consecutive `water@` errands the warden makes in 300 s.
+    const auto longestShoreRun = [](float variety) {
+        nlohmann::json doc = demoJson();
+        for (auto& e : doc["entities"]) {
+            if (e["name"] != "warden") {
+                continue;
+            }
+            for (auto& b : e["behaviors"]) {
+                if (b["kind"] == "decide") {
+                    for (auto& c : b["considerers"]) {
+                        if (c["kind"] == "interest") {
+                            c["variety"] = variety;
+                        }
+                    }
+                }
+            }
+        }
+        World w(doc);
+        BehaviorTraceRecorder r;
+        w.play(300.0, [&] { r.sample(w.world()); });
+        int run = 0;
+        int longest = 0;
+        for (const std::string& line : r.lines()) {
+            if (line.find("  warden  ") == std::string::npos) {
+                continue;
+            }
+            const bool shore = line.find("-> water@") != std::string::npos;
+            run = shore ? run + 1 : 0;
+            longest = std::max(longest, run);
+        }
+        return longest;
+    };
+    const int withVariety = longestShoreRun(0.6f);
+    const int without = longestShoreRun(1.0f);
+    INFO("longest run of shore errands: " << withVariety << " with variety, " << without << " without");
+    CHECK(without >= 6);        // subject: the fixture does pose the march
+    CHECK(withVariety <= 4);
+}
