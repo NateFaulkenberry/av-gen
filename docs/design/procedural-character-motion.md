@@ -548,3 +548,49 @@ independent reasons a step should be shorter, rather than one overwriting the ot
 for the reason ADR-555 gives about `LocomotionMode`: naming the entity type in a scene header would
 drag `entity/locomotion.hpp` into every pose layer and end the rule that makes a layer a pure
 function a scrub can replay.
+
+## §45 — validated on the alien, and the question it was carrying
+
+§45 asks the stack be validated on the real character rather than on fixtures. It arrived carrying
+a specific question from §5, which is better than a general one: §5's control had refuted my own
+diagnosis of a clamping foot, and the real cause was that on a chain whose steps are not ancestor
+links, `solveTwoBone` reads its bone lengths from the pose it is handed. **Is that visible on the
+shipping alien, or only on a rig I built with no slack?**
+
+It is visible. Across all 26 clips of `alien-scout.glb`:
+
+- `leg.l upper` **0.0%**, `leg.l lower` **0.0%**, `arm.l lower` **0.0%**, `arm.l upper` **21.4%**
+  (worst on `Crazy`, **14.3%** on an ordinary `Walking`).
+
+The three zeros are not "no translation channel" — all 26 clips carry translation on all eight
+joints. They are channels whose values never leave the rest translation. **The legs are safe by
+accident, not by structure**, and the rig is flat: every step of both chains is a sibling hop under
+`rig` or `root.x`, so nothing about the skeleton preserves any of these lengths.
+
+The consequence, measured rather than argued: over `Walking` the arm's `maxReach` runs
+**0.5091 m to 0.5398 m**, a 0.0307 m band — 5.7% of the arm. A Reach layer holding a fixed world
+point in that band reports `Solved` on some frames and `Clamped` on others; the hand leaves the
+target and returns once per stride.
+
+Then the conversion that the foot-lock drift needed too. At Glowmere's cast scale that band is
+6.0 cm. The valley cameras sit 170 m out at a 40° vertical field, which at 1080p is 8.7 px/m — the
+whole alien is sixteen pixels tall — so the band is **0.52 px**. At a character-scale framing it is
+**20.3 px**. Real on shipping content; invisible at the only framing that exists today.
+
+Recorded as ADR-601, with the fix deliberately not made. The obvious fix is optional explicit
+lengths on `TwoBoneChain` defaulting to "derive from the pose": structural, no-op for every existing
+caller, an afternoon. It is also exactly ADR-600 — a knob nobody sets refuses nothing, and shipping
+it would produce an ADR claiming the issue was handled and a test proving the inert default is
+unchanged. Two things have to be true first: a Reach consumer at a framing where 20 px matters, and
+a decision about `assets/farm`, whose bulls bind at 100% of their own span and are the callers a
+rest-derived length would change most.
+
+The leg zeros are asserted, not noted, because the foot lock is the layer that holds a fixed world
+point and it runs on the chain that is currently safe for no reason anyone chose. A re-export that
+keyframes a hip fails `test_alien_validation.cpp` and says which segment moved.
+
+Also from §45's gate pass over real content: 26 clips measured, 13 fail the §44 limits. That is the
+expected shape — `Dying_forward`, `Crazy` and the rest of the non-locomotion half are not clips the
+gate's foot-slide and contact-height limits were written for — but it means **the §44 limits are a
+locomotion gate, not a clip gate**, and a generator that feeds it non-locomotion source will reject
+everything it is given. Noted for §46's slice, which is where a generator first has a source.

@@ -383,6 +383,12 @@ night from two agents who never spoke to each other.
    its mid changes what a later IK solve believes the limb is. On an ancestor chain this cannot
    happen, because rotations preserve bone length; on a detached one it is routine.
 
+   **This is the only entry here that is engine-specific rather than a general testing hazard**, and
+   it exists solely because detached chains do (ADR-543). The general lesson still transfers: when
+   a property holds *by construction* in the common case, a fixture exercising the uncommon case
+   can violate it without anything complaining — and the property you relied on is the one nobody
+   thought to assert.
+
    Seven instances now, in seven different clothes: a parameter at its boundary, a sample domain on a
    plateau, a duration spanning two mechanisms, a lookahead landing on the feature it was meant to
    see past, a mechanism with no authority at the default values, sample points that miss the
