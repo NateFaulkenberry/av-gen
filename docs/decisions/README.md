@@ -30,7 +30,8 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 540-559 | `agent/anim-research` -- autonomous character animation |
 | 560-579 | `agent/fog` -- the volumetric foundation and the Fog Bank rebuild |
 | 580-599 | `agent/tornado` -- the Tornado world effect, replacing the Vortex |
-| 600+ | unassigned; ask before taking |
+| 600-649 | `agent/anim-research` -- phases C and D of the motion stack (540-559 exhausted) |
+| 650+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
 cheap failure: this index already skips 301-309, 311-319 and 321-329, and a non-contiguous index
